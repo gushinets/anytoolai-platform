@@ -223,6 +223,8 @@ proposal_ai=unmetered` before Compose starts. `prod-up` generates an ignored dep
 then force-recreates base + prod + live Compose, waits for API and web HTTP, and checks the
 same mounted profile fingerprint and policy references inside API and worker. It never falls
 back to fake.
+Each deployment uses a new immutable profile directory. A failed redeploy leaves the previous
+container bind source intact for restarts; old profiles are removed only after readiness passes.
 `prod-ready` repeats the live readiness check. `prod-fake-up` is reserved for the credential-free
 `kernel_demo` smoke in CI and waits for both API and web; `prod-smoke` tests that smoke stack,
 not OpenAI.

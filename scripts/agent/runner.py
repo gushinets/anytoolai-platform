@@ -14,6 +14,7 @@ import time
 import tomllib
 import urllib.error
 import urllib.request
+import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -35,6 +36,7 @@ LIVE_ENV_FILE = ROOT / "infra" / "compose" / ".env.live"
 # pass it to `docker compose` via --env-file, and only if it actually exists on disk.
 PROD_ENV_FILE = ROOT / "infra" / "compose" / ".env.prod"
 PROD_COMPOSE_PROJECT = "anytoolai-prod"
+PROFILE_VERSION_HEX_LENGTH = 32
 DEV_DEFAULT_POSTGRES_USER = "anytoolai"
 DEV_DEFAULT_POSTGRES_PASSWORD = "anytoolai"
 DEV_DEFAULT_POSTGRES_DB = "anytoolai"
@@ -736,8 +738,9 @@ def _resolved_env_file(path: Path) -> dict[str, str]:
         if result.returncode != 0:
             raise ValueError("Docker Compose could not resolve the env file")
         try:
-            env.update(json.loads(result.stdout)["services"]["env-probe"]["environment"])
-        except (ValueError, KeyError, TypeError) as exc:
+            resolved = json.loads(result.stdout)["services"]["env-probe"]["environment"]
+            env.update({name: value.replace("$$", "$") for name, value in resolved.items()})
+        except (ValueError, KeyError, TypeError, AttributeError) as exc:
             raise ValueError("Docker Compose returned an invalid environment") from exc
     return env
 
@@ -746,11 +749,49 @@ def _deployment_profile_dir(compose_project: str) -> Path:
     return ROOT / ".agent" / "deployment-profiles" / compose_project / "freelancer-suite"
 
 
-def _remove_previous_profiles(compose_project: str) -> None:
+def _active_deployment_profile_dir(compose_project: str) -> Path:
     profile_dir = _deployment_profile_dir(compose_project)
-    parent = profile_dir.parent.resolve()
-    for previous in profile_dir.parent.glob(f"{profile_dir.name}.previous-*"):
-        if previous.is_symlink() or previous.resolve().parent != parent:
+    marker = profile_dir.parent / "active-profile"
+    if not marker.is_file():
+        return profile_dir  # Profile deployed before versioned directories were introduced.
+    name = marker.read_text(encoding="utf-8").strip()
+    suffix = name.removeprefix(f"{profile_dir.name}.")
+    if (
+        not name.startswith(f"{profile_dir.name}.")
+        or len(suffix) != PROFILE_VERSION_HEX_LENGTH
+        or not all(character in "0123456789abcdef" for character in suffix)
+    ):
+        raise ValueError("invalid active deployment profile marker")
+    selected = profile_dir.parent / name
+    if selected.is_symlink():
+        raise ValueError("active deployment profile cannot be a symlink")
+    return selected
+
+
+def _activate_deployment_profile(compose_project: str, manifest: dict[str, object]) -> None:
+    profile_dir = _deployment_profile_dir(compose_project)
+    selected = Path(str(manifest["generated_products_root"])).parent
+    suffix = selected.name.removeprefix(f"{profile_dir.name}.")
+    if (
+        selected.parent.resolve() != profile_dir.parent.resolve()
+        or selected.is_symlink()
+        or not selected.is_dir()
+        or not selected.name.startswith(f"{profile_dir.name}.")
+        or len(suffix) != PROFILE_VERSION_HEX_LENGTH
+        or not all(character in "0123456789abcdef" for character in suffix)
+    ):
+        raise ValueError("generated profile is outside its versioned deployment directory")
+    marker = profile_dir.parent / "active-profile"
+    staged_marker = profile_dir.parent / f"active-profile.{uuid.uuid4().hex}"
+    staged_marker.write_text(selected.name + "\n", encoding="utf-8")
+    staged_marker.replace(marker)
+    for previous in profile_dir.parent.glob(f"{profile_dir.name}*"):
+        if previous == selected or not (
+            previous.name == profile_dir.name
+            or previous.name.startswith(f"{profile_dir.name}.")
+        ):
+            continue
+        if previous.is_symlink() or previous.resolve().parent != profile_dir.parent.resolve():
             raise ValueError(f"unsafe previous deployment profile: {previous}")
         if previous.is_dir():
             shutil.rmtree(previous)
@@ -835,7 +876,8 @@ def _build_deployment_profile(
     unmetered_products: Sequence[str],
     env: dict[str, str],
 ) -> tuple[int, dict[str, object] | None]:
-    profile_dir = _deployment_profile_dir(compose_project)
+    base_dir = _deployment_profile_dir(compose_project)
+    profile_dir = base_dir.with_name(f"{base_dir.name}.{uuid.uuid4().hex}")
     managed_python = quick_check_venv_python()
     if not quick_check_venv_ready(managed_python):
         print("LIVE001: run python scripts/agent/runner.py quick-check first", file=sys.stderr)
@@ -964,7 +1006,7 @@ def dev_live_up(product_id: str, quota_mode: str = "unmetered") -> int:
     exit_code = _run_effective_profile_checks(compose, manifest, env)
     if exit_code != 0:
         return exit_code
-    _remove_previous_profiles(identity.compose_project)
+    _activate_deployment_profile(identity.compose_project, manifest)
     print(f"Compose project: {identity.compose_project}")
     print(f"API: {identity.api_url}")
     print(f"PostgreSQL: 127.0.0.1:{identity.postgres_port}")
@@ -1617,7 +1659,7 @@ def prod_up() -> int:
         return exit_code
     exit_code = prod_ready(inputs=inputs, manifest=manifest)
     if exit_code == 0:
-        _remove_previous_profiles(PROD_COMPOSE_PROJECT)
+        _activate_deployment_profile(PROD_COMPOSE_PROJECT, manifest)
     return exit_code
 
 
@@ -1682,7 +1724,7 @@ def prod_ready(
         timeout = float(inputs.compose_env.get("ANYTOOLAI_READY_TIMEOUT", "90"))
         if manifest is None:
             manifest = json.loads(
-                (_deployment_profile_dir(PROD_COMPOSE_PROJECT) / "manifest.json").read_text(
+                (_active_deployment_profile_dir(PROD_COMPOSE_PROJECT) / "manifest.json").read_text(
                     encoding="utf-8"
                 )
             )

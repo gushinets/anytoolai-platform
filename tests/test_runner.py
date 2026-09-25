@@ -1370,10 +1370,13 @@ def test_prod_up_builds_profile_before_live_compose_and_ready(monkeypatch) -> No
         ),
     )
     monkeypatch.setattr(runner, "prod_ready", lambda **kwargs: events.append("ready") or 0)
-    monkeypatch.setattr(runner, "_remove_previous_profiles", lambda project: events.append("prune"))
+    monkeypatch.setattr(
+        runner, "_activate_deployment_profile",
+        lambda project, manifest: events.append("activate"),
+    )
 
     assert runner.prod_up() == 0
-    assert events == ["profile", "ps", "up", "ready", "prune"]
+    assert events == ["profile", "ps", "up", "ready", "activate"]
     assert all(
         str(path) in commands[0]
         for path in (runner.COMPOSE_FILE, runner.COMPOSE_PROD_FILE, runner.COMPOSE_LIVE_FILE)
@@ -2223,6 +2226,25 @@ def test_env_file_uses_compose_interpolation_without_promoting_literals(monkeypa
     assert runner._resolved_env_file(env_file)["ANYTOOLAI_POSTGRES_PASSWORD"] == "secret"
 
 
+def test_env_file_preserves_literal_dollar_signs(monkeypatch, tmp_path):
+    runner = load_runner_module()
+    env_file = tmp_path / ".env.prod"
+    env_file.write_text("REVIEW_PROBE='pa$word'\n", encoding="utf-8")
+    monkeypatch.delenv("REVIEW_PROBE", raising=False)
+    monkeypatch.setattr(
+        runner.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0], 0,
+            json.dumps({"services": {"env-probe": {"environment": {
+                "REVIEW_PROBE": "pa$$word",
+            }}}}), "",
+        ),
+    )
+
+    assert runner._resolved_env_file(env_file)["REVIEW_PROBE"] == "pa$word"
+
+
 def test_profile_check_uses_identical_expectations_for_api_and_worker(monkeypatch):
     runner = load_runner_module()
     manifest = {
@@ -2327,17 +2349,42 @@ def test_profile_generation_uses_bootstrapped_managed_python(monkeypatch):
     assert commands[0][0] == str(managed)
 
 
-def test_remove_previous_profiles_keeps_current_profile(monkeypatch, tmp_path):
+def test_profile_generation_uses_a_fresh_bind_source_on_every_attempt(monkeypatch):
+    runner = load_runner_module()
+    monkeypatch.setattr(runner, "quick_check_venv_ready", lambda candidate: True)
+    commands = []
+    monkeypatch.setattr(
+        runner, "run_with_env", lambda command, env: commands.append(list(command)) or 9
+    )
+    assert runner._build_deployment_profile("test-project", ["proposal_ai"], [], {}) == (9, None)
+    assert runner._build_deployment_profile("test-project", ["proposal_ai"], [], {}) == (9, None)
+    paths = [command[command.index("--output-dir") + 1] for command in commands]
+    assert paths[0] != paths[1]
+    assert all(path != str(runner._deployment_profile_dir("test-project")) for path in paths)
+
+
+def test_failed_deployment_keeps_active_bind_source_for_restart(monkeypatch, tmp_path):
     runner = load_runner_module()
     profile = tmp_path / "freelancer-suite"
-    profile.mkdir()
-    previous = tmp_path / "freelancer-suite.previous-test"
-    previous.mkdir()
-    (previous / "manifest.json").write_text("old", encoding="utf-8")
+    old = tmp_path / (profile.name + "." + "a" * 32)
+    new = tmp_path / (profile.name + "." + "b" * 32)
+    (old / "products").mkdir(parents=True)
     monkeypatch.setattr(runner, "_deployment_profile_dir", lambda project: profile)
-    runner._remove_previous_profiles("test-project")
-    assert not previous.exists()
-    assert profile.exists()
+    runner._activate_deployment_profile(
+        "test-project", {"generated_products_root": str(old / "products")}
+    )
+    (new / "products").mkdir(parents=True)
+
+    # A failed Compose/readiness step never activates the candidate.
+    assert runner._active_deployment_profile_dir("test-project") == old
+    assert old.is_dir()
+    assert new.is_dir()
+
+    runner._activate_deployment_profile(
+        "test-project", {"generated_products_root": str(new / "products")}
+    )
+    assert runner._active_deployment_profile_dir("test-project") == new
+    assert not old.exists()
 
 
 def test_dev_live_up_checks_both_mounted_profiles_before_ready(monkeypatch, tmp_path, capsys):
@@ -2363,7 +2410,7 @@ def test_dev_live_up_checks_both_mounted_profiles_before_ready(monkeypatch, tmp_
     }
     monkeypatch.setattr(runner, "_build_deployment_profile", lambda *args: (0, manifest))
     monkeypatch.setattr(runner, "_check_source_fingerprint", lambda manifest, env: 0)
-    monkeypatch.setattr(runner, "_remove_previous_profiles", lambda project: None)
+    monkeypatch.setattr(runner, "_activate_deployment_profile", lambda project, manifest: None)
     calls = []
     monkeypatch.setattr(
         runner,

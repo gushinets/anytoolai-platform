@@ -205,14 +205,12 @@ def test_profile_manifest_records_selected_quota_mode(tmp_path):
     assert manifest.unmetered_product_ids == ("proposal_ai",)
 
 
-def test_profile_rebuild_preserves_previous_directory_until_redeployment(tmp_path):
+def test_profile_rebuild_never_replaces_existing_bind_source(tmp_path):
     output_dir = tmp_path / "freelancer-suite"
     first = validate_configs.build_deployment_profile(output_dir, ["proposal_ai"], {"proposal_ai"})
-    second = validate_configs.build_deployment_profile(output_dir, ["proposal_ai"], set())
-    previous = list(tmp_path.glob("freelancer-suite.previous-*"))
-    assert len(previous) == 1
-    assert validate_configs.tree_fingerprint(previous[0] / "products") == first.profile_fingerprint
-    assert validate_configs.tree_fingerprint(output_dir / "products") == second.profile_fingerprint
+    with pytest.raises(ValueError, match="already exists"):
+        validate_configs.build_deployment_profile(output_dir, ["proposal_ai"], set())
+    assert validate_configs.tree_fingerprint(output_dir / "products") == first.profile_fingerprint
 
 
 def test_source_fingerprint_check_rejects_changed_tree(tmp_path):

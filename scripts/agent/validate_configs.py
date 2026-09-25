@@ -5,7 +5,6 @@ import json
 import shutil
 import sys
 import tempfile
-import uuid
 from collections.abc import Iterable, Sequence, Set
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -219,16 +218,9 @@ def build_deployment_profile(
         (staged / "manifest.json").write_text(
             json.dumps(asdict(manifest), sort_keys=True, indent=2) + "\n", encoding="utf-8"
         )
-        if output_dir.exists():
-            previous = output_dir.parent / f"{output_dir.name}.previous-{uuid.uuid4().hex}"
-            output_dir.rename(previous)
-            try:
-                staged.rename(output_dir)
-            except OSError:
-                previous.rename(output_dir)
-                raise
-        else:
-            staged.rename(output_dir)
+        if output_dir.exists() or output_dir.is_symlink():
+            raise ValueError(f"deployment profile already exists: {output_dir}")
+        shutil.copytree(staged, output_dir)
         return manifest
 
 
