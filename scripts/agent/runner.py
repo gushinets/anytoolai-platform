@@ -1445,8 +1445,8 @@ def client_update_writer_smoke() -> int:
     )
 
 
-def _prod_compose_command(*args: str) -> list[str]:
-    env_file = PROD_ENV_FILE if PROD_ENV_FILE.is_file() else None
+def _prod_compose_command(*args: str, include_env_file: bool = True) -> list[str]:
+    env_file = PROD_ENV_FILE if include_env_file and PROD_ENV_FILE.is_file() else None
     return _docker_compose_command(
         PROD_COMPOSE_PROJECT, (COMPOSE_FILE, COMPOSE_PROD_FILE), *args, env_file=env_file
     )
@@ -1709,16 +1709,30 @@ def prod_ready(
 
 def prod_status() -> int:
     return run_with_env(
-        _prod_compose_command("ps"), runner_env(), timeout=COMPOSE_QUERY_TIMEOUT_SECONDS
+        _prod_compose_command("ps", include_env_file=False),
+        _prod_control_env(),
+        timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
     )
 
 
 def prod_down() -> int:
     return run_with_env(
-        _prod_compose_command("down", "--remove-orphans"),
-        runner_env(),
+        _prod_compose_command("down", "--remove-orphans", include_env_file=False),
+        _prod_control_env(),
         timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
     )
+
+
+def _prod_control_env() -> dict[str, str]:
+    # Compose renders the model for ps/down; these values never start containers.
+    return runner_env() | {
+        "ANYTOOLAI_POSTGRES_USER": "control-only",
+        "ANYTOOLAI_POSTGRES_PASSWORD": "control-only",
+        "ANYTOOLAI_POSTGRES_DB": "control-only",
+        "ANYTOOLAI_ENABLED_PRODUCT_IDS": "kernel_demo",
+        "ANYTOOLAI_PROD_WORKER_MEMORY_LIMIT": "512M",
+        "OPENAI_API_KEY": "",
+    }
 
 
 def prod_smoke() -> int:

@@ -1152,15 +1152,30 @@ def test_prod_fake_up_skips_port_check_when_stack_already_running(monkeypatch) -
     assert commands[0][-4:] == ["up", "-d", "--build", "--remove-orphans"]
 
 
-def test_prod_status_and_down_use_prod_project(monkeypatch) -> None:
+def test_prod_status_and_down_work_without_deployment_inputs(monkeypatch, tmp_path) -> None:
     runner = load_runner_module()
+    env_file = tmp_path / ".env.prod"
+    env_file.write_text("malformed production env file\n", encoding="utf-8")
+    monkeypatch.setattr(runner, "PROD_ENV_FILE", env_file)
+    for name in (
+        "ANYTOOLAI_POSTGRES_USER",
+        "ANYTOOLAI_POSTGRES_PASSWORD",
+        "ANYTOOLAI_POSTGRES_DB",
+        "ANYTOOLAI_ENABLED_PRODUCT_IDS",
+        "ANYTOOLAI_PROD_WORKER_MEMORY_LIMIT",
+    ):
+        monkeypatch.delenv(name, raising=False)
     commands: list[list[str]] = []
+    environments: list[dict[str, str]] = []
     timeouts: list[float | None] = []
     monkeypatch.setattr(
         runner,
         "run_with_env",
         lambda command, env, timeout=None: (
-            commands.append(list(command)) or timeouts.append(timeout) or 0
+            commands.append(list(command))
+            or environments.append(env)
+            or timeouts.append(timeout)
+            or 0
         ),
     )
 
@@ -1169,6 +1184,10 @@ def test_prod_status_and_down_use_prod_project(monkeypatch) -> None:
     assert all(runner.PROD_COMPOSE_PROJECT in command for command in commands)
     assert commands[0][-1] == "ps"
     assert commands[1][-2:] == ["down", "--remove-orphans"]
+    assert all("--env-file" not in command for command in commands)
+    assert all(env["ANYTOOLAI_ENABLED_PRODUCT_IDS"] == "kernel_demo" for env in environments)
+    assert all(env["ANYTOOLAI_PROD_WORKER_MEMORY_LIMIT"] == "512M" for env in environments)
+    assert all(env["ANYTOOLAI_POSTGRES_PASSWORD"] == "control-only" for env in environments)
     assert timeouts == [runner.COMPOSE_QUERY_TIMEOUT_SECONDS, runner.COMPOSE_QUERY_TIMEOUT_SECONDS]
 
 
