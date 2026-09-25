@@ -2209,6 +2209,10 @@ export function bootstrapAtomLab({
           setPresetError();
           return true;
         }
+        if (selectedPresetVersion) {
+          materializePresetVersion(selectedPresetVersion);
+          nodes["preset-version-select"].value = String(selectedPresetVersion.version);
+        }
         conflictLatestPreset = {summary, version: latest.version};
         nodes["preset-conflict"].hidden = false;
         setPresetError("Конфликт сохранения: актуальная версия отличается от локального черновика. Значения черновика сохранены.");

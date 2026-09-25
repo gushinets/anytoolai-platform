@@ -2645,15 +2645,19 @@ test("ambiguous version write surfaces a concurrent conflict without discarding 
     example_input: A06.example_input, source_run_id: null,
     preset_id: "preset-update-conflict", version: 1, created_at: "2026-09-25T07:20:00Z",
   };
-  const competing = {
-    ...first, description: "Конкурентная версия", version: 2, created_at: "2026-09-25T07:21:00Z",
-  };
+  const competingVersion = (version) => ({
+    ...first,
+    description: `Конкурентная версия ${version}`,
+    version,
+    created_at: `2026-09-25T08:${String(version).padStart(2, "0")}:00Z`,
+  });
+  const latestVersions = Array.from({length: 20}, (_, index) => competingVersion(22 - index));
   let conflictExists = false;
   await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
     const request = route.request();
-    const {pathname} = new URL(request.url());
+    const {pathname, searchParams} = new URL(request.url());
     if (pathname === "/v1/atom-lab/presets") {
-      const latest = conflictExists ? competing : first;
+      const latest = conflictExists ? latestVersions[0] : first;
       await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [{
         preset_id: first.preset_id, latest_version: latest.version, name: latest.name,
         description: latest.description, atom_id: latest.atom_id,
@@ -2668,28 +2672,40 @@ test("ambiguous version write surfaces a concurrent conflict without discarding 
       return;
     }
     if (pathname === `/v1/atom-lab/presets/${first.preset_id}/versions`) {
-      const items = conflictExists ? [competing, first] : [first];
+      const loadingOlder = searchParams.get("cursor") === "older";
+      const items = conflictExists ? (loadingOlder ? [competingVersion(2), first] : latestVersions) : [first];
       await route.fulfill({contentType: "application/json", body: JSON.stringify({items: items.map((item) => ({
         preset_id: item.preset_id, version: item.version, name: item.name,
         description: item.description, atom_id: item.atom_id, created_at: item.created_at,
-      })), next_cursor: null})});
+      })), next_cursor: conflictExists && !loadingOlder ? "older" : null})});
       return;
     }
-    if (pathname === `/v1/atom-lab/presets/${first.preset_id}/versions/1`) {
-      await route.fulfill({contentType: "application/json", body: JSON.stringify(first)});
+    if (pathname === `/v1/atom-lab/presets/${first.preset_id}/versions/1/export`) {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({
+        format_version: 1,
+        preset_id: first.preset_id,
+        version: 1,
+        configuration: Object.fromEntries(Object.entries(first).filter(
+          ([key]) => !["preset_id", "version", "created_at"].includes(key),
+        )),
+      })});
       return;
     }
-    if (pathname === `/v1/atom-lab/presets/${first.preset_id}/versions/2`) {
-      await route.fulfill({contentType: "application/json", body: JSON.stringify(competing)});
+    const requestedVersion = Number(pathname.split("/").at(-1));
+    if (Number.isInteger(requestedVersion)) {
+      const version = requestedVersion === 1 ? first : competingVersion(requestedVersion);
+      await route.fulfill({contentType: "application/json", body: JSON.stringify(version)});
       return;
     }
     await route.fallback();
   });
 
   let dialogs = 0;
+  let acceptDialogs = false;
   page.on("dialog", (dialog) => {
     dialogs += 1;
-    dialog.accept();
+    if (acceptDialogs) dialog.accept();
+    else dialog.dismiss();
   });
   await unlockAtom(page, "A06");
   await page.locator("#presets-button").click();
@@ -2701,10 +2717,28 @@ test("ambiguous version write surfaces a concurrent conflict without discarding 
   await page.getByRole("button", {name: /Пресет conflict recovery/}).click();
 
   expect(dialogs).toBe(0);
+  await expect(page.locator("#preset-error")).toContainText("Конфликт сохранения");
+  await expect(page.locator("#preset-version-select")).toHaveValue("1");
+  await expect(page.locator('#preset-version-select option[value="1"]')).toHaveCount(1);
+  await expect(page.locator("#preset-description")).toHaveValue("Локальный конфликтующий draft");
+  await expect(page.locator("#open-latest-preset")).toBeEnabled();
+
+  await page.locator("#load-more-versions").click();
+  await expect(page.locator("#preset-version-select")).toHaveValue("1");
+  await expect(page.locator('#preset-version-select option[value="1"]')).toHaveCount(1);
+  await page.locator("#export-preset").click();
+  await expect(page.locator("#preset-export")).toContainText('"version": 1');
+
+  await page.locator("#open-latest-preset").click();
+  expect(dialogs).toBe(1);
   await expect(page.locator("#preset-version-select")).toHaveValue("1");
   await expect(page.locator("#preset-description")).toHaveValue("Локальный конфликтующий draft");
-  await expect(page.locator("#preset-error")).toContainText("Конфликт сохранения");
-  await expect(page.locator("#open-latest-preset")).toBeEnabled();
+
+  acceptDialogs = true;
+  await page.locator("#open-latest-preset").click();
+  expect(dialogs).toBe(2);
+  await expect(page.locator("#preset-version-select")).toHaveValue("22");
+  await expect(page.locator("#preset-description")).toHaveValue("Конкурентная версия 22");
 });
 
 test("gateway failure after a committed preset write blocks blind duplicate saves", async ({page}) => {
