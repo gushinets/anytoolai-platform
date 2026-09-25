@@ -34,16 +34,16 @@ The same mechanism can start any current Freelancer Suite product locally when i
 
 ### 3.1 Source and output
 
-Extend `scripts/agent/validate_configs.py`, one of the three approved Freelancer Suite composition boundaries, so it can build and validate a deployment profile.
+Extend `scripts/agent/validate_configs.py`, one of the three approved Freelancer Suite composition boundaries, with an explicit deployment-profile subcommand. The existing no-argument invocation used by `python scripts/agent/runner.py validate-configs` remains a read-only validation of the canonical bundle and never creates or changes `.agent/`. Only `dev-live-up` and `prod-up` invoke profile generation.
 
-For each run it:
+For each profile-generation run it:
 
 1. resolves the canonical product roots through `FreelancerSuiteBundle`;
 2. copies the complete current `products/` tree to `.agent/deployment-profiles/<compose-project>/freelancer-suite/products`;
 3. transforms only the requested live products;
 4. loads kernel config plus the generated product roots through the real `ConfigLoader`;
 5. verifies the requested provider and quota modes;
-6. writes a small machine-readable manifest containing the source directory, container target, live product ids, quota modes, a source fingerprint for staleness detection, and a profile fingerprint of the generated tree for container verification.
+6. writes a small machine-readable manifest containing the source directory, container target, live product ids, expected provider policy references, expected quota-policy reference or absence for each product, a source fingerprint for host-side staleness detection, and a profile fingerprint of the generated tree for container verification.
 
 Copying the tree at execution time prevents drift: prompt, schema, workflow, frontend, and product changes are present in the generated profile immediately. The profile is regenerated before every `dev-live-up` and `prod-up`.
 
@@ -137,7 +137,7 @@ python scripts/agent/runner.py dev-live-up --product proposal_ai --quota-mode ca
 
 The existing `dev-down` stops the stack. A subsequent normal `dev-up` omits the live overlay and returns to canonical fake behavior.
 
-Local development does not require `ANYTOOLAI_ENABLED_PRODUCT_IDS`. When it is absent, Platform API and web-mirror expose every canonically registered product, preserving current `dev-up` behavior. Production preflight is the boundary that requires the allowlist.
+Local development does not require `ANYTOOLAI_ENABLED_PRODUCT_IDS`. When it is absent, Platform API and web-mirror expose every canonically registered product, preserving current `dev-up` behavior. This fallback is limited to local development: production preflight and the production Compose interpolation both require the allowlist.
 
 Add a foreground command for the shared web host:
 
@@ -171,6 +171,8 @@ ANYTOOLAI_PROD_WORKER_MEMORY_LIMIT
 ```
 
 `ANYTOOLAI_UNMETERED_PRODUCT_IDS` is required but may be explicitly empty when every enabled product should use its canonical anonymous quota.
+
+`infra/compose/docker-compose.prod.yml` requires `ANYTOOLAI_ENABLED_PRODUCT_IDS` with `${ANYTOOLAI_ENABLED_PRODUCT_IDS:?...}` wherever it supplies the API setting or web build argument. A production Compose render therefore fails even if runner preflight is bypassed. The web build also rejects a missing or empty public allowlist before `next build`.
 
 Every enabled product must successfully transform to the live provider before Compose starts. Disabled products remain in the generated bundle tree with canonical configuration, but API admission and the web registry do not expose them.
 
@@ -211,7 +213,7 @@ The web pages are client components, so they cannot read that server-only variab
 NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS
 ```
 
-Next.js bakes it into the browser bundle. `apps/web-mirror/src/products/registry.ts` applies the same availability predicate in both `getRegisteredProduct()` and `listRegisteredProducts()`. This removes disabled products from the home page as well as their direct routes. The variable's absence preserves current development/test behavior with all registered products visible.
+Next.js bakes it into the browser bundle. `apps/web-mirror/src/products/registry.ts` derives each registry entry's `enabled` field from the allowlist but preserves the complete registry array. `listRegisteredProducts()` continues to return every registered product so translation-completeness checks cover disabled products. `getRegisteredProduct()` keeps returning `null` for an entry whose `enabled` field is false, and the home page's existing `product.enabled` filter hides its card. The variable's absence preserves current development/test behavior with all registered products enabled.
 
 A production browser smoke verifies both sides: Proposal AI loads, while another registered but disabled product returns the existing not-found state and cannot start through direct API calls.
 
@@ -221,7 +223,7 @@ Add `infra/docker/web-mirror.Dockerfile` and a production `web-mirror` service. 
 
 The Docker build sets `PLATFORM_API_BASE_URL=http://platform-api:8000`, preserving the existing same-origin `/v1` rewrite over the private Compose network.
 
-The Dockerfile declares and exports `NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS` before the `next build` layer. A changed product allowlist therefore invalidates that layer and creates a new browser bundle instead of reusing a stale one. Changing only quota mode does not rebuild web-mirror because the page derives metered versus unmetered behavior from API `quota_summary` at runtime.
+The Dockerfile declares and exports `NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS` before the `next build` layer and runs an explicit non-empty check before invoking `next build`. A missing production build argument therefore fails instead of baking an all-products fallback into the browser bundle. A changed product allowlist invalidates the build layer and creates a new browser bundle instead of reusing a stale one. Changing only quota mode does not rebuild web-mirror because the page derives metered versus unmetered behavior from API `quota_summary` at runtime.
 
 Web and API host ports bind to loopback. PostgreSQL remains unpublished. An operator-owned Nginx or Caddy instance terminates public HTTPS and forwards the product domain to web-mirror. Squid is outbound infrastructure and is not used for inbound traffic.
 
@@ -241,16 +243,15 @@ The same guard applies at initial load and after “start another”. Canonical-
 
 ## 7. Effective-config verification
 
-Profile validation happens twice.
+Profile validation happens twice, with different available inputs.
 
-Before Compose, the generator loads the generated roots with the real `ConfigLoader` and asserts requested provider/quota modes.
+Before Compose, the generator compares the canonical source with the generated tree, loads the generated roots with the real `ConfigLoader`, asserts the requested provider/quota modes, and records the expected references and fingerprints in the host-side manifest.
 
-After containers start, runner executes a read-only config check inside both Platform API and worker containers. It does not regenerate or mutate the profile. The manifest remains on the host beside the generated tree; runner passes its expected fingerprint to the check, which reads the already-mounted product tree and computes its actual fingerprint. It asserts:
+After containers start, runner executes a read-only config check inside both Platform API and worker containers. It does not regenerate or mutate the profile and cannot compare against canonical YAML, which is not mounted there. The manifest remains on the host beside the generated tree; runner passes the expected profile fingerprint, provider policy references, and quota-policy reference or absence as check arguments. The check reads only the mounted product tree and asserts:
 
 - the generated product tree is the root actually resolved by the editable bundle;
-- every enabled action uses the requested live provider policy;
-- every unmetered product has no quota policy;
-- every canonical-quota product matches its canonical quota definition;
+- every enabled action uses its host-validated expected live provider policy;
+- every product has the host-validated expected quota-policy reference or has none, as specified;
 - API and worker report the same profile fingerprint.
 
 `prod-up` does not report ready if either container sees canonical fake configuration, a stale profile, or a different fingerprint. Provider/model information remains internal and is not added to frontend-safe runtime-config APIs.
@@ -282,18 +283,18 @@ The target-VPS acceptance run records peak worker memory and verifies that the c
 
 ### Modified backend, runner, and deployment files
 
-- `scripts/agent/validate_configs.py` — profile generation, profile-aware registry loading, fingerprints, and provider/quota assertions.
+- `scripts/agent/validate_configs.py` — keep the default canonical validation read-only; add an explicit profile-generation/check entrypoint, profile-aware registry loading, fingerprints, and provider/quota assertions.
 - `scripts/agent/runner.py` — `dev-live-up`, `dev-web`, production profile generation, `.env.live`, preflight, Compose file selection, effective-config checks, and web readiness/status output.
-- `tests/test_runner.py` and config-validation tests — generation, strict transforms, quota modes, unset-versus-empty environment handling, paths, and identical read-only container-check commands.
+- `tests/test_runner.py` and config-validation tests — default validation remains canonical and does not write `.agent/`; explicit generation, strict transforms, quota modes, unset-versus-empty environment handling, paths, and identical read-only container-check commands.
 - `infra/compose/docker-compose.yml` — retain existing OpenAI-key wiring for live canary; do not add proxy environment to normal development.
-- `infra/compose/docker-compose.prod.yml` — product-neutral web service, loopback ports, required memory setting, restart/resource/health configuration, and web build arguments.
+- `infra/compose/docker-compose.prod.yml` — product-neutral web service, loopback ports, required memory and product-allowlist interpolation, restart/resource/health configuration, and required web build arguments.
 - `infra/compose/.env.example` — documented product allowlist, quota selection, proxy, and worker memory inputs.
 - `apps/platform-api/src/anytoolai_platform_api/settings.py` and product-scoped route dependencies — parse/validate the server allowlist and reject disabled product admission.
 - Platform API tests — unknown allowlist ids fail startup and disabled products cannot load runtime config, read quota, or start scenarios.
 
 ### Modified web files
 
-- `apps/web-mirror/src/products/registry.ts` — filter the client registry by `NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS`.
+- `apps/web-mirror/src/products/registry.ts` — derive each entry's `enabled` field from `NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS` while keeping `listRegisteredProducts()` complete.
 - `apps/web-mirror/src/products/runtime/ProductRunPage.tsx` — skip quota calls only when runtime config is unmetered.
 - `apps/web-mirror/test/registry.test.tsx` — public build-time allowlist and default behavior.
 - `apps/web-mirror/test/HomePage.test.tsx` — disabled products are absent from the home-page list.
@@ -310,15 +311,15 @@ The target-VPS acceptance run records peak worker memory and verifies that the c
 
 1. Run `python scripts/agent/runner.py doctor` before implementation.
 2. Add failing focused tests before behavior changes.
-3. Generate and validate Proposal AI profiles in both `canonical` and `unmetered` quota modes.
+3. Run the explicit profile command to generate and validate Proposal AI profiles in both `canonical` and `unmetered` quota modes.
 4. Generate live profiles for the other current standard-fake products to prove reuse without committed overlays.
-5. Run `python scripts/agent/runner.py validate-configs`.
+5. Run `python scripts/agent/runner.py validate-configs` and verify that this canonical check creates no deployment profile or other `.agent/` output.
 6. Run `python scripts/agent/runner.py validate-architecture`.
 7. Run focused config, runner, API, and web tests.
 8. Run `python scripts/agent/runner.py quick-check`.
 9. Run `python scripts/agent/runner.py frontend-check`.
 10. Run `python scripts/agent/runner.py full-check`.
-11. Render `docker compose config` for local live and production combinations.
+11. Render `docker compose config` for local live and production combinations; verify production rendering fails without `ANYTOOLAI_ENABLED_PRODUCT_IDS`, and the web image build fails without its public allowlist build argument.
 12. Keep existing credential-free Proposal AI and kernel smokes on canonical fake configuration.
 
 ### Local live smoke
@@ -348,7 +349,7 @@ The target-VPS acceptance run records peak worker memory and verifies that the c
 
 Rollback uses the previous application image and Compose revision. Removing `docker-compose.live.yml` restores canonical fake/provider quota definitions on the next container recreation. No schema rollback is required.
 
-Switching only the quota mode is also reversible: add or remove a product id from `ANYTOOLAI_UNMETERED_PRODUCT_IDS`, regenerate the profile, and recreate API/worker containers. Existing quota usage rows remain durable and become effective again when canonical quota mode is restored.
+Switching only the quota mode is also reversible: add or remove a product id from `ANYTOOLAI_UNMETERED_PRODUCT_IDS`, regenerate the profile, and recreate API/worker containers. Rows created before the unmetered window remain durable and resume from their prior `used_count` when canonical quota returns. Guests first seen during the unmetered window have no usage row and therefore start from zero; unmetered starts are neither accumulated nor backfilled.
 
 The OpenAI key and Squid access can be revoked independently. Provider failures remain visible in the existing provider-call ledger.
 
