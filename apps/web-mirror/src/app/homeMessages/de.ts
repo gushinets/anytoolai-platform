@@ -19,5 +19,9 @@ export const de: Shape<typeof en> = {
         prepaidRequest: "Vorauszahlung",
       },
     },
+    brief_decoder: {
+      blurb: "Verwandeln Sie ein Kunden-Briefing in strukturierte Angaben, Risiken und die Fragen, die Sie vor dem Start stellen sollten.",
+      sample: "Fehlt: Frist und Budget. Fragen Sie den Kunden: Wie lautet das genaue Startdatum, und wer gibt das Design frei?",
+    },
   },
 };
