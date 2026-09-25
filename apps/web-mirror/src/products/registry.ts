@@ -38,7 +38,11 @@ const PRODUCT_DEFINITIONS: readonly Omit<RegisteredProduct, "enabled">[] = [
 ];
 
 for (const productId of enabledIds ?? []) {
-  if (!PRODUCT_DEFINITIONS.some((product) => product.productId === productId)) {
+  // kernel_demo is the backend-only product used by the credential-free production smoke.
+  if (
+    productId !== "kernel_demo" &&
+    !PRODUCT_DEFINITIONS.some((product) => product.productId === productId)
+  ) {
     throw new Error(`Web product is not registered: ${productId}`);
   }
 }

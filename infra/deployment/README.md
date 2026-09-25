@@ -183,12 +183,12 @@ python scripts/agent/runner.py dev-web
 
 The first command generates an unmetered live profile. API and worker verify their mounted
 profile against the selected manifest before either process starts; readiness checks both again.
-The second command starts the local web host in a
-separate terminal. Run more than ten Proposal AI submissions, check successful live provider
+The second command starts the local web host with the active live product selection in a
+separate terminal. A failed `dev-live-up` stops its Compose candidate. Run more than ten Proposal AI submissions, check successful live provider
 rows in `platform.provider_calls` and Squid CONNECT records, and confirm there is no quota GET
 or `429`. Repeat with `dev-live-up --product proposal_ai --quota-mode canonical` and verify
 normal quota exhaustion. Stop with `dev-down`; a later ordinary `dev-up` uses the canonical
-fake-backed product configuration again. Do not treat a successful local web render as proof
+fake-backed product configuration and restores the full development web list. Do not treat a successful local web render as proof
 of an OpenAI call without the ledger and Squid evidence.
 
 ## Prod
@@ -207,6 +207,9 @@ user/password/database, a real `OPENAI_API_KEY`, the Squid URL in
 measured minimum). Keep all three public access-code variables blank. The shell overrides the
 file even with an empty value. An explicitly empty `ANYTOOLAI_UNMETERED_PRODUCT_IDS` selects the
 canonical quota; omitting the variable is an error. Never commit or print the completed file.
+Every public enabled product must also have a registered web page; the production web build
+rejects unknown product IDs before startup. The backend-only `kernel_demo` remains available
+for credential-free CI smoke.
 
 Before startup, confirm Squid allows `CONNECT api.openai.com:443`; optional cold model-catalog
 refresh also reaches `raw.githubusercontent.com:443`. Ensure the worker can reach Squid. Docker

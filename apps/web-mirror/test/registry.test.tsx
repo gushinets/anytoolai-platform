@@ -50,6 +50,13 @@ describe("getRegisteredProduct", () => {
     vi.resetModules();
     await expect(import("../src/products/registry")).rejects.toThrow("brief_decoder");
   });
+
+  it("allows the backend-only kernel demo used by credential-free production smoke", async () => {
+    vi.stubEnv("NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS", "kernel_demo");
+    vi.resetModules();
+    const registry = await import("../src/products/registry");
+    expect(registry.listRegisteredProducts().every((product) => !product.enabled)).toBe(true);
+  });
 });
 
 describe("shared runtime boundary", () => {
