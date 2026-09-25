@@ -2142,6 +2142,30 @@ def test_live_env_file_supports_quotes_blank_comments_and_shell_precedence(monke
     assert env["OTHER"] == "quoted value"
 
 
+def test_live_env_file_accepts_export_prefix(monkeypatch, tmp_path):
+    runner = load_runner_module()
+    env_file = tmp_path / ".env.live"
+    env_file.write_text("export REVIEW_PROBE=value\n", encoding="utf-8")
+    monkeypatch.delenv("REVIEW_PROBE", raising=False)
+
+    assert runner._resolved_env_file(env_file)["REVIEW_PROBE"] == "value"
+
+
+def test_live_env_file_strips_unquoted_inline_comment(monkeypatch, tmp_path):
+    runner = load_runner_module()
+    env_file = tmp_path / ".env.live"
+    env_file.write_text(
+        "REVIEW_PROBE=sample # rotated\nQUOTED_PROBE='sample # literal'\n",
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("REVIEW_PROBE", raising=False)
+    monkeypatch.delenv("QUOTED_PROBE", raising=False)
+
+    env = runner._resolved_env_file(env_file)
+    assert env["REVIEW_PROBE"] == "sample"
+    assert env["QUOTED_PROBE"] == "sample # literal"
+
+
 def test_profile_check_uses_identical_expectations_for_api_and_worker(monkeypatch):
     runner = load_runner_module()
     manifest = {

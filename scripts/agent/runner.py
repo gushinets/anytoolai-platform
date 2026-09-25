@@ -713,6 +713,8 @@ def _resolved_env_file(path: Path) -> dict[str, str]:
             stripped = line.strip()
             if not stripped or stripped.startswith("#"):
                 continue
+            if stripped.startswith("export "):
+                stripped = stripped[len("export ") :].lstrip()
             key, separator, value = stripped.partition("=")
             key = key.strip()
             if not separator or not key.isidentifier():
@@ -722,6 +724,8 @@ def _resolved_env_file(path: Path) -> dict[str, str]:
                 if len(value) < 2 or value[-1] != value[0]:
                     raise ValueError(f"{path}:{line_number}: unmatched quote")
                 value = value[1:-1]
+            elif " #" in value:
+                value = value.split(" #", 1)[0].rstrip()
             env.setdefault(key, value)
     return env
 
