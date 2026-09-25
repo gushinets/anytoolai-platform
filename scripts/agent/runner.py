@@ -1010,19 +1010,25 @@ def dev_live_up(product_id: str, quota_mode: str = "unmetered") -> int:
         return exit_code
     env.update(_deployment_profile_env(manifest, [product_id], unmetered))
     compose = _dev_live_compose_command(identity)
-    exit_code = run_with_env([*compose, "up", "-d", "--force-recreate", "--remove-orphans"], env)
-    if exit_code != 0:
-        return exit_code
-    exit_code = _check_source_fingerprint(manifest, env)
-    if exit_code != 0:
-        return exit_code
-    if not _wait_for_http_ok(f"{identity.api_url}/health", timeout):
-        print("LIVE003: API health check timed out", file=sys.stderr)
-        return 1
-    exit_code = _run_effective_profile_checks(compose, manifest, env)
-    if exit_code != 0:
-        return exit_code
-    _activate_deployment_profile(identity.compose_project, manifest)
+    activated = False
+    try:
+        exit_code = run_with_env([*compose, "up", "-d", "--force-recreate", "--remove-orphans"], env)
+        if exit_code != 0:
+            return exit_code
+        exit_code = _check_source_fingerprint(manifest, env)
+        if exit_code != 0:
+            return exit_code
+        if not _wait_for_http_ok(f"{identity.api_url}/health", timeout):
+            print("LIVE003: API health check timed out", file=sys.stderr)
+            return 1
+        exit_code = _run_effective_profile_checks(compose, manifest, env)
+        if exit_code != 0:
+            return exit_code
+        _activate_deployment_profile(identity.compose_project, manifest)
+        activated = True
+    finally:
+        if not activated and run_with_env([*compose, "down", "--remove-orphans"], env) != 0:
+            print("LIVE004: failed local-live candidate could not be stopped", file=sys.stderr)
     print(f"Compose project: {identity.compose_project}")
     print(f"API: {identity.api_url}")
     print(f"PostgreSQL: 127.0.0.1:{identity.postgres_port}")

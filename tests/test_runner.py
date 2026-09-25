@@ -2561,8 +2561,43 @@ def test_dev_live_up_worker_profile_failure_never_reports_ready(monkeypatch, tmp
     monkeypatch.setattr(runner, "run_with_env", run)
 
     assert runner.dev_live_up("proposal_ai", "unmetered") == 7
-    assert len(calls) == 3
+    assert len(calls) == 4
+    assert calls[-1][-2:] == ["down", "--remove-orphans"]
     assert "ready" not in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("failed_step", ["up", "source", "health"])
+def test_dev_live_up_stops_failed_candidate(monkeypatch, tmp_path, failed_step):
+    runner = load_runner_module()
+    identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
+    monkeypatch.setattr(runner, "runtime_identity", lambda: identity)
+    monkeypatch.setattr(runner, "LIVE_ENV_FILE", tmp_path / "missing.env")
+    monkeypatch.setenv("OPENAI_API_KEY", "hidden-key")
+    monkeypatch.setattr(runner, "_compose_stack_running", lambda command, env: False)
+    monkeypatch.setattr(runner, "port_available", lambda port: True)
+    monkeypatch.setattr(runner, "_wait_for_http_ok", lambda url, timeout: failed_step != "health")
+    manifest = {
+        "generated_products_root": str(tmp_path / "products"),
+        "profile_fingerprint": "a" * 64,
+        "enabled_products": {"proposal_ai": {"provider_policy_ref": "default_text_generation_v1", "quota_policy_ref": None}},
+    }
+    monkeypatch.setattr(runner, "_build_deployment_profile", lambda *args: (0, manifest))
+    monkeypatch.setattr(
+        runner, "_check_source_fingerprint", lambda manifest, env: 7 if failed_step == "source" else 0
+    )
+    monkeypatch.setattr(
+        runner, "_activate_deployment_profile", lambda *args: pytest.fail("failed candidate activated")
+    )
+    calls = []
+
+    def run(command, env, **kwargs):
+        calls.append(list(command))
+        return 7 if failed_step == "up" and "up" in command else 0
+
+    monkeypatch.setattr(runner, "run_with_env", run)
+
+    assert runner.dev_live_up("proposal_ai", "unmetered") != 0
+    assert calls[-1][-2:] == ["down", "--remove-orphans"]
 
 
 def test_dev_web_uses_derived_api_url(monkeypatch):
