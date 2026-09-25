@@ -785,16 +785,19 @@ def _activate_deployment_profile(compose_project: str, manifest: dict[str, objec
     staged_marker = profile_dir.parent / f"active-profile.{uuid.uuid4().hex}"
     staged_marker.write_text(selected.name + "\n", encoding="utf-8")
     staged_marker.replace(marker)
-    for previous in profile_dir.parent.glob(f"{profile_dir.name}*"):
-        if previous == selected or not (
-            previous.name == profile_dir.name
-            or previous.name.startswith(f"{profile_dir.name}.")
-        ):
-            continue
-        if previous.is_symlink() or previous.resolve().parent != profile_dir.parent.resolve():
-            raise ValueError(f"unsafe previous deployment profile: {previous}")
-        if previous.is_dir():
-            shutil.rmtree(previous)
+    try:
+        for previous in profile_dir.parent.glob(f"{profile_dir.name}*"):
+            if previous == selected or not (
+                previous.name == profile_dir.name
+                or previous.name.startswith(f"{profile_dir.name}.")
+            ):
+                continue
+            if previous.is_symlink() or previous.resolve().parent != profile_dir.parent.resolve():
+                raise ValueError(f"unsafe previous deployment profile: {previous}")
+            if previous.is_dir():
+                shutil.rmtree(previous)
+    except (OSError, ValueError) as exc:
+        print(f"WARN: could not remove previous deployment profile: {exc}", file=sys.stderr)
 
 
 def _check_source_fingerprint(manifest: dict[str, object], env: dict[str, str]) -> int:

@@ -2468,6 +2468,25 @@ def test_failed_deployment_keeps_active_bind_source_for_restart(monkeypatch, tmp
     assert not old.exists()
 
 
+def test_profile_cleanup_failure_keeps_activated_profile(monkeypatch, tmp_path, capsys):
+    runner = load_runner_module()
+    profile = tmp_path / "freelancer-suite"
+    old = tmp_path / (profile.name + "." + "a" * 32)
+    new = tmp_path / (profile.name + "." + "b" * 32)
+    (old / "products").mkdir(parents=True)
+    (new / "products").mkdir(parents=True)
+    monkeypatch.setattr(runner, "_deployment_profile_dir", lambda project: profile)
+    monkeypatch.setattr(
+        runner.shutil, "rmtree", lambda path: (_ for _ in ()).throw(OSError("busy"))
+    )
+
+    runner._activate_deployment_profile("test-project", {"generated_products_root": str(new / "products")})
+
+    assert runner._active_deployment_profile_dir("test-project") == new
+    assert old.is_dir()
+    assert "could not remove previous deployment profile" in capsys.readouterr().err
+
+
 def test_dev_live_up_checks_both_mounted_profiles_before_ready(monkeypatch, tmp_path, capsys):
     runner = load_runner_module()
     identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
