@@ -1079,7 +1079,7 @@ def test_prod_stack_running_propagates_timeout(monkeypatch) -> None:
         runner._prod_stack_running()
 
 
-def test_prod_up_fails_fast_when_docker_daemon_is_wedged(monkeypatch, capsys) -> None:
+def test_prod_fake_up_fails_fast_when_docker_daemon_is_wedged(monkeypatch, capsys) -> None:
     runner = load_runner_module()
     monkeypatch.delenv("ANYTOOLAI_PROD_API_PORT", raising=False)
 
@@ -1093,11 +1093,11 @@ def test_prod_up_fails_fast_when_docker_daemon_is_wedged(monkeypatch, capsys) ->
         lambda command, env: (_ for _ in ()).throw(AssertionError("compose must not run")),
     )
 
-    assert runner.prod_up() == 1
+    assert runner.prod_fake_up() == 1
     assert "PROD003" in capsys.readouterr().err
 
 
-def test_prod_up_fails_before_compose_when_port_is_occupied(monkeypatch) -> None:
+def test_prod_fake_up_fails_before_compose_when_port_is_occupied(monkeypatch) -> None:
     runner = load_runner_module()
     monkeypatch.delenv("ANYTOOLAI_PROD_API_PORT", raising=False)
     monkeypatch.setattr(runner, "_prod_stack_running", lambda: False)
@@ -1108,17 +1108,17 @@ def test_prod_up_fails_before_compose_when_port_is_occupied(monkeypatch) -> None
         lambda command, env: (_ for _ in ()).throw(AssertionError("compose must not run")),
     )
 
-    assert runner.prod_up() == 1
+    assert runner.prod_fake_up() == 1
 
 
-def test_prod_up_ignores_leftover_dev_port_override(monkeypatch) -> None:
+def test_prod_fake_up_ignores_leftover_dev_port_override(monkeypatch) -> None:
     runner = load_runner_module()
     # A leftover ANYTOOLAI_API_PORT from an earlier `dev-up` in the same shell must not
     # change which port prod checks/binds — prod has its own ANYTOOLAI_PROD_API_PORT.
     monkeypatch.setenv("ANYTOOLAI_API_PORT", "18123")
     monkeypatch.delenv("ANYTOOLAI_PROD_API_PORT", raising=False)
     monkeypatch.setattr(runner, "_prod_stack_running", lambda: False)
-    monkeypatch.setattr(runner, "prod_ready", lambda: 0)
+    monkeypatch.setattr(runner, "_prod_fake_ready", lambda: 0)
     checked_ports: list[int] = []
     monkeypatch.setattr(
         runner,
@@ -1127,15 +1127,15 @@ def test_prod_up_ignores_leftover_dev_port_override(monkeypatch) -> None:
     )
     monkeypatch.setattr(runner, "run_with_env", lambda command, env: 0)
 
-    assert runner.prod_up() == 0
+    assert runner.prod_fake_up() == 0
     assert checked_ports == [8000]
 
 
-def test_prod_up_skips_port_check_when_stack_already_running(monkeypatch) -> None:
+def test_prod_fake_up_skips_port_check_when_stack_already_running(monkeypatch) -> None:
     runner = load_runner_module()
     monkeypatch.delenv("ANYTOOLAI_PROD_API_PORT", raising=False)
     monkeypatch.setattr(runner, "_prod_stack_running", lambda: True)
-    monkeypatch.setattr(runner, "prod_ready", lambda: 0)
+    monkeypatch.setattr(runner, "_prod_fake_ready", lambda: 0)
     monkeypatch.setattr(
         runner,
         "port_available",
@@ -1148,7 +1148,7 @@ def test_prod_up_skips_port_check_when_stack_already_running(monkeypatch) -> Non
         lambda command, env: commands.append(list(command)) or 0,
     )
 
-    assert runner.prod_up() == 0
+    assert runner.prod_fake_up() == 0
     assert commands[0][-4:] == ["up", "-d", "--build", "--remove-orphans"]
 
 
@@ -1172,12 +1172,12 @@ def test_prod_status_and_down_use_prod_project(monkeypatch) -> None:
     assert timeouts == [runner.COMPOSE_QUERY_TIMEOUT_SECONDS, runner.COMPOSE_QUERY_TIMEOUT_SECONDS]
 
 
-def test_prod_up_builds_and_removes_orphans(monkeypatch) -> None:
+def test_prod_fake_up_builds_and_removes_orphans(monkeypatch) -> None:
     runner = load_runner_module()
     monkeypatch.delenv("ANYTOOLAI_PROD_API_PORT", raising=False)
     monkeypatch.setattr(runner, "_prod_stack_running", lambda: False)
     monkeypatch.setattr(runner, "port_available", lambda port: True)
-    monkeypatch.setattr(runner, "prod_ready", lambda: 0)
+    monkeypatch.setattr(runner, "_prod_fake_ready", lambda: 0)
     commands: list[list[str]] = []
     timeouts: list[float | None] = []
     monkeypatch.setattr(
@@ -1188,7 +1188,7 @@ def test_prod_up_builds_and_removes_orphans(monkeypatch) -> None:
         ),
     )
 
-    assert runner.prod_up() == 0
+    assert runner.prod_fake_up() == 0
     assert commands[0][-4:] == ["up", "-d", "--build", "--remove-orphans"]
     # Deliberately unbounded: --build can legitimately take minutes on a cold build.
     assert timeouts == [None]
@@ -1198,7 +1198,7 @@ def test_prod_fake_up_uses_only_base_and_prod_compose(monkeypatch) -> None:
     runner = load_runner_module()
     monkeypatch.setattr(runner, "_prod_stack_running", lambda: False)
     monkeypatch.setattr(runner, "port_available", lambda port: True)
-    monkeypatch.setattr(runner, "prod_ready", lambda: 0)
+    monkeypatch.setattr(runner, "_prod_fake_ready", lambda: 0)
     commands: list[list[str]] = []
     monkeypatch.setattr(runner, "run_with_env", lambda command, env: commands.append(list(command)) or 0)
 
@@ -1210,20 +1210,282 @@ def test_prod_fake_up_uses_only_base_and_prod_compose(monkeypatch) -> None:
     assert commands[0][-4:] == ["up", "-d", "--build", "--remove-orphans"]
 
 
-def test_prod_up_calls_prod_ready_after_successful_up(monkeypatch) -> None:
+PROD_LIVE_VALUES = {
+    "ANYTOOLAI_POSTGRES_USER": "ci",
+    "ANYTOOLAI_POSTGRES_PASSWORD": "private-db-value",
+    "ANYTOOLAI_POSTGRES_DB": "ci",
+    "OPENAI_API_KEY": "private-openai-value",
+    "ANYTOOLAI_LLM_HTTPS_PROXY": "http://private-proxy-value@proxy:3128",
+    "ANYTOOLAI_ENABLED_PRODUCT_IDS": "proposal_ai",
+    "ANYTOOLAI_UNMETERED_PRODUCT_IDS": "proposal_ai",
+    "ANYTOOLAI_PROD_WORKER_MEMORY_LIMIT": "768M",
+}
+
+
+@pytest.mark.parametrize("missing_name", list(PROD_LIVE_VALUES))
+def test_prod_up_rejects_missing_required_value_before_compose(
+    monkeypatch, missing_name, capsys
+) -> None:
+    runner = load_runner_module()
+    values = PROD_LIVE_VALUES | {missing_name: ""}
+    if missing_name == "ANYTOOLAI_UNMETERED_PRODUCT_IDS":
+        del values[missing_name]
+    monkeypatch.setattr(runner, "_resolved_env_file", lambda path: values)
+    monkeypatch.setattr(
+        runner, "_prod_stack_running", lambda: pytest.fail("preflight reached Compose")
+    )
+    monkeypatch.setattr(
+        runner, "_build_deployment_profile", lambda *args: pytest.fail("preflight wrote profile")
+    )
+
+    assert runner.prod_up() == 2
+    assert missing_name in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "invalid_list", ["proposal_ai,", ",proposal_ai", "proposal_ai,proposal_ai"]
+)
+def test_prod_up_rejects_malformed_product_lists(monkeypatch, invalid_list) -> None:
+    runner = load_runner_module()
+    monkeypatch.setattr(
+        runner,
+        "_resolved_env_file",
+        lambda path: PROD_LIVE_VALUES | {"ANYTOOLAI_ENABLED_PRODUCT_IDS": invalid_list},
+    )
+    monkeypatch.setattr(
+        runner, "_prod_stack_running", lambda: pytest.fail("preflight reached Compose")
+    )
+    assert runner.prod_up() == 2
+
+
+def test_prod_up_rejects_unmetered_product_outside_allowlist(monkeypatch) -> None:
+    runner = load_runner_module()
+    monkeypatch.setattr(
+        runner,
+        "_resolved_env_file",
+        lambda path: PROD_LIVE_VALUES | {"ANYTOOLAI_UNMETERED_PRODUCT_IDS": "client_update_writer"},
+    )
+    monkeypatch.setattr(
+        runner, "_prod_stack_running", lambda: pytest.fail("preflight reached Compose")
+    )
+    assert runner.prod_up() == 2
+
+
+@pytest.mark.parametrize(
+    "code_name",
+    ["ANYTOOLAI_DEMO_ACCESS_CODE", "ANYTOOLAI_ATOM_LAB_ACCESS_CODE", "ANYTOOLAI_LIVE_CANARY_TOKEN"],
+)
+def test_prod_up_rejects_public_access_codes(monkeypatch, code_name) -> None:
+    runner = load_runner_module()
+    monkeypatch.setattr(
+        runner, "_resolved_env_file", lambda path: PROD_LIVE_VALUES | {code_name: "private-code"}
+    )
+    monkeypatch.setattr(
+        runner, "_prod_stack_running", lambda: pytest.fail("preflight reached Compose")
+    )
+    assert runner.prod_up() == 2
+
+
+def test_prod_up_prints_safe_canonical_selection_before_profile(monkeypatch, capsys) -> None:
+    runner = load_runner_module()
+    monkeypatch.setattr(
+        runner,
+        "_resolved_env_file",
+        lambda path: PROD_LIVE_VALUES | {"ANYTOOLAI_UNMETERED_PRODUCT_IDS": ""},
+    )
+    monkeypatch.setattr(runner, "_build_deployment_profile", lambda *args: (1, None))
+    assert runner.prod_up() == 1
+    out = capsys.readouterr().out
+    assert "Enabled products: proposal_ai" in out
+    assert "Quota modes: proposal_ai=canonical" in out
+    assert not any(
+        secret in out
+        for secret in ("private-db-value", "private-openai-value", "private-proxy-value")
+    )
+
+
+def test_prod_input_shell_empty_overrides_env_file(monkeypatch, tmp_path) -> None:
+    runner = load_runner_module()
+    env_file = tmp_path / ".env.prod"
+    env_file.write_text("ANYTOOLAI_UNMETERED_PRODUCT_IDS=proposal_ai\n", encoding="utf-8")
+    monkeypatch.setattr(runner, "PROD_ENV_FILE", env_file)
+    for name, value in PROD_LIVE_VALUES.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setenv("ANYTOOLAI_UNMETERED_PRODUCT_IDS", "")
+
+    inputs = runner._deployment_inputs()
+    assert inputs.unmetered_product_ids == frozenset()
+    assert inputs.quota_mode("proposal_ai") == "canonical"
+
+
+def test_prod_up_builds_profile_before_live_compose_and_ready(monkeypatch) -> None:
+    runner = load_runner_module()
+    inputs = runner.DeploymentInputs(
+        ("proposal_ai",), frozenset({"proposal_ai"}), PROD_LIVE_VALUES.copy()
+    )
+    manifest = {
+        "generated_products_root": "C:/generated/products",
+        "container_products_root": "/app/products",
+        "profile_fingerprint": "fingerprint",
+        "enabled_products": {
+            "proposal_ai": {
+                "provider_policy_ref": "default_text_generation_v1",
+                "quota_policy_ref": None,
+            }
+        },
+    }
+    events: list[str] = []
+    monkeypatch.setattr(runner, "_deployment_inputs", lambda: inputs)
+    monkeypatch.setattr(
+        runner, "_build_deployment_profile", lambda *args: (events.append("profile") or 0, manifest)
+    )
+    monkeypatch.setattr(runner, "_prod_stack_running", lambda: events.append("ps") or False)
+    monkeypatch.setattr(runner, "port_available", lambda port: True)
+    commands: list[list[str]] = []
+    environments: list[dict[str, str]] = []
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda command, env: (
+            commands.append(list(command)) or environments.append(env) or events.append("up") or 0
+        ),
+    )
+    monkeypatch.setattr(runner, "prod_ready", lambda **kwargs: events.append("ready") or 0)
+
+    assert runner.prod_up() == 0
+    assert events == ["profile", "ps", "up", "ready"]
+    assert all(
+        str(path) in commands[0]
+        for path in (runner.COMPOSE_FILE, runner.COMPOSE_PROD_FILE, runner.COMPOSE_LIVE_FILE)
+    )
+    assert environments[0]["ANYTOOLAI_DEPLOYMENT_PRODUCTS_ROOT"] == "C:/generated/products"
+    assert environments[0]["ANYTOOLAI_ENABLED_PRODUCT_IDS"] == "proposal_ai"
+    assert "ANYTOOLAI_UNMETERED_PRODUCT_IDS" not in commands[0]
+
+
+def test_prod_ready_checks_web_and_identical_container_profiles(monkeypatch, capsys) -> None:
+    runner = load_runner_module()
+    inputs = runner.DeploymentInputs(
+        ("proposal_ai",), frozenset(), PROD_LIVE_VALUES | {"ANYTOOLAI_UNMETERED_PRODUCT_IDS": ""}
+    )
+    manifest = {
+        "generated_products_root": "C:/generated/products",
+        "container_products_root": "/app/products",
+        "profile_fingerprint": "fingerprint",
+        "enabled_products": {
+            "proposal_ai": {
+                "provider_policy_ref": "default_text_generation_v1",
+                "quota_policy_ref": "proposal_ai.guest_quota_v1",
+            }
+        },
+    }
+    urls: list[str] = []
+    commands: list[list[str]] = []
+    monkeypatch.setattr(runner, "_wait_for_http_ok", lambda url, timeout: urls.append(url) or True)
+    monkeypatch.setattr(
+        runner, "run_with_env", lambda command, env: commands.append(list(command)) or 0
+    )
+
+    assert runner.prod_ready(inputs=inputs, manifest=manifest) == 0
+    assert urls == ["http://127.0.0.1:8000/health", "http://127.0.0.1:3000/"]
+    assert len(commands) == 2
+    assert (
+        commands[0][commands[0].index("python") + 1 :]
+        == commands[1][commands[1].index("python") + 1 :]
+    )
+    assert all(
+        str(path) in command
+        for command in commands
+        for path in (runner.COMPOSE_FILE, runner.COMPOSE_PROD_FILE, runner.COMPOSE_LIVE_FILE)
+    )
+    assert "client_update_writer" not in " ".join(commands[0])
+    assert "Production environment is ready" in capsys.readouterr().out
+
+
+def test_prod_ready_rejects_failed_container_check_without_ready_output(
+    monkeypatch, capsys
+) -> None:
+    runner = load_runner_module()
+    inputs = runner.DeploymentInputs(("proposal_ai",), frozenset(), PROD_LIVE_VALUES.copy())
+    manifest = {
+        "generated_products_root": "C:/generated/products",
+        "container_products_root": "/app/products",
+        "profile_fingerprint": "fingerprint",
+        "enabled_products": {
+            "proposal_ai": {
+                "provider_policy_ref": "default_text_generation_v1",
+                "quota_policy_ref": None,
+            }
+        },
+    }
+    monkeypatch.setattr(runner, "_wait_for_http_ok", lambda url, timeout: True)
+    monkeypatch.setattr(runner, "run_with_env", lambda command, env: 1)
+
+    assert runner.prod_ready(inputs=inputs, manifest=manifest) == 1
+    assert "Production environment is ready" not in capsys.readouterr().out
+
+
+def test_prod_ready_rejects_fake_provider_expectation(monkeypatch) -> None:
+    runner = load_runner_module()
+    inputs = runner.DeploymentInputs(("proposal_ai",), frozenset(), PROD_LIVE_VALUES.copy())
+    manifest = {
+        "generated_products_root": "C:/generated/products",
+        "container_products_root": "/app/products",
+        "profile_fingerprint": "fingerprint",
+        "enabled_products": {
+            "proposal_ai": {
+                "provider_policy_ref": "default_fake_provider_v1",
+                "quota_policy_ref": None,
+            }
+        },
+    }
+    monkeypatch.setattr(
+        runner, "_wait_for_http_ok", lambda url, timeout: pytest.fail("fake policy reached health")
+    )
+
+    assert runner.prod_ready(inputs=inputs, manifest=manifest) == 2
+
+
+@pytest.mark.parametrize(
+    "enabled,unmetered",
+    [(("client_update_writer",), frozenset()), (("proposal_ai",), frozenset({"proposal_ai"}))],
+)
+def test_prod_ready_rejects_stale_profile_selection(monkeypatch, enabled, unmetered) -> None:
+    runner = load_runner_module()
+    inputs = runner.DeploymentInputs(enabled, unmetered, PROD_LIVE_VALUES.copy())
+    manifest = {
+        "generated_products_root": "C:/generated/products",
+        "container_products_root": "/app/products",
+        "profile_fingerprint": "fingerprint",
+        "enabled_products": {
+            "proposal_ai": {
+                "provider_policy_ref": "default_text_generation_v1",
+                "quota_policy_ref": "proposal_ai.guest_quota_v1",
+            }
+        },
+    }
+    monkeypatch.setattr(
+        runner,
+        "_wait_for_http_ok",
+        lambda url, timeout: pytest.fail("stale profile reached health"),
+    )
+    assert runner.prod_ready(inputs=inputs, manifest=manifest) == 2
+
+
+def test_prod_fake_up_calls_ready_after_successful_up(monkeypatch) -> None:
     runner = load_runner_module()
     monkeypatch.delenv("ANYTOOLAI_PROD_API_PORT", raising=False)
     monkeypatch.setattr(runner, "_prod_stack_running", lambda: False)
     monkeypatch.setattr(runner, "port_available", lambda port: True)
     monkeypatch.setattr(runner, "run_with_env", lambda command, env: 0)
     calls: list[str] = []
-    monkeypatch.setattr(runner, "prod_ready", lambda: calls.append("prod_ready") or 42)
+    monkeypatch.setattr(runner, "_prod_fake_ready", lambda: calls.append("prod_ready") or 42)
 
-    assert runner.prod_up() == 42
+    assert runner.prod_fake_up() == 42
     assert calls == ["prod_ready"]
 
 
-def test_prod_up_skips_ready_check_when_compose_up_fails(monkeypatch) -> None:
+def test_prod_fake_up_skips_ready_check_when_compose_up_fails(monkeypatch) -> None:
     runner = load_runner_module()
     monkeypatch.delenv("ANYTOOLAI_PROD_API_PORT", raising=False)
     monkeypatch.setattr(runner, "_prod_stack_running", lambda: False)
@@ -1231,14 +1493,14 @@ def test_prod_up_skips_ready_check_when_compose_up_fails(monkeypatch) -> None:
     monkeypatch.setattr(runner, "run_with_env", lambda command, env: 1)
     monkeypatch.setattr(
         runner,
-        "prod_ready",
+        "_prod_fake_ready",
         lambda: (_ for _ in ()).throw(AssertionError("must not poll readiness after failed up")),
     )
 
-    assert runner.prod_up() == 1
+    assert runner.prod_fake_up() == 1
 
 
-def test_prod_ready_waits_for_health(monkeypatch) -> None:
+def test_prod_fake_ready_waits_for_health(monkeypatch) -> None:
     runner = load_runner_module()
     monkeypatch.delenv("ANYTOOLAI_PROD_API_PORT", raising=False)
     monkeypatch.delenv("ANYTOOLAI_READY_TIMEOUT", raising=False)
@@ -1260,11 +1522,11 @@ def test_prod_ready_waits_for_health(monkeypatch) -> None:
 
     monkeypatch.setattr(runner.urllib.request, "urlopen", fake_urlopen)
 
-    assert runner.prod_ready() == 0
+    assert runner._prod_fake_ready() == 0
     assert requested_urls == ["http://127.0.0.1:8000/health"]
 
 
-def test_prod_ready_uses_prod_port_variable_not_dev_port(monkeypatch) -> None:
+def test_prod_fake_ready_uses_prod_port_variable_not_dev_port(monkeypatch) -> None:
     runner = load_runner_module()
     # A leftover ANYTOOLAI_API_PORT from dev work in the same shell must not redirect
     # which port prod-ready polls — prod has its own ANYTOOLAI_PROD_API_PORT.
@@ -1288,11 +1550,11 @@ def test_prod_ready_uses_prod_port_variable_not_dev_port(monkeypatch) -> None:
         lambda url, timeout: requested_urls.append(url) or Response(),
     )
 
-    assert runner.prod_ready() == 0
+    assert runner._prod_fake_ready() == 0
     assert requested_urls == ["http://127.0.0.1:18900/health"]
 
 
-def test_prod_ready_times_out_with_prod004(monkeypatch, capsys) -> None:
+def test_prod_fake_ready_times_out_with_prod004(monkeypatch, capsys) -> None:
     runner = load_runner_module()
     monkeypatch.delenv("ANYTOOLAI_PROD_API_PORT", raising=False)
     monkeypatch.setenv("ANYTOOLAI_READY_TIMEOUT", "0")
@@ -1302,15 +1564,15 @@ def test_prod_ready_times_out_with_prod004(monkeypatch, capsys) -> None:
         lambda url, timeout: (_ for _ in ()).throw(OSError("connection refused")),
     )
 
-    assert runner.prod_ready() == 1
+    assert runner._prod_fake_ready() == 1
     assert "PROD004" in capsys.readouterr().err
 
 
-def test_prod_ready_reports_prod001_for_invalid_port_override(monkeypatch, capsys) -> None:
+def test_prod_fake_ready_reports_prod001_for_invalid_port_override(monkeypatch, capsys) -> None:
     runner = load_runner_module()
     monkeypatch.setenv("ANYTOOLAI_PROD_API_PORT", "not-a-port")
 
-    assert runner.prod_ready() == 2
+    assert runner._prod_fake_ready() == 2
     assert "PROD001" in capsys.readouterr().err
 
 

@@ -1136,6 +1136,7 @@ git commit -m "docs: add Proposal AI live deployment runbook"
 | 2026-09-25 | Task 3: server allowlist parses once at startup, rejects unknown ids, and gates runtime config, quota, and scenario start before storage; focused API tests and architecture validation passed. | Task 4: web allowlist and unmetered runtime behavior. |
 | 2026-09-25 | Task 4: web registry build-time allowlist and both unmetered quota guards implemented after four failing tests; 249 frontend tests and typecheck passed. | Task 5: production Compose and web image. |
 | 2026-09-25 | Task 5: web image and production Compose enforce a nonempty allowlist, loopback API/web ports, unpublished PostgreSQL, blank public access codes, and explicit worker memory; separate `prod-fake-up` powers credential-free CI. Runner tests, Compose contract, image build, and missing-allowlist rejection passed. | Task 6: fail-closed live `prod-up` and effective-profile readiness. |
+| 2026-09-25 | Task 6: live `prod-up` now validates credentials, selections, blank public gates, and both host ports before Compose; generates the profile, selects all three overlays, then gates ready on API, web, and identical container checks. 134 runner/profile tests (3 skips), config/architecture validation, and three-file Compose render passed. | Task 7: runbook and end-to-end gates. |
 
 ## Open Questions
 

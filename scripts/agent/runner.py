@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-from __future__ import annotations
-
 import argparse
 import hashlib
 import importlib.util
@@ -17,6 +15,7 @@ import tomllib
 import urllib.error
 import urllib.request
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import NamedTuple
@@ -648,8 +647,8 @@ def runtime_identity(path: Path = ROOT) -> RuntimeIdentity:
     )
 
 
-def _port_override(name: str, default: int) -> int:
-    raw = os.environ.get(name)
+def _port_override(name: str, default: int, values: dict[str, str] | None = None) -> int:
+    raw = (os.environ if values is None else values).get(name)
     if raw is None:
         return default
     try:
@@ -746,6 +745,8 @@ def _profile_check_args(manifest: dict[str, object]) -> list[str]:
     for product_id, expectation in sorted(enabled_products.items()):
         if not isinstance(expectation, dict):
             raise ValueError(f"profile manifest has invalid expectation for {product_id}")
+        if expectation.get("provider_policy_ref") != "default_text_generation_v1":
+            raise ValueError(f"profile manifest has non-live provider policy for {product_id}")
         quota = expectation["quota_policy_ref"] or "-"
         args.extend(
             [
@@ -1406,6 +1407,76 @@ def _prod_compose_command(*args: str) -> list[str]:
     )
 
 
+def _prod_live_compose_command(*args: str) -> list[str]:
+    env_file = PROD_ENV_FILE if PROD_ENV_FILE.is_file() else None
+    return _docker_compose_command(
+        PROD_COMPOSE_PROJECT,
+        (COMPOSE_FILE, COMPOSE_PROD_FILE, COMPOSE_LIVE_FILE),
+        *args,
+        env_file=env_file,
+    )
+
+
+@dataclass(frozen=True)
+class DeploymentInputs:
+    enabled_product_ids: tuple[str, ...]
+    unmetered_product_ids: frozenset[str]
+    compose_env: dict[str, str]
+
+    def quota_mode(self, product_id: str) -> str:
+        return "unmetered" if product_id in self.unmetered_product_ids else "canonical"
+
+
+def _product_ids(value: str, name: str, *, allow_empty: bool = False) -> tuple[str, ...]:
+    if allow_empty and value == "":
+        return ()
+    ids = tuple(part.strip() for part in value.split(","))
+    if any(not product_id for product_id in ids):
+        raise ValueError(f"{name} must contain nonempty product ids")
+    if len(ids) != len(set(ids)):
+        raise ValueError(f"{name} contains duplicate product ids")
+    return ids
+
+
+def _deployment_inputs() -> DeploymentInputs:
+    env = _resolved_env_file(PROD_ENV_FILE)
+    required = (
+        "ANYTOOLAI_POSTGRES_USER",
+        "ANYTOOLAI_POSTGRES_PASSWORD",
+        "ANYTOOLAI_POSTGRES_DB",
+        "OPENAI_API_KEY",
+        "ANYTOOLAI_LLM_HTTPS_PROXY",
+        "ANYTOOLAI_ENABLED_PRODUCT_IDS",
+        "ANYTOOLAI_UNMETERED_PRODUCT_IDS",
+        "ANYTOOLAI_PROD_WORKER_MEMORY_LIMIT",
+    )
+    for name in required:
+        if name not in env or (name != "ANYTOOLAI_UNMETERED_PRODUCT_IDS" and not env[name].strip()):
+            raise ValueError(f"{name} is required for live production")
+    for name in (
+        "ANYTOOLAI_DEMO_ACCESS_CODE",
+        "ANYTOOLAI_ATOM_LAB_ACCESS_CODE",
+        "ANYTOOLAI_LIVE_CANARY_TOKEN",
+    ):
+        if env.get(name, "").strip():
+            raise ValueError(f"{name} must be blank for public production")
+    enabled = _product_ids(env["ANYTOOLAI_ENABLED_PRODUCT_IDS"], "ANYTOOLAI_ENABLED_PRODUCT_IDS")
+    unmetered = frozenset(
+        _product_ids(
+            env["ANYTOOLAI_UNMETERED_PRODUCT_IDS"],
+            "ANYTOOLAI_UNMETERED_PRODUCT_IDS",
+            allow_empty=True,
+        )
+    )
+    if not unmetered <= set(enabled):
+        raise ValueError(
+            "ANYTOOLAI_UNMETERED_PRODUCT_IDS must be within ANYTOOLAI_ENABLED_PRODUCT_IDS"
+        )
+    _port_override("ANYTOOLAI_PROD_API_PORT", 8000, env)
+    _port_override("ANYTOOLAI_PROD_WEB_PORT", 3000, env)
+    return DeploymentInputs(enabled, unmetered, env)
+
+
 def _prod_stack_running() -> bool:
     # Bounded so a wedged Docker daemon fails this preflight check quickly instead of
     # hanging prod_up() indefinitely before it ever reaches the normal error path.
@@ -1422,15 +1493,32 @@ def _prod_stack_running() -> bool:
 
 
 def prod_up() -> int:
-    # Deliberately its own variable, not ANYTOOLAI_API_PORT (dev's per-worktree derived
-    # port) — a leftover dev override in the operator's shell must not silently redirect
-    # which host port prod binds to or preflight-checks. Postgres isn't published in prod
-    # at all (see docker-compose.prod.yml), so there's no Postgres port to check here.
     try:
-        api_port = _port_override("ANYTOOLAI_PROD_API_PORT", 8000)
+        inputs = _deployment_inputs()
+        api_port = _port_override("ANYTOOLAI_PROD_API_PORT", 8000, inputs.compose_env)
+        web_port = _port_override("ANYTOOLAI_PROD_WEB_PORT", 3000, inputs.compose_env)
     except ValueError as exc:
         print(f"PROD001: {exc}", file=sys.stderr)
         return 2
+    print(f"Enabled products: {', '.join(inputs.enabled_product_ids)}")
+    print(
+        "Quota modes: "
+        + ", ".join(
+            f"{product_id}={inputs.quota_mode(product_id)}"
+            for product_id in inputs.enabled_product_ids
+        )
+    )
+    exit_code, manifest = _build_deployment_profile(
+        PROD_COMPOSE_PROJECT,
+        inputs.enabled_product_ids,
+        sorted(inputs.unmetered_product_ids),
+        inputs.compose_env,
+    )
+    if exit_code != 0 or manifest is None:
+        return exit_code or 1
+    env = inputs.compose_env | {
+        "ANYTOOLAI_DEPLOYMENT_PRODUCTS_ROOT": str(manifest["generated_products_root"])
+    }
     try:
         stack_running = _prod_stack_running()
     except FileNotFoundError as exc:
@@ -1450,15 +1538,18 @@ def prod_up() -> int:
     # stack's own already-running containers as an occupied port and block redeploys.
     if not stack_running and not _check_ports_available(
         "PROD002",
-        [("API", api_port, "ANYTOOLAI_PROD_API_PORT", None)],
+        [
+            ("API", api_port, "ANYTOOLAI_PROD_API_PORT", None),
+            ("Web", web_port, "ANYTOOLAI_PROD_WEB_PORT", None),
+        ],
     ):
         return 1
     # No timeout: `--build` can legitimately take minutes on a cold image build.
     exit_code = run_with_env(
-        _prod_compose_command("up", "-d", "--build", "--remove-orphans"),
-        runner_env(),
+        _prod_live_compose_command("up", "-d", "--build", "--remove-orphans"),
+        env,
     )
-    return prod_ready() if exit_code == 0 else exit_code
+    return prod_ready(inputs=inputs, manifest=manifest) if exit_code == 0 else exit_code
 
 
 def prod_fake_up() -> int:
@@ -1483,10 +1574,10 @@ def prod_fake_up() -> int:
     exit_code = run_with_env(
         _prod_compose_command("up", "-d", "--build", "--remove-orphans"), runner_env()
     )
-    return prod_ready() if exit_code == 0 else exit_code
+    return _prod_fake_ready() if exit_code == 0 else exit_code
 
 
-def prod_ready() -> int:
+def _prod_fake_ready() -> int:
     try:
         api_port = _port_override("ANYTOOLAI_PROD_API_PORT", 8000)
         timeout = float(os.environ.get("ANYTOOLAI_READY_TIMEOUT", "90"))
@@ -1496,7 +1587,7 @@ def prod_ready() -> int:
     health_url = f"http://127.0.0.1:{api_port}/health"
     if _wait_for_http_ok(health_url, timeout):
         print(f"API: http://127.0.0.1:{api_port}")
-        print("Production environment is ready")
+        print("Credential-free production smoke environment is ready")
         return 0
     print(
         f"PROD004: readiness timed out after {timeout:g}s for {health_url}. "
@@ -1504,6 +1595,53 @@ def prod_ready() -> int:
         file=sys.stderr,
     )
     return 1
+
+
+def prod_ready(
+    *, inputs: DeploymentInputs | None = None, manifest: dict[str, object] | None = None
+) -> int:
+    try:
+        inputs = inputs or _deployment_inputs()
+        api_port = _port_override("ANYTOOLAI_PROD_API_PORT", 8000, inputs.compose_env)
+        web_port = _port_override("ANYTOOLAI_PROD_WEB_PORT", 3000, inputs.compose_env)
+        timeout = float(inputs.compose_env.get("ANYTOOLAI_READY_TIMEOUT", "90"))
+        if manifest is None:
+            manifest = json.loads(
+                (_deployment_profile_dir(PROD_COMPOSE_PROJECT) / "manifest.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+        _profile_check_args(manifest)
+        expectations = manifest["enabled_products"]
+        if set(expectations) != set(inputs.enabled_product_ids):
+            raise ValueError("profile manifest enabled products differ from production selection")
+        if any(
+            expectations[product_id]["quota_policy_ref"] is not None
+            for product_id in inputs.unmetered_product_ids
+        ):
+            raise ValueError("profile manifest quota modes differ from production selection")
+    except (ValueError, OSError, KeyError, TypeError) as exc:
+        print(f"PROD001: {exc}", file=sys.stderr)
+        return 2
+    for name, url in (
+        ("API", f"http://127.0.0.1:{api_port}/health"),
+        ("web", f"http://127.0.0.1:{web_port}/"),
+    ):
+        if not _wait_for_http_ok(url, timeout):
+            print(
+                f"PROD004: {name} readiness timed out after {timeout:g}s for {url}", file=sys.stderr
+            )
+            return 1
+    env = inputs.compose_env | {
+        "ANYTOOLAI_DEPLOYMENT_PRODUCTS_ROOT": str(manifest["generated_products_root"])
+    }
+    exit_code = _run_effective_profile_checks(_prod_live_compose_command(), manifest, env)
+    if exit_code != 0:
+        return exit_code
+    print(f"API: http://127.0.0.1:{api_port}")
+    print(f"Web: http://127.0.0.1:{web_port}")
+    print("Production environment is ready")
+    return 0
 
 
 def prod_status() -> int:
