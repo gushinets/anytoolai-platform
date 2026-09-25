@@ -4500,19 +4500,19 @@
         "parameters": [
           {
             "in": "path",
-            "name": "product_id",
+            "name": "scenario_id",
             "required": true,
             "schema": {
-              "title": "Product Id",
+              "title": "Scenario Id",
               "type": "string"
             }
           },
           {
             "in": "path",
-            "name": "scenario_id",
+            "name": "product_id",
             "required": true,
             "schema": {
-              "title": "Scenario Id",
+              "title": "Product Id",
               "type": "string"
             }
           },

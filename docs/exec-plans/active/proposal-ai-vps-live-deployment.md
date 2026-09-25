@@ -1108,13 +1108,13 @@ git commit -m "docs: add Proposal AI live deployment runbook"
 
 ## Validation
 
-- [ ] `python scripts/agent/runner.py validate-configs`
-- [ ] `python scripts/agent/runner.py validate-architecture`
-- [ ] `python scripts/agent/runner.py validate-docs`
-- [ ] `python scripts/agent/runner.py quick-check`
-- [ ] `python scripts/agent/runner.py frontend-check`
-- [ ] `python scripts/agent/runner.py full-check`
-- [ ] Credential-free `prod-fake-up` plus `prod-smoke`
+- [x] `python scripts/agent/runner.py validate-configs`
+- [x] `python scripts/agent/runner.py validate-architecture`
+- [x] `python scripts/agent/runner.py validate-docs`
+- [x] `python scripts/agent/runner.py quick-check`
+- [x] `python scripts/agent/runner.py frontend-check`
+- [x] `python scripts/agent/runner.py full-check`
+- [x] Credential-free production Compose smoke plus `prod-smoke` in a fresh isolated project (see result below)
 - [ ] Real-provider local live acceptance
 - [ ] Target-VPS acceptance
 
@@ -1137,6 +1137,13 @@ git commit -m "docs: add Proposal AI live deployment runbook"
 | 2026-09-25 | Task 4: web registry build-time allowlist and both unmetered quota guards implemented after four failing tests; 249 frontend tests and typecheck passed. | Task 5: production Compose and web image. |
 | 2026-09-25 | Task 5: web image and production Compose enforce a nonempty allowlist, loopback API/web ports, unpublished PostgreSQL, blank public access codes, and explicit worker memory; separate `prod-fake-up` powers credential-free CI. Runner tests, Compose contract, image build, and missing-allowlist rejection passed. | Task 6: fail-closed live `prod-up` and effective-profile readiness. |
 | 2026-09-25 | Task 6: live `prod-up` now validates credentials, selections, blank public gates, and both host ports before Compose; generates the profile, selects all three overlays, then gates ready on API, web, and identical container checks. 134 runner/profile tests (3 skips), config/architecture validation, and three-file Compose render passed. | Task 7: runbook and end-to-end gates. |
+| 2026-09-25 | Task 7: public VPS runbook, next-product live contract, regenerated OpenAPI/client types, and Windows-safe API type generator finished. Doctor, config/architecture/docs, quick-check (1923 passed, 3 skipped), frontend-check, full-check (same baseline plus 99 product tests), and isolated credential-free Compose smoke (11 atoms, 3 composites) passed. | Fresh independent review; local OpenAI and VPS acceptance await operator credentials/access. |
+
+## Verification Result (2026-09-25)
+
+- `docker compose` rendered the production base + prod + live stack with disposable values. The web image built with `proposal_ai`; missing web allowlist failed both Compose interpolation and direct Docker build. Resolved production Compose bound API/web to loopback, published no PostgreSQL port, blanked public access codes, and applied the worker memory limit.
+- `prod-fake-up` on the fixed `anytoolai-prod` project could not complete because its PostgreSQL volume predates this task (created 2026-07-28) and was not removed or modified. The same base + prod Compose stack was started in a fresh disposable project with no OpenAI key or proxy; API/web health, `prod-smoke` (11/11 standalone atoms and 3/3 composite workflows), and teardown all passed. Runner command-selection tests prove `prod-fake-up` uses exactly those two Compose files.
+- No `OPENAI_API_KEY`, Squid proxy URL, `.env.live`, `.env.prod`, or VPS access details are available here. Real local OpenAI/Squid runs and target-VPS acceptance were **not run**. No provider ledger/Squid evidence, worker peak memory, chosen production limit, or reverse-proxy/firewall references can be recorded yet. This plan remains active until that acceptance is complete.
 
 ## Open Questions
 

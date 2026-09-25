@@ -94,6 +94,21 @@ must stay inside, and `tests/architecture/` for the tests that enforce it.
    validate-architecture` and `pytest tests/architecture` before calling the product done. A green
    architecture gate is part of the product's definition of done, not a one-time audit.
 
+## Live release contract
+
+Actions using `default_fake_provider_v1` are eligible for the standard generated live profile:
+the deployment generator replaces that policy with `default_text_generation_v1` for each enabled
+product. It rejects a product whose actions do not use the standard fake policy; a future product
+that needs different policies per action must add an explicit reviewed mapping instead of
+weakening that strict transform.
+
+Keep the canonical quota count, period, and dimension in the product's `quotas.yaml` and
+`product.yaml`. Deployment selects only canonical or unmetered through
+`ANYTOOLAI_UNMETERED_PRODUCT_IDS`. A product without a canonical quota remains unmetered even
+when canonical mode is selected. For release, add the product id to
+`ANYTOOLAI_ENABLED_PRODUCT_IDS` so API admits it and the web image bakes the same allowlist into
+its registry. The product needs no separate proxy or Compose configuration.
+
 ## What never changes
 
 - `packages/backend/platform-core` and `packages/backend/platform-actions` source.
