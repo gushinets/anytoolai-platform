@@ -2,12 +2,12 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-09-21
-- Last updated: 2026-09-24
+- Last updated: 2026-09-25
 - Review date: 2026-09-28
-- Next action: re-request review; merge once approved.
+- Next action: none (merged: #141).
 - Blocker: none
 
 ## Goal

@@ -1,0 +1,53 @@
+export const en = {
+  title: "Brief Decoder",
+  description: "Turn a client brief into structured details, risks, questions to ask, and a summary you can copy.",
+  quotaRemaining: "{remaining} of {limit, plural, one {# run} other {# runs}} remaining.",
+  fields: {
+    briefText: "Client brief",
+    briefTextPlaceholder: "Paste the client’s brief, request, or job post.",
+    briefTextHelp: "Paste the brief as written. Longer briefs give more precise questions.",
+  },
+  decode: {
+    submit: "Decode brief",
+    running: "Decoding your brief…",
+    runFailed: "Something went wrong decoding your brief. Please try again.",
+    startAnother: "Decode another brief",
+  },
+  result: {
+    brief: "Brief",
+    notProvided: "Not provided",
+    issues: "Issues",
+    noIssues: "No issues found.",
+    evidence: "Evidence: {text}",
+    questions: "{count, plural, one {# clarifying question} other {# clarifying questions}}",
+    noQuestions: "No clarifying questions were generated.",
+    rationale: "Why ask: {text}",
+    document: "Summary document",
+  },
+  briefFields: {
+    project_goal: "Project goal",
+    deliverables: "Deliverables",
+    deadline: "Deadline",
+    budget: "Budget",
+    target_audience: "Target audience",
+    constraints: "Constraints",
+  },
+  severity: {
+    low: "Low severity",
+    medium: "Medium severity",
+    high: "High severity",
+  },
+  priority: {
+    low: "Low priority",
+    medium: "Medium priority",
+    high: "High priority",
+  },
+  categories: {
+    missing_information: "Missing information",
+    ambiguity: "Ambiguity",
+    scope_risk: "Scope risk",
+    timeline_risk: "Timeline risk",
+    budget_risk: "Budget risk",
+    contradiction: "Contradiction",
+  },
+};

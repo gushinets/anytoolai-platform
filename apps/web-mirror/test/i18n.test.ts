@@ -229,7 +229,7 @@ describe("translation resources", () => {
   });
 
   it("format without an ICU syntax error in every locale (e.g. a stray apostrophe before a placeholder)", () => {
-    const args = { product: "Product", field: "Field", remaining: 2, limit: 5, maxLength: 3 };
+    const args = { product: "Product", field: "Field", remaining: 2, limit: 5, maxLength: 3, count: 2, text: "Text" };
     for (const bundle of bundles()) {
       for (const locale of LOCALES) {
         const messages = { [bundle.namespace]: bundle.byLocale[locale] };

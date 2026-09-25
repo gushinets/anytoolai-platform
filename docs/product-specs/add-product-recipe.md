@@ -94,6 +94,13 @@ must stay inside, and `tests/architecture/` for the tests that enforce it.
    validate-architecture` and `pytest tests/architecture` before calling the product done. A green
    architecture gate is part of the product's definition of done, not a one-time audit.
 
+For a web product whose result is several parts rather than one text, or whose activation is not
+"any rendered result", `apps/web-mirror/src/products/briefDecoder/` (ANY-248) is the worked example:
+a typed composite `R`, a product-owned renderer with a pure `composeCopyText`, and
+`emitsResultViewed` for a narrower `web.result_viewed`. Its `tests/e2e/brief-decoder-smoke` package
+is the browser proof, including runtime-correlation assertions against `platform.jobs`,
+`action_runs`, `provider_calls` and `event_log`.
+
 ## Live release contract
 
 Actions using `default_fake_provider_v1` are eligible for the standard generated live profile:

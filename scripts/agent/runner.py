@@ -1267,6 +1267,12 @@ CLIENT_UPDATE_WRITER_SMOKE_REPORT_PATH = (
     ROOT / "tests" / "e2e" / "client-update-writer-smoke" / "playwright-report.json"
 )
 
+BRIEF_DECODER_SMOKE_WEB_MIRROR_PORT_ENV = "ANYTOOLAI_BRIEF_DECODER_SMOKE_WEB_MIRROR_PORT"
+BRIEF_DECODER_SMOKE_EVIDENCE_ROOT = ROOT / ".agent" / "brief-decoder-smoke"
+BRIEF_DECODER_SMOKE_REPORT_PATH = (
+    ROOT / "tests" / "e2e" / "brief-decoder-smoke" / "playwright-report.json"
+)
+
 
 def _client_handoff_smoke_web_mirror_port() -> int:
     return _port_override(CLIENT_HANDOFF_SMOKE_WEB_MIRROR_PORT_ENV, 3000)
@@ -1278,6 +1284,10 @@ def _proposal_ai_smoke_web_mirror_port() -> int:
 
 def _client_update_writer_smoke_web_mirror_port() -> int:
     return _port_override(CLIENT_UPDATE_WRITER_SMOKE_WEB_MIRROR_PORT_ENV, 3200)
+
+
+def _brief_decoder_smoke_web_mirror_port() -> int:
+    return _port_override(BRIEF_DECODER_SMOKE_WEB_MIRROR_PORT_ENV, 3300)
 
 
 def _terminate_process_group(process: subprocess.Popen) -> None:
@@ -1305,7 +1315,7 @@ def _terminate_process_group(process: subprocess.Popen) -> None:
 
 
 def _write_smoke_evidence(exit_code: int, *, report_path: Path, evidence_root: Path) -> Path:
-    """Shared by client_handoff_smoke()/proposal_ai_smoke(): mirrors atoms_proof.py's
+    """Shared by every web-mirror smoke command (client_handoff_smoke() and the per-product ones): mirrors atoms_proof.py's
     write_evidence_report() shape (generated_at/all_passed plus the raw detail) -- the raw detail
     here is Playwright's own JSON reporter output, not a hand-rolled case list, since the smoke's
     actual pass/fail granularity already lives in that report."""
@@ -1335,7 +1345,7 @@ def _serve_web_mirror_and_run_smoke(
     report_path: Path,
     evidence_root: Path,
 ) -> int:
-    """Shared tail for client_handoff_smoke()/proposal_ai_smoke(), once each has built its own
+    """Shared tail for every web-mirror smoke command, once each has built its own
     web-mirror (and any product-specific extra artifact, e.g. the extension): serve the already-
     built web-mirror, wait for it to become ready, run the given Playwright smoke package, write
     its evidence, and always tear the server down -- whichever of the two calls this, one fix here
@@ -1421,7 +1431,11 @@ def client_handoff_smoke() -> int:
         print(f"DEV001: {exc}", file=sys.stderr)
         return 2
 
-    web_mirror_port = _client_handoff_smoke_web_mirror_port()
+    try:
+        web_mirror_port = _client_handoff_smoke_web_mirror_port()
+    except ValueError as exc:
+        print(f"DEV001: {exc}", file=sys.stderr)
+        return 2
     if not _check_ports_available(
         "CHS001",
         [
@@ -1501,7 +1515,11 @@ def proposal_ai_smoke() -> int:
         print(f"DEV001: {exc}", file=sys.stderr)
         return 2
 
-    web_mirror_port = _proposal_ai_smoke_web_mirror_port()
+    try:
+        web_mirror_port = _proposal_ai_smoke_web_mirror_port()
+    except ValueError as exc:
+        print(f"DEV001: {exc}", file=sys.stderr)
+        return 2
     if not _check_ports_available(
         "PAS001",
         [("web-mirror", web_mirror_port, PROPOSAL_AI_SMOKE_WEB_MIRROR_PORT_ENV, None)],
@@ -1553,7 +1571,11 @@ def client_update_writer_smoke() -> int:
         print(f"DEV001: {exc}", file=sys.stderr)
         return 2
 
-    web_mirror_port = _client_update_writer_smoke_web_mirror_port()
+    try:
+        web_mirror_port = _client_update_writer_smoke_web_mirror_port()
+    except ValueError as exc:
+        print(f"DEV001: {exc}", file=sys.stderr)
+        return 2
     if not _check_ports_available(
         "CUS001",
         [("web-mirror", web_mirror_port, CLIENT_UPDATE_WRITER_SMOKE_WEB_MIRROR_PORT_ENV, None)],
@@ -1580,6 +1602,48 @@ def client_update_writer_smoke() -> int:
         smoke_pnpm_filter="@anytoolai/client-update-writer-smoke",
         report_path=CLIENT_UPDATE_WRITER_SMOKE_REPORT_PATH,
         evidence_root=CLIENT_UPDATE_WRITER_SMOKE_EVIDENCE_ROOT,
+    )
+
+
+def brief_decoder_smoke() -> int:
+    """ANY-248: builds and serves web-mirror against the running dev-up platform-api, then runs the
+    Playwright browser-evidence smoke (tests/e2e/brief-decoder-smoke) for the Brief Decoder web
+    vertical: happy-path runtime correlation, validation, weak input, zero-question result,
+    terminal error and quota. Same shape as client_update_writer_smoke().
+    """
+    try:
+        identity = runtime_identity()
+    except ValueError as exc:
+        print(f"DEV001: {exc}", file=sys.stderr)
+        return 2
+
+    try:
+        web_mirror_port = _brief_decoder_smoke_web_mirror_port()
+    except ValueError as exc:
+        print(f"DEV001: {exc}", file=sys.stderr)
+        return 2
+    if not _check_ports_available(
+        "BDS001",
+        [("web-mirror", web_mirror_port, BRIEF_DECODER_SMOKE_WEB_MIRROR_PORT_ENV, None)],
+    ):
+        return 1
+    web_mirror_url = f"http://localhost:{web_mirror_port}"
+
+    env = runner_env()
+    env["PLATFORM_API_BASE_URL"] = identity.api_url
+
+    build_exit = run_with_env(["pnpm", "--filter", "@anytoolai/web-mirror", "build"], env)
+    if build_exit != 0:
+        return build_exit
+
+    return _serve_web_mirror_and_run_smoke(
+        web_mirror_port=web_mirror_port,
+        env=env,
+        readiness_error_code="BDS002",
+        smoke_extra_env={"WEB_MIRROR_BASE_URL": web_mirror_url, "DATABASE_URL": identity.database_url},
+        smoke_pnpm_filter="@anytoolai/brief-decoder-smoke",
+        report_path=BRIEF_DECODER_SMOKE_REPORT_PATH,
+        evidence_root=BRIEF_DECODER_SMOKE_EVIDENCE_ROOT,
     )
 
 
@@ -2060,6 +2124,7 @@ COMMANDS = {
     "client-handoff-smoke": client_handoff_smoke,
     "proposal-ai-smoke": proposal_ai_smoke,
     "client-update-writer-smoke": client_update_writer_smoke,
+    "brief-decoder-smoke": brief_decoder_smoke,
     "prod-up": prod_up,
     "prod-fake-up": prod_fake_up,
     "prod-fake-down": prod_fake_down,

@@ -19,6 +19,10 @@ describe("getRegisteredProduct", () => {
     expect(getRegisteredProduct("client_update_writer")?.productId).toBe("client_update_writer");
   });
 
+  it("returns the enabled Brief Decoder product", () => {
+    expect(getRegisteredProduct("brief_decoder")?.productId).toBe("brief_decoder");
+  });
+
   it("returns null for an unknown product id", () => {
     expect(getRegisteredProduct("does_not_exist")).toBeNull();
   });

@@ -1,6 +1,8 @@
 import type { ComponentType } from "react";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
 import type { ProductMessagesByLocale } from "../i18n";
+import { BriefDecoderProduct } from "./briefDecoder/BriefDecoderProduct";
+import { BRIEF_DECODER_MESSAGES } from "./briefDecoder/messages";
 import { ClientUpdateWriterProduct } from "./clientUpdateWriter/ClientUpdateWriterProduct";
 import { CLIENT_UPDATE_WRITER_MESSAGES } from "./clientUpdateWriter/messages";
 import { ProposalAIProduct } from "./proposalAi/ProposalAIProduct";
@@ -35,6 +37,7 @@ const PRODUCT_DEFINITIONS: readonly Omit<RegisteredProduct, "enabled">[] = [
     messages: CLIENT_UPDATE_WRITER_MESSAGES,
     Component: ClientUpdateWriterProduct,
   },
+  { productId: "brief_decoder", enabled: true, messages: BRIEF_DECODER_MESSAGES, Component: BriefDecoderProduct },
 ];
 
 for (const productId of enabledIds ?? []) {

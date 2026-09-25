@@ -19,5 +19,9 @@ export const pt: Shape<typeof en> = {
         prepaidRequest: "Pedido de adiantamento",
       },
     },
+    brief_decoder: {
+      blurb: "Transforme o briefing de um cliente em detalhes estruturados, riscos e as perguntas a fazer antes de começar.",
+      sample: "Faltam: prazo e orçamento. Pergunte ao cliente: qual é a data exata de lançamento e quem aprova o design?",
+    },
   },
 };
