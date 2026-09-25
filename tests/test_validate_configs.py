@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
+import stat
 from pathlib import Path, PureWindowsPath
 
 import pytest
@@ -116,6 +118,33 @@ def test_build_profile_transforms_only_enabled_product_and_preserves_full_tree(t
         "provider_policy_ref": "default_text_generation_v1",
         "quota_policy_ref": None,
     }
+
+
+def test_build_profile_sets_container_readable_manifest_mode(monkeypatch, tmp_path):
+    chmod = Path.chmod
+    modes = []
+
+    def record_chmod(path, mode, **kwargs):
+        if path.name == "manifest.json":
+            modes.append(mode)
+        return chmod(path, mode, **kwargs)
+
+    monkeypatch.setattr(Path, "chmod", record_chmod)
+    validate_configs.build_deployment_profile(tmp_path / "freelancer-suite", ["proposal_ai"], set())
+    assert modes == [0o644]
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX file modes and umask")
+def test_build_profile_manifest_is_readable_under_restrictive_umask(tmp_path):
+    previous_umask = os.umask(0o077)
+    try:
+        validate_configs.build_deployment_profile(
+            tmp_path / "freelancer-suite", ["proposal_ai"], set()
+        )
+    finally:
+        os.umask(previous_umask)
+    mode = stat.S_IMODE((tmp_path / "freelancer-suite" / "manifest.json").stat().st_mode)
+    assert mode == 0o644
 
 
 def test_build_profile_canonical_mode_preserves_quota_files(tmp_path):

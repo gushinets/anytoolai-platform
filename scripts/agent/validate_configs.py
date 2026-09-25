@@ -215,9 +215,11 @@ def build_deployment_profile(
             source_fingerprint=tree_fingerprint(source_root),
             profile_fingerprint=tree_fingerprint(staged_products),
         )
-        (staged / "manifest.json").write_text(
+        manifest_path = staged / "manifest.json"
+        manifest_path.write_text(
             json.dumps(asdict(manifest), sort_keys=True, indent=2) + "\n", encoding="utf-8"
         )
+        manifest_path.chmod(0o644)
         if output_dir.exists() or output_dir.is_symlink():
             raise ValueError(f"deployment profile already exists: {output_dir}")
         shutil.copytree(staged, output_dir)
