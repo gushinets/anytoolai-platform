@@ -36,6 +36,7 @@ export function ToneSelect({
   disabled,
   placeholderLabel,
   ariaInvalid,
+  ariaDescribedBy,
 }: {
   id: string;
   value: Tone | "";
@@ -43,6 +44,7 @@ export function ToneSelect({
   disabled: boolean;
   placeholderLabel: string;
   ariaInvalid?: boolean;
+  ariaDescribedBy?: string;
 }) {
   const t = useProductT();
   return (
@@ -54,6 +56,7 @@ export function ToneSelect({
       }
       disabled={disabled}
       aria-invalid={ariaInvalid}
+      aria-describedby={ariaDescribedBy}
     >
       <option value="">{placeholderLabel}</option>
       {TONE_OPTIONS.map((tone) => (

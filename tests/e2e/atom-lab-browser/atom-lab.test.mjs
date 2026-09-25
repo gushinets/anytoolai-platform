@@ -27,8 +27,14 @@ const {
   hasDraftPath,
   omitDraftPath,
   parseAcceptedRun,
+  parsePresetExport,
+  parsePresetList,
+  parsePresetVersion,
+  parsePresetVersionList,
+  parseRunList,
   parseRunDetail,
   pollingTimedOut,
+  presetContractMatchesAtom,
   replaceWithExample,
   resetPrompt,
   serializeDraft,
@@ -155,15 +161,25 @@ function createFakeDocument() {
     "model-catalog-warning", "refresh-models", "run-button", "retry-submit", "retry-read", "run-state",
     "submitted-snapshot", "result-section", "result-readable", "result-json",
     "invalid-response", "invalid-response-code", "invalid-response-raw", "run-metadata",
-    "run-diagnostics",
+    "run-diagnostics", "presets-panel", "close-presets", "preset-list", "load-more-presets",
+    "preset-name", "preset-description", "fixed-fields", "preset-version-select", "new-preset",
+    "load-more-versions",
+    "save-preset", "export-preset", "preset-state", "preset-error", "preset-export",
+    "preset-export-download", "preset-conflict", "open-latest-preset", "save-as-new-preset",
+    "preset-compatibility", "adapt-preset", "preset-readonly",
+    "history-panel", "close-history", "history-list", "load-more-history", "history-warning",
+    "history-detail", "restore-history", "save-history-preset", "history-error",
   ];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id.endsWith("editor") ? "textarea" : "div", id)]));
   elements.get("access-form").tagName = "FORM";
   elements.get("access-code").tagName = "INPUT";
-  for (const id of ["input-tab", "prompt-tab", "form-mode", "json-mode", "fill-example", "reset-prompt", "presets-button", "history-button", "refresh-models", "run-button", "retry-submit", "retry-read"]) {
+  for (const id of ["input-tab", "prompt-tab", "form-mode", "json-mode", "fill-example", "reset-prompt", "presets-button", "history-button", "refresh-models", "run-button", "retry-submit", "retry-read", "close-presets", "load-more-presets", "load-more-versions", "new-preset", "save-preset", "export-preset", "open-latest-preset", "save-as-new-preset", "adapt-preset", "close-history", "load-more-history", "restore-history", "save-history-preset"]) {
     elements.get(id).tagName = "BUTTON";
   }
-  for (const id of ["model-select", "reasoning-effort"]) elements.get(id).tagName = "SELECT";
+  for (const id of ["model-select", "reasoning-effort", "preset-version-select"]) elements.get(id).tagName = "SELECT";
+  for (const id of ["preset-name"]) elements.get(id).tagName = "INPUT";
+  elements.get("preset-description").tagName = "TEXTAREA";
+  elements.get("preset-export-download").tagName = "A";
   const document = {
     createElement(tagName) { return new FakeElement(tagName); },
     querySelector(selector) { return selector.startsWith("#") ? elements.get(selector.slice(1)) ?? null : null; },
@@ -2047,7 +2063,7 @@ test("accepted and detail response parsers reject incomplete or unknown lifecycl
   assert.equal(parseRunDetail({run_id: "other", status: "running", snapshot: {}, runtime_ids: {}, result: null, diagnostics: {}}, "run"), null);
   const runtimeIds = {scenario_session_id: "session", job_id: "job", action_run_id: null, artifact_id: null};
   const diagnostics = {error_code: null, duration_ms: null, requested_model_id: "openai/gpt", requested_reasoning_effort: null, response_model_id: null, validation_attempts: 0, transport_attempts: 0, physical_calls: 0, succeeded_first_attempt: null, provider_calls: [], provider_calls_truncated: false, debug_artifacts: [], debug_artifacts_truncated: false};
-  const detail = {run_id: "run", status: "running", snapshot: {}, runtime_ids: runtimeIds, result: null, diagnostics, created_at: "2026-09-20T10:00:00Z", started_at: null, finished_at: null};
+  const detail = {run_id: "run", status: "running", snapshot: {atom_id: "A01"}, runtime_ids: runtimeIds, result: null, diagnostics, created_at: "2026-09-20T10:00:00Z", started_at: null, finished_at: null};
   assert.equal(parseRunDetail({...detail, runtime_ids: {}}, "run"), null);
   assert.equal(parseRunDetail({...detail, diagnostics: {...diagnostics, provider_calls: {}}}, "run"), null);
   assert.equal(parseRunDetail({...detail, diagnostics: {...diagnostics, requested_reasoning_effort: "turbo"}}, "run"), null);
@@ -2055,15 +2071,88 @@ test("accepted and detail response parsers reject incomplete or unknown lifecycl
   assert.equal(parseRunDetail({...detail, diagnostics: {...diagnostics, provider_calls: [{provider_call_id: "call"}]}}, "run"), null);
   assert.equal(parseRunDetail({...detail, status: "succeeded"}, "run"), null);
   assert.equal(parseRunDetail({...detail, result: {value: "unexpected"}}, "run"), null);
+  assert.equal(parseRunDetail({...detail, snapshot: {atom_id: "A99"}}, "run"), null);
   assert.deepEqual(parseRunDetail(detail, "run"), {
-    run_id: "run", status: "running", snapshot: {}, runtime_ids: runtimeIds, result: null, diagnostics,
+    run_id: "run", status: "running", snapshot: {atom_id: "A01"}, runtime_ids: runtimeIds, result: null, diagnostics,
   });
   assert.deepEqual(parseRunDetail({...detail, status: "succeeded", result: {value: "ok"}}, "run"), {
-    run_id: "run", status: "succeeded", snapshot: {}, runtime_ids: runtimeIds, result: {value: "ok"}, diagnostics,
+    run_id: "run", status: "succeeded", snapshot: {atom_id: "A01"}, runtime_ids: runtimeIds, result: {value: "ok"}, diagnostics,
   });
 });
 
 test("browser polling timeout is elapsed-time based and does not reinterpret the run status", () => {
   assert.equal(pollingTimedOut(1_000, 90_999, 90_000), false);
   assert.equal(pollingTimedOut(1_000, 91_000, 90_000), true);
+});
+
+test("preset and history parsers fail closed around immutable and paginated contracts", () => {
+  const configuration = {
+    name: "Набор",
+    description: "Описание",
+    atom_id: "A01",
+    base_action_config_id: "config.a01",
+    schema_refs: {
+      input: {schema_ref: "input.A01", version: 1},
+      output: {schema_ref: "output.A01", version: 1},
+    },
+    prompt: "Промпт",
+    prompt_ref: "prompt.a01",
+    model_id: "openai/gpt-5",
+    reasoning_effort: "high",
+    fixed_fields: ["fields"],
+    example_input: {source_text: "Текст", fields: []},
+    source_run_id: "run-1",
+  };
+  const detail = {...configuration, preset_id: "preset-1", version: 1, created_at: "2026-09-23T00:00:00Z"};
+  assert.deepEqual(parsePresetVersion(detail, "preset-1", 1), detail);
+  assert.equal(parsePresetVersion({...detail, atom_id: "A99"}, "preset-1", 1), null);
+  assert.equal(parsePresetVersion({...detail, fixed_fields: ["fields", "fields"]}), null);
+  assert.ok(parsePresetList({items: [{
+    preset_id: "preset-1", latest_version: 2, name: "Набор", description: "Описание",
+    atom_id: "A01", created_at: "2026-09-23T00:00:00Z", updated_at: "2026-09-23T01:00:00Z",
+  }], next_cursor: "next"}));
+  assert.equal(parsePresetList({items: [], next_cursor: ""}), null);
+  assert.equal(parsePresetList({items: [], next_cursor: 1}), null);
+  assert.equal(parsePresetList({items: [{
+    preset_id: "preset-1", latest_version: 2, name: "Набор", description: "Описание",
+    atom_id: "A99", created_at: "2026-09-23T00:00:00Z", updated_at: "2026-09-23T01:00:00Z",
+  }], next_cursor: null}), null);
+  assert.ok(parsePresetVersionList({items: [{
+    preset_id: "preset-1", version: 1, name: "Набор", description: "Описание",
+    atom_id: "A01", created_at: "2026-09-23T00:00:00Z",
+  }], next_cursor: null}, "preset-1"));
+  assert.equal(parsePresetVersionList({items: [{
+    preset_id: "preset-other", version: 1, name: "Чужой набор", description: "Описание",
+    atom_id: "A01", created_at: "2026-09-23T00:00:00Z",
+  }], next_cursor: null}, "preset-1"), null);
+  assert.equal(parseRunList({items: [{
+    run_id: "run-1", status: "failed", atom_id: "A01", model_id: "openai/gpt-5",
+    preset_id: null, preset_version: 2, created_at: "2026-09-23T00:00:00Z",
+    started_at: null, finished_at: "2026-09-23T00:01:00Z",
+  }], next_cursor: null}), null);
+  assert.equal(parseRunList({items: [{
+    run_id: "run-1", status: "failed", atom_id: "A01", model_id: "openai/gpt-5",
+    preset_id: "preset-1", preset_version: null, created_at: "2026-09-23T00:00:00Z",
+    started_at: null, finished_at: "2026-09-23T00:01:00Z",
+  }], next_cursor: null}), null);
+  assert.ok(parsePresetExport({format_version: 1, preset_id: "preset-1", version: 1, configuration}, "preset-1", 1));
+  assert.equal(parsePresetExport({format_version: 2, preset_id: "preset-1", version: 1, configuration}, "preset-1", 1), null);
+  assert.ok(parseRunList({items: [{
+    run_id: "run-1", status: "failed", atom_id: "A01", model_id: "openai/gpt-5",
+    preset_id: null, preset_version: null, created_at: "2026-09-23T00:00:00Z",
+    started_at: null, finished_at: "2026-09-23T00:01:00Z",
+  }], next_cursor: null}));
+  assert.equal(parseRunList({items: [{run_id: "run-1", status: "mystery"}], next_cursor: null}), null);
+  assert.equal(parseRunList({items: [{
+    run_id: "run-1", status: "failed", atom_id: "A99", model_id: "openai/gpt-5",
+    preset_id: null, preset_version: null, created_at: "2026-09-23T00:00:00Z",
+    started_at: null, finished_at: "2026-09-23T00:01:00Z",
+  }], next_cursor: null}), null);
+  assert.equal(presetContractMatchesAtom(configuration, configuration), true);
+  assert.equal(presetContractMatchesAtom(configuration, {...configuration, base_action_config_id: "config.changed"}), false);
+  assert.equal(presetContractMatchesAtom(configuration, {...configuration, prompt_ref: "prompt.changed"}), false);
+  assert.equal(presetContractMatchesAtom(configuration, {
+    ...configuration,
+    schema_refs: {...configuration.schema_refs, input: {...configuration.schema_refs.input, version: 2}},
+  }), false);
 });

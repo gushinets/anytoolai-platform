@@ -16,8 +16,8 @@
           <p>Проверка контрактов и промптов атомов AnytoolAI.</p>
         </div>
         <nav aria-label="Разделы Atom Lab">
-          <button id="presets-button" type="button">Библиотека пресетов</button>
-          <button id="history-button" type="button">История запусков</button>
+          <button id="presets-button" type="button" disabled>Библиотека пресетов</button>
+          <button id="history-button" type="button" disabled>История запусков</button>
         </nav>
       </header>
       <section id="access-panel" class="access-card" aria-labelledby="access-title">
@@ -35,6 +35,74 @@
           <nav id="atom-navigation" aria-label="Каталог из 11 атомов"></nav>
         </aside>
         <div class="content-column">
+          <section id="presets-panel" class="card library-panel" aria-labelledby="presets-title" hidden>
+            <div class="panel-heading">
+              <div><p class="eyebrow">Общая библиотека</p><h2 id="presets-title">Пресеты</h2></div>
+              <button id="close-presets" type="button">Закрыть</button>
+            </div>
+            <div class="library-grid">
+              <section aria-labelledby="preset-list-title">
+                <h3 id="preset-list-title">Сохранённые пресеты</h3>
+                <div id="preset-list" class="item-list"></div>
+                <button id="load-more-presets" type="button" hidden>Показать ещё</button>
+              </section>
+              <section aria-labelledby="preset-editor-title">
+                <h3 id="preset-editor-title">Версия пресета</h3>
+                <p id="preset-state" class="draft-state" role="status"></p>
+                <label for="preset-name">Название</label>
+                <input id="preset-name" maxlength="256">
+                <label for="preset-description">Описание</label>
+                <textarea id="preset-description" rows="3" maxlength="4096"></textarea>
+                <fieldset><legend>Фиксированные поля верхнего уровня</legend><div id="fixed-fields" class="checkbox-list"></div></fieldset>
+                <label for="preset-version-select">Неизменяемая версия</label>
+                <select id="preset-version-select"></select>
+                <button id="load-more-versions" type="button" hidden>Показать более ранние версии</button>
+                <div class="button-row">
+                  <button id="new-preset" type="button">Новый пресет</button>
+                  <button id="save-preset" class="primary-action" type="button">Сохранить новый</button>
+                  <button id="export-preset" type="button" disabled>Экспорт версии</button>
+                </div>
+                <div id="preset-conflict" class="warning" role="alert" hidden>
+                  <p>Появилась более новая версия. Локальный черновик сохранён.</p>
+                  <div class="button-row">
+                    <button id="open-latest-preset" type="button">Открыть актуальную версию</button>
+                    <button id="save-as-new-preset" type="button">Сохранить отдельным пресетом</button>
+                  </div>
+                </div>
+                <div id="preset-compatibility" class="warning" role="alert" hidden>
+                  <p>Сохранённая версия использует исторический контракт и доступна только для чтения.</p>
+                  <button id="adapt-preset" type="button">Адаптировать к текущему контракту</button>
+                </div>
+                <p id="preset-error" class="error" role="alert"></p>
+                <pre id="preset-readonly" hidden></pre>
+                <a id="preset-export-download" hidden>Скачать JSON</a>
+                <pre id="preset-export" hidden></pre>
+              </section>
+            </div>
+          </section>
+          <section id="history-panel" class="card library-panel" aria-labelledby="history-title" hidden>
+            <div class="panel-heading">
+              <div><p class="eyebrow">Постоянная история</p><h2 id="history-title">Запуски</h2></div>
+              <button id="close-history" type="button">Закрыть</button>
+            </div>
+            <div class="library-grid">
+              <section aria-labelledby="history-list-title">
+                <h3 id="history-list-title">Принятые запуски</h3>
+                <div id="history-list" class="item-list"></div>
+                <button id="load-more-history" type="button" hidden>Показать ещё</button>
+              </section>
+              <section aria-labelledby="history-detail-title">
+                <h3 id="history-detail-title">Снимок запуска</h3>
+                <p id="history-warning" class="warning" role="status"></p>
+                <pre id="history-detail">Выберите запуск.</pre>
+                <div class="button-row">
+                  <button id="restore-history" type="button" disabled>Восстановить настройки</button>
+                  <button id="save-history-preset" type="button" disabled>Сохранить снимок как пресет</button>
+                </div>
+                <p id="history-error" class="error" role="alert"></p>
+              </section>
+            </div>
+          </section>
           <section id="atom-passport" class="card passport" aria-labelledby="atom-title">
             <p id="atom-action-type" class="eyebrow"></p>
             <h2 id="atom-title"></h2>

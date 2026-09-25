@@ -5,8 +5,8 @@ import type { MessageTree } from "../../src/i18n/messageTypes";
 
 /** The same English tree for every locale: for tests of a product that has no translations of its
  * own (the test-only product) or none needed (host-only components). */
-export function englishForAllLocales(en: MessageTree): ProductMessagesByLocale {
-  return Object.fromEntries(LOCALES.map((locale: Locale) => [locale, en])) as ProductMessagesByLocale;
+export function englishForAllLocales<T extends MessageTree>(en: T): Record<Locale, T> {
+  return Object.fromEntries(LOCALES.map((locale: Locale) => [locale, en])) as Record<Locale, T>;
 }
 
 /** Drop-in for RTL's `render`, inside the same `LocaleProvider` the product page shell uses. The

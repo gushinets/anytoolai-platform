@@ -96,6 +96,27 @@ describe("Client Update Writer product definitions", () => {
     expect(updateDefinition.extractResult({ text: 42 })).toBeNull();
   });
 
+  it("associates each validation error with its invalid control via aria-describedby", async () => {
+    const { queues } = bootAndHappyPathRoutes(MODE_IDS.update, { text: "x" });
+    const { client } = makeClient(queues);
+
+    render(<ProductRunPage definition={updateDefinition} client={client} />);
+    await waitFor(() => expect(screen.getByLabelText("Progress notes")).toBeTruthy());
+    expect(screen.getByLabelText("Progress notes").getAttribute("aria-describedby")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Write update" }));
+    await screen.findByText("Progress notes: required.");
+
+    for (const [label, message] of [
+      ["Progress notes", "Progress notes: required."],
+      ["Tone", "Tone: required."],
+    ] as const) {
+      const describedBy = screen.getByLabelText(label).getAttribute("aria-describedby");
+      expect(describedBy, label).toBeTruthy();
+      expect(document.getElementById(describedBy as string)?.textContent, label).toBe(message);
+    }
+  });
+
   it("Update mode validates progress_notes/tone and maps them to update_input_v1", async () => {
     const ids = MODE_IDS.update;
     const { routes, queues } = bootAndHappyPathRoutes(ids, {

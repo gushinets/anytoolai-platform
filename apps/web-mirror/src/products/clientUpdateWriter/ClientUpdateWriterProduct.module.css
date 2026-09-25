@@ -1,0 +1,98 @@
+/* Same field-group / chip pattern as ProposalAIProduct.module.css; duplicated on purpose until a
+ * third consumer justifies moving it into shared-ui. */
+.fieldGroup {
+  display: grid;
+  gap: 8px;
+}
+
+.error {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-error);
+}
+
+.modeGroup {
+  /* Same 820px column as ProductRunPage's .content, which the mode switcher sits above. */
+  width: min(100%, 820px);
+  box-sizing: border-box;
+  min-width: 0;
+  margin: 16px auto 24px;
+  padding: 0;
+  border: 0;
+}
+
+.legend {
+  margin-bottom: 8px;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.modeOptions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.modeOption {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-input);
+  background: var(--color-surface-card);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.modeOption:hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-hover);
+}
+
+.modeOption:has(.radio:checked) {
+  border-color: var(--color-accent);
+  background: var(--color-surface-active);
+  color: var(--color-text);
+}
+
+.modeOption:has(.radio:checked)::before {
+  margin-right: 6px;
+  content: "✓";
+}
+
+.modeOption:focus-within {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.modeOption:has(.radio:disabled) {
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.radio {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 640px) {
+  .modeOptions {
+    grid-template-columns: 1fr;
+  }
+}

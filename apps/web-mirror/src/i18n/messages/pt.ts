@@ -4,6 +4,11 @@ import type { en } from "./en";
 
 export const pt: Shape<typeof en> = {
   language: { label: "Idioma" },
+  nav: {
+    label: "Ferramentas",
+    allTools: "Todas as ferramentas",
+    runInProgress: "Uma execução está em andamento. Se você sair agora, não verá o resultado e a cota não será restituída.",
+  },
   loading: "Carregando {product}…",
   unavailable: "{product} está indisponível no momento. Recarregue a página.",
   quotaExhausted: "Você usou todas as execuções de {product} por enquanto.",

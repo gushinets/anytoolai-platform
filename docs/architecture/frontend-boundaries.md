@@ -151,8 +151,9 @@ product-owned. Code: `apps/web-mirror/src/i18n/` (library `use-intl`, imported o
   auto-resolved locale is not persisted, so a changed browser language keeps being respected).
   Read synchronously, unlike ce-kit's async storage adapter, to avoid a flash of English. The
   document `<html lang>` follows the effective locale.
-- **Selector:** one `LanguageSwitcher`, rendered by `ProductPageShell` around every registered
-  product on `/products/{productId}`. A product never renders its own selector. Changing locale
+- **Selector:** one `LanguageSwitcher`, rendered by `ProductPageShell` beside the localized product
+  title for every registered product on `/products/{productId}`. `ProductRunPage` omits its own
+  title and selector when mounted in that shell. A product never renders its own selector. Changing locale
   never remounts the product (no `key={locale}`), so form values, run state and the selected
   Client Update Writer mode survive.
 - **Ownership:** the host owns locale resolution/persistence/provider/selector and the `host`
@@ -201,8 +202,9 @@ product-owned. Code: `apps/web-mirror/src/i18n/` (library `use-intl`, imported o
    `ToneSelect`? Spread `TONE_MESSAGES[locale]` from `products/shared/toneMessages/` under a `tone`
    key in each locale file instead of retranslating `neutral|warm|firm`.
 3. Export `Record<Locale, Shape<typeof en>>` from `messages/index.ts`.
-4. Register the product with `messages` in `products/registry.ts`. The page shell supplies the
-   provider and language selector; the completeness tests cover the new product automatically.
+4. Register the product with `messages` in `products/registry.ts`; every locale must include a
+   nonempty `title` for the page shell. The shell supplies the provider and language selector;
+   the completeness tests cover the new product automatically.
 5. In the product, read text with `useProductT()`, render field errors with `FieldErrorMessage`, and
    set `messageScope` on each `ProductDefinition`. Never read the UI locale in `toInput`.
 

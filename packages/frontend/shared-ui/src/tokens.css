@@ -41,10 +41,11 @@
   --radius-pill: 999px;
 }
 
-/* --font-body/--font-mono are set by next/font/google on <html> in layout.tsx (DM Sans/DM Mono);
+/* --font-body/--font-mono are set by next/font/google on <html> in layout.tsx (DM Sans with
+ * Noto Sans for Cyrillic / DM Mono);
  * the var() fallback here only covers a consumer that never wires next/font at all. */
 body {
-  font-family: var(--font-body, ui-sans-serif, system-ui, sans-serif);
+  font-family: var(--font-body, ui-sans-serif), var(--font-cyrillic, system-ui), sans-serif;
   /* The browser's UA stylesheet default (8px) would otherwise sit outside .page-background's
    * full-bleed gradient/min-height:100vh, leaving an unstyled gap and risking overflow. */
   margin: 0;
@@ -56,7 +57,7 @@ body {
 h1,
 h2,
 h3 {
-  font-family: "Cabinet Grotesk", var(--font-body, ui-sans-serif, system-ui, sans-serif);
+  font-family: "Cabinet Grotesk", var(--font-body, ui-sans-serif), var(--font-cyrillic, system-ui), sans-serif;
   /* SKILL.md's "Display" role (900 weight, 44-56px) -- Fontshare's CSS API intermittently bundles
    * unrelated extra @font-face declarations for this font at the "Section" role's 800 weight
    * (verified non-deterministic), but is reliably clean at 900; see layout.tsx's own comment.
@@ -70,13 +71,17 @@ h1 {
   font-size: 44px;
 }
 
-/* SKILL.md's "Label" role: DM Sans, 600 weight, 10-11px -- ProposalAIFields's <label> elements
+a {
+  color: var(--color-accent);
+}
+
+/* SKILL.md's "Label" role: DM Sans, 600 weight (12px here: 10-11px is below the 12px readable minimum) -- ProposalAIFields's <label> elements
  * were rendering as unstyled browser-default text (same as body), which both looks wrong and
  * technically falls under Bundle 3's "unapproved system-font replacement" prohibition. */
 label {
-  font-family: var(--font-body, ui-sans-serif, system-ui, sans-serif);
+  font-family: var(--font-body, ui-sans-serif), var(--font-cyrillic, system-ui), sans-serif;
   font-weight: 600;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 /* SKILL.md: "At 520px, actions become full width where necessary" -- scoped to the primary
@@ -96,6 +101,22 @@ label {
   max-width: var(--layout-max-width);
   margin: 0 auto;
   padding: 40px 20px;
+}
+
+@media (max-width: 520px) {
+  .page-container {
+    padding: 24px 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* web.md's "Page Background" recipe -- the one directly-reusable piece of web.md for a plain

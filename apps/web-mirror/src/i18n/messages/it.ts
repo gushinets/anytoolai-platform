@@ -7,6 +7,11 @@ import type { en } from "./en";
 
 export const it: Shape<typeof en> = {
   language: { label: "Lingua" },
+  nav: {
+    label: "Strumenti",
+    allTools: "Tutti gli strumenti",
+    runInProgress: "Un’elaborazione è in corso. Se esce ora, non vedrà il risultato e la quota non verrà ripristinata.",
+  },
   loading: "Caricamento di {product}…",
   unavailable: "{product} non è disponibile al momento. Ricaricare la pagina.",
   quotaExhausted: "Le esecuzioni di {product} a disposizione sono esaurite per ora.",

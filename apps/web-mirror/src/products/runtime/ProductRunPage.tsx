@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useContext, useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Button, Card } from "@anytoolai/shared-ui";
 import {
   copyResultAndRecordActivation,
@@ -20,9 +20,10 @@ import {
   type QuotaState,
 } from "@anytoolai/ce-kit";
 import { ErrorState } from "../../components/ErrorState";
-import { useHostT, useProductT } from "../../i18n";
+import { LanguageSwitcher, useHostT, useProductT } from "../../i18n";
 import { getClientStorage } from "./clientStorage";
 import type { FieldError } from "./fieldValidation";
+import { ProductShellContext } from "./ProductShellContext";
 import { assertNever, type ProductDefinition, type ProductRunEvent } from "./productDefinition";
 import styles from "./ProductRunPage.module.css";
 
@@ -246,6 +247,11 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   const th = useHostT();
   const tp = useProductT();
   const title = tp("title");
+  const shell = useContext(ProductShellContext);
+  const inProductShell = shell !== null;
+  // Inside ProductPageShell the shell owns the one <main> (heading, product controls such as a
+  // mode selector, and this run content share it); standalone, this page is its own landmark.
+  const Root = inProductShell ? "div" : "main";
 
   // Always-current `onEvent` behind a ref, refreshed after every render. Used by every
   // emitEvent() call site below, not just the mount effect: `handleSubmit`/`handleRetry`/
@@ -345,6 +351,12 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   useIsomorphicLayoutEffect(() => {
     onBusyChangeRef.current?.(busy);
   }, [busy]);
+  // The shell's "All tools" warning follows the same `busy`; on unmount it must not keep claiming a
+  // run is in flight (e.g. a mode switch remounts this page).
+  useIsomorphicLayoutEffect(() => {
+    shell?.reportBusy(busy);
+  }, [busy, shell]);
+  useIsomorphicLayoutEffect(() => () => shell?.reportBusy(false), [shell]);
 
   const productId = definition.productId;
   const scenarioId = definition.scenarioId;
@@ -783,16 +795,22 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
 
   if (boot.kind === "loading") {
     return (
-      <main className="page-container">
-        <p role="status">{th("loading", { product: title })}</p>
-      </main>
+      <Root className={inProductShell ? undefined : "page-container"}>
+        <div className={styles.content}>
+          {inProductShell ? null : <div className={styles.utilityRow}><LanguageSwitcher /></div>}
+          <p role="status">{th("loading", { product: title })}</p>
+        </div>
+      </Root>
     );
   }
   if (boot.kind === "boot-error") {
     return (
-      <main className="page-container">
-        <ErrorState message={th("unavailable", { product: title })} />
-      </main>
+      <Root className={inProductShell ? undefined : "page-container"}>
+        <div className={styles.content}>
+          {inProductShell ? null : <div className={styles.utilityRow}><LanguageSwitcher /></div>}
+          <ErrorState message={th("unavailable", { product: title })} />
+        </div>
+      </Root>
     );
   }
 
@@ -862,10 +880,15 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   }
 
   return (
-    <main className="page-container">
+    <Root className={inProductShell ? undefined : "page-container"}>
       <div className={styles.content}>
         <header className={styles.header}>
-          <h1>{title}</h1>
+          {inProductShell ? null : (
+            <div className={styles.titleRow}>
+              <h1>{title}</h1>
+              <LanguageSwitcher />
+            </div>
+          )}
           {definition.hasDescription ? <p className={styles.description}>{tp("description")}</p> : null}
           {quota ? (
             <p className={styles.quota} aria-live="polite">
@@ -903,7 +926,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         />
       ) : null}
       </div>
-    </main>
+    </Root>
   );
 }
 

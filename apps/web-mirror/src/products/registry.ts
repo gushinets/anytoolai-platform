@@ -12,9 +12,8 @@ import type { ProductRunEvent } from "./runtime/productDefinition";
 export type RegisteredProduct = {
   productId: string;
   enabled: boolean;
-  /** This product's own translations for every UI locale. The page shell supplies the language
-   * selector and locale state, so a product only needs to provide messages. */
-  messages: ProductMessagesByLocale;
+  /** The shell renders each locale's title and supplies the language selector and locale state. */
+  messages: ProductMessagesByLocale & Record<keyof ProductMessagesByLocale, { title: string }>;
   Component: ComponentType<{
     client: PlatformApiClient;
     onEvent?: (event: ProductRunEvent) => void;

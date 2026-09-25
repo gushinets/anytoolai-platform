@@ -13,9 +13,11 @@ import {
   resetUnpersistedLocaleForTests,
   writeStoredLocale,
 } from "../src/i18n/localeStorage";
+import { HOME_MESSAGES } from "../src/app/homeMessages";
 import { HOST_MESSAGES } from "../src/i18n/messages";
 import { mergeMessages, type MessageTree } from "../src/i18n/messageTypes";
 import { resolveLocale } from "../src/i18n/resolveLocale";
+import { PROPOSAL_AI_MESSAGES } from "../src/products/proposalAi/messages";
 import { listRegisteredProducts } from "../src/products/registry";
 
 describe("readStoredLocale / writeStoredLocale (staleness on a failed write)", () => {
@@ -152,6 +154,7 @@ type Bundle = { name: string; byLocale: Record<Locale, MessageTree>; namespace: 
 function bundles(): Bundle[] {
   return [
     { name: "host", byLocale: HOST_MESSAGES, namespace: "host" },
+    { name: "home", byLocale: HOME_MESSAGES, namespace: "product" },
     ...listRegisteredProducts().map((product) => ({
       name: product.productId,
       byLocale: product.messages,
@@ -199,6 +202,14 @@ describe("translation resources", () => {
       const englishKeys = [...flatten(bundle.byLocale.en).keys()].sort();
       for (const locale of LOCALES) {
         expect([...flatten(bundle.byLocale[locale]).keys()].sort(), `${bundle.name}/${locale}`).toEqual(englishKeys);
+      }
+    }
+  });
+
+  it("provide a nonempty title for every registered product in every locale", () => {
+    for (const product of listRegisteredProducts()) {
+      for (const locale of LOCALES) {
+        expect(product.messages[locale].title.trim(), `${product.productId}/${locale}/title`).not.toBe("");
       }
     }
   });
@@ -256,6 +267,13 @@ describe("translation resources", () => {
     expect(format("en", 1)).toBe("F: 1 character maximum.");
     expect(format("en", 5)).toBe("F: 5 characters maximum.");
     expect(new Set([1, 2, 5].map((count) => format("ru", count))).size).toBe(3);
+  });
+
+  it("uses natural Russian word forms in the Proposal AI quota", () => {
+    const translate = createTranslator({ locale: "ru", messages: { product: PROPOSAL_AI_MESSAGES.ru }, namespace: "product" });
+    expect(translate("quotaRemaining", { remaining: 1, limit: 10 })).toBe("Осталось 1 предложение из 10.");
+    expect(translate("quotaRemaining", { remaining: 2, limit: 10 })).toBe("Осталось 2 предложения из 10.");
+    expect(translate("quotaRemaining", { remaining: 5, limit: 10 })).toBe("Осталось 5 предложений из 10.");
   });
 
   it("show each locale under its own untranslated name in the selector", () => {

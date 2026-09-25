@@ -36,6 +36,9 @@
 
 .legend {
   margin-bottom: 8px;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .toneOptions {
