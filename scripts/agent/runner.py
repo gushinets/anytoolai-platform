@@ -1746,7 +1746,10 @@ class _ProductionDeploymentLock:
 def _prod_deployment_lock_path() -> Path:
     # The Compose project name is host-global, so the lock must not live under ROOT/.agent:
     # separate worktrees/clones could otherwise mutate the same anytoolai-prod project concurrently.
-    return Path(tempfile.gettempdir()) / f"{PROD_COMPOSE_PROJECT}.deployment.lock"
+    # Production targets a Linux VPS, so use the fixed host /tmp namespace instead of TMPDIR,
+    # which may legitimately differ between shells/worktrees and would defeat cross-process locking.
+    lock_root = Path(tempfile.gettempdir()) if os.name == "nt" else Path("/tmp")
+    return lock_root / f"{PROD_COMPOSE_PROJECT}.deployment.lock"
 
 
 def _prod_deployment_lock() -> _ProductionDeploymentLock:
