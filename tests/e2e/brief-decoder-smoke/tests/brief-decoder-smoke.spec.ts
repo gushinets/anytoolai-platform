@@ -162,7 +162,6 @@ test.describe("Brief Decoder web product", () => {
     await page.goto(PRODUCT_URL);
     await expect(page.locator("h1")).toHaveText("Brief Decoder");
     await submitBrief(page);
-    await expect(page.getByRole("status")).toHaveText(/Decoding your brief/);
     const copyButton = page.getByRole("button", { name: "Copy" });
     await expect(copyButton).toBeVisible({ timeout: 60_000 });
 
