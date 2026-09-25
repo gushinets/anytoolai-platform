@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
-from __future__ import annotations
-
+import argparse
+import hashlib
+import json
+import shutil
 import sys
-from collections.abc import Iterable
+import tempfile
+from collections.abc import Iterable, Sequence, Set
+from dataclasses import asdict, dataclass
 from pathlib import Path
+
+import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 PLATFORM_CORE_SRC = ROOT / "packages" / "backend" / "platform-core" / "src"
@@ -41,6 +47,220 @@ from anytoolai_platform_sdk import ProductBundle  # noqa: E402
 # tests/architecture/test_bundle_composition_parity.py).
 DEFAULT_PRODUCT_BUNDLES: tuple[ProductBundle, ...] = (FreelancerSuiteBundle(),)
 
+LIVE_PROVIDER_POLICY_REF = "default_text_generation_v1"
+FAKE_PROVIDER_POLICY_REF = "default_fake_provider_v1"
+CONTAINER_PRODUCTS_ROOT = Path(
+    "/app/packages/backend/product-platforms/freelancer-suite/src/"
+    "anytoolai_freelancer_suite/products"
+)
+
+
+@dataclass(frozen=True)
+class ProductProfileExpectation:
+    provider_policy_ref: str
+    quota_policy_ref: str | None
+
+
+@dataclass(frozen=True)
+class DeploymentProfileManifest:
+    source_products_root: str
+    generated_products_root: str
+    container_products_root: str
+    enabled_products: dict[str, ProductProfileExpectation]
+    source_fingerprint: str
+    profile_fingerprint: str
+
+
+def normalized_relative_path(root: Path, path: Path) -> str:
+    return path.relative_to(root).as_posix()
+
+
+def tree_fingerprint(root: Path) -> str:
+    digest = hashlib.sha256()
+    files = sorted(
+        (path for path in root.rglob("*") if path.is_file()),
+        key=lambda path: normalized_relative_path(root, path),
+    )
+    for path in files:
+        for part in (normalized_relative_path(root, path).encode("utf-8"), path.read_bytes()):
+            digest.update(len(part).to_bytes(8, "big"))
+            digest.update(part)
+    return digest.hexdigest()
+
+
+def common_products_root(roots: Sequence[Path] | None = None) -> Path:
+    bundle = FreelancerSuiteBundle()
+    product_roots = list(roots if roots is not None else bundle.config_roots())
+    products_root = bundle._package_dir() / "products"
+    if not product_roots or any(
+        root.parent.resolve() != products_root.resolve() for root in product_roots
+    ):
+        raise ValueError("Freelancer Suite config roots must share the package products directory")
+    return products_root
+
+
+def action_config_ids_for_product(registry: ConfigRegistry, product_id: str) -> set[str]:
+    product = registry.products[product_id]
+    return {
+        step.action_config_id
+        for scenario_id in product.scenarios
+        for step in registry.workflows[registry.scenarios[scenario_id].workflow_id].steps
+    }
+
+
+def _assert_product_expectations(
+    registry: ConfigRegistry, expectations: dict[str, ProductProfileExpectation]
+) -> None:
+    for product_id, expected in expectations.items():
+        product = registry.products.get(product_id)
+        if product is None:
+            raise ValueError(f"unknown product: {product_id}")
+        if product.quota_policy_ref != expected.quota_policy_ref:
+            raise ValueError(f"{product_id}: expected quota policy {expected.quota_policy_ref!r}")
+        action_ids = action_config_ids_for_product(registry, product_id)
+        if not action_ids:
+            raise ValueError(f"{product_id}: no workflow action configs")
+        for action_id in action_ids:
+            actual = registry.action_configurations[action_id].provider_policy_ref
+            if actual != expected.provider_policy_ref:
+                raise ValueError(
+                    f"{product_id}: {action_id} uses {actual}, "
+                    f"expected {expected.provider_policy_ref}"
+                )
+
+
+def _transform_live_product(product_dir: Path, *, unmetered: bool) -> None:
+    action_path = product_dir / "action_configs.yaml"
+    payload = yaml.safe_load(action_path.read_text(encoding="utf-8"))
+    changed = 0
+    for item in payload["action_configs"]:
+        if item.get("provider_policy_ref") == FAKE_PROVIDER_POLICY_REF:
+            item["provider_policy_ref"] = LIVE_PROVIDER_POLICY_REF
+            changed += 1
+    if changed == 0:
+        raise ValueError(f"{product_dir.name}: no action config uses {FAKE_PROVIDER_POLICY_REF}")
+    if any(
+        item.get("provider_policy_ref") == FAKE_PROVIDER_POLICY_REF
+        for item in payload["action_configs"]
+    ):
+        raise ValueError(f"{product_dir.name}: fake provider policy remains after transform")
+    action_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    if unmetered:
+        product_path = product_dir / "product.yaml"
+        product = yaml.safe_load(product_path.read_text(encoding="utf-8"))
+        product.pop("quota_policy_ref", None)
+        product_path.write_text(yaml.safe_dump(product, sort_keys=False), encoding="utf-8")
+        (product_dir / "quotas.yaml").write_text("quota_policies: []\n", encoding="utf-8")
+
+
+def build_deployment_profile(
+    output_dir: Path,
+    enabled_product_ids: Sequence[str],
+    unmetered_product_ids: Set[str],
+) -> DeploymentProfileManifest:
+    if not enabled_product_ids:
+        raise ValueError("at least one enabled product is required")
+    if len(enabled_product_ids) != len(set(enabled_product_ids)):
+        raise ValueError("duplicate enabled product id")
+    if not unmetered_product_ids <= set(enabled_product_ids):
+        raise ValueError("unmetered product ids must be a subset of enabled products")
+
+    roots = FreelancerSuiteBundle().config_roots()
+    source_root = common_products_root(roots)
+    known_ids = {root.name for root in roots}
+    for product_id in enabled_product_ids:
+        if product_id not in known_ids:
+            raise ValueError(f"unknown product: {product_id}")
+
+    output_dir.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=output_dir.parent) as temporary:
+        temporary_root = Path(temporary)
+        staged = temporary_root / "profile"
+        staged_products = staged / "products"
+        shutil.copytree(source_root, staged_products)
+        expectations: dict[str, ProductProfileExpectation] = {}
+        for product_id in enabled_product_ids:
+            product_dir = staged_products / product_id
+            _transform_live_product(product_dir, unmetered=product_id in unmetered_product_ids)
+            source_product = yaml.safe_load(
+                (source_root / product_id / "product.yaml").read_text(encoding="utf-8")
+            )
+            expectations[product_id] = ProductProfileExpectation(
+                LIVE_PROVIDER_POLICY_REF,
+                None
+                if product_id in unmetered_product_ids
+                else source_product.get("quota_policy_ref"),
+            )
+
+        generated_roots = [staged_products / root.name for root in roots]
+        registry = ConfigLoader(
+            ROOT / "configs" / "kernel", extra_product_roots=generated_roots
+        ).load()
+        _assert_product_expectations(registry, expectations)
+        manifest = DeploymentProfileManifest(
+            source_products_root=str(source_root.resolve()),
+            generated_products_root=str((output_dir / "products").resolve()),
+            container_products_root=CONTAINER_PRODUCTS_ROOT.as_posix(),
+            enabled_products=expectations,
+            source_fingerprint=tree_fingerprint(source_root),
+            profile_fingerprint=tree_fingerprint(staged_products),
+        )
+        (staged / "manifest.json").write_text(
+            json.dumps(asdict(manifest), sort_keys=True, indent=2) + "\n", encoding="utf-8"
+        )
+        if output_dir.exists():
+            previous = temporary_root / "previous"
+            output_dir.rename(previous)
+            try:
+                staged.rename(output_dir)
+            except OSError:
+                previous.rename(output_dir)
+                raise
+        else:
+            staged.rename(output_dir)
+        return manifest
+
+
+def check_deployment_profile(
+    products_root: Path,
+    expected_fingerprint: str,
+    expectations: dict[str, ProductProfileExpectation],
+) -> None:
+    roots = FreelancerSuiteBundle().config_roots()
+    resolved_root = common_products_root(roots)
+    if resolved_root.resolve() != products_root.resolve():
+        raise ValueError(
+            f"resolved bundle products root {resolved_root} does not match {products_root}"
+        )
+    if not products_root.is_dir():
+        raise ValueError(f"products root does not exist: {products_root}")
+    actual_fingerprint = tree_fingerprint(products_root)
+    if actual_fingerprint != expected_fingerprint:
+        raise ValueError(
+            f"profile fingerprint mismatch: expected {expected_fingerprint}, "
+            f"got {actual_fingerprint}"
+        )
+    registry = ConfigLoader(ROOT / "configs" / "kernel", extra_product_roots=roots).load()
+    _assert_product_expectations(registry, expectations)
+
+
+def _parse_expectations(values: Sequence[str]) -> dict[str, ProductProfileExpectation]:
+    expectations: dict[str, ProductProfileExpectation] = {}
+    for value in values:
+        if "=" not in value or "," not in value:
+            raise ValueError(f"invalid expected product: {value}")
+        product_id, references = value.split("=", 1)
+        provider_ref, quota_ref = references.split(",", 1)
+        if not product_id or not provider_ref or not quota_ref or product_id in expectations:
+            raise ValueError(f"invalid or duplicate expected product: {value}")
+        expectations[product_id] = ProductProfileExpectation(
+            provider_ref, None if quota_ref == "-" else quota_ref
+        )
+    if not expectations:
+        raise ValueError("at least one expected product is required")
+    return expectations
+
 
 def load_registry(bundles: Iterable[ProductBundle] | None = None) -> ConfigRegistry:
     """Split out from main() so a test can inspect the loaded registry directly (e.g. assert a
@@ -60,17 +280,42 @@ def load_registry(bundles: Iterable[ProductBundle] | None = None) -> ConfigRegis
     return ConfigLoader(config_root, extra_product_roots=extra_product_roots).load()
 
 
-def main() -> int:
+def main(argv: Sequence[str] = ()) -> int:
+    arguments = list(argv)
     try:
+        if arguments:
+            parser = argparse.ArgumentParser(description="Validate canonical or deployment configs")
+            commands = parser.add_subparsers(dest="command", required=True)
+            build = commands.add_parser("build-deployment-profile")
+            build.add_argument("--output-dir", type=Path, required=True)
+            build.add_argument("--enabled-product", action="append", required=True)
+            build.add_argument("--unmetered-product", action="append", default=[])
+            check = commands.add_parser("check-deployment-profile")
+            check.add_argument("--products-root", type=Path, required=True)
+            check.add_argument("--expected-fingerprint", required=True)
+            check.add_argument("--expect-product", action="append", required=True)
+            try:
+                parsed = parser.parse_args(arguments)
+            except SystemExit as error:
+                return int(error.code)
+            if parsed.command == "build-deployment-profile":
+                manifest = build_deployment_profile(
+                    parsed.output_dir,
+                    parsed.enabled_product,
+                    set(parsed.unmetered_product),
+                )
+                print(f"Deployment profile built: {manifest.profile_fingerprint}")
+            else:
+                check_deployment_profile(
+                    parsed.products_root,
+                    parsed.expected_fingerprint,
+                    _parse_expectations(parsed.expect_product),
+                )
+                print(f"Deployment profile verified: {parsed.expected_fingerprint}")
+            return 0
         load_registry()
         load_model_capability_overrides(default_model_capability_overrides_path())
-    except RegistryLoadError as error:
-        print(str(error), file=sys.stderr)
-        return 1
-    except ConfigError as error:
-        print(str(error), file=sys.stderr)
-        return 1
-    except ValueError as error:
+    except (RegistryLoadError, ConfigError, ValueError, OSError, yaml.YAMLError) as error:
         print(str(error), file=sys.stderr)
         return 1
 
@@ -79,4 +324,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main(sys.argv[1:]))
