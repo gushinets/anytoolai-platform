@@ -35,12 +35,16 @@ class Settings(BaseModel):
     )
 
     @classmethod
-    def from_env(cls) -> "Settings":
-        values = {
-            field: os.environ[env_name]
-            for env_name, field in ATOM_LAB_RUN_LIMIT_ENV_FIELDS.items()
-            if env_name in os.environ
-        }
+    def from_env(cls, *, include_atom_lab_run_limits: bool = True) -> "Settings":
+        values = (
+            {
+                field: os.environ[env_name]
+                for env_name, field in ATOM_LAB_RUN_LIMIT_ENV_FIELDS.items()
+                if env_name in os.environ
+            }
+            if include_atom_lab_run_limits
+            else {}
+        )
         if "ANYTOOLAI_ENABLED_PRODUCT_IDS" in os.environ:
             values["enabled_product_ids"] = parse_product_ids(
                 os.environ["ANYTOOLAI_ENABLED_PRODUCT_IDS"]

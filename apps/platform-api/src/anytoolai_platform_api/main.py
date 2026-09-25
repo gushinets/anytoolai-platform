@@ -54,7 +54,7 @@ def create_app(
 ) -> FastAPI:
     configure_json_logging("platform-api")
     runtime = build_runtime(config_root, database_url=database_url)
-    settings = Settings.from_env()
+    settings = Settings.from_env(include_atom_lab_run_limits=False)
     if settings.enabled_product_ids is not None:
         unknown = settings.enabled_product_ids - runtime.config_registry.products.keys()
         if unknown:

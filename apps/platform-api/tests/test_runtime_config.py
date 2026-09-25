@@ -164,6 +164,12 @@ def test_unknown_enabled_product_fails_app_startup(monkeypatch) -> None:
         create_app()
 
 
+def test_invalid_atom_lab_limit_does_not_block_public_api_startup(monkeypatch) -> None:
+    monkeypatch.setenv("ANYTOOLAI_ATOM_LAB_RUN_BODY_MAX_BYTES", "invalid")
+    response = asyncio.run(_runtime_config_response("kernel_demo"))
+    assert response.status_code == HTTPStatus.OK
+
+
 def test_disabled_product_is_rejected_before_runtime_and_storage_access(monkeypatch) -> None:
     monkeypatch.setenv("ANYTOOLAI_ENABLED_PRODUCT_IDS", "proposal_ai")
     app = create_app()
