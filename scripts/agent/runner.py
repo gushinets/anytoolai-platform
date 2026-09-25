@@ -853,6 +853,18 @@ def atoms_proof() -> int:
 
 
 def live_canary() -> int:
+    surface = os.environ.get("ANYTOOLAI_LIVE_CANARY_SURFACE", "production").strip()
+    if surface == "atom-lab":
+        if not os.environ.get("ANYTOOLAI_ATOM_LAB_ACCESS_CODE", "").strip():
+            print(
+                "LIVE013: Atom Lab live-canary requires ANYTOOLAI_ATOM_LAB_ACCESS_CODE.",
+                file=sys.stderr,
+            )
+            return 2
+        return _run_proof_script(
+            "scripts/agent/live_canary.py", "ANYTOOLAI_LIVE_CANARY_DATABASE_URL"
+        )
+
     # Fail fast, before touching Docker/DB -- same precedent as postgresql_check(): a clear code
     # is better than a live_canary.py subprocess failing deep inside ProviderGateway/LiteLLM once
     # OPENAI_API_KEY turns out to be unset.
@@ -872,15 +884,6 @@ def live_canary() -> int:
             "LIVE011: live-canary requires ANYTOOLAI_LIVE_CANARY_TOKEN to be set (the live "
             "scenario_ids are internal_only -- platform-api rejects every case without a "
             "matching token).",
-            file=sys.stderr,
-        )
-        return 2
-    if (
-        os.environ.get("ANYTOOLAI_LIVE_CANARY_SURFACE", "production").strip() == "atom-lab"
-        and not os.environ.get("ANYTOOLAI_ATOM_LAB_ACCESS_CODE", "").strip()
-    ):
-        print(
-            "LIVE013: Atom Lab live-canary requires ANYTOOLAI_ATOM_LAB_ACCESS_CODE.",
             file=sys.stderr,
         )
         return 2

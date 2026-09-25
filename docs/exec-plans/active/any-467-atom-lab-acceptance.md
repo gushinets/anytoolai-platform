@@ -5,19 +5,37 @@
 - State: active
 - Owner: mixed
 - Created: 2026-09-24
-- Last updated: 2026-09-24
+- Last updated: 2026-09-25
 - Review date: 2026-09-24
 - Next action: run the credentialed Atom Lab live canary and record the privacy-safe evidence.
 - Blocker: required live-provider and protected-surface credentials are unavailable in this
   environment.
 - Branch: `feature/ANY-467`
 - Automated implementation: complete
-- Required live evidence: not executed; the current environment has no `OPENAI_API_KEY`,
-  `ANYTOOLAI_LIVE_CANARY_TOKEN`, or `ANYTOOLAI_ATOM_LAB_ACCESS_CODE`
+- Required live evidence: not executed; no configured live stack and matching
+  `ANYTOOLAI_ATOM_LAB_ACCESS_CODE` are available in the current environment
 - PostgreSQL acceptance gate: passed against a disposable local PostgreSQL 16 instance
 
 This record does not accept Atom Lab v1 while the required credentialed live gate is missing. Fake
 adapters prove plumbing and retry accounting only; they are not provider evidence.
+
+## 2026-09-25 review remediation plan
+
+- [x] Put the 11 non-smoke acceptance inputs in one repository fixture, drive that fixture through
+  the real browser Form-mode submission path, and reuse it at the HTTP/snapshot/ActionRunner
+  boundary.
+- [x] Parse the protected `/v1/atom-lab/atoms` response as its declared JSON array while retaining
+  the separate `/models` envelope contract.
+- [x] Validate each successful live result against the catalog's repository-owned output schema
+  and the configured semantic output validator before setting `result_valid=true`.
+- [x] Split runner prerequisites by surface so production retains its API-key/token checks while
+  the Atom Lab client requires only its access code and database/API connectivity.
+- [x] Treat terminal `worker_lease_lost` with no committed provider calls as unknown cost and abort
+  the remaining paid matrix.
+- [x] Verify every physical provider-call ledger row kept the requested direct model and reasoning
+  effort across retries, and accept only an exact or dated provider-confirmed version of that model.
+- [x] Run focused Python and Node suites, canonical quick-check, and documentation/architecture
+  checks; leave the credentialed-live blocker unresolved until the configured stack is available.
 
 ## Acceptance harness
 
@@ -42,14 +60,14 @@ provider-confirmed model IDs, reasoning effort, completion time, input/result va
 attempt/cost/token/latency counters, and pass/fail codes. It contains no prompt, submitted input,
 generated result, access code, API key, database URL, or hidden reasoning.
 
-Operator command after starting the normal API/PostgreSQL/worker stack with matching server-side
-configuration:
+First start the normal API/PostgreSQL/worker stack. `OPENAI_API_KEY` belongs to the worker and the
+configured `ANYTOOLAI_ATOM_LAB_ACCESS_CODE` belongs to platform-api; neither the provider key nor
+the production-only `ANYTOOLAI_LIVE_CANARY_TOKEN` is a Lab-client prerequisite. From an operator
+shell that can reach that stack and its PostgreSQL ledger, run:
 
 ```bash
 ANYTOOLAI_LIVE_CANARY_SURFACE=atom-lab \
 ANYTOOLAI_ATOM_LAB_ACCESS_CODE='<configured lab code>' \
-OPENAI_API_KEY='<provider key>' \
-ANYTOOLAI_LIVE_CANARY_TOKEN='<server live token>' \
 python3 scripts/agent/runner.py live-canary
 ```
 
@@ -62,10 +80,10 @@ one supported reasoning combination.
 | # | Evidence | Status |
 |---|---|---|
 | 1 | `apps/platform-api/tests/test_atom_lab_catalog.py::test_atom_lab_catalog_contains_all_eleven_atoms_in_stable_order`, `::test_every_atom_lab_example_passes_the_runtime_input_contracts`; live mode A01-A11 | Automated; live pending |
-| 2 | `tests/e2e/atom-lab-browser/atom-lab.test.mjs`: all-eleven form round-trip, omission/null/empty/false/zero, nested controls; `tests/test_live_canary.py::test_atom_lab_cases_cover_all_eleven_atoms_with_non_smoke_inputs` | Automated |
+| 2 | shared `tests/fixtures/atom_lab_acceptance_cases.json`; browser Form-mode POST coverage in `atom-lab.test.mjs`; HTTP/snapshot/ActionRunner bridge in `test_atom_lab_run_execution.py`; live matrix fixture validation in `test_live_canary.py` | Automated |
 | 3 | browser `prompt reset and example replacement are explicit dirty-state transitions`; schemas are rendered read-only by the protected journey tests | Automated |
-| 4 | `apps/platform-worker/tests/test_atom_lab_execution.py::test_parallel_lab_runs_do_not_leak_settings_into_an_ordinary_job`, `::test_lab_null_reasoning_reaches_adapter_without_inheriting_policy_default`, retry assertions in `::test_lab_retry_success_keeps_separate_physical_calls_after_restart`; live reasoning cases | Automated; live pending |
-| 5 | worker retry/ledger tests above and `apps/platform-api/tests/test_atom_lab_run_execution.py::test_http_worker_terminal_history_and_idempotent_replay`; the live mode reuses `atoms_proof._check_ledger` | Automated; live pending |
+| 4 | adapter isolation/null/retry tests in `test_atom_lab_execution.py`; live ledger checks require direct addressing and the requested model/effort on every physical attempt, plus exact/dated provider confirmation | Automated; live pending |
+| 5 | worker retry/ledger tests; HTTP terminal/replay test; live result validation against catalog output schema and configured semantic cross-validator before `result_valid=true` | Automated; live pending |
 | 6 | `packages/backend/platform-core/tests/unit/test_model_catalog_storage.py` initial/TTL/manual/lease/failure tests; `apps/platform-api/tests/test_atom_lab_models_api.py`; browser catalog state tests | Automated |
 | 7 | `apps/platform-api/tests/test_atom_lab_presets.py::test_create_read_list_version_and_export_preserves_immutable_payload`, `::test_new_version_is_append_only_and_rejects_stale_base`; PostgreSQL atomic version test; browser conflict/recovery journeys | Automated; PostgreSQL gate passed |
 | 8 | `apps/platform-api/tests/test_atom_lab_history.py` lifecycle/snapshot/retry/failure coverage; browser running/crash-failed and restore journeys | Automated |
@@ -76,14 +94,17 @@ one supported reasoning combination.
 
 ## Audit-specific matrix
 
-- Form/submitted/snapshot/ActionRunner equality for non-smoke A01-A11:
-  `apps/platform-api/tests/test_atom_lab_run_execution.py::test_submitted_payload_equals_snapshot_and_action_runner_input`,
-  `apps/platform-worker/tests/test_atom_lab_execution.py::test_worker_passes_each_atom_lab_payload_unchanged_to_executor`,
-  and the live A01-A11 matrix.
+- Form/submitted/snapshot/ActionRunner equality for non-smoke A01-A11 uses one shared fixture in
+  `atom-lab.test.mjs::all eleven non-smoke Form-mode drafts emit the shared acceptance POST payloads`
+  and `test_atom_lab_run_execution.py::test_browser_acceptance_payload_equals_snapshot_and_action_runner_input`;
+  the live canary consumes that same fixture.
 - Model/effort at the adapter: direct addressing, explicit-null behavior, retry stability and
-  ordinary-job isolation are covered in `test_atom_lab_execution.py`.
-- Crash/restart: durable pending snapshot, `worker_lease_lost` reconciliation for interrupted
-  running jobs, and immutable terminal replay are covered in `test_atom_lab_execution.py`.
+  ordinary-job isolation are covered in `test_atom_lab_execution.py`; the live canary additionally
+  checks `gateway_model`, `metadata.model_addressing`, and `metadata.reasoning_effort` on every
+  physical provider-call row and constrains provider confirmation to an exact or dated model.
+- Crash/restart: durable pending snapshot and reconciliation remain covered in
+  `test_atom_lab_execution.py`; canary regressions treat `worker_lease_lost` with an empty committed
+  ledger as unknown spend and prove that every later paid case is skipped.
 - Catalog: initial load, TTL, manual refresh, one PostgreSQL lease, expired-lease recovery and
   refresh without workflow jobs are covered by `test_model_catalog_storage.py` and
   `test_model_catalog_hook.py`.
@@ -94,7 +115,8 @@ one supported reasoning combination.
 
 ## Verification record
 
-- 2026-09-24 final `python3 scripts/agent/runner.py quick-check`: 1908 passed, 480 deselected.
+- 2026-09-25 final `python3 scripts/agent/runner.py quick-check`: 1929 passed, 480 deselected.
+- 2026-09-25 Atom Lab Node unit suite: 52 passed; ESLint passed; Chromium: 78 passed.
 - 2026-09-24 focused live-canary/atoms-proof/runner tests: passed.
 - 2026-09-24 focused worker retry and explicit-null reasoning tests: passed.
 - 2026-09-24 `uv run python scripts/agent/runner.py postgresql-check`: passed against a disposable
@@ -109,8 +131,8 @@ one supported reasoning combination.
 - 2026-09-24 independent read-only review: no remaining Critical or Important findings after
   correcting real snapshot nesting, rejecting blank evidence IDs, requiring provider model/date,
   and making admission, polling, timeout, and replay ambiguity cost-closed.
-- Credentialed Atom Lab live run: blocked because this environment has no real provider, server
-  live-canary, or Atom Lab access credentials.
+- Credentialed Atom Lab live run: blocked because this environment has no configured live stack
+  and matching Atom Lab access credential.
 
 ## Completion rule
 

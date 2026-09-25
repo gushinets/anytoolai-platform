@@ -11,7 +11,10 @@ import sys
 from pathlib import Path
 
 import pytest
-from anytoolai_platform_actions.structured_llm.cross_validation import build_input_validators
+from anytoolai_platform_actions.structured_llm.cross_validation import (
+    build_input_validators,
+    build_output_cross_validators,
+)
 from anytoolai_platform_api.atom_lab.catalog import build_atom_catalog
 from anytoolai_platform_core.config.loader import ConfigLoader
 from jsonschema import validate as validate_json_schema
@@ -65,10 +68,21 @@ def test_live_atom_cases_has_eleven_entries_matching_atom_smoke_cases_action_typ
 def test_atom_lab_cases_cover_all_eleven_atoms_with_non_smoke_inputs() -> None:
     """ANY-467: the live Lab matrix must exercise submitted values, not smoke literals."""
     module = load_live_canary_module()
+    fixture = json.loads(
+        (
+            Path(__file__).resolve().parent
+            / "fixtures"
+            / "atom_lab_acceptance_cases.json"
+        ).read_text(encoding="utf-8")
+    )
 
     assert [case.atom_id for case in module.ATOM_LAB_CASES] == [
         f"A{index:02d}" for index in range(1, 12)
     ]
+    assert [
+        {"atom_id": case.atom_id, "input": case.input_payload}
+        for case in module.ATOM_LAB_CASES
+    ] == fixture
     serialized_inputs = {
         json.dumps(case.input_payload, sort_keys=True) for case in module.ATOM_LAB_CASES
     }
@@ -147,6 +161,69 @@ def test_select_atom_lab_model_addresses_raw_catalog_id_for_run_admission() -> N
     assert module._select_atom_lab_model(
         catalog, requested_model_id="openai/gpt-5.4-mini",
     ) == ("openai/gpt-5.4-mini", ("high",))
+
+
+@pytest.mark.parametrize(
+    ("mutate", "response_model_id", "expected"),
+    [
+        (lambda rows: rows, "gpt-5.4-mini-2026-09-01", True),
+        (
+            lambda rows: [{**rows[0], "gateway_model": "openai/gpt-5.4"}, rows[1]],
+            "gpt-5.4-mini-2026-09-01",
+            False,
+        ),
+        (
+            lambda rows: [
+                rows[0],
+                {
+                    **rows[1],
+                    "metadata": {
+                        **rows[1]["metadata"],
+                        "model_addressing": "policy_alias",
+                    },
+                },
+            ],
+            "gpt-5.4-mini-2026-09-01",
+            False,
+        ),
+        (
+            lambda rows: [
+                rows[0],
+                {
+                    **rows[1],
+                    "metadata": {
+                        **rows[1]["metadata"],
+                        "reasoning_effort": None,
+                    },
+                },
+            ],
+            "gpt-5.4-mini-2026-09-01",
+            False,
+        ),
+        (lambda rows: rows, "gpt-5.4-2026-09-01", False),
+    ],
+)
+def test_atom_lab_provider_calls_keep_direct_model_and_effort_across_retries(
+    mutate, response_model_id, expected,
+) -> None:
+    module = load_live_canary_module()
+    rows = [
+        {
+            "gateway_model": "openai/gpt-5.4-mini",
+            "metadata": {"model_addressing": "direct", "reasoning_effort": "high"},
+        },
+        {
+            "gateway_model": "openai/gpt-5.4-mini",
+            "metadata": {"model_addressing": "direct", "reasoning_effort": "high"},
+        },
+    ]
+
+    assert module._provider_calls_match_atom_lab_request(
+        mutate(rows),
+        requested_model_id="openai/gpt-5.4-mini",
+        reasoning_effort="high",
+        response_model_id=response_model_id,
+    ) is expected
 
 
 def test_run_atom_lab_case_replays_idempotently_and_records_verified_evidence(monkeypatch) -> None:
@@ -248,6 +325,7 @@ def test_run_atom_lab_case_replays_idempotently_and_records_verified_evidence(mo
         return next(details)
 
     checked = {}
+    fetched_sessions = []
 
     def fake_check_ledger(engine, **kwargs):
         checked.update(kwargs)
@@ -259,6 +337,14 @@ def test_run_atom_lab_case_replays_idempotently_and_records_verified_evidence(mo
 
     monkeypatch.setattr(module.atoms_proof.smoke, "_http_json_request", fake_request)
     monkeypatch.setattr(module.atoms_proof, "_check_ledger", fake_check_ledger)
+    monkeypatch.setattr(
+        module,
+        "_fetch_atom_lab_provider_calls",
+        lambda engine, session_id: fetched_sessions.append(session_id) or [{
+            "gateway_model": "openai/gpt-5.4-mini",
+            "metadata": {"model_addressing": "direct", "reasoning_effort": "high"},
+        }],
+    )
     monkeypatch.setattr(module.time, "sleep", lambda _seconds: None)
 
     case = module._run_atom_lab_case(
@@ -282,6 +368,7 @@ def test_run_atom_lab_case_replays_idempotently_and_records_verified_evidence(mo
     assert case.result_valid is True
     assert case.finished_at == "2026-09-24T10:00:02Z"
     assert checked["scenario_session_id"] == "session-1"
+    assert fetched_sessions == ["session-1"]
     posts = [call for call in calls if call[1] == "POST"]
     assert len(posts) == 2
     assert posts[0][2] == posts[1][2]
@@ -324,6 +411,44 @@ def test_atom_lab_http_failure_marks_cost_unknown_when_ledger_recovery_fails(
     assert result.status == "fail"
     assert result.error_code == "LIVE022"
     assert result.session_id == "session-1"
+    assert result.cost_unknown is True
+
+
+def test_atom_lab_worker_lease_loss_with_empty_ledger_stops_costed_matrix(monkeypatch) -> None:
+    """A crashed worker may have reached the provider before its ledger transaction rolled back."""
+    module = load_live_canary_module()
+    responses = iter([
+        {
+            "run_id": "run-1", "scenario_session_id": "session-1",
+            "job_id": "job-1", "status": "queued",
+        },
+        {
+            "run_id": "run-1",
+            "status": "failed",
+            "diagnostics": {"error_code": "worker_lease_lost"},
+        },
+    ])
+    monkeypatch.setattr(
+        module.atoms_proof.smoke,
+        "_http_json_request",
+        lambda *args, **kwargs: next(responses),
+    )
+    monkeypatch.setattr(
+        module.atoms_proof, "_known_steps_for_session", lambda engine, session_id: (),
+    )
+
+    result = module._run_atom_lab_case(
+        "http://api", object(),
+        case=module.AtomLabCase(
+            atom_id="A01",
+            input_payload={"source_text": "acceptance", "fields": [], "strict": False},
+        ),
+        prompt="Prompt", model_id="openai/gpt-5.4-mini", reasoning_effort=None,
+        access_code="lab-secret", timeout=1.0,
+    )
+
+    assert result.error_code == "LIVE022"
+    assert result.steps == ()
     assert result.cost_unknown is True
 
 
@@ -452,6 +577,81 @@ def test_atom_lab_success_requires_actual_model_and_completion_date(
     assert result.input_valid is True
 
 
+@pytest.mark.parametrize(
+    "invalid_result",
+    [
+        {"unexpected": True},
+        {
+            "values": {"unrequested": "2026-10-17"},
+            "missing_fields": ["delivery_date"],
+            "confidence": {"unrequested": 0.9},
+        },
+    ],
+)
+def test_atom_lab_success_rejects_result_outside_repository_output_contract(
+    monkeypatch, invalid_result,
+) -> None:
+    """A succeeded envelope is not evidence until schema and semantic validation both pass."""
+    module = load_live_canary_module()
+    registry = ConfigLoader(Path(__file__).resolve().parents[1] / "configs" / "kernel").load()
+    atom = {item.atom_id: item for item in build_atom_catalog(registry)}["A01"]
+    validator = build_output_cross_validators(registry.action_definitions)[atom.action_type]
+    input_payload = {
+        "source_text": "Acceptance delivery date is 2026-10-17.",
+        "fields": [{
+            "name": "delivery_date", "type": "date",
+            "description": "Delivery date", "required": True,
+        }],
+        "strict": False,
+    }
+    responses = iter([
+        {
+            "run_id": "run-1", "scenario_session_id": "session-1",
+            "job_id": "job-1", "status": "queued",
+        },
+        {
+            "run_id": "run-1", "status": "succeeded",
+            "snapshot": {
+                "atom_id": "A01", "input": input_payload,
+                "prompt": {"content": "Prompt"},
+                "provider": {
+                    "model_id": "openai/gpt-5.4-mini", "reasoning_effort": None,
+                },
+                "preset": {"id": None, "version": None},
+            },
+            "runtime_ids": {
+                "scenario_session_id": "session-1", "job_id": "job-1",
+                "action_run_id": "action-1", "artifact_id": "artifact-1",
+            },
+            "result": invalid_result,
+            "diagnostics": {
+                "requested_model_id": "openai/gpt-5.4-mini",
+                "requested_reasoning_effort": None,
+                "response_model_id": "gpt-5.4-mini-2026-09-01",
+            },
+            "finished_at": "2026-09-24T10:00:02Z",
+        },
+    ])
+    monkeypatch.setattr(
+        module.atoms_proof.smoke,
+        "_http_json_request",
+        lambda *args, **kwargs: next(responses),
+    )
+    monkeypatch.setattr(module.atoms_proof, "_known_steps_for_session", lambda *args: ())
+
+    result = module._run_atom_lab_case(
+        "http://api", object(),
+        case=module.AtomLabCase(atom_id="A01", input_payload=input_payload),
+        prompt="Prompt", model_id="openai/gpt-5.4-mini", reasoning_effort=None,
+        access_code="lab-secret", timeout=1.0,
+        output_schema=atom.output_schema,
+        output_validator=validator,
+    )
+
+    assert result.error_code == "LIVE031"
+    assert result.result_valid is False
+
+
 @pytest.mark.parametrize("replay_outcome", ["mismatch", "response_lost", "non_object"])
 def test_atom_lab_idempotency_mismatch_fails_cost_closed(monkeypatch, replay_outcome) -> None:
     """ANY-467: an unproven replay may have launched a second paid execution."""
@@ -561,16 +761,21 @@ def test_run_atom_lab_reuses_catalog_prompts_and_adds_supported_reasoning_combin
 ) -> None:
     """ANY-467: the existing canary runs 11 Lab atoms plus catalog-supported effort smokes."""
     module = load_live_canary_module()
-    requested: list[tuple[str, str, str | None]] = []
+    registry = ConfigLoader(Path(__file__).resolve().parents[1] / "configs" / "kernel").load()
+    catalog_by_atom = {item.atom_id: item for item in build_atom_catalog(registry)}
+    requested: list[tuple[str, str, str | None, dict, object | None]] = []
 
     def fake_request(url, **kwargs):
         if url.endswith("/atoms"):
-            return {
-                "items": [
-                    {"atom_id": case.atom_id, "prompt": f"live prompt {case.atom_id}"}
-                    for case in module.ATOM_LAB_CASES
-                ]
-            }
+            return [
+                {
+                    "atom_id": case.atom_id,
+                    "action_type": catalog_by_atom[case.atom_id].action_type,
+                    "prompt": f"live prompt {case.atom_id}",
+                    "output_schema": catalog_by_atom[case.atom_id].output_schema,
+                }
+                for case in module.ATOM_LAB_CASES
+            ]
         if url.endswith("/models"):
             return {
                 "items": [{
@@ -582,7 +787,13 @@ def test_run_atom_lab_reuses_catalog_prompts_and_adds_supported_reasoning_combin
         raise AssertionError(url)
 
     def fake_case(api_url, engine, *, case, prompt, model_id, reasoning_effort, **kwargs):
-        requested.append((case.atom_id, prompt, reasoning_effort))
+        requested.append((
+            case.atom_id,
+            prompt,
+            reasoning_effort,
+            kwargs["output_schema"],
+            kwargs["output_validator"],
+        ))
         return module.EvidenceCase(
             label=case.label or case.atom_id, scenario_id=f"atom-lab.{case.atom_id}",
             kind=case.kind, status="pass", session_id="session", job_id="job",
@@ -603,15 +814,78 @@ def test_run_atom_lab_reuses_catalog_prompts_and_adds_supported_reasoning_combin
 
     assert exit_code == 0
     assert len(cases) == 13
-    assert requested[:11] == [
-        (case.atom_id, f"live prompt {case.atom_id}", None)
-        for case in module.ATOM_LAB_CASES
-    ]
-    assert requested[11:] == [
+    for case, captured in zip(module.ATOM_LAB_CASES, requested[:11], strict=True):
+        atom_id, prompt, effort, output_schema, output_validator = captured
+        assert (atom_id, prompt, effort) == (
+            case.atom_id, f"live prompt {case.atom_id}", None,
+        )
+        assert output_schema == catalog_by_atom[case.atom_id].output_schema
+        expected_ref = registry.action_definitions[
+            catalog_by_atom[case.atom_id].action_type
+        ].cross_validator_ref
+        assert (output_validator is not None) is (expected_ref != "none")
+    assert [(atom_id, prompt, effort) for atom_id, prompt, effort, _, _ in requested[11:]] == [
         ("A01", "live prompt A01", "low"),
         ("A01", "live prompt A01", "high"),
     ]
     assert [case.kind for case in cases[11:]] == ["reasoning", "reasoning"]
+
+
+def test_run_atom_lab_stops_after_worker_lease_loss_leaves_cost_unknown(monkeypatch) -> None:
+    """A post-send crash with rolled-back ledger rows must skip every later paid case."""
+    module = load_live_canary_module()
+    registry = ConfigLoader(Path(__file__).resolve().parents[1] / "configs" / "kernel").load()
+    catalog = build_atom_catalog(registry)
+    attempted = []
+
+    def fake_request(url, **kwargs):
+        if url.endswith("/atoms"):
+            return [
+                {
+                    "atom_id": item.atom_id,
+                    "action_type": item.action_type,
+                    "prompt": item.prompt,
+                    "output_schema": item.output_schema,
+                }
+                for item in catalog
+            ]
+        if url.endswith("/models"):
+            return {"items": [{
+                "model_id": "gpt-5.4-mini", "compatibility": "compatible",
+                "reasoning_supported": True, "allowed_reasoning_efforts": ["high"],
+            }]}
+        raise AssertionError(url)
+
+    def fake_case(api_url, engine, *, case, **kwargs):
+        attempted.append(case.atom_id)
+        return module.EvidenceCase(
+            label=case.label or case.atom_id,
+            scenario_id=f"atom-lab.{case.atom_id}",
+            kind=case.kind,
+            status="fail",
+            session_id="session-1",
+            job_id="job-1",
+            error_code="LIVE022",
+            error_message="worker lease lost after provider send",
+            steps=(),
+            cost_unknown=True,
+        )
+
+    monkeypatch.setattr(module.atoms_proof.smoke, "_http_json_request", fake_request)
+    monkeypatch.setattr(module, "_run_atom_lab_case", fake_case)
+    monkeypatch.setattr(
+        module.atoms_proof, "_build_engine", lambda database_url, **kwargs: _FakeEngine()
+    )
+
+    cases, exit_code = module.run_atom_lab(
+        "http://api", "postgresql://unused", timeout=1.0, max_total_cost_usd=1.0,
+        access_code="lab-secret", requested_model_id=None,
+    )
+
+    assert attempted == ["A01"]
+    assert exit_code == 1
+    assert cases[0].error_code == "LIVE022" and cases[0].cost_unknown is True
+    assert all(case.error_code == "LIVE012" for case in cases[1:])
 
 
 def test_main_routes_atom_lab_surface_to_existing_canary_and_separate_evidence_root(

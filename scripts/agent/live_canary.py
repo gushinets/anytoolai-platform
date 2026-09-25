@@ -10,21 +10,33 @@ Reuses atoms_proof.py's HTTP/DB/evidence machinery wholesale (_run_case_with_led
 _build_engine, _fail, write_evidence_report) instead of duplicating it -- this script only adds
 the live scenario-id substitution and the cost-abort loop.
 
-Invoked by scripts/agent/runner.py's live-canary command, which fails fast if OPENAI_API_KEY is
-unset before this script (or Docker) ever starts. Costs real money when it runs -- never part of
-quick-check/full-check/postgresql-check.
+Invoked by scripts/agent/runner.py's live-canary command. The production surface requires its
+client-side OpenAI/token prerequisites; the Atom Lab surface authenticates only with its protected
+access code while provider credentials remain on the already-running worker. Costs real money when
+it runs -- never part of quick-check/full-check/postgresql-check.
 """
 
 from __future__ import annotations
 
+import json
 import math
 import os
+import re
 import sys
 import time
 import uuid
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
+
+from anytoolai_platform_actions.structured_llm.cross_validation import (
+    build_output_cross_validators,
+)
+from anytoolai_platform_core.config.loader import ConfigLoader
+from anytoolai_platform_core.structured_output.errors import StructuredOutputValidationError
+from jsonschema import SchemaError as JsonSchemaSchemaError
+from jsonschema import ValidationError as JsonSchemaValidationError
+from jsonschema import validate as validate_json_schema
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
@@ -57,8 +69,8 @@ DEFAULT_MAX_TOTAL_COST_USD = 0.50
 # physical provider calls per action (retry_policy.hard_limits.max_physical_provider_calls_per_
 # action: 4, from 2 transport attempts x 2 validation attempts), so a live case that legitimately
 # retried once was failing as a PROOF003 correctness bug. Not read dynamically from that YAML
-# (this script deliberately keeps no ConfigLoader dependency for a pure ledger-correctness check)
-# -- if the policy's own cap ever changes, this constant needs updating to match.
+# rather than resolving this one limit dynamically -- if the policy's own cap ever changes, this
+# constant needs updating to match.
 _LIVE_PROVIDER_MAX_CALLS_PER_ACTION = 4
 
 LIVE_CANARY_TOKEN_ENV_VAR = "ANYTOOLAI_LIVE_CANARY_TOKEN"
@@ -77,77 +89,15 @@ class AtomLabCase:
     kind: str = "atom"
 
 
-# Deliberately distinct from the deterministic smoke literals. These values exercise the full
-# laboratory passthrough while remaining valid against the repo-owned A01-A11 input contracts.
-ATOM_LAB_CASES: tuple[AtomLabCase, ...] = (
-    AtomLabCase("A01", {
-        "source_text": "Acceptance A01: delivery is 17 October and costs 91500 EUR.",
-        "fields": [
-            {
-                "name": "delivery_date", "type": "date", "description": "Delivery date",
-                "required": True,
-            },
-            {"name": "price_eur", "type": "number", "description": "Price", "required": False},
-        ],
-        "strict": False,
-    }),
-    AtomLabCase("A02", {
-        "text_a": "Acceptance A02: audited prototype in nine days.",
-        "text_b": "The brief requires the prototype within twelve days.",
-        "rubric": [{"id": "deadline", "description": "Meets the deadline", "weight": 3}],
-    }),
-    AtomLabCase("A03", {
-        "text": "Acceptance A03: every milestone names an owner and verification step.",
-        "axes": [
-            {"id": "ownership", "description": "Explicit owners", "weight": 2},
-            {"id": "verification", "description": "Acceptance checks", "weight": 4},
-        ],
-    }),
-    AtomLabCase("A04", {
-        "source_text": "Acceptance A04: approver and rollback plan are missing.",
-        "context": "Release readiness review",
-        "taxonomy": ["approval", "rollback"],
-    }),
-    AtomLabCase("A05", {
-        "issues": [{
-            "category": "ownership", "description": "No approver is named.",
-            "severity": "medium", "evidence": "The approval field is blank.",
-        }],
-        "context": "Acceptance A05 launch decision", "target_audience": "Release manager",
-        "max_questions": 2,
-    }),
-    AtomLabCase("A06", {
-        "context": {"product": "Acceptance A06", "saved_hours_per_week": 11},
-        "objective": "Secure approval for a measurement pilot", "audience": "Operations lead",
-        "angle": "Measure saved time before rollout",
-        "constraints": {"tone": "firm", "length": 640, "language": "en-GB", "format": "plain_text"},
-    }),
-    AtomLabCase("A07", {
-        "situation": "Acceptance A07: customer asks whether the audit can start Tuesday.",
-        "intent": "Confirm availability and request repository access", "tone": "neutral",
-        "constraints": {"language": "en", "max_length": 420, "output_format": "markdown"},
-    }),
-    AtomLabCase("A08", {
-        "source_text": "Acceptance A08: We can probably deliver something soon.",
-        "gap": "Replace ambiguity with a measurable delivery commitment", "style": "bold",
-    }),
-    AtomLabCase("A09", {
-        "signals": [
-            {"id": "evidence", "label": "Acceptance evidence", "value": "three verified pilots"},
-            {"id": "risk", "label": "Delivery risk", "value": 0},
-        ],
-        "objective": "Select the strongest acceptance argument", "options": ["speed", "proof"],
-    }),
-    AtomLabCase("A10", {
-        "template_ref": "acceptance_summary_v1",
-        "data": {"project": "Acceptance A10", "approved": False, "variance": 0, "notes": None},
-    }),
-    AtomLabCase("A11", {
-        "subject_text": "Acceptance A11 pilot delivered in nine days.",
-        "reference_text": "The brief requires delivery within twelve days.",
-        "categories": ["match", "gap"],
-        "criteria": [{"id": "deadline", "description": "Delivery deadline"}],
-    }),
+# One fixture is consumed by the live canary, the browser Form-mode submission test, and the
+# HTTP/snapshot/ActionRunner bridge test. This makes "the same 11 non-smoke values" executable
+# evidence instead of three independently maintained copies.
+_ATOM_LAB_ACCEPTANCE_FIXTURE = (
+    REPO_ROOT / "tests" / "fixtures" / "atom_lab_acceptance_cases.json"
+)
+ATOM_LAB_CASES: tuple[AtomLabCase, ...] = tuple(
+    AtomLabCase(atom_id=item["atom_id"], input_payload=item["input"])
+    for item in json.loads(_ATOM_LAB_ACCEPTANCE_FIXTURE.read_text(encoding="utf-8"))
 )
 
 
@@ -191,6 +141,34 @@ def _select_atom_lab_model(
     return model_id, tuple(efforts)
 
 
+def _provider_calls_match_atom_lab_request(
+    provider_calls: list[dict[str, Any]],
+    *,
+    requested_model_id: str,
+    reasoning_effort: str | None,
+    response_model_id: str,
+) -> bool:
+    """Confirm direct settings on every attempt and the provider's exact/dated model alias."""
+    requested_raw = requested_model_id.removeprefix("openai/")
+    response_raw = response_model_id.removeprefix("openai/")
+    confirmed_model_matches = response_raw == requested_raw or re.fullmatch(
+        rf"{re.escape(requested_raw)}-\d{{4}}-\d{{2}}-\d{{2}}",
+        response_raw,
+    ) is not None
+    return bool(provider_calls) and confirmed_model_matches and all(
+        call.get("gateway_model") == requested_model_id
+        and isinstance(call.get("metadata"), dict)
+        and call["metadata"].get("model_addressing") == "direct"
+        and call["metadata"].get("reasoning_effort") == reasoning_effort
+        for call in provider_calls
+    )
+
+
+def _fetch_atom_lab_provider_calls(engine: Any, session_id: str) -> list[dict[str, Any]]:
+    with engine.connect() as connection:
+        return atoms_proof._fetch_provider_calls(connection, session_id)
+
+
 def _run_atom_lab_case(
     api_url: str,
     engine: Any,
@@ -201,6 +179,8 @@ def _run_atom_lab_case(
     reasoning_effort: str | None,
     access_code: str,
     timeout: float,
+    output_schema: dict[str, Any] | None = None,
+    output_validator: Any | None = None,
 ) -> EvidenceCase:
     label = case.label or case.atom_id
     scenario_id = f"atom-lab.{label}"
@@ -281,7 +261,12 @@ def _run_atom_lab_case(
         if status == "succeeded":
             break
         if status in {"failed", "expired", "cancelled"}:
-            return failure("LIVE022")
+            diagnostics = detail.get("diagnostics")
+            lease_lost = (
+                isinstance(diagnostics, dict)
+                and diagnostics.get("error_code") == "worker_lease_lost"
+            )
+            return failure("LIVE022", ambiguous_cost=lease_lost)
         time.sleep(0.25)
     else:
         return failure("LIVE023", ambiguous_cost=True)
@@ -324,6 +309,17 @@ def _run_atom_lab_case(
     result = detail.get("result")
     if not isinstance(result, (dict, list)):
         return failure("LIVE027")
+    if output_schema is not None:
+        try:
+            validate_json_schema(instance=result, schema=output_schema)
+            if output_validator is not None:
+                output_validator.validate(input_payload=case.input_payload, output=result)
+        except (
+            JsonSchemaSchemaError,
+            JsonSchemaValidationError,
+            StructuredOutputValidationError,
+        ):
+            return failure("LIVE031")
     finished_at = detail.get("finished_at")
     if not isinstance(finished_at, str) or not finished_at.strip():
         return failure("LIVE030")
@@ -347,6 +343,24 @@ def _run_atom_lab_case(
         scenario_session_id=session_id,
         max_provider_calls_per_action=_LIVE_PROVIDER_MAX_CALLS_PER_ACTION,
     )
+    if ledger.status == "pass":
+        try:
+            provider_calls = _fetch_atom_lab_provider_calls(engine, session_id)
+        except atoms_proof.sa.exc.SQLAlchemyError:
+            return replace(
+                failure("LIVE032", ambiguous_cost=True),
+                response_model_id=diagnostics["response_model_id"],
+            )
+        if not _provider_calls_match_atom_lab_request(
+            provider_calls,
+            requested_model_id=model_id,
+            reasoning_effort=reasoning_effort,
+            response_model_id=diagnostics["response_model_id"],
+        ):
+            return replace(
+                failure("LIVE032"),
+                response_model_id=diagnostics["response_model_id"],
+            )
     return replace(
         ledger,
         run_id=run_id,
@@ -383,16 +397,27 @@ def run_atom_lab(
         model_id, efforts = _select_atom_lab_model(
             models, requested_model_id=requested_model_id
         )
-        prompt_by_atom = {
-            item["atom_id"]: item["prompt"]
-            for item in catalog["items"]
-            if isinstance(item, dict)
-            and isinstance(item.get("atom_id"), str)
-            and isinstance(item.get("prompt"), str)
-            and item["prompt"].strip()
+        if not isinstance(catalog, list):
+            raise ValueError("Atom Lab catalog is not an array")
+        atom_by_id = {
+            item["atom_id"]: item
+            for item in catalog
+            if isinstance(item, dict) and isinstance(item.get("atom_id"), str)
         }
-        if set(prompt_by_atom) != {case.atom_id for case in ATOM_LAB_CASES}:
+        expected_atom_ids = {case.atom_id for case in ATOM_LAB_CASES}
+        if len(catalog) != len(expected_atom_ids) or set(atom_by_id) != expected_atom_ids:
             raise ValueError("Atom Lab catalog does not contain exactly A01-A11 prompts")
+        for atom in atom_by_id.values():
+            if (
+                not isinstance(atom.get("prompt"), str)
+                or not atom["prompt"].strip()
+                or not isinstance(atom.get("action_type"), str)
+                or not atom["action_type"].strip()
+                or not isinstance(atom.get("output_schema"), dict)
+            ):
+                raise ValueError("Atom Lab catalog has malformed execution contracts")
+        registry = ConfigLoader(REPO_ROOT / "configs" / "kernel").load()
+        output_validators = build_output_cross_validators(registry.action_definitions)
         if not efforts:
             raise ValueError("selected Atom Lab model has no confirmed reasoning effort")
         engine = atoms_proof._build_engine(
@@ -422,11 +447,15 @@ def run_atom_lab(
                 api_url,
                 engine,
                 case=case,
-                prompt=prompt_by_atom[case.atom_id],
+                prompt=atom_by_id[case.atom_id]["prompt"],
                 model_id=model_id,
                 reasoning_effort=effort,
                 access_code=access_code,
                 timeout=timeout,
+                output_schema=atom_by_id[case.atom_id]["output_schema"],
+                output_validator=output_validators.get(
+                    atom_by_id[case.atom_id]["action_type"]
+                ),
             )
             cases.append(result)
             if result.status == "pass":

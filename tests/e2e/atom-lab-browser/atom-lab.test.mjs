@@ -70,6 +70,10 @@ const EXAMPLES = {
   A10: {template_ref: "project_summary_v1", data: {project: "Atom Lab", status: "готово"}, style: "concise"},
   A11: {subject_text: "Пилот за две недели", reference_text: "Не позднее трёх недель", categories: ["соответствует", "не соответствует"], criteria: [{id: "deadline", description: "Срок", weight: 1}]},
 };
+const ACCEPTANCE_CASES = JSON.parse(await readFile(
+  new URL("tests/fixtures/atom_lab_acceptance_cases.json", REPO_ROOT),
+  "utf8",
+));
 
 class FakeClassList {
   constructor() { this.values = new Set(); }
@@ -257,6 +261,57 @@ test("all eleven current atom examples render through actual form controls", asy
     await assert.doesNotReject(() => elements.get("fill-example").click(), atomId);
     assert.deepEqual(getDraftPayload(controller.getSession()), EXAMPLES[atomId], atomId);
     assert.ok(elements.get("input-editor").children.length > 0, atomId);
+  }
+});
+
+test("all eleven non-smoke Form-mode drafts emit the shared acceptance POST payloads", async () => {
+  for (const acceptanceCase of ACCEPTANCE_CASES) {
+    const {document, elements} = createFakeDocument();
+    const atom = await catalogAtom(acceptanceCase.atom_id, {
+      example_input: acceptanceCase.input,
+    });
+    const posts = [];
+    const controller = bootstrapAtomLab({
+      document,
+      fetchImpl: async (url, options = {}) => {
+        if (url.endsWith("/atoms")) {
+          return {ok: true, status: 200, async json() { return [atom]; }};
+        }
+        if (url.endsWith("/models")) {
+          return {ok: true, status: 200, async json() { return {
+            items: [{
+              model_id: "gpt-supported",
+              compatibility: "compatible",
+              reason: "confirmed_openai_text_gpt",
+              reasoning_supported: false,
+              allowed_reasoning_efforts: null,
+              provenance: {},
+            }],
+            snapshot_id: "snapshot-current",
+            last_success_at: "2026-09-25T00:00:00Z",
+            stale: false,
+            refresh_status: "current",
+            error: null,
+          }; }};
+        }
+        if (url.endsWith("/runs") && options.method === "POST") {
+          posts.push(JSON.parse(options.body));
+          return {ok: false, status: 503, async json() { return null; }};
+        }
+        throw new Error(`Unexpected request ${url}`);
+      },
+      confirmImpl: () => true,
+      idempotencyKeyFactory: () => `acceptance-${acceptanceCase.atom_id}`,
+    });
+    elements.get("access-code").value = "secret";
+    await elements.get("access-form").dispatch("submit");
+    await elements.get("fill-example").click();
+
+    assert.equal(controller.getSession().mode, "form", acceptanceCase.atom_id);
+    await elements.get("run-button").click();
+    assert.equal(posts.length, 1, acceptanceCase.atom_id);
+    assert.deepEqual(posts[0].input, acceptanceCase.input, acceptanceCase.atom_id);
+    assert.equal(posts[0].atom_id, acceptanceCase.atom_id);
   }
 });
 
