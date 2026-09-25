@@ -87,11 +87,13 @@ class RunWorkflowHandler:
         runner_factory: RunnerFactory,
         lease: JobLease | None = None,
         config_registry: ConfigRegistry | None = None,
+        enabled_product_ids: frozenset[str] | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._runner_factory = runner_factory
         self._lease = lease if lease is not None else NullJobLease()
         self._config_registry = config_registry
+        self._enabled_product_ids = enabled_product_ids
 
     async def handle(self, job_id: str) -> JobRecord | None:
         try:
@@ -220,6 +222,27 @@ class RunWorkflowHandler:
                 )
                 job = repository.get(job_id)
                 if job is None or job.status is not JobStatus.created:
+                    return None
+
+                if (
+                    self._enabled_product_ids is not None
+                    and job.product_id not in self._enabled_product_ids
+                ):
+                    scenario = self._load_scenario(session, job)
+                    WorkflowJobService(repository, emitter).mark_failed_from_created(
+                        replace(
+                            job,
+                            status=JobStatus.failed,
+                            metadata=enrich_job_metadata_with_scenario_identity(
+                                job.metadata, scenario
+                            ),
+                            error_code="product_disabled",
+                            error_message_safe="Product is disabled.",
+                            completed_at=job.completed_at or utc_now(),
+                        ),
+                        error_code="product_disabled",
+                    )
+                    scenario_service.mark_failed(scenario, error_code="product_disabled")
                     return None
 
                 # Held until handle()'s finally releases it after the terminal-state

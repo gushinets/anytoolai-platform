@@ -66,6 +66,7 @@ services:
   platform-worker:
     environment:
       <<: *postgres-credentials
+      ANYTOOLAI_ENABLED_PRODUCT_IDS: ${ANYTOOLAI_ENABLED_PRODUCT_IDS:?enabled products are required}
     restart: unless-stopped
     deploy:
       resources:

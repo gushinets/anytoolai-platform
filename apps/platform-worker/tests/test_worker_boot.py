@@ -1979,6 +1979,39 @@ def test_lease_is_acquired_before_claim_and_released_after_success(
     assert lease.calls == [("acquire", job.id), ("release", job.id)]
 
 
+def test_disabled_product_job_is_terminal_without_running_provider(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    job = _seed_job(session_factory, input_payload={"source_text": "queued before deploy"})
+    calls: list[str] = []
+
+    def runner_factory(session: sa.orm.Session) -> RecordingRunner:
+        calls.append("provider")
+        return RecordingRunner(session)
+
+    worker = Worker(RunWorkflowHandler(
+        session_factory=session_factory,
+        runner_factory=runner_factory,
+        enabled_product_ids=frozenset({"proposal_ai"}),
+    ))
+    result = asyncio.run(worker.process_job(job.id))
+
+    assert result is not None
+    assert result.status is JobStatus.failed
+    assert result.error_code == "product_disabled"
+    assert calls == []
+    with transaction_boundary(session_factory) as session:
+        scenario = ScenarioSessionRepository(session).get(
+            job.scenario_session_id,
+            tenant_id=job.tenant_id,
+            region=job.region,
+            product_id=job.product_id,
+            frontend_id=job.frontend_id,
+        )
+        assert scenario is not None
+        assert scenario.status is ScenarioSessionStatus.failed
+
+
 def test_lease_is_released_after_handler_failure(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
