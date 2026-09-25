@@ -2435,6 +2435,85 @@ test("ambiguous version recovery opens the preset normally after its owner sessi
   await expect(page.locator("#save-preset")).toBeEnabled();
 });
 
+test("history preset draft does not inherit ambiguous recovery ownership", async ({page}) => {
+  const first = {
+    name: "Исходный recovery preset", description: "Сохранённое описание", atom_id: "A06",
+    base_action_config_id: A06.base_action_config_id, schema_refs: A06.schema_refs,
+    prompt: A06.prompt, prompt_ref: A06.prompt_ref,
+    model_id: "openai/gpt-supported", reasoning_effort: "high", fixed_fields: [],
+    example_input: A06.example_input, source_run_id: null,
+    preset_id: "preset-history-replacement", version: 1, created_at: "2026-09-25T07:06:00Z",
+  };
+  const detail = historyDetail({runId: "run-replaces-preset-draft"});
+  await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
+    const request = route.request();
+    const {pathname} = new URL(request.url());
+    if (pathname === "/v1/atom-lab/runs") {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [{
+        run_id: detail.run_id, status: detail.status, atom_id: "A06", model_id: "openai/gpt-supported",
+        preset_id: null, preset_version: null, created_at: detail.created_at,
+        started_at: detail.started_at, finished_at: detail.finished_at,
+      }], next_cursor: null})});
+      return;
+    }
+    if (pathname === `/v1/atom-lab/runs/${detail.run_id}`) {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify(detail)});
+      return;
+    }
+    if (pathname === "/v1/atom-lab/presets") {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [{
+        preset_id: first.preset_id, latest_version: 1, name: first.name,
+        description: first.description, atom_id: first.atom_id,
+        created_at: first.created_at, updated_at: first.created_at,
+      }], next_cursor: null})});
+      return;
+    }
+    if (pathname === `/v1/atom-lab/presets/${first.preset_id}/versions`
+      && request.method() === "POST") {
+      await route.abort("connectionreset");
+      return;
+    }
+    if (pathname === `/v1/atom-lab/presets/${first.preset_id}/versions`) {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [{
+        preset_id: first.preset_id, version: 1, name: first.name,
+        description: first.description, atom_id: first.atom_id, created_at: first.created_at,
+      }], next_cursor: null})});
+      return;
+    }
+    if (pathname === `/v1/atom-lab/presets/${first.preset_id}/versions/1`) {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify(first)});
+      return;
+    }
+    await route.fallback();
+  });
+
+  let dialogs = 0;
+  page.on("dialog", (dialog) => {
+    dialogs += 1;
+    dialog.accept();
+  });
+  await unlockAtom(page, "A06");
+  await page.locator("#presets-button").click();
+  await page.getByRole("button", {name: /Исходный recovery preset/}).click();
+  await page.locator("#preset-description").fill("Неизвестно сохранённый исходный draft");
+  await page.locator("#save-preset").click();
+  await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
+
+  await page.locator("#history-button").click();
+  await page.locator("#history-list button").click();
+  await page.locator("#save-history-preset").click();
+  await expect(page.locator("#preset-name")).toHaveValue(`Запуск ${detail.run_id}`);
+  expect(dialogs).toBe(1);
+
+  await page.getByRole("button", {name: /Исходный recovery preset/}).click();
+
+  expect(dialogs).toBe(2);
+  await expect(page.locator("#preset-version-select")).toHaveValue("1");
+  await expect(page.locator("#preset-name")).toHaveValue(first.name);
+  await expect(page.locator("#preset-description")).toHaveValue(first.description);
+  await expect(page.locator("#preset-error")).toHaveText("");
+});
+
 test("history-derived ambiguous recovery does not preserve a replaced owner session", async ({page}) => {
   const detail = historyDetail({runId: "run-history-recovery"});
   let savedBody = null;

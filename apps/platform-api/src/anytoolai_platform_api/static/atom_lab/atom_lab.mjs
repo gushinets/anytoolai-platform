@@ -2140,7 +2140,10 @@ export function bootstrapAtomLab({
       ? presetSaveOutcomeUnknown
       : null;
     const preservesRecoveryDraft = unknownUpdateRecovery
-      && session === unknownUpdateRecovery.ownerSession;
+      && session === unknownUpdateRecovery.ownerSession
+      && selectedPresetVersion?.preset_id === unknownUpdateRecovery.presetId
+      && selectedPresetVersion.version === unknownUpdateRecovery.baseVersion
+      && presetSourceOverride === unknownUpdateRecovery.ownerPresetSource;
     if (!preservesRecoveryDraft && !force && hasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return false;
     const generation = ++presetOpenGeneration;
     presetVersionPageGeneration += 1;
@@ -2351,6 +2354,7 @@ export function bootstrapAtomLab({
             expectedVersion,
             payload: cloneJson(payload),
             ownerSession: session,
+            ownerPresetSource: presetSourceOverride,
             preserveEditor,
           } : {}),
         };
