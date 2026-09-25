@@ -181,19 +181,24 @@ def build_deployment_profile(
         if product_id not in known_ids:
             raise ValueError(f"unknown product: {product_id}")
 
+    source_fingerprint = tree_fingerprint(source_root)
     output_dir.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=output_dir.parent) as temporary:
         temporary_root = Path(temporary)
         staged = temporary_root / "profile"
         staged_products = staged / "products"
         shutil.copytree(source_root, staged_products)
+        if tree_fingerprint(staged_products) != source_fingerprint:
+            raise ValueError("source products changed while deployment profile was copied")
+        if tree_fingerprint(source_root) != source_fingerprint:
+            raise ValueError("source products changed while deployment profile was copied")
         expectations: dict[str, ProductProfileExpectation] = {}
         for product_id in enabled_product_ids:
             product_dir = staged_products / product_id
-            _transform_live_product(product_dir, unmetered=product_id in unmetered_product_ids)
             source_product = yaml.safe_load(
-                (source_root / product_id / "product.yaml").read_text(encoding="utf-8")
+                (product_dir / "product.yaml").read_text(encoding="utf-8")
             )
+            _transform_live_product(product_dir, unmetered=product_id in unmetered_product_ids)
             expectations[product_id] = ProductProfileExpectation(
                 LIVE_PROVIDER_POLICY_REF,
                 None
@@ -212,7 +217,7 @@ def build_deployment_profile(
             container_products_root=CONTAINER_PRODUCTS_ROOT.as_posix(),
             enabled_products=expectations,
             unmetered_product_ids=tuple(sorted(unmetered_product_ids)),
-            source_fingerprint=tree_fingerprint(source_root),
+            source_fingerprint=source_fingerprint,
             profile_fingerprint=tree_fingerprint(staged_products),
         )
         manifest_path = staged / "manifest.json"
