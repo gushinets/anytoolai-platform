@@ -742,7 +742,7 @@ def _resolved_env_file(path: Path) -> dict[str, str]:
             try:
                 result = subprocess.run(
                     command, cwd=ROOT, env=env, capture_output=True,
-                    text=True, check=False, timeout=10,
+                    text=True, check=False, timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
                 )
             except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
                 raise ValueError("Docker Compose could not resolve the env file") from exc
@@ -1863,7 +1863,7 @@ def _prod_up_locked() -> int:
         return 127
     except subprocess.TimeoutExpired:
         print(
-            "PROD003: docker compose ps did not respond within 10s — "
+            f"PROD003: docker compose ps did not respond within {COMPOSE_QUERY_TIMEOUT_SECONDS:g}s — "
             "is the Docker daemon running and responsive?",
             file=sys.stderr,
         )
@@ -1890,9 +1890,12 @@ def _prod_up_locked() -> int:
         _stop_failed_prod_candidate()
         return exit_code
     try:
-        exit_code = prod_ready(inputs=inputs, manifest=manifest)
+        exit_code = prod_ready(inputs=inputs, manifest=manifest, announce=False)
         if exit_code == 0:
             _activate_deployment_profile(PROD_COMPOSE_PROJECT, manifest)
+            print(f"API: http://127.0.0.1:{api_port}")
+            print(f"Web: http://127.0.0.1:{web_port}")
+            print("Production environment is ready")
             return 0
     except Exception:
         _stop_failed_prod_candidate()
@@ -1993,7 +1996,10 @@ def _prod_fake_ready(*, env: dict[str, str] | None = None) -> int:
 
 
 def prod_ready(
-    *, inputs: DeploymentInputs | None = None, manifest: dict[str, object] | None = None
+    *,
+    inputs: DeploymentInputs | None = None,
+    manifest: dict[str, object] | None = None,
+    announce: bool = True,
 ) -> int:
     try:
         inputs = inputs or _deployment_inputs()
@@ -2042,9 +2048,10 @@ def prod_ready(
     exit_code = _run_effective_profile_checks(_prod_live_compose_command(), manifest, env)
     if exit_code != 0:
         return exit_code
-    print(f"API: http://127.0.0.1:{api_port}")
-    print(f"Web: http://127.0.0.1:{web_port}")
-    print("Production environment is ready")
+    if announce:
+        print(f"API: http://127.0.0.1:{api_port}")
+        print(f"Web: http://127.0.0.1:{web_port}")
+        print("Production environment is ready")
     return 0
 
 

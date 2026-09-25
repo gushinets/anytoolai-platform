@@ -164,6 +164,48 @@ def test_unknown_enabled_product_fails_app_startup(monkeypatch) -> None:
         create_app()
 
 
+def test_live_candidate_blocks_mutations_until_activation(monkeypatch, tmp_path) -> None:
+    marker = tmp_path / "active-profile"
+    monkeypatch.setenv("ANYTOOLAI_ENABLED_PRODUCT_IDS", "proposal_ai")
+    monkeypatch.setenv(
+        "ANYTOOLAI_DEPLOYMENT_ACTIVATION_NAME", "freelancer-suite.candidate"
+    )
+    monkeypatch.setenv("ANYTOOLAI_DEPLOYMENT_ACTIVATION_MARKER", str(marker))
+    app = create_app()
+    app.dependency_overrides[get_session_factory] = lambda: pytest.fail(
+        "inactive deployment must reject mutation before storage access"
+    )
+
+    async def request_all() -> tuple[httpx.Response, httpx.Response, httpx.Response]:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            runtime = await client.get("/v1/products/proposal_ai/runtime-config")
+            blocked = await client.post(
+                "/v1/products/proposal_ai/scenarios/proposal_ai.generate_v1/start",
+                json={"frontend_id": "proposal_ai_web", "input": {}},
+            )
+            marker.write_text("freelancer-suite.candidate\n", encoding="utf-8")
+            enabled = await client.post(
+                "/v1/products/client_update_writer/scenarios/client_update_writer.update_v1/start",
+                json={"frontend_id": "client_update_writer_web", "input": {}},
+            )
+            return runtime, blocked, enabled
+
+    runtime, blocked, enabled = asyncio.run(request_all())
+    assert runtime.status_code == HTTPStatus.OK
+    assert blocked.status_code == HTTPStatus.SERVICE_UNAVAILABLE
+    assert blocked.json()["error"]["code"] == "deployment_not_active"
+    assert enabled.status_code == HTTPStatus.NOT_FOUND
+    assert enabled.json()["error"]["code"] == "product_not_found"
+
+
+def test_deployment_activation_env_requires_name_and_marker(monkeypatch) -> None:
+    monkeypatch.setenv("ANYTOOLAI_DEPLOYMENT_ACTIVATION_NAME", "candidate")
+    monkeypatch.delenv("ANYTOOLAI_DEPLOYMENT_ACTIVATION_MARKER", raising=False)
+    with pytest.raises(ValueError, match="must be set together"):
+        Settings.from_env()
+
+
 def test_invalid_atom_lab_limit_does_not_block_public_api_startup(monkeypatch) -> None:
     monkeypatch.setenv("ANYTOOLAI_ATOM_LAB_RUN_BODY_MAX_BYTES", "invalid")
     response = asyncio.run(_runtime_config_response("kernel_demo"))

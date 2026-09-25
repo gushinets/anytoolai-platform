@@ -1527,7 +1527,12 @@ def test_prod_up_builds_profile_before_live_compose_and_ready(monkeypatch) -> No
             commands.append(list(command)) or environments.append(env) or events.append("up") or 0
         ),
     )
-    monkeypatch.setattr(runner, "prod_ready", lambda **kwargs: events.append("ready") or 0)
+    def fake_prod_ready(**kwargs):
+        assert kwargs["announce"] is False
+        events.append("ready")
+        return 0
+
+    monkeypatch.setattr(runner, "prod_ready", fake_prod_ready)
     monkeypatch.setattr(
         runner, "_activate_deployment_profile",
         lambda project, manifest: events.append("activate"),
@@ -1551,17 +1556,21 @@ def test_prod_up_builds_profile_before_live_compose_and_ready(monkeypatch) -> No
     assert "ANYTOOLAI_UNMETERED_PRODUCT_IDS" not in commands[0]
 
 
-def test_live_compose_gates_worker_on_activation_marker():
+def test_live_compose_gates_api_mutations_and_worker_on_activation_marker():
     runner = load_runner_module()
     live = yaml.safe_load(runner.COMPOSE_LIVE_FILE.read_text(encoding="utf-8"))
-    worker = live["services"]["platform-worker"]
-    assert worker["environment"]["ANYTOOLAI_DEPLOYMENT_ACTIVATION_NAME"]
     state_root = "${ANYTOOLAI_DEPLOYMENT_STATE_ROOT:?deployment state root is required}"
-    assert any(
-        volume.get("source") == state_root
-        and volume.get("target") == "/app/live-profile-state"
-        for volume in worker["volumes"]
-    )
+    for service_name in ("platform-api", "platform-worker"):
+        service = live["services"][service_name]
+        assert service["environment"]["ANYTOOLAI_DEPLOYMENT_ACTIVATION_NAME"]
+        assert service["environment"]["ANYTOOLAI_DEPLOYMENT_ACTIVATION_MARKER"] == (
+            "/app/live-profile-state/active-profile"
+        )
+        assert any(
+            volume.get("source") == state_root
+            and volume.get("target") == "/app/live-profile-state"
+            for volume in service["volumes"]
+        )
 
 
 @pytest.mark.skipif(os.name != "posix", reason="POSIX worker entrypoint")
@@ -2498,6 +2507,29 @@ def test_live_env_file_supports_quotes_blank_comments_and_shell_precedence(monke
     assert env["OPENAI_API_KEY"] == "shell key"
     assert env["ANYTOOLAI_LLM_HTTPS_PROXY"] == ""
     assert env["OTHER"] == "quoted value"
+
+
+def test_env_file_resolution_uses_compose_query_timeout(monkeypatch, tmp_path):
+    runner = load_runner_module()
+    env_file = tmp_path / ".env.live"
+    env_file.write_text("REVIEW_PROBE=value\n", encoding="utf-8")
+    captured = {}
+
+    def fake_run(command, **kwargs):
+        captured["timeout"] = kwargs["timeout"]
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            json.dumps(
+                {"services": {"env-probe": {"environment": {"REVIEW_PROBE": "value"}}}}
+            ),
+            "",
+        )
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+
+    assert runner._resolved_env_file(env_file)["REVIEW_PROBE"] == "value"
+    assert captured["timeout"] == runner.COMPOSE_QUERY_TIMEOUT_SECONDS
 
 
 def test_live_env_file_accepts_export_prefix(monkeypatch, tmp_path):

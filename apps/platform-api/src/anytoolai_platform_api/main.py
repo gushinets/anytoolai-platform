@@ -45,6 +45,7 @@ from starlette.responses import Response
 CORS_ORIGINS_ENV = "ANYTOOLAI_API_CORS_ORIGINS"
 CHROME_EXTENSION_ORIGIN_REGEX = r"^chrome-extension://[a-p]{32}$"
 logger = logging.getLogger(__name__)
+SAFE_PREACTIVATION_HTTP_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 
 def create_app(
@@ -100,6 +101,23 @@ def _configured_cors_origins() -> list[str]:
     return [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
 
 
+def _deployment_mutation_is_blocked(request: Request) -> bool:
+    if request.method in SAFE_PREACTIVATION_HTTP_METHODS:
+        return False
+    settings: Settings = request.app.state.settings
+    activation_name = settings.deployment_activation_name
+    if activation_name is None:
+        return False
+    activation_marker = settings.deployment_activation_marker
+    if activation_marker is None:
+        return True
+    try:
+        selected = Path(activation_marker).read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeError):
+        return True
+    return selected != activation_name
+
+
 def _install_request_context(app: FastAPI) -> None:
     @app.middleware("http")
     async def request_context_middleware(
@@ -111,7 +129,17 @@ def _install_request_context(app: FastAPI) -> None:
         token = bind_log_context(request_id=request_id)
         started = perf_counter()
         try:
-            response = await call_next(request)
+            if _deployment_mutation_is_blocked(request):
+                response = await api_error_handler(
+                    request,
+                    ApiError(
+                        status_code=503,
+                        code="deployment_not_active",
+                        message="Deployment is not active.",
+                    ),
+                )
+            else:
+                response = await call_next(request)
             response.headers[REQUEST_ID_HEADER] = request_id
             apply_atom_lab_cache_policy(request, response)
             log_event(

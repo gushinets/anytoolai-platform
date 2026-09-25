@@ -2,6 +2,8 @@ services:
   platform-api:
     environment:
       ANYTOOLAI_DEPLOYMENT_PROFILE_FINGERPRINT: ${ANYTOOLAI_DEPLOYMENT_PROFILE_FINGERPRINT:?live profile fingerprint is required}
+      ANYTOOLAI_DEPLOYMENT_ACTIVATION_NAME: ${ANYTOOLAI_DEPLOYMENT_ACTIVATION_NAME:?activation name is required}
+      ANYTOOLAI_DEPLOYMENT_ACTIVATION_MARKER: /app/live-profile-state/active-profile
       ANYTOOLAI_ENABLED_PRODUCT_IDS: ${ANYTOOLAI_ENABLED_PRODUCT_IDS:?enabled products are required}
       ANYTOOLAI_UNMETERED_PRODUCT_IDS: ${ANYTOOLAI_UNMETERED_PRODUCT_IDS-}
     volumes:
@@ -12,6 +14,10 @@ services:
       - type: bind
         source: ${ANYTOOLAI_DEPLOYMENT_MANIFEST_PATH:?live profile manifest is required}
         target: /app/live-profile-manifest.json
+        read_only: true
+      - type: bind
+        source: ${ANYTOOLAI_DEPLOYMENT_STATE_ROOT:?deployment state root is required}
+        target: /app/live-profile-state
         read_only: true
   platform-worker:
     environment:
