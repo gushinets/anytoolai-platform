@@ -82,6 +82,8 @@ services:
           cpus: "1.0"
           memory: 512M
   web-mirror:
+    environment:
+      ANYTOOLAI_ENABLED_PRODUCT_IDS: ${ANYTOOLAI_ENABLED_PRODUCT_IDS:?enabled products are required}
     build:
       context: ../..
       dockerfile: infra/docker/web-mirror.Dockerfile
@@ -94,7 +96,16 @@ services:
     ports:
       - "127.0.0.1:${ANYTOOLAI_PROD_WEB_PORT:-3000}:3000"
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))"]
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          const id=(process.env.ANYTOOLAI_ENABLED_PRODUCT_IDS||'').split(',')[0].trim();
+          if(!id) process.exit(1);
+          fetch('http://127.0.0.1:3000/v1/products/'+encodeURIComponent(id)+'/runtime-config')
+          .then(async r=>{if(!r.ok||(await r.json()).product_id!==id) process.exit(1)})
+          .catch(()=>process.exit(1))
       interval: 5s
       timeout: 5s
       retries: 12

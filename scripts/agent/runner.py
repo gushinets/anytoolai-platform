@@ -1656,11 +1656,27 @@ def prod_up() -> int:
         env,
     )
     if exit_code != 0:
+        _stop_failed_prod_candidate()
         return exit_code
-    exit_code = prod_ready(inputs=inputs, manifest=manifest)
-    if exit_code == 0:
-        _activate_deployment_profile(PROD_COMPOSE_PROJECT, manifest)
+    try:
+        exit_code = prod_ready(inputs=inputs, manifest=manifest)
+        if exit_code == 0:
+            _activate_deployment_profile(PROD_COMPOSE_PROJECT, manifest)
+            return 0
+    except Exception:
+        _stop_failed_prod_candidate()
+        raise
+    _stop_failed_prod_candidate()
     return exit_code
+
+
+def _stop_failed_prod_candidate() -> None:
+    if prod_down() != 0:
+        print(
+            "PROD005: failed production candidate could not be stopped; "
+            "run python scripts/agent/runner.py prod-down immediately",
+            file=sys.stderr,
+        )
 
 
 def prod_fake_up() -> int:
@@ -1700,6 +1716,7 @@ def _prod_fake_ready() -> int:
     for name, url in (
         ("API", f"http://127.0.0.1:{api_port}/health"),
         ("web", f"http://127.0.0.1:{web_port}/"),
+        ("web API", f"http://127.0.0.1:{web_port}/v1/products/kernel_demo/runtime-config"),
     ):
         if not _wait_for_http_ok(url, timeout):
             print(
@@ -1750,6 +1767,11 @@ def prod_ready(
     for name, url in (
         ("API", f"http://127.0.0.1:{api_port}/health"),
         ("web", f"http://127.0.0.1:{web_port}/"),
+        (
+            "web API",
+            f"http://127.0.0.1:{web_port}/v1/products/"
+            f"{quote(inputs.enabled_product_ids[0], safe='')}/runtime-config",
+        ),
     ):
         if not _wait_for_http_ok(url, timeout):
             print(

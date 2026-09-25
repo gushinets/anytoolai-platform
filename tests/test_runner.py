@@ -1387,6 +1387,35 @@ def test_prod_up_builds_profile_before_live_compose_and_ready(monkeypatch) -> No
     assert "ANYTOOLAI_UNMETERED_PRODUCT_IDS" not in commands[0]
 
 
+@pytest.mark.parametrize("up_exit,ready_exit", [(1, None), (0, 1)])
+def test_prod_up_stops_candidate_after_start_or_readiness_failure(
+    monkeypatch, up_exit, ready_exit
+) -> None:
+    runner = load_runner_module()
+    inputs = runner.DeploymentInputs(
+        ("proposal_ai",), frozenset({"proposal_ai"}), PROD_LIVE_VALUES.copy()
+    )
+    events: list[str] = []
+    monkeypatch.setattr(runner, "_deployment_inputs", lambda: inputs)
+    monkeypatch.setattr(
+        runner, "_build_deployment_profile",
+        lambda *args: (0, {"generated_products_root": "C:/generated/products"}),
+    )
+    monkeypatch.setattr(runner, "_prod_stack_running", lambda: True)
+    monkeypatch.setattr(runner, "run_with_env", lambda command, env: events.append("up") or up_exit)
+    monkeypatch.setattr(
+        runner, "prod_ready", lambda **kwargs: events.append("ready") or ready_exit
+    )
+    monkeypatch.setattr(runner, "prod_down", lambda: events.append("down") or 0)
+    monkeypatch.setattr(
+        runner, "_activate_deployment_profile",
+        lambda *args: pytest.fail("failed candidate must not become active"),
+    )
+
+    assert runner.prod_up() == 1
+    assert events == (["up", "down"] if up_exit else ["up", "ready", "down"])
+
+
 def test_prod_ready_checks_web_and_identical_container_profiles(monkeypatch, capsys) -> None:
     runner = load_runner_module()
     inputs = runner.DeploymentInputs(
@@ -1415,7 +1444,11 @@ def test_prod_ready_checks_web_and_identical_container_profiles(monkeypatch, cap
     )
 
     assert runner.prod_ready(inputs=inputs, manifest=manifest) == 0
-    assert urls == ["http://127.0.0.1:8000/health", "http://127.0.0.1:3000/"]
+    assert urls == [
+        "http://127.0.0.1:8000/health",
+        "http://127.0.0.1:3000/",
+        "http://127.0.0.1:3000/v1/products/proposal_ai/runtime-config",
+    ]
     assert len(commands) == 2
     assert (
         commands[0][commands[0].index("python") + 1 :]
@@ -1608,7 +1641,11 @@ def test_prod_fake_ready_waits_for_health(monkeypatch) -> None:
     monkeypatch.setattr(runner.urllib.request, "urlopen", fake_urlopen)
 
     assert runner._prod_fake_ready() == 0
-    assert requested_urls == ["http://127.0.0.1:8000/health", "http://127.0.0.1:3000/"]
+    assert requested_urls == [
+        "http://127.0.0.1:8000/health",
+        "http://127.0.0.1:3000/",
+        "http://127.0.0.1:3000/v1/products/kernel_demo/runtime-config",
+    ]
 
 
 def test_prod_fake_ready_rejects_unhealthy_web(monkeypatch, capsys) -> None:
@@ -1650,7 +1687,11 @@ def test_prod_fake_ready_uses_prod_port_variable_not_dev_port(monkeypatch) -> No
     )
 
     assert runner._prod_fake_ready() == 0
-    assert requested_urls == ["http://127.0.0.1:18900/health", "http://127.0.0.1:19300/"]
+    assert requested_urls == [
+        "http://127.0.0.1:18900/health",
+        "http://127.0.0.1:19300/",
+        "http://127.0.0.1:19300/v1/products/kernel_demo/runtime-config",
+    ]
 
 
 def test_prod_fake_ready_times_out_with_prod004(monkeypatch, capsys) -> None:
