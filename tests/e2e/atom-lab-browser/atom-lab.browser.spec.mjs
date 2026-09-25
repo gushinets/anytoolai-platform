@@ -2372,6 +2372,154 @@ test("ambiguous version write with no new server version unlocks retry and keeps
   await expect(page.locator("#save-preset")).toBeEnabled();
 });
 
+test("ambiguous version recovery opens the preset normally after its owner session is replaced", async ({page}) => {
+  const first = {
+    name: "Пресет после смены session", description: "Сохранённое описание", atom_id: "A06",
+    base_action_config_id: A06.base_action_config_id, schema_refs: A06.schema_refs,
+    prompt: A06.prompt, prompt_ref: A06.prompt_ref,
+    model_id: "openai/gpt-supported", reasoning_effort: "high", fixed_fields: [],
+    example_input: A06.example_input, source_run_id: null,
+    preset_id: "preset-replaced-session", version: 1, created_at: "2026-09-25T07:05:00Z",
+  };
+  await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
+    const request = route.request();
+    const {pathname} = new URL(request.url());
+    if (pathname === "/v1/atom-lab/presets") {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [{
+        preset_id: first.preset_id, latest_version: 1, name: first.name,
+        description: first.description, atom_id: first.atom_id,
+        created_at: first.created_at, updated_at: first.created_at,
+      }], next_cursor: null})});
+      return;
+    }
+    if (pathname === `/v1/atom-lab/presets/${first.preset_id}/versions`
+      && request.method() === "POST") {
+      await route.abort("connectionreset");
+      return;
+    }
+    if (pathname === `/v1/atom-lab/presets/${first.preset_id}/versions`) {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [{
+        preset_id: first.preset_id, version: 1, name: first.name,
+        description: first.description, atom_id: first.atom_id, created_at: first.created_at,
+      }], next_cursor: null})});
+      return;
+    }
+    if (pathname === `/v1/atom-lab/presets/${first.preset_id}/versions/1`) {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify(first)});
+      return;
+    }
+    await route.fallback();
+  });
+
+  let dialogs = 0;
+  page.on("dialog", (dialog) => {
+    dialogs += 1;
+    dialog.accept();
+  });
+  await unlockAtom(page, "A06");
+  await page.locator("#presets-button").click();
+  await page.getByRole("button", {name: /Пресет после смены session/}).click();
+  await page.locator("#preset-description").fill("Неизвестно сохранённый draft");
+  await page.locator("#save-preset").click();
+  await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
+
+  await page.getByRole("button", {name: /A05/}).click();
+  await expect(page.locator("#atom-title")).toContainText("A05");
+  await page.getByRole("button", {name: /Пресет после смены session/}).click();
+
+  expect(dialogs).toBe(1);
+  await expect(page.locator("#atom-title")).toContainText("A06");
+  await expect(page.locator("#preset-version-select")).toHaveValue("1");
+  await expect(page.locator("#preset-description")).toHaveValue("Сохранённое описание");
+  await expect(page.locator("#preset-error")).toHaveText("");
+  await expect(page.locator("#save-preset")).toBeEnabled();
+});
+
+test("history-derived ambiguous recovery does not preserve a replaced owner session", async ({page}) => {
+  const detail = historyDetail({runId: "run-history-recovery"});
+  let savedBody = null;
+  await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
+    const request = route.request();
+    const {pathname} = new URL(request.url());
+    if (pathname === "/v1/atom-lab/runs") {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [{
+        run_id: detail.run_id, status: detail.status, atom_id: "A06", model_id: "openai/gpt-supported",
+        preset_id: null, preset_version: null, created_at: detail.created_at,
+        started_at: detail.started_at, finished_at: detail.finished_at,
+      }], next_cursor: null})});
+      return;
+    }
+    if (pathname === `/v1/atom-lab/runs/${detail.run_id}`) {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify(detail)});
+      return;
+    }
+    if (pathname === "/v1/atom-lab/presets" && request.method() === "POST") {
+      savedBody = request.postDataJSON();
+      await route.fulfill({status: 201, contentType: "application/json", body: JSON.stringify({
+        preset_id: "history-recovery-preset", version: 1, created_at: "2026-09-25T07:07:00Z",
+      })});
+      return;
+    }
+    if (pathname === "/v1/atom-lab/presets") {
+      const items = savedBody ? [{
+        preset_id: "history-recovery-preset", latest_version: 1, name: savedBody.name,
+        description: savedBody.description, atom_id: savedBody.atom_id,
+        created_at: "2026-09-25T07:07:00Z", updated_at: "2026-09-25T07:07:00Z",
+      }] : [];
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({items, next_cursor: null})});
+      return;
+    }
+    if (pathname === "/v1/atom-lab/presets/history-recovery-preset/versions"
+      && request.method() === "POST") {
+      await route.abort("connectionreset");
+      return;
+    }
+    if (pathname === "/v1/atom-lab/presets/history-recovery-preset/versions") {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [{
+        preset_id: "history-recovery-preset", version: 1, name: savedBody.name,
+        description: savedBody.description, atom_id: savedBody.atom_id,
+        created_at: "2026-09-25T07:07:00Z",
+      }], next_cursor: null})});
+      return;
+    }
+    if (pathname === "/v1/atom-lab/presets/history-recovery-preset/versions/1") {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({
+        ...savedBody, preset_id: "history-recovery-preset", version: 1,
+        created_at: "2026-09-25T07:07:00Z",
+      })});
+      return;
+    }
+    await route.fallback();
+  });
+
+  let dialogs = 0;
+  page.on("dialog", (dialog) => {
+    dialogs += 1;
+    dialog.accept();
+  });
+  await unlockAtom(page, "A05");
+  await page.locator("#history-button").click();
+  await page.locator("#history-list button").click();
+  await page.locator("#save-history-preset").click();
+  await page.locator("#preset-name").fill("History recovery preset");
+  await page.locator("#preset-description").fill("Сохранённая history версия");
+  await page.locator("#save-preset").click();
+  await expect(page.locator("#preset-version-select")).toHaveValue("1");
+
+  await page.locator("#preset-description").fill("Неизвестно сохранённое history обновление");
+  await page.locator("#save-preset").click();
+  await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
+  await page.getByRole("button", {name: /A11/}).click();
+  await expect(page.locator("#atom-title")).toContainText("A11");
+  await page.getByRole("button", {name: /History recovery preset/}).click();
+
+  expect(dialogs).toBe(1);
+  await expect(page.locator("#atom-title")).toContainText("A06");
+  await expect(page.locator("#preset-version-select")).toHaveValue("1");
+  await expect(page.locator("#preset-description")).toHaveValue("Сохранённая history версия");
+  await expect(page.locator("#preset-error")).toHaveText("");
+});
+
 test("ambiguous version write reconciles an exact committed version without discarding the draft", async ({page}) => {
   const first = {
     name: "Пресет exact recovery", description: "До обновления", atom_id: "A06",

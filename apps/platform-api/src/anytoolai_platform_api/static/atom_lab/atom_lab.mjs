@@ -2119,7 +2119,7 @@ export function bootstrapAtomLab({
       ? presetSaveOutcomeUnknown
       : null;
     const preservesRecoveryDraft = unknownUpdateRecovery
-      && (unknownUpdateRecovery.preserveEditor || session === unknownUpdateRecovery.ownerSession);
+      && session === unknownUpdateRecovery.ownerSession;
     if (!preservesRecoveryDraft && !force && hasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return false;
     const generation = ++presetOpenGeneration;
     presetVersionPageGeneration += 1;
@@ -2160,7 +2160,9 @@ export function bootstrapAtomLab({
       } : preset;
       presetItems = presetItems.map((item) => item.preset_id === summary.preset_id ? summary : item);
       selectedPresetSummary = summary;
-      if (unknownUpdateRecovery) {
+      if (unknownUpdateRecovery && !preservesRecoveryDraft) {
+        presetSaveOutcomeUnknown = null;
+      } else if (unknownUpdateRecovery) {
         if (latest.version < unknownUpdateRecovery.baseVersion) {
           throw new Error("Список версий не содержит базовую версию неизвестного сохранения.");
         }
@@ -2180,11 +2182,7 @@ export function bootstrapAtomLab({
           presetPayloadFromVersion(expectedVersion),
           unknownUpdateRecovery.payload,
         )) {
-          if (preservesRecoveryDraft) {
-            reconcileCommittedPresetVersion(expectedVersion, unknownUpdateRecovery);
-          } else {
-            commitPresetVersion(expectedVersion, {applyToEditor: true});
-          }
+          reconcileCommittedPresetVersion(expectedVersion, unknownUpdateRecovery);
           renderPresetList();
           setPresetError();
           return true;
@@ -2198,6 +2196,7 @@ export function bootstrapAtomLab({
       }
       commitPresetVersion(version, {applyToEditor});
       renderPresetList();
+      setPresetError();
       return true;
     } catch (error) {
       if (generation !== presetOpenGeneration) return false;
