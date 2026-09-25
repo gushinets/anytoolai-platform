@@ -870,7 +870,10 @@ def test_dev_status_and_down_are_scoped_to_worktree_project(monkeypatch, tmp_pat
     assert all(identity.compose_project in command for command in commands)
     assert commands[0][-1] == "ps"
     assert commands[1][-2:] == ["down", "--remove-orphans"]
-    assert timeouts == [runner.COMPOSE_QUERY_TIMEOUT_SECONDS, runner.COMPOSE_TEARDOWN_TIMEOUT_SECONDS]
+    assert timeouts == [
+        runner.COMPOSE_QUERY_TIMEOUT_SECONDS,
+        runner.COMPOSE_TEARDOWN_TIMEOUT_SECONDS,
+    ]
 
 
 def test_compose_command_passes_base_and_override_files_explicitly(monkeypatch) -> None:
@@ -1221,7 +1224,10 @@ def test_prod_status_and_down_work_without_deployment_inputs(monkeypatch, tmp_pa
     assert all(env["ANYTOOLAI_ENABLED_PRODUCT_IDS"] == "kernel_demo" for env in environments)
     assert all(env["ANYTOOLAI_PROD_WORKER_MEMORY_LIMIT"] == "512M" for env in environments)
     assert all(env["ANYTOOLAI_POSTGRES_PASSWORD"] == "control-only" for env in environments)
-    assert timeouts == [runner.COMPOSE_QUERY_TIMEOUT_SECONDS, runner.COMPOSE_TEARDOWN_TIMEOUT_SECONDS]
+    assert timeouts == [
+        runner.COMPOSE_QUERY_TIMEOUT_SECONDS,
+        runner.COMPOSE_TEARDOWN_TIMEOUT_SECONDS,
+    ]
 
 
 def test_prod_fake_up_builds_and_removes_orphans(monkeypatch) -> None:
@@ -1293,7 +1299,9 @@ def test_prod_fake_up_does_not_pass_live_secrets_to_compose(monkeypatch, tmp_pat
     monkeypatch.setattr(runner, "_prod_fake_ready", lambda *, env: 0)
     captured = []
     monkeypatch.setattr(
-        runner, "run_with_env", lambda command, env: captured.append((list(command), dict(env))) or 0
+        runner,
+        "run_with_env",
+        lambda command, env: captured.append((list(command), dict(env))) or 0,
     )
 
     assert runner.prod_fake_up() == 0
