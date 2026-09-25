@@ -53,7 +53,9 @@ def test_full_check_uses_uv_for_freelancer_suite_install(monkeypatch) -> None:
         "build_system_requirements",
         lambda project_root: ["setuptools>=68", "wheel"],
     )
-    monkeypatch.setattr(runner.shutil, "which", lambda name: "/usr/local/bin/uv" if name == "uv" else None)
+    monkeypatch.setattr(
+        runner.shutil, "which", lambda name: "/usr/local/bin/uv" if name == "uv" else None
+    )
     monkeypatch.setattr(
         runner,
         "baseline_env",
@@ -231,9 +233,7 @@ def test_frontend_check_fails_when_a_workspace_has_no_lint_script(
         '{"name": "unlinted", "scripts": {"typecheck": "tsc --noEmit"}}', encoding="utf-8"
     )
     monkeypatch.setattr(runner, "ROOT", repo_root)
-    monkeypatch.setattr(
-        runner.subprocess, "run", fake_pnpm_list_run([repo_root, linted, unlinted])
-    )
+    monkeypatch.setattr(runner.subprocess, "run", fake_pnpm_list_run([repo_root, linted, unlinted]))
     commands: list[list[str]] = []
     monkeypatch.setattr(runner, "run", lambda command: commands.append(list(command)) or 0)
 
@@ -282,9 +282,7 @@ def test_pnpm_workspace_member_dirs_bounds_subprocess_with_timeout_and_closed_st
     assert kwargs["timeout"] == runner.PNPM_WORKSPACE_LIST_TIMEOUT_SECONDS
 
 
-def test_pnpm_workspace_member_dirs_returns_none_when_pnpm_is_missing(
-    monkeypatch, capsys
-) -> None:
+def test_pnpm_workspace_member_dirs_returns_none_when_pnpm_is_missing(monkeypatch, capsys) -> None:
     runner = load_runner_module()
 
     def fake_run(command, **kwargs):
@@ -310,9 +308,7 @@ def test_pnpm_workspace_member_dirs_returns_none_when_pnpm_fails(monkeypatch, ca
     assert "boom" in err
 
 
-def test_pnpm_workspace_member_dirs_returns_none_when_pnpm_times_out(
-    monkeypatch, capsys
-) -> None:
+def test_pnpm_workspace_member_dirs_returns_none_when_pnpm_times_out(monkeypatch, capsys) -> None:
     runner = load_runner_module()
 
     def fake_run(command, **kwargs):
@@ -475,9 +471,7 @@ def test_required_backend_workflow_runs_canonical_postgresql_check() -> None:
     assert job.get("continue-on-error") is not True
     steps_by_name = {step.get("name"): step for step in job["steps"]}
     postgresql_step = steps_by_name["Run all PostgreSQL production-semantics tests"]
-    assert postgresql_step["run"] == (
-        "uv run python scripts/agent/runner.py postgresql-check"
-    )
+    assert postgresql_step["run"] == ("uv run python scripts/agent/runner.py postgresql-check")
     assert postgresql_step["env"]["ANYTOOLAI_POSTGRES_TEST_DATABASE_URL"] == (
         "postgresql+psycopg://anytoolai:anytoolai@127.0.0.1:5432/postgres"
     )
@@ -511,12 +505,12 @@ def test_compose_stack_check_action_scopes_secrets_to_exactly_two_steps() -> Non
         if step.get("run") in secret_needing_runs:
             assert step_env.get("OPENAI_API_KEY") == "${{ inputs.openai-api-key }}", step
             assert (
-                step_env.get("ANYTOOLAI_LIVE_CANARY_TOKEN")
-                == "${{ inputs.live-canary-token }}"
+                step_env.get("ANYTOOLAI_LIVE_CANARY_TOKEN") == "${{ inputs.live-canary-token }}"
             ), step
         else:
             assert "OPENAI_API_KEY" not in step_env, step
             assert "ANYTOOLAI_LIVE_CANARY_TOKEN" not in step_env, step
+
 
 def test_compose_stack_check_action_shape() -> None:
     """Structural contract: bootstrap is conditional on the input, teardown always runs, the
@@ -526,7 +520,9 @@ def test_compose_stack_check_action_shape() -> None:
     steps = action["runs"]["steps"]
     steps_by_run = {step.get("run"): step for step in steps if step.get("run")}
 
-    bootstrap_step = steps_by_run["uv run python scripts/agent/runner.py quick-check --bootstrap-only"]
+    bootstrap_step = steps_by_run[
+        "uv run python scripts/agent/runner.py quick-check --bootstrap-only"
+    ]
     assert bootstrap_step["if"] == "inputs.bootstrap-quick-check == 'true'"
 
     dump_step = next(s for s in steps if s.get("name") == "Dump Docker Compose logs on failure")
@@ -693,7 +689,10 @@ def test_check_ports_available_omits_cli_flag_when_none(monkeypatch, capsys) -> 
 
     assert result is False
     stderr = capsys.readouterr().err
-    assert "PROD002: PostgreSQL port 5432 is occupied. Override with ANYTOOLAI_POSTGRES_PORT." == stderr.strip()
+    assert (
+        "PROD002: PostgreSQL port 5432 is occupied. Override with ANYTOOLAI_POSTGRES_PORT."
+        == stderr.strip()
+    )
     assert "--postgres-port" not in stderr
 
 
@@ -703,18 +702,14 @@ def test_check_ports_available_uses_the_variable_name_given_by_the_caller(
     runner = load_runner_module()
     monkeypatch.setattr(runner, "port_available", lambda port: False)
 
-    runner._check_ports_available(
-        "PROD002", [("API", 8000, "ANYTOOLAI_PROD_API_PORT", None)]
-    )
+    runner._check_ports_available("PROD002", [("API", 8000, "ANYTOOLAI_PROD_API_PORT", None)])
 
     stderr = capsys.readouterr().err
     assert "Override with ANYTOOLAI_PROD_API_PORT." in stderr
     assert "ANYTOOLAI_API_PORT." not in stderr
 
 
-def test_check_ports_available_uses_the_cli_flag_given_by_the_caller(
-    monkeypatch, capsys
-) -> None:
+def test_check_ports_available_uses_the_cli_flag_given_by_the_caller(monkeypatch, capsys) -> None:
     runner = load_runner_module()
     monkeypatch.setattr(runner, "port_available", lambda port: False)
 
@@ -730,13 +725,16 @@ def test_check_ports_available_returns_true_when_all_free(monkeypatch) -> None:
     runner = load_runner_module()
     monkeypatch.setattr(runner, "port_available", lambda port: True)
 
-    assert runner._check_ports_available(
-        "DEV002",
-        [
-            ("API", 18123, "ANYTOOLAI_API_PORT", "--api-port"),
-            ("PostgreSQL", 15555, "ANYTOOLAI_POSTGRES_PORT", "--postgres-port"),
-        ],
-    ) is True
+    assert (
+        runner._check_ports_available(
+            "DEV002",
+            [
+                ("API", 18123, "ANYTOOLAI_API_PORT", "--api-port"),
+                ("PostgreSQL", 15555, "ANYTOOLAI_POSTGRES_PORT", "--postgres-port"),
+            ],
+        )
+        is True
+    )
 
 
 def test_dev_up_fails_before_compose_when_port_is_occupied(monkeypatch) -> None:
@@ -791,7 +789,8 @@ class _FakeProcess:
 # client-handoff-smoke CI job itself, which only runs on ubuntu-latest) -- monkeypatch.setattr()
 # on a nonexistent Windows os attribute fails with AttributeError before the test body even runs.
 _posix_only = pytest.mark.skipif(
-    sys.platform == "win32", reason="_terminate_process_group() uses POSIX-only os.getpgid()/os.killpg()"
+    sys.platform == "win32",
+    reason="_terminate_process_group() uses POSIX-only os.getpgid()/os.killpg()",
 )
 
 
@@ -820,7 +819,9 @@ def test_terminate_process_group_ignores_a_group_that_exits_between_getpgid_and_
 @_posix_only
 def test_terminate_process_group_escalates_to_sigkill_and_reaps_it(monkeypatch) -> None:
     runner = load_runner_module()
-    process = _FakeProcess(wait_effects=[runner.subprocess.TimeoutExpired(cmd="x", timeout=10), None])
+    process = _FakeProcess(
+        wait_effects=[runner.subprocess.TimeoutExpired(cmd="x", timeout=10), None]
+    )
     killpg_calls: list[tuple[int, int]] = []
     monkeypatch.setattr(runner.os, "getpgid", lambda pid: 999)
     monkeypatch.setattr(runner.os, "killpg", lambda pgid, sig: killpg_calls.append((pgid, sig)))
@@ -982,7 +983,12 @@ def test_database_url_survives_the_real_sqlalchemy_consumer_path_for_reserved_db
             assert connect_args["port"] == 15555
             assert connect_args["user"] == "devuser"
             non_connection_keys = set(connect_args) - {
-                "host", "port", "user", "password", "dbname", "context",
+                "host",
+                "port",
+                "user",
+                "password",
+                "dbname",
+                "context",
             }
             assert not non_connection_keys, (
                 f"{db_name!r} injected extra connect_args: {non_connection_keys}"
@@ -1297,9 +1303,7 @@ def test_dev_smoke_invokes_kernel_demo_smoke_against_worktree_api_url(monkeypatc
     identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
     monkeypatch.setattr(runner, "runtime_identity", lambda: identity)
     commands: list[list[str]] = []
-    monkeypatch.setattr(
-        runner, "run", lambda command: commands.append(list(command)) or 0
-    )
+    monkeypatch.setattr(runner, "run", lambda command: commands.append(list(command)) or 0)
 
     assert runner.dev_smoke() == 0
     assert commands == [
@@ -1369,7 +1373,9 @@ def test_quick_check_venv_ready_rejects_stale_marker(monkeypatch, tmp_path) -> N
     assert runner.quick_check_venv_ready(venv_python) is True
 
 
-def test_proof_script_fails_fast_when_quick_check_venv_missing(monkeypatch, tmp_path, capsys) -> None:
+def test_proof_script_fails_fast_when_quick_check_venv_missing(
+    monkeypatch, tmp_path, capsys
+) -> None:
     """ANY-390: on a fresh checkout that never ran quick-check, atoms-proof/live-canary must fail
     with a clear setup instruction instead of silently launching sys.executable and reproducing
     the PROOF000 missing-dependency bug -- shared by both commands via _run_proof_script()."""
@@ -1387,7 +1393,9 @@ def test_proof_script_fails_fast_when_quick_check_venv_missing(monkeypatch, tmp_
     assert "quick-check" in err
 
 
-def test_proof_script_fails_fast_when_quick_check_venv_incomplete(monkeypatch, tmp_path, capsys) -> None:
+def test_proof_script_fails_fast_when_quick_check_venv_incomplete(
+    monkeypatch, tmp_path, capsys
+) -> None:
     """ANY-390 round-4 code-review finding: a bootstrap interrupted mid-way can leave
     .quick-check-venv's python in place without every editable package installed -- exists()
     alone would wrongly treat that as ready and let the child fail deep with a raw
@@ -1435,7 +1443,9 @@ def test_proof_script_fails_fast_when_quick_check_venv_dependency_state_is_stale
     assert "quick-check" in err
 
 
-def test_atoms_proof_reports_dev001_for_invalid_port_override(monkeypatch, tmp_path, capsys) -> None:
+def test_atoms_proof_reports_dev001_for_invalid_port_override(
+    monkeypatch, tmp_path, capsys
+) -> None:
     runner = load_runner_module()
     venv_python = tmp_path / "python"
     venv_python.touch()
@@ -1482,8 +1492,11 @@ def test_atoms_proof_passes_database_url_via_env_not_argv(monkeypatch, tmp_path)
     # encoded would silently leave a reserved-character database name encoded on the wire, and
     # would have stayed green under the prior prefix-only assertion.
     assert command == [
-        str(venv_python), "scripts/agent/atoms_proof.py", identity.api_url,
-        "--database-url-env", env_var_name,
+        str(venv_python),
+        "scripts/agent/atoms_proof.py",
+        identity.api_url,
+        "--database-url-env",
+        env_var_name,
         "--database-url-is-percent-encoded",
     ]
     assert env[env_var_name] == identity.database_url
@@ -1552,7 +1565,9 @@ def test_live_canary_fails_without_live_canary_token(monkeypatch, capsys) -> Non
     assert "LIVE011" in capsys.readouterr().err
 
 
-def test_live_canary_reports_dev001_for_invalid_port_override(monkeypatch, tmp_path, capsys) -> None:
+def test_live_canary_reports_dev001_for_invalid_port_override(
+    monkeypatch, tmp_path, capsys
+) -> None:
     runner = load_runner_module()
     venv_python = tmp_path / "python"
     venv_python.touch()
@@ -1600,8 +1615,11 @@ def test_live_canary_passes_database_url_via_env_not_argv(monkeypatch, tmp_path)
     # too, or a reserved-character ANYTOOLAI_POSTGRES_PASSWORD/_DB connects fine via atoms-proof
     # but silently fails to connect via live-canary on the same stack.
     assert command == [
-        str(venv_python), "scripts/agent/live_canary.py", identity.api_url,
-        "--database-url-env", env_var_name,
+        str(venv_python),
+        "scripts/agent/live_canary.py",
+        identity.api_url,
+        "--database-url-env",
+        env_var_name,
         "--database-url-is-percent-encoded",
     ]
     assert env[env_var_name] == identity.database_url
@@ -1616,9 +1634,7 @@ def test_prod_smoke_invokes_kernel_demo_smoke_against_prod_port(monkeypatch) -> 
     runner = load_runner_module()
     monkeypatch.setenv("ANYTOOLAI_PROD_API_PORT", "18900")
     commands: list[list[str]] = []
-    monkeypatch.setattr(
-        runner, "run", lambda command: commands.append(list(command)) or 0
-    )
+    monkeypatch.setattr(runner, "run", lambda command: commands.append(list(command)) or 0)
 
     assert runner.prod_smoke() == 0
     assert commands == [
@@ -1682,3 +1698,211 @@ def test_run_with_env_has_no_timeout_by_default(monkeypatch) -> None:
 
     assert runner.run_with_env(["docker", "compose", "ps"], {}) == 0
     assert captured_kwargs["timeout"] is None
+
+
+def test_dev_live_up_defaults_to_unmetered_and_other_commands_reject_live_options() -> None:
+    runner = load_runner_module()
+    args = runner.parse_args(["dev-live-up", "--product", "proposal_ai"])
+    assert args.product == "proposal_ai"
+    assert args.quota_mode == "unmetered"
+    assert (
+        runner.parse_args(
+            ["dev-live-up", "--product", "proposal_ai", "--quota-mode", "canonical"]
+        ).quota_mode
+        == "canonical"
+    )
+    assert runner.main(["dev-up", "--product", "proposal_ai"]) == 2
+    assert runner.main(["dev-up", "--quota-mode", "canonical"]) == 2
+
+
+def test_dev_live_compose_uses_base_dev_and_live_overlays() -> None:
+    runner = load_runner_module()
+    identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
+    command = runner._dev_live_compose_command(identity, "up", "-d")
+    files = [command[index + 1] for index, part in enumerate(command) if part == "-f"]
+    assert files == [
+        str(runner.COMPOSE_FILE),
+        str(runner.COMPOSE_OVERRIDE_FILE),
+        str(runner.COMPOSE_LIVE_FILE),
+    ]
+    assert str(runner.COMPOSE_LIVE_FILE) not in runner._compose_command(identity, "up")
+    assert str(runner.LIVE_ENV_FILE) not in runner._compose_command(identity, "up")
+
+
+def test_live_env_file_supports_quotes_blank_comments_and_shell_precedence(monkeypatch, tmp_path):
+    runner = load_runner_module()
+    env_file = tmp_path / ".env.live"
+    env_file.write_text(
+        "# comment\nOPENAI_API_KEY='file key'\nANYTOOLAI_LLM_HTTPS_PROXY=\n"
+        'OTHER="quoted value"\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("OPENAI_API_KEY", "shell key")
+    monkeypatch.setenv("ANYTOOLAI_LLM_HTTPS_PROXY", "")
+
+    env = runner._resolved_env_file(env_file)
+
+    assert env["OPENAI_API_KEY"] == "shell key"
+    assert env["ANYTOOLAI_LLM_HTTPS_PROXY"] == ""
+    assert env["OTHER"] == "quoted value"
+
+
+def test_profile_check_uses_identical_expectations_for_api_and_worker(monkeypatch):
+    runner = load_runner_module()
+    manifest = {
+        "profile_fingerprint": "a" * 64,
+        "container_products_root": "/app/products",
+        "enabled_products": {
+            "proposal_ai": {
+                "provider_policy_ref": "default_text_generation_v1",
+                "quota_policy_ref": None,
+            }
+        },
+    }
+    commands = []
+    monkeypatch.setattr(
+        runner, "run_with_env", lambda command, env: commands.append(list(command)) or 0
+    )
+
+    assert (
+        runner._run_effective_profile_checks(["docker", "compose", "-f", "live.yml"], manifest, {})
+        == 0
+    )
+
+    assert len(commands) == 2
+    assert "platform-api" in commands[0]
+    assert "platform-worker" in commands[1]
+    assert (
+        commands[0][commands[0].index("python") + 1 :]
+        == commands[1][commands[1].index("python") + 1 :]
+    )
+    assert "proposal_ai=default_text_generation_v1,-" in commands[0]
+    assert "client_update_writer" not in " ".join(commands[0] + commands[1])
+
+
+def test_profile_check_stops_after_api_failure(monkeypatch):
+    runner = load_runner_module()
+    calls = []
+    monkeypatch.setattr(
+        runner, "run_with_env", lambda command, env: calls.append(list(command)) or 17
+    )
+    manifest = {
+        "profile_fingerprint": "a" * 64,
+        "container_products_root": "/app/products",
+        "enabled_products": {},
+    }
+
+    assert runner._run_effective_profile_checks(["docker", "compose"], manifest, {}) == 17
+    assert len(calls) == 1
+
+
+def test_dev_live_up_rejects_missing_key_before_profile_or_compose(monkeypatch, tmp_path, capsys):
+    runner = load_runner_module()
+    monkeypatch.setattr(runner, "LIVE_ENV_FILE", tmp_path / "missing.env")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(
+        runner, "run_with_env", lambda *args: pytest.fail("no subprocess before key")
+    )
+
+    assert runner.dev_live_up("proposal_ai", "unmetered") == 2
+    assert "OPENAI_API_KEY" in capsys.readouterr().err
+
+
+def test_dev_live_up_aborts_on_profile_failure_before_compose(monkeypatch, tmp_path, capsys):
+    runner = load_runner_module()
+    monkeypatch.setattr(runner, "LIVE_ENV_FILE", tmp_path / "missing.env")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-only")
+    calls = []
+    monkeypatch.setattr(
+        runner, "run_with_env", lambda command, env: calls.append(list(command)) or 9
+    )
+
+    assert runner.dev_live_up("proposal_ai", "unmetered") == 9
+    assert len(calls) == 1
+    assert "build-deployment-profile" in calls[0]
+    assert "ready" not in capsys.readouterr().out
+
+
+def test_dev_live_up_checks_both_mounted_profiles_before_ready(monkeypatch, tmp_path, capsys):
+    runner = load_runner_module()
+    identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
+    monkeypatch.setattr(runner, "runtime_identity", lambda: identity)
+    monkeypatch.setattr(runner, "LIVE_ENV_FILE", tmp_path / "missing.env")
+    monkeypatch.setenv("OPENAI_API_KEY", "hidden-key")
+    monkeypatch.delenv("ANYTOOLAI_LLM_HTTPS_PROXY", raising=False)
+    monkeypatch.setattr(runner, "port_available", lambda port: True)
+    monkeypatch.setattr(runner, "_wait_for_http_ok", lambda url, timeout: True)
+    manifest = {
+        "generated_products_root": str(tmp_path / "products"),
+        "container_products_root": "/app/products",
+        "profile_fingerprint": "a" * 64,
+        "enabled_products": {
+            "proposal_ai": {
+                "provider_policy_ref": "default_text_generation_v1",
+                "quota_policy_ref": None,
+            }
+        },
+    }
+    monkeypatch.setattr(runner, "_build_deployment_profile", lambda *args: (0, manifest))
+    calls = []
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda command, env: calls.append((list(command), dict(env))) or 0,
+    )
+
+    assert runner.dev_live_up("proposal_ai", "unmetered") == 0
+
+    assert len(calls) == 3  # compose up, API check, worker check
+    assert calls[0][1]["ANYTOOLAI_DEPLOYMENT_PRODUCTS_ROOT"] == str(tmp_path / "products")
+    assert calls[0][1]["ANYTOOLAI_LLM_HTTPS_PROXY"] == ""
+    assert "platform-api" in calls[1][0]
+    assert "platform-worker" in calls[2][0]
+    output = capsys.readouterr().out
+    assert "provider=default_text_generation_v1 quota=unmetered" in output
+    assert "ready" in output
+    assert "hidden-key" not in output
+
+
+def test_dev_live_up_worker_profile_failure_never_reports_ready(monkeypatch, tmp_path, capsys):
+    runner = load_runner_module()
+    identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
+    monkeypatch.setattr(runner, "runtime_identity", lambda: identity)
+    monkeypatch.setattr(runner, "LIVE_ENV_FILE", tmp_path / "missing.env")
+    monkeypatch.setenv("OPENAI_API_KEY", "hidden-key")
+    monkeypatch.setattr(runner, "port_available", lambda port: True)
+    monkeypatch.setattr(runner, "_wait_for_http_ok", lambda url, timeout: True)
+    manifest = {
+        "generated_products_root": str(tmp_path / "products"),
+        "container_products_root": "/app/products",
+        "profile_fingerprint": "a" * 64,
+        "enabled_products": {},
+    }
+    monkeypatch.setattr(runner, "_build_deployment_profile", lambda *args: (0, manifest))
+    calls = []
+
+    def run(command, env):
+        calls.append(list(command))
+        return 7 if len(calls) == 3 else 0
+
+    monkeypatch.setattr(runner, "run_with_env", run)
+
+    assert runner.dev_live_up("proposal_ai", "unmetered") == 7
+    assert len(calls) == 3
+    assert "ready" not in capsys.readouterr().out
+
+
+def test_dev_web_uses_derived_api_url(monkeypatch):
+    runner = load_runner_module()
+    identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
+    monkeypatch.setattr(runner, "runtime_identity", lambda: identity)
+    captured = []
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda command, env: captured.append((list(command), dict(env))) or 0,
+    )
+
+    assert runner.dev_web() == 0
+    assert captured[0][0] == ["pnpm", "--filter", "@anytoolai/web-mirror", "dev"]
+    assert captured[0][1]["PLATFORM_API_BASE_URL"] == identity.api_url

@@ -1,0 +1,17 @@
+services:
+  platform-api:
+    volumes:
+      - type: bind
+        source: ${ANYTOOLAI_DEPLOYMENT_PRODUCTS_ROOT:?generated products root is required}
+        target: /app/packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products
+        read_only: true
+  platform-worker:
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY is required for live mode}
+      HTTPS_PROXY: ${ANYTOOLAI_LLM_HTTPS_PROXY-}
+      AIOHTTP_TRUST_ENV: "true"
+    volumes:
+      - type: bind
+        source: ${ANYTOOLAI_DEPLOYMENT_PRODUCTS_ROOT:?generated products root is required}
+        target: /app/packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products
+        read_only: true
