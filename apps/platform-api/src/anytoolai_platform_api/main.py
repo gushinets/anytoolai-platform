@@ -30,6 +30,7 @@ from anytoolai_platform_api.routers.runtime_config import router as runtime_conf
 from anytoolai_platform_api.routers.scenario_runtime import (
     router as scenario_runtime_router,
 )
+from anytoolai_platform_api.settings import Settings
 from anytoolai_platform_core.common.logging import (
     bind_log_context,
     configure_json_logging,
@@ -53,8 +54,14 @@ def create_app(
 ) -> FastAPI:
     configure_json_logging("platform-api")
     runtime = build_runtime(config_root, database_url=database_url)
+    settings = Settings.from_env()
+    if settings.enabled_product_ids is not None:
+        unknown = settings.enabled_product_ids - runtime.config_registry.products.keys()
+        if unknown:
+            raise ValueError(f"Unknown enabled product ids: {', '.join(sorted(unknown))}")
     app = FastAPI(title="AnytoolAI Platform API", version="0.1.0")
     app.state.runtime = runtime
+    app.state.settings = settings
 
     _install_cors(app)
     _install_request_context(app)

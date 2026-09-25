@@ -1133,6 +1133,7 @@ git commit -m "docs: add Proposal AI live deployment runbook"
 | 2026-09-25 | Design externally reviewed and approved; implementation plan written and self-reviewed. | Choose execution mode and begin Task 1. |
 | 2026-09-25 | Task 1: generated live profiles, strict provider/quota transform, deterministic fingerprints, and read-only effective-config check implemented; 32 focused/architecture tests, config validation, and lint passed. | Task 2: local live runner and Compose overlay. |
 | 2026-09-25 | Task 2: `dev-live-up`, `dev-web`, shared live overlay, env resolution, and identical API/worker effective-profile checks implemented; runner/profile tests and Compose render passed. | Task 3: Platform API release allowlist. |
+| 2026-09-25 | Task 3: server allowlist parses once at startup, rejects unknown ids, and gates runtime config, quota, and scenario start before storage; focused API tests and architecture validation passed. | Task 4: web allowlist and unmetered runtime behavior. |
 
 ## Open Questions
 

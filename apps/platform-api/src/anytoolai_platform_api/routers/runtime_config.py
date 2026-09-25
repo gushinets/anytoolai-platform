@@ -3,13 +3,12 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
-
-from anytoolai_platform_api.dependencies import get_config_registry
+from anytoolai_platform_api.dependencies import get_config_registry, require_enabled_product
 from anytoolai_platform_api.errors import ApiError
 from anytoolai_platform_api.schemas import ErrorResponse, RuntimeConfigResponse
 from anytoolai_platform_core.bootstrap.runtime_config import build_product_runtime_config
 from anytoolai_platform_core.config.registry import ConfigRegistry
+from fastapi import APIRouter, Depends
 
 router = APIRouter(prefix="/v1/products", tags=["runtime-config"])
 
@@ -166,7 +165,7 @@ RUNTIME_CONFIG_EXAMPLE = {
     },
 )
 def get_runtime_config(
-    product_id: str,
+    product_id: Annotated[str, Depends(require_enabled_product)],
     registry: Annotated[ConfigRegistry, Depends(get_config_registry)],
 ) -> RuntimeConfigResponse:
     runtime_config = build_product_runtime_config(registry, product_id)
