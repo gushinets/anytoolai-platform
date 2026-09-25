@@ -2529,12 +2529,20 @@ test("ambiguous version write reconciles an exact committed version without disc
     example_input: A06.example_input, source_run_id: null,
     preset_id: "preset-update-exact", version: 1, created_at: "2026-09-25T07:10:00Z",
   };
+  const competingVersion = (version) => ({
+    ...first,
+    description: `Конкурентная версия ${version}`,
+    version,
+    created_at: `2026-09-25T07:${String(version + 10).padStart(2, "0")}:00Z`,
+  });
+  const newerVersions = Array.from({length: 20}, (_, index) => competingVersion(30 - index));
   let committed = null;
+  const versionWriteBodies = [];
   await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
     const request = route.request();
-    const {pathname} = new URL(request.url());
+    const {pathname, searchParams} = new URL(request.url());
     if (pathname === "/v1/atom-lab/presets") {
-      const latest = committed ?? first;
+      const latest = committed ? newerVersions[0] : first;
       await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [{
         preset_id: first.preset_id, latest_version: latest.version, name: latest.name,
         description: latest.description, atom_id: latest.atom_id,
@@ -2545,6 +2553,7 @@ test("ambiguous version write reconciles an exact committed version without disc
     if (pathname === `/v1/atom-lab/presets/${first.preset_id}/versions`
       && request.method() === "POST") {
       const body = request.postDataJSON();
+      versionWriteBodies.push(body);
       committed = {
         ...body,
         schema_refs: {output: body.schema_refs.output, input: body.schema_refs.input},
@@ -2558,14 +2567,25 @@ test("ambiguous version write reconciles an exact committed version without disc
       return;
     }
     if (pathname === `/v1/atom-lab/presets/${first.preset_id}/versions`) {
-      const items = committed ? [committed, first] : [first];
+      const loadingOlder = searchParams.get("cursor") === "older";
+      const olderVersions = Array.from({length: 10}, (_, index) => {
+        const version = 10 - index;
+        if (version === 2) return committed;
+        return version === 1 ? first : competingVersion(version);
+      });
+      const items = committed ? (loadingOlder ? olderVersions : newerVersions) : [first];
       await route.fulfill({contentType: "application/json", body: JSON.stringify({items: items.map((item) => ({
         preset_id: item.preset_id, version: item.version, name: item.name,
         description: item.description, atom_id: item.atom_id, created_at: item.created_at,
-      })), next_cursor: null})});
+      })), next_cursor: committed && !loadingOlder ? "older" : null})});
       return;
     }
-    const version = pathname.endsWith("/versions/2") ? committed : first;
+    const requestedVersion = Number(pathname.split("/").at(-1));
+    const version = requestedVersion === 2
+      ? committed
+      : requestedVersion === 1
+        ? first
+        : competingVersion(requestedVersion);
     if (pathname.endsWith(`/presets/${first.preset_id}/versions/${version?.version}`)) {
       await route.fulfill({contentType: "application/json", body: JSON.stringify(version)});
       return;
@@ -2595,6 +2615,7 @@ test("ambiguous version write reconciles an exact committed version without disc
 
   expect(dialogs).toBe(0);
   await expect(page.locator("#preset-version-select")).toHaveValue("2");
+  await expect(page.locator('#preset-version-select option[value="2"]')).toHaveCount(1);
   await expect(page.locator("#preset-name")).toHaveValue("Локальное имя после ошибки");
   await expect(page.locator("#preset-description")).toHaveValue("Поздний локальный черновик");
   await expect(page.locator("#prompt-editor")).toHaveValue("Поздний локальный промпт");
@@ -2604,6 +2625,15 @@ test("ambiguous version write reconciles an exact committed version without disc
   await expect(page.locator("#preset-state")).toContainText("несохранённый черновик");
   await expect(page.locator("#preset-error")).toHaveText("");
   await expect(page.locator("#save-preset")).toBeEnabled();
+  await page.locator("#load-more-versions").click();
+  await expect(page.locator("#preset-version-select")).toHaveValue("2");
+  await expect(page.locator('#preset-version-select option[value="2"]')).toHaveCount(1);
+  expect(await page.locator("#preset-version-select option").evaluateAll(
+    (options) => options.map((option) => option.value),
+  )).toEqual(Array.from({length: 30}, (_, index) => String(30 - index)));
+  await page.locator("#save-preset").click();
+  await expect.poll(() => versionWriteBodies).toHaveLength(2);
+  expect(versionWriteBodies[1].base_version).toBe(2);
 });
 
 test("ambiguous version write surfaces a concurrent conflict without discarding the draft", async ({page}) => {

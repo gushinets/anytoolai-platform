@@ -2071,7 +2071,13 @@ export function bootstrapAtomLab({
   };
 
   const commitPresetVersions = (parsed, {append = false} = {}) => {
-    presetVersions = append ? [...presetVersions, ...parsed.items] : parsed.items;
+    const combined = append ? [...presetVersions, ...parsed.items] : parsed.items;
+    const seenVersions = new Set();
+    presetVersions = combined.filter((item) => {
+      if (seenVersions.has(item.version)) return false;
+      seenVersions.add(item.version);
+      return true;
+    }).sort((left, right) => right.version - left.version);
     presetVersionsCursor = parsed.next_cursor;
     const selectedValue = nodes["preset-version-select"].value;
     nodes["preset-version-select"].replaceChildren();
@@ -2083,6 +2089,21 @@ export function bootstrapAtomLab({
     }
     if (selectedValue) nodes["preset-version-select"].value = selectedValue;
     nodes["load-more-versions"].hidden = presetVersionsCursor === null;
+  };
+
+  const materializePresetVersion = (version) => {
+    if (presetVersions.some((item) => item.version === version.version)) return;
+    commitPresetVersions({
+      items: [...presetVersions, {
+        preset_id: version.preset_id,
+        version: version.version,
+        name: version.name,
+        description: version.description,
+        atom_id: version.atom_id,
+        created_at: version.created_at,
+      }],
+      next_cursor: presetVersionsCursor,
+    });
   };
 
   const loadMorePresetVersions = async () => {
@@ -2182,6 +2203,7 @@ export function bootstrapAtomLab({
           presetPayloadFromVersion(expectedVersion),
           unknownUpdateRecovery.payload,
         )) {
+          materializePresetVersion(expectedVersion);
           reconcileCommittedPresetVersion(expectedVersion, unknownUpdateRecovery);
           renderPresetList();
           setPresetError();
