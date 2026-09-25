@@ -36,6 +36,7 @@ LIVE_ENV_FILE = ROOT / "infra" / "compose" / ".env.live"
 # pass it to `docker compose` via --env-file, and only if it actually exists on disk.
 PROD_ENV_FILE = ROOT / "infra" / "compose" / ".env.prod"
 PROD_COMPOSE_PROJECT = "anytoolai-prod"
+PROD_FAKE_COMPOSE_PROJECT = "anytoolai-prod-fake"
 PROFILE_VERSION_HEX_LENGTH = 32
 DEV_DEFAULT_POSTGRES_USER = "anytoolai"
 DEV_DEFAULT_POSTGRES_PASSWORD = "anytoolai"
@@ -715,7 +716,17 @@ def _resolved_env_file(path: Path) -> dict[str, str]:
         for line in path.read_text(encoding="utf-8").splitlines():
             stripped = line.strip()
             if stripped and not stripped.startswith("#"):
-                name = stripped.removeprefix("export ").partition("=")[0].strip()
+                definition = stripped.removeprefix("export ").lstrip()
+                separator_positions = [
+                    position
+                    for position in (definition.find("="), definition.find(":"))
+                    if position >= 0
+                ]
+                name = (
+                    definition[: min(separator_positions)]
+                    if separator_positions
+                    else definition
+                ).strip()
                 if name.isidentifier():
                     names.add(name)
         with tempfile.TemporaryDirectory() as directory:
@@ -1575,6 +1586,16 @@ def _prod_compose_command(*args: str, include_env_file: bool = True) -> list[str
     )
 
 
+def _prod_fake_compose_command(*args: str, include_env_file: bool = True) -> list[str]:
+    env_file = PROD_ENV_FILE if include_env_file and PROD_ENV_FILE.is_file() else None
+    return _docker_compose_command(
+        PROD_FAKE_COMPOSE_PROJECT,
+        (COMPOSE_FILE, COMPOSE_PROD_FILE),
+        *args,
+        env_file=env_file,
+    )
+
+
 def _prod_live_compose_command(*args: str) -> list[str]:
     env_file = PROD_ENV_FILE if PROD_ENV_FILE.is_file() else None
     return _docker_compose_command(
@@ -1663,6 +1684,10 @@ def _prod_stack_running() -> bool:
     return _compose_stack_running(_prod_compose_command(), runner_env())
 
 
+def _prod_fake_stack_running(env: dict[str, str]) -> bool:
+    return _compose_stack_running(_prod_fake_compose_command(), env)
+
+
 def prod_up() -> int:
     try:
         inputs = _deployment_inputs()
@@ -1745,14 +1770,16 @@ def _stop_failed_prod_candidate() -> None:
 
 
 def prod_fake_up() -> int:
-    """Credential-free production-image smoke path; never selects the live overlay."""
+    """Credential-free production-image smoke path, isolated from the live production project."""
     try:
-        api_port = _port_override("ANYTOOLAI_PROD_API_PORT", 8000)
-    except ValueError as exc:
+        env = _resolved_env_file(PROD_ENV_FILE)
+        api_port = _port_override("ANYTOOLAI_PROD_API_PORT", 8000, env)
+        web_port = _port_override("ANYTOOLAI_PROD_WEB_PORT", 3000, env)
+    except (ValueError, OSError) as exc:
         print(f"PROD001: {exc}", file=sys.stderr)
         return 2
     try:
-        stack_running = _prod_stack_running()
+        stack_running = _prod_fake_stack_running(env)
     except FileNotFoundError as exc:
         print(f"Command not found: {exc.filename}", file=sys.stderr)
         return 127
@@ -1760,18 +1787,37 @@ def prod_fake_up() -> int:
         print("PROD003: docker compose ps did not respond within 10s", file=sys.stderr)
         return 1
     if not stack_running and not _check_ports_available(
-        "PROD002", [("API", api_port, "ANYTOOLAI_PROD_API_PORT", None)]
+        "PROD002",
+        [
+            ("API", api_port, "ANYTOOLAI_PROD_API_PORT", None),
+            ("Web", web_port, "ANYTOOLAI_PROD_WEB_PORT", None),
+        ],
     ):
         return 1
-    exit_code = run_with_env(
-        _prod_compose_command("up", "-d", "--build", "--remove-orphans"), runner_env()
-    )
-    return _prod_fake_ready() if exit_code == 0 else exit_code
+    compose = _prod_fake_compose_command()
+    exit_code = run_with_env([*compose, "up", "-d", "--build", "--remove-orphans"], env)
+    if exit_code != 0:
+        _stop_failed_prod_fake_candidate()
+        return exit_code
+    exit_code = _prod_fake_ready(env=env)
+    if exit_code != 0:
+        _stop_failed_prod_fake_candidate()
+    return exit_code
 
 
-def _prod_fake_ready() -> int:
+def _stop_failed_prod_fake_candidate() -> None:
+    if prod_fake_down() != 0:
+        print(
+            "PROD006: failed credential-free production smoke candidate could not be stopped; "
+            "run python scripts/agent/runner.py prod-fake-down immediately",
+            file=sys.stderr,
+        )
+
+
+def _prod_fake_ready(*, env: dict[str, str] | None = None) -> int:
     try:
-        env = _resolved_env_file(PROD_ENV_FILE)
+        if env is None:
+            env = _resolved_env_file(PROD_ENV_FILE)
         api_port = _port_override("ANYTOOLAI_PROD_API_PORT", 8000, env)
         web_port = _port_override("ANYTOOLAI_PROD_WEB_PORT", 3000, env)
         timeout = float(env.get("ANYTOOLAI_READY_TIMEOUT", "90"))
@@ -1868,6 +1914,14 @@ def prod_down() -> int:
     )
 
 
+def prod_fake_down() -> int:
+    return run_with_env(
+        _prod_fake_compose_command("down", "--remove-orphans", include_env_file=False),
+        _prod_control_env(),
+        timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
+    )
+
+
 def _prod_control_env() -> dict[str, str]:
     # Compose renders the model for ps/down; these values never start containers.
     return runner_env() | {
@@ -1882,8 +1936,9 @@ def _prod_control_env() -> dict[str, str]:
 
 def prod_smoke() -> int:
     try:
-        api_port = _port_override("ANYTOOLAI_PROD_API_PORT", 8000)
-    except ValueError as exc:
+        env = _resolved_env_file(PROD_ENV_FILE)
+        api_port = _port_override("ANYTOOLAI_PROD_API_PORT", 8000, env)
+    except (ValueError, OSError) as exc:
         print(f"PROD001: {exc}", file=sys.stderr)
         return 2
     api_url = f"http://127.0.0.1:{api_port}"
@@ -1915,6 +1970,7 @@ COMMANDS = {
     "client-update-writer-smoke": client_update_writer_smoke,
     "prod-up": prod_up,
     "prod-fake-up": prod_fake_up,
+    "prod-fake-down": prod_fake_down,
     "prod-ready": prod_ready,
     "prod-status": prod_status,
     "prod-down": prod_down,
