@@ -19,5 +19,9 @@ export const fr: Shape<typeof en> = {
         prepaidRequest: "Demande d'acompte",
       },
     },
+    brief_decoder: {
+      blurb: "Transformez un brief client en détails structurés, risques et questions à poser avant de commencer.",
+      sample: "Manquant : échéance et budget. À demander au client : quelle est la date de lancement exacte, et qui valide le design ?",
+    },
   },
 };

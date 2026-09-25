@@ -98,6 +98,14 @@ Current MVP-A runtime-owned emission points:
 Other taxonomy groups remain part of the platform contract even when their concrete runtime service
 slice lands later.
 
+`web.result_viewed` is emitted once per completed result the page has rendered (after the result
+phase commits, not when it is fetched), unless the product's
+`ProductDefinition.emitsResultViewed(result)` returns false (the shared runtime still emits its
+`scenario_completed` run event, with `resultViewed: false`; only the client-events tracker skips
+the `web.*` event). Brief Decoder (ANY-248) uses that hook so the event means "a non-empty
+clarifying-question list was rendered"; a zero-question run still renders and the backend still
+records `scenario.completed`, but no `web.result_viewed` is sent.
+
 For A13, `quota.consumed` is emitted only for backend-accepted scenario starts. `quota.exhausted`
 is emitted when the backend rejects a scenario start because the configured guest quota dimension is
 exhausted. Quota events include `quota_dimension` and `quota_dimension_key`; scenario-dimension
