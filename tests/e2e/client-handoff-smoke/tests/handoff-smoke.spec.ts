@@ -122,6 +122,39 @@ test.describe("ANY-224 client handoff integration smoke", () => {
       const handoffToken = handoffTokenFromUrl(consentPage);
       expect(handoffToken).toBeTruthy();
 
+      // The tab title follows the chosen language after hydration and reload. Next streams the
+      // route's own English title in after hydration, so this is checked once the network settles.
+      await consentPage.evaluate(() => window.localStorage.setItem("anytoolai.ui_locale", "ru"));
+      await consentPage.reload({ waitUntil: "networkidle" });
+      await expect(consentPage).toHaveTitle("Проверьте передачу · AnytoolAI");
+      await consentPage.evaluate(() => window.localStorage.setItem("anytoolai.ui_locale", "en"));
+      await consentPage.reload({ waitUntil: "networkidle" });
+      await expect(consentPage).toHaveTitle("Review handoff · AnytoolAI");
+
+      // Through the real language selector: in the first frame after <html lang> changes, the page
+      // heading and the tab title must already be in the new language too (no one-paint mismatch).
+      await consentPage.evaluate(() => {
+        (window as unknown as { __firstFrame: Promise<unknown> }).__firstFrame = new Promise((resolve) => {
+          new MutationObserver(() =>
+            requestAnimationFrame(() =>
+              resolve({
+                lang: document.documentElement.lang,
+                title: document.title,
+                heading: document.querySelector("h1")?.textContent,
+              }),
+            ),
+          ).observe(document.documentElement, { attributes: true, attributeFilter: ["lang"] });
+        });
+      });
+      await consentPage.getByRole("combobox").selectOption("de");
+      expect(await consentPage.evaluate(() => (window as unknown as { __firstFrame: Promise<unknown> }).__firstFrame)).toEqual({
+        lang: "de",
+        title: "Übergabe prüfen · AnytoolAI",
+        heading: "Übergabe prüfen",
+      });
+      await consentPage.getByRole("combobox").selectOption("en");
+      await expect(consentPage).toHaveTitle("Review handoff · AnytoolAI");
+
       await consentPage.getByRole("button", { name: "Accept" }).click();
       await expect(consentPage.getByText(/consumed|accepted/i)).toBeVisible();
       await expect(consentPage.getByRole("button", { name: "Accept" })).toHaveCount(0);

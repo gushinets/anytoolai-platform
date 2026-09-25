@@ -1,0 +1,109 @@
+[
+  {
+    "atom_id": "A01",
+    "input": {
+      "source_text": "Acceptance A01: delivery is 17 October and costs 91500 EUR.",
+      "fields": [
+        {"name": "delivery_date", "type": "date", "description": "Delivery date", "required": true},
+        {"name": "price_eur", "type": "number", "description": "Price", "required": false}
+      ],
+      "strict": false
+    }
+  },
+  {
+    "atom_id": "A02",
+    "input": {
+      "text_a": "Acceptance A02: audited prototype in nine days.",
+      "text_b": "The brief requires the prototype within twelve days.",
+      "rubric": [{"id": "deadline", "description": "Meets the deadline", "weight": 3}]
+    }
+  },
+  {
+    "atom_id": "A03",
+    "input": {
+      "text": "Acceptance A03: every milestone names an owner and verification step.",
+      "axes": [
+        {"id": "ownership", "description": "Explicit owners", "weight": 2},
+        {"id": "verification", "description": "Acceptance checks", "weight": 4}
+      ]
+    }
+  },
+  {
+    "atom_id": "A04",
+    "input": {
+      "source_text": "Acceptance A04: approver and rollback plan are missing.",
+      "context": "Release readiness review",
+      "taxonomy": ["approval", "rollback"]
+    }
+  },
+  {
+    "atom_id": "A05",
+    "input": {
+      "issues": [
+        {
+          "category": "ownership",
+          "description": "No approver is named.",
+          "severity": "medium",
+          "evidence": "The approval field is blank."
+        }
+      ],
+      "context": "Acceptance A05 launch decision",
+      "target_audience": "Release manager",
+      "max_questions": 2
+    }
+  },
+  {
+    "atom_id": "A06",
+    "input": {
+      "context": {"product": "Acceptance A06", "saved_hours_per_week": 11},
+      "objective": "Secure approval for a measurement pilot",
+      "audience": "Operations lead",
+      "angle": "Measure saved time before rollout",
+      "constraints": {"tone": "firm", "length": 640, "language": "en-GB", "format": "plain_text"}
+    }
+  },
+  {
+    "atom_id": "A07",
+    "input": {
+      "situation": "Acceptance A07: customer asks whether the audit can start Tuesday.",
+      "intent": "Confirm availability and request repository access",
+      "tone": "neutral",
+      "constraints": {"language": "en", "max_length": 420, "output_format": "markdown"}
+    }
+  },
+  {
+    "atom_id": "A08",
+    "input": {
+      "source_text": "Acceptance A08: We can probably deliver something soon.",
+      "gap": "Replace ambiguity with a measurable delivery commitment",
+      "style": "bold"
+    }
+  },
+  {
+    "atom_id": "A09",
+    "input": {
+      "signals": [
+        {"id": "evidence", "label": "Acceptance evidence", "value": "three verified pilots"},
+        {"id": "risk", "label": "Delivery risk", "value": 0}
+      ],
+      "objective": "Select the strongest acceptance argument",
+      "options": ["speed", "proof"]
+    }
+  },
+  {
+    "atom_id": "A10",
+    "input": {
+      "template_ref": "acceptance_summary_v1",
+      "data": {"project": "Acceptance A10", "approved": false, "variance": 0, "notes": null}
+    }
+  },
+  {
+    "atom_id": "A11",
+    "input": {
+      "subject_text": "Acceptance A11 pilot delivered in nine days.",
+      "reference_text": "The brief requires delivery within twelve days.",
+      "categories": ["match", "gap"],
+      "criteria": [{"id": "deadline", "description": "Delivery deadline"}]
+    }
+  }
+]

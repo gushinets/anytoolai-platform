@@ -431,8 +431,10 @@ class _SequenceLabAdapter:
 
     def __init__(self, responses: list[str | Exception]) -> None:
         self.responses = iter(responses)
+        self.requests = []
 
     async def complete(self, request):
+        self.requests.append(request)
         response = next(self.responses)
         if isinstance(response, Exception):
             raise response
@@ -592,11 +594,10 @@ def test_lab_retry_success_keeps_separate_physical_calls_after_restart(
         "values": {"deadline": "tomorrow"}, "missing_fields": [],
         "confidence": {"deadline": 0.9},
     }
+    adapter = _SequenceLabAdapter([*prefix_responses, json.dumps(expected)])
     worker = build_worker(
         session_factory=session_factory, config_registry=registry,
-        provider_adapters={
-            "litellm": _SequenceLabAdapter([*prefix_responses, json.dumps(expected)])
-        },
+        provider_adapters={"litellm": adapter},
     )
     try:
         processed = asyncio.run(worker.process_next_job())
@@ -613,6 +614,13 @@ def test_lab_retry_success_keeps_separate_physical_calls_after_restart(
         (row["semantic_attempt_index"], row["transport_attempt_index"], row["physical_call_index"])
         for row in diagnostics["provider_calls"]
     ] == expected_indices
+    assert len(adapter.requests) == len(expected_indices)
+    assert all(request.model == "openai/gpt-5.4-mini" for request in adapter.requests)
+    assert all(
+        request.model_addressing is ProviderModelAddressing.direct
+        for request in adapter.requests
+    )
+    assert all(request.reasoning_effort is ReasoningEffort.high for request in adapter.requests)
     assert "private" not in json.dumps(diagnostics)
     restarted = build_worker(
         session_factory=session_factory, config_registry=registry,
@@ -623,6 +631,37 @@ def test_lab_retry_success_keeps_separate_physical_calls_after_restart(
     finally:
         restarted.dispose()
     assert _history(session_factory, run.id) == first
+
+
+def test_lab_null_reasoning_reaches_adapter_without_inheriting_policy_default(
+    session_factory,
+) -> None:
+    """ANY-467: an explicit no-effort Lab snapshot must not inherit the policy's medium."""
+    registry = build_config_registry(CONFIG_ROOT)
+    with transaction_boundary(session_factory) as session:
+        _scenario, _job, _run = _seed_lab_run(
+            session, registry, reasoning_effort=None,
+        )
+    expected = {
+        "values": {"deadline": "tomorrow"}, "missing_fields": [],
+        "confidence": {"deadline": 0.9},
+    }
+    adapter = _SequenceLabAdapter([json.dumps(expected)])
+    worker = build_worker(
+        session_factory=session_factory,
+        config_registry=registry,
+        provider_adapters={"litellm": adapter},
+    )
+    try:
+        processed = asyncio.run(worker.process_next_job())
+    finally:
+        worker.dispose()
+
+    assert processed is not None and processed.status is JobStatus.succeeded
+    assert len(adapter.requests) == 1
+    assert adapter.requests[0].model == "openai/gpt-5.4-mini"
+    assert adapter.requests[0].model_addressing is ProviderModelAddressing.direct
+    assert adapter.requests[0].reasoning_effort is None
 
 
 def test_lab_provider_failure_exposes_only_safe_code_and_complete_attempts(session_factory):

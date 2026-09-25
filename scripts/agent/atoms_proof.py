@@ -134,6 +134,17 @@ class EvidenceCase:
     # general -- a case that failed after the job row resolved still carries its real value.
     # `code-review` (me #6) finding.
     result_artifact_id: str | None = None
+    # Atom Lab acceptance adds only privacy-safe execution metadata to the same evidence shape.
+    # Ordinary atoms-proof/live-canary cases leave these fields null.
+    run_id: str | None = None
+    action_run_id: str | None = None
+    artifact_id: str | None = None
+    requested_model_id: str | None = None
+    response_model_id: str | None = None
+    reasoning_effort: str | None = None
+    input_valid: bool | None = None
+    result_valid: bool | None = None
+    finished_at: str | None = None
 
 
 def _build_engine(database_url: str, *, decode_database_name: bool = False) -> "sa.engine.Engine":
@@ -1052,12 +1063,15 @@ def write_evidence_report(
     target_root = output_root or REPO_ROOT / ".agent" / "atoms-proof"
     atom_cases = [case for case in cases if case.kind == "atom"]
     composite_cases = [case for case in cases if case.kind == "composite"]
+    reasoning_cases = [case for case in cases if case.kind == "reasoning"]
     payload = {
         "generated_at": datetime.now(tz=UTC).isoformat(),
         "atoms_passed": sum(1 for case in atom_cases if case.status == "pass"),
         "atoms_total": len(atom_cases),
         "composite_passed": sum(1 for case in composite_cases if case.status == "pass"),
         "composite_total": len(composite_cases),
+        "reasoning_passed": sum(1 for case in reasoning_cases if case.status == "pass"),
+        "reasoning_total": len(reasoning_cases),
         # Derived from run()'s own exit_code, not re-derived from `cases` here -- an empty
         # `cases` (PROOF008/PROOF009's empty-case guards) would otherwise read as vacuous
         # 0-passed-of-0 "success" even though run() itself returned a non-zero exit_code.

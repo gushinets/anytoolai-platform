@@ -3,13 +3,15 @@
 ## Status
 
 - State: active
-- Phase: AL08/ANY-466 implemented and verified on feature/ANY-466
+- Phase: AL09/ANY-467 automated acceptance implemented; credentialed acceptance blocked
 - Owner: mixed
 - Created: 2026-09-09
-- Last updated: 2026-09-23
+- Last updated: 2026-09-24
 - Review date: 2026-09-16
-- Next action: Review and commit ANY-466, then continue with AL09/ANY-467.
-- Blocker: none for development; operator configuration required before rollout.
+- Next action: run the credentialed Atom Lab live-canary, then inspect and publish privacy-safe
+  evidence.
+- Blocker: the current ANY-467 environment has no live OpenAI, live-canary, or Atom Lab access
+  credentials; AL09 and the release remain incomplete until real evidence exists.
 - Linear project: [Atom Lab](https://linear.app/paveldik/project/atom-lab-e1efc95ce888)
 - Milestone: Atom Lab v1
 
@@ -528,6 +530,8 @@ Acceptance: Compose smoke: migrations, API/worker ready, assets доступны
 | 2026-09-22 | Addressed the next three PR #138 findings: refresh and polling failures now retain stale wording and last-success context; initial catalog loads interrupted by bfcache resume automatically; and authoritative admission field errors retire immediately when their owning prompt, input, model, or effort changes. Verified 48 Node tests, 43 Chromium journeys, ESLint, `git diff --check`, and canonical `quick-check` (1864 passed). | Review and commit the four-file remediation, then reply to the three review threads. |
 | 2026-09-22 | Addressed the next PR #138 lifecycle finding: persisted pagehide/pageshow pauses now preserve the original catalog and accepted-run polling deadlines, and resumed catalog scheduling is capped to the remaining cumulative budget. Verified 50 Node tests, 43 Chromium journeys, ESLint, `git diff --check`, and canonical `quick-check` (1864 passed). | Review and commit the three-file remediation, then reply to the review thread. |
 | 2026-09-24 | Addressed the latest PR #142 review: known structured pre-write `503` failures remain retryable while unproven proxy `5xx` outcomes stay ambiguous; history preset saves no longer replace an unrelated editor draft; preset/history entry points remain inert until access is unlocked; Reset Prompt warns only for a genuinely dirty draft; unavailable model placeholders and warnings are reconciled on every saved selection; and the browser atom-ID closed set is checked against the backend enum without hiding the literal `prompt_ref` contract field. Added focused regressions and verified 51 Node tests, all 78 Atom Lab Chromium journeys, architecture tests, ESLint, `git diff --check`, and canonical `quick-check` (1885 passed). | Commit and push the review fixes, reply to all six inline threads, then inspect replacement PR checks. |
+| 2026-09-24 | Implemented ANY-467 automated acceptance: the existing live-canary now has an optional protected Atom Lab surface with non-smoke A01-A11 inputs, repository prompts, catalog-selected GPT/reasoning combinations, immutable snapshot and idempotent-replay checks, shared PostgreSQL ledger validation, cost fail-closed behavior, and privacy-safe model/date/validity evidence. Added adapter-level retry and explicit-null reasoning assertions and a repository-visible 12-criterion matrix. Final quick-check passed (1908 tests), as did the real PostgreSQL gate and all 78 Atom Lab Chromium journeys; independent review has no remaining Critical or Important findings. The aggregate full-check remains locally red only for the previously documented Node 26/web-mirror localStorage incompatibility. | Run the supported Node 22 CI gate and credentialed Atom Lab live-canary. Live credentials are absent, so AL09 remains blocked and unchecked. |
+| 2026-09-25 | Addressed PR #145 acceptance review: one fixture now drives the same A01-A11 non-smoke inputs through browser Form submission, HTTP durability and ActionRunner; the canary consumes the real `/atoms` array; validates output schema plus semantic validators; keeps provider credentials server-side; treats crash reconciliation as unknown spend; and checks direct model/effort metadata on every physical call. Verified quick-check (1929 passed), 52 Node tests, ESLint and all 78 Chromium journeys. | Commit and push the remediation, reply to the six review threads, then run the credentialed live gate when a configured stack and access code are available. |
 
 ## Planning revision verification (2026-09-09)
 

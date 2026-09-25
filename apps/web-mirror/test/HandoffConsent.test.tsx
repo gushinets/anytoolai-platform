@@ -4,10 +4,16 @@ import { handoffPreviewPayload as previewPayload } from "@anytoolai/ce-kit/test/
 // Reuses ce-kit's own routed-fetch-mock test util instead of a second hand-maintained
 // implementation of the same "fake platform-api backend" purpose.
 import { makeRoutedFetchClient } from "@anytoolai/ce-kit/test/testUtils/routedFetchClient";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { HandoffConsent } from "../src/components/HandoffConsent";
+import { HANDOFF_MESSAGES } from "../src/components/handoffMessages";
 import { makeClientWithDeferredRoute } from "./fixtures/platformResponses";
+import { LOCALE_STORAGE_KEY } from "../src/i18n/localeStorage";
+import { makeRender } from "./support/renderWithI18n";
+
+// The page provides the locale (see the handoff route); the component reads its copy from it.
+const render = makeRender(HANDOFF_MESSAGES);
 
 afterEach(() => {
   cleanup();
@@ -505,4 +511,63 @@ describe("HandoffConsent", () => {
       await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
     },
   );
+
+  it.each([
+    ["accept", "Accept", ACCEPT_ROUTE, "accepted", "Accepted"],
+    ["decline", "Decline", DECLINE_ROUTE, "declined", "Declined"],
+  ])(
+    "announces the %s outcome on the status line that survives the consent -> terminal transition",
+    async (_kind, clicked, route, wireStatus, outcome) => {
+      const { client, resolveDeferred } = makeClientWithDeferredRoute(
+        { [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload())], [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()] },
+        route,
+      );
+      render(<HandoffConsent client={client} handoffToken="token_abc" />);
+      const button = (await screen.findByRole("button", { name: clicked })) as HTMLButtonElement;
+      await waitFor(() => expect(button.disabled).toBe(false));
+
+      // The one element that exists in both the consent and the terminal view is a polite live
+      // region: the pending line and the focused button are gone once the action settles.
+      const statusLine = screen.getByText("Waiting for your decision");
+      expect(statusLine.getAttribute("aria-live")).toBe("polite");
+
+      fireEvent.click(button);
+      resolveDeferred(jsonResponse(200, previewPayload({ status: wireStatus })));
+
+      await waitFor(() => expect(statusLine.textContent).toBe(outcome));
+      expect(statusLine.isConnected).toBe(true);
+      expect(screen.queryByRole("button", { name: clicked })).toBeNull();
+    },
+  );
+
+  it("renders the page in the stored language, with the expiry formatted for it", async () => {
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, "ru");
+    try {
+      const { client } = makeRoutedClient({
+        [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload())],
+        [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
+      });
+      const ru = HANDOFF_MESSAGES.ru;
+
+      render(<HandoffConsent client={client} handoffToken="token_abc" />);
+
+      expect((await screen.findByRole("heading", { level: 1 })).textContent).toBe(ru.title);
+      expect(screen.getByRole("button", { name: ru.accept })).toBeTruthy();
+      expect(screen.getByRole("button", { name: ru.decline })).toBeTruthy();
+      expect(screen.getByText(ru.status.waiting)).toBeTruthy();
+      expect(screen.getByText(ru.fields.expires)).toBeTruthy();
+      const expiry = document.querySelector("time");
+      expect(expiry?.textContent).toBe(
+        new Date("2026-01-01T00:10:00Z").toLocaleString("ru", { dateStyle: "medium", timeStyle: "short" }),
+      );
+      // The tab title follows the language too, not just the page body.
+      expect(document.title).toBe(`${ru.title} · AnytoolAI`);
+      // The language selector is on the page and follows a switch without reloading.
+      fireEvent.change(screen.getByRole("combobox"), { target: { value: "de" } });
+      expect(screen.getByRole("button", { name: HANDOFF_MESSAGES.de.accept })).toBeTruthy();
+      expect(document.title).toBe(`${HANDOFF_MESSAGES.de.title} · AnytoolAI`);
+    } finally {
+      window.localStorage.removeItem(LOCALE_STORAGE_KEY);
+    }
+  });
 });
