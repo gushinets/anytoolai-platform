@@ -16,7 +16,7 @@ import tomllib
 import urllib.error
 import urllib.request
 import uuid
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -39,6 +39,10 @@ PROD_ENV_FILE = ROOT / "infra" / "compose" / ".env.prod"
 PROD_COMPOSE_PROJECT = "anytoolai-prod"
 PROD_FAKE_COMPOSE_PROJECT = "anytoolai-prod-fake"
 PROFILE_VERSION_HEX_LENGTH = 32
+# The non-root API user is not the operator who writes this non-secret state.
+# umask must not leave the bind-mounted directory or marker owner-only.
+ACTIVATION_STATE_DIRECTORY_MODE = 0o755
+ACTIVATION_MARKER_FILE_MODE = 0o644
 DEV_DEFAULT_POSTGRES_USER = "anytoolai"
 DEV_DEFAULT_POSTGRES_PASSWORD = "anytoolai"
 DEV_DEFAULT_POSTGRES_DB = "anytoolai"
@@ -784,7 +788,12 @@ def _deactivate_deployment_profile(compose_project: str) -> None:
     (_deployment_profile_dir(compose_project).parent / "active-profile").unlink(missing_ok=True)
 
 
-def _activate_deployment_profile(compose_project: str, manifest: dict[str, object]) -> None:
+def _activate_deployment_profile(
+    compose_project: str,
+    manifest: dict[str, object],
+    *,
+    on_committed: Callable[[], None] | None = None,
+) -> None:
     profile_dir = _deployment_profile_dir(compose_project)
     selected = Path(str(manifest["generated_products_root"])).parent
     suffix = selected.name.removeprefix(f"{profile_dir.name}.")
@@ -797,10 +806,20 @@ def _activate_deployment_profile(compose_project: str, manifest: dict[str, objec
         or not all(character in "0123456789abcdef" for character in suffix)
     ):
         raise ValueError("generated profile is outside its versioned deployment directory")
-    marker = profile_dir.parent / "active-profile"
-    staged_marker = profile_dir.parent / f"active-profile.{uuid.uuid4().hex}"
+    state_dir = profile_dir.parent
+    state_dir.mkdir(parents=True, exist_ok=True)
+    # Bind-mounted into the API container. chmod is absolute, so a 077 umask cannot
+    # leave the directory or the replacement marker owner-only.
+    if os.name == "posix":
+        state_dir.chmod(ACTIVATION_STATE_DIRECTORY_MODE)
+    marker = state_dir / "active-profile"
+    staged_marker = state_dir / f"active-profile.{uuid.uuid4().hex}"
     staged_marker.write_text(selected.name + "\n", encoding="utf-8")
+    if os.name == "posix":
+        staged_marker.chmod(ACTIVATION_MARKER_FILE_MODE)
     staged_marker.replace(marker)
+    if on_committed is not None:
+        on_committed()
     try:
         for previous in profile_dir.parent.glob(f"{profile_dir.name}*"):
             if previous == selected or not (
@@ -1038,8 +1057,18 @@ def dev_live_up(product_id: str, quota_mode: str = "unmetered") -> int:
     env.update(_deployment_profile_env(manifest, [product_id], unmetered))
     compose = _dev_live_compose_command(identity)
     activated = False
+
+    def note_activated() -> None:
+        nonlocal activated
+        activated = True
+
     try:
-        exit_code = run_with_env([*compose, "up", "-d", "--force-recreate", "--remove-orphans"], env)
+        # --build: the worker image and live entrypoints are not bind-mounted, so
+        # --force-recreate alone would start a stale development image.
+        exit_code = run_with_env(
+            [*compose, "up", "-d", "--build", "--force-recreate", "--remove-orphans"],
+            env,
+        )
         if exit_code != 0:
             return exit_code
         exit_code = _check_source_fingerprint(manifest, env)
@@ -1052,11 +1081,15 @@ def dev_live_up(product_id: str, quota_mode: str = "unmetered") -> int:
         if exit_code != 0:
             return exit_code
         try:
-            _activate_deployment_profile(identity.compose_project, manifest)
+            _activate_deployment_profile(
+                identity.compose_project,
+                manifest,
+                on_committed=note_activated,
+            )
         except (OSError, ValueError) as exc:
             print(f"LIVE005: could not activate local-live profile: {exc}", file=sys.stderr)
             return 1
-        activated = True
+        note_activated()
     finally:
         if not activated:
             if run_with_env([*compose, "down", "--remove-orphans"], env) == 0:
@@ -1888,23 +1921,35 @@ def _prod_up_locked() -> int:
     ):
         return 1
     # No timeout: `--build` can legitimately take minutes on a cold image build.
-    exit_code = run_with_env(
-        _prod_live_compose_command("up", "-d", "--build", "--force-recreate", "--remove-orphans"),
-        env,
-    )
-    if exit_code != 0:
-        _stop_failed_prod_candidate()
-        return exit_code
+    # finally, not `except Exception`: Ctrl+C is BaseException and must stop the
+    # candidate until active-profile is replaced. After that commit, leave the stack up.
+    committed = False
+
+    def note_committed() -> None:
+        nonlocal committed
+        committed = True
+
     try:
+        exit_code = run_with_env(
+            _prod_live_compose_command(
+                "up", "-d", "--build", "--force-recreate", "--remove-orphans"
+            ),
+            env,
+        )
+        if exit_code != 0:
+            return exit_code
         exit_code = prod_ready(inputs=inputs, manifest=manifest, announce=False)
-        if exit_code == 0:
-            _activate_deployment_profile(PROD_COMPOSE_PROJECT, manifest)
-    except Exception:
-        _stop_failed_prod_candidate()
-        raise
-    if exit_code != 0:
-        _stop_failed_prod_candidate()
-        return exit_code
+        if exit_code != 0:
+            return exit_code
+        _activate_deployment_profile(
+            PROD_COMPOSE_PROJECT,
+            manifest,
+            on_committed=note_committed,
+        )
+        note_committed()
+    finally:
+        if not committed:
+            _stop_failed_prod_candidate()
     _announce_production_ready(api_port, web_port)
     return 0
 
@@ -1957,14 +2002,21 @@ def prod_fake_up() -> int:
     ):
         return 1
     compose = _prod_fake_compose_command()
-    exit_code = run_with_env([*compose, "up", "-d", "--build", "--remove-orphans"], env)
-    if exit_code != 0:
-        _stop_failed_prod_fake_candidate()
+    # Same commit rule as prod-up: an interrupt before readiness must release the
+    # production host ports. A ready smoke stack stays up.
+    committed = False
+    try:
+        exit_code = run_with_env([*compose, "up", "-d", "--build", "--remove-orphans"], env)
+        if exit_code != 0:
+            return exit_code
+        exit_code = _prod_fake_ready(env=env)
+        if exit_code != 0:
+            return exit_code
+        committed = True
         return exit_code
-    exit_code = _prod_fake_ready(env=env)
-    if exit_code != 0:
-        _stop_failed_prod_fake_candidate()
-    return exit_code
+    finally:
+        if not committed:
+            _stop_failed_prod_fake_candidate()
 
 
 def _stop_failed_prod_fake_candidate() -> None:

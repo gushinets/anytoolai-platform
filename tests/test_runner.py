@@ -3,8 +3,11 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import shutil
+import stat
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.parse
 from pathlib import Path
@@ -1543,7 +1546,7 @@ def test_prod_up_builds_profile_before_live_compose_and_ready(monkeypatch) -> No
     monkeypatch.setattr(runner, "prod_ready", fake_prod_ready)
     monkeypatch.setattr(
         runner, "_activate_deployment_profile",
-        lambda project, manifest: events.append("activate"),
+        lambda project, manifest, **kwargs: events.append("activate"),
     )
 
     assert runner.prod_up() == 0
@@ -1564,8 +1567,13 @@ def test_prod_up_builds_profile_before_live_compose_and_ready(monkeypatch) -> No
     assert "ANYTOOLAI_UNMETERED_PRODUCT_IDS" not in commands[0]
 
 
+@pytest.mark.parametrize(
+    "failure",
+    [BrokenPipeError("closed output"), KeyboardInterrupt()],
+)
 def test_prod_up_does_not_teardown_after_activation_if_announcement_fails(
     monkeypatch,
+    failure: BaseException,
 ) -> None:
     runner = load_runner_module()
     inputs = runner.DeploymentInputs(
@@ -1586,7 +1594,7 @@ def test_prod_up_does_not_teardown_after_activation_if_announcement_fails(
     monkeypatch.setattr(
         runner,
         "_activate_deployment_profile",
-        lambda *args: events.append("activate"),
+        lambda *args, **kwargs: events.append("activate"),
     )
     monkeypatch.setattr(
         runner,
@@ -1596,11 +1604,11 @@ def test_prod_up_does_not_teardown_after_activation_if_announcement_fails(
 
     def fail_announcement(*args) -> None:
         events.append("announce")
-        raise BrokenPipeError("closed output")
+        raise failure
 
     monkeypatch.setattr(runner, "_announce_production_ready", fail_announcement)
 
-    with pytest.raises(BrokenPipeError, match="closed output"):
+    with pytest.raises(type(failure)):
         runner.prod_up()
 
     assert events == ["up", "ready", "activate", "announce"]
@@ -1696,11 +1704,99 @@ def test_prod_up_stops_candidate_after_start_or_readiness_failure(
     monkeypatch.setattr(runner, "_prod_down_locked", lambda: events.append("down") or 0)
     monkeypatch.setattr(
         runner, "_activate_deployment_profile",
-        lambda *args: pytest.fail("failed candidate must not become active"),
+        lambda *args, **kwargs: pytest.fail("failed candidate must not become active"),
     )
 
     assert runner.prod_up() == 1
     assert events == (["up", "down"] if up_exit else ["up", "ready", "down"])
+
+
+@pytest.mark.parametrize("interrupt_at", ["up", "ready"])
+def test_prod_up_stops_candidate_on_interrupt_before_activation(
+    monkeypatch, interrupt_at: str
+) -> None:
+    runner = load_runner_module()
+    inputs = runner.DeploymentInputs(
+        ("proposal_ai",), frozenset({"proposal_ai"}), PROD_LIVE_VALUES.copy()
+    )
+    events: list[str] = []
+    monkeypatch.setattr(runner, "_deployment_inputs", lambda: inputs)
+    monkeypatch.setattr(
+        runner,
+        "_build_deployment_profile",
+        lambda *args: (
+            0,
+            {"generated_products_root": "C:/generated/products", "profile_fingerprint": "f" * 64},
+        ),
+    )
+    monkeypatch.setattr(runner, "_prod_stack_running", lambda: True)
+
+    def run(command, env, **kwargs):
+        events.append("up")
+        if interrupt_at == "up":
+            raise KeyboardInterrupt
+        return 0
+
+    monkeypatch.setattr(runner, "run_with_env", run)
+    monkeypatch.setattr(
+        runner,
+        "prod_ready",
+        lambda **kwargs: events.append("ready") or (_ for _ in ()).throw(KeyboardInterrupt()),
+    )
+    monkeypatch.setattr(runner, "_prod_down_locked", lambda: events.append("down") or 0)
+    monkeypatch.setattr(
+        runner,
+        "_activate_deployment_profile",
+        lambda *args, **kwargs: pytest.fail("interrupted candidate must not become active"),
+    )
+
+    with pytest.raises(KeyboardInterrupt):
+        runner.prod_up()
+
+    assert events == (["up", "down"] if interrupt_at == "up" else ["up", "ready", "down"])
+
+
+def test_prod_up_keeps_stack_when_cleanup_is_interrupted_after_commit(
+    monkeypatch, tmp_path: Path
+) -> None:
+    runner = load_runner_module()
+    profile = tmp_path / "freelancer-suite"
+    old = tmp_path / (profile.name + "." + "a" * 32)
+    new = tmp_path / (profile.name + "." + "b" * 32)
+    (old / "products").mkdir(parents=True)
+    (new / "products").mkdir(parents=True)
+    inputs = runner.DeploymentInputs(
+        ("proposal_ai",), frozenset({"proposal_ai"}), PROD_LIVE_VALUES.copy()
+    )
+    manifest = {"generated_products_root": str(new / "products"), "profile_fingerprint": "f" * 64}
+    events: list[str] = []
+    monkeypatch.setattr(runner, "_deployment_profile_dir", lambda project: profile)
+    monkeypatch.setattr(runner, "_deployment_inputs", lambda: inputs)
+    monkeypatch.setattr(runner, "_build_deployment_profile", lambda *args: (0, manifest))
+    monkeypatch.setattr(runner, "_prod_stack_running", lambda: True)
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda command, env, **kwargs: events.append("up") or 0,
+    )
+    monkeypatch.setattr(runner, "prod_ready", lambda **kwargs: events.append("ready") or 0)
+    monkeypatch.setattr(
+        runner,
+        "_prod_down_locked",
+        lambda: events.append("down") or pytest.fail("committed deployment must stay running"),
+    )
+
+    def interrupt_cleanup(path: Path) -> None:
+        events.append("prune")
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(runner.shutil, "rmtree", interrupt_cleanup)
+
+    with pytest.raises(KeyboardInterrupt):
+        runner.prod_up()
+
+    assert events == ["up", "ready", "prune"]
+    assert (tmp_path / "active-profile").read_text(encoding="utf-8").strip() == new.name
 
 
 def test_prod_ready_checks_web_and_identical_container_profiles(monkeypatch, capsys) -> None:
@@ -1927,6 +2023,32 @@ def test_prod_fake_up_skips_ready_check_and_cleans_up_when_compose_up_fails(monk
 
     assert runner.prod_fake_up() == 1
     assert cleanup == ["prod-fake-down"]
+
+
+@pytest.mark.parametrize("interrupt_at", ["up", "ready"])
+def test_prod_fake_up_stops_candidate_on_interrupt(monkeypatch, interrupt_at: str) -> None:
+    runner = load_runner_module()
+    events: list[str] = []
+    monkeypatch.setattr(runner, "_prod_fake_stack_running", lambda env: True)
+
+    def run(command, env, **kwargs):
+        events.append("up")
+        if interrupt_at == "up":
+            raise KeyboardInterrupt
+        return 0
+
+    def ready(**kwargs):
+        events.append("ready")
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(runner, "run_with_env", run)
+    monkeypatch.setattr(runner, "_prod_fake_ready", ready)
+    monkeypatch.setattr(runner, "prod_fake_down", lambda: events.append("down") or 0)
+
+    with pytest.raises(KeyboardInterrupt):
+        runner.prod_fake_up()
+
+    assert events == (["up", "down"] if interrupt_at == "up" else ["up", "ready", "down"])
 
 
 def test_prod_fake_ready_waits_for_health(monkeypatch) -> None:
@@ -2851,6 +2973,103 @@ def test_profile_cleanup_failure_keeps_activated_profile(monkeypatch, tmp_path, 
     assert "could not remove previous deployment profile" in capsys.readouterr().err
 
 
+def _deployment_request_is_blocked(marker: Path, activation_name: str) -> bool:
+    from anytoolai_platform_api.main import _deployment_request_is_blocked as gate
+
+    class Url:
+        path = "/v1/products/proposal_ai/scenarios/proposal_ai.generate_v1/start"
+
+    class State:
+        pass
+
+    class App:
+        pass
+
+    class Request:
+        method = "POST"
+        url = Url()
+        app = App()
+
+    Request.app.state = State()
+    Request.app.state.settings = type("Settings", (), {})()
+    Request.app.state.settings.deployment_activation_name = activation_name
+    Request.app.state.settings.deployment_activation_marker = str(marker)
+    return gate(Request())
+
+
+def _assert_other_user_can_match_marker(marker: Path, activation_name: str) -> None:
+    module_path = (
+        Path(__file__).resolve().parents[1]
+        / "apps/platform-api/src/anytoolai_platform_api/deployment_activation.py"
+    )
+    script = module_path.read_text(encoding="utf-8") + (
+        "\nimport sys\n"
+        "matched = deployment_marker_matches(Path(sys.argv[1]), sys.argv[2])\n"
+        "if not matched:\n"
+        "    try:\n"
+        "        print(Path(sys.argv[1]).read_text(encoding='utf-8'), file=sys.stderr)\n"
+        "    except OSError as exc:\n"
+        "        print(f'{exc.__class__.__name__}: {exc}', file=sys.stderr)\n"
+        "raise SystemExit(0 if matched else 1)\n"
+    )
+    interpreter = "/usr/bin/python3"
+    if not Path(interpreter).is_file():
+        found = shutil.which("python3")
+        if found is None:
+            pytest.fail("python3 is required to read the activation marker as nobody")
+        interpreter = found
+    try:
+        result = subprocess.run(
+            [
+                "sudo",
+                "-n",
+                "-u",
+                "nobody",
+                "--",
+                interpreter,
+                "-c",
+                script,
+                str(marker),
+                activation_name,
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError as exc:
+        pytest.fail(
+            "passwordless sudo is required to read the activation marker as nobody: "
+            f"{exc}"
+        )
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX permission bits and user switching")
+def test_activation_marker_is_readable_by_non_root_api_user(monkeypatch) -> None:
+    runner = load_runner_module()
+    state = Path(tempfile.mkdtemp(prefix="anytoolai-activation-", dir="/tmp"))
+    previous_umask = os.umask(0o077)
+    try:
+        assert stat.S_IMODE(state.stat().st_mode) == 0o700
+        profile = state / "freelancer-suite"
+        selected = state / (profile.name + "." + "a" * 32)
+        (selected / "products").mkdir(parents=True)
+        monkeypatch.setattr(runner, "_deployment_profile_dir", lambda project: profile)
+        runner._activate_deployment_profile(
+            "test-project",
+            {"generated_products_root": str(selected / "products")},
+        )
+        marker = state / "active-profile"
+        assert stat.S_IMODE(state.stat().st_mode) == runner.ACTIVATION_STATE_DIRECTORY_MODE
+        assert stat.S_IMODE(marker.stat().st_mode) == runner.ACTIVATION_MARKER_FILE_MODE
+        _assert_other_user_can_match_marker(marker, selected.name)
+        assert _deployment_request_is_blocked(marker, selected.name) is False
+        assert _deployment_request_is_blocked(marker, profile.name + "." + "b" * 32) is True
+    finally:
+        os.umask(previous_umask)
+        shutil.rmtree(state)
+
+
 def test_dev_live_up_checks_both_mounted_profiles_before_ready(monkeypatch, tmp_path, capsys):
     runner = load_runner_module()
     identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
@@ -2874,7 +3093,9 @@ def test_dev_live_up_checks_both_mounted_profiles_before_ready(monkeypatch, tmp_
     }
     monkeypatch.setattr(runner, "_build_deployment_profile", lambda *args: (0, manifest))
     monkeypatch.setattr(runner, "_check_source_fingerprint", lambda manifest, env: 0)
-    monkeypatch.setattr(runner, "_activate_deployment_profile", lambda project, manifest: None)
+    monkeypatch.setattr(
+        runner, "_activate_deployment_profile", lambda project, manifest, **kwargs: None
+    )
     calls = []
     monkeypatch.setattr(
         runner,
@@ -2885,6 +3106,8 @@ def test_dev_live_up_checks_both_mounted_profiles_before_ready(monkeypatch, tmp_
     assert runner.dev_live_up("proposal_ai", "unmetered") == 0
 
     assert len(calls) == 3  # compose up, API check, worker check
+    assert "--build" in calls[0][0]
+    assert calls[0][0].index("--build") < calls[0][0].index("--force-recreate")
     assert "--force-recreate" in calls[0][0]
     assert calls[0][1]["ANYTOOLAI_DEPLOYMENT_PRODUCTS_ROOT"] == str(tmp_path / "products")
     assert calls[0][1]["ANYTOOLAI_DEPLOYMENT_PROFILE_FINGERPRINT"] == "a" * 64
@@ -2954,7 +3177,9 @@ def test_dev_live_up_stops_failed_candidate(monkeypatch, tmp_path, failed_step):
         runner, "_check_source_fingerprint", lambda manifest, env: 7 if failed_step == "source" else 0
     )
     monkeypatch.setattr(
-        runner, "_activate_deployment_profile", lambda *args: pytest.fail("failed candidate activated")
+        runner,
+        "_activate_deployment_profile",
+        lambda *args, **kwargs: pytest.fail("failed candidate activated"),
     )
     calls = []
 
@@ -2990,7 +3215,9 @@ def test_dev_live_up_reports_activation_failure_and_stops_candidate(
     monkeypatch.setattr(runner, "_check_source_fingerprint", lambda manifest, env: 0)
     monkeypatch.setattr(runner, "_run_effective_profile_checks", lambda *args: 0)
     monkeypatch.setattr(
-        runner, "_activate_deployment_profile", lambda *args: (_ for _ in ()).throw(failure)
+        runner,
+        "_activate_deployment_profile",
+        lambda *args, **kwargs: (_ for _ in ()).throw(failure),
     )
     calls = []
     monkeypatch.setattr(
@@ -3002,6 +3229,52 @@ def test_dev_live_up_reports_activation_failure_and_stops_candidate(
     output = capsys.readouterr()
     assert "LIVE005" in output.err
     assert "ready" not in output.out
+
+
+def test_dev_live_up_keeps_stack_when_cleanup_is_interrupted_after_commit(
+    monkeypatch, tmp_path: Path
+) -> None:
+    runner = load_runner_module()
+    identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
+    profile = tmp_path / "freelancer-suite"
+    old = tmp_path / (profile.name + "." + "a" * 32)
+    new = tmp_path / (profile.name + "." + "b" * 32)
+    (old / "products").mkdir(parents=True)
+    (new / "products").mkdir(parents=True)
+    monkeypatch.setattr(runner, "runtime_identity", lambda: identity)
+    monkeypatch.setattr(runner, "_deployment_profile_dir", lambda project: profile)
+    monkeypatch.setattr(runner, "LIVE_ENV_FILE", tmp_path / "missing.env")
+    monkeypatch.setenv("OPENAI_API_KEY", "hidden-key")
+    monkeypatch.setattr(runner, "_compose_stack_running", lambda command, env: False)
+    monkeypatch.setattr(runner, "port_available", lambda port: True)
+    monkeypatch.setattr(runner, "_wait_for_http_ok", lambda url, timeout: True)
+    manifest = {
+        "generated_products_root": str(new / "products"),
+        "container_products_root": "/app/products",
+        "profile_fingerprint": "a" * 64,
+        "enabled_products": {
+            "proposal_ai": {
+                "provider_policy_ref": "default_text_generation_v1",
+                "quota_policy_ref": None,
+            }
+        },
+    }
+    monkeypatch.setattr(runner, "_build_deployment_profile", lambda *args: (0, manifest))
+    monkeypatch.setattr(runner, "_check_source_fingerprint", lambda manifest, env: 0)
+    monkeypatch.setattr(runner, "_run_effective_profile_checks", lambda *args: 0)
+    calls: list[list[str]] = []
+    monkeypatch.setattr(
+        runner, "run_with_env", lambda command, env, **kwargs: calls.append(list(command)) or 0
+    )
+    monkeypatch.setattr(
+        runner.shutil, "rmtree", lambda path: (_ for _ in ()).throw(KeyboardInterrupt())
+    )
+
+    with pytest.raises(KeyboardInterrupt):
+        runner.dev_live_up("proposal_ai", "unmetered")
+
+    assert all(command[-2:] != ["down", "--remove-orphans"] for command in calls)
+    assert (tmp_path / "active-profile").read_text(encoding="utf-8").strip() == new.name
 
 
 def test_dev_web_uses_derived_api_url(monkeypatch):

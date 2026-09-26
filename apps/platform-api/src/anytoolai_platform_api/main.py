@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from anytoolai_platform_api.atom_lab.cache import apply_atom_lab_cache_policy
 from anytoolai_platform_api.bootstrap import build_runtime
+from anytoolai_platform_api.deployment_activation import deployment_marker_matches
 from anytoolai_platform_api.errors import (
     REQUEST_ID_HEADER,
     ApiError,
@@ -121,11 +122,7 @@ def _deployment_request_is_blocked(request: Request) -> bool:
     activation_marker = settings.deployment_activation_marker
     if activation_marker is None:
         return True
-    try:
-        selected = Path(activation_marker).read_text(encoding="utf-8").strip()
-    except (OSError, UnicodeError):
-        return True
-    return selected != activation_name
+    return not deployment_marker_matches(Path(activation_marker), activation_name)
 
 
 def _install_request_context(app: FastAPI) -> None:

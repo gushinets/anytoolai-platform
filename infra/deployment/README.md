@@ -185,7 +185,10 @@ python scripts/agent/runner.py dev-web
 The first command generates an unmetered live profile. API and worker verify their mounted
 profile against the selected manifest before either process starts; readiness checks both again.
 The second command starts the local web host with the active live product selection in a
-separate terminal. A failed `dev-live-up` stops its Compose candidate. Run more than ten Proposal AI submissions, check successful live provider
+separate terminal. `dev-live-up` rebuilds the API and worker images before recreating
+containers; the worker image and live entrypoints are not bind-mounted, so a cached image
+would skip the activation guards. A failed or interrupted `dev-live-up` stops its Compose
+candidate. Run more than ten Proposal AI submissions, check successful live provider
 rows in `platform.provider_calls` and Squid CONNECT records, and confirm there is no quota GET
 or `429`. Repeat with `dev-live-up --product proposal_ai --quota-mode canonical` and verify
 normal quota exhaustion. Stop with `dev-down`; a later ordinary `dev-up` uses the canonical
@@ -229,9 +232,12 @@ then force-recreates base + prod + live Compose, waits for API and web HTTP, and
 same mounted profile fingerprint and policy references inside API and worker. It never falls
 back to fake. A host-level deployment lock covers profile generation through readiness,
 activation, and failure cleanup; a concurrent `prod-up` exits with `PROD007` before touching
-the production project or active profile. If Compose startup or readiness fails, `prod-up` stops
-the candidate project without deleting its PostgreSQL volume; investigate before restarting
-production.
+the production project or active profile. If Compose startup or readiness fails, or the
+command is interrupted before `active-profile` is replaced, `prod-up` stops the candidate
+project without deleting its PostgreSQL volume; investigate before restarting production.
+Once that marker is in place, an interrupt leaves the stack up. The activation directory
+and marker are non-secret and are published as `0755` and `0644` so the non-root API user
+can read them after a restrictive umask.
 Each deployment uses a new immutable profile directory. A failed redeploy leaves the previous
 container bind source intact for restarts; old profiles are removed only after readiness passes.
 The candidate worker verifies its profile but waits for `active-profile` to name its generation
@@ -245,7 +251,8 @@ under an allowlist that never became active.
 web server's same-origin `/v1/*` route. `prod-fake-up` is reserved for the credential-free
 `kernel_demo` smoke in CI and uses the separate `anytoolai-prod-fake` Compose project, so it
 cannot reconcile or replace the live `anytoolai-prod` services. It checks API, web, and web-to-API
-routing; failed startup/readiness tears the smoke project down, and `prod-fake-down` is the explicit
+routing; failed startup/readiness, or an interrupt before readiness, tears the smoke project
+down so it does not keep the production host ports, and `prod-fake-down` is the explicit
 cleanup command. It never passes `.env.prod` or an OpenAI key to the smoke containers. `prod-smoke`
 tests that smoke stack, not OpenAI.
 
