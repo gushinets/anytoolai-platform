@@ -1,8 +1,8 @@
 renderer_contract:
   scenario_id: brief_decoder.decode_v1
   output_schema_ref: brief_decoder.decode_output_v1
-  # The result is one composed object with four parts. apps/web-mirror (ANY-248) renders them in
-  # this order; this file pins the contract that renderer is built against, not the renderer.
+  # The result is one composed object with four parts. apps/web-mirror/src/products/briefDecoder
+  # (ANY-248) renders them in this order; this file pins the contract that renderer is built against, not the renderer.
   parts:
     - part_id: brief
       field: brief

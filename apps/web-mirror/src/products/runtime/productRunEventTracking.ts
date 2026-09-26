@@ -59,7 +59,8 @@ export function createProductRunEventTracker(
 ): (event: ProductRunEvent) => void {
   return (event) => {
     const eventType = webEventTypeForRunEvent(event.type);
-    if (eventType === undefined) {
+    // A completed run the product does not count as "viewed" (ProductDefinition.emitsResultViewed).
+    if (eventType === undefined || (event.type === "scenario_completed" && !event.resultViewed)) {
       return;
     }
     const scenarioSessionId = "scenarioSessionId" in event ? event.scenarioSessionId : undefined;

@@ -3,7 +3,7 @@
 // result rendering, next-action callback, retry, and quota/error behavior") -- no real product's
 // meaning is in the loop here. ProposalAI's own meaning is covered in ProposalAIProduct.test.tsx.
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
-import { StrictMode } from "react";
+import { Component, StrictMode, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProductRunPage, type ProductRunPageProps } from "../src/products/runtime/ProductRunPage";
 import type { ProductRunEvent } from "../src/products/runtime/productDefinition";
@@ -95,6 +95,17 @@ async function waitForResult() {
 async function advance(ms: number, step = 50): Promise<void> {
   for (let elapsed = 0; elapsed < ms; elapsed += step) {
     await vi.advanceTimersByTimeAsync(Math.min(step, ms - elapsed));
+  }
+}
+
+/** Catches a throwing renderer above `ProductRunPage`, the way an app-level boundary would. */
+class TestErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    return this.state.failed ? <p>render boundary</p> : this.props.children;
   }
 }
 
@@ -694,12 +705,82 @@ describe("ProductRunPage", () => {
       { type: "product_viewed", guestId: "guest_1" },
       { type: "form_started", guestId: "guest_1" },
       { type: "form_submitted", guestId: "guest_1" },
-      { type: "scenario_completed", scenarioSessionId: "session_1", guestId: "guest_1" },
+      { type: "scenario_completed", scenarioSessionId: "session_1", guestId: "guest_1", resultViewed: true },
       { type: "copy_activated", scenarioSessionId: "session_1", guestId: "guest_1" },
     ]);
     const serialized = JSON.stringify(events);
     expect(serialized).not.toContain("input text");
     expect(serialized).not.toContain(RESULT_TEXT);
+  });
+
+  it.each([
+    ["is left unset", undefined, true],
+    ["returns true", () => true, true],
+    ["returns false", () => false, false],
+    [
+      "throws",
+      () => {
+        throw new Error("boom");
+      },
+      false,
+    ],
+  ])("reports resultViewed per emitsResultViewed when it %s, still completing and rendering the result", async (_name, hook, expected) => {
+    const events: ProductRunEvent[] = [];
+    const { client } = makeClient(happyPathRoutes());
+    const definition = { ...testProductDefinition, emitsResultViewed: hook };
+
+    render(<ProductRunPage definition={definition} client={client} onEvent={(event) => events.push(event)} />);
+    await waitForForm();
+    fillValidForm();
+    submit();
+    await waitForResult();
+
+    expect(events.filter((event) => event.type === "scenario_completed")).toEqual([
+      { type: "scenario_completed", scenarioSessionId: "session_1", guestId: "guest_1", resultViewed: expected },
+    ]);
+    expect(screen.getByText(RESULT_TEXT)).toBeTruthy();
+  });
+
+  it("emits scenario_completed only after the result has rendered: a renderer that throws never reports a viewed result", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const events: ProductRunEvent[] = [];
+    const { client } = makeClient(happyPathRoutes());
+    const definition = {
+      ...testProductDefinition,
+      Result: () => {
+        throw new Error("render failed");
+      },
+    };
+
+    render(
+      <TestErrorBoundary>
+        <ProductRunPage definition={definition} client={client} onEvent={(event) => events.push(event)} />
+      </TestErrorBoundary>,
+    );
+    await waitForForm();
+    fillValidForm();
+    submit();
+
+    await waitFor(() => expect(screen.getByText("render boundary")).toBeTruthy());
+    expect(events.map((event) => event.type)).not.toContain("scenario_completed");
+    vi.restoreAllMocks();
+  });
+
+  it("emits scenario_completed exactly once per session under StrictMode's effect replay", async () => {
+    const events: ProductRunEvent[] = [];
+    const { client } = makeClient(happyPathRoutes());
+
+    render(
+      <StrictMode>
+        <ProductRunPage definition={testProductDefinition} client={client} onEvent={(event) => events.push(event)} />
+      </StrictMode>,
+    );
+    await waitForForm();
+    fillValidForm();
+    submit();
+    await waitForResult();
+
+    expect(events.filter((event) => event.type === "scenario_completed")).toHaveLength(1);
   });
 
   it("emits copy_activated even when the completed session has no checkpoint id, only skipping the next-action call", async () => {

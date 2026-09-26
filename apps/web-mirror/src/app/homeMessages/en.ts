@@ -17,5 +17,9 @@ export const en = {
         prepaidRequest: "Prepaid request",
       },
     },
+    brief_decoder: {
+      blurb: "Turn a client brief into structured details, risks, and the questions to ask before you start.",
+      sample: "Missing: deadline and budget. Ask the client: what is the exact launch date, and who signs off on the design?",
+    },
   },
 };

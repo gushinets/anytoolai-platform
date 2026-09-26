@@ -56,13 +56,24 @@ describe("createProductRunEventTracker", () => {
     const { client, calls } = makeClientCapturingRequests({ [CLIENT_EVENTS_ROUTE]: [clientEventReceiptResponse()] });
     const onEvent = createProductRunEventTracker(client, "proposal_ai", createInMemoryAsyncStorage());
 
-    onEvent({ type: "scenario_completed", scenarioSessionId: "session_1", guestId: "guest_1" });
+    onEvent({ type: "scenario_completed", scenarioSessionId: "session_1", guestId: "guest_1", resultViewed: true });
     await vi.waitFor(() => expect(clientEventCalls(calls)).toHaveLength(1));
 
     const body = parseBody(clientEventCalls(calls)[0]!);
     expect(body.event_type).toBe("web.result_viewed");
     expect(body.scenario_session_id).toBe("session_1");
     expect(body.guest_id).toBe("guest_1");
+  });
+
+  it("does not track web.result_viewed for a completed run the product does not count as viewed", async () => {
+    const { client, calls } = makeClientCapturingRequests({ [CLIENT_EVENTS_ROUTE]: [clientEventReceiptResponse()] });
+    const onEvent = createProductRunEventTracker(client, "brief_decoder", createInMemoryAsyncStorage());
+
+    onEvent({ type: "scenario_completed", scenarioSessionId: "session_1", guestId: "guest_1", resultViewed: false });
+    onEvent({ type: "form_started", guestId: "guest_1" });
+    await vi.waitFor(() => expect(clientEventCalls(calls)).toHaveLength(1));
+
+    expect(clientEventCalls(calls).map((call) => parseBody(call).event_type)).toEqual(["web.form_started"]);
   });
 
   it("reuses the same web_session_id across calls", async () => {

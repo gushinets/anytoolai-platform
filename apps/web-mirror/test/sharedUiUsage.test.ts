@@ -13,6 +13,8 @@ const FILES = [
   "../src/components/HandoffConsent.tsx",
   "../src/products/shared/tone.tsx",
   "../src/products/clientUpdateWriter/ClientUpdateWriterProduct.tsx",
+  "../src/products/briefDecoder/BriefDecoderProduct.tsx",
+  "../src/products/briefDecoder/BriefDecoderResult.tsx",
 ];
 
 describe("shared-ui control usage", () => {
