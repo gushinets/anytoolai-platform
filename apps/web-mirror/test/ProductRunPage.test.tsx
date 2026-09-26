@@ -765,9 +765,12 @@ describe("ProductRunPage", () => {
     submit();
     await waitForResult();
 
-    expect(events.filter((event) => event.type === "scenario_completed")).toEqual([
-      { type: "scenario_completed", scenarioSessionId: "session_1", guestId: "guest_1", resultViewed: expected },
-    ]);
+    // `scenario_completed` comes from a commit-time effect, so it can land just after the DOM does.
+    await waitFor(() =>
+      expect(events.filter((event) => event.type === "scenario_completed")).toEqual([
+        { type: "scenario_completed", scenarioSessionId: "session_1", guestId: "guest_1", resultViewed: expected },
+      ]),
+    );
     expect(screen.getByText(RESULT_TEXT)).toBeTruthy();
   });
 
@@ -810,7 +813,7 @@ describe("ProductRunPage", () => {
     submit();
     await waitForResult();
 
-    expect(events.filter((event) => event.type === "scenario_completed")).toHaveLength(1);
+    await waitFor(() => expect(events.filter((event) => event.type === "scenario_completed")).toHaveLength(1));
   });
 
   it("emits copy_activated even when the completed session has no checkpoint id, only skipping the next-action call", async () => {

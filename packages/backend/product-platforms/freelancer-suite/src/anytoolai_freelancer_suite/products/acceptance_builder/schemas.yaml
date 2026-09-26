@@ -1,0 +1,19 @@
+schemas:
+  - schema_ref: acceptance_builder.draft_input_v1
+    version: 1
+    file_path: schemas/draft_input.schema.json
+  - schema_ref: acceptance_builder.check_input_v1
+    version: 1
+    file_path: schemas/check_input.schema.json
+  - schema_ref: acceptance_builder.draft_output_v1
+    version: 1
+    file_path: schemas/draft_output.schema.json
+  - schema_ref: acceptance_builder.check_output_v1
+    version: 1
+    file_path: schemas/check_output.schema.json
+  - schema_ref: acceptance_builder.draft_from_brief_input_v1
+    version: 1
+    file_path: schemas/draft_from_brief_input.schema.json
+  - schema_ref: acceptance_builder.draft_from_brief_output_v1
+    version: 1
+    file_path: schemas/draft_from_brief_output.schema.json

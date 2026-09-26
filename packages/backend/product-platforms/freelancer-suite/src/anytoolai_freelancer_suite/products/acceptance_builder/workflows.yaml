@@ -1,0 +1,75 @@
+workflows:
+  - workflow_id: acceptance_builder.draft_v1
+    version: 1
+    input_schema_ref: acceptance_builder.draft_input_v1
+    output_schema_ref: acceptance_builder.draft_output_v1
+    # A01, composed through A10. Every output_mapping target writes a key of the composed
+    # workflow output ({extracted, document}). No mapping path indexes an array.
+    steps:
+      - step_id: extract
+        action_config_id: acceptance_builder.extract_v1
+        input_mapping:
+          source_text: scenario.input.brief_text
+          fields: 'literal:[{"name":"acceptance_criteria","type":"array_of_strings","description":"Conditions the brief says the finished work must satisfy.","required":false},{"name":"assumptions","type":"array_of_strings","description":"Things the brief takes for granted or states as assumed.","required":false},{"name":"deliverables","type":"array_of_strings","description":"Concrete deliverables the client expects.","required":false}]'
+          # Not strict: a vague brief must yield `missing_fields`, not a failed run.
+          strict: 'literal:false'
+        output_mapping:
+          context.workflow_output.extracted: steps.extract.output
+      - step_id: generate_document
+        action_config_id: acceptance_builder.draft_document_v1
+        input_mapping:
+          template_ref: 'literal:"acceptance_builder.draft_v1"'
+          data.extracted: steps.extract.output
+        output_mapping:
+          context.workflow_output.document: steps.generate_document.output
+
+  - workflow_id: acceptance_builder.check_v1
+    version: 1
+    input_schema_ref: acceptance_builder.check_input_v1
+    output_schema_ref: acceptance_builder.check_output_v1
+    # A01 + A11, composed through A10. A11 judges the deliverable against the fixed general
+    # `criteria` below, not against A01's extracted acceptance criteria (A01 yields strings, A11
+    # needs {id, description} objects and the mapping DSL cannot convert). extract -> compare is
+    # order-only. The criteria ids and categories bound check_output_v1's closed shapes.
+    steps:
+      - step_id: extract
+        action_config_id: acceptance_builder.extract_v1
+        input_mapping:
+          source_text: scenario.input.brief_text
+          fields: 'literal:[{"name":"acceptance_criteria","type":"array_of_strings","description":"Conditions the brief says the finished work must satisfy.","required":false},{"name":"assumptions","type":"array_of_strings","description":"Things the brief takes for granted or states as assumed.","required":false},{"name":"deliverables","type":"array_of_strings","description":"Concrete deliverables the client expects.","required":false}]'
+          # Not strict: a vague brief must yield `missing_fields`, not a failed run.
+          strict: 'literal:false'
+        output_mapping:
+          context.workflow_output.extracted: steps.extract.output
+      - step_id: compare
+        action_config_id: acceptance_builder.compare_v1
+        input_mapping:
+          subject_text: scenario.input.deliverable_text
+          reference_text: scenario.input.brief_text
+          categories: 'literal:["meets_expectations","partially_meets","does_not_meet"]'
+          criteria: 'literal:[{"id":"scope_coverage","description":"The deliverable covers everything in scope that the brief asks for.","weight":3},{"id":"requirement_fit","description":"What was delivered does what the brief says it must do.","weight":3},{"id":"completeness","description":"Every deliverable the brief lists is present.","weight":2},{"id":"clarity","description":"The deliverable text states plainly what was done and what was not.","weight":1}]'
+        output_mapping:
+          context.workflow_output.comparison: steps.compare.output
+      - step_id: generate_document
+        action_config_id: acceptance_builder.check_document_v1
+        input_mapping:
+          template_ref: 'literal:"acceptance_builder.check_v1"'
+          data.extracted: steps.extract.output
+          data.comparison: steps.compare.output
+        output_mapping:
+          context.workflow_output.document: steps.generate_document.output
+
+  - workflow_id: acceptance_builder.draft_from_brief_v1
+    version: 1
+    input_schema_ref: acceptance_builder.draft_from_brief_input_v1
+    output_schema_ref: acceptance_builder.draft_from_brief_output_v1
+    # A10 only: the input is already structured (a Brief Decoder `brief`), so there is nothing for
+    # A01 to extract. The workflow output is {document}.
+    steps:
+      - step_id: generate_document
+        action_config_id: acceptance_builder.draft_from_brief_document_v1
+        input_mapping:
+          template_ref: 'literal:"acceptance_builder.draft_from_brief_v1"'
+          data.brief: scenario.input.brief
+        output_mapping:
+          context.workflow_output.document: steps.generate_document.output

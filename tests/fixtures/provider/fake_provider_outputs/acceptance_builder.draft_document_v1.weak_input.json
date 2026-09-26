@@ -1,0 +1,43 @@
+{
+  "response_json": {
+    "sections": [
+      {
+        "id": "acceptance-criteria",
+        "title": "Acceptance criteria",
+        "content": "Not specified in the brief.",
+        "metadata": {
+          "kind": "list"
+        }
+      },
+      {
+        "id": "assumptions",
+        "title": "Assumptions",
+        "content": "Not specified in the brief.",
+        "metadata": {
+          "kind": "list"
+        }
+      },
+      {
+        "id": "deliverables",
+        "title": "Deliverables",
+        "content": "- A certificate",
+        "metadata": {
+          "kind": "list"
+        }
+      },
+      {
+        "id": "open-gaps",
+        "title": "Open gaps",
+        "content": "The brief does not state any acceptance criteria or assumptions; the client should confirm both."
+      }
+    ],
+    "summary": "No acceptance criteria were found in the brief. Ask the client what the certificate must do and for which courses before any work starts."
+  },
+  "input_tokens": 150,
+  "output_tokens": 110,
+  "latency_ms": 10,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "acceptance_builder.draft_document_v1.weak_input"
+  }
+}

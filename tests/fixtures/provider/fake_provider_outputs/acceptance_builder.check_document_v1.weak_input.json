@@ -1,0 +1,48 @@
+{
+  "response_json": {
+    "sections": [
+      {
+        "id": "verdict",
+        "title": "Verdict",
+        "content": "The deliverable does not meet expectations. It is judged on four general review criteria (scope coverage, requirement fit, completeness, clarity), not item by item on the acceptance criteria below. Scope coverage is a mismatch: the delivery text names no course. Requirement fit is a mismatch: the delivery text does not say whether a certificate is generated or delivered. Completeness is a mismatch: none of the deliverables the brief lists is mentioned. Clarity is a mismatch: the delivery text is a single vague sentence."
+      },
+      {
+        "id": "acceptance-criteria",
+        "title": "Acceptance criteria",
+        "content": "Not specified in the brief.",
+        "metadata": {
+          "kind": "list"
+        }
+      },
+      {
+        "id": "assumptions",
+        "title": "Assumptions",
+        "content": "Not specified in the brief.",
+        "metadata": {
+          "kind": "list"
+        }
+      },
+      {
+        "id": "deliverables",
+        "title": "Deliverables",
+        "content": "- A certificate",
+        "metadata": {
+          "kind": "list"
+        }
+      },
+      {
+        "id": "open-gaps",
+        "title": "Open gaps",
+        "content": "The brief does not state any acceptance criteria or assumptions; the client should confirm both."
+      }
+    ],
+    "summary": "The delivery does not meet expectations because the delivery text is too short to show any requirement was met. Ask for a fuller description of what was delivered."
+  },
+  "input_tokens": 260,
+  "output_tokens": 200,
+  "latency_ms": 10,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "acceptance_builder.check_document_v1.weak_input"
+  }
+}

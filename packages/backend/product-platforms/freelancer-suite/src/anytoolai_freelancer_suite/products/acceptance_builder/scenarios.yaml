@@ -1,0 +1,19 @@
+scenarios:
+  - scenario_id: acceptance_builder.draft_v1
+    version: 1
+    workflow_id: acceptance_builder.draft_v1
+    allowed_next_actions:
+      - copy_result
+  - scenario_id: acceptance_builder.check_v1
+    version: 1
+    workflow_id: acceptance_builder.check_v1
+    allowed_next_actions:
+      - copy_result
+  # Handoff target for Brief Decoder (ANY-26): its input is Brief Decoder's own `brief` object,
+  # the only always-present, structured, faithful source (its `document.summary` is a readiness
+  # note, not the brief). Direct users start draft_v1 with the brief text instead.
+  - scenario_id: acceptance_builder.draft_from_brief_v1
+    version: 1
+    workflow_id: acceptance_builder.draft_from_brief_v1
+    allowed_next_actions:
+      - copy_result

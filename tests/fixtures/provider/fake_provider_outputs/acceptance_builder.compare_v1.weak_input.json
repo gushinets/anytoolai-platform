@@ -1,0 +1,36 @@
+{
+  "response_json": {
+    "verdict": "does_not_meet",
+    "confidence": 0.35,
+    "deltas": [
+      {
+        "criterion_id": "scope_coverage",
+        "status": "mismatch",
+        "evidence": "The delivery text names no course, so coverage of the brief's scope cannot be confirmed."
+      },
+      {
+        "criterion_id": "requirement_fit",
+        "status": "mismatch",
+        "evidence": "The delivery text does not say whether a certificate is generated or delivered to students."
+      },
+      {
+        "criterion_id": "completeness",
+        "status": "mismatch",
+        "evidence": "None of the deliverables the brief lists is mentioned in the delivery text."
+      },
+      {
+        "criterion_id": "clarity",
+        "status": "mismatch",
+        "evidence": "The delivery text is a single vague sentence that does not state what was done."
+      }
+    ],
+    "rationale": "The delivery text is too short to show that any requirement of the brief was met, so every criterion is treated as unmet until more detail is given."
+  },
+  "input_tokens": 200,
+  "output_tokens": 110,
+  "latency_ms": 10,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "acceptance_builder.compare_v1.weak_input"
+  }
+}
