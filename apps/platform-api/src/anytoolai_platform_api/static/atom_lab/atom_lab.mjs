@@ -2058,6 +2058,7 @@ export function bootstrapAtomLab({
       session.presetRef = {preset_id: parsed.preset_id, version: parsed.version};
     }
     presetDraftBaseline = presetFingerprint(recovery.payload);
+    updateDraftState();
     renderPresetState();
   };
 
