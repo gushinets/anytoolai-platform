@@ -230,9 +230,9 @@ describe("Brief Decoder page", () => {
     }
     const missing = BRIEF_FIELDS.filter((field) => expected.brief.values[field] === undefined);
     expect(screen.queryAllByText("Not provided")).toHaveLength(missing.length);
-    expect(completedEvents(events)).toEqual([
+    await waitFor(() => expect(completedEvents(events)).toEqual([
       { type: "scenario_completed", scenarioSessionId: "session_1", guestId: "guest_1", resultViewed: true },
-    ]);
+    ]));
 
     fireEvent.click(screen.getByRole("button", { name: "Copy" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
@@ -248,7 +248,9 @@ describe("Brief Decoder page", () => {
     await waitFor(() => expect(screen.getByRole("heading", { name: /clarifying questions/ })).toBeTruthy());
     expect(screen.getByRole("heading", { name: "4 clarifying questions" })).toBeTruthy();
     expect(screen.queryByText("No clarifying questions were generated.")).toBeNull();
-    expect(completedEvents(events).map((event) => (event as { resultViewed: boolean }).resultViewed)).toEqual([true]);
+    await waitFor(() => expect(
+      completedEvents(events).map((event) => (event as { resultViewed: boolean }).resultViewed),
+    ).toEqual([true]));
   });
 
   it("renders both empty states for no issues, reports resultViewed false, and still copies", async () => {
@@ -256,9 +258,9 @@ describe("Brief Decoder page", () => {
     await decode(routes(composedOutput(".no_issues")), events);
     await waitFor(() => expect(screen.getByText("No issues found.")).toBeTruthy());
     expect(screen.getByText("No clarifying questions were generated.")).toBeTruthy();
-    expect(completedEvents(events)).toEqual([
+    await waitFor(() => expect(completedEvents(events)).toEqual([
       { type: "scenario_completed", scenarioSessionId: "session_1", guestId: "guest_1", resultViewed: false },
-    ]);
+    ]));
     // The empty question list must not read as a readiness claim; the rationale/priority chrome is absent.
     expect(document.querySelector("ol")).toBeNull();
 
