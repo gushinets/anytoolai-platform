@@ -1,0 +1,44 @@
+services:
+  platform-api:
+    environment:
+      ANYTOOLAI_DEPLOYMENT_PROFILE_FINGERPRINT: ${ANYTOOLAI_DEPLOYMENT_PROFILE_FINGERPRINT:?live profile fingerprint is required}
+      ANYTOOLAI_DEPLOYMENT_ACTIVATION_NAME: ${ANYTOOLAI_DEPLOYMENT_ACTIVATION_NAME:?activation name is required}
+      ANYTOOLAI_DEPLOYMENT_ACTIVATION_MARKER: /app/live-profile-state/active-profile
+      ANYTOOLAI_ENABLED_PRODUCT_IDS: ${ANYTOOLAI_ENABLED_PRODUCT_IDS:?enabled products are required}
+      ANYTOOLAI_UNMETERED_PRODUCT_IDS: ${ANYTOOLAI_UNMETERED_PRODUCT_IDS-}
+    volumes:
+      - type: bind
+        source: ${ANYTOOLAI_DEPLOYMENT_PRODUCTS_ROOT:?generated products root is required}
+        target: /app/packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products
+        read_only: true
+      - type: bind
+        source: ${ANYTOOLAI_DEPLOYMENT_MANIFEST_PATH:?live profile manifest is required}
+        target: /app/live-profile-manifest.json
+        read_only: true
+      - type: bind
+        source: ${ANYTOOLAI_DEPLOYMENT_STATE_ROOT:?deployment state root is required}
+        target: /app/live-profile-state
+        read_only: true
+  platform-worker:
+    environment:
+      ANYTOOLAI_DEPLOYMENT_PROFILE_FINGERPRINT: ${ANYTOOLAI_DEPLOYMENT_PROFILE_FINGERPRINT:?live profile fingerprint is required}
+      ANYTOOLAI_DEPLOYMENT_ACTIVATION_NAME: ${ANYTOOLAI_DEPLOYMENT_ACTIVATION_NAME:?activation name is required}
+      ANYTOOLAI_DEPLOYMENT_ACTIVATION_MARKER: /app/live-profile-state/active-profile
+      ANYTOOLAI_ENABLED_PRODUCT_IDS: ${ANYTOOLAI_ENABLED_PRODUCT_IDS:?enabled products are required}
+      ANYTOOLAI_UNMETERED_PRODUCT_IDS: ${ANYTOOLAI_UNMETERED_PRODUCT_IDS-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY is required for live mode}
+      HTTPS_PROXY: ${ANYTOOLAI_LLM_HTTPS_PROXY-}
+      AIOHTTP_TRUST_ENV: "true"
+    volumes:
+      - type: bind
+        source: ${ANYTOOLAI_DEPLOYMENT_PRODUCTS_ROOT:?generated products root is required}
+        target: /app/packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products
+        read_only: true
+      - type: bind
+        source: ${ANYTOOLAI_DEPLOYMENT_MANIFEST_PATH:?live profile manifest is required}
+        target: /app/live-profile-manifest.json
+        read_only: true
+      - type: bind
+        source: ${ANYTOOLAI_DEPLOYMENT_STATE_ROOT:?deployment state root is required}
+        target: /app/live-profile-state
+        read_only: true

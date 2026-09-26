@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from http import HTTPStatus
 from typing import Annotated, Any
 
 from anytoolai_platform_api.bootstrap import RuntimeBootstrapResult
@@ -11,8 +12,21 @@ from fastapi import Depends, Request
 from pydantic import ValidationError
 
 
-def get_settings() -> Settings:
-    return Settings()
+def get_settings(request: Request) -> Settings:
+    return request.app.state.settings
+
+
+def require_enabled_product(
+    product_id: str,
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> str:
+    if settings.enabled_product_ids is not None and product_id not in settings.enabled_product_ids:
+        raise ApiError(
+            status_code=HTTPStatus.NOT_FOUND,
+            code="product_not_found",
+            message="Product not found",
+        )
+    return product_id
 
 
 def get_atom_lab_run_settings() -> Settings:

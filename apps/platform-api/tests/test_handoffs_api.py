@@ -21,6 +21,7 @@ from anytoolai_platform_core.storage.db import (
     action_runs_table,
     event_log_table,
     guest_quota_usage_table,
+    jobs_table,
     product_handoffs_table,
     provider_calls_table,
     scenario_sessions_table,
@@ -231,7 +232,7 @@ def test_handoff_api_create_preview_accept_decline_and_expiry(
         )
         assert durable_consumed["status"] == "consumed"
         assert durable_consumed["target_scenario_session_id"] is not None
-        assert durable_consumed["target_job_id"] is not None
+    assert durable_consumed["target_job_id"] is not None
 
     declined_created = _create(app, source_id, artifact_id).json()
     declined = asyncio.run(
@@ -264,6 +265,47 @@ def test_handoff_api_create_preview_accept_decline_and_expiry(
         assert event_types.count("handoff.consumed") == 1
         assert "handoff.declined" in event_types
         assert "handoff.expired" in event_types
+
+
+def test_existing_handoff_cannot_accept_into_disabled_product(
+    session_factory: SessionFactory,
+) -> None:
+    app = _create_test_app(session_factory)
+    with transaction_boundary(session_factory) as session:
+        source_id, artifact_id = _seed_source(session)
+    created = _create(app, source_id, artifact_id).json()
+    with transaction_boundary(session_factory) as session:
+        session.execute(
+            sa.update(product_handoffs_table)
+            .where(product_handoffs_table.c.id == created["handoff_id"])
+            .values(target_product_id="proposal_ai")
+        )
+        before = tuple(
+            session.scalar(sa.select(sa.func.count()).select_from(table))
+            for table in (scenario_sessions_table, jobs_table, guest_quota_usage_table)
+        )
+    app.state.settings = app.state.settings.model_copy(
+        update={"enabled_product_ids": frozenset({"kernel_demo"})}
+    )
+
+    response = asyncio.run(
+        _request(app, "POST", f"/v1/handoffs/{created['handoff_token']}/accept", {})
+    )
+
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    assert response.json()["error"]["code"] == "product_not_found"
+    with transaction_boundary(session_factory) as session:
+        after = tuple(
+            session.scalar(sa.select(sa.func.count()).select_from(table))
+            for table in (scenario_sessions_table, jobs_table, guest_quota_usage_table)
+        )
+        status = session.scalar(
+            sa.select(product_handoffs_table.c.status).where(
+                product_handoffs_table.c.id == created["handoff_id"]
+            )
+        )
+    assert after == before
+    assert status != "accepted"
 
 
 def test_handoff_api_persists_failed_acceptance_and_openapi_contract(

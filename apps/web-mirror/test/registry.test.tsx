@@ -1,9 +1,14 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { getRegisteredProduct } from "../src/products/registry";
 import { TEST_PRODUCT_IDS } from "./fixtures/testProductDefinition";
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.resetModules();
+});
 
 describe("getRegisteredProduct", () => {
   it("returns the enabled ProposalAI product", () => {
@@ -24,6 +29,37 @@ describe("getRegisteredProduct", () => {
 
   it("never registers the test-only product definition as a production product", () => {
     expect(getRegisteredProduct(TEST_PRODUCT_IDS.productId)).toBeNull();
+  });
+
+  it("enables every product when the variable is absent", async () => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+    const registry = await import("../src/products/registry");
+    expect(registry.listRegisteredProducts().every((product) => product.enabled)).toBe(true);
+  });
+
+  it("keeps the complete list but disables products outside the allowlist", async () => {
+    vi.stubEnv("NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS", "proposal_ai");
+    vi.resetModules();
+    const registry = await import("../src/products/registry");
+    expect(registry.listRegisteredProducts().map((product) => product.productId)).toEqual(
+      expect.arrayContaining(["proposal_ai", "client_update_writer"]),
+    );
+    expect(registry.getRegisteredProduct("proposal_ai")?.enabled).toBe(true);
+    expect(registry.getRegisteredProduct("client_update_writer")).toBeNull();
+  });
+
+  it("rejects a live product without a web page", async () => {
+    vi.stubEnv("NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS", "unregistered_product");
+    vi.resetModules();
+    await expect(import("../src/products/registry")).rejects.toThrow("unregistered_product");
+  });
+
+  it("allows the backend-only kernel demo used by credential-free production smoke", async () => {
+    vi.stubEnv("NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS", "kernel_demo");
+    vi.resetModules();
+    const registry = await import("../src/products/registry");
+    expect(registry.listRegisteredProducts().every((product) => !product.enabled)).toBe(true);
   });
 });
 

@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from anytoolai_platform_api.atom_lab.cache import apply_atom_lab_cache_policy
 from anytoolai_platform_api.bootstrap import build_runtime
+from anytoolai_platform_api.deployment_activation import deployment_marker_matches
 from anytoolai_platform_api.errors import (
     REQUEST_ID_HEADER,
     ApiError,
@@ -30,6 +31,7 @@ from anytoolai_platform_api.routers.runtime_config import router as runtime_conf
 from anytoolai_platform_api.routers.scenario_runtime import (
     router as scenario_runtime_router,
 )
+from anytoolai_platform_api.settings import Settings
 from anytoolai_platform_core.common.logging import (
     bind_log_context,
     configure_json_logging,
@@ -44,6 +46,8 @@ from starlette.responses import Response
 CORS_ORIGINS_ENV = "ANYTOOLAI_API_CORS_ORIGINS"
 CHROME_EXTENSION_ORIGIN_REGEX = r"^chrome-extension://[a-p]{32}$"
 logger = logging.getLogger(__name__)
+PREACTIVATION_READ_METHODS = frozenset({"GET", "HEAD"})
+PREACTIVATION_RUNTIME_CONFIG_PATH = re.compile(r"^/v1/products/[^/]+/runtime-config$")
 
 
 def create_app(
@@ -53,8 +57,14 @@ def create_app(
 ) -> FastAPI:
     configure_json_logging("platform-api")
     runtime = build_runtime(config_root, database_url=database_url)
+    settings = Settings.from_env(include_atom_lab_run_limits=False)
+    if settings.enabled_product_ids is not None:
+        unknown = settings.enabled_product_ids - runtime.config_registry.products.keys()
+        if unknown:
+            raise ValueError(f"Unknown enabled product ids: {', '.join(sorted(unknown))}")
     app = FastAPI(title="AnytoolAI Platform API", version="0.1.0")
     app.state.runtime = runtime
+    app.state.settings = settings
 
     _install_cors(app)
     _install_request_context(app)
@@ -93,6 +103,28 @@ def _configured_cors_origins() -> list[str]:
     return [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
 
 
+def _is_preactivation_readiness_request(request: Request) -> bool:
+    if request.method == "OPTIONS":
+        return True
+    if request.method not in PREACTIVATION_READ_METHODS:
+        return False
+    path = request.url.path
+    return path == "/health" or PREACTIVATION_RUNTIME_CONFIG_PATH.fullmatch(path) is not None
+
+
+def _deployment_request_is_blocked(request: Request) -> bool:
+    settings: Settings = request.app.state.settings
+    activation_name = settings.deployment_activation_name
+    if activation_name is None:
+        return False
+    if _is_preactivation_readiness_request(request):
+        return False
+    activation_marker = settings.deployment_activation_marker
+    if activation_marker is None:
+        return True
+    return not deployment_marker_matches(Path(activation_marker), activation_name)
+
+
 def _install_request_context(app: FastAPI) -> None:
     @app.middleware("http")
     async def request_context_middleware(
@@ -104,7 +136,17 @@ def _install_request_context(app: FastAPI) -> None:
         token = bind_log_context(request_id=request_id)
         started = perf_counter()
         try:
-            response = await call_next(request)
+            if _deployment_request_is_blocked(request):
+                response = await api_error_handler(
+                    request,
+                    ApiError(
+                        status_code=503,
+                        code="deployment_not_active",
+                        message="Deployment is not active.",
+                    ),
+                )
+            else:
+                response = await call_next(request)
             response.headers[REQUEST_ID_HEADER] = request_id
             apply_atom_lab_cache_policy(request, response)
             log_event(

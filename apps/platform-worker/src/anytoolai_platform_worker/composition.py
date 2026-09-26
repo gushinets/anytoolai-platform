@@ -81,6 +81,7 @@ def build_worker(
     bundles: Sequence[ProductBundle] | None = None,
     provider_adapters: Mapping[str, Any] | None = None,
     poll_interval_seconds: float = 1.0,
+    enabled_product_ids: frozenset[str] | None = None,
     model_catalog_source: ModelCatalogSource | None = None,
     model_catalog_settings: ModelCatalogSettings | None = None,
 ) -> Worker:
@@ -170,6 +171,7 @@ def build_worker(
         runner_factory=runner_factory,
         lease=lease,
         config_registry=registry,
+        enabled_product_ids=enabled_product_ids,
     )
     reconciler = build_job_lease_reconciler(
         engine,

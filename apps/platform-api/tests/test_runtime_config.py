@@ -5,8 +5,10 @@ from http import HTTPStatus
 from typing import Any
 
 import httpx
-
+import pytest
+from anytoolai_platform_api.dependencies import get_session_factory
 from anytoolai_platform_api.main import create_app
+from anytoolai_platform_api.settings import Settings
 
 EXPECTED_QUOTA_LIMIT = 3
 CHROME_EXTENSION_ID_LENGTH = 32
@@ -137,6 +139,110 @@ def test_unknown_runtime_config_product_returns_safe_404() -> None:
         }
     }
     assert "missing_product" not in response.text
+
+
+def test_enabled_products_absent_means_all(monkeypatch) -> None:
+    monkeypatch.delenv("ANYTOOLAI_ENABLED_PRODUCT_IDS", raising=False)
+    assert Settings.from_env().enabled_product_ids is None
+
+
+def test_enabled_products_are_trimmed_and_deduplicated(monkeypatch) -> None:
+    monkeypatch.setenv("ANYTOOLAI_ENABLED_PRODUCT_IDS", " proposal_ai,proposal_ai ")
+    assert Settings.from_env().enabled_product_ids == frozenset({"proposal_ai"})
+
+
+@pytest.mark.parametrize("raw", ["", "proposal_ai,,brief_decoder", " proposal_ai, "])
+def test_enabled_products_reject_empty_csv_members(monkeypatch, raw: str) -> None:
+    monkeypatch.setenv("ANYTOOLAI_ENABLED_PRODUCT_IDS", raw)
+    with pytest.raises(ValueError, match="empty"):
+        Settings.from_env()
+
+
+def test_unknown_enabled_product_fails_app_startup(monkeypatch) -> None:
+    monkeypatch.setenv("ANYTOOLAI_ENABLED_PRODUCT_IDS", "does_not_exist")
+    with pytest.raises(ValueError, match="Unknown enabled product ids: does_not_exist"):
+        create_app()
+
+
+def test_live_candidate_blocks_mutations_until_activation(monkeypatch, tmp_path) -> None:
+    marker = tmp_path / "active-profile"
+    monkeypatch.setenv("ANYTOOLAI_ENABLED_PRODUCT_IDS", "proposal_ai")
+    monkeypatch.setenv(
+        "ANYTOOLAI_DEPLOYMENT_ACTIVATION_NAME", "freelancer-suite.candidate"
+    )
+    monkeypatch.setenv("ANYTOOLAI_DEPLOYMENT_ACTIVATION_MARKER", str(marker))
+    app = create_app()
+    app.dependency_overrides[get_session_factory] = lambda: pytest.fail(
+        "inactive deployment must reject mutation before storage access"
+    )
+
+    async def request_all() -> tuple[
+        httpx.Response, httpx.Response, httpx.Response, httpx.Response
+    ]:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            runtime = await client.get("/v1/products/proposal_ai/runtime-config")
+            blocked_start = await client.post(
+                "/v1/products/proposal_ai/scenarios/proposal_ai.generate_v1/start",
+                json={"frontend_id": "proposal_ai_web", "input": {}},
+            )
+            blocked_handoff = await client.get("/v1/handoffs/hnd_candidate")
+            marker.write_text("freelancer-suite.candidate\n", encoding="utf-8")
+            enabled = await client.post(
+                "/v1/products/client_update_writer/scenarios/client_update_writer.update_v1/start",
+                json={"frontend_id": "client_update_writer_web", "input": {}},
+            )
+            return runtime, blocked_start, blocked_handoff, enabled
+
+    runtime, blocked_start, blocked_handoff, enabled = asyncio.run(request_all())
+    assert runtime.status_code == HTTPStatus.OK
+    for blocked in (blocked_start, blocked_handoff):
+        assert blocked.status_code == HTTPStatus.SERVICE_UNAVAILABLE
+        assert blocked.json()["error"]["code"] == "deployment_not_active"
+    assert enabled.status_code == HTTPStatus.NOT_FOUND
+    assert enabled.json()["error"]["code"] == "product_not_found"
+
+
+def test_deployment_activation_env_requires_name_and_marker(monkeypatch) -> None:
+    monkeypatch.setenv("ANYTOOLAI_DEPLOYMENT_ACTIVATION_NAME", "candidate")
+    monkeypatch.delenv("ANYTOOLAI_DEPLOYMENT_ACTIVATION_MARKER", raising=False)
+    with pytest.raises(ValueError, match="must be set together"):
+        Settings.from_env()
+
+
+def test_invalid_atom_lab_limit_does_not_block_public_api_startup(monkeypatch) -> None:
+    monkeypatch.setenv("ANYTOOLAI_ATOM_LAB_RUN_BODY_MAX_BYTES", "invalid")
+    response = asyncio.run(_runtime_config_response("kernel_demo"))
+    assert response.status_code == HTTPStatus.OK
+
+
+def test_disabled_product_is_rejected_before_runtime_and_storage_access(monkeypatch) -> None:
+    monkeypatch.setenv("ANYTOOLAI_ENABLED_PRODUCT_IDS", "proposal_ai")
+    app = create_app()
+    app.dependency_overrides[get_session_factory] = lambda: pytest.fail(
+        "disabled product must be rejected before storage dependency"
+    )
+
+    async def request_all() -> list[httpx.Response]:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            return [
+                await client.get("/v1/products/client_update_writer/runtime-config"),
+                await client.get("/v1/products/client_update_writer/quota?guest_id=guest_1"),
+                await client.post(
+                    "/v1/products/client_update_writer/scenarios/client_update_writer.update_v1/start",
+                    json={"frontend_id": "client_update_writer_web", "input": {}},
+                ),
+                await client.get("/v1/products/proposal_ai/runtime-config"),
+            ]
+
+    runtime, quota, start, enabled = asyncio.run(request_all())
+    for response in (runtime, quota, start):
+        assert response.status_code == HTTPStatus.NOT_FOUND
+        assert response.json()["error"]["code"] == "product_not_found"
+        assert response.json()["error"]["message"] == "Product not found"
+        assert "client_update_writer" not in response.text
+    assert enabled.status_code == HTTPStatus.OK
 
 
 async def _cors_preflight_response() -> httpx.Response:

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-from __future__ import annotations
-
 import argparse
+import errno
 import hashlib
 import importlib.util
 import json
@@ -16,7 +15,9 @@ import time
 import tomllib
 import urllib.error
 import urllib.request
-from collections.abc import Sequence
+import uuid
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import NamedTuple
@@ -29,20 +30,28 @@ PYTEST_BASETEMP_ROOT = TMP_ROOT / "pytest-runs"
 COMPOSE_FILE = ROOT / "infra" / "compose" / "docker-compose.yml"
 COMPOSE_OVERRIDE_FILE = ROOT / "infra" / "compose" / "docker-compose.override.yml"
 COMPOSE_PROD_FILE = ROOT / "infra" / "compose" / "docker-compose.prod.yml"
+COMPOSE_LIVE_FILE = ROOT / "infra" / "compose" / "docker-compose.live.yml"
+LIVE_ENV_FILE = ROOT / "infra" / "compose" / ".env.live"
 # Optional, gitignored (see .gitignore's `.env.*` rule) -- a local convenience so credentials
 # don't have to be re-exported in every shell. Never auto-loaded for dev; only prod commands
 # pass it to `docker compose` via --env-file, and only if it actually exists on disk.
 PROD_ENV_FILE = ROOT / "infra" / "compose" / ".env.prod"
 PROD_COMPOSE_PROJECT = "anytoolai-prod"
+PROD_FAKE_COMPOSE_PROJECT = "anytoolai-prod-fake"
+PROFILE_VERSION_HEX_LENGTH = 32
+# The non-root API user is not the operator who writes this non-secret state.
+# umask must not leave the bind-mounted directory or marker owner-only.
+ACTIVATION_STATE_DIRECTORY_MODE = 0o755
+ACTIVATION_MARKER_FILE_MODE = 0o644
 DEV_DEFAULT_POSTGRES_USER = "anytoolai"
 DEV_DEFAULT_POSTGRES_PASSWORD = "anytoolai"
 DEV_DEFAULT_POSTGRES_DB = "anytoolai"
 
-# Bounds `docker compose ps`/`down` calls, which should never legitimately take this long, so a
-# wedged Docker daemon fails fast instead of hanging. Deliberately NOT applied to `up`/`--build`
-# calls (dev_up/prod_up) -- those legitimately take minutes on a cold image build, and a short
-# timeout there would turn a slow-but-healthy build into a false failure.
+# Bounds `docker compose ps` calls when the Docker daemon is unresponsive. `down` needs longer
+# than the worker's 60s stop grace period; `up`/`--build` can take minutes on a cold build.
 COMPOSE_QUERY_TIMEOUT_SECONDS = 60
+COMPOSE_STACK_QUERY_TIMEOUT_SECONDS = 10
+COMPOSE_TEARDOWN_TIMEOUT_SECONDS = 180
 # `doctor`'s tool probes are a one-off diagnostic, not a hot path, so this is generous on purpose:
 # a cold `windows-latest` CI runner has been observed timing out a bare `npm --version` at 10s
 # (round 55's stdin=DEVNULL fix closed the Node/Windows stdin-hang case, nodejs/node#10836, but a
@@ -57,6 +66,7 @@ PNPM_WORKSPACE_LIST_TIMEOUT_SECONDS = 30
 
 def resolve_postgres_db() -> str:
     return os.environ.get("ANYTOOLAI_POSTGRES_DB", DEV_DEFAULT_POSTGRES_DB)
+
 
 FREELANCER_SUITE_ROOT = ROOT / "packages" / "backend" / "product-platforms" / "freelancer-suite"
 POSTGRESQL_PYTEST_MARK_EXPRESSION = "postgresql"
@@ -171,8 +181,10 @@ def build_system_requirements(project_root: Path) -> list[str]:
         raise RuntimeError(f"{pyproject_path} is missing [build-system].")
 
     requires = build_system.get("requires")
-    if not isinstance(requires, list) or not requires or not all(
-        isinstance(item, str) for item in requires
+    if (
+        not isinstance(requires, list)
+        or not requires
+        or not all(isinstance(item, str) for item in requires)
     ):
         raise RuntimeError(
             f"{pyproject_path} is missing a non-empty string-only build-system.requires list."
@@ -250,7 +262,9 @@ def run(command: Sequence[str], *, timeout: float | None = None) -> int:
     return completed.returncode
 
 
-def run_with_env(command: Sequence[str], env: dict[str, str], *, timeout: float | None = None) -> int:
+def run_with_env(
+    command: Sequence[str], env: dict[str, str], *, timeout: float | None = None
+) -> int:
     print_command(command)
     try:
         completed = subprocess.run(
@@ -422,8 +436,7 @@ def _pnpm_workspace_member_dirs() -> list[Path] | None:
         return None
     except subprocess.CalledProcessError as exc:
         print(
-            "pnpm list -r --depth -1 --json failed "
-            f"(exit {exc.returncode}): {exc.stderr.strip()}",
+            f"pnpm list -r --depth -1 --json failed (exit {exc.returncode}): {exc.stderr.strip()}",
             file=sys.stderr,
         )
         return None
@@ -435,9 +448,7 @@ def _pnpm_workspace_member_dirs() -> list[Path] | None:
         )
         return None
     return [
-        path
-        for project in json.loads(completed.stdout)
-        if (path := Path(project["path"])) != ROOT
+        path for project in json.loads(completed.stdout) if (path := Path(project["path"])) != ROOT
     ]
 
 
@@ -464,7 +475,7 @@ def frontend_workspace_lint_preflight() -> int:
         for workspace in missing:
             print(
                 f'FRONTENDLINT001: "{workspace}" is a pnpm workspace package with no "lint" '
-                'script -- `pnpm -r lint` would silently skip it instead of failing.',
+                "script -- `pnpm -r lint` would silently skip it instead of failing.",
                 file=sys.stderr,
             )
         return 1
@@ -644,8 +655,8 @@ def runtime_identity(path: Path = ROOT) -> RuntimeIdentity:
     )
 
 
-def _port_override(name: str, default: int) -> int:
-    raw = os.environ.get(name)
+def _port_override(name: str, default: int, values: dict[str, str] | None = None) -> int:
+    raw = (os.environ if values is None else values).get(name)
     if raw is None:
         return default
     try:
@@ -695,6 +706,265 @@ def _compose_command(identity: RuntimeIdentity, *args: str) -> list[str]:
     )
 
 
+def _dev_live_compose_command(identity: RuntimeIdentity, *args: str) -> list[str]:
+    return _docker_compose_command(
+        identity.compose_project,
+        (COMPOSE_FILE, COMPOSE_OVERRIDE_FILE, COMPOSE_LIVE_FILE),
+        *args,
+    )
+
+
+def _resolved_env_file(path: Path) -> dict[str, str]:
+    env = runner_env()
+    if path.is_file():
+        names = set()
+        for line in path.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if stripped and not stripped.startswith("#"):
+                definition = stripped.removeprefix("export ").lstrip()
+                separator_positions = [
+                    position
+                    for position in (definition.find("="), definition.find(":"))
+                    if position >= 0
+                ]
+                name = (
+                    definition[: min(separator_positions)]
+                    if separator_positions
+                    else definition
+                ).strip()
+                if name.isidentifier():
+                    names.add(name)
+        with tempfile.TemporaryDirectory() as directory:
+            probe = Path(directory) / "compose.json"
+            probe.write_text(json.dumps({"services": {"env-probe": {
+                "image": "busybox",
+                "environment": {name: "${" + name + "}" for name in names},
+            }}}), encoding="utf-8")
+            command = _docker_compose_command(
+                "anytoolai-env-resolve", (probe,),
+                "config", "--format", "json", env_file=path,
+            )
+            try:
+                result = subprocess.run(
+                    command, cwd=ROOT, env=env, capture_output=True,
+                    text=True, check=False, timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
+                )
+            except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+                raise ValueError("Docker Compose could not resolve the env file") from exc
+        if result.returncode != 0:
+            raise ValueError("Docker Compose could not resolve the env file")
+        try:
+            resolved = json.loads(result.stdout)["services"]["env-probe"]["environment"]
+            env.update({name: value.replace("$$", "$") for name, value in resolved.items()})
+        except (ValueError, KeyError, TypeError, AttributeError) as exc:
+            raise ValueError("Docker Compose returned an invalid environment") from exc
+    return env
+
+
+def _deployment_profile_dir(compose_project: str) -> Path:
+    return ROOT / ".agent" / "deployment-profiles" / compose_project / "freelancer-suite"
+
+
+def _active_deployment_profile_dir(compose_project: str) -> Path:
+    profile_dir = _deployment_profile_dir(compose_project)
+    marker = profile_dir.parent / "active-profile"
+    if not marker.is_file():
+        return profile_dir  # Profile deployed before versioned directories were introduced.
+    name = marker.read_text(encoding="utf-8").strip()
+    suffix = name.removeprefix(f"{profile_dir.name}.")
+    if (
+        not name.startswith(f"{profile_dir.name}.")
+        or len(suffix) != PROFILE_VERSION_HEX_LENGTH
+        or not all(character in "0123456789abcdef" for character in suffix)
+    ):
+        raise ValueError("invalid active deployment profile marker")
+    selected = profile_dir.parent / name
+    if selected.is_symlink():
+        raise ValueError("active deployment profile cannot be a symlink")
+    return selected
+
+
+def _deactivate_deployment_profile(compose_project: str) -> None:
+    (_deployment_profile_dir(compose_project).parent / "active-profile").unlink(missing_ok=True)
+
+
+def _activate_deployment_profile(
+    compose_project: str,
+    manifest: dict[str, object],
+    *,
+    on_committed: Callable[[], None] | None = None,
+) -> None:
+    profile_dir = _deployment_profile_dir(compose_project)
+    selected = Path(str(manifest["generated_products_root"])).parent
+    suffix = selected.name.removeprefix(f"{profile_dir.name}.")
+    if (
+        selected.parent.resolve() != profile_dir.parent.resolve()
+        or selected.is_symlink()
+        or not selected.is_dir()
+        or not selected.name.startswith(f"{profile_dir.name}.")
+        or len(suffix) != PROFILE_VERSION_HEX_LENGTH
+        or not all(character in "0123456789abcdef" for character in suffix)
+    ):
+        raise ValueError("generated profile is outside its versioned deployment directory")
+    state_dir = profile_dir.parent
+    state_dir.mkdir(parents=True, exist_ok=True)
+    # Bind-mounted into the API container. chmod is absolute, so a 077 umask cannot
+    # leave the directory or the replacement marker owner-only.
+    if os.name == "posix":
+        state_dir.chmod(ACTIVATION_STATE_DIRECTORY_MODE)
+    marker = state_dir / "active-profile"
+    staged_marker = state_dir / f"active-profile.{uuid.uuid4().hex}"
+    staged_marker.write_text(selected.name + "\n", encoding="utf-8")
+    if os.name == "posix":
+        staged_marker.chmod(ACTIVATION_MARKER_FILE_MODE)
+    staged_marker.replace(marker)
+    if on_committed is not None:
+        on_committed()
+    try:
+        for previous in profile_dir.parent.glob(f"{profile_dir.name}*"):
+            if previous == selected or not (
+                previous.name == profile_dir.name
+                or previous.name.startswith(f"{profile_dir.name}.")
+            ):
+                continue
+            if previous.is_symlink() or previous.resolve().parent != profile_dir.parent.resolve():
+                raise ValueError(f"unsafe previous deployment profile: {previous}")
+            if previous.is_dir():
+                shutil.rmtree(previous)
+    except (OSError, ValueError) as exc:
+        print(f"WARN: could not remove previous deployment profile: {exc}", file=sys.stderr)
+
+
+def _check_source_fingerprint(manifest: dict[str, object], env: dict[str, str]) -> int:
+    managed_python = quick_check_venv_python()
+    if not quick_check_venv_ready(managed_python):
+        print("LIVE001: run python scripts/agent/runner.py quick-check first", file=sys.stderr)
+        return 1
+    return run_with_env(
+        [
+            str(managed_python),
+            "scripts/agent/validate_configs.py",
+            "check-source-fingerprint",
+            "--products-root",
+            str(manifest["source_products_root"]),
+            "--expected-fingerprint",
+            str(manifest["source_fingerprint"]),
+        ],
+        env,
+    )
+
+
+def _profile_check_args(manifest: dict[str, object]) -> list[str]:
+    args = [
+        "scripts/agent/validate_configs.py",
+        "check-deployment-profile",
+        "--products-root",
+        str(manifest["container_products_root"]),
+        "--expected-fingerprint",
+        str(manifest["profile_fingerprint"]),
+    ]
+    enabled_products = manifest["enabled_products"]
+    if not isinstance(enabled_products, dict):
+        raise ValueError("profile manifest has invalid enabled_products")
+    for product_id, expectation in sorted(enabled_products.items()):
+        if not isinstance(expectation, dict):
+            raise ValueError(f"profile manifest has invalid expectation for {product_id}")
+        if expectation.get("provider_policy_ref") != "default_text_generation_v1":
+            raise ValueError(f"profile manifest has non-live provider policy for {product_id}")
+        quota = expectation["quota_policy_ref"] or "-"
+        args.extend(
+            [
+                "--expect-product",
+                f"{product_id}={expectation['provider_policy_ref']},{quota}",
+            ]
+        )
+    return args
+
+
+def _deployment_profile_env(
+    manifest: dict[str, object], enabled_products: Sequence[str], unmetered_products: Sequence[str]
+) -> dict[str, str]:
+    products_root = str(manifest["generated_products_root"])
+    profile_dir = Path(products_root).parent
+    return {
+        "ANYTOOLAI_DEPLOYMENT_PRODUCTS_ROOT": products_root,
+        "ANYTOOLAI_DEPLOYMENT_MANIFEST_PATH": str(profile_dir / "manifest.json"),
+        "ANYTOOLAI_DEPLOYMENT_STATE_ROOT": str(profile_dir.parent),
+        "ANYTOOLAI_DEPLOYMENT_ACTIVATION_NAME": profile_dir.name,
+        "ANYTOOLAI_DEPLOYMENT_PROFILE_FINGERPRINT": str(manifest["profile_fingerprint"]),
+        "ANYTOOLAI_ENABLED_PRODUCT_IDS": ",".join(enabled_products),
+        "ANYTOOLAI_UNMETERED_PRODUCT_IDS": ",".join(unmetered_products),
+    }
+
+
+def _run_effective_profile_checks(
+    compose_command: Sequence[str], manifest: dict[str, object], env: dict[str, str]
+) -> int:
+    check_args = _profile_check_args(manifest)
+    for service, project in (
+        ("platform-api", "apps/platform-api"),
+        ("platform-worker", "apps/platform-worker"),
+    ):
+        command = [
+            *compose_command,
+            "exec",
+            "-T",
+            service,
+            "uv",
+            "run",
+            "--project",
+            project,
+            "--no-sync",
+            "python",
+            *check_args,
+        ]
+        exit_code = run_with_env(command, env)
+        if exit_code != 0:
+            return exit_code
+    return 0
+
+
+def _build_deployment_profile(
+    compose_project: str,
+    enabled_products: Sequence[str],
+    unmetered_products: Sequence[str],
+    env: dict[str, str],
+) -> tuple[int, dict[str, object] | None]:
+    base_dir = _deployment_profile_dir(compose_project)
+    profile_dir = base_dir.with_name(f"{base_dir.name}.{uuid.uuid4().hex}")
+    managed_python = quick_check_venv_python()
+    if not quick_check_venv_ready(managed_python):
+        print("LIVE001: run python scripts/agent/runner.py quick-check first", file=sys.stderr)
+        return 1, None
+    command = [
+        str(managed_python),
+        "scripts/agent/validate_configs.py",
+        "build-deployment-profile",
+        "--output-dir",
+        str(profile_dir),
+    ]
+    for product_id in enabled_products:
+        command.extend(["--enabled-product", product_id])
+    for product_id in unmetered_products:
+        command.extend(["--unmetered-product", product_id])
+    exit_code = run_with_env(command, env)
+    if exit_code != 0:
+        return exit_code, None
+    try:
+        manifest = json.loads((profile_dir / "manifest.json").read_text(encoding="utf-8"))
+        if not isinstance(manifest, dict):
+            raise ValueError("profile manifest must be an object")
+        if not isinstance(manifest["profile_fingerprint"], str):
+            raise ValueError("profile manifest has invalid fingerprint")
+        if not isinstance(manifest["generated_products_root"], str):
+            raise ValueError("profile manifest has invalid products root")
+        _profile_check_args(manifest)
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        print(f"LIVE002: invalid generated profile: {exc}", file=sys.stderr)
+        return 1, None
+    return 0, manifest
+
+
 def print_runtime_endpoints(identity: RuntimeIdentity) -> None:
     print(f"Compose project: {identity.compose_project}")
     print(f"API: {identity.api_url}")
@@ -737,7 +1007,129 @@ def dev_up() -> int:
         _compose_command(identity, "up", "-d", "--remove-orphans"),
         _compose_env(identity),
     )
-    return dev_ready() if exit_code == 0 else exit_code
+    if exit_code == 0:
+        exit_code = dev_ready()
+        if exit_code == 0:
+            _deactivate_deployment_profile(identity.compose_project)
+    return exit_code
+
+
+def dev_live_up(product_id: str, quota_mode: str = "unmetered") -> int:
+    try:
+        identity = runtime_identity()
+        env = _resolved_env_file(LIVE_ENV_FILE)
+        timeout = float(env.get("ANYTOOLAI_READY_TIMEOUT", "90"))
+    except ValueError as exc:
+        print(f"LIVE001: {exc}", file=sys.stderr)
+        return 2
+    if not env.get("OPENAI_API_KEY", "").strip():
+        print("LIVE001: OPENAI_API_KEY is required", file=sys.stderr)
+        return 2
+    try:
+        stack_running = _compose_stack_running(_compose_command(identity), _compose_env(identity))
+    except FileNotFoundError as exc:
+        print(f"Command not found: {exc.filename}", file=sys.stderr)
+        return 127
+    except subprocess.TimeoutExpired:
+        print(
+            "LIVE001: docker compose ps did not respond within "
+            f"{COMPOSE_STACK_QUERY_TIMEOUT_SECONDS:g}s",
+            file=sys.stderr,
+        )
+        return 1
+    if not stack_running and not _check_ports_available(
+        "DEV002",
+        [
+            ("API", identity.api_port, "ANYTOOLAI_API_PORT", "--api-port"),
+            ("PostgreSQL", identity.postgres_port, "ANYTOOLAI_POSTGRES_PORT", "--postgres-port"),
+        ],
+    ):
+        return 1
+    env.setdefault("ANYTOOLAI_LLM_HTTPS_PROXY", "")
+    env["ANYTOOLAI_POSTGRES_PORT"] = str(identity.postgres_port)
+    env["ANYTOOLAI_API_PORT"] = str(identity.api_port)
+    unmetered = [product_id] if quota_mode == "unmetered" else []
+    exit_code, manifest = _build_deployment_profile(
+        identity.compose_project, [product_id], unmetered, env
+    )
+    if exit_code != 0 or manifest is None:
+        return exit_code
+    env.update(_deployment_profile_env(manifest, [product_id], unmetered))
+    compose = _dev_live_compose_command(identity)
+    activated = False
+
+    def note_activated() -> None:
+        nonlocal activated
+        activated = True
+
+    try:
+        # --build: the worker image and live entrypoints are not bind-mounted, so
+        # --force-recreate alone would start a stale development image.
+        exit_code = run_with_env(
+            [*compose, "up", "-d", "--build", "--force-recreate", "--remove-orphans"],
+            env,
+        )
+        if exit_code != 0:
+            return exit_code
+        exit_code = _check_source_fingerprint(manifest, env)
+        if exit_code != 0:
+            return exit_code
+        if not _wait_for_http_ok(f"{identity.api_url}/health", timeout):
+            print("LIVE003: API health check timed out", file=sys.stderr)
+            return 1
+        exit_code = _run_effective_profile_checks(compose, manifest, env)
+        if exit_code != 0:
+            return exit_code
+        try:
+            _activate_deployment_profile(
+                identity.compose_project,
+                manifest,
+                on_committed=note_activated,
+            )
+        except (OSError, ValueError) as exc:
+            print(f"LIVE005: could not activate local-live profile: {exc}", file=sys.stderr)
+            return 1
+        note_activated()
+    finally:
+        if not activated:
+            if run_with_env([*compose, "down", "--remove-orphans"], env) == 0:
+                _deactivate_deployment_profile(identity.compose_project)
+            else:
+                print("LIVE004: failed local-live candidate could not be stopped", file=sys.stderr)
+    print(f"Compose project: {identity.compose_project}")
+    print(f"API: {identity.api_url}")
+    print(f"PostgreSQL: 127.0.0.1:{identity.postgres_port}")
+    print(f"{product_id}: provider=default_text_generation_v1 quota={quota_mode}")
+    print("Development live environment is ready")
+    return 0
+
+
+def dev_web() -> int:
+    try:
+        identity = runtime_identity()
+    except ValueError as exc:
+        print(f"DEV001: {exc}", file=sys.stderr)
+        return 2
+    env = runner_env()
+    env["PLATFORM_API_BASE_URL"] = identity.api_url
+    marker = _deployment_profile_dir(identity.compose_project).parent / "active-profile"
+    if marker.is_file():
+        try:
+            manifest = json.loads(
+                (_active_deployment_profile_dir(identity.compose_project) / "manifest.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            enabled = manifest["enabled_products"]
+            if not isinstance(enabled, dict) or not enabled:
+                raise ValueError("active profile has no enabled products")
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            print(f"DEV004: invalid active live profile: {exc}", file=sys.stderr)
+            return 2
+        env["NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS"] = ",".join(enabled)
+    else:
+        env.pop("NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS", None)
+    return run_with_env(["pnpm", "--filter", "@anytoolai/web-mirror", "dev"], env)
 
 
 def _wait_for_http_ok(url: str, timeout: float) -> bool:
@@ -786,11 +1178,14 @@ def dev_status() -> int:
 def dev_down() -> int:
     identity = runtime_identity()
     print_runtime_endpoints(identity)
-    return run_with_env(
+    exit_code = run_with_env(
         _compose_command(identity, "down", "--remove-orphans"),
         _compose_env(identity),
-        timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
+        timeout=COMPOSE_TEARDOWN_TIMEOUT_SECONDS,
     )
+    if exit_code == 0:
+        _deactivate_deployment_profile(identity.compose_project)
+    return exit_code
 
 
 def dev_smoke() -> int:
@@ -840,8 +1235,11 @@ def _run_proof_script(script_path: str, database_url_env: str) -> int:
     env[database_url_env] = identity.database_url
     return run_with_env(
         [
-            str(venv_python), script_path, identity.api_url,
-            "--database-url-env", database_url_env,
+            str(venv_python),
+            script_path,
+            identity.api_url,
+            "--database-url-env",
+            database_url_env,
             "--database-url-is-percent-encoded",
         ],
         env,
@@ -1001,7 +1399,16 @@ def _serve_web_mirror_and_run_smoke(
     # pnpm wrapper pid (pnpm doesn't forward signals to its child), which otherwise leaks a live
     # next-server bound to web_mirror_port past this command's exit (found by running this live).
     web_mirror_process = subprocess.Popen(
-        ["pnpm", "--filter", "@anytoolai/web-mirror", "exec", "next", "start", "-p", str(web_mirror_port)],
+        [
+            "pnpm",
+            "--filter",
+            "@anytoolai/web-mirror",
+            "exec",
+            "next",
+            "start",
+            "-p",
+            str(web_mirror_port),
+        ],
         cwd=ROOT,
         env=env,
         start_new_session=True,
@@ -1012,7 +1419,9 @@ def _serve_web_mirror_and_run_smoke(
         # failure branch immediately below, which never gets as far as that later unlink().
         report_path.unlink(missing_ok=True)
         if not _wait_for_http_ok(web_mirror_url, 30.0):
-            print(f"{readiness_error_code}: web-mirror did not become ready in time.", file=sys.stderr)
+            print(
+                f"{readiness_error_code}: web-mirror did not become ready in time.", file=sys.stderr
+            )
             # Still write an evidence bundle for this failure -- otherwise a readiness timeout
             # leaves no artifact at all for CI's "Upload evidence report" step to pick up, unlike
             # every other way this command can fail. `report_path` was just cleared above, so
@@ -1093,7 +1502,14 @@ def client_handoff_smoke() -> int:
     # not web-mirror's actual build output -- so run them concurrently instead of paying the sum of
     # both build times.
     web_mirror_build_command = ["pnpm", "--filter", "@anytoolai/web-mirror", "build"]
-    extension_build_command = ["pnpm", "--filter", "@anytoolai/kernel-demo-ce", "exec", "wxt", "build"]
+    extension_build_command = [
+        "pnpm",
+        "--filter",
+        "@anytoolai/kernel-demo-ce",
+        "exec",
+        "wxt",
+        "build",
+    ]
     print_command(web_mirror_build_command)
     print_command(extension_build_command)
     web_mirror_build = subprocess.Popen(web_mirror_build_command, cwd=ROOT, env=env)
@@ -1168,7 +1584,10 @@ def proposal_ai_smoke() -> int:
         # `client.next_action_clicked` for its own run (not just that the browser sent the
         # request) -- host-reachable since postgres's compose port is published, per the same
         # precedent as identity.api_url above.
-        smoke_extra_env={"WEB_MIRROR_BASE_URL": web_mirror_url, "DATABASE_URL": identity.database_url},
+        smoke_extra_env={
+            "WEB_MIRROR_BASE_URL": web_mirror_url,
+            "DATABASE_URL": identity.database_url,
+        },
         smoke_pnpm_filter="@anytoolai/proposal-ai-smoke",
         report_path=PROPOSAL_AI_SMOKE_REPORT_PATH,
         evidence_root=PROPOSAL_AI_SMOKE_EVIDENCE_ROOT,
@@ -1217,7 +1636,10 @@ def client_update_writer_smoke() -> int:
         web_mirror_port=web_mirror_port,
         env=env,
         readiness_error_code="CUS002",
-        smoke_extra_env={"WEB_MIRROR_BASE_URL": web_mirror_url, "DATABASE_URL": identity.database_url},
+        smoke_extra_env={
+            "WEB_MIRROR_BASE_URL": web_mirror_url,
+            "DATABASE_URL": identity.database_url,
+        },
         smoke_pnpm_filter="@anytoolai/client-update-writer-smoke",
         report_path=CLIENT_UPDATE_WRITER_SMOKE_REPORT_PATH,
         evidence_root=CLIENT_UPDATE_WRITER_SMOKE_EVIDENCE_ROOT,
@@ -1266,38 +1688,212 @@ def brief_decoder_smoke() -> int:
     )
 
 
-def _prod_compose_command(*args: str) -> list[str]:
-    env_file = PROD_ENV_FILE if PROD_ENV_FILE.is_file() else None
+def _prod_compose_command(*args: str, include_env_file: bool = True) -> list[str]:
+    env_file = PROD_ENV_FILE if include_env_file and PROD_ENV_FILE.is_file() else None
     return _docker_compose_command(
         PROD_COMPOSE_PROJECT, (COMPOSE_FILE, COMPOSE_PROD_FILE), *args, env_file=env_file
     )
 
 
-def _prod_stack_running() -> bool:
-    # Bounded so a wedged Docker daemon fails this preflight check quickly instead of
-    # hanging prod_up() indefinitely before it ever reaches the normal error path.
+def _prod_fake_compose_command(*args: str) -> list[str]:
+    return _docker_compose_command(
+        PROD_FAKE_COMPOSE_PROJECT,
+        (COMPOSE_FILE, COMPOSE_PROD_FILE),
+        *args,
+    )
+
+
+def _prod_live_compose_command(*args: str) -> list[str]:
+    env_file = PROD_ENV_FILE if PROD_ENV_FILE.is_file() else None
+    return _docker_compose_command(
+        PROD_COMPOSE_PROJECT,
+        (COMPOSE_FILE, COMPOSE_PROD_FILE, COMPOSE_LIVE_FILE),
+        *args,
+        env_file=env_file,
+    )
+
+
+@dataclass(frozen=True)
+class DeploymentInputs:
+    enabled_product_ids: tuple[str, ...]
+    unmetered_product_ids: frozenset[str]
+    compose_env: dict[str, str]
+
+    def quota_mode(self, product_id: str) -> str:
+        return "unmetered" if product_id in self.unmetered_product_ids else "canonical"
+
+
+def _product_ids(value: str, name: str, *, allow_empty: bool = False) -> tuple[str, ...]:
+    if allow_empty and value == "":
+        return ()
+    ids = tuple(part.strip() for part in value.split(","))
+    if any(not product_id for product_id in ids):
+        raise ValueError(f"{name} must contain nonempty product ids")
+    if len(ids) != len(set(ids)):
+        raise ValueError(f"{name} contains duplicate product ids")
+    return ids
+
+
+def _deployment_inputs() -> DeploymentInputs:
+    env = _resolved_env_file(PROD_ENV_FILE)
+    required = (
+        "ANYTOOLAI_POSTGRES_USER",
+        "ANYTOOLAI_POSTGRES_PASSWORD",
+        "ANYTOOLAI_POSTGRES_DB",
+        "OPENAI_API_KEY",
+        "ANYTOOLAI_LLM_HTTPS_PROXY",
+        "ANYTOOLAI_ENABLED_PRODUCT_IDS",
+        "ANYTOOLAI_UNMETERED_PRODUCT_IDS",
+        "ANYTOOLAI_PROD_WORKER_MEMORY_LIMIT",
+    )
+    for name in required:
+        if name not in env or (name != "ANYTOOLAI_UNMETERED_PRODUCT_IDS" and not env[name].strip()):
+            raise ValueError(f"{name} is required for live production")
+    for name in (
+        "ANYTOOLAI_DEMO_ACCESS_CODE",
+        "ANYTOOLAI_ATOM_LAB_ACCESS_CODE",
+        "ANYTOOLAI_LIVE_CANARY_TOKEN",
+    ):
+        if env.get(name, "").strip():
+            raise ValueError(f"{name} must be blank for public production")
+    enabled = _product_ids(env["ANYTOOLAI_ENABLED_PRODUCT_IDS"], "ANYTOOLAI_ENABLED_PRODUCT_IDS")
+    unmetered = frozenset(
+        _product_ids(
+            env["ANYTOOLAI_UNMETERED_PRODUCT_IDS"],
+            "ANYTOOLAI_UNMETERED_PRODUCT_IDS",
+            allow_empty=True,
+        )
+    )
+    if not unmetered <= set(enabled):
+        raise ValueError(
+            "ANYTOOLAI_UNMETERED_PRODUCT_IDS must be within ANYTOOLAI_ENABLED_PRODUCT_IDS"
+        )
+    _port_override("ANYTOOLAI_PROD_API_PORT", 8000, env)
+    _port_override("ANYTOOLAI_PROD_WEB_PORT", 3000, env)
+    return DeploymentInputs(enabled, unmetered, env)
+
+
+def _compose_stack_running(compose_command: Sequence[str], env: dict[str, str]) -> bool:
+    # Bound the preflight so a wedged Docker daemon cannot hang live redeployment.
     result = subprocess.run(
-        _prod_compose_command("ps", "-q"),
+        [*compose_command, "ps", "-q"],
         cwd=ROOT,
-        env=runner_env(),
+        env=env,
         capture_output=True,
         text=True,
         check=False,
-        timeout=10,
+        timeout=COMPOSE_STACK_QUERY_TIMEOUT_SECONDS,
     )
     return bool(result.stdout.strip())
 
 
+def _prod_stack_running() -> bool:
+    return _compose_stack_running(_prod_compose_command(), runner_env())
+
+
+def _prod_fake_stack_running(env: dict[str, str]) -> bool:
+    return _compose_stack_running(_prod_fake_compose_command(), env)
+
+
+class ProductionDeploymentLockError(RuntimeError):
+    """Raised when the fixed production Compose project cannot be exclusively deployed."""
+
+
+class _ProductionDeploymentLock:
+    """Cross-process host lock guarding the fixed production Compose project."""
+
+    def __init__(self, path: Path) -> None:
+        self._path = path
+        self._handle = None
+
+    def __enter__(self) -> "_ProductionDeploymentLock":
+        handle = None
+        try:
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+            handle = self._path.open("a+b")
+            if os.name == "nt":
+                import msvcrt
+
+                handle.seek(0, os.SEEK_END)
+                if handle.tell() == 0:
+                    handle.write(b"\0")
+                    handle.flush()
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except (BlockingIOError, OSError, ImportError) as exc:
+            if handle is not None:
+                handle.close()
+            if getattr(exc, "errno", None) in {errno.EACCES, errno.EAGAIN}:
+                raise ProductionDeploymentLockError(
+                    f"another prod-up is already running (lock: {self._path})"
+                ) from exc
+            raise ProductionDeploymentLockError(
+                f"could not acquire production deployment lock {self._path}: {exc}"
+            ) from exc
+        self._handle = handle
+        return self
+
+    def __exit__(self, _exc_type, _exc, _traceback) -> None:
+        if self._handle is not None:
+            # Both flock() and msvcrt byte-range locks are released when the descriptor closes.
+            # Keep the lock file itself so a crashed process cannot leave stale ownership state.
+            self._handle.close()
+            self._handle = None
+
+
+def _prod_deployment_lock_path() -> Path:
+    # The Compose project name is host-global, so the lock must not live under ROOT/.agent:
+    # separate worktrees/clones could otherwise mutate the same anytoolai-prod project concurrently.
+    # Production targets a Linux VPS, so use the fixed host /tmp namespace instead of TMPDIR,
+    # which may legitimately differ between shells/worktrees and would defeat cross-process locking.
+    lock_root = Path(tempfile.gettempdir()) if os.name == "nt" else Path("/tmp")
+    return lock_root / f"{PROD_COMPOSE_PROJECT}.deployment.lock"
+
+
+def _prod_deployment_lock() -> _ProductionDeploymentLock:
+    return _ProductionDeploymentLock(_prod_deployment_lock_path())
+
+
 def prod_up() -> int:
-    # Deliberately its own variable, not ANYTOOLAI_API_PORT (dev's per-worktree derived
-    # port) — a leftover dev override in the operator's shell must not silently redirect
-    # which host port prod binds to or preflight-checks. Postgres isn't published in prod
-    # at all (see docker-compose.prod.yml), so there's no Postgres port to check here.
     try:
-        api_port = _port_override("ANYTOOLAI_PROD_API_PORT", 8000)
+        with _prod_deployment_lock():
+            return _prod_up_locked()
+    except ProductionDeploymentLockError as exc:
+        print(f"PROD007: {exc}", file=sys.stderr)
+        return 1
+
+
+def _prod_up_locked() -> int:
+    try:
+        inputs = _deployment_inputs()
+        api_port = _port_override("ANYTOOLAI_PROD_API_PORT", 8000, inputs.compose_env)
+        web_port = _port_override("ANYTOOLAI_PROD_WEB_PORT", 3000, inputs.compose_env)
     except ValueError as exc:
         print(f"PROD001: {exc}", file=sys.stderr)
         return 2
+    print(f"Enabled products: {', '.join(inputs.enabled_product_ids)}")
+    print(
+        "Quota modes: "
+        + ", ".join(
+            f"{product_id}={inputs.quota_mode(product_id)}"
+            for product_id in inputs.enabled_product_ids
+        )
+    )
+    exit_code, manifest = _build_deployment_profile(
+        PROD_COMPOSE_PROJECT,
+        inputs.enabled_product_ids,
+        sorted(inputs.unmetered_product_ids),
+        inputs.compose_env,
+    )
+    if exit_code != 0 or manifest is None:
+        return exit_code or 1
+    env = inputs.compose_env | _deployment_profile_env(
+        manifest, inputs.enabled_product_ids, sorted(inputs.unmetered_product_ids)
+    )
     try:
         stack_running = _prod_stack_running()
     except FileNotFoundError as exc:
@@ -1305,7 +1901,8 @@ def prod_up() -> int:
         return 127
     except subprocess.TimeoutExpired:
         print(
-            "PROD003: docker compose ps did not respond within 10s — "
+            "PROD003: docker compose ps did not respond within "
+            f"{COMPOSE_STACK_QUERY_TIMEOUT_SECONDS:g}s — "
             "is the Docker daemon running and responsive?",
             file=sys.stderr,
         )
@@ -1317,55 +1914,262 @@ def prod_up() -> int:
     # stack's own already-running containers as an occupied port and block redeploys.
     if not stack_running and not _check_ports_available(
         "PROD002",
-        [("API", api_port, "ANYTOOLAI_PROD_API_PORT", None)],
+        [
+            ("API", api_port, "ANYTOOLAI_PROD_API_PORT", None),
+            ("Web", web_port, "ANYTOOLAI_PROD_WEB_PORT", None),
+        ],
     ):
         return 1
     # No timeout: `--build` can legitimately take minutes on a cold image build.
-    exit_code = run_with_env(
-        _prod_compose_command("up", "-d", "--build", "--remove-orphans"),
-        runner_env(),
-    )
-    return prod_ready() if exit_code == 0 else exit_code
+    # finally, not `except Exception`: Ctrl+C is BaseException and must stop the
+    # candidate until active-profile is replaced. After that commit, leave the stack up.
+    committed = False
 
+    def note_committed() -> None:
+        nonlocal committed
+        committed = True
 
-def prod_ready() -> int:
     try:
-        api_port = _port_override("ANYTOOLAI_PROD_API_PORT", 8000)
-        timeout = float(os.environ.get("ANYTOOLAI_READY_TIMEOUT", "90"))
-    except ValueError as exc:
+        exit_code = run_with_env(
+            _prod_live_compose_command(
+                "up", "-d", "--build", "--force-recreate", "--remove-orphans"
+            ),
+            env,
+        )
+        if exit_code != 0:
+            return exit_code
+        exit_code = prod_ready(inputs=inputs, manifest=manifest, announce=False)
+        if exit_code != 0:
+            return exit_code
+        _activate_deployment_profile(
+            PROD_COMPOSE_PROJECT,
+            manifest,
+            on_committed=note_committed,
+        )
+        note_committed()
+    finally:
+        if not committed:
+            _stop_failed_prod_candidate()
+    _announce_production_ready(api_port, web_port)
+    return 0
+
+
+def _stop_failed_prod_candidate() -> None:
+    if _prod_down_locked() != 0:
+        print(
+            "PROD005: failed production candidate could not be stopped; "
+            "run python scripts/agent/runner.py prod-down immediately",
+            file=sys.stderr,
+        )
+
+
+def prod_fake_up() -> int:
+    """Credential-free production-image smoke path, isolated from the live production project."""
+    try:
+        env = _resolved_env_file(PROD_ENV_FILE)
+        api_port = _port_override("ANYTOOLAI_PROD_API_PORT", 8000, env)
+        web_port = _port_override("ANYTOOLAI_PROD_WEB_PORT", 3000, env)
+    except (ValueError, OSError) as exc:
         print(f"PROD001: {exc}", file=sys.stderr)
         return 2
-    health_url = f"http://127.0.0.1:{api_port}/health"
-    if _wait_for_http_ok(health_url, timeout):
-        print(f"API: http://127.0.0.1:{api_port}")
-        print("Production environment is ready")
-        return 0
-    print(
-        f"PROD004: readiness timed out after {timeout:g}s for {health_url}. "
-        "Rerun: python scripts/agent/runner.py prod-status",
-        file=sys.stderr,
+    env.update({
+        "ANYTOOLAI_POSTGRES_USER": "smoke-only",
+        "ANYTOOLAI_POSTGRES_PASSWORD": "smoke-only",
+        "ANYTOOLAI_POSTGRES_DB": "smoke-only",
+        "ANYTOOLAI_ENABLED_PRODUCT_IDS": "kernel_demo",
+        "ANYTOOLAI_UNMETERED_PRODUCT_IDS": "",
+        "ANYTOOLAI_PROD_WORKER_MEMORY_LIMIT": "512M",
+        "OPENAI_API_KEY": "",
+    })
+    try:
+        stack_running = _prod_fake_stack_running(env)
+    except FileNotFoundError as exc:
+        print(f"Command not found: {exc.filename}", file=sys.stderr)
+        return 127
+    except subprocess.TimeoutExpired:
+        print(
+            "PROD003: docker compose ps did not respond within "
+            f"{COMPOSE_STACK_QUERY_TIMEOUT_SECONDS:g}s",
+            file=sys.stderr,
+        )
+        return 1
+    if not stack_running and not _check_ports_available(
+        "PROD002",
+        [
+            ("API", api_port, "ANYTOOLAI_PROD_API_PORT", None),
+            ("Web", web_port, "ANYTOOLAI_PROD_WEB_PORT", None),
+        ],
+    ):
+        return 1
+    compose = _prod_fake_compose_command()
+    # Same commit rule as prod-up: an interrupt before readiness must release the
+    # production host ports. A ready smoke stack stays up.
+    committed = False
+    try:
+        exit_code = run_with_env([*compose, "up", "-d", "--build", "--remove-orphans"], env)
+        if exit_code != 0:
+            return exit_code
+        exit_code = _prod_fake_ready(env=env)
+        if exit_code != 0:
+            return exit_code
+        committed = True
+        return exit_code
+    finally:
+        if not committed:
+            _stop_failed_prod_fake_candidate()
+
+
+def _stop_failed_prod_fake_candidate() -> None:
+    if prod_fake_down() != 0:
+        print(
+            "PROD006: failed credential-free production smoke candidate could not be stopped; "
+            "run python scripts/agent/runner.py prod-fake-down immediately",
+            file=sys.stderr,
+        )
+
+
+def _prod_fake_ready(*, env: dict[str, str] | None = None) -> int:
+    try:
+        if env is None:
+            env = _resolved_env_file(PROD_ENV_FILE)
+        api_port = _port_override("ANYTOOLAI_PROD_API_PORT", 8000, env)
+        web_port = _port_override("ANYTOOLAI_PROD_WEB_PORT", 3000, env)
+        timeout = float(env.get("ANYTOOLAI_READY_TIMEOUT", "90"))
+    except (ValueError, OSError) as exc:
+        print(f"PROD001: {exc}", file=sys.stderr)
+        return 2
+    for name, url in (
+        ("API", f"http://127.0.0.1:{api_port}/health"),
+        ("web", f"http://127.0.0.1:{web_port}/"),
+        ("web API", f"http://127.0.0.1:{web_port}/v1/products/kernel_demo/runtime-config"),
+    ):
+        if not _wait_for_http_ok(url, timeout):
+            print(
+                f"PROD004: {name} readiness timed out after {timeout:g}s for {url}. "
+                "Rerun: python scripts/agent/runner.py prod-status",
+                file=sys.stderr,
+            )
+            return 1
+    print(f"API: http://127.0.0.1:{api_port}")
+    print(f"Web: http://127.0.0.1:{web_port}")
+    print("Credential-free production smoke environment is ready")
+    return 0
+
+
+def _announce_production_ready(api_port: int, web_port: int) -> None:
+    print(f"API: http://127.0.0.1:{api_port}")
+    print(f"Web: http://127.0.0.1:{web_port}")
+    print("Production environment is ready")
+
+
+def prod_ready(
+    *,
+    inputs: DeploymentInputs | None = None,
+    manifest: dict[str, object] | None = None,
+    announce: bool = True,
+) -> int:
+    try:
+        inputs = inputs or _deployment_inputs()
+        api_port = _port_override("ANYTOOLAI_PROD_API_PORT", 8000, inputs.compose_env)
+        web_port = _port_override("ANYTOOLAI_PROD_WEB_PORT", 3000, inputs.compose_env)
+        timeout = float(inputs.compose_env.get("ANYTOOLAI_READY_TIMEOUT", "90"))
+        if manifest is None:
+            manifest = json.loads(
+                (_active_deployment_profile_dir(PROD_COMPOSE_PROJECT) / "manifest.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+        _profile_check_args(manifest)
+        expectations = manifest["enabled_products"]
+        if set(expectations) != set(inputs.enabled_product_ids):
+            raise ValueError("profile manifest enabled products differ from production selection")
+        if set(manifest["unmetered_product_ids"]) != inputs.unmetered_product_ids:
+            raise ValueError("profile manifest quota modes differ from production selection")
+        if not isinstance(manifest["source_products_root"], str) or not isinstance(
+            manifest["source_fingerprint"], str
+        ):
+            raise ValueError("profile manifest has invalid source fingerprint")
+    except (ValueError, OSError, KeyError, TypeError) as exc:
+        print(f"PROD001: {exc}", file=sys.stderr)
+        return 2
+    env = inputs.compose_env | _deployment_profile_env(
+        manifest, inputs.enabled_product_ids, sorted(inputs.unmetered_product_ids)
     )
-    return 1
+    exit_code = _check_source_fingerprint(manifest, env)
+    if exit_code != 0:
+        return exit_code
+    for name, url in (
+        ("API", f"http://127.0.0.1:{api_port}/health"),
+        ("web", f"http://127.0.0.1:{web_port}/"),
+        (
+            "web API",
+            f"http://127.0.0.1:{web_port}/v1/products/"
+            f"{quote(inputs.enabled_product_ids[0], safe='')}/runtime-config",
+        ),
+    ):
+        if not _wait_for_http_ok(url, timeout):
+            print(
+                f"PROD004: {name} readiness timed out after {timeout:g}s for {url}", file=sys.stderr
+            )
+            return 1
+    exit_code = _run_effective_profile_checks(_prod_live_compose_command(), manifest, env)
+    if exit_code != 0:
+        return exit_code
+    if announce:
+        _announce_production_ready(api_port, web_port)
+    return 0
 
 
 def prod_status() -> int:
     return run_with_env(
-        _prod_compose_command("ps"), runner_env(), timeout=COMPOSE_QUERY_TIMEOUT_SECONDS
-    )
-
-
-def prod_down() -> int:
-    return run_with_env(
-        _prod_compose_command("down", "--remove-orphans"),
-        runner_env(),
+        _prod_compose_command("ps", include_env_file=False),
+        _prod_control_env(),
         timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
     )
 
 
+def _prod_down_locked() -> int:
+    return run_with_env(
+        _prod_compose_command("down", "--remove-orphans", include_env_file=False),
+        _prod_control_env(),
+        timeout=COMPOSE_TEARDOWN_TIMEOUT_SECONDS,
+    )
+
+
+def prod_down() -> int:
+    try:
+        with _prod_deployment_lock():
+            return _prod_down_locked()
+    except ProductionDeploymentLockError as exc:
+        print(f"PROD007: {exc}", file=sys.stderr)
+        return 1
+
+
+def prod_fake_down() -> int:
+    return run_with_env(
+        _prod_fake_compose_command("down", "--remove-orphans"),
+        _prod_control_env(),
+        timeout=COMPOSE_TEARDOWN_TIMEOUT_SECONDS,
+    )
+
+
+def _prod_control_env() -> dict[str, str]:
+    # Compose renders the model for ps/down; these values never start containers.
+    return runner_env() | {
+        "ANYTOOLAI_POSTGRES_USER": "control-only",
+        "ANYTOOLAI_POSTGRES_PASSWORD": "control-only",
+        "ANYTOOLAI_POSTGRES_DB": "control-only",
+        "ANYTOOLAI_ENABLED_PRODUCT_IDS": "kernel_demo",
+        "ANYTOOLAI_PROD_WORKER_MEMORY_LIMIT": "512M",
+        "OPENAI_API_KEY": "",
+    }
+
+
 def prod_smoke() -> int:
     try:
-        api_port = _port_override("ANYTOOLAI_PROD_API_PORT", 8000)
-    except ValueError as exc:
+        env = _resolved_env_file(PROD_ENV_FILE)
+        api_port = _port_override("ANYTOOLAI_PROD_API_PORT", 8000, env)
+    except (ValueError, OSError) as exc:
         print(f"PROD001: {exc}", file=sys.stderr)
         return 2
     api_url = f"http://127.0.0.1:{api_port}"
@@ -1384,6 +2188,8 @@ COMMANDS = {
     "collect-context": collect_context,
     "generate-docs": generate_docs,
     "dev-up": dev_up,
+    "dev-live-up": dev_live_up,
+    "dev-web": dev_web,
     "dev-ready": dev_ready,
     "dev-status": dev_status,
     "dev-down": dev_down,
@@ -1395,6 +2201,8 @@ COMMANDS = {
     "client-update-writer-smoke": client_update_writer_smoke,
     "brief-decoder-smoke": brief_decoder_smoke,
     "prod-up": prod_up,
+    "prod-fake-up": prod_fake_up,
+    "prod-fake-down": prod_fake_down,
     "prod-ready": prod_ready,
     "prod-status": prod_status,
     "prod-down": prod_down,
@@ -1411,6 +2219,13 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         help="Check generated documents without modifying tracked files.",
     )
     parser.add_argument("--api-port", type=int, help="Override the worktree API host port.")
+    parser.add_argument("--product", help="Product id for dev-live-up.")
+    parser.add_argument(
+        "--quota-mode",
+        choices=("canonical", "unmetered"),
+        default=None,
+        help="Quota mode for dev-live-up (default: unmetered).",
+    )
     parser.add_argument(
         "--postgres-port",
         type=int,
@@ -1437,11 +2252,21 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         action="store_true",
         help="With quick-check: only bootstrap .quick-check-venv, skip validate/pytest.",
     )
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.command == "dev-live-up" and args.quota_mode is None:
+        args.quota_mode = "unmetered"
+    return args
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    args = parse_args(sys.argv[1:] if argv is None else argv)
+    try:
+        args = parse_args(sys.argv[1:] if argv is None else argv)
+    except SystemExit as exc:
+        return int(exc.code)
+    if args.product is not None or args.quota_mode is not None:
+        if args.command != "dev-live-up":
+            print("--product and --quota-mode are only valid with dev-live-up", file=sys.stderr)
+            return 2
     if args.check:
         if args.command != "generate-docs":
             print("--check is only valid with generate-docs", file=sys.stderr)
@@ -1450,7 +2275,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     runtime_options = (args.api_port, args.postgres_port, args.ready_timeout)
     if any(value is not None for value in runtime_options):
         if not args.command.startswith("dev-"):
-            print("runtime port/timeout overrides are only valid with dev-* commands", file=sys.stderr)
+            print(
+                "runtime port/timeout overrides are only valid with dev-* commands", file=sys.stderr
+            )
             return 2
         if args.api_port is not None:
             os.environ["ANYTOOLAI_API_PORT"] = str(args.api_port)
@@ -1460,7 +2287,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             os.environ["ANYTOOLAI_READY_TIMEOUT"] = str(args.ready_timeout)
     if args.failure_file is not None or args.log_lines != 100:
         if args.command != "collect-context":
-            print("--failure-file and --log-lines are only valid with collect-context", file=sys.stderr)
+            print(
+                "--failure-file and --log-lines are only valid with collect-context",
+                file=sys.stderr,
+            )
             return 2
         return collect_context(failure_file=args.failure_file, log_lines=args.log_lines)
     if args.bootstrap_only:
@@ -1468,6 +2298,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             print("--bootstrap-only is only valid with quick-check", file=sys.stderr)
             return 2
         return quick_check(bootstrap_only=True)
+    if args.command == "dev-live-up":
+        if not args.product:
+            print("dev-live-up requires --product", file=sys.stderr)
+            return 2
+        return dev_live_up(args.product, args.quota_mode)
     return COMMANDS[args.command]()
 
 

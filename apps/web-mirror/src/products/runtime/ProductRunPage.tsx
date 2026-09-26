@@ -195,7 +195,7 @@ function shallowEqualValues<V extends Record<string, unknown>>(a: V, b: V): bool
 type BootState =
   | { kind: "loading" }
   | { kind: "boot-error" }
-  | { kind: "ready"; scenarioId: string; frontendId: string };
+  | { kind: "ready"; scenarioId: string; frontendId: string; hasQuota: boolean };
 
 /** Why a run is retryable. A closed reason -- not finished English prose -- so an error already on
  * screen re-renders in the new language when the UI locale changes (`host.errors.<reason>`). */
@@ -422,9 +422,14 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
           setBoot({ kind: "boot-error" });
           return;
         }
-        setBoot({ kind: "ready", scenarioId: scenario.scenarioId, frontendId: frontend.frontendId });
+        setBoot({
+          kind: "ready",
+          scenarioId: scenario.scenarioId,
+          frontendId: frontend.frontendId,
+          hasQuota: runtimeResult.value.quotaSummary !== null,
+        });
 
-        if (resolvedGuestId) {
+        if (resolvedGuestId && runtimeResult.value.quotaSummary !== null) {
           // Advisory only: shown if it loads in time, never blocks the form from becoming usable.
           // scenarioId is always passed, not just for scenario-dimension policies: per
           // frontend-boundaries.md, a scenario-dimension quota policy *requires* it while a
@@ -771,6 +776,10 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     setPendingStart(null);
     activeScenarioSessionIdRef.current = null;
     setPhase({ kind: "idle" });
+
+    if (boot.kind !== "ready" || !boot.hasQuota) {
+      return;
+    }
 
     getQuota(client, { productId, guestId, scenarioId }).then((quotaResult) => {
       if (controllerRef.current?.signal.aborted || !quotaResult.ok) {

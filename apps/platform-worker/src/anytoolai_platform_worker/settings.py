@@ -12,12 +12,14 @@ from anytoolai_platform_core.storage.db import (
 PROJECT_DATABASE_URL_ENV = "ANYTOOLAI_DATABASE_URL"
 GENERIC_DATABASE_URL_ENV = "DATABASE_URL"
 POLL_INTERVAL_ENV = "ANYTOOLAI_WORKER_POLL_INTERVAL_SECONDS"
+ENABLED_PRODUCT_IDS_ENV = "ANYTOOLAI_ENABLED_PRODUCT_IDS"
 
 
 @dataclass(frozen=True)
 class WorkerSettings:
     database_url: str
     poll_interval_seconds: float = 1.0
+    enabled_product_ids: frozenset[str] | None = None
     # True only when database_url came from build_postgres_url_from_env(), which
     # percent-encodes its database segment -- PROJECT/GENERIC_DATABASE_URL_ENV are already-final
     # operator-supplied DSNs whose database name must be used exactly as given (eighteenth code
@@ -39,8 +41,15 @@ class WorkerSettings:
         poll_interval_seconds = float(os.getenv(POLL_INTERVAL_ENV, "1.0"))
         if not isfinite(poll_interval_seconds) or poll_interval_seconds <= 0:
             raise ValueError(f"{POLL_INTERVAL_ENV} must be greater than zero")
+        enabled_product_ids = None
+        if ENABLED_PRODUCT_IDS_ENV in os.environ:
+            product_ids = [part.strip() for part in os.environ[ENABLED_PRODUCT_IDS_ENV].split(",")]
+            if any(not product_id for product_id in product_ids):
+                raise ValueError(f"{ENABLED_PRODUCT_IDS_ENV} must contain nonempty product ids")
+            enabled_product_ids = frozenset(product_ids)
         return cls(
             database_url=database_url,
             poll_interval_seconds=poll_interval_seconds,
+            enabled_product_ids=enabled_product_ids,
             decode_database_name=decode_database_name,
         )

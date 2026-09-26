@@ -87,11 +87,13 @@ class RunWorkflowHandler:
         runner_factory: RunnerFactory,
         lease: JobLease | None = None,
         config_registry: ConfigRegistry | None = None,
+        enabled_product_ids: frozenset[str] | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._runner_factory = runner_factory
         self._lease = lease if lease is not None else NullJobLease()
         self._config_registry = config_registry
+        self._enabled_product_ids = enabled_product_ids
 
     async def handle(self, job_id: str) -> JobRecord | None:
         try:
@@ -222,13 +224,42 @@ class RunWorkflowHandler:
                 if job is None or job.status is not JobStatus.created:
                     return None
 
-                # Held until handle()'s finally releases it after the terminal-state
-                # commit. A failed acquire means another worker already owns this
-                # job -- not an error, just skip it.
+                # The queue may hand the same created row to multiple workers. Take
+                # the same lease for disabled jobs as for normal claims, then reread
+                # after acquiring it so a stale created row cannot emit twice.
                 if not self._lease.acquire(job_id):
                     return None
                 lease_acquired = True
+                job = repository.get(job_id)
+                if job is None or job.status is not JobStatus.created:
+                    return None
 
+                if (
+                    self._enabled_product_ids is not None
+                    and job.product_id not in self._enabled_product_ids
+                ):
+                    scenario = self._load_scenario(session, job)
+                    WorkflowJobService(repository, emitter).mark_failed_from_created(
+                        replace(
+                            job,
+                            status=JobStatus.failed,
+                            metadata=enrich_job_metadata_with_scenario_identity(
+                                job.metadata, scenario
+                            ),
+                            error_code="product_disabled",
+                            error_message_safe="Product is disabled.",
+                            completed_at=job.completed_at or utc_now(),
+                        ),
+                        error_code="product_disabled",
+                    )
+                    scenario_service.mark_failed(
+                        scenario,
+                        error_code="product_disabled",
+                        context=self._execution_context(job, scenario),
+                    )
+                    return None
+
+                # Held until handle()'s finally releases it after execution.
                 scenario = self._load_scenario(session, job)
                 metadata = enrich_job_metadata_with_scenario_identity(
                     job.metadata,
@@ -239,14 +270,15 @@ class RunWorkflowHandler:
                     metadata=metadata,
                 )
                 if claimed is None:
-                    self._lease.release(job_id)
-                    lease_acquired = False
                     return None
                 scenario_service.mark_running(scenario)
                 return claimed
 
         try:
-            return _claim_in_transaction()
+            claimed = _claim_in_transaction()
+            if claimed is None and lease_acquired:
+                self._lease.release(job_id)
+            return claimed
         except BaseException:
             if lease_acquired:
                 self._lease.release(job_id)

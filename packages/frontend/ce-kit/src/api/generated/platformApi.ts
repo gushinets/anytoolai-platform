@@ -2685,8 +2685,8 @@ export interface operations {
                 "X-Live-Canary-Token"?: string | null;
             };
             path: {
-                product_id: string;
                 scenario_id: string;
+                product_id: string;
             };
             cookie?: never;
         };

@@ -1,8 +1,7 @@
 # Deployment
 
-Covers `platform-api`, `platform-worker`, `postgres` via `infra/compose/`. The stakeholder
-workflow demo is served directly by `platform-api`; the separate `web-mirror` application is
-still intentionally out of scope and its dockerization remains paused.
+Covers the Proposal AI public web stack (`web-mirror`, `platform-api`, `platform-worker`,
+`postgres`) and the separate credential-free development/CI smoke paths.
 
 ## Compose layout
 
@@ -10,6 +9,8 @@ still intentionally out of scope and its dockerization remains paused.
 - `docker-compose.override.yml` — dev defaults + hot-reload. Auto-merged by a bare
   `docker compose up` run from this directory, and also passed explicitly by `runner.py`/`make dev-up`.
 - `docker-compose.prod.yml` — prod overlay. Never auto-merged; always passed explicitly.
+- `docker-compose.live.yml` — live provider profile mounts and worker-only OpenAI/proxy settings.
+  `prod-up` selects base + prod + live; `prod-fake-up` selects base + prod only.
 
 `docker-compose.prod.yml` uses the Compose Specification's `!reset`/`!override` merge tags (to
 drop Postgres's host port and fully replace `platform-api`'s). These require a reasonably
@@ -41,20 +42,27 @@ for the same key:
   1. `export ANYTOOLAI_POSTGRES_USER=... ANYTOOLAI_POSTGRES_PASSWORD=... ANYTOOLAI_POSTGRES_DB=...`
      before running `make prod-up` — best for CI or a one-off run.
   2. Copy `infra/compose/.env.example` to `infra/compose/.env.prod` and fill in real values.
-     `.env.prod` is gitignored (`.gitignore`'s `.env.*` rule) and picked up automatically by
-     `prod-up`/`prod-status`/`prod-down` (`scripts/agent/runner.py` passes it to `docker compose`
-     via `--env-file` — only for prod commands, never for dev, so it can never leak into a dev
-     stack even if both happen to be running). Best for a persistent local/server setup where
-     re-exporting every shell session is annoying.
+     `.env.prod` is gitignored (`.gitignore`'s `.env.*` rule) and picked up by `prod-up` via
+     `--env-file`; `prod-fake-up` reads port overrides but replaces credentials and product selection
+     with disposable fake-smoke values before Compose. Dev commands never read it. `prod-status` and
+     `prod-down` use safe render-only values so they still work if `.env.prod` is missing or
+     damaged. Best for a persistent local/server setup where re-exporting every shell session
+     is annoying.
 
 `ANYTOOLAI_POSTGRES_PORT` / `ANYTOOLAI_API_PORT` override dev's host ports; they default to a
 value derived per git worktree (see `docs/agent/worktree-runtime.md`). **Prod uses a separate
 variable, `ANYTOOLAI_PROD_API_PORT`** (default `8000`), specifically so a leftover
 `ANYTOOLAI_API_PORT` in your shell from dev work doesn't silently change which port `make prod-up`
 binds to or checks. Postgres isn't published to the host in prod at all (see below), so there's no
-prod-side Postgres port variable.
+prod-side Postgres port variable. Production web uses `ANYTOOLAI_PROD_WEB_PORT` (default `3000`).
+Both production host ports bind to `127.0.0.1` only.
 
-### Stakeholder workflow demo secrets
+### Separate stakeholder workflow demo secrets
+
+The public Proposal AI deployment leaves `ANYTOOLAI_DEMO_ACCESS_CODE`,
+`ANYTOOLAI_ATOM_LAB_ACCESS_CODE`, and `ANYTOOLAI_LIVE_CANARY_TOKEN` blank. `prod-up` rejects
+nonblank values, and the production Compose overlay blanks them in the API container. The
+following demo instructions apply to a separate private/dev environment, not this public stack.
 
 The Russian-language stakeholder surface is available at `/demo`. Loading the page is public,
 but `POST /v1/demo/runs` fails closed unless all runtime credentials are configured:
@@ -72,11 +80,12 @@ the shell or CI steps that run `dev-up` and `live-canary` must provide both
 service containers, and `scripts/agent/runner.py live-canary` reads them for its fail-fast checks.
 Neither value is sent to the demo frontend.
 
-Put these values in the operator secret store or the gitignored `infra/compose/.env.prod` file.
+For a separate private demo, put these values in the operator secret store or a gitignored
+environment file; do not put them in the public Proposal AI `.env.prod`.
 Never place them in URLs, committed files, frontend source, reverse-proxy logs, screenshots, or
 stakeholder messages. Share the access code separately and rotate it after the review window.
 
-Production access to `/demo` requires HTTPS at the reverse-proxy/load-balancer boundary. DNS,
+Any private access to `/demo` requires HTTPS at the reverse-proxy/load-balancer boundary. DNS,
 TLS certificates, firewall rules, OpenAI budget controls, and code rotation are operator-owned;
 the repository does not provision them.
 
@@ -161,46 +170,158 @@ make dev-down    # tear down
   themselves. Both wait for `migrate` to exit successfully before starting (see "Migrations and
   scaling" below).
 
-## Prod
+### Local Proposal AI live check
+
+Run `python scripts/agent/runner.py quick-check` once first to bootstrap the managed Python
+environment used to build and verify live profiles. With a real `OPENAI_API_KEY` and working
+`ANYTOOLAI_LLM_HTTPS_PROXY` supplied only through the shell or gitignored
+`infra/compose/.env.live`, run:
 
 ```bash
-cp infra/compose/.env.example infra/compose/.env.prod   # fill in real values, once
-make prod-up      # docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build (waits for prod-ready)
-make prod-ready   # poll until platform-api /health is up
-make prod-status
-make prod-smoke   # prove platform-worker is actually processing jobs (see "Verifying end-to-end")
-make prod-down
+python scripts/agent/runner.py dev-live-up --product proposal_ai
+python scripts/agent/runner.py dev-web
 ```
 
-(Or skip the `.env.prod` file and `export ANYTOOLAI_POSTGRES_USER=... ANYTOOLAI_POSTGRES_PASSWORD=...
-ANYTOOLAI_POSTGRES_DB=...` instead — see "Credentials" above.)
+The first command generates an unmetered live profile. API and worker verify their mounted
+profile against the selected manifest before either process starts; readiness checks both again.
+The second command starts the local web host with the active live product selection in a
+separate terminal. `dev-live-up` rebuilds the API and worker images before recreating
+containers; the worker image and live entrypoints are not bind-mounted, so a cached image
+would skip the activation guards. A failed or interrupted `dev-live-up` stops its Compose
+candidate. Run more than ten Proposal AI submissions, check successful live provider
+rows in `platform.provider_calls` and Squid CONNECT records, and confirm there is no quota GET
+or `429`. Repeat with `dev-live-up --product proposal_ai --quota-mode canonical` and verify
+normal quota exhaustion. Stop with `dev-down`; a later ordinary `dev-up` uses the canonical
+fake-backed product configuration and restores the full development web list. Do not treat a successful local web render as proof
+of an OpenAI call without the ledger and Squid evidence.
 
-- Uses project name `anytoolai-prod` (fixed — unlike dev, prod is not per-worktree).
-- `platform-api` builds the `prod` target of the same Dockerfile: dependencies are installed via
-  `uv sync --frozen --no-dev` in their own build layer, so no dev-only packages end up in this
-  image. No bind-mounts, no `--reload`.
-- `deploy.resources.limits` (cpus/memory) are set on all four services, including `migrate`.
-  `restart: unless-stopped` is set on the three long-running services (`postgres`,
-  `platform-api`, `platform-worker`) only — `migrate` deliberately has no `restart` (Compose's
-  default, `no`), since it's a one-shot job that's supposed to exit, not be restarted forever.
-- `deploy.replicas: 1` on `platform-api` is a safety ceiling while `/demo` is exposed. The demo
-  gate combines durable PostgreSQL counts with one process-local check-and-start lock; multiple
-  replicas could both accept a start. Replace it with a PostgreSQL advisory lock before raising
-  the replica count. Migration execution itself remains replica-safe as described below.
-- Postgres's port is **not** published to the host in prod (unlike dev) — `docker-compose.prod.yml`
-  resets the base file's `ports:` mapping to empty, since `platform-api`/`platform-worker` reach it
-  over the compose network as `postgres:5432` and don't need it exposed. If an operator genuinely
-  needs external access (manual psql/admin), add an explicit `ports:` mapping in a local,
-  uncommitted overlay — ideally bound to `127.0.0.1` or restricted at the firewall/security-group
-  level rather than published broadly.
+## Prod
+
+Install Docker Engine with the Compose plugin, Python 3.12, `uv`, Node.js, and npm on the VPS.
+Clone this repository at the reviewed deployment commit. Run
+`python scripts/agent/runner.py quick-check` once to bootstrap its managed Python environment,
+then `.quick-check-venv/bin/python scripts/agent/runner.py doctor`. The live profile generator
+uses that managed environment. Use `python3` wherever the host exposes Python 3 under that name.
+
+Copy `infra/compose/.env.example` to gitignored `infra/compose/.env.prod`. Fill the PostgreSQL
+user/password/database, a real `OPENAI_API_KEY`, the Squid URL in
+`ANYTOOLAI_LLM_HTTPS_PROXY`, `ANYTOOLAI_ENABLED_PRODUCT_IDS=proposal_ai`,
+`ANYTOOLAI_UNMETERED_PRODUCT_IDS=proposal_ai`, and an explicit
+`ANYTOOLAI_PROD_WORKER_MEMORY_LIMIT` chosen from available VPS RAM (the sample is `768M`, not a
+measured minimum). Keep all three public access-code variables blank. The shell overrides the
+file even with an empty value. An explicitly empty `ANYTOOLAI_UNMETERED_PRODUCT_IDS` selects the
+canonical quota; omitting the variable is an error. Never commit or print the completed file.
+Every public enabled product must also have a registered web page; the production web build
+rejects unknown product IDs before startup. The backend-only `kernel_demo` remains available
+for credential-free CI smoke.
+
+Before startup, confirm Squid allows `CONNECT api.openai.com:443`; optional cold model-catalog
+refresh also reaches `raw.githubusercontent.com:443`. Ensure the worker can reach Squid. Docker
+pull/build proxy configuration is separate from the worker's runtime `HTTPS_PROXY`. Runtime
+proxy variables alone do not prevent direct egress: enforce worker-to-Squid-only outbound
+traffic in the VPS firewall when bypass must be impossible.
+
+```bash
+python scripts/agent/runner.py prod-up
+python scripts/agent/runner.py prod-status
+```
+
+Inspect the printed `Enabled products: proposal_ai` and `Quota modes:
+proposal_ai=unmetered` before Compose starts. `prod-up` generates an ignored deployment profile,
+then force-recreates base + prod + live Compose, waits for API and web HTTP, and checks the
+same mounted profile fingerprint and policy references inside API and worker. It never falls
+back to fake. A host-level deployment lock covers profile generation through readiness,
+activation, and failure cleanup; a concurrent `prod-up` exits with `PROD007` before touching
+the production project or active profile. If Compose startup or readiness fails, or the
+command is interrupted before `active-profile` is replaced, `prod-up` stops the candidate
+project without deleting its PostgreSQL volume; investigate before restarting production.
+Once that marker is in place, an interrupt leaves the stack up. The activation directory
+and marker are non-secret and are published as `0755` and `0644` so the non-root API user
+can read them after a restrictive umask.
+Each deployment uses a new immutable profile directory. A failed redeploy leaves the previous
+container bind source intact for restarts; old profiles are removed only after readiness passes.
+The candidate worker verifies its profile but waits for `active-profile` to name its generation
+before polling the production queue. The candidate API mounts the same activation state and returns
+`503 deployment_not_active` for every pre-activation request except OPTIONS and the read-only
+GET/HEAD health and product runtime-config endpoints needed by deployment readiness. A failed
+candidate therefore
+cannot accept durable workflow mutations or terminalize queued jobs
+under an allowlist that never became active.
+`prod-ready` repeats the live readiness check, including a runtime-config request through the
+web server's same-origin `/v1/*` route. `prod-fake-up` is reserved for the credential-free
+`kernel_demo` smoke in CI and uses the separate `anytoolai-prod-fake` Compose project, so it
+cannot reconcile or replace the live `anytoolai-prod` services. It checks API, web, and web-to-API
+routing; failed startup/readiness, or an interrupt before readiness, tears the smoke project
+down so it does not keep the production host ports, and `prod-fake-down` is the explicit
+cleanup command. It never passes `.env.prod` or an OpenAI key to the smoke containers. `prod-smoke`
+tests that smoke stack, not OpenAI.
+
+The operator-owned Nginx/Caddy instance terminates HTTPS and forwards the product domain to
+`127.0.0.1:${ANYTOOLAI_PROD_WEB_PORT:-3000}`. Before its catch-all forward, deny `/atom-lab`,
+`/atom-lab/*` (including its CSS/JS), `/v1/atom-lab/*`, and `/v1/demo/*`. Next.js forwards all
+`/v1/*` paths to the private API, so those denies must precede the forward. API and web bind
+only to loopback; PostgreSQL has no host port. Keep the reverse-proxy config and firewall rules
+outside this repository and record their locations with the acceptance evidence.
+
+If Squid intercepts TLS, add an operator-owned Compose override after the live overlay, for
+example:
+
+```yaml
+services:
+  platform-worker:
+    environment:
+      SSL_CERT_FILE: /run/secrets/squid-ca.pem
+    volumes:
+      - type: bind
+        source: /operator/secrets/squid-ca.pem
+        target: /run/secrets/squid-ca.pem
+        read_only: true
+```
+
+Do not commit the CA or override containing an operator path. A normal CONNECT tunnel needs no
+custom CA. For an override, use an operator-owned Compose invocation that includes base, prod,
+live, then this file; preserve the same required environment and profile mount.
+
+### Acceptance and quota switch
+
+1. Open the public product domain and run Proposal AI. Confirm another registered product is
+   absent from the home page and its direct page shows not found. Direct API runtime-config,
+   quota, and scenario-start calls for that disabled product must return safe `404`.
+2. From outside the VPS, verify API/web/PostgreSQL ports are not reachable directly. Confirm the
+   four denied path groups above are blocked by the inbound proxy and the three API access codes
+   are blank. Inspect container environment **by variable name/presence only**: worker has the
+   OpenAI key and proxy; API/web do not. Do not dump environment values into evidence.
+3. Keep the generated manifest fingerprint as the expected value and run `prod-ready`; its
+   read-only check must pass separately in API and worker. Submit more than ten unmetered runs.
+   Confirm successful `platform.provider_calls` rows use the live provider policy and that Squid
+   logs corresponding CONNECT requests. Confirm `platform.guest_quota_usage` does not gain or
+   decrement Proposal AI rows during this window. Save redacted IDs/timestamps, not prompts or
+   secrets.
+4. Record peak worker memory with `docker stats --no-stream` during a cold catalog refresh and
+   real run. Check `docker inspect` for `RestartCount=0` and `OOMKilled=false`; retain memory
+   headroom when choosing the production limit.
+5. To enable canonical anonymous quota, set `ANYTOOLAI_UNMETERED_PRODUCT_IDS=` in `.env.prod`
+   (and remove any exported override), then rerun `prod-up`. Verify a guest with pre-window
+   quota rows retains its count; a guest first seen unmetered begins at zero. The web image need
+   not change for quota mode alone; runtime config supplies the quota summary.
+
+Rollback to the previously reviewed image/Compose revision and rerun `prod-up` with its matching
+environment. For an emergency shutdown, `python scripts/agent/runner.py prod-down` stops the
+project without deleting the PostgreSQL volume. Removing the live overlay alone is **not** a
+live deployment; use `prod-fake-up` only for the explicit credential-free smoke path.
+
+The production project name is fixed as `anytoolai-prod`. Migrations run once in `migrate` before
+API and worker. API stays at one replica while the demo's process-local gate exists, even though
+the public deployment denies demo routes. `platform-worker` has an explicit CPU/memory limit;
+measure it on the target VPS before treating the sample value as adequate.
 
 ## Verifying end-to-end
 
 `*-ready` and `*-smoke` prove two different things, and both are needed to actually trust that a
 Compose config boots — not just that it's syntactically valid:
 
-- **`dev-ready` / `prod-ready`** poll `platform-api`'s `/health` endpoint. This proves
-  `platform-api` itself came up and is answering HTTP requests — nothing more.
+- **`dev-ready`** polls API health. **`prod-ready`** also polls web and runs read-only
+  effective-profile checks in API and worker; it does not prove a real OpenAI call succeeded.
 - **`dev-smoke` / `prod-smoke`** drive real jobs through the stack via
   `scripts/agent/kernel_demo_smoke.py`: for each of the 11 kernel_demo standalone atom
   scenarios (`ATOM_SMOKE_CASES`, one per generic action type), create a fresh guest identity,
@@ -223,7 +344,8 @@ Compose config boots — not just that it's syntactically valid:
 
 CI runs both legs on every PR, as two independent parallel jobs in
 `.github/workflows/backend.yml`: `compose-smoke-dev` boots dev, runs `dev-smoke`, tears down;
-`compose-smoke-prod` boots prod with disposable test credentials, runs `prod-smoke`, tears down.
+`compose-smoke-prod` boots `prod-fake-up` with disposable test credentials and `kernel_demo`,
+runs `prod-smoke`, then tears down. The public `prod-up` path is live-only.
 
 ## Migrations and scaling
 
@@ -257,7 +379,6 @@ existing runtime rows and worker logs by technical ID instead of starting a dupl
 
 ## Explicitly out of scope
 
-- `web-mirror` — dockerization is paused separately.
 - `infra/compose/docker-compose.agent.yml` — a separate, unrelated compose file (fixed port,
   `anytoolai_agent` database), not wired into `runner.py`/`Makefile`; untouched.
 - `.github/workflows/backend.yml`'s Postgres service credentials, and the hardcoded credential
