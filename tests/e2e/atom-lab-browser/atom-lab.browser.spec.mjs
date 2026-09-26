@@ -2693,6 +2693,7 @@ test("successful preset readback materializes its version outside the latest pag
   await page.locator("#export-preset").click();
   await expect(page.locator("#preset-export")).toContainText('"version": 2');
   await page.locator("#load-more-versions").click();
+  await expect(page.locator('#preset-version-select option[value="1"]')).toHaveCount(1);
   await expect(page.locator("#preset-version-select")).toHaveValue("2");
   await expect(page.locator('#preset-version-select option[value="2"]')).toHaveCount(1);
   await page.locator("#preset-description").fill("Следующий черновик");
@@ -2809,7 +2810,7 @@ test("ambiguous version write reconciles an exact committed version without disc
   await page.locator("#load-more-versions").click();
   await expect(page.locator("#preset-version-select")).toHaveValue("2");
   await expect(page.locator('#preset-version-select option[value="2"]')).toHaveCount(1);
-  expect(await page.locator("#preset-version-select option").evaluateAll(
+  await expect.poll(() => page.locator("#preset-version-select option").evaluateAll(
     (options) => options.map((option) => option.value),
   )).toEqual(Array.from({length: 30}, (_, index) => String(30 - index)));
   await page.locator("#save-preset").click();
@@ -2905,6 +2906,7 @@ test("ambiguous version write surfaces a concurrent conflict without discarding 
   await expect(page.locator("#open-latest-preset")).toBeEnabled();
 
   await page.locator("#load-more-versions").click();
+  await expect(page.locator('#preset-version-select option[value="2"]')).toHaveCount(1);
   await expect(page.locator("#preset-version-select")).toHaveValue("1");
   await expect(page.locator('#preset-version-select option[value="1"]')).toHaveCount(1);
   await page.locator("#export-preset").click();
