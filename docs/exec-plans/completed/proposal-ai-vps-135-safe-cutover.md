@@ -8,18 +8,18 @@
 
 **Tech stack:** Python 3.12, uv, Docker Compose, Next.js, Caddy, PostgreSQL, LiteLLM, HAProxy, Squid.
 
-**Spec:** `docs/superpowers/specs/2026-09-25-proposal-ai-vps-live-deployment-design.md`; existing implementation plan: `docs/exec-plans/active/proposal-ai-vps-live-deployment.md`.
+**Spec:** `docs/superpowers/specs/2026-09-25-proposal-ai-vps-live-deployment-design.md`; existing implementation plan: `docs/exec-plans/completed/proposal-ai-vps-live-deployment.md`.
 
 ## Status
 
-- State: active
-- Planning only: this document does not authorize deployment.
+- State: completed
+- Execution was authorized by the user's deployment request; the later Caddy-only recreation was separately approved after the stale-bind rollback.
 - Owner: mixed (repository changes by agent; secrets, VPS cutover, and acceptance by operator).
 - Created: 2026-09-27.
-- Last updated: 2026-09-27.
+- Last updated: 2026-09-28.
 - Review date: 2026-10-04.
-- Next action: implement the local repository preparation, then execute the internal-demo VPS gates in order.
-- Blocker: none for planning; deployment awaits a separate execution request.
+- Next action: none; monitor the internal demo and address deferred production hardening separately.
+- Blocker: none.
 
 ## Confirmed target state and boundaries
 
@@ -109,17 +109,33 @@
 
 ### Task 5: Cut over the new URL through the running Caddy
 
-- [ ] Prepare the smallest change to the existing `any-tool-ai.ru` Caddy site. In explicit route order: deny the private paths above; forward `/tools` and `/tools/*` without stripping the prefix to `web-mirror:3000`; forward `/v1/*` to `web-mirror:3000`; remove upstream `Cookie` and `Authorization` headers in both AnytoolAI reverse-proxy blocks; retain `/api/*` to payments API and all other paths to payments web. Leave `api.anytoolai.store` and `ds.ru.anytoolai.store` unchanged.
-- [ ] Validate the candidate Caddyfile. Install it without replacing the bind-mounted file's inode, validate the mounted file, then use Caddy's hot reload; do not recreate Caddy or run `docker compose up` for payments portal.
-- [ ] From outside the VPS, manually load `https://any-tool-ai.ru/tools/products/proposal_ai`; confirm the page hydrates with JS/CSS, switch language and reload, submit one real run, receive and copy a nonempty result, use the in-app link back to the tool list, and confirm browser API requests use root `/v1` rather than `/tools/v1`. Verify blocked internal paths and confirm the validated active Caddy config removes upstream `Cookie` and `Authorization` in both AnytoolAI proxy blocks without logging real header values. Recheck the three existing public services against the baseline immediately after reload and again after the real run; an existing payments-portal browser session must still navigate and authenticate normally.
-- [ ] Keep Caddy's container ID unchanged. If any old route or service regresses, restore the backed-up Caddyfile and hot-reload before investigating the new stack.
+- [x] Prepare the smallest change to the existing `any-tool-ai.ru` Caddy site. In explicit route order: deny the private paths above; forward `/tools` and `/tools/*` without stripping the prefix to `web-mirror:3000`; forward `/v1/*` to `web-mirror:3000`; remove upstream `Cookie` and `Authorization` headers in both AnytoolAI reverse-proxy blocks; retain `/api/*` to payments API and all other paths to payments web. Leave `api.anytoolai.store` and `ds.ru.anytoolai.store` unchanged.
+- [x] Validate the candidate Caddyfile. The first in-place attempt exposed a pre-existing stale read-only file bind and was rolled back. With explicit user approval on 2026-09-28, install the validated host file and use `docker compose ... up -d --no-deps --force-recreate caddy` to refresh only Caddy's bind; validate the newly mounted file and do not recreate any other payments service.
+- [x] From outside the VPS, manually load `https://any-tool-ai.ru/tools/products/proposal_ai`; confirm the page hydrates with JS/CSS, switch language and reload, submit one real run, receive and copy a nonempty result, use the in-app link back to the tool list, and confirm browser API requests use root `/v1` rather than `/tools/v1`. Verify blocked internal paths and confirm the validated active Caddy config removes upstream `Cookie` and `Authorization` in both AnytoolAI proxy blocks without logging real header values. Recheck the three existing public services against the baseline immediately after reload and again after the real run; confirm the payments portal and its login surface still load normally.
+- [x] Keep every pre-existing container except the explicitly approved Caddy-only recreation unchanged. If any old route or service regresses, restore the backed-up Caddyfile and recreate only Caddy before investigating the new stack.
 
 ### Task 6: Acceptance and rollback handoff
 
-- [ ] Verify API/web/PostgreSQL ports remain inaccessible externally; only worker has OpenAI/proxy environment variables by **name/presence**, not printed values. Verify disabled product pages and API admission return safe 404.
-- [ ] Compare all pre-existing container IDs, health, restart counts, and public HTTP statuses with the baseline. Confirm PromptTune HAProxy still has two available Squid servers and payments/extension routes remain healthy under the added traffic.
-- [ ] Save redacted evidence: reviewed commit SHA and clean-checkout result, target URL, Compose profile fingerprint, Caddyfile checksum/backup path, proxy counter delta, provider-call IDs/status, resource peaks, existing-service health/restart comparison, and exact rollback commands. Update this plan's progress log and the existing ProposalAI deployment plan's VPS acceptance result.
-- [ ] Rollback order if required: restore previous Caddyfile and hot-reload first; verify old routes; then run `python3 scripts/agent/runner.py prod-down` in `/opt/anytoolai-platform` if the new stack must stop. This command must preserve the AnytoolAI PostgreSQL volume and must never target the `infra`, `payments-portal-prod`, or `extensions_backend` projects.
+- [x] Verify API/web/PostgreSQL ports remain inaccessible externally; only worker has OpenAI/proxy environment variables by **name/presence**, not printed values. Verify disabled product pages and API admission return safe 404.
+- [x] Compare all pre-existing container IDs, health, restart counts, and public HTTP statuses with the baseline. Confirm PromptTune HAProxy still has two available Squid servers and payments/extension routes remain healthy under the added traffic.
+- [x] Save redacted evidence: reviewed commit SHA and clean-checkout result, target URL, Compose profile fingerprint, Caddyfile checksum/backup path, proxy counter delta, provider-call IDs/status, resource peaks, existing-service health/restart comparison, and exact rollback commands. Update this plan's progress log and the existing ProposalAI deployment plan's VPS acceptance result.
+- [x] Rollback order if required: restore previous Caddyfile and recreate only Caddy first; verify old routes; then run `python3 scripts/agent/runner.py prod-down` in `/opt/anytoolai-platform` if the new stack must stop. This command must preserve the AnytoolAI PostgreSQL volume and must never target the `infra`, `payments-portal-prod`, or `extensions_backend` projects.
+
+Exact rollback commands:
+
+```bash
+cd /opt/payments-portal
+cat deploy/caddy/Caddyfile.prod.backup-anytoolai-20260927T162324Z > deploy/caddy/Caddyfile.prod
+docker compose --project-name payments-portal-prod -f docker-compose.prod.yml config --quiet
+docker compose --project-name payments-portal-prod -f docker-compose.prod.yml up -d --no-deps --force-recreate caddy
+curl -fsS -o /dev/null https://any-tool-ai.ru/
+curl -fsS -o /dev/null https://ds.ru.anytoolai.store/health
+
+# Only if the new AnytoolAI stack must also stop; the PostgreSQL volume is preserved.
+export PATH=/opt/anytoolai-tools/bin:$PATH
+cd /opt/anytoolai-platform
+python3 scripts/agent/runner.py prod-down
+```
 
 ## Validation gates
 
@@ -139,6 +155,7 @@
 | 2026-09-27 | Accept public unmetered OpenAI usage for this internal MVP. | Authentication, abuse controls, and provider spend hardening are intentionally outside this cutover. |
 | 2026-09-27 | Build on the VPS with Compose concurrency limited to one. | Avoid a registry/image pipeline for the demo while reducing peak build pressure on the occupied host. |
 | 2026-09-27 | Use the clean checkout commit SHA as the demo release identity. | Full immutable-image release machinery is deferred, but the deployed source remains identifiable. |
+| 2026-09-28 | Recreate only the Caddy service with `--no-deps --force-recreate` after explicit user approval. | The existing read-only file bind exposed an older file object, so in-place host edits could not produce a durable mounted configuration; the first attempt was fully rolled back before the exception was requested. |
 
 ## Progress log
 
@@ -151,10 +168,12 @@
 | 2026-09-27 | Task 3 complete. Pre-mutation audit found no stale `anytoolai-prod` container, volume, or network; expected external networks, free loopback ports, Caddy bind mount, and pre-existing dirty PromptTune/payments files matched the plan. Baseline HAProxy: both Squids UP, primary sessions total 592, backup 0. Existing container IDs/restarts remained unchanged after installing checksum-verified standalone uv 0.12.7 and Node/npm 24.18.0/11.16.0. Caddy backup: `/opt/payments-portal/deploy/caddy/Caddyfile.prod.backup-anytoolai-20260927T162324Z`, SHA-256 `74923e6cf74550d2f0f333347ebf219489a31ab310e429bc87c57e6d65d610d2`. Clean VPS checkout is `b09583815240e44d413f2070ee5f4b01714095b2`; VPS `quick-check` passed (`2045 passed`) and managed-venv `doctor` passed. | Task 4: create the protected production environment and prove the new stack privately. |
 | 2026-09-27 | Task 4 complete. Created the gitignored mode-0600 production environment, rendered the exact external networks and `/tools` build path, and started only Compose project `anytoolai-prod` with `COMPOSE_PARALLEL_LIMIT=1`. `prod-ready`/`prod-status` passed with only `proposal_ai`, matching live API/worker profile fingerprint `01b6f91f8cc0bb7e20d3eb2a6108c6d5f50f6d764fd80725ec63661aa9927683`, and no fake provider. Private page, asset, and runtime-config probes returned 200; the unprefixed product returned 404. One controlled run completed with provider call `provider_call_01790527765639517751_0000000006_b8adb91617874ba5b0d5106345b41860` (`succeeded`, OpenAI via LiteLLM, 851 tokens, 5100 ms), while HAProxy primary sessions rose 596 -> 597 at the matching time. Worker peak was 254.4 MiB of 1 GiB, restart 0, `OOMKilled=false`; 13 GiB RAM and 133 GiB disk remained free, and every pre-existing container ID/restart/public status matched baseline. | Task 5: validate and hot-reload the minimal Caddy route, then perform public browser acceptance. |
 | 2026-09-27 | Task 5 stopped at the required unexpected-state gate. The validated candidate was written to the host Caddyfile without changing its host inode, but the running container's read-only file bind continued to expose an older file object, so reload from `/etc/caddy/Caddyfile` did not install `/tools`. That stale mounted view also lacked the existing extension site; the prescribed rollback therefore restored the host backup and then hot-reloaded the verified backup through a temporary in-container path. Baseline is restored: payments 307, PromptTune 404, extensions root 401/health 200, Caddy ID `025067036b34...`, restart 0, host checksum `74923e6c...`. | Await an explicit choice between a direct validated temporary-file hot reload (leaving the mount-view mismatch until a future recreation) and a separately authorized Caddy-only recreation that refreshes the bind mount. |
+| 2026-09-28 | Task 5 complete after explicit approval for a Caddy-only recreation. A fresh baseline and private `prod-ready` passed. The candidate checksum `77e383b630bdb049effa743328ae04ee2e2e175e0cf282d2df34517a33698f4e` was validated, written to the host path, and mounted by new Caddy container `2d9fa957affa...` via `--no-deps --force-recreate caddy`; every other container ID/restart count stayed unchanged. Public page, Next asset, and root runtime-config returned 200; all six private Demo/Atom Lab paths returned 404; header stripping appears exactly twice for each sensitive header. Manual browser acceptance passed hydration, locale persistence, a nonempty real result, copy confirmation, and return to `/tools`. Payments root/login UI, PromptTune, and extensions remained at baseline. No authenticated payments account was available in the isolated acceptance browser, so credential submission was not repeated. | Task 6: record final isolation, provider/proxy, resource, and rollback evidence. |
+| 2026-09-28 | Task 6 complete. VPS checkout is clean at deployed SHA `b09583815240e44d413f2070ee5f4b01714095b2`; profile fingerprint is `01b6f91f8cc0bb7e20d3eb2a6108c6d5f50f6d764fd80725ec63661aa9927683`. Host and mounted Caddy checksums match `77e383b...`; backup is `74923e6c...`. Only the worker contains `OPENAI_API_KEY`/`HTTPS_PROXY` names. Disabled page/runtime/start return 404, proposal quota rows remain zero, API/web listen only on loopback, PostgreSQL is unpublished, and direct external application probes on 3000/8000/5432 time out. The public provider call `provider_call_01790528701256151352_0000000022_65e546d798554be4a54455f22e4766c4` succeeded through OpenAI/LiteLLM; both Squids remain UP and the primary session counter is 600 (private correlated proof was 596 -> 597). Worker is 254.6 MiB of 1 GiB, restart 0, `OOMKilled=false`; 13 GiB RAM and 133 GiB disk remain free. | Final diff review and independent code review. |
 
 ## Open questions
 
-- No unresolved design question. Actual worker memory remains a runtime measurement gate before public cutover.
+- None. The measured worker peak was 254.6 MiB under the selected 1 GiB limit.
 
 ## Follow-up debt
 

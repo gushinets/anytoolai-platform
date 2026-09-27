@@ -12,12 +12,12 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-09-25
-- Last updated: 2026-09-27
+- Last updated: 2026-09-28
 - Review date: 2026-10-02
-- Next action: follow `docs/exec-plans/active/proposal-ai-vps-135-safe-cutover.md` for the occupied VPS integration and target-VPS acceptance.
+- Next action: none; target-VPS acceptance completed through `docs/exec-plans/completed/proposal-ai-vps-135-safe-cutover.md`.
 - Blocker: none; the design was externally reviewed and approved for implementation.
 
 ## Scope
@@ -1004,7 +1004,7 @@ git commit -m "feat: orchestrate fail-closed production live deployment"
 
 - Modify: `infra/deployment/README.md`
 - Modify: `docs/product-specs/add-product-recipe.md`
-- Modify: `docs/exec-plans/active/proposal-ai-vps-live-deployment.md`
+- Modify: `docs/exec-plans/completed/proposal-ai-vps-live-deployment.md`
 
 **Interfaces:**
 
@@ -1072,7 +1072,7 @@ python scripts/agent/runner.py dev-web
 
 Submit more than ten Proposal AI runs and confirm no quota call/429, a successful OpenAI provider ledger row, and the corresponding Squid CONNECT entry. Repeat with `--quota-mode canonical` in a bounded test and confirm quota state/exhaustion returns. Finish with `dev-down`, then normal `dev-up`, and confirm fake-backed behavior returns.
 
-- [ ] **Step 6: Run VPS acceptance**
+- [x] **Step 6: Run VPS acceptance**
 
 Verify all approved success criteria:
 
@@ -1087,14 +1087,14 @@ Verify all approved success criteria:
 - canonical mode reuses pre-window rows while guests first seen unmetered begin at zero;
 - worker is neither restarted nor `OOMKilled` during a cold catalog refresh plus real run.
 
-- [ ] **Step 7: Record evidence and complete the plan**
+- [x] **Step 7: Record evidence and complete the plan**
 
 Add a dated progress/result section to this file with command results, live/VPS evidence locations, measured worker peak memory, chosen production memory limit, and any operator-owned reverse-proxy/firewall references. Move the plan to `docs/exec-plans/completed/` only after VPS acceptance succeeds.
 
 - [ ] **Step 8: Commit Task 7**
 
 ```powershell
-git add infra/deployment/README.md docs/product-specs/add-product-recipe.md docs/exec-plans/active/proposal-ai-vps-live-deployment.md
+git add infra/deployment/README.md docs/product-specs/add-product-recipe.md docs/exec-plans/completed/proposal-ai-vps-live-deployment.md
 git commit -m "docs: add Proposal AI live deployment runbook"
 ```
 
@@ -1116,7 +1116,7 @@ git commit -m "docs: add Proposal AI live deployment runbook"
 - [x] `python scripts/agent/runner.py full-check`
 - [x] Credential-free production Compose smoke plus `prod-smoke` in a fresh isolated project (see result below)
 - [x] Real-provider local live acceptance without Squid (proxy check deferred to VPS by operator)
-- [ ] Target-VPS acceptance
+- [x] Target-VPS acceptance
 
 ## Decision Log
 
@@ -1154,6 +1154,7 @@ git commit -m "docs: add Proposal AI live deployment runbook"
 | 2026-09-25 | Tenth PR review follow-up: narrowed the candidate API pre-activation allowlist to OPTIONS plus exact health/runtime-config readiness reads so side-effecting handoff GETs cannot mutate a failed candidate's durable state. Moved readiness output beyond the failed-candidate cleanup boundary so an output failure after activation cannot tear down the committed production stack. | Confirm rerun CI and complete target-VPS acceptance. |
 | 2026-09-25 | Eleventh PR review follow-up: separated the intentionally fast 10-second Compose stack-presence probe from the 60-second general Compose query timeout and derived all stack-probe diagnostics from the dedicated constant, correcting timeout-message drift without weakening the Windows env-resolution fix. | Confirm rerun CI and complete target-VPS acceptance. |
 | 2026-09-26 | Twelfth PR review follow-up: publish the activation directory and marker as `0755`/`0644` before replacement so the non-root API can read them under a restrictive umask; rebuild development images in `dev-live-up`; stop `prod-up` and `prod-fake-up` candidates on interrupt until the activation or readiness commit point. | Confirm rerun CI and complete target-VPS acceptance. |
+| 2026-09-28 | Target-VPS acceptance completed at `https://any-tool-ai.ru/tools/products/proposal_ai`. Clean deployed SHA `b09583815240e44d413f2070ee5f4b01714095b2`; live profile `01b6f91f8cc0bb7e20d3eb2a6108c6d5f50f6d764fd80725ec63661aa9927683`; worker peak 254.6 MiB under the 1 GiB production limit, restart 0, `OOMKilled=false`. A private provider call correlated exactly with HAProxy primary sessions 596 -> 597, and the public browser call also produced a successful OpenAI/LiteLLM ledger row. ProposalAI remained unmetered with zero usage rows. Public and disabled-route acceptance passed; API/web are loopback-only and PostgreSQL is unpublished. The occupied-host Caddy source had a pre-existing stale file bind, so the first hot-reload was rolled back; after explicit approval, only Caddy was recreated to refresh the bind. Payments, PromptTune, extensions, HAProxy, and every non-Caddy container retained baseline IDs/restarts/statuses. | Plan complete; production hardening remains deferred by design. |
 
 ## Verification Result (2026-09-25)
 
@@ -1161,7 +1162,7 @@ git commit -m "docs: add Proposal AI live deployment runbook"
 - `prod-fake-up` on the fixed `anytoolai-prod` project could not complete because its PostgreSQL volume predates this task (created 2026-07-28) and was not removed or modified. The same base + prod Compose stack was started in a fresh disposable project with no OpenAI key or proxy; API/web health, `prod-smoke` (11/11 standalone atoms and 3/3 composite workflows), and teardown all passed. Runner command-selection tests prove `prod-fake-up` uses exactly those two Compose files.
 - After review fixes, the same credential-free smoke was repeated in disposable project `anytoolai-review-724a5f31`: API/web health and `prod-smoke` passed (11/11 atoms, 3/3 composites), and the project volume was removed. Post-review `quick-check` and `full-check` both passed with 1929 backend tests (3 skipped); the latter also passed the frontend gates and 99 product tests.
 - Local `dev-live-up --product proposal_ai` used the operator's gitignored OpenAI key with an empty proxy setting. Eleven unmetered Proposal AI sessions completed with eleven successful OpenAI provider-call rows and no guest quota usage rows. A browser submission on the local web page returned HTTP 200, produced a nonempty result, and made no quota request. Switching to `--quota-mode canonical` preserved the guest at zero initial usage; ten more real sessions completed, quota reported `used_count=10`, `remaining_count=0`, and an eleventh start returned HTTP 429. `dev-down`, ordinary `dev-up`, and a new Proposal AI run succeeded with provider ledger `default_fake_provider_v1|fake|fake-json-v1|succeeded`; the final `dev-down` retained the PostgreSQL volume.
-- The operator deferred forward-proxy verification to VPS deployment. Squid CONNECT evidence, target-VPS acceptance, worker peak memory, production memory limit, and reverse-proxy/firewall references remain outstanding. The proposed shared HAProxy arrangement on the PromptTune VPS is not yet implemented or verified. This plan remains active until target-VPS acceptance is complete.
+- Target-VPS acceptance completed on 2026-09-28. The deployed worker uses the existing PromptTune HAProxy at `egress-lb:3128`; a private OpenAI call produced provider ledger success while `squid_primary` sessions increased 596 -> 597, with both primary and backup UP. A public browser call produced a second successful provider row. Worker peak was 254.6 MiB under the selected 1 GiB limit, restart 0, and `OOMKilled=false`. Caddy is the operator-owned reverse proxy; API/web remain loopback-only and PostgreSQL unpublished. Mandatory no-bypass network enforcement remains deferred because runtime proxy variables do not constitute an egress firewall.
 
 ## Open Questions
 
