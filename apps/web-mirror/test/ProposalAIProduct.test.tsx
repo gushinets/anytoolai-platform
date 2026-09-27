@@ -1,10 +1,11 @@
 // ProposalAI's own meaning only -- fields and their validation copy, the mapping to
 // `proposal_ai.generate_input_v1`, the canonical `text` field, and the `copy_result`
 // activation. The shared runtime behavior it rides on is proven in ProductRunPage.test.tsx.
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProposalAIProduct, proposalAiDefinition } from "../src/products/proposalAi/ProposalAIProduct";
 import {
+  errorResponse,
   guestIdentityResponse,
   idempotencyKeyOf,
   makeClient,
@@ -41,7 +42,10 @@ function renderReady() {
   const routed = makeClient({
     [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
     [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
-    [ROUTES.QUOTA]: [quotaResponse(IDS, { limit_count: 10, remaining_count: 10 })],
+    [ROUTES.QUOTA]: [
+      quotaResponse(IDS, { limit_count: 10, remaining_count: 10 }),
+      quotaResponse(IDS, { limit_count: 10, used_count: 1, remaining_count: 9 }),
+    ],
     [ROUTES.START]: [startResponse()],
     [ROUTES.SESSION]: [sessionResponse()],
     [ROUTES.RESULT]: [resultResponse(IDS, { output: { text: PROPOSAL_TEXT } })],
@@ -152,7 +156,12 @@ describe("ProposalAI product definition", () => {
     const routed = makeClientWithDeferredCalls({
       [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
       [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
-      [ROUTES.QUOTA]: [quotaResponse(IDS), quotaResponse(IDS)],
+      [ROUTES.QUOTA]: [
+        quotaResponse(IDS),
+        quotaResponse(IDS, { used_count: 1, remaining_count: 2 }),
+        quotaResponse(IDS, { used_count: 2, remaining_count: 1 }),
+        quotaResponse(IDS, { used_count: 2, remaining_count: 1 }),
+      ],
       [ROUTES.START]: [startResponse(), startResponse()],
       [ROUTES.SESSION]: [sessionResponse(), sessionResponse()],
       [ROUTES.NEXT_ACTION]: [],
@@ -193,7 +202,11 @@ describe("ProposalAI product definition", () => {
     const routed = makeClientWithDeferredCalls({
       [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
       [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
-      [ROUTES.QUOTA]: [quotaResponse(IDS)],
+      [ROUTES.QUOTA]: [
+        quotaResponse(IDS),
+        quotaResponse(IDS, { used_count: 1, remaining_count: 2 }),
+        quotaResponse(IDS, { used_count: 2, remaining_count: 1 }),
+      ],
       [ROUTES.START]: [startResponse(), startResponse()],
       [ROUTES.SESSION]: [sessionResponse(), sessionResponse()],
     }, { [ROUTES.RESULT]: 2 });
@@ -219,6 +232,65 @@ describe("ProposalAI product definition", () => {
 
     routed.resolveCall(ROUTES.RESULT, 1, resultResponse(IDS, { output: { text: "Updated proposal." } }));
     await screen.findByText("Updated proposal.");
+  });
+
+  it("refreshes advisory quota after consecutive regenerations and an authoritative rejection", async () => {
+    const routed = makeClient({
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
+      [ROUTES.QUOTA]: [
+        quotaResponse(IDS),
+        quotaResponse(IDS, { used_count: 1, remaining_count: 2 }),
+        quotaResponse(IDS, { used_count: 2, remaining_count: 1 }),
+        quotaResponse(IDS, { used_count: 3, remaining_count: 0, exhausted: true }),
+        quotaResponse(IDS, { used_count: 3, remaining_count: 0, exhausted: true }),
+      ],
+      [ROUTES.START]: [startResponse(), startResponse(), startResponse(), errorResponse(429, "quota_exhausted")],
+      [ROUTES.SESSION]: [sessionResponse(), sessionResponse(), sessionResponse()],
+      [ROUTES.RESULT]: [
+        resultResponse(IDS, { output: { text: "Proposal 1" } }),
+        resultResponse(IDS, { output: { text: "Proposal 2" } }),
+        resultResponse(IDS, { output: { text: "Proposal 3" } }),
+      ],
+    });
+    render(<ProposalAIProduct client={routed.client} />);
+    fireEvent.change(await screen.findByLabelText("Describe the task"), { target: { value: "Build a landing page." } });
+    fireEvent.change(screen.getByLabelText("Your positioning"), { target: { value: "Frontend freelancer." } });
+
+    for (const [submitLabel, resultText, remaining] of [
+      ["Generate proposal", "Proposal 1", 2],
+      ["Regenerate proposal", "Proposal 2", 1],
+      ["Regenerate proposal", "Proposal 3", 0],
+    ] as const) {
+      fireEvent.click(screen.getByRole("button", { name: submitLabel }));
+      await screen.findByText(resultText);
+      await screen.findByText(`${remaining} of 3 proposals remaining.`);
+    }
+
+    fireEvent.click(screen.getByRole("button", { name: "Regenerate proposal" }));
+    await screen.findByText("You've used all your ProposalAI runs for now.");
+    expect(screen.getByText("0 of 3 proposals remaining.")).toBeTruthy();
+    await waitFor(() => expect(routed.calls.filter((call) => call.key === ROUTES.QUOTA)).toHaveLength(5));
+  });
+
+  it("ignores an older quota response that arrives after the accepted run's refresh", async () => {
+    const routed = makeClientWithDeferredCalls({
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
+      [ROUTES.QUOTA]: [quotaResponse(IDS, { used_count: 1, remaining_count: 2 })],
+      [ROUTES.START]: [startResponse()],
+      [ROUTES.SESSION]: [sessionResponse()],
+      [ROUTES.RESULT]: [resultResponse(IDS, { output: { text: PROPOSAL_TEXT } })],
+    }, { [ROUTES.QUOTA]: 1 });
+    render(<ProposalAIProduct client={routed.client} />);
+    fireEvent.change(await screen.findByLabelText("Describe the task"), { target: { value: "Build a landing page." } });
+    fireEvent.change(screen.getByLabelText("Your positioning"), { target: { value: "Frontend freelancer." } });
+    await waitFor(() => expect(routed.calls.filter((call) => call.key === ROUTES.QUOTA)).toHaveLength(1));
+
+    fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+    await screen.findByText("2 of 3 proposals remaining.");
+    await act(async () => routed.resolveCall(ROUTES.QUOTA, 0, quotaResponse(IDS)));
+    expect(screen.getByText("2 of 3 proposals remaining.")).toBeTruthy();
   });
 
   it("treats a result without a string `text` field as unusable rather than rendering something else", () => {

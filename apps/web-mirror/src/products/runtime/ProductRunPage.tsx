@@ -1,6 +1,6 @@
 "use client";
 
-import { useContext, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useContext, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useIsomorphicLayoutEffect } from "../../lib/useIsomorphicLayoutEffect";
 import { Button, Card } from "@anytoolai/shared-ui";
 import {
@@ -140,7 +140,7 @@ function cacheSuccessOnly<T extends { ok: boolean }>(
 // caches runtime config, which went stale the instant a run actually consumed quota (never
 // invalidated after a successful start), didn't key by guestId (a guest-identity self-heal could
 // read a stale/wrong guest's cached result), and didn't dedupe concurrent calls the way this
-// function does. Quota is cheap, advisory, and re-fetched on every mount instead.
+// function does. Quota is cheap, advisory, and re-fetched on mount and after accepted inline runs.
 const runtimeConfigCache = new WeakMap<PlatformApiClient, Map<string, ReturnType<typeof getRuntimeConfig>>>();
 
 function getCachedRuntimeConfig(client: PlatformApiClient, productId: string) {
@@ -273,6 +273,8 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
 
   const [boot, setBoot] = useState<BootState>({ kind: "loading" });
   const [quota, setQuota] = useState<QuotaState | null>(null);
+  // A pre-start quota GET may resolve after a newer post-start GET; only the newest may update UI.
+  const quotaRequestGenerationRef = useRef(0);
   const [guestId, setGuestId] = useState<string | undefined>(undefined);
   // See `getClientStorage`: one storage per client, so a remount never mints a new guest.
   const [guestStorage] = useState<AsyncStorage>(() => getClientStorage(client));
@@ -391,6 +393,23 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
 
   const productId = definition.productId;
   const scenarioId = definition.scenarioId;
+  const refreshQuota = useCallback((
+    resolvedGuestId: string,
+    resolvedScenarioId: string,
+    controller: AbortController | null,
+    onExhausted?: () => void,
+  ) => {
+    const generation = ++quotaRequestGenerationRef.current;
+    getQuota(client, { productId, guestId: resolvedGuestId, scenarioId: resolvedScenarioId }).then((quotaResult) => {
+      if (controller?.signal.aborted || generation !== quotaRequestGenerationRef.current || !quotaResult.ok) {
+        return;
+      }
+      setQuota(quotaResult.value);
+      if (quotaResult.value.exhausted) {
+        onExhausted?.();
+      }
+    }, _noop);
+  }, [client, productId]);
   // See `ProductRunPageProps.visitId`'s own docstring: falls back to `productId` alone (the old
   // behavior) when no route wrapper supplies a per-visit id.
   const eventScopeKey = visitId ?? productId;
@@ -452,19 +471,10 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
           // product-wide policy simply "does not require it" (optional, not rejected) -- passing
           // it unconditionally keeps this shared runtime correct for either policy shape without
           // needing to know which one a given product uses.
-          getQuota(client, { productId, guestId: resolvedGuestId, scenarioId: scenario.scenarioId }).then((quotaResult) => {
-            if (controller?.signal.aborted || !quotaResult.ok) {
-              return;
-            }
-            setQuota(quotaResult.value);
-            if (quotaResult.value.exhausted) {
-              // Functional update, gated on the phase still being "idle": this advisory GET can
-              // resolve after the user has already submitted (or even completed) a run -- an
-              // unconditional setPhase() here would clobber "submitting"/"running"/"result" with
-              // a stale "quota-exhausted", hiding an active or already-successful run behind it.
-              setPhase((prev) => (prev.kind === "idle" ? { kind: "quota-exhausted" } : prev));
-            }
-          }, _noop);
+          refreshQuota(resolvedGuestId, scenario.scenarioId, controller, () => {
+            // An advisory GET must not replace an active or completed run.
+            setPhase((prev) => (prev.kind === "idle" ? { kind: "quota-exhausted" } : prev));
+          });
         }
       },
       () => {
@@ -474,7 +484,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         }
       },
     );
-  }, [client, guestStorage, productId, scenarioId, eventScopeKey]);
+  }, [client, guestStorage, productId, scenarioId, eventScopeKey, refreshQuota]);
 
   async function runStart(prepared: PreparedScenarioStart) {
     // Snapshotted once: this call's own controller, checked consistently across every await below
@@ -484,8 +494,13 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     if (controller?.signal.aborted) {
       return;
     }
+    const quotaRejected = !result.ok && isQuotaExhausted(result.error);
+    if (definition.inlineResult && boot.kind === "ready" && boot.hasQuota && guestId && (result.ok || quotaRejected)) {
+      // Read the backend counter after acceptance (or 429); idempotent retries cannot spend it twice.
+      refreshQuota(guestId, scenarioId, controller);
+    }
     if (!result.ok) {
-      if (isQuotaExhausted(result.error)) {
+      if (quotaRejected) {
         setPhase({ kind: "quota-exhausted" });
         return;
       }
@@ -809,15 +824,9 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       return;
     }
 
-    getQuota(client, { productId, guestId, scenarioId }).then((quotaResult) => {
-      if (controllerRef.current?.signal.aborted || !quotaResult.ok) {
-        return;
-      }
-      setQuota(quotaResult.value);
-      if (quotaResult.value.exhausted) {
-        setPhase((prev) => (prev.kind === "idle" ? { kind: "quota-exhausted" } : prev));
-      }
-    }, _noop);
+    refreshQuota(guestId, scenarioId, controllerRef.current, () => {
+      setPhase((prev) => (prev.kind === "idle" ? { kind: "quota-exhausted" } : prev));
+    });
   }
 
   function updateField<K extends keyof V>(field: K, value: V[K]) {
