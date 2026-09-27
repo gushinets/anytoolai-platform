@@ -662,6 +662,8 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     if (definition.inlineResult && activeInputRef.current) {
       setDisplayedResult({ scenarioSessionId, checkpointId, result: extracted, input: activeInputRef.current });
     }
+    // A completed run must not lend its Idempotency-Key to a later regeneration.
+    setPendingStart(null);
     setPhase({ kind: "result", scenarioSessionId, checkpointId, result: extracted });
   }
 
@@ -887,7 +889,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
                   : tp(`${definition.messageScope}.submit`)}
           </Button>
           <div className={styles.statusRegion}>
-            {phase.kind === "running" ? <p role="status">{tp(`${definition.messageScope}.running`)}</p> : null}
+            {!inlineResult && phase.kind === "running" ? <p role="status">{tp(`${definition.messageScope}.running`)}</p> : null}
             {identityUnavailable ? <p role="alert">{th("identityUnavailable")}</p> : null}
           </div>
         </div>
@@ -899,8 +901,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   // future new Phase variant fails typecheck here instead of silently falling through to the form.
   let mainContent: ReactNode;
   if (inlineResult) {
-    const oldResult = displayedResult &&
-      (phase.kind !== "result" || !shallowEqualValues(displayedResult.input, values));
+    const oldResult = displayedResult && !shallowEqualValues(displayedResult.input, values);
     const showPlaceholder = !displayedResult &&
       (phase.kind === "idle" || phase.kind === "submitting" || phase.kind === "running");
     mainContent = (
@@ -915,6 +916,9 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
               {displayedResult ? <a className={styles.backToInputs} href="#product-inputs">{tp("workspace.backToInputs")}</a> : null}
             </div>
             {oldResult ? <p role="status" className={styles.oldResultNotice}>{tp("workspace.previousDetails")}</p> : null}
+            {displayedResult && (phase.kind === "submitting" || phase.kind === "running") ? (
+              <p role="status" className={styles.resultProgress}>{tp(`${definition.messageScope}.running`)}</p>
+            ) : null}
             {displayedResult ? (
               <Result
                 key={displayedResult.scenarioSessionId}

@@ -1,11 +1,12 @@
 // ProposalAI's own meaning only -- fields and their validation copy, the mapping to
 // `proposal_ai.generate_input_v1`, the canonical `text` field, and the `copy_result`
 // activation. The shared runtime behavior it rides on is proven in ProductRunPage.test.tsx.
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProposalAIProduct, proposalAiDefinition } from "../src/products/proposalAi/ProposalAIProduct";
 import {
   guestIdentityResponse,
+  idempotencyKeyOf,
   makeClient,
   makeClientWithDeferredCalls,
   quotaResponse,
@@ -186,6 +187,38 @@ describe("ProposalAI product definition", () => {
     expect(positioning.value).toBe("");
     expect(screen.queryByText("Updated proposal.")).toBeNull();
     await waitFor(() => expect(document.activeElement).toBe(task));
+  });
+
+  it("regenerates unchanged details with a fresh start and one result-card progress notice", async () => {
+    const routed = makeClientWithDeferredCalls({
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
+      [ROUTES.QUOTA]: [quotaResponse(IDS)],
+      [ROUTES.START]: [startResponse(), startResponse()],
+      [ROUTES.SESSION]: [sessionResponse(), sessionResponse()],
+    }, { [ROUTES.RESULT]: 2 });
+    render(<ProposalAIProduct client={routed.client} />);
+    fireEvent.change(await screen.findByLabelText("Describe the task"), { target: { value: "Build a landing page." } });
+    fireEvent.change(screen.getByLabelText("Your positioning"), { target: { value: "Frontend freelancer." } });
+    fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+    await waitFor(() => expect(routed.calls.filter((call) => call.key === ROUTES.RESULT)).toHaveLength(1));
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+    routed.resolveCall(ROUTES.RESULT, 0, resultResponse(IDS, { output: { text: PROPOSAL_TEXT } }));
+    await screen.findByText(PROPOSAL_TEXT);
+
+    fireEvent.click(screen.getByRole("button", { name: "Regenerate proposal" }));
+    await waitFor(() => expect(routed.calls.filter((call) => call.key === ROUTES.RESULT)).toHaveLength(2));
+    const starts = routed.calls.filter((call) => call.key === ROUTES.START);
+    expect(starts).toHaveLength(2);
+    expect(idempotencyKeyOf(starts[0]!)).not.toBe(idempotencyKeyOf(starts[1]!));
+    expect(screen.queryByText("Created from previous details")).toBeNull();
+    const resultSection = screen.getByRole("heading", { name: "Proposal", level: 2 }).closest("section")!;
+    expect(within(resultSection).getByRole("status").textContent).toBe("Generating your proposal…");
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+    expect(screen.getByText(PROPOSAL_TEXT)).toBeTruthy();
+
+    routed.resolveCall(ROUTES.RESULT, 1, resultResponse(IDS, { output: { text: "Updated proposal." } }));
+    await screen.findByText("Updated proposal.");
   });
 
   it("treats a result without a string `text` field as unusable rather than rendering something else", () => {

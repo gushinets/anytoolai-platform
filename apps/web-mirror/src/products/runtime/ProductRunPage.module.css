@@ -60,6 +60,11 @@
   font-size: 13px;
 }
 
+.resultProgress {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
 .resultPlaceholder {
   display: grid;
   min-height: 260px;

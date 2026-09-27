@@ -107,7 +107,7 @@ test.describe("ProposalAI web product", () => {
     await expect(page.getByRole("status")).toHaveText(/Generating your proposal/);
     const copyButton = page.getByRole("button", { name: "Copy" });
     await expect(copyButton).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByRole("button", { name: "Create another proposal" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "New task" })).toBeVisible();
 
     // `.last()`, not `.first()`: the advisory quota line is also a `<p>` inside `<main>`, rendered
     // before the result.
@@ -336,7 +336,7 @@ test.describe("ProposalAI web product", () => {
       await fillValidForm(page);
       await submitAndWaitForResult(page);
       if (remainingAfter > 0) {
-        await page.getByRole("button", { name: "Create another proposal" }).click();
+        await page.getByRole("button", { name: "New task" }).click();
         await expect(page.getByText(`${remainingAfter} of 10 proposals remaining.`)).toBeVisible();
       }
     }
@@ -344,7 +344,7 @@ test.describe("ProposalAI web product", () => {
     // The refresh would short-circuit into quota-exhausted before any submit, which is correct but
     // wouldn't prove the authoritative 429 path, so block that advisory call for the final attempt.
     await page.route("**/v1/products/proposal_ai/quota**", (route) => route.abort());
-    await page.getByRole("button", { name: "Create another proposal" }).click();
+    await page.getByRole("button", { name: "New task" }).click();
     await fillValidForm(page);
     await page.getByRole("button", { name: "Generate proposal" }).click();
 
