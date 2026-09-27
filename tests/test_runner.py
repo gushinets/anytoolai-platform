@@ -1046,6 +1046,34 @@ def test_prod_compose_command_passes_env_file_when_present(monkeypatch, tmp_path
     ]
 
 
+def test_vps_135_selector_appends_overlay_only_to_live_compose(monkeypatch) -> None:
+    runner = load_runner_module()
+    monkeypatch.setattr(runner, "PROD_ENV_FILE", runner.ROOT / "does-not-exist.env")
+
+    live = runner._prod_live_compose_command(
+        "up", env={"ANYTOOLAI_VPS_135_NETWORKS": "1"}
+    )
+    fake = runner._prod_fake_compose_command("up")
+
+    assert str(runner.COMPOSE_VPS_135_FILE) in live
+    assert str(runner.COMPOSE_VPS_135_FILE) not in fake
+
+
+def test_prod_up_rejects_unknown_vps_135_selector_before_compose(monkeypatch, capsys) -> None:
+    runner = load_runner_module()
+    monkeypatch.setattr(
+        runner,
+        "_resolved_env_file",
+        lambda path: PROD_LIVE_VALUES | {"ANYTOOLAI_VPS_135_NETWORKS": "yes"},
+    )
+    monkeypatch.setattr(
+        runner, "_prod_stack_running", lambda: pytest.fail("invalid selector reached Compose")
+    )
+
+    assert runner.prod_up() == 2
+    assert "ANYTOOLAI_VPS_135_NETWORKS" in capsys.readouterr().err
+
+
 def test_dev_compose_command_never_passes_prod_env_file(monkeypatch, tmp_path) -> None:
     # Dev must never pick up prod secrets from .env.prod, even if it exists on disk.
     runner = load_runner_module()
@@ -1248,7 +1276,12 @@ def test_prod_status_and_down_work_without_deployment_inputs(monkeypatch, tmp_pa
 
 def test_prod_fake_up_builds_and_removes_orphans(monkeypatch) -> None:
     runner = load_runner_module()
-    resolved_env = {"ANYTOOLAI_PROD_API_PORT": "18000", "ANYTOOLAI_PROD_WEB_PORT": "13000"}
+    resolved_env = {
+        "ANYTOOLAI_PROD_API_PORT": "18000",
+        "ANYTOOLAI_PROD_WEB_PORT": "13000",
+        "ANYTOOLAI_WEB_BASE_PATH": "/tools",
+        "ANYTOOLAI_VPS_135_NETWORKS": "1",
+    }
     monkeypatch.setattr(runner, "_resolved_env_file", lambda path: resolved_env)
     monkeypatch.setattr(runner, "_prod_fake_stack_running", lambda env: False)
     monkeypatch.setattr(runner, "port_available", lambda port: True)
@@ -1271,6 +1304,8 @@ def test_prod_fake_up_builds_and_removes_orphans(monkeypatch) -> None:
     assert commands[0][-4:] == ["up", "-d", "--build", "--remove-orphans"]
     assert environments == [resolved_env]
     assert ready_environments == [resolved_env]
+    assert resolved_env["ANYTOOLAI_WEB_BASE_PATH"] == ""
+    assert str(runner.COMPOSE_VPS_135_FILE) not in commands[0]
     # Deliberately unbounded: --build can legitimately take minutes on a cold build.
     assert timeouts == [None]
 
@@ -1509,7 +1544,9 @@ def test_prod_input_shell_empty_overrides_env_file(monkeypatch, tmp_path) -> Non
 def test_prod_up_builds_profile_before_live_compose_and_ready(monkeypatch) -> None:
     runner = load_runner_module()
     inputs = runner.DeploymentInputs(
-        ("proposal_ai",), frozenset({"proposal_ai"}), PROD_LIVE_VALUES.copy()
+        ("proposal_ai",),
+        frozenset({"proposal_ai"}),
+        PROD_LIVE_VALUES | {"ANYTOOLAI_VPS_135_NETWORKS": "1"},
     )
     manifest = {
         "generated_products_root": "C:/generated/products",
@@ -1553,7 +1590,12 @@ def test_prod_up_builds_profile_before_live_compose_and_ready(monkeypatch) -> No
     assert events == ["profile", "ps", "up", "ready", "activate"]
     assert all(
         str(path) in commands[0]
-        for path in (runner.COMPOSE_FILE, runner.COMPOSE_PROD_FILE, runner.COMPOSE_LIVE_FILE)
+        for path in (
+            runner.COMPOSE_FILE,
+            runner.COMPOSE_PROD_FILE,
+            runner.COMPOSE_LIVE_FILE,
+            runner.COMPOSE_VPS_135_FILE,
+        )
     )
     assert environments[0]["ANYTOOLAI_DEPLOYMENT_PRODUCTS_ROOT"] == "C:/generated/products"
     assert environments[0]["ANYTOOLAI_DEPLOYMENT_MANIFEST_PATH"].endswith("manifest.json")
@@ -1844,6 +1886,45 @@ def test_prod_ready_checks_web_and_identical_container_profiles(monkeypatch, cap
     )
     assert "client_update_writer" not in " ".join(commands[0])
     assert "Production environment is ready" in capsys.readouterr().out
+
+
+def test_prod_ready_uses_web_base_path_and_vps_overlay(monkeypatch) -> None:
+    runner = load_runner_module()
+    inputs = runner.DeploymentInputs(
+        ("proposal_ai",),
+        frozenset(),
+        PROD_LIVE_VALUES
+        | {
+            "ANYTOOLAI_UNMETERED_PRODUCT_IDS": "",
+            "ANYTOOLAI_WEB_BASE_PATH": "/tools",
+            "ANYTOOLAI_VPS_135_NETWORKS": "1",
+        },
+    )
+    manifest = {
+        "generated_products_root": "C:/generated/products",
+        "container_products_root": "/app/products",
+        "profile_fingerprint": "fingerprint",
+        "unmetered_product_ids": [],
+        "source_products_root": "C:/source/products",
+        "source_fingerprint": "source-fingerprint",
+        "enabled_products": {
+            "proposal_ai": {
+                "provider_policy_ref": "default_text_generation_v1",
+                "quota_policy_ref": "proposal_ai.guest_quota_v1",
+            }
+        },
+    }
+    urls: list[str] = []
+    commands: list[list[str]] = []
+    monkeypatch.setattr(runner, "_wait_for_http_ok", lambda url, timeout: urls.append(url) or True)
+    monkeypatch.setattr(runner, "_check_source_fingerprint", lambda manifest, env: 0)
+    monkeypatch.setattr(
+        runner, "run_with_env", lambda command, env: commands.append(list(command)) or 0
+    )
+
+    assert runner.prod_ready(inputs=inputs, manifest=manifest) == 0
+    assert urls[1] == "http://127.0.0.1:3000/tools"
+    assert all(str(runner.COMPOSE_VPS_135_FILE) in command for command in commands)
 
 
 def test_prod_ready_rejects_failed_container_check_without_ready_output(

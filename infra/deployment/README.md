@@ -11,6 +11,11 @@ Covers the Proposal AI public web stack (`web-mirror`, `platform-api`, `platform
 - `docker-compose.prod.yml` — prod overlay. Never auto-merged; always passed explicitly.
 - `docker-compose.live.yml` — live provider profile mounts and worker-only OpenAI/proxy settings.
   `prod-up` selects base + prod + live; `prod-fake-up` selects base + prod only.
+- `docker-compose.vps-135.yml` — optional occupied-host network overlay. Setting
+  `ANYTOOLAI_VPS_135_NETWORKS=1` makes live `prod-up`/`prod-ready` append it: only
+  `platform-worker` joins external `infra_prompttune`, and only `web-mirror` joins external
+  `payments-portal-prod_edge`; both retain the AnytoolAI default network. Other selector values
+  fail before Compose starts. Fake and dev commands never select this overlay.
 
 `docker-compose.prod.yml` uses the Compose Specification's `!reset`/`!override` merge tags (to
 drop Postgres's host port and fully replace `platform-api`'s). These require a reasonably
@@ -211,6 +216,10 @@ user/password/database, a real `OPENAI_API_KEY`, the Squid URL in
 measured minimum). Keep all three public access-code variables blank. The shell overrides the
 file even with an empty value. An explicitly empty `ANYTOOLAI_UNMETERED_PRODUCT_IDS` selects the
 canonical quota; omitting the variable is an error. Never commit or print the completed file.
+On VPS `135.106.164.145`, also set `ANYTOOLAI_WEB_BASE_PATH=/tools` and
+`ANYTOOLAI_VPS_135_NETWORKS=1`. The latter selects the exact external networks
+`infra_prompttune` and `payments-portal-prod_edge`; those networks must already exist.
+`prod-fake-up` explicitly clears an inherited web base path and remains on base + prod only.
 Every public enabled product must also have a registered web page; the production web build
 rejects unknown product IDs before startup. The backend-only `kernel_demo` remains available
 for credential-free CI smoke.
