@@ -15,9 +15,9 @@
 - State: active
 - Owner: agent
 - Created: 2026-09-25
-- Last updated: 2026-09-25
+- Last updated: 2026-09-27
 - Review date: 2026-10-02
-- Next action: choose execution mode, then start Task 1 with a clean implementation worktree.
+- Next action: follow `docs/exec-plans/active/proposal-ai-vps-135-safe-cutover.md` for the occupied VPS integration and target-VPS acceptance.
 - Blocker: none; the design was externally reviewed and approved for implementation.
 
 ## Scope

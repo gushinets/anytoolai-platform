@@ -71,6 +71,7 @@ This directory is the system of record for agents. Keep it current. If a decisio
 - `exec-plans/template.md`
 - `exec-plans/active/`
 - `exec-plans/completed/`
+- `exec-plans/active/proposal-ai-vps-135-safe-cutover.md` — ProposalAI public URL, shared HAProxy access, and cutover gates that protect existing VPS services.
 
 ## Task handoffs
 
