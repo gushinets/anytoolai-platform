@@ -84,12 +84,14 @@ services:
   web-mirror:
     environment:
       ANYTOOLAI_ENABLED_PRODUCT_IDS: ${ANYTOOLAI_ENABLED_PRODUCT_IDS:?enabled products are required}
+      ANYTOOLAI_WEB_BASE_PATH: ${ANYTOOLAI_WEB_BASE_PATH-}
     build:
       context: ../..
       dockerfile: infra/docker/web-mirror.Dockerfile
       args:
         PLATFORM_API_BASE_URL: http://platform-api:8000
         NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS: ${ANYTOOLAI_ENABLED_PRODUCT_IDS:?enabled products are required}
+        ANYTOOLAI_WEB_BASE_PATH: ${ANYTOOLAI_WEB_BASE_PATH-}
     depends_on:
       platform-api:
         condition: service_healthy

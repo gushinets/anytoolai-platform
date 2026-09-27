@@ -1,6 +1,6 @@
 # Proposal AI VPS Live Deployment Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Deploy Proposal AI on the existing VPS stack with OpenAI calls routed from `platform-worker` through Squid, an initially unmetered guest mode that can later restore the canonical anonymous quota, and reusable local/live deployment machinery for later Freelancer Suite products.
 
@@ -12,12 +12,12 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-09-25
-- Last updated: 2026-09-25
+- Last updated: 2026-09-28
 - Review date: 2026-10-02
-- Next action: choose execution mode, then start Task 1 with a clean implementation worktree.
+- Next action: none; target-VPS acceptance completed through `docs/exec-plans/completed/proposal-ai-vps-135-safe-cutover.md`.
 - Blocker: none; the design was externally reviewed and approved for implementation.
 
 ## Scope
@@ -124,7 +124,7 @@
 - Produces CLI: `check-deployment-profile --products-root PATH --expected-fingerprint HEX --expect-product PRODUCT=PROVIDER,QUOTA_OR_DASH`.
 - Preserves: no-argument `main()` and `python scripts/agent/runner.py validate-configs` load only canonical roots and write nothing.
 
-- [ ] **Step 1: Add failing tests for canonical validation and deterministic fingerprints**
+- [x] **Step 1: Add failing tests for canonical validation and deterministic fingerprints**
 
 Add tests with these exact behaviors:
 
@@ -152,7 +152,7 @@ def test_tree_fingerprint_uses_posix_relative_paths_and_exact_bytes(tmp_path):
 
 Also pin ordering by creating the same files in opposite creation order and asserting equal hashes. Compute each hash item as `len(path_bytes).to_bytes(8, "big") + path_bytes + len(file_bytes).to_bytes(8, "big") + file_bytes`.
 
-- [ ] **Step 2: Run the focused tests and confirm they fail**
+- [x] **Step 2: Run the focused tests and confirm they fail**
 
 Run:
 
@@ -162,7 +162,7 @@ python -m pytest tests/test_validate_configs.py -q
 
 Expected: failures because the profile/fingerprint interfaces and argv-aware `main()` do not exist.
 
-- [ ] **Step 3: Implement the minimal fingerprint and manifest types**
+- [x] **Step 3: Implement the minimal fingerprint and manifest types**
 
 Keep them in `validate_configs.py`; do not create a framework module for one caller.
 
@@ -210,7 +210,7 @@ def tree_fingerprint(root: Path) -> str:
 
 Serialize the manifest with stable `json.dumps(..., sort_keys=True, indent=2)` to `manifest.json` beside `products/`.
 
-- [ ] **Step 4: Add failing transform tests using a small real-shaped fixture tree**
+- [x] **Step 4: Add failing transform tests using a small real-shaped fixture tree**
 
 Cover all of these cases in `tests/test_validate_configs.py`:
 
@@ -243,7 +243,7 @@ def test_build_profile_fails_closed(enabled, unmetered, message, ...):
 
 Add one canonical-mode assertion that preserves `proposal_ai.guest_quota_v1` and the canonical `quotas.yaml` bytes, and one unmetered Client Update Writer assertion proving canonical no-quota remains valid.
 
-- [ ] **Step 5: Implement strict copy-and-transform behavior**
+- [x] **Step 5: Implement strict copy-and-transform behavior**
 
 Resolve `FreelancerSuiteBundle().config_roots()`, require their common parent to be the package `products/` directory, copy that complete directory, and only edit these generated files:
 
@@ -272,7 +272,7 @@ def _transform_live_product(product_dir: Path, *, unmetered: bool) -> None:
 
 Build in a sibling temporary directory, load kernel plus generated product roots through the real `ConfigLoader`, validate expectations, then replace the old generated directory. A failed build must leave no half-written profile selected by Compose.
 
-- [ ] **Step 6: Implement read-only effective-profile checking**
+- [x] **Step 6: Implement read-only effective-profile checking**
 
 Derive action configurations by traversing the enabled product's scenarios and workflow steps, not by checking every product in the registry. The checker must assert:
 
@@ -288,7 +288,7 @@ for product_id, expected in expectations.items():
 
 Do not inspect provider policies belonging only to disabled products. Parse `QUOTA_OR_DASH` as `None` only for the literal `-`.
 
-- [ ] **Step 7: Add the explicit CLI without changing default validation**
+- [x] **Step 7: Add the explicit CLI without changing default validation**
 
 Use optional `argparse` subcommands:
 
@@ -300,7 +300,7 @@ validate_configs.py check-deployment-profile --products-root ... --expected-fing
 
 The no-argument branch must call the existing `load_registry()` and catalog override validation only. Both new commands return nonzero with a concise stderr message on invalid ids, transforms, paths, fingerprints, or references.
 
-- [ ] **Step 8: Run focused and architecture tests**
+- [x] **Step 8: Run focused and architecture tests**
 
 Run:
 
@@ -311,7 +311,7 @@ python scripts/agent/runner.py validate-configs
 
 Expected: all pass; the second command creates no `.agent/deployment-profiles` directory.
 
-- [ ] **Step 9: Commit Task 1**
+- [x] **Step 9: Commit Task 1**
 
 ```powershell
 git add scripts/agent/validate_configs.py tests/test_validate_configs.py
@@ -335,7 +335,7 @@ git commit -m "feat: generate validated live product profiles"
 - Produces: `dev-web`.
 - Produces: `_run_effective_profile_checks(compose_command, manifest) -> int` shared by local live and production.
 
-- [ ] **Step 1: Add failing runner CLI and command-construction tests**
+- [x] **Step 1: Add failing runner CLI and command-construction tests**
 
 Add assertions for:
 
@@ -359,7 +359,7 @@ def test_normal_dev_compose_never_uses_live_overlay_or_live_env_file(...):
 
 Also assert `--product`/`--quota-mode` are rejected for commands other than `dev-live-up`.
 
-- [ ] **Step 2: Run the new runner tests and confirm failure**
+- [x] **Step 2: Run the new runner tests and confirm failure**
 
 Run:
 
@@ -369,7 +369,7 @@ python -m pytest tests/test_runner.py -q
 
 Expected: focused failures for missing live constants, CLI options, and commands.
 
-- [ ] **Step 3: Add the live Compose overlay**
+- [x] **Step 3: Add the live Compose overlay**
 
 Create `infra/compose/docker-compose.live.yml` with one mount variable and worker-only secrets:
 
@@ -395,7 +395,7 @@ services:
 
 Do not add proxy variables to `docker-compose.yml`. Document TLS-intercept CA as an operator-only extra bind override unless the real Squid configuration proves interception is enabled; do not add a second permanent overlay speculatively.
 
-- [ ] **Step 4: Implement profile subprocess and identical container-check arguments**
+- [x] **Step 4: Implement profile subprocess and identical container-check arguments**
 
 Runner must call Task 1 as a subprocess, then read `manifest.json`:
 
@@ -421,7 +421,7 @@ def _profile_check_args(manifest: dict[str, object]) -> list[str]:
 
 Use the same `_profile_check_args()` output for `platform-api` and `platform-worker`; only each container's `uv run --project ... --no-sync python` prefix differs. Any nonzero check aborts readiness.
 
-- [ ] **Step 5: Implement `dev-live-up`**
+- [x] **Step 5: Implement `dev-live-up`**
 
 The command must:
 
@@ -436,7 +436,7 @@ The command must:
 
 Keep environment-file parsing in a small runner helper supporting documented `KEY=value`, quoted values, blank values, comments, and exported shell precedence including empty strings. Never print resolved secret values.
 
-- [ ] **Step 6: Implement `dev-web`**
+- [x] **Step 6: Implement `dev-web`**
 
 Use the existing worktree identity and existing runner subprocess helper:
 
@@ -450,7 +450,7 @@ def dev_web() -> int:
 
 No process supervisor and no fixed port fallback are added.
 
-- [ ] **Step 7: Add failure-path tests**
+- [x] **Step 7: Add failure-path tests**
 
 Pin these outcomes in `tests/test_runner.py`:
 
@@ -462,7 +462,7 @@ Pin these outcomes in `tests/test_runner.py`:
 - `dev-down` after live mode still addresses the same Compose project;
 - `dev-web` exports the derived worktree API URL.
 
-- [ ] **Step 8: Run focused tests and render Compose**
+- [x] **Step 8: Run focused tests and render Compose**
 
 Run:
 
@@ -476,7 +476,7 @@ docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compo
 
 Expected: tests and Compose render pass. Remove the three temporary shell variables after the check.
 
-- [ ] **Step 9: Commit Task 2**
+- [x] **Step 9: Commit Task 2**
 
 ```powershell
 git add scripts/agent/runner.py tests/test_runner.py infra/compose/docker-compose.live.yml
@@ -505,7 +505,7 @@ git commit -m "feat: add reusable local live mode"
 - Produces: `require_enabled_product(product_id, settings) -> str` FastAPI dependency.
 - Preserves: the existing safe `404 product_not_found` response shape.
 
-- [ ] **Step 1: Add failing settings/startup tests**
+- [x] **Step 1: Add failing settings/startup tests**
 
 Test exact parsing and startup behavior:
 
@@ -528,7 +528,7 @@ def test_unknown_enabled_product_fails_app_startup(monkeypatch):
 
 Reject empty CSV members such as `proposal_ai,,brief_decoder`; do not silently reinterpret malformed operator input.
 
-- [ ] **Step 2: Implement settings loading once at app creation**
+- [x] **Step 2: Implement settings loading once at app creation**
 
 Extend `Settings.from_env()` rather than adding another settings class:
 
@@ -552,7 +552,7 @@ class Settings(BaseModel):
 
 In `create_app()`, load settings after the registry, reject `enabled_product_ids - registry.products.keys()`, and store the result on `app.state.settings`. Change `get_settings(request: Request)` to return that stored instance; retain dependency overrides used by existing tests.
 
-- [ ] **Step 3: Add failing endpoint admission tests**
+- [x] **Step 3: Add failing endpoint admission tests**
 
 With `ANYTOOLAI_ENABLED_PRODUCT_IDS=proposal_ai`, assert all three calls for `client_update_writer` return the same safe 404 before their underlying services run:
 
@@ -564,7 +564,7 @@ POST /v1/products/client_update_writer/scenarios/client_update_writer.update_v1/
 
 For quota and scenario start, spy on the service/repository constructor or inspect the database to prove no usage/session/job row was created. Also assert Proposal AI still reaches the existing route behavior.
 
-- [ ] **Step 4: Add the shared enabled-product dependency**
+- [x] **Step 4: Add the shared enabled-product dependency**
 
 ```python
 def require_enabled_product(
@@ -578,7 +578,7 @@ def require_enabled_product(
 
 Replace each of the three route function's plain `product_id: str` parameters with `Annotated[str, Depends(require_enabled_product)]`. Do not apply this dependency to polling/results/handoff routes that operate on already-created opaque ids.
 
-- [ ] **Step 5: Run focused API tests**
+- [x] **Step 5: Run focused API tests**
 
 Run:
 
@@ -588,7 +588,7 @@ python -m pytest apps/platform-api/tests/test_runtime_config.py apps/platform-ap
 
 Expected: all pass, including existing Settings dependency overrides.
 
-- [ ] **Step 6: Commit Task 3**
+- [x] **Step 6: Commit Task 3**
 
 ```powershell
 git add apps/platform-api/src/anytoolai_platform_api/settings.py apps/platform-api/src/anytoolai_platform_api/main.py apps/platform-api/src/anytoolai_platform_api/dependencies.py apps/platform-api/src/anytoolai_platform_api/routers/runtime_config.py apps/platform-api/src/anytoolai_platform_api/routers/identity_quota.py apps/platform-api/src/anytoolai_platform_api/routers/scenario_runtime.py apps/platform-api/tests/test_runtime_config.py apps/platform-api/tests/test_identity_quota_api.py apps/platform-api/tests/test_scenario_runtime_api.py
@@ -615,7 +615,7 @@ git commit -m "feat: gate product API routes by release allowlist"
 - Produces: `getRegisteredProduct()` returns `null` for disabled entries.
 - Consumes: existing `RuntimeConfig.quotaSummary: RuntimeQuotaSummary | null`.
 
-- [ ] **Step 1: Add failing registry tests with isolated module imports**
+- [x] **Step 1: Add failing registry tests with isolated module imports**
 
 Use `vi.resetModules()` and dynamic imports so each environment value is evaluated afresh:
 
@@ -641,7 +641,7 @@ it("keeps the complete list but disables products outside the allowlist", async 
 
 Restore environment/module state in `afterEach`.
 
-- [ ] **Step 2: Implement registry enablement without filtering**
+- [x] **Step 2: Implement registry enablement without filtering**
 
 ```typescript
 const configuredIds = process.env.NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS;
@@ -666,11 +666,11 @@ const PRODUCTS: readonly RegisteredProduct[] = PRODUCT_DEFINITIONS.map((product)
 
 Keep `listRegisteredProducts(): readonly RegisteredProduct[] { return PRODUCTS; }`. The existing home-page filter and direct-route `getRegisteredProduct()` then share the same `enabled` field.
 
-- [ ] **Step 3: Add a Home page test for a disabled card**
+- [x] **Step 3: Add a Home page test for a disabled card**
 
 Mock or isolate the registry with only `proposal_ai` enabled, render `HomePage`, and assert Proposal AI is linked while Client Update Writer is absent. Keep the existing default-all test unchanged.
 
-- [ ] **Step 4: Make the default runtime fixture metered and add failing unmetered tests**
+- [x] **Step 4: Make the default runtime fixture metered and add failing unmetered tests**
 
 Change `runtimeConfigResponse()`'s default `quota_summary` to the existing three-run policy so current quota tests retain their meaning:
 
@@ -686,7 +686,7 @@ quota_summary: {
 
 Add one boot test with `{ quota_summary: null }` and no queued quota response; assert the form appears and captured calls contain no `ROUTES.QUOTA`. Add one successful-run test that clicks “Start another run” and again asserts zero quota calls.
 
-- [ ] **Step 5: Guard both quota reads from the resolved runtime config**
+- [x] **Step 5: Guard both quota reads from the resolved runtime config**
 
 Extend ready boot state with the backend-owned fact:
 
@@ -699,7 +699,7 @@ type BootState =
 
 Set `hasQuota: runtimeResult.value.quotaSummary !== null`. On initial load, call `getQuota` only when `resolvedGuestId && runtimeResult.value.quotaSummary !== null`. In `handleStartAnother`, reset the form/result as today, then return before `getQuota` unless `boot.kind === "ready" && boot.hasQuota`.
 
-- [ ] **Step 6: Run focused frontend tests**
+- [x] **Step 6: Run focused frontend tests**
 
 Run:
 
@@ -710,7 +710,7 @@ pnpm --filter @anytoolai/web-mirror typecheck
 
 Expected: complete-registry translation behavior remains intact; metered tests still make quota calls; unmetered tests make none.
 
-- [ ] **Step 7: Commit Task 4**
+- [x] **Step 7: Commit Task 4**
 
 ```powershell
 git add apps/web-mirror/src/products/registry.ts apps/web-mirror/src/products/runtime/ProductRunPage.tsx apps/web-mirror/test/fixtures/platformResponses.ts apps/web-mirror/test/registry.test.tsx apps/web-mirror/test/HomePage.test.tsx apps/web-mirror/test/ProductRunPage.test.tsx
@@ -737,7 +737,7 @@ git commit -m "feat: gate web products and support unmetered runs"
 - Produces: loopback web endpoint `ANYTOOLAI_PROD_WEB_PORT` (default `3000`).
 - Produces: explicit credential-free `prod-fake-up` for the required Compose smoke only.
 
-- [ ] **Step 1: Add failing production Compose/runner assertions**
+- [x] **Step 1: Add failing production Compose/runner assertions**
 
 Test that rendered command/environment contracts require:
 
@@ -751,7 +751,7 @@ Test that rendered command/environment contracts require:
 
 Use `docker compose config --quiet` in the verification step for YAML semantics; keep unit tests to runner command selection and preflight so they do not require Docker.
 
-- [ ] **Step 2: Create the minimal multi-stage web Dockerfile**
+- [x] **Step 2: Create the minimal multi-stage web Dockerfile**
 
 Use the repository's pinned pnpm version through Corepack and copy the workspace once:
 
@@ -781,7 +781,7 @@ Do not add standalone-output tuning or pruning in this feature; the approved spe
 
 Add `.agent/` to `.dockerignore` before building. The generated tree is a runtime bind mount and must not be captured in API, worker, or web build contexts.
 
-- [ ] **Step 3: Extend production Compose**
+- [x] **Step 3: Extend production Compose**
 
 Apply these exact contracts:
 
@@ -818,7 +818,7 @@ services:
 
 Add a bounded Node-based healthcheck for `/`; do not install curl solely for healthchecking.
 
-- [ ] **Step 4: Preserve the credential-free required Compose smoke**
+- [x] **Step 4: Preserve the credential-free required Compose smoke**
 
 Add explicit `prod-fake-up` which retains the old base + production overlay behavior and never falls back from `prod-up`. Update `.github/workflows/backend.yml`'s `compose-smoke-prod` job to call it with:
 
@@ -829,7 +829,7 @@ ANYTOOLAI_PROD_WORKER_MEMORY_LIMIT: 512M
 
 Keep `OPENAI_API_KEY` and proxy absent. `prod-smoke` continues to drive `kernel_demo`; `prod-up` is reserved for the real live deployment and must fail when live inputs are absent.
 
-- [ ] **Step 5: Update `.env.example`**
+- [x] **Step 5: Update `.env.example`**
 
 Add names and safe examples only:
 
@@ -844,7 +844,7 @@ ANYTOOLAI_PROD_WEB_PORT=3000
 
 Keep `OPENAI_API_KEY`, proxy credentials, and real database credentials blank.
 
-- [ ] **Step 6: Render and build the production web service**
+- [x] **Step 6: Render and build the production web service**
 
 Run with disposable values:
 
@@ -860,7 +860,7 @@ docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compo
 
 Then unset `ANYTOOLAI_ENABLED_PRODUCT_IDS` and confirm both Compose interpolation and a direct Docker build without `NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS` fail.
 
-- [ ] **Step 7: Commit Task 5**
+- [x] **Step 7: Commit Task 5**
 
 ```powershell
 git add .dockerignore infra/docker/web-mirror.Dockerfile infra/compose/docker-compose.prod.yml infra/compose/.env.example .github/workflows/backend.yml scripts/agent/runner.py tests/test_runner.py
@@ -884,7 +884,7 @@ git commit -m "feat: add fail-closed production web stack"
 - Produces: fail-closed `prod-up` with resolved allowlist/quota output.
 - Produces: `prod-ready` that waits for API and web, then validates API and worker profile mounts before reporting ready.
 
-- [ ] **Step 1: Add failing production selection/preflight tests**
+- [x] **Step 1: Add failing production selection/preflight tests**
 
 Add table-driven tests for:
 
@@ -912,7 +912,7 @@ Add separate cases proving:
 - stdout contains product ids/modes but not OpenAI key, proxy credentials, or DB password;
 - no Compose/profile function is called after any preflight failure.
 
-- [ ] **Step 2: Implement resolved deployment inputs**
+- [x] **Step 2: Implement resolved deployment inputs**
 
 Use a frozen runner dataclass:
 
@@ -929,7 +929,7 @@ class DeploymentInputs:
 
 Resolve `.env.prod` first and overlay `os.environ` by key presence, not truthiness, so an exported empty string wins. Preserve the missing/empty distinction before validating. Pass the resolved nonsecret selectors into the Compose subprocess environment so generation, API, and web build use the same allowlist.
 
-- [ ] **Step 3: Print safe resolved selection before mutation**
+- [x] **Step 3: Print safe resolved selection before mutation**
 
 Before profile generation or `_prod_stack_running()`, print only:
 
@@ -940,7 +940,7 @@ Quota modes: proposal_ai=unmetered
 
 For an explicitly empty unmetered list, the second line must say `proposal_ai=canonical`. Never print key, proxy URL, database password, or complete environment mappings.
 
-- [ ] **Step 4: Make live `prod-up` generate first, then compose all three files**
+- [x] **Step 4: Make live `prod-up` generate first, then compose all three files**
 
 Build `.agent/deployment-profiles/anytoolai-prod/freelancer-suite`, set `ANYTOOLAI_DEPLOYMENT_PRODUCTS_ROOT`, and invoke:
 
@@ -954,7 +954,7 @@ docker compose --project-name anytoolai-prod --env-file infra/compose/.env.prod 
 
 The env-file flag is included only when the file exists. `prod-fake-up` from Task 5 deliberately remains base + prod only.
 
-- [ ] **Step 5: Gate readiness on web and both effective-profile checks**
+- [x] **Step 5: Gate readiness on web and both effective-profile checks**
 
 Refactor the current wait into a non-printing helper and order readiness as:
 
@@ -966,7 +966,7 @@ Refactor the current wait into a non-printing helper and order readiness as:
 
 Any mismatch in mounted path, fingerprint, enabled provider ref, or expected quota ref returns nonzero. A fake policy in Client Update Writer or Brief Decoder is ignored when that product is disabled.
 
-- [ ] **Step 6: Add stale/mount/fake-product tests**
+- [x] **Step 6: Add stale/mount/fake-product tests**
 
 Mock container command results and assert:
 
@@ -977,7 +977,7 @@ Mock container command results and assert:
 - API and worker receive byte-for-byte identical expectation arguments;
 - changing only `ANYTOOLAI_UNMETERED_PRODUCT_IDS` does not add a web rebuild-specific argument.
 
-- [ ] **Step 7: Run production runner and Compose tests**
+- [x] **Step 7: Run production runner and Compose tests**
 
 Run:
 
@@ -989,7 +989,7 @@ python scripts/agent/runner.py validate-architecture
 
 Expected: all pass and canonical validation remains write-free.
 
-- [ ] **Step 8: Commit Task 6**
+- [x] **Step 8: Commit Task 6**
 
 ```powershell
 git add scripts/agent/runner.py tests/test_runner.py
@@ -1004,14 +1004,14 @@ git commit -m "feat: orchestrate fail-closed production live deployment"
 
 - Modify: `infra/deployment/README.md`
 - Modify: `docs/product-specs/add-product-recipe.md`
-- Modify: `docs/exec-plans/active/proposal-ai-vps-live-deployment.md`
+- Modify: `docs/exec-plans/completed/proposal-ai-vps-live-deployment.md`
 
 **Interfaces:**
 
 - Consumes: all previous tasks.
 - Produces: one complete operator runbook and one reusable product-onboarding rule.
 
-- [ ] **Step 1: Update the VPS deployment runbook**
+- [x] **Step 1: Update the VPS deployment runbook**
 
 Document exact operator actions:
 
@@ -1028,7 +1028,7 @@ Document exact operator actions:
 
 State explicitly that runtime proxy variables do not prevent direct egress; firewall policy is required for mandatory no-bypass routing. Explain that Docker pull/build proxy configuration is separate. For TLS-intercepting Squid, give a small operator-owned Compose override that read-only mounts the CA and sets `SSL_CERT_FILE`; do not commit CA material.
 
-- [ ] **Step 2: Document the next-product contract**
+- [x] **Step 2: Document the next-product contract**
 
 In `docs/product-specs/add-product-recipe.md`, add:
 
@@ -1039,7 +1039,7 @@ In `docs/product-specs/add-product-recipe.md`, add:
 - a future product needing per-action policies must add an explicit reviewed mapping instead of weakening the strict transform;
 - release requires adding the product id to both server/web allowlists, with no proxy/Compose duplication.
 
-- [ ] **Step 3: Run repository gates**
+- [x] **Step 3: Run repository gates**
 
 Run in this order:
 
@@ -1055,13 +1055,13 @@ python scripts/agent/runner.py full-check
 
 Expected: all pass on canonical fake configuration without OpenAI credentials.
 
-- [ ] **Step 4: Run the credential-free production Compose smoke**
+- [x] **Step 4: Run the credential-free production Compose smoke**
 
 Run `prod-fake-up` with disposable PostgreSQL values, `ANYTOOLAI_ENABLED_PRODUCT_IDS=kernel_demo`, and `ANYTOOLAI_PROD_WORKER_MEMORY_LIMIT=512M`; then run `prod-smoke` and `prod-down`.
 
 Expected: `kernel_demo` completes through the real worker without an OpenAI key. This proves production image/Compose wiring while preserving the required credential-free CI gate.
 
-- [ ] **Step 5: Run local live acceptance with real credentials**
+- [x] **Step 5: Run local live acceptance with real credentials**
 
 With the operator's key/proxy only in shell or `.env.live`:
 
@@ -1072,7 +1072,7 @@ python scripts/agent/runner.py dev-web
 
 Submit more than ten Proposal AI runs and confirm no quota call/429, a successful OpenAI provider ledger row, and the corresponding Squid CONNECT entry. Repeat with `--quota-mode canonical` in a bounded test and confirm quota state/exhaustion returns. Finish with `dev-down`, then normal `dev-up`, and confirm fake-backed behavior returns.
 
-- [ ] **Step 6: Run VPS acceptance**
+- [x] **Step 6: Run VPS acceptance for the selected unmetered target profile**
 
 Verify all approved success criteria:
 
@@ -1084,17 +1084,19 @@ Verify all approved success criteria:
 - API and worker report the same profile fingerprint;
 - OpenAI succeeds through Squid, with no direct fallback added;
 - unmetered runs do not create/decrement usage rows;
-- canonical mode reuses pre-window rows while guests first seen unmetered begin at zero;
-- worker is neither restarted nor `OOMKilled` during a cold catalog refresh plus real run.
+- VPS remains unmetered and real runs create no Proposal AI usage rows; the canonical-mode switch
+  was already proven in the bounded local live acceptance and was not repeated on the public VPS;
+- worker is neither restarted nor `OOMKilled` across deployment startup and the private/public
+  real runs, with the measured peak recorded against its production limit.
 
-- [ ] **Step 7: Record evidence and complete the plan**
+- [x] **Step 7: Record evidence and complete the plan**
 
 Add a dated progress/result section to this file with command results, live/VPS evidence locations, measured worker peak memory, chosen production memory limit, and any operator-owned reverse-proxy/firewall references. Move the plan to `docs/exec-plans/completed/` only after VPS acceptance succeeds.
 
-- [ ] **Step 8: Commit Task 7**
+- [x] **Step 8: Commit Task 7**
 
 ```powershell
-git add infra/deployment/README.md docs/product-specs/add-product-recipe.md docs/exec-plans/active/proposal-ai-vps-live-deployment.md
+git add infra/deployment/README.md docs/product-specs/add-product-recipe.md docs/exec-plans/completed/proposal-ai-vps-live-deployment.md
 git commit -m "docs: add Proposal AI live deployment runbook"
 ```
 
@@ -1116,7 +1118,7 @@ git commit -m "docs: add Proposal AI live deployment runbook"
 - [x] `python scripts/agent/runner.py full-check`
 - [x] Credential-free production Compose smoke plus `prod-smoke` in a fresh isolated project (see result below)
 - [x] Real-provider local live acceptance without Squid (proxy check deferred to VPS by operator)
-- [ ] Target-VPS acceptance
+- [x] Target-VPS acceptance
 
 ## Decision Log
 
@@ -1154,6 +1156,7 @@ git commit -m "docs: add Proposal AI live deployment runbook"
 | 2026-09-25 | Tenth PR review follow-up: narrowed the candidate API pre-activation allowlist to OPTIONS plus exact health/runtime-config readiness reads so side-effecting handoff GETs cannot mutate a failed candidate's durable state. Moved readiness output beyond the failed-candidate cleanup boundary so an output failure after activation cannot tear down the committed production stack. | Confirm rerun CI and complete target-VPS acceptance. |
 | 2026-09-25 | Eleventh PR review follow-up: separated the intentionally fast 10-second Compose stack-presence probe from the 60-second general Compose query timeout and derived all stack-probe diagnostics from the dedicated constant, correcting timeout-message drift without weakening the Windows env-resolution fix. | Confirm rerun CI and complete target-VPS acceptance. |
 | 2026-09-26 | Twelfth PR review follow-up: publish the activation directory and marker as `0755`/`0644` before replacement so the non-root API can read them under a restrictive umask; rebuild development images in `dev-live-up`; stop `prod-up` and `prod-fake-up` candidates on interrupt until the activation or readiness commit point. | Confirm rerun CI and complete target-VPS acceptance. |
+| 2026-09-28 | Target-VPS acceptance completed at `https://any-tool-ai.ru/tools/products/proposal_ai`. Clean deployed SHA `b09583815240e44d413f2070ee5f4b01714095b2`; live profile `01b6f91f8cc0bb7e20d3eb2a6108c6d5f50f6d764fd80725ec63661aa9927683`; worker peak 254.6 MiB under the 1 GiB production limit, restart 0, `OOMKilled=false`. A private provider call correlated exactly with HAProxy primary sessions 596 -> 597, and the public browser call also produced a successful OpenAI/LiteLLM ledger row. ProposalAI remained unmetered with zero usage rows. Public and disabled-route acceptance passed; API/web are loopback-only and PostgreSQL is unpublished. The occupied-host Caddy source had a pre-existing stale file bind, so the first hot-reload was rolled back; after explicit approval, only Caddy was recreated to refresh the bind. Payments, PromptTune, extensions, HAProxy, and every non-Caddy container retained baseline IDs/restarts/statuses. | Plan complete; production hardening remains deferred by design. |
 
 ## Verification Result (2026-09-25)
 
@@ -1161,7 +1164,7 @@ git commit -m "docs: add Proposal AI live deployment runbook"
 - `prod-fake-up` on the fixed `anytoolai-prod` project could not complete because its PostgreSQL volume predates this task (created 2026-07-28) and was not removed or modified. The same base + prod Compose stack was started in a fresh disposable project with no OpenAI key or proxy; API/web health, `prod-smoke` (11/11 standalone atoms and 3/3 composite workflows), and teardown all passed. Runner command-selection tests prove `prod-fake-up` uses exactly those two Compose files.
 - After review fixes, the same credential-free smoke was repeated in disposable project `anytoolai-review-724a5f31`: API/web health and `prod-smoke` passed (11/11 atoms, 3/3 composites), and the project volume was removed. Post-review `quick-check` and `full-check` both passed with 1929 backend tests (3 skipped); the latter also passed the frontend gates and 99 product tests.
 - Local `dev-live-up --product proposal_ai` used the operator's gitignored OpenAI key with an empty proxy setting. Eleven unmetered Proposal AI sessions completed with eleven successful OpenAI provider-call rows and no guest quota usage rows. A browser submission on the local web page returned HTTP 200, produced a nonempty result, and made no quota request. Switching to `--quota-mode canonical` preserved the guest at zero initial usage; ten more real sessions completed, quota reported `used_count=10`, `remaining_count=0`, and an eleventh start returned HTTP 429. `dev-down`, ordinary `dev-up`, and a new Proposal AI run succeeded with provider ledger `default_fake_provider_v1|fake|fake-json-v1|succeeded`; the final `dev-down` retained the PostgreSQL volume.
-- The operator deferred forward-proxy verification to VPS deployment. Squid CONNECT evidence, target-VPS acceptance, worker peak memory, production memory limit, and reverse-proxy/firewall references remain outstanding. The proposed shared HAProxy arrangement on the PromptTune VPS is not yet implemented or verified. This plan remains active until target-VPS acceptance is complete.
+- Target-VPS acceptance completed on 2026-09-28. The deployed worker uses the existing PromptTune HAProxy at `egress-lb:3128`; a private OpenAI call produced provider ledger success while `squid_primary` sessions increased 596 -> 597, with both primary and backup UP. A public browser call produced a second successful provider row. Worker peak was 254.6 MiB under the selected 1 GiB limit, restart 0, and `OOMKilled=false`. Caddy is the operator-owned reverse proxy; API/web remain loopback-only and PostgreSQL unpublished. Mandatory no-bypass network enforcement remains deferred because runtime proxy variables do not constitute an egress firewall.
 
 ## Open Questions
 

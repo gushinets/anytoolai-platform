@@ -31,6 +31,7 @@ COMPOSE_FILE = ROOT / "infra" / "compose" / "docker-compose.yml"
 COMPOSE_OVERRIDE_FILE = ROOT / "infra" / "compose" / "docker-compose.override.yml"
 COMPOSE_PROD_FILE = ROOT / "infra" / "compose" / "docker-compose.prod.yml"
 COMPOSE_LIVE_FILE = ROOT / "infra" / "compose" / "docker-compose.live.yml"
+COMPOSE_VPS_135_FILE = ROOT / "infra" / "compose" / "docker-compose.vps-135.yml"
 LIVE_ENV_FILE = ROOT / "infra" / "compose" / ".env.live"
 # Optional, gitignored (see .gitignore's `.env.*` rule) -- a local convenience so credentials
 # don't have to be re-exported in every shell. Never auto-loaded for dev; only prod commands
@@ -1703,11 +1704,21 @@ def _prod_fake_compose_command(*args: str) -> list[str]:
     )
 
 
-def _prod_live_compose_command(*args: str) -> list[str]:
+def _vps_135_networks_enabled(env: dict[str, str]) -> bool:
+    value = env.get("ANYTOOLAI_VPS_135_NETWORKS", "")
+    if value not in {"", "1"}:
+        raise ValueError("ANYTOOLAI_VPS_135_NETWORKS must be unset or 1")
+    return value == "1"
+
+
+def _prod_live_compose_command(*args: str, env: dict[str, str] | None = None) -> list[str]:
     env_file = PROD_ENV_FILE if PROD_ENV_FILE.is_file() else None
+    files = [COMPOSE_FILE, COMPOSE_PROD_FILE, COMPOSE_LIVE_FILE]
+    if _vps_135_networks_enabled(env if env is not None else runner_env()):
+        files.append(COMPOSE_VPS_135_FILE)
     return _docker_compose_command(
         PROD_COMPOSE_PROJECT,
-        (COMPOSE_FILE, COMPOSE_PROD_FILE, COMPOSE_LIVE_FILE),
+        files,
         *args,
         env_file=env_file,
     )
@@ -1736,6 +1747,7 @@ def _product_ids(value: str, name: str, *, allow_empty: bool = False) -> tuple[s
 
 def _deployment_inputs() -> DeploymentInputs:
     env = _resolved_env_file(PROD_ENV_FILE)
+    _vps_135_networks_enabled(env)
     required = (
         "ANYTOOLAI_POSTGRES_USER",
         "ANYTOOLAI_POSTGRES_PASSWORD",
@@ -1932,7 +1944,7 @@ def _prod_up_locked() -> int:
     try:
         exit_code = run_with_env(
             _prod_live_compose_command(
-                "up", "-d", "--build", "--force-recreate", "--remove-orphans"
+                "up", "-d", "--build", "--force-recreate", "--remove-orphans", env=env
             ),
             env,
         )
@@ -1979,6 +1991,7 @@ def prod_fake_up() -> int:
         "ANYTOOLAI_ENABLED_PRODUCT_IDS": "kernel_demo",
         "ANYTOOLAI_UNMETERED_PRODUCT_IDS": "",
         "ANYTOOLAI_PROD_WORKER_MEMORY_LIMIT": "512M",
+        "ANYTOOLAI_WEB_BASE_PATH": "",
         "OPENAI_API_KEY": "",
     })
     try:
@@ -2095,12 +2108,13 @@ def prod_ready(
     env = inputs.compose_env | _deployment_profile_env(
         manifest, inputs.enabled_product_ids, sorted(inputs.unmetered_product_ids)
     )
+    web_base_path = inputs.compose_env.get("ANYTOOLAI_WEB_BASE_PATH", "").rstrip("/")
     exit_code = _check_source_fingerprint(manifest, env)
     if exit_code != 0:
         return exit_code
     for name, url in (
         ("API", f"http://127.0.0.1:{api_port}/health"),
-        ("web", f"http://127.0.0.1:{web_port}/"),
+        ("web", f"http://127.0.0.1:{web_port}{web_base_path or '/'}"),
         (
             "web API",
             f"http://127.0.0.1:{web_port}/v1/products/"
@@ -2112,7 +2126,9 @@ def prod_ready(
                 f"PROD004: {name} readiness timed out after {timeout:g}s for {url}", file=sys.stderr
             )
             return 1
-    exit_code = _run_effective_profile_checks(_prod_live_compose_command(), manifest, env)
+    exit_code = _run_effective_profile_checks(
+        _prod_live_compose_command(env=env), manifest, env
+    )
     if exit_code != 0:
         return exit_code
     if announce:
