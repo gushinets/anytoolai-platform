@@ -172,6 +172,11 @@ product-owned. Code: `apps/web-mirror/src/i18n/` (library `use-intl`, imported o
   ("Warm & personable" etc.) in its own messages and does not use `ToneSelect` at all -- the shared
   bundle is an opt-in convenience for products that want the same plain wording, not a contract every
   `tone`-shaped product must join.
+- Proposal AI enables `inlineResult` in its product definition: the shared runtime keeps its form
+  and latest successful result together, with the result tied to the input snapshot that produced
+  it. Editing marks the displayed text as based on previous data; starting a new task clears both.
+  Other products keep the existing result-only presentation. The product owns all workspace copy
+  in its seven locale files; the shared runtime still owns start, retry, quota, and copy behavior.
 - **Validation:** shared validators return structured `FieldError` data (`required`,
   `outer_whitespace`, `max_length`, `product`), never prose; `FieldErrorMessage` renders it in the
   current locale. Backend schema validation stays authoritative.

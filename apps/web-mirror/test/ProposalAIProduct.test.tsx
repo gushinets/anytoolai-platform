@@ -7,6 +7,7 @@ import { ProposalAIProduct, proposalAiDefinition } from "../src/products/proposa
 import {
   guestIdentityResponse,
   makeClient,
+  makeClientWithDeferredCalls,
   quotaResponse,
   resultResponse,
   routesFor,
@@ -135,13 +136,56 @@ describe("ProposalAI product definition", () => {
     fireEvent.change(screen.getByLabelText("Your positioning"), { target: { value: "Frontend freelancer." } });
     fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
     await waitFor(() => expect(screen.getByText(PROPOSAL_TEXT)).toBeTruthy());
-    expect(screen.getByRole("button", { name: "Create another proposal" })).toBeTruthy();
+    const copyButton = screen.getByRole("button", { name: "Copy" });
+    const newTaskButton = screen.getByRole("button", { name: "New task" });
+    expect(copyButton.parentElement).toBe(newTaskButton.parentElement);
 
-    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    fireEvent.click(copyButton);
 
     await waitFor(() => expect(calls.some((call) => call.key === ROUTES.NEXT_ACTION)).toBe(true));
     const nextActionCall = calls.find((call) => call.key === ROUTES.NEXT_ACTION);
     expect(JSON.parse(nextActionCall?.init.body as string)).toEqual({ checkpoint_id: "checkpoint_1" });
+  });
+
+  it("keeps the task beside its result, shows when edits outdate it, and clears both for a new task", async () => {
+    const routed = makeClientWithDeferredCalls({
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
+      [ROUTES.QUOTA]: [quotaResponse(IDS), quotaResponse(IDS)],
+      [ROUTES.START]: [startResponse(), startResponse()],
+      [ROUTES.SESSION]: [sessionResponse(), sessionResponse()],
+      [ROUTES.NEXT_ACTION]: [],
+    }, { [ROUTES.RESULT]: 2 });
+    render(<ProposalAIProduct client={routed.client} />);
+    const task = await screen.findByLabelText("Describe the task") as HTMLTextAreaElement;
+    const positioning = screen.getByLabelText("Your positioning") as HTMLTextAreaElement;
+    fireEvent.change(task, { target: { value: "Build a landing page." } });
+    fireEvent.change(positioning, { target: { value: "Frontend freelancer." } });
+    fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+    await waitFor(() => expect(routed.calls.filter((call) => call.key === ROUTES.RESULT)).toHaveLength(1));
+    routed.resolveCall(ROUTES.RESULT, 0, resultResponse(IDS, { output: { text: PROPOSAL_TEXT } }));
+
+    await screen.findByText(PROPOSAL_TEXT);
+    expect(task.isConnected).toBe(true);
+    expect(task.value).toBe("Build a landing page.");
+    expect(positioning.value).toBe("Frontend freelancer.");
+    fireEvent.change(task, { target: { value: "Build a mobile app." } });
+    expect(screen.getByText("Created from previous details")).toBeTruthy();
+    expect(screen.getByText(PROPOSAL_TEXT)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Regenerate proposal" }));
+    await waitFor(() => expect(routed.calls.filter((call) => call.key === ROUTES.RESULT)).toHaveLength(2));
+    expect(screen.getByText(PROPOSAL_TEXT)).toBeTruthy();
+    expect(task.value).toBe("Build a mobile app.");
+    routed.resolveCall(ROUTES.RESULT, 1, resultResponse(IDS, { output: { text: "Updated proposal." } }));
+    await screen.findByText("Updated proposal.");
+    expect(screen.queryByText("Created from previous details")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "New task" }));
+    expect(task.value).toBe("");
+    expect(positioning.value).toBe("");
+    expect(screen.queryByText("Updated proposal.")).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(task));
   });
 
   it("treats a result without a string `text` field as unusable rather than rendering something else", () => {

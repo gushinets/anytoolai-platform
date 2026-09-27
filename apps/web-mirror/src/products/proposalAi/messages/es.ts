@@ -24,10 +24,18 @@ export const es: Shape<typeof en> = {
     taskText: "Descripción de la tarea",
     freelancerPositioning: "Su posicionamiento",
   },
+  workspace: {
+    inputTitle: "Sus datos",
+    resultTitle: "Propuesta",
+    placeholder: "Su propuesta aparecerá aquí después de generarla.",
+    previousDetails: "Creada con los datos anteriores",
+    regenerate: "Regenerar propuesta",
+    backToInputs: "Volver a los datos",
+  },
   generate: {
     submit: "Generar propuesta",
     running: "Generando su propuesta…",
     runFailed: "Algo salió mal al generar su propuesta. Inténtelo de nuevo.",
-    startAnother: "Crear otra propuesta",
+    startAnother: "Nueva tarea",
   },
 };
