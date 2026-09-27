@@ -265,12 +265,42 @@ down so it does not keep the production host ports, and `prod-fake-down` is the 
 cleanup command. It never passes `.env.prod` or an OpenAI key to the smoke containers. `prod-smoke`
 tests that smoke stack, not OpenAI.
 
-The operator-owned Nginx/Caddy instance terminates HTTPS and forwards the product domain to
-`127.0.0.1:${ANYTOOLAI_PROD_WEB_PORT:-3000}`. Before its catch-all forward, deny `/atom-lab`,
-`/atom-lab/*` (including its CSS/JS), `/v1/atom-lab/*`, and `/v1/demo/*`. Next.js forwards all
-`/v1/*` paths to the private API, so those denies must precede the forward. API and web bind
-only to loopback; PostgreSQL has no host port. Keep the reverse-proxy config and firewall rules
-outside this repository and record their locations with the acceptance evidence.
+On VPS `135.106.164.145`, the operator-owned payments Caddy terminates HTTPS and shares
+`payments-portal-prod_edge` with `web-mirror`; select `docker-compose.vps-135.yml` as documented
+above. Preserve the existing payments `/api/*` and catch-all routes, and add the AnytoolAI routes
+in this exact order without stripping `/tools`:
+
+```caddyfile
+{$CADDY_DOMAIN} {
+	route {
+		@anytoolai_private path /tools/atom-lab /tools/atom-lab/* /v1/atom-lab /v1/atom-lab/* /v1/demo /v1/demo/*
+		respond @anytoolai_private 404
+
+		@anytoolai_tools path /tools /tools/*
+		reverse_proxy @anytoolai_tools web-mirror:3000 {
+			header_up -Cookie
+			header_up -Authorization
+		}
+
+		@anytoolai_api path /v1/*
+		reverse_proxy @anytoolai_api web-mirror:3000 {
+			header_up -Cookie
+			header_up -Authorization
+		}
+
+		reverse_proxy /api/* payments-portal-prod-api-1:8000
+		reverse_proxy web:3000
+	}
+}
+```
+
+Validate the candidate and the mounted file before accepting traffic. The occupied VPS had a
+pre-existing stale file bind, so its reviewed cutover refreshed only Caddy with
+`docker compose --project-name payments-portal-prod -f docker-compose.prod.yml up -d --no-deps
+--force-recreate caddy`; do not recreate the payments API, web, or database. API and web remain
+loopback-bound and PostgreSQL has no host port. Other deployments may use their own reviewed
+ingress, but must preserve the same denies and sensitive-header removal. Keep proxy/firewall
+configuration and evidence operator-owned.
 
 If Squid intercepts TLS, add an operator-owned Compose override after the live overlay, for
 example:
@@ -296,8 +326,8 @@ live, then this file; preserve the same required environment and profile mount.
 1. Open the public product domain and run Proposal AI. Confirm another registered product is
    absent from the home page and its direct page shows not found. Direct API runtime-config,
    quota, and scenario-start calls for that disabled product must return safe `404`.
-2. From outside the VPS, verify API/web/PostgreSQL ports are not reachable directly. Confirm the
-   four denied path groups above are blocked by the inbound proxy and the three API access codes
+2. From outside the VPS, verify API/web/PostgreSQL ports are not reachable directly. Confirm all
+   six exact/prefix pairs above are blocked by the inbound proxy and the three API access codes
    are blank. Inspect container environment **by variable name/presence only**: worker has the
    OpenAI key and proxy; API/web do not. Do not dump environment values into evidence.
 3. Keep the generated manifest fingerprint as the expected value and run `prod-ready`; its
@@ -314,10 +344,15 @@ live, then this file; preserve the same required environment and profile mount.
    quota rows retains its count; a guest first seen unmetered begins at zero. The web image need
    not change for quota mode alone; runtime config supplies the quota summary.
 
-Rollback to the previously reviewed image/Compose revision and rerun `prod-up` with its matching
-environment. For an emergency shutdown, `python scripts/agent/runner.py prod-down` stops the
-project without deleting the PostgreSQL volume. Removing the live overlay alone is **not** a
-live deployment; use `prod-fake-up` only for the explicit credential-free smoke path.
+On VPS `135.106.164.145`, roll back ingress before stopping AnytoolAI: verify the saved Caddyfile
+checksum, write it back to the active host path, validate Compose, and recreate only Caddy with
+the same `--no-deps --force-recreate caddy` command. Validate `/etc/caddy/Caddyfile`, then confirm
+payments, PromptTune, and extensions match their recorded status baseline. Only then, if the new
+stack must stop, run `python scripts/agent/runner.py prod-down` from `/opt/anytoolai-platform`;
+the PostgreSQL volume is preserved. Other deployments should roll back to their previously
+reviewed image/Compose revision and rerun `prod-up` with its matching environment. Removing the
+live overlay alone is **not** a live deployment; use `prod-fake-up` only for the explicit
+credential-free smoke path.
 
 The production project name is fixed as `anytoolai-prod`. Migrations run once in `migrate` before
 API and worker. API stays at one replica while the demo's process-local gate exists, even though
