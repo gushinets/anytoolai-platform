@@ -344,6 +344,8 @@ test.describe("ProposalAI web product", () => {
       await submitAndWaitForResult(page);
       if (remainingAfter > 0) {
         await page.getByRole("button", { name: "New task" }).click();
+        await expect(page.locator("#proposal-ai-task-text")).toBeEmpty();
+        await expect(page.locator("#proposal-ai-positioning")).toBeEmpty();
         await expect(page.getByText(`${remainingAfter} of 10 proposals remaining.`)).toBeVisible();
       }
     }
