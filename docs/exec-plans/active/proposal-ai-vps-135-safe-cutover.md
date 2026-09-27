@@ -84,11 +84,11 @@
 
 ### Task 2: Attach only the new containers to existing networks
 
-- [ ] Add failing runner tests showing `ANYTOOLAI_VPS_135_NETWORKS=1` appends the VPS overlay to live `prod-up` and its effective-profile check; live `prod-ready` probes `/tools` when `ANYTOOLAI_WEB_BASE_PATH=/tools`; and `prod-fake-up` clears the inherited base path and keeps its existing `/` readiness and Compose file list.
-- [ ] Add the minimal optional overlay selection and base-path-aware live web readiness to `runner.py`; reject VPS selector values other than unset or `1` before starting Compose. Explicitly clear `ANYTOOLAI_WEB_BASE_PATH` in `prod-fake-up`. `prod-status` and `prod-down` may keep their current project-scoped base/prod commands.
-- [ ] Add `docker-compose.vps-135.yml` with `platform-worker` on `default` + `infra_prompttune` and `web-mirror` on `default` + `payments-portal-prod_edge`. Confirm the effective Compose render preserves `platform-worker -> postgres/platform-api` and `web-mirror -> platform-api` connectivity.
-- [ ] Render base + prod + live + VPS Compose with disposable environment values, and render the existing production fake combination without the VPS overlay. Do not render real secrets to a log or terminal capture.
-- [ ] Run focused runner tests, `quick-check`, and `full-check`. Update the deployment runbook with the exact overlay selection and network names.
+- [x] Add failing runner tests showing `ANYTOOLAI_VPS_135_NETWORKS=1` appends the VPS overlay to live `prod-up` and its effective-profile check; live `prod-ready` probes `/tools` when `ANYTOOLAI_WEB_BASE_PATH=/tools`; and `prod-fake-up` clears the inherited base path and keeps its existing `/` readiness and Compose file list.
+- [x] Add the minimal optional overlay selection and base-path-aware live web readiness to `runner.py`; reject VPS selector values other than unset or `1` before starting Compose. Explicitly clear `ANYTOOLAI_WEB_BASE_PATH` in `prod-fake-up`. `prod-status` and `prod-down` may keep their current project-scoped base/prod commands.
+- [x] Add `docker-compose.vps-135.yml` with `platform-worker` on `default` + `infra_prompttune` and `web-mirror` on `default` + `payments-portal-prod_edge`. Confirm the effective Compose render preserves `platform-worker -> postgres/platform-api` and `web-mirror -> platform-api` connectivity.
+- [x] Render base + prod + live + VPS Compose with disposable environment values, and render the existing production fake combination without the VPS overlay. Do not render real secrets to a log or terminal capture.
+- [x] Run focused runner tests, `quick-check`, and `full-check`. Update the deployment runbook with the exact overlay selection and network names.
 
 ### Task 3: Capture a safety baseline on VPS before installing or starting anything
 
@@ -147,6 +147,7 @@
 | 2026-09-27 | Read-only VPS inspection and deployment-route review complete; no server changes made. | Implement Tasks 1–2 after plan review, then execute gated VPS cutover. |
 | 2026-09-27 | Plan review accepted the apex `/tools` route, public unmetered demo profile, on-VPS build, lightweight HAProxy evidence, SHA-only release identity, and manual browser smoke. Added header stripping, sequential build pressure control, and stale Compose-object preflight. | Implement Tasks 1–2, then execute the internal-demo VPS gates. |
 | 2026-09-27 | Task 1 complete at `9073b11b`: optional `/tools` base path, root `/v1` rewrite, Docker/Compose propagation, and focused tests added. Production image built; `/tools/products/proposal_ai`, a `/tools/_next/*` asset, and root `/v1` returned 200 while the unprefixed product page returned 404. The full frontend gate ran in a clean local Docker context because a user-owned Windows Next process held the checkout's SWC binary. | Task 2: add the VPS network overlay and runner selection/readiness isolation. |
+| 2026-09-27 | Task 2 complete at `a4f438c8`: live-only VPS overlay selection, `/tools` readiness, fake-mode isolation, exact external networks, and runbook guidance added. RED tests failed on the missing selector/base-path behavior, then focused tests passed. Disposable live/fake Compose renders preserved default connectivity and excluded VPS networks from fake mode. `quick-check` passed (`2038 passed, 7 skipped`); an exact clean Windows `full-check` passed the same backend baseline, lint, typecheck, frontend/browser tests, generated API drift, builds, and the 99-test Freelancer Suite. | Task 3: recapture the occupied-VPS baseline and stop before mutation on any drift. |
 
 ## Open questions
 
