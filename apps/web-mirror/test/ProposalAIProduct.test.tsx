@@ -234,6 +234,28 @@ describe("ProposalAI product definition", () => {
     await screen.findByText("Updated proposal.");
   });
 
+  it("shows a regeneration error above a retained long proposal", async () => {
+    const longProposal = "A detailed proposal. ".repeat(300);
+    const routed = makeClient({
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
+      [ROUTES.QUOTA]: [quotaResponse(IDS), quotaResponse(IDS, { used_count: 1, remaining_count: 2 })],
+      [ROUTES.START]: [startResponse(), errorResponse(500, "internal_error")],
+      [ROUTES.SESSION]: [sessionResponse()],
+      [ROUTES.RESULT]: [resultResponse(IDS, { output: { text: longProposal } })],
+    });
+    render(<ProposalAIProduct client={routed.client} />);
+    fireEvent.change(await screen.findByLabelText("Describe the task"), { target: { value: "Build a landing page." } });
+    fireEvent.change(screen.getByLabelText("Your positioning"), { target: { value: "Frontend freelancer." } });
+    fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+    const previousResult = await screen.findByText(/^A detailed proposal\./);
+
+    fireEvent.click(screen.getByRole("button", { name: "Regenerate proposal" }));
+    const error = await screen.findByText("Could not start ProposalAI. Please try again.");
+    expect(error.compareDocumentPosition(previousResult) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(previousResult.isConnected).toBe(true);
+  });
+
   it("refreshes advisory quota after consecutive regenerations and an authoritative rejection", async () => {
     const routed = makeClient({
       [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],

@@ -957,6 +957,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
             </div>
             {oldResult ? <p role="status" className={styles.oldResultNotice}>{tp("workspace.previousDetails")}</p> : null}
             {progress}
+            {error}
             {displayedResult ? (
               <Result
                 key={displayedResult.scenarioSessionId}
@@ -974,7 +975,6 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
                 <p role="status">{placeholderMessage}</p>
               </div>
             ) : null}
-            {error}
           </Card>
         </section>
       </div>
