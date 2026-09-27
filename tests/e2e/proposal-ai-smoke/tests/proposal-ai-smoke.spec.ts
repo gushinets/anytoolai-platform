@@ -345,8 +345,14 @@ test.describe("ProposalAI web product", () => {
     // wouldn't prove the authoritative 429 path, so block that advisory call for the final attempt.
     await page.route("**/v1/products/proposal_ai/quota**", (route) => route.abort());
     await page.getByRole("button", { name: "New task" }).click();
+    await expect(page.locator("#proposal-ai-task-text")).toBeEmpty();
+    await expect(page.locator("#proposal-ai-positioning")).toBeEmpty();
     await fillValidForm(page);
+    const rejectedStart = page.waitForResponse((response) =>
+      response.request().method() === "POST" && START_ROUTE_PATTERN.test(response.url()),
+    );
     await page.getByRole("button", { name: "Generate proposal" }).click();
+    expect((await rejectedStart).status()).toBe(429);
 
     // Next.js's own route-announcer div also carries role="alert" (empty text) -- scope to the
     // one this app renders.
