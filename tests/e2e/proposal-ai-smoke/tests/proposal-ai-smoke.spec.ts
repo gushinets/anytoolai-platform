@@ -129,6 +129,13 @@ test.describe("ProposalAI web product", () => {
     await expect
       .poll(() => countBackendEvents("client.next_action_clicked", scenarioSessionId!), { timeout: 5_000 })
       .toBe(1);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const backToDetails = page.getByRole("link", { name: "Back to details" });
+    await expect(backToDetails).toBeVisible();
+    expect((await backToDetails.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    await backToDetails.click();
+    await expect(page).toHaveURL(/#product-inputs$/);
   });
 
   test("validation: empty required fields show validation errors and never start a scenario", async ({ page }) => {

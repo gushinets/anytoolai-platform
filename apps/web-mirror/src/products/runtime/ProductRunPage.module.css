@@ -87,6 +87,12 @@
   font-size: 13px;
 }
 
+.backToInputs:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-input);
+}
+
 .header {
   margin-bottom: 24px;
 }
@@ -167,8 +173,15 @@
     grid-template-columns: 1fr;
   }
 
+  .resultHeader {
+    flex-wrap: wrap;
+  }
+
   .backToInputs {
-    display: inline;
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 8px;
   }
 }
 

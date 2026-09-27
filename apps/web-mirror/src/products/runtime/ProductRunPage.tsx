@@ -906,13 +906,44 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     </Card>
   );
 
-  // Exhaustive over Phase["kind"] (docs/agent/coding-conventions.md's "Exhaustiveness" rule): a
-  // future new Phase variant fails typecheck here instead of silently falling through to the form.
+  // Both layouts exhaust Phase["kind"]: a new variant must be handled in each renderer.
   let mainContent: ReactNode;
   if (inlineResult) {
     const oldResult = displayedResult && !shallowEqualValues(displayedResult.input, values);
-    const showPlaceholder = !displayedResult &&
-      (phase.kind === "idle" || phase.kind === "submitting" || phase.kind === "running");
+    let placeholderMessage: string | null = null;
+    let progress: ReactNode = null;
+    let error: ReactNode = null;
+    let showNewTask = false;
+    switch (phase.kind) {
+      case "idle":
+        if (!displayedResult) placeholderMessage = tp("workspace.placeholder");
+        break;
+      case "submitting":
+      case "running":
+        if (displayedResult) {
+          progress = <p role="status" className={styles.resultProgress}>{tp(`${definition.messageScope}.running`)}</p>;
+        } else {
+          placeholderMessage = tp(`${definition.messageScope}.running`);
+        }
+        break;
+      case "result":
+        showNewTask = true;
+        break;
+      case "result-fetch-error":
+        error = <ErrorState message={th("resultFetchFailed")} onRetry={handleRetryResult} embedded />;
+        break;
+      case "quota-exhausted":
+        error = <ErrorState message={th("quotaExhausted", { product: title })} embedded />;
+        break;
+      case "retryable-error":
+        error = <ErrorState message={th(`errors.${phase.reason}`, { product: title })} onRetry={identityUnavailable ? undefined : handleRetry} embedded />;
+        break;
+      case "unknown-error":
+        error = <ErrorState message={tp(`${definition.messageScope}.runFailed`)} onRetry={() => setPhase({ kind: "idle" })} embedded />;
+        break;
+      default:
+        return assertNever(phase);
+    }
     mainContent = (
       <div className={styles.workspaceGrid}>
         <section id="product-inputs" aria-labelledby="product-input-heading">{formCard}</section>
@@ -925,46 +956,25 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
               {displayedResult ? <a className={styles.backToInputs} href="#product-inputs">{tp("workspace.backToInputs")}</a> : null}
             </div>
             {oldResult ? <p role="status" className={styles.oldResultNotice}>{tp("workspace.previousDetails")}</p> : null}
-            {displayedResult && (phase.kind === "submitting" || phase.kind === "running") ? (
-              <p role="status" className={styles.resultProgress}>{tp(`${definition.messageScope}.running`)}</p>
-            ) : null}
+            {progress}
             {displayedResult ? (
               <Result
                 key={displayedResult.scenarioSessionId}
                 result={displayedResult.result}
                 onCopy={handleCopy}
-                secondaryAction={phase.kind === "result" && definition.hasStartAnother ? (
+                secondaryAction={showNewTask && definition.hasStartAnother ? (
                   <Button variant="secondary" onClick={handleStartAnother}>
                     {tp(`${definition.messageScope}.startAnother`)}
                   </Button>
                 ) : undefined}
               />
             ) : null}
-            {showPlaceholder ? (
+            {placeholderMessage !== null ? (
               <div className={styles.resultPlaceholder}>
-                <p role="status">
-                  {phase.kind === "submitting" || phase.kind === "running"
-                    ? tp(`${definition.messageScope}.running`)
-                    : tp("workspace.placeholder")}
-                </p>
+                <p role="status">{placeholderMessage}</p>
               </div>
             ) : null}
-            {phase.kind === "result-fetch-error" ? (
-              <ErrorState message={th("resultFetchFailed")} onRetry={handleRetryResult} embedded />
-            ) : null}
-            {phase.kind === "quota-exhausted" ? (
-              <ErrorState message={th("quotaExhausted", { product: title })} embedded />
-            ) : null}
-            {phase.kind === "retryable-error" ? (
-              <ErrorState
-                message={th(`errors.${phase.reason}`, { product: title })}
-                onRetry={identityUnavailable ? undefined : handleRetry}
-                embedded
-              />
-            ) : null}
-            {phase.kind === "unknown-error" ? (
-              <ErrorState message={tp(`${definition.messageScope}.runFailed`)} onRetry={() => setPhase({ kind: "idle" })} embedded />
-            ) : null}
+            {error}
           </Card>
         </section>
       </div>
