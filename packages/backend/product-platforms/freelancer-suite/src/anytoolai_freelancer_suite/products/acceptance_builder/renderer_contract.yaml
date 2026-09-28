@@ -88,7 +88,10 @@ renderer_contract:
         body: >-
           The name of each entry as "acceptance criteria", "assumptions" or "deliverables", one
           per line as "- <name>: the client should confirm it."
-        when_absent: The brief states all three lists.
+        # `missing_fields` is required and is `[]` for a complete brief, so the fallback is keyed on
+        # empty, not absent (the list blocks above are keyed on absent: their keys are optional and
+        # an empty array is invalid there).
+        when_empty: The brief states all three lists.
   next_action: copy_result
   excluded_fields: []
   # Open (ANY-244): the spec activation rule (first successful display of verdict and criteria,

@@ -420,6 +420,21 @@ def test_copy_text_is_derived_from_structured_fields_never_from_the_a10_document
     # Every list block's absent-list text is the one the output schemas pin for the document.
     for block_id in ("acceptance_criteria", "assumptions", "deliverables"):
         assert blocks[block_id]["when_absent"] == "Not specified in the brief."
+    # Fallback semantics follow the source schema: the list sources are optional keys of `values`
+    # (and an empty array is invalid), so their fallback is `when_absent`; `missing_fields` is
+    # required and is `[]` for a complete brief, so its fallback is `when_empty`.
+    for scenario_id, schema in schemas.items():
+        extracted = schema["properties"]["extracted"]
+        assert "missing_fields" in extracted["required"], scenario_id
+        for block_id in ("acceptance_criteria", "assumptions", "deliverables"):
+            field = blocks[block_id]["source"].rsplit(".", 1)[1]
+            assert field not in extracted["properties"]["values"].get("required", []), field
+            assert extracted["properties"]["values"]["properties"][field]["minItems"] == 1, field
+            assert "when_absent" in blocks[block_id] and "when_empty" not in blocks[block_id]
+    assert "when_empty" in blocks["open_gaps"] and "when_absent" not in blocks["open_gaps"]
+    complete = _fixture_response("acceptance_builder.extract_v1")
+    assert complete["missing_fields"] == []  # the normal no-gap case is empty, not absent
+    assert blocks["open_gaps"]["when_empty"] == "The brief states all three lists."
     # Each block's source is also a rendered part, so the page and the copy agree on the authority.
     part_fields = {part["field"] for part in contract["parts"]}
     assert {block["source"] for block in copy_text["blocks"]} - {"comparison.verdict"} <= part_fields
