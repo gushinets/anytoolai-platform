@@ -6,10 +6,10 @@ of `criteria`; both come from the input payload.
 
 Rules:
 
-- `verdict` is one of `categories`, verbatim. Use `meets_expectations` only when no criterion is a
-  `mismatch`; use `does_not_meet` only when the deliverable fails the brief on the criteria that
-  matter most, which requires at least one criterion to be a `mismatch`; otherwise use
-  `partially_meets`.
+- `verdict` is one of `categories`, verbatim, and follows from the `deltas` statuses alone: use
+  `meets_expectations` only when every criterion is a `match`; use `does_not_meet` when at least
+  one criterion is a `mismatch`; otherwise (no `mismatch`, at least one `partial`) use
+  `partially_meets`. Never pick a verdict that the statuses contradict.
 - `deltas` has exactly one entry per `criteria` id, in the order given, with `criterion_id`
   copied verbatim, `status` one of `match`, `partial`, `mismatch`, and `evidence` quoting or
   closely paraphrasing what `subject_text` and `reference_text` say. Evidence comes from those

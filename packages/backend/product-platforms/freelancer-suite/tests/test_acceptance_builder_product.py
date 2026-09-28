@@ -28,11 +28,9 @@ FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "provider" / "fake_provider_ou
 (PRODUCT_DIR,) = (
     root for root in FreelancerSuiteBundle().config_roots() if root.name == "acceptance_builder"
 )
-BRIEF_DECODER_DIR = PRODUCT_DIR.parent / "brief_decoder"
 
 DRAFT = "acceptance_builder.draft_v1"
 CHECK = "acceptance_builder.check_v1"
-FROM_BRIEF = "acceptance_builder.draft_from_brief_v1"
 STEP_ACTION_TYPES = {
     DRAFT: ("text.extract_structured_fields", "document.generate_from_template"),
     CHECK: (
@@ -40,12 +38,10 @@ STEP_ACTION_TYPES = {
         "text.compare_and_classify",
         "document.generate_from_template",
     ),
-    FROM_BRIEF: ("document.generate_from_template",),
 }
 OUTPUT_SCHEMA_REFS = {
     DRAFT: "acceptance_builder.draft_output_v1",
     CHECK: "acceptance_builder.check_output_v1",
-    FROM_BRIEF: "acceptance_builder.draft_from_brief_output_v1",
 }
 # fixture stem -> kernel schema its response_json must satisfy (the atom's own output schema)
 FIXTURE_KERNEL_SCHEMAS = {
@@ -53,7 +49,6 @@ FIXTURE_KERNEL_SCHEMAS = {
     "acceptance_builder.compare_v1": "kernel.schemas.compare_classify_output_v1",
     "acceptance_builder.draft_document_v1": "kernel.schemas.generate_document_output_v1",
     "acceptance_builder.check_document_v1": "kernel.schemas.generate_document_output_v1",
-    "acceptance_builder.draft_from_brief_document_v1": "kernel.schemas.generate_document_output_v1",
 }
 EXTRACTED_FIELDS = ["acceptance_criteria", "assumptions", "deliverables"]
 
@@ -81,11 +76,8 @@ def _load_yaml(relative_path: str) -> dict[str, Any]:
     return _test_support.load_yaml(PRODUCT_DIR, relative_path)
 
 
-def _load_schema(schema_ref: str, *, product_dir: Path = PRODUCT_DIR) -> dict[str, Any]:
-    if schema_ref.startswith("kernel."):
-        manifest_dir = KERNEL_DIR
-    else:
-        manifest_dir = product_dir
+def _load_schema(schema_ref: str) -> dict[str, Any]:
+    manifest_dir = KERNEL_DIR if schema_ref.startswith("kernel.") else PRODUCT_DIR
     manifest = yaml.safe_load((manifest_dir / "schemas.yaml").read_text(encoding="utf-8"))
     (entry,) = (item for item in manifest["schemas"] if item["schema_ref"] == schema_ref)
     return json.loads((manifest_dir / entry["file_path"]).read_text(encoding="utf-8"))
@@ -140,13 +132,13 @@ def test_workflows_use_only_generic_atom_action_types_with_backend_resolved_poli
         assert set(entry) == {"action_config_id", "action_type", "prompt_ref", "provider_policy_ref"}
 
 
-def test_product_has_exactly_the_three_one_run_scenarios() -> None:
+def test_product_has_exactly_the_two_one_run_scenarios() -> None:
     """Each scenario is one workflow run (atom-ready-product-inventory.md: "Workflow runs: 1"),
     so no "explicit user-selected string" second-run input exists to be indexed out of an array."""
-    assert _load_yaml("product.yaml")["scenarios"] == [DRAFT, CHECK, FROM_BRIEF]
+    assert _load_yaml("product.yaml")["scenarios"] == [DRAFT, CHECK]
     scenarios = _load_yaml("scenarios.yaml")["scenarios"]
-    assert [s["scenario_id"] for s in scenarios] == [DRAFT, CHECK, FROM_BRIEF]
-    assert set(_workflows()) == {DRAFT, CHECK, FROM_BRIEF}
+    assert [s["scenario_id"] for s in scenarios] == [DRAFT, CHECK]
+    assert set(_workflows()) == {DRAFT, CHECK}
     for scenario in scenarios:
         assert scenario["workflow_id"] == scenario["scenario_id"]
         assert scenario["allowed_next_actions"] == ["copy_result"]
@@ -171,7 +163,7 @@ def test_no_mapping_path_uses_brackets_or_numeric_segments() -> None:
         assert not any(segment.isdigit() for segment in path.split(".")), path
 
 
-@pytest.mark.parametrize("workflow_id", [DRAFT, CHECK, FROM_BRIEF])
+@pytest.mark.parametrize("workflow_id", [DRAFT, CHECK])
 def test_every_step_writes_its_own_key_of_the_composed_workflow_output(workflow_id: str) -> None:
     targets = [t for step in _workflows()[workflow_id]["steps"] for t in step["output_mapping"]]
     schema = _load_schema(OUTPUT_SCHEMA_REFS[workflow_id])
@@ -304,117 +296,6 @@ def test_check_document_verdict_section_agrees_with_the_comparison(suffix: str) 
     assert "not item by item" in text
 
 
-_BRIEF_GAPS_KEYWORD = {
-    "project_goal": "goal",
-    "deliverables": "deliverables",
-    "deadline": "deadline",
-    "budget": "budget",
-    "target_audience": "audience",
-    "constraints": "constraint",
-}
-# (draft_from_brief fixture suffix, Brief Decoder fixture suffix feeding that run, the criterion
-# keywords Brief Decoder's issues flag -- those lines must end "(to confirm)", no other may)
-_FROM_BRIEF_RUNS = [
-    ("", "", ["modern but also traditional", "holiday season"]),
-    (".weak_input", ".weak_input", []),
-]
-_TO_CONFIRM = " (to confirm)"
-
-
-def _brief_decoder_result(suffix: str) -> dict[str, Any]:
-    issues = _fixture_response("brief_decoder.detect_issues_v1" + suffix)["issues"]
-    return {
-        "brief": _fixture_response("brief_decoder.extract_brief_v1" + suffix),
-        "issues": issues,
-        "questions": (
-            _fixture_response("brief_decoder.generate_questions_v1" + suffix)["questions"]
-            if issues
-            else []
-        ),
-    }
-
-
-@pytest.mark.parametrize(("suffix", "brief_suffix", "flagged"), _FROM_BRIEF_RUNS)
-def test_draft_from_brief_fixtures_are_grounded_in_the_brief_decoder_result(
-    suffix: str, brief_suffix: str, flagged: list[str]
-) -> None:
-    """draft_from_brief_document.v1.md: criteria restate only deliverables/constraints/deadline/
-    budget entries, `deliverables` is verbatim, `open-gaps` names every missing field, and Brief
-    Decoder's warnings survive: every issue and question is listed, and a criterion restating a
-    flagged value is marked "(to confirm)". Checked against the real Brief Decoder fixtures the
-    same run would receive."""
-    result = _brief_decoder_result(brief_suffix)
-    values = result["brief"]["values"]
-    sections = {
-        s["id"]: s["content"]
-        for s in _fixture_response("acceptance_builder.draft_from_brief_document_v1" + suffix)[
-            "sections"
-        ]
-    }
-
-    sources = (
-        len(values.get("deliverables", []))
-        + len(values.get("constraints", []))
-        + sum(1 for key in ("deadline", "budget") if key in values)
-    )
-    criteria = sections["acceptance-criteria"]
-    if sources:
-        lines = criteria.splitlines()
-        assert lines and all(line.startswith("- ") for line in lines)
-        assert len(lines) <= sources
-    else:
-        assert criteria == "Not specified in the brief."
-    if "deliverables" in values:
-        assert sections["deliverables"].splitlines() == [f"- {d}" for d in values["deliverables"]]
-    else:
-        assert sections["deliverables"] == "Not specified in the brief."
-    for name in result["brief"]["missing_fields"]:
-        assert _BRIEF_GAPS_KEYWORD[name] in sections["open-gaps"].lower(), name
-
-    # The flagged keywords must really be flagged by the Brief Decoder issues (evidence/description),
-    # and the lines carrying them -- and only those -- must be marked as unconfirmed.
-    issue_text = " ".join(
-        f"{i['description']} {i.get('evidence', '')}" for i in result["issues"]
-    ).lower()
-    assert all(keyword in issue_text for keyword in flagged)
-    for line in criteria.splitlines() if sources else []:
-        is_flagged = any(keyword in line.lower() for keyword in flagged)
-        assert line.endswith(_TO_CONFIRM) == is_flagged, line
-
-    # Every issue and every question is listed, in Brief Decoder's order.
-    expected_lines = [
-        f"- [{i['severity']}] {i['category']}: {i['description']}" for i in result["issues"]
-    ] + [f"- Ask: {q['question']}" for q in result["questions"]]
-    assert sections["open-issues"].splitlines() == (
-        expected_lines or ["Brief Decoder flagged no issues and proposed no questions."]
-    )
-
-
-def test_draft_from_brief_input_is_exactly_brief_decoders_result_contract() -> None:
-    """ANY-26's Brief Decoder -> Acceptance Builder `create draft` handoff maps Brief Decoder's
-    always-present `brief`, `issues` and `questions` here. Schema equality proves every valid
-    Brief Decoder result part is valid input (and nothing else is), including its "no issues => no
-    questions" rule. Brief Decoder's `document.summary` is a readiness note, not a faithful brief,
-    and `brief` alone would drop the warnings that keep flagged values from reading as settled
-    requirements, so neither is the handoff source."""
-    target = _load_schema("acceptance_builder.draft_from_brief_input_v1")
-    source = _load_schema("brief_decoder.decode_output_v1", product_dir=BRIEF_DECODER_DIR)
-    parts = ["brief", "issues", "questions"]
-
-    assert target["required"] == parts
-    assert target["additionalProperties"] is False
-    assert target["properties"] == {part: source["properties"][part] for part in parts}
-    assert (target["if"], target["then"]) == (source["if"], source["then"])
-    assert set(parts) <= set(source["required"])  # always present, so the mapped paths exist
-
-
-@pytest.mark.parametrize("suffix", ["", ".weak_input", ".no_issues"])
-def test_real_brief_decoder_results_are_valid_draft_from_brief_input(suffix: str) -> None:
-    schema = _load_schema("acceptance_builder.draft_from_brief_input_v1")
-
-    jsonschema.validate(_brief_decoder_result(suffix), schema)
-
-
 def test_schemas_are_closed() -> None:
     def assert_closed(node: Any, where: str) -> None:
         if isinstance(node, dict):
@@ -466,8 +347,6 @@ def test_inlined_kernel_atom_output_copies_stay_in_sync_with_the_kernel_schemas(
     for output in (draft, check):
         _assert_same_shape(output["properties"]["extracted"], kernel_extract, "extracted")
         _assert_same_shape(output["properties"]["document"], kernel_document, "document")
-    from_brief = _load_schema(OUTPUT_SCHEMA_REFS[FROM_BRIEF])
-    _assert_same_shape(from_brief["properties"]["document"], kernel_document, "from_brief document")
     comparison = check["properties"]["comparison"]
     _assert_same_shape(comparison, kernel_compare, "comparison")
     _assert_same_shape(
@@ -492,14 +371,11 @@ def test_renderer_contract_agrees_with_workflows_and_scenarios() -> None:
         assert contract["canonical_field"] in output_schema["properties"]
     assert contract["next_action"] in scenarios[DRAFT]["allowed_next_actions"]
     assert contract["next_action"] in scenarios[CHECK]["allowed_next_actions"]
-    assert contract["next_action"] in scenarios[FROM_BRIEF]["allowed_next_actions"]
     assert contract["canonical_field_composition"].strip()
     assert parts["comparison_verdict"]["field"] == "comparison"
     # Only check_v1 has a verdict; the contract must not present it for draft_v1.
     draft_parts = next(s for s in contract["scenarios"] if s["scenario_id"] == DRAFT)["parts"]
     assert "comparison_verdict" not in draft_parts
-    from_brief_parts = next(s for s in contract["scenarios"] if s["scenario_id"] == FROM_BRIEF)
-    assert from_brief_parts["parts"] == ["copy_document"]
     # The verdict is on general criteria, not the extracted list -- the contract must say so.
     assert "not item by item" in " ".join(parts["comparison_verdict"]["description"].split()).lower()
 

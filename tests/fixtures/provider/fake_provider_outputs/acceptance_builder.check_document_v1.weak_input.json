@@ -4,7 +4,7 @@
       {
         "id": "verdict",
         "title": "Verdict",
-        "content": "The deliverable does not meet expectations. It is judged on four general review criteria (scope coverage, requirement fit, completeness, clarity), not item by item on the acceptance criteria below. Scope coverage is a mismatch: the delivery text names no course. Requirement fit is a mismatch: the delivery text does not say whether a certificate is generated or delivered. Completeness is a mismatch: none of the deliverables the brief lists is mentioned. Clarity is a mismatch: the delivery text is a single vague sentence."
+        "content": "Verdict: does not meet expectations. It is judged on four general review criteria (scope coverage, requirement fit, completeness, clarity), not item by item on the acceptance criteria below. Scope coverage: mismatch. The delivery text names no course. Requirement fit: mismatch. The delivery text does not say whether a certificate is generated or delivered. Completeness: mismatch. None of the deliverables the brief lists is mentioned. Clarity: mismatch. The delivery text is a single vague sentence."
       },
       {
         "id": "acceptance-criteria",

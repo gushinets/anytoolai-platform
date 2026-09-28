@@ -17,16 +17,22 @@ Produce exactly these `sections`, in this order, with these `id`s and titles:
 4. `deliverables` ("Deliverables"), `metadata.kind` = `list`
 5. `open-gaps` ("Open gaps")
 
-`verdict` states `data.comparison.verdict` in words (underscores become spaces, for example
-"partially meets expectations"), then one sentence per `data.comparison.deltas` entry with its
-status and evidence. It must say that the verdict is judged on those four general review criteria,
+`verdict` starts with exactly one of "Verdict: meets expectations.", "Verdict: partially meets
+expectations." or "Verdict: does not meet expectations.", matching `data.comparison.verdict`
+(`meets_expectations`, `partially_meets`, `does_not_meet`). It then has one sentence per
+`data.comparison.deltas` entry, in the given order, starting with the criterion's label, a colon
+and its status exactly as in `data`: "Scope coverage: partial.", "Requirement fit: match.",
+"Completeness: mismatch.", "Clarity: match." (labels for `scope_coverage`, `requirement_fit`,
+`completeness`, `clarity`), followed by the evidence. It must say that the verdict is judged on those four general review criteria,
 not item by item on the acceptance criteria listed below -- never present it as a check of each
 extracted criterion.
 
 Sections 2-4 and `open-gaps` follow the same rules as the `acceptance_builder.draft_v1` template:
 list every item of the matching `data.extracted.values` list verbatim, one per line, each
 starting with "- ", or write "Not specified in the brief." when the list is absent; `open-gaps`
-names each `data.extracted.missing_fields` entry, or says the brief states all three lists.
+names each `data.extracted.missing_fields` entry as "acceptance criteria", "assumptions" or
+"deliverables", or says the brief states all three lists. A list absent from `values` (named in
+`missing_fields`) is always exactly "Not specified in the brief."; a present list is never.
 
 `summary` is one short paragraph with the bottom line: the verdict and the most important thing
 to fix or confirm first, taken from the `mismatch` and `partial` deltas.

@@ -2,8 +2,7 @@
 
 1. The product loads through anytoolai_platform_api.bootstrap.build_runtime()'s real default
    bundle set, with exact per-scenario action-type sequences (A01 -> A10 for draft_v1,
-   A01 -> A11 -> A10 for check_v1, A10 alone for draft_from_brief_v1, the Brief Decoder handoff
-   target).
+   A01 -> A11 -> A10 for check_v1).
 2. Its input and composed-output schemas are non-permissive.
 3. A real scenario start + one worker pass runs every step against the fake provider and the
    composed artifact equals the deterministic fixtures -- happy path and weak input, per scenario
@@ -43,17 +42,13 @@ GUEST_ID = "guest_acceptance_builder"
 
 DRAFT = "acceptance_builder.draft_v1"
 CHECK = "acceptance_builder.check_v1"
-FROM_BRIEF = "acceptance_builder.draft_from_brief_v1"
 EXTRACT = "acceptance_builder.extract_v1"
 COMPARE = "acceptance_builder.compare_v1"
 DRAFT_DOCUMENT = "acceptance_builder.draft_document_v1"
 CHECK_DOCUMENT = "acceptance_builder.check_document_v1"
-FROM_BRIEF_DOCUMENT = "acceptance_builder.draft_from_brief_document_v1"
-BRIEF_DECODER = "brief_decoder"
 STEPS = {
     DRAFT: (EXTRACT, DRAFT_DOCUMENT),
     CHECK: (EXTRACT, COMPARE, CHECK_DOCUMENT),
-    FROM_BRIEF: (FROM_BRIEF_DOCUMENT,),
 }
 ACTION_TYPES = {
     DRAFT: ("text.extract_structured_fields", "document.generate_from_template"),
@@ -62,17 +57,14 @@ ACTION_TYPES = {
         "text.compare_and_classify",
         "document.generate_from_template",
     ),
-    FROM_BRIEF: ("document.generate_from_template",),
 }
 INPUT_SCHEMA_REFS = {
     DRAFT: "acceptance_builder.draft_input_v1",
     CHECK: "acceptance_builder.check_input_v1",
-    FROM_BRIEF: "acceptance_builder.draft_from_brief_input_v1",
 }
 OUTPUT_SCHEMA_REFS = {
     DRAFT: "acceptance_builder.draft_output_v1",
     CHECK: "acceptance_builder.check_output_v1",
-    FROM_BRIEF: "acceptance_builder.draft_from_brief_output_v1",
 }
 
 BRIEF_TEXT = (
@@ -98,8 +90,6 @@ def _fixture(key: str) -> dict[str, Any]:
 def _expected_output(scenario_id: str, suffix: str = "") -> dict[str, Any]:
     """The composed workflow output the fixtures must produce: extracted = A01 output whole,
     comparison = A11 output whole (check_v1 only), document = A10."""
-    if scenario_id == FROM_BRIEF:
-        return {"document": _fixture(FROM_BRIEF_DOCUMENT + suffix)}
     output: dict[str, Any] = {"extracted": _fixture(EXTRACT + suffix)}
     if scenario_id == CHECK:
         output["comparison"] = _fixture(COMPARE + suffix)
@@ -120,9 +110,9 @@ def test_acceptance_builder_loads_through_the_real_default_bundle_set() -> None:
 
     assert "freelancer_suite" in result.loaded_bundles
     product = result.config_registry.products["acceptance_builder"]
-    assert set(product.scenarios) == {DRAFT, CHECK, FROM_BRIEF}
+    assert set(product.scenarios) == {DRAFT, CHECK}
 
-    for scenario_id in (DRAFT, CHECK, FROM_BRIEF):
+    for scenario_id in (DRAFT, CHECK):
         scenario = result.config_registry.get_scenario(scenario_id)
         assert scenario is not None
         assert scenario.workflow_id == scenario_id
@@ -167,54 +157,6 @@ def test_input_schemas_are_non_permissive(scenario_id: str, invalid_input: dict[
     jsonschema.validate(valid, schema)
     with pytest.raises(jsonschema.ValidationError):
         jsonschema.validate(invalid_input, schema)
-
-
-def _brief_decoder_result(suffix: str = "") -> dict[str, Any]:
-    """The parts of a Brief Decoder result the handoff target takes, from its real fixtures:
-    `brief` (A01 output whole), `issues` (A04's list) and `questions` (A05's list)."""
-    return {
-        "brief": _fixture(f"{BRIEF_DECODER}.extract_brief_v1{suffix}"),
-        "issues": _fixture(f"{BRIEF_DECODER}.detect_issues_v1{suffix}")["issues"],
-        "questions": (
-            _fixture(f"{BRIEF_DECODER}.generate_questions_v1{suffix}")["questions"]
-            if _fixture(f"{BRIEF_DECODER}.detect_issues_v1{suffix}")["issues"]
-            else []
-        ),
-    }
-
-
-@pytest.mark.parametrize(
-    "invalid_input",
-    [
-        {},
-        {"brief_text": BRIEF_TEXT},
-        {"brief": {}},
-        {"brief": {"values": {}}},
-        {"brief": {"values": {"budget": ""}, "missing_fields": []}},
-        {"brief": {"values": {"deliverables": []}, "missing_fields": []}},
-        {"brief": {"values": {"invented": "x"}, "missing_fields": []}},
-        {"brief": {"values": {}, "missing_fields": ["invented"]}},
-        {"brief": {"values": {}, "missing_fields": []}},  # every field in neither values nor missing
-        {**_brief_decoder_result(), "extra": 1},
-        {"brief": _brief_decoder_result()["brief"]},  # issues and questions are required
-        {**_brief_decoder_result(), "issues": [{"category": "other", "severity": "low", "description": "x"}]},
-        {**_brief_decoder_result(), "questions": _brief_decoder_result()["questions"] * 2},  # > 5
-        {**_brief_decoder_result(), "issues": [], "questions": _brief_decoder_result()["questions"]},
-    ],
-)
-def test_draft_from_brief_input_schema_is_non_permissive(invalid_input: dict[str, Any]) -> None:
-    schema = _schema(INPUT_SCHEMA_REFS[FROM_BRIEF])
-
-    jsonschema.validate(_brief_decoder_result(), schema)
-    with pytest.raises(jsonschema.ValidationError):
-        jsonschema.validate(invalid_input, schema)
-
-
-@pytest.mark.parametrize("suffix", ["", ".weak_input", ".no_issues"])
-def test_draft_from_brief_accepts_every_real_brief_decoder_brief(suffix: str) -> None:
-    jsonschema.validate(
-        _brief_decoder_result(suffix), _schema(INPUT_SCHEMA_REFS[FROM_BRIEF])
-    )
 
 
 def test_input_schemas_accept_legitimate_edge_cases() -> None:
@@ -284,46 +226,6 @@ def _shared_invalid_outputs(valid: dict[str, Any]) -> dict[str, dict[str, Any]]:
         "document_sections_reordered": _mutated(valid, swap_first_two_sections),
         "empty_summary": _mutated(valid, lambda o: o["document"].update(summary=" ")),
     }
-
-
-def test_draft_from_brief_output_schema_rejects_open_shapes() -> None:
-    schema = _schema(OUTPUT_SCHEMA_REFS[FROM_BRIEF])
-    validator = jsonschema.validators.validator_for(schema)(schema)
-    valid = _expected_output(FROM_BRIEF)
-    for suffix in ("", ".weak_input"):
-        jsonschema.validate(_expected_output(FROM_BRIEF, suffix), schema)
-
-    invalid = {
-        "unknown_top_level_key": _mutated(valid, lambda o: o.update(extra=1)),
-        "missing_document": _mutated(valid, lambda o: o.pop("document")),
-        "extracted_is_not_part_of_this_output": _mutated(valid, lambda o: o.update(extracted={})),
-        "document_missing_a_section": _mutated(valid, lambda o: o["document"]["sections"].pop()),
-        "document_extra_section": _mutated(
-            valid, lambda o: o["document"]["sections"].append(o["document"]["sections"][0])
-        ),
-        "document_section_with_arbitrary_id": _mutated(
-            valid, lambda o: o["document"]["sections"][0].update(id="random", title="Random")
-        ),
-        "list_section_missing_metadata": _mutated(
-            valid, lambda o: o["document"]["sections"][0].pop("metadata")
-        ),
-        "list_section_wrong_kind": _mutated(
-            valid, lambda o: o["document"]["sections"][1].update(metadata={"kind": "table"})
-        ),
-        "blank_section_content": _mutated(
-            valid, lambda o: o["document"]["sections"][2].update(content=" ")
-        ),
-        "open_issues_section_missing": _mutated(valid, lambda o: o["document"]["sections"].pop()),
-        "open_issues_section_wrong_kind": _mutated(
-            valid, lambda o: o["document"]["sections"][3].update(metadata={"kind": "note"})
-        ),
-        "open_issues_section_missing_metadata": _mutated(
-            valid, lambda o: o["document"]["sections"][3].pop("metadata")
-        ),
-        "empty_summary": _mutated(valid, lambda o: o["document"].update(summary=" ")),
-    }
-    for name, candidate in invalid.items():
-        assert not validator.is_valid(candidate), name
 
 
 @pytest.mark.parametrize("scenario_id", [DRAFT, CHECK])
@@ -403,23 +305,121 @@ def _comparison_mutations(valid: dict[str, Any]) -> dict[str, dict[str, Any]]:
     }
 
 
-def test_does_not_meet_with_a_mismatch_is_valid() -> None:
-    schema = _schema(OUTPUT_SCHEMA_REFS[CHECK])
-    output = _expected_output(CHECK, ".weak_input")
-    assert output["comparison"]["verdict"] == "does_not_meet"
-    output["comparison"]["deltas"][1]["status"] = "partial"  # one mismatch left is enough
+_VERDICT_PHRASES = {
+    "meets_expectations": "meets expectations",
+    "partially_meets": "partially meets expectations",
+    "does_not_meet": "does not meet expectations",
+}
+_CRITERION_LABELS = ("Scope coverage", "Requirement fit", "Completeness", "Clarity")
 
-    jsonschema.validate(output, schema)
 
-
-def test_meets_expectations_without_mismatch_is_valid() -> None:
-    schema = _schema(OUTPUT_SCHEMA_REFS[CHECK])
+def _check_output_with(verdict: str, statuses: list[str]) -> dict[str, Any]:
+    """The happy check output re-stated with `verdict` and per-criterion `statuses`, its verdict
+    section rewritten to agree -- so a schema failure can only come from the verdict/status rule."""
     output = _expected_output(CHECK)
-    output["comparison"]["verdict"] = "meets_expectations"
-    for delta in output["comparison"]["deltas"]:
-        delta["status"] = "match"
+    output["comparison"]["verdict"] = verdict
+    for delta, status in zip(output["comparison"]["deltas"], statuses, strict=True):
+        delta["status"] = status
+    output["document"]["sections"][0]["content"] = f"Verdict: {_VERDICT_PHRASES[verdict]}. " + " ".join(
+        f"{label}: {status}. Evidence." for label, status in zip(_CRITERION_LABELS, statuses, strict=True)
+    )
+    return output
 
-    jsonschema.validate(output, schema)
+
+@pytest.mark.parametrize(
+    ("verdict", "statuses"),
+    [
+        ("meets_expectations", ["match"] * 4),
+        ("partially_meets", ["match", "match", "match", "partial"]),
+        ("partially_meets", ["partial"] * 4),
+        ("does_not_meet", ["match", "match", "match", "mismatch"]),
+        ("does_not_meet", ["mismatch"] * 4),
+        ("does_not_meet", ["partial", "mismatch", "match", "partial"]),
+    ],
+)
+def test_verdict_that_follows_from_the_delta_statuses_is_valid(
+    verdict: str, statuses: list[str]
+) -> None:
+    jsonschema.validate(_check_output_with(verdict, statuses), _schema(OUTPUT_SCHEMA_REFS[CHECK]))
+
+
+@pytest.mark.parametrize(
+    ("verdict", "statuses"),
+    [
+        ("meets_expectations", ["match", "match", "match", "partial"]),
+        ("meets_expectations", ["match", "match", "match", "mismatch"]),
+        ("partially_meets", ["match"] * 4),
+        ("partially_meets", ["match", "partial", "mismatch", "match"]),
+        ("partially_meets", ["mismatch"] * 4),
+        ("does_not_meet", ["match"] * 4),
+        ("does_not_meet", ["partial"] * 4),
+    ],
+)
+def test_verdict_that_contradicts_the_delta_statuses_is_rejected(
+    verdict: str, statuses: list[str]
+) -> None:
+    """A11's cross-validator checks only category membership and criterion coverage; the product
+    schema is the last guard, so the verdict must be the partition of the statuses: all match =>
+    meets, any mismatch => does not meet, otherwise partially meets."""
+    schema = _schema(OUTPUT_SCHEMA_REFS[CHECK])
+    validator = jsonschema.validators.validator_for(schema)(schema)
+
+    assert not validator.is_valid(_check_output_with(verdict, statuses))
+
+
+def _document_binding_mutations(scenario_id: str) -> dict[str, dict[str, Any]]:
+    """Free-form A10 text must agree with the structured result it was generated from."""
+    first, second = (1, 2) if scenario_id == CHECK else (0, 1)
+    gaps = 4 if scenario_id == CHECK else 3
+    happy, weak = _expected_output(scenario_id), _expected_output(scenario_id, ".weak_input")
+
+    def section(candidate: dict[str, Any], index: int) -> dict[str, Any]:
+        return candidate["document"]["sections"][index]
+
+    invalid = {
+        # extracted lists: a list absent from `values` must read "Not specified", a present one not
+        "absent_list_with_content": _mutated(weak, lambda o: section(o, first).update(content="- x")),
+        "present_list_reported_absent": _mutated(
+            happy, lambda o: section(o, second).update(content="Not specified in the brief.")
+        ),
+        "missing_field_not_named_in_open_gaps": _mutated(
+            weak, lambda o: section(o, gaps).update(content="Please confirm the details.")
+        ),
+    }
+    if scenario_id == CHECK:
+        invalid.update(
+            {
+                "verdict_text_contradicts_comparison": _mutated(
+                    happy,
+                    lambda o: section(o, 0).update(
+                        content=section(o, 0)["content"].replace(
+                            "Verdict: partially meets", "Verdict: meets"
+                        )
+                    ),
+                ),
+                "verdict_section_lacks_verdict_phrase": _mutated(
+                    happy, lambda o: section(o, 0).update(content="The delivery looks fine.")
+                ),
+                "criterion_status_text_contradicts_delta": _mutated(
+                    happy,
+                    lambda o: section(o, 0).update(
+                        content=section(o, 0)["content"].replace(
+                            "Scope coverage: partial", "Scope coverage: match"
+                        )
+                    ),
+                ),
+            }
+        )
+    return invalid
+
+
+@pytest.mark.parametrize("scenario_id", [DRAFT, CHECK])
+def test_document_text_is_bound_to_the_structured_result(scenario_id: str) -> None:
+    schema = _schema(OUTPUT_SCHEMA_REFS[scenario_id])
+    validator = jsonschema.validators.validator_for(schema)(schema)
+
+    for name, candidate in _document_binding_mutations(scenario_id).items():
+        assert not validator.is_valid(candidate), name
 
 
 @pytest.fixture
@@ -655,63 +655,5 @@ def test_invalid_input_fails_the_job_before_any_provider_call(
     assert processed.status is JobStatus.failed
     assert processed.error_code == "workflow_input_validation_failed"
     assert processed.result_artifact_id is None
-    assert adapter.calls == []
-    assert _provider_call_count(session_factory, job_id=started["job_id"]) == 0
-
-
-@pytest.mark.parametrize(
-    ("suffix", "adapter_variants"),
-    [("", {}), (".weak_input", {FROM_BRIEF_DOCUMENT: ".weak_input"})],
-)
-def test_draft_from_brief_runs_on_a_real_brief_decoder_brief(
-    app: Any,
-    request_platform_api,
-    session_factory: SessionFactory,
-    suffix: str,
-    adapter_variants: dict[str, str],
-) -> None:
-    """The handoff target consumes Brief Decoder's own `brief`, `issues` and `questions`: the payload
-    the provider sees carries them unchanged, and the document is the fixture grounded in them."""
-    brief_decoder_result = _brief_decoder_result(suffix)
-    adapter = RecordingProviderAdapter(FIXTURE_ROOT, variants=adapter_variants)
-    _, output = _run_to_result(
-        app, request_platform_api, session_factory, FROM_BRIEF, brief_decoder_result, adapter
-    )
-
-    assert tuple(call.action_config_id for call in adapter.calls) == STEPS[FROM_BRIEF]
-    assert adapter.calls[0].step_id == "generate_document"
-    document_input = adapter.input_payload(0)
-    assert document_input["template_ref"] == FROM_BRIEF
-    # brief, issues and questions all reach the provider unchanged: Brief Decoder's warnings are
-    # what keeps flagged values from reading as settled requirements.
-    assert document_input["data"] == brief_decoder_result
-    assert document_input["data"]["issues"]
-    assert output == _expected_output(FROM_BRIEF, suffix)
-
-
-@pytest.mark.parametrize(
-    "input_payload",
-    [
-        {"brief_text": BRIEF_TEXT},
-        {"brief": {"values": {}, "missing_fields": []}, "issues": [], "questions": []},
-        {"brief": _brief_decoder_result()["brief"]},
-    ],
-    ids=[
-        "text_input_for_structured_scenario",
-        "brief_with_field_in_neither_list",
-        "issues_and_questions_missing",
-    ],
-)
-def test_invalid_draft_from_brief_input_fails_before_any_provider_call(
-    app: Any, request_platform_api, session_factory: SessionFactory, input_payload: dict[str, Any]
-) -> None:
-    started = _start(app, request_platform_api, FROM_BRIEF, input_payload).json()
-
-    adapter = RecordingProviderAdapter(FIXTURE_ROOT)
-    processed = _run_worker(session_factory, adapter)
-
-    assert processed is not None
-    assert processed.status is JobStatus.failed
-    assert processed.error_code == "workflow_input_validation_failed"
     assert adapter.calls == []
     assert _provider_call_count(session_factory, job_id=started["job_id"]) == 0

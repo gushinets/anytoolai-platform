@@ -17,8 +17,10 @@ For sections 1-3, write every item of the matching `data.extracted.values` list 
 line, each line starting with "- ". If that list is absent, write the single sentence "Not
 specified in the brief." -- do not fill the section with items you made up.
 
-`open-gaps` names, by their plain-language name, each entry of `data.extracted.missing_fields`
-and says the client should confirm it. If `missing_fields` is empty, say the brief states all
+`open-gaps` names each entry of `data.extracted.missing_fields` as "acceptance criteria",
+"assumptions" or "deliverables" and says the client should confirm it. A list absent from `values`
+(named in `missing_fields`) is always exactly "Not specified in the brief."; a present list is
+never. If `missing_fields` is empty, say the brief states all
 three lists.
 
 `summary` is one short paragraph: how many acceptance criteria were found and what the freelancer

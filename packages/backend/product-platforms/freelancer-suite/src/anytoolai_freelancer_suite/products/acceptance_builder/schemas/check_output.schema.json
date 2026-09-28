@@ -325,8 +325,48 @@
                     ],
                     "properties": {
                       "status": {
+                        "enum": [
+                          "partial",
+                          "mismatch"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "verdict": {
+                "const": "partially_meets"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "deltas": {
+                "not": {
+                  "contains": {
+                    "required": [
+                      "status"
+                    ],
+                    "properties": {
+                      "status": {
                         "const": "mismatch"
                       }
+                    }
+                  }
+                },
+                "contains": {
+                  "required": [
+                    "status"
+                  ],
+                  "properties": {
+                    "status": {
+                      "const": "partial"
                     }
                   }
                 }
@@ -669,5 +709,1045 @@
       ],
       "additionalProperties": false
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "comparison": {
+            "properties": {
+              "verdict": {
+                "const": "meets_expectations"
+              }
+            }
+          }
+        },
+        "required": [
+          "comparison"
+        ]
+      },
+      "then": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {
+                    "properties": {
+                      "content": {
+                        "pattern": "^Verdict: meets\\ expectations\\."
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "comparison": {
+            "properties": {
+              "verdict": {
+                "const": "partially_meets"
+              }
+            }
+          }
+        },
+        "required": [
+          "comparison"
+        ]
+      },
+      "then": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {
+                    "properties": {
+                      "content": {
+                        "pattern": "^Verdict: partially\\ meets\\ expectations\\."
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "comparison": {
+            "properties": {
+              "verdict": {
+                "const": "does_not_meet"
+              }
+            }
+          }
+        },
+        "required": [
+          "comparison"
+        ]
+      },
+      "then": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {
+                    "properties": {
+                      "content": {
+                        "pattern": "^Verdict: does\\ not\\ meet\\ expectations\\."
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "comparison": {
+            "properties": {
+              "deltas": {
+                "prefixItems": [
+                  {
+                    "properties": {
+                      "status": {
+                        "const": "match"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "comparison"
+        ]
+      },
+      "then": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {
+                    "properties": {
+                      "content": {
+                        "pattern": "Scope\\ coverage: match\\b"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "comparison": {
+            "properties": {
+              "deltas": {
+                "prefixItems": [
+                  {
+                    "properties": {
+                      "status": {
+                        "const": "partial"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "comparison"
+        ]
+      },
+      "then": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {
+                    "properties": {
+                      "content": {
+                        "pattern": "Scope\\ coverage: partial\\b"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "comparison": {
+            "properties": {
+              "deltas": {
+                "prefixItems": [
+                  {
+                    "properties": {
+                      "status": {
+                        "const": "mismatch"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "comparison"
+        ]
+      },
+      "then": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {
+                    "properties": {
+                      "content": {
+                        "pattern": "Scope\\ coverage: mismatch\\b"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "comparison": {
+            "properties": {
+              "deltas": {
+                "prefixItems": [
+                  {},
+                  {
+                    "properties": {
+                      "status": {
+                        "const": "match"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "comparison"
+        ]
+      },
+      "then": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {
+                    "properties": {
+                      "content": {
+                        "pattern": "Requirement\\ fit: match\\b"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "comparison": {
+            "properties": {
+              "deltas": {
+                "prefixItems": [
+                  {},
+                  {
+                    "properties": {
+                      "status": {
+                        "const": "partial"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "comparison"
+        ]
+      },
+      "then": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {
+                    "properties": {
+                      "content": {
+                        "pattern": "Requirement\\ fit: partial\\b"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "comparison": {
+            "properties": {
+              "deltas": {
+                "prefixItems": [
+                  {},
+                  {
+                    "properties": {
+                      "status": {
+                        "const": "mismatch"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "comparison"
+        ]
+      },
+      "then": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {
+                    "properties": {
+                      "content": {
+                        "pattern": "Requirement\\ fit: mismatch\\b"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "comparison": {
+            "properties": {
+              "deltas": {
+                "prefixItems": [
+                  {},
+                  {},
+                  {
+                    "properties": {
+                      "status": {
+                        "const": "match"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "comparison"
+        ]
+      },
+      "then": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {
+                    "properties": {
+                      "content": {
+                        "pattern": "Completeness: match\\b"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "comparison": {
+            "properties": {
+              "deltas": {
+                "prefixItems": [
+                  {},
+                  {},
+                  {
+                    "properties": {
+                      "status": {
+                        "const": "partial"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "comparison"
+        ]
+      },
+      "then": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {
+                    "properties": {
+                      "content": {
+                        "pattern": "Completeness: partial\\b"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "comparison": {
+            "properties": {
+              "deltas": {
+                "prefixItems": [
+                  {},
+                  {},
+                  {
+                    "properties": {
+                      "status": {
+                        "const": "mismatch"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "comparison"
+        ]
+      },
+      "then": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {
+                    "properties": {
+                      "content": {
+                        "pattern": "Completeness: mismatch\\b"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "comparison": {
+            "properties": {
+              "deltas": {
+                "prefixItems": [
+                  {},
+                  {},
+                  {},
+                  {
+                    "properties": {
+                      "status": {
+                        "const": "match"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "comparison"
+        ]
+      },
+      "then": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {
+                    "properties": {
+                      "content": {
+                        "pattern": "Clarity: match\\b"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "comparison": {
+            "properties": {
+              "deltas": {
+                "prefixItems": [
+                  {},
+                  {},
+                  {},
+                  {
+                    "properties": {
+                      "status": {
+                        "const": "partial"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "comparison"
+        ]
+      },
+      "then": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {
+                    "properties": {
+                      "content": {
+                        "pattern": "Clarity: partial\\b"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "comparison": {
+            "properties": {
+              "deltas": {
+                "prefixItems": [
+                  {},
+                  {},
+                  {},
+                  {
+                    "properties": {
+                      "status": {
+                        "const": "mismatch"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "comparison"
+        ]
+      },
+      "then": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {
+                    "properties": {
+                      "content": {
+                        "pattern": "Clarity: mismatch\\b"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "extracted": {
+            "required": [
+              "missing_fields"
+            ],
+            "properties": {
+              "missing_fields": {
+                "contains": {
+                  "const": "acceptance_criteria"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "extracted"
+        ]
+      },
+      "then": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {},
+                  {
+                    "properties": {
+                      "content": {
+                        "const": "Not specified in the brief."
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      },
+      "else": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {},
+                  {
+                    "properties": {
+                      "content": {
+                        "not": {
+                          "const": "Not specified in the brief."
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "extracted": {
+            "required": [
+              "missing_fields"
+            ],
+            "properties": {
+              "missing_fields": {
+                "contains": {
+                  "const": "acceptance_criteria"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "extracted"
+        ]
+      },
+      "then": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {},
+                  {},
+                  {},
+                  {},
+                  {
+                    "properties": {
+                      "content": {
+                        "pattern": "(?i)acceptance\\ criteria"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "extracted": {
+            "required": [
+              "missing_fields"
+            ],
+            "properties": {
+              "missing_fields": {
+                "contains": {
+                  "const": "assumptions"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "extracted"
+        ]
+      },
+      "then": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {},
+                  {},
+                  {
+                    "properties": {
+                      "content": {
+                        "const": "Not specified in the brief."
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      },
+      "else": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {},
+                  {},
+                  {
+                    "properties": {
+                      "content": {
+                        "not": {
+                          "const": "Not specified in the brief."
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "extracted": {
+            "required": [
+              "missing_fields"
+            ],
+            "properties": {
+              "missing_fields": {
+                "contains": {
+                  "const": "assumptions"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "extracted"
+        ]
+      },
+      "then": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {},
+                  {},
+                  {},
+                  {},
+                  {
+                    "properties": {
+                      "content": {
+                        "pattern": "(?i)assumptions"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "extracted": {
+            "required": [
+              "missing_fields"
+            ],
+            "properties": {
+              "missing_fields": {
+                "contains": {
+                  "const": "deliverables"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "extracted"
+        ]
+      },
+      "then": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {},
+                  {},
+                  {},
+                  {
+                    "properties": {
+                      "content": {
+                        "const": "Not specified in the brief."
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      },
+      "else": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {},
+                  {},
+                  {},
+                  {
+                    "properties": {
+                      "content": {
+                        "not": {
+                          "const": "Not specified in the brief."
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "extracted": {
+            "required": [
+              "missing_fields"
+            ],
+            "properties": {
+              "missing_fields": {
+                "contains": {
+                  "const": "deliverables"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "extracted"
+        ]
+      },
+      "then": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {},
+                  {},
+                  {},
+                  {},
+                  {
+                    "properties": {
+                      "content": {
+                        "pattern": "(?i)deliverables"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      }
+    }
+  ]
 }

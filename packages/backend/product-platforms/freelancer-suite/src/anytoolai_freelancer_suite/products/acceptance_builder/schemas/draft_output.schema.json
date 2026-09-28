@@ -431,5 +431,352 @@
       ],
       "additionalProperties": false
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "extracted": {
+            "required": [
+              "missing_fields"
+            ],
+            "properties": {
+              "missing_fields": {
+                "contains": {
+                  "const": "acceptance_criteria"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "extracted"
+        ]
+      },
+      "then": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {
+                    "properties": {
+                      "content": {
+                        "const": "Not specified in the brief."
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      },
+      "else": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {
+                    "properties": {
+                      "content": {
+                        "not": {
+                          "const": "Not specified in the brief."
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "extracted": {
+            "required": [
+              "missing_fields"
+            ],
+            "properties": {
+              "missing_fields": {
+                "contains": {
+                  "const": "acceptance_criteria"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "extracted"
+        ]
+      },
+      "then": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {},
+                  {},
+                  {},
+                  {
+                    "properties": {
+                      "content": {
+                        "pattern": "(?i)acceptance\\ criteria"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "extracted": {
+            "required": [
+              "missing_fields"
+            ],
+            "properties": {
+              "missing_fields": {
+                "contains": {
+                  "const": "assumptions"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "extracted"
+        ]
+      },
+      "then": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {},
+                  {
+                    "properties": {
+                      "content": {
+                        "const": "Not specified in the brief."
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      },
+      "else": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {},
+                  {
+                    "properties": {
+                      "content": {
+                        "not": {
+                          "const": "Not specified in the brief."
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "extracted": {
+            "required": [
+              "missing_fields"
+            ],
+            "properties": {
+              "missing_fields": {
+                "contains": {
+                  "const": "assumptions"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "extracted"
+        ]
+      },
+      "then": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {},
+                  {},
+                  {},
+                  {
+                    "properties": {
+                      "content": {
+                        "pattern": "(?i)assumptions"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "extracted": {
+            "required": [
+              "missing_fields"
+            ],
+            "properties": {
+              "missing_fields": {
+                "contains": {
+                  "const": "deliverables"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "extracted"
+        ]
+      },
+      "then": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {},
+                  {},
+                  {
+                    "properties": {
+                      "content": {
+                        "const": "Not specified in the brief."
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      },
+      "else": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {},
+                  {},
+                  {
+                    "properties": {
+                      "content": {
+                        "not": {
+                          "const": "Not specified in the brief."
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "extracted": {
+            "required": [
+              "missing_fields"
+            ],
+            "properties": {
+              "missing_fields": {
+                "contains": {
+                  "const": "deliverables"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "extracted"
+        ]
+      },
+      "then": {
+        "properties": {
+          "document": {
+            "properties": {
+              "sections": {
+                "prefixItems": [
+                  {},
+                  {},
+                  {},
+                  {
+                    "properties": {
+                      "content": {
+                        "pattern": "(?i)deliverables"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "document"
+        ]
+      }
+    }
+  ]
 }
