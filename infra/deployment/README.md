@@ -159,7 +159,10 @@ python3 scripts/agent/runner.py atom-lab-ready
 `atom-lab-up` fails before Compose if a required value or HTTPS origin is missing. The dedicated
 `migrate` container must exit successfully before API/worker startup. Readiness verifies health,
 all packaged assets, fail-closed missing/wrong codes, the authenticated eleven-atom catalog, and a
-running worker. It does not claim that ingress is private or that a paid provider call succeeded.
+running worker. To protect a working installation from failed in-place cleanup, `atom-lab-up`
+refuses to replace a running fixed project. For a reviewed update, first run `atom-lab-down`, then
+run `atom-lab-up`; the named PostgreSQL volume and history remain preserved. It does not claim that
+ingress is private or that a paid provider call succeeded.
 
 After the operator verifies HTTPS and the network boundary, run the paid smoke in an approved cost
 window:
@@ -185,7 +188,7 @@ policy. Limit the code to the named internal group and agree what data may be en
 versions and accepted run snapshots are immutable; do not edit them directly in PostgreSQL.
 
 To rotate, replace only `ANYTOOLAI_ATOM_LAB_ACCESS_CODE` in the secret store or `.env.atom-lab`,
-run `atom-lab-up`, then run readiness and verify the old code receives
+run `atom-lab-down` followed by `atom-lab-up`, then run readiness and verify the old code receives
 `401 atom_lab_access_denied`. Rotation does not re-encrypt or delete history/presets. For a suspected
 leak, remove ingress first, rotate and verify, then restore the allowlisted route.
 

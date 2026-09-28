@@ -3527,6 +3527,28 @@ def test_atom_lab_ready_checks_assets_auth_catalog_and_worker(monkeypatch) -> No
     assert runner._atom_lab_ready(inputs, announce=False) == 0
 
 
+def test_atom_lab_up_refuses_to_replace_running_stack(monkeypatch, capsys) -> None:
+    runner = load_runner_module()
+    inputs = runner.AtomLabDeploymentInputs(
+        dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
+    )
+    monkeypatch.setattr(runner, "_atom_lab_deployment_inputs", lambda: inputs)
+    monkeypatch.setattr(runner, "_atom_lab_stack_running", lambda inputs: True)
+    monkeypatch.setattr(
+        runner,
+        "_check_ports_available",
+        lambda *args: pytest.fail("running-stack refusal reached port preflight"),
+    )
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda *args, **kwargs: pytest.fail("running-stack refusal reached Compose mutation"),
+    )
+
+    assert runner.atom_lab_up() == 1
+    assert "LAB006: refusing to replace a running Atom Lab stack" in capsys.readouterr().err
+
+
 def test_atom_lab_smoke_reuses_live_canary_and_compares_history_after_restart(monkeypatch) -> None:
     runner = load_runner_module()
     inputs = runner.AtomLabDeploymentInputs(

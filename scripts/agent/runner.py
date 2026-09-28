@@ -1890,6 +1890,13 @@ def atom_lab_up() -> int:
     except OSError as exc:
         print(f"LAB001: {exc}", file=sys.stderr)
         return 2
+    if stack_running:
+        print(
+            "LAB006: refusing to replace a running Atom Lab stack; "
+            "stop it explicitly before a planned update",
+            file=sys.stderr,
+        )
+        return 1
     if not stack_running and not _check_ports_available(
         "LAB002",
         [
