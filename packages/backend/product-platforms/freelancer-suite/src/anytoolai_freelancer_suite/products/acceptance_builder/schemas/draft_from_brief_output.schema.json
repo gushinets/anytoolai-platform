@@ -6,8 +6,8 @@
       "properties": {
         "sections": {
           "type": "array",
-          "minItems": 3,
-          "maxItems": 3,
+          "minItems": 4,
+          "maxItems": 4,
           "prefixItems": [
             {
               "$ref": "#/$defs/section_acceptance-criteria"
@@ -17,6 +17,9 @@
             },
             {
               "$ref": "#/$defs/section_open-gaps"
+            },
+            {
+              "$ref": "#/$defs/section_open-issues"
             }
           ],
           "items": false
@@ -143,6 +146,32 @@
       },
       "required": [
         "kind"
+      ],
+      "additionalProperties": false
+    },
+    "section_open-issues": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "const": "open-issues"
+        },
+        "title": {
+          "const": "Open issues and questions"
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "metadata": {
+          "$ref": "#/$defs/listSectionMetadata"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "content",
+        "metadata"
       ],
       "additionalProperties": false
     }

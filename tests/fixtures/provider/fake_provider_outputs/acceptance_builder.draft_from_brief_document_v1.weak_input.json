@@ -21,12 +21,20 @@
         "id": "open-gaps",
         "title": "Open gaps",
         "content": "The brief does not state the deliverables, deadline, budget, target audience or constraints; the client should confirm each of them."
+      },
+      {
+        "id": "open-issues",
+        "title": "Open issues and questions",
+        "content": "- [high] missing_information: The brief names no deliverables and no audience, so the work cannot be sized.\n- [medium] ambiguity: \"Make it nice\" gives no usable design direction.\n- [high] timeline_risk: No deadline or timeline is given.\n- [high] budget_risk: No budget is given.\n- Ask: What should the website do, and which pages or features do you need?\n- Ask: When do you need the website to be ready?\n- Ask: What budget do you have in mind for this project?\n- Ask: What does \"nice\" mean to you -- can you share an example of a website you like?",
+        "metadata": {
+          "kind": "list"
+        }
       }
     ],
-    "summary": "No acceptance criteria could be drafted because the brief states only a goal. Ask the client for deliverables, deadline, budget and constraints first."
+    "summary": "No acceptance criteria could be drafted because the brief states only a goal, and Brief Decoder flagged four open issues. Ask the client the listed questions first."
   },
-  "input_tokens": 120,
-  "output_tokens": 90,
+  "input_tokens": 240,
+  "output_tokens": 180,
   "latency_ms": 10,
   "estimated_cost": 0.0,
   "metadata": {

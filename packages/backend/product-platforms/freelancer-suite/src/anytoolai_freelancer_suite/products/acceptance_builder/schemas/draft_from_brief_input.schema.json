@@ -461,10 +461,119 @@
         }
       ],
       "additionalProperties": false
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "missing_information",
+              "ambiguity",
+              "scope_risk",
+              "timeline_risk",
+              "budget_risk",
+              "contradiction"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "evidence": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          }
+        },
+        "required": [
+          "category",
+          "description",
+          "severity"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "questions": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "missing_information",
+              "ambiguity",
+              "scope_risk",
+              "timeline_risk",
+              "budget_risk",
+              "contradiction"
+            ]
+          },
+          "source_issue_index": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "question",
+          "rationale",
+          "priority",
+          "category",
+          "source_issue_index"
+        ],
+        "additionalProperties": false
+      }
     }
   },
   "required": [
-    "brief"
+    "brief",
+    "issues",
+    "questions"
   ],
-  "additionalProperties": false
+  "additionalProperties": false,
+  "if": {
+    "properties": {
+      "issues": {
+        "maxItems": 0
+      }
+    }
+  },
+  "then": {
+    "properties": {
+      "questions": {
+        "maxItems": 0
+      }
+    }
+  }
 }

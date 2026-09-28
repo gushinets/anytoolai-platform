@@ -85,10 +85,15 @@ endpoints; a live-provider action-config variant.
    and `output_mapping` cannot echo `scenario.input`, so the artifact cannot carry the original
    brief without a Platform Core change (out of scope) or an unverifiable LLM copy. Instead a
    third scenario, `acceptance_builder.draft_from_brief_v1`, takes Brief Decoder's always-present
-   `brief` object (values + missing_fields) and runs one A10 step that drafts the document from
-   those facts. Its input schema is a verbatim copy of Brief Decoder's `brief` schema and a test
-   asserts equality, so every valid Brief Decoder brief is valid input; tests also run the real
-   Brief Decoder brief fixtures through it. Direct users keep `draft_v1` (brief text). The
+   `brief`, `issues` and `questions` and runs one A10 step that drafts the document from them.
+   `brief` alone was not enough (review #3): Brief Decoder flags "modern but also traditional" as
+   an ambiguity and "before the holiday season" as a high-severity timeline risk, and a brief-only
+   input turned both into ready-looking criteria. The document therefore lists every issue and
+   question in an `open-issues` section, and marks any criterion restating a flagged value
+   "(to confirm)". The input schema is a verbatim copy of Brief Decoder's three schemas (plus its
+   "no issues => no questions" rule) and a test asserts equality, so every valid Brief Decoder
+   result is valid input; tests also run the real Brief Decoder fixtures through it and check the
+   warnings survive in the result. Direct users keep `draft_v1` (brief text). The
    mapping itself (`brief` -> `brief`) and `handoffs.yaml` remain ANY-26. The earlier
    `document.summary` bound on the Brief Decoder schema was reverted; ANY-232 is untouched.
    Trade-off: criteria here are drafted from structured facts (deliverables, constraints,
@@ -122,6 +127,8 @@ python scripts/agent/runner.py full-check
 - 2026-09-25: decisions 1-5 fixed; owner confirmed the two-scenario shape.
 - 2026-09-26: review #2 found the summary-based handoff source unusable; owner chose a
   structured target scenario (decision 7).
+- 2026-09-28: review #3 found `brief`-only input dropped Brief Decoder's warnings; the input now
+  also carries `issues` and `questions` and the document surfaces them (decision 7).
 
 ## Open questions
 

@@ -312,19 +312,39 @@ _BRIEF_GAPS_KEYWORD = {
     "target_audience": "audience",
     "constraints": "constraint",
 }
-# (draft_from_brief fixture suffix, the Brief Decoder A01 fixture whose `brief` feeds that run)
-_FROM_BRIEF_RUNS = [("", ""), (".weak_input", ".weak_input")]
+# (draft_from_brief fixture suffix, Brief Decoder fixture suffix feeding that run, the criterion
+# keywords Brief Decoder's issues flag -- those lines must end "(to confirm)", no other may)
+_FROM_BRIEF_RUNS = [
+    ("", "", ["modern but also traditional", "holiday season"]),
+    (".weak_input", ".weak_input", []),
+]
+_TO_CONFIRM = " (to confirm)"
 
 
-@pytest.mark.parametrize(("suffix", "brief_suffix"), _FROM_BRIEF_RUNS)
-def test_draft_from_brief_fixtures_are_grounded_in_the_brief_decoder_brief(
-    suffix: str, brief_suffix: str
+def _brief_decoder_result(suffix: str) -> dict[str, Any]:
+    issues = _fixture_response("brief_decoder.detect_issues_v1" + suffix)["issues"]
+    return {
+        "brief": _fixture_response("brief_decoder.extract_brief_v1" + suffix),
+        "issues": issues,
+        "questions": (
+            _fixture_response("brief_decoder.generate_questions_v1" + suffix)["questions"]
+            if issues
+            else []
+        ),
+    }
+
+
+@pytest.mark.parametrize(("suffix", "brief_suffix", "flagged"), _FROM_BRIEF_RUNS)
+def test_draft_from_brief_fixtures_are_grounded_in_the_brief_decoder_result(
+    suffix: str, brief_suffix: str, flagged: list[str]
 ) -> None:
     """draft_from_brief_document.v1.md: criteria restate only deliverables/constraints/deadline/
-    budget entries, `deliverables` is verbatim, `open-gaps` names every missing field. Checked
-    against the real Brief Decoder brief fixture the same run would receive."""
-    brief = _fixture_response("brief_decoder.extract_brief_v1" + brief_suffix)
-    values = brief["values"]
+    budget entries, `deliverables` is verbatim, `open-gaps` names every missing field, and Brief
+    Decoder's warnings survive: every issue and question is listed, and a criterion restating a
+    flagged value is marked "(to confirm)". Checked against the real Brief Decoder fixtures the
+    same run would receive."""
+    result = _brief_decoder_result(brief_suffix)
+    values = result["brief"]["values"]
     sections = {
         s["id"]: s["content"]
         for s in _fixture_response("acceptance_builder.draft_from_brief_document_v1" + suffix)[
@@ -348,30 +368,51 @@ def test_draft_from_brief_fixtures_are_grounded_in_the_brief_decoder_brief(
         assert sections["deliverables"].splitlines() == [f"- {d}" for d in values["deliverables"]]
     else:
         assert sections["deliverables"] == "Not specified in the brief."
-    for name in brief["missing_fields"]:
+    for name in result["brief"]["missing_fields"]:
         assert _BRIEF_GAPS_KEYWORD[name] in sections["open-gaps"].lower(), name
 
+    # The flagged keywords must really be flagged by the Brief Decoder issues (evidence/description),
+    # and the lines carrying them -- and only those -- must be marked as unconfirmed.
+    issue_text = " ".join(
+        f"{i['description']} {i.get('evidence', '')}" for i in result["issues"]
+    ).lower()
+    assert all(keyword in issue_text for keyword in flagged)
+    for line in criteria.splitlines() if sources else []:
+        is_flagged = any(keyword in line.lower() for keyword in flagged)
+        assert line.endswith(_TO_CONFIRM) == is_flagged, line
 
-def test_draft_from_brief_input_is_exactly_brief_decoders_brief_contract() -> None:
+    # Every issue and every question is listed, in Brief Decoder's order.
+    expected_lines = [
+        f"- [{i['severity']}] {i['category']}: {i['description']}" for i in result["issues"]
+    ] + [f"- Ask: {q['question']}" for q in result["questions"]]
+    assert sections["open-issues"].splitlines() == (
+        expected_lines or ["Brief Decoder flagged no issues and proposed no questions."]
+    )
+
+
+def test_draft_from_brief_input_is_exactly_brief_decoders_result_contract() -> None:
     """ANY-26's Brief Decoder -> Acceptance Builder `create draft` handoff maps Brief Decoder's
-    always-present `brief` object here. Schema equality proves every valid Brief Decoder `brief`
-    is valid input (and nothing else is); Brief Decoder's `document.summary` is a readiness note,
-    not a faithful brief, so it is deliberately not the handoff source."""
+    always-present `brief`, `issues` and `questions` here. Schema equality proves every valid
+    Brief Decoder result part is valid input (and nothing else is), including its "no issues => no
+    questions" rule. Brief Decoder's `document.summary` is a readiness note, not a faithful brief,
+    and `brief` alone would drop the warnings that keep flagged values from reading as settled
+    requirements, so neither is the handoff source."""
     target = _load_schema("acceptance_builder.draft_from_brief_input_v1")
     source = _load_schema("brief_decoder.decode_output_v1", product_dir=BRIEF_DECODER_DIR)
+    parts = ["brief", "issues", "questions"]
 
-    assert target["required"] == ["brief"]
+    assert target["required"] == parts
     assert target["additionalProperties"] is False
-    assert target["properties"] == {"brief": source["properties"]["brief"]}
-    assert "brief" in source["required"]  # always present, so the mapped path always exists
+    assert target["properties"] == {part: source["properties"][part] for part in parts}
+    assert (target["if"], target["then"]) == (source["if"], source["then"])
+    assert set(parts) <= set(source["required"])  # always present, so the mapped paths exist
 
 
 @pytest.mark.parametrize("suffix", ["", ".weak_input", ".no_issues"])
-def test_real_brief_decoder_briefs_are_valid_draft_from_brief_input(suffix: str) -> None:
+def test_real_brief_decoder_results_are_valid_draft_from_brief_input(suffix: str) -> None:
     schema = _load_schema("acceptance_builder.draft_from_brief_input_v1")
-    brief = _fixture_response("brief_decoder.extract_brief_v1" + suffix)
 
-    jsonschema.validate({"brief": brief}, schema)
+    jsonschema.validate(_brief_decoder_result(suffix), schema)
 
 
 def test_schemas_are_closed() -> None:

@@ -49,7 +49,7 @@ COMPARE = "acceptance_builder.compare_v1"
 DRAFT_DOCUMENT = "acceptance_builder.draft_document_v1"
 CHECK_DOCUMENT = "acceptance_builder.check_document_v1"
 FROM_BRIEF_DOCUMENT = "acceptance_builder.draft_from_brief_document_v1"
-BRIEF_DECODER_EXTRACT = "brief_decoder.extract_brief_v1"
+BRIEF_DECODER = "brief_decoder"
 STEPS = {
     DRAFT: (EXTRACT, DRAFT_DOCUMENT),
     CHECK: (EXTRACT, COMPARE, CHECK_DOCUMENT),
@@ -169,9 +169,18 @@ def test_input_schemas_are_non_permissive(scenario_id: str, invalid_input: dict[
         jsonschema.validate(invalid_input, schema)
 
 
-def _brief_decoder_brief(suffix: str = "") -> dict[str, Any]:
-    """Brief Decoder's real `brief` output part (its A01 fixture is that part whole)."""
-    return _fixture(BRIEF_DECODER_EXTRACT + suffix)
+def _brief_decoder_result(suffix: str = "") -> dict[str, Any]:
+    """The parts of a Brief Decoder result the handoff target takes, from its real fixtures:
+    `brief` (A01 output whole), `issues` (A04's list) and `questions` (A05's list)."""
+    return {
+        "brief": _fixture(f"{BRIEF_DECODER}.extract_brief_v1{suffix}"),
+        "issues": _fixture(f"{BRIEF_DECODER}.detect_issues_v1{suffix}")["issues"],
+        "questions": (
+            _fixture(f"{BRIEF_DECODER}.generate_questions_v1{suffix}")["questions"]
+            if _fixture(f"{BRIEF_DECODER}.detect_issues_v1{suffix}")["issues"]
+            else []
+        ),
+    }
 
 
 @pytest.mark.parametrize(
@@ -186,13 +195,17 @@ def _brief_decoder_brief(suffix: str = "") -> dict[str, Any]:
         {"brief": {"values": {"invented": "x"}, "missing_fields": []}},
         {"brief": {"values": {}, "missing_fields": ["invented"]}},
         {"brief": {"values": {}, "missing_fields": []}},  # every field in neither values nor missing
-        {"brief": _brief_decoder_brief(), "extra": 1},
+        {**_brief_decoder_result(), "extra": 1},
+        {"brief": _brief_decoder_result()["brief"]},  # issues and questions are required
+        {**_brief_decoder_result(), "issues": [{"category": "other", "severity": "low", "description": "x"}]},
+        {**_brief_decoder_result(), "questions": _brief_decoder_result()["questions"] * 2},  # > 5
+        {**_brief_decoder_result(), "issues": [], "questions": _brief_decoder_result()["questions"]},
     ],
 )
 def test_draft_from_brief_input_schema_is_non_permissive(invalid_input: dict[str, Any]) -> None:
     schema = _schema(INPUT_SCHEMA_REFS[FROM_BRIEF])
 
-    jsonschema.validate({"brief": _brief_decoder_brief()}, schema)
+    jsonschema.validate(_brief_decoder_result(), schema)
     with pytest.raises(jsonschema.ValidationError):
         jsonschema.validate(invalid_input, schema)
 
@@ -200,7 +213,7 @@ def test_draft_from_brief_input_schema_is_non_permissive(invalid_input: dict[str
 @pytest.mark.parametrize("suffix", ["", ".weak_input", ".no_issues"])
 def test_draft_from_brief_accepts_every_real_brief_decoder_brief(suffix: str) -> None:
     jsonschema.validate(
-        {"brief": _brief_decoder_brief(suffix)}, _schema(INPUT_SCHEMA_REFS[FROM_BRIEF])
+        _brief_decoder_result(suffix), _schema(INPUT_SCHEMA_REFS[FROM_BRIEF])
     )
 
 
@@ -299,6 +312,13 @@ def test_draft_from_brief_output_schema_rejects_open_shapes() -> None:
         ),
         "blank_section_content": _mutated(
             valid, lambda o: o["document"]["sections"][2].update(content=" ")
+        ),
+        "open_issues_section_missing": _mutated(valid, lambda o: o["document"]["sections"].pop()),
+        "open_issues_section_wrong_kind": _mutated(
+            valid, lambda o: o["document"]["sections"][3].update(metadata={"kind": "note"})
+        ),
+        "open_issues_section_missing_metadata": _mutated(
+            valid, lambda o: o["document"]["sections"][3].pop("metadata")
         ),
         "empty_summary": _mutated(valid, lambda o: o["document"].update(summary=" ")),
     }
@@ -650,26 +670,37 @@ def test_draft_from_brief_runs_on_a_real_brief_decoder_brief(
     suffix: str,
     adapter_variants: dict[str, str],
 ) -> None:
-    """The handoff target consumes Brief Decoder's own `brief` output: the payload the provider
-    sees carries that brief unchanged, and the document is the fixture grounded in it."""
-    brief = _brief_decoder_brief(suffix)
+    """The handoff target consumes Brief Decoder's own `brief`, `issues` and `questions`: the payload
+    the provider sees carries them unchanged, and the document is the fixture grounded in them."""
+    brief_decoder_result = _brief_decoder_result(suffix)
     adapter = RecordingProviderAdapter(FIXTURE_ROOT, variants=adapter_variants)
     _, output = _run_to_result(
-        app, request_platform_api, session_factory, FROM_BRIEF, {"brief": brief}, adapter
+        app, request_platform_api, session_factory, FROM_BRIEF, brief_decoder_result, adapter
     )
 
     assert tuple(call.action_config_id for call in adapter.calls) == STEPS[FROM_BRIEF]
     assert adapter.calls[0].step_id == "generate_document"
     document_input = adapter.input_payload(0)
     assert document_input["template_ref"] == FROM_BRIEF
-    assert document_input["data"] == {"brief": brief}
+    # brief, issues and questions all reach the provider unchanged: Brief Decoder's warnings are
+    # what keeps flagged values from reading as settled requirements.
+    assert document_input["data"] == brief_decoder_result
+    assert document_input["data"]["issues"]
     assert output == _expected_output(FROM_BRIEF, suffix)
 
 
 @pytest.mark.parametrize(
     "input_payload",
-    [{"brief_text": BRIEF_TEXT}, {"brief": {"values": {}, "missing_fields": []}}],
-    ids=["text_input_for_structured_scenario", "brief_with_field_in_neither_list"],
+    [
+        {"brief_text": BRIEF_TEXT},
+        {"brief": {"values": {}, "missing_fields": []}, "issues": [], "questions": []},
+        {"brief": _brief_decoder_result()["brief"]},
+    ],
+    ids=[
+        "text_input_for_structured_scenario",
+        "brief_with_field_in_neither_list",
+        "issues_and_questions_missing",
+    ],
 )
 def test_invalid_draft_from_brief_input_fails_before_any_provider_call(
     app: Any, request_platform_api, session_factory: SessionFactory, input_payload: dict[str, Any]
