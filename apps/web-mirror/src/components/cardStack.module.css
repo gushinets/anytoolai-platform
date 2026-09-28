@@ -16,3 +16,9 @@
 .stack > [role="status"] {
   justify-self: stretch;
 }
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}

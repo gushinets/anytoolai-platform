@@ -6,6 +6,7 @@ from anytoolai_platform_api.dependencies import (
     get_config_registry,
     get_session_factory,
     get_settings,
+    require_enabled_product,
 )
 from anytoolai_platform_api.errors import ApiError, platform_error_to_api_error
 from anytoolai_platform_api.schemas import (
@@ -193,7 +194,7 @@ SAFE_IDEMPOTENCY_CONFLICT_409_EXAMPLE = {
     },
 )
 def start_scenario(
-    product_id: str,
+    product_id: Annotated[str, Depends(require_enabled_product)],
     scenario_id: str,
     request: Annotated[ScenarioStartRequest, Body()],
     registry: Annotated[ConfigRegistry, Depends(get_config_registry)],

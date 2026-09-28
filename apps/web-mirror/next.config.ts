@@ -5,10 +5,18 @@ import type { NextConfig } from "next";
 // actually reach platform-api, whose port varies per checkout (see scripts/agent/runner.py's
 // dev-up port-offset logic).
 const platformApiBaseUrl = process.env.PLATFORM_API_BASE_URL ?? "http://localhost:18000";
+const webBasePath = process.env.ANYTOOLAI_WEB_BASE_PATH;
 
 const nextConfig: NextConfig = {
+  ...(webBasePath ? { basePath: webBasePath } : {}),
   rewrites() {
-    return Promise.resolve([{ source: "/v1/:path*", destination: `${platformApiBaseUrl}/v1/:path*` }]);
+    return Promise.resolve([
+      {
+        source: "/v1/:path*",
+        destination: `${platformApiBaseUrl}/v1/:path*`,
+        basePath: false,
+      },
+    ]);
   },
   // The canonical gate (`frontend_check()`'s `pnpm -r lint`, then its own `pnpm -r build`) already
   // lints this workspace before that `build` step runs, so without this, that path would pay for

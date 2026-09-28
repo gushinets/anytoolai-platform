@@ -80,20 +80,24 @@ jobs:
           version: "0.11.16"
       - run: uv sync --frozen --group dev
       - name: Boot prod Compose overlay (test secrets, waits for platform-api healthy)
-        run: uv run python scripts/agent/runner.py prod-up
+        run: uv run python scripts/agent/runner.py prod-fake-up
         env:
           ANYTOOLAI_POSTGRES_USER: ci_produser
           ANYTOOLAI_POSTGRES_PASSWORD: ci_testpass123
           ANYTOOLAI_POSTGRES_DB: ci_proddb
+          ANYTOOLAI_ENABLED_PRODUCT_IDS: kernel_demo
+          ANYTOOLAI_PROD_WORKER_MEMORY_LIMIT: 512M
       - name: kernel_demo smoke check against prod
         run: uv run python scripts/agent/runner.py prod-smoke
-      - name: Tear down prod stack
+      - name: Tear down credential-free prod smoke stack
         if: always()
-        run: uv run python scripts/agent/runner.py prod-down
+        run: uv run python scripts/agent/runner.py prod-fake-down
         env:
           ANYTOOLAI_POSTGRES_USER: ci_produser
           ANYTOOLAI_POSTGRES_PASSWORD: ci_testpass123
           ANYTOOLAI_POSTGRES_DB: ci_proddb
+          ANYTOOLAI_ENABLED_PRODUCT_IDS: kernel_demo
+          ANYTOOLAI_PROD_WORKER_MEMORY_LIMIT: 512M
   atoms-proof:
     # Runs the deterministic, credential-free 11-atom + composite workflow proof (ANY-391).
     # Same boot/run/log-dump/teardown shape as compose-smoke-dev, but its own dev Compose stack

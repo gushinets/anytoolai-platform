@@ -12,7 +12,7 @@ const PACKAGE_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const REPO_ROOT = join(PACKAGE_ROOT, "..", "..", "..");
 const SCHEMA_PATH = join(REPO_ROOT, "docs", "generated", "openapi.json");
 const OUTPUT_PATH = join(PACKAGE_ROOT, "src", "api", "generated", "platformApi.ts");
-const OPENAPI_TS_BIN = join(PACKAGE_ROOT, "node_modules", ".bin", "openapi-typescript");
+const OPENAPI_TS_CLI = join(PACKAGE_ROOT, "node_modules", "openapi-typescript", "bin", "cli.js");
 
 function generate(outputPath) {
   if (!existsSync(SCHEMA_PATH)) {
@@ -22,7 +22,7 @@ function generate(outputPath) {
     );
     process.exit(1);
   }
-  execFileSync(OPENAPI_TS_BIN, [SCHEMA_PATH, "-o", outputPath], { stdio: "inherit" });
+  execFileSync(process.execPath, [OPENAPI_TS_CLI, SCHEMA_PATH, "-o", outputPath], { stdio: "inherit" });
 }
 
 function main() {

@@ -117,6 +117,7 @@ export const proposalAiDefinition: ProductDefinition<ProposalAIValues, string> =
   messageScope: "generate",
   hasDescription: true,
   hasStartAnother: true,
+  inlineResult: true,
   emptyValues: { taskText: "", freelancerPositioning: "", tone: "warm" },
   validate,
   toInput: (values) => ({
@@ -126,7 +127,9 @@ export const proposalAiDefinition: ProductDefinition<ProposalAIValues, string> =
   }),
   extractResult: (output) => (typeof output.text === "string" ? output.text : null),
   Fields: ProposalAIFields,
-  Result: ({ result, onCopy }) => <ResultView text={result} onCopy={onCopy} />,
+  Result: ({ result, onCopy, secondaryAction }) => (
+    <ResultView text={result} onCopy={onCopy} secondaryAction={secondaryAction} embedded />
+  ),
 };
 
 export type ProposalAIProductProps = {

@@ -86,3 +86,8 @@
 .titleRow h1 {
   margin: 0;
 }
+
+.wideShell .nav,
+.wideShell .titleRow {
+  width: 100%;
+}

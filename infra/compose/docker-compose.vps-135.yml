@@ -1,0 +1,18 @@
+services:
+  platform-worker:
+    networks:
+      - default
+      - infra_prompttune
+
+  web-mirror:
+    networks:
+      - default
+      - payments-portal-prod_edge
+
+networks:
+  infra_prompttune:
+    external: true
+    name: infra_prompttune
+  payments-portal-prod_edge:
+    external: true
+    name: payments-portal-prod_edge

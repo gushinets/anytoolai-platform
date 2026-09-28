@@ -38,6 +38,7 @@ async def run() -> None:
         database_url=settings.database_url,
         decode_database_name=settings.decode_database_name,
         poll_interval_seconds=settings.poll_interval_seconds,
+        enabled_product_ids=settings.enabled_product_ids,
     )
     try:
         _register_sigterm_handler(asyncio.get_running_loop(), worker.request_shutdown)

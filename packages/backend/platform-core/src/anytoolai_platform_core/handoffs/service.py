@@ -182,6 +182,10 @@ class HandoffService:
                     return self.build_safe_preview(record, redact_expired_token=True)
         return self.build_safe_preview(record)
 
+    def product_ids_by_token(self, token: str, *, tenant_id: str, region: str) -> tuple[str, str]:
+        record = self._by_token(token, tenant_id=tenant_id, region=region)
+        return record.source_product_id, record.target_product_id
+
     def accept(self, token: str, command: AcceptHandoffCommand) -> HandoffAccepted:
         record = self._by_token(token, tenant_id=command.tenant_id, region=command.region)
         now = self._clock()

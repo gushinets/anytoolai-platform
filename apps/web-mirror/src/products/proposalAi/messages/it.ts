@@ -24,10 +24,18 @@ export const it: Shape<typeof en> = {
     taskText: "Descrizione dell’incarico",
     freelancerPositioning: "Il suo posizionamento",
   },
+  workspace: {
+    inputTitle: "I suoi dati",
+    resultTitle: "Proposta",
+    placeholder: "La proposta apparirà qui dopo la generazione.",
+    previousDetails: "Creata con i dati precedenti",
+    regenerate: "Rigenerare la proposta",
+    backToInputs: "Tornare ai dati",
+  },
   generate: {
     submit: "Generare la proposta",
     running: "Generazione della proposta in corso…",
     runFailed: "Si è verificato un problema durante la generazione della proposta. Riprovare.",
-    startAnother: "Creare un’altra proposta",
+    startAnother: "Nuovo incarico",
   },
 };
