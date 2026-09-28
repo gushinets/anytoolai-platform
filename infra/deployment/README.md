@@ -11,6 +11,8 @@ Covers the Proposal AI public web stack (`web-mirror`, `platform-api`, `platform
 - `docker-compose.prod.yml` — prod overlay. Never auto-merged; always passed explicitly.
 - `docker-compose.live.yml` — live provider profile mounts and worker-only OpenAI/proxy settings.
   `prod-up` selects base + prod + live; `prod-fake-up` selects base + prod only.
+- `docker-compose.atom-lab.yml` — private Atom Lab overlay over the base services: durable
+  PostgreSQL, loopback-only ports, required Lab/live/provider secrets, and no public web service.
 - `docker-compose.vps-135.yml` — optional occupied-host network overlay. Setting
   `ANYTOOLAI_VPS_135_NETWORKS=1` makes live `prod-up`/`prod-ready` append it: only
   `platform-worker` joins external `infra_prompttune`, and only `web-mirror` joins external
@@ -110,7 +112,7 @@ defaults are `ANYTOOLAI_ATOM_LAB_RUN_BODY_MAX_BYTES=393216`,
 `ANYTOOLAI_ATOM_LAB_RUN_DAILY_LIMIT=100`, and
 `ANYTOOLAI_ATOM_LAB_RUN_ACTIVE_LIMIT=1`. They bound HTTP payloads and admission counts; they are
 technical limits, not guarantees about a selected model's context-window capacity. Set overrides in
-the operator environment or gitignored `.env.prod`; never add them to `platform-worker`.
+the operator environment or gitignored `.env.atom-lab`; never add them to `platform-worker`.
 
 For a closed local check, set the code only in the shell that starts Compose:
 
@@ -125,6 +127,128 @@ committed `.env`, logs, screenshots, or browser storage. Use HTTPS and an intern
 any non-local deployment, distribute the code separately, and rotate it by changing the operator
 secret followed by an API restart. Production rollout remains operator-owned and is not performed
 by ANY-459.
+
+### Internal Atom Lab Compose deployment
+
+`atom-lab-*` is the reviewed deployment package for the private Lab. It composes the existing
+`postgres`, one-shot `migrate`, `platform-api`, and `platform-worker` services from
+`docker-compose.yml` with `docker-compose.atom-lab.yml`; it adds no service, database technology,
+SSO layer, or public frontend. The API image already packages `/atom-lab` HTML/CSS/JavaScript.
+PostgreSQL and the API bind to loopback only. External access must pass through an operator-owned
+HTTPS reverse proxy restricted to the approved internal network.
+
+Run `python3 scripts/agent/runner.py quick-check` once, copy `.env.example` to the gitignored
+`.env.atom-lab`, and set unique PostgreSQL credentials, a high-entropy Lab access code, a different
+server live token, the worker-only OpenAI key, the exact approved HTTPS origin, and a measured
+worker memory limit. Configure the worker proxy when required. Do not reuse the Lab code as the
+live token or `/demo` code. Do not put any credential in a URL, command argument, ticket, Git,
+screenshot, proxy access log, or evidence file. Readiness prints only the configured origin.
+
+Before starting Compose, configure ingress. The exact proxy is operator-owned, but it must enforce
+TLS and a network/VPN allowlist before proxying `/atom-lab`, `/atom-lab/*`, and
+`/v1/atom-lab/*` to the loopback API port. Remove `Cookie` and `Authorization` request headers and
+deny these paths on every public virtual host. The Lab uses only `X-Atom-Lab-Access-Code`; a shared
+code is not an internet-facing authentication system and does not replace the network gate.
+
+```bash
+python3 scripts/agent/runner.py atom-lab-up
+python3 scripts/agent/runner.py atom-lab-status
+python3 scripts/agent/runner.py atom-lab-ready
+```
+
+`atom-lab-up` fails before Compose if a required value or HTTPS origin is missing. The dedicated
+`migrate` container must exit successfully before API/worker startup. Readiness verifies health,
+all packaged assets, fail-closed missing/wrong codes, the authenticated eleven-atom catalog, and a
+running worker. It does not claim that ingress is private or that a paid provider call succeeded.
+
+After the operator verifies HTTPS and the network boundary, run the paid smoke in an approved cost
+window:
+
+```bash
+python3 scripts/agent/runner.py atom-lab-smoke
+```
+
+This reuses the existing A01-A11 Atom Lab live-canary and its cost ceiling/evidence format. After
+all runs are terminal, it restarts API and worker and requires the same recent protected history to
+remain visible. A restart does not resume an interrupted provider call; existing lease
+reconciliation remains authoritative. Keep the redacted evidence report plus the actual HTTPS
+address, time, reviewed commit, and operator confirmation. Never include access/provider/live
+secrets or prompt/input/result bodies. Without an approved address, credentials, cost authority,
+and operator confirmation, the package may be reported as verified but rollout and ANY-468 remain
+incomplete.
+
+#### Shared data and access-code rotation
+
+History and preset versions are shared by everyone with the Lab code. They may contain team-entered
+prompts, inputs, and outputs, have no per-user attribution, and have no automatic retention/deletion
+policy. Limit the code to the named internal group and agree what data may be entered. Preset
+versions and accepted run snapshots are immutable; do not edit them directly in PostgreSQL.
+
+To rotate, replace only `ANYTOOLAI_ATOM_LAB_ACCESS_CODE` in the secret store or `.env.atom-lab`,
+run `atom-lab-up`, then run readiness and verify the old code receives
+`401 atom_lab_access_denied`. Rotation does not re-encrypt or delete history/presets. For a suspected
+leak, remove ingress first, rotate and verify, then restore the allowlisted route.
+
+#### Catalog and limits troubleshooting
+
+An empty catalog disables runs until the worker completes its first provider catalog refresh. A
+failed later refresh retains the last-good catalog marked stale. Inspect protected
+`/v1/atom-lab/models` metadata and worker logs by timestamp/error code; never print environment
+values. Confirm worker-only OpenAI/proxy egress, matching account scope, refresh lease/TTL/cooldown,
+and host time. Manual refresh is coalesced and may be cooldown-limited. Restarting API does not
+refresh the catalog, and deleting catalog/history rows is not a repair procedure.
+
+The default API-only admission bounds are 384 KiB request body, 256 KiB input, 64 KiB prompt, 100
+accepted starts per UTC day, and one active run. They are backend limits, not a model context-window
+promise. Change them only in `.env.atom-lab`, keep them off the worker, and rerun deployment plus
+readiness after review.
+
+#### Backup, recovery, and rollback
+
+Back up before the first deployment and every migration. This streams a custom-format dump without
+exposing a password (replace the destination with a protected operator path):
+
+```bash
+docker compose --project-name anytoolai-atom-lab \
+  --env-file infra/compose/.env.atom-lab \
+  -f infra/compose/docker-compose.yml \
+  -f infra/compose/docker-compose.atom-lab.yml \
+  exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' \
+  > /operator/backups/anytoolai-atom-lab-YYYYMMDDTHHMMSSZ.dump
+```
+
+Record the checksum, commit, Alembic head, and UTC time. Test by restoring into a separate empty
+database; file existence is not restore evidence. Never use `down --volumes`, `docker volume rm`, a
+destructive Alembic downgrade, or in-place `pg_restore --clean` as rollback. `atom-lab-down`
+preserves the named PostgreSQL volume.
+
+For an application-only rollback, stop API/worker, check out the prior reviewed commit, and reuse
+the volume only if that commit supports the current schema. Otherwise keep the original database
+untouched: create a recovery database in the same preserved volume, restore the dump, then change
+only `ANYTOOLAI_POSTGRES_DB` in `.env.atom-lab` and start the reviewed commit:
+
+```bash
+docker compose --project-name anytoolai-atom-lab \
+  --env-file infra/compose/.env.atom-lab \
+  -f infra/compose/docker-compose.yml \
+  -f infra/compose/docker-compose.atom-lab.yml \
+  stop platform-api platform-worker
+docker compose --project-name anytoolai-atom-lab \
+  --env-file infra/compose/.env.atom-lab \
+  -f infra/compose/docker-compose.yml \
+  -f infra/compose/docker-compose.atom-lab.yml \
+  exec -T postgres sh -c 'createdb -U "$POSTGRES_USER" atom_lab_recovery_YYYYMMDD'
+docker compose --project-name anytoolai-atom-lab \
+  --env-file infra/compose/.env.atom-lab \
+  -f infra/compose/docker-compose.yml \
+  -f infra/compose/docker-compose.atom-lab.yml \
+  exec -T postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d atom_lab_recovery_YYYYMMDD' \
+  < /operator/backups/anytoolai-atom-lab-YYYYMMDDTHHMMSSZ.dump
+```
+
+Run deployment and readiness against the recovery database, then verify protected history and
+preset versions before reopening ingress. Keep the old database/volume until recovery is accepted
+and a new backup is verified. `atom-lab-down` removes containers/networks, not history.
 
 ### Run the stakeholder page locally
 

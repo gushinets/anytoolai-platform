@@ -9,6 +9,8 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 COMPOSE_PATH = ROOT / "infra" / "compose" / "docker-compose.yml"
+ATOM_LAB_COMPOSE_PATH = ROOT / "infra" / "compose" / "docker-compose.atom-lab.yml"
+API_DOCKERFILE_PATH = ROOT / "infra" / "docker" / "platform-api.Dockerfile"
 ATOM_LAB_BROWSER_PACKAGE_PATH = ROOT / "tests" / "e2e" / "atom-lab-browser" / "package.json"
 ATOM_LAB_MODULE_PATH = (
     ROOT
@@ -76,6 +78,27 @@ def test_atom_lab_run_limits_are_wired_only_to_platform_api() -> None:
             continue
         environment = service.get("environment", {})
         assert all(variable not in environment for variable in ATOM_LAB_RUN_LIMITS)
+
+
+def test_internal_atom_lab_overlay_preserves_credential_boundaries() -> None:
+    source = ATOM_LAB_COMPOSE_PATH.read_text(encoding="utf-8")
+    api_block, worker_block = source.split("  platform-worker:", maxsplit=1)
+
+    assert "ANYTOOLAI_ATOM_LAB_ACCESS_CODE:" in api_block
+    assert "ANYTOOLAI_LIVE_CANARY_TOKEN:" in api_block
+    assert "OPENAI_API_KEY:" not in api_block
+    assert "OPENAI_API_KEY:" in worker_block
+    assert "ANYTOOLAI_ATOM_LAB_ACCESS_CODE:" not in worker_block
+    assert "ANYTOOLAI_LIVE_CANARY_TOKEN:" not in worker_block
+    assert "127.0.0.1:${ANYTOOLAI_ATOM_LAB_API_PORT:-8000}:8000" in source
+    assert "127.0.0.1:${ANYTOOLAI_ATOM_LAB_POSTGRES_PORT:-5432}:5432" in source
+
+
+def test_platform_api_image_packages_atom_lab_static_assets() -> None:
+    dockerfile = API_DOCKERFILE_PATH.read_text(encoding="utf-8")
+    assert "COPY . ." in dockerfile
+    for asset in ("index.html", "atom_lab.css", "atom_lab.mjs"):
+        assert (ATOM_LAB_MODULE_PATH.parent / asset).is_file()
 
 
 def test_public_frontends_cannot_import_atom_lab_authority_or_overrides() -> None:

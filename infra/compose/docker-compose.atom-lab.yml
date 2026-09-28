@@ -1,0 +1,70 @@
+# Internal Atom Lab deployment overlay for docker-compose.yml.
+#
+# This reuses the existing postgres/migrate/platform-api/platform-worker services. It deliberately
+# does not add web-mirror: the Lab shell and assets are packaged and served by platform-api.
+# Keep the API and PostgreSQL bound to loopback; an operator-owned HTTPS reverse proxy and internal
+# network allowlist are the only supported ingress path.
+
+x-atom-lab-postgres-credentials: &atom-lab-postgres-credentials
+  ANYTOOLAI_POSTGRES_USER: ${ANYTOOLAI_POSTGRES_USER:?Atom Lab PostgreSQL user is required}
+  ANYTOOLAI_POSTGRES_PASSWORD: ${ANYTOOLAI_POSTGRES_PASSWORD:?Atom Lab PostgreSQL password is required}
+  ANYTOOLAI_POSTGRES_DB: ${ANYTOOLAI_POSTGRES_DB:?Atom Lab PostgreSQL database is required}
+
+services:
+  postgres:
+    environment:
+      POSTGRES_USER: ${ANYTOOLAI_POSTGRES_USER:?Atom Lab PostgreSQL user is required}
+      POSTGRES_PASSWORD: ${ANYTOOLAI_POSTGRES_PASSWORD:?Atom Lab PostgreSQL password is required}
+      POSTGRES_DB: ${ANYTOOLAI_POSTGRES_DB:?Atom Lab PostgreSQL database is required}
+    ports: !override
+      - "127.0.0.1:${ANYTOOLAI_ATOM_LAB_POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - atom-lab-postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
+
+  migrate:
+    environment:
+      <<: *atom-lab-postgres-credentials
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+  platform-api:
+    environment:
+      <<: *atom-lab-postgres-credentials
+      ANYTOOLAI_ATOM_LAB_ACCESS_CODE: ${ANYTOOLAI_ATOM_LAB_ACCESS_CODE:?Atom Lab access code is required}
+      ANYTOOLAI_LIVE_CANARY_TOKEN: ${ANYTOOLAI_LIVE_CANARY_TOKEN:?Atom Lab server live token is required}
+      # /demo remains separately gated and can stay disabled without affecting Atom Lab.
+      ANYTOOLAI_DEMO_ACCESS_CODE: ${ANYTOOLAI_DEMO_ACCESS_CODE-}
+    ports: !override
+      - "127.0.0.1:${ANYTOOLAI_ATOM_LAB_API_PORT:-8000}:8000"
+    restart: unless-stopped
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+  platform-worker:
+    environment:
+      <<: *atom-lab-postgres-credentials
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?Atom Lab worker OpenAI key is required}
+      HTTPS_PROXY: ${ANYTOOLAI_LLM_HTTPS_PROXY-}
+      AIOHTTP_TRUST_ENV: "true"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: ${ANYTOOLAI_ATOM_LAB_WORKER_MEMORY_LIMIT:?Atom Lab worker memory limit is required}
+
+volumes:
+  atom-lab-postgres-data:

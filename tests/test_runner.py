@@ -3407,3 +3407,145 @@ def test_dev_down_clears_active_live_selection(monkeypatch, tmp_path):
 
     assert runner.dev_down() == 0
     assert not marker.exists()
+
+
+ATOM_LAB_DEPLOYMENT_VALUES = {
+    "ANYTOOLAI_POSTGRES_USER": "lab-user",
+    "ANYTOOLAI_POSTGRES_PASSWORD": "lab-password",
+    "ANYTOOLAI_POSTGRES_DB": "lab-db",
+    "ANYTOOLAI_ATOM_LAB_ACCESS_CODE": "lab-access",
+    "ANYTOOLAI_LIVE_CANARY_TOKEN": "server-live-token",
+    "OPENAI_API_KEY": "provider-key",
+    "ANYTOOLAI_ATOM_LAB_INTERNAL_URL": "https://atom-lab.internal.example",
+    "ANYTOOLAI_ATOM_LAB_WORKER_MEMORY_LIMIT": "768M",
+    "ANYTOOLAI_ATOM_LAB_API_PORT": "18468",
+    "ANYTOOLAI_ATOM_LAB_POSTGRES_PORT": "15468",
+}
+
+
+@pytest.mark.parametrize(
+    "missing_name",
+    [
+        "ANYTOOLAI_POSTGRES_PASSWORD",
+        "ANYTOOLAI_ATOM_LAB_ACCESS_CODE",
+        "ANYTOOLAI_LIVE_CANARY_TOKEN",
+        "OPENAI_API_KEY",
+        "ANYTOOLAI_ATOM_LAB_INTERNAL_URL",
+        "ANYTOOLAI_ATOM_LAB_WORKER_MEMORY_LIMIT",
+    ],
+)
+def test_atom_lab_deployment_rejects_missing_required_values(monkeypatch, missing_name) -> None:
+    runner = load_runner_module()
+    values = ATOM_LAB_DEPLOYMENT_VALUES | {missing_name: ""}
+    monkeypatch.setattr(runner, "_resolved_env_file", lambda path: values)
+
+    with pytest.raises(ValueError, match=missing_name):
+        runner._atom_lab_deployment_inputs()
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://atom-lab.internal.example",
+        "https://user@atom-lab.internal.example",
+        "https://atom-lab.internal.example/path",
+    ],
+)
+def test_atom_lab_deployment_requires_plain_https_origin(monkeypatch, url) -> None:
+    runner = load_runner_module()
+    monkeypatch.setattr(
+        runner,
+        "_resolved_env_file",
+        lambda path: ATOM_LAB_DEPLOYMENT_VALUES | {"ANYTOOLAI_ATOM_LAB_INTERNAL_URL": url},
+    )
+
+    with pytest.raises(ValueError, match="HTTPS origin"):
+        runner._atom_lab_deployment_inputs()
+
+
+def test_atom_lab_deployment_keeps_access_and_server_tokens_separate(monkeypatch) -> None:
+    runner = load_runner_module()
+    monkeypatch.setattr(
+        runner,
+        "_resolved_env_file",
+        lambda path: ATOM_LAB_DEPLOYMENT_VALUES
+        | {"ANYTOOLAI_LIVE_CANARY_TOKEN": "lab-access"},
+    )
+
+    with pytest.raises(ValueError, match="must be different"):
+        runner._atom_lab_deployment_inputs()
+
+
+def test_atom_lab_compose_mode_uses_only_base_and_internal_overlay(monkeypatch, tmp_path) -> None:
+    runner = load_runner_module()
+    env_file = tmp_path / ".env.atom-lab"
+    env_file.write_text("", encoding="utf-8")
+    monkeypatch.setattr(runner, "ATOM_LAB_ENV_FILE", env_file)
+
+    command = runner._atom_lab_compose_command("ps")
+
+    assert command[:5] == [
+        "docker",
+        "compose",
+        "--project-name",
+        "anytoolai-atom-lab",
+        "--env-file",
+    ]
+    compose_files = [command[index + 1] for index, value in enumerate(command) if value == "-f"]
+    assert compose_files == [str(runner.COMPOSE_FILE), str(runner.COMPOSE_ATOM_LAB_FILE)]
+    assert str(runner.COMPOSE_PROD_FILE) not in command
+    assert str(runner.COMPOSE_LIVE_FILE) not in command
+
+
+def test_atom_lab_ready_checks_assets_auth_catalog_and_worker(monkeypatch) -> None:
+    runner = load_runner_module()
+    inputs = runner.AtomLabDeploymentInputs(
+        dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
+    )
+    monkeypatch.setattr(runner, "_wait_for_http_ok", lambda url, timeout: True)
+
+    def request(url, *, access_code=None):
+        if url.endswith("/atom-lab"):
+            return 200, b"html", "text/html"
+        if url.endswith(".css"):
+            return 200, b"css", "text/css"
+        if url.endswith(".mjs"):
+            return 200, b"js", "application/javascript"
+        if access_code == "lab-access":
+            catalog = [{"atom_id": f"A{index:02d}"} for index in range(1, 12)]
+            return 200, json.dumps(catalog).encode(), "application/json"
+        denied = {"error": {"code": "atom_lab_access_denied"}}
+        return 401, json.dumps(denied).encode(), "application/json"
+
+    monkeypatch.setattr(runner, "_atom_lab_request", request)
+    monkeypatch.setattr(
+        runner.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, "container-id\n", ""),
+    )
+
+    assert runner._atom_lab_ready(inputs, announce=False) == 0
+
+
+def test_atom_lab_smoke_reuses_live_canary_and_compares_history_after_restart(monkeypatch) -> None:
+    runner = load_runner_module()
+    inputs = runner.AtomLabDeploymentInputs(
+        dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
+    )
+    monkeypatch.setattr(runner, "_atom_lab_deployment_inputs", lambda: inputs)
+    monkeypatch.setattr(runner, "quick_check_venv_ready", lambda path: True)
+    monkeypatch.setattr(runner, "_atom_lab_ready", lambda inputs, announce=False: 0)
+    histories = iter([("run-2", "run-1"), ("run-2", "run-1")])
+    monkeypatch.setattr(runner, "_atom_lab_history_ids", lambda inputs: next(histories))
+    calls = []
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda command, env, **kwargs: calls.append((list(command), dict(env))) or 0,
+    )
+
+    assert runner.atom_lab_smoke() == 0
+    assert calls[0][0][1] == "scripts/agent/live_canary.py"
+    assert calls[0][1]["ANYTOOLAI_LIVE_CANARY_SURFACE"] == "atom-lab"
+    assert "restart" in calls[1][0]
+    assert calls[1][0][-2:] == ["platform-api", "platform-worker"]

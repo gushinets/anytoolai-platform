@@ -19,9 +19,10 @@ import uuid
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from http import HTTPStatus
 from pathlib import Path
 from typing import NamedTuple
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[2]
 QUICK_CHECK_VENV = ROOT / ".quick-check-venv"
@@ -32,13 +33,16 @@ COMPOSE_OVERRIDE_FILE = ROOT / "infra" / "compose" / "docker-compose.override.ym
 COMPOSE_PROD_FILE = ROOT / "infra" / "compose" / "docker-compose.prod.yml"
 COMPOSE_LIVE_FILE = ROOT / "infra" / "compose" / "docker-compose.live.yml"
 COMPOSE_VPS_135_FILE = ROOT / "infra" / "compose" / "docker-compose.vps-135.yml"
+COMPOSE_ATOM_LAB_FILE = ROOT / "infra" / "compose" / "docker-compose.atom-lab.yml"
 LIVE_ENV_FILE = ROOT / "infra" / "compose" / ".env.live"
 # Optional, gitignored (see .gitignore's `.env.*` rule) -- a local convenience so credentials
 # don't have to be re-exported in every shell. Never auto-loaded for dev; only prod commands
 # pass it to `docker compose` via --env-file, and only if it actually exists on disk.
 PROD_ENV_FILE = ROOT / "infra" / "compose" / ".env.prod"
+ATOM_LAB_ENV_FILE = ROOT / "infra" / "compose" / ".env.atom-lab"
 PROD_COMPOSE_PROJECT = "anytoolai-prod"
 PROD_FAKE_COMPOSE_PROJECT = "anytoolai-prod-fake"
+ATOM_LAB_COMPOSE_PROJECT = "anytoolai-atom-lab"
 PROFILE_VERSION_HEX_LENGTH = 32
 # The non-root API user is not the operator who writes this non-secret state.
 # umask must not leave the bind-mounted directory or marker owner-only.
@@ -97,6 +101,7 @@ ACTION_REGISTRY_ROWS = [
     ("A03 `score_multidim`", "`text.score_multidimensional_axes`"),
     ("A05 `generate_questions`", "`text.generate_clarifying_questions`"),
 ]
+ATOM_LAB_ATOM_COUNT = 11
 
 
 def _path_key(value: str) -> str:
@@ -1689,6 +1694,350 @@ def brief_decoder_smoke() -> int:
     )
 
 
+@dataclass(frozen=True)
+class AtomLabDeploymentInputs:
+    compose_env: dict[str, str]
+    api_port: int
+    postgres_port: int
+    internal_url: str
+
+
+def _atom_lab_compose_command(*args: str, include_env_file: bool = True) -> list[str]:
+    env_file = ATOM_LAB_ENV_FILE if include_env_file and ATOM_LAB_ENV_FILE.is_file() else None
+    return _docker_compose_command(
+        ATOM_LAB_COMPOSE_PROJECT,
+        (COMPOSE_FILE, COMPOSE_ATOM_LAB_FILE),
+        *args,
+        env_file=env_file,
+    )
+
+
+def _atom_lab_deployment_inputs() -> AtomLabDeploymentInputs:
+    env = _resolved_env_file(ATOM_LAB_ENV_FILE)
+    required = (
+        "ANYTOOLAI_POSTGRES_USER",
+        "ANYTOOLAI_POSTGRES_PASSWORD",
+        "ANYTOOLAI_POSTGRES_DB",
+        "ANYTOOLAI_ATOM_LAB_ACCESS_CODE",
+        "ANYTOOLAI_LIVE_CANARY_TOKEN",
+        "OPENAI_API_KEY",
+        "ANYTOOLAI_ATOM_LAB_INTERNAL_URL",
+        "ANYTOOLAI_ATOM_LAB_WORKER_MEMORY_LIMIT",
+    )
+    for name in required:
+        if not env.get(name, "").strip():
+            raise ValueError(f"{name} is required for an internal Atom Lab deployment")
+    if env["ANYTOOLAI_ATOM_LAB_ACCESS_CODE"] == env["ANYTOOLAI_LIVE_CANARY_TOKEN"]:
+        raise ValueError("Atom Lab access code and server live token must be different")
+    demo_access_code = env.get("ANYTOOLAI_DEMO_ACCESS_CODE", "")
+    if demo_access_code and demo_access_code == env["ANYTOOLAI_ATOM_LAB_ACCESS_CODE"]:
+        raise ValueError("Atom Lab and /demo access codes must be different")
+
+    internal_url = env["ANYTOOLAI_ATOM_LAB_INTERNAL_URL"].rstrip("/")
+    parsed_url = urlsplit(internal_url)
+    try:
+        _ = parsed_url.port
+    except ValueError as exc:
+        raise ValueError("ANYTOOLAI_ATOM_LAB_INTERNAL_URL has an invalid port") from exc
+    if (
+        parsed_url.scheme != "https"
+        or not parsed_url.hostname
+        or parsed_url.username is not None
+        or parsed_url.password is not None
+        or parsed_url.path not in {"", "/"}
+        or parsed_url.query
+        or parsed_url.fragment
+    ):
+        raise ValueError(
+            "ANYTOOLAI_ATOM_LAB_INTERNAL_URL must be an HTTPS origin without credentials, "
+            "a path, query, or fragment"
+        )
+    api_port = _port_override("ANYTOOLAI_ATOM_LAB_API_PORT", 8000, env)
+    postgres_port = _port_override("ANYTOOLAI_ATOM_LAB_POSTGRES_PORT", 5432, env)
+    if api_port == postgres_port:
+        raise ValueError("Atom Lab API and PostgreSQL ports must be different")
+    try:
+        ready_timeout = float(env.get("ANYTOOLAI_READY_TIMEOUT", "90"))
+    except ValueError as exc:
+        raise ValueError("ANYTOOLAI_READY_TIMEOUT must be a number") from exc
+    if ready_timeout <= 0:
+        raise ValueError("ANYTOOLAI_READY_TIMEOUT must be positive")
+    return AtomLabDeploymentInputs(env, api_port, postgres_port, internal_url)
+
+
+def _atom_lab_stack_running(inputs: AtomLabDeploymentInputs) -> bool:
+    return _compose_stack_running(_atom_lab_compose_command(), inputs.compose_env)
+
+
+def _atom_lab_local_identity(inputs: AtomLabDeploymentInputs) -> RuntimeIdentity:
+    return RuntimeIdentity(
+        worktree_hash="atom-lab",
+        compose_project=ATOM_LAB_COMPOSE_PROJECT,
+        postgres_port=inputs.postgres_port,
+        api_port=inputs.api_port,
+    )
+
+
+def _atom_lab_database_url(inputs: AtomLabDeploymentInputs) -> str:
+    env = inputs.compose_env
+    return (
+        f"postgresql://{quote(env['ANYTOOLAI_POSTGRES_USER'], safe='')}:"
+        f"{quote(env['ANYTOOLAI_POSTGRES_PASSWORD'], safe='')}"
+        f"@127.0.0.1:{inputs.postgres_port}/{quote(env['ANYTOOLAI_POSTGRES_DB'], safe='')}"
+    )
+
+
+def _atom_lab_request(
+    url: str, *, access_code: str | None = None
+) -> tuple[int, bytes, str]:
+    headers = {"Accept": "application/json"}
+    if access_code is not None:
+        headers["X-Atom-Lab-Access-Code"] = access_code
+    request = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:
+            return response.status, response.read(), response.headers.get_content_type()
+    except urllib.error.HTTPError as exc:
+        return exc.code, exc.read(), exc.headers.get_content_type()
+
+
+def _atom_lab_ready(inputs: AtomLabDeploymentInputs, *, announce: bool = True) -> int:
+    timeout = float(inputs.compose_env.get("ANYTOOLAI_READY_TIMEOUT", "90"))
+    identity = _atom_lab_local_identity(inputs)
+    if not _wait_for_http_ok(f"{identity.api_url}/health", timeout):
+        print("LAB003: Atom Lab API health check timed out", file=sys.stderr)
+        return 1
+    try:
+        for asset_path, expected_content_type in (
+            ("/atom-lab", "text/html"),
+            ("/atom-lab/atom_lab.css", "text/css"),
+            ("/atom-lab/atom_lab.mjs", "application/javascript"),
+        ):
+            status, body, content_type = _atom_lab_request(f"{identity.api_url}{asset_path}")
+            if status != HTTPStatus.OK or not body or content_type != expected_content_type:
+                raise ValueError(f"asset {asset_path} is unavailable or has the wrong content type")
+
+        protected_url = f"{identity.api_url}/v1/atom-lab/atoms"
+        missing_status, missing_body, _ = _atom_lab_request(protected_url)
+        wrong_status, wrong_body, _ = _atom_lab_request(
+            protected_url,
+            access_code=inputs.compose_env["ANYTOOLAI_ATOM_LAB_ACCESS_CODE"] + "-invalid",
+        )
+        valid_status, valid_body, _ = _atom_lab_request(
+            protected_url,
+            access_code=inputs.compose_env["ANYTOOLAI_ATOM_LAB_ACCESS_CODE"],
+        )
+        if missing_status != HTTPStatus.UNAUTHORIZED or wrong_status != HTTPStatus.UNAUTHORIZED:
+            raise ValueError("missing or wrong Atom Lab access code did not fail closed")
+        for body in (missing_body, wrong_body):
+            payload = json.loads(body)
+            if payload.get("error", {}).get("code") != "atom_lab_access_denied":
+                raise ValueError("Atom Lab access denial did not use the safe error envelope")
+        catalog = json.loads(valid_body)
+        if (
+            valid_status != HTTPStatus.OK
+            or not isinstance(catalog, list)
+            or len(catalog) != ATOM_LAB_ATOM_COUNT
+        ):
+            raise ValueError("valid Atom Lab access did not return the eleven-atom catalog")
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        print(f"LAB004: Atom Lab readiness failed: {exc}", file=sys.stderr)
+        return 1
+
+    try:
+        worker_check = subprocess.run(
+            [
+                *_atom_lab_compose_command(),
+                "ps",
+                "--status",
+                "running",
+                "-q",
+                "platform-worker",
+            ],
+            cwd=ROOT,
+            env=inputs.compose_env,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        print(f"LAB005: could not inspect Atom Lab worker: {exc}", file=sys.stderr)
+        return 1
+    if worker_check.returncode != 0 or not worker_check.stdout.strip():
+        print("LAB005: Atom Lab worker is not running", file=sys.stderr)
+        return 1
+    if announce:
+        print(f"Local API: {identity.api_url}")
+        print(f"Internal URL: {inputs.internal_url}/atom-lab")
+        print(
+            "Atom Lab deployment package is ready; external HTTPS/network checks remain "
+            "operator-owned"
+        )
+    return 0
+
+
+def atom_lab_up() -> int:
+    try:
+        inputs = _atom_lab_deployment_inputs()
+        stack_running = _atom_lab_stack_running(inputs)
+    except ValueError as exc:
+        print(f"LAB001: {exc}", file=sys.stderr)
+        return 2
+    except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+        print(f"LAB002: Docker Compose preflight failed: {exc}", file=sys.stderr)
+        return 1
+    except OSError as exc:
+        print(f"LAB001: {exc}", file=sys.stderr)
+        return 2
+    if not stack_running and not _check_ports_available(
+        "LAB002",
+        [
+            ("API", inputs.api_port, "ANYTOOLAI_ATOM_LAB_API_PORT", None),
+            ("PostgreSQL", inputs.postgres_port, "ANYTOOLAI_ATOM_LAB_POSTGRES_PORT", None),
+        ],
+    ):
+        return 1
+    committed = False
+    try:
+        exit_code = run_with_env(
+            [
+                *_atom_lab_compose_command(),
+                "up",
+                "-d",
+                "--build",
+                "--force-recreate",
+                "--remove-orphans",
+            ],
+            inputs.compose_env,
+        )
+        if exit_code != 0:
+            return exit_code
+        exit_code = _atom_lab_ready(inputs, announce=False)
+        if exit_code != 0:
+            return exit_code
+        committed = True
+    finally:
+        if not committed:
+            run_with_env(
+                [*_atom_lab_compose_command(include_env_file=False), "down", "--remove-orphans"],
+                _atom_lab_control_env(),
+                timeout=COMPOSE_TEARDOWN_TIMEOUT_SECONDS,
+            )
+    return _atom_lab_ready(inputs)
+
+
+def atom_lab_ready() -> int:
+    try:
+        return _atom_lab_ready(_atom_lab_deployment_inputs())
+    except (ValueError, OSError) as exc:
+        print(f"LAB001: {exc}", file=sys.stderr)
+        return 2
+
+
+def _atom_lab_control_env() -> dict[str, str]:
+    return runner_env() | {
+        "ANYTOOLAI_POSTGRES_USER": "control-only",
+        "ANYTOOLAI_POSTGRES_PASSWORD": "control-only",
+        "ANYTOOLAI_POSTGRES_DB": "control-only",
+        "ANYTOOLAI_ATOM_LAB_ACCESS_CODE": "control-only-access",
+        "ANYTOOLAI_LIVE_CANARY_TOKEN": "control-only-live-token",
+        "OPENAI_API_KEY": "control-only-provider-key",
+        "ANYTOOLAI_ATOM_LAB_WORKER_MEMORY_LIMIT": "512M",
+    }
+
+
+def atom_lab_status() -> int:
+    return run_with_env(
+        _atom_lab_compose_command("ps", include_env_file=False),
+        _atom_lab_control_env(),
+        timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
+    )
+
+
+def atom_lab_down() -> int:
+    return run_with_env(
+        _atom_lab_compose_command("down", "--remove-orphans", include_env_file=False),
+        _atom_lab_control_env(),
+        timeout=COMPOSE_TEARDOWN_TIMEOUT_SECONDS,
+    )
+
+
+def _atom_lab_history_ids(inputs: AtomLabDeploymentInputs) -> tuple[str, ...]:
+    identity = _atom_lab_local_identity(inputs)
+    status, body, _ = _atom_lab_request(
+        f"{identity.api_url}/v1/atom-lab/runs?limit=100",
+        access_code=inputs.compose_env["ANYTOOLAI_ATOM_LAB_ACCESS_CODE"],
+    )
+    payload = json.loads(body)
+    if (
+        status != HTTPStatus.OK
+        or not isinstance(payload, dict)
+        or not isinstance(payload.get("items"), list)
+    ):
+        raise ValueError("Atom Lab history is unavailable")
+    run_ids = tuple(item.get("run_id") for item in payload["items"] if isinstance(item, dict))
+    if not run_ids or any(not isinstance(run_id, str) or not run_id for run_id in run_ids):
+        raise ValueError("Atom Lab history contains no verified run ids")
+    return run_ids
+
+
+def atom_lab_smoke() -> int:  # noqa: PLR0911 - each failed deployment gate has its own exit code
+    """Run the existing paid A01-A11 acceptance harness, then prove history survives restart."""
+    try:
+        inputs = _atom_lab_deployment_inputs()
+    except (ValueError, OSError) as exc:
+        print(f"LAB001: {exc}", file=sys.stderr)
+        return 2
+    managed_python = quick_check_venv_python()
+    if not quick_check_venv_ready(managed_python):
+        print("LAB006: run python scripts/agent/runner.py quick-check first", file=sys.stderr)
+        return 2
+    if _atom_lab_ready(inputs, announce=False) != 0:
+        return 1
+    identity = _atom_lab_local_identity(inputs)
+    env = inputs.compose_env | {
+        "ANYTOOLAI_LIVE_CANARY_SURFACE": "atom-lab",
+        "ANYTOOLAI_LIVE_CANARY_DATABASE_URL": _atom_lab_database_url(inputs),
+    }
+    exit_code = run_with_env(
+        [
+            str(managed_python),
+            "scripts/agent/live_canary.py",
+            identity.api_url,
+            "--database-url-env",
+            "ANYTOOLAI_LIVE_CANARY_DATABASE_URL",
+            "--database-url-is-percent-encoded",
+        ],
+        env,
+    )
+    if exit_code != 0:
+        return exit_code
+    try:
+        before_restart = _atom_lab_history_ids(inputs)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        print(f"LAB007: could not capture terminal history before restart: {exc}", file=sys.stderr)
+        return 1
+    exit_code = run_with_env(
+        [*_atom_lab_compose_command(), "restart", "platform-api", "platform-worker"],
+        inputs.compose_env,
+        timeout=COMPOSE_TEARDOWN_TIMEOUT_SECONDS,
+    )
+    if exit_code != 0 or _atom_lab_ready(inputs, announce=False) != 0:
+        return exit_code or 1
+    try:
+        after_restart = _atom_lab_history_ids(inputs)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        print(f"LAB007: could not read terminal history after restart: {exc}", file=sys.stderr)
+        return 1
+    if after_restart != before_restart:
+        print("LAB007: Atom Lab history changed or disappeared across restart", file=sys.stderr)
+        return 1
+    print(f"Verified {len(after_restart)} recent Atom Lab runs after API/worker restart")
+    print("Paid Atom Lab deployment smoke passed; retain the generated redacted evidence report")
+    return 0
+
+
 def _prod_compose_command(*args: str, include_env_file: bool = True) -> list[str]:
     env_file = PROD_ENV_FILE if include_env_file and PROD_ENV_FILE.is_file() else None
     return _docker_compose_command(
@@ -2216,6 +2565,11 @@ COMMANDS = {
     "proposal-ai-smoke": proposal_ai_smoke,
     "client-update-writer-smoke": client_update_writer_smoke,
     "brief-decoder-smoke": brief_decoder_smoke,
+    "atom-lab-up": atom_lab_up,
+    "atom-lab-ready": atom_lab_ready,
+    "atom-lab-status": atom_lab_status,
+    "atom-lab-down": atom_lab_down,
+    "atom-lab-smoke": atom_lab_smoke,
     "prod-up": prod_up,
     "prod-fake-up": prod_fake_up,
     "prod-fake-down": prod_fake_down,

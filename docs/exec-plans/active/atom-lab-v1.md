@@ -3,15 +3,16 @@
 ## Status
 
 - State: active
-- Phase: AL09/ANY-467 automated acceptance implemented; credentialed acceptance blocked
+- Phase: AL10/ANY-468 deployment package implementation; operator rollout blocked
 - Owner: mixed
 - Created: 2026-09-09
-- Last updated: 2026-09-24
+- Last updated: 2026-09-28
 - Review date: 2026-09-16
-- Next action: run the credentialed Atom Lab live-canary, then inspect and publish privacy-safe
-  evidence.
-- Blocker: the current ANY-467 environment has no live OpenAI, live-canary, or Atom Lab access
-  credentials; AL09 and the release remain incomplete until real evidence exists.
+- Next action: validate the internal Compose package, then have an authorised operator configure
+  HTTPS/internal ingress and run the credentialed deployment smoke.
+- Blocker: the current environment has no approved internal hostname/network gate, rollout
+  authority, or live OpenAI/live-canary/Atom Lab credentials. AL09, AL10, and the release remain
+  incomplete until real evidence and operator confirmation exist.
 - Linear project: [Atom Lab](https://linear.app/paveldik/project/atom-lab-e1efc95ce888)
 - Milestone: Atom Lab v1
 
@@ -440,6 +441,16 @@ Acceptance: Compose smoke: migrations, API/worker ready, assets доступны
 - [ ] Scope этого тикета — финальное внутреннее развёртывание, операторская проверка и runbook после ANY-467. Не откладывать сюда создание dev/test окружения: auth/env принадлежит ANY-459, catalog worker wiring — ANY-461, static assets/browser setup — ANY-464.
 - [ ] Повторно проверить migration/backup и безопасный rollback существующего Postgres без удаления presets/history, обновление каталога и ротацию lab code. На restart не обещать автоматический resume прерванного provider call.
 - [ ] При отсутствии согласованного внутреннего адреса, секретов или rollout authority оставить rollout blocked и явно указать что package проверен, но развёртывание не завершено. Ни эта задача, ни milestone не считаются выполненными по одному наличию blocker report.
+- [x] Добавлен отдельный internal overlay поверх существующих Postgres/migrate/API/worker без новых
+  сервисов: loopback-only порты, durable volume, обязательные раздельные секреты и worker-only
+  OpenAI key. Публичный `prod-up` и `/demo` не изменены.
+- [x] Добавлены `atom-lab-up|ready|status|down|smoke`: preflight требует HTTPS origin/секреты,
+  readiness проверяет миграционный startup, assets, fail-closed auth, каталог и worker; paid smoke
+  переиспользует A01-A11 live-canary и сравнивает защищённую историю после restart API/worker.
+- [x] Runbook фиксирует HTTPS/internal allowlist, shared history/presets, ротацию, stale catalog,
+  backend limits, backup/restore в отдельную БД и rollback без удаления volume/history.
+- [ ] Фактический адрес, credentialed smoke и операторская проверка отсутствуют; rollout и тикет
+  намеренно остаются незавершёнными.
 
 
 ## Validation
@@ -538,6 +549,8 @@ Acceptance: Compose smoke: migrations, API/worker ready, assets доступны
 | 2026-09-25 | Closed the next PR #149 selector-consistency blocker: every directly fetched explicit preset version is now materialized in the selector after the current versions page commits, so a successful Save readback remains visibly aligned when concurrent versions push its receipt outside the first page. Added coverage for successful v2 readback behind v22..v3, exact v2 export, pagination deduplication/selection retention, and the next write using `base_version: 2`. Verified 52 Node tests, all 86 Atom Lab Chromium journeys, ESLint, documentation checks, and `git diff --check`; canonical `quick-check` remains 1929 passed. | Commit and push the remediation, update PR evidence, and inspect replacement checks. |
 | 2026-09-26 | Reconciled PR #149 with the latest `main` CI surface: Brief Decoder completion-event assertions now await the passive effect they test, Atom Lab pagination journeys await the loaded page rather than an already-true selection predicate, and exact committed recovery refreshes the shared editor draft label from v1 to v2. Added the focused draft-state regression requested by CodeRabbit. Verified the CI-supported Node 22 web-mirror suite (270 tests), web-mirror lint/typecheck, all 87 Atom Lab Chromium journeys, and Atom Lab ESLint. | Commit and push the final recovery-status fix, reply to the review, and inspect replacement CI. |
 | 2026-09-28 | Addressed the latest PR #149 state-authority review: an ambiguous update now materializes and reselects its base version before a direct expected-version read can fail, while every fresh versions page updates the shared identity summary to the real server latest without replacing the explicitly opened immutable version. Added regressions for transient expected-version failure with exact v1 export and successful v2 readback alongside a v22 library summary; rebased the ANY-467 acceptance handoff onto the 88-journey recovery baseline. | Run repository checks, commit and push the review remediation, reply to the reviewers, and inspect replacement CI. |
+| 2026-09-28 | Implemented the ANY-468 internal deployment package: base-stack Atom Lab overlay, strict secret/HTTPS preflight, asset/auth/catalog/worker readiness, existing live-canary plus restart/history smoke, and backup/recovery/rotation/troubleshooting runbook. Compose render, 22 targeted runner/architecture tests, docs/architecture validation, diff check, and managed-environment doctor pass. Canonical quick-check reached 2060 passing tests and failed only because this host cannot execute the pre-existing passwordless-`sudo` activation-marker test. No rollout was attempted and no secret was created or recorded. | An authorised operator must still supply the internal address/network gate and credentials, execute paid smoke, and record privacy-safe evidence before AL10 can complete. |
+| 2026-09-28 | Ran the local Compose smoke with disposable local codes: migration exited 0; PostgreSQL/API were healthy; worker was running; `/atom-lab`, CSS/JS, `/demo`, and ordinary `kernel_demo` runtime config returned 200; missing/wrong Lab codes returned safe 401; valid access returned all 11 atoms. API/worker restart preserved availability and all Atom Lab tables. Model catalog correctly remained pending/stale with zero models because no OpenAI key exists; therefore no paid run/history evidence was claimed. | Keep the local stack available for inspection, or stop with `dev-down`; operator credentials and ingress remain required for the full deployment smoke. |
 
 ## Planning revision verification (2026-09-09)
 
