@@ -91,7 +91,7 @@ endpoints; a live-provider action-config variant.
      every `missing_fields` entry. These are per-value `if/then` patterns generated from the closed
      enums, so a live A10 answer that contradicts the verdict, a status or a missing field fails
      validation. Ceiling: the schema cannot compare free text to dynamic values, so verbatim list
-     items and the evidence sentences are still guarded only by the fixtures and the prompts.
+     items, evidence sentences and the summary prose cannot be pinned -- decision 8 makes that safe.
 7. **No Brief Decoder handoff target in this ticket.** Three review rounds showed no handoff
    source that is both faithful and expressible today: `document.summary` is a readiness note;
    `output_mapping` cannot echo `scenario.input` (Platform Core change, out of scope); a
@@ -101,6 +101,18 @@ endpoints; a live-provider action-config variant.
    Brief Decoder -> Acceptance Builder route is an explicit ANY-26 decision: either Brief Decoder
    exposes a faithful brief field (or the mapping capability is extended) so the handoff converges
    on `draft_v1`, or ANY-26 defines an Acceptance Builder-owned handoff input.
+
+8. **Copy text is derived from structured data, not from `document`** (review #5). A schema cannot
+   bind A10's list items or prose to the values they restate, and there is no per-product
+   validator hook (validators are registered per atom type in `platform-actions`; A10's is
+   `none`; a grounding validator would be a `platform-actions` change outside this ticket). So
+   `renderer_contract.yaml` no longer names `document` the canonical field: the copy-ready text is
+   composed deterministically from `comparison` (verdict, deltas, rationale), `extracted.values`
+   and `extracted.missing_fields`, and `document` is A10's display-only narrative
+   (`copy_text.not_copyable_fields`). Nothing a model invents in `document` can reach what the
+   user sends. The schema bindings from decision 6 stay as defence in depth for what is shown.
+   ANY-244 implements the composition and decides whether to show the narrative at all. Trade-off:
+   A10's document duplicates the structured facts and is not the copy source.
 
 ## Implementation steps
 

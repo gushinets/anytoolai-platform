@@ -5,10 +5,16 @@ renderer_contract:
   scenarios:
     - scenario_id: acceptance_builder.draft_v1
       output_schema_ref: acceptance_builder.draft_output_v1
-      parts: [acceptance_criteria, assumptions, deliverables, copy_document]
+      parts: [acceptance_criteria, assumptions, deliverables, open_gaps, narrative_document]
     - scenario_id: acceptance_builder.check_v1
       output_schema_ref: acceptance_builder.check_output_v1
-      parts: [comparison_verdict, acceptance_criteria, assumptions, deliverables, copy_document]
+      parts:
+        - comparison_verdict
+        - acceptance_criteria
+        - assumptions
+        - deliverables
+        - open_gaps
+        - narrative_document
   parts:
     - part_id: comparison_verdict
       field: comparison
@@ -30,20 +36,59 @@ renderer_contract:
     - part_id: deliverables
       field: extracted.values.deliverables
       description: Same absent-list rule as `acceptance_criteria`.
-    - part_id: copy_document
+    - part_id: open_gaps
+      field: extracted.missing_fields
+      description: >-
+        The lists the brief does not state, by name. Empty means the brief states all three lists.
+    - part_id: narrative_document
       field: document
       description: >-
-        Ordered `sections` (id, title, content) followed by `summary`. This is the copy-ready
-        part.
-  canonical_field: document
-  # `document` is an object ({sections[], summary}), not a single string: copying it needs a
-  # serialization rule, not verbatim use.
-  canonical_field_composition: >-
-    For each entry in `document.sections`, in array order, emit the section's `title` as a
-    heading line followed by its `content`; separate sections by one blank line. After the last
-    section, emit one more blank line followed by `document.summary` as the closing paragraph.
-    `metadata.kind` (when present) is a rendering hint only and never changes which fields are
-    included.
+        A10's composed recap: ordered `sections` (id, title, content) and `summary`. It is free
+        text a model wrote from the structured fields, so it is display-only narrative: never the
+        copy source and never the authority for any fact. Where it disagrees with the structured
+        parts above, the structured parts are right. The output schema pins its verdict wording,
+        statuses and missing-field mentions, but cannot pin list items or prose.
+  # The copy-ready text is composed deterministically from the structured authority -- verdict,
+  # deltas and rationale from `comparison`, lists from `extracted.values`, gaps from
+  # `extracted.missing_fields` -- so nothing a model invented in `document` can reach what the
+  # user sends to a client. The renderer (ANY-244) implements this composition.
+  copy_text:
+    authority: structured_fields_only
+    not_copyable_fields: [document]
+    # Every block is `<title line>` then its body, blocks separated by one blank line.
+    blocks:
+      - block_id: verdict
+        scenarios: [acceptance_builder.check_v1]
+        title: Verdict
+        source: comparison.verdict
+        body: >-
+          "Verdict: " followed by the verdict in words (meets expectations | partially meets
+          expectations | does not meet expectations) and a full stop; then one line per entry of
+          `comparison.deltas`, in array order, as "<Label>: <status>. <evidence>" with the labels
+          Scope coverage, Requirement fit, Completeness, Clarity; then `comparison.rationale`.
+        also_uses: [comparison.deltas, comparison.rationale]
+      - block_id: acceptance_criteria
+        title: Acceptance criteria
+        source: extracted.values.acceptance_criteria
+        body: One "- <item>" line per item, in array order.
+        when_absent: Not specified in the brief.
+      - block_id: assumptions
+        title: Assumptions
+        source: extracted.values.assumptions
+        body: One "- <item>" line per item, in array order.
+        when_absent: Not specified in the brief.
+      - block_id: deliverables
+        title: Deliverables
+        source: extracted.values.deliverables
+        body: One "- <item>" line per item, in array order.
+        when_absent: Not specified in the brief.
+      - block_id: open_gaps
+        title: Open gaps
+        source: extracted.missing_fields
+        body: >-
+          The name of each entry as "acceptance criteria", "assumptions" or "deliverables", one
+          per line as "- <name>: the client should confirm it."
+        when_absent: The brief states all three lists.
   next_action: copy_result
   excluded_fields: []
   # Open (ANY-244): the spec activation rule (first successful display of verdict and criteria,

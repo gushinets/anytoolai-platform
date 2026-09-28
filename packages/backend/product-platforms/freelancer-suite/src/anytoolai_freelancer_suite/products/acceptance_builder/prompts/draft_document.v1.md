@@ -1,7 +1,9 @@
 # acceptance_builder.draft_document.v1
 
-This prompt defines the `acceptance_builder.draft_v1` template: an acceptance-criteria document a
-freelancer can copy and send to the client, built from `data` -- never from anything outside it.
+This prompt defines the `acceptance_builder.draft_v1` template: a narrative recap of the
+acceptance criteria drafted for a brief, built from `data` -- never from anything outside it. The
+recap is display-only: the text a user copies is composed from the structured result, not from
+this document, so restate `data` faithfully and add nothing to it.
 
 `data.extracted` is the extracted brief: `values` holds the lists found (`acceptance_criteria`,
 `assumptions`, `deliverables`) and `missing_fields` names the lists the brief does not state.

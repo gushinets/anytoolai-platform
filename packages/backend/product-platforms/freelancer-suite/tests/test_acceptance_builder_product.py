@@ -355,6 +355,16 @@ def test_inlined_kernel_atom_output_copies_stay_in_sync_with_the_kernel_schemas(
     assert comparison["properties"]["confidence"] == kernel_compare["properties"]["confidence"]
 
 
+def _resolves(schema: dict[str, Any], path: str) -> bool:
+    """Whether dotted `path` names a property chain in the closed object schema `schema`."""
+    node = schema
+    for segment in path.split("."):
+        if segment not in node.get("properties", {}):
+            return False
+        node = node["properties"][segment]
+    return True
+
+
 def test_renderer_contract_agrees_with_workflows_and_scenarios() -> None:
     contract = _load_yaml("renderer_contract.yaml")["renderer_contract"]
     scenarios = {s["scenario_id"]: s for s in _load_yaml("scenarios.yaml")["scenarios"]}
@@ -368,16 +378,52 @@ def test_renderer_contract_agrees_with_workflows_and_scenarios() -> None:
         assert set(entry["parts"]) <= set(parts)
         top_level_fields = {parts[p]["field"].split(".")[0] for p in entry["parts"]}
         assert top_level_fields == set(output_schema["properties"]), entry["scenario_id"]
-        assert contract["canonical_field"] in output_schema["properties"]
+        assert all(_resolves(output_schema, parts[p]["field"]) for p in entry["parts"])
     assert contract["next_action"] in scenarios[DRAFT]["allowed_next_actions"]
     assert contract["next_action"] in scenarios[CHECK]["allowed_next_actions"]
-    assert contract["canonical_field_composition"].strip()
     assert parts["comparison_verdict"]["field"] == "comparison"
     # Only check_v1 has a verdict; the contract must not present it for draft_v1.
     draft_parts = next(s for s in contract["scenarios"] if s["scenario_id"] == DRAFT)["parts"]
     assert "comparison_verdict" not in draft_parts
     # The verdict is on general criteria, not the extracted list -- the contract must say so.
     assert "not item by item" in " ".join(parts["comparison_verdict"]["description"].split()).lower()
+
+
+def test_copy_text_is_derived_from_structured_fields_never_from_the_a10_document() -> None:
+    """The copy-ready text must not have a free-form model output as its authority: `document` is
+    A10's narrative and is display-only, so nothing it invents can reach what the user sends."""
+    contract = _load_yaml("renderer_contract.yaml")["renderer_contract"]
+    copy_text = contract["copy_text"]
+    parts = {part["part_id"]: part for part in contract["parts"]}
+    schemas = {
+        entry["scenario_id"]: _load_schema(entry["output_schema_ref"])
+        for entry in contract["scenarios"]
+    }
+
+    assert copy_text["authority"] == "structured_fields_only"
+    assert copy_text["not_copyable_fields"] == ["document"]
+    assert "canonical_field" not in contract  # `document` is deliberately not the canonical field
+    assert "display-only" in parts["narrative_document"]["description"]
+
+    blocks = {block["block_id"]: block for block in copy_text["blocks"]}
+    assert list(blocks) == ["verdict", "acceptance_criteria", "assumptions", "deliverables", "open_gaps"]
+    for block in blocks.values():
+        applies_to = block.get("scenarios", list(schemas))
+        assert applies_to
+        for scenario_id in applies_to:
+            for path in [block["source"], *block.get("also_uses", [])]:
+                assert not path.split(".")[0] == "document", (block["block_id"], path)
+                assert _resolves(schemas[scenario_id], path), (scenario_id, path)
+    # The verdict block exists only where there is a comparison.
+    assert blocks["verdict"]["scenarios"] == [CHECK]
+    assert all("scenarios" not in b for b in copy_text["blocks"] if b["block_id"] != "verdict")
+    # Every list block's absent-list text is the one the output schemas pin for the document.
+    for block_id in ("acceptance_criteria", "assumptions", "deliverables"):
+        assert blocks[block_id]["when_absent"] == "Not specified in the brief."
+    # Each block's source is also a rendered part, so the page and the copy agree on the authority.
+    part_fields = {part["field"] for part in contract["parts"]}
+    assert {block["source"] for block in copy_text["blocks"]} - {"comparison.verdict"} <= part_fields
+    assert "comparison" in part_fields
 
 
 @pytest.mark.parametrize(

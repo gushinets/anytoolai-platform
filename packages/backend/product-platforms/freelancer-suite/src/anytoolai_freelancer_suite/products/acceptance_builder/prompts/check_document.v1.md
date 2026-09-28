@@ -1,8 +1,9 @@
 # acceptance_builder.check_document.v1
 
-This prompt defines the `acceptance_builder.check_v1` template: a check of a delivered piece of
-work against the client's brief, a freelancer can copy and keep, built from `data` -- never from
-anything outside it.
+This prompt defines the `acceptance_builder.check_v1` template: a narrative recap of a check of a
+delivered piece of work against the client's brief, built from `data` -- never from anything
+outside it. The recap is display-only: the text a user copies is composed from the structured
+result, not from this document, so restate `data` faithfully and add nothing to it.
 
 `data.extracted` is the extracted brief (`values` with `acceptance_criteria`, `assumptions`,
 `deliverables`; `missing_fields` for the lists the brief does not state). `data.comparison` is the
