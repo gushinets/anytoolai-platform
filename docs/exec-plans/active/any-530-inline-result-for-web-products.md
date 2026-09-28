@@ -32,8 +32,9 @@ live in the result card; "Copy" and "New task" share one action group.
   a `select`.
 - Client Update Writer keeps "switching mode = new task" (remount). Open question for the owner:
   keep, block switching while a result is shown, or store values per mode. Default: keep.
-- "Equal cards" means equal surface, radius, padding and heading structure, not equal height
-  (`DESIGN.md`: panels stay in document flow).
+- "Equal cards" means equal width (two `1fr` tracks; review #2 replaced ProposalAI's `0.9fr/1.1fr`),
+  surface, radius, padding and heading structure, not equal height (`DESIGN.md`: panels stay in
+  document flow). The smokes assert the width match.
 - Brief Decoder result is embedded: three inner `Card`s become plain sections, section headings
   drop from `h2` to `h3` (the workspace cards own `h2`).
 

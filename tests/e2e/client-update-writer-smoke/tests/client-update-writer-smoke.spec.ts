@@ -51,6 +51,8 @@ async function expectWorkspaceLayout(page: Page, layout: "side-by-side" | "stack
   if (layout === "side-by-side") {
     expect(result!.x).toBeGreaterThanOrEqual(inputs!.x + inputs!.width - 1);
     expect(Math.abs(result!.y - inputs!.y)).toBeLessThanOrEqual(2);
+    // Two equal cards: same width (height follows content and may differ).
+    expect(Math.abs(result!.width - inputs!.width)).toBeLessThanOrEqual(2);
   } else {
     expect(result!.y).toBeGreaterThanOrEqual(inputs!.y + inputs!.height - 1);
     expect(Math.abs(result!.x - inputs!.x)).toBeLessThanOrEqual(2);
