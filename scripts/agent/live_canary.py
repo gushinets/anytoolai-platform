@@ -943,7 +943,7 @@ def main() -> int:
                 _write_atom_lab_run_ids(args.atom_lab_run_ids_output, cases)
             except (OSError, ValueError) as exc:
                 print(
-                    f"LIVE030: could not write Atom Lab run-ID manifest: {exc}",
+                    f"LIVE033: could not write Atom Lab run-ID manifest: {exc}",
                     file=sys.stderr,
                 )
                 return 1

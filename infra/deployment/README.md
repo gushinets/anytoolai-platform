@@ -208,8 +208,11 @@ readiness after review.
 
 #### Backup, recovery, and rollback
 
-Back up before the first deployment and every migration. This streams a custom-format dump without
-exposing a password (replace the destination with a protected operator path):
+If the target Atom Lab PostgreSQL database already exists, back it up before every migration or
+application update. A genuinely fresh initial deployment creates a new empty database, so there is
+nothing to dump before its first start; take the first verified backup after durable data appears.
+For an existing deployment, this streams a custom-format dump without exposing a password
+(replace the destination with a protected operator path):
 
 ```bash
 docker compose --project-name anytoolai-atom-lab \

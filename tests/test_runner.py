@@ -3647,7 +3647,7 @@ def test_atom_lab_smoke_reuses_live_canary_and_compares_history_after_restart(mo
     verified = []
     monkeypatch.setattr(
         runner,
-        "_atom_lab_missing_history_run_ids",
+        "_atom_lab_invalid_terminal_history_run_ids",
         lambda inputs, run_ids: verified.append(tuple(run_ids)) or (),
     )
     calls = []
@@ -3669,7 +3669,7 @@ def test_atom_lab_smoke_reuses_live_canary_and_compares_history_after_restart(mo
     assert verified == [expected_run_ids]
 
 
-def test_atom_lab_history_verifies_exact_canary_run_ids_and_ignores_other_runs(
+def test_atom_lab_history_verifies_complete_terminal_state_for_exact_canary_runs(
     monkeypatch,
 ) -> None:
     runner = load_runner_module()
@@ -3683,16 +3683,55 @@ def test_atom_lab_history_verifies_exact_canary_run_ids_and_ignores_other_runs(
         requested.append(run_id)
         if run_id == "run-missing":
             return 404, b'{"error": {"code": "not_found"}}', "application/json"
-        return 200, json.dumps({"run_id": run_id}).encode(), "application/json"
+        payload = {
+            "run_id": run_id,
+            "status": "succeeded",
+            "snapshot": {"atom_id": "A01"},
+            "runtime_ids": {
+                "scenario_session_id": "session-1",
+                "job_id": "job-1",
+                "action_run_id": "action-1",
+                "artifact_id": "artifact-1",
+            },
+            "result": {},
+            "finished_at": "2026-09-28T12:00:00Z",
+        }
+        if run_id == "run-queued":
+            payload.update(status="queued", result=None, finished_at=None)
+        elif run_id == "run-no-snapshot":
+            payload["snapshot"] = None
+        elif run_id == "run-no-runtime":
+            payload["runtime_ids"]["action_run_id"] = None
+        elif run_id == "run-no-result":
+            payload["result"] = None
+        elif run_id == "run-no-finished-at":
+            payload["finished_at"] = None
+        return 200, json.dumps(payload).encode(), "application/json"
 
     monkeypatch.setattr(runner, "_atom_lab_request", request)
 
-    missing = runner._atom_lab_missing_history_run_ids(
-        inputs, ("run-current-1", "run-missing", "run-current-2")
+    invalid = runner._atom_lab_invalid_terminal_history_run_ids(
+        inputs,
+        (
+            "run-valid",
+            "run-missing",
+            "run-queued",
+            "run-no-snapshot",
+            "run-no-runtime",
+            "run-no-result",
+            "run-no-finished-at",
+        ),
     )
 
-    assert missing == ("run-missing",)
-    assert requested == ["run-current-1", "run-missing", "run-current-2"]
+    assert invalid == (
+        "run-missing",
+        "run-queued",
+        "run-no-snapshot",
+        "run-no-runtime",
+        "run-no-result",
+        "run-no-finished-at",
+    )
+    assert requested[0] == "run-valid"
 
 
 def test_atom_lab_canary_run_ids_reject_stale_or_incomplete_manifest(tmp_path) -> None:

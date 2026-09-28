@@ -2027,24 +2027,42 @@ def _atom_lab_canary_run_ids(path: Path) -> tuple[str, ...]:
     return tuple(run_ids)
 
 
-def _atom_lab_missing_history_run_ids(
+def _atom_lab_invalid_terminal_history_run_ids(
     inputs: AtomLabDeploymentInputs, expected_run_ids: Sequence[str]
 ) -> tuple[str, ...]:
     identity = _atom_lab_local_identity(inputs)
-    missing = []
+    invalid = []
     for run_id in expected_run_ids:
         status, body, _ = _atom_lab_request(
             f"{identity.api_url}/v1/atom-lab/runs/{quote(run_id, safe='')}",
             access_code=inputs.compose_env["ANYTOOLAI_ATOM_LAB_ACCESS_CODE"],
         )
         payload = json.loads(body)
+        runtime_ids = payload.get("runtime_ids") if isinstance(payload, dict) else None
         if (
             status != HTTPStatus.OK
             or not isinstance(payload, dict)
             or payload.get("run_id") != run_id
+            or payload.get("status") != "succeeded"
+            or not isinstance(payload.get("snapshot"), dict)
+            or not payload["snapshot"]
+            or not isinstance(payload.get("result"), (dict, list))
+            or not isinstance(payload.get("finished_at"), str)
+            or not payload["finished_at"].strip()
+            or not isinstance(runtime_ids, dict)
+            or any(
+                not isinstance(runtime_ids.get(name), str)
+                or not runtime_ids[name].strip()
+                for name in (
+                    "scenario_session_id",
+                    "job_id",
+                    "action_run_id",
+                    "artifact_id",
+                )
+            )
         ):
-            missing.append(run_id)
-    return tuple(missing)
+            invalid.append(run_id)
+    return tuple(invalid)
 
 
 def _atom_lab_canary_env(inputs: AtomLabDeploymentInputs) -> dict[str, str]:
@@ -2141,14 +2159,16 @@ def _atom_lab_smoke_locked() -> int:  # noqa: PLR0911
     if exit_code != 0 or _atom_lab_ready(inputs, announce=False) != 0:
         return exit_code or 1
     try:
-        missing_run_ids = _atom_lab_missing_history_run_ids(inputs, expected_run_ids)
+        invalid_run_ids = _atom_lab_invalid_terminal_history_run_ids(
+            inputs, expected_run_ids
+        )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"LAB007: could not read terminal history after restart: {exc}", file=sys.stderr)
         return 1
-    if missing_run_ids:
+    if invalid_run_ids:
         print(
-            f"LAB007: {len(missing_run_ids)} canary run(s) disappeared from Atom Lab history "
-            "across restart",
+            f"LAB007: {len(invalid_run_ids)} canary run(s) did not retain complete terminal "
+            "history across restart",
             file=sys.stderr,
         )
         return 1
