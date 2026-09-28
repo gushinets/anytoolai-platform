@@ -58,6 +58,7 @@ export type ProductResultProps<R> = {
    * failed activation-record never flips this back to `false` (the text is already copied).
    */
   onCopy: (text: string) => Promise<boolean>;
+  /** The runtime's "New task" button. The renderer must place it next to its own copy action. */
   secondaryAction?: ReactNode;
 };
 
@@ -65,6 +66,11 @@ export type ProductResultProps<R> = {
  * What a product owns, and nothing more (ANY-453: "Product modules own only their definition,
  * fields, renderer, and meaning"). `V` is the product's form values; `R` its canonical result.
  * Fields are a product-owned React component, deliberately not a declarative field schema.
+ *
+ * Every product gets the same one-screen workspace from `ProductRunPage`: the form card beside a
+ * result card, stacked below 860px. The product supplies an embedded `Result` (no `Card` of its
+ * own) that renders `secondaryAction`, and a form whose first `textarea`/`input` is its first
+ * field ("New task" focuses it).
  *
  * `onCopy` covers exactly the single-checkpoint "run to completion, then one post-completion
  * activation" shape ProposalAI proved (`copy_result` after `completed`) -- not a
@@ -89,20 +95,17 @@ export type ProductDefinition<V extends Record<string, unknown>, R> = {
   scenarioId: string;
   /**
    * Where this definition's run copy lives in the product's own message namespace: the runtime
-   * reads `<messageScope>.submit|running|runFailed` (plus `<messageScope>.startAnother` when
-   * `hasStartAnother` is set), and the namespace-wide `title`/`quotaRemaining({remaining, limit})`
-   * (plus `description` when `hasDescription` is set). Localized presentation comes from the i18n
-   * layer (`apps/web-mirror/src/i18n`), never from the definition, so it holds behavior only.
+   * reads `<messageScope>.submit|running|runFailed|resultTitle|placeholder|regenerate` (the result
+   * noun differs per product, and per mode for a multi-mode product), and the namespace-wide
+   * `title`/`quotaRemaining({remaining, limit})` (plus `description` when `hasDescription` is set).
+   * Workspace copy shared by every product (`workspace.inputTitle|previousDetails|backToInputs|
+   * newTask`) lives in the host messages. Localized presentation comes from the i18n layer
+   * (`apps/web-mirror/src/i18n`), never from the definition, so it holds behavior only.
    */
   messageScope: string;
   /** Whether `ProductRunPage` renders a product description under the title, resolved from the
    * product's own `description` message key. Optional -- most products have none. */
   hasDescription?: boolean;
-  /** Whether `ProductRunPage` renders a "start another run" action once a run completes, resolved
-   * from `<messageScope>.startAnother`. Optional -- most products have none. */
-  hasStartAnother?: boolean;
-  /** Keep the editable form beside the latest result in one workspace. */
-  inlineResult?: boolean;
   emptyValues: V;
   /** Client-side, for immediate feedback only -- the backend's schema stays authoritative. */
   validate: (values: V) => Partial<Record<keyof V, FieldError>>;

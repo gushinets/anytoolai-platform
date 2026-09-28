@@ -116,8 +116,6 @@ export const proposalAiDefinition: ProductDefinition<ProposalAIValues, string> =
   scenarioId: "proposal_ai.generate_v1",
   messageScope: "generate",
   hasDescription: true,
-  hasStartAnother: true,
-  inlineResult: true,
   emptyValues: { taskText: "", freelancerPositioning: "", tone: "warm" },
   validate,
   toInput: (values) => ({

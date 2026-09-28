@@ -14,7 +14,9 @@ export const pt: Shape<typeof en> = {
     submit: "Decodificar briefing",
     running: "Decodificando seu briefing…",
     runFailed: "Algo deu errado ao decodificar seu briefing. Tente novamente.",
-    startAnother: "Decodificar outro briefing",
+    resultTitle: "Briefing decodificado",
+    placeholder: "Seu briefing decodificado aparecerá aqui após a decodificação.",
+    regenerate: "Decodificar briefing novamente",
   },
   result: {
     brief: "Briefing",

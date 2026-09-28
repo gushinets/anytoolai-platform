@@ -14,7 +14,9 @@ export const it: Shape<typeof en> = {
     submit: "Decodificare il brief",
     running: "Decodifica del brief in corso…",
     runFailed: "Qualcosa è andato storto nella decodifica del brief. Riprovare.",
-    startAnother: "Decodificare un altro brief",
+    resultTitle: "Brief decodificato",
+    placeholder: "Il brief decodificato apparirà qui dopo la decodifica.",
+    regenerate: "Decodificare di nuovo il brief",
   },
   result: {
     brief: "Brief",

@@ -20,6 +20,12 @@ export const en = {
   // non-English locale (a bare `${title} form` template with "form" hardcoded), so a screen reader
   // announced e.g. "ProposalAI form" even at a Russian locale.
   formLabel: "{product} form",
+  workspace: {
+    inputTitle: "Your details",
+    previousDetails: "Created from previous details",
+    backToInputs: "Back to details",
+    newTask: "New task",
+  },
   errors: {
     startFailed: "Could not start {product}. Please try again.",
     timeout: "This is taking longer than expected. Please try again.",

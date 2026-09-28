@@ -400,7 +400,7 @@ describe("UI locale is independent of scenario input and state", () => {
     renderShell(registered("client_update_writer"), bootRoutes(CUW_IDS));
     const en = CLIENT_UPDATE_WRITER_MESSAGES.en;
     await screen.findByLabelText(en.fields.progressNotes);
-    fireEvent.click(screen.getByLabelText(en.modes.reply_draft));
+    fireEvent.click(screen.getByRole("radio", { name: en.modes.reply_draft }));
     fireEvent.change(await screen.findByLabelText(en.fields.clientMessage), { target: { value: "Where is my invoice?" } });
 
     switchTo("fr");
@@ -409,7 +409,7 @@ describe("UI locale is independent of scenario input and state", () => {
     const radios = screen.getAllByRole("radio") as HTMLInputElement[];
     expect(radios.map((radio) => radio.value)).toEqual(["update", "reply_draft", "prepaid_request"]);
     expect(radios.find((radio) => radio.checked)?.value).toBe("reply_draft");
-    expect(screen.getByLabelText(fr.modes.reply_draft)).toBe(radios[1]);
+    expect(screen.getByRole("radio", { name: fr.modes.reply_draft })).toBe(radios[1]);
     expect(valueOf(screen.getByLabelText(fr.fields.clientMessage))).toBe("Where is my invoice?");
     expect(screen.getByRole("button", { name: fr.reply_draft.submit })).toBeTruthy();
   });
