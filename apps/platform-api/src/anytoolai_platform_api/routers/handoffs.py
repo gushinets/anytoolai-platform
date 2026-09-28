@@ -8,6 +8,7 @@ from anytoolai_platform_api.dependencies import (
     get_config_registry,
     get_session_factory,
     get_settings,
+    require_enabled_product,
 )
 from anytoolai_platform_api.errors import ApiError, platform_error_to_api_error
 from anytoolai_platform_api.schemas import (
@@ -121,7 +122,15 @@ def accept_handoff(
     try:
         with transaction_boundary(session_factory) as session:
             try:
-                accepted = _service(session, registry).accept(
+                service = _service(session, registry)
+                source_product_id, target_product_id = service.product_ids_by_token(
+                    handoff_token,
+                    tenant_id=settings.default_tenant_id,
+                    region=settings.default_region,
+                )
+                require_enabled_product(source_product_id, settings)
+                require_enabled_product(target_product_id, settings)
+                accepted = service.accept(
                     handoff_token,
                     AcceptHandoffCommand(
                         tenant_id=settings.default_tenant_id,

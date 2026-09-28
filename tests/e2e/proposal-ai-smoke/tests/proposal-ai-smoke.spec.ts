@@ -107,7 +107,7 @@ test.describe("ProposalAI web product", () => {
     await expect(page.getByRole("status")).toHaveText(/Generating your proposal/);
     const copyButton = page.getByRole("button", { name: "Copy" });
     await expect(copyButton).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByRole("button", { name: "Create another proposal" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "New task" })).toBeVisible();
 
     // `.last()`, not `.first()`: the advisory quota line is also a `<p>` inside `<main>`, rendered
     // before the result.
@@ -129,6 +129,13 @@ test.describe("ProposalAI web product", () => {
     await expect
       .poll(() => countBackendEvents("client.next_action_clicked", scenarioSessionId!), { timeout: 5_000 })
       .toBe(1);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const backToDetails = page.getByRole("link", { name: "Back to details" });
+    await expect(backToDetails).toBeVisible();
+    expect((await backToDetails.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    await backToDetails.click();
+    await expect(page).toHaveURL(/#product-inputs$/);
   });
 
   test("validation: empty required fields show validation errors and never start a scenario", async ({ page }) => {
@@ -336,7 +343,9 @@ test.describe("ProposalAI web product", () => {
       await fillValidForm(page);
       await submitAndWaitForResult(page);
       if (remainingAfter > 0) {
-        await page.getByRole("button", { name: "Create another proposal" }).click();
+        await page.getByRole("button", { name: "New task" }).click();
+        await expect(page.locator("#proposal-ai-task-text")).toBeEmpty();
+        await expect(page.locator("#proposal-ai-positioning")).toBeEmpty();
         await expect(page.getByText(`${remainingAfter} of 10 proposals remaining.`)).toBeVisible();
       }
     }
@@ -344,9 +353,15 @@ test.describe("ProposalAI web product", () => {
     // The refresh would short-circuit into quota-exhausted before any submit, which is correct but
     // wouldn't prove the authoritative 429 path, so block that advisory call for the final attempt.
     await page.route("**/v1/products/proposal_ai/quota**", (route) => route.abort());
-    await page.getByRole("button", { name: "Create another proposal" }).click();
+    await page.getByRole("button", { name: "New task" }).click();
+    await expect(page.locator("#proposal-ai-task-text")).toBeEmpty();
+    await expect(page.locator("#proposal-ai-positioning")).toBeEmpty();
     await fillValidForm(page);
+    const rejectedStart = page.waitForResponse((response) =>
+      response.request().method() === "POST" && START_ROUTE_PATTERN.test(response.url()),
+    );
     await page.getByRole("button", { name: "Generate proposal" }).click();
+    expect((await rejectedStart).status()).toBe(429);
 
     // Next.js's own route-announcer div also carries role="alert" (empty text) -- scope to the
     // one this app renders.

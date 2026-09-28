@@ -111,7 +111,7 @@ export function LocaleProvider({
 
   return (
     <LocaleContext.Provider value={value}>
-      <IntlProvider locale={locale} messages={messages} onError={onError}>
+      <IntlProvider locale={locale} messages={messages} timeZone="UTC" onError={onError}>
         {children}
       </IntlProvider>
     </LocaleContext.Provider>

@@ -1,4 +1,4 @@
-import type { ComponentType } from "react";
+import type { ComponentType, ReactNode } from "react";
 import type { FieldError } from "./fieldValidation";
 
 /** Shared by every exhaustive `switch` over a discriminated union in this runtime (`Phase["kind"]`
@@ -58,6 +58,7 @@ export type ProductResultProps<R> = {
    * failed activation-record never flips this back to `false` (the text is already copied).
    */
   onCopy: (text: string) => Promise<boolean>;
+  secondaryAction?: ReactNode;
 };
 
 /**
@@ -100,6 +101,8 @@ export type ProductDefinition<V extends Record<string, unknown>, R> = {
   /** Whether `ProductRunPage` renders a "start another run" action once a run completes, resolved
    * from `<messageScope>.startAnother`. Optional -- most products have none. */
   hasStartAnother?: boolean;
+  /** Keep the editable form beside the latest result in one workspace. */
+  inlineResult?: boolean;
   emptyValues: V;
   /** Client-side, for immediate feedback only -- the backend's schema stays authoritative. */
   validate: (values: V) => Partial<Record<keyof V, FieldError>>;

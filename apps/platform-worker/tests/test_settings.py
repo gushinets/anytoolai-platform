@@ -56,6 +56,17 @@ def test_worker_settings_accepts_positive_finite_poll_interval(
     assert settings.poll_interval_seconds == POLL_INTERVAL_SECONDS
 
 
+def test_worker_settings_reads_production_product_allowlist(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(
+        GENERIC_DATABASE_URL_ENV, "postgresql+psycopg://worker:worker@postgres/db"
+    )
+    monkeypatch.setenv("ANYTOOLAI_ENABLED_PRODUCT_IDS", " proposal_ai,brief_decoder ")
+
+    assert WorkerSettings.from_env().enabled_product_ids == frozenset(
+        {"proposal_ai", "brief_decoder"}
+    )
+
+
 def test_worker_settings_raises_without_any_database_url_source(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -29,15 +29,16 @@ export function ProductPageShell({
   const { Component } = product;
   return (
     <LocaleProvider productMessages={product.messages}>
-      <ProductPageContent Component={Component} client={client} onEvent={onEvent} visitId={visitId} />
+      <ProductPageContent Component={Component} client={client} onEvent={onEvent} visitId={visitId} wideLayout={product.productId === "proposal_ai"} />
     </LocaleProvider>
   );
 }
 
-function ProductPageContent({ Component, client, onEvent, visitId }: Pick<RegisteredProduct, "Component"> & {
+function ProductPageContent({ Component, client, onEvent, visitId, wideLayout }: Pick<RegisteredProduct, "Component"> & {
   client: PlatformApiClient;
   onEvent?: (event: ProductRunEvent) => void;
   visitId?: string;
+  wideLayout: boolean;
 }) {
   const t = useProductT();
   const th = useHostT();
@@ -45,7 +46,7 @@ function ProductPageContent({ Component, client, onEvent, visitId }: Pick<Regist
   // Stable identity: the run page's effect depends on it and must not re-fire every render.
   const shell = useMemo<ProductShell>(() => ({ reportBusy: setBusy }), []);
   return (
-    <div className={styles.shell}>
+    <div className={`${styles.shell} ${wideLayout ? styles.wideShell : ""}`}>
       <nav className={styles.nav} aria-label={th("nav.label")}>
         <AllToolsLink busy={busy} />
       </nav>

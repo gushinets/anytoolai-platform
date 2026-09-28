@@ -2,12 +2,11 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Query
-
 from anytoolai_platform_api.dependencies import (
     get_config_registry,
     get_session_factory,
     get_settings,
+    require_enabled_product,
 )
 from anytoolai_platform_api.errors import ApiError
 from anytoolai_platform_api.schemas import (
@@ -26,6 +25,7 @@ from anytoolai_platform_core.quotas.models import QuotaState
 from anytoolai_platform_core.quotas.repository import QuotaUsageRepository
 from anytoolai_platform_core.quotas.service import GuestQuotaService
 from anytoolai_platform_core.storage.transactions import transaction_boundary
+from fastapi import APIRouter, Depends, Query
 
 router = APIRouter(tags=["access-lite"])
 
@@ -85,7 +85,7 @@ def create_guest_identity(
     },
 )
 def get_product_quota(
-    product_id: str,
+    product_id: Annotated[str, Depends(require_enabled_product)],
     guest_id: Annotated[str, Query(min_length=1)],
     registry: Annotated[ConfigRegistry, Depends(get_config_registry)],
     session_factory: Annotated[Any, Depends(get_session_factory)],

@@ -1,6 +1,6 @@
 "use client";
 
-import { useContext, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useContext, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useIsomorphicLayoutEffect } from "../../lib/useIsomorphicLayoutEffect";
 import { Button, Card } from "@anytoolai/shared-ui";
 import {
@@ -140,7 +140,7 @@ function cacheSuccessOnly<T extends { ok: boolean }>(
 // caches runtime config, which went stale the instant a run actually consumed quota (never
 // invalidated after a successful start), didn't key by guestId (a guest-identity self-heal could
 // read a stale/wrong guest's cached result), and didn't dedupe concurrent calls the way this
-// function does. Quota is cheap, advisory, and re-fetched on every mount instead.
+// function does. Quota is cheap, advisory, and re-fetched on mount and after accepted inline runs.
 const runtimeConfigCache = new WeakMap<PlatformApiClient, Map<string, ReturnType<typeof getRuntimeConfig>>>();
 
 function getCachedRuntimeConfig(client: PlatformApiClient, productId: string) {
@@ -195,7 +195,7 @@ function shallowEqualValues<V extends Record<string, unknown>>(a: V, b: V): bool
 type BootState =
   | { kind: "loading" }
   | { kind: "boot-error" }
-  | { kind: "ready"; scenarioId: string; frontendId: string };
+  | { kind: "ready"; scenarioId: string; frontendId: string; hasQuota: boolean };
 
 /** Why a run is retryable. A closed reason -- not finished English prose -- so an error already on
  * screen re-renders in the new language when the UI locale changes (`host.errors.<reason>`). */
@@ -273,6 +273,8 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
 
   const [boot, setBoot] = useState<BootState>({ kind: "loading" });
   const [quota, setQuota] = useState<QuotaState | null>(null);
+  // A pre-start quota GET may resolve after a newer post-start GET; only the newest may update UI.
+  const quotaRequestGenerationRef = useRef(0);
   const [guestId, setGuestId] = useState<string | undefined>(undefined);
   // See `getClientStorage`: one storage per client, so a remount never mints a new guest.
   const [guestStorage] = useState<AsyncStorage>(() => getClientStorage(client));
@@ -287,6 +289,9 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   // replay, its own independent, un-aborted controller.
   const controllerRef = useRef<AbortController | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
+  const resultHeadingRef = useRef<HTMLHeadingElement | null>(null);
+  const lastFocusedResultRef = useRef<string | null>(null);
+  const activeInputRef = useRef<V | null>(null);
   useEffect(() => {
     const controller = new AbortController();
     controllerRef.current = controller;
@@ -298,6 +303,19 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   const [values, setValues] = useState<V>(definition.emptyValues);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof V, FieldError>>>({});
   const [phase, setPhase] = useState<Phase<R>>({ kind: "idle" });
+  const [displayedResult, setDisplayedResult] = useState<{
+    scenarioSessionId: string;
+    checkpointId: string | null;
+    result: R;
+    input: V;
+  } | null>(null);
+  useEffect(() => {
+    if (!definition.inlineResult || phase.kind !== "result" || lastFocusedResultRef.current === phase.scenarioSessionId) {
+      return;
+    }
+    lastFocusedResultRef.current = phase.scenarioSessionId;
+    resultHeadingRef.current?.focus();
+  }, [definition.inlineResult, phase]);
   // Emits `scenario_completed` once per scenario session, after the `result` phase has actually
   // committed (ANY-17/ANY-248: `web.result_viewed` is the first *successful rendering*). The ref
   // dedupes across re-renders, StrictMode's effect replay and `guestId`/`definition` identity changes.
@@ -375,6 +393,23 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
 
   const productId = definition.productId;
   const scenarioId = definition.scenarioId;
+  const refreshQuota = useCallback((
+    resolvedGuestId: string,
+    resolvedScenarioId: string,
+    controller: AbortController | null,
+    onExhausted?: () => void,
+  ) => {
+    const generation = ++quotaRequestGenerationRef.current;
+    getQuota(client, { productId, guestId: resolvedGuestId, scenarioId: resolvedScenarioId }).then((quotaResult) => {
+      if (controller?.signal.aborted || generation !== quotaRequestGenerationRef.current || !quotaResult.ok) {
+        return;
+      }
+      setQuota(quotaResult.value);
+      if (quotaResult.value.exhausted) {
+        onExhausted?.();
+      }
+    }, _noop);
+  }, [client, productId]);
   // See `ProductRunPageProps.visitId`'s own docstring: falls back to `productId` alone (the old
   // behavior) when no route wrapper supplies a per-visit id.
   const eventScopeKey = visitId ?? productId;
@@ -422,28 +457,24 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
           setBoot({ kind: "boot-error" });
           return;
         }
-        setBoot({ kind: "ready", scenarioId: scenario.scenarioId, frontendId: frontend.frontendId });
+        setBoot({
+          kind: "ready",
+          scenarioId: scenario.scenarioId,
+          frontendId: frontend.frontendId,
+          hasQuota: runtimeResult.value.quotaSummary !== null,
+        });
 
-        if (resolvedGuestId) {
+        if (resolvedGuestId && runtimeResult.value.quotaSummary !== null) {
           // Advisory only: shown if it loads in time, never blocks the form from becoming usable.
           // scenarioId is always passed, not just for scenario-dimension policies: per
           // frontend-boundaries.md, a scenario-dimension quota policy *requires* it while a
           // product-wide policy simply "does not require it" (optional, not rejected) -- passing
           // it unconditionally keeps this shared runtime correct for either policy shape without
           // needing to know which one a given product uses.
-          getQuota(client, { productId, guestId: resolvedGuestId, scenarioId: scenario.scenarioId }).then((quotaResult) => {
-            if (controller?.signal.aborted || !quotaResult.ok) {
-              return;
-            }
-            setQuota(quotaResult.value);
-            if (quotaResult.value.exhausted) {
-              // Functional update, gated on the phase still being "idle": this advisory GET can
-              // resolve after the user has already submitted (or even completed) a run -- an
-              // unconditional setPhase() here would clobber "submitting"/"running"/"result" with
-              // a stale "quota-exhausted", hiding an active or already-successful run behind it.
-              setPhase((prev) => (prev.kind === "idle" ? { kind: "quota-exhausted" } : prev));
-            }
-          }, _noop);
+          refreshQuota(resolvedGuestId, scenario.scenarioId, controller, () => {
+            // An advisory GET must not replace an active or completed run.
+            setPhase((prev) => (prev.kind === "idle" ? { kind: "quota-exhausted" } : prev));
+          });
         }
       },
       () => {
@@ -453,7 +484,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         }
       },
     );
-  }, [client, guestStorage, productId, scenarioId, eventScopeKey]);
+  }, [client, guestStorage, productId, scenarioId, eventScopeKey, refreshQuota]);
 
   async function runStart(prepared: PreparedScenarioStart) {
     // Snapshotted once: this call's own controller, checked consistently across every await below
@@ -463,8 +494,13 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     if (controller?.signal.aborted) {
       return;
     }
+    const quotaRejected = !result.ok && isQuotaExhausted(result.error);
+    if (definition.inlineResult && boot.kind === "ready" && boot.hasQuota && guestId && (result.ok || quotaRejected)) {
+      // Read the backend counter after acceptance (or 429); idempotent retries cannot spend it twice.
+      refreshQuota(guestId, scenarioId, controller);
+    }
     if (!result.ok) {
-      if (isQuotaExhausted(result.error)) {
+      if (quotaRejected) {
         setPhase({ kind: "quota-exhausted" });
         return;
       }
@@ -638,6 +674,11 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     // `scenario_completed` is emitted by the commit-time effect on `phase` below, not here:
     // `setPhase` only queues the update, so emitting here would report a result that never
     // rendered (unmount, navigation, a renderer that throws).
+    if (definition.inlineResult && activeInputRef.current) {
+      setDisplayedResult({ scenarioSessionId, checkpointId, result: extracted, input: activeInputRef.current });
+    }
+    // A completed run must not lend its Idempotency-Key to a later regeneration.
+    setPendingStart(null);
     setPhase({ kind: "result", scenarioSessionId, checkpointId, result: extracted });
   }
 
@@ -685,6 +726,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     if (!reuseExisting) {
       setPendingStart({ prepared, input: values });
     }
+    activeInputRef.current = values;
     beginStart(prepared);
   }
 
@@ -726,10 +768,11 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   // request timeout, and nothing here touches component state after unmount (`resolve` only
   // settles a promise; a setState on an unmounted ResultView is a no-op).
   function handleCopy(text: string): Promise<boolean> {
-    if (phase.kind !== "result") {
+    const source = definition.inlineResult ? displayedResult : phase.kind === "result" ? phase : null;
+    if (!source) {
       return Promise.resolve(false);
     }
-    const { scenarioSessionId, checkpointId } = phase;
+    const { scenarioSessionId, checkpointId } = source;
     const writeToClipboard = (value: string) =>
       navigator.clipboard?.writeText
         ? navigator.clipboard.writeText(value)
@@ -770,17 +813,20 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     setFieldErrors({});
     setPendingStart(null);
     activeScenarioSessionIdRef.current = null;
+    activeInputRef.current = null;
+    setDisplayedResult(null);
     setPhase({ kind: "idle" });
+    if (definition.inlineResult) {
+      requestAnimationFrame(() => formRef.current?.querySelector<HTMLElement>("textarea, input")?.focus());
+    }
 
-    getQuota(client, { productId, guestId, scenarioId }).then((quotaResult) => {
-      if (controllerRef.current?.signal.aborted || !quotaResult.ok) {
-        return;
-      }
-      setQuota(quotaResult.value);
-      if (quotaResult.value.exhausted) {
-        setPhase((prev) => (prev.kind === "idle" ? { kind: "quota-exhausted" } : prev));
-      }
-    }, _noop);
+    if (boot.kind !== "ready" || !boot.hasQuota) {
+      return;
+    }
+
+    refreshQuota(guestId, scenarioId, controllerRef.current, () => {
+      setPhase((prev) => (prev.kind === "idle" ? { kind: "quota-exhausted" } : prev));
+    });
   }
 
   function updateField<K extends keyof V>(field: K, value: V[K]) {
@@ -825,11 +871,115 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   }
 
   const identityUnavailable = guestId === undefined;
+  const inlineResult = definition.inlineResult === true;
+  const formCard = (
+    <Card className={styles.formCard}>
+      {inlineResult ? <h2 id="product-input-heading" className={styles.workspaceHeading}>{tp("workspace.inputTitle")}</h2> : null}
+      <form
+        ref={formRef}
+        aria-label={th("formLabel", { product: title })}
+        className={styles.form}
+        noValidate
+        onSubmit={handleSubmit}
+      >
+        <Fields values={values} errors={fieldErrors} disabled={busy || identityUnavailable} onChange={updateField} />
+        <div className={styles.footer}>
+          <Button
+            type="submit"
+            loading={phase.kind === "submitting" || phase.kind === "running"}
+            disabled={identityUnavailable || busy || phase.kind === "quota-exhausted"}
+          >
+            {phase.kind === "submitting"
+              ? th("starting")
+              : phase.kind === "running"
+                ? th("generating")
+                : inlineResult && displayedResult
+                  ? tp("workspace.regenerate")
+                  : tp(`${definition.messageScope}.submit`)}
+          </Button>
+          <div className={styles.statusRegion}>
+            {!inlineResult && phase.kind === "running" ? <p role="status">{tp(`${definition.messageScope}.running`)}</p> : null}
+            {identityUnavailable ? <p role="alert">{th("identityUnavailable")}</p> : null}
+          </div>
+        </div>
+      </form>
+    </Card>
+  );
 
-  // Exhaustive over Phase["kind"] (docs/agent/coding-conventions.md's "Exhaustiveness" rule): a
-  // future new Phase variant fails typecheck here instead of silently falling through to the form.
+  // Both layouts exhaust Phase["kind"]: a new variant must be handled in each renderer.
   let mainContent: ReactNode;
-  switch (phase.kind) {
+  if (inlineResult) {
+    const oldResult = displayedResult && !shallowEqualValues(displayedResult.input, values);
+    let placeholderMessage: string | null = null;
+    let progress: ReactNode = null;
+    let error: ReactNode = null;
+    let showNewTask = false;
+    switch (phase.kind) {
+      case "idle":
+        if (!displayedResult) placeholderMessage = tp("workspace.placeholder");
+        break;
+      case "submitting":
+      case "running":
+        if (displayedResult) {
+          progress = <p role="status" className={styles.resultProgress}>{tp(`${definition.messageScope}.running`)}</p>;
+        } else {
+          placeholderMessage = tp(`${definition.messageScope}.running`);
+        }
+        break;
+      case "result":
+        showNewTask = true;
+        break;
+      case "result-fetch-error":
+        error = <ErrorState message={th("resultFetchFailed")} onRetry={handleRetryResult} embedded />;
+        break;
+      case "quota-exhausted":
+        error = <ErrorState message={th("quotaExhausted", { product: title })} embedded />;
+        break;
+      case "retryable-error":
+        error = <ErrorState message={th(`errors.${phase.reason}`, { product: title })} onRetry={identityUnavailable ? undefined : handleRetry} embedded />;
+        break;
+      case "unknown-error":
+        error = <ErrorState message={tp(`${definition.messageScope}.runFailed`)} onRetry={() => setPhase({ kind: "idle" })} embedded />;
+        break;
+      default:
+        return assertNever(phase);
+    }
+    mainContent = (
+      <div className={styles.workspaceGrid}>
+        <section id="product-inputs" aria-labelledby="product-input-heading">{formCard}</section>
+        <section aria-labelledby="product-result-heading">
+          <Card className={styles.workspaceResult}>
+            <div className={styles.resultHeader}>
+              <h2 id="product-result-heading" ref={resultHeadingRef} tabIndex={-1} className={styles.workspaceHeading}>
+                {tp("workspace.resultTitle")}
+              </h2>
+              {displayedResult ? <a className={styles.backToInputs} href="#product-inputs">{tp("workspace.backToInputs")}</a> : null}
+            </div>
+            {oldResult ? <p role="status" className={styles.oldResultNotice}>{tp("workspace.previousDetails")}</p> : null}
+            {progress}
+            {error}
+            {displayedResult ? (
+              <Result
+                key={displayedResult.scenarioSessionId}
+                result={displayedResult.result}
+                onCopy={handleCopy}
+                secondaryAction={showNewTask && definition.hasStartAnother ? (
+                  <Button variant="secondary" onClick={handleStartAnother}>
+                    {tp(`${definition.messageScope}.startAnother`)}
+                  </Button>
+                ) : undefined}
+              />
+            ) : null}
+            {placeholderMessage !== null ? (
+              <div className={styles.resultPlaceholder}>
+                <p role="status">{placeholderMessage}</p>
+              </div>
+            ) : null}
+          </Card>
+        </section>
+      </div>
+    );
+  } else switch (phase.kind) {
     case "result":
       mainContent = (
         <div className={styles.resultStack}>
@@ -858,32 +1008,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     case "running":
     case "retryable-error":
     case "unknown-error":
-      mainContent = (
-        <Card className={styles.formCard}>
-          <form
-            ref={formRef}
-            aria-label={th("formLabel", { product: title })}
-            className={styles.form}
-            noValidate
-            onSubmit={handleSubmit}
-          >
-            <Fields values={values} errors={fieldErrors} disabled={busy || identityUnavailable} onChange={updateField} />
-            <div className={styles.footer}>
-              <Button type="submit" loading={busy} disabled={identityUnavailable}>
-                {phase.kind === "submitting"
-                  ? th("starting")
-                  : phase.kind === "running"
-                    ? th("generating")
-                    : tp(`${definition.messageScope}.submit`)}
-              </Button>
-              <div className={styles.statusRegion}>
-                {phase.kind === "running" ? <p role="status">{tp(`${definition.messageScope}.running`)}</p> : null}
-                {identityUnavailable ? <p role="alert">{th("identityUnavailable")}</p> : null}
-              </div>
-            </div>
-          </form>
-        </Card>
-      );
+      mainContent = formCard;
       break;
     default:
       return assertNever(phase);
@@ -891,7 +1016,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
 
   return (
     <Root className={inProductShell ? undefined : "page-container"}>
-      <div className={styles.content}>
+      <div className={`${styles.content} ${inlineResult ? styles.workspaceContent : ""}`}>
         <header className={styles.header}>
           {inProductShell ? null : (
             <div className={styles.titleRow}>
@@ -909,7 +1034,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
 
         {mainContent}
 
-      {phase.kind === "retryable-error" ? (
+      {!inlineResult && phase.kind === "retryable-error" ? (
         // Not gated on `pendingStart`: submitCurrentValues() (called by both this and the form's
         // own Submit button) builds a fresh prepared start when there's none to reuse -- e.g.
         // after the guest-identity self-heal path in runStart(), which clears pendingStart while
@@ -923,7 +1048,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
           onRetry={identityUnavailable ? undefined : handleRetry}
         />
       ) : null}
-      {phase.kind === "unknown-error" ? (
+      {!inlineResult && phase.kind === "unknown-error" ? (
         <ErrorState
           message={tp(`${definition.messageScope}.runFailed`)}
           onRetry={() => {

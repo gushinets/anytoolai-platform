@@ -24,10 +24,18 @@ export const ru: Shape<typeof en> = {
     taskText: "Описание задачи",
     freelancerPositioning: "Опыт и сильные стороны",
   },
+  workspace: {
+    inputTitle: "Ваши данные",
+    resultTitle: "Предложение",
+    placeholder: "После составления предложение появится здесь.",
+    previousDetails: "Создано по предыдущим данным",
+    regenerate: "Пересоставить предложение",
+    backToInputs: "К исходным данным",
+  },
   generate: {
     submit: "Составить предложение",
     running: "Составляем предложение…",
     runFailed: "Не удалось составить предложение. Попробуйте ещё раз.",
-    startAnother: "Составить ещё одно предложение",
+    startAnother: "Новая задача",
   },
 };

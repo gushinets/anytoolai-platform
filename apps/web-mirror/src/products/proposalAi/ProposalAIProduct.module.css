@@ -20,12 +20,12 @@
 
 .taskTextArea {
   min-height: 144px;
-  resize: none;
+  resize: vertical;
 }
 
 .positioningTextArea {
   min-height: 120px;
-  resize: none;
+  resize: vertical;
 }
 
 .toneGroup {
