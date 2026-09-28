@@ -117,6 +117,29 @@ function trackRun(page: Page): { sessionId: () => string; resultArtifactId: () =
   return { sessionId: () => sessionId, resultArtifactId: () => resultArtifactId };
 }
 
+/** Wide screens: the result card sits right of the inputs card on the same top line; narrow screens:
+ * the two cards are stacked. Either way nothing overflows horizontally. */
+async function expectWorkspaceLayout(page: Page, layout: "side-by-side" | "stacked"): Promise<void> {
+  const inputs = await page.locator("#product-inputs").boundingBox();
+  const result = await page.locator('section[aria-labelledby="product-result-heading"]').boundingBox();
+  expect(inputs).not.toBeNull();
+  expect(result).not.toBeNull();
+  if (layout === "side-by-side") {
+    expect(result!.x).toBeGreaterThanOrEqual(inputs!.x + inputs!.width - 1);
+    expect(Math.abs(result!.y - inputs!.y)).toBeLessThanOrEqual(2);
+    // Two equal cards: same width (height follows content and may differ).
+    expect(Math.abs(result!.width - inputs!.width)).toBeLessThanOrEqual(2);
+  } else {
+    expect(result!.y).toBeGreaterThanOrEqual(inputs!.y + inputs!.height - 1);
+    expect(Math.abs(result!.x - inputs!.x)).toBeLessThanOrEqual(2);
+  }
+  const { scrollWidth, clientWidth } = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+  }));
+  expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+}
+
 async function submitBrief(page: Page): Promise<void> {
   await page.locator("#brief-decoder-brief-text").fill(BRIEF);
   await page.getByRole("button", { name: "Decode brief" }).click();
@@ -166,7 +189,8 @@ test.describe("Brief Decoder web product", () => {
     await expect(copyButton).toBeVisible({ timeout: 60_000 });
 
     const expected = composedOutput("");
-    await expect(page.getByRole("heading", { level: 2 })).toHaveText([
+    await expect(page.getByRole("heading", { level: 2 })).toHaveText(["Your details", "Decoded brief"]);
+    await expect(page.getByRole("heading", { level: 3 })).toHaveText([
       "Brief",
       "Issues",
       `${expected.questions.length} clarifying questions`,
@@ -210,6 +234,37 @@ test.describe("Brief Decoder web product", () => {
     await expect.poll(() => countEvents("client.next_action_clicked", sessionId), { timeout: 5_000 }).toBe(1);
     // Copy is independent of activation: still exactly one result_viewed.
     expect(await countEvents("web.result_viewed", sessionId)).toBe(1);
+  });
+
+  test("workspace: brief and result side by side on wide screens, stacked on narrow, repeat and new task reset", async ({
+    page,
+  }) => {
+    test.setTimeout(150_000);
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto(PRODUCT_URL);
+    await submitBrief(page);
+    await expect(page.getByRole("button", { name: "Copy" })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole("button", { name: "New task" })).toBeVisible();
+    await expect(page.locator("#brief-decoder-brief-text")).toHaveValue(BRIEF);
+    await expectWorkspaceLayout(page, "side-by-side");
+
+    // Edited brief: the earlier result stays, marked as made from earlier details, then repeats.
+    await page.locator("#brief-decoder-brief-text").fill(`${BRIEF} Also a logo.`);
+    await expect(page.getByText("Created from previous details")).toBeVisible();
+    await page.getByRole("button", { name: "Decode brief again" }).click();
+    // The progress line sits next to the "previous details" notice, both announced as status.
+    await expect(page.getByRole("status").filter({ hasText: "Decoding your brief" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Copy" })).toBeVisible();
+    await expect(page.getByRole("status")).toHaveCount(0, { timeout: 60_000 });
+    await expect(page.getByRole("button", { name: "New task" })).toBeVisible();
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expectWorkspaceLayout(page, "stacked");
+
+    await page.getByRole("button", { name: "New task" }).click();
+    await expect(page.locator("#brief-decoder-brief-text")).toHaveValue("");
+    await expect(page.locator("#brief-decoder-brief-text")).toBeFocused();
+    await expect(page.getByRole("button", { name: "Copy" })).toHaveCount(0);
   });
 
   test("validation: an empty brief shows the error and never starts a scenario", async ({ page }) => {
@@ -312,7 +367,8 @@ test.describe("Brief Decoder web product", () => {
     for (let run = 1; run <= GUEST_QUOTA_LIMIT; run += 1) {
       await submitBrief(page);
       await expect(page.getByRole("button", { name: "Copy" })).toBeVisible({ timeout: 60_000 });
-      await page.getByRole("button", { name: "Decode another brief" }).click();
+      await page.getByRole("button", { name: "New task" }).click();
+      await expect(page.locator("#brief-decoder-brief-text")).toHaveValue("");
     }
     await submitBrief(page);
     await expect(page.getByText(/used all your/)).toBeVisible({ timeout: 30_000 });

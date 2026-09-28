@@ -4,10 +4,10 @@
 // `append_after_blank_line`), and the mode switcher. The shared runtime behavior every mode rides
 // on (polling, retry, quota, copy-activation ordering, event callbacks) is proven once in
 // ProductRunPage.test.tsx -- not re-proven per mode here.
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProductRunPage } from "../src/products/runtime/ProductRunPage";
-import type { ProductRunEvent } from "../src/products/runtime/productDefinition";
+import type { ProductDefinition, ProductRunEvent } from "../src/products/runtime/productDefinition";
 import {
   ClientUpdateWriterProduct,
   prepaidRequestDefinition,
@@ -19,6 +19,7 @@ import {
   guestIdentityResponse,
   idempotencyKeyOf,
   makeClient,
+  makeClientWithDeferredCalls,
   makeClientWithDeferredRoute,
   quotaResponse,
   resultResponse,
@@ -72,6 +73,131 @@ function bootAndHappyPathRoutes(ids: (typeof MODE_IDS)[keyof typeof MODE_IDS], r
     },
   };
 }
+
+type ModeScenario = {
+  mode: string;
+  // Each mode has its own values shape, so the list can only hold them loosely (as MODE_DEFINITIONS does).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  definition: ProductDefinition<any, { text: string; callToAction?: string }>;
+  ids: (typeof MODE_IDS)[keyof typeof MODE_IDS];
+  /** Field label -> the value typed first; the first entry is also the field "New task" focuses. */
+  fields: Array<[string, string]>;
+  edited: [string, string];
+  submit: string;
+  regenerate: string;
+  resultTitle: string;
+};
+
+const MODE_SCENARIOS: ModeScenario[] = [
+  {
+    mode: "update",
+    definition: updateDefinition,
+    ids: MODE_IDS.update,
+    fields: [["Progress notes", "Finished the first milestone."]],
+    edited: ["Progress notes", "Finished two milestones."],
+    submit: "Write update",
+    regenerate: "Rewrite update",
+    resultTitle: "Update",
+  },
+  {
+    mode: "reply_draft",
+    definition: replyDraftDefinition,
+    ids: MODE_IDS.reply_draft,
+    fields: [
+      ["Client message", "Where is my invoice?"],
+      ["Reply goal", "Confirm it is on its way."],
+    ],
+    edited: ["Reply goal", "Confirm it was sent today."],
+    submit: "Write reply",
+    regenerate: "Rewrite reply",
+    resultTitle: "Reply draft",
+  },
+  {
+    mode: "prepaid_request",
+    definition: prepaidRequestDefinition,
+    ids: MODE_IDS.prepaid_request,
+    fields: [
+      ["Billing notes", "Work is ongoing."],
+      ["Amount", "500 USD"],
+    ],
+    edited: ["Amount", "600 USD"],
+    submit: "Write request",
+    regenerate: "Rewrite request",
+    resultTitle: "Prepaid request",
+  },
+];
+
+describe.each(MODE_SCENARIOS)("Client Update Writer $mode mode: one-screen workspace", (scenario) => {
+  it("keeps the inputs beside the result through edit, regeneration, copy and a new task", async () => {
+    const routes = routesFor(scenario.ids);
+    const routed = makeClientWithDeferredCalls(
+      {
+        [routes.RUNTIME_CONFIG]: [runtimeConfigResponse(scenario.ids)],
+        [routes.GUEST_IDENTITY]: [guestIdentityResponse()],
+        [routes.QUOTA]: [quotaResponse(scenario.ids)],
+        [routes.START]: [startResponse(), startResponse()],
+        [routes.SESSION]: [sessionResponse(), sessionResponse()],
+        [routes.NEXT_ACTION]: [sessionResponse({ status: "completed" })],
+      },
+      { [routes.RESULT]: 2 },
+    );
+    render(<ProductRunPage definition={scenario.definition} client={routed.client} />);
+    await waitFor(() => expect(screen.getByLabelText(scenario.fields[0]![0])).toBeTruthy());
+    const first = screen.getByLabelText(scenario.fields[0]![0]) as HTMLTextAreaElement;
+    for (const [label, value] of scenario.fields) {
+      fireEvent.change(screen.getByLabelText(label), { target: { value } });
+    }
+    fireEvent.change(screen.getByLabelText("Tone"), { target: { value: "neutral" } });
+    fireEvent.click(screen.getByRole("button", { name: scenario.submit }));
+    await waitFor(() => expect(routed.calls.filter((call) => call.key === routes.RESULT)).toHaveLength(1));
+    routed.resolveCall(routes.RESULT, 0, resultResponse(scenario.ids, { output: { text: "First draft." } }));
+
+    // Generation: the result appears in its own card while every input keeps its value.
+    await screen.findByText("First draft.");
+    const resultCard = screen.getByRole("heading", { name: scenario.resultTitle, level: 2 }).closest("section")!;
+    expect(within(resultCard).getByText("First draft.")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Your details", level: 2 })).toBeTruthy();
+    for (const [label, value] of scenario.fields) {
+      expect((screen.getByLabelText(label) as HTMLTextAreaElement).value).toBe(value);
+    }
+    expect((screen.getByLabelText("Tone") as HTMLSelectElement).value).toBe("neutral");
+    expect(screen.queryByText("Created from previous details")).toBeNull();
+
+    // Edit: the old result stays and is marked as made from earlier details.
+    fireEvent.change(screen.getByLabelText(scenario.edited[0]), { target: { value: scenario.edited[1] } });
+    expect(within(resultCard).getByText("Created from previous details")).toBeTruthy();
+    expect(within(resultCard).getByText("First draft.")).toBeTruthy();
+
+    // Repeat: this mode's own action label, the previous text stays until the new one arrives.
+    fireEvent.click(screen.getByRole("button", { name: scenario.regenerate }));
+    await waitFor(() => expect(routed.calls.filter((call) => call.key === routes.RESULT)).toHaveLength(2));
+    const starts = routed.calls.filter((call) => call.key === routes.START);
+    expect(idempotencyKeyOf(starts[0]!)).not.toBe(idempotencyKeyOf(starts[1]!));
+    expect(within(resultCard).getByText("First draft.")).toBeTruthy();
+    routed.resolveCall(routes.RESULT, 1, resultResponse(scenario.ids, { output: { text: "Second draft." } }));
+    await screen.findByText("Second draft.");
+    expect(screen.queryByText("First draft.")).toBeNull();
+    expect(screen.queryByText("Created from previous details")).toBeNull();
+
+    // Copy: one group with "New task".
+    const copy = screen.getByRole("button", { name: "Copy" });
+    const newTask = screen.getByRole("button", { name: "New task" });
+    expect(copy.parentElement).toBe(newTask.parentElement);
+    fireEvent.click(copy);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith("Second draft.");
+
+    // New task: form and result cleared, focus back on the first field.
+    fireEvent.click(newTask);
+    for (const [label] of scenario.fields) {
+      expect((screen.getByLabelText(label) as HTMLTextAreaElement).value).toBe("");
+    }
+    expect((screen.getByLabelText("Tone") as HTMLSelectElement).value).toBe("");
+    expect(screen.queryByText("Second draft.")).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(first));
+    expect(screen.getByRole("button", { name: scenario.submit })).toBeTruthy();
+  });
+});
 
 describe("Client Update Writer product definitions", () => {
   it("is registered under the client_update_writer product id, one scenario per mode", () => {
@@ -267,7 +393,7 @@ describe("Client Update Writer product definitions", () => {
     expect(body.input.billing_context).toEqual({ notes: "Work is ongoing.", amount: "the agreed amount" });
   });
 
-  it("enters a quota-exhausted state from the advisory quota check, with no form and no scenario started", async () => {
+  it("enters a quota-exhausted state from the advisory quota check: notice in the result card, submit disabled, no scenario started", async () => {
     const ids = MODE_IDS.update;
     const routes = routesFor(ids);
     const { client, calls } = makeClient({
@@ -279,7 +405,8 @@ describe("Client Update Writer product definitions", () => {
     render(<ProductRunPage definition={updateDefinition} client={client} />);
 
     await waitFor(() => expect(screen.getByText("You've used all your Client Update Writer runs for now.")).toBeTruthy());
-    expect(screen.queryByLabelText("Progress notes")).toBeNull();
+    expect(screen.getByLabelText("Progress notes")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Write update" }) as HTMLButtonElement).disabled).toBe(true);
     expect(calls.some((call) => call.key === routes.START)).toBe(false);
   });
 
@@ -418,7 +545,9 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
       [routes.GUEST_IDENTITY]: [guestIdentityResponse(), guestIdentityResponse()],
       [routes.QUOTA]: [
         quotaResponse(ids, { remaining_count: 3, used_count: 0 }),
-        quotaResponse(MODE_IDS.reply_draft, { remaining_count: 2, used_count: 1 }),
+        // Refetched once the run is accepted, so the banner already moves on the first mount.
+        quotaResponse(ids, { remaining_count: 2, used_count: 1 }),
+        quotaResponse(MODE_IDS.reply_draft, { remaining_count: 1, used_count: 2 }),
       ],
       [routes.START]: [startResponse()],
       [routes.SESSION]: [sessionResponse()],
@@ -434,7 +563,36 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy());
 
     fireEvent.click(screen.getByRole("radio", { name: "Reply Draft" }));
-    await waitFor(() => expect(screen.getByText("2 of 3 Client Update Writer runs remaining.")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("1 of 3 Client Update Writer runs remaining.")).toBeTruthy());
+  });
+
+  it("treats a mode switch as a new task: the previous mode's inputs and result are cleared", async () => {
+    // Deliberate (ANY-530): with inputs and result always on screen, switching mode starts over
+    // instead of carrying one mode's values into another mode's incompatible form.
+    const ids = MODE_IDS.update;
+    const routes = routesFor(ids);
+    const { client } = makeClient({
+      [routes.RUNTIME_CONFIG]: [fullRuntimeConfigResponse(ids)],
+      [routes.GUEST_IDENTITY]: [guestIdentityResponse(), guestIdentityResponse()],
+      [routes.QUOTA]: [quotaResponse(ids), quotaResponse(ids), quotaResponse(ids)],
+      [routes.START]: [startResponse()],
+      [routes.SESSION]: [sessionResponse()],
+      [routes.RESULT]: [resultResponse(ids, { output: { text: "An update for the client." } })],
+    });
+
+    render(<ClientUpdateWriterProduct client={client} />);
+    fireEvent.change(await screen.findByLabelText("Progress notes"), { target: { value: "Still working on it." } });
+    fireEvent.change(screen.getByLabelText("Tone"), { target: { value: "neutral" } });
+    fireEvent.click(screen.getByRole("button", { name: "Write update" }));
+    await screen.findByText("An update for the client.");
+
+    fireEvent.click(screen.getByRole("radio", { name: "Reply Draft" }));
+
+    expect((await screen.findByLabelText("Client message") as HTMLTextAreaElement).value).toBe("");
+    expect(screen.queryByText("An update for the client.")).toBeNull();
+    expect(screen.queryByText("Created from previous details")).toBeNull();
+    expect(screen.getByRole("heading", { name: "Reply draft", level: 2 })).toBeTruthy();
+    expect(screen.getByText("Your reply will appear here after you write it.")).toBeTruthy();
   });
 
   it("disables mode switching while a run is submitting or in progress, instead of abandoning it", async () => {

@@ -18,6 +18,12 @@ export const pt: Shape<typeof en> = {
   identityUnavailable: "Não foi possível verificar sua identidade. Recarregue a página e tente novamente.",
   retry: "Tentar novamente",
   formLabel: "Formulário {product}",
+  workspace: {
+    inputTitle: "Seus dados",
+    previousDetails: "Resultado baseado nos dados anteriores",
+    backToInputs: "Voltar aos dados",
+    newTask: "Nova tarefa",
+  },
   errors: {
     startFailed: "Não foi possível iniciar {product}. Tente novamente.",
     timeout: "Está demorando mais do que o esperado. Tente novamente.",

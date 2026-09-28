@@ -85,8 +85,8 @@ function composeCopyText(result: ClientUpdateWriterResult): string {
   return result.callToAction ? `${result.text}\n\n${result.callToAction}` : result.text;
 }
 
-function ClientUpdateWriterResultView({ result, onCopy }: ProductResultProps<ClientUpdateWriterResult>) {
-  return <ResultView text={composeCopyText(result)} onCopy={onCopy} />;
+function ClientUpdateWriterResultView({ result, onCopy, secondaryAction }: ProductResultProps<ClientUpdateWriterResult>) {
+  return <ResultView text={composeCopyText(result)} onCopy={onCopy} secondaryAction={secondaryAction} embedded />;
 }
 
 // ---- Update mode: progress_notes + tone -> client_update_writer.update_input_v1 ----

@@ -25,18 +25,12 @@ export const de: Shape<typeof en> = {
     taskText: "Die Aufgabenbeschreibung",
     freelancerPositioning: "Ihre Positionierung",
   },
-  workspace: {
-    inputTitle: "Ihre Angaben",
-    resultTitle: "Angebot",
-    placeholder: "Ihr Angebot erscheint nach dem Erstellen hier.",
-    previousDetails: "Mit vorherigen Angaben erstellt",
-    regenerate: "Angebot erneut erstellen",
-    backToInputs: "Zurück zu den Angaben",
-  },
   generate: {
     submit: "Angebot erstellen",
     running: "Ihr Angebot wird erstellt…",
     runFailed: "Beim Erstellen Ihres Angebots ist etwas schiefgelaufen. Bitte versuchen Sie es erneut.",
-    startAnother: "Neue Aufgabe",
+    resultTitle: "Angebot",
+    placeholder: "Ihr Angebot erscheint nach dem Erstellen hier.",
+    regenerate: "Angebot erneut erstellen",
   },
 };

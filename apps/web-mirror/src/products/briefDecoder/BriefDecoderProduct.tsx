@@ -69,7 +69,6 @@ export const briefDecoderDefinition: ProductDefinition<BriefDecoderValues, Brief
   scenarioId: "brief_decoder.decode_v1",
   messageScope: "decode",
   hasDescription: true,
-  hasStartAnother: true,
   emptyValues: { briefText: "" },
   validate,
   toInput: (values) => ({ brief_text: trimBriefText(values.briefText) }),

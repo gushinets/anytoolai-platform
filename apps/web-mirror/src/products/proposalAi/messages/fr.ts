@@ -24,18 +24,12 @@ export const fr: Shape<typeof en> = {
     taskText: "La description de la mission",
     freelancerPositioning: "Votre positionnement",
   },
-  workspace: {
-    inputTitle: "Vos informations",
-    resultTitle: "Proposition",
-    placeholder: "Votre proposition apparaîtra ici après sa génération.",
-    previousDetails: "Créée à partir des informations précédentes",
-    regenerate: "Régénérer la proposition",
-    backToInputs: "Retour aux informations",
-  },
   generate: {
     submit: "Générer la proposition",
     running: "Génération de votre proposition…",
     runFailed: "Une erreur s’est produite lors de la génération de votre proposition. Veuillez réessayer.",
-    startAnother: "Nouvelle mission",
+    resultTitle: "Proposition",
+    placeholder: "Votre proposition apparaîtra ici après sa génération.",
+    regenerate: "Régénérer la proposition",
   },
 };
