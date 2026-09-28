@@ -14,7 +14,9 @@ export const fr: Shape<typeof en> = {
     submit: "Décoder le brief",
     running: "Décodage de votre brief…",
     runFailed: "Une erreur s’est produite lors du décodage de votre brief. Veuillez réessayer.",
-    startAnother: "Décoder un autre brief",
+    resultTitle: "Brief décodé",
+    placeholder: "Votre brief décodé apparaîtra ici après le décodage.",
+    regenerate: "Décoder à nouveau le brief",
   },
   result: {
     brief: "Brief",

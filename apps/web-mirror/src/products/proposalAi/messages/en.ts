@@ -26,18 +26,12 @@ export const en = {
     taskText: "Task description",
     freelancerPositioning: "Your positioning",
   },
-  workspace: {
-    inputTitle: "Your details",
-    resultTitle: "Proposal",
-    placeholder: "Your proposal will appear here after you generate it.",
-    previousDetails: "Created from previous details",
-    regenerate: "Regenerate proposal",
-    backToInputs: "Back to details",
-  },
   generate: {
     submit: "Generate proposal",
     running: "Generating your proposal…",
     runFailed: "Something went wrong generating your proposal. Please try again.",
-    startAnother: "New task",
+    resultTitle: "Proposal",
+    placeholder: "Your proposal will appear here after you generate it.",
+    regenerate: "Regenerate proposal",
   },
 };

@@ -162,9 +162,8 @@ product-owned. Code: `apps/web-mirror/src/i18n/` (library `use-intl`, imported o
   product owns its `product` namespace: title, field labels, validation field names, mode names,
   submit/running/failure and quota copy, supplied through `RegisteredProduct.messages`.
   `ProductDefinition` describes behavior only; it names its copy with `messageScope` and carries no
-  English literals -- two optional flags, `hasDescription`/`hasStartAnother`, tell the shared
-  runtime whether to look up a product's own `description` / `<messageScope>.startAnother` message,
-  without the definition itself holding any text. `neutral|warm|firm` tone labels are product
+  English literals -- one optional flag, `hasDescription`, tells the shared runtime whether to look
+  up a product's own `description` message, without the definition itself holding any text. `neutral|warm|firm` tone labels are product
   vocabulary (a product-owned wire enum's visible labels), never host's: Client Update Writer's
   shared `ToneSelect` reads them from `products/shared/toneMessages/` (one translation per locale,
   spread into its own `product` namespace so a product with a differently-meaning `tone`-shaped enum
@@ -172,11 +171,17 @@ product-owned. Code: `apps/web-mirror/src/i18n/` (library `use-intl`, imported o
   ("Warm & personable" etc.) in its own messages and does not use `ToneSelect` at all -- the shared
   bundle is an opt-in convenience for products that want the same plain wording, not a contract every
   `tone`-shaped product must join.
-- Proposal AI enables `inlineResult` in its product definition: the shared runtime keeps its form
-  and latest successful result together, with the result tied to the input snapshot that produced
-  it. Editing marks the displayed text as based on previous data; starting a new task clears both.
-  Other products keep the existing result-only presentation. The product owns all workspace copy
-  in its seven locale files; the shared runtime still owns start, retry, quota, and copy behavior.
+- **One-screen workspace (ANY-528, ANY-530):** `ProductRunPage` renders every product as an input
+  card beside a result card (stacked below 860px; `ProductPageShell` always uses the wide shell).
+  The runtime keeps the form and the latest successful result together, with the result tied to the
+  input snapshot that produced it. Editing marks the displayed result as based on previous data; a
+  regeneration keeps the old result visible until the new one arrives; waiting and errors appear in
+  the result card; "Copy" and "New task" share one action group; "New task" clears both cards,
+  refreshes quota and focuses the first `textarea`/`input`. There is no result-only mode and no
+  per-product layout switch. Host messages own the copy every product shares
+  (`workspace.inputTitle|previousDetails|backToInputs|newTask`); the product owns the noun-specific
+  copy under its `messageScope` (`resultTitle|placeholder|regenerate`, one set per Client Update
+  Writer mode). The shared runtime still owns start, retry, quota, and copy behavior.
 - **Validation:** shared validators return structured `FieldError` data (`required`,
   `outer_whitespace`, `max_length`, `product`), never prose; `FieldErrorMessage` renders it in the
   current locale. Backend schema validation stays authoritative.
@@ -199,10 +204,11 @@ product-owned. Code: `apps/web-mirror/src/i18n/` (library `use-intl`, imported o
 
 1. Create `products/<name>/messages/en.ts` (English is the semantic source: `title`,
    `quotaRemaining` with `{remaining}`/`{limit}`, per-scope `submit`/`running`/`runFailed`, `fields`,
-   `fieldNames`, and any product validation keys). Want a description under the title, or a
-   "run again" action after a completed run? Add `description` / `<messageScope>.startAnother` here
-   and set `hasDescription`/`hasStartAnother: true` on the `ProductDefinition` -- both optional, the
-   shared runtime only looks them up when the flag is set.
+   `fieldNames`, and any product validation keys). Every scope also needs `resultTitle` (the
+   result card heading, a noun for what the run produces), `placeholder` (shown before the first
+   result) and `regenerate` (the submit label once a result is shown). Want a description under the
+   title? Add `description` here and set `hasDescription: true` on the `ProductDefinition` -- the
+   shared runtime only looks it up when the flag is set.
 2. Add `fr it de es ru pt` files typed `Shape<typeof en>`; use the typographic apostrophe `’` (a
    plain `'` before `{` starts ICU quoting); keep placeholders and plural categories. Reusing
    `ToneSelect`? Spread `TONE_MESSAGES[locale]` from `products/shared/toneMessages/` under a `tone`
@@ -212,7 +218,10 @@ product-owned. Code: `apps/web-mirror/src/i18n/` (library `use-intl`, imported o
    nonempty `title` for the page shell. The shell supplies the provider and language selector;
    the completeness tests cover the new product automatically.
 5. In the product, read text with `useProductT()`, render field errors with `FieldErrorMessage`, and
-   set `messageScope` on each `ProductDefinition`. Never read the UI locale in `toInput`.
+   set `messageScope` on each `ProductDefinition`. Never read the UI locale in `toInput`. The
+   product's `Result` must be embedded (`ResultView embedded`, no `Card` of its own; use `h3` for
+   headings inside it) and pass `secondaryAction` through to sit beside "Copy"; the first
+   `textarea`/`input` of its `Fields` is what "New task" focuses.
 
 ### Recipe: add a locale
 

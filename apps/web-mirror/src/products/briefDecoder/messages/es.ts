@@ -14,7 +14,9 @@ export const es: Shape<typeof en> = {
     submit: "Analizar brief",
     running: "Analizando su brief…",
     runFailed: "Algo salió mal al analizar su brief. Inténtelo de nuevo.",
-    startAnother: "Analizar otro brief",
+    resultTitle: "Brief analizado",
+    placeholder: "Su brief analizado aparecerá aquí después del análisis.",
+    regenerate: "Analizar brief de nuevo",
   },
   result: {
     brief: "Brief",

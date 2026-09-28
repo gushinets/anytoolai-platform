@@ -18,6 +18,12 @@ export const ru: Shape<typeof en> = {
   identityUnavailable: "Не удалось проверить ваш сеанс. Обновите страницу и попробуйте ещё раз.",
   retry: "Попробовать ещё раз",
   formLabel: "Форма {product}",
+  workspace: {
+    inputTitle: "Ваши данные",
+    previousDetails: "Результат основан на предыдущих данных",
+    backToInputs: "К исходным данным",
+    newTask: "Новая задача",
+  },
   errors: {
     startFailed: "Не удалось начать работу с {product}. Попробуйте ещё раз.",
     timeout: "Ожидание затянулось. Попробуйте ещё раз.",

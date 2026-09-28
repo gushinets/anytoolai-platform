@@ -14,7 +14,9 @@ export const TEST_PRODUCT_MESSAGES_EN = {
     submit: "Run",
     running: "Running…",
     runFailed: "Something went wrong. Please try again.",
-    startAnother: "Start another run",
+    resultTitle: "Test result",
+    placeholder: "Your result will appear here.",
+    regenerate: "Run again",
   },
 };
 
@@ -47,20 +49,20 @@ function TestProductFields({ values, errors, disabled, onChange }: ProductFields
  * the loop. Deliberately not registered in `src/products/registry.ts` (registry.test.tsx proves
  * that) -- it must never become a production product.
  *
- * `hasDescription`/`hasStartAnother` are both set so the shared runtime's optional description/
- * repeat-run paths (ANY-521) are exercised by the product-neutral `ProductRunPage.test.tsx` suite
- * too, not only by ProposalAI's own tests.
+ * `hasDescription` is set so the shared runtime's optional description path (ANY-521) is exercised
+ * by the product-neutral `ProductRunPage.test.tsx` suite too, not only by ProposalAI's own tests.
  */
 export const testProductDefinition: ProductDefinition<TestProductValues, string> = {
   productId: TEST_PRODUCT_IDS.productId,
   scenarioId: TEST_PRODUCT_IDS.scenarioId,
   messageScope: "run",
   hasDescription: true,
-  hasStartAnother: true,
   emptyValues: { text: "" },
   validate: (values) => (values.text.trim().length === 0 ? { text: { code: "required" } } : {}),
   toInput: (values) => ({ text: values.text }),
   extractResult: (output) => (typeof output.text === "string" ? output.text : null),
   Fields: TestProductFields,
-  Result: ({ result, onCopy }) => <ResultView text={result} onCopy={onCopy} />,
+  Result: ({ result, onCopy, secondaryAction }) => (
+    <ResultView text={result} onCopy={onCopy} secondaryAction={secondaryAction} embedded />
+  ),
 };

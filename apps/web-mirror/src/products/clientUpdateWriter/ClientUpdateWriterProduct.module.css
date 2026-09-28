@@ -13,11 +13,11 @@
 }
 
 .modeGroup {
-  /* Same 820px column as ProductRunPage's .content, which the mode switcher sits above. */
-  width: min(100%, 820px);
+  /* Spans the same workspace width as the two cards ProductRunPage renders below it. */
+  width: 100%;
   box-sizing: border-box;
   min-width: 0;
-  margin: 16px auto 24px;
+  margin: 16px 0 24px;
   padding: 0;
   border: 0;
 }

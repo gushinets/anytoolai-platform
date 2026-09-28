@@ -2,7 +2,7 @@
 // "One test-only definition proves registration, form submission, scenario polling, canonical
 // result rendering, next-action callback, retry, and quota/error behavior") -- no real product's
 // meaning is in the loop here. ProposalAI's own meaning is covered in ProposalAIProduct.test.tsx.
-import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { Component, StrictMode, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProductRunPage, type ProductRunPageProps } from "../src/products/runtime/ProductRunPage";
@@ -452,8 +452,10 @@ describe("ProductRunPage", () => {
   it("starts another run from the result with a cleared form and refreshed quota", async () => {
     const { client, calls } = makeClient({
       ...happyPathRoutes(),
+      // Boot, the refresh after the run was accepted, and the refresh after "New task".
       [ROUTES.QUOTA]: [
         quotaResponse(TEST_PRODUCT_IDS),
+        quotaResponse(TEST_PRODUCT_IDS, { used_count: 1, remaining_count: 2 }),
         quotaResponse(TEST_PRODUCT_IDS, { used_count: 1, remaining_count: 2 }),
       ],
     });
@@ -464,12 +466,14 @@ describe("ProductRunPage", () => {
     submit();
     await waitForResult();
 
-    fireEvent.click(screen.getByRole("button", { name: "Start another run" }));
+    fireEvent.click(screen.getByRole("button", { name: "New task" }));
 
     await waitForForm();
     expect((screen.getByLabelText("Text") as HTMLTextAreaElement).value).toBe("");
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText("Text")));
+    expect(screen.queryByText(RESULT_TEXT)).toBeNull();
     await waitFor(() => expect(screen.getByText("2 of 3 runs remaining.")).toBeTruthy());
-    expect(calls.filter((call) => call.key === ROUTES.QUOTA)).toHaveLength(2);
+    expect(calls.filter((call) => call.key === ROUTES.QUOTA)).toHaveLength(3);
   });
 
   it("starts another unmetered run without requesting quota", async () => {
@@ -484,27 +488,104 @@ describe("ProductRunPage", () => {
     fillValidForm();
     submit();
     await waitForResult();
-    fireEvent.click(screen.getByRole("button", { name: "Start another run" }));
+    fireEvent.click(screen.getByRole("button", { name: "New task" }));
 
     await waitForForm();
     expect((screen.getByLabelText("Text") as HTMLTextAreaElement).value).toBe("");
     expect(calls.filter((call) => call.key === ROUTES.QUOTA)).toHaveLength(0);
   });
 
-  it("does not add a repeat action to products that do not define one", async () => {
-    const { client } = makeClient(happyPathRoutes());
-    const definition = { ...testProductDefinition, hasStartAnother: false };
+  it("keeps the inputs beside the result through edit, regeneration, copy and new task", async () => {
+    const routed = makeClientWithDeferredCalls(
+      {
+        [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(TEST_PRODUCT_IDS)],
+        [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
+        [ROUTES.QUOTA]: [
+          quotaResponse(TEST_PRODUCT_IDS),
+          quotaResponse(TEST_PRODUCT_IDS, { used_count: 1, remaining_count: 2 }),
+          quotaResponse(TEST_PRODUCT_IDS, { used_count: 2, remaining_count: 1 }),
+          quotaResponse(TEST_PRODUCT_IDS, { used_count: 2, remaining_count: 1 }),
+        ],
+        [ROUTES.START]: [startResponse(), startResponse()],
+        [ROUTES.SESSION]: [sessionResponse(), sessionResponse()],
+        [ROUTES.NEXT_ACTION]: [],
+      },
+      { [ROUTES.RESULT]: 2 },
+    );
+    renderPage({ client: routed.client });
+    await waitForForm();
+    const text = screen.getByLabelText("Text") as HTMLTextAreaElement;
+    fillValidForm();
+    submit();
+    await waitFor(() => expect(routed.calls.filter((call) => call.key === ROUTES.RESULT)).toHaveLength(1));
+    routed.resolveCall(ROUTES.RESULT, 0, resultResponse(TEST_PRODUCT_IDS));
+    await waitForResult();
 
-    render(<ProductRunPage definition={definition} client={client} />);
+    // The inputs stay put, in their own card next to the result card.
+    expect(text.isConnected).toBe(true);
+    expect(text.value).toBe("Some input text.");
+    expect(screen.getByRole("heading", { name: "Your details", level: 2 })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Test result", level: 2 })).toBeTruthy();
+    expect(screen.queryByText("Created from previous details")).toBeNull();
+
+    // Editing outdates the result and says so, without hiding it.
+    fireEvent.change(text, { target: { value: "Edited input." } });
+    expect(screen.getByText("Created from previous details")).toBeTruthy();
+    expect(screen.getByText(RESULT_TEXT)).toBeTruthy();
+
+    // Regenerating keeps the old result visible with a single progress notice; a fresh key is used.
+    fireEvent.click(screen.getByRole("button", { name: "Run again" }));
+    await waitFor(() => expect(routed.calls.filter((call) => call.key === ROUTES.RESULT)).toHaveLength(2));
+    const starts = routed.calls.filter((call) => call.key === ROUTES.START);
+    expect(idempotencyKeyOf(starts[0]!)).not.toBe(idempotencyKeyOf(starts[1]!));
+    expect(screen.getByText(RESULT_TEXT)).toBeTruthy();
+    expect(text.value).toBe("Edited input.");
+    // The progress notice lives in the result card, next to the still-relevant "previous details" one.
+    const resultCard = screen.getByRole("heading", { name: "Test result", level: 2 }).closest("section")!;
+    expect(within(resultCard).getByText("Running…")).toBeTruthy();
+    expect(within(resultCard).getByText("Created from previous details")).toBeTruthy();
+    routed.resolveCall(ROUTES.RESULT, 1, resultResponse(TEST_PRODUCT_IDS, { output: { text: "Second result." } }));
+    await screen.findByText("Second result.");
+    expect(screen.queryByText("Created from previous details")).toBeNull();
+
+    // Copy and New task share one action group.
+    const copy = screen.getByRole("button", { name: "Copy" });
+    const newTask = screen.getByRole("button", { name: "New task" });
+    expect(copy.parentElement).toBe(newTask.parentElement);
+    fireEvent.click(copy);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
+
+    fireEvent.click(newTask);
+    expect(text.value).toBe("");
+    expect(screen.queryByText("Second result.")).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(text));
+    await waitFor(() => expect(screen.getByText("1 of 3 runs remaining.")).toBeTruthy());
+  });
+
+  it("shows a regeneration error in the result card above the retained result", async () => {
+    const { client } = makeClient({
+      ...bootRoutes(),
+      [ROUTES.QUOTA]: [quotaResponse(TEST_PRODUCT_IDS), quotaResponse(TEST_PRODUCT_IDS, { used_count: 1, remaining_count: 2 })],
+      [ROUTES.START]: [startResponse(), errorResponse(500, "internal_error")],
+      [ROUTES.SESSION]: [sessionResponse()],
+      [ROUTES.RESULT]: [resultResponse(TEST_PRODUCT_IDS)],
+    });
+    renderPage({ client });
     await waitForForm();
     fillValidForm();
     submit();
-    await waitForResult();
+    const previousResult = await screen.findByText(RESULT_TEXT);
 
-    expect(screen.queryByRole("button", { name: "Start another run" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Run again" }));
+
+    const error = await screen.findByText("Could not start Test Product. Please try again.");
+    const resultCard = screen.getByRole("heading", { name: "Test result", level: 2 }).closest("section")!;
+    expect(resultCard.contains(error)).toBe(true);
+    expect(error.compareDocumentPosition(previousResult) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect((screen.getByLabelText("Text") as HTMLTextAreaElement).value).toBe("Some input text.");
   });
 
-  it("enters a quota-exhausted state from the advisory quota check, with no form and no scenario started", async () => {
+  it("enters a quota-exhausted state from the advisory quota check: notice in the result card, submit disabled, no scenario started", async () => {
     const { client, calls } = makeClient({
       ...bootRoutes(),
       [ROUTES.QUOTA]: [quotaResponse(TEST_PRODUCT_IDS, { used_count: 3, remaining_count: 0, exhausted: true })],
@@ -512,8 +593,9 @@ describe("ProductRunPage", () => {
 
     renderPage({ client });
 
-    await waitFor(() => expect(screen.getByText("You've used all your Test Product runs for now.")).toBeTruthy());
-    expect(screen.queryByLabelText("Text")).toBeNull();
+    const notice = await screen.findByText("You've used all your Test Product runs for now.");
+    expect(within(screen.getByRole("heading", { name: "Test result", level: 2 }).closest("section")!).getByText(notice.textContent!)).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Run" }) as HTMLButtonElement).disabled).toBe(true);
     expect(calls.some((call) => call.key === ROUTES.START)).toBe(false);
   });
 
@@ -534,7 +616,8 @@ describe("ProductRunPage", () => {
   });
 
   it("does not let a late advisory quota response clobber an in-progress or completed run", async () => {
-    const { client, resolveDeferred } = makeClientWithDeferredRoute(
+    // Call 0 is the boot-time advisory GET, call 1 the post-acceptance refresh.
+    const { client, resolveCall } = makeClientWithDeferredCalls(
       {
         [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(TEST_PRODUCT_IDS)],
         [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
@@ -542,7 +625,7 @@ describe("ProductRunPage", () => {
         [ROUTES.SESSION]: [sessionResponse()],
         [ROUTES.RESULT]: [resultResponse(TEST_PRODUCT_IDS)],
       },
-      ROUTES.QUOTA,
+      { [ROUTES.QUOTA]: 2 },
     );
 
     renderPage({ client });
@@ -551,13 +634,15 @@ describe("ProductRunPage", () => {
     submit();
     await waitForResult();
 
-    // The advisory quota GET only settles now, well after the run already completed -- exhausted,
-    // as it would genuinely be after consuming the run this session just made.
-    resolveDeferred(quotaResponse(TEST_PRODUCT_IDS, { used_count: 3, remaining_count: 0, exhausted: true }));
-
-    // Confirms the response was actually processed (the advisory banner updates)...
+    // The refresh made after the run was accepted settles first: exhausted, as it would genuinely
+    // be after consuming the run this session just made.
+    resolveCall(ROUTES.QUOTA, 1, quotaResponse(TEST_PRODUCT_IDS, { used_count: 3, remaining_count: 0, exhausted: true }));
     await waitFor(() => expect(screen.getByText("0 of 3 runs remaining.")).toBeTruthy());
-    // ...without clobbering the already-completed run underneath it.
+    // The older boot-time response then arrives; it must not overwrite the newer counter...
+    resolveCall(ROUTES.QUOTA, 0, quotaResponse(TEST_PRODUCT_IDS, { used_count: 1, remaining_count: 2 }));
+    await act(async () => {});
+    expect(screen.getByText("0 of 3 runs remaining.")).toBeTruthy();
+    // ...and neither may replace the already-completed run.
     expect(screen.getByText(RESULT_TEXT)).toBeTruthy();
     expect(screen.queryByText("You've used all your Test Product runs for now.")).toBeNull();
   });
@@ -663,8 +748,11 @@ describe("ProductRunPage", () => {
     await waitFor(() =>
       expect(screen.getByText("Your result is ready, but we couldn't load it. Please try again.")).toBeTruthy(),
     );
-    // The run already succeeded -- no form to resubmit, so no risk of a second, wasteful run.
-    expect(screen.queryByLabelText("Text")).toBeNull();
+    // The run already succeeded: the form stays visible with the entered text but locked, and the
+    // submit button cannot start a second, wasteful run.
+    expect((screen.getByLabelText("Text") as HTMLTextAreaElement).disabled).toBe(true);
+    expect((screen.getByLabelText("Text") as HTMLTextAreaElement).value).toBe("Some input text.");
+    expect((screen.getByRole("button", { name: "Run" }) as HTMLButtonElement).disabled).toBe(true);
 
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
 

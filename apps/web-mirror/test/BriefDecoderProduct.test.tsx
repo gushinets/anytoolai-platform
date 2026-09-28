@@ -21,7 +21,9 @@ import type { ProductRunEvent } from "../src/products/runtime/productDefinition"
 import {
   errorResponse,
   guestIdentityResponse,
+  idempotencyKeyOf,
   makeClient,
+  makeClientWithDeferredCalls,
   quotaResponse,
   resultResponse,
   routesFor,
@@ -207,7 +209,9 @@ describe("Brief Decoder page", () => {
     const { calls } = await decode(routes(output), events);
 
     await waitFor(() => expect(screen.getByRole("heading", { name: /clarifying questions/ })).toBeTruthy());
-    expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual([
+    // The workspace cards own the h2s; the four contract parts sit under the result card as h3s.
+    expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual(["Your details", "Decoded brief"]);
+    expect(screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual([
       "Brief",
       "Issues",
       `${expected.questions.length} clarifying questions`,
@@ -243,6 +247,72 @@ describe("Brief Decoder page", () => {
     const nextAction = calls.filter((call) => call.key === ROUTES.NEXT_ACTION);
     expect(nextAction).toHaveLength(1);
     expect(JSON.parse(nextAction[0].init.body as string)).toEqual({ checkpoint_id: "checkpoint_1" });
+  });
+
+  it("keeps the brief beside the result through edit, repeat, copy and a new task, reporting each result once", async () => {
+    const events: ProductRunEvent[] = [];
+    const routed = makeClientWithDeferredCalls(
+      {
+        [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
+        [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
+        [ROUTES.QUOTA]: [quotaResponse(IDS)],
+        // Two distinct sessions: completion events are deduped per scenario session id.
+        [ROUTES.START]: [startResponse(), startResponse({ scenario_session_id: "session_2" })],
+        [ROUTES.SESSION]: [sessionResponse()],
+        "GET /v1/scenario-sessions/session_2": [sessionResponse({ scenario_session_id: "session_2" })],
+        [ROUTES.NEXT_ACTION]: [sessionResponse({ status: "completed" })],
+        "POST /v1/scenario-sessions/session_2/next-actions/copy_result": [sessionResponse({ scenario_session_id: "session_2", status: "completed" })],
+      },
+      { [ROUTES.RESULT]: 2 },
+    );
+    render(<ProductRunPage definition={briefDecoderDefinition} client={routed.client} onEvent={(e) => events.push(e)} />);
+    const brief = (await screen.findByLabelText("Client brief")) as HTMLTextAreaElement;
+    fireEvent.change(brief, { target: { value: "Need a website by the holidays." } });
+    fireEvent.click(screen.getByRole("button", { name: "Decode brief" }));
+    await waitFor(() => expect(routed.calls.filter((call) => call.key === ROUTES.RESULT)).toHaveLength(1));
+    routed.resolveCall(ROUTES.RESULT, 0, resultResponse(IDS, { output: composedOutput("") }));
+
+    // Generation: the four parts sit in the result card, the brief stays in its own card.
+    await screen.findByRole("heading", { name: /clarifying questions/, level: 3 });
+    const resultCard = screen.getByRole("heading", { name: "Decoded brief", level: 2 }).closest("section")!;
+    expect(within(resultCard).getAllByRole("heading", { level: 3 })).toHaveLength(4);
+    expect(brief.value).toBe("Need a website by the holidays.");
+    expect(document.querySelectorAll("section[aria-labelledby] section[aria-labelledby]").length).toBe(4);
+
+    // Edit: the decoded brief stays and is marked as made from earlier details.
+    fireEvent.change(brief, { target: { value: "Need a website and a logo by the holidays." } });
+    expect(within(resultCard).getByText("Created from previous details")).toBeTruthy();
+    expect(within(resultCard).getByRole("heading", { name: /clarifying questions/ })).toBeTruthy();
+
+    // Repeat: the previous result stays until the new one arrives; a fresh key is used.
+    fireEvent.click(screen.getByRole("button", { name: "Decode brief again" }));
+    await waitFor(() => expect(routed.calls.filter((call) => call.key === ROUTES.RESULT)).toHaveLength(2));
+    const starts = routed.calls.filter((call) => call.key === ROUTES.START);
+    expect(idempotencyKeyOf(starts[0]!)).not.toBe(idempotencyKeyOf(starts[1]!));
+    expect(within(resultCard).getByRole("heading", { name: /clarifying questions/ })).toBeTruthy();
+    expect(within(resultCard).getByText("Decoding your brief…")).toBeTruthy();
+    expect(completedEvents(events)).toHaveLength(1);
+    routed.resolveCall(ROUTES.RESULT, 1, resultResponse(IDS, { output: composedOutput(".no_issues") }));
+    await screen.findByText("No issues found.");
+    expect(screen.queryByText("Created from previous details")).toBeNull();
+    // One completion per session; the zero-question rerun does not count as a viewed result.
+    await waitFor(() => expect(completedEvents(events).map((e) => (e as { resultViewed: boolean }).resultViewed)).toEqual([true, false]));
+
+    // Copy copies the document only, in one group with "New task".
+    const expected = extractBriefDecoderResult(composedOutput(".no_issues"))!;
+    const copy = screen.getByRole("button", { name: "Copy" });
+    const newTask = screen.getByRole("button", { name: "New task" });
+    expect(copy.parentElement).toBe(newTask.parentElement);
+    fireEvent.click(copy);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(composeCopyText(expected.document));
+
+    // New task: brief and result cleared, focus back on the brief field.
+    fireEvent.click(newTask);
+    expect(brief.value).toBe("");
+    expect(screen.queryByText("No issues found.")).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(brief));
+    expect(completedEvents(events)).toHaveLength(2);
   });
 
   it("renders the weak-input fixtures as a full, activating result", async () => {

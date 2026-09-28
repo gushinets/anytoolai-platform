@@ -14,7 +14,9 @@ export const ru: Shape<typeof en> = {
     submit: "Разобрать бриф",
     running: "Разбираем ваш бриф…",
     runFailed: "При разборе брифа что-то пошло не так. Пожалуйста, попробуйте ещё раз.",
-    startAnother: "Разобрать другой бриф",
+    resultTitle: "Разбор брифа",
+    placeholder: "Разбор брифа появится здесь после запуска.",
+    regenerate: "Разобрать бриф заново",
   },
   result: {
     brief: "Бриф",

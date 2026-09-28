@@ -101,6 +101,11 @@ a typed composite `R`, a product-owned renderer with a pure `composeCopyText`, a
 is the browser proof, including runtime-correlation assertions against `platform.jobs`,
 `action_runs`, `provider_calls` and `event_log`.
 
+Every web product gets the one-screen "inputs + result" layout from `ProductRunPage` with no
+opt-in: give it an embedded `Result` that renders `secondaryAction`, the `<scope>.resultTitle|
+placeholder|regenerate` messages, and a first field that is a `textarea` or `input`
+(`docs/architecture/frontend-boundaries.md`).
+
 ## Live release contract
 
 Actions using `default_fake_provider_v1` are eligible for the standard generated live profile:
