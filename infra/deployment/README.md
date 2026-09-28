@@ -137,14 +137,18 @@ SSO layer, or public frontend. The API image already packages `/atom-lab` HTML/C
 PostgreSQL and the API bind to loopback only. External access must pass through an operator-owned
 HTTPS reverse proxy restricted to the approved internal network.
 
-Run `python3 scripts/agent/runner.py quick-check` once, copy `.env.example` to the gitignored
-`.env.atom-lab`, and set unique PostgreSQL credentials, a high-entropy Lab access code, a different
+Run `python3 scripts/agent/runner.py quick-check` once, create the gitignored secret file with
+owner-only permissions, and set unique PostgreSQL credentials, a high-entropy Lab access code, a different
 server live token, the worker-only OpenAI key, the exact approved HTTPS origin, and a measured
 worker memory limit. If no egress proxy is required, keep `ANYTOOLAI_LLM_HTTPS_PROXY=` blank; do
 not leave a sample proxy hostname. Configure a real worker proxy only when required. Do not reuse
 the Lab code as the live token or `/demo` code. Do not put any credential in a URL, command
 argument, ticket, Git, screenshot, proxy access log, or evidence file. Readiness prints only the
 configured origin.
+
+```bash
+install -m 600 infra/compose/.env.example infra/compose/.env.atom-lab
+```
 
 Before starting Compose, configure ingress. The exact proxy is operator-owned, but it must enforce
 TLS and a network/VPN allowlist before proxying `/atom-lab`, `/atom-lab/*`, and
@@ -222,8 +226,12 @@ python scripts/agent/runner.py atom-lab-quiesce
 `atom-lab-quiesce` holds the host-global lifecycle lock, stops the API so no new run can be
 accepted, leaves the worker running until every Atom Lab job has left `created`/`running`, and only
 then stops the worker. PostgreSQL remains running. If the command returns nonzero, keep ingress
-closed, do not take a backup, inspect `atom-lab-status` and worker logs, and rerun quiesce after the
-problem is resolved. On success, stream the custom-format dump without exposing a password
+closed, do not take a backup, and inspect `atom-lab-status` and worker logs. After resolving the
+problem, either rerun quiesce or abort the maintenance window with the idempotent
+`python scripts/agent/runner.py atom-lab-resume`; resume starts API/worker and requires full
+readiness before returning success. The same resume command safely reopens a successfully quiesced
+application when the planned update is cancelled. Reopen ingress only after resume succeeds. On
+successful quiesce, stream the custom-format dump without exposing a password
 (replace the destination with a protected operator path):
 
 ```bash
@@ -253,15 +261,13 @@ procedure from that checkout.
 For a **subsequent application rollback**, the target revision must already contain a compatible
 Atom Lab deployment package. Stop API/worker with that package still present, check out the prior
 reviewed Atom Lab revision, and reuse the volume only if that revision supports the current schema.
-Otherwise keep the original database untouched: create a recovery database in the same preserved
-volume and restore the dump:
+Otherwise keep the original database untouched. First bootstrap only PostgreSQL from the preserved
+volume and wait for its health check. This command is also required after a failed `atom-lab-up`:
+failed-candidate cleanup removes containers/networks but deliberately retains the named volume.
+It never starts `migrate`, API, or worker. Then create a recovery database and restore the dump:
 
 ```bash
-docker compose --project-name anytoolai-atom-lab \
-  --env-file infra/compose/.env.atom-lab \
-  -f infra/compose/docker-compose.yml \
-  -f infra/compose/docker-compose.atom-lab.yml \
-  stop platform-api platform-worker
+python scripts/agent/runner.py atom-lab-recovery-postgres-up
 docker compose --project-name anytoolai-atom-lab \
   --env-file infra/compose/.env.atom-lab \
   -f infra/compose/docker-compose.yml \

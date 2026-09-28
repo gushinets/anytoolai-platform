@@ -2101,6 +2101,76 @@ def _atom_lab_quiesce_locked() -> int:
     return exit_code
 
 
+def atom_lab_resume() -> int:
+    try:
+        with _atom_lab_deployment_lock():
+            return _atom_lab_resume_locked()
+    except DeploymentLockError as exc:
+        print(f"LAB008: {exc}", file=sys.stderr)
+        return 1
+
+
+def _atom_lab_resume_locked() -> int:
+    try:
+        inputs = _atom_lab_deployment_inputs()
+        if not _atom_lab_stack_running(inputs):
+            raise RuntimeError("Atom Lab stack has no running services to resume")
+    except ValueError as exc:
+        print(f"LAB001: {exc}", file=sys.stderr)
+        return 2
+    except (FileNotFoundError, OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
+        print(f"LAB011: Atom Lab resume preflight failed: {exc}", file=sys.stderr)
+        return 1
+
+    exit_code = run_with_env(
+        [*_atom_lab_compose_command(), "start", "platform-api", "platform-worker"],
+        inputs.compose_env,
+        timeout=COMPOSE_TEARDOWN_TIMEOUT_SECONDS,
+    )
+    if exit_code != 0:
+        return exit_code
+    return _atom_lab_ready(inputs)
+
+
+def atom_lab_recovery_postgres_up() -> int:
+    try:
+        with _atom_lab_deployment_lock():
+            return _atom_lab_recovery_postgres_up_locked()
+    except DeploymentLockError as exc:
+        print(f"LAB008: {exc}", file=sys.stderr)
+        return 1
+
+
+def _atom_lab_recovery_postgres_up_locked() -> int:
+    try:
+        inputs = _atom_lab_deployment_inputs()
+    except ValueError as exc:
+        print(f"LAB001: {exc}", file=sys.stderr)
+        return 2
+    except OSError as exc:
+        print(f"LAB012: Atom Lab recovery PostgreSQL preflight failed: {exc}", file=sys.stderr)
+        return 1
+
+    timeout = math.ceil(float(inputs.compose_env.get("ANYTOOLAI_READY_TIMEOUT", "90")))
+    exit_code = run_with_env(
+        [
+            *_atom_lab_compose_command(),
+            "up",
+            "-d",
+            "--wait",
+            "--wait-timeout",
+            str(timeout),
+            "postgres",
+        ],
+        inputs.compose_env,
+    )
+    if exit_code == 0:
+        print(
+            "Atom Lab recovery PostgreSQL is healthy; migrate, API, and worker remain stopped"
+        )
+    return exit_code
+
+
 def _stop_failed_atom_lab_candidate() -> None:
     if _atom_lab_down_locked() != 0:
         print(
@@ -2818,6 +2888,8 @@ COMMANDS = {
     "atom-lab-ready": atom_lab_ready,
     "atom-lab-status": atom_lab_status,
     "atom-lab-quiesce": atom_lab_quiesce,
+    "atom-lab-resume": atom_lab_resume,
+    "atom-lab-recovery-postgres-up": atom_lab_recovery_postgres_up,
     "atom-lab-down": atom_lab_down,
     "atom-lab-smoke": atom_lab_smoke,
     "prod-up": prod_up,

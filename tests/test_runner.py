@@ -3668,6 +3668,82 @@ def test_atom_lab_quiesce_timeout_keeps_worker_running_and_blocks_backup(
     assert "no backup may be taken" in capsys.readouterr().err
 
 
+def test_atom_lab_resume_starts_api_and_worker_then_requires_readiness(monkeypatch) -> None:
+    runner = load_runner_module()
+    inputs = runner.AtomLabDeploymentInputs(
+        dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
+    )
+    commands = []
+    readiness = []
+    monkeypatch.setattr(runner, "_atom_lab_deployment_inputs", lambda: inputs)
+    monkeypatch.setattr(runner, "_atom_lab_stack_running", lambda inputs: True)
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda command, env, **kwargs: commands.append(list(command)) or 0,
+    )
+    monkeypatch.setattr(
+        runner,
+        "_atom_lab_ready",
+        lambda ready_inputs: readiness.append(ready_inputs) or 0,
+    )
+
+    assert runner.atom_lab_resume() == 0
+    assert commands[0][-3:] == ["start", "platform-api", "platform-worker"]
+    assert readiness == [inputs]
+
+
+def test_atom_lab_failed_up_cleanup_can_bootstrap_only_recovery_postgres(
+    monkeypatch,
+) -> None:
+    runner = load_runner_module()
+    inputs = runner.AtomLabDeploymentInputs(
+        dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
+    )
+    commands = []
+    monkeypatch.setattr(runner, "_atom_lab_deployment_inputs", lambda: inputs)
+    monkeypatch.setattr(runner, "_atom_lab_stack_running", lambda inputs: False)
+    monkeypatch.setattr(runner, "_check_ports_available", lambda *args: True)
+
+    def run(command, env, **kwargs):
+        commands.append(list(command))
+        return 17 if len(commands) == 1 else 0
+
+    monkeypatch.setattr(runner, "run_with_env", run)
+
+    assert runner.atom_lab_up() == 17
+    assert commands[1][-2:] == ["down", "--remove-orphans"]
+    assert runner.atom_lab_recovery_postgres_up() == 0
+    recovery_command = commands[2]
+    assert recovery_command[-6:] == [
+        "up",
+        "-d",
+        "--wait",
+        "--wait-timeout",
+        "90",
+        "postgres",
+    ]
+    assert recovery_command[-1] == "postgres"
+    assert "migrate" not in recovery_command
+    assert "platform-api" not in recovery_command
+    assert "platform-worker" not in recovery_command
+
+
+def test_atom_lab_runbook_orders_recovery_bootstrap_and_protects_secrets() -> None:
+    runner = load_runner_module()
+    runbook = (runner.ROOT / "infra" / "deployment" / "README.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "install -m 600 infra/compose/.env.example infra/compose/.env.atom-lab" in runbook
+    assert "atom-lab-resume" in runbook
+    recovery = runbook.index("atom-lab-recovery-postgres-up")
+    createdb = runbook.index("createdb -U", recovery)
+    restore = runbook.index("pg_restore -U", createdb)
+    down = runbook.index("atom-lab-down", restore)
+    assert recovery < createdb < restore < down
+
+
 def test_atom_lab_env_template_leaves_optional_proxy_blank() -> None:
     runner = load_runner_module()
     template = (runner.ROOT / "infra" / "compose" / ".env.example").read_text(
@@ -3726,7 +3802,14 @@ def test_atom_lab_up_reports_failed_candidate_cleanup(monkeypatch, capsys) -> No
 
 @pytest.mark.parametrize(
     "command_name",
-    ["atom_lab_up", "atom_lab_quiesce", "atom_lab_down", "atom_lab_smoke"],
+    [
+        "atom_lab_up",
+        "atom_lab_quiesce",
+        "atom_lab_resume",
+        "atom_lab_recovery_postgres_up",
+        "atom_lab_down",
+        "atom_lab_smoke",
+    ],
 )
 def test_atom_lab_mutations_refuse_concurrent_operation(
     monkeypatch, tmp_path, capsys, command_name
