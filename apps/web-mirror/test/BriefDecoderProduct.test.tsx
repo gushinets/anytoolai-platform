@@ -318,7 +318,9 @@ describe("Brief Decoder page", () => {
     await waitFor(() => expect(screen.getByRole("heading", { name: /clarifying questions/ })).toBeTruthy());
     expect(screen.getByRole("heading", { name: "4 clarifying questions" })).toBeTruthy();
     expect(screen.queryByText("No clarifying questions were generated.")).toBeNull();
-    await waitFor(() => expect(completedEvents(events).map((event) => (event as { resultViewed: boolean }).resultViewed)).toEqual([true]));
+    await waitFor(() => expect(
+      completedEvents(events).map((event) => (event as { resultViewed: boolean }).resultViewed),
+    ).toEqual([true]));
   });
 
   it("renders both empty states for no issues, reports resultViewed false, and still copies", async () => {
