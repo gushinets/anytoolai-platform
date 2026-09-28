@@ -3470,6 +3470,8 @@ def test_atom_lab_deployment_requires_plain_https_origin(monkeypatch, url) -> No
         ("ANYTOOLAI_READY_TIMEOUT", "nan"),
         ("ANYTOOLAI_SMOKE_TIMEOUT", "inf"),
         ("ANYTOOLAI_SMOKE_TIMEOUT", "nan"),
+        ("ANYTOOLAI_ATOM_LAB_QUIESCE_TIMEOUT", "inf"),
+        ("ANYTOOLAI_ATOM_LAB_QUIESCE_TIMEOUT", "nan"),
     ],
 )
 def test_atom_lab_deployment_rejects_non_finite_timeouts(
@@ -3562,6 +3564,122 @@ def test_atom_lab_ready_checks_assets_auth_catalog_and_worker(monkeypatch) -> No
     assert runner._atom_lab_ready(inputs, announce=False) == 0
 
 
+@pytest.mark.parametrize("denial_body", [b"[]", b'{"error": []}'])
+def test_atom_lab_ready_rejects_malformed_denial_envelope(
+    monkeypatch, capsys, denial_body
+) -> None:
+    runner = load_runner_module()
+    inputs = runner.AtomLabDeploymentInputs(
+        dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
+    )
+    monkeypatch.setattr(runner, "_wait_for_http_ok", lambda url, timeout: True)
+
+    def request(url, *, access_code=None):
+        if url.endswith("/atom-lab"):
+            return 200, b"html", "text/html"
+        if url.endswith(".css"):
+            return 200, b"css", "text/css"
+        if url.endswith(".mjs"):
+            return 200, b"js", "application/javascript"
+        if access_code == "lab-access":
+            catalog = [{"atom_id": f"A{index:02d}"} for index in range(1, 12)]
+            return 200, json.dumps(catalog).encode(), "application/json"
+        return 401, denial_body, "application/json"
+
+    monkeypatch.setattr(runner, "_atom_lab_request", request)
+    monkeypatch.setattr(
+        runner.subprocess,
+        "run",
+        lambda *args, **kwargs: pytest.fail("malformed auth response reached worker check"),
+    )
+
+    assert runner._atom_lab_ready(inputs, announce=False) == 1
+    assert "LAB004: Atom Lab readiness failed" in capsys.readouterr().err
+
+
+def test_atom_lab_quiesce_drains_jobs_before_stopping_worker(monkeypatch, capsys) -> None:
+    runner = load_runner_module()
+    inputs = runner.AtomLabDeploymentInputs(
+        dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
+    )
+    counts = iter([2, 0])
+    commands = []
+    monkeypatch.setattr(runner, "_atom_lab_deployment_inputs", lambda: inputs)
+    monkeypatch.setattr(runner, "_atom_lab_stack_running", lambda inputs: True)
+    monkeypatch.setattr(
+        runner, "_atom_lab_nonterminal_run_count", lambda inputs: next(counts)
+    )
+    monkeypatch.setattr(runner.time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda command, env, **kwargs: commands.append(list(command)) or 0,
+    )
+
+    assert runner.atom_lab_quiesce() == 0
+    assert commands[0][-2:] == ["stop", "platform-api"]
+    assert commands[1][-2:] == ["stop", "platform-worker"]
+    assert "PostgreSQL remains running" in capsys.readouterr().out
+
+
+def test_atom_lab_quiesce_counts_only_created_and_running_lab_jobs(monkeypatch) -> None:
+    runner = load_runner_module()
+    inputs = runner.AtomLabDeploymentInputs(
+        dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
+    )
+    captured = {}
+
+    def run(command, **kwargs):
+        captured["command"] = list(command)
+        return subprocess.CompletedProcess(command, 0, "0\n", "")
+
+    monkeypatch.setattr(runner.subprocess, "run", run)
+
+    assert runner._atom_lab_nonterminal_run_count(inputs) == 0
+    command = captured["command"]
+    assert "platform.atom_lab_runs" in command[-1]
+    assert "'created', 'running'" in command[-1]
+
+
+def test_atom_lab_quiesce_timeout_keeps_worker_running_and_blocks_backup(
+    monkeypatch, capsys
+) -> None:
+    runner = load_runner_module()
+    values = dict(ATOM_LAB_DEPLOYMENT_VALUES) | {
+        "ANYTOOLAI_ATOM_LAB_QUIESCE_TIMEOUT": "1"
+    }
+    inputs = runner.AtomLabDeploymentInputs(
+        values, 18468, 15468, "https://atom-lab.internal.example"
+    )
+    commands = []
+    clock = iter([0.0, 2.0])
+    monkeypatch.setattr(runner, "_atom_lab_deployment_inputs", lambda: inputs)
+    monkeypatch.setattr(runner, "_atom_lab_stack_running", lambda inputs: True)
+    monkeypatch.setattr(runner, "_atom_lab_nonterminal_run_count", lambda inputs: 1)
+    monkeypatch.setattr(runner.time, "monotonic", lambda: next(clock))
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda command, env, **kwargs: commands.append(list(command)) or 0,
+    )
+
+    assert runner.atom_lab_quiesce() == 1
+    assert [command[-1] for command in commands] == ["platform-api"]
+    assert "no backup may be taken" in capsys.readouterr().err
+
+
+def test_atom_lab_env_template_leaves_optional_proxy_blank() -> None:
+    runner = load_runner_module()
+    template = (runner.ROOT / "infra" / "compose" / ".env.example").read_text(
+        encoding="utf-8"
+    )
+
+    assert "ANYTOOLAI_LLM_HTTPS_PROXY=\n" in template
+    assert "ANYTOOLAI_ATOM_LAB_INTERNAL_URL=\n" in template
+    assert "proxy-host" not in template
+    assert "atom-lab.internal.example" not in template
+
+
 def test_atom_lab_up_refuses_to_replace_running_stack(monkeypatch, capsys) -> None:
     runner = load_runner_module()
     inputs = runner.AtomLabDeploymentInputs(
@@ -3606,7 +3724,10 @@ def test_atom_lab_up_reports_failed_candidate_cleanup(monkeypatch, capsys) -> No
     assert "LAB009: failed Atom Lab candidate could not be stopped" in capsys.readouterr().err
 
 
-@pytest.mark.parametrize("command_name", ["atom_lab_up", "atom_lab_down", "atom_lab_smoke"])
+@pytest.mark.parametrize(
+    "command_name",
+    ["atom_lab_up", "atom_lab_quiesce", "atom_lab_down", "atom_lab_smoke"],
+)
 def test_atom_lab_mutations_refuse_concurrent_operation(
     monkeypatch, tmp_path, capsys, command_name
 ) -> None:

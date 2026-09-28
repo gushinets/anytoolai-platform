@@ -1776,6 +1776,7 @@ def _atom_lab_deployment_inputs() -> AtomLabDeploymentInputs:
     for name, default in (
         ("ANYTOOLAI_READY_TIMEOUT", "90"),
         ("ANYTOOLAI_SMOKE_TIMEOUT", "30"),
+        ("ANYTOOLAI_ATOM_LAB_QUIESCE_TIMEOUT", "600"),
     ):
         try:
             timeout = float(env.get(name, default))
@@ -1852,7 +1853,8 @@ def _atom_lab_ready(inputs: AtomLabDeploymentInputs, *, announce: bool = True) -
             raise ValueError("missing or wrong Atom Lab access code did not fail closed")
         for body in (missing_body, wrong_body):
             payload = json.loads(body)
-            if payload.get("error", {}).get("code") != "atom_lab_access_denied":
+            error = payload.get("error") if isinstance(payload, dict) else None
+            if not isinstance(error, dict) or error.get("code") != "atom_lab_access_denied":
                 raise ValueError("Atom Lab access denial did not use the safe error envelope")
         catalog = json.loads(valid_body)
         if (
@@ -2003,6 +2005,100 @@ def _atom_lab_down_locked() -> int:
         _atom_lab_control_env(),
         timeout=COMPOSE_TEARDOWN_TIMEOUT_SECONDS,
     )
+
+
+def _atom_lab_nonterminal_run_count(inputs: AtomLabDeploymentInputs) -> int:
+    query = (
+        "SELECT count(*) FROM platform.atom_lab_runs AS r "
+        "JOIN platform.jobs AS j ON j.id = r.job_id "
+        "WHERE j.status IN ('created', 'running');"
+    )
+    completed = subprocess.run(
+        [
+            *_atom_lab_compose_command(),
+            "exec",
+            "-T",
+            "postgres",
+            "sh",
+            "-c",
+            'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "$1"',
+            "atom-lab-quiesce",
+            query,
+        ],
+        cwd=ROOT,
+        env=inputs.compose_env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError("could not inspect non-terminal Atom Lab jobs")
+    try:
+        count = int(completed.stdout.strip())
+    except ValueError as exc:
+        raise RuntimeError("PostgreSQL returned an invalid Atom Lab job count") from exc
+    if count < 0:
+        raise RuntimeError("PostgreSQL returned an invalid Atom Lab job count")
+    return count
+
+
+def atom_lab_quiesce() -> int:
+    try:
+        with _atom_lab_deployment_lock():
+            return _atom_lab_quiesce_locked()
+    except DeploymentLockError as exc:
+        print(f"LAB008: {exc}", file=sys.stderr)
+        return 1
+
+
+def _atom_lab_quiesce_locked() -> int:
+    try:
+        inputs = _atom_lab_deployment_inputs()
+        if not _atom_lab_stack_running(inputs):
+            raise RuntimeError("Atom Lab stack is not running")
+    except ValueError as exc:
+        print(f"LAB001: {exc}", file=sys.stderr)
+        return 2
+    except (FileNotFoundError, OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
+        print(f"LAB010: Atom Lab quiesce preflight failed: {exc}", file=sys.stderr)
+        return 1
+
+    exit_code = run_with_env(
+        [*_atom_lab_compose_command(), "stop", "platform-api"],
+        inputs.compose_env,
+        timeout=COMPOSE_TEARDOWN_TIMEOUT_SECONDS,
+    )
+    if exit_code != 0:
+        return exit_code
+
+    timeout = float(inputs.compose_env.get("ANYTOOLAI_ATOM_LAB_QUIESCE_TIMEOUT", "600"))
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            nonterminal_count = _atom_lab_nonterminal_run_count(inputs)
+        except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
+            print(f"LAB010: could not verify the Atom Lab queue: {exc}", file=sys.stderr)
+            return 1
+        if nonterminal_count == 0:
+            break
+        if time.monotonic() >= deadline:
+            print(
+                f"LAB010: {nonterminal_count} Atom Lab run(s) remain non-terminal; "
+                "ingress/API must stay closed and no backup may be taken",
+                file=sys.stderr,
+            )
+            return 1
+        time.sleep(min(2.0, max(0.0, deadline - time.monotonic())))
+
+    exit_code = run_with_env(
+        [*_atom_lab_compose_command(), "stop", "platform-worker"],
+        inputs.compose_env,
+        timeout=COMPOSE_TEARDOWN_TIMEOUT_SECONDS,
+    )
+    if exit_code == 0:
+        print("Atom Lab is quiesced; PostgreSQL remains running for a consistent backup")
+    return exit_code
 
 
 def _stop_failed_atom_lab_candidate() -> None:
@@ -2721,6 +2817,7 @@ COMMANDS = {
     "atom-lab-up": atom_lab_up,
     "atom-lab-ready": atom_lab_ready,
     "atom-lab-status": atom_lab_status,
+    "atom-lab-quiesce": atom_lab_quiesce,
     "atom-lab-down": atom_lab_down,
     "atom-lab-smoke": atom_lab_smoke,
     "prod-up": prod_up,
