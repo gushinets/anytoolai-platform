@@ -20,7 +20,7 @@ export const ru: Shape<typeof en> = {
   formLabel: "Форма {product}",
   workspace: {
     inputTitle: "Ваши данные",
-    previousDetails: "Создано по предыдущим данным",
+    previousDetails: "Результат основан на предыдущих данных",
     backToInputs: "К исходным данным",
     newTask: "Новая задача",
   },

@@ -23,7 +23,7 @@ export const it: Shape<typeof en> = {
   formLabel: "Modulo {product}",
   workspace: {
     inputTitle: "I suoi dati",
-    previousDetails: "Creata con i dati precedenti",
+    previousDetails: "Risultato basato sui dati precedenti",
     backToInputs: "Tornare ai dati",
     newTask: "Nuova attività",
   },

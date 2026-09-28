@@ -20,7 +20,7 @@ export const fr: Shape<typeof en> = {
   formLabel: "Formulaire {product}",
   workspace: {
     inputTitle: "Vos informations",
-    previousDetails: "Créée à partir des informations précédentes",
+    previousDetails: "Résultat basé sur les informations précédentes",
     backToInputs: "Retour aux informations",
     newTask: "Nouvelle tâche",
   },
