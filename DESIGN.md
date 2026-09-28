@@ -49,7 +49,7 @@ Cabinet Grotesk at strong weight marks headings; DM Sans with Noto Sans fallback
 
 ## Layout
 
-The shared page width caps at 1160px. Long forms use natural document scrolling. Proposal AI uses source data on the left and the result on the right at desktop widths, then stacks them below 860px. Both columns use the same outer Card surface, radius, padding, and heading placement. Keep both panels in the document flow so neither clips at short heights or zoom. Inputs and actions must remain reachable on small screens.
+The shared page width caps at 1160px. Long forms use natural document scrolling. Every web product uses source data on the left and the result on the right at desktop widths, then stacks them below 860px. Both columns use the same outer Card surface, radius, padding, and heading placement. Keep both panels in the document flow so neither clips at short heights or zoom. Inputs and actions must remain reachable on small screens.
 
 ## Elevation & Depth
 

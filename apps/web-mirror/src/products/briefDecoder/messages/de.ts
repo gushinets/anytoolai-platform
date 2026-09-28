@@ -14,7 +14,9 @@ export const de: Shape<typeof en> = {
     submit: "Briefing analysieren",
     running: "Ihr Briefing wird analysiert…",
     runFailed: "Beim Analysieren Ihres Briefings ist etwas schiefgelaufen. Bitte versuchen Sie es erneut.",
-    startAnother: "Weiteres Briefing analysieren",
+    resultTitle: "Analyse des Briefings",
+    placeholder: "Die Analyse Ihres Briefings erscheint hier, sobald sie fertig ist.",
+    regenerate: "Briefing erneut analysieren",
   },
   result: {
     brief: "Briefing",

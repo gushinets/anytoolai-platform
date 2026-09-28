@@ -11,8 +11,7 @@
 }
 
 .nav {
-  width: min(100%, 820px);
-  margin: 0 auto 8px;
+  margin: 0 0 8px;
 }
 
 .linkWrap {
@@ -75,8 +74,6 @@
 }
 
 .titleRow {
-  width: min(100%, 820px);
-  margin: 0 auto;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -85,9 +82,4 @@
 
 .titleRow h1 {
   margin: 0;
-}
-
-.wideShell .nav,
-.wideShell .titleRow {
-  width: 100%;
 }

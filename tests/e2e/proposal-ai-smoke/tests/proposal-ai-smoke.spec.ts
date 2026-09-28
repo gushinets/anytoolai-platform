@@ -45,6 +45,27 @@ const WEAK_INPUT_FIXTURE_PATH = join(
   "../../../../tests/fixtures/provider/fake_provider_outputs/proposal_ai.compose_persuasive_text_v1.weak_input.json",
 );
 
+/** Wide screens: the result card sits right of the inputs card on the same top line; narrow screens:
+ * the two cards are stacked. Either way nothing overflows horizontally. */
+async function expectWorkspaceLayout(page: Page, layout: "side-by-side" | "stacked"): Promise<void> {
+  const inputs = await page.locator("#product-inputs").boundingBox();
+  const result = await page.locator('section[aria-labelledby="product-result-heading"]').boundingBox();
+  expect(inputs).not.toBeNull();
+  expect(result).not.toBeNull();
+  if (layout === "side-by-side") {
+    expect(result!.x).toBeGreaterThanOrEqual(inputs!.x + inputs!.width - 1);
+    expect(Math.abs(result!.y - inputs!.y)).toBeLessThanOrEqual(2);
+  } else {
+    expect(result!.y).toBeGreaterThanOrEqual(inputs!.y + inputs!.height - 1);
+    expect(Math.abs(result!.x - inputs!.x)).toBeLessThanOrEqual(2);
+  }
+  const { scrollWidth, clientWidth } = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+  }));
+  expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+}
+
 async function fillValidForm(page: Page): Promise<void> {
   await page.locator("#proposal-ai-task-text").fill("Write a landing page hero section for a bakery.");
   await page.locator("#proposal-ai-positioning").fill("Experienced copywriter for small businesses.");
@@ -130,7 +151,9 @@ test.describe("ProposalAI web product", () => {
       .poll(() => countBackendEvents("client.next_action_clicked", scenarioSessionId!), { timeout: 5_000 })
       .toBe(1);
 
+    await expectWorkspaceLayout(page, "side-by-side");
     await page.setViewportSize({ width: 390, height: 844 });
+    await expectWorkspaceLayout(page, "stacked");
     const backToDetails = page.getByRole("link", { name: "Back to details" });
     await expect(backToDetails).toBeVisible();
     expect((await backToDetails.boundingBox())?.height).toBeGreaterThanOrEqual(44);

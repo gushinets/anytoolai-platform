@@ -11,7 +11,9 @@ export const en = {
     submit: "Decode brief",
     running: "Decoding your brief…",
     runFailed: "Something went wrong decoding your brief. Please try again.",
-    startAnother: "Decode another brief",
+    resultTitle: "Decoded brief",
+    placeholder: "Your decoded brief will appear here after you decode it.",
+    regenerate: "Decode brief again",
   },
   result: {
     brief: "Brief",

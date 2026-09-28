@@ -62,8 +62,8 @@ h3 {
    * unrelated extra @font-face declarations for this font at the "Section" role's 800 weight
    * (verified non-deterministic), but is reliably clean at 900; see layout.tsx's own comment.
    * Weight and size must stay paired as one Bundle 3 role, not mixed across roles -- only <h1>
-   * and Brief Decoder's result <h2>s render today, so only <h1> gets an explicit size, rather
-   * than guessing sizes for heading levels nothing needs. */
+   * gets an explicit size here; product workspaces size their own <h2>/<h3> locally, rather than
+   * guessing sizes for heading levels nothing else needs. */
   font-weight: 900;
 }
 
@@ -86,8 +86,8 @@ label {
 
 /* SKILL.md: "At 520px, actions become full width where necessary" -- scoped to the primary
  * form-submission action (the only current call site), not every Button (a "Copy"/"Try again"
- * button inline in a Card has no reason to stretch). No 860px multi-column collapse rule exists
- * here because no current page lays out a multi-column grid needing one. */
+ * button inline in a Card has no reason to stretch). The 860px two-column collapse lives with the
+ * one layout that needs it, the product workspace in web-mirror's ProductRunPage.module.css. */
 @media (max-width: 520px) {
   button[type="submit"] {
     width: 100%;

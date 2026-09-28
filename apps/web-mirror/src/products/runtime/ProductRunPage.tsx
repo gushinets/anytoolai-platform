@@ -310,12 +310,12 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     input: V;
   } | null>(null);
   useEffect(() => {
-    if (!definition.inlineResult || phase.kind !== "result" || lastFocusedResultRef.current === phase.scenarioSessionId) {
+    if (phase.kind !== "result" || lastFocusedResultRef.current === phase.scenarioSessionId) {
       return;
     }
     lastFocusedResultRef.current = phase.scenarioSessionId;
     resultHeadingRef.current?.focus();
-  }, [definition.inlineResult, phase]);
+  }, [phase]);
   // Emits `scenario_completed` once per scenario session, after the `result` phase has actually
   // committed (ANY-17/ANY-248: `web.result_viewed` is the first *successful rendering*). The ref
   // dedupes across re-renders, StrictMode's effect replay and `guestId`/`definition` identity changes.
@@ -495,7 +495,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       return;
     }
     const quotaRejected = !result.ok && isQuotaExhausted(result.error);
-    if (definition.inlineResult && boot.kind === "ready" && boot.hasQuota && guestId && (result.ok || quotaRejected)) {
+    if (boot.kind === "ready" && boot.hasQuota && guestId && (result.ok || quotaRejected)) {
       // Read the backend counter after acceptance (or 429); idempotent retries cannot spend it twice.
       refreshQuota(guestId, scenarioId, controller);
     }
@@ -674,7 +674,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     // `scenario_completed` is emitted by the commit-time effect on `phase` below, not here:
     // `setPhase` only queues the update, so emitting here would report a result that never
     // rendered (unmount, navigation, a renderer that throws).
-    if (definition.inlineResult && activeInputRef.current) {
+    if (activeInputRef.current) {
       setDisplayedResult({ scenarioSessionId, checkpointId, result: extracted, input: activeInputRef.current });
     }
     // A completed run must not lend its Idempotency-Key to a later regeneration.
@@ -768,11 +768,10 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   // request timeout, and nothing here touches component state after unmount (`resolve` only
   // settles a promise; a setState on an unmounted ResultView is a no-op).
   function handleCopy(text: string): Promise<boolean> {
-    const source = definition.inlineResult ? displayedResult : phase.kind === "result" ? phase : null;
-    if (!source) {
+    if (!displayedResult) {
       return Promise.resolve(false);
     }
-    const { scenarioSessionId, checkpointId } = source;
+    const { scenarioSessionId, checkpointId } = displayedResult;
     const writeToClipboard = (value: string) =>
       navigator.clipboard?.writeText
         ? navigator.clipboard.writeText(value)
@@ -816,9 +815,8 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     activeInputRef.current = null;
     setDisplayedResult(null);
     setPhase({ kind: "idle" });
-    if (definition.inlineResult) {
-      requestAnimationFrame(() => formRef.current?.querySelector<HTMLElement>("textarea, input")?.focus());
-    }
+    // Focus contract: the first field of every product's form is a `textarea` or `input`.
+    requestAnimationFrame(() => formRef.current?.querySelector<HTMLElement>("textarea, input")?.focus());
 
     if (boot.kind !== "ready" || !boot.hasQuota) {
       return;
@@ -871,10 +869,9 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   }
 
   const identityUnavailable = guestId === undefined;
-  const inlineResult = definition.inlineResult === true;
   const formCard = (
     <Card className={styles.formCard}>
-      {inlineResult ? <h2 id="product-input-heading" className={styles.workspaceHeading}>{tp("workspace.inputTitle")}</h2> : null}
+      <h2 id="product-input-heading" className={styles.workspaceHeading}>{th("workspace.inputTitle")}</h2>
       <form
         ref={formRef}
         aria-label={th("formLabel", { product: title })}
@@ -893,12 +890,11 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
               ? th("starting")
               : phase.kind === "running"
                 ? th("generating")
-                : inlineResult && displayedResult
-                  ? tp("workspace.regenerate")
+                : displayedResult
+                  ? tp(`${definition.messageScope}.regenerate`)
                   : tp(`${definition.messageScope}.submit`)}
           </Button>
           <div className={styles.statusRegion}>
-            {!inlineResult && phase.kind === "running" ? <p role="status">{tp(`${definition.messageScope}.running`)}</p> : null}
             {identityUnavailable ? <p role="alert">{th("identityUnavailable")}</p> : null}
           </div>
         </div>
@@ -906,109 +902,38 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     </Card>
   );
 
-  // Both layouts exhaust Phase["kind"]: a new variant must be handled in each renderer.
-  let mainContent: ReactNode;
-  if (inlineResult) {
-    const oldResult = displayedResult && !shallowEqualValues(displayedResult.input, values);
-    let placeholderMessage: string | null = null;
-    let progress: ReactNode = null;
-    let error: ReactNode = null;
-    let showNewTask = false;
-    switch (phase.kind) {
-      case "idle":
-        if (!displayedResult) placeholderMessage = tp("workspace.placeholder");
-        break;
-      case "submitting":
-      case "running":
-        if (displayedResult) {
-          progress = <p role="status" className={styles.resultProgress}>{tp(`${definition.messageScope}.running`)}</p>;
-        } else {
-          placeholderMessage = tp(`${definition.messageScope}.running`);
-        }
-        break;
-      case "result":
-        showNewTask = true;
-        break;
-      case "result-fetch-error":
-        error = <ErrorState message={th("resultFetchFailed")} onRetry={handleRetryResult} embedded />;
-        break;
-      case "quota-exhausted":
-        error = <ErrorState message={th("quotaExhausted", { product: title })} embedded />;
-        break;
-      case "retryable-error":
-        error = <ErrorState message={th(`errors.${phase.reason}`, { product: title })} onRetry={identityUnavailable ? undefined : handleRetry} embedded />;
-        break;
-      case "unknown-error":
-        error = <ErrorState message={tp(`${definition.messageScope}.runFailed`)} onRetry={() => setPhase({ kind: "idle" })} embedded />;
-        break;
-      default:
-        return assertNever(phase);
-    }
-    mainContent = (
-      <div className={styles.workspaceGrid}>
-        <section id="product-inputs" aria-labelledby="product-input-heading">{formCard}</section>
-        <section aria-labelledby="product-result-heading">
-          <Card className={styles.workspaceResult}>
-            <div className={styles.resultHeader}>
-              <h2 id="product-result-heading" ref={resultHeadingRef} tabIndex={-1} className={styles.workspaceHeading}>
-                {tp("workspace.resultTitle")}
-              </h2>
-              {displayedResult ? <a className={styles.backToInputs} href="#product-inputs">{tp("workspace.backToInputs")}</a> : null}
-            </div>
-            {oldResult ? <p role="status" className={styles.oldResultNotice}>{tp("workspace.previousDetails")}</p> : null}
-            {progress}
-            {error}
-            {displayedResult ? (
-              <Result
-                key={displayedResult.scenarioSessionId}
-                result={displayedResult.result}
-                onCopy={handleCopy}
-                secondaryAction={showNewTask && definition.hasStartAnother ? (
-                  <Button variant="secondary" onClick={handleStartAnother}>
-                    {tp(`${definition.messageScope}.startAnother`)}
-                  </Button>
-                ) : undefined}
-              />
-            ) : null}
-            {placeholderMessage !== null ? (
-              <div className={styles.resultPlaceholder}>
-                <p role="status">{placeholderMessage}</p>
-              </div>
-            ) : null}
-          </Card>
-        </section>
-      </div>
-    );
-  } else switch (phase.kind) {
-    case "result":
-      mainContent = (
-        <div className={styles.resultStack}>
-          <Result result={phase.result} onCopy={handleCopy} />
-          {definition.hasStartAnother ? (
-            <Button className={styles.resultAction} variant="secondary" onClick={handleStartAnother}>
-              {tp(`${definition.messageScope}.startAnother`)}
-            </Button>
-          ) : null}
-        </div>
-      );
-      break;
-    case "quota-exhausted":
-      mainContent = <ErrorState message={th("quotaExhausted", { product: title })} />;
-      break;
-    case "result-fetch-error":
-      // No form here: the scenario run already succeeded and consumed its quota unit -- showing
-      // the form again would invite a second, wasteful run instead of just re-fetching the result
-      // that already exists.
-      mainContent = (
-        <ErrorState message={th("resultFetchFailed")} onRetry={handleRetryResult} />
-      );
-      break;
+  // Exhausts Phase["kind"]: a new variant must be handled here.
+  const oldResult = displayedResult && !shallowEqualValues(displayedResult.input, values);
+  let placeholderMessage: string | null = null;
+  let progress: ReactNode = null;
+  let error: ReactNode = null;
+  let showNewTask = false;
+  switch (phase.kind) {
     case "idle":
+      if (!displayedResult) placeholderMessage = tp(`${definition.messageScope}.placeholder`);
+      break;
     case "submitting":
     case "running":
+      if (displayedResult) {
+        progress = <p role="status" className={styles.resultProgress}>{tp(`${definition.messageScope}.running`)}</p>;
+      } else {
+        placeholderMessage = tp(`${definition.messageScope}.running`);
+      }
+      break;
+    case "result":
+      showNewTask = true;
+      break;
+    case "result-fetch-error":
+      error = <ErrorState message={th("resultFetchFailed")} onRetry={handleRetryResult} embedded />;
+      break;
+    case "quota-exhausted":
+      error = <ErrorState message={th("quotaExhausted", { product: title })} embedded />;
+      break;
     case "retryable-error":
+      error = <ErrorState message={th(`errors.${phase.reason}`, { product: title })} onRetry={identityUnavailable ? undefined : handleRetry} embedded />;
+      break;
     case "unknown-error":
-      mainContent = formCard;
+      error = <ErrorState message={tp(`${definition.messageScope}.runFailed`)} onRetry={() => setPhase({ kind: "idle" })} embedded />;
       break;
     default:
       return assertNever(phase);
@@ -1016,7 +941,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
 
   return (
     <Root className={inProductShell ? undefined : "page-container"}>
-      <div className={`${styles.content} ${inlineResult ? styles.workspaceContent : ""}`}>
+      <div className={`${styles.content} ${styles.workspaceContent}`}>
         <header className={styles.header}>
           {inProductShell ? null : (
             <div className={styles.titleRow}>
@@ -1032,34 +957,39 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
           ) : null}
         </header>
 
-        {mainContent}
-
-      {!inlineResult && phase.kind === "retryable-error" ? (
-        // Not gated on `pendingStart`: submitCurrentValues() (called by both this and the form's
-        // own Submit button) builds a fresh prepared start when there's none to reuse -- e.g.
-        // after the guest-identity self-heal path in runStart(), which clears pendingStart while
-        // still landing on retryable-error. It IS gated on `identityUnavailable`: when the
-        // self-heal's own refresh failed too, there's no valid guest id to submit with, and the
-        // form's own "We couldn't verify your identity. Please reload the page and try again."
-        // message (rendered above, inside the form) is the only path back -- offering a "Try
-        // again" here would only loop the user on a doomed retry.
-        <ErrorState
-          message={th(`errors.${phase.reason}`, { product: title })}
-          onRetry={identityUnavailable ? undefined : handleRetry}
-        />
-      ) : null}
-      {!inlineResult && phase.kind === "unknown-error" ? (
-        <ErrorState
-          message={tp(`${definition.messageScope}.runFailed`)}
-          onRetry={() => {
-            // pendingStart was already cleared the moment this phase was entered (see
-            // enterUnknownError()) -- this button (like the form's own Submit button, which stays
-            // reachable while this phase is showing) is guaranteed a fresh Idempotency-Key either
-            // way; it only needs to get the phase back to a submittable state.
-            setPhase({ kind: "idle" });
-          }}
-        />
-      ) : null}
+        <div className={styles.workspaceGrid}>
+          <section id="product-inputs" aria-labelledby="product-input-heading">{formCard}</section>
+          <section aria-labelledby="product-result-heading">
+            <Card className={styles.workspaceResult}>
+              <div className={styles.resultHeader}>
+                <h2 id="product-result-heading" ref={resultHeadingRef} tabIndex={-1} className={styles.workspaceHeading}>
+                  {tp(`${definition.messageScope}.resultTitle`)}
+                </h2>
+                {displayedResult ? <a className={styles.backToInputs} href="#product-inputs">{th("workspace.backToInputs")}</a> : null}
+              </div>
+              {oldResult ? <p role="status" className={styles.oldResultNotice}>{th("workspace.previousDetails")}</p> : null}
+              {progress}
+              {error}
+              {displayedResult ? (
+                <Result
+                  key={displayedResult.scenarioSessionId}
+                  result={displayedResult.result}
+                  onCopy={handleCopy}
+                  secondaryAction={showNewTask ? (
+                    <Button variant="secondary" onClick={handleStartAnother}>
+                      {th("workspace.newTask")}
+                    </Button>
+                  ) : undefined}
+                />
+              ) : null}
+              {placeholderMessage !== null ? (
+                <div className={styles.resultPlaceholder}>
+                  <p role="status">{placeholderMessage}</p>
+                </div>
+              ) : null}
+            </Card>
+          </section>
+        </div>
       </div>
     </Root>
   );
