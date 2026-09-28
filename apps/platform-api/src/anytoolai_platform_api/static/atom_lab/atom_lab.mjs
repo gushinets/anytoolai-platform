@@ -2174,8 +2174,12 @@ export function bootstrapAtomLab({
       }
       if (generation !== presetOpenGeneration) return false;
       if (versionsPage) commitPresetVersions(versionsPage);
+      if (preservesRecoveryDraft && selectedPresetVersion) {
+        materializePresetVersion(selectedPresetVersion);
+        nodes["preset-version-select"].value = String(selectedPresetVersion.version);
+      }
       if (preferredVersion !== null) materializePresetVersion(version);
-      const latest = preferredVersion === null ? versionsPage.items[0] : null;
+      const latest = versionsPage?.items[0] ?? null;
       const summary = latest ? {
         ...preset,
         latest_version: latest.version,

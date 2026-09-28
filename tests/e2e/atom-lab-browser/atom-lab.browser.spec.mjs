@@ -2690,6 +2690,7 @@ test("successful preset readback materializes its version outside the latest pag
 
   await expect(page.locator("#preset-version-select")).toHaveValue("2");
   await expect(page.locator('#preset-version-select option[value="2"]')).toHaveCount(1);
+  await expect(page.getByRole("button", {name: /Пресет successful readback/})).toContainText("v22");
   await page.locator("#export-preset").click();
   await expect(page.locator("#preset-export")).toContainText('"version": 2');
   await page.locator("#load-more-versions").click();
@@ -2700,6 +2701,92 @@ test("successful preset readback materializes its version outside the latest pag
   await page.locator("#save-preset").click();
   await expect.poll(() => versionWriteBodies).toHaveLength(2);
   expect(versionWriteBodies[1].base_version).toBe(2);
+});
+
+test("ambiguous recovery keeps its base selected when the expected-version read fails", async ({page}) => {
+  const first = {
+    name: "Пресет recovery read failure", description: "До обновления", atom_id: "A06",
+    base_action_config_id: A06.base_action_config_id, schema_refs: A06.schema_refs,
+    prompt: A06.prompt, prompt_ref: A06.prompt_ref,
+    model_id: "openai/gpt-supported", reasoning_effort: "high", fixed_fields: [],
+    example_input: A06.example_input, source_run_id: null,
+    preset_id: "preset-recovery-read-failure", version: 1, created_at: "2026-09-25T07:00:00Z",
+  };
+  const competingVersion = (version) => ({
+    ...first,
+    description: `Конкурентная версия ${version}`,
+    version,
+    created_at: `2026-09-25T08:${String(version).padStart(2, "0")}:00Z`,
+  });
+  const latestVersions = Array.from({length: 20}, (_, index) => competingVersion(22 - index));
+  let ambiguousWrite = false;
+  await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
+    const request = route.request();
+    const {pathname} = new URL(request.url());
+    if (pathname === "/v1/atom-lab/presets") {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [{
+        preset_id: first.preset_id, latest_version: 1, name: first.name,
+        description: first.description, atom_id: first.atom_id,
+        created_at: first.created_at, updated_at: first.created_at,
+      }], next_cursor: null})});
+      return;
+    }
+    if (pathname === `/v1/atom-lab/presets/${first.preset_id}/versions`
+      && request.method() === "POST") {
+      ambiguousWrite = true;
+      await route.abort("connectionreset");
+      return;
+    }
+    if (pathname === `/v1/atom-lab/presets/${first.preset_id}/versions`) {
+      const items = ambiguousWrite ? latestVersions : [first];
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({items: items.map((item) => ({
+        preset_id: item.preset_id, version: item.version, name: item.name,
+        description: item.description, atom_id: item.atom_id, created_at: item.created_at,
+      })), next_cursor: ambiguousWrite ? "older" : null})});
+      return;
+    }
+    if (pathname === `/v1/atom-lab/presets/${first.preset_id}/versions/1/export`) {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({
+        format_version: 1,
+        preset_id: first.preset_id,
+        version: 1,
+        configuration: Object.fromEntries(Object.entries(first).filter(
+          ([key]) => !["preset_id", "version", "created_at"].includes(key),
+        )),
+      })});
+      return;
+    }
+    if (pathname === `/v1/atom-lab/presets/${first.preset_id}/versions/2`) {
+      await route.fulfill({status: 503, contentType: "application/json", body: JSON.stringify({
+        error: {code: "temporary_failure", message: "Ожидаемая версия временно недоступна.", field_errors: []},
+        request_id: "request-expected-version-failed",
+      })});
+      return;
+    }
+    const requestedVersion = Number(pathname.split("/").at(-1));
+    if (Number.isInteger(requestedVersion)) {
+      const version = requestedVersion === 1 ? first : competingVersion(requestedVersion);
+      await route.fulfill({contentType: "application/json", body: JSON.stringify(version)});
+      return;
+    }
+    await route.fallback();
+  });
+
+  await unlockAtom(page, "A06");
+  await page.locator("#presets-button").click();
+  await page.getByRole("button", {name: /Пресет recovery read failure/}).click();
+  await page.locator("#preset-description").fill("Локальный черновик после неизвестного Save");
+  await page.locator("#save-preset").click();
+  await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
+
+  await page.getByRole("button", {name: /Пресет recovery read failure/}).click();
+
+  await expect(page.locator("#preset-error")).toContainText("Ожидаемая версия временно недоступна");
+  await expect(page.locator('#preset-version-select option[value="1"]')).toHaveCount(1);
+  await expect(page.locator("#preset-version-select")).toHaveValue("1");
+  await expect(page.locator("#preset-description")).toHaveValue("Локальный черновик после неизвестного Save");
+  await page.locator("#export-preset").click();
+  await expect(page.locator("#preset-export")).toContainText('"version": 1');
 });
 
 test("exact committed recovery refreshes the editor draft version", async ({page}) => {

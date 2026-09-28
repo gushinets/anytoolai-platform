@@ -5,7 +5,7 @@
 - State: active
 - Owner: mixed
 - Created: 2026-09-24
-- Last updated: 2026-09-25
+- Last updated: 2026-09-28
 - Review date: 2026-09-24
 - Next action: run the credentialed Atom Lab live canary and record the privacy-safe evidence.
 - Blocker: required live-provider and protected-surface credentials are unavailable in this
@@ -75,6 +75,16 @@ python3 scripts/agent/runner.py live-canary
 catalog model with confirmed reasoning efforts. The run fails closed if it cannot execute at least
 one supported reasoning combination.
 
+### Inherited ANY-466 browser baseline
+
+ANY-467 acceptance must retain the final ANY-466 browser state-machine baseline, not the earlier
+78-journey handoff. The current baseline is 52 deterministic Node tests and 88 Chromium journeys.
+In particular, preset recovery has one visible immutable-version authority: the selected base stays
+materialized and selected across first-page replacement, pagination and transient direct-version
+read failures, while the shared identity row independently tracks the newest version reported by a
+fresh server page. Exact commit, no-commit retry, concurrent conflict, owner-session replacement,
+History-derived replacement, export and next-write `base_version` remain covered as distinct paths.
+
 ## Twelve-criterion matrix
 
 | # | Evidence | Status |
@@ -85,12 +95,12 @@ one supported reasoning combination.
 | 4 | adapter isolation/null/retry tests in `test_atom_lab_execution.py`; live ledger checks require direct addressing and the requested model/effort on every physical attempt, plus exact/dated provider confirmation | Automated; live pending |
 | 5 | worker retry/ledger tests; HTTP terminal/replay test; live result validation against catalog output schema and configured semantic cross-validator before `result_valid=true` | Automated; live pending |
 | 6 | `packages/backend/platform-core/tests/unit/test_model_catalog_storage.py` initial/TTL/manual/lease/failure tests; `apps/platform-api/tests/test_atom_lab_models_api.py`; browser catalog state tests | Automated |
-| 7 | `apps/platform-api/tests/test_atom_lab_presets.py::test_create_read_list_version_and_export_preserves_immutable_payload`, `::test_new_version_is_append_only_and_rejects_stale_base`; PostgreSQL atomic version test; browser conflict/recovery journeys | Automated; PostgreSQL gate passed |
+| 7 | `apps/platform-api/tests/test_atom_lab_presets.py::test_create_read_list_version_and_export_preserves_immutable_payload`, `::test_new_version_is_append_only_and_rejects_stale_base`; PostgreSQL atomic version test; browser no-commit/exact-commit/conflict recovery, off-page base materialization, failed expected-version read, latest-summary separation, export and next-write base journeys | Automated; PostgreSQL gate passed |
 | 8 | `apps/platform-api/tests/test_atom_lab_history.py` lifecycle/snapshot/retry/failure coverage; browser running/crash-failed and restore journeys | Automated |
 | 9 | `apps/platform-api/tests/test_atom_lab_run_execution.py::test_http_worker_terminal_history_and_idempotent_replay`; worker pending/running/terminal restart coverage; live replay in `_run_atom_lab_case` | Automated; live pending |
 | 10 | preset export round-trip API test and protected browser export journey; evidence serializer omits payload/prompt/result/secrets | Automated |
 | 11 | `apps/platform-api/tests/test_atom_lab_access.py` authentication and public session/result/artifact/client-event/handoff bypass tests | Automated |
-| 12 | Chromium accessibility/focus/error journeys, dirty-navigation tests and readable result/JSON journeys in `tests/e2e/atom-lab-browser/` | Automated |
+| 12 | All 88 Chromium accessibility/focus/error, dirty-navigation, recovery-authority and readable result/JSON journeys in `tests/e2e/atom-lab-browser/` | Automated |
 
 ## Audit-specific matrix
 
@@ -115,6 +125,9 @@ one supported reasoning combination.
 
 ## Verification record
 
+- 2026-09-28 final ANY-466 baseline: 52 deterministic Node tests and 88 Atom Lab Chromium
+  journeys, including independent selected-version and server-latest authority plus transient
+  expected-version read recovery.
 - 2026-09-25 final `python3 scripts/agent/runner.py quick-check`: 1929 passed, 480 deselected.
 - 2026-09-25 Atom Lab Node unit suite: 52 passed; ESLint passed; Chromium: 78 passed.
 - 2026-09-24 focused live-canary/atoms-proof/runner tests: passed.
