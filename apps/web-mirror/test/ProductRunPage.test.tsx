@@ -765,9 +765,9 @@ describe("ProductRunPage", () => {
     submit();
     await waitForResult();
 
-    expect(events.filter((event) => event.type === "scenario_completed")).toEqual([
+    await waitFor(() => expect(events.filter((event) => event.type === "scenario_completed")).toEqual([
       { type: "scenario_completed", scenarioSessionId: "session_1", guestId: "guest_1", resultViewed: expected },
-    ]);
+    ]));
     expect(screen.getByText(RESULT_TEXT)).toBeTruthy();
   });
 
