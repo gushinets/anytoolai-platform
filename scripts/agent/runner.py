@@ -4,6 +4,7 @@ import errno
 import hashlib
 import importlib.util
 import json
+import math
 import os
 import shutil
 import signal
@@ -1772,12 +1773,16 @@ def _atom_lab_deployment_inputs() -> AtomLabDeploymentInputs:
     postgres_port = _port_override("ANYTOOLAI_ATOM_LAB_POSTGRES_PORT", 5432, env)
     if api_port == postgres_port:
         raise ValueError("Atom Lab API and PostgreSQL ports must be different")
-    try:
-        ready_timeout = float(env.get("ANYTOOLAI_READY_TIMEOUT", "90"))
-    except ValueError as exc:
-        raise ValueError("ANYTOOLAI_READY_TIMEOUT must be a number") from exc
-    if ready_timeout <= 0:
-        raise ValueError("ANYTOOLAI_READY_TIMEOUT must be positive")
+    for name, default in (
+        ("ANYTOOLAI_READY_TIMEOUT", "90"),
+        ("ANYTOOLAI_SMOKE_TIMEOUT", "30"),
+    ):
+        try:
+            timeout = float(env.get(name, default))
+        except ValueError as exc:
+            raise ValueError(f"{name} must be a number") from exc
+        if not math.isfinite(timeout) or timeout <= 0:
+            raise ValueError(f"{name} must be a positive, finite number")
     return AtomLabDeploymentInputs(env, api_port, postgres_port, internal_url)
 
 
@@ -1951,11 +1956,7 @@ def _atom_lab_up_locked() -> int:
         committed = True
     finally:
         if not committed:
-            run_with_env(
-                [*_atom_lab_compose_command(include_env_file=False), "down", "--remove-orphans"],
-                _atom_lab_control_env(),
-                timeout=COMPOSE_TEARDOWN_TIMEOUT_SECONDS,
-            )
+            _stop_failed_atom_lab_candidate()
     return _atom_lab_ready(inputs)
 
 
@@ -2004,23 +2005,46 @@ def _atom_lab_down_locked() -> int:
     )
 
 
-def _atom_lab_history_ids(inputs: AtomLabDeploymentInputs) -> tuple[str, ...]:
-    identity = _atom_lab_local_identity(inputs)
-    status, body, _ = _atom_lab_request(
-        f"{identity.api_url}/v1/atom-lab/runs?limit=100",
-        access_code=inputs.compose_env["ANYTOOLAI_ATOM_LAB_ACCESS_CODE"],
-    )
-    payload = json.loads(body)
+def _stop_failed_atom_lab_candidate() -> None:
+    if _atom_lab_down_locked() != 0:
+        print(
+            "LAB009: failed Atom Lab candidate could not be stopped; "
+            "run atom-lab-status and atom-lab-down immediately",
+            file=sys.stderr,
+        )
+
+
+def _atom_lab_canary_run_ids(path: Path) -> tuple[str, ...]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    run_ids = payload.get("run_ids") if isinstance(payload, dict) else None
     if (
-        status != HTTPStatus.OK
-        or not isinstance(payload, dict)
-        or not isinstance(payload.get("items"), list)
+        not isinstance(run_ids, list)
+        or len(run_ids) < ATOM_LAB_ATOM_COUNT
+        or any(not isinstance(run_id, str) or not run_id for run_id in run_ids)
+        or len(set(run_ids)) != len(run_ids)
     ):
-        raise ValueError("Atom Lab history is unavailable")
-    run_ids = tuple(item.get("run_id") for item in payload["items"] if isinstance(item, dict))
-    if not run_ids or any(not isinstance(run_id, str) or not run_id for run_id in run_ids):
-        raise ValueError("Atom Lab history contains no verified run ids")
-    return run_ids
+        raise ValueError("Atom Lab canary run-ID manifest is missing or invalid")
+    return tuple(run_ids)
+
+
+def _atom_lab_missing_history_run_ids(
+    inputs: AtomLabDeploymentInputs, expected_run_ids: Sequence[str]
+) -> tuple[str, ...]:
+    identity = _atom_lab_local_identity(inputs)
+    missing = []
+    for run_id in expected_run_ids:
+        status, body, _ = _atom_lab_request(
+            f"{identity.api_url}/v1/atom-lab/runs/{quote(run_id, safe='')}",
+            access_code=inputs.compose_env["ANYTOOLAI_ATOM_LAB_ACCESS_CODE"],
+        )
+        payload = json.loads(body)
+        if (
+            status != HTTPStatus.OK
+            or not isinstance(payload, dict)
+            or payload.get("run_id") != run_id
+        ):
+            missing.append(run_id)
+    return tuple(missing)
 
 
 def _atom_lab_canary_env(inputs: AtomLabDeploymentInputs) -> dict[str, str]:
@@ -2087,24 +2111,28 @@ def _atom_lab_smoke_locked() -> int:  # noqa: PLR0911
         return 1
     identity = _atom_lab_local_identity(inputs)
     env = _atom_lab_canary_env(inputs)
-    exit_code = run_with_env(
-        [
-            str(managed_python),
-            "scripts/agent/live_canary.py",
-            identity.api_url,
-            "--database-url-env",
-            "ANYTOOLAI_LIVE_CANARY_DATABASE_URL",
-            "--database-url-is-percent-encoded",
-        ],
-        env,
-    )
-    if exit_code != 0:
-        return exit_code
-    try:
-        before_restart = _atom_lab_history_ids(inputs)
-    except (OSError, ValueError, json.JSONDecodeError) as exc:
-        print(f"LAB007: could not capture terminal history before restart: {exc}", file=sys.stderr)
-        return 1
+    with tempfile.TemporaryDirectory(prefix="atom-lab-smoke-", dir=TMP_ROOT) as directory:
+        run_ids_path = Path(directory) / "run-ids.json"
+        exit_code = run_with_env(
+            [
+                str(managed_python),
+                "scripts/agent/live_canary.py",
+                identity.api_url,
+                "--database-url-env",
+                "ANYTOOLAI_LIVE_CANARY_DATABASE_URL",
+                "--database-url-is-percent-encoded",
+                "--atom-lab-run-ids-output",
+                str(run_ids_path),
+            ],
+            env,
+        )
+        if exit_code != 0:
+            return exit_code
+        try:
+            expected_run_ids = _atom_lab_canary_run_ids(run_ids_path)
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            print(f"LAB007: could not read canary run IDs: {exc}", file=sys.stderr)
+            return 1
     exit_code = run_with_env(
         [*_atom_lab_compose_command(), "restart", "platform-api", "platform-worker"],
         inputs.compose_env,
@@ -2113,14 +2141,18 @@ def _atom_lab_smoke_locked() -> int:  # noqa: PLR0911
     if exit_code != 0 or _atom_lab_ready(inputs, announce=False) != 0:
         return exit_code or 1
     try:
-        after_restart = _atom_lab_history_ids(inputs)
+        missing_run_ids = _atom_lab_missing_history_run_ids(inputs, expected_run_ids)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"LAB007: could not read terminal history after restart: {exc}", file=sys.stderr)
         return 1
-    if after_restart != before_restart:
-        print("LAB007: Atom Lab history changed or disappeared across restart", file=sys.stderr)
+    if missing_run_ids:
+        print(
+            f"LAB007: {len(missing_run_ids)} canary run(s) disappeared from Atom Lab history "
+            "across restart",
+            file=sys.stderr,
+        )
         return 1
-    print(f"Verified {len(after_restart)} recent Atom Lab runs after API/worker restart")
+    print(f"Verified {len(expected_run_ids)} canary runs after API/worker restart")
     print("Paid Atom Lab deployment smoke passed; retain the generated redacted evidence report")
     return 0
 

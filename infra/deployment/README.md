@@ -225,9 +225,19 @@ database; file existence is not restore evidence. Never use `down --volumes`, `d
 destructive Alembic downgrade, or in-place `pg_restore --clean` as rollback. `atom-lab-down`
 preserves the named PostgreSQL volume.
 
-For an application-only rollback, stop API/worker, check out the prior reviewed commit, and reuse
-the volume only if that commit supports the current schema. Otherwise keep the original database
-untouched: create a recovery database in the same preserved volume and restore the dump:
+For the **initial ANY-468 rollout**, do not check out the pre-ANY-468 revision while the Lab is
+running: that revision has neither the Atom Lab overlay nor its lifecycle commands. Close ingress,
+use the currently deployed ANY-468 checkout to run `atom-lab-down`, retain the named volume and
+verified backup, then check out the previous revision. This returns the host to its pre-Lab
+application state without depending on tooling that does not exist in that revision. If the Lab
+must be attempted again, check out a reviewed revision containing this deployment package and run
+the normal recovery or deployment procedure from that checkout.
+
+For a **subsequent application rollback**, the target revision must already contain a compatible
+Atom Lab deployment package. Stop API/worker with that package still present, check out the prior
+reviewed Atom Lab revision, and reuse the volume only if that revision supports the current schema.
+Otherwise keep the original database untouched: create a recovery database in the same preserved
+volume and restore the dump:
 
 ```bash
 docker compose --project-name anytoolai-atom-lab \

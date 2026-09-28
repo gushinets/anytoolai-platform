@@ -513,6 +513,18 @@ def _positive_finite_cost(raw: str) -> float:
         raise ValueError(f"must be a positive, finite number, got {raw!r}")
     return value
 
+
+def _write_atom_lab_run_ids(path: Path, cases: list[EvidenceCase]) -> None:
+    run_ids = [case.run_id for case in cases]
+    if (
+        not run_ids
+        or any(not isinstance(run_id, str) or not run_id.strip() for run_id in run_ids)
+        or len(set(run_ids)) != len(run_ids)
+    ):
+        raise ValueError("successful Atom Lab evidence must contain unique non-empty run IDs")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"run_ids": run_ids}) + "\n", encoding="utf-8")
+
 # action_type -> live scenario_id, mirroring the fake-sibling scenario ids one-for-one (see
 # configs/kernel/products/kernel_demo/scenarios.yaml). Explicit rather than a string-transform
 # helper: the extract atom's fake scenario_id (kernel_demo.single_action_smoke_v1) is missing its
@@ -879,6 +891,11 @@ def main() -> int:
         help="Abort remaining cases once cumulative estimated_cost exceeds this (default: "
         "%(default)s, also settable via ANYTOOLAI_LIVE_CANARY_MAX_COST_USD)",
     )
+    parser.add_argument(
+        "--atom-lab-run-ids-output",
+        type=Path,
+        help="Write the successful Atom Lab canary run IDs for post-restart verification",
+    )
     args = parser.parse_args()
 
     database_url = os.environ.get(args.database_url_env)
@@ -921,6 +938,15 @@ def main() -> int:
             output_root=REPO_ROOT / ".agent" / "live-canary" / "atom-lab",
         )
         print(f"Evidence report: {report_path}")
+        if exit_code == 0 and args.atom_lab_run_ids_output is not None:
+            try:
+                _write_atom_lab_run_ids(args.atom_lab_run_ids_output, cases)
+            except (OSError, ValueError) as exc:
+                print(
+                    f"LIVE030: could not write Atom Lab run-ID manifest: {exc}",
+                    file=sys.stderr,
+                )
+                return 1
         return exit_code
 
     coverage_error = atoms_proof.smoke._atom_coverage_error(

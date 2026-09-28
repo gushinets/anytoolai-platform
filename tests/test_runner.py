@@ -3464,6 +3464,29 @@ def test_atom_lab_deployment_requires_plain_https_origin(monkeypatch, url) -> No
 
 
 @pytest.mark.parametrize(
+    ("timeout_name", "timeout_value"),
+    [
+        ("ANYTOOLAI_READY_TIMEOUT", "inf"),
+        ("ANYTOOLAI_READY_TIMEOUT", "nan"),
+        ("ANYTOOLAI_SMOKE_TIMEOUT", "inf"),
+        ("ANYTOOLAI_SMOKE_TIMEOUT", "nan"),
+    ],
+)
+def test_atom_lab_deployment_rejects_non_finite_timeouts(
+    monkeypatch, timeout_name, timeout_value
+) -> None:
+    runner = load_runner_module()
+    monkeypatch.setattr(
+        runner,
+        "_resolved_env_file",
+        lambda path: ATOM_LAB_DEPLOYMENT_VALUES | {timeout_name: timeout_value},
+    )
+
+    with pytest.raises(ValueError, match=f"{timeout_name} must be a positive, finite number"):
+        runner._atom_lab_deployment_inputs()
+
+
+@pytest.mark.parametrize(
     ("secret_name", "reused_value"),
     [
         ("ANYTOOLAI_LIVE_CANARY_TOKEN", "lab-access"),
@@ -3561,6 +3584,28 @@ def test_atom_lab_up_refuses_to_replace_running_stack(monkeypatch, capsys) -> No
     assert "LAB006: refusing to replace a running Atom Lab stack" in capsys.readouterr().err
 
 
+def test_atom_lab_up_reports_failed_candidate_cleanup(monkeypatch, capsys) -> None:
+    runner = load_runner_module()
+    inputs = runner.AtomLabDeploymentInputs(
+        dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
+    )
+    monkeypatch.setattr(runner, "_atom_lab_deployment_inputs", lambda: inputs)
+    monkeypatch.setattr(runner, "_atom_lab_stack_running", lambda inputs: False)
+    monkeypatch.setattr(runner, "_check_ports_available", lambda *args: True)
+    calls = []
+
+    def run(command, env, **kwargs):
+        calls.append(list(command))
+        return 17 if "up" in command else 23
+
+    monkeypatch.setattr(runner, "run_with_env", run)
+
+    assert runner.atom_lab_up() == 17
+    assert "up" in calls[0]
+    assert calls[1][-2:] == ["down", "--remove-orphans"]
+    assert "LAB009: failed Atom Lab candidate could not be stopped" in capsys.readouterr().err
+
+
 @pytest.mark.parametrize("command_name", ["atom_lab_up", "atom_lab_down", "atom_lab_smoke"])
 def test_atom_lab_mutations_refuse_concurrent_operation(
     monkeypatch, tmp_path, capsys, command_name
@@ -3595,8 +3640,16 @@ def test_atom_lab_smoke_reuses_live_canary_and_compares_history_after_restart(mo
     monkeypatch.setattr(runner, "_atom_lab_deployment_inputs", lambda: inputs)
     monkeypatch.setattr(runner, "quick_check_venv_ready", lambda path: True)
     monkeypatch.setattr(runner, "_atom_lab_ready", lambda inputs, announce=False: 0)
-    histories = iter([("run-2", "run-1"), ("run-2", "run-1")])
-    monkeypatch.setattr(runner, "_atom_lab_history_ids", lambda inputs: next(histories))
+    expected_run_ids = tuple(f"run-{index}" for index in range(1, 12))
+    monkeypatch.setattr(
+        runner, "_atom_lab_canary_run_ids", lambda path: expected_run_ids
+    )
+    verified = []
+    monkeypatch.setattr(
+        runner,
+        "_atom_lab_missing_history_run_ids",
+        lambda inputs, run_ids: verified.append(tuple(run_ids)) or (),
+    )
     calls = []
     monkeypatch.setattr(
         runner,
@@ -3610,5 +3663,42 @@ def test_atom_lab_smoke_reuses_live_canary_and_compares_history_after_restart(mo
     assert calls[0][1]["ANYTOOLAI_ATOM_LAB_ACCESS_CODE"] == "lab-access"
     assert "OPENAI_API_KEY" not in calls[0][1]
     assert "ANYTOOLAI_LIVE_CANARY_TOKEN" not in calls[0][1]
+    assert "--atom-lab-run-ids-output" in calls[0][0]
     assert "restart" in calls[1][0]
     assert calls[1][0][-2:] == ["platform-api", "platform-worker"]
+    assert verified == [expected_run_ids]
+
+
+def test_atom_lab_history_verifies_exact_canary_run_ids_and_ignores_other_runs(
+    monkeypatch,
+) -> None:
+    runner = load_runner_module()
+    inputs = runner.AtomLabDeploymentInputs(
+        dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
+    )
+    requested = []
+
+    def request(url, *, access_code=None):
+        run_id = url.rsplit("/", 1)[-1]
+        requested.append(run_id)
+        if run_id == "run-missing":
+            return 404, b'{"error": {"code": "not_found"}}', "application/json"
+        return 200, json.dumps({"run_id": run_id}).encode(), "application/json"
+
+    monkeypatch.setattr(runner, "_atom_lab_request", request)
+
+    missing = runner._atom_lab_missing_history_run_ids(
+        inputs, ("run-current-1", "run-missing", "run-current-2")
+    )
+
+    assert missing == ("run-missing",)
+    assert requested == ["run-current-1", "run-missing", "run-current-2"]
+
+
+def test_atom_lab_canary_run_ids_reject_stale_or_incomplete_manifest(tmp_path) -> None:
+    runner = load_runner_module()
+    manifest = tmp_path / "run-ids.json"
+    manifest.write_text(json.dumps({"run_ids": ["old-run"]}), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="missing or invalid"):
+        runner._atom_lab_canary_run_ids(manifest)
