@@ -1727,11 +1727,27 @@ def _atom_lab_deployment_inputs() -> AtomLabDeploymentInputs:
     for name in required:
         if not env.get(name, "").strip():
             raise ValueError(f"{name} is required for an internal Atom Lab deployment")
-    if env["ANYTOOLAI_ATOM_LAB_ACCESS_CODE"] == env["ANYTOOLAI_LIVE_CANARY_TOKEN"]:
-        raise ValueError("Atom Lab access code and server live token must be different")
-    demo_access_code = env.get("ANYTOOLAI_DEMO_ACCESS_CODE", "")
-    if demo_access_code and demo_access_code == env["ANYTOOLAI_ATOM_LAB_ACCESS_CODE"]:
-        raise ValueError("Atom Lab and /demo access codes must be different")
+    secret_names = (
+        "ANYTOOLAI_POSTGRES_PASSWORD",
+        "ANYTOOLAI_ATOM_LAB_ACCESS_CODE",
+        "ANYTOOLAI_LIVE_CANARY_TOKEN",
+        "OPENAI_API_KEY",
+        "ANYTOOLAI_DEMO_ACCESS_CODE",
+    )
+    populated_secrets = {
+        name: env[name]
+        for name in secret_names
+        if env.get(name, "").strip()
+    }
+    duplicate_names: dict[str, list[str]] = {}
+    for name, value in populated_secrets.items():
+        duplicate_names.setdefault(value, []).append(name)
+    reused = next((names for names in duplicate_names.values() if len(names) > 1), None)
+    if reused is not None:
+        raise ValueError(
+            "Atom Lab secrets from different trust domains must be unique: "
+            + ", ".join(reused)
+        )
 
     internal_url = env["ANYTOOLAI_ATOM_LAB_INTERNAL_URL"].rstrip("/")
     parsed_url = urlsplit(internal_url)
@@ -1879,6 +1895,15 @@ def _atom_lab_ready(inputs: AtomLabDeploymentInputs, *, announce: bool = True) -
 
 def atom_lab_up() -> int:
     try:
+        with _atom_lab_deployment_lock():
+            return _atom_lab_up_locked()
+    except DeploymentLockError as exc:
+        print(f"LAB008: {exc}", file=sys.stderr)
+        return 1
+
+
+def _atom_lab_up_locked() -> int:
+    try:
         inputs = _atom_lab_deployment_inputs()
         stack_running = _atom_lab_stack_running(inputs)
     except ValueError as exc:
@@ -1963,6 +1988,15 @@ def atom_lab_status() -> int:
 
 
 def atom_lab_down() -> int:
+    try:
+        with _atom_lab_deployment_lock():
+            return _atom_lab_down_locked()
+    except DeploymentLockError as exc:
+        print(f"LAB008: {exc}", file=sys.stderr)
+        return 1
+
+
+def _atom_lab_down_locked() -> int:
     return run_with_env(
         _atom_lab_compose_command("down", "--remove-orphans", include_env_file=False),
         _atom_lab_control_env(),
@@ -1989,7 +2023,56 @@ def _atom_lab_history_ids(inputs: AtomLabDeploymentInputs) -> tuple[str, ...]:
     return run_ids
 
 
-def atom_lab_smoke() -> int:  # noqa: PLR0911 - each failed deployment gate has its own exit code
+def _atom_lab_canary_env(inputs: AtomLabDeploymentInputs) -> dict[str, str]:
+    base_env = runner_env()
+    env = {
+        name: base_env[name]
+        for name in (
+            "COMSPEC",
+            "LANG",
+            "LC_ALL",
+            "PATH",
+            "PATHEXT",
+            "PYTHONPATH",
+            "SYSTEMROOT",
+            "TEMP",
+            "TMP",
+            "TMPDIR",
+            "TZ",
+            "WINDIR",
+        )
+        if name in base_env
+    }
+    for name in (
+        "ANYTOOLAI_ATOM_LAB_MODEL_ID",
+        "ANYTOOLAI_LIVE_CANARY_MAX_COST_USD",
+        "ANYTOOLAI_SMOKE_TIMEOUT",
+    ):
+        value = inputs.compose_env.get(name)
+        if value:
+            env[name] = value
+    env.update(
+        {
+            "ANYTOOLAI_ATOM_LAB_ACCESS_CODE": inputs.compose_env[
+                "ANYTOOLAI_ATOM_LAB_ACCESS_CODE"
+            ],
+            "ANYTOOLAI_LIVE_CANARY_SURFACE": "atom-lab",
+            "ANYTOOLAI_LIVE_CANARY_DATABASE_URL": _atom_lab_database_url(inputs),
+        }
+    )
+    return env
+
+
+def atom_lab_smoke() -> int:
+    try:
+        with _atom_lab_deployment_lock():
+            return _atom_lab_smoke_locked()
+    except DeploymentLockError as exc:
+        print(f"LAB008: {exc}", file=sys.stderr)
+        return 1
+
+
+def _atom_lab_smoke_locked() -> int:  # noqa: PLR0911
     """Run the existing paid A01-A11 acceptance harness, then prove history survives restart."""
     try:
         inputs = _atom_lab_deployment_inputs()
@@ -2003,10 +2086,7 @@ def atom_lab_smoke() -> int:  # noqa: PLR0911 - each failed deployment gate has 
     if _atom_lab_ready(inputs, announce=False) != 0:
         return 1
     identity = _atom_lab_local_identity(inputs)
-    env = inputs.compose_env | {
-        "ANYTOOLAI_LIVE_CANARY_SURFACE": "atom-lab",
-        "ANYTOOLAI_LIVE_CANARY_DATABASE_URL": _atom_lab_database_url(inputs),
-    }
+    env = _atom_lab_canary_env(inputs)
     exit_code = run_with_env(
         [
             str(managed_python),
@@ -2163,18 +2243,23 @@ def _prod_fake_stack_running(env: dict[str, str]) -> bool:
     return _compose_stack_running(_prod_fake_compose_command(), env)
 
 
-class ProductionDeploymentLockError(RuntimeError):
-    """Raised when the fixed production Compose project cannot be exclusively deployed."""
+class DeploymentLockError(RuntimeError):
+    """Raised when a fixed Compose project cannot be mutated exclusively."""
 
 
-class _ProductionDeploymentLock:
-    """Cross-process host lock guarding the fixed production Compose project."""
+# Retain the established name for callers and tests that distinguish production lock failures.
+ProductionDeploymentLockError = DeploymentLockError
 
-    def __init__(self, path: Path) -> None:
+
+class _DeploymentLock:
+    """Cross-process host lock guarding a fixed Compose project."""
+
+    def __init__(self, path: Path, operation: str) -> None:
         self._path = path
+        self._operation = operation
         self._handle = None
 
-    def __enter__(self) -> "_ProductionDeploymentLock":
+    def __enter__(self) -> "_DeploymentLock":
         handle = None
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
@@ -2196,11 +2281,11 @@ class _ProductionDeploymentLock:
             if handle is not None:
                 handle.close()
             if getattr(exc, "errno", None) in {errno.EACCES, errno.EAGAIN}:
-                raise ProductionDeploymentLockError(
-                    f"another prod-up is already running (lock: {self._path})"
+                raise DeploymentLockError(
+                    f"another {self._operation} is already running (lock: {self._path})"
                 ) from exc
-            raise ProductionDeploymentLockError(
-                f"could not acquire production deployment lock {self._path}: {exc}"
+            raise DeploymentLockError(
+                f"could not acquire {self._operation} lock {self._path}: {exc}"
             ) from exc
         self._handle = handle
         return self
@@ -2222,15 +2307,24 @@ def _prod_deployment_lock_path() -> Path:
     return lock_root / f"{PROD_COMPOSE_PROJECT}.deployment.lock"
 
 
-def _prod_deployment_lock() -> _ProductionDeploymentLock:
-    return _ProductionDeploymentLock(_prod_deployment_lock_path())
+def _prod_deployment_lock() -> _DeploymentLock:
+    return _DeploymentLock(_prod_deployment_lock_path(), "prod-up")
+
+
+def _atom_lab_deployment_lock_path() -> Path:
+    lock_root = Path(tempfile.gettempdir()) if os.name == "nt" else Path("/tmp")
+    return lock_root / f"{ATOM_LAB_COMPOSE_PROJECT}.deployment.lock"
+
+
+def _atom_lab_deployment_lock() -> _DeploymentLock:
+    return _DeploymentLock(_atom_lab_deployment_lock_path(), "Atom Lab lifecycle operation")
 
 
 def prod_up() -> int:
     try:
         with _prod_deployment_lock():
             return _prod_up_locked()
-    except ProductionDeploymentLockError as exc:
+    except DeploymentLockError as exc:
         print(f"PROD007: {exc}", file=sys.stderr)
         return 1
 
@@ -2512,7 +2606,7 @@ def prod_down() -> int:
     try:
         with _prod_deployment_lock():
             return _prod_down_locked()
-    except ProductionDeploymentLockError as exc:
+    except DeploymentLockError as exc:
         print(f"PROD007: {exc}", file=sys.stderr)
         return 1
 

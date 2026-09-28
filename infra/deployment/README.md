@@ -227,8 +227,7 @@ preserves the named PostgreSQL volume.
 
 For an application-only rollback, stop API/worker, check out the prior reviewed commit, and reuse
 the volume only if that commit supports the current schema. Otherwise keep the original database
-untouched: create a recovery database in the same preserved volume, restore the dump, then change
-only `ANYTOOLAI_POSTGRES_DB` in `.env.atom-lab` and start the reviewed commit:
+untouched: create a recovery database in the same preserved volume and restore the dump:
 
 ```bash
 docker compose --project-name anytoolai-atom-lab \
@@ -249,9 +248,18 @@ docker compose --project-name anytoolai-atom-lab \
   < /operator/backups/anytoolai-atom-lab-YYYYMMDDTHHMMSSZ.dump
 ```
 
-Run deployment and readiness against the recovery database, then verify protected history and
-preset versions before reopening ingress. Keep the old database/volume until recovery is accepted
-and a new backup is verified. `atom-lab-down` removes containers/networks, not history.
+After the restore succeeds, stop the entire fixed project while preserving its named volume:
+
+```bash
+python scripts/agent/runner.py atom-lab-down
+```
+
+Only then change `ANYTOOLAI_POSTGRES_DB` in `.env.atom-lab` to the recovery database name and run
+`atom-lab-up`, followed by `atom-lab-ready`. This explicit down/up boundary is required because
+`atom-lab-up` rejects any running container in the fixed project with `LAB006`; leaving PostgreSQL
+running would make the recovery procedure fail closed. Verify protected history and preset
+versions before reopening ingress. Keep the old database/volume until recovery is accepted and a
+new backup is verified. `atom-lab-down` removes containers/networks, not history.
 
 ### Run the stakeholder page locally
 

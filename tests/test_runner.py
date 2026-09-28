@@ -3463,16 +3463,28 @@ def test_atom_lab_deployment_requires_plain_https_origin(monkeypatch, url) -> No
         runner._atom_lab_deployment_inputs()
 
 
-def test_atom_lab_deployment_keeps_access_and_server_tokens_separate(monkeypatch) -> None:
+@pytest.mark.parametrize(
+    ("secret_name", "reused_value"),
+    [
+        ("ANYTOOLAI_LIVE_CANARY_TOKEN", "lab-access"),
+        ("OPENAI_API_KEY", "lab-access"),
+        ("OPENAI_API_KEY", "server-live-token"),
+        ("ANYTOOLAI_POSTGRES_PASSWORD", "lab-access"),
+        ("ANYTOOLAI_DEMO_ACCESS_CODE", "lab-access"),
+    ],
+)
+def test_atom_lab_deployment_keeps_trust_domain_secrets_unique(
+    monkeypatch, secret_name, reused_value
+) -> None:
     runner = load_runner_module()
     monkeypatch.setattr(
         runner,
         "_resolved_env_file",
         lambda path: ATOM_LAB_DEPLOYMENT_VALUES
-        | {"ANYTOOLAI_LIVE_CANARY_TOKEN": "lab-access"},
+        | {secret_name: reused_value},
     )
 
-    with pytest.raises(ValueError, match="must be different"):
+    with pytest.raises(ValueError, match="different trust domains must be unique"):
         runner._atom_lab_deployment_inputs()
 
 
@@ -3549,6 +3561,32 @@ def test_atom_lab_up_refuses_to_replace_running_stack(monkeypatch, capsys) -> No
     assert "LAB006: refusing to replace a running Atom Lab stack" in capsys.readouterr().err
 
 
+@pytest.mark.parametrize("command_name", ["atom_lab_up", "atom_lab_down", "atom_lab_smoke"])
+def test_atom_lab_mutations_refuse_concurrent_operation(
+    monkeypatch, tmp_path, capsys, command_name
+) -> None:
+    runner = load_runner_module()
+    lock_path = tmp_path / "atom-lab-deployment.lock"
+    monkeypatch.setattr(runner, "_atom_lab_deployment_lock_path", lambda: lock_path)
+    monkeypatch.setattr(
+        runner,
+        "_atom_lab_deployment_inputs",
+        lambda: pytest.fail("concurrent Atom Lab operation reached deployment preflight"),
+    )
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda *args, **kwargs: pytest.fail("concurrent Atom Lab operation mutated Compose"),
+    )
+
+    with runner._atom_lab_deployment_lock():
+        assert getattr(runner, command_name)() == 1
+
+    output = capsys.readouterr()
+    assert "LAB008" in output.err
+    assert "another Atom Lab lifecycle operation is already running" in output.err
+
+
 def test_atom_lab_smoke_reuses_live_canary_and_compares_history_after_restart(monkeypatch) -> None:
     runner = load_runner_module()
     inputs = runner.AtomLabDeploymentInputs(
@@ -3569,5 +3607,8 @@ def test_atom_lab_smoke_reuses_live_canary_and_compares_history_after_restart(mo
     assert runner.atom_lab_smoke() == 0
     assert calls[0][0][1] == "scripts/agent/live_canary.py"
     assert calls[0][1]["ANYTOOLAI_LIVE_CANARY_SURFACE"] == "atom-lab"
+    assert calls[0][1]["ANYTOOLAI_ATOM_LAB_ACCESS_CODE"] == "lab-access"
+    assert "OPENAI_API_KEY" not in calls[0][1]
+    assert "ANYTOOLAI_LIVE_CANARY_TOKEN" not in calls[0][1]
     assert "restart" in calls[1][0]
     assert calls[1][0][-2:] == ["platform-api", "platform-worker"]
