@@ -224,8 +224,9 @@ python scripts/agent/runner.py atom-lab-quiesce
 ```
 
 `atom-lab-quiesce` holds the host-global lifecycle lock, stops the API so no new run can be
-accepted, leaves the worker running until every Atom Lab job has left `created`/`running`, and only
-then stops the worker. PostgreSQL remains running. If the command returns nonzero, keep ingress
+accepted, leaves the worker running until every job in this deployment database (Atom Lab,
+`/demo`, or ordinary runtime) has left `created`/`running`, and only then stops the worker.
+PostgreSQL remains running. If the command returns nonzero, keep ingress
 closed, do not take a backup, and inspect `atom-lab-status` and worker logs. After resolving the
 problem, either rerun quiesce or abort the maintenance window with the idempotent
 `python scripts/agent/runner.py atom-lab-resume`; resume starts API/worker and requires full
@@ -258,13 +259,26 @@ tooling that does not exist in that revision. If the Lab must be attempted again
 reviewed revision containing this deployment package and run the normal recovery or deployment
 procedure from that checkout.
 
-For a **subsequent application rollback**, the target revision must already contain a compatible
-Atom Lab deployment package. Stop API/worker with that package still present, check out the prior
-reviewed Atom Lab revision, and reuse the volume only if that revision supports the current schema.
-Otherwise keep the original database untouched. First bootstrap only PostgreSQL from the preserved
+For a **subsequent compatible-schema application rollback**, keep the current deployment checkout
+until quiesce and the verified backup are complete, then remove its containers while retaining the
+named volume:
+
+```bash
+python scripts/agent/runner.py atom-lab-down
+```
+
+Only after `atom-lab-down` succeeds, check out the prior reviewed Atom Lab revision. Reuse the
+volume only if that revision supports the current schema, then run its `atom-lab-up` followed by
+`atom-lab-ready`. This rebuilds/recreates application containers from the target revision; neither
+`atom-lab-resume` nor `docker compose start` performs an application rollback. Verify protected
+history and preset versions before reopening ingress.
+
+For an **incompatible-schema rollback**, stay on the current revision that contains the recovery
+tooling. Keep the original database untouched. First bootstrap only PostgreSQL from the preserved
 volume and wait for its health check. This command is also required after a failed `atom-lab-up`:
 failed-candidate cleanup removes containers/networks but deliberately retains the named volume.
-It never starts `migrate`, API, or worker. Then create a recovery database and restore the dump:
+The helper fails closed if an application service is running and never starts `migrate`, API, or
+worker. Then create a recovery database and restore the dump:
 
 ```bash
 python scripts/agent/runner.py atom-lab-recovery-postgres-up
@@ -287,8 +301,10 @@ After the restore succeeds, stop the entire fixed project while preserving its n
 python scripts/agent/runner.py atom-lab-down
 ```
 
-Only then change `ANYTOOLAI_POSTGRES_DB` in `.env.atom-lab` to the recovery database name and run
-`atom-lab-up`, followed by `atom-lab-ready`. This explicit down/up boundary is required because
+Only then check out the prior reviewed revision, change `ANYTOOLAI_POSTGRES_DB` in `.env.atom-lab`
+to the recovery database name, and run that revision's `atom-lab-up`, followed by
+`atom-lab-ready`. Do not check out a revision that may lack recovery tooling until the restore and
+`atom-lab-down` have completed. This explicit down/up boundary is required because
 `atom-lab-up` rejects any running container in the fixed project with `LAB006`; leaving PostgreSQL
 running would make the recovery procedure fail closed. Verify protected history and preset
 versions before reopening ingress. Keep the old database/volume until recovery is accepted and a

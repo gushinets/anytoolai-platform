@@ -3607,7 +3607,7 @@ def test_atom_lab_quiesce_drains_jobs_before_stopping_worker(monkeypatch, capsys
     monkeypatch.setattr(runner, "_atom_lab_deployment_inputs", lambda: inputs)
     monkeypatch.setattr(runner, "_atom_lab_stack_running", lambda inputs: True)
     monkeypatch.setattr(
-        runner, "_atom_lab_nonterminal_run_count", lambda inputs: next(counts)
+        runner, "_atom_lab_nonterminal_job_count", lambda inputs: next(counts)
     )
     monkeypatch.setattr(runner.time, "sleep", lambda seconds: None)
     monkeypatch.setattr(
@@ -3622,7 +3622,7 @@ def test_atom_lab_quiesce_drains_jobs_before_stopping_worker(monkeypatch, capsys
     assert "PostgreSQL remains running" in capsys.readouterr().out
 
 
-def test_atom_lab_quiesce_counts_only_created_and_running_lab_jobs(monkeypatch) -> None:
+def test_atom_lab_quiesce_counts_created_and_running_jobs_from_entire_queue(monkeypatch) -> None:
     runner = load_runner_module()
     inputs = runner.AtomLabDeploymentInputs(
         dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
@@ -3635,13 +3635,14 @@ def test_atom_lab_quiesce_counts_only_created_and_running_lab_jobs(monkeypatch) 
 
     monkeypatch.setattr(runner.subprocess, "run", run)
 
-    assert runner._atom_lab_nonterminal_run_count(inputs) == 0
+    assert runner._atom_lab_nonterminal_job_count(inputs) == 0
     command = captured["command"]
-    assert "platform.atom_lab_runs" in command[-1]
+    assert "platform.jobs" in command[-1]
+    assert "platform.atom_lab_runs" not in command[-1]
     assert "'created', 'running'" in command[-1]
 
 
-def test_atom_lab_quiesce_timeout_keeps_worker_running_and_blocks_backup(
+def test_atom_lab_quiesce_non_lab_job_timeout_keeps_worker_running_and_blocks_backup(
     monkeypatch, capsys
 ) -> None:
     runner = load_runner_module()
@@ -3655,7 +3656,9 @@ def test_atom_lab_quiesce_timeout_keeps_worker_running_and_blocks_backup(
     clock = iter([0.0, 2.0])
     monkeypatch.setattr(runner, "_atom_lab_deployment_inputs", lambda: inputs)
     monkeypatch.setattr(runner, "_atom_lab_stack_running", lambda inputs: True)
-    monkeypatch.setattr(runner, "_atom_lab_nonterminal_run_count", lambda inputs: 1)
+    # The unscoped jobs-table query means this count can be an ordinary runtime job with no
+    # platform.atom_lab_runs row; quiesce must still keep the shared worker alive to drain it.
+    monkeypatch.setattr(runner, "_atom_lab_nonterminal_job_count", lambda inputs: 1)
     monkeypatch.setattr(runner.time, "monotonic", lambda: next(clock))
     monkeypatch.setattr(
         runner,
@@ -3704,6 +3707,7 @@ def test_atom_lab_failed_up_cleanup_can_bootstrap_only_recovery_postgres(
     monkeypatch.setattr(runner, "_atom_lab_deployment_inputs", lambda: inputs)
     monkeypatch.setattr(runner, "_atom_lab_stack_running", lambda inputs: False)
     monkeypatch.setattr(runner, "_check_ports_available", lambda *args: True)
+    monkeypatch.setattr(runner, "_atom_lab_running_services", lambda inputs: frozenset())
 
     def run(command, env, **kwargs):
         commands.append(list(command))
@@ -3729,6 +3733,48 @@ def test_atom_lab_failed_up_cleanup_can_bootstrap_only_recovery_postgres(
     assert "platform-worker" not in recovery_command
 
 
+def test_atom_lab_recovery_postgres_refuses_running_application_services(
+    monkeypatch, capsys
+) -> None:
+    runner = load_runner_module()
+    inputs = runner.AtomLabDeploymentInputs(
+        dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
+    )
+    monkeypatch.setattr(runner, "_atom_lab_deployment_inputs", lambda: inputs)
+    monkeypatch.setattr(
+        runner,
+        "_atom_lab_running_services",
+        lambda inputs: frozenset({"postgres", "platform-api", "platform-worker"}),
+    )
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda *args, **kwargs: pytest.fail("unsafe recovery preflight mutated Compose"),
+    )
+
+    assert runner.atom_lab_recovery_postgres_up() == 1
+    assert "LAB012" in capsys.readouterr().err
+
+
+def test_atom_lab_running_services_uses_compose_running_service_names(monkeypatch) -> None:
+    runner = load_runner_module()
+    inputs = runner.AtomLabDeploymentInputs(
+        dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
+    )
+    captured = {}
+
+    def run(command, **kwargs):
+        captured["command"] = list(command)
+        return subprocess.CompletedProcess(command, 0, "postgres\nplatform-api\n", "")
+
+    monkeypatch.setattr(runner.subprocess, "run", run)
+
+    assert runner._atom_lab_running_services(inputs) == frozenset(
+        {"postgres", "platform-api"}
+    )
+    assert captured["command"][-4:] == ["ps", "--status", "running", "--services"]
+
+
 def test_atom_lab_runbook_orders_recovery_bootstrap_and_protects_secrets() -> None:
     runner = load_runner_module()
     runbook = (runner.ROOT / "infra" / "deployment" / "README.md").read_text(
@@ -3742,6 +3788,8 @@ def test_atom_lab_runbook_orders_recovery_bootstrap_and_protects_secrets() -> No
     restore = runbook.index("pg_restore -U", createdb)
     down = runbook.index("atom-lab-down", restore)
     assert recovery < createdb < restore < down
+    checkout = runbook.index("check out the prior reviewed revision", down)
+    assert down < checkout
 
 
 def test_atom_lab_env_template_leaves_optional_proxy_blank() -> None:

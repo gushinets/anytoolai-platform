@@ -2007,10 +2007,9 @@ def _atom_lab_down_locked() -> int:
     )
 
 
-def _atom_lab_nonterminal_run_count(inputs: AtomLabDeploymentInputs) -> int:
+def _atom_lab_nonterminal_job_count(inputs: AtomLabDeploymentInputs) -> int:
     query = (
-        "SELECT count(*) FROM platform.atom_lab_runs AS r "
-        "JOIN platform.jobs AS j ON j.id = r.job_id "
+        "SELECT count(*) FROM platform.jobs AS j "
         "WHERE j.status IN ('created', 'running');"
     )
     completed = subprocess.run(
@@ -2033,13 +2032,13 @@ def _atom_lab_nonterminal_run_count(inputs: AtomLabDeploymentInputs) -> int:
         timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
     )
     if completed.returncode != 0:
-        raise RuntimeError("could not inspect non-terminal Atom Lab jobs")
+        raise RuntimeError("could not inspect non-terminal deployment jobs")
     try:
         count = int(completed.stdout.strip())
     except ValueError as exc:
-        raise RuntimeError("PostgreSQL returned an invalid Atom Lab job count") from exc
+        raise RuntimeError("PostgreSQL returned an invalid deployment job count") from exc
     if count < 0:
-        raise RuntimeError("PostgreSQL returned an invalid Atom Lab job count")
+        raise RuntimeError("PostgreSQL returned an invalid deployment job count")
     return count
 
 
@@ -2076,15 +2075,15 @@ def _atom_lab_quiesce_locked() -> int:
     deadline = time.monotonic() + timeout
     while True:
         try:
-            nonterminal_count = _atom_lab_nonterminal_run_count(inputs)
+            nonterminal_count = _atom_lab_nonterminal_job_count(inputs)
         except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
-            print(f"LAB010: could not verify the Atom Lab queue: {exc}", file=sys.stderr)
+            print(f"LAB010: could not verify the deployment queue: {exc}", file=sys.stderr)
             return 1
         if nonterminal_count == 0:
             break
         if time.monotonic() >= deadline:
             print(
-                f"LAB010: {nonterminal_count} Atom Lab run(s) remain non-terminal; "
+                f"LAB010: {nonterminal_count} deployment job(s) remain non-terminal; "
                 "ingress/API must stay closed and no backup may be taken",
                 file=sys.stderr,
             )
@@ -2141,13 +2140,37 @@ def atom_lab_recovery_postgres_up() -> int:
         return 1
 
 
+def _atom_lab_running_services(inputs: AtomLabDeploymentInputs) -> frozenset[str]:
+    completed = subprocess.run(
+        [*_atom_lab_compose_command(), "ps", "--status", "running", "--services"],
+        cwd=ROOT,
+        env=inputs.compose_env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError("could not inspect running Atom Lab services")
+    return frozenset(
+        service.strip() for service in completed.stdout.splitlines() if service.strip()
+    )
+
+
 def _atom_lab_recovery_postgres_up_locked() -> int:
     try:
         inputs = _atom_lab_deployment_inputs()
+        running_services = _atom_lab_running_services(inputs)
+        unsafe_services = sorted(running_services - {"postgres"})
+        if unsafe_services:
+            raise RuntimeError(
+                "recovery PostgreSQL bootstrap requires API, worker, and migrate to be stopped; "
+                f"running services: {', '.join(unsafe_services)}"
+            )
     except ValueError as exc:
         print(f"LAB001: {exc}", file=sys.stderr)
         return 2
-    except OSError as exc:
+    except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
         print(f"LAB012: Atom Lab recovery PostgreSQL preflight failed: {exc}", file=sys.stderr)
         return 1
 
