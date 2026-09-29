@@ -468,3 +468,20 @@ def test_handoff_route_is_allowlisted_declarative_and_leak_free() -> None:
     }
     scenarios = _test_support.load_yaml(PRODUCT_DIR, "scenarios.yaml")["scenarios"]
     assert "continue_to_target" in scenarios[0]["allowed_next_actions"]
+
+
+def test_handoff_source_summary_is_never_looser_than_target_brief_text() -> None:
+    """ANY-26 review: every valid decode output must produce a valid handoff `brief_text`, so a
+    source artifact can never fail target validation at POST /v1/handoffs."""
+    source = json.loads((PRODUCT_DIR / "schemas" / "decode_output.schema.json").read_text())
+    source_summary = source["properties"]["document"]["properties"]["summary"]
+    target_dir = PRODUCT_DIR.parent / "acceptance_builder" / "schemas"
+    target = json.loads((target_dir / "draft_input.schema.json").read_text())["properties"]
+    target_brief_text = target["brief_text"]
+    assert source_summary == target_brief_text
+
+    validator = jsonschema.validators.validator_for(source_summary)(source_summary)
+    assert validator.is_valid("x" * 8000)
+    assert validator.is_valid("a\n\nb")
+    for bad in ("x" * 8001, " a", "a ", "\na", "a\n", ""):
+        assert not validator.is_valid(bad), repr(bad)
