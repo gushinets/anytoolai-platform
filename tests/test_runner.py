@@ -3900,7 +3900,9 @@ def test_atom_lab_up_fails_closed_when_compose_stack_probe_fails(
     )
 
     assert runner.atom_lab_up() == 1
-    assert "LAB002: Docker Compose preflight failed" in capsys.readouterr().err
+    error = capsys.readouterr().err
+    assert "LAB002: Docker Compose preflight failed" in error
+    assert "daemon unavailable" in error
 
 
 def test_atom_lab_up_reports_failed_candidate_cleanup(monkeypatch, capsys) -> None:
@@ -3969,6 +3971,13 @@ def test_atom_lab_smoke_reuses_live_canary_and_compares_history_after_restart(mo
     monkeypatch.setattr(runner, "_atom_lab_deployment_inputs", lambda: inputs)
     monkeypatch.setattr(runner, "quick_check_venv_ready", lambda path: True)
     monkeypatch.setattr(runner, "_atom_lab_ready", lambda inputs, announce=False: 0)
+    lifecycle = []
+    monkeypatch.setattr(
+        runner, "_atom_lab_quiesce_locked", lambda: lifecycle.append("quiesce") or 0
+    )
+    monkeypatch.setattr(
+        runner, "_atom_lab_resume_locked", lambda: lifecycle.append("resume") or 0
+    )
     expected_run_ids = tuple(f"run-{index}" for index in range(1, 12))
     monkeypatch.setattr(
         runner, "_atom_lab_canary_run_ids", lambda path: expected_run_ids
@@ -3993,8 +4002,8 @@ def test_atom_lab_smoke_reuses_live_canary_and_compares_history_after_restart(mo
     assert "OPENAI_API_KEY" not in calls[0][1]
     assert "ANYTOOLAI_LIVE_CANARY_TOKEN" not in calls[0][1]
     assert "--atom-lab-run-ids-output" in calls[0][0]
-    assert "restart" in calls[1][0]
-    assert calls[1][0][-2:] == ["platform-api", "platform-worker"]
+    assert len(calls) == 1
+    assert lifecycle == ["quiesce", "resume"]
     assert verified == [expected_run_ids]
 
 

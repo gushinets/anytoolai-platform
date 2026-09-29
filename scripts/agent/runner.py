@@ -2343,13 +2343,12 @@ def _atom_lab_smoke_locked() -> int:  # noqa: PLR0911
         except (OSError, ValueError, json.JSONDecodeError) as exc:
             print(f"LAB007: could not read canary run IDs: {exc}", file=sys.stderr)
             return 1
-    exit_code = run_with_env(
-        [*_atom_lab_compose_command(), "restart", "platform-api", "platform-worker"],
-        inputs.compose_env,
-        timeout=COMPOSE_TEARDOWN_TIMEOUT_SECONDS,
-    )
-    if exit_code != 0 or _atom_lab_ready(inputs, announce=False) != 0:
-        return exit_code or 1
+    exit_code = _atom_lab_quiesce_locked()
+    if exit_code != 0:
+        return exit_code
+    exit_code = _atom_lab_resume_locked()
+    if exit_code != 0:
+        return exit_code
     try:
         invalid_run_ids = _atom_lab_invalid_terminal_history_run_ids(
             inputs, expected_run_ids
@@ -2477,7 +2476,13 @@ def _compose_stack_running(compose_command: Sequence[str], env: dict[str, str]) 
         timeout=COMPOSE_STACK_QUERY_TIMEOUT_SECONDS,
     )
     if result.returncode != 0:
-        raise RuntimeError(f"docker compose ps failed with exit code {result.returncode}")
+        message = f"docker compose ps failed with exit code {result.returncode}"
+        detail = next(
+            (line.strip() for line in result.stderr.splitlines() if line.strip()), ""
+        )
+        if detail:
+            message += f": {detail[:300]}"
+        raise RuntimeError(message)
     return bool(result.stdout.strip())
 
 
