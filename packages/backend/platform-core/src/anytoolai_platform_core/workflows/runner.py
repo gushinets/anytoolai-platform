@@ -620,6 +620,7 @@ class SequentialWorkflowRunner:
                     step_id=step.step_id,
                     step_output=state.step_outputs[step.step_id],
                     context=state.context,
+                    scenario_input=state.scenario_input,
                 )
             except Exception as exc:
                 state.step_state[step.step_id] = self._build_step_state(

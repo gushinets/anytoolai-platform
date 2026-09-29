@@ -1093,6 +1093,58 @@ def test_workflow_runner_executes_multi_step_workflow_with_input_and_output_mapp
     ]
 
 
+def test_workflow_runner_output_mapping_passes_scenario_input_through_verbatim(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    """A step's `output_mapping` may source `scenario.input.*`: the runner hands the scenario
+    input to the output-mapping resolver, so the caller's value lands in the workflow context
+    unchanged (not the step's output, not a literal)."""
+    base = build_config_registry(CONFIG_ROOT)
+    workflow = base.workflows["kernel_demo.extract_detect_report_v1"]
+    steps = [
+        replace(
+            step,
+            output_mapping={**step.output_mapping, "context.echoed_source": "scenario.input.source_text"},
+        )
+        if step.step_id == "extract"
+        else step
+        for step in workflow.steps
+    ]
+    registry = replace(
+        base,
+        workflows={
+            **base.workflows,
+            workflow.workflow_id: replace(workflow, steps=steps),
+        },
+    )
+    executor = RecordingExecutor(
+        {
+            "extract": {"values": {}, "missing_fields": []},
+            "detect_issues": {"issues": []},
+            "generate_report": {
+                "sections": [{"id": "overview", "title": "Overview", "content": "done"}],
+                "summary": "done",
+            },
+        }
+    )
+    source_text = "  exact text\nwith  spacing  "
+    with transaction_boundary(session_factory) as session:
+        context = _base_context()
+        _seed_context_scenario(session, context)
+        runner = _build_recording_workflow_runner(session, executor=executor, registry=registry)
+        result = asyncio.run(
+            runner.run(
+                workflow.workflow_id,
+                {"source_text": source_text, "fields": _EXTRACT_FIELDS, "strict": False},
+                context,
+            )
+        )
+        job = session.execute(sa.select(jobs_table)).mappings().one()
+
+    assert result.status.value == "succeeded"
+    assert job["metadata"]["workflow_state"]["context"]["echoed_source"] == source_text
+
+
 def test_workflow_runner_maps_detected_issues_directly_into_generate_clarifying_questions(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:

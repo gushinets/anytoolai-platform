@@ -38,11 +38,12 @@ Existing simple YAML remains valid because every new field is optional.
 `output_mapping` is a mapping of:
 
 ```text
-context.<target path> -> steps.<current_step_id>.output[.<field>...] | literal:<json>
+context.<target path> -> steps.<current_step_id>.output[.<field>...] | scenario.input[.<field>...] | literal:<json>
 ```
 
-`output_mapping` sources are restricted to the current step's own output or a `literal:<json>`
-constant — never scenario input, `context`, or another step's output.
+`output_mapping` sources are restricted to the current step's own output, the scenario input
+(so a workflow can pass the caller's input through verbatim into its output), or a
+`literal:<json>` constant — never `context` or another step's output.
 
 Supported `input_mapping` source paths are:
 
