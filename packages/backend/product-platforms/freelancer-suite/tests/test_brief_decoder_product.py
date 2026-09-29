@@ -447,3 +447,24 @@ def test_prompt_and_schema_manifests_point_at_existing_files() -> None:
         assert (PRODUCT_DIR / entry["template_path"]).is_file(), entry["prompt_ref"]
     for entry in _load_yaml("schemas.yaml")["schemas"]:
         assert (PRODUCT_DIR / entry["file_path"]).is_file(), entry["schema_ref"]
+
+
+def test_handoff_route_is_allowlisted_declarative_and_leak_free() -> None:
+    """ANY-26: the Brief Decoder -> Acceptance Builder route maps only always-present paths."""
+    (route,) = _test_support.load_yaml(PRODUCT_DIR, "handoffs.yaml")["handoffs"]
+    acceptance_dir = PRODUCT_DIR.parent / "acceptance_builder"
+    target = _test_support.load_yaml(acceptance_dir, "scenarios.yaml")["scenarios"]
+    frontends = _test_support.load_yaml(acceptance_dir, "frontends.yaml")["frontends"]
+
+    assert route["source_scenario_id"] == WORKFLOW_ID
+    assert route["target_scenario_id"] in {s["scenario_id"] for s in target}
+    assert route["target_frontend_id"] in {f["frontend_id"] for f in frontends if f["enabled"]}
+    assert (route["target_start_policy"], route["consent_required"]) == ("immediate", True)
+    assert route["context_mapping"] == {"brief_text": "artifact.content_json.document.summary"}
+    # preview_mapping: direct artifact paths only -- no literals, no optional brief.values.*
+    assert set(route["preview_mapping"].values()) == {
+        "artifact.content_json.document.summary",
+        "artifact.content_json.brief.missing_fields",
+    }
+    scenarios = _test_support.load_yaml(PRODUCT_DIR, "scenarios.yaml")["scenarios"]
+    assert "continue_to_target" in scenarios[0]["allowed_next_actions"]

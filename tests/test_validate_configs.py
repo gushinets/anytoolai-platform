@@ -351,7 +351,12 @@ def test_check_deployment_profile_reads_resolved_bundle_and_ignores_disabled_fak
         "config_roots",
         lambda self: [
             products_root / name
-            for name in ("proposal_ai", "client_update_writer", "brief_decoder")
+            for name in (
+                "proposal_ai",
+                "client_update_writer",
+                "brief_decoder",
+                "acceptance_builder",
+            )
         ],
     )
 
@@ -400,7 +405,12 @@ def test_startup_profile_check_rejects_stale_mount_and_selection(monkeypatch, tm
         "config_roots",
         lambda self: [
             products_root / name
-            for name in ("proposal_ai", "client_update_writer", "brief_decoder")
+            for name in (
+                "proposal_ai",
+                "client_update_writer",
+                "brief_decoder",
+                "acceptance_builder",
+            )
         ],
     )
     monkeypatch.setattr(validate_configs, "CONTAINER_PRODUCTS_ROOT", products_root)
@@ -451,7 +461,12 @@ def test_profile_cli_build_and_check_fail_closed(monkeypatch, tmp_path, capsys):
         "config_roots",
         lambda self: [
             products_root / name
-            for name in ("proposal_ai", "client_update_writer", "brief_decoder")
+            for name in (
+                "proposal_ai",
+                "client_update_writer",
+                "brief_decoder",
+                "acceptance_builder",
+            )
         ],
     )
     args = [

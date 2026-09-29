@@ -29,7 +29,12 @@ import sqlalchemy as sa
 from anytoolai_platform_api.bootstrap import build_runtime
 from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
 from anytoolai_platform_core.scenarios.checkpoints import RESULT_READY_CHECKPOINT_ID
-from anytoolai_platform_core.storage.db import event_log_table, provider_calls_table
+from anytoolai_platform_core.storage.db import (
+    event_log_table,
+    jobs_table,
+    provider_calls_table,
+    scenario_sessions_table,
+)
 from anytoolai_platform_core.storage.transactions import SessionFactory, transaction_boundary
 from anytoolai_platform_core.structured_output.schemas import normalize_schema_mapping
 from anytoolai_platform_core.workflows.models import JobStatus
@@ -251,14 +256,10 @@ def test_output_schema_accepts_the_fixtures_and_rejects_open_shapes() -> None:
         "whitespace_deliverable_item": mutated(
             lambda o: o["brief"]["values"].update(deliverables=[" "])
         ),
-        "whitespace_issue_description": mutated(
-            lambda o: o["issues"][0].update(description=" ")
-        ),
+        "whitespace_issue_description": mutated(lambda o: o["issues"][0].update(description=" ")),
         "whitespace_issue_evidence": mutated(lambda o: o["issues"][0].update(evidence="\n")),
         "whitespace_question": mutated(lambda o: o["questions"][0].update(question="  ")),
-        "whitespace_question_rationale": mutated(
-            lambda o: o["questions"][0].update(rationale=" ")
-        ),
+        "whitespace_question_rationale": mutated(lambda o: o["questions"][0].update(rationale=" ")),
         "key_details_missing_metadata": mutated(
             lambda o: o["document"]["sections"][1].pop("metadata")
         ),
@@ -345,7 +346,7 @@ def _run_to_result(
     ).json()
     assert session_body["status"] == "completed"
     assert session_body["current_checkpoint_id"] == RESULT_READY_CHECKPOINT_ID
-    assert session_body["allowed_next_actions"] == ["copy_result"]
+    assert session_body["allowed_next_actions"] == ["copy_result", "continue_to_target"]
 
     result = asyncio.run(
         request_platform_api(
@@ -407,11 +408,15 @@ def test_happy_path_composes_the_four_step_result(
     )
     assert response.status_code == HTTPStatus.OK
     with transaction_boundary(session_factory) as session:
-        event = session.execute(
-            sa.select(event_log_table).where(
-                event_log_table.c.event_type == "client.next_action_clicked"
+        event = (
+            session.execute(
+                sa.select(event_log_table).where(
+                    event_log_table.c.event_type == "client.next_action_clicked"
+                )
             )
-        ).mappings().one()
+            .mappings()
+            .one()
+        )
     assert event["scenario_session_id"] == started["scenario_session_id"]
     assert event["properties"] == {
         "checkpoint_id": RESULT_READY_CHECKPOINT_ID,
@@ -425,9 +430,7 @@ def test_weak_input_fixtures_are_reachable_end_to_end(
     adapter = RecordingProviderAdapter(
         FIXTURE_ROOT, variants={step: ".weak_input" for step in STEP_ORDER}
     )
-    _, output = _run_to_result(
-        app, request_platform_api, session_factory, WEAK_BRIEF_TEXT, adapter
-    )
+    _, output = _run_to_result(app, request_platform_api, session_factory, WEAK_BRIEF_TEXT, adapter)
 
     assert tuple(call.action_config_id for call in adapter.calls) == STEP_ORDER
     assert output == _expected_output(".weak_input")
@@ -503,3 +506,52 @@ def test_invalid_brief_text_fails_the_job_before_any_provider_call(
     assert processed.result_artifact_id is None
     assert adapter.calls == []
     assert _provider_call_count(session_factory, job_id=started["job_id"]) == 0
+
+
+def test_handoff_to_acceptance_builder_queues_draft_from_summary(
+    app: Any, request_platform_api, session_factory: SessionFactory
+) -> None:
+    """ANY-26: create -> safe preview -> accept queues acceptance_builder.draft_v1 immediately."""
+    started = _start(app, request_platform_api, BRIEF_TEXT).json()
+    processed = _run_worker(session_factory, RecordingProviderAdapter(FIXTURE_ROOT))
+    assert processed is not None and processed.status is JobStatus.succeeded
+
+    def call(method: str, path: str, **kwargs: Any) -> httpx.Response:
+        return asyncio.run(
+            request_platform_api(app, method, path, request_id="req_handoff", **kwargs)
+        )
+
+    created = call(
+        "POST",
+        "/v1/handoffs",
+        json={
+            "handoff_definition_id": "brief_decoder_to_acceptance_builder_v1",
+            "source_scenario_session_id": started["scenario_session_id"],
+            "source_artifact_id": processed.result_artifact_id,
+        },
+    )
+    assert created.status_code == HTTPStatus.OK, created.text
+    token = created.json()["handoff_token"]
+
+    summary = _fixture(SUMMARY)["summary"]
+    preview = call("GET", f"/v1/handoffs/{token}").json()["preview"]
+    assert preview == {
+        "summary": summary,
+        "missing_fields": _fixture(EXTRACT)["missing_fields"],
+    }
+
+    accepted = call("POST", f"/v1/handoffs/{token}/accept", json={})
+    assert accepted.status_code == HTTPStatus.OK, accepted.text
+    with transaction_boundary(session_factory) as session:
+        target = session.execute(
+            sa.select(scenario_sessions_table.c.scenario_id).where(
+                scenario_sessions_table.c.id == accepted.json()["target_scenario_session_id"]
+            )
+        ).scalar_one()
+        job = session.execute(
+            sa.select(jobs_table.c.workflow_id, jobs_table.c.status).where(
+                jobs_table.c.id == accepted.json()["target_job_id"]
+            )
+        ).one()
+    assert target == "acceptance_builder.draft_v1"
+    assert tuple(job) == ("acceptance_builder.draft_v1", JobStatus.created)

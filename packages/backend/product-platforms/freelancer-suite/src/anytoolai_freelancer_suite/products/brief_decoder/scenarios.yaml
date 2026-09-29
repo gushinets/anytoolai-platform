@@ -4,3 +4,4 @@ scenarios:
     workflow_id: brief_decoder.decode_v1
     allowed_next_actions:
       - copy_result
+      - continue_to_target
