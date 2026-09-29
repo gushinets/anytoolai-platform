@@ -129,8 +129,10 @@ committed, never while the result is merely fetched), carrying `resultViewed: fa
 tracker skips `web.result_viewed`. A throwing hook counts as false. It exists because the
 client-event property allowlist has no question-count property and Platform Core is not changed
 for a product. Brief Decoder's `R` is a composite
-object (`brief`, `issues`, `questions`, `document`) rendered by product-owned markup; only its
-copy-ready `document` goes through the shared `ResultView`, using a product-side
+object (`brief_text`, `brief`, `issues`, `questions`, `document`); `brief_text` is the caller's
+original brief, a backend handoff source excluded from the renderer contract (never rendered or
+copied). The other four parts are rendered by product-owned markup; only the copy-ready
+`document` goes through the shared `ResultView`, using a product-side
 `composeCopyText` that implements `renderer_contract.yaml`'s `canonical_field_composition`.
 
 ## Web i18n (ANY-519)
