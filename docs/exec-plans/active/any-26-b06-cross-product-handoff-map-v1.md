@@ -26,6 +26,10 @@ changes.
   creation and the target extracts from the real brief, not the readiness summary. This needed one
   small Platform Core change: `output_mapping` may now source `scenario.input.*`
   (`docs/architecture/workflow-model.md`). Not a handoff-contract change.
+- Acceptance criterion "no mapping DSL extension appears in mappings" is read as the handoff
+  mappings: `handoffs.yaml` uses only the existing `artifact.content_json.*` grammar. The
+  `scenario.input.*` source is a workflow `output_mapping` capability in Platform Core, needed to
+  make the decode artifact carry the original brief, and does not touch the handoff contract.
 - Preview maps only `document.summary` and `brief.missing_fields` (no literals).
 - Acceptance Builder gets no structured handoff input scenario.
 - `brief_text` is excluded from the renderer contract: it is a handoff source, never rendered.
