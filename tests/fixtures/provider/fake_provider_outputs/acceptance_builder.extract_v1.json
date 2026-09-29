@@ -1,0 +1,32 @@
+{
+  "response_json": {
+    "values": {
+      "acceptance_criteria": [
+        "A student who finishes a course automatically receives a PDF certificate",
+        "The certificate is issued for every existing course",
+        "The certificate uses the brand colors"
+      ],
+      "assumptions": [
+        "Course completion data already exists in the database"
+      ],
+      "deliverables": [
+        "Certificate template in brand colors",
+        "Automated PDF generation service",
+        "Email that delivers the certificate"
+      ]
+    },
+    "missing_fields": [],
+    "confidence": {
+      "acceptance_criteria": 0.85,
+      "assumptions": 0.9,
+      "deliverables": 0.95
+    }
+  },
+  "input_tokens": 220,
+  "output_tokens": 90,
+  "latency_ms": 10,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "acceptance_builder.extract_v1"
+  }
+}

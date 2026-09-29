@@ -1,0 +1,7 @@
+# Metadata only: ScenarioRuntimeService.start_session rejects any scenario start unless the
+# product has an enabled frontend. The apps/web-mirror page itself is ANY-244; no Chrome
+# Extension entry (ANY-236 is optional).
+frontends:
+  - frontend_id: web_mirror
+    type: web
+    enabled: true

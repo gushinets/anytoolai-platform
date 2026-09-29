@@ -1,0 +1,98 @@
+renderer_contract:
+  # One contract per scenario output shape: both scenarios render `extracted` and `document`;
+  # only check_v1 has a `comparison`. apps/web-mirror (ANY-244) is built against this file; this
+  # file pins the contract, not the renderer.
+  scenarios:
+    - scenario_id: acceptance_builder.draft_v1
+      output_schema_ref: acceptance_builder.draft_output_v1
+      parts: [acceptance_criteria, assumptions, deliverables, open_gaps, narrative_document]
+    - scenario_id: acceptance_builder.check_v1
+      output_schema_ref: acceptance_builder.check_output_v1
+      parts:
+        - comparison_verdict
+        - acceptance_criteria
+        - assumptions
+        - deliverables
+        - open_gaps
+        - narrative_document
+  parts:
+    - part_id: comparison_verdict
+      field: comparison
+      description: >-
+        `verdict` (meets_expectations | partially_meets | does_not_meet), `confidence`, and one
+        `delta` per general review criterion (scope_coverage, requirement_fit, completeness,
+        clarity) with `status` and `evidence`. The verdict is judged on those four general
+        criteria only, NOT item by item on the extracted acceptance criteria; the renderer must
+        not label it a check of the extracted list.
+    - part_id: acceptance_criteria
+      field: extracted.values.acceptance_criteria
+      description: >-
+        Conditions the brief imposes on the finished work. When absent (listed in
+        `extracted.missing_fields`) it renders as "not specified in the brief" -- never as a claim
+        that the brief is complete.
+    - part_id: assumptions
+      field: extracted.values.assumptions
+      description: Same absent-list rule as `acceptance_criteria`.
+    - part_id: deliverables
+      field: extracted.values.deliverables
+      description: Same absent-list rule as `acceptance_criteria`.
+    - part_id: open_gaps
+      field: extracted.missing_fields
+      description: >-
+        The lists the brief does not state, by name. Empty means the brief states all three lists.
+    - part_id: narrative_document
+      field: document
+      description: >-
+        A10's composed recap: ordered `sections` (id, title, content) and `summary`. It is free
+        text a model wrote from the structured fields, so it is display-only narrative: never the
+        copy source and never the authority for any fact. Where it disagrees with the structured
+        parts above, the structured parts are right. The output schema pins its verdict wording,
+        statuses and missing-field mentions, but cannot pin list items or prose.
+  # The copy-ready text is composed deterministically from the structured authority -- verdict,
+  # deltas and rationale from `comparison`, lists from `extracted.values`, gaps from
+  # `extracted.missing_fields` -- so nothing a model invented in `document` can reach what the
+  # user sends to a client. The renderer (ANY-244) implements this composition.
+  copy_text:
+    authority: structured_fields_only
+    not_copyable_fields: [document]
+    # Every block is `<title line>` then its body, blocks separated by one blank line.
+    blocks:
+      - block_id: verdict
+        scenarios: [acceptance_builder.check_v1]
+        title: Verdict
+        source: comparison.verdict
+        body: >-
+          "Verdict: " followed by the verdict in words (meets expectations | partially meets
+          expectations | does not meet expectations) and a full stop; then one line per entry of
+          `comparison.deltas`, in array order, as "<Label>: <status>. <evidence>" with the labels
+          Scope coverage, Requirement fit, Completeness, Clarity; then `comparison.rationale`.
+        also_uses: [comparison.deltas, comparison.rationale]
+      - block_id: acceptance_criteria
+        title: Acceptance criteria
+        source: extracted.values.acceptance_criteria
+        body: One "- <item>" line per item, in array order.
+        when_absent: Not specified in the brief.
+      - block_id: assumptions
+        title: Assumptions
+        source: extracted.values.assumptions
+        body: One "- <item>" line per item, in array order.
+        when_absent: Not specified in the brief.
+      - block_id: deliverables
+        title: Deliverables
+        source: extracted.values.deliverables
+        body: One "- <item>" line per item, in array order.
+        when_absent: Not specified in the brief.
+      - block_id: open_gaps
+        title: Open gaps
+        source: extracted.missing_fields
+        body: >-
+          The name of each entry as "acceptance criteria", "assumptions" or "deliverables", one
+          per line as "- <name>: the client should confirm it."
+        # `missing_fields` is required and is `[]` for a complete brief, so the fallback is keyed on
+        # empty, not absent (the list blocks above are keyed on absent: their keys are optional and
+        # an empty array is invalid there).
+        when_empty: The brief states all three lists.
+  next_action: copy_result
+  excluded_fields: []
+  # Open (ANY-244): the spec activation rule (first successful display of verdict and criteria,
+  # web-first-product-framework-design.md) has no verdict in draft_v1; ANY-244 decides it.

@@ -1,0 +1,22 @@
+{
+  "type": "object",
+  "properties": {
+    "brief_text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8000,
+      "pattern": "^\\S([\\s\\S]*\\S)?(?!\\n)$"
+    },
+    "deliverable_text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8000,
+      "pattern": "^\\S([\\s\\S]*\\S)?(?!\\n)$"
+    }
+  },
+  "required": [
+    "brief_text",
+    "deliverable_text"
+  ],
+  "additionalProperties": false
+}
