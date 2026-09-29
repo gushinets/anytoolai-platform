@@ -1093,6 +1093,7 @@ def test_prod_stack_running_reflects_compose_ps_output(monkeypatch) -> None:
     class Result:
         def __init__(self, stdout: str) -> None:
             self.stdout = stdout
+            self.returncode = 0
 
     monkeypatch.setattr(
         runner.subprocess, "run", lambda *args, **kwargs: Result("container-id-123\n")
@@ -3782,6 +3783,8 @@ def test_atom_lab_runbook_orders_recovery_bootstrap_and_protects_secrets() -> No
     )
 
     assert "install -m 600 infra/compose/.env.example infra/compose/.env.atom-lab" in runbook
+    assert "`docker-compose.prod.yml` and `docker-compose.atom-lab.yml`" in runbook
+    assert "`make prod-up` or `make atom-lab-up`" in runbook
     assert runbook.index("umask 077") < runbook.index("pg_dump -U")
     assert "atom-lab-resume" in runbook
     incompatible = runbook.index("incompatible-schema rollback from a running deployment")
@@ -3844,6 +3847,36 @@ def test_atom_lab_up_refuses_to_replace_running_stack(monkeypatch, capsys) -> No
 
     assert runner.atom_lab_up() == 1
     assert "LAB006: refusing to replace a running Atom Lab stack" in capsys.readouterr().err
+
+
+def test_atom_lab_up_fails_closed_when_compose_stack_probe_fails(
+    monkeypatch, capsys
+) -> None:
+    runner = load_runner_module()
+    inputs = runner.AtomLabDeploymentInputs(
+        dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
+    )
+    monkeypatch.setattr(runner, "_atom_lab_deployment_inputs", lambda: inputs)
+    monkeypatch.setattr(
+        runner.subprocess,
+        "run",
+        lambda command, **kwargs: subprocess.CompletedProcess(
+            command, 1, "", "daemon unavailable"
+        ),
+    )
+    monkeypatch.setattr(
+        runner,
+        "_check_ports_available",
+        lambda *args: pytest.fail("failed stack probe reached port preflight"),
+    )
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda *args, **kwargs: pytest.fail("failed stack probe mutated Compose"),
+    )
+
+    assert runner.atom_lab_up() == 1
+    assert "LAB002: Docker Compose preflight failed" in capsys.readouterr().err
 
 
 def test_atom_lab_up_reports_failed_candidate_cleanup(monkeypatch, capsys) -> None:

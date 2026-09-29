@@ -1044,6 +1044,9 @@ def dev_live_up(product_id: str, quota_mode: str = "unmetered") -> int:
             file=sys.stderr,
         )
         return 1
+    except RuntimeError as exc:
+        print(f"LIVE001: {exc}", file=sys.stderr)
+        return 1
     if not stack_running and not _check_ports_available(
         "DEV002",
         [
@@ -1916,7 +1919,7 @@ def _atom_lab_up_locked() -> int:
     except ValueError as exc:
         print(f"LAB001: {exc}", file=sys.stderr)
         return 2
-    except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+    except (FileNotFoundError, RuntimeError, subprocess.TimeoutExpired) as exc:
         print(f"LAB002: Docker Compose preflight failed: {exc}", file=sys.stderr)
         return 1
     except OSError as exc:
@@ -2473,6 +2476,8 @@ def _compose_stack_running(compose_command: Sequence[str], env: dict[str, str]) 
         check=False,
         timeout=COMPOSE_STACK_QUERY_TIMEOUT_SECONDS,
     )
+    if result.returncode != 0:
+        raise RuntimeError(f"docker compose ps failed with exit code {result.returncode}")
     return bool(result.stdout.strip())
 
 
@@ -2610,6 +2615,9 @@ def _prod_up_locked() -> int:
             file=sys.stderr,
         )
         return 1
+    except RuntimeError as exc:
+        print(f"PROD003: {exc}", file=sys.stderr)
+        return 1
     # Skip the port preflight when the anytoolai-prod stack is already up: this is an
     # in-place redeploy (`docker compose up -d --build` recreates its own containers,
     # freeing/rebinding their ports itself), not a fresh start racing against something
@@ -2696,6 +2704,9 @@ def prod_fake_up() -> int:
             f"{COMPOSE_STACK_QUERY_TIMEOUT_SECONDS:g}s",
             file=sys.stderr,
         )
+        return 1
+    except RuntimeError as exc:
+        print(f"PROD003: {exc}", file=sys.stderr)
         return 1
     if not stack_running and not _check_ports_available(
         "PROD002",

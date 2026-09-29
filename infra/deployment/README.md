@@ -19,10 +19,10 @@ Covers the Proposal AI public web stack (`web-mirror`, `platform-api`, `platform
   `payments-portal-prod_edge`; both retain the AnytoolAI default network. Other selector values
   fail before Compose starts. Fake and dev commands never select this overlay.
 
-`docker-compose.prod.yml` uses the Compose Specification's `!reset`/`!override` merge tags (to
-drop Postgres's host port and fully replace `platform-api`'s). These require a reasonably
-recent `docker compose` CLI — tested with v5.3.1 here. If `make prod-up` fails with a YAML
-parse error mentioning `!reset` or `!override`, upgrade Docker Compose
+`docker-compose.prod.yml` and `docker-compose.atom-lab.yml` use the Compose Specification's
+`!reset`/`!override` merge tags (to remove or replace inherited ports). These require a reasonably
+recent `docker compose` CLI — tested with v5.3.1 here. If `make prod-up` or `make atom-lab-up`
+fails with a YAML parse error mentioning `!reset` or `!override`, upgrade Docker Compose
 (see [Merge Compose files](https://docs.docker.com/reference/compose-file/merge/)).
 
 `docker-compose.yml` also defines a `migrate` service: a one-shot container (same image as
