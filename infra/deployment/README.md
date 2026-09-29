@@ -193,10 +193,26 @@ prompts, inputs, and outputs, have no per-user attribution, and have no automati
 policy. Limit the code to the named internal group and agree what data may be entered. Preset
 versions and accepted run snapshots are immutable; do not edit them directly in PostgreSQL.
 
-To rotate, replace only `ANYTOOLAI_ATOM_LAB_ACCESS_CODE` in the secret store or `.env.atom-lab`,
-run `atom-lab-down` followed by `atom-lab-up`, then run readiness and verify the old code receives
-`401 atom_lab_access_denied`. Rotation does not re-encrypt or delete history/presets. For a suspected
-leak, remove ingress first, rotate and verify, then restore the allowlisted route.
+For every planned rotation, first close ingress and drain all already accepted work:
+
+```bash
+python scripts/agent/runner.py atom-lab-quiesce
+```
+
+Only after quiesce succeeds, replace `ANYTOOLAI_ATOM_LAB_ACCESS_CODE` in the secret store or
+`.env.atom-lab`, then recreate the application containers and require readiness:
+
+```bash
+python scripts/agent/runner.py atom-lab-down
+python scripts/agent/runner.py atom-lab-up
+python scripts/agent/runner.py atom-lab-ready
+```
+
+Verify the old code receives `401 atom_lab_access_denied`, and only then reopen ingress. Rotation
+does not re-encrypt or delete history/presets. For a suspected leak, remove ingress immediately,
+but still quiesce and drain already accepted work before changing the code and restarting the
+stack; do not turn a paid in-flight provider call into a forced-stop failure merely to rotate the
+admission credential.
 
 #### Catalog and limits troubleshooting
 
@@ -234,6 +250,13 @@ readiness before returning success. The same resume command safely reopens a suc
 application when the planned update is cancelled. Reopen ingress only after resume succeeds. On
 successful quiesce, stream the custom-format dump without exposing a password
 (replace the destination with a protected operator path):
+
+The lifecycle lock serializes each runner command, but it cannot cover the raw `pg_dump` and
+`pg_restore` commands below. One named operator/process must therefore hold exclusive maintenance
+ownership from before quiesce through the verified dump and `atom-lab-down` (or `atom-lab-resume`).
+During recovery, retain that ownership from before `atom-lab-recovery-postgres-up` through
+`pg_restore` and the following `atom-lab-down`. No other shell, automation, or operator may run an
+`atom-lab-*` command or direct Compose mutation in those intervals.
 
 ```bash
 umask 077

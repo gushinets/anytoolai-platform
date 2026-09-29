@@ -3787,6 +3787,30 @@ def test_atom_lab_runbook_orders_recovery_bootstrap_and_protects_secrets() -> No
     assert "`make prod-up` or `make atom-lab-up`" in runbook
     assert runbook.index("umask 077") < runbook.index("pg_dump -U")
     assert "atom-lab-resume" in runbook
+    rotation = runbook[
+        runbook.index("#### Shared data and access-code rotation") : runbook.index(
+            "#### Catalog and limits troubleshooting"
+        )
+    ]
+    quiesce_rotation = rotation.index("atom-lab-quiesce")
+    replace_code = rotation.index("replace `ANYTOOLAI_ATOM_LAB_ACCESS_CODE`")
+    down_rotation = rotation.index("atom-lab-down", replace_code)
+    up_rotation = rotation.index("atom-lab-up", down_rotation)
+    ready_rotation = rotation.index("atom-lab-ready", up_rotation)
+    denied_rotation = rotation.index("401 atom_lab_access_denied", ready_rotation)
+    reopen_rotation = rotation.index("reopen ingress", denied_rotation)
+    assert (
+        quiesce_rotation
+        < replace_code
+        < down_rotation
+        < up_rotation
+        < ready_rotation
+        < denied_rotation
+        < reopen_rotation
+    )
+    assert "hold exclusive maintenance" in runbook
+    assert "ownership from before quiesce" in runbook
+    assert "No other shell, automation, or operator" in runbook
     incompatible = runbook.index("incompatible-schema rollback from a running deployment")
     quiesce = runbook.index("atom-lab-quiesce", incompatible)
     first_down = runbook.index("atom-lab-down", quiesce)
