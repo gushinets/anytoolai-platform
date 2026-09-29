@@ -1,0 +1,7 @@
+product_id: acceptance_builder
+product_platform: freelancer_suite
+display_name: Acceptance Builder
+scenarios:
+  - acceptance_builder.draft_v1
+  - acceptance_builder.check_v1
+quota_policy_ref: acceptance_builder.guest_quota_v1

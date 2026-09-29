@@ -1,0 +1,43 @@
+{
+  "response_json": {
+    "sections": [
+      {
+        "id": "acceptance-criteria",
+        "title": "Acceptance criteria",
+        "content": "- A student who finishes a course automatically receives a PDF certificate\n- The certificate is issued for every existing course\n- The certificate uses the brand colors",
+        "metadata": {
+          "kind": "list"
+        }
+      },
+      {
+        "id": "assumptions",
+        "title": "Assumptions",
+        "content": "- Course completion data already exists in the database",
+        "metadata": {
+          "kind": "list"
+        }
+      },
+      {
+        "id": "deliverables",
+        "title": "Deliverables",
+        "content": "- Certificate template in brand colors\n- Automated PDF generation service\n- Email that delivers the certificate",
+        "metadata": {
+          "kind": "list"
+        }
+      },
+      {
+        "id": "open-gaps",
+        "title": "Open gaps",
+        "content": "The brief states acceptance criteria, assumptions and deliverables, so nothing is missing from these three lists."
+      }
+    ],
+    "summary": "The brief yields three acceptance criteria. Confirm with the client that the certificate must cover every existing course, since that is the widest requirement."
+  },
+  "input_tokens": 300,
+  "output_tokens": 170,
+  "latency_ms": 10,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "acceptance_builder.draft_document_v1"
+  }
+}

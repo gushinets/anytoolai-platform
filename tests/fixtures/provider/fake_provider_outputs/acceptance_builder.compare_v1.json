@@ -1,0 +1,36 @@
+{
+  "response_json": {
+    "verdict": "partially_meets",
+    "confidence": 0.78,
+    "deltas": [
+      {
+        "criterion_id": "scope_coverage",
+        "status": "partial",
+        "evidence": "The brief requires every existing course, but the delivery covers 12 courses and leaves 5 legacy courses unconnected."
+      },
+      {
+        "criterion_id": "requirement_fit",
+        "status": "match",
+        "evidence": "Students receive a PDF certificate by email right after finishing a course, as the brief asks."
+      },
+      {
+        "criterion_id": "completeness",
+        "status": "match",
+        "evidence": "The template, the PDF generation and the email delivery are all described as delivered."
+      },
+      {
+        "criterion_id": "clarity",
+        "status": "match",
+        "evidence": "The delivery text says plainly what works and which courses are not connected yet."
+      }
+    ],
+    "rationale": "The certificate flow works as briefed, but five legacy courses are not connected, so the requirement to cover every existing course is only partly met."
+  },
+  "input_tokens": 420,
+  "output_tokens": 160,
+  "latency_ms": 10,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "acceptance_builder.compare_v1"
+  }
+}

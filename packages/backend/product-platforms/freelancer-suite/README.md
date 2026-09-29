@@ -11,9 +11,9 @@ require changes to platform-core.
 
 ## Product config roots
 
-As of ANY-232, `FreelancerSuiteBundle.config_roots()` returns three implemented product roots, in
-this order: `proposal_ai` (ANY-227), `client_update_writer` (ANY-413) and `brief_decoder`
-(ANY-232).
+As of ANY-228, `FreelancerSuiteBundle.config_roots()` returns four implemented product roots, in
+this order: `proposal_ai` (ANY-227), `client_update_writer` (ANY-413), `brief_decoder` (ANY-232)
+and `acceptance_builder` (ANY-228).
 
 Per `docs/product-specs/mvp-scope-source-of-truth.md`'s five-product committed release order
 (`ANY-452`):
@@ -24,10 +24,11 @@ Per `docs/product-specs/mvp-scope-source-of-truth.md`'s five-product committed r
 4. Send-Ready
 5. Brief Decoder (ANY-232) -- implemented
 
-Client Update Writer (ANY-413) is implemented as a real product directory -- this ticket landed
-it independently of the five-product sequence above -- but is not itself part of that committed
-release order: `mvp-scope-source-of-truth.md` places it, along with Acceptance Builder and
-External Task Finder & Fit, in the capability backlog without a committed release order.
+Client Update Writer (ANY-413) and Acceptance Builder (ANY-228) are implemented as real product
+directories -- those tickets landed them independently of the five-product sequence above -- but
+are not themselves part of that committed release order: `mvp-scope-source-of-truth.md` places
+them, along with External Task Finder & Fit, in the capability backlog without a committed
+release order.
 
 A product only appears in `config_roots()` once its own issue lands a real product directory
 (product config, scenarios, workflows, action configs, prompts, strict schemas, and any handoff
