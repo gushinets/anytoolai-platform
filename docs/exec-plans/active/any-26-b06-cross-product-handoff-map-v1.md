@@ -13,8 +13,9 @@
 ## Goal
 
 Declare Brief Decoder -> Acceptance Builder as a `handoffs.yaml` route over the existing Platform
-Core handoff contract ("create draft", not final approval). No Platform Core, web, or consent-page
-changes.
+Core handoff contract ("create draft", not final approval). No handoff runtime/lifecycle, web, or
+consent-page changes; the one Platform Core change is the product-neutral workflow `output_mapping`
+passthrough described below.
 
 ## Decisions
 
