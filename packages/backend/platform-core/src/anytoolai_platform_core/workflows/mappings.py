@@ -108,6 +108,7 @@ def apply_output_mapping(
     step_id: str,
     step_output: Mapping[str, Any] | list[Any] | Any,
     context: dict[str, Any],
+    scenario_input: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     if not output_mapping:
         return {}
@@ -116,16 +117,16 @@ def apply_output_mapping(
     applied: dict[str, Any] = {}
     for target_path, source_path in output_mapping.items():
         reference = parse_source_path(source_path)
-        if reference.root != "literal" and (
+        if reference.root not in ("literal", "scenario_input") and (
             reference.root != "step_output" or reference.step_id != step_id
         ):
             raise WorkflowMappingResolutionError(
-                "output_mapping sources must reference the current step output or a "
-                f"literal: constant: {source_path}"
+                "output_mapping sources must reference the current step output, the scenario "
+                f"input, or a literal: constant: {source_path}"
             )
         value = resolve_source_path(
             source_path,
-            scenario_input={},
+            scenario_input=scenario_input or {},
             step_outputs=step_outputs,
             context=context,
         )
@@ -209,12 +210,12 @@ def _validate_output_mapping(
     for target_path, source_path in mapping.items():
         _parse_context_target_path(target_path)
         reference = parse_source_path(source_path)
-        if reference.root == "literal":
+        if reference.root in ("literal", "scenario_input"):
             continue
         if reference.root != "step_output" or reference.step_id != current_step_id:
             raise WorkflowMappingResolutionError(
-                "output_mapping must map from the current step output or a literal: "
-                "constant to `context.*`."
+                "output_mapping must map from the current step output, the scenario input, or "
+                "a literal: constant to `context.*`."
             )
 
 

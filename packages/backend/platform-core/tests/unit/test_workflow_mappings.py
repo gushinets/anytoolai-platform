@@ -367,3 +367,32 @@ def test_validate_step_contract_still_validates_shape_under_optional_prefix() ->
         )
 
     assert "bracket syntax" in str(exc_info.value)
+
+
+def test_output_mapping_can_pass_scenario_input_through_but_not_context_or_other_steps() -> None:
+    """A step may copy `scenario.input.*` verbatim into `context.*` (a workflow passing its input
+    through into its output); `context.*` and other steps' outputs stay rejected."""
+    context: dict[str, object] = {}
+    applied = apply_output_mapping(
+        {"context.workflow_output.brief_text": "scenario.input.brief_text"},
+        step_id="extract",
+        step_output={},
+        context=context,
+        scenario_input={"brief_text": "raw brief"},
+    )
+    assert applied == {"context.workflow_output.brief_text": "raw brief"}
+    assert context == {"workflow_output": {"brief_text": "raw brief"}}
+
+    validate_step_contract(
+        step_id="extract",
+        prior_step_ids=(),
+        input_mapping={},
+        output_mapping={"context.x": "scenario.input.brief_text"},
+        when=None,
+        retry_count=0,
+    )
+    for source in ("context.other", "steps.other.output"):
+        with pytest.raises(WorkflowMappingResolutionError):
+            apply_output_mapping(
+                {"context.x": source}, step_id="extract", step_output={}, context={}
+            )
