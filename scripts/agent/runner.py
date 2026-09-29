@@ -2140,9 +2140,9 @@ def atom_lab_recovery_postgres_up() -> int:
         return 1
 
 
-def _atom_lab_running_services(inputs: AtomLabDeploymentInputs) -> frozenset[str]:
+def _atom_lab_existing_services(inputs: AtomLabDeploymentInputs) -> frozenset[str]:
     completed = subprocess.run(
-        [*_atom_lab_compose_command(), "ps", "--status", "running", "--services"],
+        [*_atom_lab_compose_command(), "ps", "--all", "--services"],
         cwd=ROOT,
         env=inputs.compose_env,
         capture_output=True,
@@ -2151,7 +2151,7 @@ def _atom_lab_running_services(inputs: AtomLabDeploymentInputs) -> frozenset[str
         timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
     )
     if completed.returncode != 0:
-        raise RuntimeError("could not inspect running Atom Lab services")
+        raise RuntimeError("could not inspect existing Atom Lab services")
     return frozenset(
         service.strip() for service in completed.stdout.splitlines() if service.strip()
     )
@@ -2160,12 +2160,12 @@ def _atom_lab_running_services(inputs: AtomLabDeploymentInputs) -> frozenset[str
 def _atom_lab_recovery_postgres_up_locked() -> int:
     try:
         inputs = _atom_lab_deployment_inputs()
-        running_services = _atom_lab_running_services(inputs)
-        unsafe_services = sorted(running_services - {"postgres"})
+        existing_services = _atom_lab_existing_services(inputs)
+        unsafe_services = sorted(existing_services - {"postgres"})
         if unsafe_services:
             raise RuntimeError(
-                "recovery PostgreSQL bootstrap requires API, worker, and migrate to be stopped; "
-                f"running services: {', '.join(unsafe_services)}"
+                "recovery PostgreSQL bootstrap requires application containers to be removed; "
+                f"existing services: {', '.join(unsafe_services)}"
             )
     except ValueError as exc:
         print(f"LAB001: {exc}", file=sys.stderr)
@@ -2312,7 +2312,7 @@ def _atom_lab_smoke_locked() -> int:  # noqa: PLR0911
         return 2
     managed_python = quick_check_venv_python()
     if not quick_check_venv_ready(managed_python):
-        print("LAB006: run python scripts/agent/runner.py quick-check first", file=sys.stderr)
+        print("LAB013: run python scripts/agent/runner.py quick-check first", file=sys.stderr)
         return 2
     if _atom_lab_ready(inputs, announce=False) != 0:
         return 1

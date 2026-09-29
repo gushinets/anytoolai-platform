@@ -236,6 +236,7 @@ successful quiesce, stream the custom-format dump without exposing a password
 (replace the destination with a protected operator path):
 
 ```bash
+umask 077
 docker compose --project-name anytoolai-atom-lab \
   --env-file infra/compose/.env.atom-lab \
   -f infra/compose/docker-compose.yml \
@@ -273,12 +274,26 @@ volume only if that revision supports the current schema, then run its `atom-lab
 `atom-lab-resume` nor `docker compose start` performs an application rollback. Verify protected
 history and preset versions before reopening ingress.
 
-For an **incompatible-schema rollback**, stay on the current revision that contains the recovery
-tooling. Keep the original database untouched. First bootstrap only PostgreSQL from the preserved
-volume and wait for its health check. This command is also required after a failed `atom-lab-up`:
-failed-candidate cleanup removes containers/networks but deliberately retains the named volume.
-The helper fails closed if an application service is running and never starts `migrate`, API, or
-worker. Then create a recovery database and restore the dump:
+For an **incompatible-schema rollback from a running deployment**, stay on the current revision
+that contains the recovery tooling. Close ingress, run `atom-lab-quiesce`, and create a fresh
+owner-only safety backup of the current/new schema with the dump command above (do not follow its
+normal update step). This safety backup
+preserves the state being abandoned; it is not necessarily the pre-upgrade dump used to return to
+the target schema. Record both files unambiguously. Then remove every container while retaining the
+volume, still without checking out the prior revision:
+
+```bash
+python scripts/agent/runner.py atom-lab-quiesce
+# Create and verify a new-schema safety backup using the procedure above.
+python scripts/agent/runner.py atom-lab-down
+```
+
+If rollback follows a failed `atom-lab-up` whose failed-candidate cleanup already completed
+`atom-lab-down`, skip that quiesce/safety-backup/down sequence and start here. Bootstrap only
+PostgreSQL from the preserved volume and wait for its health check. The helper inspects containers
+in every state and fails closed unless the project contains at most PostgreSQL; it never starts
+`migrate`, API, or worker. Restore the last verified **pre-upgrade** dump that is compatible with
+the target revision into a separate recovery database:
 
 ```bash
 python scripts/agent/runner.py atom-lab-recovery-postgres-up

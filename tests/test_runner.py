@@ -3707,7 +3707,7 @@ def test_atom_lab_failed_up_cleanup_can_bootstrap_only_recovery_postgres(
     monkeypatch.setattr(runner, "_atom_lab_deployment_inputs", lambda: inputs)
     monkeypatch.setattr(runner, "_atom_lab_stack_running", lambda inputs: False)
     monkeypatch.setattr(runner, "_check_ports_available", lambda *args: True)
-    monkeypatch.setattr(runner, "_atom_lab_running_services", lambda inputs: frozenset())
+    monkeypatch.setattr(runner, "_atom_lab_existing_services", lambda inputs: frozenset())
 
     def run(command, env, **kwargs):
         commands.append(list(command))
@@ -3733,7 +3733,7 @@ def test_atom_lab_failed_up_cleanup_can_bootstrap_only_recovery_postgres(
     assert "platform-worker" not in recovery_command
 
 
-def test_atom_lab_recovery_postgres_refuses_running_application_services(
+def test_atom_lab_recovery_postgres_refuses_application_containers_in_any_state(
     monkeypatch, capsys
 ) -> None:
     runner = load_runner_module()
@@ -3743,7 +3743,7 @@ def test_atom_lab_recovery_postgres_refuses_running_application_services(
     monkeypatch.setattr(runner, "_atom_lab_deployment_inputs", lambda: inputs)
     monkeypatch.setattr(
         runner,
-        "_atom_lab_running_services",
+        "_atom_lab_existing_services",
         lambda inputs: frozenset({"postgres", "platform-api", "platform-worker"}),
     )
     monkeypatch.setattr(
@@ -3756,7 +3756,7 @@ def test_atom_lab_recovery_postgres_refuses_running_application_services(
     assert "LAB012" in capsys.readouterr().err
 
 
-def test_atom_lab_running_services_uses_compose_running_service_names(monkeypatch) -> None:
+def test_atom_lab_existing_services_uses_compose_all_service_names(monkeypatch) -> None:
     runner = load_runner_module()
     inputs = runner.AtomLabDeploymentInputs(
         dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
@@ -3769,10 +3769,10 @@ def test_atom_lab_running_services_uses_compose_running_service_names(monkeypatc
 
     monkeypatch.setattr(runner.subprocess, "run", run)
 
-    assert runner._atom_lab_running_services(inputs) == frozenset(
+    assert runner._atom_lab_existing_services(inputs) == frozenset(
         {"postgres", "platform-api"}
     )
-    assert captured["command"][-4:] == ["ps", "--status", "running", "--services"]
+    assert captured["command"][-3:] == ["ps", "--all", "--services"]
 
 
 def test_atom_lab_runbook_orders_recovery_bootstrap_and_protects_secrets() -> None:
@@ -3782,14 +3782,34 @@ def test_atom_lab_runbook_orders_recovery_bootstrap_and_protects_secrets() -> No
     )
 
     assert "install -m 600 infra/compose/.env.example infra/compose/.env.atom-lab" in runbook
+    assert runbook.index("umask 077") < runbook.index("pg_dump -U")
     assert "atom-lab-resume" in runbook
-    recovery = runbook.index("atom-lab-recovery-postgres-up")
+    incompatible = runbook.index("incompatible-schema rollback from a running deployment")
+    quiesce = runbook.index("atom-lab-quiesce", incompatible)
+    first_down = runbook.index("atom-lab-down", quiesce)
+    recovery = runbook.index("atom-lab-recovery-postgres-up", first_down)
     createdb = runbook.index("createdb -U", recovery)
     restore = runbook.index("pg_restore -U", createdb)
     down = runbook.index("atom-lab-down", restore)
-    assert recovery < createdb < restore < down
+    assert quiesce < first_down < recovery < createdb < restore < down
     checkout = runbook.index("check out the prior reviewed revision", down)
     assert down < checkout
+
+
+def test_atom_lab_smoke_uses_distinct_managed_environment_error_code(
+    monkeypatch, capsys
+) -> None:
+    runner = load_runner_module()
+    inputs = runner.AtomLabDeploymentInputs(
+        dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
+    )
+    monkeypatch.setattr(runner, "_atom_lab_deployment_inputs", lambda: inputs)
+    monkeypatch.setattr(runner, "quick_check_venv_ready", lambda path: False)
+
+    assert runner.atom_lab_smoke() == 2
+    error = capsys.readouterr().err
+    assert "LAB013" in error
+    assert "LAB006" not in error
 
 
 def test_atom_lab_env_template_leaves_optional_proxy_blank() -> None:
