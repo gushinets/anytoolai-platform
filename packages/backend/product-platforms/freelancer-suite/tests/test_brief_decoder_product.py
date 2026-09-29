@@ -145,7 +145,7 @@ def test_product_has_exactly_one_scenario_and_one_workflow() -> None:
     (scenario,) = _load_yaml("scenarios.yaml")["scenarios"]
     assert scenario["scenario_id"] == scenario["workflow_id"] == WORKFLOW_ID
     assert _workflow()["workflow_id"] == WORKFLOW_ID
-    assert scenario["allowed_next_actions"] == ["copy_result"]
+    assert scenario["allowed_next_actions"] == ["copy_result", "continue_to_target"]
 
 
 def test_no_mapping_path_uses_brackets_or_numeric_segments() -> None:
