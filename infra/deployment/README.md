@@ -147,7 +147,7 @@ argument, ticket, Git, screenshot, proxy access log, or evidence file. Readiness
 configured origin.
 
 ```bash
-install -m 600 infra/compose/.env.example infra/compose/.env.atom-lab
+install -m 600 infra/compose/.env.atom-lab.example infra/compose/.env.atom-lab
 ```
 
 Before starting Compose, configure ingress. The exact proxy is operator-owned, but it must enforce

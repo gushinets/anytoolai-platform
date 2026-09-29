@@ -3782,7 +3782,10 @@ def test_atom_lab_runbook_orders_recovery_bootstrap_and_protects_secrets() -> No
         encoding="utf-8"
     )
 
-    assert "install -m 600 infra/compose/.env.example infra/compose/.env.atom-lab" in runbook
+    assert (
+        "install -m 600 infra/compose/.env.atom-lab.example infra/compose/.env.atom-lab"
+        in runbook
+    )
     assert "`docker-compose.prod.yml` and `docker-compose.atom-lab.yml`" in runbook
     assert "`make prod-up` or `make atom-lab-up`" in runbook
     assert runbook.index("umask 077") < runbook.index("pg_dump -U")
@@ -3839,16 +3842,20 @@ def test_atom_lab_smoke_uses_distinct_managed_environment_error_code(
     assert "LAB006" not in error
 
 
-def test_atom_lab_env_template_leaves_optional_proxy_blank() -> None:
+def test_deployment_env_templates_keep_proxy_contracts_separate() -> None:
     runner = load_runner_module()
-    template = (runner.ROOT / "infra" / "compose" / ".env.example").read_text(
+    prod_template = (runner.ROOT / "infra" / "compose" / ".env.example").read_text(
         encoding="utf-8"
     )
+    atom_lab_template = (
+        runner.ROOT / "infra" / "compose" / ".env.atom-lab.example"
+    ).read_text(encoding="utf-8")
 
-    assert "ANYTOOLAI_LLM_HTTPS_PROXY=\n" in template
-    assert "ANYTOOLAI_ATOM_LAB_INTERNAL_URL=\n" in template
-    assert "proxy-host" not in template
-    assert "atom-lab.internal.example" not in template
+    assert "ANYTOOLAI_LLM_HTTPS_PROXY=http://proxy-host:3128\n" in prod_template
+    assert "ANYTOOLAI_LLM_HTTPS_PROXY=\n" in atom_lab_template
+    assert "ANYTOOLAI_ATOM_LAB_INTERNAL_URL=\n" in atom_lab_template
+    assert "proxy-host" not in atom_lab_template
+    assert "atom-lab.internal.example" not in atom_lab_template
 
 
 def test_atom_lab_up_refuses_to_replace_running_stack(monkeypatch, capsys) -> None:
