@@ -87,10 +87,12 @@ def _fixture(key: str) -> dict[str, Any]:
     return json.loads((FIXTURE_ROOT / f"{key}.json").read_text(encoding="utf-8"))["response_json"]
 
 
-def _expected_output(suffix: str = "") -> dict[str, Any]:
-    """The composed workflow output the fixtures must produce: brief = A01 output whole, issues =
+def _expected_output(suffix: str = "", brief_text: str = BRIEF_TEXT) -> dict[str, Any]:
+    """The composed workflow output the fixtures must produce: brief_text = the input verbatim
+    (ANY-26 handoff source), brief = A01 output whole, issues =
     A04's `issues`, questions = A05's `questions`, document = A10."""
     return {
+        "brief_text": brief_text,
         "brief": _fixture(EXTRACT + suffix),
         "issues": _fixture(DETECT + suffix)["issues"],
         "questions": _fixture(QUESTIONS + suffix)["questions"],
@@ -189,6 +191,7 @@ def test_output_schema_accepts_the_fixtures_and_rejects_open_shapes() -> None:
     for suffix in ("", ".weak_input"):
         jsonschema.validate(_expected_output(suffix), schema)
     no_issues_output = {
+        "brief_text": CLEAN_BRIEF_TEXT,
         "brief": _fixture(EXTRACT + ".no_issues"),
         "issues": [],
         "questions": [],
@@ -433,7 +436,7 @@ def test_weak_input_fixtures_are_reachable_end_to_end(
     _, output = _run_to_result(app, request_platform_api, session_factory, WEAK_BRIEF_TEXT, adapter)
 
     assert tuple(call.action_config_id for call in adapter.calls) == STEP_ORDER
-    assert output == _expected_output(".weak_input")
+    assert output == _expected_output(".weak_input", WEAK_BRIEF_TEXT)
     assert output["brief"]["missing_fields"]  # a vague brief reports gaps instead of failing
 
 
@@ -473,6 +476,7 @@ def test_no_issues_skips_question_generation_and_still_produces_a_consistent_doc
     extract_input, detect_input, _ = (adapter.input_payload(i) for i in range(3))
     assert extract_input["source_text"] == CLEAN_BRIEF_TEXT
     assert detect_input["source_text"] == CLEAN_BRIEF_TEXT
+    assert output["brief_text"] == CLEAN_BRIEF_TEXT
     assert output["issues"] == []
     assert output["questions"] == []
     assert output["brief"] == _fixture(EXTRACT + ".no_issues")
@@ -508,10 +512,11 @@ def test_invalid_brief_text_fails_the_job_before_any_provider_call(
     assert _provider_call_count(session_factory, job_id=started["job_id"]) == 0
 
 
-def test_handoff_to_acceptance_builder_queues_draft_from_summary(
+def test_handoff_to_acceptance_builder_feeds_the_original_brief_to_the_draft(
     app: Any, request_platform_api, session_factory: SessionFactory
 ) -> None:
-    """ANY-26: create -> safe preview -> accept queues acceptance_builder.draft_v1 immediately."""
+    """ANY-26: create -> safe preview -> accept queues acceptance_builder.draft_v1 immediately, and
+    the target's extraction receives the caller's original brief (not the readiness summary)."""
     started = _start(app, request_platform_api, BRIEF_TEXT).json()
     processed = _run_worker(session_factory, RecordingProviderAdapter(FIXTURE_ROOT))
     assert processed is not None and processed.status is JobStatus.succeeded
@@ -555,3 +560,9 @@ def test_handoff_to_acceptance_builder_queues_draft_from_summary(
         ).one()
     assert target == "acceptance_builder.draft_v1"
     assert tuple(job) == ("acceptance_builder.draft_v1", JobStatus.created)
+
+    target_adapter = RecordingProviderAdapter(FIXTURE_ROOT)
+    target_job = _run_worker(session_factory, target_adapter)
+    assert target_job is not None and target_job.id == accepted.json()["target_job_id"]
+    assert target_job.status is JobStatus.succeeded, target_job.error_message_safe
+    assert target_adapter.input_payload(0)["source_text"] == BRIEF_TEXT

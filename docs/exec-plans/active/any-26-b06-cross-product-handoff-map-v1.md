@@ -20,12 +20,15 @@ changes.
 
 - Only route implemented: Task Finder, Send-Ready and Scope Guard products do not exist, so the
   three optional routes are out of scope (not rejected on merit).
-- `context_mapping` sends `document.summary` as `brief_text`: the only always-present non-empty
-  string in the decode output (the raw brief is not stored, `brief.values.*` are optional, and a
-  missing mapped path is a hard `HandoffPayloadError`). `decode_output` `document.summary` carries the same `maxLength`/pattern as the target `brief_text`, so a valid decode never fails handoff creation (an over-long summary fails the decode job instead; no truncation). Known v1 limit: the draft may be sparse.
-  Enriching the decode output is a separate future ticket.
+- `context_mapping` sends `brief_text`, the caller's original brief. The decode workflow passes
+  `scenario.input.brief_text` through verbatim into its output (schema identical to the decode
+  input's and the target's `brief_text`, pinned by a test), so a valid decode never fails handoff
+  creation and the target extracts from the real brief, not the readiness summary. This needed one
+  small Platform Core change: `output_mapping` may now source `scenario.input.*`
+  (`docs/architecture/workflow-model.md`). Not a handoff-contract change.
 - Preview maps only `document.summary` and `brief.missing_fields` (no literals).
 - Acceptance Builder gets no structured handoff input scenario.
+- `brief_text` is excluded from the renderer contract: it is a handoff source, never rendered.
 
 ## Verification
 

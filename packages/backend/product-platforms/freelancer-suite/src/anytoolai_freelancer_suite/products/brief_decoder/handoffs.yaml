@@ -1,9 +1,9 @@
 # ANY-26: the only Freelancer Suite route whose two products exist today. "Create draft", not final
-# approval. document.summary is the one always-present, non-empty string in the decode output
-# (brief.values.* are optional and the raw brief text is not stored), so it is the only safe
-# brief_text source: a missing path is a hard HandoffPayloadError. decode_output's
-# document.summary schema is identical to draft_input's brief_text (pinned by a test), so the
-# mapped context always validates at create time. The draft may be sparse.
+# approval. brief_text is the caller's original brief, passed through verbatim by the decode
+# workflow (its schema is identical to draft_input's brief_text, pinned by a test), so the target
+# extracts from the real brief, not from the readiness summary. The preview shows only the summary
+# and missing_fields. A missing mapped path is a hard HandoffPayloadError, so only always-present
+# paths are mapped.
 handoffs:
   - handoff_id: brief_decoder_to_acceptance_builder_v1
     source_product_id: brief_decoder
@@ -14,7 +14,7 @@ handoffs:
     target_start_policy: immediate
     consent_required: true
     context_mapping:
-      brief_text: artifact.content_json.document.summary
+      brief_text: artifact.content_json.brief_text
     preview_mapping:
       summary: artifact.content_json.document.summary
       missing_fields: artifact.content_json.brief.missing_fields

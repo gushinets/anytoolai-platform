@@ -252,7 +252,13 @@ def test_a01_field_invariants_hold_for_every_configured_field(state: str) -> Non
     document = _fixture_response("brief_decoder.generate_summary_v1.no_issues")
 
     def output(brief: dict[str, Any]) -> dict[str, Any]:
-        return {"brief": brief, "issues": [], "questions": [], "document": document}
+        return {
+            "brief_text": "x",
+            "brief": brief,
+            "issues": [],
+            "questions": [],
+            "document": document,
+        }
 
     assert validator.is_valid(output(complete))  # control: every field present, none missing
     for name in fields:
@@ -406,7 +412,12 @@ def test_renderer_contract_agrees_with_workflow_and_scenario() -> None:
         "clarifying_questions",
         "summary_document",
     ]
-    assert {part["field"] for part in contract["parts"]} == set(output_schema["properties"])
+    # every output field is either a rendered part or explicitly excluded (brief_text is the
+    # verbatim input echoed for the handoff, never rendered)
+    assert contract["excluded_fields"] == ["brief_text"]
+    assert {part["field"] for part in contract["parts"]} | set(contract["excluded_fields"]) == set(
+        output_schema["properties"]
+    )
     assert contract["canonical_field"] in output_schema["properties"]
     # Code review finding (round #1, finding #10): `canonical_field` (`document`) is an object,
     # not a single string like sibling products' `text` -- pin that a serialization rule exists.
@@ -460,7 +471,7 @@ def test_handoff_route_is_allowlisted_declarative_and_leak_free() -> None:
     assert route["target_scenario_id"] in {s["scenario_id"] for s in target}
     assert route["target_frontend_id"] in {f["frontend_id"] for f in frontends if f["enabled"]}
     assert (route["target_start_policy"], route["consent_required"]) == ("immediate", True)
-    assert route["context_mapping"] == {"brief_text": "artifact.content_json.document.summary"}
+    assert route["context_mapping"] == {"brief_text": "artifact.content_json.brief_text"}
     # preview_mapping: direct artifact paths only -- no literals, no optional brief.values.*
     assert set(route["preview_mapping"].values()) == {
         "artifact.content_json.document.summary",
@@ -470,17 +481,24 @@ def test_handoff_route_is_allowlisted_declarative_and_leak_free() -> None:
     assert "continue_to_target" in scenarios[0]["allowed_next_actions"]
 
 
-def test_handoff_source_summary_is_never_looser_than_target_brief_text() -> None:
-    """ANY-26 review: every valid decode output must produce a valid handoff `brief_text`, so a
-    source artifact can never fail target validation at POST /v1/handoffs."""
-    source = json.loads((PRODUCT_DIR / "schemas" / "decode_output.schema.json").read_text())
-    source_summary = source["properties"]["document"]["properties"]["summary"]
+def test_handoff_brief_text_is_the_verbatim_input_and_never_looser_than_the_target() -> None:
+    """ANY-26 review: the handoff source is the caller's brief passed through untouched, so its
+    output schema must equal the decode input's and the target's `brief_text` (a valid decode can
+    never fail handoff creation), and the workflow must copy `scenario.input.brief_text`."""
+    schemas = PRODUCT_DIR / "schemas"
+    source = json.loads((schemas / "decode_output.schema.json").read_text())
+    decode_input = json.loads((schemas / "decode_input.schema.json").read_text())
     target_dir = PRODUCT_DIR.parent / "acceptance_builder" / "schemas"
-    target = json.loads((target_dir / "draft_input.schema.json").read_text())["properties"]
-    target_brief_text = target["brief_text"]
-    assert source_summary == target_brief_text
+    target = json.loads((target_dir / "draft_input.schema.json").read_text())
+    brief_text = source["properties"]["brief_text"]
+    assert "brief_text" in source["required"]
+    assert brief_text == decode_input["properties"]["brief_text"]
+    assert brief_text == target["properties"]["brief_text"]
+    steps = _workflow()["steps"]
+    passthrough = [s["output_mapping"].get("context.workflow_output.brief_text") for s in steps]
+    assert passthrough.count("scenario.input.brief_text") == 1
 
-    validator = jsonschema.validators.validator_for(source_summary)(source_summary)
+    validator = jsonschema.validators.validator_for(brief_text)(brief_text)
     assert validator.is_valid("x" * 8000)
     assert validator.is_valid("a\n\nb")
     for bad in ("x" * 8001, " a", "a ", "\na", "a\n", ""):

@@ -40,4 +40,5 @@ renderer_contract:
     a `list`-kind section's content as a bulleted list if it already reads as one item per
     line) and never changes which fields are included.
   next_action: copy_result
-  excluded_fields: []
+  excluded_fields:
+    - brief_text

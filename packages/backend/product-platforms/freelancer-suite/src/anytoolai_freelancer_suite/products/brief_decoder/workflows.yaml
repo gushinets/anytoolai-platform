@@ -17,6 +17,9 @@ workflows:
           strict: 'literal:false'
         output_mapping:
           context.workflow_output.brief: steps.extract.output
+          # Verbatim passthrough of the caller's brief: the faithful source for the
+          # Acceptance Builder handoff (ANY-26); the LLM-written summary is a readiness note.
+          context.workflow_output.brief_text: scenario.input.brief_text
       - step_id: detect_issues
         action_config_id: brief_decoder.detect_issues_v1
         input_mapping:
