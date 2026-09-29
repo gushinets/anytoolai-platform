@@ -34,6 +34,7 @@ blob-report/
 .env
 .env.*
 !.env.example
+!.env.atom-lab.example
 
 # OS and editors
 .DS_Store

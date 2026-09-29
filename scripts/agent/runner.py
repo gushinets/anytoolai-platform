@@ -4,6 +4,7 @@ import errno
 import hashlib
 import importlib.util
 import json
+import math
 import os
 import shutil
 import signal
@@ -19,9 +20,10 @@ import uuid
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from http import HTTPStatus
 from pathlib import Path
 from typing import NamedTuple
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[2]
 QUICK_CHECK_VENV = ROOT / ".quick-check-venv"
@@ -32,13 +34,16 @@ COMPOSE_OVERRIDE_FILE = ROOT / "infra" / "compose" / "docker-compose.override.ym
 COMPOSE_PROD_FILE = ROOT / "infra" / "compose" / "docker-compose.prod.yml"
 COMPOSE_LIVE_FILE = ROOT / "infra" / "compose" / "docker-compose.live.yml"
 COMPOSE_VPS_135_FILE = ROOT / "infra" / "compose" / "docker-compose.vps-135.yml"
+COMPOSE_ATOM_LAB_FILE = ROOT / "infra" / "compose" / "docker-compose.atom-lab.yml"
 LIVE_ENV_FILE = ROOT / "infra" / "compose" / ".env.live"
 # Optional, gitignored (see .gitignore's `.env.*` rule) -- a local convenience so credentials
 # don't have to be re-exported in every shell. Never auto-loaded for dev; only prod commands
 # pass it to `docker compose` via --env-file, and only if it actually exists on disk.
 PROD_ENV_FILE = ROOT / "infra" / "compose" / ".env.prod"
+ATOM_LAB_ENV_FILE = ROOT / "infra" / "compose" / ".env.atom-lab"
 PROD_COMPOSE_PROJECT = "anytoolai-prod"
 PROD_FAKE_COMPOSE_PROJECT = "anytoolai-prod-fake"
+ATOM_LAB_COMPOSE_PROJECT = "anytoolai-atom-lab"
 PROFILE_VERSION_HEX_LENGTH = 32
 # The non-root API user is not the operator who writes this non-secret state.
 # umask must not leave the bind-mounted directory or marker owner-only.
@@ -97,6 +102,7 @@ ACTION_REGISTRY_ROWS = [
     ("A03 `score_multidim`", "`text.score_multidimensional_axes`"),
     ("A05 `generate_questions`", "`text.generate_clarifying_questions`"),
 ]
+ATOM_LAB_ATOM_COUNT = 11
 
 
 def _path_key(value: str) -> str:
@@ -1038,6 +1044,9 @@ def dev_live_up(product_id: str, quota_mode: str = "unmetered") -> int:
             file=sys.stderr,
         )
         return 1
+    except RuntimeError as exc:
+        print(f"LIVE001: {exc}", file=sys.stderr)
+        return 1
     if not stack_running and not _check_ports_available(
         "DEV002",
         [
@@ -1689,6 +1698,676 @@ def brief_decoder_smoke() -> int:
     )
 
 
+@dataclass(frozen=True)
+class AtomLabDeploymentInputs:
+    compose_env: dict[str, str]
+    api_port: int
+    postgres_port: int
+    internal_url: str
+
+
+def _atom_lab_compose_command(*args: str, include_env_file: bool = True) -> list[str]:
+    env_file = ATOM_LAB_ENV_FILE if include_env_file and ATOM_LAB_ENV_FILE.is_file() else None
+    return _docker_compose_command(
+        ATOM_LAB_COMPOSE_PROJECT,
+        (COMPOSE_FILE, COMPOSE_ATOM_LAB_FILE),
+        *args,
+        env_file=env_file,
+    )
+
+
+def _atom_lab_deployment_inputs() -> AtomLabDeploymentInputs:
+    env = _resolved_env_file(ATOM_LAB_ENV_FILE)
+    required = (
+        "ANYTOOLAI_POSTGRES_USER",
+        "ANYTOOLAI_POSTGRES_PASSWORD",
+        "ANYTOOLAI_POSTGRES_DB",
+        "ANYTOOLAI_ATOM_LAB_ACCESS_CODE",
+        "ANYTOOLAI_LIVE_CANARY_TOKEN",
+        "OPENAI_API_KEY",
+        "ANYTOOLAI_ATOM_LAB_INTERNAL_URL",
+        "ANYTOOLAI_ATOM_LAB_WORKER_MEMORY_LIMIT",
+    )
+    for name in required:
+        if not env.get(name, "").strip():
+            raise ValueError(f"{name} is required for an internal Atom Lab deployment")
+    secret_names = (
+        "ANYTOOLAI_POSTGRES_PASSWORD",
+        "ANYTOOLAI_ATOM_LAB_ACCESS_CODE",
+        "ANYTOOLAI_LIVE_CANARY_TOKEN",
+        "OPENAI_API_KEY",
+        "ANYTOOLAI_DEMO_ACCESS_CODE",
+    )
+    populated_secrets = {
+        name: env[name]
+        for name in secret_names
+        if env.get(name, "").strip()
+    }
+    duplicate_names: dict[str, list[str]] = {}
+    for name, value in populated_secrets.items():
+        duplicate_names.setdefault(value, []).append(name)
+    reused = next((names for names in duplicate_names.values() if len(names) > 1), None)
+    if reused is not None:
+        raise ValueError(
+            "Atom Lab secrets from different trust domains must be unique: "
+            + ", ".join(reused)
+        )
+
+    internal_url = env["ANYTOOLAI_ATOM_LAB_INTERNAL_URL"].rstrip("/")
+    parsed_url = urlsplit(internal_url)
+    try:
+        _ = parsed_url.port
+    except ValueError as exc:
+        raise ValueError("ANYTOOLAI_ATOM_LAB_INTERNAL_URL has an invalid port") from exc
+    if (
+        parsed_url.scheme != "https"
+        or not parsed_url.hostname
+        or parsed_url.username is not None
+        or parsed_url.password is not None
+        or parsed_url.path not in {"", "/"}
+        or parsed_url.query
+        or parsed_url.fragment
+    ):
+        raise ValueError(
+            "ANYTOOLAI_ATOM_LAB_INTERNAL_URL must be an HTTPS origin without credentials, "
+            "a path, query, or fragment"
+        )
+    api_port = _port_override("ANYTOOLAI_ATOM_LAB_API_PORT", 8000, env)
+    postgres_port = _port_override("ANYTOOLAI_ATOM_LAB_POSTGRES_PORT", 5432, env)
+    if api_port == postgres_port:
+        raise ValueError("Atom Lab API and PostgreSQL ports must be different")
+    for name, default in (
+        ("ANYTOOLAI_READY_TIMEOUT", "90"),
+        ("ANYTOOLAI_SMOKE_TIMEOUT", "30"),
+        ("ANYTOOLAI_ATOM_LAB_QUIESCE_TIMEOUT", "600"),
+    ):
+        try:
+            timeout = float(env.get(name, default))
+        except ValueError as exc:
+            raise ValueError(f"{name} must be a number") from exc
+        if not math.isfinite(timeout) or timeout <= 0:
+            raise ValueError(f"{name} must be a positive, finite number")
+    return AtomLabDeploymentInputs(env, api_port, postgres_port, internal_url)
+
+
+def _atom_lab_stack_running(inputs: AtomLabDeploymentInputs) -> bool:
+    return _compose_stack_running(_atom_lab_compose_command(), inputs.compose_env)
+
+
+def _atom_lab_local_identity(inputs: AtomLabDeploymentInputs) -> RuntimeIdentity:
+    return RuntimeIdentity(
+        worktree_hash="atom-lab",
+        compose_project=ATOM_LAB_COMPOSE_PROJECT,
+        postgres_port=inputs.postgres_port,
+        api_port=inputs.api_port,
+    )
+
+
+def _atom_lab_database_url(inputs: AtomLabDeploymentInputs) -> str:
+    env = inputs.compose_env
+    return (
+        f"postgresql://{quote(env['ANYTOOLAI_POSTGRES_USER'], safe='')}:"
+        f"{quote(env['ANYTOOLAI_POSTGRES_PASSWORD'], safe='')}"
+        f"@127.0.0.1:{inputs.postgres_port}/{quote(env['ANYTOOLAI_POSTGRES_DB'], safe='')}"
+    )
+
+
+def _atom_lab_request(
+    url: str, *, access_code: str | None = None
+) -> tuple[int, bytes, str]:
+    headers = {"Accept": "application/json"}
+    if access_code is not None:
+        headers["X-Atom-Lab-Access-Code"] = access_code
+    request = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:
+            return response.status, response.read(), response.headers.get_content_type()
+    except urllib.error.HTTPError as exc:
+        return exc.code, exc.read(), exc.headers.get_content_type()
+
+
+def _atom_lab_ready(inputs: AtomLabDeploymentInputs, *, announce: bool = True) -> int:
+    timeout = float(inputs.compose_env.get("ANYTOOLAI_READY_TIMEOUT", "90"))
+    identity = _atom_lab_local_identity(inputs)
+    if not _wait_for_http_ok(f"{identity.api_url}/health", timeout):
+        print("LAB003: Atom Lab API health check timed out", file=sys.stderr)
+        return 1
+    try:
+        for asset_path, expected_content_type in (
+            ("/atom-lab", "text/html"),
+            ("/atom-lab/atom_lab.css", "text/css"),
+            ("/atom-lab/atom_lab.mjs", "application/javascript"),
+        ):
+            status, body, content_type = _atom_lab_request(f"{identity.api_url}{asset_path}")
+            if status != HTTPStatus.OK or not body or content_type != expected_content_type:
+                raise ValueError(f"asset {asset_path} is unavailable or has the wrong content type")
+
+        protected_url = f"{identity.api_url}/v1/atom-lab/atoms"
+        missing_status, missing_body, _ = _atom_lab_request(protected_url)
+        wrong_status, wrong_body, _ = _atom_lab_request(
+            protected_url,
+            access_code=inputs.compose_env["ANYTOOLAI_ATOM_LAB_ACCESS_CODE"] + "-invalid",
+        )
+        valid_status, valid_body, _ = _atom_lab_request(
+            protected_url,
+            access_code=inputs.compose_env["ANYTOOLAI_ATOM_LAB_ACCESS_CODE"],
+        )
+        if missing_status != HTTPStatus.UNAUTHORIZED or wrong_status != HTTPStatus.UNAUTHORIZED:
+            raise ValueError("missing or wrong Atom Lab access code did not fail closed")
+        for body in (missing_body, wrong_body):
+            payload = json.loads(body)
+            error = payload.get("error") if isinstance(payload, dict) else None
+            if not isinstance(error, dict) or error.get("code") != "atom_lab_access_denied":
+                raise ValueError("Atom Lab access denial did not use the safe error envelope")
+        catalog = json.loads(valid_body)
+        if (
+            valid_status != HTTPStatus.OK
+            or not isinstance(catalog, list)
+            or len(catalog) != ATOM_LAB_ATOM_COUNT
+        ):
+            raise ValueError("valid Atom Lab access did not return the eleven-atom catalog")
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        print(f"LAB004: Atom Lab readiness failed: {exc}", file=sys.stderr)
+        return 1
+
+    try:
+        worker_check = subprocess.run(
+            [
+                *_atom_lab_compose_command(),
+                "ps",
+                "--status",
+                "running",
+                "-q",
+                "platform-worker",
+            ],
+            cwd=ROOT,
+            env=inputs.compose_env,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        print(f"LAB005: could not inspect Atom Lab worker: {exc}", file=sys.stderr)
+        return 1
+    if worker_check.returncode != 0 or not worker_check.stdout.strip():
+        print("LAB005: Atom Lab worker is not running", file=sys.stderr)
+        return 1
+    if announce:
+        print(f"Local API: {identity.api_url}")
+        print(f"Internal URL: {inputs.internal_url}/atom-lab")
+        print(
+            "Atom Lab deployment package is ready; external HTTPS/network checks remain "
+            "operator-owned"
+        )
+    return 0
+
+
+def atom_lab_up() -> int:
+    try:
+        with _atom_lab_deployment_lock():
+            return _atom_lab_up_locked()
+    except DeploymentLockError as exc:
+        print(f"LAB008: {exc}", file=sys.stderr)
+        return 1
+
+
+def _atom_lab_up_locked() -> int:
+    try:
+        inputs = _atom_lab_deployment_inputs()
+        stack_running = _atom_lab_stack_running(inputs)
+    except ValueError as exc:
+        print(f"LAB001: {exc}", file=sys.stderr)
+        return 2
+    except (FileNotFoundError, RuntimeError, subprocess.TimeoutExpired) as exc:
+        print(f"LAB002: Docker Compose preflight failed: {exc}", file=sys.stderr)
+        return 1
+    except OSError as exc:
+        print(f"LAB001: {exc}", file=sys.stderr)
+        return 2
+    if stack_running:
+        print(
+            "LAB006: refusing to replace a running Atom Lab stack; "
+            "stop it explicitly before a planned update",
+            file=sys.stderr,
+        )
+        return 1
+    if not stack_running and not _check_ports_available(
+        "LAB002",
+        [
+            ("API", inputs.api_port, "ANYTOOLAI_ATOM_LAB_API_PORT", None),
+            ("PostgreSQL", inputs.postgres_port, "ANYTOOLAI_ATOM_LAB_POSTGRES_PORT", None),
+        ],
+    ):
+        return 1
+    committed = False
+    try:
+        exit_code = run_with_env(
+            [
+                *_atom_lab_compose_command(),
+                "up",
+                "-d",
+                "--build",
+                "--force-recreate",
+                "--remove-orphans",
+            ],
+            inputs.compose_env,
+        )
+        if exit_code != 0:
+            return exit_code
+        exit_code = _atom_lab_ready(inputs, announce=False)
+        if exit_code != 0:
+            return exit_code
+        committed = True
+    finally:
+        if not committed:
+            _stop_failed_atom_lab_candidate()
+    return _atom_lab_ready(inputs)
+
+
+def atom_lab_ready() -> int:
+    try:
+        return _atom_lab_ready(_atom_lab_deployment_inputs())
+    except (ValueError, OSError) as exc:
+        print(f"LAB001: {exc}", file=sys.stderr)
+        return 2
+
+
+def _atom_lab_control_env() -> dict[str, str]:
+    return runner_env() | {
+        "ANYTOOLAI_POSTGRES_USER": "control-only",
+        "ANYTOOLAI_POSTGRES_PASSWORD": "control-only",
+        "ANYTOOLAI_POSTGRES_DB": "control-only",
+        "ANYTOOLAI_ATOM_LAB_ACCESS_CODE": "control-only-access",
+        "ANYTOOLAI_LIVE_CANARY_TOKEN": "control-only-live-token",
+        "OPENAI_API_KEY": "control-only-provider-key",
+        "ANYTOOLAI_ATOM_LAB_WORKER_MEMORY_LIMIT": "512M",
+    }
+
+
+def atom_lab_status() -> int:
+    return run_with_env(
+        _atom_lab_compose_command("ps", include_env_file=False),
+        _atom_lab_control_env(),
+        timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
+    )
+
+
+def atom_lab_down() -> int:
+    try:
+        with _atom_lab_deployment_lock():
+            return _atom_lab_down_locked()
+    except DeploymentLockError as exc:
+        print(f"LAB008: {exc}", file=sys.stderr)
+        return 1
+
+
+def _atom_lab_down_locked() -> int:
+    return run_with_env(
+        _atom_lab_compose_command("down", "--remove-orphans", include_env_file=False),
+        _atom_lab_control_env(),
+        timeout=COMPOSE_TEARDOWN_TIMEOUT_SECONDS,
+    )
+
+
+def _atom_lab_nonterminal_job_count(inputs: AtomLabDeploymentInputs) -> int:
+    query = (
+        "SELECT count(*) FROM platform.jobs AS j "
+        "WHERE j.status IN ('created', 'running');"
+    )
+    completed = subprocess.run(
+        [
+            *_atom_lab_compose_command(),
+            "exec",
+            "-T",
+            "postgres",
+            "sh",
+            "-c",
+            'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "$1"',
+            "atom-lab-quiesce",
+            query,
+        ],
+        cwd=ROOT,
+        env=inputs.compose_env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError("could not inspect non-terminal deployment jobs")
+    try:
+        count = int(completed.stdout.strip())
+    except ValueError as exc:
+        raise RuntimeError("PostgreSQL returned an invalid deployment job count") from exc
+    if count < 0:
+        raise RuntimeError("PostgreSQL returned an invalid deployment job count")
+    return count
+
+
+def atom_lab_quiesce() -> int:
+    try:
+        with _atom_lab_deployment_lock():
+            return _atom_lab_quiesce_locked()
+    except DeploymentLockError as exc:
+        print(f"LAB008: {exc}", file=sys.stderr)
+        return 1
+
+
+def _atom_lab_quiesce_locked() -> int:
+    try:
+        inputs = _atom_lab_deployment_inputs()
+        if not _atom_lab_stack_running(inputs):
+            raise RuntimeError("Atom Lab stack is not running")
+    except ValueError as exc:
+        print(f"LAB001: {exc}", file=sys.stderr)
+        return 2
+    except (FileNotFoundError, OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
+        print(f"LAB010: Atom Lab quiesce preflight failed: {exc}", file=sys.stderr)
+        return 1
+
+    exit_code = run_with_env(
+        [*_atom_lab_compose_command(), "stop", "platform-api"],
+        inputs.compose_env,
+        timeout=COMPOSE_TEARDOWN_TIMEOUT_SECONDS,
+    )
+    if exit_code != 0:
+        return exit_code
+
+    timeout = float(inputs.compose_env.get("ANYTOOLAI_ATOM_LAB_QUIESCE_TIMEOUT", "600"))
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            nonterminal_count = _atom_lab_nonterminal_job_count(inputs)
+        except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
+            print(f"LAB010: could not verify the deployment queue: {exc}", file=sys.stderr)
+            return 1
+        if nonterminal_count == 0:
+            break
+        if time.monotonic() >= deadline:
+            print(
+                f"LAB010: {nonterminal_count} deployment job(s) remain non-terminal; "
+                "ingress/API must stay closed and no backup may be taken",
+                file=sys.stderr,
+            )
+            return 1
+        time.sleep(min(2.0, max(0.0, deadline - time.monotonic())))
+
+    exit_code = run_with_env(
+        [*_atom_lab_compose_command(), "stop", "platform-worker"],
+        inputs.compose_env,
+        timeout=COMPOSE_TEARDOWN_TIMEOUT_SECONDS,
+    )
+    if exit_code == 0:
+        print("Atom Lab is quiesced; PostgreSQL remains running for a consistent backup")
+    return exit_code
+
+
+def atom_lab_resume() -> int:
+    try:
+        with _atom_lab_deployment_lock():
+            return _atom_lab_resume_locked()
+    except DeploymentLockError as exc:
+        print(f"LAB008: {exc}", file=sys.stderr)
+        return 1
+
+
+def _atom_lab_resume_locked() -> int:
+    try:
+        inputs = _atom_lab_deployment_inputs()
+        if not _atom_lab_stack_running(inputs):
+            raise RuntimeError("Atom Lab stack has no running services to resume")
+    except ValueError as exc:
+        print(f"LAB001: {exc}", file=sys.stderr)
+        return 2
+    except (FileNotFoundError, OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
+        print(f"LAB011: Atom Lab resume preflight failed: {exc}", file=sys.stderr)
+        return 1
+
+    exit_code = run_with_env(
+        [*_atom_lab_compose_command(), "start", "platform-api", "platform-worker"],
+        inputs.compose_env,
+        timeout=COMPOSE_TEARDOWN_TIMEOUT_SECONDS,
+    )
+    if exit_code != 0:
+        return exit_code
+    return _atom_lab_ready(inputs)
+
+
+def atom_lab_recovery_postgres_up() -> int:
+    try:
+        with _atom_lab_deployment_lock():
+            return _atom_lab_recovery_postgres_up_locked()
+    except DeploymentLockError as exc:
+        print(f"LAB008: {exc}", file=sys.stderr)
+        return 1
+
+
+def _atom_lab_existing_services(inputs: AtomLabDeploymentInputs) -> frozenset[str]:
+    completed = subprocess.run(
+        [*_atom_lab_compose_command(), "ps", "--all", "--services"],
+        cwd=ROOT,
+        env=inputs.compose_env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError("could not inspect existing Atom Lab services")
+    return frozenset(
+        service.strip() for service in completed.stdout.splitlines() if service.strip()
+    )
+
+
+def _atom_lab_recovery_postgres_up_locked() -> int:
+    try:
+        inputs = _atom_lab_deployment_inputs()
+        existing_services = _atom_lab_existing_services(inputs)
+        unsafe_services = sorted(existing_services - {"postgres"})
+        if unsafe_services:
+            raise RuntimeError(
+                "recovery PostgreSQL bootstrap requires application containers to be removed; "
+                f"existing services: {', '.join(unsafe_services)}"
+            )
+    except ValueError as exc:
+        print(f"LAB001: {exc}", file=sys.stderr)
+        return 2
+    except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
+        print(f"LAB012: Atom Lab recovery PostgreSQL preflight failed: {exc}", file=sys.stderr)
+        return 1
+
+    timeout = math.ceil(float(inputs.compose_env.get("ANYTOOLAI_READY_TIMEOUT", "90")))
+    exit_code = run_with_env(
+        [
+            *_atom_lab_compose_command(),
+            "up",
+            "-d",
+            "--wait",
+            "--wait-timeout",
+            str(timeout),
+            "postgres",
+        ],
+        inputs.compose_env,
+    )
+    if exit_code == 0:
+        print(
+            "Atom Lab recovery PostgreSQL is healthy; migrate, API, and worker remain stopped"
+        )
+    return exit_code
+
+
+def _stop_failed_atom_lab_candidate() -> None:
+    if _atom_lab_down_locked() != 0:
+        print(
+            "LAB009: failed Atom Lab candidate could not be stopped; "
+            "run atom-lab-status and atom-lab-down immediately",
+            file=sys.stderr,
+        )
+
+
+def _atom_lab_canary_run_ids(path: Path) -> tuple[str, ...]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    run_ids = payload.get("run_ids") if isinstance(payload, dict) else None
+    if (
+        not isinstance(run_ids, list)
+        or len(run_ids) < ATOM_LAB_ATOM_COUNT
+        or any(not isinstance(run_id, str) or not run_id for run_id in run_ids)
+        or len(set(run_ids)) != len(run_ids)
+    ):
+        raise ValueError("Atom Lab canary run-ID manifest is missing or invalid")
+    return tuple(run_ids)
+
+
+def _atom_lab_invalid_terminal_history_run_ids(
+    inputs: AtomLabDeploymentInputs, expected_run_ids: Sequence[str]
+) -> tuple[str, ...]:
+    identity = _atom_lab_local_identity(inputs)
+    invalid = []
+    for run_id in expected_run_ids:
+        status, body, _ = _atom_lab_request(
+            f"{identity.api_url}/v1/atom-lab/runs/{quote(run_id, safe='')}",
+            access_code=inputs.compose_env["ANYTOOLAI_ATOM_LAB_ACCESS_CODE"],
+        )
+        payload = json.loads(body)
+        runtime_ids = payload.get("runtime_ids") if isinstance(payload, dict) else None
+        if (
+            status != HTTPStatus.OK
+            or not isinstance(payload, dict)
+            or payload.get("run_id") != run_id
+            or payload.get("status") != "succeeded"
+            or not isinstance(payload.get("snapshot"), dict)
+            or not payload["snapshot"]
+            or not isinstance(payload.get("result"), (dict, list))
+            or not isinstance(payload.get("finished_at"), str)
+            or not payload["finished_at"].strip()
+            or not isinstance(runtime_ids, dict)
+            or any(
+                not isinstance(runtime_ids.get(name), str)
+                or not runtime_ids[name].strip()
+                for name in (
+                    "scenario_session_id",
+                    "job_id",
+                    "action_run_id",
+                    "artifact_id",
+                )
+            )
+        ):
+            invalid.append(run_id)
+    return tuple(invalid)
+
+
+def _atom_lab_canary_env(inputs: AtomLabDeploymentInputs) -> dict[str, str]:
+    base_env = runner_env()
+    env = {
+        name: base_env[name]
+        for name in (
+            "COMSPEC",
+            "LANG",
+            "LC_ALL",
+            "PATH",
+            "PATHEXT",
+            "PYTHONPATH",
+            "SYSTEMROOT",
+            "TEMP",
+            "TMP",
+            "TMPDIR",
+            "TZ",
+            "WINDIR",
+        )
+        if name in base_env
+    }
+    for name in (
+        "ANYTOOLAI_ATOM_LAB_MODEL_ID",
+        "ANYTOOLAI_LIVE_CANARY_MAX_COST_USD",
+        "ANYTOOLAI_SMOKE_TIMEOUT",
+    ):
+        value = inputs.compose_env.get(name)
+        if value:
+            env[name] = value
+    env.update(
+        {
+            "ANYTOOLAI_ATOM_LAB_ACCESS_CODE": inputs.compose_env[
+                "ANYTOOLAI_ATOM_LAB_ACCESS_CODE"
+            ],
+            "ANYTOOLAI_LIVE_CANARY_SURFACE": "atom-lab",
+            "ANYTOOLAI_LIVE_CANARY_DATABASE_URL": _atom_lab_database_url(inputs),
+        }
+    )
+    return env
+
+
+def atom_lab_smoke() -> int:
+    try:
+        with _atom_lab_deployment_lock():
+            return _atom_lab_smoke_locked()
+    except DeploymentLockError as exc:
+        print(f"LAB008: {exc}", file=sys.stderr)
+        return 1
+
+
+def _atom_lab_smoke_locked() -> int:  # noqa: PLR0911
+    """Run the existing paid A01-A11 acceptance harness, then prove history survives restart."""
+    try:
+        inputs = _atom_lab_deployment_inputs()
+    except (ValueError, OSError) as exc:
+        print(f"LAB001: {exc}", file=sys.stderr)
+        return 2
+    managed_python = quick_check_venv_python()
+    if not quick_check_venv_ready(managed_python):
+        print("LAB013: run python scripts/agent/runner.py quick-check first", file=sys.stderr)
+        return 2
+    if _atom_lab_ready(inputs, announce=False) != 0:
+        return 1
+    identity = _atom_lab_local_identity(inputs)
+    env = _atom_lab_canary_env(inputs)
+    with tempfile.TemporaryDirectory(prefix="atom-lab-smoke-", dir=TMP_ROOT) as directory:
+        run_ids_path = Path(directory) / "run-ids.json"
+        exit_code = run_with_env(
+            [
+                str(managed_python),
+                "scripts/agent/live_canary.py",
+                identity.api_url,
+                "--database-url-env",
+                "ANYTOOLAI_LIVE_CANARY_DATABASE_URL",
+                "--database-url-is-percent-encoded",
+                "--atom-lab-run-ids-output",
+                str(run_ids_path),
+            ],
+            env,
+        )
+        if exit_code != 0:
+            return exit_code
+        try:
+            expected_run_ids = _atom_lab_canary_run_ids(run_ids_path)
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            print(f"LAB007: could not read canary run IDs: {exc}", file=sys.stderr)
+            return 1
+    exit_code = _atom_lab_quiesce_locked()
+    if exit_code != 0:
+        return exit_code
+    exit_code = _atom_lab_resume_locked()
+    if exit_code != 0:
+        return exit_code
+    try:
+        invalid_run_ids = _atom_lab_invalid_terminal_history_run_ids(
+            inputs, expected_run_ids
+        )
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        print(f"LAB007: could not read terminal history after restart: {exc}", file=sys.stderr)
+        return 1
+    if invalid_run_ids:
+        print(
+            f"LAB007: {len(invalid_run_ids)} canary run(s) did not retain complete terminal "
+            "history across restart",
+            file=sys.stderr,
+        )
+        return 1
+    print(f"Verified {len(expected_run_ids)} canary runs after API/worker restart")
+    print("Paid Atom Lab deployment smoke passed; retain the generated redacted evidence report")
+    return 0
+
+
 def _prod_compose_command(*args: str, include_env_file: bool = True) -> list[str]:
     env_file = PROD_ENV_FILE if include_env_file and PROD_ENV_FILE.is_file() else None
     return _docker_compose_command(
@@ -1796,6 +2475,14 @@ def _compose_stack_running(compose_command: Sequence[str], env: dict[str, str]) 
         check=False,
         timeout=COMPOSE_STACK_QUERY_TIMEOUT_SECONDS,
     )
+    if result.returncode != 0:
+        message = f"docker compose ps failed with exit code {result.returncode}"
+        detail = next(
+            (line.strip() for line in result.stderr.splitlines() if line.strip()), ""
+        )
+        if detail:
+            message += f": {detail[:300]}"
+        raise RuntimeError(message)
     return bool(result.stdout.strip())
 
 
@@ -1807,18 +2494,23 @@ def _prod_fake_stack_running(env: dict[str, str]) -> bool:
     return _compose_stack_running(_prod_fake_compose_command(), env)
 
 
-class ProductionDeploymentLockError(RuntimeError):
-    """Raised when the fixed production Compose project cannot be exclusively deployed."""
+class DeploymentLockError(RuntimeError):
+    """Raised when a fixed Compose project cannot be mutated exclusively."""
 
 
-class _ProductionDeploymentLock:
-    """Cross-process host lock guarding the fixed production Compose project."""
+# Retain the established name for callers and tests that distinguish production lock failures.
+ProductionDeploymentLockError = DeploymentLockError
 
-    def __init__(self, path: Path) -> None:
+
+class _DeploymentLock:
+    """Cross-process host lock guarding a fixed Compose project."""
+
+    def __init__(self, path: Path, operation: str) -> None:
         self._path = path
+        self._operation = operation
         self._handle = None
 
-    def __enter__(self) -> "_ProductionDeploymentLock":
+    def __enter__(self) -> "_DeploymentLock":
         handle = None
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
@@ -1840,11 +2532,11 @@ class _ProductionDeploymentLock:
             if handle is not None:
                 handle.close()
             if getattr(exc, "errno", None) in {errno.EACCES, errno.EAGAIN}:
-                raise ProductionDeploymentLockError(
-                    f"another prod-up is already running (lock: {self._path})"
+                raise DeploymentLockError(
+                    f"another {self._operation} is already running (lock: {self._path})"
                 ) from exc
-            raise ProductionDeploymentLockError(
-                f"could not acquire production deployment lock {self._path}: {exc}"
+            raise DeploymentLockError(
+                f"could not acquire {self._operation} lock {self._path}: {exc}"
             ) from exc
         self._handle = handle
         return self
@@ -1866,15 +2558,24 @@ def _prod_deployment_lock_path() -> Path:
     return lock_root / f"{PROD_COMPOSE_PROJECT}.deployment.lock"
 
 
-def _prod_deployment_lock() -> _ProductionDeploymentLock:
-    return _ProductionDeploymentLock(_prod_deployment_lock_path())
+def _prod_deployment_lock() -> _DeploymentLock:
+    return _DeploymentLock(_prod_deployment_lock_path(), "prod-up")
+
+
+def _atom_lab_deployment_lock_path() -> Path:
+    lock_root = Path(tempfile.gettempdir()) if os.name == "nt" else Path("/tmp")
+    return lock_root / f"{ATOM_LAB_COMPOSE_PROJECT}.deployment.lock"
+
+
+def _atom_lab_deployment_lock() -> _DeploymentLock:
+    return _DeploymentLock(_atom_lab_deployment_lock_path(), "Atom Lab lifecycle operation")
 
 
 def prod_up() -> int:
     try:
         with _prod_deployment_lock():
             return _prod_up_locked()
-    except ProductionDeploymentLockError as exc:
+    except DeploymentLockError as exc:
         print(f"PROD007: {exc}", file=sys.stderr)
         return 1
 
@@ -1918,6 +2619,9 @@ def _prod_up_locked() -> int:
             "is the Docker daemon running and responsive?",
             file=sys.stderr,
         )
+        return 1
+    except RuntimeError as exc:
+        print(f"PROD003: {exc}", file=sys.stderr)
         return 1
     # Skip the port preflight when the anytoolai-prod stack is already up: this is an
     # in-place redeploy (`docker compose up -d --build` recreates its own containers,
@@ -2005,6 +2709,9 @@ def prod_fake_up() -> int:
             f"{COMPOSE_STACK_QUERY_TIMEOUT_SECONDS:g}s",
             file=sys.stderr,
         )
+        return 1
+    except RuntimeError as exc:
+        print(f"PROD003: {exc}", file=sys.stderr)
         return 1
     if not stack_running and not _check_ports_available(
         "PROD002",
@@ -2156,7 +2863,7 @@ def prod_down() -> int:
     try:
         with _prod_deployment_lock():
             return _prod_down_locked()
-    except ProductionDeploymentLockError as exc:
+    except DeploymentLockError as exc:
         print(f"PROD007: {exc}", file=sys.stderr)
         return 1
 
@@ -2216,6 +2923,14 @@ COMMANDS = {
     "proposal-ai-smoke": proposal_ai_smoke,
     "client-update-writer-smoke": client_update_writer_smoke,
     "brief-decoder-smoke": brief_decoder_smoke,
+    "atom-lab-up": atom_lab_up,
+    "atom-lab-ready": atom_lab_ready,
+    "atom-lab-status": atom_lab_status,
+    "atom-lab-quiesce": atom_lab_quiesce,
+    "atom-lab-resume": atom_lab_resume,
+    "atom-lab-recovery-postgres-up": atom_lab_recovery_postgres_up,
+    "atom-lab-down": atom_lab_down,
+    "atom-lab-smoke": atom_lab_smoke,
     "prod-up": prod_up,
     "prod-fake-up": prod_fake_up,
     "prod-fake-down": prod_fake_down,

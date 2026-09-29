@@ -916,6 +916,110 @@ def test_main_routes_atom_lab_surface_to_existing_canary_and_separate_evidence_r
     assert captured["output_root"].as_posix().endswith(".agent/live-canary/atom-lab")
 
 
+def test_main_writes_exact_atom_lab_run_ids_for_restart_verification(
+    monkeypatch, tmp_path
+) -> None:
+    module = load_live_canary_module()
+    monkeypatch.setenv(_TEST_DATABASE_URL_ENV, "postgresql://u:p@127.0.0.1:5432/db")
+    monkeypatch.setenv(module.LIVE_CANARY_SURFACE_ENV_VAR, module.ATOM_LAB_SURFACE)
+    monkeypatch.setenv(module.ATOM_LAB_ACCESS_CODE_ENV_VAR, "lab-secret")
+    cases = [
+        module.EvidenceCase(
+            label=f"A{index:02d}",
+            scenario_id=f"atom-lab.A{index:02d}",
+            kind="atom",
+            status="pass",
+            session_id=f"session-{index}",
+            job_id=f"job-{index}",
+            error_code=None,
+            error_message=None,
+            steps=(),
+            run_id=f"run-{index}",
+        )
+        for index in range(1, 12)
+    ]
+    output = tmp_path / "run-ids.json"
+    monkeypatch.setattr(module, "run_atom_lab", lambda *args, **kwargs: (cases, 0))
+    monkeypatch.setattr(
+        module.atoms_proof,
+        "write_evidence_report",
+        lambda cases, exit_code, **kwargs: Path("evidence.json"),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [*_TEST_MAIN_ARGV, "--atom-lab-run-ids-output", str(output)],
+    )
+
+    assert module.main() == 0
+    assert json.loads(output.read_text(encoding="utf-8")) == {
+        "run_ids": [f"run-{index}" for index in range(1, 12)]
+    }
+
+
+def test_atom_lab_run_id_manifest_rejects_duplicate_evidence(tmp_path) -> None:
+    module = load_live_canary_module()
+    case = module.EvidenceCase(
+        label="A01",
+        scenario_id="atom-lab.A01",
+        kind="atom",
+        status="pass",
+        session_id="session-1",
+        job_id="job-1",
+        error_code=None,
+        error_message=None,
+        steps=(),
+        run_id="run-1",
+    )
+
+    with pytest.raises(ValueError, match="unique non-empty run IDs"):
+        module._write_atom_lab_run_ids(tmp_path / "run-ids.json", [case, case])
+
+
+def test_main_uses_distinct_code_when_atom_lab_run_id_manifest_write_fails(
+    monkeypatch, tmp_path, capsys
+) -> None:
+    module = load_live_canary_module()
+    monkeypatch.setenv(_TEST_DATABASE_URL_ENV, "postgresql://u:p@127.0.0.1:5432/db")
+    monkeypatch.setenv(module.LIVE_CANARY_SURFACE_ENV_VAR, module.ATOM_LAB_SURFACE)
+    monkeypatch.setenv(module.ATOM_LAB_ACCESS_CODE_ENV_VAR, "lab-secret")
+    case = module.EvidenceCase(
+        label="A01",
+        scenario_id="atom-lab.A01",
+        kind="atom",
+        status="pass",
+        session_id="session-1",
+        job_id="job-1",
+        error_code=None,
+        error_message=None,
+        steps=(),
+        run_id="run-1",
+    )
+    monkeypatch.setattr(module, "run_atom_lab", lambda *args, **kwargs: ([case], 0))
+    monkeypatch.setattr(
+        module.atoms_proof,
+        "write_evidence_report",
+        lambda cases, exit_code, **kwargs: Path("evidence.json"),
+    )
+    monkeypatch.setattr(
+        module,
+        "_write_atom_lab_run_ids",
+        lambda path, cases: (_ for _ in ()).throw(OSError("disk unavailable")),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            *_TEST_MAIN_ARGV,
+            "--atom-lab-run-ids-output",
+            str(tmp_path / "run-ids.json"),
+        ],
+    )
+
+    assert module.main() == 1
+    assert "LIVE033: could not write Atom Lab run-ID manifest" in capsys.readouterr().err
+
+
 def test_live_composite_cases_has_three_entries_matching_composite_smoke_cases_workflow_ids() -> None:
     module = load_live_canary_module()
 

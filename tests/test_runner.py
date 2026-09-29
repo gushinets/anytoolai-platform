@@ -1093,6 +1093,7 @@ def test_prod_stack_running_reflects_compose_ps_output(monkeypatch) -> None:
     class Result:
         def __init__(self, stdout: str) -> None:
             self.stdout = stdout
+            self.returncode = 0
 
     monkeypatch.setattr(
         runner.subprocess, "run", lambda *args, **kwargs: Result("container-id-123\n")
@@ -3407,3 +3408,681 @@ def test_dev_down_clears_active_live_selection(monkeypatch, tmp_path):
 
     assert runner.dev_down() == 0
     assert not marker.exists()
+
+
+ATOM_LAB_DEPLOYMENT_VALUES = {
+    "ANYTOOLAI_POSTGRES_USER": "lab-user",
+    "ANYTOOLAI_POSTGRES_PASSWORD": "lab-password",
+    "ANYTOOLAI_POSTGRES_DB": "lab-db",
+    "ANYTOOLAI_ATOM_LAB_ACCESS_CODE": "lab-access",
+    "ANYTOOLAI_LIVE_CANARY_TOKEN": "server-live-token",
+    "OPENAI_API_KEY": "provider-key",
+    "ANYTOOLAI_ATOM_LAB_INTERNAL_URL": "https://atom-lab.internal.example",
+    "ANYTOOLAI_ATOM_LAB_WORKER_MEMORY_LIMIT": "768M",
+    "ANYTOOLAI_ATOM_LAB_API_PORT": "18468",
+    "ANYTOOLAI_ATOM_LAB_POSTGRES_PORT": "15468",
+}
+
+
+@pytest.mark.parametrize(
+    "missing_name",
+    [
+        "ANYTOOLAI_POSTGRES_PASSWORD",
+        "ANYTOOLAI_ATOM_LAB_ACCESS_CODE",
+        "ANYTOOLAI_LIVE_CANARY_TOKEN",
+        "OPENAI_API_KEY",
+        "ANYTOOLAI_ATOM_LAB_INTERNAL_URL",
+        "ANYTOOLAI_ATOM_LAB_WORKER_MEMORY_LIMIT",
+    ],
+)
+def test_atom_lab_deployment_rejects_missing_required_values(monkeypatch, missing_name) -> None:
+    runner = load_runner_module()
+    values = ATOM_LAB_DEPLOYMENT_VALUES | {missing_name: ""}
+    monkeypatch.setattr(runner, "_resolved_env_file", lambda path: values)
+
+    with pytest.raises(ValueError, match=missing_name):
+        runner._atom_lab_deployment_inputs()
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://atom-lab.internal.example",
+        "https://user@atom-lab.internal.example",
+        "https://atom-lab.internal.example/path",
+    ],
+)
+def test_atom_lab_deployment_requires_plain_https_origin(monkeypatch, url) -> None:
+    runner = load_runner_module()
+    monkeypatch.setattr(
+        runner,
+        "_resolved_env_file",
+        lambda path: ATOM_LAB_DEPLOYMENT_VALUES | {"ANYTOOLAI_ATOM_LAB_INTERNAL_URL": url},
+    )
+
+    with pytest.raises(ValueError, match="HTTPS origin"):
+        runner._atom_lab_deployment_inputs()
+
+
+@pytest.mark.parametrize(
+    ("timeout_name", "timeout_value"),
+    [
+        ("ANYTOOLAI_READY_TIMEOUT", "inf"),
+        ("ANYTOOLAI_READY_TIMEOUT", "nan"),
+        ("ANYTOOLAI_SMOKE_TIMEOUT", "inf"),
+        ("ANYTOOLAI_SMOKE_TIMEOUT", "nan"),
+        ("ANYTOOLAI_ATOM_LAB_QUIESCE_TIMEOUT", "inf"),
+        ("ANYTOOLAI_ATOM_LAB_QUIESCE_TIMEOUT", "nan"),
+    ],
+)
+def test_atom_lab_deployment_rejects_non_finite_timeouts(
+    monkeypatch, timeout_name, timeout_value
+) -> None:
+    runner = load_runner_module()
+    monkeypatch.setattr(
+        runner,
+        "_resolved_env_file",
+        lambda path: ATOM_LAB_DEPLOYMENT_VALUES | {timeout_name: timeout_value},
+    )
+
+    with pytest.raises(ValueError, match=f"{timeout_name} must be a positive, finite number"):
+        runner._atom_lab_deployment_inputs()
+
+
+@pytest.mark.parametrize(
+    ("secret_name", "reused_value"),
+    [
+        ("ANYTOOLAI_LIVE_CANARY_TOKEN", "lab-access"),
+        ("OPENAI_API_KEY", "lab-access"),
+        ("OPENAI_API_KEY", "server-live-token"),
+        ("ANYTOOLAI_POSTGRES_PASSWORD", "lab-access"),
+        ("ANYTOOLAI_DEMO_ACCESS_CODE", "lab-access"),
+    ],
+)
+def test_atom_lab_deployment_keeps_trust_domain_secrets_unique(
+    monkeypatch, secret_name, reused_value
+) -> None:
+    runner = load_runner_module()
+    monkeypatch.setattr(
+        runner,
+        "_resolved_env_file",
+        lambda path: ATOM_LAB_DEPLOYMENT_VALUES
+        | {secret_name: reused_value},
+    )
+
+    with pytest.raises(ValueError, match="different trust domains must be unique"):
+        runner._atom_lab_deployment_inputs()
+
+
+def test_atom_lab_compose_mode_uses_only_base_and_internal_overlay(monkeypatch, tmp_path) -> None:
+    runner = load_runner_module()
+    env_file = tmp_path / ".env.atom-lab"
+    env_file.write_text("", encoding="utf-8")
+    monkeypatch.setattr(runner, "ATOM_LAB_ENV_FILE", env_file)
+
+    command = runner._atom_lab_compose_command("ps")
+
+    assert command[:5] == [
+        "docker",
+        "compose",
+        "--project-name",
+        "anytoolai-atom-lab",
+        "--env-file",
+    ]
+    compose_files = [command[index + 1] for index, value in enumerate(command) if value == "-f"]
+    assert compose_files == [str(runner.COMPOSE_FILE), str(runner.COMPOSE_ATOM_LAB_FILE)]
+    assert str(runner.COMPOSE_PROD_FILE) not in command
+    assert str(runner.COMPOSE_LIVE_FILE) not in command
+
+
+def test_atom_lab_ready_checks_assets_auth_catalog_and_worker(monkeypatch) -> None:
+    runner = load_runner_module()
+    inputs = runner.AtomLabDeploymentInputs(
+        dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
+    )
+    monkeypatch.setattr(runner, "_wait_for_http_ok", lambda url, timeout: True)
+
+    def request(url, *, access_code=None):
+        if url.endswith("/atom-lab"):
+            return 200, b"html", "text/html"
+        if url.endswith(".css"):
+            return 200, b"css", "text/css"
+        if url.endswith(".mjs"):
+            return 200, b"js", "application/javascript"
+        if access_code == "lab-access":
+            catalog = [{"atom_id": f"A{index:02d}"} for index in range(1, 12)]
+            return 200, json.dumps(catalog).encode(), "application/json"
+        denied = {"error": {"code": "atom_lab_access_denied"}}
+        return 401, json.dumps(denied).encode(), "application/json"
+
+    monkeypatch.setattr(runner, "_atom_lab_request", request)
+    monkeypatch.setattr(
+        runner.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, "container-id\n", ""),
+    )
+
+    assert runner._atom_lab_ready(inputs, announce=False) == 0
+
+
+@pytest.mark.parametrize("denial_body", [b"[]", b'{"error": []}'])
+def test_atom_lab_ready_rejects_malformed_denial_envelope(
+    monkeypatch, capsys, denial_body
+) -> None:
+    runner = load_runner_module()
+    inputs = runner.AtomLabDeploymentInputs(
+        dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
+    )
+    monkeypatch.setattr(runner, "_wait_for_http_ok", lambda url, timeout: True)
+
+    def request(url, *, access_code=None):
+        if url.endswith("/atom-lab"):
+            return 200, b"html", "text/html"
+        if url.endswith(".css"):
+            return 200, b"css", "text/css"
+        if url.endswith(".mjs"):
+            return 200, b"js", "application/javascript"
+        if access_code == "lab-access":
+            catalog = [{"atom_id": f"A{index:02d}"} for index in range(1, 12)]
+            return 200, json.dumps(catalog).encode(), "application/json"
+        return 401, denial_body, "application/json"
+
+    monkeypatch.setattr(runner, "_atom_lab_request", request)
+    monkeypatch.setattr(
+        runner.subprocess,
+        "run",
+        lambda *args, **kwargs: pytest.fail("malformed auth response reached worker check"),
+    )
+
+    assert runner._atom_lab_ready(inputs, announce=False) == 1
+    assert "LAB004: Atom Lab readiness failed" in capsys.readouterr().err
+
+
+def test_atom_lab_quiesce_drains_jobs_before_stopping_worker(monkeypatch, capsys) -> None:
+    runner = load_runner_module()
+    inputs = runner.AtomLabDeploymentInputs(
+        dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
+    )
+    counts = iter([2, 0])
+    commands = []
+    monkeypatch.setattr(runner, "_atom_lab_deployment_inputs", lambda: inputs)
+    monkeypatch.setattr(runner, "_atom_lab_stack_running", lambda inputs: True)
+    monkeypatch.setattr(
+        runner, "_atom_lab_nonterminal_job_count", lambda inputs: next(counts)
+    )
+    monkeypatch.setattr(runner.time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda command, env, **kwargs: commands.append(list(command)) or 0,
+    )
+
+    assert runner.atom_lab_quiesce() == 0
+    assert commands[0][-2:] == ["stop", "platform-api"]
+    assert commands[1][-2:] == ["stop", "platform-worker"]
+    assert "PostgreSQL remains running" in capsys.readouterr().out
+
+
+def test_atom_lab_quiesce_counts_created_and_running_jobs_from_entire_queue(monkeypatch) -> None:
+    runner = load_runner_module()
+    inputs = runner.AtomLabDeploymentInputs(
+        dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
+    )
+    captured = {}
+
+    def run(command, **kwargs):
+        captured["command"] = list(command)
+        return subprocess.CompletedProcess(command, 0, "0\n", "")
+
+    monkeypatch.setattr(runner.subprocess, "run", run)
+
+    assert runner._atom_lab_nonterminal_job_count(inputs) == 0
+    command = captured["command"]
+    assert "platform.jobs" in command[-1]
+    assert "platform.atom_lab_runs" not in command[-1]
+    assert "'created', 'running'" in command[-1]
+
+
+def test_atom_lab_quiesce_non_lab_job_timeout_keeps_worker_running_and_blocks_backup(
+    monkeypatch, capsys
+) -> None:
+    runner = load_runner_module()
+    values = dict(ATOM_LAB_DEPLOYMENT_VALUES) | {
+        "ANYTOOLAI_ATOM_LAB_QUIESCE_TIMEOUT": "1"
+    }
+    inputs = runner.AtomLabDeploymentInputs(
+        values, 18468, 15468, "https://atom-lab.internal.example"
+    )
+    commands = []
+    clock = iter([0.0, 2.0])
+    monkeypatch.setattr(runner, "_atom_lab_deployment_inputs", lambda: inputs)
+    monkeypatch.setattr(runner, "_atom_lab_stack_running", lambda inputs: True)
+    # The unscoped jobs-table query means this count can be an ordinary runtime job with no
+    # platform.atom_lab_runs row; quiesce must still keep the shared worker alive to drain it.
+    monkeypatch.setattr(runner, "_atom_lab_nonterminal_job_count", lambda inputs: 1)
+    monkeypatch.setattr(runner.time, "monotonic", lambda: next(clock))
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda command, env, **kwargs: commands.append(list(command)) or 0,
+    )
+
+    assert runner.atom_lab_quiesce() == 1
+    assert [command[-1] for command in commands] == ["platform-api"]
+    assert "no backup may be taken" in capsys.readouterr().err
+
+
+def test_atom_lab_resume_starts_api_and_worker_then_requires_readiness(monkeypatch) -> None:
+    runner = load_runner_module()
+    inputs = runner.AtomLabDeploymentInputs(
+        dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
+    )
+    commands = []
+    readiness = []
+    monkeypatch.setattr(runner, "_atom_lab_deployment_inputs", lambda: inputs)
+    monkeypatch.setattr(runner, "_atom_lab_stack_running", lambda inputs: True)
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda command, env, **kwargs: commands.append(list(command)) or 0,
+    )
+    monkeypatch.setattr(
+        runner,
+        "_atom_lab_ready",
+        lambda ready_inputs: readiness.append(ready_inputs) or 0,
+    )
+
+    assert runner.atom_lab_resume() == 0
+    assert commands[0][-3:] == ["start", "platform-api", "platform-worker"]
+    assert readiness == [inputs]
+
+
+def test_atom_lab_failed_up_cleanup_can_bootstrap_only_recovery_postgres(
+    monkeypatch,
+) -> None:
+    runner = load_runner_module()
+    inputs = runner.AtomLabDeploymentInputs(
+        dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
+    )
+    commands = []
+    monkeypatch.setattr(runner, "_atom_lab_deployment_inputs", lambda: inputs)
+    monkeypatch.setattr(runner, "_atom_lab_stack_running", lambda inputs: False)
+    monkeypatch.setattr(runner, "_check_ports_available", lambda *args: True)
+    monkeypatch.setattr(runner, "_atom_lab_existing_services", lambda inputs: frozenset())
+
+    def run(command, env, **kwargs):
+        commands.append(list(command))
+        return 17 if len(commands) == 1 else 0
+
+    monkeypatch.setattr(runner, "run_with_env", run)
+
+    assert runner.atom_lab_up() == 17
+    assert commands[1][-2:] == ["down", "--remove-orphans"]
+    assert runner.atom_lab_recovery_postgres_up() == 0
+    recovery_command = commands[2]
+    assert recovery_command[-6:] == [
+        "up",
+        "-d",
+        "--wait",
+        "--wait-timeout",
+        "90",
+        "postgres",
+    ]
+    assert recovery_command[-1] == "postgres"
+    assert "migrate" not in recovery_command
+    assert "platform-api" not in recovery_command
+    assert "platform-worker" not in recovery_command
+
+
+def test_atom_lab_recovery_postgres_refuses_application_containers_in_any_state(
+    monkeypatch, capsys
+) -> None:
+    runner = load_runner_module()
+    inputs = runner.AtomLabDeploymentInputs(
+        dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
+    )
+    monkeypatch.setattr(runner, "_atom_lab_deployment_inputs", lambda: inputs)
+    monkeypatch.setattr(
+        runner,
+        "_atom_lab_existing_services",
+        lambda inputs: frozenset({"postgres", "platform-api", "platform-worker"}),
+    )
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda *args, **kwargs: pytest.fail("unsafe recovery preflight mutated Compose"),
+    )
+
+    assert runner.atom_lab_recovery_postgres_up() == 1
+    assert "LAB012" in capsys.readouterr().err
+
+
+def test_atom_lab_existing_services_uses_compose_all_service_names(monkeypatch) -> None:
+    runner = load_runner_module()
+    inputs = runner.AtomLabDeploymentInputs(
+        dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
+    )
+    captured = {}
+
+    def run(command, **kwargs):
+        captured["command"] = list(command)
+        return subprocess.CompletedProcess(command, 0, "postgres\nplatform-api\n", "")
+
+    monkeypatch.setattr(runner.subprocess, "run", run)
+
+    assert runner._atom_lab_existing_services(inputs) == frozenset(
+        {"postgres", "platform-api"}
+    )
+    assert captured["command"][-3:] == ["ps", "--all", "--services"]
+
+
+def test_atom_lab_runbook_orders_recovery_bootstrap_and_protects_secrets() -> None:
+    runner = load_runner_module()
+    runbook = (runner.ROOT / "infra" / "deployment" / "README.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert (
+        "install -m 600 infra/compose/.env.atom-lab.example infra/compose/.env.atom-lab"
+        in runbook
+    )
+    assert "`docker-compose.prod.yml` and `docker-compose.atom-lab.yml`" in runbook
+    assert "`make prod-up` or `make atom-lab-up`" in runbook
+    assert runbook.index("umask 077") < runbook.index("pg_dump -U")
+    assert "atom-lab-resume" in runbook
+    rotation = runbook[
+        runbook.index("#### Shared data and access-code rotation") : runbook.index(
+            "#### Catalog and limits troubleshooting"
+        )
+    ]
+    quiesce_rotation = rotation.index("atom-lab-quiesce")
+    replace_code = rotation.index("replace `ANYTOOLAI_ATOM_LAB_ACCESS_CODE`")
+    down_rotation = rotation.index("atom-lab-down", replace_code)
+    up_rotation = rotation.index("atom-lab-up", down_rotation)
+    ready_rotation = rotation.index("atom-lab-ready", up_rotation)
+    denied_rotation = rotation.index("401 atom_lab_access_denied", ready_rotation)
+    reopen_rotation = rotation.index("reopen ingress", denied_rotation)
+    assert (
+        quiesce_rotation
+        < replace_code
+        < down_rotation
+        < up_rotation
+        < ready_rotation
+        < denied_rotation
+        < reopen_rotation
+    )
+    assert "hold exclusive maintenance" in runbook
+    assert "ownership from before quiesce" in runbook
+    assert "No other shell, automation, or operator" in runbook
+    incompatible = runbook.index("incompatible-schema rollback from a running deployment")
+    quiesce = runbook.index("atom-lab-quiesce", incompatible)
+    first_down = runbook.index("atom-lab-down", quiesce)
+    recovery = runbook.index("atom-lab-recovery-postgres-up", first_down)
+    createdb = runbook.index("createdb -U", recovery)
+    restore = runbook.index("pg_restore -U", createdb)
+    down = runbook.index("atom-lab-down", restore)
+    assert quiesce < first_down < recovery < createdb < restore < down
+    checkout = runbook.index("check out the prior reviewed revision", down)
+    assert down < checkout
+
+
+def test_atom_lab_smoke_uses_distinct_managed_environment_error_code(
+    monkeypatch, capsys
+) -> None:
+    runner = load_runner_module()
+    inputs = runner.AtomLabDeploymentInputs(
+        dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
+    )
+    monkeypatch.setattr(runner, "_atom_lab_deployment_inputs", lambda: inputs)
+    monkeypatch.setattr(runner, "quick_check_venv_ready", lambda path: False)
+
+    assert runner.atom_lab_smoke() == 2
+    error = capsys.readouterr().err
+    assert "LAB013" in error
+    assert "LAB006" not in error
+
+
+def test_deployment_env_templates_keep_proxy_contracts_separate() -> None:
+    runner = load_runner_module()
+    prod_template = (runner.ROOT / "infra" / "compose" / ".env.example").read_text(
+        encoding="utf-8"
+    )
+    atom_lab_template = (
+        runner.ROOT / "infra" / "compose" / ".env.atom-lab.example"
+    ).read_text(encoding="utf-8")
+
+    assert "ANYTOOLAI_LLM_HTTPS_PROXY=http://proxy-host:3128\n" in prod_template
+    assert "ANYTOOLAI_LLM_HTTPS_PROXY=\n" in atom_lab_template
+    assert "ANYTOOLAI_ATOM_LAB_INTERNAL_URL=\n" in atom_lab_template
+    assert "proxy-host" not in atom_lab_template
+    assert "atom-lab.internal.example" not in atom_lab_template
+
+
+def test_atom_lab_up_refuses_to_replace_running_stack(monkeypatch, capsys) -> None:
+    runner = load_runner_module()
+    inputs = runner.AtomLabDeploymentInputs(
+        dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
+    )
+    monkeypatch.setattr(runner, "_atom_lab_deployment_inputs", lambda: inputs)
+    monkeypatch.setattr(runner, "_atom_lab_stack_running", lambda inputs: True)
+    monkeypatch.setattr(
+        runner,
+        "_check_ports_available",
+        lambda *args: pytest.fail("running-stack refusal reached port preflight"),
+    )
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda *args, **kwargs: pytest.fail("running-stack refusal reached Compose mutation"),
+    )
+
+    assert runner.atom_lab_up() == 1
+    assert "LAB006: refusing to replace a running Atom Lab stack" in capsys.readouterr().err
+
+
+def test_atom_lab_up_fails_closed_when_compose_stack_probe_fails(
+    monkeypatch, capsys
+) -> None:
+    runner = load_runner_module()
+    inputs = runner.AtomLabDeploymentInputs(
+        dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
+    )
+    monkeypatch.setattr(runner, "_atom_lab_deployment_inputs", lambda: inputs)
+    monkeypatch.setattr(
+        runner.subprocess,
+        "run",
+        lambda command, **kwargs: subprocess.CompletedProcess(
+            command, 1, "", "daemon unavailable"
+        ),
+    )
+    monkeypatch.setattr(
+        runner,
+        "_check_ports_available",
+        lambda *args: pytest.fail("failed stack probe reached port preflight"),
+    )
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda *args, **kwargs: pytest.fail("failed stack probe mutated Compose"),
+    )
+
+    assert runner.atom_lab_up() == 1
+    error = capsys.readouterr().err
+    assert "LAB002: Docker Compose preflight failed" in error
+    assert "daemon unavailable" in error
+
+
+def test_atom_lab_up_reports_failed_candidate_cleanup(monkeypatch, capsys) -> None:
+    runner = load_runner_module()
+    inputs = runner.AtomLabDeploymentInputs(
+        dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
+    )
+    monkeypatch.setattr(runner, "_atom_lab_deployment_inputs", lambda: inputs)
+    monkeypatch.setattr(runner, "_atom_lab_stack_running", lambda inputs: False)
+    monkeypatch.setattr(runner, "_check_ports_available", lambda *args: True)
+    calls = []
+
+    def run(command, env, **kwargs):
+        calls.append(list(command))
+        return 17 if "up" in command else 23
+
+    monkeypatch.setattr(runner, "run_with_env", run)
+
+    assert runner.atom_lab_up() == 17
+    assert "up" in calls[0]
+    assert calls[1][-2:] == ["down", "--remove-orphans"]
+    assert "LAB009: failed Atom Lab candidate could not be stopped" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "command_name",
+    [
+        "atom_lab_up",
+        "atom_lab_quiesce",
+        "atom_lab_resume",
+        "atom_lab_recovery_postgres_up",
+        "atom_lab_down",
+        "atom_lab_smoke",
+    ],
+)
+def test_atom_lab_mutations_refuse_concurrent_operation(
+    monkeypatch, tmp_path, capsys, command_name
+) -> None:
+    runner = load_runner_module()
+    lock_path = tmp_path / "atom-lab-deployment.lock"
+    monkeypatch.setattr(runner, "_atom_lab_deployment_lock_path", lambda: lock_path)
+    monkeypatch.setattr(
+        runner,
+        "_atom_lab_deployment_inputs",
+        lambda: pytest.fail("concurrent Atom Lab operation reached deployment preflight"),
+    )
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda *args, **kwargs: pytest.fail("concurrent Atom Lab operation mutated Compose"),
+    )
+
+    with runner._atom_lab_deployment_lock():
+        assert getattr(runner, command_name)() == 1
+
+    output = capsys.readouterr()
+    assert "LAB008" in output.err
+    assert "another Atom Lab lifecycle operation is already running" in output.err
+
+
+def test_atom_lab_smoke_reuses_live_canary_and_compares_history_after_restart(monkeypatch) -> None:
+    runner = load_runner_module()
+    inputs = runner.AtomLabDeploymentInputs(
+        dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
+    )
+    monkeypatch.setattr(runner, "_atom_lab_deployment_inputs", lambda: inputs)
+    monkeypatch.setattr(runner, "quick_check_venv_ready", lambda path: True)
+    monkeypatch.setattr(runner, "_atom_lab_ready", lambda inputs, announce=False: 0)
+    lifecycle = []
+    monkeypatch.setattr(
+        runner, "_atom_lab_quiesce_locked", lambda: lifecycle.append("quiesce") or 0
+    )
+    monkeypatch.setattr(
+        runner, "_atom_lab_resume_locked", lambda: lifecycle.append("resume") or 0
+    )
+    expected_run_ids = tuple(f"run-{index}" for index in range(1, 12))
+    monkeypatch.setattr(
+        runner, "_atom_lab_canary_run_ids", lambda path: expected_run_ids
+    )
+    verified = []
+    monkeypatch.setattr(
+        runner,
+        "_atom_lab_invalid_terminal_history_run_ids",
+        lambda inputs, run_ids: verified.append(tuple(run_ids)) or (),
+    )
+    calls = []
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda command, env, **kwargs: calls.append((list(command), dict(env))) or 0,
+    )
+
+    assert runner.atom_lab_smoke() == 0
+    assert calls[0][0][1] == "scripts/agent/live_canary.py"
+    assert calls[0][1]["ANYTOOLAI_LIVE_CANARY_SURFACE"] == "atom-lab"
+    assert calls[0][1]["ANYTOOLAI_ATOM_LAB_ACCESS_CODE"] == "lab-access"
+    assert "OPENAI_API_KEY" not in calls[0][1]
+    assert "ANYTOOLAI_LIVE_CANARY_TOKEN" not in calls[0][1]
+    assert "--atom-lab-run-ids-output" in calls[0][0]
+    assert len(calls) == 1
+    assert lifecycle == ["quiesce", "resume"]
+    assert verified == [expected_run_ids]
+
+
+def test_atom_lab_history_verifies_complete_terminal_state_for_exact_canary_runs(
+    monkeypatch,
+) -> None:
+    runner = load_runner_module()
+    inputs = runner.AtomLabDeploymentInputs(
+        dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
+    )
+    requested = []
+
+    def request(url, *, access_code=None):
+        run_id = url.rsplit("/", 1)[-1]
+        requested.append(run_id)
+        if run_id == "run-missing":
+            return 404, b'{"error": {"code": "not_found"}}', "application/json"
+        payload = {
+            "run_id": run_id,
+            "status": "succeeded",
+            "snapshot": {"atom_id": "A01"},
+            "runtime_ids": {
+                "scenario_session_id": "session-1",
+                "job_id": "job-1",
+                "action_run_id": "action-1",
+                "artifact_id": "artifact-1",
+            },
+            "result": {},
+            "finished_at": "2026-09-28T12:00:00Z",
+        }
+        if run_id == "run-queued":
+            payload.update(status="queued", result=None, finished_at=None)
+        elif run_id == "run-no-snapshot":
+            payload["snapshot"] = None
+        elif run_id == "run-no-runtime":
+            payload["runtime_ids"]["action_run_id"] = None
+        elif run_id == "run-no-result":
+            payload["result"] = None
+        elif run_id == "run-no-finished-at":
+            payload["finished_at"] = None
+        return 200, json.dumps(payload).encode(), "application/json"
+
+    monkeypatch.setattr(runner, "_atom_lab_request", request)
+
+    invalid = runner._atom_lab_invalid_terminal_history_run_ids(
+        inputs,
+        (
+            "run-valid",
+            "run-missing",
+            "run-queued",
+            "run-no-snapshot",
+            "run-no-runtime",
+            "run-no-result",
+            "run-no-finished-at",
+        ),
+    )
+
+    assert invalid == (
+        "run-missing",
+        "run-queued",
+        "run-no-snapshot",
+        "run-no-runtime",
+        "run-no-result",
+        "run-no-finished-at",
+    )
+    assert requested[0] == "run-valid"
+
+
+def test_atom_lab_canary_run_ids_reject_stale_or_incomplete_manifest(tmp_path) -> None:
+    runner = load_runner_module()
+    manifest = tmp_path / "run-ids.json"
+    manifest.write_text(json.dumps({"run_ids": ["old-run"]}), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="missing or invalid"):
+        runner._atom_lab_canary_run_ids(manifest)
