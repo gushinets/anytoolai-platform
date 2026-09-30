@@ -197,6 +197,20 @@ export function HandoffConsent({ client, handoffToken, canOpenTarget }: HandoffC
     }
     const refetched = await getHandoff(client, handoffToken);
     setState(viewStateFromResult(refetched));
+    // A lost Accept response: the retry gets "already accepted" and this authoritative preview names
+    // the target session the first Accept already queued (and charged), so reach it the same way.
+    if (kind === "accept" && refetched.ok && (refetched.value.status === "accepted" || refetched.value.status === "consumed")) {
+      redirectToAcceptedTarget(refetched.value);
+    }
+  }
+
+  // An accepted handoff has already queued its target session server-side; the ids are redacted once
+  // the token's TTL passes, so go to the target product right away, same tab -- but only when the host
+  // can attach it (other targets, e.g. an extension, stay on this page's terminal status).
+  function redirectToAcceptedTarget(preview: HandoffPreview): void {
+    if (preview.targetScenarioSessionId && canOpenTarget?.(preview.targetProductId, preview.targetScenarioId)) {
+      router.push(productAttachPath(preview.targetProductId, preview.targetScenarioSessionId));
+    }
   }
 
   async function runAction(
@@ -208,13 +222,8 @@ export function HandoffConsent({ client, handoffToken, canOpenTarget }: HandoffC
       const result = await mutate();
       if (result.ok) {
         setState(stateForPreview(result.value));
-        // An accepted handoff has already queued its target session server-side; the ids are
-        // redacted once the token's TTL passes, so go to the target product right away, same tab --
-        // but only when it is a web product enabled here (other targets, e.g. an extension, stay on
-        // this page's terminal status).
-        if (kind === "accept" && result.value.targetScenarioSessionId && canOpenTarget?.(result.value.targetProductId, result.value.targetScenarioId)) {
-          const { targetProductId, targetScenarioSessionId } = result.value;
-          router.push(productAttachPath(targetProductId, targetScenarioSessionId));
+        if (kind === "accept") {
+          redirectToAcceptedTarget(result.value);
         }
       } else {
         await resolveActionError(kind, result.error);
