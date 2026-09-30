@@ -155,6 +155,9 @@ The shared runtime, not a product, owns the web side of a handoff:
   still shows the result the accept already charged for (`useAttachSession`; dropped when the user
   starts their own work). The platform's session/result GETs take no guest id, so the id is treated
   as a short-lived capability, not as proof of ownership.
+- A spent (accepted/consumed) token that still names the target session shows an explicit "Open result" on the
+  consent page, for the case where the Accept response was lost and the person reloaded instead of retrying
+  (a retry that gets "already accepted" redirects on its own). It never redirects automatically on load.
 - The redirect happens only when `products/attachTargets.ts` lists the accepted target scenario
   (a registered, enabled product page that can attach it); otherwise the consent page keeps showing
   the terminal status. The consent route injects that check, so it does not bundle every product.

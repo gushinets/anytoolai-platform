@@ -14,6 +14,8 @@ export const ru: Shape<typeof en> = {
     expires: "Действует до",
     status: "Статус",
   },
+  // Shown on a spent (accepted/consumed) token that still names the queued target session.
+  openResult: "Открыть результат",
   accept: "Принять",
   decline: "Отклонить",
   accepting: "Принимаем…",

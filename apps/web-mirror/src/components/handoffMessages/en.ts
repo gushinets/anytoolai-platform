@@ -12,6 +12,8 @@ export const en = {
     expires: "Expires",
     status: "Status",
   },
+  // Shown on a spent (accepted/consumed) token that still names the queued target session.
+  openResult: "Open result",
   accept: "Accept",
   decline: "Decline",
   accepting: "Accepting…",

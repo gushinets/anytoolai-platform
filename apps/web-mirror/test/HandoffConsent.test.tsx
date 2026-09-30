@@ -278,6 +278,44 @@ describe("HandoffConsent", () => {
     expect(routerPush).not.toHaveBeenCalled();
   });
 
+  it.each(["accepted", "consumed"] as const)(
+    "offers Open result on a %s token opened again (e.g. a reload after a lost Accept response), without jumping automatically",
+    async (status) => {
+      const spent = previewPayload({ status, target_scenario_session_id: "session_kept", target_product_id: "acceptance_builder" });
+      const { client } = makeRoutedClient({
+        [PREVIEW_ROUTE]: [jsonResponse(200, spent)],
+        [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
+      });
+      render(<HandoffConsent client={client} handoffToken="token_abc" canOpenTarget={(id, scenario) => id === "acceptance_builder" && scenario === "scenario_1"} />);
+
+      await waitFor(() => expect(screen.getByRole("button", { name: "Open result" })).toBeTruthy());
+      expect(screen.queryByRole("button", { name: "Accept" })).toBeNull();
+      expect(routerPush).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole("button", { name: "Open result" }));
+      expect(routerPush).toHaveBeenCalledTimes(1);
+      expect(routerPush).toHaveBeenCalledWith("/products/acceptance_builder?session=session_kept");
+    },
+  );
+
+  it("offers no Open result on a spent token without a target session, for a target the host cannot open, or when declined", async () => {
+    const cases = [
+      previewPayload({ status: "accepted", target_scenario_session_id: null }),
+      previewPayload({ status: "consumed", target_scenario_session_id: "s1", target_product_id: "kernel_demo" }),
+      previewPayload({ status: "declined", target_scenario_session_id: null }),
+    ];
+    for (const payload of cases) {
+      const { client } = makeRoutedClient({
+        [PREVIEW_ROUTE]: [jsonResponse(200, payload)],
+        [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
+      });
+      const { unmount } = render(<HandoffConsent client={client} handoffToken="token_abc" canOpenTarget={(id) => id === "acceptance_builder"} />);
+      await waitFor(() => expect(screen.queryByText("Loading handoff…")).toBeNull());
+      expect(screen.queryByRole("button", { name: "Open result" })).toBeNull();
+      unmount();
+    }
+  });
+
   it("does not navigate after Decline", async () => {
     const { client } = makeRoutedClient({
       [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload())],

@@ -536,6 +536,14 @@ test.describe("Brief Decoder -> Acceptance Builder handoff", () => {
     });
     expect(replay.status()).toBe(409);
     expect(((await replay.json()) as { error: { code: string } }).error.code).toBe("handoff_already_accepted");
+
+    // 7. The spent token still names the queued target, so a reload after a lost Accept response can
+    // reach it: an explicit "Open result" (no automatic jump), which shows the same paid result.
+    await expect(page.getByRole("button", { name: "Open result" })).toBeVisible();
+    await page.getByRole("button", { name: "Open result" }).click();
+    await page.waitForURL(/\/products\/acceptance_builder(\?|$)/);
+    await expect(page.getByRole("button", { name: "Copy" })).toBeVisible({ timeout: 60_000 });
+    expect(await countEvents("web.result_viewed", targetSessionId)).toBe(1);
   });
 
   test("declined handoff: no target session is created and the token cannot be accepted afterwards", async ({ page }) => {

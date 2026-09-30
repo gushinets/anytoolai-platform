@@ -89,6 +89,18 @@ function viewStateFromResult(result: PlatformApiResult<HandoffPreview>): ViewSta
   return stateForPreview(result.value);
 }
 
+/** An accepted/consumed preview that names a target session the host can open. */
+function acceptedTargetIsReachable(
+  preview: HandoffPreview,
+  canOpenTarget: HandoffConsentProps["canOpenTarget"],
+): boolean {
+  return (
+    (preview.status === "accepted" || preview.status === "consumed") &&
+    preview.targetScenarioSessionId !== null &&
+    canOpenTarget?.(preview.targetProductId, preview.targetScenarioId) === true
+  );
+}
+
 const KNOWN_PREVIEW_FIELDS = ["summary", "missing_fields"] as const;
 
 function isKnownPreviewField(key: string): key is (typeof KNOWN_PREVIEW_FIELDS)[number] {
@@ -332,6 +344,15 @@ export function HandoffConsent({ client, handoffToken, canOpenTarget }: HandoffC
           ) : null}
           {state.actionFailed ? <Toast variant="error">{t("actionFailed")}</Toast> : null}
         </>
+      ) : null}
+      {/* A spent token still names the target session the accept queued (and charged) until its TTL. If
+          the Accept response was lost and the person reloaded instead of retrying, this is the only way
+          to it -- an explicit action, not an automatic jump, because the page may be opened later just to
+          look. */}
+      {state.kind === "terminal" && acceptedTargetIsReachable(preview, canOpenTarget) ? (
+        <div className={styles.actions}>
+          <Button onClick={() => redirectToAcceptedTarget(preview)}>{t("openResult")}</Button>
+        </div>
       ) : null}
     </HandoffShell>
   );
