@@ -119,6 +119,33 @@ describe("ProductRunPage attachSessionId", () => {
     await waitFor(() => expect(screen.getByText(TEST_PRODUCT_MESSAGES_EN.run.runFailed)).toBeTruthy());
   });
 
+  it("tells the route to stop restoring an attached session that ended in a terminal failure", async () => {
+    const events: ProductRunEvent[] = [];
+    const { client } = makeClientCapturingRequests(
+      attachRoutes({ [ROUTES.SESSION]: [sessionResponse({ status: "failed", result_artifact_id: null })] }),
+    );
+    render(
+      <ProductRunPage definition={testProductDefinition} client={client} attachSessionId="session_1" onEvent={(e) => events.push(e)} />,
+    );
+    await waitFor(() => expect(screen.getByText(TEST_PRODUCT_MESSAGES_EN.run.runFailed)).toBeTruthy());
+    expect(events.filter((e) => e.type === "attach_ended")).toHaveLength(1);
+  });
+
+  it("does not report attach_ended for an ordinary run that fails", async () => {
+    const events: ProductRunEvent[] = [];
+    const { client } = makeClientCapturingRequests({
+      ...attachRoutes(),
+      [ROUTES.START]: [jsonResponse(200, { scenario_session_id: "session_1", job_id: "job_1", status: "started", allowed_next_actions: [], result_artifact_id: null })],
+      [ROUTES.SESSION]: [sessionResponse({ status: "failed", result_artifact_id: null })],
+    });
+    render(<ProductRunPage definition={testProductDefinition} client={client} onEvent={(e) => events.push(e)} />);
+    await waitFor(() => expect(screen.getByLabelText("Text")).toBeTruthy());
+    fireEvent.change(screen.getByLabelText("Text"), { target: { value: "hello" } });
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
+    await waitFor(() => expect(screen.getByText(TEST_PRODUCT_MESSAGES_EN.run.runFailed)).toBeTruthy());
+    expect(events.some((e) => e.type === "attach_ended")).toBe(false);
+  });
+
   it("ends in the run-failed state, without a retry loop, for a session id that does not exist", async () => {
     const { client, calls } = makeClientCapturingRequests(
       attachRoutes({ [ROUTES.SESSION]: [errorResponse(404, "scenario_session_not_found")] }),

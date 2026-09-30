@@ -641,6 +641,12 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   // ordinary form Submit button able to silently replay it too.
   function enterUnknownError() {
     setPendingStart(null);
+    if (attachActiveRef.current) {
+      // A terminal failure of the attached session (failed/expired, unknown id, unusable result): the
+      // route must stop restoring it, or every reload would just show the same error again.
+      attachActiveRef.current = false;
+      emitEvent(onEventRef.current, { type: "attach_ended", guestId });
+    }
     setPhase({ kind: "unknown-error" });
   }
 
