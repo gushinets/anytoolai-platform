@@ -19,6 +19,7 @@ import {
   hasCriteria,
 } from "../src/products/acceptanceBuilder/parseAcceptanceBuilder";
 import {
+  errorResponse,
   guestIdentityResponse,
   makeClientCapturingRequests,
   quotaResponse,
@@ -292,6 +293,23 @@ describe("Acceptance Builder page", () => {
     expect(events.filter((e) => e.type === "attach_ended")).toHaveLength(1);
     expect(made.calls.filter((c) => c.key === "GET /v1/scenario-sessions/session_1")).toHaveLength(1);
     expect(events.filter((e) => e.type === "scenario_completed")).toHaveLength(1);
+  });
+
+  it("keeps the mode switch blocked when the attached session's poll fails ambiguously, and Try again finishes the same session", async () => {
+    const r = routesFor(IDS.draft);
+    const made = makeClientCapturingRequests({
+      ...routes("draft", draftOutput()),
+      [r.SESSION]: [errorResponse(500, "internal_error"), sessionResponse()],
+    });
+    render(<AcceptanceBuilderProduct client={made.client} attachSessionId="session_1" />);
+    await waitFor(() => expect(screen.getByRole("button", { name: /try again/i })).toBeTruthy());
+    expect((screen.getByRole("radio", { name: "Check deliverable" }) as HTMLInputElement).disabled).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: /try again/i }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "New task" })).toBeTruthy());
+    expect((screen.getByRole("radio", { name: "Check deliverable" }) as HTMLInputElement).disabled).toBe(false);
+    expect(made.calls.filter((c) => c.key === "GET /v1/scenario-sessions/session_1")).toHaveLength(2);
+    expect(made.calls.some((c) => c.key.endsWith("/start"))).toBe(false);
   });
 
   it("does not show an attached check session as a draft result", async () => {

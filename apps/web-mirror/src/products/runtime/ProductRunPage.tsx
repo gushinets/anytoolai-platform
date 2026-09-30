@@ -361,6 +361,9 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   // Editing any field after a failure makes the next submit build a genuinely new handle instead.
   // Declared before `busy` below, which reads it.
   const [pendingStart, setPendingStart] = useState<{ prepared: PreparedScenarioStart; input: V } | null>(null);
+  // True while the run on screen is the attached session (no local submit since): "Try again"
+  // re-polls it instead of validating an empty form or starting a second, quota-spending run.
+  const attachActiveRef = useRef(false);
   // Code review finding: `retryable-error` alone isn't a safe-to-remount signal -- both an
   // ambiguous poll failure (timeout/connection loss in `runPoll`, backend may still be running the
   // accepted session) *and* an ambiguous `/start` failure itself (network/timeout/5xx -- the
@@ -390,7 +393,10 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     phase.kind === "submitting" ||
     phase.kind === "running" ||
     phase.kind === "result-fetch-error" ||
-    (phase.kind === "retryable-error" && pendingStart !== null);
+    // An ambiguous failure keeps the run "live": a started run through its Idempotency-Key
+    // (`pendingStart`), an attached handoff session through the session itself. Both may still be
+    // running server-side, so abandoning this mount (a mode switch) would lose the only handle.
+    (phase.kind === "retryable-error" && (pendingStart !== null || attachActiveRef.current));
   // Always-current, same reasoning as `onEventRef` above -- `onBusyChange` itself is not a
   // dependency of the effect below (a new identity every render must not re-fire it).
   const onBusyChangeRef = useRef(onBusyChange);
@@ -505,9 +511,6 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   // Attach once per session id, after boot: `boot.kind` only turns "ready" once per mount, so
   // StrictMode's effect replay cannot poll twice.
   const attachedSessionRef = useRef<string | null>(null);
-  // True while the run on screen is the attached session (no local submit since): "Try again"
-  // re-polls it instead of validating an empty form or starting a second, quota-spending run.
-  const attachActiveRef = useRef(false);
   useEffect(() => {
     if (!attachSessionId || boot.kind !== "ready" || attachedSessionRef.current === attachSessionId) {
       return;

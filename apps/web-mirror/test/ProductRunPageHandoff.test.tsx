@@ -128,6 +128,27 @@ describe("ProductRunPage attachSessionId", () => {
     expect(calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(1);
   });
 
+  it("stays busy through an ambiguous poll failure of the attached session, and Try again polls the same session", async () => {
+    // Same rule as a started run's pendingStart: the queued session may still be running server-side, so
+    // a mode switch (which remounts and drops the attach) must stay blocked until it has a result.
+    const busy: boolean[] = [];
+    const { client, calls } = makeClientCapturingRequests(
+      attachRoutes({ [ROUTES.SESSION]: [errorResponse(500, "internal_error"), sessionResponse()] }),
+    );
+    render(
+      <ProductRunPage definition={testProductDefinition} client={client} attachSessionId="session_1" onBusyChange={(b) => busy.push(b)} />,
+    );
+    await waitFor(() => expect(screen.getByRole("button", { name: /try again/i })).toBeTruthy());
+    expect(busy.at(-1)).toBe(true);
+    expect((screen.getByLabelText("Text") as HTMLTextAreaElement).disabled).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: /try again/i }));
+    await waitFor(() => expect(screen.getByText(RESULT_TEXT)).toBeTruthy());
+    expect(busy.at(-1)).toBe(false);
+    expect(calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(2);
+    expect(calls.some((call) => call.key === ROUTES.START)).toBe(false);
+  });
+
   it("retries by re-polling the attached session, without validating the form or starting a run", async () => {
     const { client, calls } = makeClientCapturingRequests(
       attachRoutes({ [ROUTES.SESSION]: [errorResponse(500, "internal_error"), sessionResponse()] }),
