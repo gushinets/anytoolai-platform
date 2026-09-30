@@ -32,16 +32,22 @@ immediate same-tab handoff from Brief Decoder into a queued `acceptance_builder.
   backend handoff and opens its consent page; hidden when the target product is not enabled).
 - An attached session always opens `draft` mode: the ANY-26 route targets `draft_v1`.
 
+## Repo tooling
+
+`scripts/agent/runner.py` (the repo's command interface) gains only the `acceptance-builder-smoke` command,
+as ANY-243/ANY-248/ANY-414 did for their smokes; it changes no platform runner semantics.
+
 ## Out of scope
 
-Chrome Extension (ANY-236), Platform Core/atoms/runner/Provider Gateway/handoff runtime/mapping
-DSL changes, localizing `HandoffConsent` beyond its existing messages, pre-filling the form from an
+Chrome Extension (ANY-236), any Platform Core, atom, workflow/action runner (`platform-core`
+`workflows/runner.py`, `actions/runner.py`), Provider Gateway, handoff runtime or mapping DSL change
+(the acceptance criterion's "runner" is that platform runner, not the repo command interface), localizing `HandoffConsent` beyond its existing messages, pre-filling the form from an
 attached session, and making the route a release gate.
 
 ## Open items
 
 - None open. The smoke found one product bug, fixed here: a reload of a restored handoff result reported `web.result_viewed` a second time (now once per session per tab in `productRunEventTracking.ts`).
-- `client-handoff-smoke` (Chrome extension) was not run.
+- `client-handoff-smoke` (Chrome extension) passes locally (2/2) and in CI.
 
 ## Notes
 

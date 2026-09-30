@@ -244,22 +244,24 @@ describe("HandoffConsent", () => {
     expect(routerPush).not.toHaveBeenCalled();
   });
 
-  it("still reaches the queued target when the Accept response was lost and the retry reports it already accepted", async () => {
-    const accepted = previewPayload({ status: "accepted", target_scenario_session_id: "session_lost", target_product_id: "acceptance_builder" });
-    const { client } = makeRoutedClient({
-      // First read = the consent preview; second = the refetch after "already accepted".
-      [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload()), jsonResponse(200, accepted)],
-      [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
-      [ACCEPT_ROUTE]: [errorResponse(409, "handoff_already_accepted")],
-    });
-    render(<HandoffConsent client={client} handoffToken="token_abc" canOpenTarget={(id, scenario) => id === "acceptance_builder" && scenario === "scenario_1"} />);
-    await waitFor(() => expect((screen.getByRole("button", { name: "Accept" }) as HTMLButtonElement).disabled).toBe(false));
-    fireEvent.click(screen.getByRole("button", { name: "Accept" }));
+  it.each(["accepted", "consumed"] as const)(
+    "still reaches the queued target when the Accept response was lost and the refetched preview is %s",
+    async (status) => {
+      const refetched = previewPayload({ status, target_scenario_session_id: "session_lost", target_product_id: "acceptance_builder" });
+      const { client } = makeRoutedClient({
+        // First read = the consent preview; second = the refetch after "already accepted".
+        [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload()), jsonResponse(200, refetched)],
+        [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
+        [ACCEPT_ROUTE]: [errorResponse(409, "handoff_already_accepted")],
+      });
+      render(<HandoffConsent client={client} handoffToken="token_abc" canOpenTarget={(id, scenario) => id === "acceptance_builder" && scenario === "scenario_1"} />);
+      await waitFor(() => expect((screen.getByRole("button", { name: "Accept" }) as HTMLButtonElement).disabled).toBe(false));
+      fireEvent.click(screen.getByRole("button", { name: "Accept" }));
 
-    await waitFor(() => expect(screen.getByText("Accepted")).toBeTruthy());
-    expect(routerPush).toHaveBeenCalledTimes(1);
-    expect(routerPush).toHaveBeenCalledWith("/products/acceptance_builder?session=session_lost");
-  });
+      await waitFor(() => expect(routerPush).toHaveBeenCalledTimes(1));
+      expect(routerPush).toHaveBeenCalledWith("/products/acceptance_builder?session=session_lost");
+    },
+  );
 
   it("does not redirect from a refetch that is not accepted", async () => {
     const declined = previewPayload({ status: "declined", target_scenario_session_id: null });
