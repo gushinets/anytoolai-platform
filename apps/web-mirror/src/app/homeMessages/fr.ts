@@ -23,5 +23,13 @@ export const fr: Shape<typeof en> = {
       blurb: "Transformez un brief client en détails structurés, risques et questions à poser avant de commencer.",
       sample: "Manquant : échéance et budget. À demander au client : quelle est la date de lancement exacte, et qui valide le design ?",
     },
+    acceptance_builder: {
+      blurb: "Transformez un brief en critères d’acceptation, ou vérifiez un livrable par rapport au brief.",
+      sample: "Critères d’acceptation : la page d’accueil se charge en moins de deux secondes ; le client valide deux tours de design.",
+      tags: {
+        draft: "Rédiger les critères",
+        check: "Vérifier le livrable",
+      },
+    },
   },
 };

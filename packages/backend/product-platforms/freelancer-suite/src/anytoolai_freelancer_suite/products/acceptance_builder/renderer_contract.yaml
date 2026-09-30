@@ -94,5 +94,5 @@ renderer_contract:
         when_empty: The brief states all three lists.
   next_action: copy_result
   excluded_fields: []
-  # Open (ANY-244): the spec activation rule (first successful display of verdict and criteria,
-  # web-first-product-framework-design.md) has no verdict in draft_v1; ANY-244 decides it.
+  # Activation (decided in ANY-244): check_v1 counts the first display of its verdict; draft_v1 has
+  # no verdict, so it counts the first display of a non-empty acceptance-criteria list.

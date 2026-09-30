@@ -23,6 +23,7 @@ export const fr: Shape<typeof en> = {
     previousDetails: "Résultat basé sur les informations précédentes",
     backToInputs: "Retour aux informations",
     newTask: "Nouvelle tâche",
+    handoffFailed: "Impossible d’ouvrir l’étape suivante. Veuillez réessayer.",
   },
   errors: {
     startFailed: "Impossible de démarrer {product}. Veuillez réessayer.",

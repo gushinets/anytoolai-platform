@@ -136,6 +136,35 @@ The canonical backend output additionally contains `brief_text` (the caller's or
 as handoff material); the frontend result intentionally excludes it: the product parser drops it
 and it is never rendered or copied, so it must not be added to the frontend result model.
 
+## Cross-product handoff in the web host (ANY-244)
+
+The shared runtime, not a product, owns the web side of a handoff:
+
+- `ProductDefinition.handoff` (`handoffDefinitionId`, `targetProductId`) makes `ProductRunPage`
+  render a button beside "New task" (label from `<messageScope>.continueToTarget`). A click calls
+  `createHandoff` for the shown result and opens `/handoff/{token}` in the same tab. The button is
+  hidden unless the target is in `NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS` (unset = all).
+- `HandoffConsent` sends the user to `/products/{targetProductId}?session={id}` right after a
+  successful Accept; the ids are redacted once the token's TTL passes.
+- `/products/{id}?session=` reaches the product as `attachSessionId`; `ProductRunPage` polls that
+  already-queued session and renders its result with no start request and no quota charge; "Try
+  again" re-polls that session, and an unknown session id (404) ends in the run-failed state. The
+  route reads `?session=` from its `searchParams` prop (not `useSearchParams`, whose Suspense
+  boundary would turn the unknown-product 404 into a 200), removes it from the address bar so a
+  bookmark or shared link does not carry it, and keeps it in the tab's `sessionStorage` so a reload
+  still shows the result the accept already charged for (`useAttachSession`; dropped when the user
+  starts their own work). The platform's session/result GETs take no guest id, so the id is treated
+  as a short-lived capability, not as proof of ownership.
+- The redirect happens only when `products/attachTargets.ts` lists the accepted target scenario
+  (a registered, enabled product page that can attach it); otherwise the consent page keeps showing
+  the terminal status. The consent route injects that check, so it does not bundle every product.
+- A product with a `handoff` must define `<messageScope>.continueToTarget` in its messages. A
+  multi-mode product (each mode its own `ProductDefinition`) supplies only its mode list to the shared
+  `products/shared/MultiModeProduct.tsx`, which owns the selector, the clean remount per mode, the
+  "no mode switch while a run is active" rule and the one-shot handoff attach.
+- The copy text of a product whose renderer contract fixes its wording (Acceptance Builder) is the
+  contract's English text, not UI-locale copy.
+
 ## Web i18n (ANY-519)
 
 `apps/web-mirror` localizes product-page UI. The mechanism is host-owned; the words are
@@ -182,7 +211,7 @@ product-owned. Code: `apps/web-mirror/src/i18n/` (library `use-intl`, imported o
   the result card; "Copy" and "New task" share one action group; "New task" clears both cards,
   refreshes quota and focuses the first `textarea`/`input`. There is no result-only mode and no
   per-product layout switch. Host messages own the copy every product shares
-  (`workspace.inputTitle|previousDetails|backToInputs|newTask`); the product owns the noun-specific
+  (`workspace.inputTitle|previousDetails|backToInputs|newTask|handoffFailed`); the product owns the noun-specific
   copy under its `messageScope` (`resultTitle|placeholder|regenerate`, one set per Client Update
   Writer mode). The shared runtime still owns start, retry, quota, and copy behavior.
 - **Validation:** shared validators return structured `FieldError` data (`required`,

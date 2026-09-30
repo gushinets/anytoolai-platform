@@ -1,12 +1,15 @@
 import type { ComponentType } from "react";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
 import type { ProductMessagesByLocale } from "../i18n";
+import { AcceptanceBuilderProduct } from "./acceptanceBuilder/AcceptanceBuilderProduct";
+import { ACCEPTANCE_BUILDER_MESSAGES } from "./acceptanceBuilder/messages";
 import { BriefDecoderProduct } from "./briefDecoder/BriefDecoderProduct";
 import { BRIEF_DECODER_MESSAGES } from "./briefDecoder/messages";
 import { ClientUpdateWriterProduct } from "./clientUpdateWriter/ClientUpdateWriterProduct";
 import { CLIENT_UPDATE_WRITER_MESSAGES } from "./clientUpdateWriter/messages";
 import { ProposalAIProduct } from "./proposalAi/ProposalAIProduct";
 import { PROPOSAL_AI_MESSAGES } from "./proposalAi/messages";
+import { enabledProductIds, isProductEnabled } from "./runtime/enabledProducts";
 import type { ProductRunEvent } from "./runtime/productDefinition";
 
 export type RegisteredProduct = {
@@ -21,14 +24,15 @@ export type RegisteredProduct = {
      * product, used to scope the shared runtime's once-per-visit event dedupe (code review
      * finding: a bare productId-keyed dedupe undercounted a genuine revisit to the same product). */
     visitId?: string;
+    /** A session already queued for this guest (an accepted handoff); see `ProductRunPageProps`. */
+    attachSessionId?: string;
   }>;
 };
 
 /** Static product registry for `/products/{productId}`. This is the composition layer
  * (`docs/architecture/frontend-boundaries.md`): the one place allowed to import both the shared
  * runtime and individual products. The shared runtime itself never imports a product. */
-const configuredIds = process.env.NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS;
-const enabledIds = configuredIds === undefined ? null : new Set(configuredIds.split(",").map((id) => id.trim()).filter(Boolean));
+const enabledIds = enabledProductIds();
 
 const PRODUCT_DEFINITIONS: readonly Omit<RegisteredProduct, "enabled">[] = [
   { productId: "proposal_ai", messages: PROPOSAL_AI_MESSAGES, Component: ProposalAIProduct },
@@ -38,6 +42,7 @@ const PRODUCT_DEFINITIONS: readonly Omit<RegisteredProduct, "enabled">[] = [
     Component: ClientUpdateWriterProduct,
   },
   { productId: "brief_decoder", messages: BRIEF_DECODER_MESSAGES, Component: BriefDecoderProduct },
+  { productId: "acceptance_builder", messages: ACCEPTANCE_BUILDER_MESSAGES, Component: AcceptanceBuilderProduct },
 ];
 
 for (const productId of enabledIds ?? []) {
@@ -52,7 +57,10 @@ for (const productId of enabledIds ?? []) {
 
 const PRODUCTS: readonly RegisteredProduct[] = PRODUCT_DEFINITIONS.map((product) => ({
   ...product,
-  enabled: enabledIds === null || enabledIds.has(product.productId),
+  // Live, like the handoff button's own check: one predicate (`isProductEnabled`), no import-time snapshot.
+  get enabled() {
+    return isProductEnabled(product.productId);
+  },
 }));
 
 export function getRegisteredProduct(productId: string): RegisteredProduct | null {

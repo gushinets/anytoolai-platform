@@ -113,6 +113,18 @@ async function decode(queues: ReturnType<typeof routes>, events: ProductRunEvent
 const completedEvents = (events: ProductRunEvent[]) => events.filter((e) => e.type === "scenario_completed");
 
 describe("Brief Decoder definition", () => {
+  it("declares the backend's Brief Decoder -> Acceptance Builder handoff and its button label", () => {
+    const handoffs = readFileSync(
+      resolve(SCHEMA_ROOT, "../handoffs.yaml"),
+      "utf8",
+    );
+    const { handoffDefinitionId, targetProductId } = briefDecoderDefinition.handoff!;
+    // The route's own block in handoffs.yaml names this id and this target product.
+    const block = handoffs.split(/\n {2}- handoff_id: /).find((entry) => entry.startsWith(handoffDefinitionId));
+    expect(block).toContain(`target_product_id: ${targetProductId}`);
+    expect(BRIEF_DECODER_MESSAGES.en.decode.continueToTarget).toBeTruthy();
+  });
+
   it("maps the form to brief_text and identifies its scenario", () => {
     expect(briefDecoderDefinition.productId).toBe("brief_decoder");
     expect(briefDecoderDefinition.scenarioId).toBe("brief_decoder.decode_v1");

@@ -27,6 +27,22 @@ function webEventTypeForRunEvent(eventType: ProductRunEvent["type"]): WebClientE
   }
 }
 
+/** `web.result_viewed` is one activation per session: a reload of a restored result (see
+ * `useAttachSession`) renders it again, and must not count again. Tab-scoped (`sessionStorage`); an
+ * unusable storage just falls back to reporting. */
+function isFirstResultViewInTab(scenarioSessionId: string): boolean {
+  const key = `anytoolai.result_viewed.${scenarioSessionId}`;
+  try {
+    if (window.sessionStorage.getItem(key) !== null) {
+      return false;
+    }
+    window.sessionStorage.setItem(key, "1");
+  } catch {
+    // Storage unavailable: report rather than drop the activation.
+  }
+  return true;
+}
+
 /**
  * Wires the shared runtime's injectable `ProductRunEvent` callback (ANY-453) to ANY-17's real
  * `POST /v1/client-events` ingestion. This lives in the composition layer (called from
@@ -64,6 +80,9 @@ export function createProductRunEventTracker(
       return;
     }
     const scenarioSessionId = "scenarioSessionId" in event ? event.scenarioSessionId : undefined;
+    if (event.type === "scenario_completed" && !isFirstResultViewInTab(event.scenarioSessionId)) {
+      return;
+    }
 
     void getOrCreateWebSessionId(storage)
       .then((webSessionId) =>

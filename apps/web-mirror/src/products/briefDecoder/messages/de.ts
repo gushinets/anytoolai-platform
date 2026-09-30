@@ -17,6 +17,7 @@ export const de: Shape<typeof en> = {
     resultTitle: "Analyse des Briefings",
     placeholder: "Die Analyse Ihres Briefings erscheint hier, sobald sie fertig ist.",
     regenerate: "Briefing erneut analysieren",
+    continueToTarget: "Abnahmekriterien erstellen",
   },
   result: {
     brief: "Briefing",

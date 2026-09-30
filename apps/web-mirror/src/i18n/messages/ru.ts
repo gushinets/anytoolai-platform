@@ -23,6 +23,7 @@ export const ru: Shape<typeof en> = {
     previousDetails: "Результат основан на предыдущих данных",
     backToInputs: "К исходным данным",
     newTask: "Новая задача",
+    handoffFailed: "Не удалось открыть следующий шаг. Попробуйте ещё раз.",
   },
   errors: {
     startFailed: "Не удалось начать работу с {product}. Попробуйте ещё раз.",

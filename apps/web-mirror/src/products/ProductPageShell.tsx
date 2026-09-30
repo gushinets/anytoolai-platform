@@ -20,24 +20,33 @@ export function ProductPageShell({
   client,
   onEvent,
   visitId,
+  attachSessionId,
 }: {
   product: RegisteredProduct;
   client: PlatformApiClient;
   onEvent?: (event: ProductRunEvent) => void;
   visitId?: string;
+  attachSessionId?: string;
 }) {
   const { Component } = product;
   return (
     <LocaleProvider productMessages={product.messages}>
-      <ProductPageContent Component={Component} client={client} onEvent={onEvent} visitId={visitId} />
+      <ProductPageContent
+        Component={Component}
+        client={client}
+        onEvent={onEvent}
+        visitId={visitId}
+        attachSessionId={attachSessionId}
+      />
     </LocaleProvider>
   );
 }
 
-function ProductPageContent({ Component, client, onEvent, visitId }: Pick<RegisteredProduct, "Component"> & {
+function ProductPageContent({ Component, client, onEvent, visitId, attachSessionId }: Pick<RegisteredProduct, "Component"> & {
   client: PlatformApiClient;
   onEvent?: (event: ProductRunEvent) => void;
   visitId?: string;
+  attachSessionId?: string;
 }) {
   const t = useProductT();
   const th = useHostT();
@@ -57,7 +66,7 @@ function ProductPageContent({ Component, client, onEvent, visitId }: Pick<Regist
         {/* No key here: the caller already keys ProductPageShell itself by productId (page.tsx), so
             this whole subtree -- Component included -- already remounts on a product change. */}
         <ProductShellContext.Provider value={shell}>
-          <Component client={client} onEvent={onEvent} visitId={visitId} />
+          <Component client={client} onEvent={onEvent} visitId={visitId} attachSessionId={attachSessionId} />
         </ProductShellContext.Provider>
       </main>
     </div>

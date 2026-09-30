@@ -5,6 +5,7 @@ import { getPlatformApiClient } from "../../../lib/apiClient";
 import { HandoffConsent } from "../../../components/HandoffConsent";
 import { HANDOFF_MESSAGES } from "../../../components/handoffMessages";
 import { LocaleProvider } from "../../../i18n";
+import { canAttachTarget } from "../../../products/attachTargets";
 
 type HandoffPageProps = {
   params: Promise<{ handoffToken: string }>;
@@ -20,7 +21,12 @@ export default function HandoffPage({ params }: HandoffPageProps) {
   // token changes and overwrite state with a stale result.
   return (
     <LocaleProvider productMessages={HANDOFF_MESSAGES}>
-      <HandoffConsent key={handoffToken} client={client} handoffToken={handoffToken} />
+      <HandoffConsent
+        key={handoffToken}
+        client={client}
+        handoffToken={handoffToken}
+        canOpenTarget={canAttachTarget}
+      />
     </LocaleProvider>
   );
 }

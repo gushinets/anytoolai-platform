@@ -25,4 +25,9 @@ export const es: Shape<typeof en> = {
     expired: "Caducada",
     failed: "Fallida",
   },
+  // Labels for the backend's known preview keys (`handoffs.yaml` `preview_mapping`); any other key is shown as sent.
+  previewFields: {
+    summary: "Resumen",
+    missing_fields: "Datos que faltan",
+  },
 };

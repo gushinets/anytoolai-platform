@@ -23,4 +23,9 @@ export const en = {
     expired: "Expired",
     failed: "Failed",
   },
+  // Labels for the backend's known preview keys (`handoffs.yaml` `preview_mapping`); any other key is shown as sent.
+  previewFields: {
+    summary: "Summary",
+    missing_fields: "Missing details",
+  },
 };

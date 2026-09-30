@@ -5,6 +5,8 @@ import { useIsomorphicLayoutEffect } from "../../lib/useIsomorphicLayoutEffect";
 import { Button, Card } from "@anytoolai/shared-ui";
 import {
   copyResultAndRecordActivation,
+  createHandoff,
+  createWindowNavigator,
   getQuota,
   getResult,
   getRuntimeConfig,
@@ -12,6 +14,7 @@ import {
   isQuotaExhausted,
   isResultNotFound,
   isResultUnavailable,
+  openHandoffConsent,
   pollScenarioSession,
   prepareScenarioStart,
   refreshGuestIdentity,
@@ -23,6 +26,8 @@ import {
 import { ErrorState } from "../../components/ErrorState";
 import { LanguageSwitcher, useHostT, useProductT } from "../../i18n";
 import { getClientStorage } from "./clientStorage";
+import { webBaseUrlFromProductLocation } from "../../lib/hostUrls";
+import { isProductEnabled } from "./enabledProducts";
 import type { FieldError } from "./fieldValidation";
 import { ProductShellContext } from "./ProductShellContext";
 import { assertNever, type ProductDefinition, type ProductRunEvent } from "./productDefinition";
@@ -64,6 +69,14 @@ export type ProductRunPageProps<V extends Record<string, unknown>, R> = {
    * every existing test constructs `ProductRunPage` directly without a route wrapper.
    */
   visitId?: string;
+  /**
+   * A scenario session already queued for this guest elsewhere (an accepted handoff creates the
+   * target session server-side): on mount the page polls it and renders its result, without a
+   * start request or a quota charge. There is no local input, so the form stays empty and no
+   * "previous details" notice is shown. A missing or foreign id ends in the ordinary retryable
+   * error state.
+   */
+  attachSessionId?: string;
 };
 
 /**
@@ -234,6 +247,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   onEvent,
   onBusyChange,
   visitId,
+  attachSessionId,
 }: ProductRunPageProps<V, R>) {
   const { Fields, Result } = definition;
   const th = useHostT();
@@ -305,9 +319,11 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   const [phase, setPhase] = useState<Phase<R>>({ kind: "idle" });
   const [displayedResult, setDisplayedResult] = useState<{
     scenarioSessionId: string;
+    resultArtifactId: string;
     checkpointId: string | null;
     result: R;
-    input: V;
+    // Null for a result attached from an already-queued session (no local input to compare).
+    input: V | null;
   } | null>(null);
   useEffect(() => {
     if (phase.kind !== "result" || lastFocusedResultRef.current === phase.scenarioSessionId) {
@@ -486,6 +502,23 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     );
   }, [client, guestStorage, productId, scenarioId, eventScopeKey, refreshQuota]);
 
+  // Attach once per session id, after boot: `boot.kind` only turns "ready" once per mount, so
+  // StrictMode's effect replay cannot poll twice.
+  const attachedSessionRef = useRef<string | null>(null);
+  // True while the run on screen is the attached session (no local submit since): "Try again"
+  // re-polls it instead of validating an empty form or starting a second, quota-spending run.
+  const attachActiveRef = useRef(false);
+  useEffect(() => {
+    if (!attachSessionId || boot.kind !== "ready" || attachedSessionRef.current === attachSessionId) {
+      return;
+    }
+    attachedSessionRef.current = attachSessionId;
+    attachActiveRef.current = true;
+    setPhase({ kind: "running", scenarioSessionId: attachSessionId });
+    void runPoll(attachSessionId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runPoll is a per-render closure over stable refs/props
+  }, [attachSessionId, boot.kind]);
+
   async function runStart(prepared: PreparedScenarioStart) {
     // Snapshotted once: this call's own controller, checked consistently across every await below
     // regardless of which controller (if any) controllerRef points to by the time each resolves.
@@ -555,6 +588,12 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       return;
     }
     if (!polled.result.ok) {
+      // A definite 404 for an attached id (stale, foreign or mistyped `?session=`) can never
+      // succeed on retry: end in the run-failed state instead of offering an endless re-poll.
+      if (attachActiveRef.current && polled.result.error.type === "backend_error" && polled.result.error.status === 404) {
+        enterUnknownError();
+        return;
+      }
       setPhase({ kind: "retryable-error", reason: polled.reason === "timeout" ? "timeout" : "connectionLost" });
       return;
     }
@@ -674,9 +713,8 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     // `scenario_completed` is emitted by the commit-time effect on `phase` below, not here:
     // `setPhase` only queues the update, so emitting here would report a result that never
     // rendered (unmount, navigation, a renderer that throws).
-    if (activeInputRef.current) {
-      setDisplayedResult({ scenarioSessionId, checkpointId, result: extracted, input: activeInputRef.current });
-    }
+    setDisplayedResult({ scenarioSessionId, resultArtifactId, checkpointId, result: extracted, input: activeInputRef.current });
+    setHandoffStatus("idle");
     // A completed run must not lend its Idempotency-Key to a later regeneration.
     setPendingStart(null);
     setPhase({ kind: "result", scenarioSessionId, checkpointId, result: extracted });
@@ -684,6 +722,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
 
   // Shared by handleSubmit/handleRetry: both begin a (new or reused) prepared start the same way.
   function beginStart(prepared: PreparedScenarioStart) {
+    attachActiveRef.current = false;
     setPhase({ kind: "submitting" });
     emitEvent(onEventRef.current, { type: "form_submitted", guestId });
     void runStart(prepared);
@@ -737,6 +776,11 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
 
   function handleRetry() {
     if (phase.kind !== "retryable-error") {
+      return;
+    }
+    if (attachActiveRef.current && attachedSessionRef.current) {
+      setPhase({ kind: "running", scenarioSessionId: attachedSessionRef.current });
+      void runPoll(attachedSessionRef.current);
       return;
     }
     submitCurrentValues();
@@ -804,6 +848,61 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     });
   }
 
+  const handoffInFlightRef = useRef(false);
+  useEffect(() => {
+    const reset = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        setHandoffStatus("idle");
+      }
+    };
+    window.addEventListener("pageshow", reset);
+    return () => window.removeEventListener("pageshow", reset);
+  }, []);
+  const [handoffStatus, setHandoffStatus] = useState<"idle" | "creating" | "failed">("idle");
+  const handoff = definition.handoff && isProductEnabled(definition.handoff.targetProductId) ? definition.handoff : null;
+
+  // Backend creates the handoff; the consent page (same tab) owns confirmation, the target session
+  // and its quota. `location.assign` from a shared navigator keeps the basePath-relative origin.
+  async function handleContinueToTarget() {
+    // A ref, not `handoffStatus`: two clicks in one tick both see the stale state.
+    if (!displayedResult || !handoff || handoffInFlightRef.current) {
+      return;
+    }
+    handoffInFlightRef.current = true;
+    setHandoffStatus("creating");
+    const controller = controllerRef.current;
+    try {
+      const created = await createHandoff(
+        client,
+        {
+          handoffDefinitionId: handoff.handoffDefinitionId,
+          sourceScenarioSessionId: displayedResult.scenarioSessionId,
+          sourceArtifactId: displayedResult.resultArtifactId,
+        },
+        { signal: controller?.signal },
+      );
+      // Left the page (mode switch, "All tools") while the POST was in flight: do not navigate.
+      if (controller?.signal.aborted) {
+        return;
+      }
+      if (!created.ok) {
+        setHandoffStatus("failed");
+        return;
+      }
+      // Stays "creating" (button disabled) until the page unloads; a bfcache return resets it below.
+      void openHandoffConsent({
+        webConsentBaseUrl: webBaseUrlFromProductLocation(window.location),
+        handoffToken: created.value.handoffToken,
+        navigate: createWindowNavigator(window),
+      });
+    } catch {
+      // Never strand the button disabled with no message (same rule as HandoffConsent's runAction).
+      setHandoffStatus("failed");
+    } finally {
+      handoffInFlightRef.current = false;
+    }
+  }
+
   function handleStartAnother() {
     if (phase.kind !== "result" || guestId === undefined) {
       return;
@@ -813,7 +912,9 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     setPendingStart(null);
     activeScenarioSessionIdRef.current = null;
     activeInputRef.current = null;
+    attachActiveRef.current = false;
     setDisplayedResult(null);
+    setHandoffStatus("idle");
     setPhase({ kind: "idle" });
     // Focus contract: the first field of every product's form is a `textarea` or `input`.
     requestAnimationFrame(() => formRef.current?.querySelector<HTMLElement>("textarea, input")?.focus());
@@ -890,7 +991,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
               ? th("starting")
               : phase.kind === "running"
                 ? th("generating")
-                : displayedResult
+                : displayedResult?.input
                   ? tp(`${definition.messageScope}.regenerate`)
                   : tp(`${definition.messageScope}.submit`)}
           </Button>
@@ -903,7 +1004,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   );
 
   // Exhausts Phase["kind"]: a new variant must be handled here.
-  const oldResult = displayedResult && !shallowEqualValues(displayedResult.input, values);
+  const oldResult = displayedResult?.input && !shallowEqualValues(displayedResult.input, values);
   let placeholderMessage: string | null = null;
   let progress: ReactNode = null;
   let error: ReactNode = null;
@@ -930,7 +1031,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       error = <ErrorState message={th("quotaExhausted", { product: title })} embedded />;
       break;
     case "retryable-error":
-      error = <ErrorState message={th(`errors.${phase.reason}`, { product: title })} onRetry={identityUnavailable ? undefined : handleRetry} embedded />;
+      error = <ErrorState message={th(`errors.${phase.reason}`, { product: title })} onRetry={identityUnavailable && !attachActiveRef.current ? undefined : handleRetry} embedded />;
       break;
     case "unknown-error":
       error = <ErrorState message={tp(`${definition.messageScope}.runFailed`)} onRetry={() => setPhase({ kind: "idle" })} embedded />;
@@ -970,15 +1071,25 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
               {oldResult ? <p role="status" className={styles.oldResultNotice}>{th("workspace.previousDetails")}</p> : null}
               {progress}
               {error}
+              {handoffStatus === "failed" && showNewTask ? (
+                <p role="alert" className={styles.oldResultNotice}>{th("workspace.handoffFailed")}</p>
+              ) : null}
               {displayedResult ? (
                 <Result
                   key={displayedResult.scenarioSessionId}
                   result={displayedResult.result}
                   onCopy={handleCopy}
                   secondaryAction={showNewTask ? (
-                    <Button variant="secondary" onClick={handleStartAnother}>
-                      {th("workspace.newTask")}
-                    </Button>
+                    <>
+                      <Button variant="secondary" onClick={handleStartAnother} disabled={handoffStatus === "creating"}>
+                        {th("workspace.newTask")}
+                      </Button>
+                      {handoff ? (
+                        <Button onClick={() => void handleContinueToTarget()} disabled={handoffStatus === "creating"}>
+                          {tp(`${definition.messageScope}.continueToTarget`)}
+                        </Button>
+                      ) : null}
+                    </>
                   ) : undefined}
                 />
               ) : null}

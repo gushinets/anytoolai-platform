@@ -23,5 +23,13 @@ export const pt: Shape<typeof en> = {
       blurb: "Transforme o briefing de um cliente em detalhes estruturados, riscos e as perguntas a fazer antes de começar.",
       sample: "Faltam: prazo e orçamento. Pergunte ao cliente: qual é a data exata de lançamento e quem aprova o design?",
     },
+    acceptance_builder: {
+      blurb: "Transforme um briefing em critérios de aceitação, ou confira o trabalho concluído com o briefing.",
+      sample: "Critérios de aceitação: a página inicial carrega em menos de dois segundos; o cliente aprova duas rodadas de design.",
+      tags: {
+        draft: "Redigir critérios",
+        check: "Conferir entrega",
+      },
+    },
   },
 };

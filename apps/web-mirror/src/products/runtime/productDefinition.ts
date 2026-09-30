@@ -49,6 +49,13 @@ export type ProductFieldsProps<V> = {
   onChange: <K extends keyof V>(field: K, value: V[K]) => void;
 };
 
+/** A backend-owned handoff from this product's result to another product (`handoffs.yaml`). */
+export type ProductHandoff = {
+  handoffDefinitionId: string;
+  /** The button is shown only while this product is enabled in this deployment. */
+  targetProductId: string;
+};
+
 export type ProductResultProps<R> = {
   result: R;
   /**
@@ -58,7 +65,7 @@ export type ProductResultProps<R> = {
    * failed activation-record never flips this back to `false` (the text is already copied).
    */
   onCopy: (text: string) => Promise<boolean>;
-  /** The runtime's "New task" button. The renderer must place it next to its own copy action. */
+  /** The runtime's result actions ("New task", the handoff button). The renderer must place them next to its own copy action. */
   secondaryAction?: ReactNode;
 };
 
@@ -121,6 +128,13 @@ export type ProductDefinition<V extends Record<string, unknown>, R> = {
    * tracker skips `web.result_viewed`. A throwing hook counts as false.
    */
   emitsResultViewed?: (result: R) => boolean;
+  /**
+   * Optional next step to another product. The runtime renders the button (label from
+   * `<messageScope>.continueToTarget`) beside "New task"; a click creates the backend handoff and
+   * opens its consent page in the same tab. The consent, target session and quota stay
+   * backend-owned.
+   */
+  handoff?: ProductHandoff;
   Fields: ComponentType<ProductFieldsProps<V>>;
   Result: ComponentType<ProductResultProps<R>>;
 };

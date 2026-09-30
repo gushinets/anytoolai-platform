@@ -23,6 +23,7 @@ export const de: Shape<typeof en> = {
     previousDetails: "Mit vorherigen Angaben erstellt",
     backToInputs: "Zurück zu den Angaben",
     newTask: "Neue Aufgabe",
+    handoffFailed: "Der nächste Schritt konnte nicht geöffnet werden. Bitte versuchen Sie es erneut.",
   },
   errors: {
     startFailed: "{product} konnte nicht gestartet werden. Bitte versuchen Sie es erneut.",

@@ -1,0 +1,24 @@
+.fieldGroup {
+  display: grid;
+  gap: 8px;
+}
+
+.help,
+.error {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.help {
+  color: var(--color-text-secondary);
+}
+
+.error {
+  color: var(--color-error);
+}
+
+.textArea {
+  min-height: var(--textarea-min-height, 160px);
+  resize: none;
+}

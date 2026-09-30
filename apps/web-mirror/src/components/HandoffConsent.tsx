@@ -1,11 +1,10 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { Button, Card, Toast } from "@anytoolai/shared-ui";
 import {
   acceptHandoff,
-  createInMemoryAsyncStorage,
-  createWindowLocalStorageAdapter,
   declineHandoff,
   getHandoff,
   isHandoffActionRefetchable,
@@ -19,6 +18,8 @@ import {
   type PlatformApiError,
   type PlatformApiResult,
 } from "@anytoolai/ce-kit";
+import { productAttachPath } from "../lib/hostUrls";
+import { getClientStorage } from "../products/runtime/clientStorage";
 import { useIsomorphicLayoutEffect } from "../lib/useIsomorphicLayoutEffect";
 import { LanguageSwitcher, useHostT, useLocale, useProductT, type Locale } from "../i18n";
 import styles from "./HandoffConsent.module.css";
@@ -26,6 +27,10 @@ import styles from "./HandoffConsent.module.css";
 export type HandoffConsentProps = {
   client: PlatformApiClient;
   handoffToken: string;
+  /** Whether the web host can attach the accepted handoff's target scenario, so it redirects only to
+   * a page that can show that session (the route supplies it; this component must not import the
+   * product registry). */
+  canOpenTarget?: (productId: string, scenarioId: string) => boolean;
 };
 
 // A `Record<HandoffStatus, boolean>` literal, not a hand-written `Set` -- this fails to typecheck
@@ -84,16 +89,31 @@ function viewStateFromResult(result: PlatformApiResult<HandoffPreview>): ViewSta
   return stateForPreview(result.value);
 }
 
+const KNOWN_PREVIEW_FIELDS = ["summary", "missing_fields"] as const;
+
+function isKnownPreviewField(key: string): key is (typeof KNOWN_PREVIEW_FIELDS)[number] {
+  return (KNOWN_PREVIEW_FIELDS as readonly string[]).includes(key);
+}
+
+/** Strings as sent; a list of strings as a comma-separated line; anything else as opaque JSON. */
+function formatPreviewValue(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+  return Array.isArray(value) && value.every((item) => typeof item === "string") ? value.join(", ") : JSON.stringify(value);
+}
+
 /**
  * State machine for the backend-owned handoff consent page. Renders only the fields the backend
  * safe preview carries -- no provider/model, prompt, or raw artifact data ever reaches this
  * component. `preview.preview` is a bounded, config-mapped `dict[str, Any]` on the wire, so it is
  * always rendered as opaque key/value pairs, never by assuming specific keys.
  */
-export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
+export function HandoffConsent({ client, handoffToken, canOpenTarget }: HandoffConsentProps) {
   const t = useProductT();
   const th = useHostT();
   const { locale } = useLocale();
+  const router = useRouter();
   const [state, setState] = useState<ViewState>({ kind: "loading" });
   // `guestId === undefined` doubles as "identity resolution failed": by the time the consent view
   // can render at all, resolution has already settled (below), so there's no separate "still
@@ -101,18 +121,11 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
   // sending no guest_id would let the backend's HandoffService.accept() attribute the target
   // session/quota to the handoff's creator instead of the person actually accepting.
   const [guestId, setGuestId] = useState<string | undefined>(undefined);
-  // Fallback storage for guestStorage/refreshGuestIdentity() when window.localStorage itself isn't
-  // available -- lazily created once per component instance (stable across re-renders and across a
-  // self-heal retry within the same mount), not module-level, so it doesn't leak a minted guest id
-  // across remounts/tests the way a module singleton would.
-  const [ephemeralGuestStorage] = useState<AsyncStorage>(() => createInMemoryAsyncStorage());
-  // Which backend to persist the guest id in, decided once at mount and reused for every storage
-  // operation for this component's whole lifetime -- resolving it fresh on each call (as a prior
-  // version of this component did, once in the mount effect and again in resolveActionError) risks
-  // the two calls disagreeing if localStorage's availability changes in between (e.g. a Storage
-  // Access API grant lands mid-session), which would split a stale/fresh guest id across two
-  // different storage backends instead of ever colocating them.
-  const [guestStorage] = useState<AsyncStorage>(() => createWindowLocalStorageAdapter() ?? ephemeralGuestStorage);
+  // The same per-client storage the product pages use (`getClientStorage`: localStorage when usable,
+  // else one in-memory store per client), so the guest that accepts here is the guest the target
+  // product page -- reached by a client-side redirect on the same client -- resolves. It is also
+  // decided once, so every storage operation for this mount uses one backend.
+  const [guestStorage] = useState<AsyncStorage>(() => getClientStorage(client));
   // Bumped to force the mount effect below to re-run on demand (e.g. a "Try again" click from the
   // safe-error view) without duplicating its fetch logic in a second function.
   const [retryToken, setRetryToken] = useState(0);
@@ -173,9 +186,7 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
       // refetching would just return the same actionable preview) -- refreshGuestIdentity() clears
       // the stale persisted id and resolves a fresh one so a retry can actually succeed instead of
       // 404ing forever.
-      const fresh = await refreshGuestIdentity(client, guestStorage, {
-        fallbackStorage: ephemeralGuestStorage,
-      });
+      const fresh = await refreshGuestIdentity(client, guestStorage);
       setGuestId(fresh.ok ? fresh.value.guestId : undefined);
       showRetryableActionError();
       return;
@@ -197,6 +208,14 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
       const result = await mutate();
       if (result.ok) {
         setState(stateForPreview(result.value));
+        // An accepted handoff has already queued its target session server-side; the ids are
+        // redacted once the token's TTL passes, so go to the target product right away, same tab --
+        // but only when it is a web product enabled here (other targets, e.g. an extension, stay on
+        // this page's terminal status).
+        if (kind === "accept" && result.value.targetScenarioSessionId && canOpenTarget?.(result.value.targetProductId, result.value.targetScenarioId)) {
+          const { targetProductId, targetScenarioSessionId } = result.value;
+          router.push(productAttachPath(targetProductId, targetScenarioSessionId));
+        }
       } else {
         await resolveActionError(kind, result.error);
       }
@@ -268,8 +287,8 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
         <dd aria-live="polite">{t(`status.${HANDOFF_STATUS_KEY[preview.status]}`)}</dd>
         {Object.entries(preview.preview).map(([key, value]) => (
           <div key={key} className={styles.entry}>
-            <dt>{key}</dt>
-            <dd>{typeof value === "string" ? value : JSON.stringify(value)}</dd>
+            <dt>{isKnownPreviewField(key) ? t(`previewFields.${key}`) : key}</dt>
+            <dd>{formatPreviewValue(value)}</dd>
           </div>
         ))}
       </dl>

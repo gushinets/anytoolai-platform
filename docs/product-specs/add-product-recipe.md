@@ -99,7 +99,9 @@ For a web product whose result is several parts rather than one text, or whose a
 a typed composite `R`, a product-owned renderer with a pure `composeCopyText`, and
 `emitsResultViewed` for a narrower `web.result_viewed`. Its `tests/e2e/brief-decoder-smoke` package
 is the browser proof, including runtime-correlation assertions against `platform.jobs`,
-`action_runs`, `provider_calls` and `event_log`.
+`action_runs`, `provider_calls` and `event_log`. `tests/e2e/acceptance-builder-smoke` (ANY-244) adds
+the cross-product proof: a real Brief Decoder run, consent, Accept, the same-tab redirect and the
+queued target run, checked against `product_handoffs`, `scenario_sessions` and `event_log`.
 
 Every web product gets the one-screen "inputs + result" layout from `ProductRunPage` with no
 opt-in: give it an embedded `Result` that renders `secondaryAction`, the `<scope>.resultTitle|

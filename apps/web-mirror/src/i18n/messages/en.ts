@@ -25,6 +25,7 @@ export const en = {
     previousDetails: "Created from previous details",
     backToInputs: "Back to details",
     newTask: "New task",
+    handoffFailed: "Could not open the next step. Please try again.",
   },
   errors: {
     startFailed: "Could not start {product}. Please try again.",

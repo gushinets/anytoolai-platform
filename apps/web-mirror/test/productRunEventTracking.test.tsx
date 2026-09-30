@@ -1,5 +1,5 @@
 import { createInMemoryAsyncStorage } from "@anytoolai/ce-kit";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createProductRunEventTracker } from "../src/products/runtime/productRunEventTracking";
 import { errorResponse, jsonResponse, makeClientCapturingRequests } from "./fixtures/platformResponses";
 
@@ -28,6 +28,9 @@ function clientEventCalls<C extends { key: string }>(calls: C[]): C[] {
 }
 
 describe("createProductRunEventTracker", () => {
+  // The result-viewed once-per-session guard lives in this tab's sessionStorage.
+  beforeEach(() => window.sessionStorage.clear());
+
   it("tracks product_viewed/form_started/form_submitted as their web.* counterparts, forwarding the guest id ProductRunPage already resolved", async () => {
     const { client, calls } = makeClientCapturingRequests({
       [CLIENT_EVENTS_ROUTE]: [clientEventReceiptResponse(), clientEventReceiptResponse(), clientEventReceiptResponse()],
@@ -63,6 +66,19 @@ describe("createProductRunEventTracker", () => {
     expect(body.event_type).toBe("web.result_viewed");
     expect(body.scenario_session_id).toBe("session_1");
     expect(body.guest_id).toBe("guest_1");
+  });
+
+  it("reports web.result_viewed once per session, so a reload of a restored result does not count again", async () => {
+    const { client, calls } = makeClientCapturingRequests({
+      [CLIENT_EVENTS_ROUTE]: [clientEventReceiptResponse(), clientEventReceiptResponse()],
+    });
+    const onEvent = createProductRunEventTracker(client, "acceptance_builder", createInMemoryAsyncStorage());
+
+    onEvent({ type: "scenario_completed", scenarioSessionId: "session_9", guestId: "guest_1", resultViewed: true });
+    onEvent({ type: "scenario_completed", scenarioSessionId: "session_9", guestId: "guest_1", resultViewed: true });
+    onEvent({ type: "scenario_completed", scenarioSessionId: "session_10", guestId: "guest_1", resultViewed: true });
+    await vi.waitFor(() => expect(clientEventCalls(calls)).toHaveLength(2));
+    expect(clientEventCalls(calls).map((call) => parseBody(call).scenario_session_id)).toEqual(["session_9", "session_10"]);
   });
 
   it("does not track web.result_viewed for a completed run the product does not count as viewed", async () => {

@@ -12,11 +12,15 @@ import { makeClientWithDeferredRoute } from "./fixtures/platformResponses";
 import { LOCALE_STORAGE_KEY } from "../src/i18n/localeStorage";
 import { makeRender } from "./support/renderWithI18n";
 
+const routerPush = vi.hoisted(() => vi.fn());
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: routerPush }) }));
+
 // The page provides the locale (see the handoff route); the component reads its copy from it.
 const render = makeRender(HANDOFF_MESSAGES);
 
 afterEach(() => {
   cleanup();
+  routerPush.mockClear();
   // HandoffConsent persists guest identity to real window.localStorage (jsdom provides it) so it
   // survives remounts within a browser session -- clear it between tests so one test's minted
   // guest id can't leak into the next.
@@ -90,7 +94,7 @@ describe("HandoffConsent", () => {
 
     render(<HandoffConsent client={client} handoffToken="token_abc" />);
 
-    await waitFor(() => expect(screen.getByText("summary")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Summary")).toBeTruthy());
     expect(screen.getByText("A brief")).toBeTruthy();
   });
 
@@ -192,6 +196,66 @@ describe("HandoffConsent", () => {
       const acceptCall = calls.find((call) => call.key === ACCEPT_ROUTE);
       expect(JSON.parse(acceptCall?.init.body as string)).toEqual({ guest_id: "guest_ephemeral" });
     });
+  });
+
+  it("labels the known preview fields in the UI language, lists arrays plainly and shows unknown keys as sent", async () => {
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, "fr");
+    const { client } = makeRoutedClient({
+      [PREVIEW_ROUTE]: [
+        jsonResponse(200, previewPayload({ preview: { summary: "Un brief", missing_fields: ["deadline", "budget"], custom_key: { a: 1 } } })),
+      ],
+      [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
+    });
+    render(<HandoffConsent client={client} handoffToken="token_abc" />);
+
+    await waitFor(() => expect(screen.getByText("Résumé")).toBeTruthy());
+    expect(screen.getByText("Informations manquantes")).toBeTruthy();
+    expect(screen.getByText("deadline, budget")).toBeTruthy();
+    expect(screen.getByText("custom_key")).toBeTruthy();
+    expect(screen.getByText('{"a":1}')).toBeTruthy();
+  });
+
+  it("goes to the target product's attached session right after Accept, and not after Decline", async () => {
+    const accepted = previewPayload({ status: "accepted", target_scenario_session_id: "session 1", target_product_id: "acceptance_builder" });
+    const { client } = makeRoutedClient({
+      [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload())],
+      [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
+      [ACCEPT_ROUTE]: [jsonResponse(200, accepted)],
+    });
+    render(<HandoffConsent client={client} handoffToken="token_abc" canOpenTarget={(id, scenario) => id === "acceptance_builder" && scenario === "scenario_1"} />);
+    await waitFor(() => expect((screen.getByRole("button", { name: "Accept" }) as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByRole("button", { name: "Accept" }));
+
+    await waitFor(() => expect(routerPush).toHaveBeenCalledTimes(1));
+    expect(routerPush).toHaveBeenCalledWith("/products/acceptance_builder?session=session%201");
+  });
+
+  it("stays on the terminal status when the target cannot be opened by the host", async () => {
+    const { client } = makeRoutedClient({
+      [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload())],
+      [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
+      [ACCEPT_ROUTE]: [jsonResponse(200, previewPayload({ status: "accepted", target_scenario_session_id: "s1", target_product_id: "kernel_demo" }))],
+    });
+    render(<HandoffConsent client={client} handoffToken="token_abc" />);
+    await waitFor(() => expect((screen.getByRole("button", { name: "Accept" }) as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByRole("button", { name: "Accept" }));
+
+    await waitFor(() => expect(screen.getByText("Accepted")).toBeTruthy());
+    expect(routerPush).not.toHaveBeenCalled();
+  });
+
+  it("does not navigate after Decline", async () => {
+    const { client } = makeRoutedClient({
+      [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload())],
+      [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
+      [DECLINE_ROUTE]: [jsonResponse(200, previewPayload({ status: "declined" }))],
+    });
+    render(<HandoffConsent client={client} handoffToken="token_abc" />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Decline" })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "Decline" }));
+
+    await waitFor(() => expect(screen.getByText("Declined")).toBeTruthy());
+    expect(routerPush).not.toHaveBeenCalled();
   });
 
   it("resolves neither localStorage nor a guest identity, but still renders usably with Accept disabled", async () => {

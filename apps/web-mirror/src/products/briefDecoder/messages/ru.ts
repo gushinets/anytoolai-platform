@@ -17,6 +17,7 @@ export const ru: Shape<typeof en> = {
     resultTitle: "Разбор брифа",
     placeholder: "Разбор брифа появится здесь после запуска.",
     regenerate: "Разобрать бриф заново",
+    continueToTarget: "Составить критерии приёмки",
   },
   result: {
     brief: "Бриф",
