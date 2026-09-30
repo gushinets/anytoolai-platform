@@ -517,6 +517,13 @@ test.describe("Brief Decoder -> Acceptance Builder handoff", () => {
     await expect(page.getByRole("button", { name: "Copy" })).toBeVisible({ timeout: 60_000 });
     expect(await countEvents("web.result_viewed", targetSessionId)).toBe(1);
 
+    // 5b. Moving on ("New task") makes a later reload start clean instead of restoring the old result.
+    await page.getByRole("button", { name: "New task" }).click();
+    await expect(page.getByRole("button", { name: "Copy" })).toHaveCount(0);
+    await page.reload();
+    await expect(page.locator("#acceptance-builder-brief-text")).toHaveValue("");
+    await expect(page.getByRole("button", { name: "Copy" })).toHaveCount(0);
+
     // 6. The token is spent: the consent page is terminal, a replayed accept is refused, and the
     // backend's own view names the target session.
     await page.goto(`${WEB_MIRROR_BASE_URL}/handoff/${encodeURIComponent(token)}`);

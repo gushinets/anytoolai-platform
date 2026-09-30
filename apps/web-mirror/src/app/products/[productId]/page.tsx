@@ -8,7 +8,7 @@ import { getPlatformApiClient } from "../../../lib/apiClient";
 import { ProductPageShell } from "../../../products/ProductPageShell";
 import { getRegisteredProduct } from "../../../products/registry";
 import { getClientStorage } from "../../../products/runtime/clientStorage";
-import { useAttachSession } from "../../../products/runtime/attachSession";
+import { endsAttach, useAttachSession } from "../../../products/runtime/attachSession";
 import type { ProductRunEvent } from "../../../products/runtime/productDefinition";
 import { createProductRunEventTracker } from "../../../products/runtime/productRunEventTracking";
 
@@ -37,8 +37,8 @@ export default function ProductPage({ params, searchParams }: ProductPageProps) 
     () => {
       const track = createProductRunEventTracker(client, productId, getClientStorage(client));
       return (event: ProductRunEvent) => {
-        // The user started their own work: a reload no longer restores the attached handoff result.
-        if (event.type === "form_started" || event.type === "form_submitted") {
+        // The user started their own work or moved on: a reload no longer restores the attached result.
+        if (endsAttach(event)) {
           endAttach();
         }
         track(event);

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ATTACH_SESSION_PARAM } from "../../lib/hostUrls";
+import type { ProductRunEvent } from "./productDefinition";
 
 const storageKey = (productId: string) => `anytoolai.attach_session.${productId}`;
 
@@ -23,11 +24,17 @@ function writeStored(productId: string, id: string | null): void {
   }
 }
 
+/** Events after which the route must stop restoring the attached session on reload: the user started
+ * their own work (form) or moved on from the attached result ("New task", a mode switch). */
+export function endsAttach(event: ProductRunEvent): boolean {
+  return event.type === "form_started" || event.type === "form_submitted" || event.type === "attach_ended";
+}
+
 /**
  * The already-queued session (an accepted handoff) a product page should attach to. The id comes
  * from `?session=` once, is removed from the address bar (so a bookmark or shared link does not
  * carry it), and is kept in this tab's `sessionStorage` so a reload still shows the result the
- * accept already charged for. `endAttach()` drops it once the user starts their own work.
+ * accept already charged for. `endAttach()` drops it once the user starts their own work or moves on (see `endsAttach`).
  */
 export function useAttachSession(productId: string, fromUrl: string | undefined) {
   const [attachSessionId] = useState(() => fromUrl ?? readStored(productId));

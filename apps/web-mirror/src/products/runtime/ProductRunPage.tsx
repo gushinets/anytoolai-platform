@@ -913,6 +913,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     activeScenarioSessionIdRef.current = null;
     activeInputRef.current = null;
     attachActiveRef.current = false;
+    emitEvent(onEventRef.current, { type: "attach_ended", guestId });
     setDisplayedResult(null);
     setHandoffStatus("idle");
     setPhase({ kind: "idle" });

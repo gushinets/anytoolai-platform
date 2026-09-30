@@ -2,7 +2,7 @@
 // reload in the same tab, and dropped once the user starts their own work.
 import { renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { useAttachSession } from "../src/products/runtime/attachSession";
+import { endsAttach, useAttachSession } from "../src/products/runtime/attachSession";
 import { canAttachTarget } from "../src/products/attachTargets";
 import { draftDefinition } from "../src/products/acceptanceBuilder/AcceptanceBuilderProduct";
 import { getRegisteredProduct } from "../src/products/registry";
@@ -33,6 +33,17 @@ describe("useAttachSession", () => {
   it("is scoped per product", () => {
     window.sessionStorage.setItem("anytoolai.attach_session.acceptance_builder", "s 1");
     expect(renderHook(() => useAttachSession("brief_decoder", undefined)).result.current.attachSessionId).toBeUndefined();
+  });
+});
+
+describe("endsAttach", () => {
+  it("is true when the user starts their own work or moves on from the attached result, false otherwise", () => {
+    const guestId = "guest_1";
+    expect(endsAttach({ type: "form_started", guestId })).toBe(true);
+    expect(endsAttach({ type: "form_submitted", guestId })).toBe(true);
+    expect(endsAttach({ type: "attach_ended", guestId })).toBe(true);
+    expect(endsAttach({ type: "product_viewed", guestId })).toBe(false);
+    expect(endsAttach({ type: "copy_activated", scenarioSessionId: "s", guestId })).toBe(false);
   });
 });
 

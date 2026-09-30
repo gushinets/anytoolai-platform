@@ -22,6 +22,9 @@ function webEventTypeForRunEvent(eventType: ProductRunEvent["type"]): WebClientE
     case "copy_activated":
       // No web.* counterpart on purpose -- see this function's caller docstring below.
       return undefined;
+    case "attach_ended":
+      // Route bookkeeping (`endsAttach`), not a funnel event.
+      return undefined;
     default:
       return assertNever(eventType);
   }

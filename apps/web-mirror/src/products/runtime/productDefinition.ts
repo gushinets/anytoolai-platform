@@ -39,7 +39,10 @@ export type ProductRunEvent =
   // `resultViewed` is false only when the product's `emitsResultViewed` says this completed result
   // does not count as a "viewed" activation; the run itself still completed.
   | { type: "scenario_completed"; scenarioSessionId: string; guestId: string | undefined; resultViewed: boolean }
-  | { type: "copy_activated"; scenarioSessionId: string; guestId: string | undefined };
+  | { type: "copy_activated"; scenarioSessionId: string; guestId: string | undefined }
+  // The user moved on from an attached (handoff) result -- "New task" or a mode switch -- so the route
+  // stops restoring that session on reload. Not a funnel event: it never reaches the backend.
+  | { type: "attach_ended"; guestId: string | undefined };
 
 export type ProductFieldsProps<V> = {
   values: V;

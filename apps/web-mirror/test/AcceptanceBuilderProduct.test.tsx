@@ -288,6 +288,8 @@ describe("Acceptance Builder page", () => {
     await waitFor(() => expect(screen.getByLabelText("Client brief")).toBeTruthy());
 
     expect(screen.queryByRole("button", { name: "New task" })).toBeNull();
+    // Leaving the attached result is reported once, so the route stops restoring it on reload.
+    expect(events.filter((e) => e.type === "attach_ended")).toHaveLength(1);
     expect(made.calls.filter((c) => c.key === "GET /v1/scenario-sessions/session_1")).toHaveLength(1);
     expect(events.filter((e) => e.type === "scenario_completed")).toHaveLength(1);
   });

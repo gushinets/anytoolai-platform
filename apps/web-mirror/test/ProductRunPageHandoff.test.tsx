@@ -73,9 +73,12 @@ describe("ProductRunPage attachSessionId", () => {
     await waitFor(() => expect(screen.getByText(RESULT_TEXT)).toBeTruthy());
     expect(calls.some((call) => call.key === ROUTES.START)).toBe(false);
     expect(calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(1);
-    expect(events.filter((event) => event.type === "scenario_completed")).toEqual([
-      expect.objectContaining({ scenarioSessionId: "session_1", resultViewed: true }),
-    ]);
+    // Emitted from an effect after the result commits, so wait for it rather than racing the text.
+    await waitFor(() =>
+      expect(events.filter((event) => event.type === "scenario_completed")).toEqual([
+        expect.objectContaining({ scenarioSessionId: "session_1", resultViewed: true }),
+      ]),
+    );
     // No local input, so nothing to compare against: no "previous details" notice; form stays empty.
     expect(screen.queryByText("Created from previous details")).toBeNull();
     expect((screen.getByLabelText("Text") as HTMLTextAreaElement).value).toBe("");
@@ -93,6 +96,19 @@ describe("ProductRunPage attachSessionId", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "New task" }));
     expect(screen.queryByText(RESULT_TEXT)).toBeNull();
+  });
+
+  it("tells the route the attached result was left when the user clicks New task", async () => {
+    const events: ProductRunEvent[] = [];
+    const { client } = makeClientCapturingRequests(attachRoutes());
+    render(
+      <ProductRunPage definition={testProductDefinition} client={client} attachSessionId="session_1" onEvent={(e) => events.push(e)} />,
+    );
+    await waitFor(() => expect(screen.getByText(RESULT_TEXT)).toBeTruthy());
+    expect(events.some((e) => e.type === "attach_ended")).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "New task" }));
+    expect(events.filter((e) => e.type === "attach_ended")).toHaveLength(1);
   });
 
   it("ends in the run-failed state when the attached session failed", async () => {
