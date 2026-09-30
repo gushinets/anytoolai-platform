@@ -349,7 +349,7 @@ def _run_to_result(
     ).json()
     assert session_body["status"] == "completed"
     assert session_body["current_checkpoint_id"] == RESULT_READY_CHECKPOINT_ID
-    assert session_body["allowed_next_actions"] == ["copy_result", "continue_to_target"]
+    assert session_body["allowed_next_actions"] == ["copy_result"]
 
     result = asyncio.run(
         request_platform_api(

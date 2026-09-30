@@ -1,6 +1,6 @@
 workflows:
   - workflow_id: brief_decoder.decode_v1
-    version: 1
+    version: 2
     input_schema_ref: brief_decoder.decode_input_v1
     output_schema_ref: brief_decoder.decode_output_v1
     # A01 + A04 -> A05, composed through A10. Every output_mapping target writes a key of the

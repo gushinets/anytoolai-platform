@@ -145,7 +145,7 @@ def test_product_has_exactly_one_scenario_and_one_workflow() -> None:
     (scenario,) = _load_yaml("scenarios.yaml")["scenarios"]
     assert scenario["scenario_id"] == scenario["workflow_id"] == WORKFLOW_ID
     assert _workflow()["workflow_id"] == WORKFLOW_ID
-    assert scenario["allowed_next_actions"] == ["copy_result", "continue_to_target"]
+    assert scenario["allowed_next_actions"] == ["copy_result"]
 
 
 def test_no_mapping_path_uses_brackets_or_numeric_segments() -> None:
@@ -477,8 +477,22 @@ def test_handoff_route_is_allowlisted_declarative_and_leak_free() -> None:
         "artifact.content_json.document.summary",
         "artifact.content_json.brief.missing_fields",
     }
+    # `continue_to_target` is deliberately not advertised: the target may be disabled in a
+    # supported deployment, and the web handoff journey belongs to ANY-244.
     scenarios = _test_support.load_yaml(PRODUCT_DIR, "scenarios.yaml")["scenarios"]
-    assert "continue_to_target" in scenarios[0]["allowed_next_actions"]
+    assert scenarios[0]["allowed_next_actions"] == ["copy_result"]
+
+
+def test_changed_output_contract_carries_a_bumped_version() -> None:
+    """ANY-26: `brief_text` became a required workflow-output field, so the workflow and the
+    output schema are no longer the v1 definitions already persisted by earlier jobs/artifacts
+    (job.workflow_version / artifact schema_version drift guards). The input schema and the
+    scenario (whose advertised next actions are unchanged) stay at v1."""
+    versions = {s["schema_ref"]: s["version"] for s in _test_support.load_yaml(PRODUCT_DIR, "schemas.yaml")["schemas"]}
+    assert versions == {"brief_decoder.decode_input_v1": 1, "brief_decoder.decode_output_v1": 2}
+    assert _workflow()["version"] == 2
+    (scenario,) = _test_support.load_yaml(PRODUCT_DIR, "scenarios.yaml")["scenarios"]
+    assert scenario["version"] == 1
 
 
 def test_handoff_brief_text_is_the_verbatim_input_and_never_looser_than_the_target() -> None:

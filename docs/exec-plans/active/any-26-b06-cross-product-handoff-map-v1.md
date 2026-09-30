@@ -31,6 +31,14 @@ runtime/lifecycle, web, or consent-page changes in this ticket: the workflow `ou
   contains no Core change.
 - Preview maps only `document.summary` and `brief.missing_fields` (no literals).
 - Acceptance Builder gets no structured handoff input scenario.
+- `brief_text` became a required field of the decode workflow output, so `brief_decoder.decode_v1`
+  (workflow) and `brief_decoder.decode_output_v1` (schema) are bumped to version 2: the persisted
+  `job.workflow_version` / artifact `schema_version` drift guards must tell pre- and post-deploy
+  definitions apart. The input schema and the scenario (advertised next actions unchanged) stay at
+  version 1.
+- `continue_to_target` is not advertised on `brief_decoder.decode_v1`: the target may be disabled
+  in a supported deployment, and the actual same-tab web handoff journey (with target
+  availability) belongs to ANY-244. The declarative backend route stays here.
 - `brief_text` is excluded from the renderer contract: it is a handoff source, never rendered.
 
 ## Verification
