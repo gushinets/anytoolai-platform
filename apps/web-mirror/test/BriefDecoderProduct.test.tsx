@@ -63,8 +63,13 @@ function fixture(action: string, suffix: string): Record<string, unknown> {
 
 /** The composed workflow output: brief = A01 whole, issues = A04's, questions = A05's, document =
  * A10. A05 is skipped for `.no_issues` (no question fixture exists), so questions is empty there. */
+// The backend now also returns the caller's original brief as `brief_text` (the handoff source,
+// excluded from the renderer contract): it must be accepted, never rendered and never copied.
+const RAW_BRIEF_SENTINEL = "RAW-BRIEF-SENTINEL-must-not-render";
+
 function composedOutput(suffix: "" | ".weak_input" | ".no_issues"): Record<string, unknown> {
   return {
+    brief_text: RAW_BRIEF_SENTINEL,
     brief: fixture("extract_brief", suffix),
     issues: (fixture("detect_issues", suffix) as { issues: unknown[] }).issues,
     questions: suffix === ".no_issues" ? [] : (fixture("generate_questions", suffix) as { questions: unknown[] }).questions,
@@ -244,6 +249,8 @@ describe("Brief Decoder page", () => {
     fireEvent.click(screen.getByRole("button", { name: "Copy" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(composeCopyText(expected.document));
+    expect(document.body.textContent).not.toContain(RAW_BRIEF_SENTINEL);
+    expect(JSON.stringify(vi.mocked(navigator.clipboard.writeText).mock.calls)).not.toContain(RAW_BRIEF_SENTINEL);
     const nextAction = calls.filter((call) => call.key === ROUTES.NEXT_ACTION);
     expect(nextAction).toHaveLength(1);
     expect(JSON.parse(nextAction[0].init.body as string)).toEqual({ checkpoint_id: "checkpoint_1" });

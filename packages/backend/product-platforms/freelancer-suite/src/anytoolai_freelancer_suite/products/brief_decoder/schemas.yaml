@@ -3,5 +3,5 @@ schemas:
     version: 1
     file_path: schemas/decode_input.schema.json
   - schema_ref: brief_decoder.decode_output_v1
-    version: 1
+    version: 2
     file_path: schemas/decode_output.schema.json

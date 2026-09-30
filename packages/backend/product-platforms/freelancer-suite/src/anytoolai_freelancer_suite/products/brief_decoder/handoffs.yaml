@@ -1,0 +1,20 @@
+# ANY-26: the only Freelancer Suite route whose two products exist today. "Create draft", not final
+# approval. brief_text is the caller's original brief, passed through verbatim by the decode
+# workflow (its schema is identical to draft_input's brief_text, pinned by a test), so the target
+# extracts from the real brief, not from the readiness summary. The preview shows only the summary
+# and missing_fields. A missing mapped path is a hard HandoffPayloadError, so only always-present
+# paths are mapped.
+handoffs:
+  - handoff_id: brief_decoder_to_acceptance_builder_v1
+    source_product_id: brief_decoder
+    source_scenario_id: brief_decoder.decode_v1
+    target_product_id: acceptance_builder
+    target_frontend_id: web_mirror
+    target_scenario_id: acceptance_builder.draft_v1
+    target_start_policy: immediate
+    consent_required: true
+    context_mapping:
+      brief_text: artifact.content_json.brief_text
+    preview_mapping:
+      summary: artifact.content_json.document.summary
+      missing_fields: artifact.content_json.brief.missing_fields

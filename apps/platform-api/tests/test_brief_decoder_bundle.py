@@ -29,7 +29,12 @@ import sqlalchemy as sa
 from anytoolai_platform_api.bootstrap import build_runtime
 from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
 from anytoolai_platform_core.scenarios.checkpoints import RESULT_READY_CHECKPOINT_ID
-from anytoolai_platform_core.storage.db import event_log_table, provider_calls_table
+from anytoolai_platform_core.storage.db import (
+    event_log_table,
+    jobs_table,
+    provider_calls_table,
+    scenario_sessions_table,
+)
 from anytoolai_platform_core.storage.transactions import SessionFactory, transaction_boundary
 from anytoolai_platform_core.structured_output.schemas import normalize_schema_mapping
 from anytoolai_platform_core.workflows.models import JobStatus
@@ -82,10 +87,12 @@ def _fixture(key: str) -> dict[str, Any]:
     return json.loads((FIXTURE_ROOT / f"{key}.json").read_text(encoding="utf-8"))["response_json"]
 
 
-def _expected_output(suffix: str = "") -> dict[str, Any]:
-    """The composed workflow output the fixtures must produce: brief = A01 output whole, issues =
+def _expected_output(suffix: str = "", brief_text: str = BRIEF_TEXT) -> dict[str, Any]:
+    """The composed workflow output the fixtures must produce: brief_text = the input verbatim
+    (ANY-26 handoff source), brief = A01 output whole, issues =
     A04's `issues`, questions = A05's `questions`, document = A10."""
     return {
+        "brief_text": brief_text,
         "brief": _fixture(EXTRACT + suffix),
         "issues": _fixture(DETECT + suffix)["issues"],
         "questions": _fixture(QUESTIONS + suffix)["questions"],
@@ -184,6 +191,7 @@ def test_output_schema_accepts_the_fixtures_and_rejects_open_shapes() -> None:
     for suffix in ("", ".weak_input"):
         jsonschema.validate(_expected_output(suffix), schema)
     no_issues_output = {
+        "brief_text": CLEAN_BRIEF_TEXT,
         "brief": _fixture(EXTRACT + ".no_issues"),
         "issues": [],
         "questions": [],
@@ -251,14 +259,10 @@ def test_output_schema_accepts_the_fixtures_and_rejects_open_shapes() -> None:
         "whitespace_deliverable_item": mutated(
             lambda o: o["brief"]["values"].update(deliverables=[" "])
         ),
-        "whitespace_issue_description": mutated(
-            lambda o: o["issues"][0].update(description=" ")
-        ),
+        "whitespace_issue_description": mutated(lambda o: o["issues"][0].update(description=" ")),
         "whitespace_issue_evidence": mutated(lambda o: o["issues"][0].update(evidence="\n")),
         "whitespace_question": mutated(lambda o: o["questions"][0].update(question="  ")),
-        "whitespace_question_rationale": mutated(
-            lambda o: o["questions"][0].update(rationale=" ")
-        ),
+        "whitespace_question_rationale": mutated(lambda o: o["questions"][0].update(rationale=" ")),
         "key_details_missing_metadata": mutated(
             lambda o: o["document"]["sections"][1].pop("metadata")
         ),
@@ -407,11 +411,15 @@ def test_happy_path_composes_the_four_step_result(
     )
     assert response.status_code == HTTPStatus.OK
     with transaction_boundary(session_factory) as session:
-        event = session.execute(
-            sa.select(event_log_table).where(
-                event_log_table.c.event_type == "client.next_action_clicked"
+        event = (
+            session.execute(
+                sa.select(event_log_table).where(
+                    event_log_table.c.event_type == "client.next_action_clicked"
+                )
             )
-        ).mappings().one()
+            .mappings()
+            .one()
+        )
     assert event["scenario_session_id"] == started["scenario_session_id"]
     assert event["properties"] == {
         "checkpoint_id": RESULT_READY_CHECKPOINT_ID,
@@ -425,12 +433,10 @@ def test_weak_input_fixtures_are_reachable_end_to_end(
     adapter = RecordingProviderAdapter(
         FIXTURE_ROOT, variants={step: ".weak_input" for step in STEP_ORDER}
     )
-    _, output = _run_to_result(
-        app, request_platform_api, session_factory, WEAK_BRIEF_TEXT, adapter
-    )
+    _, output = _run_to_result(app, request_platform_api, session_factory, WEAK_BRIEF_TEXT, adapter)
 
     assert tuple(call.action_config_id for call in adapter.calls) == STEP_ORDER
-    assert output == _expected_output(".weak_input")
+    assert output == _expected_output(".weak_input", WEAK_BRIEF_TEXT)
     assert output["brief"]["missing_fields"]  # a vague brief reports gaps instead of failing
 
 
@@ -470,6 +476,7 @@ def test_no_issues_skips_question_generation_and_still_produces_a_consistent_doc
     extract_input, detect_input, _ = (adapter.input_payload(i) for i in range(3))
     assert extract_input["source_text"] == CLEAN_BRIEF_TEXT
     assert detect_input["source_text"] == CLEAN_BRIEF_TEXT
+    assert output["brief_text"] == CLEAN_BRIEF_TEXT
     assert output["issues"] == []
     assert output["questions"] == []
     assert output["brief"] == _fixture(EXTRACT + ".no_issues")
@@ -503,3 +510,59 @@ def test_invalid_brief_text_fails_the_job_before_any_provider_call(
     assert processed.result_artifact_id is None
     assert adapter.calls == []
     assert _provider_call_count(session_factory, job_id=started["job_id"]) == 0
+
+
+def test_handoff_to_acceptance_builder_feeds_the_original_brief_to_the_draft(
+    app: Any, request_platform_api, session_factory: SessionFactory
+) -> None:
+    """ANY-26: create -> safe preview -> accept queues acceptance_builder.draft_v1 immediately, and
+    the target's extraction receives the caller's original brief (not the readiness summary)."""
+    started = _start(app, request_platform_api, BRIEF_TEXT).json()
+    processed = _run_worker(session_factory, RecordingProviderAdapter(FIXTURE_ROOT))
+    assert processed is not None and processed.status is JobStatus.succeeded
+
+    def call(method: str, path: str, **kwargs: Any) -> httpx.Response:
+        return asyncio.run(
+            request_platform_api(app, method, path, request_id="req_handoff", **kwargs)
+        )
+
+    created = call(
+        "POST",
+        "/v1/handoffs",
+        json={
+            "handoff_definition_id": "brief_decoder_to_acceptance_builder_v1",
+            "source_scenario_session_id": started["scenario_session_id"],
+            "source_artifact_id": processed.result_artifact_id,
+        },
+    )
+    assert created.status_code == HTTPStatus.OK, created.text
+    token = created.json()["handoff_token"]
+
+    summary = _fixture(SUMMARY)["summary"]
+    preview = call("GET", f"/v1/handoffs/{token}").json()["preview"]
+    assert preview == {
+        "summary": summary,
+        "missing_fields": _fixture(EXTRACT)["missing_fields"],
+    }
+
+    accepted = call("POST", f"/v1/handoffs/{token}/accept", json={})
+    assert accepted.status_code == HTTPStatus.OK, accepted.text
+    with transaction_boundary(session_factory) as session:
+        target = session.execute(
+            sa.select(scenario_sessions_table.c.scenario_id).where(
+                scenario_sessions_table.c.id == accepted.json()["target_scenario_session_id"]
+            )
+        ).scalar_one()
+        job = session.execute(
+            sa.select(jobs_table.c.workflow_id, jobs_table.c.status).where(
+                jobs_table.c.id == accepted.json()["target_job_id"]
+            )
+        ).one()
+    assert target == "acceptance_builder.draft_v1"
+    assert tuple(job) == ("acceptance_builder.draft_v1", JobStatus.created)
+
+    target_adapter = RecordingProviderAdapter(FIXTURE_ROOT)
+    target_job = _run_worker(session_factory, target_adapter)
+    assert target_job is not None and target_job.id == accepted.json()["target_job_id"]
+    assert target_job.status is JobStatus.succeeded, target_job.error_message_safe
+    assert target_adapter.input_payload(0)["source_text"] == BRIEF_TEXT

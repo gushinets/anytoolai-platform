@@ -252,7 +252,13 @@ def test_a01_field_invariants_hold_for_every_configured_field(state: str) -> Non
     document = _fixture_response("brief_decoder.generate_summary_v1.no_issues")
 
     def output(brief: dict[str, Any]) -> dict[str, Any]:
-        return {"brief": brief, "issues": [], "questions": [], "document": document}
+        return {
+            "brief_text": "x",
+            "brief": brief,
+            "issues": [],
+            "questions": [],
+            "document": document,
+        }
 
     assert validator.is_valid(output(complete))  # control: every field present, none missing
     for name in fields:
@@ -406,7 +412,12 @@ def test_renderer_contract_agrees_with_workflow_and_scenario() -> None:
         "clarifying_questions",
         "summary_document",
     ]
-    assert {part["field"] for part in contract["parts"]} == set(output_schema["properties"])
+    # every output field is either a rendered part or explicitly excluded (brief_text is the
+    # verbatim input echoed for the handoff, never rendered)
+    assert contract["excluded_fields"] == ["brief_text"]
+    assert {part["field"] for part in contract["parts"]} | set(contract["excluded_fields"]) == set(
+        output_schema["properties"]
+    )
     assert contract["canonical_field"] in output_schema["properties"]
     # Code review finding (round #1, finding #10): `canonical_field` (`document`) is an object,
     # not a single string like sibling products' `text` -- pin that a serialization rule exists.
@@ -447,3 +458,62 @@ def test_prompt_and_schema_manifests_point_at_existing_files() -> None:
         assert (PRODUCT_DIR / entry["template_path"]).is_file(), entry["prompt_ref"]
     for entry in _load_yaml("schemas.yaml")["schemas"]:
         assert (PRODUCT_DIR / entry["file_path"]).is_file(), entry["schema_ref"]
+
+
+def test_handoff_route_is_allowlisted_declarative_and_leak_free() -> None:
+    """ANY-26: the Brief Decoder -> Acceptance Builder route maps only always-present paths."""
+    (route,) = _test_support.load_yaml(PRODUCT_DIR, "handoffs.yaml")["handoffs"]
+    acceptance_dir = PRODUCT_DIR.parent / "acceptance_builder"
+    target = _test_support.load_yaml(acceptance_dir, "scenarios.yaml")["scenarios"]
+    frontends = _test_support.load_yaml(acceptance_dir, "frontends.yaml")["frontends"]
+
+    assert route["source_scenario_id"] == WORKFLOW_ID
+    assert route["target_scenario_id"] in {s["scenario_id"] for s in target}
+    assert route["target_frontend_id"] in {f["frontend_id"] for f in frontends if f["enabled"]}
+    assert (route["target_start_policy"], route["consent_required"]) == ("immediate", True)
+    assert route["context_mapping"] == {"brief_text": "artifact.content_json.brief_text"}
+    # preview_mapping: direct artifact paths only -- no literals, no optional brief.values.*
+    assert set(route["preview_mapping"].values()) == {
+        "artifact.content_json.document.summary",
+        "artifact.content_json.brief.missing_fields",
+    }
+    # `continue_to_target` is deliberately not advertised: the target may be disabled in a
+    # supported deployment, and the web handoff journey belongs to ANY-244.
+    scenarios = _test_support.load_yaml(PRODUCT_DIR, "scenarios.yaml")["scenarios"]
+    assert scenarios[0]["allowed_next_actions"] == ["copy_result"]
+
+
+def test_changed_output_contract_carries_a_bumped_version() -> None:
+    """ANY-26: `brief_text` became a required workflow-output field, so the workflow and the
+    output schema are no longer the v1 definitions already persisted by earlier jobs/artifacts
+    (job.workflow_version / artifact schema_version drift guards). The input schema and the
+    scenario (whose advertised next actions are unchanged) stay at v1."""
+    versions = {s["schema_ref"]: s["version"] for s in _test_support.load_yaml(PRODUCT_DIR, "schemas.yaml")["schemas"]}
+    assert versions == {"brief_decoder.decode_input_v1": 1, "brief_decoder.decode_output_v1": 2}
+    assert _workflow()["version"] == 2
+    (scenario,) = _test_support.load_yaml(PRODUCT_DIR, "scenarios.yaml")["scenarios"]
+    assert scenario["version"] == 1
+
+
+def test_handoff_brief_text_is_the_verbatim_input_and_never_looser_than_the_target() -> None:
+    """ANY-26 review: the handoff source is the caller's brief passed through untouched, so its
+    output schema must equal the decode input's and the target's `brief_text` (a valid decode can
+    never fail handoff creation), and the workflow must copy `scenario.input.brief_text`."""
+    schemas = PRODUCT_DIR / "schemas"
+    source = json.loads((schemas / "decode_output.schema.json").read_text())
+    decode_input = json.loads((schemas / "decode_input.schema.json").read_text())
+    target_dir = PRODUCT_DIR.parent / "acceptance_builder" / "schemas"
+    target = json.loads((target_dir / "draft_input.schema.json").read_text())
+    brief_text = source["properties"]["brief_text"]
+    assert "brief_text" in source["required"]
+    assert brief_text == decode_input["properties"]["brief_text"]
+    assert brief_text == target["properties"]["brief_text"]
+    steps = _workflow()["steps"]
+    passthrough = [s["output_mapping"].get("context.workflow_output.brief_text") for s in steps]
+    assert passthrough.count("scenario.input.brief_text") == 1
+
+    validator = jsonschema.validators.validator_for(brief_text)(brief_text)
+    assert validator.is_valid("x" * 8000)
+    assert validator.is_valid("a\n\nb")
+    for bad in ("x" * 8001, " a", "a ", "\na", "a\n", ""):
+        assert not validator.is_valid(bad), repr(bad)

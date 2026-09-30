@@ -1,11 +1,12 @@
 workflows:
   - workflow_id: brief_decoder.decode_v1
-    version: 1
+    version: 2
     input_schema_ref: brief_decoder.decode_input_v1
     output_schema_ref: brief_decoder.decode_output_v1
     # A01 + A04 -> A05, composed through A10. Every output_mapping target writes a key of the
-    # composed workflow output ({brief, issues, questions, document}; detect_issues writes both
-    # `issues` and the `questions` default A05 overrides). A01 -> A04 is order-only: A04 reads
+    # composed workflow output ({brief_text, brief, issues, questions, document}; brief_text is the
+    # input passed through verbatim; detect_issues writes both `issues` and the `questions`
+    # default A05 overrides). A01 -> A04 is order-only: A04 reads
     # the original brief text, not A01's output (docs/architecture/action-model.md).
     steps:
       - step_id: extract
@@ -17,6 +18,9 @@ workflows:
           strict: 'literal:false'
         output_mapping:
           context.workflow_output.brief: steps.extract.output
+          # Verbatim passthrough of the caller's brief: the faithful source for the
+          # Acceptance Builder handoff (ANY-26); the LLM-written summary is a readiness note.
+          context.workflow_output.brief_text: scenario.input.brief_text
       - step_id: detect_issues
         action_config_id: brief_decoder.detect_issues_v1
         input_mapping:

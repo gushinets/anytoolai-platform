@@ -1,6 +1,12 @@
 {
   "type": "object",
   "properties": {
+    "brief_text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8000,
+      "pattern": "^\\S([\\s\\S]*\\S)?(?!\\n)$"
+    },
     "brief": {
       "type": "object",
       "properties": {
@@ -584,6 +590,7 @@
     }
   },
   "required": [
+    "brief_text",
     "brief",
     "issues",
     "questions",
