@@ -5,9 +5,9 @@
 - State: active
 - Owner: agent
 - Created: 2026-09-29
-- Last updated: 2026-09-29
+- Last updated: 2026-09-30
 - Review date: 2026-10-06
-- Next action: run the full validation set, open the PR, address review.
+- Next action: wait for CI on the open PR (#156) and reviewer sign-off, then merge; ANY-244 owns the web handoff journey.
 - Blocker: none
 
 ## Goal
