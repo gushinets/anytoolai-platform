@@ -7,6 +7,7 @@ import { makeRoutedFetchClient } from "@anytoolai/ce-kit/test/testUtils/routedFe
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { HandoffConsent } from "../src/components/HandoffConsent";
+import { readAttachSessionId } from "../src/products/runtime/attachSession";
 import { HANDOFF_MESSAGES } from "../src/components/handoffMessages";
 import { makeClientWithDeferredCalls, makeClientWithDeferredRoute } from "./fixtures/platformResponses";
 import { LOCALE_STORAGE_KEY } from "../src/i18n/localeStorage";
@@ -343,7 +344,7 @@ describe("HandoffConsent", () => {
 
     expect(routerPush).not.toHaveBeenCalled();
     // The Accept happened (and charged the quota): the target product restores that session on its next visit.
-    expect(window.sessionStorage.getItem("anytoolai.attach_session.acceptance_builder")).toBe("s1");
+    expect(readAttachSessionId("acceptance_builder")).toBe("s1");
   });
 
   it("does not redirect from the already-accepted refetch when the person left the page meanwhile", async () => {
@@ -366,7 +367,7 @@ describe("HandoffConsent", () => {
 
     expect(routerPush).not.toHaveBeenCalled();
     // The refetch answered after the person left: it still names the queued (charged) session, so keep it.
-    expect(window.sessionStorage.getItem("anytoolai.attach_session.acceptance_builder")).toBe("s1");
+    expect(readAttachSessionId("acceptance_builder")).toBe("s1");
   });
 
   it("after the person left, an Accept error ('already accepted') refetches once to keep the queued session, and does nothing else", async () => {
@@ -392,7 +393,7 @@ describe("HandoffConsent", () => {
     await settle();
 
     // The 409 proves the Accept went through: its session is kept; no navigation, nothing more is read.
-    expect(window.sessionStorage.getItem("anytoolai.attach_session.acceptance_builder")).toBe("s1");
+    expect(readAttachSessionId("acceptance_builder")).toBe("s1");
     expect(routerPush).not.toHaveBeenCalled();
     expect(calls.filter((call) => call.key === PREVIEW_ROUTE)).toHaveLength(2);
   });
@@ -412,7 +413,7 @@ describe("HandoffConsent", () => {
     resolveDeferred(jsonResponse(200, previewPayload({ status: "accepted", target_scenario_session_id: "s1", target_product_id: "kernel_demo" })));
     await settle();
 
-    expect(window.sessionStorage.getItem("anytoolai.attach_session.kernel_demo")).toBeNull();
+    expect(readAttachSessionId("kernel_demo")).toBeUndefined();
     expect(routerPush).not.toHaveBeenCalled();
   });
 
@@ -425,7 +426,7 @@ describe("HandoffConsent", () => {
     await waitFor(() => expect(screen.queryByText("Loading handoff…")).toBeNull());
     expect(screen.queryByRole("button", { name: "Open result" })).toBeNull();
     expect(routerPush).not.toHaveBeenCalled();
-    expect(window.sessionStorage.getItem("anytoolai.attach_session.acceptance_builder")).toBeNull();
+    expect(readAttachSessionId("acceptance_builder")).toBeUndefined();
   });
 
   it("stays on the terminal status for a failed handoff even when it names a session (only accepted/consumed open)", async () => {
@@ -454,6 +455,41 @@ describe("HandoffConsent", () => {
     await settle();
 
     expect(calls.filter((call) => call.key === PREVIEW_ROUTE)).toHaveLength(1);
+  });
+
+  it("keeps the newer accepted session when an older Accept settles late (two deferred accepts: B first, then A)", async () => {
+    const A = { token: "token_a", route: "POST /v1/handoffs/token_a/accept", session: "session_a", expires: "2026-10-01T10:00:00Z" };
+    const B = { token: "token_b", route: "POST /v1/handoffs/token_b/accept", session: "session_b", expires: "2026-10-01T10:05:00Z" };
+    const consent = (token: string, expires: string) => ({
+      [`GET /v1/handoffs/${token}`]: [jsonResponse(200, previewPayload({ expires_at: expires }))],
+      [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
+    });
+
+    // Accept A stays pending while the person leaves its consent page.
+    const a = makeClientWithDeferredRoute(consent(A.token, A.expires), A.route);
+    const pageA = render(<HandoffConsent client={a.client} handoffToken={A.token} canOpenTarget={() => true} />);
+    const acceptA = (await screen.findByRole("button", { name: "Accept" })) as HTMLButtonElement;
+    await waitFor(() => expect(acceptA.disabled).toBe(false));
+    fireEvent.click(acceptA);
+    await waitFor(() => expect(acceptA.getAttribute("aria-busy")).toBe("true"));
+    pageA.unmount();
+
+    // Accept B (the same target product) completes and the person lands on B's page.
+    const b = makeRoutedClient({
+      ...consent(B.token, B.expires),
+      [B.route]: [jsonResponse(200, previewPayload({ status: "accepted", expires_at: B.expires, target_scenario_session_id: B.session, target_product_id: "acceptance_builder" }))],
+    });
+    render(<HandoffConsent client={b.client} handoffToken={B.token} canOpenTarget={() => true} />);
+    const acceptB = (await screen.findByRole("button", { name: "Accept" })) as HTMLButtonElement;
+    await waitFor(() => expect(acceptB.disabled).toBe(false));
+    fireEvent.click(acceptB);
+    await waitFor(() => expect(routerPush).toHaveBeenCalledWith(`/products/acceptance_builder?session=${B.session}`));
+    expect(readAttachSessionId("acceptance_builder")).toBe(B.session);
+
+    // The older A's response arrives late: it must not replace B.
+    a.resolveDeferred(jsonResponse(200, previewPayload({ status: "accepted", expires_at: A.expires, target_scenario_session_id: A.session, target_product_id: "acceptance_builder" })));
+    await settle();
+    expect(readAttachSessionId("acceptance_builder")).toBe(B.session);
   });
 
   it("does not navigate after Decline", async () => {

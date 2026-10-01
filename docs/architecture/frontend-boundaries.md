@@ -174,13 +174,15 @@ The shared runtime, not a product, owns the web side of a handoff:
   the terminal status. The consent route injects that check, so it does not bundle every product.
 - `web.result_viewed` for an attached session is sent with the session alone, without a guest: the backend
   derives guest and chain from the session and rejects a different explicit guest, which is what the
-  current one is after a reload without a usable `localStorage` (a fresh in-memory guest). The tab's
-  once-per-session mark for it is set before the request and taken back if the backend did not accept the
-  event, so a reload can report it again.
+  current one is after a reload without a usable `localStorage` (a fresh in-memory guest). The tab keeps, per
+  session, the event id and whether the backend accepted it: accepted means never again; anything else
+  (a lost response, a timeout) is retried on the next report with the SAME `event_id`, so a first attempt
+  that the backend did commit is deduped there (`trackClientEvent` requires the same id on every retry of
+  one logical event) instead of adding a second row.
 - The redirect after Accept (and the "Open result" action, and what is remembered) needs an `accepted` or
   `consumed` preview that names a non-empty target session the host can open; any other status with a
   session id (for example `failed`) stays on the consent page's terminal status. One remembered session
-  per product per tab: the newest accepted one wins.
+  per product per tab, and the newest accepted one wins by the handoff's own order (its `expiresAt`, which grows with creation time), not by which response arrives last: an older Accept that settles late cannot replace the newer session the person is already on. The remembered entry is stored with that rank before the same-tab navigation too.
 - A product with a `handoff` must define `<messageScope>.continueToTarget` in its messages. A
   multi-mode product (each mode its own `ProductDefinition`) supplies only its mode list to the shared
   `products/shared/MultiModeProduct.tsx`, which owns the selector, the clean remount per mode, the

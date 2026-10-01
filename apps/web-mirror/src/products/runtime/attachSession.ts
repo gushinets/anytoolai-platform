@@ -3,30 +3,55 @@ import { ATTACH_SESSION_PARAM } from "../../lib/hostUrls";
 
 const storageKey = (productId: string) => `anytoolai.attach_session.${productId}`;
 
-function readStored(productId: string): string | undefined {
+/** One remembered session per product per tab. `rank` orders accepted handoffs (see `rememberAttachSession`);
+ * a session that arrived without one (a `?session=` link) has the lowest rank, "". */
+type StoredAttach = { id: string; rank: string };
+
+function readEntry(productId: string): StoredAttach | undefined {
   try {
-    return window.sessionStorage.getItem(storageKey(productId)) ?? undefined;
+    const raw = window.sessionStorage.getItem(storageKey(productId));
+    if (raw === null) {
+      return undefined;
+    }
+    const parsed: unknown = JSON.parse(raw);
+    return typeof parsed === "object" && parsed !== null && typeof (parsed as StoredAttach).id === "string"
+      ? { id: (parsed as StoredAttach).id, rank: String((parsed as StoredAttach).rank ?? "") }
+      : undefined;
   } catch {
     return undefined;
   }
 }
 
-function writeStored(productId: string, id: string | null): void {
+function writeEntry(productId: string, entry: StoredAttach | null): void {
   try {
-    if (id === null) {
+    if (entry === null) {
       window.sessionStorage.removeItem(storageKey(productId));
     } else {
-      window.sessionStorage.setItem(storageKey(productId), id);
+      window.sessionStorage.setItem(storageKey(productId), JSON.stringify(entry));
     }
   } catch {
     // Storage unavailable: the id then simply does not survive a reload.
   }
 }
 
-/** Remembers a session an accepted handoff queued for `productId` without navigating there (an Accept that
- * settled after the person left the consent page), so the product restores it on its next visit. */
-export function rememberAttachSession(productId: string, scenarioSessionId: string): void {
-  writeStored(productId, scenarioSessionId);
+/** The remembered session id for `productId`, if any (what a visit would restore). */
+export function readAttachSessionId(productId: string): string | undefined {
+  return readEntry(productId)?.id;
+}
+
+/**
+ * Remembers a session an accepted handoff queued for `productId` (an Accept that settled after the person left
+ * the consent page, or just before navigating), so the product restores it on its next visit. Ordering-aware:
+ * `rank` is the handoff's own `expiresAt` (it grows with the handoff's creation time), and a remembered
+ * session is replaced only by a NEWER one, so an older Accept whose response arrives late cannot overwrite
+ * the newer accepted session the person is already on.
+ */
+export function rememberAttachSession(productId: string, scenarioSessionId: string, rank: string): void {
+  const current = readEntry(productId);
+  if (current === undefined || current.id === scenarioSessionId || rank > current.rank) {
+    const newest = current !== undefined && current.rank > rank ? current.rank : rank;
+    writeEntry(productId, { id: scenarioSessionId, rank: newest });
+  }
 }
 
 /** What a product page needs to show an already-queued session, threaded route -> shell -> product ->
@@ -56,7 +81,7 @@ export type AttachProps = {
  * the person typing in another mode, forgets nothing, so a reload still retries the paid-for session.
  */
 export function useAttachSession(productId: string, fromUrl: string | undefined): AttachProps {
-  const [attachSessionId] = useState(() => fromUrl || readStored(productId));
+  const [attachSessionId] = useState(() => fromUrl || readEntry(productId)?.id);
   // The id this route attached, once the page started showing it. `onAttachEnd` forgets only that one: a late
   // Accept may have stored another session for the product meanwhile (`rememberAttachSession`).
   const begunIdRef = useRef<string | undefined>(undefined);
@@ -64,7 +89,9 @@ export function useAttachSession(productId: string, fromUrl: string | undefined)
     if (!fromUrl) {
       return;
     }
-    writeStored(productId, fromUrl);
+    // A session the consent page already remembered keeps its rank; a bare link starts at the lowest.
+    const current = readEntry(productId);
+    writeEntry(productId, current?.id === fromUrl ? current : { id: fromUrl, rank: "" });
     const url = new URL(window.location.href);
     url.searchParams.delete(ATTACH_SESSION_PARAM);
     // `null` state: Next then copies its own history internals into it and syncs `useSearchParams`;
@@ -77,8 +104,8 @@ export function useAttachSession(productId: string, fromUrl: string | undefined)
   const onAttachEnd = useCallback(() => {
     const begunId = begunIdRef.current;
     begunIdRef.current = undefined;
-    if (begunId !== undefined && readStored(productId) === begunId) {
-      writeStored(productId, null);
+    if (begunId !== undefined && readEntry(productId)?.id === begunId) {
+      writeEntry(productId, null);
     }
   }, [productId]);
   return { attachSessionId, onAttachBegin, onAttachEnd };

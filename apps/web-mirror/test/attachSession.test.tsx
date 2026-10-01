@@ -2,7 +2,7 @@
 // reload in the same tab, and forgotten only when the person moves on from the session the page showed.
 import { renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { useAttachSession } from "../src/products/runtime/attachSession";
+import { readAttachSessionId, rememberAttachSession, useAttachSession } from "../src/products/runtime/attachSession";
 import { canAttachTarget } from "../src/products/attachTargets";
 import { draftDefinition } from "../src/products/acceptanceBuilder/AcceptanceBuilderProduct";
 import { getRegisteredProduct } from "../src/products/registry";
@@ -17,11 +17,11 @@ describe("useAttachSession", () => {
     const { result } = renderHook(() => useAttachSession("acceptance_builder", "s 1"));
     expect(result.current.attachSessionId).toBe("s 1");
     expect(window.location.search).toBe("?keep=1");
-    expect(window.sessionStorage.getItem("anytoolai.attach_session.acceptance_builder")).toBe("s 1");
+    expect(readAttachSessionId("acceptance_builder")).toBe("s 1");
   });
 
   it("restores the id after a reload (no URL param) until the person moves on from the shown session", () => {
-    window.sessionStorage.setItem("anytoolai.attach_session.acceptance_builder", "s 1");
+    rememberAttachSession("acceptance_builder", "s 1", "2026-10-01T10:00:00Z");
     const reloaded = renderHook(() => useAttachSession("acceptance_builder", undefined));
     expect(reloaded.result.current.attachSessionId).toBe("s 1");
 
@@ -32,31 +32,47 @@ describe("useAttachSession", () => {
   });
 
   it("forgets only the id it attached: a session stored meanwhile (a late Accept) survives the end", () => {
-    window.sessionStorage.setItem("anytoolai.attach_session.acceptance_builder", "s 1");
+    rememberAttachSession("acceptance_builder", "s 1", "2026-10-01T10:00:00Z");
     const shown = renderHook(() => useAttachSession("acceptance_builder", undefined));
     shown.result.current.onAttachBegin?.();
-    window.sessionStorage.setItem("anytoolai.attach_session.acceptance_builder", "s 2");
+    rememberAttachSession("acceptance_builder", "s 2", "2026-10-01T10:05:00Z");
 
     shown.result.current.onAttachEnd?.();
-    expect(window.sessionStorage.getItem("anytoolai.attach_session.acceptance_builder")).toBe("s 2");
+    expect(readAttachSessionId("acceptance_builder")).toBe("s 2");
   });
 
   it("forgets nothing for an end that was never preceded by a begin (a failed boot, another mode)", () => {
-    window.sessionStorage.setItem("anytoolai.attach_session.acceptance_builder", "s 1");
+    rememberAttachSession("acceptance_builder", "s 1", "2026-10-01T10:00:00Z");
     const reloaded = renderHook(() => useAttachSession("acceptance_builder", undefined));
     reloaded.result.current.onAttachEnd?.();
-    expect(window.sessionStorage.getItem("anytoolai.attach_session.acceptance_builder")).toBe("s 1");
+    expect(readAttachSessionId("acceptance_builder")).toBe("s 1");
   });
 
   it("treats an empty URL value as no id, falling back to this tab's stored one", () => {
-    window.sessionStorage.setItem("anytoolai.attach_session.acceptance_builder", "s 1");
+    rememberAttachSession("acceptance_builder", "s 1", "2026-10-01T10:00:00Z");
     expect(renderHook(() => useAttachSession("acceptance_builder", "")).result.current.attachSessionId).toBe("s 1");
     window.sessionStorage.clear();
     expect(renderHook(() => useAttachSession("acceptance_builder", "")).result.current.attachSessionId).toBeUndefined();
   });
 
+  it("remembers only a NEWER accepted session: an older one settling late cannot replace it", () => {
+    rememberAttachSession("acceptance_builder", "new", "2026-10-01T10:05:00Z");
+    rememberAttachSession("acceptance_builder", "old", "2026-10-01T10:00:00Z");
+    expect(readAttachSessionId("acceptance_builder")).toBe("new");
+
+    rememberAttachSession("acceptance_builder", "newest", "2026-10-01T10:10:00Z");
+    expect(readAttachSessionId("acceptance_builder")).toBe("newest");
+  });
+
+  it("keeps the rank of a session the consent page remembered when it arrives as ?session= (a late older one still loses)", () => {
+    rememberAttachSession("acceptance_builder", "s 1", "2026-10-01T10:05:00Z");
+    renderHook(() => useAttachSession("acceptance_builder", "s 1"));
+    rememberAttachSession("acceptance_builder", "older", "2026-10-01T10:00:00Z");
+    expect(readAttachSessionId("acceptance_builder")).toBe("s 1");
+  });
+
   it("is scoped per product", () => {
-    window.sessionStorage.setItem("anytoolai.attach_session.acceptance_builder", "s 1");
+    rememberAttachSession("acceptance_builder", "s 1", "2026-10-01T10:00:00Z");
     expect(renderHook(() => useAttachSession("brief_decoder", undefined)).result.current.attachSessionId).toBeUndefined();
   });
 });

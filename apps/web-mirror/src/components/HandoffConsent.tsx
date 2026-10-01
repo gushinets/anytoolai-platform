@@ -245,7 +245,7 @@ export function HandoffConsent({ client, handoffToken, canOpenTarget }: HandoffC
   function rememberAcceptedTarget(preview: HandoffPreview): void {
     const sessionId = acceptedTargetSessionId(preview, canOpenTarget);
     if (sessionId !== null) {
-      rememberAttachSession(preview.targetProductId, sessionId);
+      rememberAttachSession(preview.targetProductId, sessionId, preview.expiresAt);
     }
   }
 
@@ -256,6 +256,8 @@ export function HandoffConsent({ client, handoffToken, canOpenTarget }: HandoffC
   function redirectToAcceptedTarget(preview: HandoffPreview): void {
     const sessionId = acceptedTargetSessionId(preview, canOpenTarget);
     if (sessionId !== null) {
+      // Remembered with its rank before leaving, so a late response of an OLDER Accept cannot replace it.
+      rememberAcceptedTarget(preview);
       router.push(productAttachPath(preview.targetProductId, sessionId));
     }
   }

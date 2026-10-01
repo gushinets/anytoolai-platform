@@ -35,7 +35,7 @@ import { ProductRunPage } from "../src/products/runtime/ProductRunPage";
 import { AcceptanceBuilderResultView } from "../src/products/acceptanceBuilder/AcceptanceBuilderResult";
 import { LOCALE_STORAGE_KEY } from "../src/i18n/localeStorage";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
-import { useAttachSession } from "../src/products/runtime/attachSession";
+import { readAttachSessionId, useAttachSession } from "../src/products/runtime/attachSession";
 import { makeRender } from "./support/renderWithI18n";
 import type { ProductRunEvent } from "../src/products/runtime/productDefinition";
 
@@ -371,7 +371,7 @@ describe("Acceptance Builder page", () => {
     const attach = useAttachSession("acceptance_builder", "session_1");
     return <AcceptanceBuilderProduct client={client} {...attach} />;
   }
-  const PERSISTED = "anytoolai.attach_session.acceptance_builder";
+
 
   it("releases the lock when the boot of an attached session fails, and keeps the persisted session (a reload retries it)", async () => {
     const r = routesFor(IDS.draft);
@@ -379,7 +379,7 @@ describe("Acceptance Builder page", () => {
     render(<Harness client={client} />);
     const checkMode = screen.getByRole("radio", { name: "Check deliverable" }) as HTMLInputElement;
     expect(checkMode.disabled).toBe(true); // booting
-    expect(window.sessionStorage.getItem(PERSISTED)).toBe("session_1");
+    expect(readAttachSessionId("acceptance_builder")).toBe("session_1");
 
     resolveDeferred(errorResponse(500, "internal_error"));
     await waitFor(() => expect(screen.getByText(/unavailable right now/i)).toBeTruthy());
@@ -387,7 +387,7 @@ describe("Acceptance Builder page", () => {
 
     fireEvent.click(checkMode);
     // The attach never began, so nothing forgot the paid-for session: a reload still has it.
-    expect(window.sessionStorage.getItem(PERSISTED)).toBe("session_1");
+    expect(readAttachSessionId("acceptance_builder")).toBe("session_1");
   });
 
   it("forgets the persisted session when own work's result replaces the attached one on screen (not at submit)", async () => {
@@ -401,25 +401,25 @@ describe("Acceptance Builder page", () => {
     });
     render(<Harness client={made.client} />);
     await waitFor(() => expect(screen.getByRole("button", { name: "New task" })).toBeTruthy());
-    expect(window.sessionStorage.getItem(PERSISTED)).toBe("session_1");
+    expect(readAttachSessionId("acceptance_builder")).toBe("session_1");
 
     // Typing alone leaves it (the attached result is still on screen) ...
     fireEvent.change(screen.getByLabelText("Client brief"), { target: { value: "My own brief." } });
-    expect(window.sessionStorage.getItem(PERSISTED)).toBe("session_1");
+    expect(readAttachSessionId("acceptance_builder")).toBe("session_1");
     // ... and so does starting the run: it is forgotten once the own result replaced the attached one.
     fireEvent.click(screen.getByRole("button", { name: /Draft criteria/ }));
-    await waitFor(() => expect(window.sessionStorage.getItem(PERSISTED)).toBeNull());
+    await waitFor(() => expect(readAttachSessionId("acceptance_builder")).toBeUndefined());
   });
 
   it("forgets the persisted session on a mode switch only once the attached result was shown", async () => {
     const made = makeClientCapturingRequests(bothModesRoutes(draftOutput()));
     render(<Harness client={made.client} />);
     await waitFor(() => expect(screen.getByRole("button", { name: "New task" })).toBeTruthy());
-    expect(window.sessionStorage.getItem(PERSISTED)).toBe("session_1");
+    expect(readAttachSessionId("acceptance_builder")).toBe("session_1");
 
     fireEvent.click(screen.getByRole("radio", { name: "Check deliverable" }));
     await waitFor(() => expect(screen.getByLabelText("Finished work")).toBeTruthy());
-    expect(window.sessionStorage.getItem(PERSISTED)).toBeNull();
+    expect(readAttachSessionId("acceptance_builder")).toBeUndefined();
   });
 
   it("does not show an attached check session as a draft result", async () => {
