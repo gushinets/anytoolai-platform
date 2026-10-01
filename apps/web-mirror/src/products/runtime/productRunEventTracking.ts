@@ -29,9 +29,22 @@ function webEventTypeForRunEvent(eventType: ProductRunEvent["type"]): WebClientE
 
 /** `web.result_viewed` is one activation per session: a reload of a restored result (see
  * `useAttachSession`) renders it again, and must not count again. Tab-scoped (`sessionStorage`); an
- * unusable storage just falls back to reporting. */
+ * unusable storage just falls back to reporting. The mark is set before the request (so two events in a
+ * row send one) and taken back if the backend did not accept it, so a reload can report it again. */
+function resultViewedKey(scenarioSessionId: string): string {
+  return `anytoolai.result_viewed.${scenarioSessionId}`;
+}
+
+function forgetResultViewInTab(scenarioSessionId: string): void {
+  try {
+    window.sessionStorage.removeItem(resultViewedKey(scenarioSessionId));
+  } catch {
+    // Storage unavailable: nothing was marked.
+  }
+}
+
 function isFirstResultViewInTab(scenarioSessionId: string): boolean {
-  const key = `anytoolai.result_viewed.${scenarioSessionId}`;
+  const key = resultViewedKey(scenarioSessionId);
   try {
     if (window.sessionStorage.getItem(key) !== null) {
       return false;
@@ -84,6 +97,7 @@ export function createProductRunEventTracker(
       return;
     }
 
+    const resultViewedSessionId = event.type === "scenario_completed" ? event.scenarioSessionId : undefined;
     void getOrCreateWebSessionId(storage)
       .then((webSessionId) =>
         trackClientEvent(client, {
@@ -95,8 +109,16 @@ export function createProductRunEventTracker(
           scenarioSessionId,
         }),
       )
+      .then((result) => {
+        if (resultViewedSessionId !== undefined && !result.ok) {
+          forgetResultViewInTab(resultViewedSessionId);
+        }
+      })
       .catch(() => {
         // See this function's own docstring: backstop only, not an expected path.
+        if (resultViewedSessionId !== undefined) {
+          forgetResultViewInTab(resultViewedSessionId);
+        }
       });
   };
 }

@@ -424,10 +424,66 @@ describe("ProductRunPage handoff button", () => {
 
     const stop = vi.spyOn(window, "stop").mockImplementation(() => undefined);
     fireEvent.click(screen.getByRole("button", { name: "Stay on this page" }));
-    // It does not abort the document's other requests (a copy activation POST must survive).
-    expect(stop).not.toHaveBeenCalled();
+    // It stops the pending navigation first, so a slow one cannot commit over a run started after unlocking.
+    expect(stop).toHaveBeenCalledTimes(1);
     expect((screen.getByLabelText("Text") as HTMLTextAreaElement).disabled).toBe(false);
     expect(screen.queryByText("Opening the next step…")).toBeNull();
+  });
+
+  it("waits for a pending copy activation before letting the person out of a navigation (stopping it would abort the POST)", async () => {
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: vi.fn(() => Promise.resolve()) } });
+    const assign = vi.fn();
+    vi.spyOn(window, "location", "get").mockReturnValue({
+      origin: "https://web.example.com",
+      pathname: "/products/test_product",
+      assign,
+    } as unknown as Location);
+    const stop = vi.spyOn(window, "stop").mockImplementation(() => undefined);
+    const { client, resolveCall } = makeClientWithDeferredCalls(
+      {
+        ...attachRoutes(),
+        [ROUTES.NEXT_ACTION]: [sessionResponse({ status: "completed" })],
+        [HANDOFFS_ROUTE]: [
+          jsonResponse(200, { handoff_id: "handoff_1", handoff_token: "tok", status: "created", expires_at: "2026-09-30T00:00:00Z" }),
+        ],
+      },
+      { [ROUTES.NEXT_ACTION]: 1 },
+    );
+    render(<ProductRunPage definition={withHandoff} client={client} attachSessionId="session_1" />);
+    await waitFor(() => expect(screen.getByText(RESULT_TEXT)).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "Continue to next tool" }));
+    await waitFor(() => expect(assign).toHaveBeenCalled()); // navigating
+    const stay = screen.getByRole("button", { name: "Stay on this page" }) as HTMLButtonElement;
+    expect(stay.disabled).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy" })); // the copy_result POST is now pending
+    await waitFor(() => expect(stay.disabled).toBe(true));
+    expect(stop).not.toHaveBeenCalled();
+
+    resolveCall(ROUTES.NEXT_ACTION, 0, sessionResponse({ status: "completed" }));
+    await waitFor(() => expect(stay.disabled).toBe(false));
+    fireEvent.click(stay);
+    expect(stop).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports an attached result by its session alone (no guest), and an own run with the guest", async () => {
+    const events: ProductRunEvent[] = [];
+    const attached = makeClientCapturingRequests(attachRoutes());
+    render(<ProductRunPage definition={testProductDefinition} client={attached.client} attachSessionId="session_1" onEvent={(e) => events.push(e)} />);
+    await waitFor(() => expect(events.some((e) => e.type === "scenario_completed")).toBe(true));
+    // After a reload without a usable localStorage the current guest differs from the session's owner, and the
+    // backend rejects an explicit guest that is not the owner: the session is the authority.
+    expect(events.find((e) => e.type === "scenario_completed")).toMatchObject({ scenarioSessionId: "session_1", guestId: undefined });
+
+    cleanup();
+    events.length = 0;
+    const own = makeClientCapturingRequests({ ...attachRoutes(), [ROUTES.START]: [startResponse()] });
+    render(<ProductRunPage definition={testProductDefinition} client={own.client} onEvent={(e) => events.push(e)} />);
+    await waitFor(() => expect(screen.getByLabelText("Text")).toBeTruthy());
+    fireEvent.change(screen.getByLabelText("Text"), { target: { value: "mine" } });
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
+    await waitFor(() => expect(events.some((e) => e.type === "scenario_completed")).toBe(true));
+    expect(events.find((e) => e.type === "scenario_completed")).toMatchObject({ guestId: "guest_1" });
   });
 
   it("ends the attach when own work's result replaces the attached one on screen, not for typing, nor at submit", async () => {

@@ -172,6 +172,11 @@ The shared runtime, not a product, owns the web side of a handoff:
 - The redirect happens only when `products/attachTargets.ts` lists the accepted target scenario
   (a registered, enabled product page that can attach it); otherwise the consent page keeps showing
   the terminal status. The consent route injects that check, so it does not bundle every product.
+- `web.result_viewed` for an attached session is sent with the session alone, without a guest: the backend
+  derives guest and chain from the session and rejects a different explicit guest, which is what the
+  current one is after a reload without a usable `localStorage` (a fresh in-memory guest). The tab's
+  once-per-session mark for it is set before the request and taken back if the backend did not accept the
+  event, so a reload can report it again.
 - The redirect after Accept (and the "Open result" action, and what is remembered) needs an `accepted` or
   `consumed` preview that names a non-empty target session the host can open; any other status with a
   session id (for example `failed`) stays on the consent page's terminal status. One remembered session
@@ -190,10 +195,11 @@ The shared runtime, not a product, owns the web side of a handoff:
   and lock the page until it unloads; a bfcache return resets it. There is deliberately no timer: how
   long a navigation takes is a guess, and unlocking on a guess lets a new paid run start under a
   navigation that is still going to leave for the previous result. A cancelled navigation (Esc, Stop)
-  fires no event, so the "navigating" status carries an explicit "Stay on this page" action. It does not
-  call `window.stop()` (that would also abort a copy activation POST that the copy handler is built to
-  keep alive), so a navigation that was merely slow may still arrive, at the previous result's consent
-  page, which is harmless to leave.
+  fires no event, so the "navigating" status carries an explicit "Stay on this page" action. It calls
+  `window.stop()` before unlocking: otherwise a merely slow navigation could still commit after the
+  person started a new run here and abandon that run's result. `window.stop()` also aborts every other
+  in-flight request of the document, and the one that must survive is a copy activation POST (it
+  outlives the "Copied" feedback), so the action is disabled while one is in flight.
 - An Accept whose response arrives after the person left the consent page still happened server-side and
   charged the quota: the target session id is kept for that product's next visit
   (`rememberAttachSession`), and nothing navigates. An error such as "already accepted" that

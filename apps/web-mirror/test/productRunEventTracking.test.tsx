@@ -81,6 +81,27 @@ describe("createProductRunEventTracker", () => {
     expect(clientEventCalls(calls).map((call) => parseBody(call).scenario_session_id)).toEqual(["session_9", "session_10"]);
   });
 
+  it("takes the once-per-session mark back when the backend did not accept the event, so a reload can report it", async () => {
+    const { client, calls } = makeClientCapturingRequests({
+      [CLIENT_EVENTS_ROUTE]: [
+        errorResponse(400, "client_event_invalid"),
+        // A receipt the client accepts (the backend answers with both fields).
+        jsonResponse(200, { event_id: "event_2", event_type: "web.result_viewed" }),
+      ],
+    });
+    const onEvent = createProductRunEventTracker(client, "acceptance_builder", createInMemoryAsyncStorage());
+    const completed = { type: "scenario_completed", scenarioSessionId: "session_7", guestId: undefined, resultViewed: true } as const;
+
+    onEvent(completed);
+    await vi.waitFor(() => expect(clientEventCalls(calls)).toHaveLength(1));
+    await vi.waitFor(() => expect(window.sessionStorage.getItem("anytoolai.result_viewed.session_7")).toBeNull());
+
+    onEvent(completed); // a reload of the same result in this tab: the first event was rejected
+    await vi.waitFor(() => expect(clientEventCalls(calls)).toHaveLength(2));
+    expect(parseBody(clientEventCalls(calls)[1]!).guest_id).toBeUndefined();
+    await vi.waitFor(() => expect(window.sessionStorage.getItem("anytoolai.result_viewed.session_7")).toBe("1"));
+  });
+
   it("does not track web.result_viewed for a completed run the product does not count as viewed", async () => {
     const { client, calls } = makeClientCapturingRequests({ [CLIENT_EVENTS_ROUTE]: [clientEventReceiptResponse()] });
     const onEvent = createProductRunEventTracker(client, "brief_decoder", createInMemoryAsyncStorage());

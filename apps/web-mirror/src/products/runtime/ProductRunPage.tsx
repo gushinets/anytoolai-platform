@@ -360,10 +360,13 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     emitEvent(onEventRef.current, {
       type: "scenario_completed",
       scenarioSessionId: phase.scenarioSessionId,
-      guestId,
+      // An attached session is its own authority: the backend derives guest and chain from it and rejects a
+      // different explicit guest, which is what the current one is after a reload without a usable
+      // localStorage (a fresh in-memory guest). Own runs started by this guest keep sending it.
+      guestId: displayedResult?.attached ? undefined : guestId,
       resultViewed,
     });
-  }, [phase, guestId, definition, onEventRef]);
+  }, [phase, guestId, definition, displayedResult, onEventRef]);
   // Holds the one Idempotency-Key-bound handle for the current logical submission (ANY-150): a
   // "Try again" after a retryable failure reuses `.execute()` on this same handle so the backend
   // can collapse a duplicate submit into the original session instead of spending quota twice.
@@ -391,6 +394,8 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     handoffStatusRef.current = next;
     setHandoffState(next);
   }
+  // Copy activations whose `copy_result` POST has not settled (it outlives the "Copied" feedback): see "Stay".
+  const [copyActivationsInFlight, setCopyActivationsInFlight] = useState(0);
   const handoffLocked = HANDOFF_STATUS_IS_LOCKED[handoffStatus];
   const isHandoffLocked = () => HANDOFF_STATUS_IS_LOCKED[handoffStatusRef.current];
   // Code review finding: `retryable-error` alone isn't a safe-to-remount signal -- both an
@@ -899,6 +904,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         ? navigator.clipboard.writeText(value)
         : Promise.reject(new Error("Clipboard API unavailable."));
 
+    setCopyActivationsInFlight((count) => count + 1);
     return new Promise<boolean>((resolve) => {
       void copyResultAndRecordActivation(
         client,
@@ -922,7 +928,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         // else in that chain) would leave this promise -- and the Copy button -- hanging forever
         // with no feedback. `resolve(false)` is a no-op if `onCopied` already resolved `true`.
         () => resolve(false),
-      );
+      ).finally(() => setCopyActivationsInFlight((count) => count - 1));
     });
   }
 
@@ -1158,12 +1164,15 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
                   <p role="status" className={styles.resultProgress}>{th("workspace.handoffOpening")}</p>
                   {handoffStatus === "navigating" ? (
                     // A cancelled navigation (Esc, Stop) fires no event, so the page cannot know; this is the way
-                    // out. It deliberately does not call `window.stop()`: that would also abort a copy activation
-                    // POST that `handleCopy` is built to keep alive. A navigation that was merely slow may still
-                    // arrive afterwards, at the previous result's consent page, which is harmless to leave.
+                    // out. It stops the pending navigation before unlocking: otherwise a merely slow one could still
+                    // commit after the person started a new run here, abandoning that run's result. `window.stop()`
+                    // also aborts every other in-flight request of the document, and the one that must survive is a
+                    // copy activation POST (see `handleCopy`): so the action waits while one is in flight.
                     <Button
                       variant="secondary"
+                      disabled={copyActivationsInFlight > 0}
                       onClick={() => {
+                        window.stop?.();
                         setHandoffStatus("idle");
                         // This button (and the busy Continue before it) is gone: keep the focus in the card.
                         requestAnimationFrame(() => resultHeadingRef.current?.focus());
