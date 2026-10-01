@@ -158,8 +158,9 @@ The shared runtime, not a product, owns the web side of a handoff:
   the id is an opaque public handle, not proof of ownership, and not the short-lived handoff bearer
   token (which does have a TTL and redaction contract). If a bounded lifetime is ever wanted for it,
   that is a backend lifecycle contract, not a frontend assumption. The attached result must come
-  from this product's scenario: its backend-owned `schemaRef` is checked against the selected
-  scenario's output schema ref from runtime config before the product parser sees it.
+  from this product's scenario: its backend-owned `schemaRef` and `schemaVersion` are checked
+  against the selected scenario's output schema from runtime config (a declared version must match;
+  a ref keeps its name across a version bump) before the product parser sees it.
 - A spent (accepted/consumed) token that still names the target session shows an explicit "Open result" on the
   consent page, for the case where the Accept response was lost and the person reloaded instead of retrying
   (a retry that gets "already accepted" redirects on its own). It never redirects automatically on load.

@@ -194,6 +194,23 @@ describe("ProductRunPage attachSessionId", () => {
     expect(events.filter((e) => e.type === "attach_ended")).toHaveLength(1);
   });
 
+  it("fails closed on the right schema ref at another schema version (an older session after a version bump)", async () => {
+    const events: ProductRunEvent[] = [];
+    const { client } = makeClientCapturingRequests(
+      attachRoutes({
+        // runtimeConfigResponse declares `schema_version: 1` for the output; this artifact is version 0.
+        [ROUTES.RESULT]: [resultResponse(TEST_PRODUCT_IDS, { schema_version: 0 })],
+      }),
+    );
+    render(
+      <ProductRunPage definition={testProductDefinition} client={client} attachSessionId="session_1" onEvent={(e) => events.push(e)} />,
+    );
+    await waitFor(() => expect(screen.getByText(TEST_PRODUCT_MESSAGES_EN.run.runFailed)).toBeTruthy());
+    expect(screen.queryByText(RESULT_TEXT)).toBeNull();
+    expect(events.filter((e) => e.type === "scenario_completed")).toHaveLength(0);
+    expect(events.filter((e) => e.type === "attach_ended")).toHaveLength(1);
+  });
+
   it("lets the user leave an attached result with New task even when guest identity resolution failed", async () => {
     const events: ProductRunEvent[] = [];
     const { client } = makeClientCapturingRequests(

@@ -208,7 +208,7 @@ function shallowEqualValues<V extends Record<string, unknown>>(a: V, b: V): bool
 type BootState =
   | { kind: "loading" }
   | { kind: "boot-error" }
-  | { kind: "ready"; scenarioId: string; frontendId: string; hasQuota: boolean; outputSchemaRef: string };
+  | { kind: "ready"; scenarioId: string; frontendId: string; hasQuota: boolean; outputSchemaRef: string; outputSchemaVersion: number | null };
 
 /** Why a run is retryable. A closed reason -- not finished English prose -- so an error already on
  * screen re-renders in the new language when the UI locale changes (`host.errors.<reason>`). */
@@ -485,6 +485,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
           frontendId: frontend.frontendId,
           hasQuota: runtimeResult.value.quotaSummary !== null,
           outputSchemaRef: scenario.outputRendererHint.schemaRef,
+          outputSchemaVersion: scenario.outputRendererHint.schemaVersion,
         });
 
         if (resolvedGuestId && runtimeResult.value.quotaSummary !== null) {
@@ -713,8 +714,15 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     }
     // An attached id comes from an editable URL, so the backend-owned identity of what it yields must
     // match this product's scenario before the product parser (which only checks payload shape) sees it:
-    // the result's schema ref against the selected scenario's output schema ref from runtime config.
-    if (attachActiveRef.current && boot.kind === "ready" && resultResult.value.schemaRef !== boot.outputSchemaRef) {
+    // the result's schema ref and version against the selected scenario's output schema from runtime
+    // config (a ref keeps its name across a version bump, and an attached session has no expiry, so an
+    // older session can come back with an older version; no declared version means ref-only).
+    if (
+      attachActiveRef.current &&
+      boot.kind === "ready" &&
+      (resultResult.value.schemaRef !== boot.outputSchemaRef ||
+        (boot.outputSchemaVersion !== null && resultResult.value.schemaVersion !== boot.outputSchemaVersion))
+    ) {
       resultFetchSettledRef.current = true;
       enterUnknownError();
       return;
