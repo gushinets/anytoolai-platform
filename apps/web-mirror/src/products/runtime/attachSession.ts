@@ -3,9 +3,16 @@ import { ATTACH_SESSION_PARAM } from "../../lib/hostUrls";
 
 const storageKey = (productId: string) => `anytoolai.attach_session.${productId}`;
 
-/** One remembered session per product per tab. `rank` orders accepted handoffs (see `rememberAttachSession`);
- * a session that arrived without one (a `?session=` link) has the lowest rank, "". */
-type StoredAttach = { id: string; rank: string };
+/** One remembered session per product per tab. `rank` orders accepted handoffs (see `rememberAttachSession`):
+ * a timestamp in milliseconds, compared as a NUMBER (as strings, "...:00Z" would sort after "...:00.5Z", which
+ * is later). A session that arrived without one (a `?session=` link) has the lowest rank, 0. */
+type StoredAttach = { id: string; rank: number };
+
+/** An ISO timestamp as a rank; anything unparseable ranks lowest. */
+function toRank(timestamp: string): number {
+  const ms = Date.parse(timestamp);
+  return Number.isNaN(ms) ? 0 : ms;
+}
 
 function readEntry(productId: string): StoredAttach | undefined {
   try {
@@ -15,7 +22,7 @@ function readEntry(productId: string): StoredAttach | undefined {
     }
     const parsed: unknown = JSON.parse(raw);
     return typeof parsed === "object" && parsed !== null && typeof (parsed as StoredAttach).id === "string"
-      ? { id: (parsed as StoredAttach).id, rank: String((parsed as StoredAttach).rank ?? "") }
+      ? { id: (parsed as StoredAttach).id, rank: typeof (parsed as StoredAttach).rank === "number" ? (parsed as StoredAttach).rank : 0 }
       : undefined;
   } catch {
     return undefined;
@@ -42,15 +49,15 @@ export function readAttachSessionId(productId: string): string | undefined {
 /**
  * Remembers a session an accepted handoff queued for `productId` (an Accept that settled after the person left
  * the consent page, or just before navigating), so the product restores it on its next visit. Ordering-aware:
- * `rank` is the handoff's own `expiresAt` (it grows with the handoff's creation time), and a remembered
+ * the rank is the handoff's own `expiresAt` (it grows with the handoff's creation time), and a remembered
  * session is replaced only by a NEWER one, so an older Accept whose response arrives late cannot overwrite
  * the newer accepted session the person is already on.
  */
-export function rememberAttachSession(productId: string, scenarioSessionId: string, rank: string): void {
+export function rememberAttachSession(productId: string, scenarioSessionId: string, timestamp: string): void {
+  const rank = toRank(timestamp);
   const current = readEntry(productId);
   if (current === undefined || current.id === scenarioSessionId || rank > current.rank) {
-    const newest = current !== undefined && current.rank > rank ? current.rank : rank;
-    writeEntry(productId, { id: scenarioSessionId, rank: newest });
+    writeEntry(productId, { id: scenarioSessionId, rank: Math.max(rank, current?.rank ?? 0) });
   }
 }
 
@@ -91,7 +98,7 @@ export function useAttachSession(productId: string, fromUrl: string | undefined)
     }
     // A session the consent page already remembered keeps its rank; a bare link starts at the lowest.
     const current = readEntry(productId);
-    writeEntry(productId, current?.id === fromUrl ? current : { id: fromUrl, rank: "" });
+    writeEntry(productId, current?.id === fromUrl ? current : { id: fromUrl, rank: 0 });
     const url = new URL(window.location.href);
     url.searchParams.delete(ATTACH_SESSION_PARAM);
     // `null` state: Next then copies its own history internals into it and syncs `useSearchParams`;
