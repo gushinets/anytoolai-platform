@@ -176,6 +176,39 @@ describe("ProductRunPage attachSessionId", () => {
     expect(calls.some((call) => call.key === ROUTES.START)).toBe(false);
   });
 
+  it("fails closed on a shape-compatible result from another scenario (its schema ref is not this scenario's)", async () => {
+    const events: ProductRunEvent[] = [];
+    const { client } = makeClientCapturingRequests(
+      attachRoutes({
+        // Same output shape the product parser accepts, but produced by a different scenario.
+        [ROUTES.RESULT]: [resultResponse(TEST_PRODUCT_IDS, { schema_ref: "other_product.output_v1" })],
+      }),
+    );
+    render(
+      <ProductRunPage definition={testProductDefinition} client={client} attachSessionId="session_1" onEvent={(e) => events.push(e)} />,
+    );
+    await waitFor(() => expect(screen.getByText(TEST_PRODUCT_MESSAGES_EN.run.runFailed)).toBeTruthy());
+    expect(screen.queryByText(RESULT_TEXT)).toBeNull();
+    expect(events.filter((e) => e.type === "scenario_completed")).toHaveLength(0);
+    // A foreign session is dropped from the persisted attach state too.
+    expect(events.filter((e) => e.type === "attach_ended")).toHaveLength(1);
+  });
+
+  it("lets the user leave an attached result with New task even when guest identity resolution failed", async () => {
+    const events: ProductRunEvent[] = [];
+    const { client } = makeClientCapturingRequests(
+      attachRoutes({ [ROUTES.GUEST_IDENTITY]: [errorResponse(500, "internal_error")] }),
+    );
+    render(
+      <ProductRunPage definition={testProductDefinition} client={client} attachSessionId="session_1" onEvent={(e) => events.push(e)} />,
+    );
+    await waitFor(() => expect(screen.getByText(RESULT_TEXT)).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "New task" }));
+    expect(screen.queryByText(RESULT_TEXT)).toBeNull();
+    expect(events.filter((e) => e.type === "attach_ended")).toHaveLength(1);
+  });
+
   it("retries by re-polling the attached session, without validating the form or starting a run", async () => {
     const { client, calls } = makeClientCapturingRequests(
       attachRoutes({ [ROUTES.SESSION]: [errorResponse(500, "internal_error"), sessionResponse()] }),

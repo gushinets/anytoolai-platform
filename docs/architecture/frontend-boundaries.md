@@ -153,8 +153,13 @@ The shared runtime, not a product, owns the web side of a handoff:
   boundary would turn the unknown-product 404 into a 200), removes it from the address bar so a
   bookmark or shared link does not carry it, and keeps it in the tab's `sessionStorage` so a reload
   still shows the result the accept already charged for (`useAttachSession`; dropped when the user
-  starts their own work). The platform's session/result GETs take no guest id, so the id is treated
-  as a short-lived capability, not as proof of ownership.
+  starts their own work). After consent the linked scenario session is an ordinary runtime handle:
+  the platform's session/result GETs take no guest id and the session has no expiry of its own, so
+  the id is an opaque public handle, not proof of ownership, and not the short-lived handoff bearer
+  token (which does have a TTL and redaction contract). If a bounded lifetime is ever wanted for it,
+  that is a backend lifecycle contract, not a frontend assumption. The attached result must come
+  from this product's scenario: its backend-owned `schemaRef` is checked against the selected
+  scenario's output schema ref from runtime config before the product parser sees it.
 - A spent (accepted/consumed) token that still names the target session shows an explicit "Open result" on the
   consent page, for the case where the Accept response was lost and the person reloaded instead of retrying
   (a retry that gets "already accepted" redirects on its own). It never redirects automatically on load.

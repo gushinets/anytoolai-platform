@@ -127,29 +127,29 @@ function extract(output: Record<string, unknown>, requireComparison: boolean): A
 export const extractDraftResult = (output: Record<string, unknown>) => extract(output, false);
 export const extractCheckResult = (output: Record<string, unknown>) => extract(output, true);
 
-const VERDICT_WORDS: Record<Verdict, string> = {
+export const VERDICT_WORDS: Record<Verdict, string> = {
   meets_expectations: "meets expectations",
   partially_meets: "partially meets expectations",
   does_not_meet: "does not meet expectations",
 };
-const DELTA_LABELS: Record<DeltaCriterion, string> = {
+export const DELTA_LABELS: Record<DeltaCriterion, string> = {
   scope_coverage: "Scope coverage",
   requirement_fit: "Requirement fit",
   completeness: "Completeness",
   clarity: "Clarity",
 };
-const LIST_TITLES: Record<ListField, string> = {
+export const LIST_TITLES: Record<ListField, string> = {
   acceptance_criteria: "Acceptance criteria",
   assumptions: "Assumptions",
   deliverables: "Deliverables",
 };
-const GAP_NAMES: Record<ListField, string> = {
+export const GAP_NAMES: Record<ListField, string> = {
   acceptance_criteria: "acceptance criteria",
   assumptions: "assumptions",
   deliverables: "deliverables",
 };
-const NOT_SPECIFIED = "Not specified in the brief.";
-const ALL_STATED = "The brief states all three lists.";
+export const NOT_SPECIFIED = "Not specified in the brief.";
+export const ALL_STATED = "The brief states all three lists.";
 
 /** `renderer_contract.yaml`'s `copy_text`, verbatim: the text the freelancer sends on to a client
  * is fixed English, not UI-locale copy, and is built from the structured fields only (never from

@@ -184,6 +184,29 @@ function routes(mode: "draft" | "check", output: Record<string, unknown>): Route
   };
 }
 
+/** `routes()` for a page that boots twice (a mode switch remounts it) with both scenarios in the config. */
+function bothModesRoutes(output: Record<string, unknown>): RouteQueues {
+  const r = routesFor(IDS.draft);
+  const scenario = (ids: { productId: string; scenarioId: string }) => ({
+    scenario_id: ids.scenarioId,
+    version: 1,
+    allowed_next_actions: ["copy_result"],
+    input_renderer_hint: { renderer: "json_schema", schema_ref: `${ids.productId}.input_v1`, schema_version: 1 },
+    output_renderer_hint: { renderer: "json_schema", schema_ref: `${ids.productId}.output_v1`, schema_version: 1 },
+  });
+  return {
+    ...routes("draft", output),
+    [r.RUNTIME_CONFIG]: [
+      runtimeConfigResponse(IDS.draft, {
+        scenario_ids: [IDS.draft.scenarioId, IDS.check.scenarioId],
+        scenarios: [scenario(IDS.draft), scenario(IDS.check)],
+      }),
+    ],
+    [r.GUEST_IDENTITY]: [guestIdentityResponse(), guestIdentityResponse(), guestIdentityResponse()],
+    [r.QUOTA]: [quotaResponse(IDS.draft), quotaResponse(IDS.draft), quotaResponse(IDS.draft)],
+  };
+}
+
 function resultText(): string {
   const paragraphs = document.querySelectorAll("main p, div p");
   return Array.from(paragraphs).map((p) => p.textContent ?? "").join("\n");
@@ -310,6 +333,18 @@ describe("Acceptance Builder page", () => {
     expect((screen.getByRole("radio", { name: "Check deliverable" }) as HTMLInputElement).disabled).toBe(false);
     expect(made.calls.filter((c) => c.key === "GET /v1/scenario-sessions/session_1")).toHaveLength(2);
     expect(made.calls.some((c) => c.key.endsWith("/start"))).toBe(false);
+  });
+
+  it.each([
+    ["throws synchronously", () => { throw new Error("handler broke"); }],
+    ["rejects asynchronously", () => Promise.reject(new Error("handler broke")) as unknown as void],
+  ])("still switches mode when the event handler %s", async (_name, handler) => {
+    const made = makeClientCapturingRequests(bothModesRoutes(draftOutput()));
+    render(<AcceptanceBuilderProduct client={made.client} attachSessionId="session_1" onEvent={handler} />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "New task" })).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("radio", { name: "Check deliverable" }));
+    await waitFor(() => expect(screen.getByLabelText("Finished work")).toBeTruthy());
   });
 
   it("does not show an attached check session as a draft result", async () => {

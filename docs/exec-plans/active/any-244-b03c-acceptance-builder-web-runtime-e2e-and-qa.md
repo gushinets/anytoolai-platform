@@ -52,4 +52,4 @@ attached session, and making the route a release gate.
 ## Notes
 
 - `confidence` fields are not shown (like Brief Decoder's): a model self-estimate beside a rule-derived verdict invites false precision.
-- The session id in `?session=` is a short-lived capability (the platform GETs take no guest id); the route strips it from the address bar.
+- The session id in `?session=` is an opaque public runtime handle after consent (the platform GETs take no guest id and the session has no expiry), distinct from the short-lived handoff bearer token; the route strips it from the address bar and keeps it per tab for reload.

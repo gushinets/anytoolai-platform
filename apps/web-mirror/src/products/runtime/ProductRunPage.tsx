@@ -86,7 +86,7 @@ export type ProductRunPageProps<V extends Record<string, unknown>, R> = {
  * failure non-blocking"). `Promise.resolve(...)` correctly adopts a genuine thenable and just
  * wraps a plain sync return value otherwise, so no manual `.then`-sniffing is needed.
  */
-function emitEvent(handler: ((event: ProductRunEvent) => void) | undefined, event: ProductRunEvent): void {
+export function emitEvent(handler: ((event: ProductRunEvent) => void) | undefined, event: ProductRunEvent): void {
   try {
     Promise.resolve(handler?.(event)).catch(_noop);
   } catch {
@@ -208,7 +208,7 @@ function shallowEqualValues<V extends Record<string, unknown>>(a: V, b: V): bool
 type BootState =
   | { kind: "loading" }
   | { kind: "boot-error" }
-  | { kind: "ready"; scenarioId: string; frontendId: string; hasQuota: boolean };
+  | { kind: "ready"; scenarioId: string; frontendId: string; hasQuota: boolean; outputSchemaRef: string };
 
 /** Why a run is retryable. A closed reason -- not finished English prose -- so an error already on
  * screen re-renders in the new language when the UI locale changes (`host.errors.<reason>`). */
@@ -484,6 +484,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
           scenarioId: scenario.scenarioId,
           frontendId: frontend.frontendId,
           hasQuota: runtimeResult.value.quotaSummary !== null,
+          outputSchemaRef: scenario.outputRendererHint.schemaRef,
         });
 
         if (resolvedGuestId && runtimeResult.value.quotaSummary !== null) {
@@ -710,6 +711,14 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       setPhase({ kind: "result-fetch-error", scenarioSessionId, resultArtifactId, checkpointId });
       return;
     }
+    // An attached id comes from an editable URL, so the backend-owned identity of what it yields must
+    // match this product's scenario before the product parser (which only checks payload shape) sees it:
+    // the result's schema ref against the selected scenario's output schema ref from runtime config.
+    if (attachActiveRef.current && boot.kind === "ready" && resultResult.value.schemaRef !== boot.outputSchemaRef) {
+      resultFetchSettledRef.current = true;
+      enterUnknownError();
+      return;
+    }
     const extracted = definition.extractResult(resultResult.value.output);
     if (extracted === null) {
       // The backend returned a genuinely unusable/malformed result -- an unexpected terminal
@@ -913,7 +922,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   }
 
   function handleStartAnother() {
-    if (phase.kind !== "result" || guestId === undefined) {
+    if (phase.kind !== "result") {
       return;
     }
     setValues(definition.emptyValues);
@@ -929,7 +938,9 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     // Focus contract: the first field of every product's form is a `textarea` or `input`.
     requestAnimationFrame(() => formRef.current?.querySelector<HTMLElement>("textarea, input")?.focus());
 
-    if (boot.kind !== "ready" || !boot.hasQuota) {
+    // Leaving the result never needs an identity (an attached result can be on screen after a failed
+    // identity resolution); only the advisory quota refresh does.
+    if (boot.kind !== "ready" || !boot.hasQuota || guestId === undefined) {
       return;
     }
 

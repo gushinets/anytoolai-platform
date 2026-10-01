@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
-import { ProductRunPage } from "../runtime/ProductRunPage";
+import { ProductRunPage, emitEvent } from "../runtime/ProductRunPage";
 import type { ProductDefinition, ProductRunEvent } from "../runtime/productDefinition";
 import { ModeSwitch } from "./ModeSwitch";
 
@@ -63,7 +63,7 @@ export function MultiModeProduct<Id extends string, R>({
         onChange={(id) => {
           if (attachSessionId) {
             // Persisted route state must forget the attached session too, or a reload restores it.
-            onEvent?.({ type: "attach_ended", guestId: undefined });
+            emitEvent(onEvent, { type: "attach_ended", guestId: undefined });
           }
           setAttachSessionId(undefined);
           setModeId(id);
