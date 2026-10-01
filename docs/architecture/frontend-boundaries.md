@@ -175,10 +175,13 @@ The shared runtime, not a product, owns the web side of a handoff:
 - `web.result_viewed` for an attached session is sent with the session alone, without a guest: the backend
   derives guest and chain from the session and rejects a different explicit guest, which is what the
   current one is after a reload without a usable `localStorage` (a fresh in-memory guest). The tab keeps, per
-  session, the event id and whether the backend accepted it: accepted means never again; anything else
-  (a lost response, a timeout) is retried on the next report with the SAME `event_id`, so a first attempt
-  that the backend did commit is deduped there (`trackClientEvent` requires the same id on every retry of
-  one logical event) instead of adding a second row.
+  session, the event id, the web session id it was sent under, and whether the backend accepted it:
+  accepted means never again; anything else (a lost response, a timeout) is retried on the next report with
+  the SAME `event_id` and the SAME web session id, so a first attempt that the backend did commit is deduped
+  there (`trackClientEvent` requires the same id on every retry of one logical event) instead of adding a
+  second row. The web session id matters: the backend compares the whole event for a reused id, and a reload
+  without a usable `localStorage` mints a new web session id, which would otherwise be rejected as
+  `client_event_id_conflict`; such a conflict is itself treated as "already recorded".
 - The redirect after Accept (and the "Open result" action, and what is remembered) needs an `accepted` or
   `consumed` preview that names a non-empty target session the host can open; any other status with a
   session id (for example `failed`) stays on the consent page's terminal status. One remembered session
