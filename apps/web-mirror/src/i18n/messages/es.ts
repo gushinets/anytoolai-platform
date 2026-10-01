@@ -23,6 +23,8 @@ export const es: Shape<typeof en> = {
     previousDetails: "Resultado basado en los datos anteriores",
     backToInputs: "Volver a los datos",
     newTask: "Nueva tarea",
+    handoffOpening: "Abriendo el siguiente paso…",
+    handoffStay: "Quedarse en esta página",
     handoffFailed: "No se pudo abrir el siguiente paso. Inténtelo de nuevo.",
   },
   errors: {

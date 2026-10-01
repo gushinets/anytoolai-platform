@@ -10,6 +10,7 @@ import { CLIENT_UPDATE_WRITER_MESSAGES } from "./clientUpdateWriter/messages";
 import { ProposalAIProduct } from "./proposalAi/ProposalAIProduct";
 import { PROPOSAL_AI_MESSAGES } from "./proposalAi/messages";
 import { enabledProductIds, isProductEnabled } from "./runtime/enabledProducts";
+import type { AttachProps } from "./runtime/attachSession";
 import type { ProductRunEvent } from "./runtime/productDefinition";
 
 export type RegisteredProduct = {
@@ -24,9 +25,7 @@ export type RegisteredProduct = {
      * product, used to scope the shared runtime's once-per-visit event dedupe (code review
      * finding: a bare productId-keyed dedupe undercounted a genuine revisit to the same product). */
     visitId?: string;
-    /** A session already queued for this guest (an accepted handoff); see `ProductRunPageProps`. */
-    attachSessionId?: string;
-  }>;
+  } & AttachProps>;
 };
 
 /** Static product registry for `/products/{productId}`. This is the composition layer

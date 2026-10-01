@@ -1,8 +1,8 @@
 // The route-level handling of `?session=`: read once, removed from the address bar, restored for a
-// reload in the same tab, and dropped once the user starts their own work.
+// reload in the same tab, and forgotten only when the person moves on from the session the page showed.
 import { renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { endsAttach, useAttachSession } from "../src/products/runtime/attachSession";
+import { useAttachSession } from "../src/products/runtime/attachSession";
 import { canAttachTarget } from "../src/products/attachTargets";
 import { draftDefinition } from "../src/products/acceptanceBuilder/AcceptanceBuilderProduct";
 import { getRegisteredProduct } from "../src/products/registry";
@@ -20,30 +20,44 @@ describe("useAttachSession", () => {
     expect(window.sessionStorage.getItem("anytoolai.attach_session.acceptance_builder")).toBe("s 1");
   });
 
-  it("restores the id after a reload (no URL param) until the user starts their own work", () => {
+  it("restores the id after a reload (no URL param) until the person moves on from the shown session", () => {
     window.sessionStorage.setItem("anytoolai.attach_session.acceptance_builder", "s 1");
     const reloaded = renderHook(() => useAttachSession("acceptance_builder", undefined));
     expect(reloaded.result.current.attachSessionId).toBe("s 1");
 
-    reloaded.result.current.endAttach();
+    reloaded.result.current.onAttachBegin?.();
+    reloaded.result.current.onAttachEnd?.();
     const next = renderHook(() => useAttachSession("acceptance_builder", undefined));
     expect(next.result.current.attachSessionId).toBeUndefined();
+  });
+
+  it("forgets only the id it attached: a session stored meanwhile (a late Accept) survives the end", () => {
+    window.sessionStorage.setItem("anytoolai.attach_session.acceptance_builder", "s 1");
+    const shown = renderHook(() => useAttachSession("acceptance_builder", undefined));
+    shown.result.current.onAttachBegin?.();
+    window.sessionStorage.setItem("anytoolai.attach_session.acceptance_builder", "s 2");
+
+    shown.result.current.onAttachEnd?.();
+    expect(window.sessionStorage.getItem("anytoolai.attach_session.acceptance_builder")).toBe("s 2");
+  });
+
+  it("forgets nothing for an end that was never preceded by a begin (a failed boot, another mode)", () => {
+    window.sessionStorage.setItem("anytoolai.attach_session.acceptance_builder", "s 1");
+    const reloaded = renderHook(() => useAttachSession("acceptance_builder", undefined));
+    reloaded.result.current.onAttachEnd?.();
+    expect(window.sessionStorage.getItem("anytoolai.attach_session.acceptance_builder")).toBe("s 1");
+  });
+
+  it("treats an empty URL value as no id, falling back to this tab's stored one", () => {
+    window.sessionStorage.setItem("anytoolai.attach_session.acceptance_builder", "s 1");
+    expect(renderHook(() => useAttachSession("acceptance_builder", "")).result.current.attachSessionId).toBe("s 1");
+    window.sessionStorage.clear();
+    expect(renderHook(() => useAttachSession("acceptance_builder", "")).result.current.attachSessionId).toBeUndefined();
   });
 
   it("is scoped per product", () => {
     window.sessionStorage.setItem("anytoolai.attach_session.acceptance_builder", "s 1");
     expect(renderHook(() => useAttachSession("brief_decoder", undefined)).result.current.attachSessionId).toBeUndefined();
-  });
-});
-
-describe("endsAttach", () => {
-  it("is true when the user starts their own work or moves on from the attached result, false otherwise", () => {
-    const guestId = "guest_1";
-    expect(endsAttach({ type: "form_started", guestId })).toBe(true);
-    expect(endsAttach({ type: "form_submitted", guestId })).toBe(true);
-    expect(endsAttach({ type: "attach_ended", guestId })).toBe(true);
-    expect(endsAttach({ type: "product_viewed", guestId })).toBe(false);
-    expect(endsAttach({ type: "copy_activated", scenarioSessionId: "s", guestId })).toBe(false);
   });
 });
 

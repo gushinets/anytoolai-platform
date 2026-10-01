@@ -25,6 +25,8 @@ export const en = {
     previousDetails: "Created from previous details",
     backToInputs: "Back to details",
     newTask: "New task",
+    handoffOpening: "Opening the next step…",
+    handoffStay: "Stay on this page",
     handoffFailed: "Could not open the next step. Please try again.",
   },
   errors: {

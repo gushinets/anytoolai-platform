@@ -27,13 +27,16 @@ import { ErrorState } from "../../components/ErrorState";
 import { LanguageSwitcher, useHostT, useProductT } from "../../i18n";
 import { getClientStorage } from "./clientStorage";
 import { webBaseUrlFromProductLocation } from "../../lib/hostUrls";
+import type { AttachProps } from "./attachSession";
+import { callSafely } from "./callSafely";
 import { isProductEnabled } from "./enabledProducts";
+import { useLatest } from "./useLatest";
 import type { FieldError } from "./fieldValidation";
 import { ProductShellContext } from "./ProductShellContext";
 import { assertNever, type ProductDefinition, type ProductRunEvent } from "./productDefinition";
 import styles from "./ProductRunPage.module.css";
 
-export type ProductRunPageProps<V extends Record<string, unknown>, R> = {
+export type ProductRunPageProps<V extends Record<string, unknown>, R> = AttachProps & {
   definition: ProductDefinition<V, R>;
   client: PlatformApiClient;
   /**
@@ -44,16 +47,20 @@ export type ProductRunPageProps<V extends Record<string, unknown>, R> = {
    */
   onEvent?: (event: ProductRunEvent) => void;
   /**
-   * Fires whenever this mount's own submitting/running state changes -- code review finding: a
-   * multi-mode product (Client Update Writer) that remounts `ProductRunPage` on every mode switch
-   * (`key={modeId}`) could switch mode mid-run, abandoning an already-accepted, quota-consuming
-   * scenario run: the remount's cleanup aborts the poll/result fetch, but the backend keeps running
-   * it and the result is lost to the UI. Lets a multi-mode caller disable its own mode switch while
-   * `true`, without this shared runtime needing to know what "mode switching" means for any
-   * particular product. Single-mode products (ProposalAI) have nothing to gate on this and can
-   * ignore it.
+   * Fires whenever this mount's locked state changes: a run in flight (submitting/running, an ambiguous
+   * failure that may still be running server-side), a handoff being created or navigated to, or an
+   * attached session that is still booting. A multi-mode caller disables its mode switch while `true`.
+   * (It is not what the shell's "a run is in progress" warning follows: that one is driven by the run
+   * alone.)
+   *
+   * Why it exists -- code review finding: a multi-mode product (Client Update Writer) that remounts
+   * `ProductRunPage` on every mode switch (`key={modeId}`) could switch mode mid-run, abandoning an
+   * already-accepted, quota-consuming scenario run: the remount's cleanup aborts the poll/result fetch, but
+   * the backend keeps running it and the result is lost to the UI. This lets a multi-mode caller disable its
+   * own mode switch while `true`, without the shared runtime needing to know what "mode switching" means
+   * for any particular product. Single-mode products (ProposalAI) have nothing to gate on this.
    */
-  onBusyChange?: (busy: boolean) => void;
+  onLockedChange?: (locked: boolean) => void;
   /**
    * Scopes the `product_viewed`/`form_started` once-per-visit dedupe below to one real page visit
    * -- code review finding: keying that dedupe by `(client, productId)` alone meant it lived for
@@ -69,14 +76,6 @@ export type ProductRunPageProps<V extends Record<string, unknown>, R> = {
    * every existing test constructs `ProductRunPage` directly without a route wrapper.
    */
   visitId?: string;
-  /**
-   * A scenario session already queued for this guest elsewhere (an accepted handoff creates the
-   * target session server-side): on mount the page polls it and renders its result, without a
-   * start request or a quota charge. There is no local input, so the form stays empty and no
-   * "previous details" notice is shown. A missing or foreign id ends in the ordinary retryable
-   * error state.
-   */
-  attachSessionId?: string;
 };
 
 /**
@@ -86,12 +85,8 @@ export type ProductRunPageProps<V extends Record<string, unknown>, R> = {
  * failure non-blocking"). `Promise.resolve(...)` correctly adopts a genuine thenable and just
  * wraps a plain sync return value otherwise, so no manual `.then`-sniffing is needed.
  */
-export function emitEvent(handler: ((event: ProductRunEvent) => void) | undefined, event: ProductRunEvent): void {
-  try {
-    Promise.resolve(handler?.(event)).catch(_noop);
-  } catch {
-    // handler threw synchronously -- nothing to attach a rejection handler to.
-  }
+function emitEvent(handler: ((event: ProductRunEvent) => void) | undefined, event: ProductRunEvent): void {
+  callSafely(() => handler?.(event));
 }
 
 /**
@@ -245,9 +240,11 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   definition,
   client,
   onEvent,
-  onBusyChange,
+  onLockedChange,
   visitId,
   attachSessionId,
+  onAttachBegin,
+  onAttachEnd,
 }: ProductRunPageProps<V, R>) {
   const { Fields, Result } = definition;
   const th = useHostT();
@@ -268,10 +265,11 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   // `onEvent` identity, and a closure captured before that await would fire the stale one. Using
   // the ref uniformly, rather than trying to classify each call site as "safe," avoids
   // re-introducing this exact bug: an earlier version used `onEvent` directly in `runPoll`.
-  const onEventRef = useRef(onEvent);
-  useEffect(() => {
-    onEventRef.current = onEvent;
-  });
+  const onEventRef = useLatest(onEvent);
+  // The attach callbacks are read from async continuations too (a terminal failure after a poll), so they
+  // get the same always-current treatment.
+  const onAttachBeginRef = useLatest(onAttachBegin);
+  const onAttachEndRef = useLatest(onAttachEnd);
   // Bumped by every fetchResult() call; see that function's own comment for why.
   const resultFetchGenerationRef = useRef(0);
   // True once any concurrent fetchResult() call for the current session has reached a definitive,
@@ -324,7 +322,18 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     result: R;
     // Null for a result attached from an already-queued session (no local input to compare).
     input: V | null;
+    // True for the attached (handoff) session's result, false for the person's own run.
+    attached: boolean;
   } | null>(null);
+  // The person's own run replaced the attached result on screen: said at commit, like the other effects that
+  // describe what is on screen (a renderer that throws on the own result must not have forgotten the paid-for one).
+  const previousDisplayedRef = useRef(displayedResult);
+  useEffect(() => {
+    if (previousDisplayedRef.current?.attached && displayedResult && !displayedResult.attached) {
+      callSafely(onAttachEndRef.current);
+    }
+    previousDisplayedRef.current = displayedResult;
+  }, [displayedResult, onAttachEndRef]);
   useEffect(() => {
     if (phase.kind !== "result" || lastFocusedResultRef.current === phase.scenarioSessionId) {
       return;
@@ -354,7 +363,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       guestId,
       resultViewed,
     });
-  }, [phase, guestId, definition]);
+  }, [phase, guestId, definition, onEventRef]);
   // Holds the one Idempotency-Key-bound handle for the current logical submission (ANY-150): a
   // "Try again" after a retryable failure reuses `.execute()` on this same handle so the backend
   // can collapse a duplicate submit into the original session instead of spending quota twice.
@@ -364,6 +373,26 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   // True while the run on screen is the attached session (no local submit since): "Try again"
   // re-polls it instead of validating an empty form or starting a second, quota-spending run.
   const attachActiveRef = useRef(false);
+  // The session id this mount has started polling (see the attach effect below).
+  const attachedSessionRef = useRef<string | null>(null);
+  // Render-visible twin of the ref above: true once polling of the attached session has started. Both stay:
+  // the effect that starts the poll needs a value that is current in the same tick (a StrictMode replay of the
+  // effect would otherwise poll twice), while `busy` needs one that re-renders.
+  const [attachBegun, setAttachBegun] = useState(false);
+  // A handoff being created (`POST /v1/handoffs`) is a pending navigation: it must exclude a new run,
+  // or the navigation would land on the previous result's consent over the run just started.
+  // One state, mirrored in a ref so every handler (not only the disabled DOM) sees the same value in the
+  // same tick: "creating" while the POST is pending, "navigating" once the same-tab navigation started
+  // (the page is about to unload, so it stays locked, with a visible status, until it does or a bfcache
+  // return resets it), "failed" for a safe message. No timer: how long a navigation takes is a guess.
+  const [handoffStatus, setHandoffState] = useState<HandoffUiStatus>("idle");
+  const handoffStatusRef = useRef(handoffStatus);
+  function setHandoffStatus(next: HandoffUiStatus) {
+    handoffStatusRef.current = next;
+    setHandoffState(next);
+  }
+  const handoffLocked = HANDOFF_STATUS_IS_LOCKED[handoffStatus];
+  const isHandoffLocked = () => HANDOFF_STATUS_IS_LOCKED[handoffStatusRef.current];
   // Code review finding: `retryable-error` alone isn't a safe-to-remount signal -- both an
   // ambiguous poll failure (timeout/connection loss in `runPoll`, backend may still be running the
   // accepted session) *and* an ambiguous `/start` failure itself (network/timeout/5xx -- the
@@ -397,15 +426,22 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     // (`pendingStart`), an attached handoff session through the session itself. Both may still be
     // running server-side, so abandoning this mount (a mode switch) would lose the only handle.
     (phase.kind === "retryable-error" && (pendingStart !== null || attachActiveRef.current));
-  // Always-current, same reasoning as `onEventRef` above -- `onBusyChange` itself is not a
+  // An attached (already queued and charged) session that has not started polling yet (runtime config and
+  // identity still loading): a mode switch would drop it before it could attach. A failed boot releases the
+  // lock: nothing is running, and a mode switch before the attach began does not forget the persisted
+  // session (`useAttachSession`), so a reload still retries it.
+  const attachBooting = Boolean(attachSessionId) && !attachBegun && boot.kind !== "boot-error";
+  // What disables the form and locks the mode switch (`onLockedChange`): a run in flight, an attached
+  // session about to start, or a handoff being created or navigated to (its navigation must not race a new
+  // run). Kept apart from `busy`, which alone drives the shell's "a run is in progress" warning: neither a
+  // booting attach nor a handoff request is a run on screen yet.
+  const locked = busy || attachBooting || handoffLocked;
+  // Always-current, same reasoning as `onEventRef` above -- `onLockedChange` itself is not a
   // dependency of the effect below (a new identity every render must not re-fire it).
-  const onBusyChangeRef = useRef(onBusyChange);
-  useEffect(() => {
-    onBusyChangeRef.current = onBusyChange;
-  });
+  const onLockedChangeRef = useLatest(onLockedChange);
   useIsomorphicLayoutEffect(() => {
-    onBusyChangeRef.current?.(busy);
-  }, [busy]);
+    onLockedChangeRef.current?.(locked);
+  }, [locked]);
   // The shell's "All tools" warning follows the same `busy`; on unmount it must not keep claiming a
   // run is in flight (e.g. a mode switch remounts this page).
   useIsomorphicLayoutEffect(() => {
@@ -508,20 +544,21 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         }
       },
     );
-  }, [client, guestStorage, productId, scenarioId, eventScopeKey, refreshQuota]);
+  }, [client, guestStorage, productId, scenarioId, eventScopeKey, refreshQuota, onEventRef]);
 
   // Attach once per session id, after boot: `boot.kind` only turns "ready" once per mount, so
   // StrictMode's effect replay cannot poll twice.
-  const attachedSessionRef = useRef<string | null>(null);
   useEffect(() => {
     if (!attachSessionId || boot.kind !== "ready" || attachedSessionRef.current === attachSessionId) {
       return;
     }
     attachedSessionRef.current = attachSessionId;
+    setAttachBegun(true);
     attachActiveRef.current = true;
     setPhase({ kind: "running", scenarioSessionId: attachSessionId });
     void runPoll(attachSessionId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- runPoll is a per-render closure over stable refs/props
+    callSafely(onAttachBeginRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runPoll is a per-render closure over stable refs/props; the callbacks come from always-current refs
   }, [attachSessionId, boot.kind]);
 
   async function runStart(prepared: PreparedScenarioStart) {
@@ -647,7 +684,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       // A terminal failure of the attached session (failed/expired, unknown id, unusable result): the
       // route must stop restoring it, or every reload would just show the same error again.
       attachActiveRef.current = false;
-      emitEvent(onEventRef.current, { type: "attach_ended", guestId });
+      callSafely(onAttachEndRef.current);
     }
     setPhase({ kind: "unknown-error" });
   }
@@ -739,7 +776,14 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     // `scenario_completed` is emitted by the commit-time effect on `phase` below, not here:
     // `setPhase` only queues the update, so emitting here would report a result that never
     // rendered (unmount, navigation, a renderer that throws).
-    setDisplayedResult({ scenarioSessionId, resultArtifactId, checkpointId, result: extracted, input: activeInputRef.current });
+    setDisplayedResult({
+      scenarioSessionId,
+      resultArtifactId,
+      checkpointId,
+      result: extracted,
+      input: activeInputRef.current,
+      attached: attachActiveRef.current,
+    });
     setHandoffStatus("idle");
     // A completed run must not lend its Idempotency-Key to a later regeneration.
     setPendingStart(null);
@@ -748,6 +792,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
 
   // Shared by handleSubmit/handleRetry: both begin a (new or reused) prepared start the same way.
   function beginStart(prepared: PreparedScenarioStart) {
+    // Not the end of the attach yet: if this start fails, the attached result is still what is on screen.
     attachActiveRef.current = false;
     setPhase({ kind: "submitting" });
     emitEvent(onEventRef.current, { type: "form_submitted", guestId });
@@ -767,7 +812,14 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     // Matches the ordinary Submit button's own `identityUnavailable` guard below, so "Try again"
     // can't bypass it and mint a doomed prepared start/Idempotency-Key that only loops the user on
     // the same failure.
-    if (boot.kind !== "ready" || phase.kind === "submitting" || phase.kind === "running" || guestId === undefined) {
+    if (
+      boot.kind !== "ready" ||
+      phase.kind === "submitting" ||
+      phase.kind === "running" ||
+      guestId === undefined ||
+      isHandoffLocked() ||
+      attachBooting
+    ) {
       return;
     }
     const errors = definition.validate(values);
@@ -874,7 +926,6 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     });
   }
 
-  const handoffInFlightRef = useRef(false);
   useEffect(() => {
     const reset = (event: PageTransitionEvent) => {
       if (event.persisted) {
@@ -884,17 +935,15 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     window.addEventListener("pageshow", reset);
     return () => window.removeEventListener("pageshow", reset);
   }, []);
-  const [handoffStatus, setHandoffStatus] = useState<"idle" | "creating" | "failed">("idle");
   const handoff = definition.handoff && isProductEnabled(definition.handoff.targetProductId) ? definition.handoff : null;
 
   // Backend creates the handoff; the consent page (same tab) owns confirmation, the target session
   // and its quota. `location.assign` from a shared navigator keeps the basePath-relative origin.
   async function handleContinueToTarget() {
-    // A ref, not `handoffStatus`: two clicks in one tick both see the stale state.
-    if (!displayedResult || !handoff || handoffInFlightRef.current) {
+    // The ref, not the state: two clicks in one tick both see the stale state.
+    if (!displayedResult || !handoff || isHandoffLocked()) {
       return;
     }
-    handoffInFlightRef.current = true;
     setHandoffStatus("creating");
     const controller = controllerRef.current;
     try {
@@ -907,7 +956,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         },
         { signal: controller?.signal },
       );
-      // Left the page (mode switch, "All tools") while the POST was in flight: do not navigate.
+      // Left the page (the mount's controller aborts on unmount) while the POST was in flight: do not navigate.
       if (controller?.signal.aborted) {
         return;
       }
@@ -915,22 +964,23 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         setHandoffStatus("failed");
         return;
       }
-      // Stays "creating" (button disabled) until the page unloads; a bfcache return resets it below.
-      void openHandoffConsent({
+      setHandoffStatus("navigating");
+      // The Continue button is disabled now: keep the focus in the card instead of losing it.
+      resultHeadingRef.current?.focus();
+      // Awaited inside the try: a navigator may return a promise, and its rejection must end in "failed".
+      await openHandoffConsent({
         webConsentBaseUrl: webBaseUrlFromProductLocation(window.location),
         handoffToken: created.value.handoffToken,
         navigate: createWindowNavigator(window),
       });
     } catch {
-      // Never strand the button disabled with no message (same rule as HandoffConsent's runAction).
+      // Never strand the page locked with no message (same rule as HandoffConsent's runAction).
       setHandoffStatus("failed");
-    } finally {
-      handoffInFlightRef.current = false;
     }
   }
 
   function handleStartAnother() {
-    if (phase.kind !== "result") {
+    if (phase.kind !== "result" || isHandoffLocked()) {
       return;
     }
     setValues(definition.emptyValues);
@@ -939,7 +989,10 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     activeScenarioSessionIdRef.current = null;
     activeInputRef.current = null;
     attachActiveRef.current = false;
-    emitEvent(onEventRef.current, { type: "attach_ended", guestId });
+    if (displayedResult?.attached) {
+      // Leaving the attached result itself ("New task" after an own run says nothing about an attach).
+      callSafely(onAttachEndRef.current);
+    }
     setDisplayedResult(null);
     setHandoffStatus("idle");
     setPhase({ kind: "idle" });
@@ -1009,12 +1062,12 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         noValidate
         onSubmit={handleSubmit}
       >
-        <Fields values={values} errors={fieldErrors} disabled={busy || identityUnavailable} onChange={updateField} />
+        <Fields values={values} errors={fieldErrors} disabled={locked || identityUnavailable} onChange={updateField} />
         <div className={styles.footer}>
           <Button
             type="submit"
             loading={phase.kind === "submitting" || phase.kind === "running"}
-            disabled={identityUnavailable || busy || phase.kind === "quota-exhausted"}
+            disabled={identityUnavailable || locked || phase.kind === "quota-exhausted"}
           >
             {phase.kind === "submitting"
               ? th("starting")
@@ -1100,6 +1153,27 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
               {oldResult ? <p role="status" className={styles.oldResultNotice}>{th("workspace.previousDetails")}</p> : null}
               {progress}
               {error}
+              {handoffLocked ? (
+                <div className={styles.handoffOpening}>
+                  <p role="status" className={styles.resultProgress}>{th("workspace.handoffOpening")}</p>
+                  {handoffStatus === "navigating" ? (
+                    // A cancelled navigation (Esc, Stop) fires no event, so the page cannot know; this is the way
+                    // out. It deliberately does not call `window.stop()`: that would also abort a copy activation
+                    // POST that `handleCopy` is built to keep alive. A navigation that was merely slow may still
+                    // arrive afterwards, at the previous result's consent page, which is harmless to leave.
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        setHandoffStatus("idle");
+                        // This button (and the busy Continue before it) is gone: keep the focus in the card.
+                        requestAnimationFrame(() => resultHeadingRef.current?.focus());
+                      }}
+                    >
+                      {th("workspace.handoffStay")}
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
               {handoffStatus === "failed" && showNewTask ? (
                 <p role="alert" className={styles.oldResultNotice}>{th("workspace.handoffFailed")}</p>
               ) : null}
@@ -1110,11 +1184,11 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
                   onCopy={handleCopy}
                   secondaryAction={showNewTask ? (
                     <>
-                      <Button variant="secondary" onClick={handleStartAnother} disabled={handoffStatus === "creating"}>
+                      <Button variant="secondary" onClick={handleStartAnother} disabled={handoffLocked}>
                         {th("workspace.newTask")}
                       </Button>
                       {handoff ? (
-                        <Button onClick={() => void handleContinueToTarget()} disabled={handoffStatus === "creating"}>
+                        <Button onClick={() => void handleContinueToTarget()} loading={handoffStatus === "creating"} disabled={handoffLocked}>
                           {tp(`${definition.messageScope}.continueToTarget`)}
                         </Button>
                       ) : null}
@@ -1134,6 +1208,16 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     </Root>
   );
 }
+
+type HandoffUiStatus = "idle" | "creating" | "navigating" | "failed";
+
+// A `Record`, not a comparison: a fifth status fails to typecheck until it is classified here.
+const HANDOFF_STATUS_IS_LOCKED: Record<HandoffUiStatus, boolean> = {
+  idle: false,
+  creating: true,
+  navigating: true,
+  failed: false,
+};
 
 function _noop(): void {
   // Deliberately discards a settled promise's value/rejection -- see call sites' comments.

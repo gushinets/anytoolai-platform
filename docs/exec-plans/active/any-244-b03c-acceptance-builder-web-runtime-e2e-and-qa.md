@@ -31,6 +31,10 @@ immediate same-tab handoff from Brief Decoder into a queued `acceptance_builder.
   `/products/{target}?session={id}`, and `ProductDefinition.handoff` (a button that creates the
   backend handoff and opens its consent page; hidden when the target product is not enabled).
 - An attached session always opens `draft` mode: the ANY-26 route targets `draft_v1`.
+- Lock rules (`ProductRunPage` `locked`, reported through `onLockedChange` to the mode switch): a run in
+  flight, a handoff being created or navigated to ("navigating", visible status, no timer, reset on a
+  bfcache return), and an attached session still booting; a failed boot releases it and keeps the
+  persisted session (`useAttachSession` forgets it only for an `onAttachEnd` that follows an `onAttachBegin`).
 
 ## Repo tooling
 

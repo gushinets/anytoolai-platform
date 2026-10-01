@@ -8,8 +8,7 @@ import { getPlatformApiClient } from "../../../lib/apiClient";
 import { ProductPageShell } from "../../../products/ProductPageShell";
 import { getRegisteredProduct } from "../../../products/registry";
 import { getClientStorage } from "../../../products/runtime/clientStorage";
-import { endsAttach, useAttachSession } from "../../../products/runtime/attachSession";
-import type { ProductRunEvent } from "../../../products/runtime/productDefinition";
+import { useAttachSession } from "../../../products/runtime/attachSession";
 import { createProductRunEventTracker } from "../../../products/runtime/productRunEventTracking";
 
 type ProductPageProps = {
@@ -25,26 +24,13 @@ export default function ProductPage({ params, searchParams }: ProductPageProps) 
   // `searchParams` prop (not `useSearchParams`, whose Suspense boundary would turn the unknown-product
   // 404 into a 200); see `useAttachSession` for how the id is kept and removed from the URL.
   const sessionParam = use(searchParams)[ATTACH_SESSION_PARAM];
-  const { attachSessionId, endAttach } = useAttachSession(
-    productId,
-    typeof sessionParam === "string" ? sessionParam : undefined,
-  );
+  const attach = useAttachSession(productId, typeof sessionParam === "string" ? sessionParam : undefined);
   const onEvent = useMemo(
     // The same per-client storage ProductRunPage uses for the guest id -- code review finding: a
     // fresh in-memory fallback per `productId` change rotated `web_session_id` when navigating
     // between products with no usable localStorage, but it should only rotate after 30 minutes
     // of inactivity.
-    () => {
-      const track = createProductRunEventTracker(client, productId, getClientStorage(client));
-      return (event: ProductRunEvent) => {
-        // The user started their own work or moved on: a reload no longer restores the attached result.
-        if (endsAttach(event)) {
-          endAttach();
-        }
-        track(event);
-      };
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- endAttach only closes over productId
+    () => createProductRunEventTracker(client, productId, getClientStorage(client)),
     [client, productId],
   );
   // A fresh id every time `productId` actually changes -- including a return to a productId
@@ -71,7 +57,7 @@ export default function ProductPage({ params, searchParams }: ProductPageProps) 
       client={client}
       onEvent={onEvent}
       visitId={visitId}
-      attachSessionId={attachSessionId}
+      attach={attach}
     />
   );
 }

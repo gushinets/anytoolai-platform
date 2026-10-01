@@ -382,6 +382,9 @@ test.describe("Acceptance Builder web product", () => {
   });
 
   test("quota: the guest's run beyond the product limit is rejected with the quota message", async ({ page }) => {
+    // Three full start -> worker -> result cycles plus a fourth start: the config's 60s per-test cap is
+    // too tight for a cold CI worker (the ProposalAI quota smoke does the same).
+    test.setTimeout(240_000);
     // The advisory quota GET would disable the form after the last allowed run; abort it so the next
     // start reaches the authoritative 429 from the real backend.
     await page.route(QUOTA_ROUTE, (route) => route.abort());

@@ -4,11 +4,11 @@ import { handoffPreviewPayload as previewPayload } from "@anytoolai/ce-kit/test/
 // Reuses ce-kit's own routed-fetch-mock test util instead of a second hand-maintained
 // implementation of the same "fake platform-api backend" purpose.
 import { makeRoutedFetchClient } from "@anytoolai/ce-kit/test/testUtils/routedFetchClient";
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { HandoffConsent } from "../src/components/HandoffConsent";
 import { HANDOFF_MESSAGES } from "../src/components/handoffMessages";
-import { makeClientWithDeferredRoute } from "./fixtures/platformResponses";
+import { makeClientWithDeferredCalls, makeClientWithDeferredRoute } from "./fixtures/platformResponses";
 import { LOCALE_STORAGE_KEY } from "../src/i18n/localeStorage";
 import { makeRender } from "./support/renderWithI18n";
 
@@ -25,7 +25,17 @@ afterEach(() => {
   // survives remounts within a browser session -- clear it between tests so one test's minted
   // guest id can't leak into the next.
   window.localStorage.clear();
+  window.sessionStorage.clear();
 });
+
+/** Lets every pending promise continuation run (two macrotask turns), so a negative assertion about what a
+ * settled request did is made after it has settled, not after a guessed wall-clock delay. */
+async function settle(): Promise<void> {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -314,6 +324,136 @@ describe("HandoffConsent", () => {
       expect(screen.queryByRole("button", { name: "Open result" })).toBeNull();
       unmount();
     }
+  });
+
+  it("does not redirect from a stale consent view when the person left the page while Accept was in flight", async () => {
+    const { client, resolveDeferred } = makeClientWithDeferredRoute(
+      { [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload())], [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()] },
+      ACCEPT_ROUTE,
+    );
+    const { unmount } = render(<HandoffConsent client={client} handoffToken="token_abc" canOpenTarget={() => true} />);
+    const accept = (await screen.findByRole("button", { name: "Accept" })) as HTMLButtonElement;
+    await waitFor(() => expect(accept.disabled).toBe(false));
+    fireEvent.click(accept);
+    await waitFor(() => expect(accept.getAttribute("aria-busy")).toBe("true"));
+
+    unmount(); // the person navigated away
+    resolveDeferred(jsonResponse(200, previewPayload({ status: "accepted", target_scenario_session_id: "s1", target_product_id: "acceptance_builder" })));
+    await settle();
+
+    expect(routerPush).not.toHaveBeenCalled();
+    // The Accept happened (and charged the quota): the target product restores that session on its next visit.
+    expect(window.sessionStorage.getItem("anytoolai.attach_session.acceptance_builder")).toBe("s1");
+  });
+
+  it("does not redirect from the already-accepted refetch when the person left the page meanwhile", async () => {
+    const { client, calls, resolveCall } = makeClientWithDeferredCalls(
+      { [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()], [ACCEPT_ROUTE]: [errorResponse(409, "handoff_already_accepted")] },
+      { [PREVIEW_ROUTE]: 2 },
+    );
+    const previewCalls = () => calls.filter((call) => call.key === PREVIEW_ROUTE).length;
+    const { unmount } = render(<HandoffConsent client={client} handoffToken="token_abc" canOpenTarget={() => true} />);
+    resolveCall(PREVIEW_ROUTE, 0, jsonResponse(200, previewPayload())); // the consent preview
+    const accept = (await screen.findByRole("button", { name: "Accept" })) as HTMLButtonElement;
+    await waitFor(() => expect(accept.disabled).toBe(false));
+    fireEvent.click(accept); // 409 -> the refetch (second preview call) goes out
+
+    // The refetch is really in flight when the person leaves.
+    await waitFor(() => expect(previewCalls()).toBe(2));
+    unmount();
+    resolveCall(PREVIEW_ROUTE, 1, jsonResponse(200, previewPayload({ status: "consumed", target_scenario_session_id: "s1", target_product_id: "acceptance_builder" })));
+    await settle();
+
+    expect(routerPush).not.toHaveBeenCalled();
+    // The refetch answered after the person left: it still names the queued (charged) session, so keep it.
+    expect(window.sessionStorage.getItem("anytoolai.attach_session.acceptance_builder")).toBe("s1");
+  });
+
+  it("after the person left, an Accept error ('already accepted') refetches once to keep the queued session, and does nothing else", async () => {
+    const { client, calls, resolveDeferred } = makeClientWithDeferredRoute(
+      {
+        [PREVIEW_ROUTE]: [
+          jsonResponse(200, previewPayload()),
+          jsonResponse(200, previewPayload({ status: "consumed", target_scenario_session_id: "s1", target_product_id: "acceptance_builder" })),
+        ],
+        [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
+      },
+      ACCEPT_ROUTE,
+    );
+    const { unmount } = render(<HandoffConsent client={client} handoffToken="token_abc" canOpenTarget={() => true} />);
+    const accept = (await screen.findByRole("button", { name: "Accept" })) as HTMLButtonElement;
+    await waitFor(() => expect(accept.disabled).toBe(false));
+    fireEvent.click(accept);
+    await waitFor(() => expect(accept.getAttribute("aria-busy")).toBe("true"));
+
+    unmount();
+    resolveDeferred(errorResponse(409, "handoff_already_accepted"));
+    await waitFor(() => expect(calls.filter((call) => call.key === PREVIEW_ROUTE)).toHaveLength(2));
+    await settle();
+
+    // The 409 proves the Accept went through: its session is kept; no navigation, nothing more is read.
+    expect(window.sessionStorage.getItem("anytoolai.attach_session.acceptance_builder")).toBe("s1");
+    expect(routerPush).not.toHaveBeenCalled();
+    expect(calls.filter((call) => call.key === PREVIEW_ROUTE)).toHaveLength(2);
+  });
+
+  it("keeps nothing for a target the host cannot open, even after the Accept succeeded while the person was away", async () => {
+    const { client, resolveDeferred } = makeClientWithDeferredRoute(
+      { [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload())], [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()] },
+      ACCEPT_ROUTE,
+    );
+    const { unmount } = render(<HandoffConsent client={client} handoffToken="token_abc" canOpenTarget={() => false} />);
+    const accept = (await screen.findByRole("button", { name: "Accept" })) as HTMLButtonElement;
+    await waitFor(() => expect(accept.disabled).toBe(false));
+    fireEvent.click(accept);
+    await waitFor(() => expect(accept.getAttribute("aria-busy")).toBe("true"));
+
+    unmount();
+    resolveDeferred(jsonResponse(200, previewPayload({ status: "accepted", target_scenario_session_id: "s1", target_product_id: "kernel_demo" })));
+    await settle();
+
+    expect(window.sessionStorage.getItem("anytoolai.attach_session.kernel_demo")).toBeNull();
+    expect(routerPush).not.toHaveBeenCalled();
+  });
+
+  it("treats an empty target session id as no id: no redirect, no Open result, nothing remembered", async () => {
+    const { client } = makeRoutedClient({
+      [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload({ status: "consumed", target_scenario_session_id: "", target_product_id: "acceptance_builder" }))],
+      [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
+    });
+    render(<HandoffConsent client={client} handoffToken="token_abc" canOpenTarget={() => true} />);
+    await waitFor(() => expect(screen.queryByText("Loading handoff…")).toBeNull());
+    expect(screen.queryByRole("button", { name: "Open result" })).toBeNull();
+    expect(routerPush).not.toHaveBeenCalled();
+    expect(window.sessionStorage.getItem("anytoolai.attach_session.acceptance_builder")).toBeNull();
+  });
+
+  it("stays on the terminal status for a failed handoff even when it names a session (only accepted/consumed open)", async () => {
+    const { client } = makeRoutedClient({
+      [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload({ status: "failed", target_scenario_session_id: "s1", target_product_id: "acceptance_builder" }))],
+      [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
+    });
+    render(<HandoffConsent client={client} handoffToken="token_abc" canOpenTarget={() => true} />);
+    await waitFor(() => expect(screen.queryByText("Loading handoff…")).toBeNull());
+    expect(screen.queryByRole("button", { name: "Open result" })).toBeNull();
+  });
+
+  it("does not refetch after leaving for an Accept error that does not prove it went through (e.g. expired)", async () => {
+    const { client, calls, resolveDeferred } = makeClientWithDeferredRoute(
+      { [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload())], [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()] },
+      ACCEPT_ROUTE,
+    );
+    const { unmount } = render(<HandoffConsent client={client} handoffToken="token_abc" canOpenTarget={() => true} />);
+    const accept = (await screen.findByRole("button", { name: "Accept" })) as HTMLButtonElement;
+    await waitFor(() => expect(accept.disabled).toBe(false));
+    fireEvent.click(accept);
+    await waitFor(() => expect(accept.getAttribute("aria-busy")).toBe("true"));
+
+    unmount();
+    resolveDeferred(errorResponse(410, "handoff_expired"));
+    await settle();
+
+    expect(calls.filter((call) => call.key === PREVIEW_ROUTE)).toHaveLength(1);
   });
 
   it("does not navigate after Decline", async () => {

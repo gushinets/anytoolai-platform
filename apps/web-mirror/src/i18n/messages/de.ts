@@ -23,6 +23,8 @@ export const de: Shape<typeof en> = {
     previousDetails: "Mit vorherigen Angaben erstellt",
     backToInputs: "Zurück zu den Angaben",
     newTask: "Neue Aufgabe",
+    handoffOpening: "Der nächste Schritt wird geöffnet…",
+    handoffStay: "Auf dieser Seite bleiben",
     handoffFailed: "Der nächste Schritt konnte nicht geöffnet werden. Bitte versuchen Sie es erneut.",
   },
   errors: {

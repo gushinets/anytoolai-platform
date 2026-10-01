@@ -7,6 +7,7 @@ import {
   requiredBackendTrimmedFieldError,
   trimBackendWhitespace,
 } from "../runtime/fieldValidation";
+import type { AttachProps } from "../runtime/attachSession";
 import type { ProductDefinition, ProductFieldsProps, ProductRunEvent } from "../runtime/productDefinition";
 import { MultiModeProduct } from "../shared/MultiModeProduct";
 import { TextAreaField } from "../shared/TextAreaField";
@@ -90,16 +91,15 @@ export const checkDefinition: ProductDefinition<CheckValues, AcceptanceBuilderRe
   Result: AcceptanceBuilderResultView,
 };
 
-export type AcceptanceBuilderProductProps = {
+export type AcceptanceBuilderProductProps = AttachProps & {
   client: PlatformApiClient;
   onEvent?: (event: ProductRunEvent) => void;
   visitId?: string;
-  attachSessionId?: string;
 };
 
 /** One `ProductDefinition` per mode. An attached session (an accepted Brief Decoder handoff) is
  * always a `draft_v1` run, so only draft mode receives it. */
-export function AcceptanceBuilderProduct({ client, onEvent, visitId, attachSessionId }: AcceptanceBuilderProductProps) {
+export function AcceptanceBuilderProduct({ client, onEvent, visitId, ...attach }: AcceptanceBuilderProductProps) {
   const t = useProductT();
   return (
     <MultiModeProduct
@@ -112,7 +112,7 @@ export function AcceptanceBuilderProduct({ client, onEvent, visitId, attachSessi
         { id: "draft", label: t("modes.draft"), definition: draftDefinition },
         { id: "check", label: t("modes.check"), definition: checkDefinition },
       ]}
-      attachSessionId={attachSessionId}
+      {...attach}
       attachModeId="draft"
     />
   );
