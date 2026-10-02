@@ -142,11 +142,13 @@ python scripts/agent/runner.py full-check
 - 2026-09-29: team-lead review #1 found it forks the drafting contract; the owner chose to remove
   it and leave the handoff route to ANY-26 (decision 7). The verdict partition and the
   document-to-result binding were added (decision 6).
+- 2026-10-02: resolved after this plan's scope. Activation rule for `draft_v1` (no verdict): decided in
+  ANY-244 (a non-empty acceptance-criteria list counts as the first display). Brief Decoder -> Acceptance
+  Builder handoff route (decision 7): delivered by ANY-26 (PR #156) and proven end to end by ANY-244
+  (PR #158).
 
 ## Open questions
 
-- Activation rule for `draft_v1` (no verdict): decided in ANY-244: a non-empty acceptance-criteria list counts as the first display.
-- Handoff route from Brief Decoder (decision 7): ANY-26.
 - Product priority: Linear calls Acceptance Builder "required #4"; repo docs keep it in the
   backlog outside the release order. README wording is unchanged on that point.
 
