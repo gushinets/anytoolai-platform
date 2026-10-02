@@ -3,11 +3,13 @@ import { ATTACH_SESSION_PARAM } from "../../lib/hostUrls";
 
 const storageKey = (productId: string) => `anytoolai.attach_session.${productId}`;
 
-/** One remembered session per product per tab: `id` is what a visit restores; `rank` is the order of the NEWEST
- * accepted handoff this tab has seen for the product (not necessarily `id`'s own; see `rememberAttachSession`),
- * a timestamp in MICROseconds, compared as a number (as strings, "...:00Z" would sort after "...:00.5Z", which
- * is later). A session that arrived without one (a `?session=` link) has the lowest rank, 0. */
-type StoredAttach = { id: string; rank: number };
+/** One remembered entry per product per tab. `id` is what a visit restores. `rank` is the order of the NEWEST
+ * accepted handoff this tab has seen for the product (see `rememberAttachSession`), a timestamp in MICROseconds,
+ * compared as a number (as strings, "...:00Z" would sort after "...:00.5Z", which is later); a session that
+ * arrived without one (a `?session=` link) has the lowest rank, 0. `newestId` names that newest session when
+ * the person explicitly opened an older one (`id`): the paid-for newer one is kept as the fallback and
+ * restored once the opened one ends. Absent, `id` itself is the newest. */
+type StoredAttach = { id: string; rank: number; newestId?: string };
 
 /**
  * An ISO timestamp as a rank in microseconds; anything unparseable ranks lowest. The backend stamps
@@ -32,9 +34,11 @@ function readEntry(productId: string): StoredAttach | undefined {
       return undefined;
     }
     const parsed: unknown = JSON.parse(raw);
-    return typeof parsed === "object" && parsed !== null && typeof (parsed as StoredAttach).id === "string"
-      ? { id: (parsed as StoredAttach).id, rank: typeof (parsed as StoredAttach).rank === "number" ? (parsed as StoredAttach).rank : 0 }
-      : undefined;
+    if (typeof parsed !== "object" || parsed === null || typeof (parsed as StoredAttach).id !== "string") {
+      return undefined;
+    }
+    const { id, rank, newestId } = parsed as StoredAttach;
+    return { id, rank: typeof rank === "number" ? rank : 0, ...(typeof newestId === "string" ? { newestId } : {}) };
   } catch {
     return undefined;
   }
@@ -80,9 +84,21 @@ export function chooseAttachSession(productId: string, scenarioSessionId: string
 function keepEntry(productId: string, scenarioSessionId: string, timestamp: string, chosen: boolean): void {
   const rank = toRank(timestamp);
   const current = readEntry(productId);
-  if (chosen || current === undefined || current.id === scenarioSessionId || rank > current.rank) {
-    writeEntry(productId, { id: scenarioSessionId, rank: Math.max(rank, current?.rank ?? 0) });
+  const isNewest = current === undefined || rank > current.rank;
+  if (!chosen) {
+    if (isNewest || current.id === scenarioSessionId) {
+      writeEntry(productId, { id: scenarioSessionId, rank: Math.max(rank, current?.rank ?? 0), ...(isNewest ? {} : keptNewest(current)) });
+    }
+    return;
   }
+  // Chosen: it is what is restored; the newest session (this one, or the remembered one it is older than) stays
+  // as the fallback.
+  const newestId = isNewest ? scenarioSessionId : (current.newestId ?? current.id);
+  writeEntry(productId, { id: scenarioSessionId, rank: Math.max(rank, current?.rank ?? 0), ...(newestId === scenarioSessionId ? {} : { newestId }) });
+}
+
+function keptNewest(current: StoredAttach): { newestId?: string } {
+  return current.newestId === undefined ? {} : { newestId: current.newestId };
 }
 
 /** What a product page needs to show an already-queued session, threaded route -> shell -> product ->
@@ -138,8 +154,10 @@ export function useAttachSession(productId: string, fromUrl: string | undefined)
   const onAttachEnd = useCallback(() => {
     const begunId = begunIdRef.current;
     begunIdRef.current = undefined;
-    if (begunId !== undefined && readEntry(productId)?.id === begunId) {
-      writeEntry(productId, null);
+    const current = readEntry(productId);
+    if (begunId !== undefined && current?.id === begunId) {
+      // The opened session ended: the newer accepted one it displaced (if any) is what a visit restores now.
+      writeEntry(productId, current.newestId === undefined ? null : { id: current.newestId, rank: current.rank });
     }
   }, [productId]);
   return { attachSessionId, onAttachBegin, onAttachEnd };

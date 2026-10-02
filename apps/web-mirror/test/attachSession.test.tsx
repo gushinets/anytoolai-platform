@@ -1,6 +1,6 @@
 // The route-level handling of `?session=`: read once, removed from the address bar, restored for a
 // reload in the same tab, and forgotten only when the person moves on from the session the page showed.
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { chooseAttachSession, readAttachSessionId, rememberAttachSession, useAttachSession } from "../src/products/runtime/attachSession";
 import { canAttachTarget } from "../src/products/attachTargets";
@@ -114,6 +114,36 @@ describe("useAttachSession", () => {
     // Its reload identity survives the bare `?session=` link the open navigates with.
     renderHook(() => useAttachSession("acceptance_builder", "chosen older"));
     expect(readAttachSessionId("acceptance_builder")).toBe("chosen older");
+  });
+
+  it("an explicitly opened older session does not destroy the newer accepted one: when it ends, the newer is restored", () => {
+    rememberAttachSession("acceptance_builder", "B", "2026-10-01T10:05:00Z");
+    chooseAttachSession("acceptance_builder", "A", "2026-10-01T10:00:00Z");
+    const { result } = renderHook(() => useAttachSession("acceptance_builder", "A"));
+    act(() => result.current.onAttachBegin?.());
+    expect(readAttachSessionId("acceptance_builder")).toBe("A");
+
+    act(() => result.current.onAttachEnd?.());
+    expect(readAttachSessionId("acceptance_builder")).toBe("B");
+    // B ending in turn leaves nothing behind.
+    const second = renderHook(() => useAttachSession("acceptance_builder", undefined));
+    act(() => second.result.current.onAttachBegin?.());
+    act(() => second.result.current.onAttachEnd?.());
+    expect(readAttachSessionId("acceptance_builder")).toBeUndefined();
+  });
+
+  it("a late older Accept leaves the fallback newest session alone, and a newer one replaces both", () => {
+    rememberAttachSession("acceptance_builder", "B", "2026-10-01T10:05:00Z");
+    chooseAttachSession("acceptance_builder", "A", "2026-10-01T10:00:00Z");
+    rememberAttachSession("acceptance_builder", "A", "2026-10-01T10:00:00Z"); // same id again: keeps the fallback
+    rememberAttachSession("acceptance_builder", "older", "2026-10-01T09:00:00Z");
+    const { result } = renderHook(() => useAttachSession("acceptance_builder", undefined));
+    act(() => result.current.onAttachBegin?.());
+    act(() => result.current.onAttachEnd?.());
+    expect(readAttachSessionId("acceptance_builder")).toBe("B");
+
+    rememberAttachSession("acceptance_builder", "C", "2026-10-01T10:30:00Z");
+    expect(readAttachSessionId("acceptance_builder")).toBe("C");
   });
 
   it("is scoped per product", () => {
