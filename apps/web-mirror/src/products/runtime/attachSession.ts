@@ -6,8 +6,9 @@ const storageKey = (productId: string) => `anytoolai.attach_session.${productId}
 /** One remembered entry per product per tab. `id` is the NEWEST accepted session this tab has seen for the
  * product and `rank` its order (see `rememberAttachSession`): a timestamp in MICROseconds, compared as a number
  * (as strings, "...:00Z" would sort after "...:00.5Z", which is later); a session that arrived without one (a
- * `?session=` link) has the lowest rank, 0. `active` is an OLDER session the person explicitly opened
- * (`chooseAttachSession`): a visit restores it until it ends, then `id`, the newer paid-for one, again. */
+ * `?session=` link) has the lowest rank, 0. `active` is the session the person explicitly opened
+ * (`chooseAttachSession`), whatever its order, the newest included: a visit restores it until it ends, then
+ * `id` (if that is another, newer paid-for session). Absent, nothing was explicitly opened. */
 type StoredAttach = { id: string; rank: number; active?: string };
 
 /**
@@ -73,29 +74,26 @@ export function rememberAttachSession(productId: string, scenarioSessionId: stri
   const rank = toRank(timestamp);
   const current = readEntry(productId);
   if (current === undefined || rank > current.rank) {
-    writeEntry(productId, { id: scenarioSessionId, rank, ...activeOf(current, scenarioSessionId) });
+    writeEntry(productId, { id: scenarioSessionId, rank, ...activeOf(current) });
   }
 }
 
 /**
  * The person opens this accepted handoff's session now (the Accept they just clicked, or "Open result" on a
- * spent token): it is what the tab restores from here on, whatever its order. Newer than the remembered newest,
- * it simply becomes it; older, it is kept as `active` in front of that newer paid-for session, which is
- * restored again once this one ends (`useAttachSession`'s `onAttachEnd`).
+ * spent token): it is what the tab restores from here on, whatever its order, until it ends
+ * (`useAttachSession`'s `onAttachEnd`). It also becomes the newest when it is newer than the remembered one;
+ * either way a newer Accept that settles late only becomes the fallback behind it, never the restored one.
  */
 export function chooseAttachSession(productId: string, scenarioSessionId: string, timestamp: string): void {
   const rank = toRank(timestamp);
   const current = readEntry(productId);
-  if (current === undefined || rank > current.rank) {
-    writeEntry(productId, { id: scenarioSessionId, rank });
-  } else {
-    writeEntry(productId, { id: current.id, rank: current.rank, ...activeOf({ ...current, active: scenarioSessionId }, current.id) });
-  }
+  const newest = current === undefined || rank > current.rank ? { id: scenarioSessionId, rank } : { id: current.id, rank: current.rank };
+  writeEntry(productId, { ...newest, active: scenarioSessionId });
 }
 
-/** `current`'s active session, kept unless it is `newestId` itself (then it is not an older one in front). */
-function activeOf(current: StoredAttach | undefined, newestId: string): { active?: string } {
-  return current?.active === undefined || current.active === newestId ? {} : { active: current.active };
+/** `current`'s explicitly opened session, carried over unchanged. */
+function activeOf(current: StoredAttach | undefined): { active?: string } {
+  return current?.active === undefined ? {} : { active: current.active };
 }
 
 /** What a product page needs to show an already-queued session, threaded route -> shell -> product ->
@@ -156,8 +154,9 @@ export function useAttachSession(productId: string, fromUrl: string | undefined)
       return;
     }
     if (current.active === begunId) {
-      // The explicitly opened session ended: the newer paid-for one behind it is what a visit restores now.
-      writeEntry(productId, { id: current.id, rank: current.rank });
+      // The explicitly opened session ended: a newer paid-for one behind it is what a visit restores now; none
+      // (it was the newest itself), nothing is.
+      writeEntry(productId, current.id === begunId ? null : { id: current.id, rank: current.rank });
     } else if (current.id === begunId && current.active === undefined) {
       writeEntry(productId, null);
     }

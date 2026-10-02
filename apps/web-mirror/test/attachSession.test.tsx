@@ -158,6 +158,29 @@ describe("useAttachSession", () => {
     expect(readAttachSessionId("acceptance_builder")).toBe("C");
   });
 
+  it.each([
+    ["an empty entry", () => undefined],
+    ["the already remembered newest", () => rememberAttachSession("acceptance_builder", "A", "2026-10-01T10:00:00Z")],
+  ])("choosing the newest session (from %s) keeps it restored over a newer Accept that settles late; nothing is left once it ends", (_label, arrange) => {
+    arrange();
+    chooseAttachSession("acceptance_builder", "A", "2026-10-01T10:00:00Z");
+    const { result } = renderHook(() => useAttachSession("acceptance_builder", "A"));
+    act(() => result.current.onAttachBegin?.());
+    rememberAttachSession("acceptance_builder", "B", "2026-10-01T10:05:00Z");
+    expect(readAttachSessionId("acceptance_builder")).toBe("A");
+
+    act(() => result.current.onAttachEnd?.());
+    expect(readAttachSessionId("acceptance_builder")).toBe("B");
+  });
+
+  it("a chosen newest session that ends with nothing newer behind it leaves nothing", () => {
+    chooseAttachSession("acceptance_builder", "A", "2026-10-01T10:00:00Z");
+    const { result } = renderHook(() => useAttachSession("acceptance_builder", "A"));
+    act(() => result.current.onAttachBegin?.());
+    act(() => result.current.onAttachEnd?.());
+    expect(readAttachSessionId("acceptance_builder")).toBeUndefined();
+  });
+
   it("is scoped per product", () => {
     rememberAttachSession("acceptance_builder", "s 1", "2026-10-01T10:00:00Z");
     expect(renderHook(() => useAttachSession("brief_decoder", undefined)).result.current.attachSessionId).toBeUndefined();
