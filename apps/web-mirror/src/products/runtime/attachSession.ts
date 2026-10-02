@@ -106,9 +106,12 @@ export function useAttachSession(productId: string, fromUrl: string | undefined)
     if (!fromUrl) {
       return;
     }
-    // A session the consent page already remembered keeps its rank; a bare link starts at the lowest.
+    // A bare link has no order of its own (rank 0): it keeps the rank of the same session the consent page
+    // remembered, and never replaces a different session that has one (a newer accepted handoff).
     const current = readEntry(productId);
-    writeEntry(productId, current?.id === fromUrl ? current : { id: fromUrl, rank: 0 });
+    if (current === undefined || current.rank === 0) {
+      writeEntry(productId, { id: fromUrl, rank: 0 });
+    }
     const url = new URL(window.location.href);
     url.searchParams.delete(ATTACH_SESSION_PARAM);
     // `null` state: Next then copies its own history internals into it and syncs `useSearchParams`;

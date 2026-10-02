@@ -93,6 +93,17 @@ describe("useAttachSession", () => {
     expect(readAttachSessionId("acceptance_builder")).toBe("s 1");
   });
 
+  it("does not let a bare ?session= link replace a different, ranked remembered session; a bare one replaces a bare one", () => {
+    rememberAttachSession("acceptance_builder", "newer", "2026-10-01T10:05:00Z");
+    renderHook(() => useAttachSession("acceptance_builder", "stale"));
+    expect(readAttachSessionId("acceptance_builder")).toBe("newer");
+
+    window.sessionStorage.clear();
+    renderHook(() => useAttachSession("acceptance_builder", "bare 1"));
+    renderHook(() => useAttachSession("acceptance_builder", "bare 2"));
+    expect(readAttachSessionId("acceptance_builder")).toBe("bare 2");
+  });
+
   it("is scoped per product", () => {
     rememberAttachSession("acceptance_builder", "s 1", "2026-10-01T10:00:00Z");
     expect(renderHook(() => useAttachSession("brief_decoder", undefined)).result.current.attachSessionId).toBeUndefined();
