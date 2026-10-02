@@ -146,7 +146,6 @@ python scripts/agent/runner.py full-check
 ## Open questions
 
 - Activation rule for `draft_v1` (no verdict): decided in ANY-244: a non-empty acceptance-criteria list counts as the first display.
-- Quota limit 3 is a starting value, not validated.
 - Handoff route from Brief Decoder (decision 7): ANY-26.
 - Product priority: Linear calls Acceptance Builder "required #4"; repo docs keep it in the
   backlog outside the release order. README wording is unchanged on that point.
@@ -154,4 +153,6 @@ python scripts/agent/runner.py full-check
 ## Follow-up debt
 
 - Quota is charged before input validation (inherited Platform Core gap, separate task).
+- Quota limit 3 is a starting value, not validated. Validating it needs usage data and is outside
+  this plan's completion criteria; it is tracked as separate follow-up debt, not as work owned here.
 - The Linear blocked-by list omits A11/A02 and includes unused A07; left as is.
