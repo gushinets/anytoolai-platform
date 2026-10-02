@@ -146,6 +146,18 @@ describe("useAttachSession", () => {
     expect(readAttachSessionId("acceptance_builder")).toBe("C");
   });
 
+  it("a newer Accept that settles late while an explicitly opened older session is shown becomes the fallback, not the restored one", () => {
+    rememberAttachSession("acceptance_builder", "B", "2026-10-01T10:05:00Z");
+    chooseAttachSession("acceptance_builder", "A", "2026-10-01T10:00:00Z");
+    const { result } = renderHook(() => useAttachSession("acceptance_builder", "A"));
+    act(() => result.current.onAttachBegin?.());
+    rememberAttachSession("acceptance_builder", "C", "2026-10-01T10:30:00Z");
+    expect(readAttachSessionId("acceptance_builder")).toBe("A");
+
+    act(() => result.current.onAttachEnd?.());
+    expect(readAttachSessionId("acceptance_builder")).toBe("C");
+  });
+
   it("is scoped per product", () => {
     rememberAttachSession("acceptance_builder", "s 1", "2026-10-01T10:00:00Z");
     expect(renderHook(() => useAttachSession("brief_decoder", undefined)).result.current.attachSessionId).toBeUndefined();
