@@ -2,7 +2,7 @@
 // reload in the same tab, and forgotten only when the person moves on from the session the page showed.
 import { renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { readAttachSessionId, rememberAttachSession, useAttachSession } from "../src/products/runtime/attachSession";
+import { chooseAttachSession, readAttachSessionId, rememberAttachSession, useAttachSession } from "../src/products/runtime/attachSession";
 import { canAttachTarget } from "../src/products/attachTargets";
 import { draftDefinition } from "../src/products/acceptanceBuilder/AcceptanceBuilderProduct";
 import { getRegisteredProduct } from "../src/products/registry";
@@ -102,6 +102,18 @@ describe("useAttachSession", () => {
     renderHook(() => useAttachSession("acceptance_builder", "bare 1"));
     renderHook(() => useAttachSession("acceptance_builder", "bare 2"));
     expect(readAttachSessionId("acceptance_builder")).toBe("bare 2");
+  });
+
+  it("a session the person opens themselves replaces a newer remembered one, and a late older Accept still cannot replace it", () => {
+    rememberAttachSession("acceptance_builder", "newer", "2026-10-01T10:05:00Z");
+    chooseAttachSession("acceptance_builder", "chosen older", "2026-10-01T10:00:00Z");
+    expect(readAttachSessionId("acceptance_builder")).toBe("chosen older");
+
+    rememberAttachSession("acceptance_builder", "late, older than newer", "2026-10-01T10:04:00Z");
+    expect(readAttachSessionId("acceptance_builder")).toBe("chosen older");
+    // Its reload identity survives the bare `?session=` link the open navigates with.
+    renderHook(() => useAttachSession("acceptance_builder", "chosen older"));
+    expect(readAttachSessionId("acceptance_builder")).toBe("chosen older");
   });
 
   it("is scoped per product", () => {

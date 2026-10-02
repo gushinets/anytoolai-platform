@@ -7,7 +7,7 @@ import { makeRoutedFetchClient } from "@anytoolai/ce-kit/test/testUtils/routedFe
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { HandoffConsent } from "../src/components/HandoffConsent";
-import { readAttachSessionId } from "../src/products/runtime/attachSession";
+import { readAttachSessionId, rememberAttachSession } from "../src/products/runtime/attachSession";
 import { HANDOFF_MESSAGES } from "../src/components/handoffMessages";
 import { makeClientWithDeferredCalls, makeClientWithDeferredRoute } from "./fixtures/platformResponses";
 import { LOCALE_STORAGE_KEY } from "../src/i18n/localeStorage";
@@ -309,6 +309,21 @@ describe("HandoffConsent", () => {
     },
   );
 
+  it("Open result on the older of two accepted handoffs makes that one what the target restores on a reload", async () => {
+    // A newer handoff's session is already remembered for the product (its Accept came after this token's).
+    rememberAttachSession("acceptance_builder", "session_newer", "2026-01-01T00:20:00Z");
+    const older = previewPayload({ status: "consumed", target_scenario_session_id: "session_older", target_product_id: "acceptance_builder", expires_at: "2026-01-01T00:10:00Z" });
+    const { client } = makeRoutedClient({
+      [PREVIEW_ROUTE]: [jsonResponse(200, older)],
+      [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
+    });
+    render(<HandoffConsent client={client} handoffToken="token_abc" canOpenTarget={() => true} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Open result" }));
+
+    expect(routerPush).toHaveBeenCalledWith("/products/acceptance_builder?session=session_older");
+    expect(readAttachSessionId("acceptance_builder")).toBe("session_older");
+  });
+
   it("offers no Open result on a spent token without a target session, for a target the host cannot open, or when declined", async () => {
     const cases = [
       previewPayload({ status: "accepted", target_scenario_session_id: null }),
@@ -396,6 +411,42 @@ describe("HandoffConsent", () => {
     expect(readAttachSessionId("acceptance_builder")).toBe("s1");
     expect(routerPush).not.toHaveBeenCalled();
     expect(calls.filter((call) => call.key === PREVIEW_ROUTE)).toHaveLength(2);
+  });
+
+  it("an Accept whose answer is unreadable (2xx, not a preview) while still on the page refetches the preview and opens the queued session", async () => {
+    const { client, calls } = makeRoutedClient({
+      [PREVIEW_ROUTE]: [
+        jsonResponse(200, previewPayload()),
+        jsonResponse(200, previewPayload({ status: "consumed", target_scenario_session_id: "s1", target_product_id: "acceptance_builder" })),
+      ],
+      [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
+      [ACCEPT_ROUTE]: [jsonResponse(200, { unexpected: true })],
+    });
+    render(<HandoffConsent client={client} handoffToken="token_abc" canOpenTarget={() => true} />);
+    const accept = (await screen.findByRole("button", { name: "Accept" })) as HTMLButtonElement;
+    await waitFor(() => expect(accept.disabled).toBe(false));
+    fireEvent.click(accept);
+
+    await waitFor(() => expect(routerPush).toHaveBeenCalledWith("/products/acceptance_builder?session=s1"));
+    expect(calls.filter((call) => call.key === PREVIEW_ROUTE)).toHaveLength(2);
+    expect(readAttachSessionId("acceptance_builder")).toBe("s1");
+  });
+
+  it("an Accept whose answer is unreadable, when the refetched preview is still actionable, shows the retryable error and keeps nothing", async () => {
+    const { client } = makeRoutedClient({
+      [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload()), jsonResponse(200, previewPayload())],
+      [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
+      [ACCEPT_ROUTE]: [jsonResponse(200, { unexpected: true })],
+    });
+    render(<HandoffConsent client={client} handoffToken="token_abc" canOpenTarget={() => true} />);
+    const accept = (await screen.findByRole("button", { name: "Accept" })) as HTMLButtonElement;
+    await waitFor(() => expect(accept.disabled).toBe(false));
+    fireEvent.click(accept);
+
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/could not be completed/i));
+    expect(accept.disabled).toBe(false);
+    expect(routerPush).not.toHaveBeenCalled();
+    expect(readAttachSessionId("acceptance_builder")).toBeUndefined();
   });
 
   it("after the person left, an Accept whose answer is unreadable (2xx, not a preview) refetches the preview and keeps the queued session", async () => {

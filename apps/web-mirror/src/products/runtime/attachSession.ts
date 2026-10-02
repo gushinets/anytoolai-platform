@@ -3,7 +3,8 @@ import { ATTACH_SESSION_PARAM } from "../../lib/hostUrls";
 
 const storageKey = (productId: string) => `anytoolai.attach_session.${productId}`;
 
-/** One remembered session per product per tab. `rank` orders accepted handoffs (see `rememberAttachSession`):
+/** One remembered session per product per tab: `id` is what a visit restores; `rank` is the order of the NEWEST
+ * accepted handoff this tab has seen for the product (not necessarily `id`'s own; see `rememberAttachSession`),
  * a timestamp in MICROseconds, compared as a number (as strings, "...:00Z" would sort after "...:00.5Z", which
  * is later). A session that arrived without one (a `?session=` link) has the lowest rank, 0. */
 type StoredAttach = { id: string; rank: number };
@@ -57,16 +58,29 @@ export function readAttachSessionId(productId: string): string | undefined {
 }
 
 /**
- * Remembers a session an accepted handoff queued for `productId` (an Accept that settled after the person left
- * the consent page, or just before navigating), so the product restores it on its next visit. Ordering-aware:
- * the rank is the handoff's own `expiresAt` (it grows with the handoff's creation time), and a remembered
- * session is replaced only by a NEWER one, so an older Accept whose response arrives late cannot overwrite
- * the newer accepted session the person is already on.
+ * Remembers a session an accepted handoff queued for `productId` when its Accept settled AFTER the person left
+ * the consent page, so the product restores it on its next visit. Ordering-aware: the rank is the handoff's own
+ * `expiresAt` (it grows with the handoff's creation time), and a remembered session is replaced only by a NEWER
+ * one, so an older Accept whose response arrives late cannot overwrite the newer accepted session the person is
+ * already on. Use `chooseAttachSession` for a session the person opens themselves.
  */
 export function rememberAttachSession(productId: string, scenarioSessionId: string, timestamp: string): void {
+  keepEntry(productId, scenarioSessionId, timestamp, false);
+}
+
+/**
+ * The person opens this accepted handoff's session now (the Accept they just clicked, or "Open result" on a
+ * spent token): it is what the tab restores from here on, whatever its order; a newer remembered one is
+ * replaced too. The newest order seen stays as the rank, so a late older Accept still cannot replace it.
+ */
+export function chooseAttachSession(productId: string, scenarioSessionId: string, timestamp: string): void {
+  keepEntry(productId, scenarioSessionId, timestamp, true);
+}
+
+function keepEntry(productId: string, scenarioSessionId: string, timestamp: string, chosen: boolean): void {
   const rank = toRank(timestamp);
   const current = readEntry(productId);
-  if (current === undefined || current.id === scenarioSessionId || rank > current.rank) {
+  if (chosen || current === undefined || current.id === scenarioSessionId || rank > current.rank) {
     writeEntry(productId, { id: scenarioSessionId, rank: Math.max(rank, current?.rank ?? 0) });
   }
 }

@@ -19,7 +19,7 @@ import {
   type PlatformApiResult,
 } from "@anytoolai/ce-kit";
 import { productAttachPath } from "../lib/hostUrls";
-import { rememberAttachSession } from "../products/runtime/attachSession";
+import { chooseAttachSession, rememberAttachSession } from "../products/runtime/attachSession";
 import { getClientStorage } from "../products/runtime/clientStorage";
 import { useIsomorphicLayoutEffect } from "../lib/useIsomorphicLayoutEffect";
 import { LanguageSwitcher, useHostT, useLocale, useProductT, type Locale } from "../i18n";
@@ -94,10 +94,11 @@ function isAlreadyAccepted(error: PlatformApiError): boolean {
   return error.type === "backend_error" && error.code === "handoff_already_accepted";
 }
 
-/** An Accept that may have gone through whose answer was lost or unreadable (transport failure, timeout, a
- * 2xx body that is not a preview): only the authoritative preview says whether it queued (and charged) a target. */
-function isAmbiguousAcceptOutcome(error: PlatformApiError): boolean {
-  return error.type === "network_error" || error.type === "timeout" || error.type === "invalid_response";
+/** An Accept error after which the handoff may be accepted anyway: "already accepted" says it is; a lost or
+ * unreadable answer (transport failure, timeout, a 2xx body that is not a preview) hides whether it queued
+ * (and charged) a target. Only the authoritative preview knows, so both call for one `getHandoff()`. */
+function acceptMayHaveGoneThrough(error: PlatformApiError): boolean {
+  return isAlreadyAccepted(error) || error.type === "network_error" || error.type === "timeout" || error.type === "invalid_response";
 }
 
 /** The target session of an accepted/consumed preview, if the host can open it; null otherwise. The one
@@ -227,7 +228,8 @@ export function HandoffConsent({ client, handoffToken, canOpenTarget }: HandoffC
       showRetryableActionError();
       return;
     }
-    if (!isHandoffActionRefetchable(error)) {
+    const ambiguousAccept = kind === "accept" && acceptMayHaveGoneThrough(error);
+    if (!isHandoffActionRefetchable(error) && !ambiguousAccept) {
       showRetryableActionError();
       return;
     }
@@ -235,23 +237,33 @@ export function HandoffConsent({ client, handoffToken, canOpenTarget }: HandoffC
     if (!mountedRef.current) {
       // Left while the refetch was in flight: its answer still names the queued session, so keep it.
       if (kind === "accept" && refetched.ok) {
-        rememberAcceptedTarget(refetched.value);
+        keepAcceptedTarget(refetched.value, "late");
       }
       return;
     }
-    setState(viewStateFromResult(refetched));
-    // A lost Accept response: the retry gets "already accepted" and this authoritative preview names
-    // the target session the first Accept already queued (and charged), so reach it the same way.
+    // A lost Accept response (or a retry's "already accepted"): this authoritative preview names the target
+    // session the Accept already queued (and charged), so reach it the same way as a direct success.
     if (kind === "accept" && refetched.ok && (refetched.value.status === "accepted" || refetched.value.status === "consumed")) {
+      setState(stateForPreview(refetched.value));
       redirectToAcceptedTarget(refetched.value);
+      return;
     }
+    // The Accept did not go through (the handoff is still actionable, or nothing readable came back): let the
+    // person retry it; a terminal answer is shown as such.
+    if (ambiguousAccept && (!refetched.ok || !isTerminalHandoffStatus(refetched.value.status))) {
+      showRetryableActionError();
+      return;
+    }
+    setState(viewStateFromResult(refetched));
   }
 
-  // Keep the queued session for the target product's next visit (an Accept that settled after the person left).
-  function rememberAcceptedTarget(preview: HandoffPreview): void {
+  // Keep the queued session for the target product's next visit. "chosen": the person opens it now, so it is
+  // what the tab restores from here on, even over a newer one; "late": an Accept settled after they left, so
+  // only a newer session than the remembered one may replace it.
+  function keepAcceptedTarget(preview: HandoffPreview, how: "chosen" | "late"): void {
     const sessionId = acceptedTargetSessionId(preview, canOpenTarget);
     if (sessionId !== null) {
-      rememberAttachSession(preview.targetProductId, sessionId, preview.expiresAt);
+      (how === "chosen" ? chooseAttachSession : rememberAttachSession)(preview.targetProductId, sessionId, preview.expiresAt);
     }
   }
 
@@ -262,8 +274,9 @@ export function HandoffConsent({ client, handoffToken, canOpenTarget }: HandoffC
   function redirectToAcceptedTarget(preview: HandoffPreview): void {
     const sessionId = acceptedTargetSessionId(preview, canOpenTarget);
     if (sessionId !== null) {
-      // Remembered with its rank before leaving, so a late response of an OLDER Accept cannot replace it.
-      rememberAcceptedTarget(preview);
+      // Chosen before leaving: a reload of the target shows this one, and a late response of an OLDER Accept
+      // cannot replace it.
+      keepAcceptedTarget(preview, "chosen");
       router.push(productAttachPath(preview.targetProductId, sessionId));
     }
   }
@@ -280,14 +293,13 @@ export function HandoffConsent({ client, handoffToken, canOpenTarget }: HandoffC
         // page: keep the session it queued for the target product's next visit, and do not navigate over
         // wherever they went. (Left before any answer arrived, the id is simply unknown.)
         if (result.ok && kind === "accept") {
-          rememberAcceptedTarget(result.value);
-        } else if (!result.ok && kind === "accept" && (isAlreadyAccepted(result.error) || isAmbiguousAcceptOutcome(result.error))) {
-          // "Already accepted" proves the Accept went through (an expired, declined or failed handoff does not),
-          // and a lost or unreadable answer may hide one: one read of the authoritative preview names the
-          // session it queued, if any. Nothing else continues (no state, no navigation).
+          keepAcceptedTarget(result.value, "late");
+        } else if (!result.ok && kind === "accept" && acceptMayHaveGoneThrough(result.error)) {
+          // One read of the authoritative preview names the session the Accept queued, if any (an expired,
+          // declined or failed handoff queued none). Nothing else continues (no state, no navigation).
           void getHandoff(client, handoffToken).then((refetched) => {
             if (refetched.ok) {
-              rememberAcceptedTarget(refetched.value);
+              keepAcceptedTarget(refetched.value, "late");
             }
           });
         }
