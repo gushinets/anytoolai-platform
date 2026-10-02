@@ -398,6 +398,32 @@ describe("HandoffConsent", () => {
     expect(calls.filter((call) => call.key === PREVIEW_ROUTE)).toHaveLength(2);
   });
 
+  it("after the person left, an Accept whose answer is unreadable (2xx, not a preview) refetches the preview and keeps the queued session", async () => {
+    const { client, calls, resolveDeferred } = makeClientWithDeferredRoute(
+      {
+        [PREVIEW_ROUTE]: [
+          jsonResponse(200, previewPayload()),
+          jsonResponse(200, previewPayload({ status: "consumed", target_scenario_session_id: "s1", target_product_id: "acceptance_builder" })),
+        ],
+        [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
+      },
+      ACCEPT_ROUTE,
+    );
+    const { unmount } = render(<HandoffConsent client={client} handoffToken="token_abc" canOpenTarget={() => true} />);
+    const accept = (await screen.findByRole("button", { name: "Accept" })) as HTMLButtonElement;
+    await waitFor(() => expect(accept.disabled).toBe(false));
+    fireEvent.click(accept);
+    await waitFor(() => expect(accept.getAttribute("aria-busy")).toBe("true"));
+
+    unmount();
+    resolveDeferred(jsonResponse(200, { unexpected: true }));
+    await waitFor(() => expect(calls.filter((call) => call.key === PREVIEW_ROUTE)).toHaveLength(2));
+    await settle();
+
+    expect(readAttachSessionId("acceptance_builder")).toBe("s1");
+    expect(routerPush).not.toHaveBeenCalled();
+  });
+
   it("keeps nothing for a target the host cannot open, even after the Accept succeeded while the person was away", async () => {
     const { client, resolveDeferred } = makeClientWithDeferredRoute(
       { [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload())], [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()] },

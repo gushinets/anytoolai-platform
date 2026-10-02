@@ -94,6 +94,12 @@ function isAlreadyAccepted(error: PlatformApiError): boolean {
   return error.type === "backend_error" && error.code === "handoff_already_accepted";
 }
 
+/** An Accept that may have gone through whose answer was lost or unreadable (transport failure, timeout, a
+ * 2xx body that is not a preview): only the authoritative preview says whether it queued (and charged) a target. */
+function isAmbiguousAcceptOutcome(error: PlatformApiError): boolean {
+  return error.type === "network_error" || error.type === "timeout" || error.type === "invalid_response";
+}
+
 /** The target session of an accepted/consumed preview, if the host can open it; null otherwise. The one
  * answer to "is there a queued target we can reach", used to open it, to remember it and to offer it. */
 function acceptedTargetSessionId(
@@ -275,10 +281,10 @@ export function HandoffConsent({ client, handoffToken, canOpenTarget }: HandoffC
         // wherever they went. (Left before any answer arrived, the id is simply unknown.)
         if (result.ok && kind === "accept") {
           rememberAcceptedTarget(result.value);
-        } else if (!result.ok && kind === "accept" && isAlreadyAccepted(result.error)) {
-          // "Already accepted" proves the Accept went through (an expired, declined or failed handoff does not):
-          // one read of the authoritative preview names the session it queued. Nothing else continues (no
-          // state, no navigation).
+        } else if (!result.ok && kind === "accept" && (isAlreadyAccepted(result.error) || isAmbiguousAcceptOutcome(result.error))) {
+          // "Already accepted" proves the Accept went through (an expired, declined or failed handoff does not),
+          // and a lost or unreadable answer may hide one: one read of the authoritative preview names the
+          // session it queued, if any. Nothing else continues (no state, no navigation).
           void getHandoff(client, handoffToken).then((refetched) => {
             if (refetched.ok) {
               rememberAcceptedTarget(refetched.value);
