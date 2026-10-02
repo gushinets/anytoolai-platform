@@ -4,14 +4,24 @@ import { ATTACH_SESSION_PARAM } from "../../lib/hostUrls";
 const storageKey = (productId: string) => `anytoolai.attach_session.${productId}`;
 
 /** One remembered session per product per tab. `rank` orders accepted handoffs (see `rememberAttachSession`):
- * a timestamp in milliseconds, compared as a NUMBER (as strings, "...:00Z" would sort after "...:00.5Z", which
+ * a timestamp in MICROseconds, compared as a number (as strings, "...:00Z" would sort after "...:00.5Z", which
  * is later). A session that arrived without one (a `?session=` link) has the lowest rank, 0. */
 type StoredAttach = { id: string; rank: number };
 
-/** An ISO timestamp as a rank; anything unparseable ranks lowest. */
+/**
+ * An ISO timestamp as a rank in microseconds; anything unparseable ranks lowest. The backend stamps
+ * `expires_at` with Python's microsecond-precision clock, so two handoffs can differ only below a
+ * millisecond, and `Date.parse` drops everything past milliseconds: the digits it drops (the fraction's 4th to
+ * 6th) are added back. (ms * 1000 + 999 stays far below Number.MAX_SAFE_INTEGER for any current date.)
+ */
 function toRank(timestamp: string): number {
   const ms = Date.parse(timestamp);
-  return Number.isNaN(ms) ? 0 : ms;
+  if (Number.isNaN(ms)) {
+    return 0;
+  }
+  const fraction = /\.(\d+)/.exec(timestamp)?.[1] ?? "";
+  const microsPastMillisecond = Number(fraction.padEnd(6, "0").slice(3, 6));
+  return ms * 1000 + microsPastMillisecond;
 }
 
 function readEntry(productId: string): StoredAttach | undefined {

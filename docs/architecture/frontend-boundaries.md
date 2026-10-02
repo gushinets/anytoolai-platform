@@ -185,7 +185,7 @@ The shared runtime, not a product, owns the web side of a handoff:
 - The redirect after Accept (and the "Open result" action, and what is remembered) needs an `accepted` or
   `consumed` preview that names a non-empty target session the host can open; any other status with a
   session id (for example `failed`) stays on the consent page's terminal status. One remembered session
-  per product per tab, and the newest accepted one wins by the handoff's own order (its `expiresAt`, which grows with creation time, compared as a time and not as a string: `...:00.5Z` is later than `...:00Z`), not by which response arrives last: an older Accept that settles late cannot replace the newer session the person is already on. The remembered entry is stored with that rank before the same-tab navigation too.
+  per product per tab, and the newest accepted one wins by the handoff's own order (its `expiresAt`, which grows with creation time, compared as a time to the microsecond, since the backend clock has microseconds, and not as a string: `...:00.5Z` is later than `...:00Z`), not by which response arrives last: an older Accept that settles late cannot replace the newer session the person is already on. The remembered entry is stored with that rank before the same-tab navigation too.
 - A product with a `handoff` must define `<messageScope>.continueToTarget` in its messages. A
   multi-mode product (each mode its own `ProductDefinition`) supplies only its mode list to the shared
   `products/shared/MultiModeProduct.tsx`, which owns the selector, the clean remount per mode, the

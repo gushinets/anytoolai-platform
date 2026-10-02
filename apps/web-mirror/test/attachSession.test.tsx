@@ -75,6 +75,17 @@ describe("useAttachSession", () => {
     expect(readAttachSessionId("acceptance_builder")).toBe("later");
   });
 
+  it("orders timestamps that differ only below a millisecond (the backend's clock has microseconds), in either arrival order", () => {
+    rememberAttachSession("acceptance_builder", "newer", "2026-10-01T10:00:00.000900Z");
+    rememberAttachSession("acceptance_builder", "older", "2026-10-01T10:00:00.000100Z");
+    expect(readAttachSessionId("acceptance_builder")).toBe("newer");
+
+    window.sessionStorage.clear();
+    rememberAttachSession("acceptance_builder", "older", "2026-10-01T10:00:00.000100Z");
+    rememberAttachSession("acceptance_builder", "newer", "2026-10-01T10:00:00.000900Z");
+    expect(readAttachSessionId("acceptance_builder")).toBe("newer");
+  });
+
   it("keeps the rank of a session the consent page remembered when it arrives as ?session= (a late older one still loses)", () => {
     rememberAttachSession("acceptance_builder", "s 1", "2026-10-01T10:05:00Z");
     renderHook(() => useAttachSession("acceptance_builder", "s 1"));
