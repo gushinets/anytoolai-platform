@@ -14,6 +14,7 @@ export const en = {
     resultTitle: "Decoded brief",
     placeholder: "Your decoded brief will appear here after you decode it.",
     regenerate: "Decode brief again",
+    continueToTarget: "Create acceptance criteria",
   },
   result: {
     brief: "Brief",

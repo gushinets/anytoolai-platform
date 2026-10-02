@@ -14,6 +14,8 @@ export const ru: Shape<typeof en> = {
     expires: "Действует до",
     status: "Статус",
   },
+  // Shown on a spent (accepted/consumed) token that still names the queued target session.
+  openResult: "Открыть результат",
   accept: "Принять",
   decline: "Отклонить",
   accepting: "Принимаем…",
@@ -24,5 +26,10 @@ export const ru: Shape<typeof en> = {
     declined: "Отклонена",
     expired: "Истекла",
     failed: "Не удалась",
+  },
+  // Labels for the backend's known preview keys (`handoffs.yaml` `preview_mapping`); any other key is shown as sent.
+  previewFields: {
+    summary: "Сводка",
+    missing_fields: "Чего не хватает",
   },
 };

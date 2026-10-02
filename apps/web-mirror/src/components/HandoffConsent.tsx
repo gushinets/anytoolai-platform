@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button, Card, Toast } from "@anytoolai/shared-ui";
 import {
   acceptHandoff,
-  createInMemoryAsyncStorage,
-  createWindowLocalStorageAdapter,
   declineHandoff,
   getHandoff,
   isHandoffActionRefetchable,
@@ -19,6 +18,9 @@ import {
   type PlatformApiError,
   type PlatformApiResult,
 } from "@anytoolai/ce-kit";
+import { productAttachPath } from "../lib/hostUrls";
+import { chooseAttachSession, rememberAttachSession } from "../products/runtime/attachSession";
+import { getClientStorage } from "../products/runtime/clientStorage";
 import { useIsomorphicLayoutEffect } from "../lib/useIsomorphicLayoutEffect";
 import { LanguageSwitcher, useHostT, useLocale, useProductT, type Locale } from "../i18n";
 import styles from "./HandoffConsent.module.css";
@@ -26,6 +28,10 @@ import styles from "./HandoffConsent.module.css";
 export type HandoffConsentProps = {
   client: PlatformApiClient;
   handoffToken: string;
+  /** Whether the web host can attach the accepted handoff's target scenario, so it redirects only to
+   * a page that can show that session (the route supplies it; this component must not import the
+   * product registry). */
+  canOpenTarget?: (productId: string, scenarioId: string) => boolean;
 };
 
 // A `Record<HandoffStatus, boolean>` literal, not a hand-written `Set` -- this fails to typecheck
@@ -84,16 +90,64 @@ function viewStateFromResult(result: PlatformApiResult<HandoffPreview>): ViewSta
   return stateForPreview(result.value);
 }
 
+function isAlreadyAccepted(error: PlatformApiError): boolean {
+  return error.type === "backend_error" && error.code === "handoff_already_accepted";
+}
+
+/** An Accept error after which the handoff may be accepted anyway: "already accepted" says it is; a lost or
+ * unreadable answer (transport failure, timeout, a 2xx body that is not a preview) hides whether it queued
+ * (and charged) a target. Only the authoritative preview knows, so both call for one `getHandoff()`. */
+function acceptMayHaveGoneThrough(error: PlatformApiError): boolean {
+  return isAlreadyAccepted(error) || error.type === "network_error" || error.type === "timeout" || error.type === "invalid_response";
+}
+
+/** The target session of an accepted/consumed preview, if the host can open it; null otherwise. The one
+ * answer to "is there a queued target we can reach", used to open it, to remember it and to offer it. */
+function acceptedTargetSessionId(
+  preview: HandoffPreview,
+  canOpenTarget: HandoffConsentProps["canOpenTarget"],
+): string | null {
+  const accepted = preview.status === "accepted" || preview.status === "consumed";
+  // `||`, not `??`: an empty id is no id (it would open the target page with nothing to attach).
+  return accepted && canOpenTarget?.(preview.targetProductId, preview.targetScenarioId) === true
+    ? preview.targetScenarioSessionId || null
+    : null;
+}
+
+const KNOWN_PREVIEW_FIELDS = ["summary", "missing_fields"] as const;
+
+function isKnownPreviewField(key: string): key is (typeof KNOWN_PREVIEW_FIELDS)[number] {
+  return (KNOWN_PREVIEW_FIELDS as readonly string[]).includes(key);
+}
+
+/** Strings as sent; a list of strings as a comma-separated line; anything else as opaque JSON. */
+function formatPreviewValue(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+  return Array.isArray(value) && value.every((item) => typeof item === "string") ? value.join(", ") : JSON.stringify(value);
+}
+
 /**
  * State machine for the backend-owned handoff consent page. Renders only the fields the backend
  * safe preview carries -- no provider/model, prompt, or raw artifact data ever reaches this
  * component. `preview.preview` is a bounded, config-mapped `dict[str, Any]` on the wire, so it is
  * always rendered as opaque key/value pairs, never by assuming specific keys.
  */
-export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
+export function HandoffConsent({ client, handoffToken, canOpenTarget }: HandoffConsentProps) {
   const t = useProductT();
   const th = useHostT();
   const { locale } = useLocale();
+  const router = useRouter();
+  // Not tied to the mount effect's AbortController (it also guards other work); a plain "still on this
+  // page" flag, set again on a StrictMode effect replay.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   const [state, setState] = useState<ViewState>({ kind: "loading" });
   // `guestId === undefined` doubles as "identity resolution failed": by the time the consent view
   // can render at all, resolution has already settled (below), so there's no separate "still
@@ -101,18 +155,11 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
   // sending no guest_id would let the backend's HandoffService.accept() attribute the target
   // session/quota to the handoff's creator instead of the person actually accepting.
   const [guestId, setGuestId] = useState<string | undefined>(undefined);
-  // Fallback storage for guestStorage/refreshGuestIdentity() when window.localStorage itself isn't
-  // available -- lazily created once per component instance (stable across re-renders and across a
-  // self-heal retry within the same mount), not module-level, so it doesn't leak a minted guest id
-  // across remounts/tests the way a module singleton would.
-  const [ephemeralGuestStorage] = useState<AsyncStorage>(() => createInMemoryAsyncStorage());
-  // Which backend to persist the guest id in, decided once at mount and reused for every storage
-  // operation for this component's whole lifetime -- resolving it fresh on each call (as a prior
-  // version of this component did, once in the mount effect and again in resolveActionError) risks
-  // the two calls disagreeing if localStorage's availability changes in between (e.g. a Storage
-  // Access API grant lands mid-session), which would split a stale/fresh guest id across two
-  // different storage backends instead of ever colocating them.
-  const [guestStorage] = useState<AsyncStorage>(() => createWindowLocalStorageAdapter() ?? ephemeralGuestStorage);
+  // The same per-client storage the product pages use (`getClientStorage`: localStorage when usable,
+  // else one in-memory store per client), so the guest that accepts here is the guest the target
+  // product page -- reached by a client-side redirect on the same client -- resolves. It is also
+  // decided once, so every storage operation for this mount uses one backend.
+  const [guestStorage] = useState<AsyncStorage>(() => getClientStorage(client));
   // Bumped to force the mount effect below to re-run on demand (e.g. a "Try again" click from the
   // safe-error view) without duplicating its fetch logic in a second function.
   const [retryToken, setRetryToken] = useState(0);
@@ -173,19 +220,65 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
       // refetching would just return the same actionable preview) -- refreshGuestIdentity() clears
       // the stale persisted id and resolves a fresh one so a retry can actually succeed instead of
       // 404ing forever.
-      const fresh = await refreshGuestIdentity(client, guestStorage, {
-        fallbackStorage: ephemeralGuestStorage,
-      });
+      const fresh = await refreshGuestIdentity(client, guestStorage);
+      if (!mountedRef.current) {
+        return;
+      }
       setGuestId(fresh.ok ? fresh.value.guestId : undefined);
       showRetryableActionError();
       return;
     }
-    if (!isHandoffActionRefetchable(error)) {
+    const ambiguousAccept = kind === "accept" && acceptMayHaveGoneThrough(error);
+    if (!isHandoffActionRefetchable(error) && !ambiguousAccept) {
       showRetryableActionError();
       return;
     }
     const refetched = await getHandoff(client, handoffToken);
+    if (!mountedRef.current) {
+      // Left while the refetch was in flight: its answer still names the queued session, so keep it.
+      if (kind === "accept" && refetched.ok) {
+        keepAcceptedTarget(refetched.value, "late");
+      }
+      return;
+    }
+    // A lost Accept response (or a retry's "already accepted"): this authoritative preview names the target
+    // session the Accept already queued (and charged), so reach it the same way as a direct success.
+    if (kind === "accept" && refetched.ok && (refetched.value.status === "accepted" || refetched.value.status === "consumed")) {
+      setState(stateForPreview(refetched.value));
+      redirectToAcceptedTarget(refetched.value);
+      return;
+    }
+    // The Accept did not go through (the handoff is still actionable, or nothing readable came back): let the
+    // person retry it; a terminal answer is shown as such.
+    if (ambiguousAccept && (!refetched.ok || !isTerminalHandoffStatus(refetched.value.status))) {
+      showRetryableActionError();
+      return;
+    }
     setState(viewStateFromResult(refetched));
+  }
+
+  // Keep the queued session for the target product's next visit. "chosen": the person opens it now, so it is
+  // what the tab restores from here on, even over a newer one; "late": an Accept settled after they left, so
+  // only a newer session than the remembered one may replace it.
+  function keepAcceptedTarget(preview: HandoffPreview, how: "chosen" | "late"): void {
+    const sessionId = acceptedTargetSessionId(preview, canOpenTarget);
+    if (sessionId !== null) {
+      (how === "chosen" ? chooseAttachSession : rememberAttachSession)(preview.targetProductId, sessionId, preview.expiresAt);
+    }
+  }
+
+  // An accepted handoff has already queued its target session server-side; the ids are redacted once the
+  // token's TTL passes, so go to the target product right away, same tab -- but only when the host can
+  // attach it (other targets, e.g. an extension, stay on this page's terminal status). Also the explicit
+  // "Open result" action.
+  function redirectToAcceptedTarget(preview: HandoffPreview): void {
+    const sessionId = acceptedTargetSessionId(preview, canOpenTarget);
+    if (sessionId !== null) {
+      // Chosen before leaving: a reload of the target shows this one, and a late response of an OLDER Accept
+      // cannot replace it.
+      keepAcceptedTarget(preview, "chosen");
+      router.push(productAttachPath(preview.targetProductId, sessionId));
+    }
   }
 
   async function runAction(
@@ -195,8 +288,28 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
     setState((prev) => (prev.kind === "consent" ? { ...prev, pending: kind, actionFailed: false } : prev));
     try {
       const result = await mutate();
+      if (!mountedRef.current) {
+        // The Accept already happened server-side (and charged the quota) though the person has left this
+        // page: keep the session it queued for the target product's next visit, and do not navigate over
+        // wherever they went. (Left before any answer arrived, the id is simply unknown.)
+        if (result.ok && kind === "accept") {
+          keepAcceptedTarget(result.value, "late");
+        } else if (!result.ok && kind === "accept" && acceptMayHaveGoneThrough(result.error)) {
+          // One read of the authoritative preview names the session the Accept queued, if any (an expired,
+          // declined or failed handoff queued none). Nothing else continues (no state, no navigation).
+          void getHandoff(client, handoffToken).then((refetched) => {
+            if (refetched.ok) {
+              keepAcceptedTarget(refetched.value, "late");
+            }
+          });
+        }
+        return;
+      }
       if (result.ok) {
         setState(stateForPreview(result.value));
+        if (kind === "accept") {
+          redirectToAcceptedTarget(result.value);
+        }
       } else {
         await resolveActionError(kind, result.error);
       }
@@ -268,8 +381,8 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
         <dd aria-live="polite">{t(`status.${HANDOFF_STATUS_KEY[preview.status]}`)}</dd>
         {Object.entries(preview.preview).map(([key, value]) => (
           <div key={key} className={styles.entry}>
-            <dt>{key}</dt>
-            <dd>{typeof value === "string" ? value : JSON.stringify(value)}</dd>
+            <dt>{isKnownPreviewField(key) ? t(`previewFields.${key}`) : key}</dt>
+            <dd>{formatPreviewValue(value)}</dd>
           </div>
         ))}
       </dl>
@@ -304,6 +417,15 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
           ) : null}
           {state.actionFailed ? <Toast variant="error">{t("actionFailed")}</Toast> : null}
         </>
+      ) : null}
+      {/* A spent token still names the target session the accept queued (and charged) until its TTL. If
+          the Accept response was lost and the person reloaded instead of retrying, this is the only way
+          to it -- an explicit action, not an automatic jump, because the page may be opened later just to
+          look. */}
+      {state.kind === "terminal" && acceptedTargetSessionId(preview, canOpenTarget) !== null ? (
+        <div className={styles.actions}>
+          <Button onClick={() => redirectToAcceptedTarget(preview)}>{t("openResult")}</Button>
+        </div>
       ) : null}
     </HandoffShell>
   );

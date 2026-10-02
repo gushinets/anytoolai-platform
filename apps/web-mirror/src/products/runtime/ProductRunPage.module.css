@@ -190,3 +190,11 @@
     flex-direction: column;
   }
 }
+
+/* "Opening the next step…" and its way out: the status and the button side by side, wrapping on narrow cards. */
+.handoffOpening {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}

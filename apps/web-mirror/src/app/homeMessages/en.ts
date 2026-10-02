@@ -21,5 +21,13 @@ export const en = {
       blurb: "Turn a client brief into structured details, risks, and the questions to ask before you start.",
       sample: "Missing: deadline and budget. Ask the client: what is the exact launch date, and who signs off on the design?",
     },
+    acceptance_builder: {
+      blurb: "Turn a client brief into acceptance criteria, or check finished work against the brief.",
+      sample: "Acceptance criteria: the homepage loads in under two seconds; the client approves two design rounds.",
+      tags: {
+        draft: "Draft criteria",
+        check: "Check deliverable",
+      },
+    },
   },
 };

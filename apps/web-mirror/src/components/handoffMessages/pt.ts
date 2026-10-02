@@ -14,6 +14,8 @@ export const pt: Shape<typeof en> = {
     expires: "Expira em",
     status: "Status",
   },
+  // Shown on a spent (accepted/consumed) token that still names the queued target session.
+  openResult: "Abrir o resultado",
   accept: "Aceitar",
   decline: "Recusar",
   accepting: "Aceitando…",
@@ -24,5 +26,10 @@ export const pt: Shape<typeof en> = {
     declined: "Recusada",
     expired: "Expirada",
     failed: "Falhou",
+  },
+  // Labels for the backend's known preview keys (`handoffs.yaml` `preview_mapping`); any other key is shown as sent.
+  previewFields: {
+    summary: "Resumo",
+    missing_fields: "Informações em falta",
   },
 };

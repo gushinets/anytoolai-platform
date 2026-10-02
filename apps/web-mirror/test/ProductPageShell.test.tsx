@@ -594,3 +594,40 @@ describe("All tools link", () => {
     }
   });
 });
+
+describe("attach props through the shell and the registry", () => {
+  const AB_IDS = { productId: "acceptance_builder", scenarioId: "acceptance_builder.draft_v1" } as const;
+
+  it("reach a registered product: the queued session is polled, shown and reported (begin), with no start request", async () => {
+    const ids = routesFor(AB_IDS);
+    const output = {
+      extracted: { values: { acceptance_criteria: ["Students get a PDF"] }, missing_fields: ["assumptions", "deliverables"] },
+      document: { sections: [], summary: "Recap" },
+    };
+    const { client, calls } = makeClientCapturingRequests({
+      [ids.RUNTIME_CONFIG]: [runtimeConfigResponse(AB_IDS)],
+      [ids.GUEST_IDENTITY]: [guestIdentityResponse()],
+      [ids.QUOTA]: [quotaResponse(AB_IDS)],
+      [ids.SESSION]: [sessionResponse()],
+      [ids.RESULT]: [resultResponse(AB_IDS, { output })],
+    });
+    const onAttachBegin = vi.fn();
+    const onAttachEnd = vi.fn();
+    const product = getRegisteredProduct("acceptance_builder")!;
+
+    render(
+      <ProductPageShell
+        product={product}
+        client={client}
+        attach={{ attachSessionId: "session_1", onAttachBegin, onAttachEnd }}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "New task" })).toBeTruthy());
+    expect(onAttachBegin).toHaveBeenCalledTimes(1);
+    expect(calls.some((call) => call.key === ids.START)).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "New task" }));
+    expect(onAttachEnd).toHaveBeenCalledTimes(1); // the callbacks got all the way down, and back up
+  });
+});

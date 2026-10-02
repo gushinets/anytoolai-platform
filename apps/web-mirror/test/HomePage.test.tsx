@@ -37,7 +37,7 @@ describe("HomePage", () => {
   it("keeps each tool's sample output available to screen readers, hiding only the duplicate call to action", () => {
     render(<HomePage />);
     const cards = Object.values(HOME_MESSAGES.en.cards);
-    expect(cards).toHaveLength(3);
+    expect(cards).toHaveLength(4);
     for (const card of cards) {
       expect(screen.getByText(card.sample).closest('[aria-hidden="true"]')).toBeNull();
     }

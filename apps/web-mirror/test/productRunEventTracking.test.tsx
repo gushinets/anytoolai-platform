@@ -1,15 +1,17 @@
 import { createInMemoryAsyncStorage } from "@anytoolai/ce-kit";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createProductRunEventTracker } from "../src/products/runtime/productRunEventTracking";
 import { errorResponse, jsonResponse, makeClientCapturingRequests } from "./fixtures/platformResponses";
 
 const CLIENT_EVENTS_ROUTE = "POST /v1/client-events";
 
 function clientEventReceiptResponse() {
-  return jsonResponse(200, { event_id: "event_1", accepted: true });
+  // The shape the client's own parser accepts (the backend answers with both fields).
+  return jsonResponse(200, { event_id: "event_1", event_type: "web.result_viewed" });
 }
 
 type ClientEventRequestBody = {
+  event_id: string;
   event_type: string;
   product_id: string;
   frontend_id: string;
@@ -28,6 +30,9 @@ function clientEventCalls<C extends { key: string }>(calls: C[]): C[] {
 }
 
 describe("createProductRunEventTracker", () => {
+  // The result-viewed once-per-session guard lives in this tab's sessionStorage.
+  beforeEach(() => window.sessionStorage.clear());
+
   it("tracks product_viewed/form_started/form_submitted as their web.* counterparts, forwarding the guest id ProductRunPage already resolved", async () => {
     const { client, calls } = makeClientCapturingRequests({
       [CLIENT_EVENTS_ROUTE]: [clientEventReceiptResponse(), clientEventReceiptResponse(), clientEventReceiptResponse()],
@@ -63,6 +68,82 @@ describe("createProductRunEventTracker", () => {
     expect(body.event_type).toBe("web.result_viewed");
     expect(body.scenario_session_id).toBe("session_1");
     expect(body.guest_id).toBe("guest_1");
+  });
+
+  it("reports web.result_viewed once per session, so a reload of a restored result does not count again", async () => {
+    const { client, calls } = makeClientCapturingRequests({
+      [CLIENT_EVENTS_ROUTE]: [clientEventReceiptResponse(), clientEventReceiptResponse()],
+    });
+    const onEvent = createProductRunEventTracker(client, "acceptance_builder", createInMemoryAsyncStorage());
+
+    onEvent({ type: "scenario_completed", scenarioSessionId: "session_9", guestId: "guest_1", resultViewed: true });
+    onEvent({ type: "scenario_completed", scenarioSessionId: "session_9", guestId: "guest_1", resultViewed: true });
+    onEvent({ type: "scenario_completed", scenarioSessionId: "session_10", guestId: "guest_1", resultViewed: true });
+    await vi.waitFor(() => expect(clientEventCalls(calls)).toHaveLength(2));
+    expect(clientEventCalls(calls).map((call) => parseBody(call).scenario_session_id)).toEqual(["session_9", "session_10"]);
+  });
+
+  it("retries with the SAME event id after an attempt the backend did not acknowledge (its response may have been lost), and stops once accepted", async () => {
+    const { client, calls } = makeClientCapturingRequests({
+      [CLIENT_EVENTS_ROUTE]: [
+        errorResponse(503, "unavailable"), // e.g. a lost/failed response: the backend may or may not have committed it
+        clientEventReceiptResponse(),
+        clientEventReceiptResponse(),
+      ],
+    });
+    const onEvent = createProductRunEventTracker(client, "acceptance_builder", createInMemoryAsyncStorage());
+    const completed = { type: "scenario_completed", scenarioSessionId: "session_7", guestId: undefined, resultViewed: true } as const;
+
+    onEvent(completed);
+    await vi.waitFor(() => expect(clientEventCalls(calls)).toHaveLength(1));
+    await vi.waitFor(() => expect(JSON.parse(window.sessionStorage.getItem("anytoolai.result_viewed.session_7")!)).toMatchObject({ accepted: false }));
+
+    onEvent(completed); // a reload of the same result in this tab
+    await vi.waitFor(() => expect(clientEventCalls(calls)).toHaveLength(2));
+    const [first, second] = clientEventCalls(calls).map(parseBody);
+    // Same logical event, same id: if the first attempt did commit, the backend dedupes instead of adding a row.
+    expect(second!.event_id).toBe(first!.event_id);
+    expect(second!.guest_id).toBeUndefined();
+    await vi.waitFor(() => expect(JSON.parse(window.sessionStorage.getItem("anytoolai.result_viewed.session_7")!)).toMatchObject({ accepted: true }));
+
+    onEvent(completed); // accepted: never again
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(clientEventCalls(calls)).toHaveLength(2);
+  });
+
+  it("retries under the web session id of the first attempt, even when a reload without localStorage minted another", async () => {
+    const { client, calls } = makeClientCapturingRequests({
+      [CLIENT_EVENTS_ROUTE]: [errorResponse(503, "unavailable"), clientEventReceiptResponse()],
+    });
+    const completed = { type: "scenario_completed", scenarioSessionId: "session_8", guestId: undefined, resultViewed: true } as const;
+
+    // First load: its own (in-memory) web session id; the attempt is not acknowledged.
+    createProductRunEventTracker(client, "acceptance_builder", createInMemoryAsyncStorage())(completed);
+    await vi.waitFor(() => expect(clientEventCalls(calls)).toHaveLength(1));
+    await vi.waitFor(() => expect(JSON.parse(window.sessionStorage.getItem("anytoolai.result_viewed.session_8")!)).toMatchObject({ accepted: false }));
+
+    // Reload: sessionStorage survived, the in-memory storage did not, so a NEW web session id is minted.
+    createProductRunEventTracker(client, "acceptance_builder", createInMemoryAsyncStorage())(completed);
+    await vi.waitFor(() => expect(clientEventCalls(calls)).toHaveLength(2));
+    const [first, second] = clientEventCalls(calls).map(parseBody);
+    expect(second!.event_id).toBe(first!.event_id);
+    // The backend compares the whole event for a reused id (the web session id is part of it): same one, or 409.
+    expect(second!.web_session_id).toBe(first!.web_session_id);
+  });
+
+  it("treats an id conflict as recorded: the backend already holds an event under our own id, so it is not retried forever", async () => {
+    const { client, calls } = makeClientCapturingRequests({
+      [CLIENT_EVENTS_ROUTE]: [errorResponse(409, "client_event_id_conflict")],
+    });
+    const onEvent = createProductRunEventTracker(client, "acceptance_builder", createInMemoryAsyncStorage());
+    const completed = { type: "scenario_completed", scenarioSessionId: "session_9", guestId: undefined, resultViewed: true } as const;
+
+    onEvent(completed);
+    await vi.waitFor(() => expect(JSON.parse(window.sessionStorage.getItem("anytoolai.result_viewed.session_9")!)).toMatchObject({ accepted: true }));
+
+    onEvent(completed); // a reload: nothing more to send
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(clientEventCalls(calls)).toHaveLength(1);
   });
 
   it("does not track web.result_viewed for a completed run the product does not count as viewed", async () => {

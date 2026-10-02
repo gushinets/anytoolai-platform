@@ -12,6 +12,8 @@ export const en = {
     expires: "Expires",
     status: "Status",
   },
+  // Shown on a spent (accepted/consumed) token that still names the queued target session.
+  openResult: "Open result",
   accept: "Accept",
   decline: "Decline",
   accepting: "Accepting…",
@@ -22,5 +24,10 @@ export const en = {
     declined: "Declined",
     expired: "Expired",
     failed: "Failed",
+  },
+  // Labels for the backend's known preview keys (`handoffs.yaml` `preview_mapping`); any other key is shown as sent.
+  previewFields: {
+    summary: "Summary",
+    missing_fields: "Missing details",
   },
 };

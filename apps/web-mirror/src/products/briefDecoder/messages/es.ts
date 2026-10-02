@@ -17,6 +17,7 @@ export const es: Shape<typeof en> = {
     resultTitle: "Brief analizado",
     placeholder: "Su brief analizado aparecerá aquí después del análisis.",
     regenerate: "Analizar brief de nuevo",
+    continueToTarget: "Crear criterios de aceptación",
   },
   result: {
     brief: "Brief",

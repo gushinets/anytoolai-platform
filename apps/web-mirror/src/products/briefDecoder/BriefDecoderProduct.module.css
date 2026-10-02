@@ -1,28 +1,3 @@
-.fieldGroup {
-  display: grid;
-  gap: 8px;
-}
-
-.help,
-.error {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-.help {
-  color: var(--color-text-secondary);
-}
-
-.error {
-  color: var(--color-error);
-}
-
-.briefTextArea {
-  min-height: 200px;
-  resize: none;
-}
-
 /* The result quotes the user's brief verbatim (URLs, long tokens): grid items default to
  * `min-width: auto`, so without these a single unbroken token widens the whole page on mobile. */
 .result,

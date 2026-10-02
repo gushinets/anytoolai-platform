@@ -23,5 +23,13 @@ export const it: Shape<typeof en> = {
       blurb: "Trasformare il brief di un cliente in dettagli strutturati, rischi e domande da porre prima di iniziare.",
       sample: "Mancano: scadenza e budget. Da chiedere al cliente: qual è la data di lancio esatta e chi approva il design?",
     },
+    acceptance_builder: {
+      blurb: "Trasformare un brief in criteri di accettazione, o verificare il lavoro finito rispetto al brief.",
+      sample: "Criteri di accettazione: la home si carica in meno di due secondi; il cliente approva due giri di design.",
+      tags: {
+        draft: "Redigi i criteri",
+        check: "Verifica il lavoro",
+      },
+    },
   },
 };

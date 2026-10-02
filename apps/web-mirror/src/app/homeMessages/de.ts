@@ -23,5 +23,13 @@ export const de: Shape<typeof en> = {
       blurb: "Verwandeln Sie ein Kunden-Briefing in strukturierte Angaben, Risiken und die Fragen, die Sie vor dem Start stellen sollten.",
       sample: "Fehlt: Frist und Budget. Fragen Sie den Kunden: Wie lautet das genaue Startdatum, und wer gibt das Design frei?",
     },
+    acceptance_builder: {
+      blurb: "Machen Sie aus einem Briefing Abnahmekriterien oder prüfen Sie fertige Arbeit gegen das Briefing.",
+      sample: "Abnahmekriterien: Die Startseite lädt in unter zwei Sekunden; der Kunde gibt zwei Designrunden frei.",
+      tags: {
+        draft: "Kriterien entwerfen",
+        check: "Ergebnis prüfen",
+      },
+    },
   },
 };

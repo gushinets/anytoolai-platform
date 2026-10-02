@@ -643,7 +643,7 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
     // synchronously (no waitFor) right after the result text appears -- code review finding: an
     // earlier version notified the parent's busy state from a plain useEffect, which could still
     // be stale at this exact instant (result rendered, guard not yet lifted), silently dropping a
-    // click landing in that window; onBusyChange now fires from a (isomorphic) layout effect, so
+    // click landing in that window; onLockedChange now fires from a (isomorphic) layout effect, so
     // the whole child-settles -> parent-unblocks cascade is flushed before this line runs.
     expect((screen.getByRole("radio", { name: "Update" }) as HTMLInputElement).disabled).toBe(false);
     fireEvent.click(screen.getByRole("radio", { name: "Reply Draft" }));

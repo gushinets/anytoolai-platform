@@ -1,0 +1,27 @@
+/* The recap quotes model text (URLs, long tokens): without this a single unbroken token widens the
+ * whole page on mobile. */
+.result,
+.section {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.result {
+  display: grid;
+  gap: 16px;
+  width: 100%;
+}
+
+.section {
+  display: grid;
+  gap: 8px;
+}
+
+.label {
+  font-weight: 600;
+}
+
+.meta {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}

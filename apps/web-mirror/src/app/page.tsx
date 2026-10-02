@@ -14,6 +14,7 @@ const CARD_TAGS: Record<string, readonly string[]> = {
   proposal_ai: [],
   client_update_writer: ["update", "replyDraft", "prepaidRequest"],
   brief_decoder: [],
+  acceptance_builder: ["draft", "check"],
 };
 
 export default function HomePage() {

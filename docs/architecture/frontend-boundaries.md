@@ -136,6 +136,84 @@ The canonical backend output additionally contains `brief_text` (the caller's or
 as handoff material); the frontend result intentionally excludes it: the product parser drops it
 and it is never rendered or copied, so it must not be added to the frontend result model.
 
+## Cross-product handoff in the web host (ANY-244)
+
+The shared runtime, not a product, owns the web side of a handoff:
+
+- `ProductDefinition.handoff` (`handoffDefinitionId`, `targetProductId`) makes `ProductRunPage`
+  render a button beside "New task" (label from `<messageScope>.continueToTarget`). A click calls
+  `createHandoff` for the shown result and opens `/handoff/{token}` in the same tab. The button is
+  hidden unless the target is in `NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS` (unset = all).
+- `HandoffConsent` sends the user to `/products/{targetProductId}?session={id}` right after a
+  successful Accept; the ids are redacted once the token's TTL passes.
+- `/products/{id}?session=` reaches the product as `attachSessionId`; `ProductRunPage` polls that
+  already-queued session and renders its result with no start request and no quota charge; "Try
+  again" re-polls that session, and an unknown session id (404) ends in the run-failed state. The
+  route reads `?session=` from its `searchParams` prop (not `useSearchParams`, whose Suspense
+  boundary would turn the unknown-product 404 into a 200), removes it from the address bar so a
+  bookmark or shared link does not carry it, and keeps it in the tab's `sessionStorage` so a reload
+  still shows the result the accept already charged for. `useAttachSession` is the one owner of that
+  state (`AttachProps`: `attachSessionId`, `onAttachBegin`, `onAttachEnd`, threaded route -> shell ->
+  product -> `ProductRunPage`; no analytics event is involved). The page reports two facts: it started
+  polling the session, and the person moved on from it ("New task" on the attached result, own work
+  whose result replaced it on screen, a mode switch, or its terminal failure). The owner forgets the
+  persisted id only for an end that follows a begin, so a failed boot, or typing in another mode,
+  forgets nothing, and a run that failed to start leaves the attached result restorable. After consent the linked scenario session is an ordinary runtime handle:
+  the platform's session/result GETs take no guest id and the session has no expiry of its own, so
+  the id is an opaque public handle, not proof of ownership, and not the short-lived handoff bearer
+  token (which does have a TTL and redaction contract). If a bounded lifetime is ever wanted for it,
+  that is a backend lifecycle contract, not a frontend assumption. The attached result must come
+  from this product's scenario: its backend-owned `schemaRef` and `schemaVersion` are checked
+  against the selected scenario's output schema from runtime config (a declared version must match;
+  a ref keeps its name across a version bump) before the product parser sees it.
+- A spent (accepted/consumed) token that still names the target session shows an explicit "Open result" on the
+  consent page, for the case where the Accept response was lost and the person reloaded instead of retrying
+  (a retry that gets "already accepted" redirects on its own). It never redirects automatically on load.
+- The redirect happens only when `products/attachTargets.ts` lists the accepted target scenario
+  (a registered, enabled product page that can attach it); otherwise the consent page keeps showing
+  the terminal status. The consent route injects that check, so it does not bundle every product.
+- `web.result_viewed` for an attached session is sent with the session alone, without a guest: the backend
+  derives guest and chain from the session and rejects a different explicit guest, which is what the
+  current one is after a reload without a usable `localStorage` (a fresh in-memory guest). The tab keeps, per
+  session, the event id, the web session id it was sent under, and whether the backend accepted it:
+  accepted means never again; anything else (a lost response, a timeout) is retried on the next report with
+  the SAME `event_id` and the SAME web session id, so a first attempt that the backend did commit is deduped
+  there (`trackClientEvent` requires the same id on every retry of one logical event) instead of adding a
+  second row. The web session id matters: the backend compares the whole event for a reused id, and a reload
+  without a usable `localStorage` mints a new web session id, which would otherwise be rejected as
+  `client_event_id_conflict`; such a conflict is itself treated as "already recorded".
+- The redirect after Accept (and the "Open result" action, and what is remembered) needs an `accepted` or
+  `consumed` preview that names a non-empty target session the host can open; any other status with a
+  session id (for example `failed`) stays on the consent page's terminal status. One remembered session
+  per product per tab, and the newest accepted one wins by the handoff's own order (its `expiresAt`, which grows with creation time, compared as a time to the microsecond, since the backend clock has microseconds, and not as a string: `...:00.5Z` is later than `...:00Z`), not by which response arrives last: an older Accept that settles late cannot replace the newer session the person is already on. A session the person opens themselves (the Accept they just clicked, or "Open result" on a spent token) is chosen outright: it is what the tab restores from then on, even when an older one, while the newest accepted session stays remembered as its fallback (and its order as the guard against late Accepts): when the opened one ends, that newer paid-for session is what the next visit restores, and a newer Accept that settles late meanwhile only becomes that fallback, never the restored one. An Accept whose answer was lost or unreadable (transport failure, timeout, a non-preview 2xx) is resolved by one authoritative preview read, on the page (open the queued session, or let the person retry) and after leaving it (remember the queued session only).
+- A product with a `handoff` must define `<messageScope>.continueToTarget` in its messages. A
+  multi-mode product (each mode its own `ProductDefinition`) supplies only its mode list to the shared
+  `products/shared/MultiModeProduct.tsx`, which owns the selector, the clean remount per mode, the
+  one-shot handoff attach, and the rule that the mode switch (and the form) stay locked while the page
+  is "locked" (`onLockedChange`): a run in flight (including an ambiguous failure that may still be
+  running server-side), a handoff being created or navigated to, or an attached session that is still
+  booting. A failed boot of an attached session releases the lock and leaves the persisted session
+  untouched (an `onAttachEnd` that was never preceded by `onAttachBegin` does nothing), so a reload
+  still retries it.
+- The source-side handoff button creates the handoff (state "creating", form and mode switch locked),
+  then starts the same-tab navigation ("navigating"). Both show a visible "Opening the next step…" status
+  and lock the page until it unloads; a bfcache return resets it. There is deliberately no timer: how
+  long a navigation takes is a guess, and unlocking on a guess lets a new paid run start under a
+  navigation that is still going to leave for the previous result. A cancelled navigation (Esc, Stop)
+  fires no event, so the "navigating" status carries an explicit "Stay on this page" action. It calls
+  `window.stop()` before unlocking: otherwise a merely slow navigation could still commit after the
+  person started a new run here and abandon that run's result. `window.stop()` also aborts every other
+  in-flight request of the document, and the one that must survive is a copy activation POST (it
+  outlives the "Copied" feedback), so the action is disabled while one is in flight.
+- An Accept whose response arrives after the person left the consent page still happened server-side and
+  charged the quota: the target session id is kept for that product's next visit
+  (`rememberAttachSession`), and nothing navigates. An error such as "already accepted" that
+  arrives after the person left proves the Accept went through, so one read of the authoritative preview
+  names the session it queued and that is kept too; nothing else continues. Left before any answer
+  arrived, the id is simply unknown.
+- The copy text of a product whose renderer contract fixes its wording (Acceptance Builder) is the
+  contract's English text, not UI-locale copy.
+
 ## Web i18n (ANY-519)
 
 `apps/web-mirror` localizes product-page UI. The mechanism is host-owned; the words are
@@ -182,7 +260,7 @@ product-owned. Code: `apps/web-mirror/src/i18n/` (library `use-intl`, imported o
   the result card; "Copy" and "New task" share one action group; "New task" clears both cards,
   refreshes quota and focuses the first `textarea`/`input`. There is no result-only mode and no
   per-product layout switch. Host messages own the copy every product shares
-  (`workspace.inputTitle|previousDetails|backToInputs|newTask`); the product owns the noun-specific
+  (`workspace.inputTitle|previousDetails|backToInputs|newTask|handoffFailed|handoffOpening|handoffStay`); the product owns the noun-specific
   copy under its `messageScope` (`resultTitle|placeholder|regenerate`, one set per Client Update
   Writer mode). The shared runtime still owns start, retry, quota, and copy behavior.
 - **Validation:** shared validators return structured `FieldError` data (`required`,

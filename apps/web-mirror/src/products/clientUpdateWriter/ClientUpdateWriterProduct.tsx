@@ -1,13 +1,11 @@
 "use client";
 
 import type { ChangeEvent } from "react";
-import { useState } from "react";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
 import { Input, TextArea } from "@anytoolai/shared-ui";
 import { FieldErrorMessage } from "../../components/FieldErrorMessage";
 import { ResultView } from "../../components/ResultView";
 import { useProductT } from "../../i18n";
-import { ProductRunPage } from "../runtime/ProductRunPage";
 import {
   collectFieldErrors,
   optionalTrimmedFieldError,
@@ -15,6 +13,7 @@ import {
   type FieldError,
 } from "../runtime/fieldValidation";
 import type { ProductDefinition, ProductFieldsProps, ProductResultProps, ProductRunEvent } from "../runtime/productDefinition";
+import { MultiModeProduct } from "../shared/MultiModeProduct";
 import { ToneSelect, type Tone } from "../shared/tone";
 import styles from "./ClientUpdateWriterProduct.module.css";
 
@@ -270,91 +269,27 @@ export const prepaidRequestDefinition: ProductDefinition<PrepaidRequestValues, C
   Result: ClientUpdateWriterResultView,
 };
 
-// ---- Mode switcher: product-owned composition, not a shared-runtime concept (ANY-453's
-// ProductDefinition/ProductRunPage contract already covers "one definition -> one scenario" for a
-// single mount; each mode here is its own complete ProductDefinition, and switching between them
-// is just which one this component currently renders). `key={modeId}` forces a full ProductRunPage
-// remount on switch, so a mode change always starts from a clean form/run state, exactly like
-// navigating to a different product would -- each mode's form values have an incompatible shape
-// (UpdateValues/ReplyDraftValues/PrepaidRequestValues), so the remount is load-bearing, not just
-// defensive: without it, ProductRunPage's own `values` state would keep the previous mode's shape. ----
-
-type ModeId = "update" | "reply_draft" | "prepaid_request";
-
-// One map, not a separate label list plus a separate mode -> definition ternary (code review
-// finding: the two used to list the same three modes independently; labels now live in the
-// product's `modes.<id>` messages) -- `Record<ModeId, ...>`
-// also makes a missing mode a compile error instead of needing a runtime exhaustiveness check.
-// Each mode's own V is a distinct, incompatible values shape (see the docstring above); `any`
-// here is the map's value type only, not a loosening of any individual mode's own
-// ProductDefinition<V, R> declaration above.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyModeDefinition = ProductDefinition<any, ClientUpdateWriterResult>;
-
-const MODE_DEFINITIONS: Record<ModeId, AnyModeDefinition> = {
-  update: updateDefinition,
-  reply_draft: replyDraftDefinition,
-  prepaid_request: prepaidRequestDefinition,
-};
-const MODE_IDS = Object.keys(MODE_DEFINITIONS) as ModeId[];
-
 export type ClientUpdateWriterProductProps = {
   client: PlatformApiClient;
   onEvent?: (event: ProductRunEvent) => void;
   visitId?: string;
 };
 
+/** One `ProductDefinition` per mode; the mode selector and its run-safety rules are `MultiModeProduct`. */
 export function ClientUpdateWriterProduct({ client, onEvent, visitId }: ClientUpdateWriterProductProps) {
   const t = useProductT();
-  const [modeId, setModeId] = useState<ModeId>("update");
-  // Code review finding: `key={modeId}` below unmounts the active mode's ProductRunPage the
-  // instant another mode is picked -- its cleanup aborts the in-flight poll/result fetch, but the
-  // backend keeps running an already-accepted scenario (a provider call the user has no way to
-  // get back). Switching mode mid-run
-  // silently abandoned that run's result. Disabling the mode switch for the duration of a
-  // submit/run (mirroring how the form's own fields are already disabled then) is simpler and
-  // safer than trying to preserve/reattach the run across a remount, and needs no changes to the
-  // shared runtime's own single-mount contract.
-  const [busy, setBusy] = useState(false);
-  // The `disabled` attribute is the real, sufficient guard in an actual browser; this handler-level
-  // check is a second, independent guard against the actual mode-switching side effect (rather
-  // than only a DOM affordance a test environment's click simulation might not honor identically).
-  function handleModeChange(id: ModeId) {
-    if (busy) {
-      return;
-    }
-    setModeId(id);
-  }
-
   return (
-    <>
-      <fieldset className={styles.modeGroup}>
-        <legend className={styles.legend}>{t("modes.legend")}</legend>
-        <div className={styles.modeOptions}>
-          {MODE_IDS.map((id) => (
-            <label key={id} className={styles.modeOption}>
-              <input
-                className={styles.radio}
-                type="radio"
-                name="client-update-writer-mode"
-                value={id}
-                checked={id === modeId}
-                disabled={busy}
-                onChange={() => handleModeChange(id)}
-              />
-              {t(`modes.${id}`)}
-            </label>
-          ))}
-        </div>
-      </fieldset>
-      <ProductRunPage
-        key={modeId}
-        definition={MODE_DEFINITIONS[modeId]}
-        client={client}
-        onEvent={onEvent}
-        onBusyChange={setBusy}
-        visitId={visitId}
-      />
-    </>
+    <MultiModeProduct
+      client={client}
+      onEvent={onEvent}
+      visitId={visitId}
+      legend={t("modes.legend")}
+      name="client-update-writer-mode"
+      modes={[
+        { id: "update", label: t("modes.update"), definition: updateDefinition },
+        { id: "reply_draft", label: t("modes.reply_draft"), definition: replyDraftDefinition },
+        { id: "prepaid_request", label: t("modes.prepaid_request"), definition: prepaidRequestDefinition },
+      ]}
+    />
   );
 }

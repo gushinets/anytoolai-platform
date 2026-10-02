@@ -23,6 +23,9 @@ export const pt: Shape<typeof en> = {
     previousDetails: "Resultado baseado nos dados anteriores",
     backToInputs: "Voltar aos dados",
     newTask: "Nova tarefa",
+    handoffOpening: "Abrindo a próxima etapa…",
+    handoffStay: "Ficar nesta página",
+    handoffFailed: "Não foi possível abrir a próxima etapa. Tente novamente.",
   },
   errors: {
     startFailed: "Não foi possível iniciar {product}. Tente novamente.",

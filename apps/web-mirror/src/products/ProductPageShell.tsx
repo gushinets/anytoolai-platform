@@ -6,6 +6,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { LanguageSwitcher, LocaleProvider, useHostT, useProductT } from "../i18n";
 import type { RegisteredProduct } from "./registry";
 import type { ProductRunEvent } from "./runtime/productDefinition";
+import type { AttachProps } from "./runtime/attachSession";
 import { ProductShellContext, type ProductShell } from "./runtime/ProductShellContext";
 import styles from "./ProductPageShell.module.css";
 
@@ -20,24 +21,33 @@ export function ProductPageShell({
   client,
   onEvent,
   visitId,
+  attach,
 }: {
   product: RegisteredProduct;
   client: PlatformApiClient;
   onEvent?: (event: ProductRunEvent) => void;
   visitId?: string;
+  attach?: AttachProps;
 }) {
   const { Component } = product;
   return (
     <LocaleProvider productMessages={product.messages}>
-      <ProductPageContent Component={Component} client={client} onEvent={onEvent} visitId={visitId} />
+      <ProductPageContent
+        Component={Component}
+        client={client}
+        onEvent={onEvent}
+        visitId={visitId}
+        attach={attach}
+      />
     </LocaleProvider>
   );
 }
 
-function ProductPageContent({ Component, client, onEvent, visitId }: Pick<RegisteredProduct, "Component"> & {
+function ProductPageContent({ Component, client, onEvent, visitId, attach }: Pick<RegisteredProduct, "Component"> & {
   client: PlatformApiClient;
   onEvent?: (event: ProductRunEvent) => void;
   visitId?: string;
+  attach?: AttachProps;
 }) {
   const t = useProductT();
   const th = useHostT();
@@ -57,7 +67,7 @@ function ProductPageContent({ Component, client, onEvent, visitId }: Pick<Regist
         {/* No key here: the caller already keys ProductPageShell itself by productId (page.tsx), so
             this whole subtree -- Component included -- already remounts on a product change. */}
         <ProductShellContext.Provider value={shell}>
-          <Component client={client} onEvent={onEvent} visitId={visitId} />
+          <Component client={client} onEvent={onEvent} visitId={visitId} {...attach} />
         </ProductShellContext.Provider>
       </main>
     </div>

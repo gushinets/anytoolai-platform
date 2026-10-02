@@ -21,6 +21,7 @@ describe("getRegisteredProduct", () => {
 
   it("returns the enabled Brief Decoder product", () => {
     expect(getRegisteredProduct("brief_decoder")?.productId).toBe("brief_decoder");
+    expect(getRegisteredProduct("acceptance_builder")?.productId).toBe("acceptance_builder");
   });
 
   it("returns null for an unknown product id", () => {

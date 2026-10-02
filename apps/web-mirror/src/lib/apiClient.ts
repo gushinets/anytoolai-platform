@@ -20,8 +20,8 @@ let browserClient: PlatformApiClient | undefined;
  * `web_session_id` -- hangs off the client, so its lifetime must not be tied to a component:
  * Client Update Writer's mode switch remounts `ProductRunPage`, and a page-level `useMemo` only
  * lasts as long as that page's own mount. Owned by the module instead, so any remount or future
- * client-side navigation keeps it, and a full page load (the only way to move between products
- * today -- nothing in the app links or routes between them) starts fresh.
+ * client-side navigation keeps it, and a full page load starts fresh. (An accepted handoff moves between products with a client-side
+ * `router.push`, which keeps this client -- and so the guest and web session -- on purpose.)
  *
  * Not cached outside the browser: on the server there is no origin to build a real client from.
  */

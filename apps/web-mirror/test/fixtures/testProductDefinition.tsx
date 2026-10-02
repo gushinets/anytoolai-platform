@@ -17,6 +17,7 @@ export const TEST_PRODUCT_MESSAGES_EN = {
     resultTitle: "Test result",
     placeholder: "Your result will appear here.",
     regenerate: "Run again",
+    continueToTarget: "Continue to next tool",
   },
 };
 

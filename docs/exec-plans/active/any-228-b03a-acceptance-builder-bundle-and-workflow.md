@@ -145,7 +145,7 @@ python scripts/agent/runner.py full-check
 
 ## Open questions
 
-- Activation rule for `draft_v1` (no verdict): decided by ANY-244.
+- Activation rule for `draft_v1` (no verdict): decided in ANY-244: a non-empty acceptance-criteria list counts as the first display.
 - Quota limit 3 is a starting value, not validated.
 - Handoff route from Brief Decoder (decision 7): ANY-26.
 - Product priority: Linear calls Acceptance Builder "required #4"; repo docs keep it in the

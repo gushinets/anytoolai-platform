@@ -1391,7 +1391,7 @@ describe("ProductRunPage", () => {
     const busyStates: boolean[] = [];
     const { client } = makeClient(happyPathRoutes());
 
-    renderPage({ client, onBusyChange: (busy) => busyStates.push(busy) });
+    renderPage({ client, onLockedChange: (busy) => busyStates.push(busy) });
     await waitForForm();
     fillValidForm();
 
@@ -1415,7 +1415,7 @@ describe("ProductRunPage", () => {
       [ROUTES.RESULT]: [errorResponse(500, "internal_error"), resultResponse(TEST_PRODUCT_IDS)],
     });
 
-    renderPage({ client, onBusyChange: (busy) => busyStates.push(busy) });
+    renderPage({ client, onLockedChange: (busy) => busyStates.push(busy) });
     await waitForForm();
     fillValidForm();
     submit();
@@ -1440,7 +1440,7 @@ describe("ProductRunPage", () => {
       ...happyPathRoutes(),
       [ROUTES.START]: [errorResponse(500, "internal_error"), startResponse()],
     });
-    renderPage({ client: ambiguousClient, onBusyChange: (busy) => ambiguousBusyStates.push(busy) });
+    renderPage({ client: ambiguousClient, onLockedChange: (busy) => ambiguousBusyStates.push(busy) });
     await waitForForm();
     fillValidForm();
     submit();
@@ -1455,7 +1455,7 @@ describe("ProductRunPage", () => {
       ...happyPathRoutes(),
       [ROUTES.START]: [errorResponse(422, "scenario_input_invalid"), startResponse()],
     });
-    renderPage({ client: deterministicClient, onBusyChange: (busy) => deterministicBusyStates.push(busy) });
+    renderPage({ client: deterministicClient, onLockedChange: (busy) => deterministicBusyStates.push(busy) });
     await waitForForm();
     fillValidForm();
     submit();

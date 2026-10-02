@@ -17,6 +17,7 @@ export const it: Shape<typeof en> = {
     resultTitle: "Brief decodificato",
     placeholder: "Il brief decodificato apparirà qui dopo la decodifica.",
     regenerate: "Decodificare di nuovo il brief",
+    continueToTarget: "Crea i criteri di accettazione",
   },
   result: {
     brief: "Brief",

@@ -122,17 +122,6 @@ export function extractBriefDecoderResult(output: Record<string, unknown>): Brie
   };
 }
 
-/** Python `re` `\s` (the backend's `brief_text` pattern) for a str: Unicode White_Space-ish set plus
- * U+001C-U+001F and U+0085, and *not* U+FEFF. JS `trim()` differs on exactly those code points, so
- * the client must not use it for this field. */
-const BACKEND_WHITESPACE = "\\t\\n\\v\\f\\r \\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000";
-const OUTER_BACKEND_WHITESPACE = new RegExp(`^[${BACKEND_WHITESPACE}]+|[${BACKEND_WHITESPACE}]+$`, "g");
-
-/** The brief exactly as the backend accepts it: outer whitespace removed, inner text untouched. */
-export function trimBriefText(value: string): string {
-  return value.replace(OUTER_BACKEND_WHITESPACE, "");
-}
-
 /** `renderer_contract.yaml`'s `canonical_field_composition`: each section as a title line then its
  * content, sections separated by one blank line, then one more blank line and the summary. */
 export function composeCopyText({ sections, summary }: BriefDecoderResult["document"]): string {
