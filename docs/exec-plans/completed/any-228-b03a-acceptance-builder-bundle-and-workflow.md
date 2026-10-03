@@ -2,12 +2,12 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-09-25
-- Last updated: 2026-09-25
+- Last updated: 2026-10-02
 - Review date: 2026-09-29
-- Next action: run the full validation set, open the PR, address review.
+- Next action: none; PR #150 merged; no plan-scoped work remains.
 - Blocker: none
 
 ## Goal
@@ -142,16 +142,22 @@ python scripts/agent/runner.py full-check
 - 2026-09-29: team-lead review #1 found it forks the drafting contract; the owner chose to remove
   it and leave the handoff route to ANY-26 (decision 7). The verdict partition and the
   document-to-result binding were added (decision 6).
+- 2026-10-02: resolved after this plan's scope. Activation rule for `draft_v1` (no verdict): decided in
+  ANY-244 (a non-empty acceptance-criteria list counts as the first display). Brief Decoder -> Acceptance
+  Builder handoff route (decision 7): delivered by ANY-26 (PR #156) and proven end to end by ANY-244
+  (PR #158).
+- 2026-10-02: product priority resolved. The canonical source is `mvp-scope-source-of-truth.md`
+  (ANY-452): Acceptance Builder stays in the capability backlog outside the committed five-product
+  release order. The Linear "required #4" wording is planning-source drift, not a second authority;
+  this plan does not change the repo docs on that point.
 
 ## Open questions
 
-- Activation rule for `draft_v1` (no verdict): decided in ANY-244: a non-empty acceptance-criteria list counts as the first display.
-- Quota limit 3 is a starting value, not validated.
-- Handoff route from Brief Decoder (decision 7): ANY-26.
-- Product priority: Linear calls Acceptance Builder "required #4"; repo docs keep it in the
-  backlog outside the release order. README wording is unchanged on that point.
+- None.
 
 ## Follow-up debt
 
 - Quota is charged before input validation (inherited Platform Core gap, separate task).
+- Quota limit 3 is a starting value, not validated. Validating it needs usage data and is outside
+  this plan's completion criteria; it is tracked as separate follow-up debt, not as work owned here.
 - The Linear blocked-by list omits A11/A02 and includes unused A07; left as is.

@@ -2,12 +2,12 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-09-29
-- Last updated: 2026-09-30
+- Last updated: 2026-10-02
 - Review date: 2026-10-06
-- Next action: wait for CI on the open PR (#156) and reviewer sign-off, then merge; ANY-244 owns the web handoff journey.
+- Next action: none; PR #156 merged; no plan-scoped work remains.
 - Blocker: none
 
 ## Goal

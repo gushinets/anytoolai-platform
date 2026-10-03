@@ -112,7 +112,7 @@ The table records the legacy issue structure for audit only:
 | Product parent | Bundle child | CE child | E2E child | Workflow |
 |---|---|---|---|---|
 | ProposalAI ANY-35 | ANY-227 | ANY-235 | ANY-243 | A06 |
-| Acceptance Builder ANY-28 | ANY-228 | ANY-236 | ANY-244 | A01 → A07 → A10 |
+| Acceptance Builder ANY-28 | ANY-228 | ANY-236 | ANY-244 | A01 + A11 → A10 |
 | Scope Guard ANY-9 | ANY-229 | ANY-237 | ANY-245 | A01 → A04 → A11 → A07 |
 | Send-Ready ANY-12 | ANY-230 | ANY-238 | ANY-246 | A04 → A11 → A02 → A08 |
 | Task Finder ANY-10 | ANY-231 | ANY-239 | ANY-247 | A01 → A11 → A02 → A09 |
