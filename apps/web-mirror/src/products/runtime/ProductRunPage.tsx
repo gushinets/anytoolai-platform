@@ -1029,11 +1029,18 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       markEventFired(client, eventScopeKey, "form_started");
       emitEvent(onEventRef.current, { type: "form_started", guestId });
     }
-    setValues((prev) => {
-      const next = { ...prev };
-      next[field] = value;
-      return next;
-    });
+    const next = { ...values, [field]: value };
+    setValues(next);
+    // Recheck only a previously invalid field; keep sibling errors and untouched fields quiet.
+    if (fieldErrors[field]) {
+      const error = definition.validate(next)[field];
+      setFieldErrors((previous) => {
+        const errors = { ...previous };
+        if (error) errors[field] = error;
+        else delete errors[field];
+        return errors;
+      });
+    }
   }
 
   if (boot.kind === "loading") {
@@ -1206,7 +1213,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
                 />
               ) : null}
               {placeholderMessage !== null ? (
-                <div className={styles.resultPlaceholder}>
+                <div className={`${styles.resultPlaceholder} ${phase.kind === "idle" ? styles.emptyPlaceholder : ""}`}>
                   <p role="status">{placeholderMessage}</p>
                 </div>
               ) : null}

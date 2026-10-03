@@ -110,6 +110,36 @@ class TestErrorBoundary extends Component<{ children: ReactNode }, { failed: boo
 }
 
 describe("ProductRunPage", () => {
+  it("removes a corrected required error, preserves input/help ARIA and starts no scenario on edit or blur", async () => {
+    const { client, calls } = makeClient(bootRoutes());
+    renderPage({ client });
+    await waitForForm();
+    submit();
+    const field = screen.getByLabelText("Text");
+    expect(field.getAttribute("aria-invalid")).toBe("true");
+    fireEvent.change(field, { target: { value: "   " } });
+    fireEvent.blur(field);
+    expect(field.getAttribute("aria-invalid")).toBe("true");
+    fireEvent.change(field, { target: { value: "Corrected input" } });
+    fireEvent.blur(field);
+    expect(field.getAttribute("aria-invalid")).toBe("false");
+    expect(field.getAttribute("aria-describedby")).toBe("test-product-text-help");
+    expect((field as HTMLTextAreaElement).value).toBe("Corrected input");
+    expect(screen.queryByText("Text: required.")).toBeNull();
+    expect(calls.filter((call) => call.key === ROUTES.START)).toHaveLength(0);
+  });
+
+  it("shows no premature error for an untouched or edited field before first submit", async () => {
+    const { client } = makeClient(bootRoutes());
+    renderPage({ client });
+    await waitForForm();
+    const field = screen.getByLabelText("Text");
+    fireEvent.change(field, { target: { value: "   " } });
+    fireEvent.blur(field);
+    expect(field.getAttribute("aria-invalid")).toBe("false");
+    expect(screen.queryByText("Text: required.")).toBeNull();
+  });
+
   it("loads runtime config, guest identity, and advisory quota, then shows the product's form", async () => {
     const { client } = makeClient(bootRoutes());
 

@@ -14,7 +14,7 @@ import {
 } from "../runtime/fieldValidation";
 import type { ProductDefinition, ProductFieldsProps, ProductResultProps, ProductRunEvent } from "../runtime/productDefinition";
 import { MultiModeProduct } from "../shared/MultiModeProduct";
-import { ToneSelect, type Tone } from "../shared/tone";
+import { TONE_OPTIONS, type Tone } from "../shared/tone";
 import styles from "./ClientUpdateWriterProduct.module.css";
 
 const PRODUCT_ID = "client_update_writer";
@@ -39,25 +39,33 @@ function ToneField({
   value: Tone | "";
   error?: FieldError;
   disabled: boolean;
-  onChange: (tone: Tone | "") => void;
+  onChange: (tone: Tone) => void;
 }) {
   const t = useProductT();
   return (
-    <>
-      <div className={styles.fieldGroup}>
-        <label htmlFor="client-update-writer-tone">{t("fields.tone")}</label>
-        <ToneSelect
-          id="client-update-writer-tone"
-          value={value}
-          onChange={onChange}
-          disabled={disabled}
-          placeholderLabel={t("fields.tonePlaceholder")}
-          ariaInvalid={Boolean(error)}
-          ariaDescribedBy={error ? "client-update-writer-tone-error" : undefined}
-        />
-        <FieldErrorMessage id="client-update-writer-tone-error" className={styles.error} error={error} label={t("fieldNames.tone")} />
+    <fieldset className={styles.toneGroup} role="radiogroup" aria-required="true">
+      <legend className={styles.legend}>{t("fields.tone")}</legend>
+      <div className={styles.toneOptions}>
+        {TONE_OPTIONS.map((tone) => (
+          <label key={tone} className={styles.toneOption} htmlFor={`client-update-writer-tone-${tone}`}>
+            <input
+              className={styles.radio}
+              id={`client-update-writer-tone-${tone}`}
+              type="radio"
+              name="client-update-writer-tone"
+              value={tone}
+              checked={value === tone}
+              onChange={() => onChange(tone)}
+              disabled={disabled}
+              aria-invalid={Boolean(error)}
+              aria-describedby={error ? "client-update-writer-tone-error" : undefined}
+            />
+            {t(`tone.${tone}`)}
+          </label>
+        ))}
       </div>
-    </>
+      <FieldErrorMessage id="client-update-writer-tone-error" className={styles.error} error={error} label={t("fieldNames.tone")} />
+    </fieldset>
   );
 }
 
@@ -107,6 +115,7 @@ function UpdateFields({ values, errors, disabled, onChange }: ProductFieldsProps
         <label htmlFor="client-update-writer-progress-notes">{t("fields.progressNotes")}</label>
         <TextArea
           id="client-update-writer-progress-notes"
+          rows={5}
           value={values.progressNotes}
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange("progressNotes", event.target.value)}
           disabled={disabled}
@@ -124,7 +133,7 @@ export const updateDefinition: ProductDefinition<UpdateValues, ClientUpdateWrite
   productId: PRODUCT_ID,
   scenarioId: "client_update_writer.update_v1",
   messageScope: "update",
-  emptyValues: { progressNotes: "", tone: "" },
+  emptyValues: { progressNotes: "", tone: "neutral" },
   validate: validateUpdate,
   toInput: (values) => ({ progress_notes: values.progressNotes, tone: values.tone }),
   extractResult: extractComposeReplyResult,
@@ -152,6 +161,7 @@ function ReplyDraftFields({ values, errors, disabled, onChange }: ProductFieldsP
         <label htmlFor="client-update-writer-client-message">{t("fields.clientMessage")}</label>
         <TextArea
           id="client-update-writer-client-message"
+          rows={5}
           value={values.clientMessage}
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange("clientMessage", event.target.value)}
           disabled={disabled}
@@ -165,6 +175,7 @@ function ReplyDraftFields({ values, errors, disabled, onChange }: ProductFieldsP
         <label htmlFor="client-update-writer-reply-goal">{t("fields.replyGoal")}</label>
         <TextArea
           id="client-update-writer-reply-goal"
+          rows={4}
           value={values.replyGoal}
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange("replyGoal", event.target.value)}
           disabled={disabled}
@@ -182,7 +193,7 @@ export const replyDraftDefinition: ProductDefinition<ReplyDraftValues, ClientUpd
   productId: PRODUCT_ID,
   scenarioId: "client_update_writer.reply_draft_v1",
   messageScope: "reply_draft",
-  emptyValues: { clientMessage: "", replyGoal: "", tone: "" },
+  emptyValues: { clientMessage: "", replyGoal: "", tone: "neutral" },
   validate: validateReplyDraft,
   toInput: (values) => ({ client_message: values.clientMessage, reply_goal: values.replyGoal, tone: values.tone }),
   extractResult: extractComposeReplyResult,
@@ -211,6 +222,7 @@ function PrepaidRequestFields({ values, errors, disabled, onChange }: ProductFie
         <label htmlFor="client-update-writer-billing-notes">{t("fields.billingNotes")}</label>
         <TextArea
           id="client-update-writer-billing-notes"
+          rows={5}
           value={values.billingNotes}
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange("billingNotes", event.target.value)}
           disabled={disabled}
@@ -254,7 +266,7 @@ export const prepaidRequestDefinition: ProductDefinition<PrepaidRequestValues, C
   productId: PRODUCT_ID,
   scenarioId: "client_update_writer.prepaid_request_v1",
   messageScope: "prepaid_request",
-  emptyValues: { billingNotes: "", billingAmount: "", billingDueDate: "", tone: "" },
+  emptyValues: { billingNotes: "", billingAmount: "", billingDueDate: "", tone: "neutral" },
   validate: validatePrepaidRequest,
   toInput: (values) => ({
     billing_context: {

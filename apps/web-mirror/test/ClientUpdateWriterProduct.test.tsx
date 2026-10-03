@@ -128,6 +128,23 @@ const MODE_SCENARIOS: ModeScenario[] = [
 ];
 
 describe.each(MODE_SCENARIOS)("Client Update Writer $mode mode: one-screen workspace", (scenario) => {
+  it("defaults to neutral and offers three exclusive tone radios", async () => {
+    const { queues } = bootAndHappyPathRoutes(scenario.ids, { text: "Draft." });
+    const { client } = makeClient(queues);
+    render(<ProductRunPage definition={scenario.definition} client={client} />);
+    const group = await screen.findByRole("radiogroup", { name: "Tone" });
+    const radios = within(group).getAllByRole("radio") as HTMLInputElement[];
+    expect(radios.map((radio) => radio.value)).toEqual(["neutral", "warm", "firm"]);
+    expect(radios.filter((radio) => radio.checked).map((radio) => radio.value)).toEqual(["neutral"]);
+    for (const name of ["warm", "firm", "neutral"]) {
+      fireEvent.click(within(group).getByRole("radio", { name }));
+      expect(radios.filter((radio) => radio.checked).map((radio) => radio.value)).toEqual([name]);
+    }
+    expect(screen.queryByText("Tone: required.")).toBeNull();
+    expect(radios.every((radio) => radio.getAttribute("aria-invalid") === "false")).toBe(true);
+    expect(radios.every((radio) => !radio.hasAttribute("aria-describedby"))).toBe(true);
+  });
+
   it("keeps the inputs beside the result through edit, regeneration, copy and a new task", async () => {
     const routes = routesFor(scenario.ids);
     const routed = makeClientWithDeferredCalls(
@@ -147,20 +164,26 @@ describe.each(MODE_SCENARIOS)("Client Update Writer $mode mode: one-screen works
     for (const [label, value] of scenario.fields) {
       fireEvent.change(screen.getByLabelText(label), { target: { value } });
     }
-    fireEvent.change(screen.getByLabelText("Tone"), { target: { value: "neutral" } });
+    fireEvent.click(screen.getByRole("radio", { name: "warm" }));
     fireEvent.click(screen.getByRole("button", { name: scenario.submit }));
     await waitFor(() => expect(routed.calls.filter((call) => call.key === routes.RESULT)).toHaveLength(1));
+    for (const name of ["neutral", "warm", "firm"]) {
+      expect((screen.getByRole("radio", { name }) as HTMLInputElement).disabled).toBe(true);
+    }
     routed.resolveCall(routes.RESULT, 0, resultResponse(scenario.ids, { output: { text: "First draft." } }));
 
     // Generation: the result appears in its own card while every input keeps its value.
     await screen.findByText("First draft.");
+    for (const name of ["neutral", "warm", "firm"]) {
+      expect((screen.getByRole("radio", { name }) as HTMLInputElement).disabled).toBe(false);
+    }
     const resultCard = screen.getByRole("heading", { name: scenario.resultTitle, level: 2 }).closest("section")!;
     expect(within(resultCard).getByText("First draft.")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Your details", level: 2 })).toBeTruthy();
     for (const [label, value] of scenario.fields) {
       expect((screen.getByLabelText(label) as HTMLTextAreaElement).value).toBe(value);
     }
-    expect((screen.getByLabelText("Tone") as HTMLSelectElement).value).toBe("neutral");
+    expect((screen.getByRole("radio", { name: "warm" }) as HTMLInputElement).checked).toBe(true);
     expect(screen.queryByText("Created from previous details")).toBeNull();
 
     // Edit: the old result stays and is marked as made from earlier details.
@@ -192,7 +215,7 @@ describe.each(MODE_SCENARIOS)("Client Update Writer $mode mode: one-screen works
     for (const [label] of scenario.fields) {
       expect((screen.getByLabelText(label) as HTMLTextAreaElement).value).toBe("");
     }
-    expect((screen.getByLabelText("Tone") as HTMLSelectElement).value).toBe("");
+    expect((screen.getByRole("radio", { name: "neutral" }) as HTMLInputElement).checked).toBe(true);
     expect(screen.queryByText("Second draft.")).toBeNull();
     await waitFor(() => expect(document.activeElement).toBe(first));
     expect(screen.getByRole("button", { name: scenario.submit })).toBeTruthy();
@@ -226,7 +249,8 @@ describe("Client Update Writer product definitions", () => {
     const { queues } = bootAndHappyPathRoutes(MODE_IDS.update, { text: "x" });
     const { client } = makeClient(queues);
 
-    render(<ProductRunPage definition={updateDefinition} client={client} />);
+    // An explicit empty tone still requires accessible validation, even with a neutral default.
+    render(<ProductRunPage definition={{ ...updateDefinition, emptyValues: { progressNotes: "", tone: "" } }} client={client} />);
     await waitFor(() => expect(screen.getByLabelText("Progress notes")).toBeTruthy());
     expect(screen.getByLabelText("Progress notes").getAttribute("aria-describedby")).toBeNull();
 
@@ -235,7 +259,7 @@ describe("Client Update Writer product definitions", () => {
 
     for (const [label, message] of [
       ["Progress notes", "Progress notes: required."],
-      ["Tone", "Tone: required."],
+      ["neutral", "Tone: required."],
     ] as const) {
       const describedBy = screen.getByLabelText(label).getAttribute("aria-describedby");
       expect(describedBy, label).toBeTruthy();
@@ -256,13 +280,13 @@ describe("Client Update Writer product definitions", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Write update" }));
     expect(await screen.findByText("Progress notes: required.")).toBeTruthy();
-    expect(screen.getByText("Tone: required.")).toBeTruthy();
+    expect(screen.queryByText("Tone: required.")).toBeNull();
     expect(calls.some((call) => call.key === routes.START)).toBe(false);
 
     fireEvent.change(screen.getByLabelText("Progress notes"), {
       target: { value: "Homepage redesign is done and ready for review by Friday." },
     });
-    fireEvent.change(screen.getByLabelText("Tone"), { target: { value: "warm" } });
+    fireEvent.click(screen.getByRole("radio", { name: "warm" }));
     fireEvent.click(screen.getByRole("button", { name: "Write update" }));
 
     await waitFor(() =>
@@ -288,7 +312,7 @@ describe("Client Update Writer product definitions", () => {
     render(<ProductRunPage definition={updateDefinition} client={client} />);
     await waitFor(() => expect(screen.getByLabelText("Progress notes")).toBeTruthy());
     fireEvent.change(screen.getByLabelText("Progress notes"), { target: { value: "Still working on it." } });
-    fireEvent.change(screen.getByLabelText("Tone"), { target: { value: "neutral" } });
+    fireEvent.click(screen.getByRole("radio", { name: "neutral" }));
     fireEvent.click(screen.getByRole("button", { name: "Write update" }));
 
     await waitFor(() => expect(screen.getByText("Quick update: work is still underway.")).toBeTruthy());
@@ -310,7 +334,7 @@ describe("Client Update Writer product definitions", () => {
 
     fireEvent.change(screen.getByLabelText("Client message"), { target: { value: "When will this ship?" } });
     fireEvent.change(screen.getByLabelText("Reply goal"), { target: { value: "Give a concrete date." } });
-    fireEvent.change(screen.getByLabelText("Tone"), { target: { value: "neutral" } });
+    fireEvent.click(screen.getByRole("radio", { name: "neutral" }));
     fireEvent.click(screen.getByRole("button", { name: "Write reply" }));
 
     await waitFor(() =>
@@ -350,7 +374,7 @@ describe("Client Update Writer product definitions", () => {
     });
     fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "$500" } });
     fireEvent.change(screen.getByLabelText("Due date (optional)"), { target: { value: "Friday" } });
-    fireEvent.change(screen.getByLabelText("Tone"), { target: { value: "firm" } });
+    fireEvent.click(screen.getByRole("radio", { name: "firm" }));
     fireEvent.click(screen.getByRole("button", { name: "Write request" }));
 
     await waitFor(() =>
@@ -384,7 +408,7 @@ describe("Client Update Writer product definitions", () => {
     await waitFor(() => expect(screen.getByLabelText("Billing notes")).toBeTruthy());
     fireEvent.change(screen.getByLabelText("Billing notes"), { target: { value: "Work is ongoing." } });
     fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "the agreed amount" } });
-    fireEvent.change(screen.getByLabelText("Tone"), { target: { value: "neutral" } });
+    fireEvent.click(screen.getByRole("radio", { name: "neutral" }));
     fireEvent.click(screen.getByRole("button", { name: "Write request" }));
 
     await waitFor(() => expect(screen.getByText("Ok.")).toBeTruthy());
@@ -424,7 +448,7 @@ describe("Client Update Writer product definitions", () => {
     render(<ProductRunPage definition={updateDefinition} client={client} />);
     await waitFor(() => expect(screen.getByLabelText("Progress notes")).toBeTruthy());
     fireEvent.change(screen.getByLabelText("Progress notes"), { target: { value: "Still working on it." } });
-    fireEvent.change(screen.getByLabelText("Tone"), { target: { value: "neutral" } });
+    fireEvent.click(screen.getByRole("radio", { name: "neutral" }));
     fireEvent.click(screen.getByRole("button", { name: "Write update" }));
 
     await waitFor(() =>
@@ -447,7 +471,7 @@ describe("Client Update Writer product definitions", () => {
     render(<ProductRunPage definition={updateDefinition} client={client} />);
     await waitFor(() => expect(screen.getByLabelText("Progress notes")).toBeTruthy());
     fireEvent.change(screen.getByLabelText("Progress notes"), { target: { value: "Still working on it." } });
-    fireEvent.change(screen.getByLabelText("Tone"), { target: { value: "neutral" } });
+    fireEvent.click(screen.getByRole("radio", { name: "neutral" }));
     fireEvent.click(screen.getByRole("button", { name: "Write update" }));
 
     await waitFor(() => expect(screen.getByText("You've used all your Client Update Writer runs for now.")).toBeTruthy());
@@ -462,7 +486,7 @@ describe("Client Update Writer product definitions", () => {
     render(<ProductRunPage definition={updateDefinition} client={client} onEvent={(event) => events.push(event)} />);
     await waitFor(() => expect(screen.getByLabelText("Progress notes")).toBeTruthy());
     fireEvent.change(screen.getByLabelText("Progress notes"), { target: { value: "Still working on it." } });
-    fireEvent.change(screen.getByLabelText("Tone"), { target: { value: "neutral" } });
+    fireEvent.click(screen.getByRole("radio", { name: "neutral" }));
     fireEvent.click(screen.getByRole("button", { name: "Write update" }));
     await waitFor(() => expect(screen.getByText("Quick update: work is still underway.")).toBeTruthy());
 
@@ -558,7 +582,7 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
     await waitFor(() => expect(screen.getByText("3 of 3 Client Update Writer runs remaining.")).toBeTruthy());
 
     fireEvent.change(screen.getByLabelText("Progress notes"), { target: { value: "Still working on it." } });
-    fireEvent.change(screen.getByLabelText("Tone"), { target: { value: "neutral" } });
+    fireEvent.click(screen.getByRole("radio", { name: "neutral" }));
     fireEvent.click(screen.getByRole("button", { name: "Write update" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy());
 
@@ -582,7 +606,7 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
 
     render(<ClientUpdateWriterProduct client={client} />);
     fireEvent.change(await screen.findByLabelText("Progress notes"), { target: { value: "Still working on it." } });
-    fireEvent.change(screen.getByLabelText("Tone"), { target: { value: "neutral" } });
+    fireEvent.click(screen.getByRole("radio", { name: "neutral" }));
     fireEvent.click(screen.getByRole("button", { name: "Write update" }));
     await screen.findByText("An update for the client.");
 
@@ -620,7 +644,7 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
     await waitFor(() => expect(screen.getByLabelText("Progress notes")).toBeTruthy());
 
     fireEvent.change(screen.getByLabelText("Progress notes"), { target: { value: "Working on it still." } });
-    fireEvent.change(screen.getByLabelText("Tone"), { target: { value: "neutral" } });
+    fireEvent.click(screen.getByRole("radio", { name: "neutral" }));
     fireEvent.click(screen.getByRole("button", { name: "Write update" }));
     await waitFor(() => expect(screen.getByRole("status").textContent).toMatch(/writing your update/i));
 
@@ -673,7 +697,7 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
     await waitFor(() => expect(screen.getByLabelText("Progress notes")).toBeTruthy());
 
     fireEvent.change(screen.getByLabelText("Progress notes"), { target: { value: "Working on it still." } });
-    fireEvent.change(screen.getByLabelText("Tone"), { target: { value: "neutral" } });
+    fireEvent.click(screen.getByRole("radio", { name: "neutral" }));
     fireEvent.click(screen.getByRole("button", { name: "Write update" }));
     await waitFor(() =>
       expect(screen.getByText("Lost connection while waiting for your result. Please try again.")).toBeTruthy(),
@@ -724,7 +748,7 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
     await waitFor(() => expect(screen.getByLabelText("Progress notes")).toBeTruthy());
 
     fireEvent.change(screen.getByLabelText("Progress notes"), { target: { value: "Working on it still." } });
-    fireEvent.change(screen.getByLabelText("Tone"), { target: { value: "neutral" } });
+    fireEvent.click(screen.getByRole("radio", { name: "neutral" }));
     fireEvent.click(screen.getByRole("button", { name: "Write update" }));
     await waitFor(() =>
       expect(screen.getByText("Could not start Client Update Writer. Please try again.")).toBeTruthy(),
@@ -769,7 +793,7 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
     await waitFor(() => expect(screen.getByLabelText("Progress notes")).toBeTruthy());
 
     fireEvent.change(screen.getByLabelText("Progress notes"), { target: { value: "Working on it still." } });
-    fireEvent.change(screen.getByLabelText("Tone"), { target: { value: "neutral" } });
+    fireEvent.click(screen.getByRole("radio", { name: "neutral" }));
     fireEvent.click(screen.getByRole("button", { name: "Write update" }));
     await waitFor(() =>
       expect(screen.getByText("Your result is ready, but we couldn't load it. Please try again.")).toBeTruthy(),
@@ -806,7 +830,7 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
     await waitFor(() => expect(screen.getByLabelText("Progress notes")).toBeTruthy());
 
     fireEvent.change(screen.getByLabelText("Progress notes"), { target: { value: "Working on it still." } });
-    fireEvent.change(screen.getByLabelText("Tone"), { target: { value: "neutral" } });
+    fireEvent.click(screen.getByRole("radio", { name: "neutral" }));
     fireEvent.click(screen.getByRole("button", { name: "Write update" }));
     await waitFor(() =>
       expect(screen.getByText("Could not start Client Update Writer. Please try again.")).toBeTruthy(),
@@ -845,7 +869,7 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
     render(<ClientUpdateWriterProduct client={client} />);
     await waitFor(() => expect(screen.getByLabelText("Progress notes")).toBeTruthy());
     fireEvent.change(screen.getByLabelText("Progress notes"), { target: { value: "Still working on it." } });
-    fireEvent.change(screen.getByLabelText("Tone"), { target: { value: "neutral" } });
+    fireEvent.click(screen.getByRole("radio", { name: "neutral" }));
     fireEvent.click(screen.getByRole("button", { name: "Write update" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy());
 

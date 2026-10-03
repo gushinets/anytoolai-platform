@@ -11,9 +11,8 @@ import { collectFieldErrors, requiredTrimmedFieldError, type FieldError } from "
 import type { ProductDefinition, ProductFieldsProps, ProductRunEvent } from "../runtime/productDefinition";
 import styles from "./ProposalAIProduct.module.css";
 
-// ANY-521's own product-owned tone UI (three visible radio choices, not the shared `ToneSelect`
-// dropdown -- its exec-plan explicitly rules out "a speculative shared RadioGroup abstraction for
-// one product"). Values stay the untranslated wire enum; labels come from `toneOptions.<value>`.
+// Product-owned tone UI with three visible radio choices. Values stay the untranslated wire
+// enum; ProposalAI's descriptive labels come from its own `toneOptions.<value>` messages.
 const TONE_VALUES = ["warm", "neutral", "firm"] as const;
 type Tone = (typeof TONE_VALUES)[number];
 
