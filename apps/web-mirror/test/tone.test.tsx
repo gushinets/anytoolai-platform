@@ -1,26 +1,12 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { cleanup, fireEvent, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { isTone, TONE_OPTIONS, ToneSelect } from "../src/products/shared/tone";
-import { TONE_MESSAGES } from "../src/products/shared/toneMessages";
-import { englishForAllLocales, makeRender } from "./support/renderWithI18n";
-
-// ToneSelect now reads its option labels from the current PRODUCT namespace (code review finding:
-// tone is product vocabulary, not host's), so this direct render needs a product tree that has a
-// `tone` key -- the real shared bundle, not an empty object.
-const render = makeRender(englishForAllLocales({ tone: TONE_MESSAGES.en }));
-
-
-afterEach(cleanup);
-
-// The input schemas of the products that render this shared ToneSelect. A product with its own
-// tone vocabulary simply doesn't use ToneSelect and isn't listed; a product that adopts it adds
-// its schema here.
+import { describe, expect, it } from "vitest";
+import { isTone, TONE_OPTIONS } from "../src/products/shared/tone";
+// Input schemas sharing the neutral/warm/firm wire vocabulary.
 const PRODUCTS_DIR =
   "../../../packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products";
-const SCHEMAS_USING_TONE_SELECT = [
+const SCHEMAS_USING_TONE = [
   "proposal_ai/schemas/generate_input.schema.json",
   "client_update_writer/schemas/update_input.schema.json",
   "client_update_writer/schemas/reply_draft_input.schema.json",
@@ -28,7 +14,7 @@ const SCHEMAS_USING_TONE_SELECT = [
 ];
 
 describe("TONE_OPTIONS", () => {
-  it.each(SCHEMAS_USING_TONE_SELECT)("matches the tone enum of %s", (relativePath) => {
+  it.each(SCHEMAS_USING_TONE)("matches the tone enum of %s", (relativePath) => {
     // fileURLToPath, not `new URL(..., import.meta.url)`: see registry.test.tsx.
     const here = dirname(fileURLToPath(import.meta.url));
     const schema = JSON.parse(readFileSync(resolve(here, PRODUCTS_DIR, relativePath), "utf8")) as {
@@ -52,18 +38,4 @@ describe("isTone", () => {
       expect(isTone(value)).toBe(false);
     },
   );
-});
-
-describe("ToneSelect", () => {
-  it("reports a chosen tone, and the empty placeholder as an empty string", () => {
-    const onChange = vi.fn();
-    render(<ToneSelect id="tone" value="" onChange={onChange} disabled={false} placeholderLabel="Default" />);
-    const select = screen.getByRole("combobox");
-
-    fireEvent.change(select, { target: { value: "warm" } });
-    expect(onChange).toHaveBeenLastCalledWith("warm");
-
-    fireEvent.change(select, { target: { value: "" } });
-    expect(onChange).toHaveBeenLastCalledWith("");
-  });
 });

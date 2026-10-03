@@ -4,7 +4,7 @@
   height: var(--spinner-size, 16px);
   border-radius: 50%;
   border: 2px solid var(--color-accent-glow);
-  border-top-color: var(--color-accent);
+  border-top-color: var(--spinner-foreground, var(--color-accent));
   animation: spin 0.7s linear infinite;
 }
 

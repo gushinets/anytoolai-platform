@@ -28,7 +28,8 @@
 .primary {
   border: none;
   background: var(--gradient-accent);
-  color: var(--color-text);
+  color: var(--color-on-accent);
+  --spinner-foreground: var(--color-on-accent);
   box-shadow: 0 0 0 1px var(--color-accent-glow);
 }
 

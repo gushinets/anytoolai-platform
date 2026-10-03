@@ -68,9 +68,7 @@
 }
 
 .name {
-  /* Bundle 3's Section role is Cabinet Grotesk 800, which Fontshare does not deliver reliably
-   * (see layout.tsx), and 900 at a Section size would break the weight/size pairing. Card titles
-   * therefore use the approved body face instead of a mismatched heading role. */
+  /* Same section role as the global h2 in shared-ui. */
   margin: 0;
   font-family: var(--font-body, ui-sans-serif), var(--font-cyrillic, system-ui), sans-serif;
   font-size: 24px;

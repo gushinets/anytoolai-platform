@@ -164,6 +164,11 @@
     grid-template-columns: 1fr;
   }
 
+  .emptyPlaceholder {
+    box-sizing: border-box;
+    min-height: 120px;
+  }
+
   .resultHeader {
     flex-wrap: wrap;
   }

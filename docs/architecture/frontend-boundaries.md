@@ -63,6 +63,8 @@ surface. Dependency direction: `shared-ui` depends only on `react`; `apps/web-mi
 page background/fonts, and every product's `Fields`/result/error chrome) depends on `shared-ui`.
 `shared-ui` must not import `ce-kit`, `web-result-kit`, or any product-specific module -- it owns
 presentation only, never product meaning or client transport/state. See
+[`shared-ui/README.md`](../../packages/frontend/shared-ui/README.md) for the current presentation
+contract: color pairs, typography, exterior control minimums, textarea and responsive rules. See
 `docs/exec-plans/active/any-503-adopt-bundle3-design-system.md` for the token-gap and font-sourcing
 decisions this package's implementation made.
 
@@ -246,10 +248,10 @@ product-owned. Code: `apps/web-mirror/src/i18n/` (library `use-intl`, imported o
   English literals -- one optional flag, `hasDescription`, tells the shared runtime whether to look
   up a product's own `description` message, without the definition itself holding any text. `neutral|warm|firm` tone labels are product
   vocabulary (a product-owned wire enum's visible labels), never host's: Client Update Writer's
-  shared `ToneSelect` reads them from `products/shared/toneMessages/` (one translation per locale,
+  native tone radios read them from `products/shared/toneMessages/` (one translation per locale,
   spread into its own `product` namespace so a product with a differently-meaning `tone`-shaped enum
   needs no host change); ProposalAI instead defines its own descriptive `toneOptions` labels
-  ("Warm & personable" etc.) in its own messages and does not use `ToneSelect` at all -- the shared
+  ("Warm & personable" etc.) in its own messages for its radio choices -- the shared
   bundle is an opt-in convenience for products that want the same plain wording, not a contract every
   `tone`-shaped product must join.
 - **One-screen workspace (ANY-528, ANY-530):** `ProductRunPage` renders every product as an input
@@ -292,7 +294,7 @@ product-owned. Code: `apps/web-mirror/src/i18n/` (library `use-intl`, imported o
    shared runtime only looks it up when the flag is set.
 2. Add `fr it de es ru pt` files typed `Shape<typeof en>`; use the typographic apostrophe `’` (a
    plain `'` before `{` starts ICU quoting); keep placeholders and plural categories. Reusing
-   `ToneSelect`? Spread `TONE_MESSAGES[locale]` from `products/shared/toneMessages/` under a `tone`
+   the plain tone labels? Spread `TONE_MESSAGES[locale]` from `products/shared/toneMessages/` under a `tone`
    key in each locale file instead of retranslating `neutral|warm|firm`.
 3. Export `Record<Locale, Shape<typeof en>>` from `messages/index.ts`.
 4. Register the product with `messages` in `products/registry.ts`; every locale must include a
