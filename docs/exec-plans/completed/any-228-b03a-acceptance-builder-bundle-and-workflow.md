@@ -146,11 +146,14 @@ python scripts/agent/runner.py full-check
   ANY-244 (a non-empty acceptance-criteria list counts as the first display). Brief Decoder -> Acceptance
   Builder handoff route (decision 7): delivered by ANY-26 (PR #156) and proven end to end by ANY-244
   (PR #158).
+- 2026-10-02: product priority resolved. The canonical source is `mvp-scope-source-of-truth.md`
+  (ANY-452): Acceptance Builder stays in the capability backlog outside the committed five-product
+  release order. The Linear "required #4" wording is planning-source drift, not a second authority;
+  this plan does not change the repo docs on that point.
 
 ## Open questions
 
-- Product priority: Linear calls Acceptance Builder "required #4"; repo docs keep it in the
-  backlog outside the release order. README wording is unchanged on that point.
+- None.
 
 ## Follow-up debt
 
