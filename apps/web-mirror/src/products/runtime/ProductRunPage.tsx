@@ -314,6 +314,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
 
   const [values, setValues] = useState<V>(definition.emptyValues);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof V, FieldError>>>({});
+  const liveValidationFieldsRef = useRef(new Set<keyof V>());
   const [phase, setPhase] = useState<Phase<R>>({ kind: "idle" });
   const [displayedResult, setDisplayedResult] = useState<{
     scenarioSessionId: string;
@@ -828,6 +829,9 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       return;
     }
     const errors = definition.validate(values);
+    for (const field in errors) {
+      liveValidationFieldsRef.current.add(field);
+    }
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) {
       requestAnimationFrame(() => {
@@ -991,6 +995,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     }
     setValues(definition.emptyValues);
     setFieldErrors({});
+    liveValidationFieldsRef.current.clear();
     setPendingStart(null);
     activeScenarioSessionIdRef.current = null;
     activeInputRef.current = null;
@@ -1031,8 +1036,8 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     }
     const next = { ...values, [field]: value };
     setValues(next);
-    // Recheck only a previously invalid field; keep sibling errors and untouched fields quiet.
-    if (fieldErrors[field]) {
+    // Previously invalid fields stay live after correction, until New task resets the form.
+    if (liveValidationFieldsRef.current.has(field)) {
       const error = definition.validate(next)[field];
       setFieldErrors((previous) => {
         const errors = { ...previous };

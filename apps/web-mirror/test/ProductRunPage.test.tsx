@@ -110,7 +110,7 @@ class TestErrorBoundary extends Component<{ children: ReactNode }, { failed: boo
 }
 
 describe("ProductRunPage", () => {
-  it("removes a corrected required error, preserves input/help ARIA and starts no scenario on edit or blur", async () => {
+  it("keeps validating an invalid field after correction without starting a scenario", async () => {
     const { client, calls } = makeClient(bootRoutes());
     renderPage({ client });
     await waitForForm();
@@ -126,6 +126,14 @@ describe("ProductRunPage", () => {
     expect(field.getAttribute("aria-describedby")).toBe("test-product-text-help");
     expect((field as HTMLTextAreaElement).value).toBe("Corrected input");
     expect(screen.queryByText("Text: required.")).toBeNull();
+    fireEvent.change(field, { target: { value: "   " } });
+    expect(field.getAttribute("aria-invalid")).toBe("true");
+    expect(field.getAttribute("aria-describedby")).toBe("test-product-text-help test-product-text-error");
+    expect(screen.getByText("Text: required.")).toBeTruthy();
+    fireEvent.change(field, { target: { value: "Corrected again" } });
+    expect(field.getAttribute("aria-invalid")).toBe("false");
+    fireEvent.change(field, { target: { value: "" } });
+    expect(field.getAttribute("aria-invalid")).toBe("true");
     expect(calls.filter((call) => call.key === ROUTES.START)).toHaveLength(0);
   });
 
@@ -492,6 +500,8 @@ describe("ProductRunPage", () => {
 
     renderPage({ client });
     await waitForForm();
+    submit();
+    expect(screen.getByLabelText("Text").getAttribute("aria-invalid")).toBe("true");
     fillValidForm();
     submit();
     await waitForResult();
@@ -499,8 +509,14 @@ describe("ProductRunPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "New task" }));
 
     await waitForForm();
-    expect((screen.getByLabelText("Text") as HTMLTextAreaElement).value).toBe("");
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText("Text")));
+    const field = screen.getByLabelText("Text");
+    expect((field as HTMLTextAreaElement).value).toBe("");
+    expect(field.getAttribute("aria-invalid")).toBe("false");
+    fireEvent.change(field, { target: { value: "   " } });
+    expect(field.getAttribute("aria-invalid")).toBe("false");
+    expect(screen.queryByText("Text: required.")).toBeNull();
+    expect(calls.filter((call) => call.key === ROUTES.START)).toHaveLength(1);
+    await waitFor(() => expect(document.activeElement).toBe(field));
     expect(screen.queryByText(RESULT_TEXT)).toBeNull();
     await waitFor(() => expect(screen.getByText("2 of 3 runs remaining.")).toBeTruthy());
     expect(calls.filter((call) => call.key === ROUTES.QUOTA)).toHaveLength(3);

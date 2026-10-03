@@ -68,6 +68,8 @@ describe("ProposalAI product definition", () => {
       [" padded ", "Task description: no leading or trailing whitespace."],
       ["x".repeat(4001), "Task description: 4,000 characters maximum."],
     ]) {
+      fireEvent.change(task, { target: { value: "Build a landing page." } });
+      expect(task.getAttribute("aria-invalid")).toBe("false");
       fireEvent.change(task, { target: { value } });
       fireEvent.blur(task);
       expect(task.getAttribute("aria-invalid")).toBe("true");
