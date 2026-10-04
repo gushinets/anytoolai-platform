@@ -2,12 +2,12 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-09-29
-- Last updated: 2026-09-29
+- Last updated: 2026-10-02
 - Review date: 2026-10-06
-- Next action: run the validation set, open the PR, address review; then rebase ANY-26 on it.
+- Next action: none; PR #157 merged; no plan-scoped work remains.
 - Blocker: none
 
 ## Goal
