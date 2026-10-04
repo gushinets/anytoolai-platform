@@ -68,7 +68,7 @@ async function fillValidForm(page: Page): Promise<void> {
   await page
     .locator("#client-update-writer-progress-notes")
     .fill("Homepage redesign is done and ready for review by Friday.");
-  await page.locator("#client-update-writer-tone").selectOption("warm");
+  await page.locator('label[for="client-update-writer-tone-warm"]').click();
 }
 
 /** Queries the real `event_log` table directly -- the acceptance criterion is that the backend,
@@ -147,7 +147,7 @@ test.describe("Client Update Writer web product (Update mode)", () => {
     await expect(page.getByRole("button", { name: "Copy" })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole("button", { name: "New task" })).toBeVisible();
     await expect(page.locator("#client-update-writer-progress-notes")).not.toBeEmpty();
-    await expect(page.locator("#client-update-writer-tone")).toHaveValue("warm");
+    await expect(page.locator("#client-update-writer-tone-warm")).toBeChecked();
     await expectWorkspaceLayout(page, "side-by-side");
 
     // Edited notes: the earlier result stays, marked as made from earlier details, then repeats.
@@ -164,7 +164,7 @@ test.describe("Client Update Writer web product (Update mode)", () => {
 
     await page.getByRole("button", { name: "New task" }).click();
     await expect(page.locator("#client-update-writer-progress-notes")).toBeEmpty();
-    await expect(page.locator("#client-update-writer-tone")).toHaveValue("");
+    await expect(page.locator("#client-update-writer-tone-neutral")).toBeChecked();
     await expect(page.locator("#client-update-writer-progress-notes")).toBeFocused();
     await expect(page.getByRole("button", { name: "Copy" })).toHaveCount(0);
   });
@@ -182,7 +182,14 @@ test.describe("Client Update Writer web product (Update mode)", () => {
 
     await page.getByRole("button", { name: "Write update" }).click();
     await expect(page.getByText("Progress notes: required.")).toBeVisible();
-    await expect(page.getByText("Tone: required.")).toBeVisible();
+    await expect(page.locator("#client-update-writer-tone-neutral")).toBeChecked();
+    await expect(page.getByText("Tone: required.")).toHaveCount(0);
+    expect(startRequested).toBe(false);
+    const toneGroup = page.getByRole("radiogroup", { name: "Tone" });
+    await expect(toneGroup.getByRole("radio")).toHaveCount(3);
+    await page.locator('label[for="client-update-writer-tone-warm"]').click();
+    await expect(page.locator("#client-update-writer-tone-warm")).toBeChecked();
+    await expect(page.getByText("Tone: required.")).toHaveCount(0);
     expect(startRequested).toBe(false);
   });
 
@@ -200,7 +207,7 @@ test.describe("Client Update Writer web product (Update mode)", () => {
     // backend/worker -- only the final canonical-result fetch is substituted below with the real
     // documented weak-input fixture content (see WEAK_INPUT_FIXTURE_PATH's own comment for why).
     await page.locator("#client-update-writer-progress-notes").fill("Still working on it.");
-    await page.locator("#client-update-writer-tone").selectOption("neutral");
+    await page.locator('label[for="client-update-writer-tone-neutral"]').click();
 
     await page.route("**/v1/results/**", async (route) => {
       const response = await route.fetch();

@@ -15,7 +15,7 @@ import { ru } from "./ru";
  * generic runtime/result/error/validation copy, never product meaning, and `neutral|warm|firm` is
  * exactly that -- a product-owned wire enum's visible labels. Each product's own message tree
  * spreads this in under its own `tone` key (see `products/proposalAi/messages/en.ts`), so
- * `tone.tsx`'s `useProductT()` resolves it from whichever product is actually active, and a future
+ * product fields use `useProductT()` to resolve it from the active product, and a future
  * product with a differently-meaning `tone`-shaped enum needs no change here or in host.
  */
 export const TONE_MESSAGES: Record<Locale, Shape<typeof en>> = { en, fr, it, de, es, ru, pt };

@@ -1,9 +1,5 @@
 "use client";
 
-import type { ChangeEvent } from "react";
-import { Select } from "@anytoolai/shared-ui";
-import { useProductT } from "../../i18n";
-
 // Product vocabulary shared by the products whose input schemas declare this `tone` enum, so it
 // lives here (shared across products) and not in `products/runtime/`, which must hold no product
 // meaning (docs/architecture/frontend-boundaries.md). The backend schemas own the enum; this is a
@@ -15,55 +11,4 @@ export const TONE_OPTIONS = Object.keys(TONE_BY_VALUE) as readonly Tone[];
 
 export function isTone(value: string): value is Tone {
   return Object.hasOwn(TONE_BY_VALUE, value);
-}
-
-/**
- * The `<select>` + option list every product's own tone field wraps in its own `<label>`/error
- * markup. Option *labels* are localized from the current product's own `tone.*` messages (code
- * review finding: host previously owned these, even though this is product vocabulary by this
- * file's own contract above -- each product's message tree now spreads in the shared
- * `products/shared/toneMessages/` bundle under its own `tone` key instead, one translation per
- * locale, so a future product with a differently-meaning `tone`-shaped enum needs no host change).
- * Each option's `value` stays the untranslated wire value. Each product still owns its label text,
- * placeholder option, and (optional) validation error around this, since ProposalAI's tone is
- * optional with no error state and Client Update Writer's is required with one -- only the
- * genuinely identical part is shared.
- */
-export function ToneSelect({
-  id,
-  value,
-  onChange,
-  disabled,
-  placeholderLabel,
-  ariaInvalid,
-  ariaDescribedBy,
-}: {
-  id: string;
-  value: Tone | "";
-  onChange: (tone: Tone | "") => void;
-  disabled: boolean;
-  placeholderLabel: string;
-  ariaInvalid?: boolean;
-  ariaDescribedBy?: string;
-}) {
-  const t = useProductT();
-  return (
-    <Select
-      id={id}
-      value={value}
-      onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-        onChange(isTone(event.target.value) ? event.target.value : "")
-      }
-      disabled={disabled}
-      aria-invalid={ariaInvalid}
-      aria-describedby={ariaDescribedBy}
-    >
-      <option value="">{placeholderLabel}</option>
-      {TONE_OPTIONS.map((tone) => (
-        <option key={tone} value={tone}>
-          {t(`tone.${tone}`)}
-        </option>
-      ))}
-    </Select>
-  );
 }

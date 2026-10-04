@@ -11,7 +11,6 @@ const here = dirname(fileURLToPath(import.meta.url));
 const FILES = [
   "../src/components/ResultView.tsx",
   "../src/components/HandoffConsent.tsx",
-  "../src/products/shared/tone.tsx",
   "../src/products/shared/ModeSwitch.tsx",
   "../src/products/clientUpdateWriter/ClientUpdateWriterProduct.tsx",
   "../src/products/briefDecoder/BriefDecoderProduct.tsx",

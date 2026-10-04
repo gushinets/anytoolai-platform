@@ -56,3 +56,7 @@ plans/
 /.claude/
 /skills-lock.json
 /CLAUDE.md
+
+# Local visual-audit output and temporary browser fixtures
+/docs/qa/visual-audit/
+/apps/web-mirror/test/visual-remediation/

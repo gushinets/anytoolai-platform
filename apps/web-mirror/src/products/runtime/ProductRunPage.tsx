@@ -314,6 +314,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
 
   const [values, setValues] = useState<V>(definition.emptyValues);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof V, FieldError>>>({});
+  const liveValidationFieldsRef = useRef(new Set<keyof V>());
   const [phase, setPhase] = useState<Phase<R>>({ kind: "idle" });
   const [displayedResult, setDisplayedResult] = useState<{
     scenarioSessionId: string;
@@ -828,6 +829,9 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       return;
     }
     const errors = definition.validate(values);
+    for (const field in errors) {
+      liveValidationFieldsRef.current.add(field);
+    }
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) {
       requestAnimationFrame(() => {
@@ -991,6 +995,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     }
     setValues(definition.emptyValues);
     setFieldErrors({});
+    liveValidationFieldsRef.current.clear();
     setPendingStart(null);
     activeScenarioSessionIdRef.current = null;
     activeInputRef.current = null;
@@ -1029,11 +1034,18 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       markEventFired(client, eventScopeKey, "form_started");
       emitEvent(onEventRef.current, { type: "form_started", guestId });
     }
-    setValues((prev) => {
-      const next = { ...prev };
-      next[field] = value;
-      return next;
-    });
+    const next = { ...values, [field]: value };
+    setValues(next);
+    // Previously invalid fields stay live after correction, until New task resets the form.
+    if (liveValidationFieldsRef.current.has(field)) {
+      const error = definition.validate(next)[field];
+      setFieldErrors((previous) => {
+        const errors = { ...previous };
+        if (error) errors[field] = error;
+        else delete errors[field];
+        return errors;
+      });
+    }
   }
 
   if (boot.kind === "loading") {
@@ -1206,7 +1218,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
                 />
               ) : null}
               {placeholderMessage !== null ? (
-                <div className={styles.resultPlaceholder}>
+                <div className={`${styles.resultPlaceholder} ${phase.kind === "idle" ? styles.emptyPlaceholder : ""}`}>
                   <p role="status">{placeholderMessage}</p>
                 </div>
               ) : null}

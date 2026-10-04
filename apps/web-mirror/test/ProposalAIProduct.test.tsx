@@ -56,6 +56,34 @@ function renderReady() {
 }
 
 describe("ProposalAI product definition", () => {
+  it("revalidates only the edited invalid field using its current product rules", async () => {
+    const { calls } = renderReady();
+    const task = await screen.findByLabelText("Describe the task");
+    const positioning = screen.getByLabelText("Your positioning");
+    fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+    expect(task.getAttribute("aria-invalid")).toBe("true");
+    // Required, whitespace and maxLength are the actual product validator's rules.
+    for (const [value, message] of [
+      ["   ", "Task description: required."],
+      [" padded ", "Task description: no leading or trailing whitespace."],
+      ["x".repeat(4001), "Task description: 4,000 characters maximum."],
+    ]) {
+      fireEvent.change(task, { target: { value: "Build a landing page." } });
+      expect(task.getAttribute("aria-invalid")).toBe("false");
+      fireEvent.change(task, { target: { value } });
+      fireEvent.blur(task);
+      expect(task.getAttribute("aria-invalid")).toBe("true");
+      expect(screen.getByText(message!)).toBeTruthy();
+      expect(positioning.getAttribute("aria-invalid")).toBe("true");
+    }
+    fireEvent.change(task, { target: { value: "Build a landing page." } });
+    fireEvent.blur(task);
+    expect(task.getAttribute("aria-invalid")).toBe("false");
+    expect(positioning.getAttribute("aria-invalid")).toBe("true");
+    expect(screen.getByText("Your positioning: required.")).toBeTruthy();
+    expect(calls.filter((call) => call.key === ROUTES.START)).toHaveLength(0);
+  });
+
   it("is registered under its backend product id with ProposalAI copy", async () => {
     expect(proposalAiDefinition.productId).toBe("proposal_ai");
     renderReady();

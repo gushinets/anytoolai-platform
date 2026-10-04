@@ -143,7 +143,7 @@ describe("ProductPageShell locale rendering", () => {
     expect(await screen.findByRole("button", { name: messages.update.submit })).toBeTruthy();
     expect(screen.getByText(messages.modes.legend)).toBeTruthy();
     expect(screen.getByLabelText(messages.fields.progressNotes)).toBeTruthy();
-    expect(screen.getByLabelText(messages.fields.tone)).toBeTruthy();
+    expect(screen.getByRole("radiogroup", { name: messages.fields.tone })).toBeTruthy();
 
     fireEvent.click(screen.getByLabelText(messages.modes.reply_draft));
     expect(await screen.findByRole("button", { name: messages.reply_draft.submit })).toBeTruthy();
@@ -393,7 +393,8 @@ describe("UI locale is independent of scenario input and state", () => {
     const main = screen.getByRole("main");
     expect(screen.getAllByRole("main")).toHaveLength(1);
     expect(within(main).getByRole("heading", { level: 1 })).toBeTruthy();
-    expect(within(main).getAllByRole("radio")).toHaveLength(3);
+    const modeGroup = within(main).getByRole("group", { name: CLIENT_UPDATE_WRITER_MESSAGES.en.modes.legend });
+    expect(within(modeGroup).getAllByRole("radio")).toHaveLength(3);
   });
 
   it("keeps Client Update Writer's selected mode, its values and the mode wire values across a switch", async () => {
@@ -402,16 +403,20 @@ describe("UI locale is independent of scenario input and state", () => {
     await screen.findByLabelText(en.fields.progressNotes);
     fireEvent.click(screen.getByRole("radio", { name: en.modes.reply_draft }));
     fireEvent.change(await screen.findByLabelText(en.fields.clientMessage), { target: { value: "Where is my invoice?" } });
+    fireEvent.click(screen.getByRole("radio", { name: en.tone.firm }));
 
     switchTo("fr");
 
     const fr = CLIENT_UPDATE_WRITER_MESSAGES.fr;
-    const radios = screen.getAllByRole("radio") as HTMLInputElement[];
+    const radios = within(screen.getByRole("group", { name: fr.modes.legend })).getAllByRole("radio") as HTMLInputElement[];
     expect(radios.map((radio) => radio.value)).toEqual(["update", "reply_draft", "prepaid_request"]);
     expect(radios.find((radio) => radio.checked)?.value).toBe("reply_draft");
     expect(screen.getByRole("radio", { name: fr.modes.reply_draft })).toBe(radios[1]);
     expect(valueOf(screen.getByLabelText(fr.fields.clientMessage))).toBe("Where is my invoice?");
     expect(screen.getByRole("button", { name: fr.reply_draft.submit })).toBeTruthy();
+    const toneRadios = within(screen.getByRole("radiogroup", { name: fr.fields.tone })).getAllByRole("radio") as HTMLInputElement[];
+    expect(toneRadios.filter((radio) => radio.checked).map((radio) => radio.value)).toEqual(["firm"]);
+    expect(screen.getByRole("radio", { name: fr.tone.firm })).toBe(toneRadios[2]);
   });
 
   it("re-localizes validation errors and a retryable run error that are already on screen", async () => {
