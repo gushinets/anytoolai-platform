@@ -2,12 +2,12 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-09-30
-- Last updated: 2026-09-30
+- Last updated: 2026-10-02
 - Review date: 2026-10-07
-- Next action: merge decision; `acceptance-builder-smoke` (11 tests) passes against a fresh `dev-up`, as do the brief-decoder, client-update-writer and proposal-ai smokes.
+- Next action: none; PR #158 merged; no plan-scoped work remains.
 - Blocker: none (the ANY-26 handoff route is already in this branch's history).
 
 ## Goal
