@@ -15,6 +15,8 @@ typography:
   body:
     fontFamily: "DM Sans, Noto Sans, system-ui, sans-serif"
   heading:
+    fontFamily: "DM Sans, Noto Sans, system-ui, sans-serif"
+  display:
     fontFamily: "Cabinet Grotesk, DM Sans, Noto Sans, system-ui, sans-serif"
 rounded:
   input: "8px"
@@ -45,7 +47,7 @@ The dark purple background carries the atmosphere. Translucent cards and subtle 
 
 ## Typography
 
-Cabinet Grotesk at strong weight marks headings; DM Sans with Noto Sans fallback carries controls and prose, including Cyrillic. Keep generated text readable at a natural line length. Labels stay compact but legible; avoid all-caps body copy.
+Cabinet Grotesk 900 is reserved for display headings (`h1`), with the body/Cyrillic fallback. Section headings (`h2`) and result subheadings (`h3`) use the body family at 700; DM Sans with Noto Sans fallback carries controls and prose, including Cyrillic. The [shared UI typography contract](packages/frontend/shared-ui/README.md#typography) owns the role sizes, weights and line heights. Keep generated text readable at a natural line length. Labels stay compact but legible; avoid all-caps body copy.
 
 ## Layout
 
