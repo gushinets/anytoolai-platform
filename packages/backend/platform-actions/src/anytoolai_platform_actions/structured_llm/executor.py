@@ -182,7 +182,7 @@ class StructuredLlmActionExecutor:
     def _render_prompt(self, template: str, input_payload: Mapping[str, Any]) -> str:
         if not input_payload:
             return template
-        serialized_payload = json.dumps(dict(input_payload), sort_keys=True)
+        serialized_payload = json.dumps(dict(input_payload), sort_keys=True, ensure_ascii=False)
         return f"{template}\n\nInput payload:\n{serialized_payload}"
 
     def _finalize_response(
