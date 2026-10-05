@@ -158,7 +158,7 @@ def test_http_worker_terminal_history_and_idempotent_replay(app, success):
     expected_prompt = (
         submitted["prompt"]
         + "\n\nInput payload:\n"
-        + json.dumps(submitted["input"], sort_keys=True)
+        + json.dumps(submitted["input"], sort_keys=True, ensure_ascii=False)
     )
     assert all(request.prompt == expected_prompt for request in adapter.requests)
     if success:
