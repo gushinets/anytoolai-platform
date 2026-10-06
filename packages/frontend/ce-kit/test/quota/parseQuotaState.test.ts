@@ -46,6 +46,7 @@ describe("parseQuotaState", () => {
       usedCount: 1,
       remainingCount: 2,
       exhausted: false,
+      resetsAt: null,
     });
   });
 
@@ -66,6 +67,20 @@ describe("parseQuotaState", () => {
   it("treats a missing scenario_id the same as null", () => {
     const { scenario_id: _scenarioId, ...rest } = VALID_PAYLOAD;
     expect(parseQuotaState(rest)?.scenarioId).toBeNull();
+  });
+
+  it("accepts every calendar period and maps resets_at (absent or null -> null)", () => {
+    for (const period of ["calendar_day", "calendar_week", "calendar_month"]) {
+      const resetsAt = "2026-10-01T00:00:00Z";
+      expect(parseQuotaState({ ...VALID_PAYLOAD, period, resets_at: resetsAt })).toMatchObject({
+        period,
+        resetsAt,
+      });
+    }
+    expect(parseQuotaState({ ...VALID_PAYLOAD, resets_at: null })?.resetsAt).toBeNull();
+    // Informational field: malformed values degrade to null instead of failing the payload.
+    expect(parseQuotaState({ ...VALID_PAYLOAD, resets_at: 5 })?.resetsAt).toBeNull();
+    expect(parseQuotaState({ ...VALID_PAYLOAD, resets_at: "garbage" })?.resetsAt).toBeNull();
   });
 
   it("returns null when unit/period/quota_dimension aren't known enum members", () => {

@@ -52,6 +52,7 @@ describe("getQuota", () => {
         usedCount: 1,
         remainingCount: 2,
         exhausted: false,
+        resetsAt: null,
       },
       status: 200,
     });

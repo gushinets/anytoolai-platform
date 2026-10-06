@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 import pytest
 from pydantic import ValidationError
 
+from anytoolai_platform_api.routers.identity_quota import _quota_state_payload
 from anytoolai_platform_api.schemas import (
     ClientEventResponse,
     HandoffCreateResponse,
@@ -14,6 +15,12 @@ from anytoolai_platform_api.schemas import (
     RuntimeQuotaSummaryResponse,
     ScenarioSessionResponse,
     ScenarioStartResponse,
+)
+from anytoolai_platform_core.quotas.models import (
+    QuotaDimension,
+    QuotaPeriod,
+    QuotaState,
+    QuotaUnit,
 )
 
 _EXPIRES_AT = datetime(2026, 1, 1, tzinfo=UTC)
@@ -93,3 +100,26 @@ def test_handoff_preview_response_rejects_an_off_enum_status() -> None:
             preview={},
             expires_at=_EXPIRES_AT,
         )
+
+
+def test_quota_state_payload_exposes_resets_at_and_hides_period_key() -> None:
+    state = QuotaState(
+        guest_id="g1",
+        product_id="p1",
+        quota_policy_id="p1",
+        quota_dimension=QuotaDimension.product,
+        dimension_key="p1",
+        scenario_id=None,
+        unit=QuotaUnit.scenario_run,
+        period=QuotaPeriod.calendar_day,
+        period_key="day:2026-09-30",
+        limit_count=3,
+        used_count=0,
+        remaining_count=3,
+        exhausted=False,
+        resets_at=datetime(2026, 10, 1, tzinfo=UTC),
+    )
+    body = QuotaStateResponse(**_quota_state_payload(state)).model_dump(mode="json")
+    assert body["resets_at"] == "2026-10-01T00:00:00Z"
+    assert body["period"] == "calendar_day"
+    assert "period_key" not in body

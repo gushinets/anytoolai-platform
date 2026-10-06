@@ -89,6 +89,7 @@ class QuotaStateResponse(BaseModel):
     used_count: int
     remaining_count: int
     exhausted: bool
+    resets_at: datetime | None = None
 
 
 class ScenarioStartRequest(BaseModel):

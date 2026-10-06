@@ -27,6 +27,7 @@ export function parseQuotaState(payload: unknown): QuotaState | null {
     used_count: usedCount,
     remaining_count: remainingCount,
     exhausted,
+    resets_at: resetsAt,
   } = payload;
 
   if (
@@ -64,6 +65,8 @@ export function parseQuotaState(payload: unknown): QuotaState | null {
     usedCount,
     remainingCount,
     exhausted,
+    // Informational only: absent (older API), null or malformed all map to null.
+    resetsAt: typeof resetsAt === "string" && !Number.isNaN(Date.parse(resetsAt)) ? resetsAt : null,
   };
 }
 
@@ -82,6 +85,7 @@ type _QuotaStateShapeCheck = AssertExactSchemaShape<
     quota_dimension: components["schemas"]["QuotaDimension"];
     quota_policy_id: string;
     remaining_count: number;
+    resets_at?: string | null;
     scenario_id?: string | null;
     unit: components["schemas"]["QuotaUnit"];
     used_count: number;

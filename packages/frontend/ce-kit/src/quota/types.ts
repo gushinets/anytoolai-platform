@@ -19,4 +19,5 @@ export type QuotaState = {
   usedCount: number;
   remainingCount: number;
   exhausted: boolean;
+  resetsAt: string | null;
 };
