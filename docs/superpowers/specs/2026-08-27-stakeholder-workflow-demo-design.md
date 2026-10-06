@@ -151,8 +151,8 @@ requires HTTPS at the deployment boundary.
 
 ## Daily Limit and Single-Run Gate
 
-The existing quota policy is intentionally unchanged: it supports only the `lifetime` period and
-protects normal `kernel_demo` guest journeys. Each accepted demo start creates a fresh server-side
+The existing quota policy is intentionally unchanged: it uses the `lifetime` period (other periods
+exist, see `docs/architecture/quota-model.md`) and protects normal `kernel_demo` guest journeys. Each accepted demo start creates a fresh server-side
 guest identity so the existing per-guest lifetime quota remains valid and auditable.
 
 Before creating that guest, the demo router queries existing `scenario_sessions` and `jobs`:

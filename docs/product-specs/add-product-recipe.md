@@ -116,6 +116,9 @@ product. It rejects a product whose actions do not use the standard fake policy;
 that needs different policies per action must add an explicit reviewed mapping instead of
 weakening that strict transform.
 
+Switching a product to a calendar quota period has a client-first rollout order, see
+`docs/architecture/quota-model.md` (Periods and windows).
+
 Keep the canonical quota count, period, and dimension in the product's `quotas.yaml` and
 `product.yaml`. Deployment selects only canonical or unmetered through
 `ANYTOOLAI_UNMETERED_PRODUCT_IDS`. A product without a canonical quota remains unmetered even

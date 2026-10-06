@@ -993,7 +993,7 @@ export interface components {
          * QuotaPeriod
          * @enum {string}
          */
-        QuotaPeriod: "lifetime";
+        QuotaPeriod: "lifetime" | "calendar_day" | "calendar_week" | "calendar_month";
         /** QuotaStateResponse */
         QuotaStateResponse: {
             /** Dimension Key */
@@ -1012,6 +1012,8 @@ export interface components {
             quota_policy_id: string;
             /** Remaining Count */
             remaining_count: number;
+            /** Resets At */
+            resets_at?: string | null;
             /** Scenario Id */
             scenario_id?: string | null;
             unit: components["schemas"]["QuotaUnit"];

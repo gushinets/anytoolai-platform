@@ -122,3 +122,30 @@ guest usage -> quota exhausted -> email capture -> waitlist/paywall intent -> ea
 ```
 
 Implementing guest quota only in frontend is an architecture error.
+
+## Periods and windows
+
+Quota periods are `lifetime` and the fixed UTC calendar windows `calendar_day` (UTC day),
+`calendar_week` (ISO week, Monday-Sunday) and `calendar_month` (UTC month). Rolling windows are not
+supported. `resolve_quota_period(period, now)` computes `period_key` (`lifetime`, `day:2026-09-30`,
+`week:2020-W53` using the ISO week-year, `month:2026-09`), `starts_at` and `ends_at` together from one
+UTC instant; naive datetimes are rejected.
+
+- The window is resolved once per operation: `validate_accepted_start` stores it in `QuotaValidation`,
+  and consume and rollback recovery reuse it; `check_quota` resolves once per request. Only these two
+  entry points read the injectable quota clock.
+- A new window selects or creates a new `guest_quota_usage` row through the existing `period_key`
+  unique dimension. Nothing is reset and no job or migration is needed.
+- `QuotaState.resets_at` (the window's `ends_at`, `null` for `lifetime`) is exposed as `resets_at` on
+  `GET /v1/products/{product_id}/quota`. `period_key`, the runtime quota summary and quota events do
+  not carry it.
+- Changing a policy's period while keeping its `quota_policy_id` gives guests a fresh window;
+  switching back to `lifetime` revives the old lifetime row. Historical period rows are not cleaned up.
+
+### Rollout order for a new period
+
+A client that does not know a period value fails `parseRuntimeConfig` and the product does not open.
+Before a product YAML switches from `lifetime` to a calendar period: (1) Core/SDK/OpenAPI support the
+value, (2) CE-kit and all supported web/extension clients understand it, (3) those clients are
+deployed, (4) only then switch the YAML. Never switch a product before every supported client version
+understands the new `QuotaPeriod` values.

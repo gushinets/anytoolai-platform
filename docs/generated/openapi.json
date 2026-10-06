@@ -1776,7 +1776,10 @@
       },
       "QuotaPeriod": {
         "enum": [
-          "lifetime"
+          "lifetime",
+          "calendar_day",
+          "calendar_week",
+          "calendar_month"
         ],
         "title": "QuotaPeriod",
         "type": "string"
@@ -1817,6 +1820,18 @@
           "remaining_count": {
             "title": "Remaining Count",
             "type": "integer"
+          },
+          "resets_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resets At"
           },
           "scenario_id": {
             "anyOf": [
