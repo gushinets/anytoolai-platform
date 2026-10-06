@@ -82,6 +82,14 @@ describe("parseQuotaState", () => {
     expect(parseQuotaState({ ...VALID_PAYLOAD, resets_at: 5 })).toBeNull();
     expect(parseQuotaState({ ...VALID_PAYLOAD, resets_at: "garbage" })).toBeNull();
     expect(parseQuotaState({ ...VALID_PAYLOAD, resets_at: "5" })).toBeNull();
+    // Impossible calendar date, and a timestamp without a timezone.
+    expect(parseQuotaState({ ...VALID_PAYLOAD, resets_at: "2026-02-31T00:00:00Z" })).toBeNull();
+    expect(parseQuotaState({ ...VALID_PAYLOAD, resets_at: "2026-10-01T00:00:00" })).toBeNull();
+    expect(parseQuotaState({ ...VALID_PAYLOAD, resets_at: "2026-10-01T24:00:00Z" })).toBeNull();
+    // Offset-aware and fractional-second forms are valid.
+    expect(
+      parseQuotaState({ ...VALID_PAYLOAD, resets_at: "2026-10-01T03:00:00.5+03:00" })?.resetsAt,
+    ).toBe("2026-10-01T03:00:00.5+03:00");
   });
 
   it("returns null when unit/period/quota_dimension aren't known enum members", () => {

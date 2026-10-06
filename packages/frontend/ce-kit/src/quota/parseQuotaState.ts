@@ -4,9 +4,30 @@ import { isNullableString, isRecord } from "../api/parsing";
 import { isQuotaDimension, isQuotaPeriod, isQuotaUnit } from "./quotaEnums";
 import type { QuotaState } from "./types";
 
-// Date.parse alone accepts strings like "5", so require an ISO date-time prefix as well.
+// OpenAPI `date-time` is RFC 3339: offset-aware, with a real calendar date. Date.parse is not
+// enough (it rolls 2026-02-31 over to March and accepts timezone-less strings).
+const RFC3339 =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-](\d{2}):(\d{2}))$/;
+
 function isIsoTimestamp(value: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}T/.test(value) && !Number.isNaN(Date.parse(value));
+  const match = RFC3339.exec(value);
+  if (match === null) {
+    return false;
+  }
+  const [year, month, day, hour, minute, second] = match.slice(1, 7).map(Number);
+  const offsetHour = Number(match[7] ?? 0);
+  const offsetMinute = Number(match[8] ?? 0);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day &&
+    hour < 24 &&
+    minute < 60 &&
+    second < 60 &&
+    offsetHour < 24 &&
+    offsetMinute < 60
+  );
 }
 
 /**
