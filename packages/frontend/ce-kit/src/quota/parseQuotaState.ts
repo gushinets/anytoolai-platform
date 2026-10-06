@@ -4,6 +4,11 @@ import { isNullableString, isRecord } from "../api/parsing";
 import { isQuotaDimension, isQuotaPeriod, isQuotaUnit } from "./quotaEnums";
 import type { QuotaState } from "./types";
 
+// Date.parse alone accepts strings like "5", so require an ISO date-time prefix as well.
+function isIsoTimestamp(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}T/.test(value) && !Number.isNaN(Date.parse(value));
+}
+
 /**
  * Validates and maps the backend's `QuotaStateResponse` payload (snake_case) into the client's
  * `QuotaState` shape (camelCase). Returns null for anything that doesn't match, so callers fall
@@ -45,7 +50,12 @@ export function parseQuotaState(payload: unknown): QuotaState | null {
   ) {
     return null;
   }
-  if (!isNullableString(scenarioId)) {
+  // resets_at is absent from older APIs: absent and null map to null, anything else must be an
+  // ISO-8601 timestamp string (fail closed, like every other field).
+  if (!isNullableString(scenarioId) || !isNullableString(resetsAt)) {
+    return null;
+  }
+  if (typeof resetsAt === "string" && !isIsoTimestamp(resetsAt)) {
     return null;
   }
   if (!isQuotaDimension(quotaDimension) || !isQuotaUnit(unit) || !isQuotaPeriod(period)) {
@@ -65,8 +75,7 @@ export function parseQuotaState(payload: unknown): QuotaState | null {
     usedCount,
     remainingCount,
     exhausted,
-    // Informational only: absent (older API), null or malformed all map to null.
-    resetsAt: typeof resetsAt === "string" && !Number.isNaN(Date.parse(resetsAt)) ? resetsAt : null,
+    resetsAt: resetsAt ?? null,
   };
 }
 

@@ -78,9 +78,10 @@ describe("parseQuotaState", () => {
       });
     }
     expect(parseQuotaState({ ...VALID_PAYLOAD, resets_at: null })?.resetsAt).toBeNull();
-    // Informational field: malformed values degrade to null instead of failing the payload.
-    expect(parseQuotaState({ ...VALID_PAYLOAD, resets_at: 5 })?.resetsAt).toBeNull();
-    expect(parseQuotaState({ ...VALID_PAYLOAD, resets_at: "garbage" })?.resetsAt).toBeNull();
+    // A present but malformed value is an off-contract response, not a missing one.
+    expect(parseQuotaState({ ...VALID_PAYLOAD, resets_at: 5 })).toBeNull();
+    expect(parseQuotaState({ ...VALID_PAYLOAD, resets_at: "garbage" })).toBeNull();
+    expect(parseQuotaState({ ...VALID_PAYLOAD, resets_at: "5" })).toBeNull();
   });
 
   it("returns null when unit/period/quota_dimension aren't known enum members", () => {
