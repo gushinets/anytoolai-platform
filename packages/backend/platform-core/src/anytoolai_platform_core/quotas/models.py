@@ -15,11 +15,27 @@ class QuotaUnit(StrEnum):
 
 class QuotaPeriod(StrEnum):
     lifetime = "lifetime"
+    calendar_day = "calendar_day"
+    calendar_week = "calendar_week"
+    calendar_month = "calendar_month"
 
 
 class QuotaDimension(StrEnum):
     product = "product"
     scenario = "scenario"
+
+
+@dataclass(frozen=True)
+class ResolvedQuotaPeriod:
+    """One quota window, resolved once from a single UTC instant.
+
+    ends_at is the first instant of the next window (None for lifetime).
+    """
+
+    period: QuotaPeriod
+    period_key: str
+    starts_at: datetime | None
+    ends_at: datetime | None
 
 
 @dataclass(frozen=True)
@@ -67,3 +83,4 @@ class QuotaState:
     used_count: int
     remaining_count: int
     exhausted: bool
+    resets_at: datetime | None

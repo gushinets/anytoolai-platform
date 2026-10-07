@@ -57,6 +57,19 @@ describe("parseRuntimeConfig", () => {
     expect(parseRuntimeConfig(payload)).toBeNull();
   });
 
+  it("accepts calendar quota periods in the quota summary", () => {
+    const quota_summary = {
+      quota_policy_id: "p1",
+      unit: "scenario_run",
+      limit_count: 3,
+      period: "calendar_week",
+      dimension: "product",
+    };
+    expect(parseRuntimeConfig({ ...VALID_PAYLOAD, quota_summary })?.quotaSummary?.period).toBe(
+      "calendar_week",
+    );
+  });
+
   it("returns null when a scenario's quota summary has an unknown unit/period/dimension", () => {
     expect(
       parseRuntimeConfig({

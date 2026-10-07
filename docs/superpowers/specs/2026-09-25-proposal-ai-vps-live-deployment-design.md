@@ -98,7 +98,7 @@ Quota usage behaves differently for guests with and without an existing usage ro
 - a usage row created before an unmetered window remains durable and resumes from its prior `used_count` when canonical quota returns;
 - `ensure_usage` synchronizes an existing row's `limit_count` from the current canonical policy.
 
-Preserve `proposal_ai.guest_quota_v1` when changing the canonical limit. Changing `quota_policy_id` intentionally selects a different usage key and gives every guest a fresh allowance. Changing quota dimension also selects different usage keys. The current kernel supports only `period: lifetime`; if additional periods are implemented later, changing period also changes `period_key` and therefore starts a new usage window.
+Preserve `proposal_ai.guest_quota_v1` when changing the canonical limit. Changing `quota_policy_id` intentionally selects a different usage key and gives every guest a fresh allowance. Changing quota dimension also selects different usage keys. Changing period also changes `period_key` and therefore starts a new usage window. Supported periods and their fixed UTC window semantics are in `docs/architecture/quota-model.md` (Periods and windows).
 
 `canonical` means “use whatever quota the product defines”, not “force a quota”. Proposal AI currently defines 10 lifetime product-level scenario runs. Client Update Writer currently defines no quota, so its canonical mode remains unmetered until a quota policy and `quota_policy_ref` are added to its canonical YAML.
 

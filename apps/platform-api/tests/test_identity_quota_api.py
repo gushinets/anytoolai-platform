@@ -121,6 +121,7 @@ def test_quota_check_endpoint_returns_current_state(
         "used_count": 0,
         "remaining_count": 3,
         "exhausted": False,
+        "resets_at": None,
     }
 
     with transaction_boundary(session_factory) as session:

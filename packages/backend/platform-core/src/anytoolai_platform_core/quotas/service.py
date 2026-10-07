@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
@@ -17,10 +19,14 @@ from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.identity.service import GuestIdentityNotFoundError
 from anytoolai_platform_core.quotas.models import (
     QuotaDimension,
-    QuotaPeriod,
     QuotaPolicy,
     QuotaState,
     QuotaUsageRecord,
+    ResolvedQuotaPeriod,
+)
+from anytoolai_platform_core.quotas.periods import (
+    UnsupportedQuotaPeriodError,
+    resolve_quota_period,
 )
 from anytoolai_platform_core.quotas.repository import QuotaUsageRepository
 from anytoolai_platform_core.storage.db import event_log_table
@@ -85,6 +91,7 @@ class QuotaValidation:
 
     policy: QuotaPolicy
     dimension: ResolvedQuotaDimension
+    resolved_period: ResolvedQuotaPeriod
 
 
 @dataclass(frozen=True)
@@ -100,6 +107,7 @@ class QuotaExhaustionRecovery:
     handoff_id: str | None
     policy: QuotaPolicy
     dimension: ResolvedQuotaDimension
+    resolved_period: ResolvedQuotaPeriod
 
 
 class GuestQuotaService:
@@ -110,11 +118,14 @@ class GuestQuotaService:
         quota_repository: QuotaUsageRepository,
         guest_repository: GuestIdentityRepository,
         event_emitter: EventEmitter,
+        clock: Callable[[], datetime] | None = None,
     ) -> None:
         self._config_registry = config_registry
         self._quota_repository = quota_repository
         self._guest_repository = guest_repository
         self._event_emitter = event_emitter
+        # Business clock: only used to pick the active quota window.
+        self._clock = clock or utc_now
 
     def check_quota(
         self,
@@ -139,6 +150,7 @@ class GuestQuotaService:
             tenant_id=tenant_id,
             region=region,
         )
+        resolved = self._resolve_period(policy)
         usage = self._get_usage(
             tenant_id=tenant_id,
             region=region,
@@ -146,6 +158,7 @@ class GuestQuotaService:
             product_id=product_id,
             policy=policy,
             dimension=dimension,
+            resolved_period=resolved,
         )
         if usage is None and persist_usage:
             usage = self._ensure_usage(
@@ -155,15 +168,17 @@ class GuestQuotaService:
                 product_id=product_id,
                 policy=policy,
                 dimension=dimension,
+                resolved_period=resolved,
             )
         state = (
-            _state_from_usage(usage, policy)
+            _state_from_usage(usage, policy, resolved)
             if usage is not None
             else _state_from_empty_usage(
                 guest_id=guest_id,
                 product_id=product_id,
                 policy=policy,
                 dimension=dimension,
+                resolved_period=resolved,
             )
         )
         if emit_event:
@@ -215,7 +230,11 @@ class GuestQuotaService:
             tenant_id=tenant_id,
             region=region,
         )
-        return QuotaValidation(policy=policy, dimension=dimension)
+        return QuotaValidation(
+            policy=policy,
+            dimension=dimension,
+            resolved_period=self._resolve_period(policy),
+        )
 
     def consume_for_accepted_start(
         self,
@@ -233,6 +252,7 @@ class GuestQuotaService:
     ) -> QuotaState:
         policy = validation.policy
         dimension = validation.dimension
+        resolved = validation.resolved_period
         usage = self._ensure_usage(
             tenant_id=tenant_id,
             region=region,
@@ -240,8 +260,9 @@ class GuestQuotaService:
             product_id=product_id,
             policy=policy,
             dimension=dimension,
+            resolved_period=resolved,
         )
-        checked_state = _state_from_usage(usage, policy)
+        checked_state = _state_from_usage(usage, policy, resolved)
         context_kwargs = {
             "tenant_id": tenant_id,
             "region": region,
@@ -260,7 +281,7 @@ class GuestQuotaService:
         consumed = self._quota_repository.consume_if_available(usage)
         if consumed is None:
             latest = self._quota_repository.get(usage.id) or usage
-            exhausted_state = _state_from_usage(latest, policy)
+            exhausted_state = _state_from_usage(latest, policy, resolved)
             self._emit_quota_event(
                 "quota.exhausted",
                 state=exhausted_state,
@@ -281,11 +302,12 @@ class GuestQuotaService:
                     handoff_id=handoff_id,
                     policy=policy,
                     dimension=dimension,
+                    resolved_period=resolved,
                 )
             )
             raise QuotaExhaustedError()
 
-        consumed_state = _state_from_usage(consumed, policy)
+        consumed_state = _state_from_usage(consumed, policy, resolved)
         self._emit_quota_event(
             "quota.consumed",
             state=consumed_state,
@@ -307,6 +329,12 @@ class GuestQuotaService:
             phase=RollbackRecoveryPhase.quota_exhaustion,
             critical=recovery.handoff_id is not None,
         )
+
+    def _resolve_period(self, policy: QuotaPolicy) -> ResolvedQuotaPeriod:
+        try:
+            return resolve_quota_period(policy.period, self._clock())
+        except UnsupportedQuotaPeriodError:
+            raise QuotaPolicyNotConfiguredError() from None
 
     def _require_product_quota_policy(self, product_id: str) -> QuotaPolicy:
         product = self._config_registry.get_product(product_id)
@@ -346,6 +374,7 @@ class GuestQuotaService:
         product_id: str,
         policy: QuotaPolicy,
         dimension: ResolvedQuotaDimension,
+        resolved_period: ResolvedQuotaPeriod,
     ) -> QuotaUsageRecord:
         return self._quota_repository.ensure_usage(
             tenant_id=tenant_id,
@@ -356,7 +385,7 @@ class GuestQuotaService:
             quota_dimension=dimension.quota_dimension,
             dimension_key=dimension.dimension_key,
             scenario_id=dimension.scenario_id,
-            period_key=_period_key(policy),
+            period_key=resolved_period.period_key,
             limit_count=policy.limit_count,
             metadata={
                 "unit": policy.unit.value,
@@ -375,6 +404,7 @@ class GuestQuotaService:
         product_id: str,
         policy: QuotaPolicy,
         dimension: ResolvedQuotaDimension,
+        resolved_period: ResolvedQuotaPeriod,
     ) -> QuotaUsageRecord | None:
         return self._quota_repository.get_by_dimension(
             tenant_id=tenant_id,
@@ -384,7 +414,7 @@ class GuestQuotaService:
             quota_policy_id=policy.quota_policy_id,
             quota_dimension=dimension.quota_dimension,
             dimension_key=dimension.dimension_key,
-            period_key=_period_key(policy),
+            period_key=resolved_period.period_key,
         )
 
     def _emit_quota_event(
@@ -460,7 +490,7 @@ def _recover_quota_exhaustion(
             quota_dimension=recovery.dimension.quota_dimension,
             dimension_key=recovery.dimension.dimension_key,
             scenario_id=recovery.dimension.scenario_id,
-            period_key=_period_key(recovery.policy),
+            period_key=recovery.resolved_period.period_key,
             limit_count=recovery.policy.limit_count,
             metadata={
                 "unit": recovery.policy.unit.value,
@@ -469,7 +499,7 @@ def _recover_quota_exhaustion(
                 "dimension_key": recovery.dimension.dimension_key,
             },
         )
-        state = _state_from_usage(usage, recovery.policy)
+        state = _state_from_usage(usage, recovery.policy, recovery.resolved_period)
         event_emitter = EventEmitter(EventLogRepository(session))
         context = {
             "tenant_id": recovery.tenant_id,
@@ -536,7 +566,11 @@ def _quota_recovery_audit_pair_exists(
     return checked_exists and exhausted_exists
 
 
-def _state_from_usage(record: QuotaUsageRecord, policy: QuotaPolicy) -> QuotaState:
+def _state_from_usage(
+    record: QuotaUsageRecord,
+    policy: QuotaPolicy,
+    resolved_period: ResolvedQuotaPeriod,
+) -> QuotaState:
     remaining_count = max(policy.limit_count - record.used_count, 0)
     return QuotaState(
         guest_id=record.guest_id,
@@ -552,6 +586,7 @@ def _state_from_usage(record: QuotaUsageRecord, policy: QuotaPolicy) -> QuotaSta
         used_count=record.used_count,
         remaining_count=remaining_count,
         exhausted=remaining_count <= 0,
+        resets_at=resolved_period.ends_at,
     )
 
 
@@ -561,6 +596,7 @@ def _state_from_empty_usage(
     product_id: str,
     policy: QuotaPolicy,
     dimension: ResolvedQuotaDimension,
+    resolved_period: ResolvedQuotaPeriod,
 ) -> QuotaState:
     return QuotaState(
         guest_id=guest_id,
@@ -571,11 +607,12 @@ def _state_from_empty_usage(
         scenario_id=dimension.scenario_id,
         unit=policy.unit,
         period=policy.period,
-        period_key=_period_key(policy),
+        period_key=resolved_period.period_key,
         limit_count=policy.limit_count,
         used_count=0,
         remaining_count=policy.limit_count,
         exhausted=policy.limit_count <= 0,
+        resets_at=resolved_period.ends_at,
     )
 
 
@@ -599,12 +636,6 @@ def _resolve_dimension(
             dimension_key=scenario_id,
             scenario_id=scenario_id,
         )
-    raise QuotaPolicyNotConfiguredError()
-
-
-def _period_key(policy: QuotaPolicy) -> str:
-    if policy.period is QuotaPeriod.lifetime:
-        return "lifetime"
     raise QuotaPolicyNotConfiguredError()
 
 

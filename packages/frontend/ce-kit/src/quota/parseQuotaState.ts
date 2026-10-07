@@ -4,6 +4,32 @@ import { isNullableString, isRecord } from "../api/parsing";
 import { isQuotaDimension, isQuotaPeriod, isQuotaUnit } from "./quotaEnums";
 import type { QuotaState } from "./types";
 
+// OpenAPI `date-time` is RFC 3339: offset-aware, with a real calendar date. Date.parse is not
+// enough (it rolls 2026-02-31 over to March and accepts timezone-less strings).
+const RFC3339 =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-](\d{2}):(\d{2}))$/;
+
+function isIsoTimestamp(value: string): boolean {
+  const match = RFC3339.exec(value);
+  if (match === null) {
+    return false;
+  }
+  const [year, month, day, hour, minute, second] = match.slice(1, 7).map(Number);
+  const offsetHour = Number(match[7] ?? 0);
+  const offsetMinute = Number(match[8] ?? 0);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day &&
+    hour < 24 &&
+    minute < 60 &&
+    second < 60 &&
+    offsetHour < 24 &&
+    offsetMinute < 60
+  );
+}
+
 /**
  * Validates and maps the backend's `QuotaStateResponse` payload (snake_case) into the client's
  * `QuotaState` shape (camelCase). Returns null for anything that doesn't match, so callers fall
@@ -27,6 +53,7 @@ export function parseQuotaState(payload: unknown): QuotaState | null {
     used_count: usedCount,
     remaining_count: remainingCount,
     exhausted,
+    resets_at: resetsAt,
   } = payload;
 
   if (
@@ -44,7 +71,12 @@ export function parseQuotaState(payload: unknown): QuotaState | null {
   ) {
     return null;
   }
-  if (!isNullableString(scenarioId)) {
+  // resets_at is absent from older APIs: absent and null map to null, anything else must be an
+  // ISO-8601 timestamp string (fail closed, like every other field).
+  if (!isNullableString(scenarioId) || !isNullableString(resetsAt)) {
+    return null;
+  }
+  if (typeof resetsAt === "string" && !isIsoTimestamp(resetsAt)) {
     return null;
   }
   if (!isQuotaDimension(quotaDimension) || !isQuotaUnit(unit) || !isQuotaPeriod(period)) {
@@ -64,6 +96,7 @@ export function parseQuotaState(payload: unknown): QuotaState | null {
     usedCount,
     remainingCount,
     exhausted,
+    resetsAt: resetsAt ?? null,
   };
 }
 
@@ -82,6 +115,7 @@ type _QuotaStateShapeCheck = AssertExactSchemaShape<
     quota_dimension: components["schemas"]["QuotaDimension"];
     quota_policy_id: string;
     remaining_count: number;
+    resets_at?: string | null;
     scenario_id?: string | null;
     unit: components["schemas"]["QuotaUnit"];
     used_count: number;

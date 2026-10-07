@@ -63,7 +63,8 @@ Quota policy is repo-configured and product-owned:
 
 - `product.yaml` references `quota_policy_ref`;
 - product-local `quotas.yaml` defines the referenced policy;
-- the current quota contract supports `scenario_run` / `lifetime`;
+- the current quota contract supports `scenario_run` and the periods `lifetime`, `calendar_day`, `calendar_week`, `calendar_month`
+  (fixed UTC calendar windows, see `quota-model.md`);
 - each quota policy must declare `dimension: product` or `dimension: scenario`;
 - `product` dimension shares one quota counter across all scenarios for the guest/product;
 - `scenario` dimension creates one quota counter per guest/product/scenario;
@@ -147,7 +148,7 @@ and tests.
 - transport retry owner: `provider_gateway_litellm_sdk`
 - validation retry owner: `pydantic_ai`
 - quota unit: `scenario_run`
-- quota period: `lifetime`
+- quota period: `lifetime`, `calendar_day`, `calendar_week`, `calendar_month`
 - quota dimension: `product`, `scenario`
 - scenario session status: `started`, `waiting_for_user`, `running`, `completed`, `failed`, `expired`
 - job status: `created`, `running`, `succeeded`, `failed`, `canceled`

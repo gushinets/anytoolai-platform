@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -22,7 +23,7 @@ from anytoolai_platform_core.handoffs.models import (
 from anytoolai_platform_core.handoffs.repository import HandoffRepository
 from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.identity.service import GuestIdentityService
-from anytoolai_platform_core.quotas.models import QuotaDimension
+from anytoolai_platform_core.quotas.models import QuotaDimension, QuotaPeriod
 from anytoolai_platform_core.quotas.repository import QuotaUsageRepository
 from anytoolai_platform_core.quotas.service import GuestQuotaService, QuotaExhaustedError
 from anytoolai_platform_core.scenarios.models import (
@@ -73,12 +74,14 @@ def _quota_service(
     session: sa.orm.Session,
     *,
     registry: ConfigRegistry | None = None,
+    clock: Callable[[], datetime] | None = None,
 ) -> GuestQuotaService:
     return GuestQuotaService(
         config_registry=registry or build_config_registry(CONFIG_ROOT),
         quota_repository=QuotaUsageRepository(session),
         guest_repository=GuestIdentityRepository(session),
         event_emitter=EventEmitter(EventLogRepository(session)),
+        clock=clock,
     )
 
 
@@ -533,6 +536,50 @@ def test_quota_exhaustion_recovery_survives_caller_transaction_rollback(
     assert all(event["handoff_id"] is None for event in quota_events)
     assert quota_events[-1]["error_code"] == "quota_exhausted"
     assert quota_events[-1]["properties"]["exhausted"] is True
+
+
+def test_quota_exhaustion_recovery_keeps_window_resolved_at_validation(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    registry = _registry_with_quota_limit(0)
+    policy = registry.get_quota_policy("kernel_demo.guest_quota_v1")
+    assert policy is not None
+    registry = replace(
+        registry,
+        quotas={
+            policy.quota_policy_id: replace(policy, period=QuotaPeriod.calendar_day),
+        },
+    )
+    reads = iter(
+        [datetime(2026, 9, 30, 23, 59, 59, 999000, tzinfo=UTC), datetime(2026, 10, 1, tzinfo=UTC)]
+    )
+    with transaction_boundary(session_factory) as session:
+        guest_id = _create_guest(session)
+
+    with pytest.raises(QuotaExhaustedError), transaction_boundary(
+        session_factory
+    ) as session:
+        service = _quota_service(session, registry=registry, clock=lambda: next(reads))
+        _consume_accepted_start(
+            service,
+            guest_id=guest_id,
+            scenario_id="kernel_demo.single_action_smoke_v1",
+            scenario_session_id="scenario_session_rejected_boundary",
+        )
+
+    with transaction_boundary(session_factory) as session:
+        usage = session.execute(sa.select(guest_quota_usage_table)).mappings().one()
+        events = list(
+            session.execute(
+                sa.select(event_log_table).where(
+                    event_log_table.c.scenario_session_id
+                    == "scenario_session_rejected_boundary"
+                )
+            ).mappings()
+        )
+    assert usage["period_key"] == "day:2026-09-30"
+    assert {e["event_type"] for e in events} == {"quota.checked", "quota.exhausted"}
+    assert {e["properties"]["period_key"] for e in events} == {"day:2026-09-30"}
 
 
 def test_handoff_quota_exhaustion_recovery_survives_caller_transaction_rollback(

@@ -13,6 +13,9 @@ class QuotaUnit(StrEnum):
 
 class QuotaPeriod(StrEnum):
     lifetime = "lifetime"
+    calendar_day = "calendar_day"
+    calendar_week = "calendar_week"
+    calendar_month = "calendar_month"
 
 
 class QuotaDimension(StrEnum):

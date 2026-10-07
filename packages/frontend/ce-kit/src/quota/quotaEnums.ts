@@ -11,6 +11,9 @@ export const isQuotaUnit = makeEnumGuard<QuotaUnit>({
 
 export const isQuotaPeriod = makeEnumGuard<QuotaPeriod>({
   lifetime: true,
+  calendar_day: true,
+  calendar_week: true,
+  calendar_month: true,
 });
 
 export const isQuotaDimension = makeEnumGuard<QuotaDimension>({

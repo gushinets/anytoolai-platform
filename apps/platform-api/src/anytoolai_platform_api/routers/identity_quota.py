@@ -43,6 +43,7 @@ QUOTA_RESPONSE_EXAMPLE = {
     "used_count": 1,
     "remaining_count": 2,
     "exhausted": False,
+    "resets_at": None,
 }
 
 
@@ -142,6 +143,7 @@ def _quota_state_payload(state: QuotaState) -> dict[str, object]:
         "used_count": state.used_count,
         "remaining_count": state.remaining_count,
         "exhausted": state.exhausted,
+        "resets_at": state.resets_at,
     }
 
 
