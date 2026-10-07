@@ -1,7 +1,7 @@
 {
   "response_json": {
     "verdict": "partial_fit",
-    "confidence": 0.8,
+    "confidence": 0.75,
     "deltas": [
       {
         "criterion_id": "skills_fit",
@@ -20,11 +20,11 @@
       },
       {
         "criterion_id": "constraints_fit",
-        "status": "match",
-        "evidence": "The task has a six-week timeline; the profile says the freelancer is available part time from next month."
+        "status": "partial",
+        "evidence": "The task states a six-week timeline and a fixed budget; the profile gives no rate or working terms and only says part-time availability from next month, so compatibility is not established."
       }
     ],
-    "rationale": "Skills and experience line up, but the mobile app part of the task is outside the offered scope, so the fit is partial."
+    "rationale": "Skills and experience line up, but the mobile app part is outside the offered scope and the budget and timeline compatibility is not established, so the fit is partial."
   },
   "input_tokens": 430,
   "output_tokens": 170,

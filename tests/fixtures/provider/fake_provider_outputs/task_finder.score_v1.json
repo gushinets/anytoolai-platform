@@ -18,17 +18,18 @@
       },
       {
         "criterion_id": "constraints_fit",
-        "score": 100,
-        "rationale": "The timeline is workable with part-time availability from next month."
+        "score": 50,
+        "rationale": "The timeline is stated, but the profile gives no rate, terms or full-time availability to confirm the constraints are compatible."
       }
     ],
-    "score": 75,
+    "score": 69,
     "strengths": [
       "Core skills match the task's stack.",
       "Directly relevant dashboard experience."
     ],
     "gaps": [
-      "Mobile app part is outside the offered scope."
+      "Mobile app part is outside the offered scope.",
+      "Budget and working terms are not covered by the profile."
     ],
     "overall_rationale": "Strong skills and relevant experience; the mobile app scope is the main gap."
   },

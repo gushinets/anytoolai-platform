@@ -35,6 +35,7 @@ OUTPUT_SCHEMA_REF = "task_finder.fit_output_v1"
 CRITERION_IDS = ["skills_fit", "experience_fit", "scope_fit", "constraints_fit"]
 CATEGORIES = ["strong_fit", "partial_fit", "weak_fit"]
 WEAK_SCORE_CEILING = 50
+WEAK_CONFIDENCE_CEILING = 0.5
 SCORE_TOLERANCE = 0.5  # the A02 cross-validator's tolerance
 # fixture stem -> kernel schema its response_json must satisfy (the atom's own output schema)
 FIXTURE_KERNEL_SCHEMAS = {
@@ -242,7 +243,11 @@ def test_fixture_verdict_follows_statuses_and_score_is_the_weighted_average(suff
 
 
 def test_weak_input_fixtures_are_a_valid_low_result_not_an_error() -> None:
-    assert _fixture_response("task_finder.compare_v1.weak_input")["verdict"] == "weak_fit"
+    weak = _fixture_response("task_finder.compare_v1.weak_input")
+    # The compare prompt makes unstated information `partial`, never `mismatch`.
+    assert {d["status"] for d in weak["deltas"]} == {"partial"}
+    assert weak["verdict"] == "partial_fit"
+    assert weak["confidence"] < WEAK_CONFIDENCE_CEILING
     assert _fixture_response("task_finder.score_v1.weak_input")["score"] < WEAK_SCORE_CEILING
 
 

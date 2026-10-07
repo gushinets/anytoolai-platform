@@ -59,6 +59,7 @@ PROFILE_TEXT = (
 WEAK_TASK_TEXT = "Need some website help."
 WEAK_PROFILE_TEXT = "I do web stuff."
 WEAK_SCORE_CEILING = 50
+WEAK_CONFIDENCE_CEILING = 0.5
 
 
 def _fixture(key: str) -> dict[str, Any]:
@@ -409,7 +410,9 @@ def test_weak_input_fixtures_are_reachable_end_to_end(
     )
 
     assert output == _expected_output(WEAK_TASK_TEXT, WEAK_PROFILE_TEXT, ".weak_input")
-    assert output["comparison"]["verdict"] == "weak_fit"
+    # Nothing stated is not a conflict: the prompt makes it `partial` (low-confidence partial_fit).
+    assert output["comparison"]["verdict"] == "partial_fit"
+    assert output["comparison"]["confidence"] < WEAK_CONFIDENCE_CEILING
     assert output["match"]["score"] < WEAK_SCORE_CEILING
 
 

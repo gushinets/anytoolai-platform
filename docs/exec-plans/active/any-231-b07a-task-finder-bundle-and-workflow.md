@@ -71,13 +71,16 @@ changes; any change to the wording about release order.
    `experience_fit` 2, `scope_fit` 2, `constraints_fit` 1. A02 requires weights, A11 accepts them.
    Categories: `strong_fit | partial_fit | weak_fit`.
 6. The output schema binds the verdict to the delta statuses (all match -> strong, any mismatch ->
-   weak, else partial), fixes four deltas and four scores in criterion order, and inlines the atom
-   output shapes (a test pins them to the kernel schemas). It deliberately does not bind the score
+   weak, else partial), requires exactly one delta and one score per criterion id in any order
+   (the atom validators check id coverage, not array order), and inlines the atom output shapes
+   (a test pins them to the kernel schemas). It deliberately does not bind the score
    to the verdict: they come from two independent model calls, and a threshold would fail whole
    live runs on a disagreement. The renderer contract shows them as two indicators.
 7. No `handoffs.yaml` and no `analytics.yaml`: the ProposalAI route is an optional later step.
 8. Quota: `scenario_run`, `lifetime`, `product`, limit 3 -- a starting value, not validated.
-9. A weak input (vague task, thin profile) is a valid low-score `weak_fit` result, not an error.
+9. A weak input (vague task, thin profile) is a valid low-score result, not an error. Information
+   the texts do not state is `partial`, never `mismatch` (compare prompt), so the weak fixture is
+   a low-confidence `partial_fit`; `weak_fit` needs a clear conflict or a clear lack.
 
 ## Implementation steps
 
