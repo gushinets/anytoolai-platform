@@ -2,12 +2,12 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-10-06
-- Last updated: 2026-10-06
+- Last updated: 2026-10-07
 - Review date: 2026-10-13
-- Next action: run the full validation set, then open the PR.
+- Next action: none; PR #165 open, awaiting merge; no plan-scoped work remains.
 - Blocker: none
 
 ## Goal
