@@ -2,12 +2,12 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: mixed
 - Created: 2026-10-06
-- Last updated: 2026-10-06
+- Last updated: 2026-10-07
 - Review date: 2026-10-13
-- Next action: re-run `full-check` where passwordless sudo is available (only `test_activation_marker_is_readable_by_non_root_api_user` fails locally), then review.
+- Next action: none; PR #164 merged; no plan-scoped work remains.
 - Blocker: none
 
 ## Goal
