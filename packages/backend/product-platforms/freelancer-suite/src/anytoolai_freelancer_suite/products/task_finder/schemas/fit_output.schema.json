@@ -1,0 +1,362 @@
+{
+  "type": "object",
+  "properties": {
+    "task_text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4000,
+      "pattern": "^\\S([\\s\\S]*\\S)?(?!\\n)$"
+    },
+    "freelancer_positioning": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4000,
+      "pattern": "^\\S([\\s\\S]*\\S)?(?!\\n)$"
+    },
+    "comparison": {
+      "type": "object",
+      "properties": {
+        "verdict": {
+          "type": "string",
+          "enum": [
+            "strong_fit",
+            "partial_fit",
+            "weak_fit"
+          ]
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "deltas": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/delta"
+          },
+          "allOf": [
+            {
+              "contains": {
+                "required": [
+                  "criterion_id"
+                ],
+                "properties": {
+                  "criterion_id": {
+                    "const": "skills_fit"
+                  }
+                }
+              }
+            },
+            {
+              "contains": {
+                "required": [
+                  "criterion_id"
+                ],
+                "properties": {
+                  "criterion_id": {
+                    "const": "experience_fit"
+                  }
+                }
+              }
+            },
+            {
+              "contains": {
+                "required": [
+                  "criterion_id"
+                ],
+                "properties": {
+                  "criterion_id": {
+                    "const": "scope_fit"
+                  }
+                }
+              }
+            },
+            {
+              "contains": {
+                "required": [
+                  "criterion_id"
+                ],
+                "properties": {
+                  "criterion_id": {
+                    "const": "constraints_fit"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      },
+      "required": [
+        "verdict",
+        "confidence",
+        "deltas",
+        "rationale"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "verdict": {
+                "const": "strong_fit"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "deltas": {
+                "not": {
+                  "contains": {
+                    "required": [
+                      "status"
+                    ],
+                    "properties": {
+                      "status": {
+                        "enum": [
+                          "partial",
+                          "mismatch"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "verdict": {
+                "const": "partial_fit"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "deltas": {
+                "not": {
+                  "contains": {
+                    "required": [
+                      "status"
+                    ],
+                    "properties": {
+                      "status": {
+                        "const": "mismatch"
+                      }
+                    }
+                  }
+                },
+                "contains": {
+                  "required": [
+                    "status"
+                  ],
+                  "properties": {
+                    "status": {
+                      "const": "partial"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "verdict": {
+                "const": "weak_fit"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "deltas": {
+                "contains": {
+                  "required": [
+                    "status"
+                  ],
+                  "properties": {
+                    "status": {
+                      "const": "mismatch"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "match": {
+      "type": "object",
+      "properties": {
+        "criterion_scores": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/criterion_score"
+          },
+          "allOf": [
+            {
+              "contains": {
+                "required": [
+                  "criterion_id"
+                ],
+                "properties": {
+                  "criterion_id": {
+                    "const": "skills_fit"
+                  }
+                }
+              }
+            },
+            {
+              "contains": {
+                "required": [
+                  "criterion_id"
+                ],
+                "properties": {
+                  "criterion_id": {
+                    "const": "experience_fit"
+                  }
+                }
+              }
+            },
+            {
+              "contains": {
+                "required": [
+                  "criterion_id"
+                ],
+                "properties": {
+                  "criterion_id": {
+                    "const": "scope_fit"
+                  }
+                }
+              }
+            },
+            {
+              "contains": {
+                "required": [
+                  "criterion_id"
+                ],
+                "properties": {
+                  "criterion_id": {
+                    "const": "constraints_fit"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "strengths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "gaps": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "overall_rationale": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      },
+      "required": [
+        "criterion_scores",
+        "score",
+        "strengths",
+        "gaps",
+        "overall_rationale"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "task_text",
+    "freelancer_positioning",
+    "comparison",
+    "match"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "delta": {
+      "type": "object",
+      "properties": {
+        "criterion_id": {
+          "enum": [
+            "skills_fit",
+            "experience_fit",
+            "scope_fit",
+            "constraints_fit"
+          ]
+        },
+        "status": {
+          "enum": [
+            "match",
+            "partial",
+            "mismatch"
+          ]
+        },
+        "evidence": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "criterion_id",
+        "status",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    "criterion_score": {
+      "type": "object",
+      "properties": {
+        "criterion_id": {
+          "enum": [
+            "skills_fit",
+            "experience_fit",
+            "scope_fit",
+            "constraints_fit"
+          ]
+        },
+        "score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      },
+      "required": [
+        "criterion_id",
+        "score",
+        "rationale"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

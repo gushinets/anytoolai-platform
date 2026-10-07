@@ -1,0 +1,36 @@
+{
+  "response_json": {
+    "verdict": "weak_fit",
+    "confidence": 0.4,
+    "deltas": [
+      {
+        "criterion_id": "skills_fit",
+        "status": "mismatch",
+        "evidence": "The task names no required skills, so the profile's skills cannot be matched to anything."
+      },
+      {
+        "criterion_id": "experience_fit",
+        "status": "mismatch",
+        "evidence": "The profile gives no past work, so relevant experience cannot be confirmed."
+      },
+      {
+        "criterion_id": "scope_fit",
+        "status": "partial",
+        "evidence": "The task does not describe its scope and the profile does not describe an offer, so the scope fit is not stated either way."
+      },
+      {
+        "criterion_id": "constraints_fit",
+        "status": "partial",
+        "evidence": "Neither text states a deadline, budget or availability, so compatibility is not stated."
+      }
+    ],
+    "rationale": "Both texts are too vague: nothing shows a skills or experience match, and scope and constraints are not stated, so the fit is weak with low confidence."
+  },
+  "input_tokens": 120,
+  "output_tokens": 120,
+  "latency_ms": 10,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "task_finder.compare_v1.weak_input"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "response_json": {
+    "verdict": "partial_fit",
+    "confidence": 0.8,
+    "deltas": [
+      {
+        "criterion_id": "skills_fit",
+        "status": "match",
+        "evidence": "The task needs React and TypeScript; the profile lists both as core skills."
+      },
+      {
+        "criterion_id": "experience_fit",
+        "status": "match",
+        "evidence": "The profile cites five years of dashboard work, which is the kind of task described."
+      },
+      {
+        "criterion_id": "scope_fit",
+        "status": "partial",
+        "evidence": "The task asks for a full rebuild plus a mobile app; the profile offers web front ends only."
+      },
+      {
+        "criterion_id": "constraints_fit",
+        "status": "match",
+        "evidence": "The task has a six-week timeline; the profile says the freelancer is available part time from next month."
+      }
+    ],
+    "rationale": "Skills and experience line up, but the mobile app part of the task is outside the offered scope, so the fit is partial."
+  },
+  "input_tokens": 430,
+  "output_tokens": 170,
+  "latency_ms": 10,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "task_finder.compare_v1"
+  }
+}

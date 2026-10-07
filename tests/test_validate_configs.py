@@ -356,6 +356,7 @@ def test_check_deployment_profile_reads_resolved_bundle_and_ignores_disabled_fak
                 "client_update_writer",
                 "brief_decoder",
                 "acceptance_builder",
+                "task_finder",
             )
         ],
     )
@@ -410,6 +411,7 @@ def test_startup_profile_check_rejects_stale_mount_and_selection(monkeypatch, tm
                 "client_update_writer",
                 "brief_decoder",
                 "acceptance_builder",
+                "task_finder",
             )
         ],
     )
@@ -466,6 +468,7 @@ def test_profile_cli_build_and_check_fail_closed(monkeypatch, tmp_path, capsys):
                 "client_update_writer",
                 "brief_decoder",
                 "acceptance_builder",
+                "task_finder",
             )
         ],
     )

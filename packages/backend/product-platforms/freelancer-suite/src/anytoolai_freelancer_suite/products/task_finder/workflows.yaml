@@ -1,0 +1,31 @@
+workflows:
+  - workflow_id: task_finder.fit_v1
+    version: 1
+    input_schema_ref: task_finder.fit_input_v1
+    output_schema_ref: task_finder.fit_output_v1
+    # A11 + A02, each reading scenario.input directly (the steps are independent; list order is
+    # the only ordering). Both judge the same four general criteria, so the literal below appears
+    # twice and a test pins the two copies equal. A01 and A09 are not part of v1: A09 needs
+    # `signals` objects no step produces, and the mapping DSL cannot build them. The task and
+    # profile are echoed into the output so a later Task Finder -> ProposalAI handoff can map
+    # task_text and freelancer_positioning from the artifact. No mapping path indexes an array.
+    steps:
+      - step_id: compare
+        action_config_id: task_finder.compare_v1
+        input_mapping:
+          subject_text: scenario.input.freelancer_positioning
+          reference_text: scenario.input.task_text
+          categories: 'literal:["strong_fit","partial_fit","weak_fit"]'
+          criteria: 'literal:[{"id":"skills_fit","description":"The stated skills of the freelancer and tools cover what the task needs.","weight":3},{"id":"experience_fit","description":"The stated experience of the freelancer is relevant to this kind of task.","weight":2},{"id":"scope_fit","description":"The size and scope of the task fit what the freelancer says they offer.","weight":2},{"id":"constraints_fit","description":"The constraints of the task (deadline, budget, working terms) are compatible with the stated availability and terms of the freelancer.","weight":1}]'
+        output_mapping:
+          context.workflow_output.task_text: scenario.input.task_text
+          context.workflow_output.freelancer_positioning: scenario.input.freelancer_positioning
+          context.workflow_output.comparison: steps.compare.output
+      - step_id: score
+        action_config_id: task_finder.score_v1
+        input_mapping:
+          text_a: scenario.input.task_text
+          text_b: scenario.input.freelancer_positioning
+          rubric: 'literal:[{"id":"skills_fit","description":"The stated skills of the freelancer and tools cover what the task needs.","weight":3},{"id":"experience_fit","description":"The stated experience of the freelancer is relevant to this kind of task.","weight":2},{"id":"scope_fit","description":"The size and scope of the task fit what the freelancer says they offer.","weight":2},{"id":"constraints_fit","description":"The constraints of the task (deadline, budget, working terms) are compatible with the stated availability and terms of the freelancer.","weight":1}]'
+        output_mapping:
+          context.workflow_output.match: steps.score.output
