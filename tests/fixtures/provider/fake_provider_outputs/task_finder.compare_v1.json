@@ -1,6 +1,6 @@
 {
   "response_json": {
-    "verdict": "partial_fit",
+    "verdict": "weak_fit",
     "confidence": 0.75,
     "deltas": [
       {
@@ -15,8 +15,8 @@
       },
       {
         "criterion_id": "scope_fit",
-        "status": "partial",
-        "evidence": "The task asks for a full rebuild plus a mobile app; the profile offers web front ends only."
+        "status": "mismatch",
+        "evidence": "The task requires a mobile app, and the profile says web only, no mobile apps, so a required part of the task is outside the offered scope."
       },
       {
         "criterion_id": "constraints_fit",
@@ -24,7 +24,7 @@
         "evidence": "The task states a six-week timeline and a fixed budget; the profile gives no rate or working terms and only says part-time availability from next month, so compatibility is not established."
       }
     ],
-    "rationale": "Skills and experience line up, but the mobile app part is outside the offered scope and the budget and timeline compatibility is not established, so the fit is partial."
+    "rationale": "Skills and experience line up, but the task requires a mobile app and the profile excludes mobile work, so the fit is weak despite the otherwise good match."
   },
   "input_tokens": 430,
   "output_tokens": 170,

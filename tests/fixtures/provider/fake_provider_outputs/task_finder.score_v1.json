@@ -13,8 +13,8 @@
       },
       {
         "criterion_id": "scope_fit",
-        "score": 60,
-        "rationale": "The web part fits the offer, but the mobile app part falls outside it."
+        "score": 40,
+        "rationale": "The web part fits the offer, but the required mobile app is explicitly outside it."
       },
       {
         "criterion_id": "constraints_fit",
@@ -22,7 +22,7 @@
         "rationale": "The timeline is stated, but the profile gives no rate, terms or full-time availability to confirm the constraints are compatible."
       }
     ],
-    "score": 69,
+    "score": 64,
     "strengths": [
       "Core skills match the task's stack.",
       "Directly relevant dashboard experience."

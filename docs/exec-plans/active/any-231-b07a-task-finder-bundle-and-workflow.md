@@ -119,6 +119,11 @@ python scripts/agent/runner.py full-check
   `copy_result` event; the kernel-copy sync test compares limits; `test_validate_configs.py` lists
   `task_finder`.
 
+- 2026-10-07: review follow-up. The happy compare fixture marks `scope_fit` as `mismatch` (the
+  task requires a mobile app, the profile says web only), so its verdict is `weak_fit`; the happy
+  score fixture's `scope_fit` is 40 and the total 64. The happy path now exercises `weak_fit`
+  and the weak-input path `partial_fit`.
+
 ## Open questions
 
 - Owner: confirm A01/A09 stay out of v1, and whether the input echo should stay (if it is
