@@ -8,6 +8,7 @@ renderer_contract:
       parts:
         - fit_score
         - verdict
+        - verdict_confidence
         - criteria_comparison
         - criterion_scores
         - strengths
@@ -25,9 +26,14 @@ renderer_contract:
     - part_id: verdict
       field: comparison.verdict
       description: >-
-        `verdict` (strong_fit | partial_fit | weak_fit) with `confidence`. It is judged on four
-        general criteria (skills_fit, experience_fit, scope_fit, constraints_fit) only; the
-        renderer must not call it a check of the task's stated requirements.
+        `verdict` (strong_fit | partial_fit | weak_fit). It is judged on four general criteria
+        (skills_fit, experience_fit, scope_fit, constraints_fit) only; the renderer must not call
+        it a check of the task's stated requirements.
+    - part_id: verdict_confidence
+      field: comparison.confidence
+      description: >-
+        The comparison's 0-1 `confidence` in the verdict, shown next to `verdict`. Display only:
+        it is not part of the copy-ready text.
     - part_id: criteria_comparison
       field: comparison.deltas
       description: >-

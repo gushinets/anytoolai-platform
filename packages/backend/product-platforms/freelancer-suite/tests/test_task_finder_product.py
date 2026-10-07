@@ -377,14 +377,9 @@ def test_renderer_contract_agrees_with_workflow_and_scenario() -> None:
     assert rendered.isdisjoint(contract["excluded_fields"])
     # Every property of the two atom outputs is shown by some part.
     fields = {parts[p]["field"] for p in entry["parts"]}
-    assert {"comparison.verdict", "comparison.deltas", "comparison.rationale"} <= fields
-    assert {
-        "match.score",
-        "match.criterion_scores",
-        "match.strengths",
-        "match.gaps",
-        "match.overall_rationale",
-    } <= fields
+    for holder in ("comparison", "match"):
+        for name in schema["properties"][holder]["properties"]:
+            assert f"{holder}.{name}" in fields, f"{holder}.{name} is not rendered by any part"
     assert (
         contract["next_action"]
         in _load_yaml("scenarios.yaml")["scenarios"][0]["allowed_next_actions"]
