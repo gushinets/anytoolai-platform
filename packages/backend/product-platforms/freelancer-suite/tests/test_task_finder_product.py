@@ -371,15 +371,26 @@ def test_renderer_contract_agrees_with_workflow_and_scenario() -> None:
     assert entry["output_schema_ref"] == _workflow()["output_schema_ref"] == OUTPUT_SCHEMA_REF
     assert set(entry["parts"]) == set(parts)
     assert all(_resolves(schema, parts[p]["field"]) for p in entry["parts"])
-    # Every top-level output property is either rendered or explicitly excluded (the echoed inputs).
-    rendered = {parts[p]["field"].split(".")[0] for p in entry["parts"]}
-    assert rendered | set(contract["excluded_fields"]) == set(schema["properties"])
-    assert rendered.isdisjoint(contract["excluded_fields"])
-    # Every property of the two atom outputs is shown by some part.
+    # Every output property is either rendered by a part or explicitly excluded, never both.
+    # Exclusions are top-level names (the echoed inputs) or dotted paths into an atom output.
+    excluded = set(contract["excluded_fields"])
     fields = {parts[p]["field"] for p in entry["parts"]}
+    top_level = set(schema["properties"])
+    assert {e for e in excluded if "." not in e} <= top_level
     for holder in ("comparison", "match"):
         for name in schema["properties"][holder]["properties"]:
-            assert f"{holder}.{name}" in fields, f"{holder}.{name} is not rendered by any part"
+            path = f"{holder}.{name}"
+            assert (path in fields) != (path in excluded), path
+    assert {e for e in excluded if "." in e} <= {
+        f"{holder}.{name}"
+        for holder in ("comparison", "match")
+        for name in schema["properties"][holder]["properties"]
+    }
+    rendered_top = {f.split(".")[0] for f in fields}
+    assert rendered_top | {e for e in excluded if "." not in e} == top_level
+    # The model's self-estimate is deliberately not displayed (A11: not a calibrated probability).
+    assert "comparison.confidence" in excluded
+    assert "confidence" not in " ".join(parts["verdict"]["description"].split())
     assert (
         contract["next_action"]
         in _load_yaml("scenarios.yaml")["scenarios"][0]["allowed_next_actions"]
