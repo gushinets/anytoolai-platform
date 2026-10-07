@@ -1,0 +1,36 @@
+{
+  "response_json": {
+    "verdict": "partial_fit",
+    "confidence": 0.3,
+    "deltas": [
+      {
+        "criterion_id": "skills_fit",
+        "status": "partial",
+        "evidence": "The task names no required skills and the profile names no specific skills, so the skills fit is not stated either way."
+      },
+      {
+        "criterion_id": "experience_fit",
+        "status": "partial",
+        "evidence": "The profile gives no past work and the task does not describe its kind of work, so the experience fit is not stated."
+      },
+      {
+        "criterion_id": "scope_fit",
+        "status": "partial",
+        "evidence": "The task does not describe its scope and the profile does not describe an offer, so the scope fit is not stated either way."
+      },
+      {
+        "criterion_id": "constraints_fit",
+        "status": "partial",
+        "evidence": "Neither text states a deadline, budget or availability, so compatibility is not stated."
+      }
+    ],
+    "rationale": "Both texts are too vague to judge anything: nothing is stated either way, so the fit is partial with low confidence rather than a conflict."
+  },
+  "input_tokens": 120,
+  "output_tokens": 120,
+  "latency_ms": 10,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "task_finder.compare_v1.weak_input"
+  }
+}

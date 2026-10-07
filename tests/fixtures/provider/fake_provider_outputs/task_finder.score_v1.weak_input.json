@@ -1,0 +1,40 @@
+{
+  "response_json": {
+    "criterion_scores": [
+      {
+        "criterion_id": "skills_fit",
+        "score": 30,
+        "rationale": "No required skills are named in the task, so no skills match can be shown."
+      },
+      {
+        "criterion_id": "experience_fit",
+        "score": 20,
+        "rationale": "The profile gives no past work to compare with the task."
+      },
+      {
+        "criterion_id": "scope_fit",
+        "score": 40,
+        "rationale": "The task's scope is not described, so fit with the offer is unclear."
+      },
+      {
+        "criterion_id": "constraints_fit",
+        "score": 40,
+        "rationale": "Neither text states constraints, so compatibility cannot be confirmed."
+      }
+    ],
+    "score": 31,
+    "strengths": [],
+    "gaps": [
+      "The task names no required skills.",
+      "The profile gives no past work."
+    ],
+    "overall_rationale": "Both texts say too little to support a fit; the score stays low rather than guessing."
+  },
+  "input_tokens": 120,
+  "output_tokens": 140,
+  "latency_ms": 10,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "task_finder.score_v1.weak_input"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "response_json": {
+    "verdict": "weak_fit",
+    "confidence": 0.75,
+    "deltas": [
+      {
+        "criterion_id": "skills_fit",
+        "status": "match",
+        "evidence": "The task needs React and TypeScript; the profile lists both as core skills."
+      },
+      {
+        "criterion_id": "experience_fit",
+        "status": "match",
+        "evidence": "The profile cites five years of dashboard work, which is the kind of task described."
+      },
+      {
+        "criterion_id": "scope_fit",
+        "status": "mismatch",
+        "evidence": "The task requires a mobile app, and the profile says web only, no mobile apps, so a required part of the task is outside the offered scope."
+      },
+      {
+        "criterion_id": "constraints_fit",
+        "status": "partial",
+        "evidence": "The task states a six-week timeline and a fixed budget; the profile gives no rate or working terms and only says part-time availability from next month, so compatibility is not established."
+      }
+    ],
+    "rationale": "Skills and experience line up, but the task requires a mobile app and the profile excludes mobile work, so the fit is weak despite the otherwise good match."
+  },
+  "input_tokens": 430,
+  "output_tokens": 170,
+  "latency_ms": 10,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "task_finder.compare_v1"
+  }
+}

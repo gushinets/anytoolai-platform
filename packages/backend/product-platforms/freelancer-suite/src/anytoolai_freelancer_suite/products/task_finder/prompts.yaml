@@ -1,0 +1,11 @@
+prompts:
+  - prompt_ref: task_finder.compare.v1
+    version: 1
+    template_path: prompts/compare.v1.md
+    input_variables: []
+    output_schema_ref: kernel.schemas.compare_classify_output_v1
+  - prompt_ref: task_finder.score.v1
+    version: 1
+    template_path: prompts/score.v1.md
+    input_variables: []
+    output_schema_ref: kernel.schemas.score_match_output_v1

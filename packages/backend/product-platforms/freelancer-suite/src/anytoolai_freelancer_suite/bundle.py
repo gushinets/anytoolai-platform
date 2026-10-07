@@ -7,10 +7,11 @@ from anytoolai_platform_sdk import ProductBundle
 
 class FreelancerSuiteBundle(ProductBundle):
     """MVP-B Freelancer Suite. ProposalAI (ANY-227, B02a), Client Update Writer (ANY-413), Brief
-    Decoder (ANY-232, B08a) and Acceptance Builder (ANY-228, B03a) are the implemented product
-    roots so far, in config_roots() order -- Client Update Writer landed ahead of the committed
-    release order and isn't part of it (see this package's README for the 5-product release
-    order, ANY-452, and its own capability-backlog note). A product only appears in config_roots() once its own
+    Decoder (ANY-232, B08a), Acceptance Builder (ANY-228, B03a) and Task Finder (ANY-231, B07a) are
+    the implemented product roots so far, in config_roots() order -- Client Update Writer,
+    Acceptance Builder and Task Finder landed ahead of the committed release order and aren't part
+    of it (see this package's README for the 5-product release order, ANY-452, and its own
+    capability-backlog note). A product only appears in config_roots() once its own
     bundle-and-workflow issue lands a real product directory here."""
 
     bundle_id = "freelancer_suite"
@@ -21,4 +22,5 @@ class FreelancerSuiteBundle(ProductBundle):
             self._package_dir() / "products" / "client_update_writer",
             self._package_dir() / "products" / "brief_decoder",
             self._package_dir() / "products" / "acceptance_builder",
+            self._package_dir() / "products" / "task_finder",
         ]

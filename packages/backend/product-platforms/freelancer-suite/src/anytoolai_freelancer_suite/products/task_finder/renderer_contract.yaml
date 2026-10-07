@@ -1,0 +1,101 @@
+renderer_contract:
+  # One scenario, one output shape. apps/web-mirror (ANY-247) is built against this file; this
+  # file pins the contract, not the renderer. v1 does not produce structured extraction or an
+  # angle (A01/A09 are not part of this workflow).
+  scenarios:
+    - scenario_id: task_finder.fit_v1
+      output_schema_ref: task_finder.fit_output_v1
+      parts:
+        - fit_score
+        - verdict
+        - criteria_comparison
+        - criterion_scores
+        - strengths
+        - gaps
+        - rationale
+        - score_rationale
+  parts:
+    - part_id: fit_score
+      field: match.score
+      description: >-
+        The 0-100 fit score (weighted average of the four criterion scores). It is a separate
+        measure from `verdict`: two independent model calls produce them, and the output schema
+        does not force them to agree. The renderer shows both as two indicators, in words and not
+        by colour alone, and never reconciles or hides a disagreement.
+    - part_id: verdict
+      field: comparison.verdict
+      description: >-
+        `verdict` (strong_fit | partial_fit | weak_fit). It is judged on four general criteria
+        (skills_fit, experience_fit, scope_fit, constraints_fit) only; the renderer must not call
+        it a check of the task's stated requirements.
+    - part_id: criteria_comparison
+      field: comparison.deltas
+      description: >-
+        One row per general criterion with its comparison `status` and `evidence`. The output
+        schema pins exactly one entry per criterion id but not their array order, so the renderer
+        orders the rows by `criterion_id` as skills_fit, experience_fit, scope_fit,
+        constraints_fit. These statuses come from a different model call than the scores below
+        and may disagree with them; the renderer shows the two lists separately and never joins
+        a status and a score into one row.
+    - part_id: criterion_scores
+      field: match.criterion_scores
+      description: >-
+        One row per criterion with its 0-100 `score` and `rationale`, ordered by `criterion_id`
+        like `criteria_comparison`. Independent of that list (see there).
+    - part_id: strengths
+      field: match.strengths
+      description: Where the freelancer fits the task. Empty renders as "not specified", never as a claim of completeness.
+    - part_id: gaps
+      field: match.gaps
+      description: Where the freelancer falls short. Empty renders as "not specified", never as "no gaps".
+    - part_id: rationale
+      field: comparison.rationale
+      description: The comparison's plain-sentence explanation of the verdict.
+    - part_id: score_rationale
+      field: match.overall_rationale
+      description: The scorer's plain-sentence explanation of the fit score.
+  # The copy-ready text is composed deterministically from the structured fields; there is no
+  # free-text document in this output. The renderer (ANY-247) implements this composition.
+  copy_text:
+    authority: structured_fields_only
+    not_copyable_fields: []
+    blocks:
+      - block_id: fit
+        title: Fit
+        source: match.score
+        body: >-
+          "Fit score: <score>/100. " then `match.overall_rationale`; then "Verdict: " followed by
+          the verdict in words (strong fit | partial fit | weak fit) and a full stop, then
+          `comparison.rationale`. The two are separate statements and are never reconciled.
+        also_uses: [comparison.verdict, comparison.rationale, match.overall_rationale]
+      - block_id: criteria
+        title: Criteria
+        source: comparison.deltas
+        body: >-
+          One line per delta, ordered by `criterion_id` as skills_fit, experience_fit, scope_fit,
+          constraints_fit, as "<Label>: <status>. <evidence>" with the labels Skills fit,
+          Experience fit, Scope fit, Constraints fit.
+      - block_id: criterion_scores
+        title: Criterion scores
+        source: match.criterion_scores
+        body: >-
+          One line per entry, in the same criterion order and with the same labels, as
+          "<Label>: <score>/100. <rationale>".
+      - block_id: strengths
+        title: Strengths
+        source: match.strengths
+        body: One "- <item>" line per item, in array order.
+        when_empty: Not specified.
+      - block_id: gaps
+        title: Gaps
+        source: match.gaps
+        body: One "- <item>" line per item, in array order.
+        when_empty: Not specified.
+  next_action: copy_result
+  # task_text and freelancer_positioning: echoed inputs that exist only so a later handoff can map
+  # them from the artifact; never rendered or copied.
+  # comparison.confidence: the model's own 0-1 estimate. A11 defines it as a relative signal, not
+  # a calibrated probability, and this product defines no calibration, so showing it beside the
+  # verdict would read as a reliability score. It stays in the artifact and is never displayed.
+  excluded_fields: [task_text, freelancer_positioning, comparison.confidence]
+  # Activation: the first display of the fit score. It is always present, so there is no empty case.

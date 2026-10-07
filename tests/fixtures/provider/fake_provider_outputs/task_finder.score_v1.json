@@ -1,0 +1,43 @@
+{
+  "response_json": {
+    "criterion_scores": [
+      {
+        "criterion_id": "skills_fit",
+        "score": 80,
+        "rationale": "React and TypeScript, both required by the task, are core skills in the profile."
+      },
+      {
+        "criterion_id": "experience_fit",
+        "score": 70,
+        "rationale": "Five years of dashboard work is directly relevant to the task."
+      },
+      {
+        "criterion_id": "scope_fit",
+        "score": 40,
+        "rationale": "The web part fits the offer, but the required mobile app is explicitly outside it."
+      },
+      {
+        "criterion_id": "constraints_fit",
+        "score": 50,
+        "rationale": "The timeline is stated, but the profile gives no rate, terms or full-time availability to confirm the constraints are compatible."
+      }
+    ],
+    "score": 64,
+    "strengths": [
+      "Core skills match the task's stack.",
+      "Directly relevant dashboard experience."
+    ],
+    "gaps": [
+      "Mobile app part is outside the offered scope.",
+      "Budget and working terms are not covered by the profile."
+    ],
+    "overall_rationale": "Strong skills and relevant experience; the mobile app scope is the main gap."
+  },
+  "input_tokens": 430,
+  "output_tokens": 200,
+  "latency_ms": 10,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "task_finder.score_v1"
+  }
+}

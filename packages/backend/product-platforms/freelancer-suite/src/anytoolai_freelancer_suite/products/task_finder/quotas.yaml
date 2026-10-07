@@ -1,0 +1,7 @@
+# Two provider calls per run (A11, A02). The limit is a starting value, not a validated one.
+quota_policies:
+  - quota_policy_id: task_finder.guest_quota_v1
+    unit: scenario_run
+    limit_count: 3
+    period: lifetime
+    dimension: product
