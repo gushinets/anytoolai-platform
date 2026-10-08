@@ -2,13 +2,12 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-10-08
 - Last updated: 2026-10-08
-- Review date: 2026-10-15
-- Next action: run full-check and the Client Update Writer smoke, then open the PR.
-- Blocker: none
+- Completed: 2026-10-08
+- Next action: none — implementation and review rounds are done; the PR awaits approval and merge.
 
 ## Goal
 
