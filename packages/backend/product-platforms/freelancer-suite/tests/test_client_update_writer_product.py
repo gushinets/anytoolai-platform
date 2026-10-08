@@ -432,7 +432,7 @@ def test_prepaid_request_reply_step_intent_preserves_urgency_and_correct_confirm
     intent = reply_step["input_mapping"]["intent"].lower()
 
     assert "confirm receipt" not in intent
-    assert "promptly" in intent
+    assert "promptly send the prepayment" in intent
 
 
 # Code review finding (xhigh #5): the plain `constraints` mapping on each mode's compose_reply
@@ -561,3 +561,39 @@ def test_prepaid_request_situation_puts_notes_last_and_prompt_forbids_invented_d
 
     prompt = _load_prompt_template("client_update_writer.prepaid_request_compose_reply.v1")
     assert "If there is no `Due date:` line, do not state or imply any date" in prompt
+
+
+# Disputed or unagreed terms must yield a terms-confirmation message, not a payment ask (for
+# example: notes say the deposit is disputed and no payment demand may go out until confirmed,
+# while the form still says "USD 1,200 by 7 October 2026"). Model behavior is only provable live
+# (ANY-604); the fake provider returns one fixed response, so the rule text is what is pinned.
+def test_prepaid_request_intent_does_not_unconditionally_ask_for_payment() -> None:
+    workflow = _workflow_by_id()["client_update_writer.prepaid_request_v1"]
+    (step,) = workflow["steps"]
+    intent = step["input_mapping"]["intent"].lower()
+
+    assert "send the requested prepayment" not in intent
+    assert "otherwise a request to confirm the terms" in intent
+    # The agreed/unagreed criteria live in the prompt only; the goal must not restate them.
+    assert "disputed" not in intent and "not specified" not in intent
+
+
+def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
+    prompt = " ".join(
+        _load_prompt_template("client_update_writer.prepaid_request_compose_reply.v1").split()
+    )
+
+    # Explicit-signal trigger, default is a payment request, silence is not a signal.
+    assert "Default to a payment request; switch only on an explicit signal" in prompt
+    assert "is not agreed, is disputed or awaits confirmation" in prompt
+    assert "placeholder such as \"TBD\"" in prompt
+    # Not triggers: missing due date, details still to come.
+    assert "These are never a reason to ask for confirmation: a missing due date" in prompt
+    # What a confirmation may and may not contain.
+    assert "Do not ask the client to pay or remit" in prompt
+    assert "anything the notes call agreed stays stated as agreed" in prompt
+    assert "which comes before any payment" in prompt
+    assert "except the open points of a terms confirmation" in prompt
+    # call_to_action per kind: never a payment report in a confirmation, no repeated question.
+    assert "never ask the client to report a payment" in prompt
+    assert "do not repeat them or the question" in prompt
