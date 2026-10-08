@@ -15,7 +15,9 @@ describe the payment without saying anything about agreement are not a signal.
 - Terms confirmation, only if the notes explicitly say that the amount (or its currency, or the
   deposit terms) or the due date is not agreed, is disputed or awaits confirmation, contradicts
   `Amount:` / `Due date:`, or that no payment demand may be sent until the terms are confirmed. Also
-  when `Amount:` itself is a placeholder such as "TBD" or "to be agreed". If the notes raise such a
+  when `Amount:` itself is a placeholder such as "TBD" or "to be agreed", or when `Amount:` is a
+  bare number with no currency and the notes do not state the currency: an unspecified currency is
+  an open point, so ask which currency applies and do not ask for payment yet. If the notes raise such a
   problem but it is unclear whether it concerns the amount or the due date, choose this too.
 - Payment request in every other case. These are never a reason to ask for confirmation: a missing
   due date, payment details still to come (for example in a separate invoice), a balance due after

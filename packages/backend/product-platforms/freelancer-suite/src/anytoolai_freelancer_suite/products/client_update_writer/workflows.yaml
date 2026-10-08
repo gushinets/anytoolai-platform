@@ -34,7 +34,7 @@ workflows:
         action_config_id: client_update_writer.prepaid_request_compose_reply_v1
         input_mapping:
           situation: "template:Amount: {scenario.input.billing_context.amount}\nDue date: {?scenario.input.billing_context.due_date}\nBilling notes: {scenario.input.billing_context.notes}"
-          intent: 'literal:"Write the message the billing notes call for: a request to promptly send the prepayment and let you know once it has been sent when the payment terms are agreed, otherwise a request to confirm the terms that does not ask for payment."'
+          intent: 'literal:"Write the prepayment message the billing notes call for, following the prompt rules on what to ask of the client; when it asks for payment, ask the client to promptly send the prepayment and let you know once it has been sent."'
           tone: scenario.input.tone
           constraints: '?scenario.input.constraints'
         output_mapping:

@@ -573,7 +573,8 @@ def test_prepaid_request_intent_does_not_unconditionally_ask_for_payment() -> No
     intent = step["input_mapping"]["intent"].lower()
 
     assert "send the requested prepayment" not in intent
-    assert "otherwise a request to confirm the terms" in intent
+    assert "following the prompt rules" in intent
+    assert "confirm" not in intent  # the alternative message kind is chosen by the prompt
     # The agreed/unagreed criteria live in the prompt only; the goal must not restate them.
     assert "disputed" not in intent and "not specified" not in intent
 
@@ -593,6 +594,9 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     assert "Do not ask the client to pay or remit" in prompt
     assert "anything the notes call agreed stays stated as agreed" in prompt
     assert "which comes before any payment" in prompt
+    # Unspecified currency is a trigger (not just permission to ask): bare number, notes silent.
+    assert "a bare number with no currency and the notes do not state the currency" in prompt
+    assert "an unspecified currency is an open point" in prompt
     assert "except the open points of a terms confirmation" in prompt
     # call_to_action per kind: never a payment report in a confirmation, no repeated question.
     assert "never ask the client to report a payment" in prompt
