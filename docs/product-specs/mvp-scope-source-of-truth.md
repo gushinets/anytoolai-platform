@@ -399,6 +399,10 @@ Client Surfaces enablement, including the allowlisted `POST /v1/client-events` c
 MVP-A2 and may change `apps/platform-api`, the platform event taxonomy/service, and shared frontend
 clients without introducing product-specific backend behavior.
 
+Exception: ANY-601 added one product-neutral Platform Core mapping DSL capability, the
+`template:` `input_mapping` source (`docs/architecture/workflow-model.md`). Products may use it; any
+further mapping DSL change still needs its own platform-level ticket.
+
 ## MVP-B Validation Set And Order
 
 1. ProposalAI: `A06` for v1; `A09 -> A06` remains a later option.

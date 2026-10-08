@@ -107,6 +107,10 @@ Product-neutral Client Surfaces enablement may add the allowlisted `POST /v1/cli
 contract, platform event types, shared client support, and tests. That work belongs to MVP-A2 and is
 not product-specific MVP-B runtime behavior.
 
+Exception: ANY-601 added one product-neutral Platform Core mapping DSL capability, the
+`template:` `input_mapping` source (`docs/architecture/workflow-model.md`). Products may use it; any
+further mapping DSL change still needs its own platform-level ticket.
+
 If a product needs a missing generic execution capability, update the controlling platform contract
 explicitly rather than hiding the change inside the product bundle. If a second product repeats
 frontend behavior, extract only that proven repetition into the shared web runtime.
