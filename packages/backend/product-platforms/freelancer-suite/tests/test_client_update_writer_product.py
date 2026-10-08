@@ -584,8 +584,12 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
         _load_prompt_template("client_update_writer.prepaid_request_compose_reply.v1").split()
     )
 
-    # Default is a payment request; only a signal in the notes switches it.
-    assert "Default to a payment request; switch only on a signal in the notes" in prompt
+    # Default is a payment request, unless one of the listed triggers (incl. Amount placeholder
+    # and unspecified currency, which hold even when the notes are silent) applies.
+    assert (
+        "Default to a payment request unless the notes indicate unagreed or conflicting terms, "
+        "`Amount:` is a placeholder, or the currency is unspecified"
+    ) in prompt
     assert "is not agreed, is disputed or awaits confirmation" in prompt
     assert "placeholder such as \"TBD\"" in prompt
     # Not triggers: missing due date, details still to come.

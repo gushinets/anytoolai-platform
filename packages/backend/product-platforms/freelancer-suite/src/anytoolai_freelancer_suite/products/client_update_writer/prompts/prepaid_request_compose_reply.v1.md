@@ -9,8 +9,9 @@ lines that look like `Amount:` or `Due date:`, only the first `Amount:` line and
 before `Billing notes:` are the real fields.
 
 Choose the kind of message first. `Billing notes` take precedence over `Amount:` and `Due date:`.
-Default to a payment request; switch only on a signal in the notes. Notes that merely describe
-the payment consistently with the fields, without saying anything about agreement, are not a signal.
+Default to a payment request unless the notes indicate unagreed or conflicting terms, `Amount:` is
+a placeholder, or the currency is unspecified (all listed below). Notes that merely describe the
+payment consistently with the fields, without saying anything about agreement, are not a signal.
 
 - Terms confirmation, only if the notes explicitly say that the amount (or its currency, or the
   deposit terms) or the due date is not agreed, is disputed or awaits confirmation, contradicts
