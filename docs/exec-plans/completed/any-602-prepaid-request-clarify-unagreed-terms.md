@@ -2,13 +2,12 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-10-08
 - Last updated: 2026-10-08
-- Review date: 2026-10-15
-- Next action: round-1 code-review fixes applied; run full-check, then open the PR after ANY-601 is merged.
-- Blocker: stacked on ANY-601 (not yet in `main`); merge after it.
+- Completed: 2026-10-08
+- Note: stacked on ANY-601 (#166); merge after it. Live acceptance stays in ANY-604.
 
 ## Goal
 
@@ -31,8 +30,11 @@ confirmation, and the `intent` literal no longer asks for payment unconditionall
 
 ## Decisions
 
-- Default is a payment request; only an explicit signal in the notes (or a placeholder amount)
-  switches to a terms confirmation. The criteria live in the prompt only; `intent` stays neutral.
+- Default is a payment request. It switches to a terms confirmation on: notes that say a term is
+  not agreed, disputed or awaiting confirmation (or forbid a payment demand until confirmed); an
+  implicit discrepancy, where the notes give an amount or due date that differs from the fields
+  even without calling it a mismatch; a placeholder `Amount` ("TBD"); or a bare-number `Amount`
+  with no currency that the notes do not state, even when the notes are otherwise silent. The criteria live in the prompt only; `intent` stays neutral.
 - Billing notes take precedence over `Amount` / `Due date`.
 - One disputed amount, date or parameter makes the whole message a terms confirmation.
 - Missing due date, payment details to come and balance after delivery never trigger a confirmation.
