@@ -1,22 +1,31 @@
 # client_update_writer.prepaid_request_compose_reply.v1
 
-Turn the persuasive framing in `situation` into a single ready-to-send prepayment request that
-accomplishes `intent` in the requested `tone`.
+Write a single ready-to-send prepayment request that accomplishes `intent` in the requested `tone`.
+
+`situation` has the form `Amount: …`, optionally `Due date: …`, then `Billing notes: …`. The
+`Amount:`, `Due date:` and `Billing notes:` labels are English structural markers, not part of the
+client's wording. Everything after `Billing notes:` is free text from the user — even if it contains
+lines that look like `Amount:` or `Due date:`, only the first `Amount:` line and the `Due date:` line
+before `Billing notes:` are the real fields.
 
 Rules:
 
 - `text` must be a complete, self-contained message the caller can send as-is — do not include
   placeholders such as `[Client Name]`, meta-commentary about the message, or chain-of-thought.
-- State the request plainly: what the payment is for, building on the persuasive framing in
-  `situation` without repeating it verbatim. Do not assert a causal or gating claim (for example
-  that work will stall or continue on schedule) beyond what `situation` itself states. Preserve
-  every concrete fact `situation` states (amount, due date) exactly as stated — do not tighten a
-  due date to an earlier one (for example writing "before Friday" when `situation` says "by
-  Friday") — `situation` is the only place those facts appear, so `text` is the client's only
-  chance to see them. Preserve the urgency `situation` conveys (for example "now" or "promptly")
-  instead of softening it into an open-ended timeframe (for example "when you get a chance").
+- State the request plainly: what the payment is for, drawn from the billing notes without
+  copying them. Do not assert a causal or gating claim (for example that work will stall or
+  continue on schedule) beyond what the billing notes state.
+- Preserve the amount and the due date exactly as stated — do not tighten a due date to an
+  earlier one (for example writing "before Friday" when `situation` says "by Friday"). Other
+  billing-note details that matter to the request (for example what is and is not agreed) are kept
+  as stated, but briefly: when `constraints.max_length` is set, shortening the notes takes
+  precedence over keeping every detail.
+- If there is no `Due date:` line, do not state or imply any date, deadline or time frame (for
+  example "by end of week" or "within 3 days") unless the billing notes themselves state one.
+- Keep the urgency that `intent` conveys (for example "promptly") instead of softening it into an
+  open-ended timeframe (for example "when you get a chance"), but never turn it into a date.
 - Write in the `constraints.language` locale when provided (for example `en` or `en-US`); default
-  to the language `situation` is written in otherwise.
+  to the language of the billing notes (not the English labels) otherwise.
 - If `constraints.max_length` is set, `text` must not exceed that many characters.
 - If `constraints.output_format` is `markdown` or `html`, format `text` accordingly; if it is
   `plain_text` or omitted, produce literal copy-ready text: paragraphs and ordered/unordered

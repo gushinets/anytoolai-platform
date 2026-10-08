@@ -122,11 +122,7 @@ def test_product_directory_contains_no_python_or_forbidden_provider_references()
     [
         ("update", "client_update_writer.update_v1", ("text.compose_reply",)),
         ("reply_draft", "client_update_writer.reply_draft_v1", ("text.compose_reply",)),
-        (
-            "prepaid_request",
-            "client_update_writer.prepaid_request_v1",
-            ("text.compose_persuasive_text", "text.compose_reply"),
-        ),
+        ("prepaid_request", "client_update_writer.prepaid_request_v1", ("text.compose_reply",)),
     ],
 )
 def test_each_mode_workflow_uses_only_generic_atom_action_types(
@@ -224,10 +220,6 @@ _ACTION_CONFIG_OUTPUT_SCHEMAS = (
     (
         "client_update_writer.reply_draft_compose_reply_v1",
         "kernel.schemas.compose_reply_output_v1",
-    ),
-    (
-        "client_update_writer.prepaid_request_compose_persuasive_text_v1",
-        "kernel.schemas.compose_persuasive_text_output_v1",
     ),
     (
         "client_update_writer.prepaid_request_compose_reply_v1",
@@ -365,7 +357,6 @@ _UNGROUNDED_CAUSALITY_PHRASES = ("before work continues", "on schedule", "keeps 
 @pytest.mark.parametrize(
     "action_config_id",
     [
-        "client_update_writer.prepaid_request_compose_persuasive_text_v1",
         "client_update_writer.prepaid_request_compose_reply_v1",
     ],
 )
@@ -393,7 +384,6 @@ _DUE_DATE_TIGHTENING_PATTERN = re.compile(
 @pytest.mark.parametrize(
     "action_config_id",
     [
-        "client_update_writer.prepaid_request_compose_persuasive_text_v1",
         "client_update_writer.prepaid_request_compose_reply_v1",
     ],
 )
@@ -404,8 +394,8 @@ def test_prepaid_request_happy_fixture_does_not_tighten_the_due_date(action_conf
     assert _DUE_DATE_TIGHTENING_PATTERN.search(text) is None, action_config_id
 
 
-# Code review finding: prepaid_request_v1's second step (compose_reply) dropped step 1's
-# "promptly" urgency and phrased its CTA as the client confirming *receipt* -- the client is the
+# Code review finding: prepaid_request_v1's compose_reply step dropped the "promptly"
+# urgency and phrased its CTA as the client confirming *receipt* -- the client is the
 # one sending the payment, not receiving one, so "confirm receipt" addresses the wrong party.
 def test_prepaid_request_reply_step_intent_preserves_urgency_and_correct_confirmation_party() -> (
     None
@@ -418,24 +408,8 @@ def test_prepaid_request_reply_step_intent_preserves_urgency_and_correct_confirm
     assert "promptly" in intent
 
 
-# Code review finding (team lead #2): `?scenario.input...` silently skips an absent source, and the
-# fake provider isn't input-sensitive, so a typo'd/deleted source path here could keep E2E green
-# while dropping language/length/format for a live provider. Pins the exact source paths.
-def test_prepaid_request_persuasive_text_step_maps_constraints_from_expected_sources() -> None:
-    workflow = _workflow_by_id()["client_update_writer.prepaid_request_v1"]
-    persuasive_step = next(
-        step for step in workflow["steps"] if step["step_id"] == "compose_persuasive_text"
-    )
-    mapping = persuasive_step["input_mapping"]
-
-    assert mapping["constraints.language"] == "?scenario.input.constraints.language"
-    assert mapping["constraints.length"] == "?scenario.input.constraints.max_length"
-    assert mapping["constraints.format"] == "?scenario.input.constraints.output_format"
-
-
-# Code review finding (xhigh #5): the per-field constraint mapping above already has a pinning
-# test for compose_persuasive_text; the plain `constraints` mapping on each mode's compose_reply
-# step had none.
+# Code review finding (xhigh #5): the plain `constraints` mapping on each mode's compose_reply
+# step needs a pinning test.
 @pytest.mark.parametrize(
     "workflow_id",
     [
@@ -451,64 +425,32 @@ def test_compose_reply_step_maps_constraints_from_scenario_input(workflow_id: st
     assert reply_step["input_mapping"]["constraints"] == "?scenario.input.constraints"
 
 
-# Code review finding (team lead #2): the compose_reply fixtures repeated the compose_persuasive_text
-# fixture's first sentence verbatim, while prepaid_request_compose_reply.v1.md says to build on
-# `situation` "without repeating it verbatim".
-@pytest.mark.parametrize("fixture_suffix", ["", ".weak_input"])
-def test_prepaid_request_reply_fixture_does_not_repeat_the_situation_verbatim(
-    fixture_suffix: str,
-) -> None:
-    persuasive_text = json.loads(
-        (
-            FIXTURE_ROOT
-            / f"client_update_writer.prepaid_request_compose_persuasive_text_v1{fixture_suffix}.json"
-        ).read_text(encoding="utf-8")
-    )["response_json"]["text"]
-    reply_text = json.loads(
-        (
-            FIXTURE_ROOT
-            / f"client_update_writer.prepaid_request_compose_reply_v1{fixture_suffix}.json"
-        ).read_text(encoding="utf-8")
-    )["response_json"]["text"]
-
-    first_sentence = persuasive_text.split(". ")[0]
-    assert first_sentence not in reply_text, fixture_suffix
+# Code review finding (me #12): the E2E test's amount/due_date assertion doesn't protect the
+# *other* grounded facts the billing notes state (week, phase type, sequence) -- this class of
+# regression (dropping/rewording them while paraphrasing) had already recurred once. Pins that
+# the happy reply keeps all three, independent of exact wording.
+_HAPPY_NOTES_FACTS = ("this week", "development", "starting next")
 
 
-# Code review finding (me #12): the verbatim-repeat check above and the E2E test's amount/due_date
-# assertion don't protect the *other* grounded facts A06 states (week, phase type, sequence) --
-# this exact class of regression (dropping/rewording them while paraphrasing) had already
-# recurred once. Pins that the happy reply keeps all three, independent of exact wording.
-_A06_HAPPY_FRAMING_FACTS = ("this week", "development", "starting next")
-
-
-def test_prepaid_request_happy_reply_preserves_a06_framing_facts() -> None:
+def test_prepaid_request_happy_reply_preserves_notes_facts() -> None:
     reply_text = json.loads(
         (
             FIXTURE_ROOT / "client_update_writer.prepaid_request_compose_reply_v1.json"
         ).read_text(encoding="utf-8")
     )["response_json"]["text"].lower()
 
-    for fact in _A06_HAPPY_FRAMING_FACTS:
+    for fact in _HAPPY_NOTES_FACTS:
         assert fact in reply_text, fact
 
 
-def test_prepaid_request_weak_fixture_preserves_urgency_across_both_steps() -> None:
-    persuasive_text = json.loads(
-        (
-            FIXTURE_ROOT
-            / "client_update_writer.prepaid_request_compose_persuasive_text_v1.weak_input.json"
-        ).read_text(encoding="utf-8")
-    )["response_json"]["text"].lower()
+def test_prepaid_request_weak_fixture_preserves_urgency() -> None:
     reply_text = json.loads(
         (
             FIXTURE_ROOT / "client_update_writer.prepaid_request_compose_reply_v1.weak_input.json"
         ).read_text(encoding="utf-8")
     )["response_json"]["text"].lower()
 
-    urgency_words = ("now", "promptly", "today")
-    assert any(word in persuasive_text for word in urgency_words), persuasive_text
-    assert any(word in reply_text for word in urgency_words), reply_text
+    assert any(word in reply_text for word in ("now", "promptly", "today")), reply_text
     assert "when you get a chance" not in reply_text
 
 
@@ -571,13 +513,24 @@ def test_renderer_contract_pins_the_canonical_copy_ready_composition() -> None:
 
 # Code review finding (team lead #1 fix, "me #10"): the deterministic e2e tests run against fixed
 # fake-provider fixtures, so they can't prove a real model honors this prompt's constraints.language/
-# length/format instructions -- only the prompt text itself can regress here undetected. Pins that
-# A06's canonical language/length/format rules (including the html-format case) actually made it
-# into the product-owned prompt, not just the workflow mapping that feeds those fields in.
-def test_prepaid_request_persuasive_text_prompt_documents_language_length_and_format() -> None:
-    prompt = _load_prompt_template("client_update_writer.prepaid_request_compose_persuasive_text.v1")
+# length/format instructions -- only the prompt text itself can regress here undetected.
+def test_prepaid_request_reply_prompt_documents_language_length_and_format() -> None:
+    prompt = _load_prompt_template("client_update_writer.prepaid_request_compose_reply.v1")
 
     assert "constraints.language" in prompt
-    assert "constraints.length" in prompt
-    assert "constraints.format" in prompt
+    assert "constraints.max_length" in prompt
+    assert "constraints.output_format" in prompt
     assert "html" in prompt.lower()
+
+
+# Code review finding: the free-text billing notes must come last in `situation`, so a note line
+# that looks like `Due date: ...` cannot pass for a real field; the prompt must also forbid
+# inventing a date when no `Due date:` line is present.
+def test_prepaid_request_situation_puts_notes_last_and_prompt_forbids_invented_dates() -> None:
+    workflow = _workflow_by_id()["client_update_writer.prepaid_request_v1"]
+    (step,) = workflow["steps"]
+    lines = step["input_mapping"]["situation"].removeprefix("template:").split("\n")
+    assert [line.split(":")[0] for line in lines] == ["Amount", "Due date", "Billing notes"]
+
+    prompt = _load_prompt_template("client_update_writer.prepaid_request_compose_reply.v1")
+    assert "If there is no `Due date:` line, do not state or imply any date" in prompt

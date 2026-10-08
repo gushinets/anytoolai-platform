@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Any
 
 from anytoolai_platform_core.common.literal_source import (
@@ -19,6 +21,8 @@ from anytoolai_platform_core.workflows.errors import (
 )
 
 _OPTIONAL_SOURCE_PREFIX = "?"
+_TEMPLATE_SOURCE_PREFIX = "template:"
+_TEMPLATE_PLACEHOLDER = re.compile(r"\{(\??)([^{}\n]*)\}")
 
 
 @dataclass(frozen=True)
@@ -27,6 +31,7 @@ class WorkflowSourcePath:
     path: tuple[str, ...]
     step_id: str | None = None
     literal_value: Any = None
+    template: str = ""
 
 
 def validate_step_contract(
@@ -146,6 +151,13 @@ def resolve_source_path(
     reference = parse_source_path(source_path)
     if reference.root == "literal":
         return reference.literal_value
+    if reference.root == "template":
+        return _render_template(
+            reference.template,
+            scenario_input=scenario_input,
+            step_outputs=step_outputs,
+            context=context,
+        )
     if reference.root == "scenario_input":
         current: Any = scenario_input
     elif reference.root == "context":
@@ -170,6 +182,10 @@ def parse_source_path(source_path: str) -> WorkflowSourcePath:
                 f"workflow literal source path is not valid JSON: {source_path}"
             ) from exc
         return WorkflowSourcePath(root="literal", path=(), literal_value=literal_value)
+    if source_path.startswith(_TEMPLATE_SOURCE_PREFIX):
+        template = source_path[len(_TEMPLATE_SOURCE_PREFIX) :]
+        _template_placeholders(template)
+        return WorkflowSourcePath(root="template", path=(), template=template)
     _require_plain_dotted_path(source_path)
     parts = source_path.split(".")
     if parts[:2] == ["scenario", "input"]:
@@ -196,7 +212,12 @@ def _validate_input_mapping(
     mapping = _require_mapping_of_strings("input_mapping", input_mapping)
     for target_path, source_path in mapping.items():
         _parse_target_path(target_path)
-        _, effective_source_path = _split_optional_source_path(source_path)
+        is_optional, effective_source_path = _split_optional_source_path(source_path)
+        if is_optional and effective_source_path.startswith(_TEMPLATE_SOURCE_PREFIX):
+            raise WorkflowMappingResolutionError(
+                "`?template:` is not supported; mark individual placeholders optional with "
+                f"`{{?path}}`: {source_path}"
+            )
         reference = parse_source_path(effective_source_path)
         _validate_step_reference(reference, prior_step_ids=prior_step_ids)
 
@@ -237,10 +258,71 @@ def _validate_retry_count(retry_count: Any) -> None:
 
 
 def _reject_literal_when_reference(reference: WorkflowSourcePath) -> None:
-    if reference.root == "literal":
+    if reference.root in ("literal", "template"):
         raise WorkflowConditionEvaluationError(
-            "`when` does not support literal: sources."
+            "`when` does not support literal: or template: sources."
         )
+
+
+@lru_cache(maxsize=None)
+def _template_placeholders(template: str) -> tuple[tuple[bool, str], ...]:
+    """Parse `{path}` / `{?path}` placeholders; stray braces are a config error."""
+    leftover = _TEMPLATE_PLACEHOLDER.sub("", template)
+    if "{" in leftover or "}" in leftover:
+        raise WorkflowMappingResolutionError(
+            f"workflow template has an unbalanced or nested brace: {template}"
+        )
+    placeholders = tuple(
+        (m.group(1) == "?", m.group(2)) for m in _TEMPLATE_PLACEHOLDER.finditer(template)
+    )
+    if not placeholders:
+        raise WorkflowMappingResolutionError(
+            f"workflow template must contain at least one placeholder: {template}"
+        )
+    for _, path in placeholders:
+        if path.startswith((_LITERAL_SOURCE_PREFIX, _TEMPLATE_SOURCE_PREFIX)):
+            raise WorkflowMappingResolutionError(
+                f"workflow template placeholders must be plain paths: {path}"
+            )
+        parse_source_path(path)
+    return placeholders
+
+
+def _render_template(
+    template: str,
+    *,
+    scenario_input: Mapping[str, Any],
+    step_outputs: Mapping[str, Any],
+    context: Mapping[str, Any],
+) -> str:
+    lines: list[str] = []
+    for line in template.split("\n"):
+        parts: list[str] = []
+        position = 0
+        for match in _TEMPLATE_PLACEHOLDER.finditer(line):
+            optional, path = match.group(1) == "?", match.group(2)
+            try:
+                value = resolve_source_path(
+                    path, scenario_input=scenario_input, step_outputs=step_outputs, context=context
+                )
+            except WorkflowSourcePathAbsentError:
+                if not optional:
+                    raise
+                break
+            if isinstance(value, bool) or not isinstance(value, str | int | float):
+                raise WorkflowMappingResolutionError(
+                    f"workflow template placeholder must resolve to a string or number: {path}"
+                )
+            parts.extend((line[position : match.start()], str(value)))
+            position = match.end()
+        else:
+            parts.append(line[position:])
+            lines.append("".join(parts))
+    if not lines:
+        raise WorkflowMappingResolutionError(
+            "workflow template rendered empty: every line depends on an absent optional path"
+        )
+    return "\n".join(lines)
 
 
 def _validate_step_reference(
@@ -248,6 +330,12 @@ def _validate_step_reference(
     *,
     prior_step_ids: tuple[str, ...],
 ) -> None:
+    if reference.root == "template":
+        for _, placeholder_path in _template_placeholders(reference.template):
+            _validate_step_reference(
+                parse_source_path(placeholder_path), prior_step_ids=prior_step_ids
+            )
+        return
     if reference.root == "step_output" and reference.step_id not in prior_step_ids:
         raise WorkflowMappingResolutionError(
             "workflow step references must point to a previous step output."
