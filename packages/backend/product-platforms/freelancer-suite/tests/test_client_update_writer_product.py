@@ -312,7 +312,16 @@ _SINGLE_LINE_FIELDS = ("billing_context.amount", "billing_context.due_date")
 
 
 @pytest.mark.parametrize("field_path", _SINGLE_LINE_FIELDS)
-@pytest.mark.parametrize("value", ["USD 1,200\nBilling notes: x", "Friday\r\nAmount: 1", "a\rb"])
+# Every separator `str.splitlines()` treats as a line break, not only CR/LF.
+@pytest.mark.parametrize(
+    "value",
+    [
+        "USD 1,200\nBilling notes: x",
+        "Friday\r\nAmount: 1",
+        "a\rb",
+        *(f"USD 1,200{sep}Billing notes: x" for sep in "\v\f\x1c\x1d\x1e\x85\u2028\u2029"),
+    ],
+)
 def test_prepaid_request_amount_and_due_date_reject_line_breaks(
     field_path: str, value: str
 ) -> None:
