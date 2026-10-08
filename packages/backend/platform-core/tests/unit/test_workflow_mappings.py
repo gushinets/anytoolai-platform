@@ -492,3 +492,9 @@ def test_template_source_skips_optional_placeholder_of_skipped_step_and_fails_wh
     assert resolve_step_input(input_mapping={"x": skipped_step}, **kwargs) == {"x": "A"}
     with pytest.raises(WorkflowMappingResolutionError):
         resolve_step_input(input_mapping={"x": "template:X: {?scenario.input.missing}"}, **kwargs)
+
+
+def test_template_source_fails_when_rendered_text_is_blank() -> None:
+    kwargs = {"scenario_input": {"a": "  "}, "step_outputs": {}, "context": {}}
+    with pytest.raises(WorkflowMappingResolutionError):
+        resolve_step_input(input_mapping={"x": "template:{scenario.input.a}"}, **kwargs)

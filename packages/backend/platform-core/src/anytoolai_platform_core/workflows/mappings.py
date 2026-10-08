@@ -318,11 +318,12 @@ def _render_template(
         else:
             parts.append(line[position:])
             lines.append("".join(parts))
-    if not lines:
+    rendered = "\n".join(lines)
+    if not rendered.strip():
         raise WorkflowMappingResolutionError(
-            "workflow template rendered empty: every line depends on an absent optional path"
+            "workflow template rendered empty or whitespace-only: every line is dropped or blank"
         )
-    return "\n".join(lines)
+    return rendered
 
 
 def _validate_step_reference(

@@ -14,13 +14,13 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 200,
-          "pattern": "^\\S([\\s\\S]*\\S)?(?!\\n)$"
+          "pattern": "^\\S([^\\r\\n]*\\S)?(?!\\n)$"
         },
         "due_date": {
           "type": "string",
           "minLength": 1,
           "maxLength": 200,
-          "pattern": "^\\S([\\s\\S]*\\S)?(?!\\n)$"
+          "pattern": "^\\S([^\\r\\n]*\\S)?(?!\\n)$"
         }
       },
       "required": ["notes", "amount"],
