@@ -584,8 +584,8 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
         _load_prompt_template("client_update_writer.prepaid_request_compose_reply.v1").split()
     )
 
-    # Explicit-signal trigger, default is a payment request, silence is not a signal.
-    assert "Default to a payment request; switch only on an explicit signal" in prompt
+    # Default is a payment request; only a signal in the notes switches it.
+    assert "Default to a payment request; switch only on a signal in the notes" in prompt
     assert "is not agreed, is disputed or awaits confirmation" in prompt
     assert "placeholder such as \"TBD\"" in prompt
     # Not triggers: missing due date, details still to come.
@@ -594,6 +594,11 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     assert "Do not ask the client to pay or remit" in prompt
     assert "anything the notes call agreed stays stated as agreed" in prompt
     assert "which comes before any payment" in prompt
+    # An implicit discrepancy with the fields is a trigger even without "mismatch"/"not agreed".
+    assert "A plain discrepancy also triggers it, even when the notes never call it a mismatch" in prompt
+    assert "`Amount: USD 1,200` against \"deposit is 50%, USD 1,000\"" in prompt
+    assert "`Due date: 7 October` against \"payment due after delivery on 20 October\"" in prompt
+    assert "A total or balance in the notes is not a discrepancy when `Amount:` matches" in prompt
     # Unspecified currency is a trigger (not just permission to ask): bare number, notes silent.
     assert "a bare number with no currency and the notes do not state the currency" in prompt
     assert "an unspecified currency is an open point" in prompt

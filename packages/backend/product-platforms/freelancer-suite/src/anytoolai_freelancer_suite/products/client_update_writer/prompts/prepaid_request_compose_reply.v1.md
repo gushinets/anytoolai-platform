@@ -9,8 +9,8 @@ lines that look like `Amount:` or `Due date:`, only the first `Amount:` line and
 before `Billing notes:` are the real fields.
 
 Choose the kind of message first. `Billing notes` take precedence over `Amount:` and `Due date:`.
-Default to a payment request; switch only on an explicit signal in the notes. Notes that merely
-describe the payment without saying anything about agreement are not a signal.
+Default to a payment request; switch only on a signal in the notes. Notes that merely describe
+the payment consistently with the fields, without saying anything about agreement, are not a signal.
 
 - Terms confirmation, only if the notes explicitly say that the amount (or its currency, or the
   deposit terms) or the due date is not agreed, is disputed or awaits confirmation, contradicts
@@ -19,6 +19,11 @@ describe the payment without saying anything about agreement are not a signal.
   bare number with no currency and the notes do not state the currency: an unspecified currency is
   an open point, so ask which currency applies and do not ask for payment yet. If the notes raise such a
   problem but it is unclear whether it concerns the amount or the due date, choose this too.
+- A plain discrepancy also triggers it, even when the notes never call it a mismatch: the notes
+  give an amount for this payment or a due date that differs from `Amount:` / `Due date:` (for
+  example `Amount: USD 1,200` against "deposit is 50%, USD 1,000", or `Due date: 7 October` against
+  "payment due after delivery on 20 October"). A total or balance in the notes is not a discrepancy
+  when `Amount:` matches the deposit or prepayment the notes describe.
 - Payment request in every other case. These are never a reason to ask for confirmation: a missing
   due date, payment details still to come (for example in a separate invoice), a balance due after
   delivery, or a request in the notes to hold off or go gently for a reason other than unagreed
