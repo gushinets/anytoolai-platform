@@ -31,14 +31,13 @@ the whole `scenario.input.billing_context` (notes, amount, optional due date) as
 
 - `constraints.max_length` now limits the whole `text` (it includes the follow-up), so the prepaid
   input schema requires `max_length >= 80`; smaller limits are rejected before any LLM call.
-- Rollout: the workflow `version` is stored on each job and the runner rejects a mismatch, so jobs
-  queued under `prepaid_request_v1` version 1 fail once the worker loads version 2. Deploy only
-  after no `created` prepaid jobs remain (same constraint as any graph-shape version bump, e.g.
-  `brief_decoder.decode_v1` version 2).
+- Workflow `version` stays 1: the existing workflow is changed in place, no second version is kept
+  (team lead decision). Jobs already queued under version 1 therefore run the new graph instead
+  of failing the runner's version check.
 
 ## Scope
 
-- `prepaid_request_v1` (version 2): one `compose_persuasive_text` step; the `compose_reply` step,
+- `prepaid_request_v1` (version 1, changed in place): one `compose_persuasive_text` step; the `compose_reply` step,
   its action config, prompt and fake-provider fixtures removed.
 - The product A06 prompt now writes the final client message (no invented dates, language from
   the notes, amount and due date kept exactly).

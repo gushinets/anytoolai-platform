@@ -26,7 +26,7 @@ workflows:
           constraints: '?scenario.input.constraints'
 
   - workflow_id: client_update_writer.prepaid_request_v1
-    version: 2
+    version: 1
     input_schema_ref: client_update_writer.prepaid_request_input_v1
     output_schema_ref: kernel.schemas.compose_reply_output_v1
     steps:
