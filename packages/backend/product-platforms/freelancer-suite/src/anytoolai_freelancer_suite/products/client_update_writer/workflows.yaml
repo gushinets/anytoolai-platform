@@ -34,20 +34,12 @@ workflows:
         action_config_id: client_update_writer.prepaid_request_compose_persuasive_text_v1
         input_mapping:
           context: scenario.input.billing_context
-          objective: 'literal:"Persuade the client to send the requested prepayment promptly, using only the stated context."'
+          objective: 'literal:"Write the final message asking the client to send the requested prepayment promptly and to let you know once it has been sent, using only the stated context."'
           constraints.tone: scenario.input.tone
           # compose_persuasive_text_input.schema.json names these length/format, not
-          # compose_reply_input's max_length/output_format -- same scenario.input.constraints
-          # object as the compose_reply step below, renamed per-field to this step's own schema.
+          # compose_reply_input's max_length/output_format.
           constraints.language: '?scenario.input.constraints.language'
           constraints.length: '?scenario.input.constraints.max_length'
           constraints.format: '?scenario.input.constraints.output_format'
-      - step_id: compose_reply
-        action_config_id: client_update_writer.prepaid_request_compose_reply_v1
-        input_mapping:
-          situation: steps.compose_persuasive_text.output.text
-          intent: 'literal:"Ask the client to send the requested prepayment promptly and let you know once it has been sent."'
-          tone: scenario.input.tone
-          constraints: '?scenario.input.constraints'
         output_mapping:
-          context.workflow_output: steps.compose_reply.output
+          context.workflow_output: steps.compose_persuasive_text.output

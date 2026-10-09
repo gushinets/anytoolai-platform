@@ -496,20 +496,22 @@ def test_no_issues_skips_question_generation_and_still_produces_a_consistent_doc
 
 
 @pytest.mark.parametrize("brief_text", ["", "   ", " padded "], ids=["empty", "blank", "untrimmed"])
-def test_invalid_brief_text_fails_the_job_before_any_provider_call(
+def test_invalid_brief_text_is_rejected_at_start_before_any_job_or_provider_call(
     app: Any, request_platform_api, session_factory: SessionFactory, brief_text: str
 ) -> None:
-    started = _start(app, request_platform_api, brief_text).json()
+    # Code review finding (ANY-601): start_session() now validates the input against the
+    # workflow's input schema, so an invalid payload is rejected at /start (422) before any
+    # job is queued or quota consumed -- it no longer reaches the worker at all.
+    response = _start(app, request_platform_api, brief_text)
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY, response.text
+    assert response.json()["error"]["code"] == "scenario_input_invalid"
 
     adapter = RecordingProviderAdapter(FIXTURE_ROOT)
-    processed = _run_worker(session_factory, adapter)
-
-    assert processed is not None
-    assert processed.status is JobStatus.failed
-    assert processed.error_code == "workflow_input_validation_failed"
-    assert processed.result_artifact_id is None
+    assert _run_worker(session_factory, adapter) is None  # no job was queued
     assert adapter.calls == []
-    assert _provider_call_count(session_factory, job_id=started["job_id"]) == 0
+    with transaction_boundary(session_factory) as session:
+        count = session.execute(sa.select(sa.func.count()).select_from(provider_calls_table))
+        assert count.scalar_one() == 0
 
 
 def test_handoff_to_acceptance_builder_feeds_the_original_brief_to_the_draft(

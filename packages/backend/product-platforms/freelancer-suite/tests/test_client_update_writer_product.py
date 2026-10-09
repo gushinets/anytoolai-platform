@@ -125,7 +125,7 @@ def test_product_directory_contains_no_python_or_forbidden_provider_references()
         (
             "prepaid_request",
             "client_update_writer.prepaid_request_v1",
-            ("text.compose_persuasive_text", "text.compose_reply"),
+            ("text.compose_persuasive_text",),
         ),
     ],
 )
@@ -228,10 +228,6 @@ _ACTION_CONFIG_OUTPUT_SCHEMAS = (
     (
         "client_update_writer.prepaid_request_compose_persuasive_text_v1",
         "kernel.schemas.compose_persuasive_text_output_v1",
-    ),
-    (
-        "client_update_writer.prepaid_request_compose_reply_v1",
-        "kernel.schemas.compose_reply_output_v1",
     ),
 )
 
@@ -366,7 +362,6 @@ _UNGROUNDED_CAUSALITY_PHRASES = ("before work continues", "on schedule", "keeps 
     "action_config_id",
     [
         "client_update_writer.prepaid_request_compose_persuasive_text_v1",
-        "client_update_writer.prepaid_request_compose_reply_v1",
     ],
 )
 @pytest.mark.parametrize("fixture_suffix", ["", ".weak_input"])
@@ -394,7 +389,6 @@ _DUE_DATE_TIGHTENING_PATTERN = re.compile(
     "action_config_id",
     [
         "client_update_writer.prepaid_request_compose_persuasive_text_v1",
-        "client_update_writer.prepaid_request_compose_reply_v1",
     ],
 )
 def test_prepaid_request_happy_fixture_does_not_tighten_the_due_date(action_config_id: str) -> None:
@@ -404,18 +398,30 @@ def test_prepaid_request_happy_fixture_does_not_tighten_the_due_date(action_conf
     assert _DUE_DATE_TIGHTENING_PATTERN.search(text) is None, action_config_id
 
 
-# Code review finding: prepaid_request_v1's second step (compose_reply) dropped step 1's
-# "promptly" urgency and phrased its CTA as the client confirming *receipt* -- the client is the
-# one sending the payment, not receiving one, so "confirm receipt" addresses the wrong party.
-def test_prepaid_request_reply_step_intent_preserves_urgency_and_correct_confirmation_party() -> (
-    None
-):
+# Code review finding: the prepaid step's `objective` must keep the "promptly" urgency and ask the
+# client to say when the payment was *sent* -- the client is the one sending the payment, not
+# receiving one, so "confirm receipt" addresses the wrong party.
+def test_prepaid_request_objective_preserves_urgency_and_correct_confirmation_party() -> None:
     workflow = _workflow_by_id()["client_update_writer.prepaid_request_v1"]
-    reply_step = next(step for step in workflow["steps"] if step["step_id"] == "compose_reply")
-    intent = reply_step["input_mapping"]["intent"].lower()
+    (step,) = workflow["steps"]
+    objective = step["input_mapping"]["objective"].lower()
 
-    assert "confirm receipt" not in intent
-    assert "promptly" in intent
+    assert "confirm receipt" not in objective
+    assert "promptly" in objective
+    assert "has been sent" in objective
+
+
+# ANY-601: the single A06 step gets the whole billing_context object (notes, amount, optional
+# due_date) -- no string joining and no second step that could lose a field.
+def test_prepaid_request_single_step_receives_the_whole_billing_context() -> None:
+    workflow = _workflow_by_id()["client_update_writer.prepaid_request_v1"]
+    (step,) = workflow["steps"]
+
+    assert step["step_id"] == "compose_persuasive_text"
+    assert step["input_mapping"]["context"] == "scenario.input.billing_context"
+    assert step["output_mapping"] == {
+        "context.workflow_output": "steps.compose_persuasive_text.output"
+    }
 
 
 # Code review finding (team lead #2): `?scenario.input...` silently skips an absent source, and the
@@ -441,7 +447,6 @@ def test_prepaid_request_persuasive_text_step_maps_constraints_from_expected_sou
     [
         "client_update_writer.update_v1",
         "client_update_writer.reply_draft_v1",
-        "client_update_writer.prepaid_request_v1",
     ],
 )
 def test_compose_reply_step_maps_constraints_from_scenario_input(workflow_id: str) -> None:
@@ -451,91 +456,48 @@ def test_compose_reply_step_maps_constraints_from_scenario_input(workflow_id: st
     assert reply_step["input_mapping"]["constraints"] == "?scenario.input.constraints"
 
 
-# Code review finding (team lead #2): the compose_reply fixtures repeated the compose_persuasive_text
-# fixture's first sentence verbatim, while prepaid_request_compose_reply.v1.md says to build on
-# `situation` "without repeating it verbatim".
-@pytest.mark.parametrize("fixture_suffix", ["", ".weak_input"])
-def test_prepaid_request_reply_fixture_does_not_repeat_the_situation_verbatim(
-    fixture_suffix: str,
-) -> None:
-    persuasive_text = json.loads(
-        (
-            FIXTURE_ROOT
-            / f"client_update_writer.prepaid_request_compose_persuasive_text_v1{fixture_suffix}.json"
-        ).read_text(encoding="utf-8")
-    )["response_json"]["text"]
-    reply_text = json.loads(
-        (
-            FIXTURE_ROOT
-            / f"client_update_writer.prepaid_request_compose_reply_v1{fixture_suffix}.json"
-        ).read_text(encoding="utf-8")
-    )["response_json"]["text"]
-
-    first_sentence = persuasive_text.split(". ")[0]
-    assert first_sentence not in reply_text, fixture_suffix
+# The E2E test's amount/due_date assertion doesn't protect the *other* grounded facts the billing
+# notes state (week, phase type, sequence) -- this class of regression (dropping/rewording them
+# while paraphrasing) had already recurred once. Pins that the happy text keeps all three,
+# independent of exact wording.
+_HAPPY_NOTES_FACTS = ("this week", "development", "starting next")
 
 
-# Code review finding (me #12): the verbatim-repeat check above and the E2E test's amount/due_date
-# assertion don't protect the *other* grounded facts A06 states (week, phase type, sequence) --
-# this exact class of regression (dropping/rewording them while paraphrasing) had already
-# recurred once. Pins that the happy reply keeps all three, independent of exact wording.
-_A06_HAPPY_FRAMING_FACTS = ("this week", "development", "starting next")
+def test_prepaid_request_happy_text_preserves_notes_facts() -> None:
+    text = _prepaid_fixture_text("")
+
+    for fact in _HAPPY_NOTES_FACTS:
+        assert fact in text.lower(), fact
 
 
-def test_prepaid_request_happy_reply_preserves_a06_framing_facts() -> None:
-    reply_text = json.loads(
-        (
-            FIXTURE_ROOT / "client_update_writer.prepaid_request_compose_reply_v1.json"
-        ).read_text(encoding="utf-8")
-    )["response_json"]["text"].lower()
-
-    for fact in _A06_HAPPY_FRAMING_FACTS:
-        assert fact in reply_text, fact
-
-
-def test_prepaid_request_weak_fixture_preserves_urgency_across_both_steps() -> None:
-    persuasive_text = json.loads(
-        (
-            FIXTURE_ROOT
-            / "client_update_writer.prepaid_request_compose_persuasive_text_v1.weak_input.json"
-        ).read_text(encoding="utf-8")
-    )["response_json"]["text"].lower()
-    reply_text = json.loads(
-        (
-            FIXTURE_ROOT / "client_update_writer.prepaid_request_compose_reply_v1.weak_input.json"
-        ).read_text(encoding="utf-8")
-    )["response_json"]["text"].lower()
-
-    urgency_words = ("now", "promptly", "today")
-    assert any(word in persuasive_text for word in urgency_words), persuasive_text
-    assert any(word in reply_text for word in urgency_words), reply_text
-    assert "when you get a chance" not in reply_text
-
-
-# Code review finding (xhigh #5): the reversed call_to_action rule -- CTA is follow-up
-# acknowledgement only, not a repeat of the payment ask -- had no regression test of its own.
-# Code review finding (team lead #4): checking only for the literal word "send" let a repeated
-# payment ask worded differently ("Please pay the $500 now", "Transfer the agreed amount") slip
-# through undetected. Broadened to a payment-verb denylist plus a no-digits check, so any CTA that
-# restates the amount or re-asks for payment in some other verb fails here too.
-# Code review finding (me #12): plain substring matching made "pay" false-positive on the
-# legitimate word "payment" (e.g. "Let me know once the payment is on its way."). Word-boundary
-# matching only, mirroring _forbidden_token_pattern's approach elsewhere in this file.
-_PAYMENT_ASK_TERM_PATTERN = re.compile(r"\b(send|pay|transfer|wire)\b", re.IGNORECASE)
+def _prepaid_fixture_text(fixture_suffix: str) -> str:
+    fixture = FIXTURE_ROOT / (
+        f"client_update_writer.prepaid_request_compose_persuasive_text_v1{fixture_suffix}.json"
+    )
+    return json.loads(fixture.read_text(encoding="utf-8"))["response_json"]["text"]
 
 
 @pytest.mark.parametrize("fixture_suffix", ["", ".weak_input"])
-def test_prepaid_request_reply_call_to_action_does_not_repeat_the_payment_ask(
+def test_prepaid_request_fixture_keeps_urgency_and_asks_to_be_told_once_sent(
     fixture_suffix: str,
 ) -> None:
-    call_to_action = json.loads(
-        (
-            FIXTURE_ROOT / f"client_update_writer.prepaid_request_compose_reply_v1{fixture_suffix}.json"
-        ).read_text(encoding="utf-8")
-    )["response_json"]["call_to_action"].lower()
+    text = _prepaid_fixture_text(fixture_suffix).lower()
 
-    assert _PAYMENT_ASK_TERM_PATTERN.search(call_to_action) is None, fixture_suffix
-    assert not any(char.isdigit() for char in call_to_action), fixture_suffix
+    assert "when you get a chance" not in text
+    assert "let me know once it has been sent" in text
+
+
+def test_prepaid_request_weak_fixture_preserves_urgency() -> None:
+    assert re.search(r"\b(now|promptly|today)\b", _prepaid_fixture_text(".weak_input").lower())
+
+
+# ANY-601: with no `due_date` in `context`, the model must not invent a date; this pins the rule.
+def test_prepaid_request_prompt_forbids_invented_dates_without_a_due_date() -> None:
+    prompt = _load_prompt_template(
+        "client_update_writer.prepaid_request_compose_persuasive_text.v1"
+    )
+
+    assert "If `context` has no `due_date`, do not state or imply any date" in prompt
 
 
 def test_renderer_contract_pins_the_canonical_copy_ready_composition() -> None:
@@ -581,3 +543,18 @@ def test_prepaid_request_persuasive_text_prompt_documents_language_length_and_fo
     assert "constraints.length" in prompt
     assert "constraints.format" in prompt
     assert "html" in prompt.lower()
+
+
+def test_prepaid_request_max_length_floor_fits_longest_amount_and_due_date() -> None:
+    schema = _load_schema("client_update_writer.prepaid_request_input_v1")
+    context = schema["properties"]["billing_context"]["properties"]
+    floor = schema["properties"]["constraints"]["properties"]["max_length"]["minimum"]
+    # "Please send <amount> by <due_date>. Please let me know once it has been sent." plus slack
+    overhead = len("Please send  by . Please let me know once it has been sent.") + 20
+
+    assert context["amount"]["maxLength"] + context["due_date"]["maxLength"] + overhead <= floor
+
+    base = {"billing_context": {"notes": "Phase 2 prepayment", "amount": "$500"}, "tone": "firm"}
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate({**base, "constraints": {"max_length": floor - 1}}, schema)
+    jsonschema.validate({**base, "constraints": {"max_length": floor}}, schema)
