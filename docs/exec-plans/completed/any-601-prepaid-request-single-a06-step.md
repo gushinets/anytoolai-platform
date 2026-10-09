@@ -29,6 +29,13 @@ the whole `scenario.input.billing_context` (notes, amount, optional due date) as
   `text` (product prompt) instead of `call_to_action`. The output is still valid
   `kernel.schemas.compose_reply_output_v1`, where `call_to_action` is optional.
 
+- `constraints.max_length` now limits the whole `text` (it includes the follow-up), so the prepaid
+  input schema requires `max_length >= 80`; smaller limits are rejected before any LLM call.
+- Rollout: the workflow `version` is stored on each job and the runner rejects a mismatch, so jobs
+  queued under `prepaid_request_v1` version 1 fail once the worker loads version 2. Deploy only
+  after no `created` prepaid jobs remain (same constraint as any graph-shape version bump, e.g.
+  `brief_decoder.decode_v1` version 2).
+
 ## Scope
 
 - `prepaid_request_v1` (version 2): one `compose_persuasive_text` step; the `compose_reply` step,

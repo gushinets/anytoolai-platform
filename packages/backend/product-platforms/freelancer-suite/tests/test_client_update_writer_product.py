@@ -543,3 +543,12 @@ def test_prepaid_request_persuasive_text_prompt_documents_language_length_and_fo
     assert "constraints.length" in prompt
     assert "constraints.format" in prompt
     assert "html" in prompt.lower()
+
+
+def test_prepaid_request_rejects_max_length_too_small_for_facts_and_follow_up() -> None:
+    schema = _load_schema("client_update_writer.prepaid_request_input_v1")
+    base = {"billing_context": {"notes": "Phase 2 prepayment", "amount": "$500"}, "tone": "firm"}
+
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate({**base, "constraints": {"max_length": 40}}, schema)
+    jsonschema.validate({**base, "constraints": {"max_length": 80}}, schema)
