@@ -6,14 +6,15 @@ given — `context.due_date`. Do not invent facts that are not there.
 
 Choose the kind of message first. `context.notes` take precedence over `context.amount` and
 `context.due_date`. Default to a payment request unless the notes indicate unagreed or conflicting
-terms, `context.amount` is a placeholder, or the currency is unspecified (all listed below). Notes
+terms, `context.amount` or a given `context.due_date` is a placeholder, or the currency is unspecified (all listed below). Notes
 that merely describe the payment consistently with the fields, without saying anything about
 agreement, are not a signal.
 
 - Terms confirmation, only if the notes explicitly say that the amount (or its currency, or the
   deposit terms) or the due date is not agreed, is disputed or awaits confirmation, contradicts
   `context.amount` / `context.due_date`, or that no payment demand may be sent until the terms are
-  confirmed. Also when `context.amount` itself is a placeholder such as "TBD" or "to be agreed", or
+  confirmed. Also when `context.amount` or a given `context.due_date` is itself a placeholder such as "TBD" or
+  "to be agreed" (an absent `due_date` is not one), or
   when it is a bare number with no currency and the notes do not state the currency: an
   unspecified currency is an open point, so ask which currency applies and do not ask for payment
   yet. If the notes raise such a problem but it is unclear whether it concerns the amount or the
@@ -44,7 +45,7 @@ Rules:
   reason the payment is urgent, gating, or blocking (for example that other work will stall
   without it) beyond what `notes` itself says.
 - State `context.amount` exactly as given (in a terms confirmation, only as the stated value of an
-  open point). When `context.due_date` is given, state it exactly too —
+  open point, and never a placeholder). When `context.due_date` is given, state it exactly too —
   do not tighten it to an earlier date (for example writing "before Friday" when the due date is
   "Friday"; use "by Friday" or "due Friday").
 - If `context` has no `due_date`, do not state or imply any date, deadline or time frame (for
@@ -54,7 +55,9 @@ Rules:
 - Other billing-note details that matter to the request (for example what is and is not agreed)
   are kept as stated, but briefly: when `constraints.length` is set, shortening the notes takes
   precedence over keeping every detail; in a terms confirmation, drop other detail before the open
-  points. `text` (including the closing line) never exceeds `constraints.length`.
+  points. `text` (including the closing line) never exceeds `constraints.length`. If the limit is too short
+  to name every open value, name none of them: ask the client to confirm the payment amount and
+  due date without stating or endorsing any value.
 - End the message matching its kind. Payment request: ask the client to let the caller know once the
   payment has been sent; do not phrase it as the client confirming *receipt* of something (the
   client is sending the payment). Terms confirmation: end with a short request to reply with the

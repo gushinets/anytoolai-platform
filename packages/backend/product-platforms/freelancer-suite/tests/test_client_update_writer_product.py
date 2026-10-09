@@ -580,7 +580,7 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     # Default is a payment request, unless one of the listed triggers applies.
     assert (
         "Default to a payment request unless the notes indicate unagreed or conflicting terms, "
-        "`context.amount` is a placeholder, or the currency is unspecified"
+        "`context.amount` or a given `context.due_date` is a placeholder, or the currency is unspecified"
     ) in prompt
     assert "is not agreed, is disputed or awaits confirmation" in prompt
     assert 'placeholder such as "TBD"' in prompt
@@ -604,6 +604,12 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     # What a confirmation may and may not contain.
     assert "Do not ask the client to pay or remit" in prompt
     assert "anything the notes call agreed stays stated as agreed" in prompt
+    # A placeholder due_date is unresolved (an absent one is not); a too-short limit never
+    # endorses a value.
+    assert "a given `context.due_date` is itself a placeholder" in prompt
+    assert "an absent `due_date` is not one" in prompt
+    assert "name none of them" in prompt
+    assert "without stating or endorsing any value" in prompt
     assert "drop other detail before the open points" in prompt
     assert "never exceeds `constraints.length`" in prompt
     # Closing line per kind: never a payment report in a confirmation.
