@@ -417,6 +417,23 @@ describe("Client Update Writer product definitions", () => {
     expect(body.input.billing_context).toEqual({ notes: "Work is ongoing.", amount: "the agreed amount" });
   });
 
+  it("Prepaid Request mode blocks submit when amount or due date is over the 40-character schema cap", async () => {
+    const ids = MODE_IDS.prepaid_request;
+    const { routes, queues } = bootAndHappyPathRoutes(ids, { text: "Ok." });
+    const { client, calls } = makeClient(queues);
+
+    render(<ProductRunPage definition={prepaidRequestDefinition} client={client} />);
+    await waitFor(() => expect(screen.getByLabelText("Billing notes")).toBeTruthy());
+    fireEvent.change(screen.getByLabelText("Billing notes"), { target: { value: "Phase 2" } });
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: `USD ${"1".repeat(37)}` } });
+    fireEvent.change(screen.getByLabelText("Due date (optional)"), { target: { value: "d".repeat(41) } });
+    fireEvent.click(screen.getByRole("radio", { name: "firm" }));
+    fireEvent.click(screen.getByRole("button", { name: "Write request" }));
+
+    await waitFor(() => expect(screen.getAllByRole("alert").length).toBeGreaterThan(0));
+    expect(calls.some((call) => call.key === routes.START)).toBe(false);
+  });
+
   it("enters a quota-exhausted state from the advisory quota check: notice in the result card, submit disabled, no scenario started", async () => {
     const ids = MODE_IDS.update;
     const routes = routesFor(ids);

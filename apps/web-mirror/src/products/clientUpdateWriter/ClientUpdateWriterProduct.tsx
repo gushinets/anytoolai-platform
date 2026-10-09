@@ -23,7 +23,8 @@ const PRODUCT_ID = "client_update_writer";
 // products/client_update_writer/) -- named once instead of as bare literals repeated at every
 // field's validate() call (code review finding).
 const LONG_FIELD_MAX_LENGTH = 4000;
-const SHORT_FIELD_MAX_LENGTH = 200;
+// Prepaid Request caps amount/due_date at 40 (not 200) so the whole message fits max_length >= 160.
+const SHORT_FIELD_MAX_LENGTH = 40;
 
 
 function toneError(tone: Tone | ""): FieldError | undefined {
