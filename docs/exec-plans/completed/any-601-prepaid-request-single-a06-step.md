@@ -32,6 +32,10 @@ the whole `scenario.input.billing_context` (notes, amount, optional due date) as
   compare fields, so `amount` and `due_date` are capped at 40 characters and `max_length` must be
   at least 160: the longest valid amount, due date and follow-up always fit; smaller limits are
   rejected before any LLM call.
+- `ScenarioRuntimeService` validates the start/handoff input against the workflow's input
+  schema before quota is consumed or a job is created (previously only the worker did, so an
+  invalid payload was accepted, billed, then failed as `workflow_input_validation_failed`).
+  The UI short-field limit for Prepaid Request is 40 to match the schema.
 - Workflow `version` stays 1: the existing workflow is changed in place, no second version is kept
   (team lead decision). Jobs already queued under version 1 therefore run the new graph instead
   of failing the runner's version check. Rollout: drain queued prepaid jobs before deploying if

@@ -38,7 +38,10 @@ from anytoolai_platform_core.storage.db import (
     action_runs_table,
     artifacts_table,
     event_log_table,
+    guest_quota_usage_table,
+    jobs_table,
     provider_calls_table,
+    scenario_sessions_table,
 )
 from anytoolai_platform_core.storage.transactions import SessionFactory, transaction_boundary
 from anytoolai_platform_core.structured_output.schemas import normalize_schema_mapping
@@ -587,3 +590,40 @@ def test_prepaid_request_step_receives_the_whole_billing_context() -> None:
     )
 
     assert resolved["context"] == billing
+
+
+def test_prepaid_request_start_rejects_schema_invalid_input_before_any_job_or_quota(
+    app: Any,
+    request_platform_api,
+    session_factory: SessionFactory,
+) -> None:
+    # Code review finding: the input JSON Schema used to be checked only in the worker, so a
+    # payload the UI did not catch (amount/due_date over the 40-char cap) was accepted by
+    # /start, consumed quota, and then failed as workflow_input_validation_failed with no
+    # result. start_session() now validates against the workflow's input schema first.
+    response = asyncio.run(
+        request_platform_api(
+            app,
+            "POST",
+            "/v1/products/client_update_writer/scenarios/client_update_writer.prepaid_request_v1/start",
+            json={
+                "frontend_id": "web_mirror",
+                "guest_id": GUEST_ID,
+                "input": {
+                    "billing_context": {
+                        "notes": "Phase 2",
+                        "amount": "USD " + "1" * 37,
+                        "due_date": "d" * 41,
+                    },
+                    "tone": "firm",
+                },
+            },
+            request_id=REQUEST_ID,
+        )
+    )
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["error"]["code"] == "scenario_input_invalid"
+    with transaction_boundary(session_factory) as session:
+        for table in (scenario_sessions_table, jobs_table, guest_quota_usage_table):
+            assert session.execute(sa.select(sa.func.count()).select_from(table)).scalar_one() == 0

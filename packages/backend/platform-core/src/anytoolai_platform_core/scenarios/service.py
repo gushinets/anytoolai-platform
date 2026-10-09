@@ -7,6 +7,8 @@ from collections.abc import Mapping
 from dataclasses import replace
 from typing import Any
 
+from jsonschema import ValidationError as JsonSchemaValidationError
+from jsonschema import validate as validate_json_schema
 from sqlalchemy.exc import IntegrityError
 
 from anytoolai_platform_core.common.errors import PlatformError
@@ -47,7 +49,8 @@ from anytoolai_platform_core.scenarios.runtime_scope import (
     RuntimeScope,
     runtime_scope_metadata,
 )
-from anytoolai_platform_core.workflows.models import JobRecord
+from anytoolai_platform_core.structured_output.schemas import normalize_schema_mapping
+from anytoolai_platform_core.workflows.models import JobRecord, WorkflowDefinition
 from anytoolai_platform_core.workflows.repository import JobRepository
 
 
@@ -70,11 +73,8 @@ class ScenarioFrontendInvalidError(PlatformError):
 
 
 class ScenarioInputInvalidError(PlatformError):
-    def __init__(self) -> None:
-        super().__init__(
-            "scenario_input_invalid",
-            "Scenario input must be a JSON object.",
-        )
+    def __init__(self, message: str = "Scenario input must be a JSON object.") -> None:
+        super().__init__("scenario_input_invalid", message)
 
 
 class IdempotencyKeyConflictError(PlatformError):
@@ -231,6 +231,7 @@ class ScenarioRuntimeService:
         workflow = self._config_registry.get_workflow(scenario.workflow_id)
         if workflow is None:
             raise LookupError(f"workflow not found: {scenario.workflow_id}")
+        self._require_valid_workflow_input(workflow, input_payload)
 
         scenario_session_id = new_id("scenario_session")
         session_record = ScenarioSessionRecord(
@@ -385,6 +386,7 @@ class ScenarioRuntimeService:
         workflow = self._config_registry.get_workflow(scenario.workflow_id)
         if workflow is None:
             raise LookupError(f"workflow not found: {scenario.workflow_id}")
+        self._require_valid_workflow_input(workflow, input_payload)
 
         if queue_workflow and self._quota_service is not None:
             quota_validation = self._quota_service.validate_accepted_start(
@@ -611,6 +613,29 @@ class ScenarioRuntimeService:
             if frontend.frontend_id == frontend_id and frontend.enabled:
                 return frontend
         raise ScenarioFrontendInvalidError()
+
+    def _require_valid_workflow_input(
+        self,
+        workflow: WorkflowDefinition,
+        input_payload: Mapping[str, Any],
+    ) -> None:
+        # Same check SequentialWorkflowRunner._validate_workflow_input() repeats in the worker.
+        # Running it here too means a payload the product's input schema rejects fails the
+        # start request (422) before any scenario_sessions/jobs row is written or quota is
+        # consumed, instead of being accepted and then failing in the worker with
+        # workflow_input_validation_failed after the caller already paid for it.
+        schema = self._config_registry.get_schema(workflow.input_schema_ref)
+        if schema is None:
+            raise LookupError(f"schema not found: {workflow.input_schema_ref}")
+        normalized_schema = normalize_schema_mapping(schema.schema)
+        if normalized_schema is None:
+            return
+        try:
+            validate_json_schema(instance=input_payload, schema=normalized_schema)
+        except JsonSchemaValidationError as exc:
+            raise ScenarioInputInvalidError(
+                "Scenario input does not match the scenario input schema."
+            ) from exc
 
 
 class ScenarioSessionService:
