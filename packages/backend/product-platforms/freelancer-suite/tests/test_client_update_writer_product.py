@@ -409,6 +409,10 @@ def test_prepaid_request_objective_preserves_urgency_and_correct_confirmation_pa
     assert "confirm receipt" not in objective
     assert "promptly" in objective
     assert "has been sent" in objective
+    # Not an unconditional payment ask; the alternative message kind is chosen by the prompt.
+    assert "send the requested prepayment" not in objective
+    assert "following the prompt rules" in objective
+    assert "confirm" not in objective
 
 
 # ANY-601: the single A06 step gets the whole billing_context object (notes, amount, optional
@@ -537,7 +541,9 @@ def test_renderer_contract_pins_the_canonical_copy_ready_composition() -> None:
 # A06's canonical language/length/format rules (including the html-format case) actually made it
 # into the product-owned prompt, not just the workflow mapping that feeds those fields in.
 def test_prepaid_request_persuasive_text_prompt_documents_language_length_and_format() -> None:
-    prompt = _load_prompt_template("client_update_writer.prepaid_request_compose_persuasive_text.v1")
+    prompt = _load_prompt_template(
+        "client_update_writer.prepaid_request_compose_persuasive_text.v1"
+    )
 
     assert "constraints.language" in prompt
     assert "constraints.length" in prompt
@@ -558,3 +564,53 @@ def test_prepaid_request_max_length_floor_fits_longest_amount_and_due_date() -> 
     with pytest.raises(jsonschema.ValidationError):
         jsonschema.validate({**base, "constraints": {"max_length": floor - 1}}, schema)
     jsonschema.validate({**base, "constraints": {"max_length": floor}}, schema)
+
+
+# Disputed or unagreed terms must yield a terms-confirmation message, not a payment ask (for
+# example: notes say the deposit is disputed and no payment demand may go out until confirmed,
+# while the form still says "USD 1,200 by 7 October 2026"). Model behavior is only provable live
+# (ANY-604); the fake provider returns one fixed response, so the rule text is what is pinned.
+def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
+    prompt = " ".join(
+        _load_prompt_template(
+            "client_update_writer.prepaid_request_compose_persuasive_text.v1"
+        ).split()
+    )
+
+    # Default is a payment request, unless one of the listed triggers applies.
+    assert (
+        "Default to a payment request unless the notes indicate unagreed or conflicting terms, "
+        "`context.amount` or a given `context.due_date` is a placeholder, or the currency is unspecified"
+    ) in prompt
+    assert "is not agreed, is disputed or awaits confirmation" in prompt
+    assert 'placeholder such as "TBD"' in prompt
+    # An implicit discrepancy with the fields is a trigger even without "mismatch"/"not agreed".
+    assert (
+        "A plain discrepancy also triggers it, even when the notes never call it a mismatch"
+        in prompt
+    )
+    assert '`amount: USD 1,200` against "deposit is 50%, USD 1,000"' in prompt
+    assert '`due_date: 7 October` against "payment due after delivery on 20 October"' in prompt
+    assert (
+        "A total or balance in the notes is not a discrepancy when `context.amount` matches"
+        in prompt
+    )
+    # Unspecified currency is a trigger (not just permission to ask): bare number, notes silent.
+    assert "bare number with no currency" in prompt
+    assert "unspecified currency is an open point" in prompt
+    assert "before any payment" in prompt
+    # Not triggers: missing due date, details still to come.
+    assert "These are never a reason to ask for confirmation: a missing `due_date`" in prompt
+    # What a confirmation may and may not contain.
+    assert "Do not ask the client to pay or remit" in prompt
+    assert "anything the notes call agreed stays stated as agreed" in prompt
+    # A placeholder due_date is unresolved (an absent one is not); a too-short limit never
+    # endorses a value.
+    assert "a given `context.due_date` is itself a placeholder" in prompt
+    assert "an absent `due_date` is not one" in prompt
+    assert "name none of them" in prompt
+    assert "without stating or endorsing any value" in prompt
+    assert "drop other detail before the open points" in prompt
+    assert "never exceeds `constraints.length`" in prompt
+    # Closing line per kind: never a payment report in a confirmation.
+    assert "never ask the client to report a payment" in prompt
