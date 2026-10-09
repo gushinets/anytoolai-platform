@@ -28,12 +28,14 @@ the whole `scenario.input.billing_context` (notes, amount, optional due date) as
 - A06 returns `text` only. The "let me know once it has been sent" follow-up now lives inside
   `text` (product prompt) instead of `call_to_action`. The output is still valid
   `kernel.schemas.compose_reply_output_v1`, where `call_to_action` is optional.
-
-- `constraints.max_length` now limits the whole `text` (it includes the follow-up), so the prepaid
-  input schema requires `max_length >= 80`; smaller limits are rejected before any LLM call.
+- `constraints.max_length` limits the whole `text` (it includes the follow-up). Schema cannot
+  compare fields, so `amount` and `due_date` are capped at 40 characters and `max_length` must be
+  at least 160: the longest valid amount, due date and follow-up always fit; smaller limits are
+  rejected before any LLM call.
 - Workflow `version` stays 1: the existing workflow is changed in place, no second version is kept
   (team lead decision). Jobs already queued under version 1 therefore run the new graph instead
-  of failing the runner's version check.
+  of failing the runner's version check. Rollout: drain queued prepaid jobs before deploying if
+  the old two-step behavior must be preserved for them.
 
 ## Scope
 

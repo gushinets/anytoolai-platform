@@ -545,10 +545,16 @@ def test_prepaid_request_persuasive_text_prompt_documents_language_length_and_fo
     assert "html" in prompt.lower()
 
 
-def test_prepaid_request_rejects_max_length_too_small_for_facts_and_follow_up() -> None:
+def test_prepaid_request_max_length_floor_fits_longest_amount_and_due_date() -> None:
     schema = _load_schema("client_update_writer.prepaid_request_input_v1")
-    base = {"billing_context": {"notes": "Phase 2 prepayment", "amount": "$500"}, "tone": "firm"}
+    context = schema["properties"]["billing_context"]["properties"]
+    floor = schema["properties"]["constraints"]["properties"]["max_length"]["minimum"]
+    # "Please send <amount> by <due_date>. Please let me know once it has been sent." plus slack
+    overhead = len("Please send  by . Please let me know once it has been sent.") + 20
 
+    assert context["amount"]["maxLength"] + context["due_date"]["maxLength"] + overhead <= floor
+
+    base = {"billing_context": {"notes": "Phase 2 prepayment", "amount": "$500"}, "tone": "firm"}
     with pytest.raises(jsonschema.ValidationError):
-        jsonschema.validate({**base, "constraints": {"max_length": 40}}, schema)
-    jsonschema.validate({**base, "constraints": {"max_length": 80}}, schema)
+        jsonschema.validate({**base, "constraints": {"max_length": floor - 1}}, schema)
+    jsonschema.validate({**base, "constraints": {"max_length": floor}}, schema)
