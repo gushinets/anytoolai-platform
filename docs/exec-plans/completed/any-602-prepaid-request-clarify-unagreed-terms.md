@@ -13,8 +13,8 @@
 
 QA Q-005: when the billing notes say the amount, due date or another payment parameter is not
 agreed, disputed, or contradicts the form fields, the result asks the client to pay. Now the
-`prepaid_request_compose_reply.v1` prompt picks between a payment request and a terms
-confirmation, and the `intent` literal no longer asks for payment unconditionally.
+`prepaid_request_compose_persuasive_text.v1` prompt (the single A06 step since ANY-601) picks between a payment request and a terms
+confirmation, and the `objective` literal no longer asks for payment unconditionally.
 
 ## Scenarios
 
@@ -25,7 +25,7 @@ confirmation, and the `intent` literal no longer asks for payment unconditionall
 - Agreed, no due date: agreed total, 50% prepayment, balance after delivery, payment details in a
   separate invoice, due date empty. Expected: a payment request with amount and agreed terms and
   no invented deadline.
-- Unspecified currency: `Amount: 500`, notes say the currency still needs clarifying. Expected: a
+- Unspecified currency: `amount: 500`, notes say the currency still needs clarifying. Expected: a
   question about the currency before any payment.
 
 ## Decisions
@@ -34,11 +34,23 @@ confirmation, and the `intent` literal no longer asks for payment unconditionall
   not agreed, disputed or awaiting confirmation (or forbid a payment demand until confirmed); an
   implicit discrepancy, where the notes give an amount or due date that differs from the fields
   even without calling it a mismatch; a placeholder `Amount` ("TBD"); or a bare-number `Amount`
-  with no currency that the notes do not state, even when the notes are otherwise silent. The criteria live in the prompt only; `intent` stays neutral.
+  with no currency that the notes do not state, even when the notes are otherwise silent. The criteria live in the prompt only; `objective` stays neutral.
 - Billing notes take precedence over `Amount` / `Due date`.
 - One disputed amount, date or parameter makes the whole message a terms confirmation.
 - Missing due date, payment details to come and balance after delivery never trigger a confirmation.
-- A07 output schema is closed; the decision is the model's, so there is no structural flag.
+- The A06 output is just `text` (no `call_to_action`), so the closing line of each kind lives in `text`; the decision is the model's, so there is no structural flag.
+
+## Builds on ANY-601 (single A06 step)
+
+- A06 gets the whole `billing_context` as `context`, so the prompt reads `context.notes`,
+  `context.amount` and `context.due_date` as separate fields. `amount` and `due_date` are
+  single-line and at most 40 characters, so they cannot fake a structural marker.
+- A06 returns `text` only: the closing line of each message kind is part of `text`, and
+  `constraints.length` (at least 160, from ANY-601) limits all of it. In a terms confirmation the
+  open points are kept and other detail is dropped first; the limit is never exceeded.
+- ANY-602 owns parent decisions 1 and 4 (notes over fields, one open point means a full
+  confirmation). ANY-601 left the `objective` literal containing "promptly"; it is now conditional
+  on a payment request. Decision 3 (urgency only with a deadline) stays out of scope.
 
 ## Out of scope
 
