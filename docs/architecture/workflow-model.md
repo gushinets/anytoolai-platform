@@ -67,15 +67,6 @@ Supported `input_mapping` source paths are:
   `context.workflow_output` with `literal:{"questions": []}` in case the following step is
   skipped).
 
-- `template:<text>` (`input_mapping` only; not supported on `output_mapping` or `when`) — joins
-  several scalar fields into one string. `{<path>}` placeholders use the plain source paths above
-  and must resolve to a string or number (objects, booleans and `null` fail the step). A
-  `{?<path>}` placeholder is optional: when its path is absent, the whole line containing it is
-  dropped; `?template:` is rejected, and a template with no placeholder or one that renders empty
-  fails. Lines are separated by `\n`. Braces are reserved for placeholders (no escaping), and
-  placeholder paths are validated at config-load time like any other source. Example:
-  `situation: "template:Notes: {scenario.input.notes}\nDue date: {?scenario.input.due_date}"`.
-
 Path rules:
 
 - dotted object paths only;

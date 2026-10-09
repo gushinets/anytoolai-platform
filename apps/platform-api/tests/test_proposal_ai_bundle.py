@@ -284,20 +284,30 @@ def test_proposal_ai_weak_input_end_to_end_produces_the_checked_in_weak_fixture_
         {"task_text": "Build a site.", "freelancer_positioning": "I build websites.\n"},
     ],
 )
-def test_proposal_ai_rejects_invalid_required_field_values_before_provider_execution(
+def test_proposal_ai_rejects_invalid_required_field_values_at_start(
     app: Any,
     request_platform_api,
     session_factory: SessionFactory,
     invalid_input: dict[str, Any],
 ) -> None:
-    started = _start(app, request_platform_api, input_payload=invalid_input, request_id="req_start_invalid")
+    # Code review finding (ANY-601): start_session() now validates the input against the
+    # workflow's input schema, so an invalid payload is rejected at /start (422) before any
+    # job is queued or quota consumed -- it no longer reaches the worker at all.
+    response = asyncio.run(
+        request_platform_api(
+            app,
+            "POST",
+            "/v1/products/proposal_ai/scenarios/proposal_ai.generate_v1/start",
+            json={"frontend_id": "web_mirror", "guest_id": GUEST_ID, "input": invalid_input},
+            request_id="req_start_invalid",
+        )
+    )
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY, response.text
+    assert response.json()["error"]["code"] == "scenario_input_invalid"
 
     worker = _build_worker(app, session_factory)
-    processed = asyncio.run(worker.process_next_job())
+    assert asyncio.run(worker.process_next_job()) is None  # no job was queued
     worker.dispose()
-
-    assert processed is not None
-    assert processed.status is JobStatus.failed
-    assert processed.error_code == "workflow_input_validation_failed"
-    assert processed.result_artifact_id is None
-    assert _provider_call_count(session_factory, job_id=started["job_id"]) == 0
+    with transaction_boundary(session_factory) as session:
+        count = session.execute(sa.select(sa.func.count()).select_from(provider_calls_table))
+        assert count.scalar_one() == 0

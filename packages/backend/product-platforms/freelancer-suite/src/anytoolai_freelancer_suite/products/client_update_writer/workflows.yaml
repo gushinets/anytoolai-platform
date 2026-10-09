@@ -26,16 +26,20 @@ workflows:
           constraints: '?scenario.input.constraints'
 
   - workflow_id: client_update_writer.prepaid_request_v1
-    version: 2
+    version: 1
     input_schema_ref: client_update_writer.prepaid_request_input_v1
     output_schema_ref: kernel.schemas.compose_reply_output_v1
     steps:
-      - step_id: compose_reply
-        action_config_id: client_update_writer.prepaid_request_compose_reply_v1
+      - step_id: compose_persuasive_text
+        action_config_id: client_update_writer.prepaid_request_compose_persuasive_text_v1
         input_mapping:
-          situation: "template:Amount: {scenario.input.billing_context.amount}\nDue date: {?scenario.input.billing_context.due_date}\nBilling notes: {scenario.input.billing_context.notes}"
-          intent: 'literal:"Write the prepayment message the billing notes call for, following the prompt rules on what to ask of the client; when it asks for payment, ask the client to promptly send the prepayment and let you know once it has been sent."'
-          tone: scenario.input.tone
-          constraints: '?scenario.input.constraints'
+          context: scenario.input.billing_context
+          objective: 'literal:"Write the final message asking the client to send the requested prepayment promptly and to let you know once it has been sent, using only the stated context."'
+          constraints.tone: scenario.input.tone
+          # compose_persuasive_text_input.schema.json names these length/format, not
+          # compose_reply_input's max_length/output_format.
+          constraints.language: '?scenario.input.constraints.language'
+          constraints.length: '?scenario.input.constraints.max_length'
+          constraints.format: '?scenario.input.constraints.output_format'
         output_mapping:
-          context.workflow_output: steps.compose_reply.output
+          context.workflow_output: steps.compose_persuasive_text.output
