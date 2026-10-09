@@ -117,10 +117,8 @@ Strict, closed (`additionalProperties: false`) schemas — `kernel.schemas.compa
 ## kernel_demo composite workflow mapping notes
 
 The workflow mapping DSL (`packages/backend/platform-core/.../workflows/mappings.py`) only
-supports plain dotted paths — no array indexing, and string joining only through the
-`template:` `input_mapping` source (`workflow-model.md`; added by ANY-601, after the two cases
-below were resolved without it). Two places in `kernel_demo`'s composite workflows hit the
-original limitation directly:
+supports plain dotted paths — no array indexing, no string formatting/concatenation. Two places
+in `kernel_demo`'s composite workflows hit this limitation directly:
 
 - `composite_evaluate_match_v1`'s `score_multidimensional_axes` step needs a plain-string `text`
   input. `score_match_by_rubric`'s output had no top-level string — the only per-item rationale

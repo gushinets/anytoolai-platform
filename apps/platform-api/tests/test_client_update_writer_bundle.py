@@ -13,9 +13,9 @@ apps/platform-api/tests/test_demo_api.py for the same SQLite pattern):
    proving schemas are non-permissive, not just present.
 3. An end-to-end scenario-start + worker step-run happy path for *all three* modes using the fake
    provider, asserting the produced artifact matches the deterministic fixture -- PrepaidRequest's
-   single compose_reply step runs for real here too, not just at the config/schema level, so a
-   wiring regression (a broken mapping, a dropped step) actually fails a test instead of only
-   showing up at runtime.
+   single compose_persuasive_text step runs for real here too, not just at the config/schema
+   level, so a wiring regression (a broken mapping, a dropped step) actually fails a test instead
+   of only showing up at runtime.
 """
 
 from __future__ import annotations
@@ -68,7 +68,7 @@ _MODE_WORKFLOWS = {
     "prepaid_request": (
         "client_update_writer.prepaid_request_v1",
         "client_update_writer.prepaid_request_input_v1",
-        ("text.compose_reply",),
+        ("text.compose_persuasive_text",),
     ),
     "reply_draft": (
         "client_update_writer.reply_draft_v1",
@@ -81,15 +81,18 @@ _MODE_WORKFLOWS = {
 # code review finding: the existing per-mode evidence only correlated job_id -> processed job and
 # scenario_session_id -> result artifact; it never proved that action_run/provider_call/artifact/
 # event rows for a run are correctly linked to each other and to the run's own identifiers,
-# each step needing its own correctly-linked action_run + provider_call, not just "one of
-# something exists".
+# each step needing its own correctly-linked action_run + provider_call.
 _MODE_EXPECTED_STEPS = {
     "update": (("compose_reply", "text.compose_reply", "client_update_writer.update_compose_reply_v1"),),
     "reply_draft": (
         ("compose_reply", "text.compose_reply", "client_update_writer.reply_draft_compose_reply_v1"),
     ),
     "prepaid_request": (
-        ("compose_reply", "text.compose_reply", "client_update_writer.prepaid_request_compose_reply_v1"),
+        (
+            "compose_persuasive_text",
+            "text.compose_persuasive_text",
+            "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+        ),
     ),
 }
 
@@ -118,7 +121,7 @@ def test_client_update_writer_loads_through_the_real_default_bundle_set() -> Non
         assert workflow.output_schema_ref == "kernel.schemas.compose_reply_output_v1"
 
         # Exact per-step action_type sequence, not membership -- a step wired to the wrong atom
-        # (e.g. a leftover extra step) must fail here.
+        # (e.g. compose_reply instead of compose_persuasive_text) must fail here.
         actual_action_types = tuple(
             result.config_registry.get_action_configuration(step.action_config_id).action_type
             for step in workflow.steps
@@ -265,9 +268,8 @@ _MODE_HAPPY_PATH_CASES = {
             "text": (
                 "Now that the approved design phase is wrapping up this week and phase 2 "
                 "(development) is starting next, could you send the $500 prepayment for phase 2 "
-                "by Friday?"
+                "by Friday? Please let me know once it has been sent."
             ),
-            "call_to_action": "Let me know once it's on its way.",
         },
     ),
 }
@@ -391,7 +393,7 @@ def test_mode_happy_path_produces_the_deterministic_fixture_result(
             assert row["scenario_session_id"] == started["scenario_session_id"], label
 
     # Provider-call correlation: exactly one provider_calls row per action_run -- proves
-    # PrepaidRequest's two steps each made their own provider call, not one call shared/skipped.
+    # each step made its own provider call, not one call shared/skipped.
     provider_calls_by_action_run: dict[str, list[dict[str, Any]]] = {}
     for call in provider_calls:
         provider_calls_by_action_run.setdefault(call["action_run_id"], []).append(call)
@@ -411,8 +413,8 @@ def test_mode_happy_path_produces_the_deterministic_fixture_result(
 
     # Event coverage, plus per-step action.started/action.succeeded ordering: flattens those two
     # event types into one trace ordered by timestamp and resolves each row to its step via
-    # action_run_id, proving real interleaving (started, succeeded, started, ...) rather than
-    # each event type's own sub-sequence independently matching step order.
+    # action_run_id, proving real interleaving (started, succeeded, started, ...)
+    # rather than each event type's own sub-sequence independently matching step order.
     event_types = {event_row["event_type"] for event_row in events}
     assert _EXPECTED_EVENT_TYPES.issubset(event_types)
     for event_row in events:
@@ -433,9 +435,9 @@ def test_mode_happy_path_produces_the_deterministic_fixture_result(
 
     # Code review finding (xhigh #5): nothing structurally guarantees amount/due_date survive a
     # future prompt/fixture edit -- several earlier rounds each caught one way they'd been
-    # dropped or altered. Assert directly against this test's own
-    # `start_input`, independent of `expected_output`'s hardcoded string, so a future edit that
-    # updates the fixture and `expected_output` together but drops a fact still fails here.
+    # dropped or altered. Assert directly against this test's own `start_input`, independent of
+    # `expected_output`'s hardcoded string, so a future edit that updates the fixture and
+    # `expected_output` together but drops a fact still fails here.
     if mode == "prepaid_request":
         billing_context = start_input["billing_context"]
         assert billing_context["amount"] in result_body["output"]["text"]
@@ -504,7 +506,7 @@ _MODE_WEAK_INPUT_CASES = {
             "billing_context": {"notes": "Work is ongoing.", "amount": "the agreed amount"},
             "tone": "neutral",
         },
-        "client_update_writer.prepaid_request_compose_reply_v1",
+        "client_update_writer.prepaid_request_compose_persuasive_text_v1",
     ),
 }
 
@@ -570,23 +572,18 @@ def test_weak_input_fixture_is_reachable_end_to_end(
     assert result_body["output"] == expected_output
 
 
-def test_prepaid_request_reply_step_receives_notes_amount_and_due_date() -> None:
+def test_prepaid_request_step_receives_the_whole_billing_context() -> None:
     result = build_runtime(config_root=CONFIG_ROOT)
     workflow = result.config_registry.get_workflow("client_update_writer.prepaid_request_v1")
     assert workflow is not None
     (step,) = workflow.steps
     billing = {"notes": "Kickoff.", "amount": "$500", "due_date": "Friday"}
-    scenario_input = {"billing_context": billing, "tone": "firm"}
 
-    def situation(billing_context: dict[str, str]) -> str:
-        return resolve_step_input(
-            input_mapping=step.input_mapping,
-            scenario_input={**scenario_input, "billing_context": billing_context},
-            step_outputs={},
-            context={},
-        )["situation"]
+    resolved = resolve_step_input(
+        input_mapping=step.input_mapping,
+        scenario_input={"billing_context": billing, "tone": "firm"},
+        step_outputs={},
+        context={},
+    )
 
-    assert all(value in situation(billing) for value in billing.values())
-    without_due_date = situation({"notes": "Kickoff.", "amount": "$500"})
-    assert "Due date" not in without_due_date
-    assert "$500" in without_due_date
+    assert resolved["context"] == billing
