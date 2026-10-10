@@ -398,17 +398,32 @@ def test_prepaid_request_happy_fixture_does_not_tighten_the_due_date(action_conf
     assert _DUE_DATE_TIGHTENING_PATTERN.search(text) is None, action_config_id
 
 
-# Code review finding: the prepaid step's `objective` must keep the "promptly" urgency and ask the
-# client to say when the payment was *sent* -- the client is the one sending the payment, not
-# receiving one, so "confirm receipt" addresses the wrong party.
-def test_prepaid_request_objective_preserves_urgency_and_correct_confirmation_party() -> None:
+# Urgency words (ANY-603): shared by the objective and fixture tests; the prompt's own list is
+# examples, the rule is by meaning.
+_URGENCY_PATTERN = re.compile(
+    r"\b(now|promptly|today|asap|soon|shortly|quickly|immediately|urgent(ly)?|urgency|at once"
+    r"|right away|straight away|without delay)\b|as soon as|this week",
+    re.IGNORECASE,
+)
+
+
+def _normalized_prepaid_prompt() -> str:
+    return " ".join(
+        _load_prompt_template(
+            "client_update_writer.prepaid_request_compose_persuasive_text.v1"
+        ).split()
+    )
+
+
+# The prepaid step's `objective` is neutral (ANY-603/ANY-602): it hardcodes neither urgency, nor
+# the closing line, nor the message kind -- all of that lives in the prompt.
+def test_prepaid_request_objective_is_neutral() -> None:
     workflow = _workflow_by_id()["client_update_writer.prepaid_request_v1"]
     (step,) = workflow["steps"]
     objective = step["input_mapping"]["objective"].lower()
 
-    assert "confirm receipt" not in objective
-    assert "promptly" in objective
-    assert "has been sent" in objective
+    assert _URGENCY_PATTERN.search(objective) is None
+    assert "has been sent" not in objective
     # Not an unconditional payment ask; the alternative message kind is chosen by the prompt.
     assert "send the requested prepayment" not in objective
     assert "following the prompt rules" in objective
@@ -482,7 +497,7 @@ def _prepaid_fixture_text(fixture_suffix: str) -> str:
 
 
 @pytest.mark.parametrize("fixture_suffix", ["", ".weak_input"])
-def test_prepaid_request_fixture_keeps_urgency_and_asks_to_be_told_once_sent(
+def test_prepaid_request_fixture_asks_to_be_told_once_sent(
     fixture_suffix: str,
 ) -> None:
     text = _prepaid_fixture_text(fixture_suffix).lower()
@@ -491,8 +506,25 @@ def test_prepaid_request_fixture_keeps_urgency_and_asks_to_be_told_once_sent(
     assert "let me know once it has been sent" in text
 
 
-def test_prepaid_request_weak_fixture_preserves_urgency() -> None:
-    assert re.search(r"\b(now|promptly|today)\b", _prepaid_fixture_text(".weak_input").lower())
+# ANY-603: the weak fixture has no deadline in its input, so it must stay neutral. The happy
+# fixture has a due date, so urgency there is allowed.
+def test_prepaid_request_weak_fixture_has_no_urgency() -> None:
+    text = _prepaid_fixture_text(".weak_input").lower()
+
+    assert _URGENCY_PATTERN.search(text) is None
+
+
+# ANY-603: urgency only with a basis in the input; neutral request otherwise. Model behavior is
+# only provable live (ANY-604); this pins the rule text.
+def test_prepaid_request_prompt_gates_urgency_on_the_input() -> None:
+    prompt = _normalized_prepaid_prompt()
+
+    assert "Urgency in a payment request comes only from `context.notes`" in prompt
+    assert "A `context.due_date` alone, a placeholder `due_date`" in prompt
+    assert "add no urgency words of your own" in prompt
+    assert "Without it, make a neutral request" in prompt
+    assert "do not soften it into an open-ended timeframe" in prompt
+    assert "Firmness belongs in the wording, not in a deadline" in prompt
 
 
 # ANY-601: with no `due_date` in `context`, the model must not invent a date; this pins the rule.
@@ -571,11 +603,7 @@ def test_prepaid_request_max_length_floor_fits_longest_amount_and_due_date() -> 
 # while the form still says "USD 1,200 by 7 October 2026"). Model behavior is only provable live
 # (ANY-604); the fake provider returns one fixed response, so the rule text is what is pinned.
 def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
-    prompt = " ".join(
-        _load_prompt_template(
-            "client_update_writer.prepaid_request_compose_persuasive_text.v1"
-        ).split()
-    )
+    prompt = _normalized_prepaid_prompt()
 
     # Default is a payment request, unless one of the listed triggers applies.
     assert (
@@ -613,4 +641,5 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     assert "drop other detail before the open points" in prompt
     assert "never exceeds `constraints.length`" in prompt
     # Closing line per kind: never a payment report in a confirmation.
+    assert "End the message matching its kind" in prompt
     assert "never ask the client to report a payment" in prompt

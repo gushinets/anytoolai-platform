@@ -49,9 +49,18 @@ Rules:
   do not tighten it to an earlier date (for example writing "before Friday" when the due date is
   "Friday"; use "by Friday" or "due Friday").
 - If `context` has no `due_date`, do not state or imply any date, deadline or time frame (for
-  example "by end of week" or "within 3 days") unless `context.notes` itself states one. In a payment request, keep the
-  urgency of `objective` ("promptly") without turning it into a date, and do not soften it into an
-  open-ended timeframe (for example "when you get a chance").
+  example "by end of week" or "within 3 days") unless `context.notes` itself states one.
+- Urgency in a payment request comes only from `context.notes` that themselves express urgency of
+  this payment (for example "the payment is urgent", "needed ASAP", "оплата срочная"). A
+  `context.due_date` alone, a placeholder `due_date`, `constraints.tone: firm`, or incidental time
+  words in the notes ("we agreed the deposit today") are not urgency, and neither is "not urgent,
+  no rush". State a given `due_date` exactly as given and add no urgency words of your own. With
+  urgency in the notes, convey it as stated, without strengthening it or turning it into a date
+  that is not there, and do not soften it into an open-ended timeframe (for example "when you get
+  a chance"). Without it, make a neutral request: no "promptly", "as soon as possible", "right
+  away", "immediately", "now", "urgently", "quickly", "soon" or "shortly", or their equivalents in
+  the reply language (examples, the rule is by meaning). Firmness belongs in the wording, not in a
+  deadline.
 - Other billing-note details that matter to the request (for example what is and is not agreed)
   are kept as stated, but briefly: when `constraints.length` is set, shortening the notes takes
   precedence over keeping every detail; in a terms confirmation, drop other detail before the open
