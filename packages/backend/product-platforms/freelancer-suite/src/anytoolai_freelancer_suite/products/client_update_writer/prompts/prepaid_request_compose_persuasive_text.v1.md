@@ -28,8 +28,8 @@ schedule) is open when any of these holds:
 
 - the notes say it is not agreed, disputed, awaiting confirmation or contradicted, or that no
   payment demand may be sent until it is confirmed;
-- the notes state a different current amount or due date for this payment than `context.amount` /
-  `context.due_date` (an earlier proposal the notes call rejected, superseded or replaced is history,
+- the notes state a different current amount, currency or due date for this payment than
+  `context.amount` / `context.due_date` (`amount: USD 500` against "the agreed currency is EUR") (an earlier proposal the notes call rejected, superseded or replaced is history,
   not a conflict), or an amount that the notes' own terms determine (for example "50% of an agreed
   total of USD 2,000" is USD 1,000, against `amount: USD 1,200`), even without calling it a mismatch and even if the notes call that value agreed (for example `amount: USD 1,200` against
   "deposit is 50%, USD 1,000"; `due_date: 7 October` against "payment due after delivery on

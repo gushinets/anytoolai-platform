@@ -38,7 +38,7 @@ confirmation, and the `objective` literal no longer asks for payment uncondition
      attribution makes the condition open.
   2. One definition of an open condition (amount, currency, deposit terms, due date, method,
      schedule): said not agreed / disputed / awaiting confirmation / no demand until confirmed;
-     a different current amount (including one the notes' own terms compute, e.g. 50% of an agreed
+     a different current amount or currency (including one the notes' own terms compute, e.g. 50% of an agreed
      total) or date for this payment in the notes, even without the word
      "mismatch" (a superseded proposal is history, not a conflict);
      a placeholder `amount` or given `due_date` ("TBD"), or one that names no single value
