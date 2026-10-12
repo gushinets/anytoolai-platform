@@ -520,7 +520,9 @@ def test_prepaid_request_prompt_gates_urgency_on_the_input() -> None:
     prompt = _normalized_prepaid_prompt()
 
     assert "Urgency in a payment request comes only from `context.notes`" in prompt
-    assert "A `context.due_date` alone, a placeholder `due_date`" in prompt
+    assert "or the free text of `context.due_date` that themselves express urgency" in prompt
+    assert '`due_date: "Friday — ASAP"`' in prompt
+    assert "A plain date in `context.due_date`, a placeholder `due_date`" in prompt
     assert "add no urgency words of your own" in prompt
     assert "Without it, make a neutral request" in prompt
     assert "do not soften it into an open-ended timeframe" in prompt

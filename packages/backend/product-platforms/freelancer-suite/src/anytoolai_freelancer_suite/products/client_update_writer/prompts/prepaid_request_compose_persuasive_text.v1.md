@@ -96,12 +96,14 @@ Rules:
   ask the client to confirm that amount or due date instead.
 - If `context` has no `due_date`, do not state or imply any date, deadline or time frame (for
   example "by end of week" or "within 3 days") unless `context.notes` itself states one.
-- Urgency in a payment request comes only from `context.notes` that themselves express urgency of
-  this payment (for example "the payment is urgent", "needed ASAP", "оплата срочная"). A
-  `context.due_date` alone, a placeholder `due_date`, `constraints.tone: firm`, or incidental time
+- Urgency in a payment request comes only from `context.notes` or the free text of
+  `context.due_date` that themselves express urgency of this payment (for example "the payment is
+  urgent", "needed ASAP", "оплата срочная", or `due_date: "Friday — ASAP"`; the due date is then
+  still stated exactly as given, urgency included). A plain date in
+  `context.due_date`, a placeholder `due_date`, `constraints.tone: firm`, or incidental time
   words in the notes ("we agreed the deposit today") are not urgency, and neither is "not urgent,
   no rush". State a given `due_date` exactly as given and add no urgency words of your own. With
-  urgency in the notes, convey it as stated, without strengthening it or turning it into a date
+  urgency in the input, convey it as stated, without strengthening it or turning it into a date
   that is not there, and do not soften it into an open-ended timeframe (for example "when you get
   a chance"). Without it, make a neutral request: no "promptly", "as soon as possible", "right
   away", "immediately", "now", "urgently", "quickly", "soon" or "shortly", or their equivalents in

@@ -13,9 +13,9 @@
 ## Goal
 
 Prepaid Request (A06 `compose_persuasive_text`, one step) asked for payment "promptly" even when
-the input gave no deadline (QA cases A01, A03). Urgency now needs a basis in the input: a given
-`due_date`, or notes that express payment urgency. Otherwise the request is neutral; `firm` tone
-is not a basis. The closing line by message kind was done in ANY-602 and is only pinned by a test here.
+the input gave no deadline (QA cases A01, A03). Urgency now needs urgency expressed in the input: in the
+notes or in the free text of `due_date` (for example "Friday — ASAP"). A plain date alone is not a
+basis. Otherwise the request is neutral; `firm` tone is not a basis. The closing line by message kind was done in ANY-602 and is only pinned by a test here.
 
 ## Scope
 
