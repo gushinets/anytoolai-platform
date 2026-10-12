@@ -615,13 +615,16 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     assert "confirm only the open conditions" in prompt
     # A settled/cancelled payment wins over an obsolete open condition; D states one amount only.
     assert 'whatever else is open (an obsolete "TBD" included)' in prompt
+    # "Received in full" must match the amount field; a different settled amount is a conflict.
+    assert '"in full" means the settled amount equals `context.amount`' in prompt
+    assert "USD 1,000 settled against `amount: USD 1,200`" in prompt
     # A currency named in the notes that differs from the amount field is a different amount.
     assert "a different current amount, currency or due date for this payment" in prompt
     assert '`amount: USD 500` against "the agreed currency is EUR"' in prompt
     # Alternatives or a range are not one amount; a reversal goes to B, the thank-you stays in A.
     assert 'alternatives such as "USD 500 or EUR 460", or a range' in prompt
     assert "a short thank-you for the payment, or a note that the request is withdrawn" in prompt
-    assert "two cases that go to rule B instead" in prompt
+    assert "Two more cases go to rule B instead" in prompt
     # An "agreed" value that differs from the field is still open; the claim is not repeated.
     assert "even if the notes call that value agreed" in prompt
     assert (
