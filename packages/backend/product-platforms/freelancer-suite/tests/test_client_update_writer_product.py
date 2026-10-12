@@ -624,6 +624,9 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     # "Received in full" must match the amount field; a different settled amount is a conflict.
     assert '"in full" means the settled amount equals `context.amount`' in prompt
     assert "USD 1,000 settled against `amount: USD 1,200`" in prompt
+    # A currency the notes tie to this payment is stated with the number, which is unchanged.
+    assert "state it with the number, without changing the number" in prompt
+    assert '`amount: 500` with "the currency is USD" is "USD 500"' in prompt
     # A currency named in the notes that differs from the amount field is a different amount.
     assert "a different current amount, currency or due date for this payment" in prompt
     assert '`amount: USD 500` against "the agreed currency is EUR"' in prompt
