@@ -5,9 +5,9 @@
 - State: active
 - Owner: agent
 - Created: 2026-10-10
-- Last updated: 2026-10-10
-- Review date: 2026-10-10
-- Next action: run checks, open PR after ANY-602 merges; live acceptance in ANY-604.
+- Last updated: 2026-10-12
+- Review date: 2026-10-12
+- Next action: merge PR #168 once CI is green; live acceptance in ANY-604.
 - Blocker: none
 
 ## Goal
@@ -28,5 +28,5 @@ Message-kind choice (ANY-602), `call_to_action`/A07, schemas/DSL/UI, live accept
 
 ## Risks
 
-Text tests do not prove model behavior; only live runs (ANY-604) do. Stacked on ANY-602: rebase
-after it merges.
+Text tests do not prove model behavior; only live runs (ANY-604) do, including a case with explicit
+urgency ("ASAP") to check it is preserved. ANY-602 is already in `main`.
