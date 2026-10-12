@@ -54,8 +54,9 @@ Rules:
   reason the payment is urgent, gating, or blocking (for example that other work will stall
   without it) beyond what `notes` itself says.
 - State `context.amount` exactly as given (in a terms confirmation, only as the stated value of an
-  open point). When `context.due_date` is a genuine date, state it exactly too — do not tighten it
-  to an earlier date (for example writing "before Friday" when the due date is "Friday"; use
+  open point). When `context.due_date` is a real, non-placeholder due date or deadline (a calendar date or a
+  relative term such as "Net 30 after invoice" or "within 14 days of delivery"), state it exactly
+  too — do not tighten it to an earlier date (for example writing "before Friday" when the due date is "Friday"; use
   "by Friday" or "due Friday"). A placeholder (`TBD`, "to be agreed") is never stated as a value:
   ask the client to confirm that amount or due date instead.
 - If `context` has no `due_date`, do not state or imply any date, deadline or time frame (for

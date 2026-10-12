@@ -30,14 +30,25 @@ confirmation, and the `objective` literal no longer asks for payment uncondition
 
 ## Decisions
 
-- Default is a payment request. It switches to a terms confirmation on: notes that say a term is
-  not agreed, disputed or awaiting confirmation (or forbid a payment demand until confirmed); an
-  implicit discrepancy, where the notes give an amount or due date that differs from the fields
-  even without calling it a mismatch; a placeholder `Amount` ("TBD"); or a bare-number `Amount`
-  with no currency that the notes do not state, even when the notes are otherwise silent. The criteria live in the prompt only; `objective` stays neutral.
-- Billing notes take precedence over `Amount` / `Due date`.
-- One disputed amount, date or parameter makes the whole message a terms confirmation.
-- Missing due date, payment details to come and balance after delivery never trigger a confirmation.
+- Default is a payment request. Kinds of message, decided by the model from the prompt:
+  - Terms confirmation, when the notes say that the amount, currency, deposit terms, due date or
+    another essential condition of this payment (for example the payment method) is not agreed,
+    disputed or awaiting confirmation, or forbid a payment demand until the terms are confirmed;
+    when the notes give an amount or due date that differs from the fields, even without calling it
+    a mismatch; when `amount` or a given `due_date` is a placeholder ("TBD", "to be agreed"); or
+    when `amount` is a bare number with no currency the notes do not state.
+  - Hold-off message (a short "we will wait" note, no payment ask), when the notes explicitly say
+    not to ask for payment yet for a reason other than unagreed terms, whether or not they call the
+    terms agreed; an open term takes priority and gives a terms confirmation.
+  - Payment request otherwise. A real due date, including a relative one ("Net 30 after
+    invoice"), is stated exactly; an absent `due_date`, payment details to come in a separate
+    invoice, a balance after delivery and a "go gently" note never trigger a confirmation.
+- The criteria live in the prompt only; `objective` stays neutral.
+- In a terms confirmation only the open points are named, and a placeholder is never printed as a
+  value. If `constraints.length` is too short, none of the values is named: the client is asked to
+  confirm only the conditions that are actually open.
+- Billing notes take precedence over `amount` / `due_date`.
+- One open amount, date or parameter makes the whole message a terms confirmation.
 - The A06 output is just `text` (no `call_to_action`), so the closing line of each kind lives in `text`; the decision is the model's, so there is no structural flag.
 
 ## Builds on ANY-601 (single A06 step)

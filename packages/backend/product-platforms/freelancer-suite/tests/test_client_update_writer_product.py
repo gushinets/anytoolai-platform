@@ -621,6 +621,9 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     assert "whether or not they call the terms agreed" in prompt
     assert "If a term is also open, the terms confirmation takes priority" in prompt
     assert "Write a short acknowledgment that you will wait, without a payment ask" in prompt
+    # A relative term ("Net 30 after invoice") is a real due date and is kept exactly.
+    assert "a real, non-placeholder due date or deadline" in prompt
+    assert '"Net 30 after invoice"' in prompt
     # A placeholder is never printed as a date/amount; the fallback names only the open conditions.
     assert 'A placeholder (`TBD`, "to be agreed") is never stated as a value' in prompt
     assert "ask the client to confirm only the conditions that are actually open" in prompt
