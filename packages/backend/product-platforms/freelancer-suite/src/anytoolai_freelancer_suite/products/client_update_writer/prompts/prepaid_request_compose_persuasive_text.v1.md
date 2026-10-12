@@ -62,8 +62,9 @@ X by Y" is a payment ask too), and never ask the client to report a payment.
   settled amount that differs from it (USD 1,000 settled against `amount: USD 1,200`) is a conflict
   of this payment's amount and goes to rule B. Two more cases go to rule B instead: the notes say
   the received amount or its terms are still disputed, or ask for clarification or a refund (a live
-  dispute); or the payment was reversed, refunded, charged back or its status is unclear (a
-  payment that is not settled has an open status).
+  dispute); or the payment was reversed, charged back, has a pending or contested refund, or its
+  status is unclear (a payment that is not settled has an open status). A refund that is completed
+  and undisputed, with nothing owed, is not open: a cancelled request stays in rule A.
 - B. Any condition is open → terms confirmation. Ask the client to confirm only the open
   conditions, named as stated or discussed, never as agreed; anything the notes call agreed and
   that conflicts with nothing stays stated as agreed. A value the notes call agreed that differs
