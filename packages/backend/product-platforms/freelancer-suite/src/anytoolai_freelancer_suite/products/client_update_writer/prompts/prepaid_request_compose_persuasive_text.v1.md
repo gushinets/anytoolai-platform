@@ -35,7 +35,8 @@ schedule) is open when any of these holds:
   "deposit is 50%, USD 1,000"; `due_date: 7 October` against "payment due after delivery on
   20 October");
 - `context.amount`, or a given `context.due_date`, is a placeholder such as "TBD" or "to be
-  agreed" (an absent `due_date` is not a placeholder);
+  agreed", or does not name one value (alternatives such as "USD 500 or EUR 460", or a range)
+  (an absent `due_date` is not a placeholder);
 - `context.amount` names no currency (a bare number, or one with other words such as
   "500 (deposit)") and the notes do not tie a currency to this payment (a currency named only for
   other amounts, or several currencies with none named for this payment, does not count);
@@ -55,13 +56,12 @@ Only rule D may ask for payment. Rules A–C never ask the client to pay or remi
 X by Y" is a payment ask too), and never ask the client to report a payment.
 
 - A. The notes say that, as things stand now, this payment is received in full and stays settled,
-  or is cancelled → settled
-  acknowledgment, whatever else is open (an obsolete "TBD" included), unless the notes say the received amount or
-  its terms are still disputed, or ask for clarification or a refund: a live dispute is an open
-  condition (rule B) and wins over the settled status. A payment that was reversed, refunded,
-  charged back or whose status is unclear is not settled: its status is an open condition (rule B): a
-  short thank-you for the payment, or a note that the request is withdrawn, without restating
-  `context.amount` as owed.
+  or is cancelled → settled acknowledgment: a short thank-you for the payment, or a note that the
+  request is withdrawn, without restating `context.amount` as owed. It applies whatever else is
+  open (an obsolete "TBD" included), except in two cases that go to rule B instead: the notes say
+  the received amount or its terms are still disputed, or ask for clarification or a refund (a live
+  dispute); or the payment was reversed, refunded, charged back or its status is unclear (a
+  payment that is not settled has an open status).
 - B. Any condition is open → terms confirmation. Ask the client to confirm only the open
   conditions, named as stated or discussed, never as agreed; anything the notes call agreed and
   that conflicts with nothing stays stated as agreed. A value the notes call agreed that differs

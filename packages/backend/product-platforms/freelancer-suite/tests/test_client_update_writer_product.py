@@ -615,6 +615,10 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     assert "confirm only the open conditions" in prompt
     # A settled/cancelled payment wins over an obsolete open condition; D states one amount only.
     assert 'whatever else is open (an obsolete "TBD" included)' in prompt
+    # Alternatives or a range are not one amount; a reversal goes to B, the thank-you stays in A.
+    assert 'alternatives such as "USD 500 or EUR 460", or a range' in prompt
+    assert "a short thank-you for the payment, or a note that the request is withdrawn" in prompt
+    assert "two cases that go to rule B instead" in prompt
     # An "agreed" value that differs from the field is still open; the claim is not repeated.
     assert "even if the notes call that value agreed" in prompt
     assert (
@@ -625,11 +629,11 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     assert "In a payment request, when `context.due_date` is a real, non-placeholder" in prompt
     assert "rules A and C never present an amount or due date as owed or upcoming" in prompt
     # A live dispute beats the settled status; a computed deposit is a "different amount".
-    assert "a live dispute is an open condition (rule B) and wins over the settled status" in prompt
+    assert "(a live dispute)" in prompt
     assert "an amount that the notes' own terms determine" in prompt
     # Only a currently settled payment is acknowledged; reversals are open; history is no conflict.
     assert "as things stand now, this payment is received in full and stays settled" in prompt
-    assert "reversed, refunded, charged back or whose status is unclear is not settled" in prompt
+    assert "reversed, refunded, charged back or its status is unclear" in prompt
     assert "rejected, superseded or replaced is history, not a conflict" in prompt
     assert (
         "the stated remaining figure after a partial receipt, else `context.amount`, never both"
