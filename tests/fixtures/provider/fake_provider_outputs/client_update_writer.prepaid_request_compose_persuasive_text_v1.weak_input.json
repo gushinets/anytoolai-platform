@@ -1,6 +1,6 @@
 {
   "response_json": {
-    "text": "The project is still in progress. Could you send the agreed amount? Please let me know once it has been sent."
+    "text": "The project is still in progress. Could you confirm the payment amount and its currency? Please reply with the confirmation."
   },
   "input_tokens": 22,
   "output_tokens": 20,
