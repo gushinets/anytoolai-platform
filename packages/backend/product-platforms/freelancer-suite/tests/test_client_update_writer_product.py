@@ -586,7 +586,7 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     rule_positions = [
         prompt.index(marker)
         for marker in (
-            "A. The notes say this payment was already received in full or is cancelled",
+            "A. The notes say that, as things stand now",
             "B. Any condition is open",
             "C. The notes say not to ask for payment yet",
             "D. Otherwise",
@@ -597,13 +597,13 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     # What opens a condition: every ANY-602 / review case is one bullet of this list.
     for trigger in (
         "not agreed, disputed, awaiting confirmation or contradicted",
-        "a different amount or due date for this payment",
+        "a different current amount or due date for this payment",
         '`amount: USD 1,200` against "deposit is 50%, USD 1,000"',
         'placeholder such as "TBD"',
         "an absent `due_date` is not a placeholder",
         "names no currency (a bare number, or one with other words",
         "do not tie a currency to this payment",
-        "part of this amount was already received and the notes do not state the remaining figure",
+        "part of this amount was received (and not reversed) and the notes do not state the remaining figure",
         "do not add up",
         "a due date for this payment",
     ):
@@ -615,6 +615,10 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     assert "confirm only the open conditions" in prompt
     # A settled/cancelled payment wins over an obsolete open condition; D states one amount only.
     assert 'whatever else is open (an obsolete "TBD" included)' in prompt
+    # Only a currently settled payment is acknowledged; reversals are open; history is no conflict.
+    assert "as things stand now, this payment is received in full and stays settled" in prompt
+    assert "reversed, refunded, charged back or whose status is unclear is not settled" in prompt
+    assert "rejected, superseded or replaced is history, not a conflict" in prompt
     assert (
         "the stated remaining figure after a partial receipt, else `context.amount`, never both"
         in prompt

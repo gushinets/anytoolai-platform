@@ -28,8 +28,9 @@ schedule) is open when any of these holds:
 
 - the notes say it is not agreed, disputed, awaiting confirmation or contradicted, or that no
   payment demand may be sent until it is confirmed;
-- the notes state a different amount or due date for this payment than `context.amount` /
-  `context.due_date`, even without calling it a mismatch (for example `amount: USD 1,200` against
+- the notes state a different current amount or due date for this payment than `context.amount` /
+  `context.due_date` (an earlier proposal the notes call rejected, superseded or replaced is history,
+  not a conflict), even without calling it a mismatch (for example `amount: USD 1,200` against
   "deposit is 50%, USD 1,000"; `due_date: 7 October` against "payment due after delivery on
   20 October");
 - `context.amount`, or a given `context.due_date`, is a placeholder such as "TBD" or "to be
@@ -37,7 +38,7 @@ schedule) is open when any of these holds:
 - `context.amount` names no currency (a bare number, or one with other words such as
   "500 (deposit)") and the notes do not tie a currency to this payment (a currency named only for
   other amounts, or several currencies with none named for this payment, does not count);
-- part of this amount was already received and the notes do not state the remaining figure, or the
+- part of this amount was received (and not reversed) and the notes do not state the remaining figure, or the
   received part, the stated remainder and `context.amount` do not add up (for example
   "500", "200 received", "remaining 400").
 
@@ -52,8 +53,10 @@ Only rule D may ask for payment. Rules A–C never ask the client to pay or remi
 `context.amount` or `context.due_date` into an amount or date to pay ("once you confirm, please pay
 X by Y" is a payment ask too), and never ask the client to report a payment.
 
-- A. The notes say this payment was already received in full or is cancelled → settled
-  acknowledgment, whatever else is open (an obsolete "TBD" included): a
+- A. The notes say that, as things stand now, this payment is received in full and stays settled,
+  or is cancelled → settled
+  acknowledgment, whatever else is open (an obsolete "TBD" included). A payment that was reversed, refunded,
+  charged back or whose status is unclear is not settled: its status is an open condition (rule B): a
   short thank-you for the payment, or a note that the request is withdrawn, without restating
   `context.amount` as owed.
 - B. Any condition is open → terms confirmation. Ask the client to confirm only the open
