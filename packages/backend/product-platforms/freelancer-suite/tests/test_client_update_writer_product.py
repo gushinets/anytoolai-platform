@@ -506,11 +506,12 @@ def test_prepaid_request_happy_fixture_asks_to_be_told_once_sent() -> None:
 
 
 def test_prepaid_request_weak_fixture_is_a_terms_confirmation() -> None:
-    text = _prepaid_fixture_text(".weak_input").lower()
-
-    assert "amount" in text and "currency" in text
-    assert "has been sent" not in text
-    assert not re.search(r"\b(send|pay|remit|wire|transfer|make a payment)\b", text)
+    # Exact text on purpose: any rewrite must be a conscious change here, because the text must
+    # stay a confirmation request (no payment ask, no "let me know once it has been sent").
+    assert _prepaid_fixture_text(".weak_input") == (
+        "The project is still in progress. Could you confirm the payment amount and its "
+        "currency? Please reply with the confirmation."
+    )
 
 
 # ANY-603: neither fixture's input expresses urgency (the happy one has a plain date and firm
