@@ -615,6 +615,12 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     assert "confirm only the open conditions" in prompt
     # A settled/cancelled payment wins over an obsolete open condition; D states one amount only.
     assert 'whatever else is open (an obsolete "TBD" included)' in prompt
+    # An "agreed" value that differs from the field is still open; the claim is not repeated.
+    assert "even if the notes call that value agreed" in prompt
+    assert (
+        "without presenting either value as settled or repeating the notes' agreement claim"
+        in prompt
+    )
     # The due date is echoed only in a payment request; A and C never present it as upcoming.
     assert "In a payment request, when `context.due_date` is a real, non-placeholder" in prompt
     assert "rules A and C never present an amount or due date as owed or upcoming" in prompt
@@ -629,7 +635,7 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
         "the stated remaining figure after a partial receipt, else `context.amount`, never both"
         in prompt
     )
-    assert "anything the notes call agreed stays stated as agreed" in prompt
+    assert "that conflicts with nothing stays stated as agreed" in prompt
     assert "Never print a placeholder as a value" in prompt
     # D asks for the amount still due, never the full amount after a partial payment.
     assert (

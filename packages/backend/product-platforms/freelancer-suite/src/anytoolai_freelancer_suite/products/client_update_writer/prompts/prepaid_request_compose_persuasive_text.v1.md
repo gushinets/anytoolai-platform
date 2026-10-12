@@ -31,7 +31,7 @@ schedule) is open when any of these holds:
 - the notes state a different current amount or due date for this payment than `context.amount` /
   `context.due_date` (an earlier proposal the notes call rejected, superseded or replaced is history,
   not a conflict), or an amount that the notes' own terms determine (for example "50% of an agreed
-  total of USD 2,000" is USD 1,000, against `amount: USD 1,200`), even without calling it a mismatch (for example `amount: USD 1,200` against
+  total of USD 2,000" is USD 1,000, against `amount: USD 1,200`), even without calling it a mismatch and even if the notes call that value agreed (for example `amount: USD 1,200` against
   "deposit is 50%, USD 1,000"; `due_date: 7 October` against "payment due after delivery on
   20 October");
 - `context.amount`, or a given `context.due_date`, is a placeholder such as "TBD" or "to be
@@ -63,8 +63,10 @@ X by Y" is a payment ask too), and never ask the client to report a payment.
   short thank-you for the payment, or a note that the request is withdrawn, without restating
   `context.amount` as owed.
 - B. Any condition is open → terms confirmation. Ask the client to confirm only the open
-  conditions, named as stated or discussed, never as agreed; anything the notes call agreed stays
-  stated as agreed. Asking for the information the terms need (for example which currency applies,
+  conditions, named as stated or discussed, never as agreed; anything the notes call agreed and
+  that conflicts with nothing stays stated as agreed. A value the notes call agreed that differs
+  from `context.amount` / `context.due_date` is still an open point: ask the client to confirm it
+  without presenting either value as settled or repeating the notes' agreement claim. Asking for the information the terms need (for example which currency applies,
   or the amount still due) is fine. Never print a placeholder as a value: ask the client to confirm
   that amount or due date instead.
 - C. The notes say not to ask for payment yet (for example "do not request payment yet, we are
