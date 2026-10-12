@@ -618,7 +618,7 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     rule_positions = [
         prompt.index(marker)
         for marker in (
-            "A. The notes say that, as things stand now",
+            "A. Nothing is owed on this payment as things stand now",
             "B. Any condition is open",
             "C. The notes say not to ask for payment yet",
             "D. Otherwise",
@@ -646,21 +646,20 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     assert "Rules A–C never ask the client to pay or remit" in prompt
     assert "confirm only the open conditions" in prompt
     # A settled/cancelled payment wins over an obsolete open condition; D states one amount only.
-    assert 'whatever else is open (an obsolete "TBD" included)' in prompt
+    assert "An obsolete placeholder in `context.amount` or `context.due_date`" in prompt
     # A completed, undisputed refund of a cancelled request is settled (rule A), not open.
-    assert (
-        "A reversal or refund that is final and undisputed, with nothing owed, is not open"
-        in prompt
-    )
-    assert "a cancelled request stays in rule A" in prompt
+    assert "final with nothing owed keeps A" in prompt
+    assert "A reversal, refund or chargeback matters only through what it leaves" in prompt
     # "Received in full" must match the amount field; a different settled amount is a conflict.
-    assert '"in full" means the settled amount equals `context.amount`' in prompt
+    assert "A settled amount that differs from a concrete `context.amount`" in prompt
     assert "USD 1,000 settled against `amount: USD 1,200`" in prompt
     # A placeholder amount has nothing to compare: a fully settled payment stays in rule A.
-    assert 'a placeholder in `context.amount` ("TBD") compares with nothing' in prompt
+    assert "does not block this: it compares with nothing" in prompt
     # A currency the notes tie to this payment is stated with the number, which is unchanged.
     assert "Always state the currency with the number, never a bare figure" in prompt
     assert '`amount: USD 1,000` with "750 remains" is "USD 750"' in prompt
+    assert "The currency is the one `context.amount` names, else the one the notes tie" in prompt
+    assert '"300 remains" is "USD 300"' in prompt
     assert "A different currency in the notes is an open point, not a choice" in prompt
     assert '`amount: 500` with "the currency is USD" is "USD 500"' in prompt
     # A currency named in the notes that differs from the amount field is a different amount.
@@ -676,7 +675,10 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     # Alternatives or a range are not one amount; a reversal goes to B, the thank-you stays in A.
     assert 'alternatives such as "USD 500 or EUR 460", or a range' in prompt
     assert "a short thank-you for the payment, or a note that the request is withdrawn" in prompt
-    assert "Two more cases go to rule B instead" in prompt
+    assert (
+        "pending or contested, a live dispute about the received amount, or an unclear status"
+        in prompt
+    )
     # An "agreed" value that differs from the field is still open; the claim is not repeated.
     assert "even if the notes call that value agreed" in prompt
     assert (
@@ -687,11 +689,14 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     assert "In a payment request, when `context.due_date` is a real, non-placeholder" in prompt
     assert "rules A and C never present an amount or due date as owed or upcoming" in prompt
     # A live dispute beats the settled status; a computed deposit is a "different amount".
-    assert "(a live dispute)" in prompt
+    assert "a live dispute about the received amount" in prompt
     assert "an amount that the notes' own terms determine" in prompt
     # Only a currently settled payment is acknowledged; reversals are open; history is no conflict.
-    assert "as things stand now, this payment is received in full and stays settled" in prompt
-    assert "reversed or charged back and still stands, has a pending or contested refund" in prompt
+    assert (
+        "receipts that add up to `context.amount`, or a stated zero balance, count as in full"
+        in prompt
+    )
+    assert "final with an agreed amount still owed is an ordinary unpaid payment" in prompt
     assert "rejected, superseded or replaced is history, not a conflict" in prompt
     assert (
         "the stated remaining figure after a partial receipt, else `context.amount`, never both"

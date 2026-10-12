@@ -46,9 +46,10 @@ confirmation, and the `objective` literal no longer asks for payment uncondition
      payment; partial payment with no stated remainder or with received + remainder not adding up to
      `amount`; the stated due date of the remainder of this amount differs from `due_date`. Never open by themselves: missing
      `due_date`, details to come in a separate invoice, balance after delivery, "go gently".
-  3. Ordered rules, first match wins, only D may ask for payment: A currently received in full (not reversed, and the settled amount equals `amount`)
-     or cancelled → settled acknowledgment (wins over an obsolete open condition, but not over a live dispute of the received amount; a reversal or
-     unclear status is an open condition instead); B open condition → terms
+  3. Ordered rules, first match wins, only D may ask for payment: A nothing owed now and nothing disputed or unclear
+     (received in full — receipts summing to `amount` or a zero balance count — or cancelled) →
+     settled acknowledgment; a reversal matters only through what it leaves (final + nothing owed
+     → A, final + agreed debt → ordinary unpaid payment, pending/contested/unclear → B); B open condition → terms
      confirmation (only the open points, nothing presented as agreed, no placeholder printed); C "do not ask yet" → hold-off
      acknowledgment; D otherwise → payment request for the amount still due (stated remainder, else
      `amount`).

@@ -60,18 +60,17 @@ Only rule D may ask for payment. Rules A–C never ask the client to pay or remi
 `context.amount` or `context.due_date` into an amount or date to pay ("once you confirm, please pay
 X by Y" is a payment ask too), and never ask the client to report a payment.
 
-- A. The notes say that, as things stand now, this payment is received in full and stays settled,
-  or is cancelled → settled acknowledgment: a short thank-you for the payment, or a note that the
-  request is withdrawn, without restating `context.amount` as owed. It applies whatever else is
-  open (an obsolete "TBD" included), but "in full" means the settled amount equals `context.amount`: a
-  settled amount that differs from it (USD 1,000 settled against `amount: USD 1,200`) is a conflict
-  of this payment's amount and goes to rule B; a placeholder in `context.amount` ("TBD") compares
-  with nothing, so it stays obsolete and the notes' settled amount stands. Two more cases go to rule B
-  instead: the notes say
-  the received amount or its terms are still disputed, or ask for clarification or a refund (a live
-  dispute); or the payment was reversed or charged back and still stands, has a pending or contested refund, or its
-  status is unclear (a payment that is not settled has an open status). A reversal or refund that is final
-  and undisputed, with nothing owed, is not open: a cancelled request stays in rule A.
+- A. Nothing is owed on this payment as things stand now, and nothing about it is disputed or
+  unclear: the notes say it is received in full (receipts that add up to `context.amount`, or a
+  stated zero balance, count as in full) or that the request is cancelled → settled acknowledgment:
+  a short thank-you for the payment, or a note that the request is withdrawn, without restating
+  `context.amount` as owed. An obsolete placeholder in `context.amount` or `context.due_date` does
+  not block this: it compares with nothing. A settled amount that differs from a concrete
+  `context.amount` (USD 1,000 settled against `amount: USD 1,200`) is a conflict and goes to rule B.
+  A reversal, refund or chargeback matters only through what it leaves: final with nothing owed
+  keeps A; final with an agreed amount still owed is an ordinary unpaid payment (rules B–D as
+  usual, so D when nothing is open); pending or contested, a live dispute about the received
+  amount, or an unclear status is an open condition (rule B).
 - B. Any condition is open → terms confirmation. Ask the client to confirm only the open
   conditions, named as stated or discussed, never as agreed; anything the notes call agreed and
   that conflicts with nothing stays stated as agreed. A value the notes call agreed that differs
@@ -94,11 +93,11 @@ Rules:
   without it) beyond what `notes` itself says.
 - In a payment request (rule D) state the amount still due exactly as given: the stated remaining
   figure after a partial receipt, else `context.amount`, never both. Always state the
-  currency with the number, never a bare figure, without changing the number: if the amount names no
-  currency, use the one the notes tie to this payment (`amount: 500` with "the currency is USD" is
-  "USD 500"); if the notes give the remainder as a bare number, use the currency of
-  `context.amount` (`amount: USD 1,000` with "750 remains" is "USD 750"). A different currency in
-  the notes is an open point, not a choice. A terms confirmation shows an
+  currency with the number, never a bare figure, without changing the number. The currency is the
+  one `context.amount` names, else the one the notes tie to this payment; this holds for a bare
+  remainder too (`amount: USD 1,000` with "750 remains" is "USD 750"; `amount: 500` with "the
+  currency is USD" is "USD 500"; `amount: 500`, "the currency is USD", "300 remains" is "USD 300").
+  A different currency in the notes is an open point, not a choice. A terms confirmation shows an
   amount or due date only as the stated value of an open point; rules A and C never present an
   amount or due date as owed or upcoming.
 - In a payment request, when `context.due_date` is a real, non-placeholder due date or deadline (a
