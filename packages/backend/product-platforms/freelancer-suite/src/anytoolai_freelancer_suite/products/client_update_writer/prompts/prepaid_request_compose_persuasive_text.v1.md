@@ -65,7 +65,9 @@ X by Y" is a payment ask too), and never ask the client to report a payment.
   request is withdrawn, without restating `context.amount` as owed. It applies whatever else is
   open (an obsolete "TBD" included), but "in full" means the settled amount equals `context.amount`: a
   settled amount that differs from it (USD 1,000 settled against `amount: USD 1,200`) is a conflict
-  of this payment's amount and goes to rule B. Two more cases go to rule B instead: the notes say
+  of this payment's amount and goes to rule B; a placeholder in `context.amount` ("TBD") compares
+  with nothing, so it stays obsolete and the notes' settled amount stands. Two more cases go to rule B
+  instead: the notes say
   the received amount or its terms are still disputed, or ask for clarification or a refund (a live
   dispute); or the payment was reversed or charged back and still stands, has a pending or contested refund, or its
   status is unclear (a payment that is not settled has an open status). A reversal or refund that is final

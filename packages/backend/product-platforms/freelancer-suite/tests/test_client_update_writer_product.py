@@ -624,6 +624,8 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     # "Received in full" must match the amount field; a different settled amount is a conflict.
     assert '"in full" means the settled amount equals `context.amount`' in prompt
     assert "USD 1,000 settled against `amount: USD 1,200`" in prompt
+    # A placeholder amount has nothing to compare: a fully settled payment stays in rule A.
+    assert 'a placeholder in `context.amount` ("TBD") compares with nothing' in prompt
     # A currency the notes tie to this payment is stated with the number, which is unchanged.
     assert "Always state the currency with the number, never a bare figure" in prompt
     assert '`amount: USD 1,000` with "750 remains" is "USD 750"' in prompt
