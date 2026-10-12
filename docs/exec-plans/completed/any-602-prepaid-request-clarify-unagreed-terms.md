@@ -41,7 +41,7 @@ confirmation, and the `objective` literal no longer asks for payment uncondition
      a different current amount or currency (including one the notes' own terms compute, e.g. 50% of an agreed
      total) or date for this payment in the notes, even without the word
      "mismatch" (a superseded proposal is history, not a conflict);
-     a placeholder `amount` or given `due_date` ("TBD"), or one that names no single value
+     an `amount` computed from a base the notes say is not agreed or give in two versions; a placeholder `amount` or given `due_date` ("TBD"), or one that names no single value
      (alternatives like "USD 500 or EUR 460", a range); `amount` with no currency tied to this
      payment; partial payment with no stated remainder or with received + remainder not adding up to
      `amount`; the stated due date of the remainder of this amount differs from `due_date`. Never open by themselves: missing

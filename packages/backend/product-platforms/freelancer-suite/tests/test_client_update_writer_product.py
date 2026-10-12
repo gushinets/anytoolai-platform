@@ -632,6 +632,10 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     # A currency named in the notes that differs from the amount field is a different amount.
     assert "a different current amount, currency or due date for this payment" in prompt
     assert '`amount: USD 500` against "the agreed currency is EUR"' in prompt
+    # A project total matters when this payment is computed from it and the total is not agreed.
+    assert "A project total is no exception when this payment is computed from it" in prompt
+    assert "is computed from a base (a total, a rate) that the notes say is not agreed" in prompt
+    assert "(50% of USD 2,000 or of USD 2,400)" in prompt
     # Alternatives or a range are not one amount; a reversal goes to B, the thank-you stays in A.
     assert 'alternatives such as "USD 500 or EUR 460", or a range' in prompt
     assert "a short thank-you for the payment, or a note that the request is withdrawn" in prompt
