@@ -34,7 +34,7 @@ workflows:
         action_config_id: client_update_writer.prepaid_request_compose_persuasive_text_v1
         input_mapping:
           context: scenario.input.billing_context
-          objective: 'literal:"Write the final prepayment message the billing notes call for, following the prompt rules on what to ask of the client; when it asks for payment, ask the client to promptly send the prepayment and let you know once it has been sent, using only the stated context."'
+          objective: 'literal:"Write the final prepayment message the billing notes call for, following the prompt rules, using only the stated context."'
           constraints.tone: scenario.input.tone
           # compose_persuasive_text_input.schema.json names these length/format, not
           # compose_reply_input's max_length/output_format.
