@@ -586,8 +586,8 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     rule_positions = [
         prompt.index(marker)
         for marker in (
-            "A. Any condition is open",
-            "B. The notes say this payment was already received or is cancelled",
+            "A. The notes say this payment was already received in full or is cancelled",
+            "B. Any condition is open",
             "C. The notes say not to ask for payment yet",
             "D. Otherwise",
         )
@@ -604,6 +604,8 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
         "names no currency (a bare number, or one with other words",
         "do not tie a currency to this payment",
         "part of this amount was already received and the notes do not state the remaining figure",
+        "do not add up",
+        "a due date for this payment",
     ):
         assert trigger in prompt, trigger
     assert "Never open by themselves: a missing `due_date`, payment details still to come" in prompt
@@ -611,6 +613,12 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     # Rules A-C never ask for payment; a confirmation names only open points, no placeholders.
     assert "Rules A–C never ask the client to pay or remit" in prompt
     assert "confirm only the open conditions" in prompt
+    # A settled/cancelled payment wins over an obsolete open condition; D states one amount only.
+    assert 'whatever else is open (an obsolete "TBD" included)' in prompt
+    assert (
+        "the stated remaining figure after a partial receipt, else `context.amount`, never both"
+        in prompt
+    )
     assert "anything the notes call agreed stays stated as agreed" in prompt
     assert "Never print a placeholder as a value" in prompt
     # D asks for the amount still due, never the full amount after a partial payment.

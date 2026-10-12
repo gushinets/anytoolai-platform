@@ -9,15 +9,18 @@ acknowledgment. Decide which first, in three steps.
 Step 1. Attribute every fact to this payment or not.
 
 Only facts about *this* payment (the one `context.amount` is for) can agree with, contradict or
-settle its terms. A project total, a balance or later instalment and their due dates, a currency
-named only for other amounts, penalties, or any other payment are facts about something else: they
+settle its terms. A project total, a separate later instalment or balance (one the notes present as its own
+payment) and its due date, a currency named only for other amounts, penalties, or any other payment
+are facts about something else: they
 are never a conflict with `context.amount` / `context.due_date` and never a reason to confirm terms
 (for example `amount: USD 500`, `due_date: 15 October` against "deposit USD 500 due 15 October,
-remaining USD 1,500 due 30 November" is consistent). When it is unclear whether a fact concerns
-this payment, treat the condition it touches as open (rule A below): a question costs less than an
+remaining USD 1,500 due 30 November" is consistent). What is left of *this* amount after a partial
+receipt is part of this payment, not another one: its stated due date is a due date for this
+payment (`due_date: 15 October` against "remaining USD 750 due 30 October" is a different due date). When it is unclear whether a fact concerns
+this payment, treat the condition it touches as open (Step 2): a question costs less than an
 unfounded payment demand.
 
-Step 2. Decide which conditions of this payment are open.
+Step 2. Decide which conditions of this payment are open (not needed when rule A below applies).
 
 `context.notes` take precedence over `context.amount` and `context.due_date`. An essential
 condition of this payment (its amount, currency, deposit terms, due date, payment method or
@@ -34,7 +37,9 @@ schedule) is open when any of these holds:
 - `context.amount` names no currency (a bare number, or one with other words such as
   "500 (deposit)") and the notes do not tie a currency to this payment (a currency named only for
   other amounts, or several currencies with none named for this payment, does not count);
-- part of this amount was already received and the notes do not state the remaining figure.
+- part of this amount was already received and the notes do not state the remaining figure, or the
+  received part, the stated remainder and `context.amount` do not add up (for example
+  "500", "200 received", "remaining 400").
 
 Never open by themselves: a missing `due_date`, payment details still to come (for example in a
 separate invoice), a balance due after delivery, or a request in the notes to go gently. Notes that
@@ -47,14 +52,15 @@ Only rule D may ask for payment. Rules A–C never ask the client to pay or remi
 `context.amount` or `context.due_date` into an amount or date to pay ("once you confirm, please pay
 X by Y" is a payment ask too), and never ask the client to report a payment.
 
-- A. Any condition is open → terms confirmation. Ask the client to confirm only the open
+- A. The notes say this payment was already received in full or is cancelled → settled
+  acknowledgment, whatever else is open (an obsolete "TBD" included): a
+  short thank-you for the payment, or a note that the request is withdrawn, without restating
+  `context.amount` as owed.
+- B. Any condition is open → terms confirmation. Ask the client to confirm only the open
   conditions, named as stated or discussed, never as agreed; anything the notes call agreed stays
   stated as agreed. Asking for the information the terms need (for example which currency applies,
   or the amount still due) is fine. Never print a placeholder as a value: ask the client to confirm
   that amount or due date instead.
-- B. The notes say this payment was already received or is cancelled → settled acknowledgment: a
-  short thank-you for the payment, or a note that the request is withdrawn, without restating
-  `context.amount` as owed.
 - C. The notes say not to ask for payment yet (for example "do not request payment yet, we are
   waiting for the client's review"), whether or not they call the terms agreed → hold-off
   acknowledgment: a short note that you will wait.
@@ -68,8 +74,9 @@ Rules:
 - In a payment request, ground the request in what `context.notes` states (what the payment
   covers). Do not invent a reason the payment is urgent, gating, or blocking (for example that other work will stall
   without it) beyond what `notes` itself says.
-- State `context.amount` exactly as given (in a terms confirmation, only as the stated value of an
-  open point). When `context.due_date` is a real, non-placeholder due date or deadline (a calendar date or a
+- In a payment request (rule D) state the amount still due exactly as given: the stated remaining
+  figure after a partial receipt, else `context.amount`, never both. A terms confirmation shows an
+  amount only as the stated value of an open point; rules A and C never present an amount as owed. When `context.due_date` is a real, non-placeholder due date or deadline (a calendar date or a
   relative term such as "Net 30 after invoice" or "within 14 days of delivery"), state it exactly
   too — do not tighten it to an earlier date (for example writing "before Friday" when the due date is "Friday"; use
   "by Friday" or "due Friday"). A placeholder (`TBD`, "to be agreed") is never stated as a value:
@@ -87,7 +94,7 @@ Rules:
   stating or endorsing any value and without raising anything the notes call agreed.
 - End the message matching its kind. Payment request (rule D): ask the client to let the caller
   know once the payment has been sent; do not phrase it as the client confirming *receipt* of
-  something (the client is sending the payment). Terms confirmation (rule A): end with a short
+  something (the client is sending the payment). Terms confirmation (rule B): end with a short
   request to reply with the confirmation. Rules A–C never ask the client to report a payment.
 - Do not state a payment method, link, reference, or account details (for example a bank name,
   PayPal address, invoice number, or "the account on file") unless `context.notes` states it —

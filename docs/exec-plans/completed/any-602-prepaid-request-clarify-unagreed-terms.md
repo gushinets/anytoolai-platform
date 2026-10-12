@@ -40,11 +40,12 @@ confirmation, and the `objective` literal no longer asks for payment uncondition
      schedule): said not agreed / disputed / awaiting confirmation / no demand until confirmed;
      a different amount or date for this payment in the notes, even without the word "mismatch";
      a placeholder `amount` or given `due_date` ("TBD"); `amount` with no currency tied to this
-     payment; partial payment with no stated remainder. Never open by themselves: missing
+     payment; partial payment with no stated remainder or with received + remainder not adding up to
+     `amount`; the stated due date of the remainder of this amount differs from `due_date`. Never open by themselves: missing
      `due_date`, details to come in a separate invoice, balance after delivery, "go gently".
-  3. Ordered rules, first match wins, only D may ask for payment: A open condition → terms
-     confirmation (only the open points, nothing presented as agreed, no placeholder printed);
-     B received or cancelled → settled acknowledgment; C "do not ask yet" → hold-off
+  3. Ordered rules, first match wins, only D may ask for payment: A received in full or cancelled →
+     settled acknowledgment (wins over an obsolete open condition); B open condition → terms
+     confirmation (only the open points, nothing presented as agreed, no placeholder printed); C "do not ask yet" → hold-off
      acknowledgment; D otherwise → payment request for the amount still due (stated remainder, else
      `amount`).
 - The criteria live in the prompt only; `objective` stays neutral.
