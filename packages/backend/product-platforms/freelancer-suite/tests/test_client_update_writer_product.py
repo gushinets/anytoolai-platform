@@ -616,7 +616,10 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     # A settled/cancelled payment wins over an obsolete open condition; D states one amount only.
     assert 'whatever else is open (an obsolete "TBD" included)' in prompt
     # A completed, undisputed refund of a cancelled request is settled (rule A), not open.
-    assert "A refund that is completed and undisputed, with nothing owed, is not open" in prompt
+    assert (
+        "A reversal or refund that is final and undisputed, with nothing owed, is not open"
+        in prompt
+    )
     assert "a cancelled request stays in rule A" in prompt
     # "Received in full" must match the amount field; a different settled amount is a conflict.
     assert '"in full" means the settled amount equals `context.amount`' in prompt
@@ -642,7 +645,7 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     assert "an amount that the notes' own terms determine" in prompt
     # Only a currently settled payment is acknowledged; reversals are open; history is no conflict.
     assert "as things stand now, this payment is received in full and stays settled" in prompt
-    assert "reversed, charged back, has a pending or contested refund" in prompt
+    assert "reversed or charged back and still stands, has a pending or contested refund" in prompt
     assert "rejected, superseded or replaced is history, not a conflict" in prompt
     assert (
         "the stated remaining figure after a partial receipt, else `context.amount`, never both"
