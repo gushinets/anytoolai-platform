@@ -401,7 +401,7 @@ def test_prepaid_request_happy_fixture_does_not_tighten_the_due_date(action_conf
 # Urgency words (ANY-603): shared by the objective and fixture tests; the prompt's own list is
 # examples, the rule is by meaning.
 _URGENCY_PATTERN = re.compile(
-    r"\b(now|promptly|today|asap|soon|shortly|quickly|immediately|urgent(ly)?|urgency|at once"
+    r"\b(now(?! that)|promptly|today|asap|soon|shortly|quickly|immediately|urgent(ly)?|urgency|at once"
     r"|right away|straight away|without delay)\b|as soon as",
     re.IGNORECASE,
 )
