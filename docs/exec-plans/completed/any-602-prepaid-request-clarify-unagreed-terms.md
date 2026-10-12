@@ -30,32 +30,29 @@ confirmation, and the `objective` literal no longer asks for payment uncondition
 
 ## Decisions
 
-- Default is a payment request. Kinds of message, decided by the model from the prompt:
-  - Terms confirmation, when the notes say that the amount, currency, deposit terms, due date or
-    another essential condition of this payment (for example the payment method) is not agreed,
-    disputed or awaiting confirmation, or forbid a payment demand until the terms are confirmed;
-    when the notes give an amount or due date that differs from the fields, even without calling it
-    a mismatch; when `amount` or a given `due_date` is a placeholder ("TBD", "to be agreed"); or
-    when `amount` names no currency (a bare number or e.g. "500 (deposit)") that the notes do not
-    tie to this payment (a currency for other amounts, or several currencies with none named for
-    this payment, does not count).
-  - Hold-off message (a short "we will wait" note, no payment ask), when the notes explicitly say
-    not to ask for payment yet for a reason other than unagreed terms, whether or not they call the
-    terms agreed; an open term takes priority and gives a terms confirmation.
-  - Settled message (a short acknowledgment, no payment ask), when the notes say the amount was
-    already received or the payment is cancelled.
-  - Partly settled: never re-ask the full `amount`; ask for the remaining figure if the notes state
-    it, otherwise a terms confirmation of the amount still due.
-  - Payment request otherwise. A real due date, including a relative one ("Net 30 after
-    invoice"), is stated exactly; an absent `due_date`, payment details to come in a separate
-    invoice, a balance after delivery and a "go gently" note never trigger a confirmation.
+- The prompt decides the kind of message in three steps, so a new case is a bullet, not a new
+  branch with its own priority clause (review rounds 1-10 kept finding pairwise priority gaps
+  between enumerated branches):
+  1. Attribution: only facts about this payment count. Totals, balances, later instalments and
+     their dates, currencies named for other amounts, penalties are never a conflict. Unclear
+     attribution makes the condition open.
+  2. One definition of an open condition (amount, currency, deposit terms, due date, method,
+     schedule): said not agreed / disputed / awaiting confirmation / no demand until confirmed;
+     a different amount or date for this payment in the notes, even without the word "mismatch";
+     a placeholder `amount` or given `due_date` ("TBD"); `amount` with no currency tied to this
+     payment; partial payment with no stated remainder. Never open by themselves: missing
+     `due_date`, details to come in a separate invoice, balance after delivery, "go gently".
+  3. Ordered rules, first match wins, only D may ask for payment: A open condition → terms
+     confirmation (only the open points, nothing presented as agreed, no placeholder printed);
+     B received or cancelled → settled acknowledgment; C "do not ask yet" → hold-off
+     acknowledgment; D otherwise → payment request for the amount still due (stated remainder, else
+     `amount`).
 - The criteria live in the prompt only; `objective` stays neutral.
-- In a terms confirmation only the open points are named, and a placeholder is never printed as a
-  value. If `constraints.length` is too short, none of the values is named: the client is asked to
-  confirm only the conditions that are actually open.
+- If `constraints.length` is too short, no value is named: the client is asked to confirm only the
+  conditions that are actually open.
 - Billing notes take precedence over `amount` / `due_date`.
-- One open amount, date or parameter makes the whole message a terms confirmation.
-- The A06 output is just `text` (no `call_to_action`), so the closing line of each kind lives in `text`; the decision is the model's, so there is no structural flag.
+- The A06 output is just `text` (no `call_to_action`), so the closing line of each kind lives in
+  `text`; the decision is the model's, so there is no structural flag.
 
 ## Builds on ANY-601 (single A06 step)
 

@@ -566,10 +566,11 @@ def test_prepaid_request_max_length_floor_fits_longest_amount_and_due_date() -> 
     jsonschema.validate({**base, "constraints": {"max_length": floor}}, schema)
 
 
-# Disputed or unagreed terms must yield a terms-confirmation message, not a payment ask (for
-# example: notes say the deposit is disputed and no payment demand may go out until confirmed,
-# while the form still says "USD 1,200 by 7 October 2026"). Model behavior is only provable live
-# (ANY-604); the fake provider returns one fixed response, so the rule text is what is pinned.
+# ANY-602: the prompt decides the kind of message with one ordered rule list ("first matching rule
+# wins", only the last rule may ask for payment) over one definition of an open condition, so a
+# new case maps onto a bullet instead of a new branch that needs its own priority clause. Model
+# behavior is only provable live (ANY-604): the fake provider returns one fixed response, so the
+# rule text is what is pinned here.
 def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     prompt = " ".join(
         _load_prompt_template(
@@ -577,66 +578,47 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
         ).split()
     )
 
-    # Default is a payment request, unless one of the listed triggers applies.
-    assert (
-        "Default to a payment request unless the notes indicate unagreed or conflicting terms, "
-        "`context.amount` or a given `context.due_date` is a placeholder, the currency is unspecified"
-    ) in prompt
-    assert "is not agreed, is disputed or awaits confirmation" in prompt
-    assert 'placeholder such as "TBD"' in prompt
-    # An implicit discrepancy with the fields is a trigger even without "mismatch"/"not agreed".
-    assert (
-        "A plain discrepancy also triggers it, even when the notes never call it a mismatch"
-        in prompt
-    )
-    assert '`amount: USD 1,200` against "deposit is 50%, USD 1,000"' in prompt
-    assert '`due_date: 7 October` against "payment due after delivery on 20 October"' in prompt
-    assert (
-        "A total or balance in the notes is not a discrepancy when `context.amount` matches"
-        in prompt
-    )
-    # Unspecified currency is a trigger (not just permission to ask): bare number, notes silent.
-    assert "names no currency (a bare number, or one with other words" in prompt
-    assert "unspecified currency is an open point" in prompt
-    assert "before any payment" in prompt
-    # Not triggers: missing due date, details still to come.
-    assert "These are never a reason to ask for confirmation: a missing `due_date`" in prompt
-    # What a confirmation may and may not contain.
-    assert "Do not ask the client to pay or remit" in prompt
+    # Structure: attribution to this payment, one open-condition definition, ordered rules.
+    assert "Only facts about *this* payment" in prompt
+    assert "never a conflict with `context.amount` / `context.due_date`" in prompt
+    assert "the first matching rule wins" in prompt
+    assert "Only rule D may ask for payment" in prompt
+    rule_positions = [
+        prompt.index(marker)
+        for marker in (
+            "A. Any condition is open",
+            "B. The notes say this payment was already received or is cancelled",
+            "C. The notes say not to ask for payment yet",
+            "D. Otherwise",
+        )
+    ]
+    assert rule_positions == sorted(rule_positions)
+
+    # What opens a condition: every ANY-602 / review case is one bullet of this list.
+    for trigger in (
+        "not agreed, disputed, awaiting confirmation or contradicted",
+        "a different amount or due date for this payment",
+        '`amount: USD 1,200` against "deposit is 50%, USD 1,000"',
+        'placeholder such as "TBD"',
+        "an absent `due_date` is not a placeholder",
+        "names no currency (a bare number, or one with other words",
+        "do not tie a currency to this payment",
+        "part of this amount was already received and the notes do not state the remaining figure",
+    ):
+        assert trigger in prompt, trigger
+    assert "Never open by themselves: a missing `due_date`, payment details still to come" in prompt
+
+    # Rules A-C never ask for payment; a confirmation names only open points, no placeholders.
+    assert "Rules A–C never ask the client to pay or remit" in prompt
+    assert "confirm only the open conditions" in prompt
     assert "anything the notes call agreed stays stated as agreed" in prompt
-    # A placeholder due_date is unresolved (an absent one is not); a too-short limit never
-    # endorses a value.
-    assert "a given `context.due_date` is itself a placeholder" in prompt
-    assert "an absent `due_date` is not one" in prompt
-    assert "name none of them" in prompt
-    assert "without stating or endorsing any value" in prompt
-    assert "drop other detail before the open points" in prompt
-    assert "never exceeds `constraints.length`" in prompt
-    # Any other explicitly open essential condition triggers it; separate-invoice details do not.
-    assert "any other essential condition of this payment" in prompt
-    assert "payment details still to come" in prompt
-    # Hold-off notes get a non-payment acknowledgment, not a softened payment demand.
-    assert "the notes say not to ask for payment yet" in prompt
-    assert "Hold-off message" in prompt
-    assert "whether or not they call the terms agreed" in prompt
-    assert "If a term is also open, the terms confirmation takes priority" in prompt
-    assert "Write a short acknowledgment that you will wait, without a payment ask" in prompt
-    # Already received / cancelled payments are never asked for again.
-    assert "Settled message" in prompt
-    assert "already been received or the payment is cancelled: do not ask for payment" in prompt
-    # Partly paid: never re-ask the full amount. Currency must be tied to this payment.
-    assert "Partly settled" in prompt
-    assert "never ask for the full `context.amount` again" in prompt
-    assert "confirm the amount still due" in prompt
-    assert "do not tie a currency to this payment" in prompt
-    assert "several currencies with none named for this payment" in prompt
-    # A relative term ("Net 30 after invoice") is a real due date and is kept exactly.
-    assert "a real, non-placeholder due date or deadline" in prompt
-    assert '"Net 30 after invoice"' in prompt
-    # A placeholder is never printed as a date/amount; the fallback names only the open conditions.
-    assert 'A placeholder (`TBD`, "to be agreed") is never stated as a value' in prompt
+    assert "Never print a placeholder as a value" in prompt
+    # D asks for the amount still due, never the full amount after a partial payment.
+    assert (
+        "payment request for the amount still due: the remaining figure the notes state" in prompt
+    )
+    # Length fallback never endorses a value; a relative term is a real due date.
     assert "ask the client to confirm only the conditions that are actually open" in prompt
-    assert "without raising anything the notes call agreed" in prompt
-    assert "ask the client to confirm the payment amount and due date" not in prompt
-    # Closing line per kind: never a payment report in a confirmation.
-    assert "never ask the client to report a payment" in prompt
+    assert "without stating or endorsing any value" in prompt
+    assert '"Net 30 after invoice"' in prompt
+    assert "Rules A–C never ask the client to report a payment" in prompt
