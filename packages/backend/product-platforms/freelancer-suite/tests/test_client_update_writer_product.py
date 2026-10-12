@@ -596,7 +596,7 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
         in prompt
     )
     # Unspecified currency is a trigger (not just permission to ask): bare number, notes silent.
-    assert "bare number with no currency" in prompt
+    assert "names no currency (a bare number, or one with other words" in prompt
     assert "unspecified currency is an open point" in prompt
     assert "before any payment" in prompt
     # Not triggers: missing due date, details still to come.
@@ -621,6 +621,9 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     assert "whether or not they call the terms agreed" in prompt
     assert "If a term is also open, the terms confirmation takes priority" in prompt
     assert "Write a short acknowledgment that you will wait, without a payment ask" in prompt
+    # Already received / cancelled payments are never asked for again.
+    assert "Settled message" in prompt
+    assert "already been received or the payment is cancelled: do not ask for payment" in prompt
     # A relative term ("Net 30 after invoice") is a real due date and is kept exactly.
     assert "a real, non-placeholder due date or deadline" in prompt
     assert '"Net 30 after invoice"' in prompt
