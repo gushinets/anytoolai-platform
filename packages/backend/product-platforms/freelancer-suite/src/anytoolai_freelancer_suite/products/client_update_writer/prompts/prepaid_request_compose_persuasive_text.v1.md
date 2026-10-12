@@ -30,7 +30,8 @@ schedule) is open when any of these holds:
   payment demand may be sent until it is confirmed;
 - the notes state a different current amount or due date for this payment than `context.amount` /
   `context.due_date` (an earlier proposal the notes call rejected, superseded or replaced is history,
-  not a conflict), even without calling it a mismatch (for example `amount: USD 1,200` against
+  not a conflict), or an amount that the notes' own terms determine (for example "50% of an agreed
+  total of USD 2,000" is USD 1,000, against `amount: USD 1,200`), even without calling it a mismatch (for example `amount: USD 1,200` against
   "deposit is 50%, USD 1,000"; `due_date: 7 October` against "payment due after delivery on
   20 October");
 - `context.amount`, or a given `context.due_date`, is a placeholder such as "TBD" or "to be
@@ -55,7 +56,9 @@ X by Y" is a payment ask too), and never ask the client to report a payment.
 
 - A. The notes say that, as things stand now, this payment is received in full and stays settled,
   or is cancelled → settled
-  acknowledgment, whatever else is open (an obsolete "TBD" included). A payment that was reversed, refunded,
+  acknowledgment, whatever else is open (an obsolete "TBD" included), unless the notes say the received amount or
+  its terms are still disputed, or ask for clarification or a refund: a live dispute is an open
+  condition (rule B) and wins over the settled status. A payment that was reversed, refunded,
   charged back or whose status is unclear is not settled: its status is an open condition (rule B): a
   short thank-you for the payment, or a note that the request is withdrawn, without restating
   `context.amount` as owed.
