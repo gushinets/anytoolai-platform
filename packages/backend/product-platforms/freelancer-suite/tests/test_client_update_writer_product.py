@@ -510,7 +510,7 @@ def test_prepaid_request_weak_fixture_is_a_terms_confirmation() -> None:
 
     assert "amount" in text and "currency" in text
     assert "has been sent" not in text
-    assert not re.search(r"\b(send|pay|remit)\b", text)
+    assert not re.search(r"\b(send|pay|remit|wire|transfer|make a payment)\b", text)
 
 
 # ANY-603: neither fixture's input expresses urgency (the happy one has a plain date and firm
