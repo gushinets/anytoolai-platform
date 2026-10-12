@@ -647,12 +647,32 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     assert "confirm only the open conditions" in prompt
     # A settled/cancelled payment wins over an obsolete open condition; D states one amount only.
     assert 'whatever else is open (an obsolete "TBD" included)' in prompt
+    # A completed, undisputed refund of a cancelled request is settled (rule A), not open.
+    assert (
+        "A reversal or refund that is final and undisputed, with nothing owed, is not open"
+        in prompt
+    )
+    assert "a cancelled request stays in rule A" in prompt
     # "Received in full" must match the amount field; a different settled amount is a conflict.
     assert '"in full" means the settled amount equals `context.amount`' in prompt
     assert "USD 1,000 settled against `amount: USD 1,200`" in prompt
+    # A placeholder amount has nothing to compare: a fully settled payment stays in rule A.
+    assert 'a placeholder in `context.amount` ("TBD") compares with nothing' in prompt
+    # A currency the notes tie to this payment is stated with the number, which is unchanged.
+    assert "Always state the currency with the number, never a bare figure" in prompt
+    assert '`amount: USD 1,000` with "750 remains" is "USD 750"' in prompt
+    assert "A different currency in the notes is an open point, not a choice" in prompt
+    assert '`amount: 500` with "the currency is USD" is "USD 500"' in prompt
     # A currency named in the notes that differs from the amount field is a different amount.
     assert "a different current amount, currency or due date for this payment" in prompt
     assert '`amount: USD 500` against "the agreed currency is EUR"' in prompt
+    # A project total matters when this payment is computed from it and the total is not agreed.
+    assert "A project total is no exception when this payment is computed from it" in prompt
+    assert "is computed from a base (a total, a rate) that the notes say is not agreed" in prompt
+    assert "(50% of USD 2,000 or of USD 2,400)" in prompt
+    # Two *current* candidates open the base; a superseded base next to an agreed one does not.
+    assert "leave as two current candidates" in prompt
+    assert "a rejected or superseded base next to one agreed current base opens nothing" in prompt
     # Alternatives or a range are not one amount; a reversal goes to B, the thank-you stays in A.
     assert 'alternatives such as "USD 500 or EUR 460", or a range' in prompt
     assert "a short thank-you for the payment, or a note that the request is withdrawn" in prompt
@@ -671,7 +691,7 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     assert "an amount that the notes' own terms determine" in prompt
     # Only a currently settled payment is acknowledged; reversals are open; history is no conflict.
     assert "as things stand now, this payment is received in full and stays settled" in prompt
-    assert "reversed, refunded, charged back or its status is unclear" in prompt
+    assert "reversed or charged back and still stands, has a pending or contested refund" in prompt
     assert "rejected, superseded or replaced is history, not a conflict" in prompt
     assert (
         "the stated remaining figure after a partial receipt, else `context.amount`, never both"

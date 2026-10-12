@@ -14,7 +14,9 @@ payment) and its due date, a currency named only for other amounts, penalties, o
 are facts about something else: they
 are never a conflict with `context.amount` / `context.due_date` and never a reason to confirm terms
 (for example `amount: USD 500`, `due_date: 15 October` against "deposit USD 500 due 15 October,
-remaining USD 1,500 due 30 November" is consistent). What is left of *this* amount after a partial
+remaining USD 1,500 due 30 November" is consistent). A project total is no exception when this payment is computed from it (for example "deposit is 50%
+of the final fee"): if the notes say that total is not agreed or leave two current candidates, this amount is
+open; a total the notes call rejected or superseded is history, and the current one is the base. What is left of *this* amount after a partial
 receipt is part of this payment, not another one: its stated due date is a due date for this
 payment (`due_date: 15 October` against "remaining USD 750 due 30 October" is a different due date). When it is unclear whether a fact concerns
 this payment, treat the condition it touches as open (Step 2): a question costs less than an
@@ -34,6 +36,9 @@ schedule) is open when any of these holds:
   total of USD 2,000" is USD 1,000, against `amount: USD 1,200`), even without calling it a mismatch and even if the notes call that value agreed (for example `amount: USD 1,200` against
   "deposit is 50%, USD 1,000"; `due_date: 7 October` against "payment due after delivery on
   20 October");
+- `context.amount` is computed from a base (a total, a rate) that the notes say is not agreed or leave
+  as two current candidates, even if the rate itself is agreed (50% of USD 2,000 or of USD 2,400);
+  a rejected or superseded base next to one agreed current base opens nothing;
 - `context.amount`, or a given `context.due_date`, is a placeholder such as "TBD" or "to be
   agreed", or does not name one value (alternatives such as "USD 500 or EUR 460", or a range)
   (an absent `due_date` is not a placeholder);
@@ -60,10 +65,13 @@ X by Y" is a payment ask too), and never ask the client to report a payment.
   request is withdrawn, without restating `context.amount` as owed. It applies whatever else is
   open (an obsolete "TBD" included), but "in full" means the settled amount equals `context.amount`: a
   settled amount that differs from it (USD 1,000 settled against `amount: USD 1,200`) is a conflict
-  of this payment's amount and goes to rule B. Two more cases go to rule B instead: the notes say
+  of this payment's amount and goes to rule B; a placeholder in `context.amount` ("TBD") compares
+  with nothing, so it stays obsolete and the notes' settled amount stands. Two more cases go to rule B
+  instead: the notes say
   the received amount or its terms are still disputed, or ask for clarification or a refund (a live
-  dispute); or the payment was reversed, refunded, charged back or its status is unclear (a
-  payment that is not settled has an open status).
+  dispute); or the payment was reversed or charged back and still stands, has a pending or contested refund, or its
+  status is unclear (a payment that is not settled has an open status). A reversal or refund that is final
+  and undisputed, with nothing owed, is not open: a cancelled request stays in rule A.
 - B. Any condition is open → terms confirmation. Ask the client to confirm only the open
   conditions, named as stated or discussed, never as agreed; anything the notes call agreed and
   that conflicts with nothing stays stated as agreed. A value the notes call agreed that differs
@@ -85,7 +93,12 @@ Rules:
   covers). Do not invent a reason the payment is urgent, gating, or blocking (for example that other work will stall
   without it) beyond what `notes` itself says.
 - In a payment request (rule D) state the amount still due exactly as given: the stated remaining
-  figure after a partial receipt, else `context.amount`, never both. A terms confirmation shows an
+  figure after a partial receipt, else `context.amount`, never both. Always state the
+  currency with the number, never a bare figure, without changing the number: if the amount names no
+  currency, use the one the notes tie to this payment (`amount: 500` with "the currency is USD" is
+  "USD 500"); if the notes give the remainder as a bare number, use the currency of
+  `context.amount` (`amount: USD 1,000` with "750 remains" is "USD 750"). A different currency in
+  the notes is an open point, not a choice. A terms confirmation shows an
   amount or due date only as the stated value of an open point; rules A and C never present an
   amount or due date as owed or upcoming.
 - In a payment request, when `context.due_date` is a real, non-placeholder due date or deadline (a
