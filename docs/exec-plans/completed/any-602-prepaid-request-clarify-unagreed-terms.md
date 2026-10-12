@@ -30,15 +30,34 @@ confirmation, and the `objective` literal no longer asks for payment uncondition
 
 ## Decisions
 
-- Default is a payment request. It switches to a terms confirmation on: notes that say a term is
-  not agreed, disputed or awaiting confirmation (or forbid a payment demand until confirmed); an
-  implicit discrepancy, where the notes give an amount or due date that differs from the fields
-  even without calling it a mismatch; a placeholder `Amount` ("TBD"); or a bare-number `Amount`
-  with no currency that the notes do not state, even when the notes are otherwise silent. The criteria live in the prompt only; `objective` stays neutral.
-- Billing notes take precedence over `Amount` / `Due date`.
-- One disputed amount, date or parameter makes the whole message a terms confirmation.
-- Missing due date, payment details to come and balance after delivery never trigger a confirmation.
-- The A06 output is just `text` (no `call_to_action`), so the closing line of each kind lives in `text`; the decision is the model's, so there is no structural flag.
+- The prompt decides the kind of message in three steps, so a new case is a bullet, not a new
+  branch with its own priority clause (review rounds 1-10 kept finding pairwise priority gaps
+  between enumerated branches):
+  1. Attribution: only facts about this payment count. Totals, balances, later instalments and
+     their dates, currencies named for other amounts, penalties are never a conflict. Unclear
+     attribution makes the condition open.
+  2. One definition of an open condition (amount, currency, deposit terms, due date, method,
+     schedule): said not agreed / disputed / awaiting confirmation / no demand until confirmed;
+     a different current amount or currency (including one the notes' own terms compute, e.g. 50% of an agreed
+     total) or date for this payment in the notes, even without the word
+     "mismatch" (a superseded proposal is history, not a conflict);
+     a placeholder `amount` or given `due_date` ("TBD"), or one that names no single value
+     (alternatives like "USD 500 or EUR 460", a range); `amount` with no currency tied to this
+     payment; partial payment with no stated remainder or with received + remainder not adding up to
+     `amount`; the stated due date of the remainder of this amount differs from `due_date`. Never open by themselves: missing
+     `due_date`, details to come in a separate invoice, balance after delivery, "go gently".
+  3. Ordered rules, first match wins, only D may ask for payment: A currently received in full (not reversed, and the settled amount equals `amount`)
+     or cancelled → settled acknowledgment (wins over an obsolete open condition, but not over a live dispute of the received amount; a reversal or
+     unclear status is an open condition instead); B open condition → terms
+     confirmation (only the open points, nothing presented as agreed, no placeholder printed); C "do not ask yet" → hold-off
+     acknowledgment; D otherwise → payment request for the amount still due (stated remainder, else
+     `amount`).
+- The criteria live in the prompt only; `objective` stays neutral.
+- If `constraints.length` is too short, no value is named: the client is asked to confirm only the
+  conditions that are actually open.
+- Billing notes take precedence over `amount` / `due_date`.
+- The A06 output is just `text` (no `call_to_action`), so the closing line of each kind lives in
+  `text`; the decision is the model's, so there is no structural flag.
 
 ## Builds on ANY-601 (single A06 step)
 
