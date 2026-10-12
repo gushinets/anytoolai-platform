@@ -626,6 +626,8 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     # A currency the notes tie to this payment is stated with the number, which is unchanged.
     assert "Always state the currency with the number, never a bare figure" in prompt
     assert '`amount: USD 1,000` with "750 remains" is "USD 750"' in prompt
+    assert "The currency is the one `context.amount` names, else the one the notes tie" in prompt
+    assert '"300 remains" is "USD 300"' in prompt
     assert "A different currency in the notes is an open point, not a choice" in prompt
     assert '`amount: 500` with "the currency is USD" is "USD 500"' in prompt
     # A currency named in the notes that differs from the amount field is a different amount.

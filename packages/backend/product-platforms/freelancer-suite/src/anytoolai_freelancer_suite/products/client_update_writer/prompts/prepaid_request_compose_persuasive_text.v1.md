@@ -93,11 +93,11 @@ Rules:
   without it) beyond what `notes` itself says.
 - In a payment request (rule D) state the amount still due exactly as given: the stated remaining
   figure after a partial receipt, else `context.amount`, never both. Always state the
-  currency with the number, never a bare figure, without changing the number: if the amount names no
-  currency, use the one the notes tie to this payment (`amount: 500` with "the currency is USD" is
-  "USD 500"); if the notes give the remainder as a bare number, use the currency of
-  `context.amount` (`amount: USD 1,000` with "750 remains" is "USD 750"). A different currency in
-  the notes is an open point, not a choice. A terms confirmation shows an
+  currency with the number, never a bare figure, without changing the number. The currency is the
+  one `context.amount` names, else the one the notes tie to this payment; this holds for a bare
+  remainder too (`amount: USD 1,000` with "750 remains" is "USD 750"; `amount: 500` with "the
+  currency is USD" is "USD 500"; `amount: 500`, "the currency is USD", "300 remains" is "USD 300").
+  A different currency in the notes is an open point, not a choice. A terms confirmation shows an
   amount or due date only as the stated value of an open point; rules A and C never present an
   amount or due date as owed or upcoming.
 - In a payment request, when `context.due_date` is a real, non-placeholder due date or deadline (a
