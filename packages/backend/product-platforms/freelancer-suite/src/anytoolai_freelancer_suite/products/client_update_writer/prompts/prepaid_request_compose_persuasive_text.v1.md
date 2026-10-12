@@ -99,7 +99,8 @@ Rules:
 - Urgency in a payment request comes only from `context.notes` or the free text of
   `context.due_date` that themselves express urgency of this payment (for example "the payment is
   urgent", "needed ASAP", "оплата срочная", or `due_date: "Friday — ASAP"`; the due date is then
-  still stated exactly as given, urgency included). A plain date in
+  still stated exactly as given, urgency included; but when the notes say the payment is not
+  urgent or not to be rushed, the notes win: state only the date, without its urgency words). A plain date in
   `context.due_date`, a placeholder `due_date`, `constraints.tone: firm`, or incidental time
   words in the notes ("we agreed the deposit today") are not urgency, and neither is "not urgent,
   no rush". State a given `due_date` exactly as given and add no urgency words of your own. With

@@ -402,7 +402,7 @@ def test_prepaid_request_happy_fixture_does_not_tighten_the_due_date(action_conf
 # examples, the rule is by meaning.
 _URGENCY_PATTERN = re.compile(
     r"\b(now|promptly|today|asap|soon|shortly|quickly|immediately|urgent(ly)?|urgency|at once"
-    r"|right away|straight away|without delay)\b|as soon as|this week",
+    r"|right away|straight away|without delay)\b|as soon as",
     re.IGNORECASE,
 )
 
@@ -506,10 +506,11 @@ def test_prepaid_request_fixture_asks_to_be_told_once_sent(
     assert "let me know once it has been sent" in text
 
 
-# ANY-603: the weak fixture has no deadline in its input, so it must stay neutral. The happy
-# fixture has a due date, so urgency there is allowed.
-def test_prepaid_request_weak_fixture_has_no_urgency() -> None:
-    text = _prepaid_fixture_text(".weak_input").lower()
+# ANY-603: neither fixture's input expresses urgency (the happy one has a plain date and firm
+# tone, the weak one no deadline), so both must stay neutral.
+@pytest.mark.parametrize("fixture_suffix", ["", ".weak_input"])
+def test_prepaid_request_fixtures_have_no_urgency(fixture_suffix: str) -> None:
+    text = _prepaid_fixture_text(fixture_suffix).lower()
 
     assert _URGENCY_PATTERN.search(text) is None
 
@@ -522,6 +523,7 @@ def test_prepaid_request_prompt_gates_urgency_on_the_input() -> None:
     assert "Urgency in a payment request comes only from `context.notes`" in prompt
     assert "or the free text of `context.due_date` that themselves express urgency" in prompt
     assert '`due_date: "Friday — ASAP"`' in prompt
+    assert "the notes win: state only the date, without its urgency words" in prompt
     assert "A plain date in `context.due_date`, a placeholder `due_date`" in prompt
     assert "add no urgency words of your own" in prompt
     assert "Without it, make a neutral request" in prompt
