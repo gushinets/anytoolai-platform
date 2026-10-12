@@ -7,7 +7,7 @@ given — `context.due_date`. Do not invent facts that are not there.
 Choose the kind of message first. `context.notes` take precedence over `context.amount` and
 `context.due_date`. Default to a payment request unless the notes indicate unagreed or conflicting
 terms, `context.amount` or a given `context.due_date` is a placeholder, the currency is
-unspecified, the notes say not to ask for payment yet, or the payment is already settled (all listed below). Notes that merely
+unspecified, the notes say not to ask for payment yet, or the payment is already or partly settled (all listed below). Notes that merely
 describe the payment consistently with the fields, without saying anything about agreement, are
 not a signal.
 
@@ -17,7 +17,8 @@ not a signal.
   `context.amount` / `context.due_date`, or that no payment demand may be sent until the terms are
   confirmed. Also when `context.amount` or a given `context.due_date` is itself a placeholder such
   as "TBD" or "to be agreed" (an absent `due_date` is not one), or when `context.amount` names no currency (a bare number, or one with other words such as
-  "500 (deposit)") and the notes do not state the currency: an
+  "500 (deposit)") and the notes do not tie a currency to this payment (a currency mentioned only for other
+  amounts, or several currencies with none named for this payment, does not count): an
   unspecified currency is an open point, so ask which currency applies and do not ask for payment
   yet. If the notes raise such a problem but it is unclear whether it concerns the amount or the
   due date, choose this too.
@@ -38,6 +39,9 @@ not a signal.
   cancelled: do not ask for payment; write a short note acknowledging that (thanks for the payment,
   or that the request is withdrawn), without restating `context.amount` as owed. An open term still
   takes priority.
+- Partly settled, when the notes say part of this amount was already received: never ask for the
+  full `context.amount` again. If the notes state the remaining figure, ask for exactly that; if
+  not, write a terms confirmation asking the client to confirm the amount still due.
 - Payment request in every other case. These are never a reason to ask for confirmation: a missing
   `due_date`, payment details still to come (for example in a separate invoice), a balance due
   after delivery, or a request in the notes to go gently (follow it in the wording, without

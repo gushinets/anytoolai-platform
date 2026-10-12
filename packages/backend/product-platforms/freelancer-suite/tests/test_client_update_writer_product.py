@@ -624,6 +624,12 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     # Already received / cancelled payments are never asked for again.
     assert "Settled message" in prompt
     assert "already been received or the payment is cancelled: do not ask for payment" in prompt
+    # Partly paid: never re-ask the full amount. Currency must be tied to this payment.
+    assert "Partly settled" in prompt
+    assert "never ask for the full `context.amount` again" in prompt
+    assert "confirm the amount still due" in prompt
+    assert "do not tie a currency to this payment" in prompt
+    assert "several currencies with none named for this payment" in prompt
     # A relative term ("Net 30 after invoice") is a real due date and is kept exactly.
     assert "a real, non-placeholder due date or deadline" in prompt
     assert '"Net 30 after invoice"' in prompt

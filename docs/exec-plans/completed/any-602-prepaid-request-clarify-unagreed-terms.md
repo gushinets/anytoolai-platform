@@ -37,12 +37,15 @@ confirmation, and the `objective` literal no longer asks for payment uncondition
     when the notes give an amount or due date that differs from the fields, even without calling it
     a mismatch; when `amount` or a given `due_date` is a placeholder ("TBD", "to be agreed"); or
     when `amount` names no currency (a bare number or e.g. "500 (deposit)") that the notes do not
-    state.
+    tie to this payment (a currency for other amounts, or several currencies with none named for
+    this payment, does not count).
   - Hold-off message (a short "we will wait" note, no payment ask), when the notes explicitly say
     not to ask for payment yet for a reason other than unagreed terms, whether or not they call the
     terms agreed; an open term takes priority and gives a terms confirmation.
   - Settled message (a short acknowledgment, no payment ask), when the notes say the amount was
     already received or the payment is cancelled.
+  - Partly settled: never re-ask the full `amount`; ask for the remaining figure if the notes state
+    it, otherwise a terms confirmation of the amount still due.
   - Payment request otherwise. A real due date, including a relative one ("Net 30 after
     invoice"), is stated exactly; an absent `due_date`, payment details to come in a separate
     invoice, a balance after delivery and a "go gently" note never trigger a confirmation.
