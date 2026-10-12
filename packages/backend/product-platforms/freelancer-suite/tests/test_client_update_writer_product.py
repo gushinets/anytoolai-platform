@@ -625,7 +625,9 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     assert '"in full" means the settled amount equals `context.amount`' in prompt
     assert "USD 1,000 settled against `amount: USD 1,200`" in prompt
     # A currency the notes tie to this payment is stated with the number, which is unchanged.
-    assert "state it with the number, without changing the number" in prompt
+    assert "Always state the currency with the number, never a bare figure" in prompt
+    assert '`amount: USD 1,000` with "750 remains" is "USD 750"' in prompt
+    assert "A different currency in the notes is an open point, not a choice" in prompt
     assert '`amount: 500` with "the currency is USD" is "USD 500"' in prompt
     # A currency named in the notes that differs from the amount field is a different amount.
     assert "a different current amount, currency or due date for this payment" in prompt
