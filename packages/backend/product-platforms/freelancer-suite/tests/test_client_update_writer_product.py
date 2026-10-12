@@ -615,6 +615,9 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     assert "confirm only the open conditions" in prompt
     # A settled/cancelled payment wins over an obsolete open condition; D states one amount only.
     assert 'whatever else is open (an obsolete "TBD" included)' in prompt
+    # The due date is echoed only in a payment request; A and C never present it as upcoming.
+    assert "In a payment request, when `context.due_date` is a real, non-placeholder" in prompt
+    assert "rules A and C never present an amount or due date as owed or upcoming" in prompt
     # A live dispute beats the settled status; a computed deposit is a "different amount".
     assert "a live dispute is an open condition (rule B) and wins over the settled status" in prompt
     assert "an amount that the notes' own terms determine" in prompt

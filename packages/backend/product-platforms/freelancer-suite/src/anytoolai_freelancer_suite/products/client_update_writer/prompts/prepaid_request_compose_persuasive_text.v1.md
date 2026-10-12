@@ -82,9 +82,12 @@ Rules:
   without it) beyond what `notes` itself says.
 - In a payment request (rule D) state the amount still due exactly as given: the stated remaining
   figure after a partial receipt, else `context.amount`, never both. A terms confirmation shows an
-  amount only as the stated value of an open point; rules A and C never present an amount as owed. When `context.due_date` is a real, non-placeholder due date or deadline (a calendar date or a
-  relative term such as "Net 30 after invoice" or "within 14 days of delivery"), state it exactly
-  too — do not tighten it to an earlier date (for example writing "before Friday" when the due date is "Friday"; use
+  amount or due date only as the stated value of an open point; rules A and C never present an
+  amount or due date as owed or upcoming.
+- In a payment request, when `context.due_date` is a real, non-placeholder due date or deadline (a
+  calendar date or a relative term such as "Net 30 after invoice" or "within 14 days of delivery")
+  and the notes give no other due date for the amount still due, state it exactly — do not tighten
+  it to an earlier date (for example writing "before Friday" when the due date is "Friday"; use
   "by Friday" or "due Friday"). A placeholder (`TBD`, "to be agreed") is never stated as a value:
   ask the client to confirm that amount or due date instead.
 - If `context` has no `due_date`, do not state or imply any date, deadline or time frame (for
