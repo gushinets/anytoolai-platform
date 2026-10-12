@@ -15,8 +15,8 @@ are facts about something else: they
 are never a conflict with `context.amount` / `context.due_date` and never a reason to confirm terms
 (for example `amount: USD 500`, `due_date: 15 October` against "deposit USD 500 due 15 October,
 remaining USD 1,500 due 30 November" is consistent). A project total is no exception when this payment is computed from it (for example "deposit is 50%
-of the final fee"): if the notes say that total is not agreed or give two candidates, this amount is
-open. What is left of *this* amount after a partial
+of the final fee"): if the notes say that total is not agreed or leave two current candidates, this amount is
+open; a total the notes call rejected or superseded is history, and the current one is the base. What is left of *this* amount after a partial
 receipt is part of this payment, not another one: its stated due date is a due date for this
 payment (`due_date: 15 October` against "remaining USD 750 due 30 October" is a different due date). When it is unclear whether a fact concerns
 this payment, treat the condition it touches as open (Step 2): a question costs less than an
@@ -36,8 +36,9 @@ schedule) is open when any of these holds:
   total of USD 2,000" is USD 1,000, against `amount: USD 1,200`), even without calling it a mismatch and even if the notes call that value agreed (for example `amount: USD 1,200` against
   "deposit is 50%, USD 1,000"; `due_date: 7 October` against "payment due after delivery on
   20 October");
-- `context.amount` is computed from a base (a total, a rate) that the notes say is not agreed or give
-  in two versions, even if the rate itself is agreed (50% of USD 2,000 or of USD 2,400);
+- `context.amount` is computed from a base (a total, a rate) that the notes say is not agreed or leave
+  as two current candidates, even if the rate itself is agreed (50% of USD 2,000 or of USD 2,400);
+  a rejected or superseded base next to one agreed current base opens nothing;
 - `context.amount`, or a given `context.due_date`, is a placeholder such as "TBD" or "to be
   agreed", or does not name one value (alternatives such as "USD 500 or EUR 460", or a range)
   (an absent `due_date` is not a placeholder);

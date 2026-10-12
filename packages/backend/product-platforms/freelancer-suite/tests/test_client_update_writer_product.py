@@ -636,6 +636,9 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     assert "A project total is no exception when this payment is computed from it" in prompt
     assert "is computed from a base (a total, a rate) that the notes say is not agreed" in prompt
     assert "(50% of USD 2,000 or of USD 2,400)" in prompt
+    # Two *current* candidates open the base; a superseded base next to an agreed one does not.
+    assert "leave as two current candidates" in prompt
+    assert "a rejected or superseded base next to one agreed current base opens nothing" in prompt
     # Alternatives or a range are not one amount; a reversal goes to B, the thank-you stays in A.
     assert 'alternatives such as "USD 500 or EUR 460", or a range' in prompt
     assert "a short thank-you for the payment, or a note that the request is withdrawn" in prompt
