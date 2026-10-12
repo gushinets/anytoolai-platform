@@ -618,7 +618,9 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     # Hold-off notes get a non-payment acknowledgment, not a softened payment demand.
     assert "the notes say not to ask for payment yet" in prompt
     assert "Hold-off message" in prompt
-    assert "write a short acknowledgment that you will wait, without a payment ask" in prompt
+    assert "whether or not they call the terms agreed" in prompt
+    assert "If a term is also open, the terms confirmation takes priority" in prompt
+    assert "Write a short acknowledgment that you will wait, without a payment ask" in prompt
     # A placeholder is never printed as a date/amount; the fallback names only the open conditions.
     assert 'A placeholder (`TBD`, "to be agreed") is never stated as a value' in prompt
     assert "ask the client to confirm only the conditions that are actually open" in prompt

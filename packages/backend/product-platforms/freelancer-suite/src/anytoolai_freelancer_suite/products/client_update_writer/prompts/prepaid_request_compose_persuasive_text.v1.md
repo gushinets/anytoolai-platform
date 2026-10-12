@@ -26,8 +26,10 @@ not a signal.
   `due_date: 7 October` against "payment due after delivery on 20 October"). A total or balance in
   the notes is not a discrepancy when `context.amount` matches the deposit or prepayment the notes
   describe.
-- Hold-off message, when the notes agree the terms but say not to ask for payment yet (for
-  example "do not send a payment request until the client's review is done"): write a short
+- Hold-off message, when the notes explicitly say not to ask for payment yet for a reason other
+  than unagreed terms (for example "do not request payment yet, we are waiting for the client's
+  review"), whether or not they call the terms agreed. If a term is also open, the terms
+  confirmation takes priority. Write a short
   acknowledgment that you will wait, without a payment ask, without turning `context.amount` or
   `context.due_date` into an amount or date to pay, and without asking the client to report a
   payment.
