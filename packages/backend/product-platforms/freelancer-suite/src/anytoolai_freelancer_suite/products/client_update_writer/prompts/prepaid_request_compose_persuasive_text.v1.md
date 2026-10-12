@@ -6,16 +6,17 @@ given — `context.due_date`. Do not invent facts that are not there.
 
 Choose the kind of message first. `context.notes` take precedence over `context.amount` and
 `context.due_date`. Default to a payment request unless the notes indicate unagreed or conflicting
-terms, `context.amount` or a given `context.due_date` is a placeholder, or the currency is unspecified (all listed below). Notes
-that merely describe the payment consistently with the fields, without saying anything about
-agreement, are not a signal.
+terms, `context.amount` or a given `context.due_date` is a placeholder, the currency is
+unspecified, or the notes say not to ask for payment yet (all listed below). Notes that merely
+describe the payment consistently with the fields, without saying anything about agreement, are
+not a signal.
 
 - Terms confirmation, only if the notes explicitly say that the amount (or its currency, or the
-  deposit terms) or the due date is not agreed, is disputed or awaits confirmation, contradicts
+  deposit terms), the due date or any other essential condition of this payment (for example the
+  payment method or schedule) is not agreed, is disputed or awaits confirmation, contradicts
   `context.amount` / `context.due_date`, or that no payment demand may be sent until the terms are
-  confirmed. Also when `context.amount` or a given `context.due_date` is itself a placeholder such as "TBD" or
-  "to be agreed" (an absent `due_date` is not one), or
-  when it is a bare number with no currency and the notes do not state the currency: an
+  confirmed. Also when `context.amount` or a given `context.due_date` is itself a placeholder such
+  as "TBD" or "to be agreed" (an absent `due_date` is not one), or when `context.amount` is a bare number with no currency and the notes do not state the currency: an
   unspecified currency is an open point, so ask which currency applies and do not ask for payment
   yet. If the notes raise such a problem but it is unclear whether it concerns the amount or the
   due date, choose this too.
@@ -25,17 +26,23 @@ agreement, are not a signal.
   `due_date: 7 October` against "payment due after delivery on 20 October"). A total or balance in
   the notes is not a discrepancy when `context.amount` matches the deposit or prepayment the notes
   describe.
+- Hold-off message, when the notes agree the terms but say not to ask for payment yet (for
+  example "do not send a payment request until the client's review is done"): write a short
+  acknowledgment that you will wait, without a payment ask, without turning `context.amount` or
+  `context.due_date` into an amount or date to pay, and without asking the client to report a
+  payment.
 - Payment request in every other case. These are never a reason to ask for confirmation: a missing
   `due_date`, payment details still to come (for example in a separate invoice), a balance due
-  after delivery, or a request in the notes to hold off or go gently for a reason other than
-  unagreed terms (follow it in the wording, without inventing a date).
+  after delivery, or a request in the notes to go gently (follow it in the wording, without
+  inventing a date).
 
 In a terms confirmation, ask the client to confirm only the open points, named as stated or
 discussed, never as agreed; anything the notes call agreed stays stated as agreed. Do not ask the
 client to pay or remit, do not present either version of an open point as agreed, and do not turn
 `context.amount` or `context.due_date` into an amount or date to pay ("once you confirm, please pay
 X by Y" is also a payment ask). Asking for information the terms need (for example the currency,
-which comes before any payment) is fine. Do not show "TBD"-style placeholders as values.
+which comes before any payment) is fine. Do not show "TBD"-style placeholders as values; ask the
+client to confirm that amount or due date instead.
 
 Rules:
 
@@ -45,9 +52,10 @@ Rules:
   reason the payment is urgent, gating, or blocking (for example that other work will stall
   without it) beyond what `notes` itself says.
 - State `context.amount` exactly as given (in a terms confirmation, only as the stated value of an
-  open point, and never a placeholder). When `context.due_date` is given, state it exactly too —
-  do not tighten it to an earlier date (for example writing "before Friday" when the due date is
-  "Friday"; use "by Friday" or "due Friday").
+  open point). When `context.due_date` is a genuine date, state it exactly too — do not tighten it
+  to an earlier date (for example writing "before Friday" when the due date is "Friday"; use
+  "by Friday" or "due Friday"). A placeholder (`TBD`, "to be agreed") is never stated as a value:
+  ask the client to confirm that amount or due date instead.
 - If `context` has no `due_date`, do not state or imply any date, deadline or time frame (for
   example "by end of week" or "within 3 days") unless `context.notes` itself states one. In a payment request, keep the
   urgency of `objective` ("promptly") without turning it into a date, and do not soften it into an
@@ -56,15 +64,17 @@ Rules:
   are kept as stated, but briefly: when `constraints.length` is set, shortening the notes takes
   precedence over keeping every detail; in a terms confirmation, drop other detail before the open
   points. `text` (including the closing line) never exceeds `constraints.length`. If the limit is too short
-  to name every open value, name none of them: ask the client to confirm the payment amount and
-  due date without stating or endorsing any value.
+  to name every open value, name none of them: ask the client to confirm only the conditions that
+  are actually open (or "the unresolved payment terms" if even those labels do not fit), without
+  stating or endorsing any value and without raising anything the notes call agreed.
 - End the message matching its kind. Payment request: ask the client to let the caller know once the
   payment has been sent; do not phrase it as the client confirming *receipt* of something (the
   client is sending the payment). Terms confirmation: end with a short request to reply with the
   confirmation, and never ask the client to report a payment.
 - Do not state a payment method, link, reference, or account details (for example a bank name,
-  PayPal address, invoice number, or "the account on file") — `context` never contains any, so any
-  such detail would be invented.
+  PayPal address, invoice number, or "the account on file") unless `context.notes` states it —
+  `context.amount` and `context.due_date` never contain any, so any other such detail would be
+  invented. Naming an open payment condition (for example "the payment method") is fine.
 - Match `constraints.tone` (`neutral`, `warm`, or `firm`) when provided.
 - Write in the `constraints.language` locale when provided (for example `en` or `en-US`); default
   to the language of `context.notes` otherwise.

@@ -580,7 +580,7 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     # Default is a payment request, unless one of the listed triggers applies.
     assert (
         "Default to a payment request unless the notes indicate unagreed or conflicting terms, "
-        "`context.amount` or a given `context.due_date` is a placeholder, or the currency is unspecified"
+        "`context.amount` or a given `context.due_date` is a placeholder, the currency is unspecified"
     ) in prompt
     assert "is not agreed, is disputed or awaits confirmation" in prompt
     assert 'placeholder such as "TBD"' in prompt
@@ -612,5 +612,17 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     assert "without stating or endorsing any value" in prompt
     assert "drop other detail before the open points" in prompt
     assert "never exceeds `constraints.length`" in prompt
+    # Any other explicitly open essential condition triggers it; separate-invoice details do not.
+    assert "any other essential condition of this payment" in prompt
+    assert "payment details still to come" in prompt
+    # Hold-off notes get a non-payment acknowledgment, not a softened payment demand.
+    assert "the notes say not to ask for payment yet" in prompt
+    assert "Hold-off message" in prompt
+    assert "write a short acknowledgment that you will wait, without a payment ask" in prompt
+    # A placeholder is never printed as a date/amount; the fallback names only the open conditions.
+    assert 'A placeholder (`TBD`, "to be agreed") is never stated as a value' in prompt
+    assert "ask the client to confirm only the conditions that are actually open" in prompt
+    assert "without raising anything the notes call agreed" in prompt
+    assert "ask the client to confirm the payment amount and due date" not in prompt
     # Closing line per kind: never a payment report in a confirmation.
     assert "never ask the client to report a payment" in prompt
