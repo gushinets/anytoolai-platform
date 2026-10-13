@@ -1286,6 +1286,22 @@ class TestPersuasiveTextProductConstraints:
                 "I have 4 years of experience and can build 5 pages for 3,200 EUR.",
             ),
             ({"numbers_must_appear_in_context": True}, {}, "No digits at all."),
+            # a thousands separator is read both ways, in the input and in the text
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Need 3 500-word blog posts"},
+                "I can write 3 posts of 500 words.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "We have 12 100 clients"},
+                "I will handle 12 100 clients and also 12.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Budget 3200 EUR"},
+                "Your budget of 3,200 EUR is clear.",
+            ),
             ({"numbers_must_appear_in_context": False}, {}, "Invented 999 EUR is not checked."),
         ],
     )
@@ -1311,6 +1327,11 @@ class TestPersuasiveTextProductConstraints:
                 {"numbers_must_appear_in_context": True},
                 {"freelancer_positioning": "Make and n8n automation"},
                 "Ready in 3 days.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Need 3 500-word blog posts"},
+                "I can write 4 posts of 500 words.",
             ),
         ],
     )

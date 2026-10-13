@@ -162,6 +162,8 @@ def test_litellm_adapter_sends_direct_lab_model_and_reasoning_without_alias_subs
             "timeout": 60.0,
             "num_retries": 0,
             "reasoning_effort": "high",
+            # a model LiteLLM does not list yet would otherwise reject the parameter
+            "allowed_openai_params": ["reasoning_effort"],
         }
     ]
 

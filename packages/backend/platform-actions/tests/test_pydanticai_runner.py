@@ -77,9 +77,13 @@ def _capture_agent_infos(monkeypatch: pytest.MonkeyPatch) -> list[Any]:
     return captured
 
 
-def test_schema_bound_request_binds_json_schema_into_output_contract(
+def test_schema_bound_request_takes_plain_text_so_our_own_parser_decides(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """PydanticAI's JSON parser rejects a raw newline in a string, or a reply without the JSON
+    wrapper, before any output validator runs. The agent therefore takes plain text and the
+    platform's own validator (tolerant parser, own retry message) is the one that decides. The
+    schema still reaches the model through the adapter's guidance message, not PydanticAI's."""
     captured = _capture_agent_infos(monkeypatch)
     runner = PydanticAIStructuredRunner()
     request = _base_request(response_schema=SCHEMA)
@@ -94,12 +98,48 @@ def test_schema_bound_request_binds_json_schema_into_output_contract(
 
     assert result.structured_output == {"name": "Ada"}
     params = captured[-1].model_request_parameters
-    assert params.output_mode == "prompted"
-    assert params.output_object is not None
-    assert params.output_object.json_schema == SCHEMA
-    # template=False is required: the LiteLLM adapter already injects its own schema
-    # guidance message, so PromptedOutput must not inject a second one.
-    assert params.prompted_output_template is False
+    assert params.output_mode == "text"
+    assert params.output_object is None
+
+
+def test_a_raw_newline_inside_a_json_string_is_accepted() -> None:
+    runner = PydanticAIStructuredRunner()
+    request = _base_request(response_schema=SCHEMA)
+
+    result = asyncio.run(
+        runner.run(
+            request,
+            request_executor=_fixed_executor('{"name": "Ada\n\nLovelace"}'),
+            validation_max_attempts=1,
+        )
+    )
+
+    assert result.structured_output == {"name": "Ada\n\nLovelace"}
+
+
+def test_a_reply_without_the_json_wrapper_gets_our_retry_message_and_can_recover() -> None:
+    runner = PydanticAIStructuredRunner()
+    request = _base_request(response_schema=SCHEMA)
+    seen_prompts: list[str] = []
+
+    async def request_executor(attempt: ProviderRequest) -> ProviderResponse:
+        seen_prompts.append(" ".join(message.content for message in attempt.messages))
+        output = "Ada Lovelace" if len(seen_prompts) == 1 else '{"name": "Ada"}'
+        return ProviderResponse(
+            provider_policy_ref=attempt.provider_policy_ref,
+            provider="fake",
+            model="fake-json-v1",
+            output_text=output,
+            status=ProviderCallStatus.succeeded,
+        )
+
+    result = asyncio.run(
+        runner.run(request, request_executor=request_executor, validation_max_attempts=2)
+    )
+
+    assert result.structured_output == {"name": "Ada"}
+    assert len(seen_prompts) == 2
+    assert "Reply with exactly one JSON object" in seen_prompts[1]
 
 
 def test_schema_less_request_stays_on_text_output(

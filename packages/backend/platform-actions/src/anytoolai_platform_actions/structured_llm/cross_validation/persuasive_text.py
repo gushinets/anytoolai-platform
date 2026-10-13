@@ -13,8 +13,11 @@ from ._shared import (
     _truncated_repr,
 )
 
-# A thousands separator (comma, space, no-break/narrow space) between digit groups is dropped on
-# both sides before comparing, so "3 200" in the input matches "3,200" in the text.
+# A thousands separator (comma, space, no-break/narrow space) between digit groups is read both ways:
+# "3 200" is the one number 3200 and also the two numbers 3 and 200. A text number is accepted when it
+# matches either reading of the context, and a text is accepted when either reading of the text is
+# fully covered, so "3,200" in the input matches "3 200" in the text and "3 500-word posts" matches
+# "3 posts of 500 words".
 _THOUSANDS_SEPARATOR = re.compile(r"(?<=\d)[,\u00a0\u202f ](?=\d{3}(?!\d))")
 _DIGIT_RUN = re.compile(r"\d+")
 
@@ -32,8 +35,12 @@ def _context_strings(value: Any) -> Iterator[str]:
         yield str(value)
 
 
-def _digit_runs(value: str) -> set[str]:
-    return set(_DIGIT_RUN.findall(_THOUSANDS_SEPARATOR.sub("", value)))
+def _digit_runs(value: str) -> tuple[set[str], set[str]]:
+    """(numbers as written, numbers with thousands separators joined)."""
+    return (
+        set(_DIGIT_RUN.findall(value)),
+        set(_DIGIT_RUN.findall(_THOUSANDS_SEPARATOR.sub("", value))),
+    )
 
 
 class PersuasiveTextInputValidator:
@@ -107,11 +114,12 @@ class PersuasiveTextCrossValidator:
         if constraints.get("plain_text_lists") == "forbidden" and _has_list(text):
             raise _cross_validation_error("text_contains_list")
         if constraints.get("numbers_must_appear_in_context"):
-            allowed = set()
+            allowed: set[str] = set()
             for chunk in _context_strings(input_payload.get("context")):
-                allowed |= _digit_runs(chunk)
-            invented = sorted(_digit_runs(text) - allowed)
-            if invented:
+                allowed.update(*_digit_runs(chunk))
+            as_written, joined = _digit_runs(text)
+            if not (as_written <= allowed or joined <= allowed):
+                invented = sorted(min(as_written - allowed, joined - allowed, key=len))
                 raise _cross_validation_error(
                     f"text_has_numbers_absent_from_context:{_truncated_repr(','.join(invented))}"
                 )
