@@ -38,6 +38,7 @@ export const pt: Shape<typeof en> = {
     copying: "Copiando…",
     copied: "Copiado",
     copyFailed: "Não foi possível copiar para a área de transferência. Copie o texto acima manualmente.",
+    selectText: "Selecionar texto",
   },
   // Code review finding: outerWhitespace/maxLength made `{field}` the subject of "pode"/"deve"
   // (which agree in number: pode/podem, deve/devem) -- every message is now a label-colon-fragment

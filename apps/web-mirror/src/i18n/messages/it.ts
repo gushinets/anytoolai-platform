@@ -19,7 +19,7 @@ export const it: Shape<typeof en> = {
   starting: "Avvio in corso…",
   generating: "Generazione in corso…",
   identityUnavailable: "Non è stato possibile verificare la sua identità. Ricaricare la pagina e riprovare.",
-  retry: "Riprovare",
+  retry: "Riprovi",
   formLabel: "Modulo {product}",
   workspace: {
     inputTitle: "I suoi dati",
@@ -37,10 +37,11 @@ export const it: Shape<typeof en> = {
     tryAgain: "Riprovare.",
   },
   result: {
-    copy: "Copiare",
+    copy: "Copi",
     copying: "Copia in corso…",
     copied: "Copiato",
     copyFailed: "Impossibile copiare negli appunti. Copiare manualmente il testo qui sopra.",
+    selectText: "Selezioni il testo",
   },
   // Code review finding: outerWhitespace/maxLength made `{field}` the subject of "deve" (which
   // agrees in number: deve/devono) -- every message is now a label-colon-fragment instead, matching

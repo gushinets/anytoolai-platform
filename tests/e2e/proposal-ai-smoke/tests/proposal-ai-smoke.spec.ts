@@ -114,9 +114,10 @@ test.describe("ProposalAI web product", () => {
     await expect(page.getByRole("radio", { name: "Warm & personable" })).toBeChecked();
     const form = page.getByRole("form", { name: "ProposalAI form" });
     await expect(page.locator("header").getByRole("combobox", { name: "Language" })).toBeVisible();
-    // The UI selector is in the header; the form still has no output-language field.
+    // The header selector is the interface language; the form's own select is the proposal
+    // language and defaults to "auto" (the task's language, nothing sent).
     await expect(form.getByRole("textbox", { name: /Language/i })).toHaveCount(0);
-    await expect(form.getByRole("combobox", { name: /Language/i })).toHaveCount(0);
+    await expect(form.getByRole("combobox", { name: "Proposal language" })).toHaveValue("auto");
 
     const nextActionRequests: string[] = [];
     page.on("request", (request) => {
@@ -176,7 +177,7 @@ test.describe("ProposalAI web product", () => {
 
     await page.getByRole("button", { name: "Generate proposal" }).click();
     await expect(page.getByText("Task description: required.")).toBeVisible();
-    await expect(page.getByText("Your positioning: required.")).toBeVisible();
+    await expect(page.getByText("Your experience and strengths: required.")).toBeVisible();
     expect(startRequested).toBe(false);
   });
 
@@ -199,8 +200,8 @@ test.describe("ProposalAI web product", () => {
 
     await page.route("**/v1/results/**", async (route) => {
       const response = await route.fetch();
-      const body = (await response.json()) as { output: { text: string } };
-      body.output = { text: weakInputText };
+      const body = (await response.json()) as { output: { text: string; gaps: unknown[] } };
+      body.output = { ...body.output, text: weakInputText };
       await route.fulfill({ response, json: body });
     });
 
@@ -328,9 +329,9 @@ test.describe("ProposalAI web product", () => {
   test("language switch: the UI changes and persists across reload, entered values and tone stay", async ({
     page,
   }) => {
-    // ANY-521 dropped the UI-visible language field entirely (output language now derives from
-    // task_text), so UI-locale independence from generated-content language holds trivially here --
-    // this only proves entered form state (text + the radio-group tone choice) survives a switch.
+    // The interface language (header) and the proposal language (form select, default "auto") are
+    // separate controls -- this proves entered form state (text + the radio-group tone choice)
+    // survives an interface switch.
     await page.goto(PRODUCT_URL);
     await expect(page.getByRole("button", { name: "Generate proposal" })).toBeVisible();
     await page.locator("#proposal-ai-task-text").fill("Write a landing page hero section for a bakery.");

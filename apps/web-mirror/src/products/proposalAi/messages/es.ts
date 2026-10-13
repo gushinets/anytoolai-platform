@@ -10,10 +10,14 @@ export const es: Shape<typeof en> = {
     taskText: "Describa la tarea",
     taskTextPlaceholder: "Pegue la tarea, el briefing o la oferta de trabajo del cliente.",
     taskTextHelp: "Incluya el objetivo, los entregables, las restricciones y el plazo cuando estén disponibles.",
-    freelancerPositioning: "Su posicionamiento",
+    freelancerPositioning: "Su experiencia y puntos fuertes",
     freelancerPositioningPlaceholder: "Describa la experiencia y los puntos fuertes que lo convierten en la persona adecuada.",
-    freelancerPositioningHelp: "Use solo afirmaciones que pueda respaldar: la propuesta no inventará experiencia.",
+    freelancerPositioningHelp: "La propuesta se basa solo en lo que escriba aquí. Indique hechos verificables: herramientas, casos, resultados.",
     toneLegend: "Estilo de la propuesta",
+    required: "obligatorio",
+    languageLabel: "Idioma de la propuesta",
+    languageHelp: "No es el idioma de la interfaz. De forma predeterminada, la propuesta se redacta en el idioma de la tarea.",
+    languageAuto: "Como la tarea",
   },
   toneOptions: {
     warm: "Cercano y cordial",
@@ -22,7 +26,11 @@ export const es: Shape<typeof en> = {
   },
   fieldNames: {
     taskText: "Descripción de la tarea",
-    freelancerPositioning: "Su posicionamiento",
+    freelancerPositioning: "Su experiencia y puntos fuertes",
+  },
+  result: {
+    gapsTitle: "Lo que su experiencia no cubre",
+    gapsHint: "La propuesta no lo afirma. Complételo usted o no lo mencione.",
   },
   generate: {
     submit: "Generar propuesta",

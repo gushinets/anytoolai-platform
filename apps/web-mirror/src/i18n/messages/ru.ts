@@ -38,6 +38,7 @@ export const ru: Shape<typeof en> = {
     copying: "Копируем…",
     copied: "Скопировано",
     copyFailed: "Не удалось скопировать текст. Выделите его выше и скопируйте вручную.",
+    selectText: "Выделить текст",
   },
   // These label-colon fragments do not require agreement with `{field}`'s grammatical number.
   validation: {

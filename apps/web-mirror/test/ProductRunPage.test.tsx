@@ -487,6 +487,47 @@ describe("ProductRunPage", () => {
     expect(calls.some((call) => call.key === ROUTES.NEXT_ACTION)).toBe(false);
   });
 
+  it("falls back to the legacy copy command when the clipboard API is blocked", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: vi.fn(() => Promise.reject(new Error("denied"))) },
+    });
+    const execCommand = vi.fn(() => true);
+    Object.defineProperty(document, "execCommand", { configurable: true, value: execCommand });
+    const { client } = makeClient(happyPathRoutes());
+
+    try {
+      renderPage({ client });
+      await waitForForm();
+      fillValidForm();
+      submit();
+      await waitForResult();
+
+      fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+
+      await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
+      expect(execCommand).toHaveBeenCalledWith("copy");
+    } finally {
+      Reflect.deleteProperty(document, "execCommand");
+    }
+  });
+
+  it("offers to select the text for a manual copy when every copy path fails", async () => {
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined });
+    const { client } = makeClient(happyPathRoutes());
+
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+    await waitForResult();
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+
+    const select = await screen.findByRole("button", { name: "Select text" });
+    fireEvent.click(select);
+    expect(window.getSelection()?.toString()).toContain(RESULT_TEXT);
+  });
+
   it("starts another run from the result with a cleared form and refreshed quota", async () => {
     const { client, calls } = makeClient({
       ...happyPathRoutes(),
@@ -696,7 +737,7 @@ describe("ProductRunPage", () => {
   it("preserves entered form values and retries with the same Idempotency-Key after a retryable start failure", async () => {
     const { client, calls } = makeClient({
       ...happyPathRoutes(),
-      [ROUTES.START]: [errorResponse(500, "internal_error"), startResponse()],
+      [ROUTES.START]: [errorResponse(500, "internal_error"), errorResponse(500, "internal_error"), startResponse()],
     });
 
     renderPage({ client });
@@ -713,9 +754,42 @@ describe("ProductRunPage", () => {
 
     await waitForResult();
     const startCalls = calls.filter((call) => call.key === ROUTES.START);
-    expect(startCalls).toHaveLength(2);
+    // The first submit already retried once on its own (500, 500), then "Try again" succeeded.
+    expect(startCalls).toHaveLength(3);
     expect(idempotencyKeyOf(startCalls[0]!)).toBeTruthy();
+    expect(new Set(startCalls.map((call) => idempotencyKeyOf(call))).size).toBe(1);
+  });
+
+  it("retries an ambiguous /start failure once on its own with the same Idempotency-Key", async () => {
+    const { client, calls } = makeClient({
+      ...happyPathRoutes(),
+      [ROUTES.START]: [errorResponse(500, "internal_error"), startResponse()],
+    });
+
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+
+    await waitForResult();
+    const startCalls = calls.filter((call) => call.key === ROUTES.START);
+    expect(startCalls).toHaveLength(2);
     expect(idempotencyKeyOf(startCalls[0]!)).toBe(idempotencyKeyOf(startCalls[1]!));
+  });
+
+  it("never retries a definite 4xx /start rejection automatically", async () => {
+    const { client, calls } = makeClient({
+      ...happyPathRoutes(),
+      [ROUTES.START]: [errorResponse(422, "scenario_input_invalid"), startResponse()],
+    });
+
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/could not start test product/i));
+    expect(calls.filter((call) => call.key === ROUTES.START)).toHaveLength(1);
   });
 
   it("starts a genuinely new logical submission (new Idempotency-Key) after a terminal execution failure, instead of replaying the dead session", async () => {
@@ -973,7 +1047,7 @@ describe("ProductRunPage", () => {
     const events: ProductRunEvent[] = [];
     const { client } = makeClient({
       ...happyPathRoutes(),
-      [ROUTES.START]: [errorResponse(500, "internal_error"), startResponse()],
+      [ROUTES.START]: [errorResponse(500, "internal_error"), errorResponse(500, "internal_error"), startResponse()],
     });
 
     renderPage({ client, onEvent: (event) => events.push(event) });
@@ -1484,7 +1558,7 @@ describe("ProductRunPage", () => {
     const ambiguousBusyStates: boolean[] = [];
     const { client: ambiguousClient } = makeClient({
       ...happyPathRoutes(),
-      [ROUTES.START]: [errorResponse(500, "internal_error"), startResponse()],
+      [ROUTES.START]: [errorResponse(500, "internal_error"), errorResponse(500, "internal_error"), startResponse()],
     });
     renderPage({ client: ambiguousClient, onLockedChange: (busy) => ambiguousBusyStates.push(busy) });
     await waitForForm();

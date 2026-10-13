@@ -756,7 +756,7 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
       // First START attempt is itself ambiguous (a lost/failed response, not a clean rejection);
       // the retry with the same Idempotency-Key is what the real backend would collapse onto
       // whatever it actually did with the first one.
-      [routes.START]: [errorResponse(500, "internal_error"), startResponse()],
+      [routes.START]: [errorResponse(500, "internal_error"), errorResponse(500, "internal_error"), startResponse()],
       [routes.SESSION]: [sessionResponse()],
       [routes.RESULT]: [resultResponse(ids, { output: { text: "Reattached from start." } })],
     });
@@ -783,9 +783,10 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
     await waitFor(() => expect(screen.getByText("Reattached from start.")).toBeTruthy());
 
     const startCalls = calls.filter((call) => call.key === routes.START);
-    expect(startCalls).toHaveLength(2);
+    // Two attempts from the automatic retry, then the user's "Try again": one key throughout.
+    expect(startCalls).toHaveLength(3);
     expect(idempotencyKeyOf(startCalls[0]!)).toBeTruthy();
-    expect(idempotencyKeyOf(startCalls[1]!)).toBe(idempotencyKeyOf(startCalls[0]!));
+    expect(new Set(startCalls.map((call) => idempotencyKeyOf(call))).size).toBe(1);
     expect((screen.getByRole("radio", { name: "Update" }) as HTMLInputElement).disabled).toBe(false);
   });
 

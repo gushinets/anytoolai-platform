@@ -38,6 +38,7 @@ export const de: Shape<typeof en> = {
     copying: "Wird kopiert…",
     copied: "Kopiert",
     copyFailed: "Das Kopieren in die Zwischenablage ist fehlgeschlagen. Bitte kopieren Sie den obigen Text manuell.",
+    selectText: "Text auswählen",
   },
   // Code review finding: `{field}` (e.g. "Die Fortschrittsnotizen", plural) can no longer be the
   // grammatical subject of an agreeing verb ("ist"/"sind", "darf"/"dürfen") -- every message is now

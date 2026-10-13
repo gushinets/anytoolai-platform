@@ -38,6 +38,7 @@ export const fr: Shape<typeof en> = {
     copying: "Copie en cours…",
     copied: "Copié",
     copyFailed: "Impossible de copier dans le presse-papiers. Veuillez copier le texte ci-dessus manuellement.",
+    selectText: "Sélectionner le texte",
   },
   // Code review finding: `{field}` (e.g. "Notes d’avancement", plural) can no longer be the
   // grammatical subject of an agreeing verb ("est"/"sont") -- every message is now a label-colon-

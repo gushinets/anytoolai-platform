@@ -149,6 +149,40 @@ function cacheSuccessOnly<T extends { ok: boolean }>(
 // invalidated after a successful start), didn't key by guestId (a guest-identity self-heal could
 // read a stale/wrong guest's cached result), and didn't dedupe concurrent calls the way this
 // function does. Quota is cheap, advisory, and re-fetched on mount and after accepted inline runs.
+// The start request creates the session and job; on a slow backend it can take longer than the
+// client's 10 s default, and an aborted request cannot be told apart from a lost response.
+const START_TIMEOUT_MS = 20_000;
+
+/** Clipboard write for browsers or embedded views that block `navigator.clipboard`: the legacy
+ * `execCommand("copy")` through a temporary textarea. Rejects when neither path works. */
+async function writeTextToClipboard(value: string): Promise<void> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value);
+      return;
+    }
+  } catch {
+    // fall through to the legacy path
+  }
+  if (typeof document.execCommand !== "function") {
+    throw new Error("Clipboard unavailable.");
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  try {
+    textarea.select();
+    if (!document.execCommand("copy")) {
+      throw new Error("Clipboard unavailable.");
+    }
+  } finally {
+    document.body.removeChild(textarea);
+  }
+}
+
 const runtimeConfigCache = new WeakMap<PlatformApiClient, Map<string, ReturnType<typeof getRuntimeConfig>>>();
 
 function getCachedRuntimeConfig(client: PlatformApiClient, productId: string) {
@@ -571,7 +605,18 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     // Snapshotted once: this call's own controller, checked consistently across every await below
     // regardless of which controller (if any) controllerRef points to by the time each resolves.
     const controller = controllerRef.current;
-    const result = await prepared.execute(client, { signal: controller?.signal });
+    const startOptions = { signal: controller?.signal, timeoutMs: START_TIMEOUT_MS };
+    let result = await prepared.execute(client, startOptions);
+    // One automatic retry of an ambiguous failure (network, timeout, 5xx). It reuses the prepared
+    // handle, so the same Idempotency-Key makes it safe: the backend returns the session it already
+    // created instead of spending quota twice. A definite 4xx is never retried.
+    if (
+      !controller?.signal.aborted &&
+      !result.ok &&
+      !(result.error.type === "backend_error" && result.error.status < 500)
+    ) {
+      result = await prepared.execute(client, startOptions);
+    }
     if (controller?.signal.aborted) {
       return;
     }
@@ -903,10 +948,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       return Promise.resolve(false);
     }
     const { scenarioSessionId, checkpointId } = displayedResult;
-    const writeToClipboard = (value: string) =>
-      navigator.clipboard?.writeText
-        ? navigator.clipboard.writeText(value)
-        : Promise.reject(new Error("Clipboard API unavailable."));
+    const writeToClipboard = writeTextToClipboard;
 
     setCopyActivationsInFlight((count) => count + 1);
     return new Promise<boolean>((resolve) => {

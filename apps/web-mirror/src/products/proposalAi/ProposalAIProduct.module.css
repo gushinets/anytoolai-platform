@@ -18,14 +18,67 @@
   color: var(--color-error);
 }
 
-.taskTextArea {
+/* The parent selector keeps these above shared-ui's own `.field` min-height of equal specificity
+ * (CSS order must not decide). `field-sizing` grows the box with the text where supported. */
+.fieldGroup .taskTextArea {
   min-height: 144px;
+  max-height: 480px;
+  field-sizing: content;
   resize: vertical;
 }
 
-.positioningTextArea {
+.fieldGroup .positioningTextArea {
   min-height: 120px;
+  max-height: 480px;
+  field-sizing: content;
   resize: vertical;
+}
+
+.helpRow {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.counter {
+  flex: none;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.required {
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+.result {
+  display: grid;
+  gap: 16px;
+}
+
+.gaps {
+  display: grid;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.gapsTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.gapsList {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 4px;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .toneGroup {

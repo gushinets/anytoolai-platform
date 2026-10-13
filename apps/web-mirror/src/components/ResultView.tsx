@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Button, Card, Toast } from "@anytoolai/shared-ui";
 import { GeneratedTextRenderer } from "@anytoolai/web-result-kit";
 import { useHostT } from "../i18n";
@@ -22,6 +22,16 @@ export type ResultViewProps = {
 export function ResultView({ text, onCopy, embedded = false, secondaryAction }: ResultViewProps) {
   const t = useHostT();
   const [copyState, setCopyState] = useState<"idle" | "copying" | "copied" | "error">("idle");
+  const anchorRef = useRef<HTMLSpanElement>(null);
+
+  // Last resort when the clipboard is blocked (embedded browsers): select the text so the user can
+  // copy it with the keyboard or the system menu.
+  function handleSelectText() {
+    const textElement = anchorRef.current?.nextElementSibling;
+    if (textElement) {
+      window.getSelection()?.selectAllChildren(textElement);
+    }
+  }
 
   function handleCopy() {
     if (!onCopy) {
@@ -47,10 +57,17 @@ export function ResultView({ text, onCopy, embedded = false, secondaryAction }: 
   );
   return (
     <Container className={styles.stack}>
+      {/* Empty marker: the text element right after it is what "Select text" selects. */}
+      <span ref={anchorRef} hidden />
       <GeneratedTextRenderer text={text} />
       {secondaryAction ? <div className={styles.actions}>{copyButton}{secondaryAction}</div> : copyButton}
       {copyState === "error" ? (
-        <Toast variant="error">{t("result.copyFailed")}</Toast>
+        <>
+          <Toast variant="error">{t("result.copyFailed")}</Toast>
+          <Button variant="secondary" onClick={handleSelectText}>
+            {t("result.selectText")}
+          </Button>
+        </>
       ) : null}
     </Container>
   );
