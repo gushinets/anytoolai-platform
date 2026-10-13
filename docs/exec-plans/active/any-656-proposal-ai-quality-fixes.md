@@ -84,9 +84,12 @@ Found and fixed during the live run:
 - LiteLLM does not know `gpt-6-luna` and rejected `reasoning_effort`: `allowed_openai_params` in
   `litellm_router.yaml`.
 - The model wrote paragraph breaks as raw newlines inside the JSON string and the strict parser
-  failed both attempts on 4 of 10 orders. The schema instruction now asks for an escaped newline,
-  and the parser of provider output (not config literals) accepts raw control characters. This
-  affected every multi-paragraph product, not only ProposalAI.
+  failed both attempts on 4 of 10 orders. The schema instruction now asks for an escaped newline.
+  A first attempt to also accept raw control characters in the platform parser did nothing for
+  structured runs: PydanticAI rejects the raw newline in its own JSON parsing before any validator
+  runs (found in code review). The runner now takes plain text from the model and the platform's
+  own validator, with the tolerant parser, decides. This affects every multi-paragraph product,
+  not only ProposalAI.
 - The prompt itself invited "I will confirm the estimate and timeline", which ended 8 of 10 texts.
   The sentence is removed from the prompt (0 of 9 afterwards).
 - A very short English order ("Need an automation expert...") got a Russian text in the firm tone,
@@ -96,8 +99,9 @@ Found and fixed during the live run:
   prompt forbids it and the eval script counts it, validation does not reject it. Placeholders,
   brackets and meta phrases still fail validation.
 - A reasoning model sometimes answered in plain text without the JSON wrapper, and the retry prompt
-  said only "Malformed JSON". The retry now spells out what to return. After the last rebuild
-  there were no failed runs in 45 targeted and 129 total jobs.
+  said only "Malformed JSON". The retry message now says to reply with exactly one JSON object; it
+  reaches the model only since the runner takes plain text (see above), and a test covers a plain
+  text reply that recovers on the second attempt.
 
 ## Blind tone check (2026-10-13)
 
@@ -105,6 +109,27 @@ One person read 10 orders with the three tones shuffled and unlabeled and named 
 text: all 30 correct, 10 of 10 orders fully right (threshold 8 of 10, D-07). The 10 orders were the
 Freelancer-style set, 7 English and 3 Russian, in the prompt version before the last language and
 dash tweaks.
+
+## Code review, round 1 (all items handled)
+
+Verified by experiment or code reading, then fixed: the tolerant parser and the retry message did not
+reach structured runs (runner now takes plain text); a thousands separator was read only one way, so
+"3 posts of 500 words" failed against "3 500-word posts" (both readings are accepted now, in the
+validator and in the eval script); the direct LiteLLM path rejected `reasoning_effort` for the new
+model (allowed per request in the adapter, the router entry stays for calls without an explicit
+effort); the meta-commentary patterns hit ordinary phrases such as "As an AI automation engineer"
+(narrowed to first-person model talk); the eval script ignored `--language`; the product specs
+still said A06 only; Client Update Writer kept the strict whitespace check (all products use the
+backend trim now); a hard `maxLength` cut pasted text silently (removed, the counter turns red above
+the limit and submit shows the length error); the start timeout and the clipboard helper sat inside
+another comment block; Italian mixed the infinitive with the polite imperative (all Italian
+instructions are the polite imperative now); `gaps` parsing used type casts (typed guard).
+The reference to an ignored `tmp/` file was already gone.
+
+The default model change for every product (item 10) is a separate commit. `atoms-proof` (fake
+provider) passes, and the live canary on `gpt-6-luna` passes for all 11 kernel_demo atoms and the 3
+composite workflows, which exercise the changed structured output runner for every action type.
+The other freelancer products were not run live; they use the same actions and the same runner.
 
 ## Measured in Chrome on the production build of web-mirror (local, against the live stack)
 
