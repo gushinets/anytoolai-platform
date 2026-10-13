@@ -7,7 +7,7 @@
 - Created: 2026-10-13
 - Last updated: 2026-10-13
 - Review date: 2026-10-20
-- Next action: the blind tone check (`tmp/proposal-ai-blind-tone-check.md`), real postings if available, and F.1 latency from the production logs.
+- Next action: real postings if they become available. F.1 latency cannot be measured (no access to the production logs).
 - Blocker: none for code; live runs and the production checks (E.4, E.6, F.1 log analysis) cannot
   run from the agent sandbox.
 
@@ -54,7 +54,8 @@ Open, needs the live stack or the deployed site:
 
 - 0.1 and G are done for the 10 synthetic orders (table above). Add the 10 real orders to the
   fixture and rerun `python scripts/agent/proposal_ai_eval.py --api-url ...`.
-- F.1: latency tail of `POST /scenario-sessions/start` from the API or proxy logs; the client change
+- F.1: no access to the production logs, so the latency tail of `POST /scenario-sessions/start` is not
+  measured; the client change
   (20 s timeout, one automatic retry with the same idempotency key) is already in.
 
 ## Live results on gpt-6-luna (2026-10-13, 10 synthetic orders, automatic checks only)
@@ -71,9 +72,7 @@ Open, needs the live stack or the deployed site:
 Before, the text itself said "my listed experience does not include HubSpot". After, the gap is a
 separate block and the text claims nothing about it. Not covered by the automatic checks and read by
 hand on the warm run: profile facts stay as written, no amounts or terms were invented, a similar
-case stands in the first sentence when the order asks for it. Still manual and open: blind tone
-distinction (firm is about a third shorter than neutral by length, the rest needs a human) and the
-10 real orders.
+case stands in the first sentence when the order asks for it. The blind tone check is below.
 
 The set now has 20 orders: the 10 above plus 10 written in the style of Freelancer postings
 (`fl-*`; real postings were not available). All 20 pass the automatic checks in the warm tone; the
@@ -99,6 +98,13 @@ Found and fixed during the live run:
 - A reasoning model sometimes answered in plain text without the JSON wrapper, and the retry prompt
   said only "Malformed JSON". The retry now spells out what to return. After the last rebuild
   there were no failed runs in 45 targeted and 129 total jobs.
+
+## Blind tone check (2026-10-13)
+
+One person read 10 orders with the three tones shuffled and unlabeled and named the tone of every
+text: all 30 correct, 10 of 10 orders fully right (threshold 8 of 10, D-07). The 10 orders were the
+Freelancer-style set, 7 English and 3 Russian, in the prompt version before the last language and
+dash tweaks.
 
 ## Measured in Chrome on the production build of web-mirror (local, against the live stack)
 
