@@ -2,12 +2,12 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-10-13
 - Last updated: 2026-10-13
 - Review date: 2026-10-13
-- Next action: finish isolated checks and publish the scoped change
+- Next action: review PR 169; no deployment requested
 - Blocker: none
 
 ## Goal
@@ -39,7 +39,7 @@ decision report, and publish only this change as a commit, Linear issue, and pul
 - [x] Run doctor and verify tested snapshot hashes and current Git scope.
 - [x] Apply exact prompt texts, add a concise results report, and update `docs/index.md`.
 - [x] Validate configuration loading, documentation, and credential-free backend checks on the isolated change.
-- [ ] Commit only the approved files, create a classified Linear issue, and publish the linked PR.
+- [x] Commit only the approved files, create a classified Linear issue, and publish the linked PR.
 
 ## Validation
 
@@ -66,6 +66,11 @@ decision report, and publish only this change as a commit, Linear issue, and pul
   by the existing `not slow` filter. Config, architecture, docs and generated-doc checks passed.
   Only thirteen authorized files are staged; SDK/Gateway/dependency changes and archives excluded.
   No new paid calls or Compose/deployment actions were performed. Commit and external publication follow.
+- 2026-10-13: Commit `7a621c69` contains exactly the thirteen authorized files. Published branch
+  `codex/apply-kernel-demo-prompts`, created [ANY-662](https://linear.app/paveldik/issue/ANY-662/primenit-proverennye-prompty-kernel-demo)
+  in Platform Kernel with `type:bug` and `func:dev`, and opened [PR 169](https://github.com/gushinets/anytoolai-platform/pull/169).
+  Issue properties were read back; the PR is attached to this task and linked from the issue.
+  Local pre-existing SDK changes and experiment archives remain uncommitted and unchanged.
 
 ## Open questions
 
