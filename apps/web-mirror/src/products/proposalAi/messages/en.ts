@@ -18,6 +18,8 @@ export const en = {
     languageLabel: "Proposal language",
     languageHelp: "Not the interface language. By default the proposal is written in the language of the task.",
     languageAuto: "Same as the task",
+    counterNear: "Approaching the limit of {max} characters.",
+    counterOver: "Over the limit of {max} characters.",
   },
   toneOptions: {
     warm: "Warm & personable",

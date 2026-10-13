@@ -31,12 +31,6 @@ export function FieldErrorMessage({
           {th("validation.required", { field: label })}
         </p>
       );
-    case "outer_whitespace":
-      return (
-        <p id={id} className={className} role="alert">
-          {th("validation.outerWhitespace", { field: label })}
-        </p>
-      );
     case "max_length":
       return (
         <p id={id} className={className} role="alert">

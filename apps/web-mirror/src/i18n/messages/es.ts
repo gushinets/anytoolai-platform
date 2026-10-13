@@ -46,7 +46,6 @@ export const es: Shape<typeof en> = {
   // number. Already safe; left as-is.
   validation: {
     required: "{field}: este campo es obligatorio.",
-    outerWhitespace: "{field}: no debe empezar ni terminar con espacios en blanco.",
     maxLength: "{field}: debe tener como máximo {maxLength, plural, one {# carácter} many {# de caracteres} other {# caracteres}}.",
   },
 };

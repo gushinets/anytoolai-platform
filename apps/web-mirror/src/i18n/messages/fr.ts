@@ -45,7 +45,6 @@ export const fr: Shape<typeof en> = {
   // fragment, none of which needs number agreement.
   validation: {
     required: "{field} : champ obligatoire.",
-    outerWhitespace: "{field} : pas d’espace au début ni à la fin.",
     maxLength: "{field} : {maxLength, plural, one {# caractère} many {# de caractères} other {# caractères}} maximum.",
   },
 };

@@ -18,6 +18,8 @@ export const ru: Shape<typeof en> = {
     languageLabel: "Язык предложения",
     languageHelp: "Не язык интерфейса. По умолчанию предложение пишется на языке задачи.",
     languageAuto: "Как в задаче",
+    counterNear: "Вы приближаетесь к лимиту в {max} символов.",
+    counterOver: "Превышен лимит в {max} символов.",
   },
   toneOptions: {
     warm: "Дружелюбный",

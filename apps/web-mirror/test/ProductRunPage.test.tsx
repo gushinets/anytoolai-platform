@@ -503,10 +503,14 @@ describe("ProductRunPage", () => {
       submit();
       await waitForResult();
 
-      fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+      const copyButton = screen.getByRole("button", { name: "Copy" });
+      copyButton.focus();
+      fireEvent.click(copyButton);
 
       await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
       expect(execCommand).toHaveBeenCalledWith("copy");
+      // the temporary textarea must not leave the keyboard user's focus behind
+      expect(document.activeElement).toBe(copyButton);
     } finally {
       Reflect.deleteProperty(document, "execCommand");
     }

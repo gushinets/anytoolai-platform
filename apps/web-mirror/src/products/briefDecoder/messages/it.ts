@@ -11,12 +11,12 @@ export const it: Shape<typeof en> = {
     briefTextHelp: "Incolli il brief così com’è. Un brief più lungo produce domande più precise.",
   },
   decode: {
-    submit: "Decodificare il brief",
+    submit: "Decodifichi il brief",
     running: "Decodifica del brief in corso…",
     runFailed: "Qualcosa è andato storto nella decodifica del brief. Riprovi.",
     resultTitle: "Brief decodificato",
     placeholder: "Il brief decodificato apparirà qui dopo la decodifica.",
-    regenerate: "Decodificare di nuovo il brief",
+    regenerate: "Decodifichi di nuovo il brief",
     continueToTarget: "Crea i criteri di accettazione",
   },
   result: {

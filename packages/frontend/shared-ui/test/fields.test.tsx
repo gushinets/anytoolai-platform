@@ -45,3 +45,14 @@ describe("field components", () => {
     expect(field.disabled).toBe(true);
   });
 });
+
+describe("field minimum height", () => {
+  it("keeps the 44px minimum at zero specificity so a product class can override it in any CSS order", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { resolve } = await import("node:path");
+    const css = readFileSync(resolve(process.cwd(), "src/field.module.css"), "utf8");
+
+    expect(css).toMatch(/:where\(\.field\)\s*\{[^}]*min-height:\s*44px/);
+    expect(css.match(/\.field\s*\{[^}]*\}/)?.[0]).not.toMatch(/min-height/);
+  });
+});

@@ -1,42 +1,26 @@
 import { describe, expect, it } from "vitest";
 import {
   collectFieldErrors,
+  backendTrimmedLength,
   optionalBackendTrimmedFieldError,
-  optionalTrimmedFieldError,
-  requiredTrimmedFieldError,
+  requiredBackendTrimmedFieldError,
 } from "../src/products/runtime/fieldValidation";
 
-describe("requiredTrimmedFieldError", () => {
-  it("requires a non-empty, trimmed value within maxLength, as structured data (no prose)", () => {
-    expect(requiredTrimmedFieldError("", 10)).toEqual({ code: "required" });
-    expect(requiredTrimmedFieldError("  a", 10)).toEqual({ code: "outer_whitespace" });
-    expect(requiredTrimmedFieldError("hello world", 5)).toEqual({ code: "max_length", maxLength: 5 });
-    expect(requiredTrimmedFieldError("hello", 5)).toBeUndefined();
+describe("requiredBackendTrimmedFieldError", () => {
+  it("requires non-empty text after the backend trim, as structured data (no prose)", () => {
+    expect(requiredBackendTrimmedFieldError("", 10)).toEqual({ code: "required" });
+    expect(requiredBackendTrimmedFieldError(" \n ", 10)).toEqual({ code: "required" });
+    expect(requiredBackendTrimmedFieldError("  hello\n", 5)).toBeUndefined();
+    expect(requiredBackendTrimmedFieldError("hello world", 5)).toEqual({ code: "max_length", maxLength: 5 });
   });
 
   it("counts Unicode code points for maxLength, not UTF-16 code units", () => {
-    // Code review finding: astral characters (many emoji) are 2 UTF-16 units each, so a naive
-    // `.length` check would reject input the backend's code-point-counting JSON schema accepts.
+    // Astral characters (many emoji) are 2 UTF-16 units each; the backend schema counts code points.
     const twoEmoji = "\u{1F600}\u{1F600}"; // 2 code points, 4 UTF-16 units
-    expect(requiredTrimmedFieldError(twoEmoji, 2)).toBeUndefined();
-    expect(requiredTrimmedFieldError(twoEmoji, 1)).toEqual({ code: "max_length", maxLength: 1 });
-  });
-});
-
-describe("optionalTrimmedFieldError", () => {
-  it("treats an empty string as absent", () => {
-    expect(optionalTrimmedFieldError("", 10)).toBeUndefined();
-  });
-
-  it("treats a whitespace-only value as absent too, not as a required-but-missing value", () => {
-    // Code review finding: only `value.length === 0` was checked before, so "   " fell through to
-    // requiredTrimmedFieldError and produced a "required" error.
-    expect(optionalTrimmedFieldError("   ", 10)).toBeUndefined();
-  });
-
-  it("validates a genuinely non-empty value the same way requiredTrimmedFieldError does", () => {
-    expect(optionalTrimmedFieldError("  Friday", 10)).toEqual({ code: "outer_whitespace" });
-    expect(optionalTrimmedFieldError("Friday", 10)).toBeUndefined();
+    expect(requiredBackendTrimmedFieldError(twoEmoji, 2)).toBeUndefined();
+    expect(requiredBackendTrimmedFieldError(twoEmoji, 1)).toEqual({ code: "max_length", maxLength: 1 });
+    expect(backendTrimmedLength(twoEmoji)).toBe(2);
+    expect(backendTrimmedLength("  ab\n")).toBe(2);
   });
 });
 

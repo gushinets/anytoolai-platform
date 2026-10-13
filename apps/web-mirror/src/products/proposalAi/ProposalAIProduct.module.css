@@ -18,16 +18,16 @@
   color: var(--color-error);
 }
 
-/* The parent selector keeps these above shared-ui's own `.field` min-height of equal specificity
- * (CSS order must not decide). `field-sizing` grows the box with the text where supported. */
-.fieldGroup .taskTextArea {
+/* shared-ui keeps its 44px minimum at zero specificity, so these win whatever the CSS order is.
+ * `field-sizing` grows the box with the text where supported. */
+.taskTextArea {
   min-height: 144px;
   max-height: 480px;
   field-sizing: content;
   resize: vertical;
 }
 
-.fieldGroup .positioningTextArea {
+.positioningTextArea {
   min-height: 120px;
   max-height: 480px;
   field-sizing: content;
@@ -47,6 +47,18 @@
   line-height: 1.45;
   color: var(--color-text-secondary);
   font-variant-numeric: tabular-nums;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .counterOver {

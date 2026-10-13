@@ -18,6 +18,8 @@ export const it: Shape<typeof en> = {
     languageLabel: "Lingua della proposta",
     languageHelp: "Non è la lingua dell’interfaccia. Per impostazione predefinita la proposta è scritta nella lingua dell’incarico.",
     languageAuto: "Come l’incarico",
+    counterNear: "Si avvicina al limite di {max} caratteri.",
+    counterOver: "Limite di {max} caratteri superato.",
   },
   toneOptions: {
     warm: "Caloroso e cordiale",

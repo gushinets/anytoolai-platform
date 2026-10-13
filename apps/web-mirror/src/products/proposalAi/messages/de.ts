@@ -19,6 +19,8 @@ export const de: Shape<typeof en> = {
     languageLabel: "Sprache des Angebots",
     languageHelp: "Nicht die Sprache der Oberfläche. Standardmäßig wird das Angebot in der Sprache der Aufgabe verfasst.",
     languageAuto: "Wie in der Aufgabe",
+    counterNear: "Sie nähern sich dem Limit von {max} Zeichen.",
+    counterOver: "Limit von {max} Zeichen überschritten.",
   },
   toneOptions: {
     warm: "Warm & persönlich",

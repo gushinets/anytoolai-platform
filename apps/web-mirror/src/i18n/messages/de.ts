@@ -45,7 +45,6 @@ export const de: Shape<typeof en> = {
   // a label-colon-fragment, none of which needs a verb at all.
   validation: {
     required: "{field}: erforderlich.",
-    outerWhitespace: "{field}: keine Leerzeichen am Anfang oder Ende.",
     maxLength: "{field}: höchstens {maxLength, plural, one {# Zeichen} other {# Zeichen}}.",
   },
 };

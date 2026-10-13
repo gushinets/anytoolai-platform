@@ -43,7 +43,6 @@ export const ru: Shape<typeof en> = {
   // These label-colon fragments do not require agreement with `{field}`'s grammatical number.
   validation: {
     required: "{field}: обязательное поле.",
-    outerWhitespace: "{field}: уберите пробелы в начале или конце.",
     maxLength: "{field}: не более {maxLength, plural, one {# символ} few {# символа} many {# символов} other {# символа}}.",
   },
 };

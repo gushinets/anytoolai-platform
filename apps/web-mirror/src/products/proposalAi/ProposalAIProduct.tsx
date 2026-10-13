@@ -8,6 +8,7 @@ import { ResultView } from "../../components/ResultView";
 import { LOCALES, LOCALE_NAMES, useProductT, type Locale } from "../../i18n";
 import { ProductRunPage } from "../runtime/ProductRunPage";
 import {
+  backendTrimmedLength,
   collectFieldErrors,
   requiredBackendTrimmedFieldError,
   trimBackendWhitespace,
@@ -92,15 +93,24 @@ function RequiredLabel({ htmlFor, children }: { htmlFor: string; children: strin
   );
 }
 
-/** "N / 4000", announced politely, shown only near the limit. The live region itself is always in
- * the DOM so screen readers pick up the text when it appears. There is deliberately no hard
- * `maxLength` on the textarea: it would cut a pasted text silently, while the counter and the
- * validation error tell the user what to shorten. */
-function Counter({ length }: { length: number }) {
+/** "N / 4000" next to the help text once the limit is near, counted like the backend and the
+ * validation do (code points of the trimmed text). The visible number is not a live region, it would
+ * be read out on every keystroke; a visually hidden status announces only when the state changes
+ * (near, over). There is deliberately no hard `maxLength` on the textarea: it would cut a pasted
+ * text silently, while the counter and the validation error tell the user what to shorten. */
+function Counter({ value }: { value: string }) {
+  const t = useProductT();
+  const length = backendTrimmedLength(value);
+  const state = length > TEXT_MAX_LENGTH ? "over" : length > COUNTER_THRESHOLD ? "near" : "ok";
   return (
-    <span className={length > TEXT_MAX_LENGTH ? `${styles.counter} ${styles.counterOver}` : styles.counter} aria-live="polite">
-      {length > COUNTER_THRESHOLD ? `${length} / ${TEXT_MAX_LENGTH}` : ""}
-    </span>
+    <>
+      <span className={state === "over" ? `${styles.counter} ${styles.counterOver}` : styles.counter} aria-hidden="true">
+        {state === "ok" ? "" : `${length} / ${TEXT_MAX_LENGTH}`}
+      </span>
+      <span className={styles.srOnly} aria-live="polite">
+        {state === "ok" ? "" : t(state === "over" ? "fields.counterOver" : "fields.counterNear", { max: TEXT_MAX_LENGTH })}
+      </span>
+    </>
   );
 }
 
@@ -125,7 +135,7 @@ function ProposalAIFields({ values, errors, disabled, onChange }: ProductFieldsP
           <p id="proposal-ai-task-help" className={styles.help}>
             {t("fields.taskTextHelp")}
           </p>
-          <Counter length={values.taskText.length} />
+          <Counter value={values.taskText} />
         </div>
         <FieldErrorMessage
           id="proposal-ai-task-error"
@@ -152,7 +162,7 @@ function ProposalAIFields({ values, errors, disabled, onChange }: ProductFieldsP
           <p id="proposal-ai-positioning-help" className={styles.help}>
             {t("fields.freelancerPositioningHelp")}
           </p>
-          <Counter length={values.freelancerPositioning.length} />
+          <Counter value={values.freelancerPositioning} />
         </div>
         <FieldErrorMessage
           id="proposal-ai-positioning-error"

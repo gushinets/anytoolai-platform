@@ -42,12 +42,11 @@ export const it: Shape<typeof en> = {
     copyFailed: "Impossibile copiare negli appunti. Copi manualmente il testo qui sopra.",
     selectText: "Selezioni il testo",
   },
-  // Code review finding: outerWhitespace/maxLength made `{field}` the subject of "deve" (which
+  // Code review finding: maxLength made `{field}` the subject of "deve" (which
   // agrees in number: deve/devono) -- every message is now a label-colon-fragment instead, matching
   // `required`'s already-safe shape (normalized to "{field}: ..." order for consistency).
   validation: {
     required: "{field}: campo obbligatorio.",
-    outerWhitespace: "{field}: niente spazi all’inizio o alla fine.",
     maxLength: "{field}: massimo {maxLength, plural, one {# carattere} many {# di caratteri} other {# caratteri}}.",
   },
 };

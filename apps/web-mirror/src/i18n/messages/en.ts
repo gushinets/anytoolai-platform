@@ -48,7 +48,6 @@ export const en = {
   // fragment instead, which needs no agreement in any of the seven locales.
   validation: {
     required: "{field}: required.",
-    outerWhitespace: "{field}: no leading or trailing whitespace.",
     maxLength: "{field}: {maxLength, plural, one {# character} other {# characters}} maximum.",
   },
 };

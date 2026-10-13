@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { Button, Card, Toast } from "@anytoolai/shared-ui";
 import { GeneratedTextRenderer } from "@anytoolai/web-result-kit";
 import { useHostT } from "../i18n";
@@ -23,6 +23,9 @@ export function ResultView({ text, onCopy, embedded = false, secondaryAction }: 
   const t = useHostT();
   const [copyState, setCopyState] = useState<"idle" | "copying" | "copied" | "error">("idle");
   const anchorRef = useRef<HTMLSpanElement>(null);
+  // The Copy button is disabled while copying, and a disabled button drops keyboard focus. Remember
+  // it if it had focus and give focus back once the copy settles.
+  const refocusRef = useRef<HTMLElement | null>(null);
 
   // Last resort when the clipboard is blocked (embedded browsers): select the text so the user can
   // copy it with the keyboard or the system menu.
@@ -33,7 +36,15 @@ export function ResultView({ text, onCopy, embedded = false, secondaryAction }: 
     }
   }
 
-  function handleCopy() {
+  useEffect(() => {
+    if (copyState !== "copying" && refocusRef.current) {
+      refocusRef.current.focus();
+      refocusRef.current = null;
+    }
+  }, [copyState]);
+
+  function handleCopy(event: MouseEvent<HTMLButtonElement>) {
+    refocusRef.current = document.activeElement === event.currentTarget ? event.currentTarget : null;
     if (!onCopy) {
       setCopyState("error");
       return;

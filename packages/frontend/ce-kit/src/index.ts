@@ -8,6 +8,7 @@ export type {
 } from "./api/client";
 export type { PlatformApiError } from "./api/errors";
 export { networkError } from "./api/errors";
+export { isAmbiguousFailure } from "./api/client/retry";
 export {
   isGuestIdentityNotFound,
   isHandoffAcceptanceFailed,

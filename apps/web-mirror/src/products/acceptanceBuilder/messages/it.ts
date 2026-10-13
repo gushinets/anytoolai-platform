@@ -7,8 +7,8 @@ export const it: Shape<typeof en> = {
   quotaRemaining: "{remaining} di {limit, plural, one {# esecuzione} other {# esecuzioni}} rimanenti.",
   modes: {
     legend: "Modalità",
-    draft: "Redigi i criteri",
-    check: "Verifica il lavoro",
+    draft: "Rediga i criteri",
+    check: "Verifichi il lavoro",
   },
   fields: {
     briefText: "Brief del cliente",
@@ -19,20 +19,20 @@ export const it: Shape<typeof en> = {
     deliverableTextHelp: "Incolli il testo da consegnare.",
   },
   draft: {
-    submit: "Redigi i criteri",
+    submit: "Rediga i criteri",
     running: "Redazione dei criteri di accettazione…",
     runFailed: "Qualcosa è andato storto nella redazione dei criteri. Riprovi.",
     resultTitle: "Criteri di accettazione",
     placeholder: "I criteri di accettazione appariranno qui dopo la redazione.",
-    regenerate: "Redigi di nuovo",
+    regenerate: "Rediga di nuovo",
   },
   check: {
-    submit: "Verifica il lavoro",
+    submit: "Verifichi il lavoro",
     running: "Verifica del lavoro in corso…",
     runFailed: "Qualcosa è andato storto nella verifica. Riprovi.",
     resultTitle: "Verifica del lavoro",
     placeholder: "La verifica apparirà qui dopo l’esecuzione.",
-    regenerate: "Verifica di nuovo",
+    regenerate: "Verifichi di nuovo",
   },
   result: {
     verdictScope: "Il verdetto si basa su quattro criteri di revisione generali, non voce per voce sui criteri elencati sotto.",

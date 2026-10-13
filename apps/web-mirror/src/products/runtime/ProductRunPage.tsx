@@ -10,6 +10,7 @@ import {
   getQuota,
   getResult,
   getRuntimeConfig,
+  isAmbiguousFailure,
   isGuestIdentityNotFound,
   isQuotaExhausted,
   isResultNotFound,
@@ -153,6 +154,9 @@ async function writeTextToClipboard(value: string): Promise<void> {
   if (typeof document.execCommand !== "function") {
     throw new Error("Clipboard unavailable.");
   }
+  // The temporary textarea steals focus and the selection; give both back so a keyboard user does
+  // not lose their place after a copy.
+  const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   const textarea = document.createElement("textarea");
   textarea.value = value;
   textarea.setAttribute("readonly", "");
@@ -166,6 +170,7 @@ async function writeTextToClipboard(value: string): Promise<void> {
     }
   } finally {
     document.body.removeChild(textarea);
+    previouslyFocused?.focus();
   }
 }
 
@@ -610,11 +615,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     // One automatic retry of an ambiguous failure (network, timeout, 5xx). It reuses the prepared
     // handle, so the same Idempotency-Key makes it safe: the backend returns the session it already
     // created instead of spending quota twice. A definite 4xx is never retried.
-    if (
-      !controller?.signal.aborted &&
-      !result.ok &&
-      !(result.error.type === "backend_error" && result.error.status < 500)
-    ) {
+    if (!controller?.signal.aborted && !result.ok && isAmbiguousFailure(result.error)) {
       result = await prepared.execute(client, startOptions);
     }
     if (controller?.signal.aborted) {

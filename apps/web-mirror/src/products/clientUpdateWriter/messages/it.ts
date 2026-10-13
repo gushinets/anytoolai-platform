@@ -38,7 +38,7 @@ export const it: Shape<typeof en> = {
     runFailed: "Si è verificato un problema durante la scrittura dell’aggiornamento. Riprovi.",
     resultTitle: "Aggiornamento",
     placeholder: "L’aggiornamento apparirà qui dopo la scrittura.",
-    regenerate: "Riscrivere l’aggiornamento",
+    regenerate: "Riscriva l’aggiornamento",
   },
   reply_draft: {
     submit: "Scriva la risposta",
@@ -46,7 +46,7 @@ export const it: Shape<typeof en> = {
     runFailed: "Si è verificato un problema durante la scrittura della risposta. Riprovi.",
     resultTitle: "Bozza di risposta",
     placeholder: "La risposta apparirà qui dopo la scrittura.",
-    regenerate: "Riscrivere la risposta",
+    regenerate: "Riscriva la risposta",
   },
   prepaid_request: {
     submit: "Scriva la richiesta",
@@ -54,6 +54,6 @@ export const it: Shape<typeof en> = {
     runFailed: "Si è verificato un problema durante la scrittura della richiesta. Riprovi.",
     resultTitle: "Richiesta di pagamento anticipato",
     placeholder: "La richiesta apparirà qui dopo la scrittura.",
-    regenerate: "Riscrivere la richiesta",
+    regenerate: "Riscriva la richiesta",
   },
 };

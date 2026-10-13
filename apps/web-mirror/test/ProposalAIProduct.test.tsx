@@ -389,11 +389,23 @@ describe("ProposalAI product definition", () => {
     expect(screen.queryByText(/\/ 4000/)).toBeNull();
 
     fireEvent.change(task, { target: { value: "x".repeat(3501) } });
-    expect(screen.getByText("3501 / 4000").getAttribute("aria-live")).toBe("polite");
+    expect(screen.getByText("3501 / 4000")).toBeTruthy();
+    // the visible number is not a live region; a hidden status announces the state change only
+    expect(screen.getByText("3501 / 4000").getAttribute("aria-hidden")).toBe("true");
+    expect(screen.getByText("Approaching the limit of 4000 characters.").getAttribute("aria-live")).toBe("polite");
+
+    fireEvent.change(task, { target: { value: "x".repeat(3999) } });
+    expect(screen.getByText("Approaching the limit of 4000 characters.")).toBeTruthy();
 
     fireEvent.change(task, { target: { value: "x".repeat(4100) } });
     expect(task.value).toHaveLength(4100);
     expect(screen.getByText("4100 / 4000")).toBeTruthy();
+    expect(screen.getByText("Over the limit of 4000 characters.")).toBeTruthy();
+
+    // counted like the validation: code points of the trimmed text, not UTF-16 units or padding
+    fireEvent.change(task, { target: { value: "\u{1F600}".repeat(3000) + "\n\n" } });
+    expect(screen.queryByText(/\/ 4000/)).toBeNull();
+    expect(screen.queryByText("Approaching the limit of 4000 characters.")).toBeNull();
   });
 
   it("shows the experience gaps under the proposal and copies only the proposal text", async () => {
