@@ -2,14 +2,14 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-10-13
 - Last updated: 2026-10-13
-- Review date: 2026-10-20
-- Next action: real postings if they become available. F.1 latency cannot be measured (no access to the production logs).
-- Blocker: none for code; live runs and the production checks (E.4, E.6, F.1 log analysis) cannot
-  run from the agent sandbox.
+- Completed: 2026-10-13
+- Note: acceptance ran on gpt-6-luna with 20 orders (10 synthetic, 10 written in the style of
+  Freelancer postings). Left open on purpose: real postings, the start latency (F.1, no access to the
+  production logs) and a run of the deployed site, which still has the old build.
 
 ## Goal
 
