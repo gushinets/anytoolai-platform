@@ -131,6 +131,36 @@ provider) passes, and the live canary on `gpt-6-luna` passes for all 11 kernel_d
 composite workflows, which exercise the changed structured output runner for every action type.
 The other freelancer products were not run live; they use the same actions and the same runner.
 
+## Code review, round 2 (all items handled)
+
+- The runner no longer takes plain text through `output_type=str`, which the coding conventions
+  forbid: the typed binding is `TextOutput`, PydanticAI passes the raw reply to the platform parser
+  and validator, and the retry message names the field and the rule. `docs/architecture/llm-runtime.md`
+  says so. The schema is no longer handed to pydantic, so the "old-style `$ref` fails fast" test now
+  proves the platform validator accepts such a schema; a schema without a top-level object still
+  fails fast.
+- `numbers_must_appear_in_context` compares numbers by value ("2024-05-01" covers "May 1"),
+  `plain_text_lists: forbidden` also catches lines that start with a bullet, a dash or a lettered
+  marker, and the placeholder pattern needs word boundaries ("your namespace" is fine).
+- The automatic start retry decides with `isAmbiguousFailure` in ce-kit (network, timeout, 5xx), not
+  inside the page, and no longer repeats an unparsable response.
+- Italian: every instruction in every product is the polite imperative, including the verbs that
+  differ from the ones fixed in round 1.
+- The counter counts code points of the trimmed text like the validation and announces only when the
+  state changes (near, over) through a hidden status, not on every keystroke. The dead strict-trim
+  helpers, the `outer_whitespace` code and its messages were removed.
+- The 44px minimum height of shared-ui fields is a zero-specificity rule, so any product class wins
+  in any CSS order; the ProposalAI-only specificity workaround is gone.
+- The clipboard fallback and the Copy button give focus back after copying.
+- Not changed on purpose: a failing gap step still fails the run (the workflow runner cannot
+  continue after a failed step, and an empty gaps list would mislead), and the default model alias
+  is still shared by all products.
+
+A live run showed the model sometimes answering in plain text without the JSON object, in Russian
+only (1 of 8 on one order, both attempts). The last line of the prompt now asks for the JSON object
+explicitly: 24 of 24 afterwards, 20 of 20 orders clean, and the live canary passes 11 of 11 atoms and
+3 of 3 composite workflows on the new runner.
+
 ## Measured in Chrome on the production build of web-mirror (local, against the live stack)
 
 - E.4: both textareas keep their own minimum (144 px and 120 px, 6 and 5 lines at 16 px with a 24 px
