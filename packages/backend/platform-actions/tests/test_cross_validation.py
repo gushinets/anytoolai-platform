@@ -18,6 +18,7 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     ScoreMultidimensionalAxesInputValidator,
     SynthesizeAngleCrossValidator,
     PersuasiveTextCrossValidator,
+    PersuasiveTextInputValidator,
     ScoreMatchByRubricCrossValidator,
     ScoreMatchByRubricInputValidator,
     SynthesizeAngleCrossValidator,
@@ -1265,6 +1266,73 @@ class TestPersuasiveTextCrossValidator:
     def test_rejects(self, input_payload: dict, output: dict | None) -> None:
         with pytest.raises(StructuredOutputValidationError):
             self.validator.validate(input_payload=input_payload, output=output)
+
+
+class TestPersuasiveTextProductConstraints:
+    """ANY-656: forbidden_patterns, plain_text_lists and numbers_must_appear_in_context."""
+
+    def setup_method(self) -> None:
+        self.validator = PersuasiveTextCrossValidator()
+
+    @pytest.mark.parametrize(
+        ("constraints", "context", "text"),
+        [
+            ({"forbidden_patterns": [r"\[[^\]]*\]", "your name"]}, {}, "Hello, I can start today."),
+            ({"plain_text_lists": "forbidden"}, {}, "First paragraph.\n\nSecond paragraph."),
+            ({"plain_text_lists": "allowed"}, {}, "- one\n- two"),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Build 5 pages for 3 200 EUR", "freelancer_positioning": "4 years"},
+                "I have 4 years of experience and can build 5 pages for 3,200 EUR.",
+            ),
+            ({"numbers_must_appear_in_context": True}, {}, "No digits at all."),
+            ({"numbers_must_appear_in_context": False}, {}, "Invented 999 EUR is not checked."),
+        ],
+    )
+    def test_accepts(self, constraints: dict, context: dict, text: str) -> None:
+        self.validator.validate(
+            input_payload={"context": context, "constraints": constraints}, output={"text": text}
+        )
+
+    @pytest.mark.parametrize(
+        ("constraints", "context", "text"),
+        [
+            ({"forbidden_patterns": [r"\[[^\]]*\]"]}, {}, "Hello [Client Name]."),
+            ({"forbidden_patterns": ["your name"]}, {}, "Regards, Your Name"),
+            ({"forbidden_patterns": ["\u2014"]}, {}, "Fast \u2014 and clean."),
+            ({"plain_text_lists": "forbidden"}, {}, "- one\n- two"),
+            ({"plain_text_lists": "forbidden"}, {}, "1. one\n2. two"),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Budget 500 EUR"},
+                "I can do it for 350 EUR.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"freelancer_positioning": "Make and n8n automation"},
+                "Ready in 3 days.",
+            ),
+        ],
+    )
+    def test_rejects(self, constraints: dict, context: dict, text: str) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"context": context, "constraints": constraints},
+                output={"text": text},
+            )
+
+
+class TestPersuasiveTextInputValidator:
+    def setup_method(self) -> None:
+        self.validator = PersuasiveTextInputValidator()
+
+    def test_accepts_missing_and_valid_patterns(self) -> None:
+        self.validator.validate(input_payload={})
+        self.validator.validate(input_payload={"constraints": {"forbidden_patterns": [r"\{\{"]}})
+
+    def test_rejects_invalid_regular_expression(self) -> None:
+        with pytest.raises(ActionInputValidationError):
+            self.validator.validate(input_payload={"constraints": {"forbidden_patterns": ["["]}})
 
 
 def _axis(axis_id: str, **extra: object) -> dict:

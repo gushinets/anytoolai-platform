@@ -67,6 +67,17 @@ closed if a declared ref has no matching class, since `platform-core` must not i
 
 `generate_proposal` must never become a platform action type. ProposalAI uses `text.compose_persuasive_text` through product-specific MVP-B action config.
 
+## A06 `text.compose_persuasive_text` caller constraints
+
+`input.constraints` (closed object) carries `tone`, `length`, `language`, `format` and four optional rules that stay product-neutral so any A06 caller can opt in:
+
+- `forbidden_patterns` (array of regular expressions): `PersuasiveTextCrossValidator` rejects `text` when any pattern matches, case-insensitively (placeholders, boilerplate signatures, a banned dash). `PersuasiveTextInputValidator` rejects an invalid expression before any provider call.
+- `plain_text_lists` (`allowed` | `forbidden`): `forbidden` rejects a CommonMark list on top of the kernel-wide plain_text policy that allows lists (ANY-502).
+- `numbers_must_appear_in_context` (boolean): every digit group in `text` must occur in `input.context` (thousands separators ignored). It catches invented amounts, dates and durations without domain knowledge.
+- `claims_to_avoid` (array of objects with a required `description`): prompt-level only. The caller lists statements the text must not assert, for example gaps found by A04. It is a constraint and not a `context` field because the mapping DSL rejects dotted `context.*` input targets.
+
+A failed cross-validation is a PydanticAI validation retry, so the model gets another attempt before the user sees an error.
+
 ## A03 `text.score_multidimensional_axes` contract
 
 Strict, closed (`additionalProperties: false`) schemas — `kernel.schemas.score_multidim_input_v1` / `kernel.schemas.score_multidim_output_v1`:

@@ -15,7 +15,7 @@ from .extract_structured_fields import (
 )
 from .generate_clarifying_questions import GenerateClarifyingQuestionsCrossValidator
 from .generate_gap_rewrites import GapRewritesCrossValidator
-from .persuasive_text import PersuasiveTextCrossValidator
+from .persuasive_text import PersuasiveTextCrossValidator, PersuasiveTextInputValidator
 from .score_match_by_rubric import (
     ScoreMatchByRubricCrossValidator,
     ScoreMatchByRubricInputValidator,
@@ -44,6 +44,7 @@ _CROSS_VALIDATORS: dict[str, type[ActionOutputCrossValidator]] = {
 _INPUT_VALIDATORS: dict[str, type[ActionInputValidator]] = {
     "text.extract_structured_fields": ExtractStructuredFieldsInputValidator,
     "text.compare_and_classify": CompareAndClassifyInputValidator,
+    "text.compose_persuasive_text": PersuasiveTextInputValidator,
     "text.score_match_by_rubric": ScoreMatchByRubricInputValidator,
     "text.score_multidimensional_axes": ScoreMultidimensionalAxesInputValidator,
 }

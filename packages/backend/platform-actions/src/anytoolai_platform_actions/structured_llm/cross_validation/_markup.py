@@ -312,3 +312,11 @@ def _has_disallowed_plain_text_markup(value: str) -> bool:
                 if inline_token.type == "inline" and _TASK_LIST_CHECKBOX_RE.match(inline_token.content):
                     return True
     return False
+
+
+def _has_list(value: str) -> bool:
+    """True when the text parses as a CommonMark ordered or unordered list."""
+    return any(
+        token.type in ("bullet_list_open", "ordered_list_open")
+        for token in _tokenize_markdown(value)
+    )

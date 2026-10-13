@@ -1,15 +1,62 @@
 from __future__ import annotations
 
-from typing import Any, Mapping
+import re
+from typing import Any, Iterator, Mapping
 
-from ._markup import _has_disallowed_plain_text_markup, _has_html_tag, _has_visible_text
-from ._shared import _coerce_integer_valued, _cross_validation_error, _require_output
+from anytoolai_platform_core.actions.runner import ActionInputValidationError
+
+from ._markup import _has_disallowed_plain_text_markup, _has_html_tag, _has_list, _has_visible_text
+from ._shared import (
+    _coerce_integer_valued,
+    _cross_validation_error,
+    _require_output,
+    _truncated_repr,
+)
+
+# A thousands separator (comma, space, no-break/narrow space) between digit groups is dropped on
+# both sides before comparing, so "3 200" in the input matches "3,200" in the text.
+_THOUSANDS_SEPARATOR = re.compile(r"(?<=\d)[,\u00a0\u202f ](?=\d{3}(?!\d))")
+_DIGIT_RUN = re.compile(r"\d+")
+
+
+def _context_strings(value: Any) -> Iterator[str]:
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, Mapping):
+        for item in value.values():
+            yield from _context_strings(item)
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            yield from _context_strings(item)
+    elif isinstance(value, (int, float)) and not isinstance(value, bool):
+        yield str(value)
+
+
+def _digit_runs(value: str) -> set[str]:
+    return set(_DIGIT_RUN.findall(_THOUSANDS_SEPARATOR.sub("", value)))
+
+
+class PersuasiveTextInputValidator:
+    """Rejects an A06 input.constraints.forbidden_patterns entry that is not a valid regular
+    expression before any provider call is made (a bad pattern is a caller bug the model cannot
+    fix by retrying)."""
+
+    def validate(self, *, input_payload: Mapping[str, Any]) -> None:
+        constraints = input_payload.get("constraints")
+        patterns = constraints.get("forbidden_patterns") if isinstance(constraints, Mapping) else None
+        for pattern in patterns if isinstance(patterns, list) else []:
+            try:
+                re.compile(pattern)
+            except (re.error, TypeError) as exc:
+                raise ActionInputValidationError(
+                    f"constraints.forbidden_patterns has an invalid regular expression: {exc}"
+                ) from exc
 
 
 class PersuasiveTextCrossValidator:
     """Validates A06 output.text against the caller-supplied input.constraints
-    (length, format) that the static output schema cannot express because they vary per
-    call."""
+    (length, format, forbidden_patterns, plain_text_lists, numbers_must_appear_in_context) that
+    the static output schema cannot express because they vary per call."""
 
     def validate(
         self,
@@ -48,3 +95,23 @@ class PersuasiveTextCrossValidator:
         # decorative token (a plain paragraph is valid Markdown too).
         if text_format == "html" and not _has_html_tag(text):
             raise _cross_validation_error("text_missing_markup_for_html_format")
+
+        # Product-level rules (ANY-656): all generic, so any A06 caller can opt in.
+        # Case-insensitive on purpose: "Your Name" must also catch "your name".
+        for pattern in constraints.get("forbidden_patterns") or []:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                raise _cross_validation_error(
+                    f"text_matches_forbidden_pattern:{_truncated_repr(match.group(0))}"
+                )
+        if constraints.get("plain_text_lists") == "forbidden" and _has_list(text):
+            raise _cross_validation_error("text_contains_list")
+        if constraints.get("numbers_must_appear_in_context"):
+            allowed = set()
+            for chunk in _context_strings(input_payload.get("context")):
+                allowed |= _digit_runs(chunk)
+            invented = sorted(_digit_runs(text) - allowed)
+            if invented:
+                raise _cross_validation_error(
+                    f"text_has_numbers_absent_from_context:{_truncated_repr(','.join(invented))}"
+                )
