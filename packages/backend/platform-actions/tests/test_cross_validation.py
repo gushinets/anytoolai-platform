@@ -1286,6 +1286,19 @@ class TestPersuasiveTextProductConstraints:
                 "I have 4 years of experience and can build 5 pages for 3,200 EUR.",
             ),
             ({"numbers_must_appear_in_context": True}, {}, "No digits at all."),
+            # numbers are compared by value: "2024-05-01" covers "May 1" and "05/01" covers "5/1"
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Deadline 2024-05-01"},
+                "I can deliver by May 1.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Due 05/01"},
+                "Due 5/1 works for me.",
+            ),
+            ({"plain_text_lists": "forbidden"}, {}, "a) is how the quote starts, then prose."),
+            ({"plain_text_lists": "forbidden"}, {}, "\u2022 One bullet alone is a sentence."),
             # a thousands separator is read both ways, in the input and in the text
             (
                 {"numbers_must_appear_in_context": True},
@@ -1318,6 +1331,9 @@ class TestPersuasiveTextProductConstraints:
             ({"forbidden_patterns": ["\u2014"]}, {}, "Fast \u2014 and clean."),
             ({"plain_text_lists": "forbidden"}, {}, "- one\n- two"),
             ({"plain_text_lists": "forbidden"}, {}, "1. one\n2. two"),
+            ({"plain_text_lists": "forbidden"}, {}, "\u2022 one\n\u2022 two"),
+            ({"plain_text_lists": "forbidden"}, {}, "\u2013 one\n\u2013 two"),
+            ({"plain_text_lists": "forbidden"}, {}, "a) one\nb) two"),
             (
                 {"numbers_must_appear_in_context": True},
                 {"task_text": "Budget 500 EUR"},

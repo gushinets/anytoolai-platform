@@ -314,9 +314,16 @@ def _has_disallowed_plain_text_markup(value: str) -> bool:
     return False
 
 
+# Plain-text list markers a CommonMark parser does not treat as lists: a bullet or dash at the start of
+# a line and a lettered item ("a)", "(b)"). Two such lines in a row are a list, one is just a sentence.
+_PLAIN_LIST_LINE = re.compile(r"^\s*(?:[\u2022\u25cf\u25aa\u2023\u2013\u2014]|\(?[A-Za-z]\))\s+\S")
+
+
 def _has_list(value: str) -> bool:
-    """True when the text parses as a CommonMark ordered or unordered list."""
-    return any(
-        token.type in ("bullet_list_open", "ordered_list_open")
-        for token in _tokenize_markdown(value)
-    )
+    """True when the text is a CommonMark ordered or unordered list, or has two or more lines that
+    start with a bullet, a dash or a lettered marker."""
+    if any(
+        token.type in ("bullet_list_open", "ordered_list_open") for token in _tokenize_markdown(value)
+    ):
+        return True
+    return sum(bool(_PLAIN_LIST_LINE.match(line)) for line in value.splitlines()) >= 2  # noqa: PLR2004

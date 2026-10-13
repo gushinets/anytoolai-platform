@@ -36,10 +36,11 @@ def _context_strings(value: Any) -> Iterator[str]:
 
 
 def _digit_runs(value: str) -> tuple[set[str], set[str]]:
-    """(numbers as written, numbers with thousands separators joined)."""
+    """(numbers as written, numbers with thousands separators joined), compared by value: "05" and
+    "5" are the same number, so "2024-05-01" in the input covers "May 1" in the text."""
     return (
-        set(_DIGIT_RUN.findall(value)),
-        set(_DIGIT_RUN.findall(_THOUSANDS_SEPARATOR.sub("", value))),
+        {str(int(run)) for run in _DIGIT_RUN.findall(value)},
+        {str(int(run)) for run in _DIGIT_RUN.findall(_THOUSANDS_SEPARATOR.sub("", value))},
     )
 
 

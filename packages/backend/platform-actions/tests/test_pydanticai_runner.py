@@ -247,34 +247,47 @@ def test_schema_missing_top_level_object_type_fails_fast_with_clear_error() -> N
         )
 
 
-def test_schema_with_old_style_ref_fails_fast_with_clear_error() -> None:
-    """StructuredDict's own "type": "object" guard passes for a schema using the old-style
-    "definitions"/"$ref" pair instead of "$defs", but Agent construction then raises a raw
-    KeyError from pydantic's JSON-schema generator -- a different internal exception for the
-    same underlying "cannot bind this schema" condition the previous test covers. Assert it
-    surfaces as the same kind of clear RuntimeError, not the raw KeyError."""
-
-    async def request_executor(_request: ProviderRequest) -> ProviderResponse:
-        raise AssertionError("request_executor should not be called for a malformed schema")
-
+def test_schema_with_old_style_ref_is_validated_by_the_platform_validator() -> None:
+    """The schema is no longer bound as a PydanticAI output type, so pydantic's JSON-schema
+    generator (which choked on the old-style "definitions"/"$ref" pair) is out of the path and the
+    platform's jsonschema validator handles it."""
     runner = PydanticAIStructuredRunner()
     request = _base_request(
-        action_config_id="kernel_demo.old_style_ref_v1",
         response_schema={
             "type": "object",
             "properties": {"child": {"$ref": "#/definitions/Foo"}},
+            "required": ["child"],
             "definitions": {"Foo": {"type": "string"}},
         },
     )
 
-    with pytest.raises(RuntimeError, match="kernel_demo.old_style_ref_v1"):
-        asyncio.run(
-            runner.run(
-                request,
-                request_executor=request_executor,
-                validation_max_attempts=2,
-            )
+    result = asyncio.run(
+        runner.run(request, request_executor=_fixed_executor('{"child": "x"}'), validation_max_attempts=1)
+    )
+
+    assert result.structured_output == {"child": "x"}
+
+
+def test_schema_mismatch_retry_message_names_the_field_and_the_rule() -> None:
+    runner = PydanticAIStructuredRunner()
+    request = _base_request(response_schema=SCHEMA)
+    seen: list[str] = []
+
+    async def request_executor(attempt: ProviderRequest) -> ProviderResponse:
+        seen.append(" ".join(message.content for message in attempt.messages))
+        output = '{"name": 3}' if len(seen) == 1 else '{"name": "Ada"}'
+        return ProviderResponse(
+            provider_policy_ref=attempt.provider_policy_ref,
+            provider="fake",
+            model="fake-json-v1",
+            output_text=output,
+            status=ProviderCallStatus.succeeded,
         )
+
+    result = asyncio.run(runner.run(request, request_executor=request_executor, validation_max_attempts=2))
+
+    assert result.structured_output == {"name": "Ada"}
+    assert "Field name:" in seen[1] and "is not of type 'string'" in seen[1]
 
 
 def test_non_finite_numeric_value_retries_and_then_exhausts() -> None:

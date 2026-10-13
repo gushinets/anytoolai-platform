@@ -138,6 +138,13 @@ PydanticAI owns structured-output generation inside the executor:
 - validation retry/reflection;
 - native/tool/prompted structured-output mode selection where supported.
 
+In MVP-A the typed binding is `TextOutput`: PydanticAI hands the raw model text to the platform's own
+parser and validator (tolerant of a raw newline inside a JSON string, with a retry message that names
+the offending field and rule) and receives the normalized object. `PromptedOutput` is not used,
+because PydanticAI's own JSON parsing rejects a raw newline or a reply without the JSON wrapper
+before any output validator runs, so the platform's validation and retry message would never be
+reached. The schema reaches the model through the gateway's schema guidance message.
+
 LiteLLM does not independently enforce a second JSON schema for the same action. If PydanticAI chooses a provider-native schema transport, the gateway may pass that through to LiteLLM, but AnytoolAI must not configure a conflicting LiteLLM `response_format` separately.
 
 AnytoolAI still owns final validation because artifacts, user-safe errors, and action contracts are platform behavior. The final validator persists raw provider output for debugging and normalized output for downstream steps.
