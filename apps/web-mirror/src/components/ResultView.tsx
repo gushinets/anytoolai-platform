@@ -66,20 +66,25 @@ export function ResultView({ text, onCopy, embedded = false, secondaryAction }: 
       {copyState === "copied" ? t("result.copied") : copyState === "copying" ? t("result.copying") : t("result.copy")}
     </Button>
   );
+  // "Select text" sits in the same row as Copy: it is the fallback for the same action.
+  const selectButton =
+    copyState === "error" ? (
+      <Button variant="secondary" onClick={handleSelectText}>
+        {t("result.selectText")}
+      </Button>
+    ) : null;
   return (
     <Container className={styles.stack}>
       {/* Empty marker: the text element right after it is what "Select text" selects. */}
       <span ref={anchorRef} hidden />
       <GeneratedTextRenderer text={text} />
-      {secondaryAction ? <div className={styles.actions}>{copyButton}{secondaryAction}</div> : copyButton}
-      {copyState === "error" ? (
-        <>
-          <Toast variant="error">{t("result.copyFailed")}</Toast>
-          <Button variant="secondary" onClick={handleSelectText}>
-            {t("result.selectText")}
-          </Button>
-        </>
-      ) : null}
+      {/* Always wrapped: a wrapper that appeared only on error would remount the Copy button and drop its focus. */}
+      <div className={styles.actions}>
+        {copyButton}
+        {selectButton}
+        {secondaryAction}
+      </div>
+      {copyState === "error" ? <Toast variant="error">{t("result.copyFailed")}</Toast> : null}
     </Container>
   );
 }

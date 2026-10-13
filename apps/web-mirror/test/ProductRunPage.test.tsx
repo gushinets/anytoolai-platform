@@ -528,6 +528,8 @@ describe("ProductRunPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Copy" }));
 
     const select = await screen.findByRole("button", { name: "Select text" });
+    // same row as Copy, not a separate block under the error
+    expect(select.parentElement).toBe(screen.getByRole("button", { name: "Copy" }).parentElement);
     fireEvent.click(select);
     expect(window.getSelection()?.toString()).toContain(RESULT_TEXT);
   });
