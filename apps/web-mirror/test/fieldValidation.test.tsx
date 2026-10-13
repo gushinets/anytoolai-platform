@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   collectFieldErrors,
+  optionalBackendTrimmedFieldError,
   optionalTrimmedFieldError,
   requiredTrimmedFieldError,
 } from "../src/products/runtime/fieldValidation";
@@ -47,5 +48,14 @@ describe("collectFieldErrors", () => {
         ["b", undefined],
       ]),
     ).toEqual({ a: { code: "required" } });
+  });
+});
+
+describe("optionalBackendTrimmedFieldError", () => {
+  it("accepts empty or outer-whitespace-only values and pasted padding, checks only the length", () => {
+    expect(optionalBackendTrimmedFieldError("", 5)).toBeUndefined();
+    expect(optionalBackendTrimmedFieldError(" \n\u00a0 ", 5)).toBeUndefined();
+    expect(optionalBackendTrimmedFieldError("  abc\n", 5)).toBeUndefined();
+    expect(optionalBackendTrimmedFieldError("abcdef", 5)).toEqual({ code: "max_length", maxLength: 5 });
   });
 });

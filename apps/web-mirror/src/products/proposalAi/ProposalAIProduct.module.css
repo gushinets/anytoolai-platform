@@ -49,6 +49,10 @@
   font-variant-numeric: tabular-nums;
 }
 
+.counterOver {
+  color: var(--color-error);
+}
+
 .required {
   font-weight: 400;
   color: var(--color-text-secondary);

@@ -382,13 +382,18 @@ describe("ProposalAI product definition", () => {
     const positioning = screen.getByLabelText(/^Your experience and strengths/) as HTMLTextAreaElement;
     for (const field of [task, positioning]) {
       expect(field.getAttribute("aria-required")).toBe("true");
-      expect(field.maxLength).toBe(4000);
+      // no hard cap: a paste over the limit must stay visible and get the counter and the error
+      expect(field.maxLength).toBe(-1);
     }
     expect(screen.getAllByText("(required)")).toHaveLength(2);
     expect(screen.queryByText(/\/ 4000/)).toBeNull();
 
     fireEvent.change(task, { target: { value: "x".repeat(3501) } });
     expect(screen.getByText("3501 / 4000").getAttribute("aria-live")).toBe("polite");
+
+    fireEvent.change(task, { target: { value: "x".repeat(4100) } });
+    expect(task.value).toHaveLength(4100);
+    expect(screen.getByText("4100 / 4000")).toBeTruthy();
   });
 
   it("shows the experience gaps under the proposal and copies only the proposal text", async () => {

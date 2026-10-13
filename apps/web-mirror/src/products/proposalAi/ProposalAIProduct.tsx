@@ -49,17 +49,15 @@ function validate(values: ProposalAIValues): Partial<Record<keyof ProposalAIValu
   ]);
 }
 
+function isGap(value: unknown): value is ProposalAIGap {
+  return typeof value === "object" && value !== null && "description" in value && typeof value.description === "string";
+}
+
 function extractResult(output: Record<string, unknown>): ProposalAIResult | null {
   if (typeof output.text !== "string") {
     return null;
   }
-  const gaps = Array.isArray(output.gaps)
-    ? output.gaps.flatMap((gap): ProposalAIGap[] =>
-        typeof gap === "object" && gap !== null && typeof (gap as { description?: unknown }).description === "string"
-          ? [{ description: (gap as { description: string }).description }]
-          : [],
-      )
-    : [];
+  const gaps = Array.isArray(output.gaps) ? output.gaps.filter(isGap).map(({ description }) => ({ description })) : [];
   return { text: output.text, gaps };
 }
 
@@ -95,10 +93,12 @@ function RequiredLabel({ htmlFor, children }: { htmlFor: string; children: strin
 }
 
 /** "N / 4000", announced politely, shown only near the limit. The live region itself is always in
- * the DOM so screen readers pick up the text when it appears. */
+ * the DOM so screen readers pick up the text when it appears. There is deliberately no hard
+ * `maxLength` on the textarea: it would cut a pasted text silently, while the counter and the
+ * validation error tell the user what to shorten. */
 function Counter({ length }: { length: number }) {
   return (
-    <span className={styles.counter} aria-live="polite">
+    <span className={length > TEXT_MAX_LENGTH ? `${styles.counter} ${styles.counterOver}` : styles.counter} aria-live="polite">
       {length > COUNTER_THRESHOLD ? `${length} / ${TEXT_MAX_LENGTH}` : ""}
     </span>
   );
@@ -117,7 +117,6 @@ function ProposalAIFields({ values, errors, disabled, onChange }: ProductFieldsP
           placeholder={t("fields.taskTextPlaceholder")}
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange("taskText", event.target.value)}
           disabled={disabled}
-          maxLength={TEXT_MAX_LENGTH}
           aria-required="true"
           aria-invalid={Boolean(errors.taskText)}
           aria-describedby={`proposal-ai-task-help${errors.taskText ? " proposal-ai-task-error" : ""}`}
@@ -145,7 +144,6 @@ function ProposalAIFields({ values, errors, disabled, onChange }: ProductFieldsP
           placeholder={t("fields.freelancerPositioningPlaceholder")}
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange("freelancerPositioning", event.target.value)}
           disabled={disabled}
-          maxLength={TEXT_MAX_LENGTH}
           aria-required="true"
           aria-invalid={Boolean(errors.freelancerPositioning)}
           aria-describedby={`proposal-ai-positioning-help${errors.freelancerPositioning ? " proposal-ai-positioning-error" : ""}`}

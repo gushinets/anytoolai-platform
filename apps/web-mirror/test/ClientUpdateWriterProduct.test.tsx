@@ -267,6 +267,24 @@ describe("Client Update Writer product definitions", () => {
     }
   });
 
+  it("trims pasted outer whitespace instead of rejecting it, and sends the trimmed values", async () => {
+    const ids = MODE_IDS.update;
+    const { routes, queues } = bootAndHappyPathRoutes(ids, { text: "Done.", call_to_action: "Reply." });
+    const { client, calls } = makeClient(queues);
+
+    render(<ProductRunPage definition={updateDefinition} client={client} />);
+    await waitFor(() => expect(screen.getByLabelText("Progress notes")).toBeTruthy());
+    fireEvent.change(screen.getByLabelText("Progress notes"), { target: { value: "  Redesign is done.\n\n" } });
+    fireEvent.click(screen.getByRole("radio", { name: "warm" }));
+    fireEvent.click(screen.getByRole("button", { name: "Write update" }));
+
+    await waitFor(() => expect(calls.some((call) => call.key === routes.START)).toBe(true));
+    const startCall = calls.find((call) => call.key === routes.START);
+    expect(JSON.parse(startCall?.init.body as string)).toMatchObject({
+      input: { progress_notes: "Redesign is done.", tone: "warm" },
+    });
+  });
+
   it("Update mode validates progress_notes/tone and maps them to update_input_v1", async () => {
     const ids = MODE_IDS.update;
     const { routes, queues } = bootAndHappyPathRoutes(ids, {

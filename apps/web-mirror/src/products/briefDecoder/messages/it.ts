@@ -7,13 +7,13 @@ export const it: Shape<typeof en> = {
   quotaRemaining: "{remaining} su {limit, plural, one {# analisi} many {# di analisi} other {# analisi}} rimaste.",
   fields: {
     briefText: "Brief del cliente",
-    briefTextPlaceholder: "Incollare il brief, la richiesta o l’annuncio del cliente.",
-    briefTextHelp: "Incollare il brief così com’è. Un brief più lungo produce domande più precise.",
+    briefTextPlaceholder: "Incolli il brief, la richiesta o l’annuncio del cliente.",
+    briefTextHelp: "Incolli il brief così com’è. Un brief più lungo produce domande più precise.",
   },
   decode: {
     submit: "Decodificare il brief",
     running: "Decodifica del brief in corso…",
-    runFailed: "Qualcosa è andato storto nella decodifica del brief. Riprovare.",
+    runFailed: "Qualcosa è andato storto nella decodifica del brief. Riprovi.",
     resultTitle: "Brief decodificato",
     placeholder: "Il brief decodificato apparirà qui dopo la decodifica.",
     regenerate: "Decodificare di nuovo il brief",

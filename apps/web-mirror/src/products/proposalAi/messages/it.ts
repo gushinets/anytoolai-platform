@@ -35,7 +35,7 @@ export const it: Shape<typeof en> = {
   generate: {
     submit: "Generi la proposta",
     running: "Generazione della proposta in corso…",
-    runFailed: "Si è verificato un problema durante la generazione della proposta. Riprovare.",
+    runFailed: "Si è verificato un problema durante la generazione della proposta. Riprovi.",
     resultTitle: "Proposta",
     placeholder: "La proposta apparirà qui dopo la generazione.",
     regenerate: "Rigeneri la proposta",

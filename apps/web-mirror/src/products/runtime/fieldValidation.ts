@@ -89,3 +89,9 @@ export function requiredBackendTrimmedFieldError(value: string, maxLength: numbe
   }
   return [...trimmed].length > maxLength ? { code: "max_length", maxLength } : undefined;
 }
+
+/** Optional counterpart of `requiredBackendTrimmedFieldError`: empty (after the backend trim) is fine,
+ * otherwise only the length is checked. The product's `toInput` sends the trimmed value. */
+export function optionalBackendTrimmedFieldError(value: string, maxLength: number): FieldError | undefined {
+  return trimBackendWhitespace(value).length === 0 ? undefined : requiredBackendTrimmedFieldError(value, maxLength);
+}

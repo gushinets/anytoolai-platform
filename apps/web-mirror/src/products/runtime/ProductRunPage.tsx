@@ -135,20 +135,6 @@ function cacheSuccessOnly<T extends { ok: boolean }>(
   return pending;
 }
 
-// Runtime config is immutable per (client, productId) for the lifetime of a page load -- caching
-// it here means a product that mounts several ProductRunPage instances for the same productId in
-// sequence (e.g. Client Update Writer's mode switcher, which remounts on every mode change since
-// each mode's form values have an incompatible shape) doesn't re-fetch identical data on every
-// switch. Keyed by the client instance (not a bare module-level cache) so distinct clients --
-// different tests, or a real app with more than one client -- never share entries.
-//
-// Guest identity and quota are deliberately NOT cached this way: identity already caches itself
-// via guestStorage, and quota genuinely changes over the page's lifetime as the guest consumes
-// it -- a code review finding caught a first attempt at caching quota the same way this file
-// caches runtime config, which went stale the instant a run actually consumed quota (never
-// invalidated after a successful start), didn't key by guestId (a guest-identity self-heal could
-// read a stale/wrong guest's cached result), and didn't dedupe concurrent calls the way this
-// function does. Quota is cheap, advisory, and re-fetched on mount and after accepted inline runs.
 // The start request creates the session and job; on a slow backend it can take longer than the
 // client's 10 s default, and an aborted request cannot be told apart from a lost response.
 const START_TIMEOUT_MS = 20_000;
@@ -183,6 +169,20 @@ async function writeTextToClipboard(value: string): Promise<void> {
   }
 }
 
+// Runtime config is immutable per (client, productId) for the lifetime of a page load -- caching
+// it here means a product that mounts several ProductRunPage instances for the same productId in
+// sequence (e.g. Client Update Writer's mode switcher, which remounts on every mode change since
+// each mode's form values have an incompatible shape) doesn't re-fetch identical data on every
+// switch. Keyed by the client instance (not a bare module-level cache) so distinct clients --
+// different tests, or a real app with more than one client -- never share entries.
+//
+// Guest identity and quota are deliberately NOT cached this way: identity already caches itself
+// via guestStorage, and quota genuinely changes over the page's lifetime as the guest consumes
+// it -- a code review finding caught a first attempt at caching quota the same way this file
+// caches runtime config, which went stale the instant a run actually consumed quota (never
+// invalidated after a successful start), didn't key by guestId (a guest-identity self-heal could
+// read a stale/wrong guest's cached result), and didn't dedupe concurrent calls the way this
+// function does. Quota is cheap, advisory, and re-fetched on mount and after accepted inline runs.
 const runtimeConfigCache = new WeakMap<PlatformApiClient, Map<string, ReturnType<typeof getRuntimeConfig>>>();
 
 function getCachedRuntimeConfig(client: PlatformApiClient, productId: string) {
@@ -948,7 +948,6 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       return Promise.resolve(false);
     }
     const { scenarioSessionId, checkpointId } = displayedResult;
-    const writeToClipboard = writeTextToClipboard;
 
     setCopyActivationsInFlight((count) => count + 1);
     return new Promise<boolean>((resolve) => {
@@ -958,7 +957,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
           text,
           scenarioSessionId,
           checkpointId,
-          writeToClipboard,
+          writeToClipboard: writeTextToClipboard,
           onCopied: () => {
             emitEvent(onEventRef.current, { type: "copy_activated", scenarioSessionId, guestId });
             resolve(true);
