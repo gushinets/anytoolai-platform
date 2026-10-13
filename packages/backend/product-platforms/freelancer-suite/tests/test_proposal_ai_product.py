@@ -176,6 +176,7 @@ def test_forbidden_patterns_catch_placeholders_and_meta_phrases(bad_text: str) -
         "As an AI automation engineer I build Telegram bots.",
         "Based on the information in your brief, I would start with the API.",
         "I build AI agents and describe the information flow first.",
+        "I will follow your namespace conventions.",
     ],
 )
 def test_ordinary_phrases_are_not_meta_commentary(fine_text: str) -> None:
@@ -265,6 +266,7 @@ def test_prompt_v2_pins_the_quality_rules_from_the_qa_report() -> None:
         "No long dashes",  # D-06
         "A Russian positioning does not make an English order a Russian one",  # D-02
         "Do not list the whole profile",  # no padding with unrelated cases
+        "Answer with one JSON object that has the single field `text`",  # no bare-text replies
         "similar project",  # D-08
         "`warm`:",  # D-07
         "`neutral`:",

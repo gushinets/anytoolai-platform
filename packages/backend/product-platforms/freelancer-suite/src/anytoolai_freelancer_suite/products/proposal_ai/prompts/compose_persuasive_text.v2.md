@@ -73,4 +73,6 @@ Tone (`constraints.tone`; default `warm`) changes wording and length, not the fa
 - `firm`: about one third shorter than `neutral`; direct statements ("I will", "I have done") instead
   of hedged offers; one explicit next step with no courtesy filler.
 
-Do not include anything outside the schema fields.
+Answer with one JSON object that has the single field `text` and nothing else, even when the
+proposal is written in Russian or another language: {"text": "<the whole proposal>"}. A reply that
+is only the proposal text, without the JSON object around it, is rejected.

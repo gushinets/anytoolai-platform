@@ -53,6 +53,13 @@ def test_numbers_are_read_both_ways_and_ordinary_ai_phrases_pass() -> None:
     assert "meta_phrase" in violations(CLEAN + " As an AI language model I cannot promise.")
 
 
+def test_numbers_are_compared_by_value_and_your_namespace_is_not_a_placeholder() -> None:
+    order = {**EN_ORDER, "task_text": "Deadline 2024-05-01"}
+    assert "invented_number" not in violations("I can deliver by May 1.", order=order)
+    assert "placeholder" not in violations(CLEAN + " I follow your namespace conventions.")
+    assert "placeholder" in violations(CLEAN + " Best, Your Name")
+
+
 def test_an_explicit_language_replaces_the_orders_expected_one() -> None:
     russian = "Я делаю автоматизации на Make.com. Могу начать на этой неделе."
     checks = proposal_ai_eval.check_proposal(russian, [], EN_ORDER, PROFILE, expect_language="ru")

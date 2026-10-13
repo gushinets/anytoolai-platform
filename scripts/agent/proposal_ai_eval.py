@@ -21,7 +21,7 @@ import urllib.request
 from pathlib import Path
 
 ORDERS_PATH = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "proposal_ai_eval" / "orders.json"
-PLACEHOLDER = re.compile(r"\[[^\]\n]{1,80}\]|\{\{|\}\}|your name|<[^>]+>", re.IGNORECASE)
+PLACEHOLDER = re.compile(r"\[[^\]\n]{1,80}\]|\{\{|\}\}|\byour name\b|<[^>]+>", re.IGNORECASE)
 META = re.compile(
     r"based on the information i(?:.m| am| have| was| can)|truthfully|as an ai (?:language )?model"
     r"|as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\b|my listed experience|haven.t specified"
@@ -36,7 +36,10 @@ MAX_WORDS = 250
 
 def _digit_runs(value: str) -> tuple[set[str], set[str]]:
     """(numbers as written, numbers with thousands separators joined); same reading as the backend."""
-    return set(re.findall(r"\d+", value)), set(re.findall(r"\d+", THOUSANDS_SEPARATOR.sub("", value)))
+    def numbers(text: str) -> set[str]:
+        return {str(int(run)) for run in re.findall(r"\d+", text)}
+
+    return numbers(value), numbers(THOUSANDS_SEPARATOR.sub("", value))
 
 
 def _has_invented_number(text: str, source: str) -> bool:
