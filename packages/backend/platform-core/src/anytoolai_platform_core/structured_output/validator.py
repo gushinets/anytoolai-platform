@@ -29,7 +29,7 @@ class StructuredOutputValidationResult:
 
 def parse_json_value(raw: str) -> Any:
     try:
-        return parse_strict_json(raw)
+        return parse_strict_json(raw, allow_control_chars=True)
     except json.JSONDecodeError as exc:
         raise StructuredOutputMalformedJsonError("Malformed JSON") from exc
 

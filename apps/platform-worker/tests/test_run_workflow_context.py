@@ -113,9 +113,9 @@ def test_execution_context_carries_typed_run_local_settings_only_when_supplied()
         provider_policy=ProviderPolicy(
             provider_policy_ref="default_text_generation_v1",
             provider="litellm",
-            model="openai/gpt-5.4-mini",
+            model="openai/gpt-6-luna",
         ),
-        model_id="openai/gpt-5.4-mini",
+        model_id="openai/gpt-6-luna",
         reasoning_effort=ReasoningEffort.high,
     )
 

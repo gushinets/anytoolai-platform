@@ -196,7 +196,7 @@ def _seed_lab_run(
     input_payload: dict[str, Any] | None = None,
     definition_hash: str | None = None,
     source_suffix: str = "",
-    model_id: str = "openai/gpt-5.4-mini",
+    model_id: str = "openai/gpt-6-luna",
     reasoning_effort: ReasoningEffort | None = ReasoningEffort.high,
 ):
     payload = (
@@ -343,7 +343,7 @@ def test_worker_loads_exact_input_and_settings_from_durable_snapshot(session_fac
     assert settings is not None
     assert settings.run_id == record.id
     assert settings.prompt == "worker edited prompt"
-    assert settings.provider_policy.model == "openai/gpt-5.4-mini"
+    assert settings.provider_policy.model == "openai/gpt-6-luna"
 
 
 def test_worker_rejects_incompatible_snapshot_before_action_creation(session_factory) -> None:
@@ -414,7 +414,7 @@ def test_real_worker_path_applies_snapshot_and_binds_runtime_ids(session_factory
     assert processed.error_code is None
     assert len(adapter.requests) == 1
     request = adapter.requests[0]
-    assert request.model == "openai/gpt-5.4-mini"
+    assert request.model == "openai/gpt-6-luna"
     assert request.model_addressing is ProviderModelAddressing.direct
     assert request.reasoning_effort is ReasoningEffort.high
     assert request.prompt.startswith("worker edited prompt")
@@ -445,7 +445,7 @@ class _SequenceLabAdapter:
             output_text=response,
             status=ProviderCallStatus.succeeded,
             metadata={
-                "litellm": {"actual_model": "gpt-5.4-mini-2026-03-17"},
+                "litellm": {"actual_model": "gpt-6-luna-2026-03-17"},
                 "reasoning_content": "private hidden reasoning",
                 "authorization": "Bearer private-provider-key",
             },
@@ -609,13 +609,13 @@ def test_lab_retry_success_keeps_separate_physical_calls_after_restart(
     diagnostics = first["diagnostics"]
     assert _attempt_counts(diagnostics) == attempt_counts
     assert diagnostics["succeeded_first_attempt"] is False
-    assert diagnostics["response_model_id"] == "gpt-5.4-mini-2026-03-17"
+    assert diagnostics["response_model_id"] == "gpt-6-luna-2026-03-17"
     assert [
         (row["semantic_attempt_index"], row["transport_attempt_index"], row["physical_call_index"])
         for row in diagnostics["provider_calls"]
     ] == expected_indices
     assert len(adapter.requests) == len(expected_indices)
-    assert all(request.model == "openai/gpt-5.4-mini" for request in adapter.requests)
+    assert all(request.model == "openai/gpt-6-luna" for request in adapter.requests)
     assert all(
         request.model_addressing is ProviderModelAddressing.direct
         for request in adapter.requests
@@ -659,7 +659,7 @@ def test_lab_null_reasoning_reaches_adapter_without_inheriting_policy_default(
 
     assert processed is not None and processed.status is JobStatus.succeeded
     assert len(adapter.requests) == 1
-    assert adapter.requests[0].model == "openai/gpt-5.4-mini"
+    assert adapter.requests[0].model == "openai/gpt-6-luna"
     assert adapter.requests[0].model_addressing is ProviderModelAddressing.direct
     assert adapter.requests[0].reasoning_effort is None
 
@@ -796,7 +796,7 @@ def test_concurrent_lab_submission_creates_one_job_with_distinct_allowed_retries
             }],
             "strict": False,
         },
-        prompt="Extract the deadline.", model_id="openai/gpt-5.4-mini",
+        prompt="Extract the deadline.", model_id="openai/gpt-6-luna",
         reasoning_effort=ReasoningEffort.high,
         capability_snapshot_id="worker-integration", capability_provenance={"source": "fixture"},
         idempotency_key="concurrent-submission",
@@ -865,7 +865,7 @@ def test_parallel_lab_runs_do_not_leak_settings_into_an_ordinary_job(
             session,
             registry,
             source_suffix=" for lab one",
-            model_id="openai/gpt-5.4-mini",
+            model_id="openai/gpt-6-luna",
             reasoning_effort=ReasoningEffort.low,
         )
         _scenario_two, job_two, run_two = _seed_lab_run(
@@ -941,7 +941,7 @@ def test_parallel_lab_runs_do_not_leak_settings_into_an_ordinary_job(
     assert all(job is not None and job.status is JobStatus.succeeded for job in final_jobs)
     requests_by_job = {request.job_id: request for request in adapter.requests}
     assert len(requests_by_job) == len(final_jobs)
-    assert requests_by_job[job_one.id].model == "openai/gpt-5.4-mini"
+    assert requests_by_job[job_one.id].model == "openai/gpt-6-luna"
     assert requests_by_job[job_one.id].reasoning_effort is ReasoningEffort.low
     assert requests_by_job[job_two.id].model == "openai/gpt-5.4"
     assert requests_by_job[job_two.id].reasoning_effort is ReasoningEffort.high

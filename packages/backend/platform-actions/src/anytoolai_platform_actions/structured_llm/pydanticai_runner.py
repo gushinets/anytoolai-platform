@@ -182,7 +182,12 @@ class PydanticAIStructuredRunner:
                     schema=dict(ctx.deps.request.response_schema),
                 )
             except StructuredOutputError as exc:
-                raise ModelRetry(str(exc)) from exc
+                # The retry prompt is all the model sees of the failure: a bare "Malformed JSON"
+                # made a model that had answered in plain text answer in plain text again.
+                raise ModelRetry(
+                    f"{exc}. Reply with exactly one JSON object that matches the schema, with "
+                    "all text inside its string fields and nothing before or after it."
+                ) from exc
             normalized_output = validation_result.normalized_output
             if cross_validator is not None:
                 try:

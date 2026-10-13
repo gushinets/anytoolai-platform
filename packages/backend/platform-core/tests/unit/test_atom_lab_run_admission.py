@@ -78,7 +78,7 @@ def _request(**overrides: Any) -> AtomLabRunAdmissionRequest:
             "strict": False,
         },
         "prompt": "Edited prompt",
-        "model_id": "openai/gpt-5.4-mini",
+        "model_id": "openai/gpt-6-luna",
         "reasoning_effort": ReasoningEffort.high,
         "capability_snapshot_id": "capability_snapshot_1",
         "capability_provenance": {"source": "fixture", "version": "1"},

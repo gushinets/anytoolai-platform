@@ -136,14 +136,14 @@ def test_litellm_adapter_sends_direct_lab_model_and_reasoning_without_alias_subs
 
     async def direct_completion(**kwargs: object) -> object:
         direct_calls.append(dict(kwargs))
-        return make_router_response(model="gpt-5.4-mini")
+        return make_router_response(model="gpt-6-luna")
 
     adapter = LiteLLMProviderAdapter(router, direct_completion=direct_completion)
 
     asyncio.run(
         adapter.complete(
             make_request(
-                model="openai/gpt-5.4-mini",
+                model="openai/gpt-6-luna",
                 model_addressing=ProviderModelAddressing.direct,
                 reasoning_effort=ReasoningEffort.high,
             )
@@ -153,7 +153,7 @@ def test_litellm_adapter_sends_direct_lab_model_and_reasoning_without_alias_subs
     assert router.calls == []
     assert direct_calls == [
         {
-            "model": "openai/gpt-5.4-mini",
+            "model": "openai/gpt-6-luna",
             "messages": [
                 {"role": "system", "content": "You are structured"},
                 {"role": "user", "content": "Return JSON"},
@@ -173,14 +173,14 @@ def test_litellm_adapter_does_not_inherit_reasoning_for_direct_model_when_omitte
 
     async def direct_completion(**kwargs: object) -> object:
         direct_calls.append(dict(kwargs))
-        return make_router_response(model="gpt-5.4-mini")
+        return make_router_response(model="gpt-6-luna")
 
     adapter = LiteLLMProviderAdapter(router, direct_completion=direct_completion)
 
     asyncio.run(
         adapter.complete(
             make_request(
-                model="openai/gpt-5.4-mini",
+                model="openai/gpt-6-luna",
                 model_addressing=ProviderModelAddressing.direct,
                 reasoning_effort=None,
             )
@@ -308,7 +308,7 @@ def test_litellm_adapter_does_not_inject_conflicting_response_format() -> None:
         "role": "system",
         "content": (
             "Return JSON that matches this schema exactly. "
-            'Do not wrap the JSON in markdown fences.\nJSON Schema: {"additionalProperties":false,"properties":{"ok":{"type":"boolean"}},"required":["ok"],"type":"object"}'
+            'Do not wrap the JSON in markdown fences. Inside JSON strings write line breaks as the escape sequence \\n, never as a literal newline.\nJSON Schema: {"additionalProperties":false,"properties":{"ok":{"type":"boolean"}},"required":["ok"],"type":"object"}'
         ),
     }
     assert router.calls[0]["messages"][1:] == [
@@ -340,7 +340,7 @@ def test_litellm_adapter_includes_schema_guidance_with_prompt_fallback() -> None
             "role": "system",
             "content": (
                 "Return JSON that matches this schema exactly. "
-                'Do not wrap the JSON in markdown fences.\nJSON Schema: {"additionalProperties":false,"properties":{"summary":{"type":"string"}},"required":["summary"],"type":"object"}'
+                'Do not wrap the JSON in markdown fences. Inside JSON strings write line breaks as the escape sequence \\n, never as a literal newline.\nJSON Schema: {"additionalProperties":false,"properties":{"summary":{"type":"string"}},"required":["summary"],"type":"object"}'
             ),
         },
         {"role": "user", "content": "hello world"},
@@ -386,7 +386,7 @@ def test_litellm_adapter_serializes_nested_frozen_schema_values() -> None:
         "role": "system",
         "content": (
             "Return JSON that matches this schema exactly. "
-            'Do not wrap the JSON in markdown fences.\nJSON Schema: {"additionalProperties":false,"properties":{"outer":{"additionalProperties":false,"properties":{"items":{"items":{"type":"integer"},"type":"array"},"value":{"type":"string"}},"required":["value","items"],"type":"object"}},"required":["outer"],"type":"object"}'
+            'Do not wrap the JSON in markdown fences. Inside JSON strings write line breaks as the escape sequence \\n, never as a literal newline.\nJSON Schema: {"additionalProperties":false,"properties":{"outer":{"additionalProperties":false,"properties":{"items":{"items":{"type":"integer"},"type":"array"},"value":{"type":"string"}},"required":["value","items"],"type":"object"}},"required":["outer"],"type":"object"}'
         ),
     }
 
@@ -405,7 +405,9 @@ def test_litellm_adapter_serializes_real_registry_schema_before_dispatch() -> No
         "role": "system",
         "content": (
             "Return JSON that matches this schema exactly. "
-            "Do not wrap the JSON in markdown fences.\n"
+            "Do not wrap the JSON in markdown fences. "
+            "Inside JSON strings write line breaks as the escape sequence \\n, never as a "
+            "literal newline.\n"
             "JSON Schema: "
             '{"additionalProperties":false,"properties":{"confidence":{"additionalProperties":{"maximum":1,"minimum":0,"type":"number"},"type":"object"},"missing_fields":{"items":{"minLength":1,"type":"string"},"type":"array"},"values":{"additionalProperties":true,"type":"object"}},"required":["values","missing_fields"],"type":"object"}'
         ),

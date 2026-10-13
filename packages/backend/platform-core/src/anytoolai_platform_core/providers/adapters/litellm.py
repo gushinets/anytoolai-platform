@@ -255,7 +255,9 @@ def _schema_guidance_message(schema: Mapping[str, Any]) -> dict[str, str]:
         "role": "system",
         "content": (
             "Return JSON that matches this schema exactly. "
-            "Do not wrap the JSON in markdown fences.\n"
+            "Do not wrap the JSON in markdown fences. "
+            "Inside JSON strings write line breaks as the escape sequence \\n, never as a "
+            "literal newline.\n"
             f"JSON Schema: {schema_json}"
         ),
     }

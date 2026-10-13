@@ -35,3 +35,16 @@ def test_parse_json_object_rejects_markdown_fenced_text() -> None:
 def test_parse_json_object_rejects_empty_string() -> None:
     with pytest.raises(StructuredOutputMalformedJsonError):
         parse_json_object("")
+
+
+def test_provider_output_may_contain_a_raw_newline_inside_a_string() -> None:
+    """Some models write paragraph breaks as a literal newline inside the JSON string. The text is
+    kept exactly; a config-owned literal stays strict (see test_strict_json)."""
+    assert parse_json_object('{"text":"First.\n\nSecond."}') == {"text": "First.\n\nSecond."}
+
+
+def test_config_owned_literal_json_stays_strict_about_control_characters() -> None:
+    from anytoolai_platform_core.common.strict_json import parse_strict_json
+
+    with pytest.raises(ValueError, match="control character"):
+        parse_strict_json('{"a":"x\ny"}')

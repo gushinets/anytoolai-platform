@@ -115,7 +115,7 @@ def _version_payload(**overrides: Any) -> dict[str, Any]:
         },
         "prompt": "Извлеки перечисленные поля строго по контракту.",
         "prompt_ref": "kernel_demo.extract_structured_fields.v1",
-        "model_id": "openai/gpt-5.4-mini",
+        "model_id": "openai/gpt-6-luna",
         "reasoning_effort": "high",
         "fixed_fields": ["fields", "strict"],
         "example_input": {
@@ -204,7 +204,7 @@ def _seed_lab_run(
             atom_id="A01",
             input_payload=input_payload,
             prompt=_version_payload()["prompt"],
-            model_id="openai/gpt-5.4-mini",
+            model_id="openai/gpt-6-luna",
             reasoning_effort=ReasoningEffort.high,
             capability_snapshot_id=f"capability_snapshot_{suffix}",
             capability_provenance={},
@@ -430,7 +430,7 @@ def test_create_rejects_model_id_that_runtime_cannot_address(app: FastAPI) -> No
             app,
             "POST",
             "/v1/atom-lab/presets",
-            json=_version_payload(model_id="gpt-5.4-mini"),
+            json=_version_payload(model_id="gpt-6-luna"),
         )
     )
 
