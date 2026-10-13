@@ -55,10 +55,11 @@ def _load_prompt(name: str) -> str:
     return (PRODUCT_DIR / name).read_text(encoding="utf-8")
 
 
-def test_action_type_sequence_is_exactly_compose_persuasive_text() -> None:
+def test_action_type_sequence_is_gap_detection_then_compose_persuasive_text() -> None:
     action_configs = _load_yaml("action_configs.yaml")["action_configs"]
     assert [config["action_type"] for config in action_configs] == [
-        "text.compose_persuasive_text"
+        "text.detect_issues_by_taxonomy",
+        "text.compose_persuasive_text",
     ]
 
     workflow = _load_yaml("workflows.yaml")["workflows"][0]
@@ -67,7 +68,15 @@ def test_action_type_sequence_is_exactly_compose_persuasive_text() -> None:
         action_config_by_id[step["action_config_id"]]["action_type"]
         for step in workflow["steps"]
     ]
-    assert step_action_types == ["text.compose_persuasive_text"]
+    assert step_action_types == ["text.detect_issues_by_taxonomy", "text.compose_persuasive_text"]
+
+
+def test_prompt_refs_resolve_to_existing_templates() -> None:
+    prompts = {entry["prompt_ref"]: entry for entry in _load_yaml("prompts.yaml")["prompts"]}
+    for config in _load_yaml("action_configs.yaml")["action_configs"]:
+        entry = prompts[config["prompt_ref"]]
+        assert (PRODUCT_DIR / entry["template_path"]).is_file()
+    assert prompts["proposal_ai.compose_persuasive_text.v2"]["version"] == 2
 
 
 def test_product_contains_no_forbidden_provider_sdk_or_model_string_tokens() -> None:
@@ -93,48 +102,158 @@ def test_quota_policy_ref_resolves_to_the_declared_lifetime_product_quota() -> N
     assert policy["limit_count"] == 10
 
 
-def test_renderer_contract_pins_the_canonical_copy_ready_field_to_a06_text() -> None:
-    """Code review finding: ANY-227 lists a renderer contract as a Bundle-And-Workflow scope item
-    (also required at the MVP-B spec level,
-    docs/product-specs/mvp-b-freelancer-validation-bundle.md), distinct from ANY-243's later
-    `apps/web-mirror` renderer *implementation*. Nothing under
-    `products/proposal_ai/` pinned it before this file. Cross-checked against workflows.yaml and
-    scenarios.yaml so it can't silently drift from the actual output schema / next action."""
+def test_renderer_contract_pins_the_copy_ready_text_and_the_informational_gaps() -> None:
+    """The renderer contract is cross-checked against workflows.yaml, scenarios.yaml and the
+    output schema so it cannot silently drift from the actual output."""
     contract = _load_yaml("renderer_contract.yaml")["renderer_contract"]
     workflow = _load_yaml("workflows.yaml")["workflows"][0]
     scenario = _load_yaml("scenarios.yaml")["scenarios"][0]
+    output_schema = json.loads(
+        (PRODUCT_DIR / "schemas" / "generate_output.schema.json").read_text(encoding="utf-8")
+    )
 
     assert contract["scenario_id"] == scenario["scenario_id"]
     assert contract["output_schema_ref"] == workflow["output_schema_ref"]
-    assert contract["output_schema_ref"] == "kernel.schemas.compose_persuasive_text_output_v1"
+    assert contract["output_schema_ref"] == "proposal_ai.generate_output_v1"
     assert contract["canonical_field"] == "text"
+    assert [part["field"] for part in contract["parts"]] == ["text", "gaps"]
+    assert {part["field"] for part in contract["parts"]} == set(output_schema["properties"])
     assert contract["next_action"] in scenario["allowed_next_actions"]
     assert set(contract["excluded_fields"]) >= {"angle", "rationale", "model", "provider"}
 
 
 def test_workflow_input_mapping_uses_only_generic_mapping_dsl_syntax() -> None:
-    """No mapping-DSL change was needed: the whole `context` maps in one entry (`scenario.input`,
-    single-segment target -- the DSL only rejects a *dotted* `context.*` target key), and
-    tone/language stay optional via the existing `?`-prefix, not a new operator."""
-    workflow = _load_yaml("workflows.yaml")["workflows"][0]
-    step = workflow["steps"][0]
-    mapping = step["input_mapping"]
+    """No mapping-DSL change: the whole `context` maps in one entry (the DSL rejects a dotted
+    `context.*` input target, so gaps travel as `constraints.claims_to_avoid`), tone/language stay
+    optional via the existing `?` prefix, and the post-checks are config literals."""
+    detect, compose = _load_yaml("workflows.yaml")["workflows"][0]["steps"]
 
+    assert detect["input_mapping"]["source_text"] == "scenario.input.task_text"
+    assert detect["input_mapping"]["context"] == "scenario.input.freelancer_positioning"
+    assert json.loads(detect["input_mapping"]["taxonomy"].removeprefix("literal:")) == [
+        "experience_gap"
+    ]
+    assert detect["output_mapping"] == {"context.workflow_output.gaps": "steps.detect_gaps.output.issues"}
+
+    mapping = compose["input_mapping"]
     assert mapping["context"] == "scenario.input"
     assert mapping["constraints.tone"] == "?scenario.input.tone"
     assert mapping["constraints.language"] == "?scenario.input.language"
-    assert mapping["constraints.format"].startswith("literal:")
-    assert mapping["constraints.length"].startswith("literal:")
+    assert mapping["constraints.claims_to_avoid"] == "steps.detect_gaps.output.issues"
+    assert mapping["constraints.format"] == 'literal:"plain_text"'
+    assert mapping["constraints.length"] == "literal:1800"
+    assert mapping["constraints.plain_text_lists"] == 'literal:"forbidden"'
+    assert mapping["constraints.numbers_must_appear_in_context"] == "literal:true"
     assert mapping["objective"].startswith("literal:")
+    assert compose["output_mapping"] == {
+        "context.workflow_output.text": "steps.compose_persuasive_text.output.text"
+    }
+
+
+def _forbidden_patterns() -> list[str]:
+    compose = _load_yaml("workflows.yaml")["workflows"][0]["steps"][1]
+    raw = compose["input_mapping"]["constraints.forbidden_patterns"]
+    return json.loads(raw.removeprefix("literal:"))
+
+
+@pytest.mark.parametrize(
+    "bad_text",
+    [
+        "Hello [Client Name], I can help.",
+        "Hello {{name}}, I can help.",
+        "Best regards, Your Name",
+        "Based on the information I'm working from here, I can help.",
+        "I can't truthfully claim HubSpot experience.",
+    ],
+)
+def test_forbidden_patterns_catch_placeholders_and_meta_phrases(bad_text: str) -> None:
+    assert any(re.search(pattern, bad_text, re.IGNORECASE) for pattern in _forbidden_patterns())
+
+
+def test_a_long_dash_is_a_style_rule_not_a_validation_failure() -> None:
+    """A run failed twice in a row over an em dash in a Russian text; the prompt keeps the rule,
+    the eval script counts it, the validator no longer rejects it."""
+    assert not any(re.search(pattern, "Fast \u2014 and clean. Fast \u2013 too.") for pattern in _forbidden_patterns())
+
+
+@pytest.mark.parametrize(
+    "fixture_name",
+    ["proposal_ai.compose_persuasive_text_v1", "proposal_ai.compose_persuasive_text_v1.weak_input"],
+)
+def test_compose_fixtures_pass_the_workflow_forbidden_patterns(fixture_name: str) -> None:
+    text = json.loads((FIXTURE_ROOT / f"{fixture_name}.json").read_text(encoding="utf-8"))[
+        "response_json"
+    ]["text"]
+    for pattern in _forbidden_patterns():
+        assert not re.search(pattern, text, re.IGNORECASE), pattern
+
+
+@pytest.mark.parametrize(
+    "fixture_name",
+    [
+        "proposal_ai.detect_experience_gaps_v1",
+        "proposal_ai.detect_experience_gaps_v1.with_gaps",
+    ],
+)
+def test_gap_fixtures_only_use_the_experience_gap_taxonomy(fixture_name: str) -> None:
+    issues = json.loads((FIXTURE_ROOT / f"{fixture_name}.json").read_text(encoding="utf-8"))[
+        "response_json"
+    ]["issues"]
+    assert {issue["category"] for issue in issues} <= {"experience_gap"}
+
+
+def test_generate_output_schema_requires_text_and_gaps() -> None:
+    schema = json.loads(
+        (PRODUCT_DIR / "schemas" / "generate_output.schema.json").read_text(encoding="utf-8")
+    )
+    assert schema["additionalProperties"] is False
+    assert set(schema["required"]) == {"text", "gaps"}
+    jsonschema.validate({"text": "Hi", "gaps": []}, schema)
+    jsonschema.validate(
+        {"text": "Hi", "gaps": [{"category": "experience_gap", "description": "d", "severity": "low"}]},
+        schema,
+    )
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate({"text": "Hi"}, schema)
 
 
 def test_prompt_uses_task_language_by_default_and_preserves_explicit_override() -> None:
-    prompt = _load_prompt("prompts/compose_persuasive_text.v1.md")
+    prompt = " ".join(_load_prompt("prompts/compose_persuasive_text.v2.md").split())
 
     assert "constraints.language" in prompt
     assert "language of `context.task_text`" in prompt
     assert "cannot be determined" in prompt
-    assert "English" in prompt
+    assert "never decides the language" in prompt
+
+
+def test_prompt_v2_pins_the_quality_rules_from_the_qa_report() -> None:
+    prompt = " ".join(_load_prompt("prompts/compose_persuasive_text.v2.md").split())
+
+    for fragment in (
+        "Never rename, generalize",  # D-01
+        "constraints.claims_to_avoid",  # D-15
+        "Do not name an amount, rate, currency, deadline or duration",  # D-04
+        "is not your offer",  # D-04 client budget
+        "No placeholders",  # D-03
+        "must not retell the client's task",  # D-05
+        "No headings",  # D-06
+        "No long dashes",  # D-06
+        "A Russian positioning does not make an English order a Russian one",  # D-02
+        "Do not list the whole profile",  # no padding with unrelated cases
+        "similar project",  # D-08
+        "`warm`:",  # D-07
+        "`neutral`:",
+        "`firm`:",
+        "tie the text to a grammatical gender",  # D-13
+    ):
+        assert fragment in prompt, fragment
+
+
+def test_gap_prompt_is_scoped_to_experience_gaps() -> None:
+    prompt = _load_prompt("prompts/detect_experience_gaps.v1.md")
+    assert "`experience_gap`" in prompt
+    assert "Do not report routine steps" in " ".join(prompt.split())
+    assert "empty `issues` array" in prompt
 
 
 @pytest.mark.parametrize(

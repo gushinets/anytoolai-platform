@@ -1,0 +1,19 @@
+{
+  "response_json": {
+    "issues": [
+      {
+        "category": "experience_gap",
+        "description": "Order requires HubSpot CRM integration, which is not in the stated experience.",
+        "severity": "high",
+        "evidence": "must have experience with HubSpot CRM"
+      }
+    ]
+  },
+  "input_tokens": 140,
+  "output_tokens": 48,
+  "latency_ms": 8,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "proposal_ai.detect_experience_gaps_v1.with_gaps"
+  }
+}
