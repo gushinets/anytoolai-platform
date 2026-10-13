@@ -398,21 +398,26 @@ def test_prepaid_request_happy_fixture_does_not_tighten_the_due_date(action_conf
     assert _DUE_DATE_TIGHTENING_PATTERN.search(text) is None, action_config_id
 
 
-# Code review finding: the prepaid step's `objective` must keep the "promptly" urgency and ask the
-# client to say when the payment was *sent* -- the client is the one sending the payment, not
-# receiving one, so "confirm receipt" addresses the wrong party.
-def test_prepaid_request_objective_preserves_urgency_and_correct_confirmation_party() -> None:
+def _normalized_prepaid_prompt() -> str:
+    return " ".join(
+        _load_prompt_template(
+            "client_update_writer.prepaid_request_compose_persuasive_text.v1"
+        ).split()
+    )
+
+
+# The prepaid step's `objective` is pinned exactly (ANY-603/ANY-602): it must stay neutral --
+# no urgency, no closing line, no message kind, no "confirm" -- all of that lives in the prompt.
+# A word heuristic cannot tell payment urgency from neutral time words, so the literal itself is
+# the check: any rewording is a conscious change here.
+def test_prepaid_request_objective_is_neutral() -> None:
     workflow = _workflow_by_id()["client_update_writer.prepaid_request_v1"]
     (step,) = workflow["steps"]
-    objective = step["input_mapping"]["objective"].lower()
 
-    assert "confirm receipt" not in objective
-    assert "promptly" in objective
-    assert "has been sent" in objective
-    # Not an unconditional payment ask; the alternative message kind is chosen by the prompt.
-    assert "send the requested prepayment" not in objective
-    assert "following the prompt rules" in objective
-    assert "confirm" not in objective
+    assert step["input_mapping"]["objective"] == (
+        'literal:"Write the final prepayment message the billing notes call for, following the '
+        'prompt rules, using only the stated context."'
+    )
 
 
 # ANY-601: the single A06 step gets the whole billing_context object (notes, amount, optional
@@ -481,18 +486,47 @@ def _prepaid_fixture_text(fixture_suffix: str) -> str:
     return json.loads(fixture.read_text(encoding="utf-8"))["response_json"]["text"]
 
 
-@pytest.mark.parametrize("fixture_suffix", ["", ".weak_input"])
-def test_prepaid_request_fixture_keeps_urgency_and_asks_to_be_told_once_sent(
-    fixture_suffix: str,
-) -> None:
-    text = _prepaid_fixture_text(fixture_suffix).lower()
+# Both fake-provider fixtures are pinned exactly. The happy one is a payment request with a plain
+# due date and no urgency words, ending with the "let me know once it has been sent" line; the
+# weak one (its input has no amount value or currency) is a terms confirmation that asks for
+# nothing to be paid or reported. A word heuristic cannot separate payment urgency from neutral
+# time words ("agreed today"), so the text itself is the check: any rewrite is a conscious change
+# here. Model behavior is only provable live (ANY-604).
+@pytest.mark.parametrize(
+    ("fixture_suffix", "expected"),
+    [
+        (
+            "",
+            "With the approved design phase wrapping up this week and phase 2 (development) "
+            "starting next, could you send the $500 prepayment for phase 2 by Friday? Please let "
+            "me know once it has been sent.",
+        ),
+        (
+            ".weak_input",
+            "The project is still in progress. Could you confirm the payment amount and its "
+            "currency? Please reply with the confirmation.",
+        ),
+    ],
+)
+def test_prepaid_request_fixtures_are_pinned_exactly(fixture_suffix: str, expected: str) -> None:
+    assert _prepaid_fixture_text(fixture_suffix) == expected
 
-    assert "when you get a chance" not in text
-    assert "let me know once it has been sent" in text
 
+# ANY-603: urgency only with a basis in the input; neutral request otherwise. Model behavior is
+# only provable live (ANY-604); this pins the rule text.
+def test_prepaid_request_prompt_gates_urgency_on_the_input() -> None:
+    prompt = _normalized_prepaid_prompt()
 
-def test_prepaid_request_weak_fixture_preserves_urgency() -> None:
-    assert re.search(r"\b(now|promptly|today)\b", _prepaid_fixture_text(".weak_input").lower())
+    assert "Urgency in a payment request comes only from `context.notes`" in prompt
+    assert "or the free text of `context.due_date` that themselves express urgency" in prompt
+    assert '`due_date: "Friday — ASAP"`' in prompt
+    assert "then the notes win and only the date is stated, without its urgency words" in prompt
+    assert "urgency words in it follow the urgency rule below" in prompt
+    assert "A plain date in `context.due_date`, a placeholder `due_date`" in prompt
+    assert "add no urgency words of your own" in prompt
+    assert "make a neutral request" in prompt
+    assert "do not soften it into an open-ended timeframe" in prompt
+    assert "Firmness belongs in the wording, not in a deadline" in prompt
 
 
 # ANY-601: with no `due_date` in `context`, the model must not invent a date; this pins the rule.
