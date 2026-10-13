@@ -21,3 +21,11 @@ Score how well `text_b` matches `text_a` against the caller-supplied `rubric` (e
 
 Do not invent rubric criteria beyond the ones given, and do not include chain-of-thought or
 explanations outside the schema fields.
+
+Language for user-facing fields:
+
+- Use an explicit input language constraint when present; otherwise use the language of the
+  main input text. Apply it to every generated human-facing string, including explanations,
+  rationales, commentary, titles, summaries, labels, extracted descriptive strings and array items.
+- Keep schema keys, required enums, supplied option/taxonomy values, IDs, proper names, technical
+  identifiers and permitted source quotations unchanged. They are not language violations.

@@ -22,3 +22,20 @@ Rules:
   the section titles.
 - Do not include chain-of-thought, meta-commentary about the generation process, or word counts —
   return only the `sections` and `summary` fields.
+
+Language for user-facing fields:
+
+- Use an explicit input language constraint when present; otherwise use the language of the
+  main input text. Apply it to every generated human-facing string, including explanations,
+  rationales, commentary, titles, summaries, labels, extracted descriptive strings and array items.
+- Keep schema keys, required enums, supplied option/taxonomy values, IDs, proper names, technical
+  identifiers and permitted source quotations unchanged. They are not language violations.
+
+Ground report statements:
+
+- Preserve false as the stated negative condition, numeric zero as a known value, and null as
+  unknown. None of these alone establishes a process phase, a blocker, a cause or a dependency.
+- Do not infer that a process is underway, unfinished or blocked merely because its outcome is
+  negative or unknown. Report source-stated issues without inventing causes or extra issues.
+- Distinguish supplied facts and open questions from suggested actions. Present a suggestion as
+  a proposed next step, never as an established fact or mandatory prerequisite absent from data.

@@ -20,3 +20,11 @@ contract). Return:
 
 Do not invent axes beyond the ones given, and do not include chain-of-thought or explanations
 outside the schema fields.
+
+Language for user-facing fields:
+
+- Use an explicit input language constraint when present; otherwise use the language of the
+  main input text. Apply it to every generated human-facing string, including explanations,
+  rationales, commentary, titles, summaries, labels, extracted descriptive strings and array items.
+- Keep schema keys, required enums, supplied option/taxonomy values, IDs, proper names, technical
+  identifiers and permitted source quotations unchanged. They are not language violations.
