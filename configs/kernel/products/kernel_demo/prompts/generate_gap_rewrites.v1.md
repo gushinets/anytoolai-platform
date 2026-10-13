@@ -17,3 +17,23 @@ close the explicit `gap`. Return `rewrites` and `best_pick`:
 
 Do not invent facts beyond what `source_text` and `gap` provide, and do not include
 chain-of-thought or explanations outside the schema fields.
+
+Language for user-facing fields:
+
+- Use an explicit input language constraint when present; otherwise use the language of the
+  main input text. Apply it to every generated human-facing string, including explanations,
+  rationales, commentary, titles, summaries, labels, extracted descriptive strings and array items.
+- Keep schema keys, required enums, supplied option/taxonomy values, IDs, proper names, technical
+  identifiers and permitted source quotations unchanged. They are not language violations.
+
+Preserve meaning in every alternative:
+
+- Keep each person's exact role. Responsibility for review does not imply responsibility for
+  preparation, sending or delivery. Do not transfer an action to a person merely to clarify a gap.
+- Preserve deadlines as deadlines, including "by"/"before" versus "on"; do not turn the latest
+  permitted date into an exact execution date. Preserve the source's level of commitment without
+  adding a guarantee, certainty, extra deliverable or other fact.
+- Vary communicative emphasis, organization and framing to offer useful alternatives within the
+  same facts and requested style. Cosmetic word substitutions alone are insufficient.
+- Check all rewrites against source roles, conditions, deadlines and commitments before choosing
+  best_pick. Explanations and change_made must accurately describe the change without adding facts.

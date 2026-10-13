@@ -19,3 +19,17 @@ Return:
 
 Do not invent criteria, categories, or facts beyond what `subject_text`, `reference_text`,
 `categories`, and `criteria` provide.
+
+Language for user-facing fields:
+
+- Use an explicit input language constraint when present; otherwise use the language of the
+  main input text. Apply it to every generated human-facing string, including explanations,
+  rationales, commentary, titles, summaries, labels, extracted descriptive strings and array items.
+- Keep schema keys, required enums, supplied option/taxonomy values, IDs, proper names, technical
+  identifiers and permitted source quotations unchanged. They are not language violations.
+
+Evidence precision:
+
+- A broad capability statement does not establish a narrower requested operation. Preserve
+  unconfirmed detail as unconfirmed in evidence and rationale, choosing the appropriate supplied
+  comparison status without inventing missing capability facts.
