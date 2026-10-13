@@ -45,6 +45,24 @@ def test_numbers_from_the_order_are_allowed_and_gap_is_required_when_expected() 
     assert "missing_gap" not in violations(CLEAN, [{"description": "No HubSpot."}], gap_order)
 
 
+def test_numbers_are_read_both_ways_and_ordinary_ai_phrases_pass() -> None:
+    order = {**EN_ORDER, "task_text": "Need 3 500-word blog posts"}
+    assert "invented_number" not in violations("I can write 3 posts of 500 words.", order=order)
+    assert "invented_number" in violations("I can write 4 posts of 500 words.", order=order)
+    assert "meta_phrase" not in violations(CLEAN + " As an AI automation engineer I build bots.")
+    assert "meta_phrase" in violations(CLEAN + " As an AI language model I cannot promise.")
+
+
+def test_an_explicit_language_replaces_the_orders_expected_one() -> None:
+    russian = "Я делаю автоматизации на Make.com. Могу начать на этой неделе."
+    checks = proposal_ai_eval.check_proposal(russian, [], EN_ORDER, PROFILE, expect_language="ru")
+    assert checks["wrong_language"] is False
+    checks = proposal_ai_eval.check_proposal(CLEAN, [], EN_ORDER, PROFILE, expect_language="de")
+    assert checks["wrong_language"] is False  # not detectable, skipped
+    checks = proposal_ai_eval.check_proposal(CLEAN, [], EN_ORDER, PROFILE, expect_language="ru")
+    assert checks["wrong_language"] is True
+
+
 def test_order_set_covers_the_protocol_classes() -> None:
     orders = FIXTURE["orders"]
     assert {order["expect_language"] for order in orders} == {"en", "ru"}

@@ -23,7 +23,8 @@ from pathlib import Path
 ORDERS_PATH = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "proposal_ai_eval" / "orders.json"
 PLACEHOLDER = re.compile(r"\[[^\]\n]{1,80}\]|\{\{|\}\}|your name|<[^>]+>", re.IGNORECASE)
 META = re.compile(
-    r"based on the information|truthfully|as an ai\b|my listed experience|haven.t specified"
+    r"based on the information i(?:.m| am| have| was| can)|truthfully|as an ai (?:language )?model"
+    r"|as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\b|my listed experience|haven.t specified"
     r"|в описании моего опыта|не буду заявлять",
     re.IGNORECASE,
 )
@@ -33,8 +34,15 @@ THOUSANDS_SEPARATOR = re.compile(r"(?<=\d)[,   ](?=\d{3}(?!\d))")
 MAX_WORDS = 250
 
 
-def _digit_runs(value: str) -> set[str]:
-    return set(re.findall(r"\d+", THOUSANDS_SEPARATOR.sub("", value)))
+def _digit_runs(value: str) -> tuple[set[str], set[str]]:
+    """(numbers as written, numbers with thousands separators joined); same reading as the backend."""
+    return set(re.findall(r"\d+", value)), set(re.findall(r"\d+", THOUSANDS_SEPARATOR.sub("", value)))
+
+
+def _has_invented_number(text: str, source: str) -> bool:
+    allowed = set().union(*_digit_runs(source))
+    as_written, joined = _digit_runs(text)
+    return not (as_written <= allowed or joined <= allowed)
 
 
 def _cyrillic_share(value: str) -> float:
@@ -47,15 +55,20 @@ def _is_heading_like(line: str) -> bool:
     return 0 < len(stripped) <= 60 and stripped[-1] not in ".!?:;,…" and len(stripped.split()) <= 8
 
 
-def check_proposal(text: str, gaps: list, order: dict, profile: str) -> dict[str, bool | int]:
-    """Hard checks (True means violated) plus the word count."""
+def check_proposal(
+    text: str, gaps: list, order: dict, profile: str, *, expect_language: str | None = None
+) -> dict[str, bool | int]:
+    """Hard checks (True means violated) plus the word count. `expect_language` overrides the
+    order's own (an explicit `--language`); a language other than ru or en is not detectable here
+    and skips the check."""
     lines = [line for line in text.splitlines() if line.strip()]
     language = "ru" if _cyrillic_share(text) > 0.5 else "en"
+    expected = (expect_language or order["expect_language"]).split("-")[0]
     return {
-        "wrong_language": language != order["expect_language"],
+        "wrong_language": expected in ("ru", "en") and language != expected,
         "placeholder": bool(PLACEHOLDER.search(text)),
         "meta_phrase": bool(META.search(text)),
-        "invented_number": bool(_digit_runs(text) - _digit_runs(order["task_text"] + " " + profile)),
+        "invented_number": _has_invented_number(text, order["task_text"] + " " + profile),
         "list_or_heading": any(LIST_OR_HEADING_LINE.match(line) for line in lines)
         or (len(lines) > 1 and any(_is_heading_like(line) for line in lines)),
         "long_dash": bool(LONG_DASH.search(text)),
@@ -114,7 +127,9 @@ def main() -> int:
             failed = True
             continue
         raw[order["id"]] = output
-        checks = check_proposal(output["text"], output.get("gaps", []), order, profile)
+        checks = check_proposal(
+            output["text"], output.get("gaps", []), order, profile, expect_language=args.language
+        )
         violations = [name for name, value in checks.items() if value is True]
         failed = failed or bool(violations)
         rows.append(

@@ -170,6 +170,31 @@ def test_forbidden_patterns_catch_placeholders_and_meta_phrases(bad_text: str) -
     assert any(re.search(pattern, bad_text, re.IGNORECASE) for pattern in _forbidden_patterns())
 
 
+@pytest.mark.parametrize(
+    "fine_text",
+    [
+        "As an AI automation engineer I build Telegram bots.",
+        "Based on the information in your brief, I would start with the API.",
+        "I build AI agents and describe the information flow first.",
+    ],
+)
+def test_ordinary_phrases_are_not_meta_commentary(fine_text: str) -> None:
+    assert not any(re.search(pattern, fine_text, re.IGNORECASE) for pattern in _forbidden_patterns())
+
+
+@pytest.mark.parametrize(
+    "bad_text",
+    [
+        "As an AI language model, I cannot promise this.",
+        "As an AI, I can only use what is written here.",
+        "Based on the information I have, I fit.",
+        "Based on the information I\u2019m working from here, I fit.",
+    ],
+)
+def test_first_person_ai_meta_commentary_is_caught(bad_text: str) -> None:
+    assert any(re.search(pattern, bad_text, re.IGNORECASE) for pattern in _forbidden_patterns())
+
+
 def test_a_long_dash_is_a_style_rule_not_a_validation_failure() -> None:
     """A run failed twice in a row over an em dash in a Russian text; the prompt keeps the rule,
     the eval script counts it, the validator no longer rejects it."""
