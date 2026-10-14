@@ -228,7 +228,10 @@ def test_litellm_adapter_drops_temperature_when_the_router_deployment_reasons(
     assert ("temperature" in router.calls[0]) is sends_temperature
 
 
-def test_litellm_adapter_uses_the_shipped_router_config_to_drop_temperature_for_the_default_alias() -> None:
+def test_litellm_adapter_uses_the_shipped_router_config_to_drop_temperature_for_the_default_alias(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     config = load_litellm_router_config(default_litellm_router_config_path(CONFIG_ROOT))
     router = RecordingRouter(make_router_response(), model_list=config["model_list"])
 
