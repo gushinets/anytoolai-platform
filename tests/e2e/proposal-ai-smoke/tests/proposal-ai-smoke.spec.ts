@@ -210,28 +210,17 @@ test.describe("ProposalAI web product", () => {
     await expect(page.getByText(weakInputText)).toBeVisible();
   });
 
-  test("idempotent retry: retrying the same prepared start after a transient failure consumes no additional quota", async ({
-    page,
-  }) => {
-    await page.goto(PRODUCT_URL);
-    await expect(page.getByText("10 of 10 proposals remaining.")).toBeVisible();
-    await fillValidForm(page);
-
+  /** Lets `failedAttempts` start requests reach the real backend -- each really starts the scenario
+   * and consumes a quota unit server-side -- and then replaces the response with a 500, i.e. the
+   * ambiguous-outcome class the backend's idempotency-key contract exists for (a dropped connection
+   * after the server already committed the write). Fulfilling the failure from a canned response
+   * without `route.fetch()` would mean the first attempt never reached the backend, and the retry
+   * would be the only real start: it would prove nothing about idempotency. */
+  async function failFirstStartAttempts(page: Page, failedAttempts: number) {
     const idempotencyKeys: (string | null)[] = [];
-    let startAttempts = 0;
     await page.route(START_ROUTE_PATTERN, async (route) => {
       idempotencyKeys.push(route.request().headers()["idempotency-key"] ?? null);
-      startAttempts += 1;
-      if (startAttempts === 1) {
-        // Let the request reach the real backend for real -- it genuinely starts the scenario and
-        // consumes a quota unit server-side -- then simulate the client never durably seeing that
-        // response (e.g. a dropped connection after the server already committed the write). This
-        // is exactly the ambiguous-outcome class the backend's idempotency-key contract exists
-        // for: fulfilling this from a canned response without ever calling route.fetch() would
-        // mean the "first" attempt never reached the backend at all, so the retry below would be
-        // the *only* real start -- proving nothing about idempotency (a prior version of this test
-        // had exactly that bug: the 3->2 transition it asserted would have passed even with
-        // completely broken backend idempotency).
+      if (idempotencyKeys.length <= failedAttempts) {
         await route.fetch();
         await route.fulfill({
           status: 500,
@@ -242,6 +231,41 @@ test.describe("ProposalAI web product", () => {
       }
       await route.continue();
     });
+    return idempotencyKeys;
+  }
+
+  test("idempotent retry: an ambiguous start failure is retried once automatically with the same key and consumes no additional quota", async ({
+    page,
+  }) => {
+    await page.goto(PRODUCT_URL);
+    await expect(page.getByText("10 of 10 proposals remaining.")).toBeVisible();
+    await fillValidForm(page);
+    const idempotencyKeys = await failFirstStartAttempts(page, 1);
+
+    await page.getByRole("button", { name: "Generate proposal" }).click();
+    // The page retries the ambiguous failure itself: no error, no "Try again" click.
+    await expect(page.getByRole("button", { name: "Copy" })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("Could not start ProposalAI. Please try again.")).toHaveCount(0);
+
+    expect(idempotencyKeys).toHaveLength(2);
+    expect(idempotencyKeys[0]).toBeTruthy();
+    expect(idempotencyKeys[1]).toBe(idempotencyKeys[0]);
+
+    // Both attempts reached the real backend with the identical Idempotency-Key; the backend's own
+    // replay semantics must return the first attempt's already-accepted session on the second
+    // call rather than starting (and charging) a new one -- confirmed by exactly one unit gone.
+    await page.unroute(START_ROUTE_PATTERN);
+    await page.goto(PRODUCT_URL);
+    await expect(page.getByText("9 of 10 proposals remaining.")).toBeVisible();
+  });
+
+  test("idempotent retry: when the automatic retry fails too, Try again reuses the same key and still consumes one quota unit", async ({
+    page,
+  }) => {
+    await page.goto(PRODUCT_URL);
+    await expect(page.getByText("10 of 10 proposals remaining.")).toBeVisible();
+    await fillValidForm(page);
+    const idempotencyKeys = await failFirstStartAttempts(page, 2);
 
     await page.getByRole("button", { name: "Generate proposal" }).click();
     await expect(page.getByText("Could not start ProposalAI. Please try again.")).toBeVisible();
@@ -249,13 +273,11 @@ test.describe("ProposalAI web product", () => {
     await page.getByRole("button", { name: "Try again" }).click();
     await expect(page.getByRole("button", { name: "Copy" })).toBeVisible({ timeout: 30_000 });
 
-    expect(startAttempts).toBe(2);
+    // Two attempts from the first click (the second one automatic), one more from "Try again".
+    expect(idempotencyKeys).toHaveLength(3);
     expect(idempotencyKeys[0]).toBeTruthy();
-    expect(idempotencyKeys[1]).toBe(idempotencyKeys[0]);
+    expect(new Set(idempotencyKeys).size).toBe(1);
 
-    // Both attempts reached the real backend with the identical Idempotency-Key; the backend's own
-    // replay semantics must return the first attempt's already-accepted session on the second
-    // call rather than starting (and charging) a new one -- confirmed by exactly one unit gone.
     await page.unroute(START_ROUTE_PATTERN);
     await page.goto(PRODUCT_URL);
     await expect(page.getByText("9 of 10 proposals remaining.")).toBeVisible();
