@@ -8,6 +8,12 @@ model_list:
       # parameter as unsupported although the API accepts it.
       allowed_openai_params: [reasoning_effort]
 
+# The effort a direct (Atom Lab) call reasons at when it names none; the adapter drops the
+# temperature for these models. The router alias above carries its own effort.
+direct_model_default_reasoning:
+  openai/gpt-6-luna: medium
+  openai/gpt-6-sol: medium
+
 router_settings:
   routing_strategy: simple-shuffle
   enable_pre_call_checks: true

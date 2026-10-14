@@ -86,3 +86,15 @@ def test_numbers_are_not_joined_across_the_task_and_the_profile() -> None:
     order = {**EN_ORDER, "task_text": "Budget is $2"}
     assert "invented_number" in violations(CLEAN + " I charge 2500.", order=order, profile="n8n, 500 happy clients")
     assert "invented_number" not in violations(CLEAN + " I have 500 clients.", order=order, profile="n8n, 500 happy clients")
+
+
+def test_decimals_and_names_with_digits_are_not_evidence_for_standalone_numbers() -> None:
+    order = {**EN_ORDER, "task_text": "About 1.5 hours a day"}
+    assert "invented_number" not in violations("I can give 1.5 hours a day on n8n.", order=order, profile="n8n")
+    assert "invented_number" in violations("I can give 5 hours a day on n8n.", order=order, profile="n8n")
+    assert "invented_number" in violations("I have delivered 8 projects on n8n.", order=order, profile="n8n")
+
+
+def test_angle_placeholders_are_caught_but_comparisons_pass() -> None:
+    assert "placeholder" in violations(CLEAN + " Hello <client_name>.")
+    assert "placeholder" not in violations(CLEAN + " I keep latency <50ms and uptime >99%.")

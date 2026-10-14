@@ -139,7 +139,9 @@ def test_litellm_adapter_sends_direct_lab_model_and_reasoning_without_alias_subs
         direct_calls.append(dict(kwargs))
         return make_router_response(model="gpt-6-luna")
 
-    adapter = LiteLLMProviderAdapter(router, direct_completion=direct_completion)
+    adapter = LiteLLMProviderAdapter(
+        router, direct_completion=direct_completion, direct_model_default_reasoning=DIRECT_DEFAULTS
+    )
 
     asyncio.run(
         adapter.complete(
@@ -185,14 +187,16 @@ def test_litellm_adapter_omits_temperature_for_a_direct_reasoning_model_unless_e
     """OpenAI reasoning models take only the default temperature, so an explicit reasoning effort
     drops the policy's temperature from the request, and so does a direct model that names none but
     is the one the router config runs at medium; effort none keeps it."""
-    router = RecordingRouter(make_router_response(), model_list=[_deployment("medium")])
+    router = RecordingRouter(make_router_response())
     direct_calls: list[dict[str, object]] = []
 
     async def direct_completion(**kwargs: object) -> object:
         direct_calls.append(dict(kwargs))
         return make_router_response(model="gpt-6-luna")
 
-    adapter = LiteLLMProviderAdapter(router, direct_completion=direct_completion)
+    adapter = LiteLLMProviderAdapter(
+        router, direct_completion=direct_completion, direct_model_default_reasoning=DIRECT_DEFAULTS
+    )
     asyncio.run(
         adapter.complete(
             make_request(
@@ -204,6 +208,9 @@ def test_litellm_adapter_omits_temperature_for_a_direct_reasoning_model_unless_e
     )
 
     assert ("temperature" in direct_calls[0]) is sends_temperature
+
+
+DIRECT_DEFAULTS = {"openai/gpt-6-luna": "medium", "openai/gpt-6-sol": "medium"}
 
 
 def _deployment(effort: str | None) -> dict[str, object]:
@@ -239,6 +246,7 @@ def test_litellm_adapter_uses_the_shipped_router_config_to_drop_temperature_for_
     asyncio.run(LiteLLMProviderAdapter(router).complete(make_request()))
 
     assert "temperature" not in router.calls[0]
+    assert config["direct_model_default_reasoning"]["openai/gpt-6-sol"] == "medium"
 
 
 def test_litellm_adapter_keeps_the_temperature_for_an_alias_the_router_does_not_describe() -> None:
@@ -256,6 +264,28 @@ def test_litellm_adapter_keeps_the_policy_temperature_on_the_router_path_without
     assert router.calls[0]["temperature"] == 0.3
 
 
+def test_litellm_adapter_drops_the_temperature_for_a_direct_sol_run_without_an_effort() -> None:
+    direct_calls: list[dict[str, object]] = []
+
+    async def direct_completion(**kwargs: object) -> object:
+        direct_calls.append(dict(kwargs))
+        return make_router_response(model="gpt-6-sol")
+
+    adapter = LiteLLMProviderAdapter(
+        RecordingRouter(make_router_response(), model_list=[_deployment("medium")]),
+        direct_completion=direct_completion,
+        direct_model_default_reasoning=DIRECT_DEFAULTS,
+    )
+    asyncio.run(
+        adapter.complete(
+            make_request(model="openai/gpt-6-sol", model_addressing=ProviderModelAddressing.direct)
+        )
+    )
+
+    assert "temperature" not in direct_calls[0]
+    assert "reasoning_effort" not in direct_calls[0]
+
+
 def test_litellm_adapter_keeps_the_temperature_for_a_direct_model_that_does_not_reason() -> None:
     direct_calls: list[dict[str, object]] = []
 
@@ -264,7 +294,9 @@ def test_litellm_adapter_keeps_the_temperature_for_a_direct_model_that_does_not_
         return make_router_response(model="gpt-4o")
 
     router = RecordingRouter(make_router_response(), model_list=[_deployment("medium")])
-    adapter = LiteLLMProviderAdapter(router, direct_completion=direct_completion)
+    adapter = LiteLLMProviderAdapter(
+        router, direct_completion=direct_completion, direct_model_default_reasoning=DIRECT_DEFAULTS
+    )
     asyncio.run(
         adapter.complete(
             make_request(model="openai/gpt-4o", model_addressing=ProviderModelAddressing.direct)
@@ -283,7 +315,9 @@ def test_litellm_adapter_does_not_inherit_reasoning_for_direct_model_when_omitte
         direct_calls.append(dict(kwargs))
         return make_router_response(model="gpt-6-luna")
 
-    adapter = LiteLLMProviderAdapter(router, direct_completion=direct_completion)
+    adapter = LiteLLMProviderAdapter(
+        router, direct_completion=direct_completion, direct_model_default_reasoning=DIRECT_DEFAULTS
+    )
 
     asyncio.run(
         adapter.complete(

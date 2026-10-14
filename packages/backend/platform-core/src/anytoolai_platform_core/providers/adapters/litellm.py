@@ -155,8 +155,10 @@ class LiteLLMProviderAdapter:
         router: Router,
         *,
         direct_completion: Callable[..., Awaitable[Any]] | None = None,
+        direct_model_default_reasoning: Mapping[str, str] | None = None,
     ) -> None:
         self._router = router
+        self._direct_model_default_reasoning = dict(direct_model_default_reasoning or {})
         self._direct_completion = direct_completion or litellm.acompletion
 
     async def complete(self, request: ResolvedProviderRequest) -> ProviderResponse:
@@ -190,17 +192,16 @@ class LiteLLMProviderAdapter:
         return _normalize_litellm_response(request, response)
 
     def _effective_reasoning_effort(self, request: ResolvedProviderRequest) -> str | None:
-        """The effort the provider will see: the request's own, else the one the router config sets
-        for the alias, or, for a direct model, for the deployment that serves that same model (it
-        reasons at that effort by default, which decides the temperature only: the effort itself
-        is not sent)."""
+        """The effort the provider will see: the request's own, else the router alias deployment's,
+        or, for a direct model, the default the router config lists for that model (it decides the
+        temperature only: the effort itself is not sent)."""
         if request.reasoning_effort is not None:
             return request.reasoning_effort.value
-        direct = request.model_addressing is ProviderModelAddressing.direct
+        if request.model_addressing is ProviderModelAddressing.direct:
+            return self._direct_model_default_reasoning.get(request.model)
         for deployment in getattr(self._router, "model_list", None) or []:
-            params = deployment.get("litellm_params") or {}
-            if request.model == (params.get("model") if direct else deployment.get("model_name")):
-                return params.get("reasoning_effort")
+            if deployment.get("model_name") == request.model:
+                return (deployment.get("litellm_params") or {}).get("reasoning_effort")
         return None
 
     def _messages_for(self, request: ResolvedProviderRequest) -> list[dict[str, Any]]:
@@ -234,14 +235,29 @@ def load_litellm_router_config(path: Path) -> dict[str, Any]:
     if not isinstance(router_settings, dict):
         raise ValueError(f"LiteLLM router_settings must be a mapping: {path}")
 
+    default_reasoning = data.get("direct_model_default_reasoning", {})
+    if not isinstance(default_reasoning, dict):
+        raise ValueError(f"LiteLLM direct_model_default_reasoning must be a mapping: {path}")
+
     return {
+        "direct_model_default_reasoning": default_reasoning,
         "model_list": _resolve_env_sentinels(model_list),
         "router_settings": _resolve_env_sentinels(router_settings),
     }
 
 
-def build_litellm_router(config_root: Path | None = None) -> Router:
+def build_litellm_adapter(config_root: Path | None = None) -> LiteLLMProviderAdapter:
     config = load_litellm_router_config(default_litellm_router_config_path(config_root))
+    return LiteLLMProviderAdapter(
+        _router_from(config), direct_model_default_reasoning=config["direct_model_default_reasoning"]
+    )
+
+
+def build_litellm_router(config_root: Path | None = None) -> Router:
+    return _router_from(load_litellm_router_config(default_litellm_router_config_path(config_root)))
+
+
+def _router_from(config: dict[str, Any]) -> Router:
     router_kwargs = {
         "model_list": config["model_list"],
         **config["router_settings"],

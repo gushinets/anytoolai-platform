@@ -22,7 +22,11 @@ from ._shared import (
 # be an invented one. A comma and the no-break spaces are explicit separators ("3,500-word" and
 # "3\u00a0500-word" are 3500).
 _THOUSANDS_SEPARATOR = re.compile(r"(?<=\d)(?:[,  ](?=\d{3}(?!\d))| (?=\d{3}(?!\d)(?!-[^\W\d_])))")
-_DIGIT_RUN = re.compile(r"\d+")
+# A number as a reader sees it: a decimal ("1.5", "1,5") is one number, not 1 and 5, and digits that
+# follow a letter belong to a name ("n8n", "v2", "H2O"), not to a quantity. A comma before exactly three
+# digits is a thousands separator (handled by _THOUSANDS_SEPARATOR), so only one or two digits make a
+# comma decimal; "10.5.2024" is a date, so a dot decimal must not be followed by another group.
+_NUMBER = re.compile(r"(?<![^\W\d_])(\d+)(?:\.(\d+)(?![.\d])|,(\d{1,2})(?!\d))?")
 
 
 def _context_strings(value: Any) -> Iterator[str]:
@@ -41,10 +45,15 @@ def _context_strings(value: Any) -> Iterator[str]:
 def _digit_runs(value: str) -> tuple[set[str], set[str]]:
     """(numbers as written, numbers with thousands separators joined), compared by value: "05" and
     "5" are the same number, so "2024-05-01" in the input covers "May 1" in the text."""
-    return (
-        {str(int(run)) for run in _DIGIT_RUN.findall(value)},
-        {str(int(run)) for run in _DIGIT_RUN.findall(_THOUSANDS_SEPARATOR.sub("", value))},
-    )
+    return _numbers(value), _numbers(_THOUSANDS_SEPARATOR.sub("", value))
+
+
+def _numbers(value: str) -> set[str]:
+    found = set()
+    for whole, dot_fraction, comma_fraction in _NUMBER.findall(value):
+        fraction = (dot_fraction or comma_fraction).rstrip("0")
+        found.add(str(int(whole)) + (f".{fraction}" if fraction else ""))
+    return found
 
 
 class PersuasiveTextInputValidator:

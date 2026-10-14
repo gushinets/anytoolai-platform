@@ -1297,6 +1297,17 @@ class TestPersuasiveTextProductConstraints:
                 {"task_text": "Due 05/01"},
                 "Due 5/1 works for me.",
             ),
+            # a decimal is one number, a dotted date is three, and a name with a digit is no number
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "About 1.5 hours a day, n8n flows"},
+                "I can give 1.5 hours a day and build n8n flows.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Due 10.5.2024"},
+                "I can deliver by May 10.",
+            ),
             ({"plain_text_lists": "forbidden"}, {}, "a) is how the quote starts, then prose."),
             ({"plain_text_lists": "forbidden"}, {}, "\u2022 One bullet alone is a sentence."),
             # the no-break spaces are explicit separators like the comma
@@ -1370,6 +1381,16 @@ class TestPersuasiveTextProductConstraints:
                 {"numbers_must_appear_in_context": True},
                 {"task_text": "Need 3 500-word blog posts"},
                 "I can write 4 posts of 500 words.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Make and n8n automation"},
+                "I have delivered 8 projects.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "About 1.5 hours a day"},
+                "I can give 5 hours a day.",
             ),
             # a space before a group that starts a hyphenated unit separates two numbers, never 3500
             (

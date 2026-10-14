@@ -7,7 +7,7 @@ from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
 from anytoolai_platform_core.providers.adapters.litellm import (
     LiteLLMModelCatalogSource,
     LiteLLMProviderAdapter,
-    build_litellm_router,
+    build_litellm_adapter,
 )
 from anytoolai_platform_core.providers.catalog_refresh import ModelCatalogSource
 from anytoolai_platform_core.providers.models import ProviderResponse, ResolvedProviderRequest
@@ -22,7 +22,7 @@ class LazyLiteLLMProviderAdapter:
 
     async def complete(self, request: ResolvedProviderRequest) -> ProviderResponse:
         if self._adapter is None:
-            self._adapter = LiteLLMProviderAdapter(build_litellm_router(self._config_root))
+            self._adapter = build_litellm_adapter(self._config_root)
         return await self._adapter.complete(request)
 
 
