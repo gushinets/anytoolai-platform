@@ -1313,6 +1313,22 @@ class TestPersuasiveTextProductConstraints:
                 {"task_text": "Due 10.05.2024"},
                 "I can deliver by May 5, 2024.",
             ),
+            # a European amount is one number too, and a bare "1.500" is read as Milan or Boston would
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Budget €1.234,50"},
+                "My price is €1234.50, that is €1,234.50.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Budget 12.500,00"},
+                "12500 is fine.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Price 1.500 EUR"},
+                "1500 EUR, or 1.5 if you meant that.",
+            ),
             # an explicit grouping is one number, read the same way on both sides
             (
                 {"numbers_must_appear_in_context": True},
@@ -1397,6 +1413,16 @@ class TestPersuasiveTextProductConstraints:
                 {"numbers_must_appear_in_context": True},
                 {"task_text": "Make and n8n automation"},
                 "I have delivered 8 projects.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Budget €1.234,50"},
+                "My price is €50.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Price 1.500 EUR"},
+                "500 EUR.",
             ),
             # the digit groups of an explicit grouping are not standalone numbers
             (

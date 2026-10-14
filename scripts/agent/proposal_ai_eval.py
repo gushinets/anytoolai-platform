@@ -5,7 +5,9 @@ quota is lifetime), then applies the automatic checks from the QA protocol that 
 Facts about experience, tone distinguishability and "similar project in the first two sentences"
 stay manual.
 
-    python scripts/agent/proposal_ai_eval.py --api-url http://localhost:8000 [--tone warm] [--language ru]
+    .quick-check-venv/bin/python scripts/agent/proposal_ai_eval.py --api-url http://localhost:8000 [--tone warm] [--language ru]
+
+(the quick-check environment, because the number check is imported from the A06 validator)
 
 Exit code 1 when any order has a hard violation. The report is Markdown on stdout.
 """
@@ -20,8 +22,10 @@ import time
 import urllib.request
 from pathlib import Path
 
+from anytoolai_platform_actions.structured_llm.cross_validation.persuasive_text import numbers_absent_from_context
+
 ORDERS_PATH = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "proposal_ai_eval" / "orders.json"
-PLACEHOLDER = re.compile(r"\[[^\]\n]{1,80}\]|\{[^{}\n]{1,80}\}|\{\{|\}\}|\byour name\b|<[^\W\d](?:[\w .-]{0,38}\w)?>", re.IGNORECASE)
+PLACEHOLDER = re.compile(r"\[[^\]\n]{1,80}\]|\{[^{}\n]{1,80}\}|\{\{|\}\}|\byour name\b|<[^\W\d][^<>\n]{0,39}>", re.IGNORECASE)
 META = re.compile(
     r"based on the information i(?:.m| am| have| was| can)|truthfully|as an ai (?:language )?model"
     r"|as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\b|my listed experience|haven.t specified"
@@ -30,33 +34,13 @@ META = re.compile(
 )
 LONG_DASH = re.compile(r"—| – ")
 LIST_OR_HEADING_LINE = re.compile(r"^\s*(#{1,6}\s|[-*+•]\s|\d+[.)]\s)")
-# Same reading as the backend validator: a comma or no-break space groups thousands atomically, an ASCII
-# space is read both ways, a decimal is one number, a dotted date is three, digits after a letter ("n8n")
-# are no number.
-EXPLICIT_THOUSANDS_SEPARATOR = re.compile(r"(?<=\d)[,\u00a0\u202f](?=\d{3}(?!\d))")
-SPACE_THOUSANDS_SEPARATOR = re.compile(r"(?<=\d) (?=\d{3}(?!\d)(?!-[^\W\d_]))")
-NUMBER = re.compile(r"(?<![^\W\d_])(?:(?<!\.)(\d+)\.(\d+)(?![.\d])|(\d+),(\d{1,2})(?!\d)|(\d+))")
 MAX_WORDS = 250
 
 
-def _digit_runs(value: str) -> tuple[set[str], set[str]]:
-    """(numbers as written, numbers with thousands separators joined); same reading as the backend."""
-    def numbers(text: str) -> set[str]:
-        found = set()
-        for dot_whole, dot_fraction, comma_whole, comma_fraction, whole in NUMBER.findall(text):
-            fraction = (dot_fraction or comma_fraction).rstrip("0")
-            found.add(str(int(dot_whole or comma_whole or whole)) + (f".{fraction}" if fraction else ""))
-        return found
-
-    value = EXPLICIT_THOUSANDS_SEPARATOR.sub("", value)
-    return numbers(value), numbers(SPACE_THOUSANDS_SEPARATOR.sub("", value))
-
-
 def _has_invented_number(text: str, *sources: str) -> bool:
-    # Each source is read on its own: the end of one field and the start of the next are not one number.
-    allowed = set().union(*(runs for source in sources for runs in _digit_runs(source)))
-    as_written, joined = _digit_runs(text)
-    return not (as_written <= allowed or joined <= allowed)
+    # The validator's own reading of numbers; each source is a separate string so the end of one field
+    # and the start of the next are never one number.
+    return bool(numbers_absent_from_context(text, list(sources)))
 
 
 def _cyrillic_share(value: str) -> float:
