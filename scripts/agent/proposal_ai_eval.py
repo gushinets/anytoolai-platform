@@ -21,7 +21,7 @@ import urllib.request
 from pathlib import Path
 
 ORDERS_PATH = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "proposal_ai_eval" / "orders.json"
-PLACEHOLDER = re.compile(r"\[[^\]\n]{1,80}\]|\{[^{}\n]{1,80}\}|\{\{|\}\}|\byour name\b|<[^\W\d](?:[\w -]{0,38}\w)?>", re.IGNORECASE)
+PLACEHOLDER = re.compile(r"\[[^\]\n]{1,80}\]|\{[^{}\n]{1,80}\}|\{\{|\}\}|\byour name\b|<[^\W\d](?:[\w .-]{0,38}\w)?>", re.IGNORECASE)
 META = re.compile(
     r"based on the information i(?:.m| am| have| was| can)|truthfully|as an ai (?:language )?model"
     r"|as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\b|my listed experience|haven.t specified"
@@ -30,9 +30,12 @@ META = re.compile(
 )
 LONG_DASH = re.compile(r"—| – ")
 LIST_OR_HEADING_LINE = re.compile(r"^\s*(#{1,6}\s|[-*+•]\s|\d+[.)]\s)")
-THOUSANDS_SEPARATOR = re.compile(r"(?<=\d)(?:[,  ](?=\d{3}(?!\d))| (?=\d{3}(?!\d)(?!-[^\W\d_])))")
-# A decimal is one number and digits after a letter belong to a name ("n8n"); same reading as the backend.
-NUMBER = re.compile(r"(?<![^\W\d_])(\d+)(?:\.(\d+)(?![.\d])|,(\d{1,2})(?!\d))?")
+# Same reading as the backend validator: a comma or no-break space groups thousands atomically, an ASCII
+# space is read both ways, a decimal is one number, a dotted date is three, digits after a letter ("n8n")
+# are no number.
+EXPLICIT_THOUSANDS_SEPARATOR = re.compile(r"(?<=\d)[,\u00a0\u202f](?=\d{3}(?!\d))")
+SPACE_THOUSANDS_SEPARATOR = re.compile(r"(?<=\d) (?=\d{3}(?!\d)(?!-[^\W\d_]))")
+NUMBER = re.compile(r"(?<![^\W\d_])(?:(?<!\.)(\d+)\.(\d+)(?![.\d])|(\d+),(\d{1,2})(?!\d)|(\d+))")
 MAX_WORDS = 250
 
 
@@ -40,12 +43,13 @@ def _digit_runs(value: str) -> tuple[set[str], set[str]]:
     """(numbers as written, numbers with thousands separators joined); same reading as the backend."""
     def numbers(text: str) -> set[str]:
         found = set()
-        for whole, dot_fraction, comma_fraction in NUMBER.findall(text):
+        for dot_whole, dot_fraction, comma_whole, comma_fraction, whole in NUMBER.findall(text):
             fraction = (dot_fraction or comma_fraction).rstrip("0")
-            found.add(str(int(whole)) + (f".{fraction}" if fraction else ""))
+            found.add(str(int(dot_whole or comma_whole or whole)) + (f".{fraction}" if fraction else ""))
         return found
 
-    return numbers(value), numbers(THOUSANDS_SEPARATOR.sub("", value))
+    value = EXPLICIT_THOUSANDS_SEPARATOR.sub("", value)
+    return numbers(value), numbers(SPACE_THOUSANDS_SEPARATOR.sub("", value))
 
 
 def _has_invented_number(text: str, *sources: str) -> bool:

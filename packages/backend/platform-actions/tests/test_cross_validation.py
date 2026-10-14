@@ -1306,7 +1306,18 @@ class TestPersuasiveTextProductConstraints:
             (
                 {"numbers_must_appear_in_context": True},
                 {"task_text": "Due 10.5.2024"},
-                "I can deliver by May 10.",
+                "I can deliver by May 5, 2024, or on the 10th.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Due 10.05.2024"},
+                "I can deliver by May 5, 2024.",
+            ),
+            # an explicit grouping is one number, read the same way on both sides
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Budget is $1,500"},
+                "I can do it for $1500, or $1,500 as you wrote.",
             ),
             ({"plain_text_lists": "forbidden"}, {}, "a) is how the quote starts, then prose."),
             ({"plain_text_lists": "forbidden"}, {}, "\u2022 One bullet alone is a sentence."),
@@ -1386,6 +1397,17 @@ class TestPersuasiveTextProductConstraints:
                 {"numbers_must_appear_in_context": True},
                 {"task_text": "Make and n8n automation"},
                 "I have delivered 8 projects.",
+            ),
+            # the digit groups of an explicit grouping are not standalone numbers
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Budget is $1,500"},
+                "My price is $500.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Budget is $1,234.50"},
+                "My price is $234.50.",
             ),
             (
                 {"numbers_must_appear_in_context": True},
