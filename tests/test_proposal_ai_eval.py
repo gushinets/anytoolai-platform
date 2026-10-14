@@ -113,3 +113,11 @@ def test_european_amounts_are_one_number() -> None:
     order = {**EN_ORDER, "task_text": "Budget €1.234,50"}
     assert "invented_number" not in violations("My price is €1234.50.", order=order)
     assert "invented_number" in violations("My price is €50.", order=order)
+
+
+def test_identifiers_do_not_offer_their_digits_as_numbers() -> None:
+    for task_text in ("Integrate GPT-4o", "Need 4K footage"):
+        order = {**EN_ORDER, "task_text": task_text}
+        assert "invented_number" in violations("I have delivered 4 projects.", order=order)
+    order = {**EN_ORDER, "task_text": "Keep latency under 50ms"}
+    assert "invented_number" not in violations("I keep it under 50 ms.", order=order)

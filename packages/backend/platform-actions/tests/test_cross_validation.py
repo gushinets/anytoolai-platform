@@ -1335,6 +1335,12 @@ class TestPersuasiveTextProductConstraints:
                 {"task_text": "Budget is $1,500"},
                 "I can do it for $1500, or $1,500 as you wrote.",
             ),
+            # a lower-case unit keeps its number, an identifier does not offer one
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Keep latency under 50ms, 2h of work"},
+                "Under 50 ms, 2 hours.",
+            ),
             ({"plain_text_lists": "forbidden"}, {}, "a) is how the quote starts, then prose."),
             ({"plain_text_lists": "forbidden"}, {}, "\u2022 One bullet alone is a sentence."),
             # the no-break spaces are explicit separators like the comma
@@ -1423,6 +1429,22 @@ class TestPersuasiveTextProductConstraints:
                 {"numbers_must_appear_in_context": True},
                 {"task_text": "Price 1.500 EUR"},
                 "500 EUR.",
+            ),
+            # digits inside an identifier are no evidence for a count
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Integrate GPT-4o"},
+                "I have delivered 4 projects.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Need 4K footage"},
+                "I have delivered 4 projects.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Set up 2FA and H.265 for ANY-656"},
+                "2 factors, 265 streams, 656 users, 56 of them new.",
             ),
             # a grouped figure never switches magnitude: 1,500 is not 1.5 and 1.5 is not 1,500
             (

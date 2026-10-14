@@ -18,10 +18,13 @@ from ._shared import (
 # any of its readings is in the context; the context offers every reading of every token. A number is
 # compared by value ("05" is 5, "1,500" is 1500) and never by its digit groups, so a "$1,500" budget
 # never offers "$500" as a price. A grouped figure has one magnitude: "1.500" is 1500, never 1.5,
-# so a brief's "1.5 years" cannot cover a claimed "1,500 projects" (ambiguity fails closed). Digits that follow a letter ("n8n", "v2") are a name, not a number.
+# so a brief's "1.5 years" cannot cover a claimed "1,500 projects" (ambiguity fails closed). Digits
+# inside an identifier are not a number: after a letter ("n8n", "v2"), after letters and a hyphen or
+# dot ("GPT-4o", "ANY-656", "H.265"), or before an upper-case letter ("4K", "2FA"); a lower-case unit
+# keeps its number ("50ms", "2h", "3500-word").
 # ponytail: a fixed list of formats; add a format here (with its test) rather than a special case.
 _NUMBER_TOKEN = re.compile(
-    r"""(?<![^\W\d_])(?:
+    r"""(?<![^\W_])(?<![^\W\d_][-.])(?:  # not after a letter or digit, not after "GPT-"/"H."
     (?P<date>\d{1,2}[./]\d{1,2}[./]\d{2,4})                              # 10.5.2024, 05/01/24: three numbers
   | (?P<us>\d{1,3}(?:,\d{3})+)(?P<us_fraction>\.\d+)?                     # 1,500 and 1,234.50
   | (?P<eu>\d{1,3}(?:\.\d{3})+)(?P<eu_fraction>,\d+)?                     # 1.500 and 1.234,50
@@ -29,7 +32,7 @@ _NUMBER_TOKEN = re.compile(
   | (?P<space>\d{1,3}(?:\x20\d{3})+)(?P<space_fraction>[.,]\d+)?(?!-[^\W\d_])  # 3 200: 3200, or 3 and 200
   | (?P<decimal>\d+)(?P<decimal_fraction>[.,]\d+)                         # 1.5 and 1,5
   | (?P<integer>\d+)
-)(?!\d)""",
+)(?!\d)(?![A-Z\u0410-\u042f])""",
     re.VERBOSE,
 )
 _GROUP_SEPARATORS = str.maketrans("", "", ",.\u00a0\u202f\x20")
