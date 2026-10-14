@@ -186,6 +186,7 @@ def test_forbidden_patterns_catch_placeholders_and_meta_phrases(bad_text: str) -
         "I will follow your namespace conventions.",
         "Budget < 500 and timeline > 2 weeks works for me.",
         "I keep latency <50ms and uptime >99% on every integration.",
+        "I can implement the condition x<y && a>b.",
     ],
 )
 def test_ordinary_phrases_are_not_meta_commentary(fine_text: str) -> None:

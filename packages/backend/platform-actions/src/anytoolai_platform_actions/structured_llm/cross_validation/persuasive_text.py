@@ -17,7 +17,8 @@ from ._shared import (
 # first, and yields one or more readings: a set of numbers it may mean. A text token is covered when
 # any of its readings is in the context; the context offers every reading of every token. A number is
 # compared by value ("05" is 5, "1,500" is 1500) and never by its digit groups, so a "$1,500" budget
-# never offers "$500" as a price. Digits that follow a letter ("n8n", "v2") are a name, not a number.
+# never offers "$500" as a price. A grouped figure has one magnitude: "1.500" is 1500, never 1.5,
+# so a brief's "1.5 years" cannot cover a claimed "1,500 projects" (ambiguity fails closed). Digits that follow a letter ("n8n", "v2") are a name, not a number.
 # ponytail: a fixed list of formats; add a format here (with its test) rather than a special case.
 _NUMBER_TOKEN = re.compile(
     r"""(?<![^\W\d_])(?:
@@ -53,10 +54,6 @@ def _readings(match: re.Match[str]) -> list[set[str]]:
             break
     grouped, fraction = groups[kind], groups[f"{kind}_fraction"] or ""
     readings = [{_number(grouped.translate(_GROUP_SEPARATORS), fraction[1:])}]
-    separator = {"us": ",", "eu": "."}.get(kind)
-    if separator and not fraction and grouped.count(separator) == 1:
-        # "1.500" is 1500 in Milan and 1.5 in Boston; "1,500" the other way round
-        readings.append({_number(*grouped.split(separator))})
     if kind == "space":
         # an ASCII space may just separate two numbers ("3 posts of 200 words" written "3 200")
         readings.append({_number(part) for part in grouped.split("\x20")} | ({_number(fraction[1:])} if fraction else set()))
