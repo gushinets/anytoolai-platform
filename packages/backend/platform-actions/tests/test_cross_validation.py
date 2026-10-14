@@ -1349,6 +1349,12 @@ class TestPersuasiveTextProductConstraints:
                 {"task_text": "Need 3 500-word blog posts"},
                 "I can write 4 posts of 500 words.",
             ),
+            # a group that starts a hyphenated unit is two numbers, never the joined 3500
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Need 3 500-word blog posts"},
+                "I have completed 3500 projects.",
+            ),
         ],
     )
     def test_rejects(self, constraints: dict, context: dict, text: str) -> None:

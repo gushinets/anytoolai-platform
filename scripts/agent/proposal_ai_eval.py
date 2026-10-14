@@ -30,7 +30,7 @@ META = re.compile(
 )
 LONG_DASH = re.compile(r"—| – ")
 LIST_OR_HEADING_LINE = re.compile(r"^\s*(#{1,6}\s|[-*+•]\s|\d+[.)]\s)")
-THOUSANDS_SEPARATOR = re.compile(r"(?<=\d)[,   ](?=\d{3}(?!\d))")
+THOUSANDS_SEPARATOR = re.compile(r"(?<=\d)[,   ](?=\d{3}(?!\d)(?!-[^\W\d_]))")
 MAX_WORDS = 250
 
 

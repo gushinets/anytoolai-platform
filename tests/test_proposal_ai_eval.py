@@ -49,6 +49,7 @@ def test_numbers_are_read_both_ways_and_ordinary_ai_phrases_pass() -> None:
     order = {**EN_ORDER, "task_text": "Need 3 500-word blog posts"}
     assert "invented_number" not in violations("I can write 3 posts of 500 words.", order=order)
     assert "invented_number" in violations("I can write 4 posts of 500 words.", order=order)
+    assert "invented_number" in violations("I have completed 3500 projects.", order=order)
     assert "meta_phrase" not in violations(CLEAN + " As an AI automation engineer I build bots.")
     assert "meta_phrase" in violations(CLEAN + " As an AI language model I cannot promise.")
 

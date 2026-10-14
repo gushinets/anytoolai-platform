@@ -17,8 +17,9 @@ from ._shared import (
 # "3 200" is the one number 3200 and also the two numbers 3 and 200. A text number is accepted when it
 # matches either reading of the context, and a text is accepted when either reading of the text is
 # fully covered, so "3,200" in the input matches "3 200" in the text and "3 500-word posts" matches
-# "3 posts of 500 words".
-_THOUSANDS_SEPARATOR = re.compile(r"(?<=\d)[,\u00a0\u202f ](?=\d{3}(?!\d))")
+# "3 posts of 500 words". A digit group that starts a hyphenated unit ("3 500-word posts") is never
+# joined: there the space separates two numbers, so "3500" would be an invented one.
+_THOUSANDS_SEPARATOR = re.compile(r"(?<=\d)[,\u00a0\u202f ](?=\d{3}(?!\d)(?!-[^\W\d_]))")
 _DIGIT_RUN = re.compile(r"\d+")
 
 
