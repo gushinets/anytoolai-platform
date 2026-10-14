@@ -18,8 +18,8 @@ EN_ORDER = {"task_text": "Need Make.com scenarios for Telegram. Budget $150.", "
 CLEAN = "I build Make.com and n8n automations with Telegram bots.\n\nI can start this week and will confirm the plan after a short call."
 
 
-def violations(text: str, gaps: list | None = None, order: dict = EN_ORDER) -> set[str]:
-    checks = proposal_ai_eval.check_proposal(text, gaps or [], order, PROFILE)
+def violations(text: str, gaps: list | None = None, order: dict = EN_ORDER, profile: str = PROFILE) -> set[str]:
+    checks = proposal_ai_eval.check_proposal(text, gaps or [], order, profile)
     return {name for name, value in checks.items() if value is True}
 
 
@@ -80,3 +80,9 @@ def test_order_set_covers_the_protocol_classes() -> None:
     assert {order["expect_language"] for order in orders} == {"en", "ru"}
     assert any(order["expect_gap"] for order in orders)
     assert any(order.get("asks_similar_project") for order in orders)
+
+
+def test_numbers_are_not_joined_across_the_task_and_the_profile() -> None:
+    order = {**EN_ORDER, "task_text": "Budget is $2"}
+    assert "invented_number" in violations(CLEAN + " I charge 2500.", order=order, profile="n8n, 500 happy clients")
+    assert "invented_number" not in violations(CLEAN + " I have 500 clients.", order=order, profile="n8n, 500 happy clients")

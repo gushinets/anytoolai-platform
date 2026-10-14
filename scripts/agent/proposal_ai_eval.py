@@ -42,8 +42,9 @@ def _digit_runs(value: str) -> tuple[set[str], set[str]]:
     return numbers(value), numbers(THOUSANDS_SEPARATOR.sub("", value))
 
 
-def _has_invented_number(text: str, source: str) -> bool:
-    allowed = set().union(*_digit_runs(source))
+def _has_invented_number(text: str, *sources: str) -> bool:
+    # Each source is read on its own: the end of one field and the start of the next are not one number.
+    allowed = set().union(*(runs for source in sources for runs in _digit_runs(source)))
     as_written, joined = _digit_runs(text)
     return not (as_written <= allowed or joined <= allowed)
 
@@ -71,7 +72,7 @@ def check_proposal(
         "wrong_language": expected in ("ru", "en") and language != expected,
         "placeholder": bool(PLACEHOLDER.search(text)),
         "meta_phrase": bool(META.search(text)),
-        "invented_number": _has_invented_number(text, order["task_text"] + " " + profile),
+        "invented_number": _has_invented_number(text, order["task_text"], profile),
         "list_or_heading": any(LIST_OR_HEADING_LINE.match(line) for line in lines)
         or (len(lines) > 1 and any(_is_heading_like(line) for line in lines)),
         "long_dash": bool(LONG_DASH.search(text)),

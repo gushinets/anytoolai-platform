@@ -163,6 +163,7 @@ def _forbidden_patterns() -> list[str]:
         "Hello {{name}}, I can help.",
         "Hello {client_name}, I can build this workflow.",
         "\u0417\u0434\u0440\u0430\u0432\u0441\u0442\u0432\u0443\u0439\u0442\u0435, {\u0418\u043c\u044f}!",
+        "Hello <client_name>, I can help.",
         "Best regards, Your Name",
         "Based on the information I'm working from here, I can help.",
         "I can't truthfully claim HubSpot experience.",
@@ -179,6 +180,7 @@ def test_forbidden_patterns_catch_placeholders_and_meta_phrases(bad_text: str) -
         "Based on the information in your brief, I would start with the API.",
         "I build AI agents and describe the information flow first.",
         "I will follow your namespace conventions.",
+        "Budget < 500 and timeline > 2 weeks works for me.",
     ],
 )
 def test_ordinary_phrases_are_not_meta_commentary(fine_text: str) -> None:

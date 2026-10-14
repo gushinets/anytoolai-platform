@@ -25,6 +25,9 @@ from anytoolai_platform_core.structured_output.schemas import normalize_schema_m
 from litellm import Router
 
 _ENV_SENTINEL_PREFIX = "env/"
+# Direct models that reason at the provider's default effort when the request names none; the
+# provider then rejects a temperature just as it does for an explicit effort.
+_REASONS_BY_DEFAULT_PREFIXES = ("openai/gpt-6",)
 _OPENAI_MODELS_URL = "https://api.openai.com/v1/models"
 _LITELLM_METADATA_URL = (
     "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
@@ -191,11 +194,11 @@ class LiteLLMProviderAdapter:
 
     def _effective_reasoning_effort(self, request: ResolvedProviderRequest) -> str | None:
         """The effort the provider will see: the request's own, else the one the router deployment of
-        the alias sets. A direct model without an explicit effort has none."""
+        the alias sets. A direct model without an explicit effort has none, unless it reasons by default."""
         if request.reasoning_effort is not None:
             return request.reasoning_effort.value
         if request.model_addressing is ProviderModelAddressing.direct:
-            return None
+            return "medium" if request.model.startswith(_REASONS_BY_DEFAULT_PREFIXES) else None
         for deployment in getattr(self._router, "model_list", None) or []:
             if deployment.get("model_name") == request.model:
                 return (deployment.get("litellm_params") or {}).get("reasoning_effort")

@@ -171,7 +171,7 @@ def test_litellm_adapter_sends_direct_lab_model_and_reasoning_without_alias_subs
 @pytest.mark.parametrize(
     ("effort", "sends_temperature"),
     [
-        (None, True),
+        (None, False),
         (ReasoningEffort.none, True),
         (ReasoningEffort.low, False),
         (ReasoningEffort.medium, False),
@@ -179,11 +179,12 @@ def test_litellm_adapter_sends_direct_lab_model_and_reasoning_without_alias_subs
         (ReasoningEffort.max, False),
     ],
 )
-def test_litellm_adapter_omits_temperature_only_for_an_explicit_reasoning_effort(
+def test_litellm_adapter_omits_temperature_for_a_direct_reasoning_model_unless_effort_is_none(
     effort: ReasoningEffort | None, sends_temperature: bool
 ) -> None:
     """OpenAI reasoning models take only the default temperature, so an explicit reasoning effort
-    drops the policy's temperature from the request; no effort, or effort none, keeps it."""
+    drops the policy's temperature from the request, and so does a gpt-6 model that names none (it
+    reasons by default); effort none keeps it."""
     router = RecordingRouter(make_router_response())
     direct_calls: list[dict[str, object]] = []
 
@@ -253,6 +254,23 @@ def test_litellm_adapter_keeps_the_policy_temperature_on_the_router_path_without
     asyncio.run(LiteLLMProviderAdapter(router).complete(make_request()))
 
     assert router.calls[0]["temperature"] == 0.3
+
+
+def test_litellm_adapter_keeps_the_temperature_for_a_direct_model_that_does_not_reason() -> None:
+    direct_calls: list[dict[str, object]] = []
+
+    async def direct_completion(**kwargs: object) -> object:
+        direct_calls.append(dict(kwargs))
+        return make_router_response(model="gpt-4o")
+
+    adapter = LiteLLMProviderAdapter(RecordingRouter(make_router_response()), direct_completion=direct_completion)
+    asyncio.run(
+        adapter.complete(
+            make_request(model="openai/gpt-4o", model_addressing=ProviderModelAddressing.direct)
+        )
+    )
+
+    assert direct_calls[0]["temperature"] == 0.3
 
 
 def test_litellm_adapter_does_not_inherit_reasoning_for_direct_model_when_omitted() -> None:
