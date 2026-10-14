@@ -25,9 +25,6 @@ from anytoolai_platform_core.structured_output.schemas import normalize_schema_m
 from litellm import Router
 
 _ENV_SENTINEL_PREFIX = "env/"
-# Direct models that reason at the provider's default effort when the request names none; the
-# provider then rejects a temperature just as it does for an explicit effort.
-_REASONS_BY_DEFAULT_PREFIXES = ("openai/gpt-6",)
 _OPENAI_MODELS_URL = "https://api.openai.com/v1/models"
 _LITELLM_METADATA_URL = (
     "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
@@ -193,15 +190,17 @@ class LiteLLMProviderAdapter:
         return _normalize_litellm_response(request, response)
 
     def _effective_reasoning_effort(self, request: ResolvedProviderRequest) -> str | None:
-        """The effort the provider will see: the request's own, else the one the router deployment of
-        the alias sets. A direct model without an explicit effort has none, unless it reasons by default."""
+        """The effort the provider will see: the request's own, else the one the router config sets
+        for the alias, or, for a direct model, for the deployment that serves that same model (it
+        reasons at that effort by default, which decides the temperature only: the effort itself
+        is not sent)."""
         if request.reasoning_effort is not None:
             return request.reasoning_effort.value
-        if request.model_addressing is ProviderModelAddressing.direct:
-            return "medium" if request.model.startswith(_REASONS_BY_DEFAULT_PREFIXES) else None
+        direct = request.model_addressing is ProviderModelAddressing.direct
         for deployment in getattr(self._router, "model_list", None) or []:
-            if deployment.get("model_name") == request.model:
-                return (deployment.get("litellm_params") or {}).get("reasoning_effort")
+            params = deployment.get("litellm_params") or {}
+            if request.model == (params.get("model") if direct else deployment.get("model_name")):
+                return params.get("reasoning_effort")
         return None
 
     def _messages_for(self, request: ResolvedProviderRequest) -> list[dict[str, Any]]:

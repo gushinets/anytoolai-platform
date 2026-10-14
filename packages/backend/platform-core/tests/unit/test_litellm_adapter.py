@@ -183,9 +183,9 @@ def test_litellm_adapter_omits_temperature_for_a_direct_reasoning_model_unless_e
     effort: ReasoningEffort | None, sends_temperature: bool
 ) -> None:
     """OpenAI reasoning models take only the default temperature, so an explicit reasoning effort
-    drops the policy's temperature from the request, and so does a gpt-6 model that names none (it
-    reasons by default); effort none keeps it."""
-    router = RecordingRouter(make_router_response())
+    drops the policy's temperature from the request, and so does a direct model that names none but
+    is the one the router config runs at medium; effort none keeps it."""
+    router = RecordingRouter(make_router_response(), model_list=[_deployment("medium")])
     direct_calls: list[dict[str, object]] = []
 
     async def direct_completion(**kwargs: object) -> object:
@@ -263,7 +263,8 @@ def test_litellm_adapter_keeps_the_temperature_for_a_direct_model_that_does_not_
         direct_calls.append(dict(kwargs))
         return make_router_response(model="gpt-4o")
 
-    adapter = LiteLLMProviderAdapter(RecordingRouter(make_router_response()), direct_completion=direct_completion)
+    router = RecordingRouter(make_router_response(), model_list=[_deployment("medium")])
+    adapter = LiteLLMProviderAdapter(router, direct_completion=direct_completion)
     asyncio.run(
         adapter.complete(
             make_request(model="openai/gpt-4o", model_addressing=ProviderModelAddressing.direct)
