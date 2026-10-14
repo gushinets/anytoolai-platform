@@ -19,11 +19,16 @@ from ._shared import (
 # compared by value ("05" is 5, "1,500" is 1500) and never by its digit groups, so a "$1,500" budget
 # never offers "$500" as a price. A grouped figure has one magnitude: "1.500" is 1500, never 1.5,
 # so a brief's "1.5 years" cannot cover a claimed "1,500 projects" (ambiguity fails closed).
-# An opaque identifier is dropped whole before numbers are read: a word that mixes letters and digits
-# ("n8n", "GPT-4.1-mini", "gpt_4o", "task_id_42", "H.265", "4K", "2FA") offers none of its digits as a
-# number. A quantity with an attached unit is not opaque: digits, then a lower-case unit ("50ms",
-# "2h", "3500-word", "10th") or a byte unit ("16GB", "10MB"), so "16GB" and "16 GB" are the same 16.
-# ponytail: a fixed list of formats; add a format here (with its test) rather than a special case.
+#
+# Letters next to digits are decided by one rule, the first character of the word: a word that starts
+# with a letter is a name and offers no number at all ("n8n", "v2", "GPT-4.1-mini", "gpt_4o",
+# "task_id_42", "ANY-656", "H.265"); a word that starts with a digit is a quantity, read by the
+# grammar, whose trailing letters are a unit and are ignored ("16GB", "12V", "60Hz", "50ms", "2FA",
+# "3500-word", "10th"), except that a whole suffix "k"/"K"/"M" scales the number ("$20k" is 20000,
+# "4K" is 4000, "1.5M" is 1500000; "5km" is 5). There is no unit list and no case rule: a word starts
+# with a letter or with a digit, and that is the whole decision. Who may assert a number (the client's
+# budget is not the freelancer's fee) is not a lexical question and is not decided here.
+_NAME = re.compile(r"(?<!\w)[^\W\d_]\w*(?:[.-]\w+)*")  # a word that starts with a letter
 _NUMBER_TOKEN = re.compile(
     r"""(?<![^\W_])(?:  # not after a letter or digit
     (?P<date>\d{1,2}[./]\d{1,2}[./]\d{2,4})                              # 10.5.2024, 05/01/24: three numbers
@@ -33,25 +38,23 @@ _NUMBER_TOKEN = re.compile(
   | (?P<space>\d{1,3}(?:\x20\d{3})+)(?P<space_fraction>[.,]\d+)?(?!-[^\W\d_])  # 3 200: 3200, or 3 and 200
   | (?P<decimal>\d+)(?P<decimal_fraction>[.,]\d+)                         # 1.5 and 1,5
   | (?P<integer>\d+)
-)(?!\d)""",
+)(?!\d)(?P<scale>[kKM](?![^\W\d_]))?""",
     re.VERBOSE,
 )
+_SCALE = {"k": 1000, "K": 1000, "M": 1_000_000}
 _GROUP_SEPARATORS = str.maketrans("", "", ",.\u00a0\u202f\x20")
-_WORD = re.compile(r"(?<!\w)\w+(?:[.-]\w+)*")  # letters, digits and "_" with inner "." or "-"
-_QUANTITY_WITH_UNIT = re.compile(r"\d+(?:[.,]\d+)?-?([^\W\d_]+)")
-_BYTE_UNITS = {"kb", "mb", "gb", "tb", "кб", "мб", "гб", "тб"}
 
 
-def _is_opaque_identifier(word: str) -> bool:
-    if not (any(char.isdigit() for char in word) and any(char.isalpha() for char in word)):
-        return False
-    quantity = _QUANTITY_WITH_UNIT.fullmatch(word)
-    unit = quantity.group(1) if quantity else ""
-    return not (unit.islower() or unit.lower() in _BYTE_UNITS)
+def _without_names(value: str) -> str:
+    """Blank every word that starts with a letter and carries a digit; "May 5" and "16GB" stay."""
+    return _NAME.sub(lambda m: " " if any(c.isdigit() for c in m.group(0)) else m.group(0), value)
 
 
-def _without_identifiers(value: str) -> str:
-    return _WORD.sub(lambda match: " " if _is_opaque_identifier(match.group(0)) else match.group(0), value)
+def _scaled(number: str, scale: str | None) -> str:
+    if not scale:
+        return number
+    whole, _, fraction = number.partition(".")
+    return str(int(whole) * _SCALE[scale] + (int(fraction) * _SCALE[scale] // 10 ** len(fraction) if fraction else 0))
 
 
 def _number(whole_digits: str, fraction: str = "") -> str:
@@ -61,6 +64,10 @@ def _number(whole_digits: str, fraction: str = "") -> str:
 
 
 def _readings(match: re.Match[str]) -> list[set[str]]:
+    return [{_scaled(number, match.group("scale")) for number in reading} for reading in _unscaled_readings(match)]
+
+
+def _unscaled_readings(match: re.Match[str]) -> list[set[str]]:
     groups = match.groupdict()
     if groups["date"]:
         return [{_number(part) for part in re.split(r"[./]", groups["date"])}]
@@ -80,7 +87,7 @@ def _readings(match: re.Match[str]) -> list[set[str]]:
 
 
 def _number_tokens(value: str) -> list[list[set[str]]]:
-    return [_readings(match) for match in _NUMBER_TOKEN.finditer(_without_identifiers(value))]
+    return [_readings(match) for match in _NUMBER_TOKEN.finditer(_without_names(value))]
 
 
 def numbers_absent_from_context(text: str, context: Any) -> list[str]:

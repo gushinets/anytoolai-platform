@@ -1335,11 +1335,16 @@ class TestPersuasiveTextProductConstraints:
                 {"task_text": "Budget is $1,500"},
                 "I can do it for $1500, or $1,500 as you wrote.",
             ),
-            # a unit attached to a quantity keeps its number, an identifier does not offer one
+            # a word that starts with a digit is a quantity: its unit is ignored, a k/M suffix scales it
             (
                 {"numbers_must_appear_in_context": True},
-                {"task_text": "Keep latency under 50ms, 2h of work, 16GB RAM, 10MB uploads"},
-                "Under 50 ms, 2 hours, 16 GB of RAM and 10 MB uploads.",
+                {"task_text": "Keep latency under 50ms, 2h of work, 16GB RAM, 10MB uploads, 12V, 60Hz"},
+                "Under 50 ms, 2 hours, 16 GB of RAM, 10 MB uploads, 12 volts and 60 Hz.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"freelancer_positioning": "My fixed fee is $20k, 1.5M rows processed"},
+                "My fixed fee is $20,000 for 1,500,000 rows, or $20k as I usually say.",
             ),
             ({"plain_text_lists": "forbidden"}, {}, "a) is how the quote starts, then prose."),
             ({"plain_text_lists": "forbidden"}, {}, "\u2022 One bullet alone is a sentence."),
@@ -1430,7 +1435,18 @@ class TestPersuasiveTextProductConstraints:
                 {"task_text": "Price 1.500 EUR"},
                 "500 EUR.",
             ),
-            # digits inside an identifier are no evidence for a count
+            # a scaled quantity has one magnitude
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Need 4K footage, budget $20k"},
+                "I have delivered 4 projects for $20.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "About 20 hours"},
+                "My fee is $20k.",
+            ),
+            # a word that starts with a letter is a name and offers no number
             (
                 {"numbers_must_appear_in_context": True},
                 {"task_text": "Integrate GPT-4o"},

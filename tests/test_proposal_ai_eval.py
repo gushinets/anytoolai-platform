@@ -126,3 +126,6 @@ def test_identifiers_do_not_offer_their_digits_as_numbers() -> None:
     assert "invented_number" in violations("I completed 42 projects.", order=order)
     order = {**EN_ORDER, "task_text": "Keep latency under 50ms with 16GB RAM"}
     assert "invented_number" not in violations("I keep it under 50 ms with 16 GB.", order=order)
+    order = {**EN_ORDER, "task_text": "Need 12V at 60Hz, budget $20k"}
+    assert "invented_number" not in violations("12 volts at 60 Hz for $20,000.", order=order)
+    assert "invented_number" in violations("My fee is $20.", order=order)
