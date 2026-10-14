@@ -1451,6 +1451,11 @@ class TestPersuasiveTextProductConstraints:
                 {"task_text": "Integrate GPT-4.1-mini and V2.1 of the API"},
                 "I have completed 1 project.",
             ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Integrate gpt_4o, use task_id_42"},
+                "I have delivered 4 projects and completed 42 more.",
+            ),
             # a grouped figure never switches magnitude: 1,500 is not 1.5 and 1.5 is not 1,500
             (
                 {"numbers_must_appear_in_context": True},

@@ -20,7 +20,7 @@ from ._shared import (
 # never offers "$500" as a price. A grouped figure has one magnitude: "1.500" is 1500, never 1.5,
 # so a brief's "1.5 years" cannot cover a claimed "1,500 projects" (ambiguity fails closed).
 # An opaque identifier is dropped whole before numbers are read: a word that mixes letters and digits
-# ("n8n", "GPT-4.1-mini", "ANY-656", "H.265", "V2.1", "4K", "2FA") offers none of its digits as a
+# ("n8n", "GPT-4.1-mini", "gpt_4o", "task_id_42", "H.265", "4K", "2FA") offers none of its digits as a
 # number. A quantity with an attached unit is not opaque: digits, then a lower-case unit ("50ms",
 # "2h", "3500-word", "10th") or a byte unit ("16GB", "10MB"), so "16GB" and "16 GB" are the same 16.
 # ponytail: a fixed list of formats; add a format here (with its test) rather than a special case.
@@ -37,7 +37,7 @@ _NUMBER_TOKEN = re.compile(
     re.VERBOSE,
 )
 _GROUP_SEPARATORS = str.maketrans("", "", ",.\u00a0\u202f\x20")
-_WORD = re.compile(r"(?<![^\W_])[^\W_]+(?:[.-][^\W_]+)*")
+_WORD = re.compile(r"(?<!\w)\w+(?:[.-]\w+)*")  # letters, digits and "_" with inner "." or "-"
 _QUANTITY_WITH_UNIT = re.compile(r"\d+(?:[.,]\d+)?-?([^\W\d_]+)")
 _BYTE_UNITS = {"kb", "mb", "gb", "tb", "кб", "мб", "гб", "тб"}
 

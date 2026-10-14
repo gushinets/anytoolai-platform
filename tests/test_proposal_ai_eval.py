@@ -121,5 +121,8 @@ def test_identifiers_do_not_offer_their_digits_as_numbers() -> None:
         assert "invented_number" in violations("I have delivered 4 projects.", order=order)
     order = {**EN_ORDER, "task_text": "Integrate GPT-4.1-mini"}
     assert "invented_number" in violations("I have completed 1 project.", order=order)
+    order = {**EN_ORDER, "task_text": "Integrate gpt_4o, use task_id_42"}
+    assert "invented_number" in violations("I have delivered 4 projects.", order=order)
+    assert "invented_number" in violations("I completed 42 projects.", order=order)
     order = {**EN_ORDER, "task_text": "Keep latency under 50ms with 16GB RAM"}
     assert "invented_number" not in violations("I keep it under 50 ms with 16 GB.", order=order)
