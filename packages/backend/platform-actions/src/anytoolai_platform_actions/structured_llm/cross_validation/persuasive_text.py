@@ -18,13 +18,14 @@ from ._shared import (
 # any of its readings is in the context; the context offers every reading of every token. A number is
 # compared by value ("05" is 5, "1,500" is 1500) and never by its digit groups, so a "$1,500" budget
 # never offers "$500" as a price. A grouped figure has one magnitude: "1.500" is 1500, never 1.5,
-# so a brief's "1.5 years" cannot cover a claimed "1,500 projects" (ambiguity fails closed). Digits
-# inside an identifier are not a number: after a letter ("n8n", "v2"), after letters and a hyphen or
-# dot ("GPT-4o", "ANY-656", "H.265"), or before an upper-case letter ("4K", "2FA"); a lower-case unit
-# keeps its number ("50ms", "2h", "3500-word").
+# so a brief's "1.5 years" cannot cover a claimed "1,500 projects" (ambiguity fails closed).
+# An opaque identifier is dropped whole before numbers are read: a word that mixes letters and digits
+# ("n8n", "GPT-4.1-mini", "ANY-656", "H.265", "V2.1", "4K", "2FA") offers none of its digits as a
+# number. A quantity with an attached unit is not opaque: digits, then a lower-case unit ("50ms",
+# "2h", "3500-word", "10th") or a byte unit ("16GB", "10MB"), so "16GB" and "16 GB" are the same 16.
 # ponytail: a fixed list of formats; add a format here (with its test) rather than a special case.
 _NUMBER_TOKEN = re.compile(
-    r"""(?<![^\W_])(?<![^\W\d_][-.])(?:  # not after a letter or digit, not after "GPT-"/"H."
+    r"""(?<![^\W_])(?:  # not after a letter or digit
     (?P<date>\d{1,2}[./]\d{1,2}[./]\d{2,4})                              # 10.5.2024, 05/01/24: three numbers
   | (?P<us>\d{1,3}(?:,\d{3})+)(?P<us_fraction>\.\d+)?                     # 1,500 and 1,234.50
   | (?P<eu>\d{1,3}(?:\.\d{3})+)(?P<eu_fraction>,\d+)?                     # 1.500 and 1.234,50
@@ -32,10 +33,25 @@ _NUMBER_TOKEN = re.compile(
   | (?P<space>\d{1,3}(?:\x20\d{3})+)(?P<space_fraction>[.,]\d+)?(?!-[^\W\d_])  # 3 200: 3200, or 3 and 200
   | (?P<decimal>\d+)(?P<decimal_fraction>[.,]\d+)                         # 1.5 and 1,5
   | (?P<integer>\d+)
-)(?!\d)(?![A-Z\u0410-\u042f])""",
+)(?!\d)""",
     re.VERBOSE,
 )
 _GROUP_SEPARATORS = str.maketrans("", "", ",.\u00a0\u202f\x20")
+_WORD = re.compile(r"(?<![^\W_])[^\W_]+(?:[.-][^\W_]+)*")
+_QUANTITY_WITH_UNIT = re.compile(r"\d+(?:[.,]\d+)?-?([^\W\d_]+)")
+_BYTE_UNITS = {"kb", "mb", "gb", "tb", "кб", "мб", "гб", "тб"}
+
+
+def _is_opaque_identifier(word: str) -> bool:
+    if not (any(char.isdigit() for char in word) and any(char.isalpha() for char in word)):
+        return False
+    quantity = _QUANTITY_WITH_UNIT.fullmatch(word)
+    unit = quantity.group(1) if quantity else ""
+    return not (unit.islower() or unit.lower() in _BYTE_UNITS)
+
+
+def _without_identifiers(value: str) -> str:
+    return _WORD.sub(lambda match: " " if _is_opaque_identifier(match.group(0)) else match.group(0), value)
 
 
 def _number(whole_digits: str, fraction: str = "") -> str:
@@ -64,7 +80,7 @@ def _readings(match: re.Match[str]) -> list[set[str]]:
 
 
 def _number_tokens(value: str) -> list[list[set[str]]]:
-    return [_readings(match) for match in _NUMBER_TOKEN.finditer(value)]
+    return [_readings(match) for match in _NUMBER_TOKEN.finditer(_without_identifiers(value))]
 
 
 def numbers_absent_from_context(text: str, context: Any) -> list[str]:

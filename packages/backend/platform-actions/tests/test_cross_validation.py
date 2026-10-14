@@ -1335,11 +1335,11 @@ class TestPersuasiveTextProductConstraints:
                 {"task_text": "Budget is $1,500"},
                 "I can do it for $1500, or $1,500 as you wrote.",
             ),
-            # a lower-case unit keeps its number, an identifier does not offer one
+            # a unit attached to a quantity keeps its number, an identifier does not offer one
             (
                 {"numbers_must_appear_in_context": True},
-                {"task_text": "Keep latency under 50ms, 2h of work"},
-                "Under 50 ms, 2 hours.",
+                {"task_text": "Keep latency under 50ms, 2h of work, 16GB RAM, 10MB uploads"},
+                "Under 50 ms, 2 hours, 16 GB of RAM and 10 MB uploads.",
             ),
             ({"plain_text_lists": "forbidden"}, {}, "a) is how the quote starts, then prose."),
             ({"plain_text_lists": "forbidden"}, {}, "\u2022 One bullet alone is a sentence."),
@@ -1445,6 +1445,11 @@ class TestPersuasiveTextProductConstraints:
                 {"numbers_must_appear_in_context": True},
                 {"task_text": "Set up 2FA and H.265 for ANY-656"},
                 "2 factors, 265 streams, 656 users, 56 of them new.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Integrate GPT-4.1-mini and V2.1 of the API"},
+                "I have completed 1 project.",
             ),
             # a grouped figure never switches magnitude: 1,500 is not 1.5 and 1.5 is not 1,500
             (
