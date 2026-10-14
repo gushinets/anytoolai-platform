@@ -81,6 +81,10 @@ This directory is the system of record for agents. Keep it current. If a decisio
 - `tasks/a11-scenario-identity-metadata-deduplication.md`
 - `handoffs/a11-job-lifecycle-worker-review-remediation.md`
 
+## Experiments
+
+- [Kernel Demo prompt selection results](experiments/kernel-demo-prompt-results-2026-10-13.md) — adopted variants, multilingual comparison results, and limits of the evidence.
+
 ## Generated docs
 
 - `generated/db-schema.md`
