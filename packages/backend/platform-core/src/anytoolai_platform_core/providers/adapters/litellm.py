@@ -169,18 +169,17 @@ class LiteLLMProviderAdapter:
         }
         if request.reasoning_effort is not None:
             kwargs["reasoning_effort"] = request.reasoning_effort.value
-            if request.reasoning_effort is not ReasoningEffort.none:
-                # A reasoning request takes the model's own temperature: OpenAI's reasoning models
-                # accept only the default and answer any other value with a 400, so a lab run with
-                # an explicit effort and a policy temperature of 0.3 would fail. Runs without an
-                # explicit effort (the router's static medium) keep the policy temperature, which
-                # the default text policy sets to the one value those models accept.
-                del kwargs["temperature"]
             # LiteLLM's static model registry rejects the parameter for a model it does not list
             # yet (for example a brand-new OpenAI model) although the API accepts it. Allowing it
             # per request covers the direct path and the router; the router entry in
             # litellm_router.yaml covers calls that carry no explicit effort.
             kwargs["allowed_openai_params"] = ["reasoning_effort"]
+        if self._effective_reasoning_effort(request) not in (None, ReasoningEffort.none.value):
+            # A reasoning request takes the model's own temperature: OpenAI's reasoning models
+            # document dropping the parameter and answer any value other than the default with a
+            # 400. The effort counts whether the request names it or the router deployment of the
+            # alias sets it (the default text alias runs at medium).
+            del kwargs["temperature"]
 
         completion = (
             self._direct_completion
@@ -189,6 +188,18 @@ class LiteLLMProviderAdapter:
         )
         response = await completion(**kwargs)
         return _normalize_litellm_response(request, response)
+
+    def _effective_reasoning_effort(self, request: ResolvedProviderRequest) -> str | None:
+        """The effort the provider will see: the request's own, else the one the router deployment of
+        the alias sets. A direct model without an explicit effort has none."""
+        if request.reasoning_effort is not None:
+            return request.reasoning_effort.value
+        if request.model_addressing is ProviderModelAddressing.direct:
+            return None
+        for deployment in getattr(self._router, "model_list", None) or []:
+            if deployment.get("model_name") == request.model:
+                return (deployment.get("litellm_params") or {}).get("reasoning_effort")
+        return None
 
     def _messages_for(self, request: ResolvedProviderRequest) -> list[dict[str, Any]]:
         messages = (

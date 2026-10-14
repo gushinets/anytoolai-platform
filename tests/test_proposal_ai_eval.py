@@ -50,8 +50,10 @@ def test_numbers_are_read_both_ways_and_ordinary_ai_phrases_pass() -> None:
     assert "invented_number" not in violations("I can write 3 posts of 500 words.", order=order)
     assert "invented_number" in violations("I can write 4 posts of 500 words.", order=order)
     assert "invented_number" in violations("I have completed 3500 projects.", order=order)
-    comma_order = {**EN_ORDER, "task_text": "Write a 3,500-word article"}
-    assert "invented_number" not in violations("I can write a 3500-word article.", order=comma_order)
+    for separator in (",", "\u00a0", "\u202f"):
+        grouped = {**EN_ORDER, "task_text": f"Write a 3{separator}500-word article"}
+        assert "invented_number" not in violations("I can write a 3500-word article.", order=grouped)
+    assert "placeholder" in violations(CLEAN + " Hello {client_name}.")
     assert "meta_phrase" not in violations(CLEAN + " As an AI automation engineer I build bots.")
     assert "meta_phrase" in violations(CLEAN + " As an AI language model I cannot promise.")
 

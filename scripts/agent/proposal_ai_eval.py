@@ -21,7 +21,7 @@ import urllib.request
 from pathlib import Path
 
 ORDERS_PATH = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "proposal_ai_eval" / "orders.json"
-PLACEHOLDER = re.compile(r"\[[^\]\n]{1,80}\]|\{\{|\}\}|\byour name\b|<[^>]+>", re.IGNORECASE)
+PLACEHOLDER = re.compile(r"\[[^\]\n]{1,80}\]|\{[^{}\n]{1,80}\}|\{\{|\}\}|\byour name\b|<[^>]+>", re.IGNORECASE)
 META = re.compile(
     r"based on the information i(?:.m| am| have| was| can)|truthfully|as an ai (?:language )?model"
     r"|as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\b|my listed experience|haven.t specified"
@@ -30,7 +30,7 @@ META = re.compile(
 )
 LONG_DASH = re.compile(r"—| – ")
 LIST_OR_HEADING_LINE = re.compile(r"^\s*(#{1,6}\s|[-*+•]\s|\d+[.)]\s)")
-THOUSANDS_SEPARATOR = re.compile(r"(?<=\d)(?:,(?=\d{3}(?!\d))|[\u00a0\u202f ](?=\d{3}(?!\d)(?!-[^\W\d_])))")
+THOUSANDS_SEPARATOR = re.compile(r"(?<=\d)(?:[,  ](?=\d{3}(?!\d))| (?=\d{3}(?!\d)(?!-[^\W\d_])))")
 MAX_WORDS = 250
 
 

@@ -31,8 +31,9 @@ CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
 
 
 class RecordingRouter:
-    def __init__(self, response: object) -> None:
+    def __init__(self, response: object, model_list: list[dict[str, object]] | None = None) -> None:
         self.response = response
+        self.model_list = model_list or []
         self.calls: list[dict[str, object]] = []
 
     async def acompletion(
@@ -202,6 +203,46 @@ def test_litellm_adapter_omits_temperature_only_for_an_explicit_reasoning_effort
     )
 
     assert ("temperature" in direct_calls[0]) is sends_temperature
+
+
+def _deployment(effort: str | None) -> dict[str, object]:
+    params: dict[str, object] = {"model": "openai/gpt-6-luna"}
+    if effort is not None:
+        params["reasoning_effort"] = effort
+    return {"model_name": "anytoolai.default_text", "litellm_params": params}
+
+
+@pytest.mark.parametrize(
+    ("effort", "sends_temperature"),
+    [("medium", False), ("high", False), ("none", True), (None, True)],
+)
+def test_litellm_adapter_drops_temperature_when_the_router_deployment_reasons(
+    effort: str | None, sends_temperature: bool
+) -> None:
+    """The routed default alias carries no explicit effort in the request; the router adds its own
+    medium. The request that reaches the router must already be without temperature then."""
+    router = RecordingRouter(make_router_response(), model_list=[_deployment(effort)])
+
+    asyncio.run(LiteLLMProviderAdapter(router).complete(make_request()))
+
+    assert ("temperature" in router.calls[0]) is sends_temperature
+
+
+def test_litellm_adapter_uses_the_shipped_router_config_to_drop_temperature_for_the_default_alias() -> None:
+    config = load_litellm_router_config(default_litellm_router_config_path(CONFIG_ROOT))
+    router = RecordingRouter(make_router_response(), model_list=config["model_list"])
+
+    asyncio.run(LiteLLMProviderAdapter(router).complete(make_request()))
+
+    assert "temperature" not in router.calls[0]
+
+
+def test_litellm_adapter_keeps_the_temperature_for_an_alias_the_router_does_not_describe() -> None:
+    router = RecordingRouter(make_router_response(), model_list=[_deployment("medium")])
+
+    asyncio.run(LiteLLMProviderAdapter(router).complete(make_request(model="another.alias")))
+
+    assert router.calls[0]["temperature"] == 0.3
 
 
 def test_litellm_adapter_keeps_the_policy_temperature_on_the_router_path_without_an_effort() -> None:

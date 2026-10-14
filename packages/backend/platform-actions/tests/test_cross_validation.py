@@ -1299,6 +1299,17 @@ class TestPersuasiveTextProductConstraints:
             ),
             ({"plain_text_lists": "forbidden"}, {}, "a) is how the quote starts, then prose."),
             ({"plain_text_lists": "forbidden"}, {}, "\u2022 One bullet alone is a sentence."),
+            # the no-break spaces are explicit separators like the comma
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Write a 3\u202f500-word article"},
+                "I can write a 3500-word article.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Write a 3\u00a0500-word article"},
+                "I can write a 3500-word article.",
+            ),
             # an explicit comma still groups thousands before a hyphenated unit
             (
                 {"numbers_must_appear_in_context": True},
