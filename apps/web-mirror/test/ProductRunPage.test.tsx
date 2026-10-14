@@ -503,6 +503,10 @@ describe("ProductRunPage", () => {
       submit();
       await waitForResult();
 
+      // the page moves focus to the result heading once; wait for that, or it can land after the
+      // button focus below and make the assertion race on a slow runner
+      const resultHeading = document.getElementById("product-result-heading");
+      await waitFor(() => expect(document.activeElement).toBe(resultHeading));
       const copyButton = screen.getByRole("button", { name: "Copy" });
       copyButton.focus();
       fireEvent.click(copyButton);
