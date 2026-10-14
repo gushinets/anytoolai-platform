@@ -158,7 +158,6 @@ def test_litellm_adapter_sends_direct_lab_model_and_reasoning_without_alias_subs
                 {"role": "system", "content": "You are structured"},
                 {"role": "user", "content": "Return JSON"},
             ],
-            "temperature": 0.3,
             "timeout": 60.0,
             "num_retries": 0,
             "reasoning_effort": "high",
@@ -166,6 +165,50 @@ def test_litellm_adapter_sends_direct_lab_model_and_reasoning_without_alias_subs
             "allowed_openai_params": ["reasoning_effort"],
         }
     ]
+
+
+@pytest.mark.parametrize(
+    ("effort", "sends_temperature"),
+    [
+        (None, True),
+        (ReasoningEffort.none, True),
+        (ReasoningEffort.low, False),
+        (ReasoningEffort.medium, False),
+        (ReasoningEffort.high, False),
+        (ReasoningEffort.max, False),
+    ],
+)
+def test_litellm_adapter_omits_temperature_only_for_an_explicit_reasoning_effort(
+    effort: ReasoningEffort | None, sends_temperature: bool
+) -> None:
+    """OpenAI reasoning models take only the default temperature, so an explicit reasoning effort
+    drops the policy's temperature from the request; no effort, or effort none, keeps it."""
+    router = RecordingRouter(make_router_response())
+    direct_calls: list[dict[str, object]] = []
+
+    async def direct_completion(**kwargs: object) -> object:
+        direct_calls.append(dict(kwargs))
+        return make_router_response(model="gpt-6-luna")
+
+    adapter = LiteLLMProviderAdapter(router, direct_completion=direct_completion)
+    asyncio.run(
+        adapter.complete(
+            make_request(
+                model="openai/gpt-6-luna",
+                model_addressing=ProviderModelAddressing.direct,
+                reasoning_effort=effort,
+            )
+        )
+    )
+
+    assert ("temperature" in direct_calls[0]) is sends_temperature
+
+
+def test_litellm_adapter_keeps_the_policy_temperature_on_the_router_path_without_an_effort() -> None:
+    router = RecordingRouter(make_router_response())
+    asyncio.run(LiteLLMProviderAdapter(router).complete(make_request()))
+
+    assert router.calls[0]["temperature"] == 0.3
 
 
 def test_litellm_adapter_does_not_inherit_reasoning_for_direct_model_when_omitted() -> None:

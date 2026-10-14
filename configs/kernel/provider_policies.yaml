@@ -20,7 +20,9 @@ provider_policies:
   - provider_policy_ref: default_text_generation_v1
     provider: litellm
     model: anytoolai.default_text
-    # gpt-6-luna accepts only the default temperature (1); any other value is a 400 from the API.
+    # gpt-6-luna with reasoning on accepts only the default temperature (1); any other value is a
+    # 400 from the API. A request that carries an explicit reasoning effort (Atom Lab) drops the
+    # temperature in the LiteLLM adapter; this policy keeps 1.0 for the router's static effort.
     temperature: 1.0
     timeout_seconds: 60
     retry_policy:

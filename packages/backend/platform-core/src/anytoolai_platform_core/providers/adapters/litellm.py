@@ -18,6 +18,7 @@ from anytoolai_platform_core.providers.models import (
     ProviderModelAddressing,
     ProviderResponse,
     ProviderUsage,
+    ReasoningEffort,
     ResolvedProviderRequest,
 )
 from anytoolai_platform_core.structured_output.schemas import normalize_schema_mapping
@@ -168,6 +169,13 @@ class LiteLLMProviderAdapter:
         }
         if request.reasoning_effort is not None:
             kwargs["reasoning_effort"] = request.reasoning_effort.value
+            if request.reasoning_effort is not ReasoningEffort.none:
+                # A reasoning request takes the model's own temperature: OpenAI's reasoning models
+                # accept only the default and answer any other value with a 400, so a lab run with
+                # an explicit effort and a policy temperature of 0.3 would fail. Runs without an
+                # explicit effort (the router's static medium) keep the policy temperature, which
+                # the default text policy sets to the one value those models accept.
+                del kwargs["temperature"]
             # LiteLLM's static model registry rejects the parameter for a model it does not list
             # yet (for example a brand-new OpenAI model) although the API accepts it. Allowing it
             # per request covers the direct path and the router; the router entry in

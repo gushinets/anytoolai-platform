@@ -1299,6 +1299,17 @@ class TestPersuasiveTextProductConstraints:
             ),
             ({"plain_text_lists": "forbidden"}, {}, "a) is how the quote starts, then prose."),
             ({"plain_text_lists": "forbidden"}, {}, "\u2022 One bullet alone is a sentence."),
+            # an explicit comma still groups thousands before a hyphenated unit
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Write a 3,500-word article"},
+                "I can write a 3500-word article.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Write a 3500-word article"},
+                "A 3,500-word article is fine.",
+            ),
             # a thousands separator is read both ways, in the input and in the text
             (
                 {"numbers_must_appear_in_context": True},
@@ -1349,7 +1360,7 @@ class TestPersuasiveTextProductConstraints:
                 {"task_text": "Need 3 500-word blog posts"},
                 "I can write 4 posts of 500 words.",
             ),
-            # a group that starts a hyphenated unit is two numbers, never the joined 3500
+            # a space before a group that starts a hyphenated unit separates two numbers, never 3500
             (
                 {"numbers_must_appear_in_context": True},
                 {"task_text": "Need 3 500-word blog posts"},
