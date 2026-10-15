@@ -125,6 +125,13 @@ def test_european_amounts_are_one_number() -> None:
     assert "invented_number" in violations("My price is €50.", order=order)
 
 
+def test_the_fraction_of_a_space_grouped_amount_is_not_a_separate_number() -> None:
+    for fee, fraction in (("3 200,50", "50"), ("12 500.75", "75")):
+        order = {**EN_ORDER, "task_text": "Automate my CRM"}
+        profile = f"My fixed fee is {fee} EUR"
+        assert "invented_number" in violations(f"My fee is {fraction} EUR.", order=order, profile=profile)
+
+
 def test_identifiers_do_not_offer_their_digits_as_numbers() -> None:
     for task_text in ("Integrate GPT-4o", "Need 4K footage"):
         order = {**EN_ORDER, "task_text": task_text}

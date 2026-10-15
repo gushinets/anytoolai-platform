@@ -84,8 +84,10 @@ def _unscaled_readings(match: re.Match[str]) -> list[set[str]]:
     grouped, fraction = groups[kind], groups[f"{kind}_fraction"] or ""
     readings = [{_number(grouped.translate(_GROUP_SEPARATORS), fraction[1:])}]
     if kind == "space":
-        # an ASCII space may just separate two numbers ("3 posts of 200 words" written "3 200")
-        readings.append({_number(part) for part in grouped.split("\x20")} | ({_number(fraction[1:])} if fraction else set()))
+        # an ASCII space may just separate two numbers ("3 posts of 200 words" written "3 200");
+        # a fraction stays on the last of them: "3 200,50" is 3 and 200.5, never a separate 50
+        *parts, last = grouped.split("\x20")
+        readings.append({_number(part) for part in parts} | {_number(last, fraction[1:])})
     return readings
 
 

@@ -1349,6 +1349,12 @@ class TestPersuasiveTextProductConstraints:
             ),
             ({"plain_text_lists": "forbidden"}, {}, "a) is how the quote starts, then prose."),
             ({"plain_text_lists": "forbidden"}, {}, "– Pavel, the dash line is a signature."),
+            # a space-grouped amount with a fraction: one amount, or two numbers with the fraction on the last
+            (
+                {"numbers_must_appear_in_context": True},
+                {"freelancer_positioning": "My fixed fee is 3 200,50 EUR"},
+                "My fixed fee is 3200.50 EUR; 3 sites at 200,5 EUR each.",
+            ),
             # the no-break spaces are explicit separators like the comma
             (
                 {"numbers_must_appear_in_context": True},
@@ -1507,6 +1513,17 @@ class TestPersuasiveTextProductConstraints:
                 {"numbers_must_appear_in_context": True},
                 {"task_text": "Need 3 500-word blog posts"},
                 "I have completed 3500 projects.",
+            ),
+            # the fraction of a space-grouped amount is never a separate number
+            (
+                {"numbers_must_appear_in_context": True},
+                {"freelancer_positioning": "My fixed fee is 3 200,50 EUR"},
+                "My fixed fee is 50 EUR.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"freelancer_positioning": "My fixed fee is 12 500.75 EUR"},
+                "My fixed fee is 75 EUR.",
             ),
         ],
     )

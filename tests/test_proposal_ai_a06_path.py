@@ -83,3 +83,15 @@ def test_a_bracketed_word_never_reaches_a_copy_ready_proposal(text: str) -> None
 )
 def test_numeric_comparisons_and_plain_prose_pass(text: str) -> None:
     _validate(text)
+
+
+@pytest.mark.parametrize(("fee", "fraction"), [("3 200,50", "50"), ("12 500.75", "75")])
+def test_the_fraction_of_a_space_grouped_fee_is_not_an_allowed_price(fee: str, fraction: str) -> None:
+    with pytest.raises(StructuredOutputValidationError):
+        PersuasiveTextCrossValidator().validate(
+            input_payload={
+                "constraints": _proposal_constraints(),
+                "context": {"freelancer_positioning": f"My fixed fee is {fee} EUR"},
+            },
+            output={"text": f"My fixed fee is {fraction} EUR."},
+        )
