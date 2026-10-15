@@ -10,6 +10,7 @@ dependencies = [
     "anytoolai-platform-core",
     "markdown-it-py>=3.0.0",
     "pydantic-ai-slim>=2.2.0",
+    "regex>=2024.11.6",
     "sqlalchemy>=2.0",
 ]
 

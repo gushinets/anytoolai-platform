@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any, Iterator, Mapping
 
+import regex
 from anytoolai_platform_core.actions.runner import ActionInputValidationError
 
 from ._markup import _has_disallowed_plain_text_markup, _has_html_tag, _has_list, _has_visible_text
@@ -119,6 +120,12 @@ def _context_strings(value: Any) -> Iterator[str]:
         yield str(value)
 
 
+# A caller's forbidden_patterns run through the `regex` package, not `re`: its matcher resists
+# catastrophic backtracking and takes a timeout, so a pathological pattern (a caller bug, the input
+# schema accepts any expression) cannot hold a worker beyond this bound on a long model output.
+_FORBIDDEN_PATTERN_TIMEOUT_SECONDS = 1.0
+
+
 class PersuasiveTextInputValidator:
     """Rejects an A06 input.constraints.forbidden_patterns entry that is not a valid regular
     expression before any provider call is made (a bad pattern is a caller bug the model cannot
@@ -129,8 +136,8 @@ class PersuasiveTextInputValidator:
         patterns = constraints.get("forbidden_patterns") if isinstance(constraints, Mapping) else None
         for pattern in patterns if isinstance(patterns, list) else []:
             try:
-                re.compile(pattern)
-            except (re.error, TypeError) as exc:
+                regex.compile(pattern)
+            except (regex.error, TypeError) as exc:
                 raise ActionInputValidationError(
                     f"constraints.forbidden_patterns has an invalid regular expression: {exc}"
                 ) from exc
@@ -182,7 +189,17 @@ class PersuasiveTextCrossValidator:
         # Product-level rules (ANY-656): all generic, so any A06 caller can opt in.
         # Case-insensitive on purpose: "Your Name" must also catch "your name".
         for pattern in constraints.get("forbidden_patterns") or []:
-            match = re.search(pattern, text, re.IGNORECASE)
+            try:
+                match = regex.search(
+                    pattern, text, regex.IGNORECASE, timeout=_FORBIDDEN_PATTERN_TIMEOUT_SECONDS
+                )
+            except TimeoutError as exc:
+                # Not a model mistake: retrying the model would run the same pattern again.
+                raise ActionInputValidationError(
+                    "constraints.forbidden_patterns entry "
+                    f"{_truncated_repr(pattern)} did not finish within "
+                    f"{_FORBIDDEN_PATTERN_TIMEOUT_SECONDS}s on the model output"
+                ) from exc
             if match:
                 raise _cross_validation_error(
                     f"text_matches_forbidden_pattern:{_truncated_repr(match.group(0))}"

@@ -23,6 +23,7 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     ScoreMatchByRubricInputValidator,
     SynthesizeAngleCrossValidator,
 )
+from anytoolai_platform_actions.structured_llm.cross_validation import persuasive_text
 from anytoolai_platform_core.actions.runner import ActionInputValidationError
 from anytoolai_platform_core.structured_output.errors import StructuredOutputValidationError
 
@@ -1347,7 +1348,7 @@ class TestPersuasiveTextProductConstraints:
                 "My fixed fee is $20,000 for 1,500,000 rows, or $20k as I usually say.",
             ),
             ({"plain_text_lists": "forbidden"}, {}, "a) is how the quote starts, then prose."),
-            ({"plain_text_lists": "forbidden"}, {}, "\u2022 One bullet alone is a sentence."),
+            ({"plain_text_lists": "forbidden"}, {}, "– Pavel, the dash line is a signature."),
             # the no-break spaces are explicit separators like the comma
             (
                 {"numbers_must_appear_in_context": True},
@@ -1402,7 +1403,9 @@ class TestPersuasiveTextProductConstraints:
             ({"forbidden_patterns": ["\u2014"]}, {}, "Fast \u2014 and clean."),
             ({"plain_text_lists": "forbidden"}, {}, "- one\n- two"),
             ({"plain_text_lists": "forbidden"}, {}, "1. one\n2. two"),
-            ({"plain_text_lists": "forbidden"}, {}, "\u2022 one\n\u2022 two"),
+            ({"plain_text_lists": "forbidden"}, {}, "• one\n• two"),
+            # one visible bullet is already a list (code review round 15)
+            ({"plain_text_lists": "forbidden"}, {}, "• I can build it.\n\nI have API experience."),
             ({"plain_text_lists": "forbidden"}, {}, "\u2013 one\n\u2013 two"),
             ({"plain_text_lists": "forbidden"}, {}, "a) one\nb) two"),
             (
@@ -1526,6 +1529,17 @@ class TestPersuasiveTextInputValidator:
     def test_rejects_invalid_regular_expression(self) -> None:
         with pytest.raises(ActionInputValidationError):
             self.validator.validate(input_payload={"constraints": {"forbidden_patterns": ["["]}})
+
+    def test_a_pattern_that_backtracks_forever_fails_the_action_within_the_bound(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Code review round 15: a syntactically valid pattern must not hold the worker."""
+        monkeypatch.setattr(persuasive_text, "_FORBIDDEN_PATTERN_TIMEOUT_SECONDS", 0.05)
+        with pytest.raises(ActionInputValidationError, match="did not finish"):
+            PersuasiveTextCrossValidator().validate(
+                input_payload={"constraints": {"forbidden_patterns": ["(?:a|aa)+$"]}},
+                output={"text": "a" * 60 + "!"},
+            )
 
 
 def _axis(axis_id: str, **extra: object) -> dict:

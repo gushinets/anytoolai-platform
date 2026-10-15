@@ -787,6 +787,27 @@ describe("ProductRunPage", () => {
     expect(idempotencyKeyOf(startCalls[0]!)).toBe(idempotencyKeyOf(startCalls[1]!));
   });
 
+  it("retries a 5xx that carries no error envelope (a proxy's HTML 502) with the same Idempotency-Key", async () => {
+    const htmlBadGateway = new Response("<html><body>502 Bad Gateway</body></html>", {
+      status: 502,
+      headers: { "Content-Type": "text/html" },
+    });
+    const { client, calls } = makeClient({
+      ...happyPathRoutes(),
+      [ROUTES.START]: [htmlBadGateway, startResponse()],
+    });
+
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+
+    await waitForResult();
+    const startCalls = calls.filter((call) => call.key === ROUTES.START);
+    expect(startCalls).toHaveLength(2);
+    expect(idempotencyKeyOf(startCalls[0]!)).toBe(idempotencyKeyOf(startCalls[1]!));
+  });
+
   it("never retries a definite 4xx /start rejection automatically", async () => {
     const { client, calls } = makeClient({
       ...happyPathRoutes(),

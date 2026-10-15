@@ -96,11 +96,17 @@ describe("isAmbiguousFailure", () => {
     ).toBe(true);
   });
 
-  it("is false for a definite 4xx, an aborted request and an unparsable response", () => {
+  it("is true for a 5xx without the error envelope (a proxy's HTML 502, an empty 503)", () => {
+    expect(isAmbiguousFailure({ type: "invalid_response", status: 502, message: "x" })).toBe(true);
+    expect(isAmbiguousFailure({ type: "invalid_response", status: 503, message: "x" })).toBe(true);
+  });
+
+  it("is false for a definite 4xx, an aborted request and an unparsable 2xx or 4xx", () => {
     expect(
       isAmbiguousFailure({ type: "backend_error", status: 422, code: "invalid", message: "x", requestId: "r" }),
     ).toBe(false);
     expect(isAmbiguousFailure({ type: "aborted" })).toBe(false);
-    expect(isAmbiguousFailure({ type: "invalid_response", message: "x" } as never)).toBe(false);
+    expect(isAmbiguousFailure({ type: "invalid_response", status: 200, message: "x" })).toBe(false);
+    expect(isAmbiguousFailure({ type: "invalid_response", status: 404, message: "x" })).toBe(false);
   });
 });

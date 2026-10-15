@@ -21,11 +21,11 @@ provider_policies:
     provider: litellm
     model: anytoolai.default_text
     # gpt-6-luna with reasoning on accepts only the default temperature (1) and the API docs say to
-    # drop the parameter; any other value is a 400. The LiteLLM adapter omits the temperature from
-    # every request whose effective reasoning effort is not none: an explicit effort (Atom Lab) or
-    # the router deployment's own (the default alias runs at medium), or the default listed for a direct
-    # model in litellm_router.yaml. The 1.0 here is only the
-    # fallback for a request that reaches a non-reasoning deployment.
+    # drop the parameter; any other value is a 400. The LiteLLM adapter sends the temperature only
+    # where reasoning is known to be off: an explicit effort of none, or an alias whose router
+    # deployment sets no effort (the default alias runs at medium). A direct Atom Lab model that
+    # names no effort runs at the provider's defaults for both. The 1.0 here is only the fallback
+    # for a request that reaches a non-reasoning deployment.
     temperature: 1.0
     timeout_seconds: 60
     retry_policy:

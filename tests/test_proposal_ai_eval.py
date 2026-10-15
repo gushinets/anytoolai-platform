@@ -101,6 +101,8 @@ def test_angle_placeholders_are_caught_but_comparisons_pass() -> None:
         assert "placeholder" in violations(CLEAN + f" Hello {placeholder}.")
     assert "placeholder" not in violations(CLEAN + " I keep latency <50ms and uptime >99%.")
     assert "placeholder" not in violations(CLEAN + " I can implement the condition x<y && a>b.")
+    assert "placeholder" not in violations(CLEAN + " I can implement comparisons x<y and a>b.")
+    assert "placeholder" not in violations(CLEAN + " The guard alpha<beta and gamma>delta holds.")
 
 
 def test_explicit_groupings_are_one_number_and_dotted_dates_are_three() -> None:

@@ -155,10 +155,8 @@ class LiteLLMProviderAdapter:
         router: Router,
         *,
         direct_completion: Callable[..., Awaitable[Any]] | None = None,
-        direct_model_default_reasoning: Mapping[str, str] | None = None,
     ) -> None:
         self._router = router
-        self._direct_model_default_reasoning = dict(direct_model_default_reasoning or {})
         self._direct_completion = direct_completion or litellm.acompletion
 
     async def complete(self, request: ResolvedProviderRequest) -> ProviderResponse:
@@ -176,11 +174,7 @@ class LiteLLMProviderAdapter:
             # per request covers the direct path and the router; the router entry in
             # litellm_router.yaml covers calls that carry no explicit effort.
             kwargs["allowed_openai_params"] = ["reasoning_effort"]
-        if self._effective_reasoning_effort(request) not in (None, ReasoningEffort.none.value):
-            # A reasoning request takes the model's own temperature: OpenAI's reasoning models
-            # document dropping the parameter and answer any value other than the default with a
-            # 400. The effort counts whether the request names it or the router deployment of the
-            # alias sets it (the default text alias runs at medium).
+        if not self._sends_temperature(request):
             del kwargs["temperature"]
 
         completion = (
@@ -191,18 +185,25 @@ class LiteLLMProviderAdapter:
         response = await completion(**kwargs)
         return _normalize_litellm_response(request, response)
 
-    def _effective_reasoning_effort(self, request: ResolvedProviderRequest) -> str | None:
-        """The effort the provider will see: the request's own, else the router alias deployment's,
-        or, for a direct model, the default the router config lists for that model (it decides the
-        temperature only: the effort itself is not sent)."""
+    def _sends_temperature(self, request: ResolvedProviderRequest) -> bool:
+        """A reasoning request takes the model's own temperature: OpenAI's reasoning models document
+        dropping the parameter and answer any value other than the default with a 400. The policy's
+        temperature is sent only where reasoning is known to be off: an explicit effort of `none`,
+        or a router alias whose deployment sets no effort. A direct model (Atom Lab) that names no
+        effort runs at the model's own default effort, which the adapter does not know (every
+        OpenAI model since GPT-5 defaults to medium), so it is treated as reasoning and the
+        provider applies its default temperature."""
+        # ponytail: a non-reasoning direct model (gpt-4o) also runs at the provider default; carry
+        # the model catalog's reasoning_supported into the request if one ever needs another value.
         if request.reasoning_effort is not None:
-            return request.reasoning_effort.value
+            return request.reasoning_effort is ReasoningEffort.none
         if request.model_addressing is ProviderModelAddressing.direct:
-            return self._direct_model_default_reasoning.get(request.model)
+            return False
         for deployment in getattr(self._router, "model_list", None) or []:
             if deployment.get("model_name") == request.model:
-                return (deployment.get("litellm_params") or {}).get("reasoning_effort")
-        return None
+                effort = (deployment.get("litellm_params") or {}).get("reasoning_effort")
+                return effort in (None, ReasoningEffort.none.value)
+        return True
 
     def _messages_for(self, request: ResolvedProviderRequest) -> list[dict[str, Any]]:
         messages = (
@@ -235,12 +236,7 @@ def load_litellm_router_config(path: Path) -> dict[str, Any]:
     if not isinstance(router_settings, dict):
         raise ValueError(f"LiteLLM router_settings must be a mapping: {path}")
 
-    default_reasoning = data.get("direct_model_default_reasoning", {})
-    if not isinstance(default_reasoning, dict):
-        raise ValueError(f"LiteLLM direct_model_default_reasoning must be a mapping: {path}")
-
     return {
-        "direct_model_default_reasoning": default_reasoning,
         "model_list": _resolve_env_sentinels(model_list),
         "router_settings": _resolve_env_sentinels(router_settings),
     }
@@ -248,9 +244,7 @@ def load_litellm_router_config(path: Path) -> dict[str, Any]:
 
 def build_litellm_adapter(config_root: Path | None = None) -> LiteLLMProviderAdapter:
     config = load_litellm_router_config(default_litellm_router_config_path(config_root))
-    return LiteLLMProviderAdapter(
-        _router_from(config), direct_model_default_reasoning=config["direct_model_default_reasoning"]
-    )
+    return LiteLLMProviderAdapter(_router_from(config))
 
 
 def build_litellm_router(config_root: Path | None = None) -> Router:
