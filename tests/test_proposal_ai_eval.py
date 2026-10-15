@@ -125,11 +125,19 @@ def test_european_amounts_are_one_number() -> None:
     assert "invented_number" in violations("My price is €50.", order=order)
 
 
-def test_the_fraction_of_a_space_grouped_amount_is_not_a_separate_number() -> None:
-    for fee, fraction in (("3 200,50", "50"), ("12 500.75", "75")):
-        order = {**EN_ORDER, "task_text": "Automate my CRM"}
-        profile = f"My fixed fee is {fee} EUR"
-        assert "invented_number" in violations(f"My fee is {fraction} EUR.", order=order, profile=profile)
+def test_a_space_grouped_amount_is_one_number_never_its_parts() -> None:
+    order = {**EN_ORDER, "task_text": "Automate my CRM"}
+    for profile, fee in (
+        ("My fixed fee is 3 200,50 EUR", "50"),
+        ("My fixed fee is 3 200,50 EUR", "200,50"),
+        ("My fixed fee is 3 200,50 EUR", "3"),
+        ("My fixed fee is 12 500.75 EUR", "75"),
+        ("My fixed fee is 12 500.75 EUR", "500.75"),
+        ("3 projects, 200 clients", "3 200"),
+    ):
+        assert "invented_number" in violations(f"My fee is {fee} EUR.", order=order, profile=profile)
+    profile = "My fixed fee is 3 200,50 EUR"
+    assert "invented_number" not in violations("My fee is 3200.50 EUR.", order=order, profile=profile)
 
 
 def test_identifiers_do_not_offer_their_digits_as_numbers() -> None:

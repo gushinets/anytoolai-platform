@@ -1349,11 +1349,11 @@ class TestPersuasiveTextProductConstraints:
             ),
             ({"plain_text_lists": "forbidden"}, {}, "a) is how the quote starts, then prose."),
             ({"plain_text_lists": "forbidden"}, {}, "– Pavel, the dash line is a signature."),
-            # a space-grouped amount with a fraction: one amount, or two numbers with the fraction on the last
+            # a space-grouped amount is one magnitude, however it is restated
             (
                 {"numbers_must_appear_in_context": True},
                 {"freelancer_positioning": "My fixed fee is 3 200,50 EUR"},
-                "My fixed fee is 3200.50 EUR; 3 sites at 200,5 EUR each.",
+                "My fixed fee is 3200.50 EUR, that is 3,200.5 EUR.",
             ),
             # the no-break spaces are explicit separators like the comma
             (
@@ -1377,7 +1377,7 @@ class TestPersuasiveTextProductConstraints:
                 {"task_text": "Write a 3500-word article"},
                 "A 3,500-word article is fine.",
             ),
-            # a thousands separator is read both ways, in the input and in the text
+            # a space before a group that starts a hyphenated unit separates two numbers
             (
                 {"numbers_must_appear_in_context": True},
                 {"task_text": "Need 3 500-word blog posts"},
@@ -1386,7 +1386,7 @@ class TestPersuasiveTextProductConstraints:
             (
                 {"numbers_must_appear_in_context": True},
                 {"task_text": "We have 12 100 clients"},
-                "I will handle 12 100 clients and also 12.",
+                "I will handle 12 100 clients, that is 12,100.",
             ),
             (
                 {"numbers_must_appear_in_context": True},
@@ -1514,16 +1514,22 @@ class TestPersuasiveTextProductConstraints:
                 {"task_text": "Need 3 500-word blog posts"},
                 "I have completed 3500 projects.",
             ),
-            # the fraction of a space-grouped amount is never a separate number
-            (
-                {"numbers_must_appear_in_context": True},
-                {"freelancer_positioning": "My fixed fee is 3 200,50 EUR"},
-                "My fixed fee is 50 EUR.",
-            ),
-            (
-                {"numbers_must_appear_in_context": True},
-                {"freelancer_positioning": "My fixed fee is 12 500.75 EUR"},
-                "My fixed fee is 75 EUR.",
+            # a space-grouped number is one magnitude: none of its groups is a separate number
+            *(
+                (
+                    {"numbers_must_appear_in_context": True},
+                    {"freelancer_positioning": context},
+                    text,
+                )
+                for context, text in [
+                    ("My fixed fee is 3 200,50 EUR", "My fixed fee is 50 EUR."),
+                    ("My fixed fee is 3 200,50 EUR", "My fixed fee is 200,50 EUR."),
+                    ("My fixed fee is 3 200,50 EUR", "My fixed fee is 3 EUR."),
+                    ("My fixed fee is 12 500.75 EUR", "My fixed fee is 75 EUR."),
+                    ("My fixed fee is 12 500.75 EUR", "My fixed fee is 500.75 EUR."),
+                    ("3 projects, 200 clients", "My fixed fee is 3 200 EUR."),
+                    ("We have 12 100 clients", "We have 12 clients."),
+                ]
             ),
         ],
     )

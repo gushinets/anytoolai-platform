@@ -15,11 +15,12 @@ from ._shared import (
 )
 
 # The number formats a brief or a proposal is read in. Each token is one of these, longest form
-# first, and yields one or more readings: a set of numbers it may mean. A text token is covered when
-# any of its readings is in the context; the context offers every reading of every token. A number is
-# compared by value ("05" is 5, "1,500" is 1500) and never by its digit groups, so a "$1,500" budget
-# never offers "$500" as a price. A grouped figure has one magnitude: "1.500" is 1500, never 1.5,
-# so a brief's "1.5 years" cannot cover a claimed "1,500 projects" (ambiguity fails closed).
+# first, and yields the numbers it means (a dotted date is three). A text number is covered when the
+# context has a token offering it. A number is compared by value ("05" is 5, "1,500" is 1500) and
+# never by its digit groups, so a "$1,500" budget never offers "$500" as a price. A grouped figure
+# has one magnitude whatever the separator: "1.500" is 1500, never 1.5, and "3 200,50" is 3200.5,
+# never 3, 200 or 50, so a brief's "1.5 years" cannot cover a claimed "1,500 projects" and a
+# "3 200 EUR" fee cannot cover "3 EUR" (ambiguity fails closed).
 #
 # Letters next to digits are decided by one rule, the first character of the word: a word that starts
 # with a letter is a name and offers no number at all ("n8n", "v2", "GPT-4.1-mini", "gpt_4o",
@@ -38,7 +39,7 @@ _NUMBER_TOKEN = re.compile(
   | (?P<us>\d{1,3}(?:,\d{3})+)(?P<us_fraction>\.\d+)?                     # 1,500 and 1,234.50
   | (?P<eu>\d{1,3}(?:\.\d{3})+)(?P<eu_fraction>,\d+)?                     # 1.500 and 1.234,50
   | (?P<nbsp>\d{1,3}(?:[\u00a0\u202f]\d{3})+)(?P<nbsp_fraction>[.,]\d+)?  # 3\u202f500: an explicit group
-  | (?P<space>\d{1,3}(?:\x20\d{3})+)(?P<space_fraction>[.,]\d+)?(?!-[^\W\d_])  # 3 200: 3200, or 3 and 200
+  | (?P<space>\d{1,3}(?:\x20\d{3})+)(?P<space_fraction>[.,]\d+)?(?!-[^\W\d_])  # 3 200 is 3200; "3 500-word" is 3 and 500
   | (?P<decimal>\d+)(?P<decimal_fraction>[.,]\d+)                         # 1.5 and 1,5
   | (?P<integer>\d+)
 )(?!\d)(?P<scale>[kKM](?![^\W\d_]))?""",
@@ -66,47 +67,31 @@ def _number(whole_digits: str, fraction: str = "") -> str:
     return str(int(whole_digits)) + (f".{fraction}" if fraction else "")
 
 
-def _readings(match: re.Match[str]) -> list[set[str]]:
-    return [{_scaled(number, match.group("scale")) for number in reading} for reading in _unscaled_readings(match)]
+def _token_numbers(match: re.Match[str]) -> set[str]:
+    return {_scaled(number, match.group("scale")) for number in _unscaled_numbers(match)}
 
 
-def _unscaled_readings(match: re.Match[str]) -> list[set[str]]:
+def _unscaled_numbers(match: re.Match[str]) -> set[str]:
     groups = match.groupdict()
     if groups["date"]:
-        return [{_number(part) for part in re.split(r"[./]", groups["date"])}]
+        return {_number(part) for part in re.split(r"[./]", groups["date"])}
     if groups["decimal"]:
-        return [{_number(groups["decimal"], groups["decimal_fraction"][1:])}]
+        return {_number(groups["decimal"], groups["decimal_fraction"][1:])}
     if groups["integer"]:
-        return [{_number(groups["integer"])}]
-    for kind in ("us", "eu", "nbsp", "space"):
-        if groups[kind]:
-            break
-    grouped, fraction = groups[kind], groups[f"{kind}_fraction"] or ""
-    readings = [{_number(grouped.translate(_GROUP_SEPARATORS), fraction[1:])}]
-    if kind == "space":
-        # an ASCII space may just separate two numbers ("3 posts of 200 words" written "3 200");
-        # a fraction stays on the last of them: "3 200,50" is 3 and 200.5, never a separate 50
-        *parts, last = grouped.split("\x20")
-        readings.append({_number(part) for part in parts} | {_number(last, fraction[1:])})
-    return readings
+        return {_number(groups["integer"])}
+    kind = next(kind for kind in ("us", "eu", "nbsp", "space") if groups[kind])
+    return {_number(groups[kind].translate(_GROUP_SEPARATORS), (groups[f"{kind}_fraction"] or "")[1:])}
 
 
-def _number_tokens(value: str) -> list[list[set[str]]]:
-    return [_readings(match) for match in _NUMBER_TOKEN.finditer(_without_names(value))]
+def _numbers(value: str) -> set[str]:
+    return {number for match in _NUMBER_TOKEN.finditer(_without_names(value)) for number in _token_numbers(match)}
 
 
 def numbers_absent_from_context(text: str, context: Any) -> list[str]:
-    """The numbers in `text` that no reading of any number in `context` offers, shortest first;
-    empty when every text number is covered. Shared with the ProposalAI eval script."""
-    allowed: set[str] = set()
-    for chunk in _context_strings(context):
-        for readings in _number_tokens(chunk):
-            allowed.update(*readings)
-    invented: set[str] = set()
-    for readings in _number_tokens(text):
-        if not any(reading <= allowed for reading in readings):
-            invented |= min((reading - allowed for reading in readings), key=len)
-    return sorted(invented, key=len)
+    """The numbers in `text` that no number in `context` offers, shortest first; empty when every
+    text number is covered. Shared with the ProposalAI eval script."""
+    allowed = {number for chunk in _context_strings(context) for number in _numbers(chunk)}
+    return sorted(_numbers(text) - allowed, key=len)
 
 
 def _context_strings(value: Any) -> Iterator[str]:

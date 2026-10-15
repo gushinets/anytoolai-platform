@@ -85,13 +85,28 @@ def test_numeric_comparisons_and_plain_prose_pass(text: str) -> None:
     _validate(text)
 
 
-@pytest.mark.parametrize(("fee", "fraction"), [("3 200,50", "50"), ("12 500.75", "75")])
-def test_the_fraction_of_a_space_grouped_fee_is_not_an_allowed_price(fee: str, fraction: str) -> None:
+def _validate_fee(profile: str, text: str) -> None:
+    PersuasiveTextCrossValidator().validate(
+        input_payload={"constraints": _proposal_constraints(), "context": {"freelancer_positioning": profile}},
+        output={"text": text},
+    )
+
+
+@pytest.mark.parametrize(
+    ("profile", "fee"),
+    [
+        ("My fixed fee is 3 200,50 EUR", "50"),
+        ("My fixed fee is 3 200,50 EUR", "200,50"),
+        ("My fixed fee is 3 200,50 EUR", "3"),
+        ("My fixed fee is 12 500.75 EUR", "75"),
+        ("My fixed fee is 12 500.75 EUR", "500.75"),
+        ("3 projects, 200 clients", "3 200"),
+    ],
+)
+def test_a_space_grouped_fee_is_one_amount_never_its_parts(profile: str, fee: str) -> None:
     with pytest.raises(StructuredOutputValidationError):
-        PersuasiveTextCrossValidator().validate(
-            input_payload={
-                "constraints": _proposal_constraints(),
-                "context": {"freelancer_positioning": f"My fixed fee is {fee} EUR"},
-            },
-            output={"text": f"My fixed fee is {fraction} EUR."},
-        )
+        _validate_fee(profile, f"My fixed fee is {fee} EUR.")
+
+
+def test_a_space_grouped_fee_may_be_restated() -> None:
+    _validate_fee("My fixed fee is 3 200,50 EUR", "My fixed fee is 3200.50 EUR.")
