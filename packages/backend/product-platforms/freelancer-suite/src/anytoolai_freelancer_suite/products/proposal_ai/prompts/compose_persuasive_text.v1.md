@@ -60,7 +60,7 @@ Form:
 
 - `text` is complete, copy-ready plain text. No headings (not even a plain line such as "Why I'm a
   good fit"), no lists, no bullet or number markers, no bold or other Markdown or HTML.
-- No placeholders in any form: no square, curly or angle brackets, no "Your Name", no sign-off with a name.
+- No placeholders in any form: no square, curly or angle brackets, no %NAME% merge tags, no "Your Name", no sign-off with a name.
   Write a comparison in words ("under 50 ms", "x is less than y"), never with < or > around words.
 - No long dashes (em dash or spaced en dash); use a comma, a colon or a new sentence.
 - No meta-commentary: nothing about the text itself, about the information you were given, about

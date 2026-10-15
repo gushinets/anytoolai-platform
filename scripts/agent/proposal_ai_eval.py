@@ -25,7 +25,7 @@ from pathlib import Path
 from anytoolai_platform_actions.structured_llm.cross_validation.persuasive_text import numbers_absent_from_context
 
 ORDERS_PATH = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "proposal_ai_eval" / "orders.json"
-PLACEHOLDER = re.compile(r"\[[^\]\n]{1,80}\]|\{[^{}\n]{1,80}\}|\{\{|\}\}|\byour name\b|<[^\W\d][^<>\n]{0,79}>", re.IGNORECASE)
+PLACEHOLDER = re.compile(r"\[[^\]\n]{1,80}\]|\{[^{}\n]{1,80}\}|\{\{|\}\}|\byour name\b|<[^\s\d<>=][^<>\n]{0,79}>|%[^\W\d][\w.]{0,39}%", re.IGNORECASE)
 META = re.compile(
     r"based on the information i(?:.m| am| have| was| can)|truthfully|as an ai (?:language )?model"
     r"|as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\b|my listed experience|haven.t specified"

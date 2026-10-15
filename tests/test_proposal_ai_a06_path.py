@@ -52,6 +52,14 @@ def _validate(text: str) -> None:
         "Hello<client_name>world, I can help.",
         "Hello <Имя или фамилия>, I can help.",
         "Hello <client and/or company>, I can help.",
+        # any template syntax, not only a bracketed name (code review round 19)
+        "Hello <%=client_name%>, I can help.",
+        "Hello <%first_name%>, I can help.",
+        "Hello <@client_name>, I can help.",
+        "Hello <$name>, I can help.",
+        "Hello <#name>, I can help.",
+        "Hello %FIRST_NAME%, I can help.",
+        "Hello %client.name%, I can help.",
         # fail closed: brackets around words are rejected even in a comparison
         "I can implement the condition x<y && a>b.",
         "I can implement x<y and a> 10.",
@@ -67,6 +75,8 @@ def test_a_bracketed_word_never_reaches_a_copy_ready_proposal(text: str) -> None
     [
         "I keep latency <50ms and uptime >99% on every integration.",
         "Budget < 500 and timeline > 2 weeks works for me.",
+        "I keep latency <=50ms and uptime >99%.",
+        "Uptime stays at 99% while latency drops by 50%.",
         "I can start this week and deliver the integration with tests.",
     ],
 )
