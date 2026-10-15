@@ -4,8 +4,8 @@ prompts:
     template_path: prompts/detect_experience_gaps.v1.md
     input_variables: []
     output_schema_ref: kernel.schemas.issue_detection_output_v1
-  - prompt_ref: proposal_ai.compose_persuasive_text.v2
-    version: 2
-    template_path: prompts/compose_persuasive_text.v2.md
+  - prompt_ref: proposal_ai.compose_persuasive_text.v1
+    version: 1
+    template_path: prompts/compose_persuasive_text.v1.md
     input_variables: []
     output_schema_ref: kernel.schemas.compose_persuasive_text_output_v1

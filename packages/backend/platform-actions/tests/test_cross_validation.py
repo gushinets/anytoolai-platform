@@ -1530,6 +1530,18 @@ class TestPersuasiveTextInputValidator:
         with pytest.raises(ActionInputValidationError):
             self.validator.validate(input_payload={"constraints": {"forbidden_patterns": ["["]}})
 
+    def test_rejects_an_oversized_pattern_list_before_compiling_any_of_it(self) -> None:
+        """Code review round 17: compiling is bounded by count and length, not by the clock."""
+        self.validator.validate(input_payload={"constraints": {"forbidden_patterns": ["a"] * 32}})
+        with pytest.raises(ActionInputValidationError, match="at most 32"):
+            self.validator.validate(
+                input_payload={"constraints": {"forbidden_patterns": ["a"] * 33}}
+            )
+        with pytest.raises(ActionInputValidationError, match="longer than 200"):
+            self.validator.validate(
+                input_payload={"constraints": {"forbidden_patterns": ["a" * 201]}}
+            )
+
     def test_a_pattern_that_backtracks_forever_fails_the_action_within_the_bound(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:

@@ -1,4 +1,4 @@
-# proposal_ai.compose_persuasive_text.v2
+# proposal_ai.compose_persuasive_text.v1
 
 Compose a single persuasive `text` that pursues `objective`: a freelance proposal the freelancer can
 send as-is. Facts come only from `context.task_text` (what the client needs) and

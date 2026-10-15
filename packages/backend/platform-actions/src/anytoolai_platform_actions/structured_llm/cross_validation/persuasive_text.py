@@ -125,7 +125,12 @@ def _context_strings(value: Any) -> Iterator[str]:
 # catastrophic backtracking and takes a timeout, so pathological patterns (a caller bug, the input
 # schema accepts any expression and any number of them) cannot hold a worker beyond this bound on
 # a long model output. The bound covers the whole list: each search gets what is left of it.
+# Compiling is bounded by the input schema (at most 32 patterns of at most 200 characters), which
+# the action runner enforces before this module sees the payload; the validator below repeats the
+# bound for callers that skip the schema.
 _FORBIDDEN_PATTERNS_BUDGET_SECONDS = 1.0
+_FORBIDDEN_PATTERNS_MAX_ITEMS = 32
+_FORBIDDEN_PATTERN_MAX_LENGTH = 200
 _monotonic = time.monotonic  # replaced by tests
 
 
@@ -137,7 +142,19 @@ class PersuasiveTextInputValidator:
     def validate(self, *, input_payload: Mapping[str, Any]) -> None:
         constraints = input_payload.get("constraints")
         patterns = constraints.get("forbidden_patterns") if isinstance(constraints, Mapping) else None
-        for pattern in patterns if isinstance(patterns, list) else []:
+        if not isinstance(patterns, list):
+            return
+        if len(patterns) > _FORBIDDEN_PATTERNS_MAX_ITEMS:
+            raise ActionInputValidationError(
+                f"constraints.forbidden_patterns has {len(patterns)} entries, at most "
+                f"{_FORBIDDEN_PATTERNS_MAX_ITEMS} are allowed"
+            )
+        for pattern in patterns:
+            if isinstance(pattern, str) and len(pattern) > _FORBIDDEN_PATTERN_MAX_LENGTH:
+                raise ActionInputValidationError(
+                    "constraints.forbidden_patterns entry is longer than "
+                    f"{_FORBIDDEN_PATTERN_MAX_LENGTH} characters"
+                )
             try:
                 regex.compile(pattern)
             except (regex.error, TypeError) as exc:

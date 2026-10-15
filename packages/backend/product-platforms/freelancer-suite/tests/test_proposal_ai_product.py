@@ -76,7 +76,7 @@ def test_prompt_refs_resolve_to_existing_templates() -> None:
     for config in _load_yaml("action_configs.yaml")["action_configs"]:
         entry = prompts[config["prompt_ref"]]
         assert (PRODUCT_DIR / entry["template_path"]).is_file()
-    assert prompts["proposal_ai.compose_persuasive_text.v2"]["version"] == 2
+    assert prompts["proposal_ai.compose_persuasive_text.v1"]["version"] == 1
 
 
 def test_product_contains_no_forbidden_provider_sdk_or_model_string_tokens() -> None:
@@ -168,10 +168,13 @@ def _forbidden_patterns() -> list[str]:
         "Hello <client/email>, I can help.",
         "Hello <client:name>, I can help.",
         "Hello <Client Name>, I can help.",
-        # glued to the salutation: a word on one side only is still a placeholder (round 16)
+        # glued to words on either side is still a placeholder (rounds 16, 17): a comparison is
+        # told apart by its content (a conjunction between the operands), not by its neighbours
         "Hello<client_name>, I can help.",
         "Dear<client.name>, I can help.",
         "Hi<client/email>, I can help.",
+        "Hello<client_name>world, I can help.",
+        "Hi<client.email>there, I can help.",
         "Best regards, Your Name",
         "Based on the information I'm working from here, I can help.",
         "I can't truthfully claim HubSpot experience.",
@@ -194,6 +197,8 @@ def test_forbidden_patterns_catch_placeholders_and_meta_phrases(bad_text: str) -
         # a placeholder is never glued to a word, a comparison always is (code review round 15)
         "I can implement comparisons x<y and a>b.",
         "The guard alpha<beta and gamma>delta holds.",
+        "I can implement x<y and a> 10.",
+        "The branch runs if a<b or c>d holds.",
     ],
 )
 def test_ordinary_phrases_are_not_meta_commentary(fine_text: str) -> None:
@@ -261,7 +266,7 @@ def test_generate_output_schema_requires_text_and_gaps() -> None:
 
 
 def test_prompt_uses_task_language_by_default_and_preserves_explicit_override() -> None:
-    prompt = " ".join(_load_prompt("prompts/compose_persuasive_text.v2.md").split())
+    prompt = " ".join(_load_prompt("prompts/compose_persuasive_text.v1.md").split())
 
     assert "constraints.language" in prompt
     assert "language of `context.task_text`" in prompt
@@ -270,7 +275,7 @@ def test_prompt_uses_task_language_by_default_and_preserves_explicit_override() 
 
 
 def test_prompt_v2_pins_the_quality_rules_from_the_qa_report() -> None:
-    prompt = " ".join(_load_prompt("prompts/compose_persuasive_text.v2.md").split())
+    prompt = " ".join(_load_prompt("prompts/compose_persuasive_text.v1.md").split())
 
     for fragment in (
         "Never rename, generalize",  # D-01

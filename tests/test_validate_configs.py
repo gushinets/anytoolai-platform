@@ -109,9 +109,9 @@ def test_build_profile_transforms_only_enabled_product_and_preserves_full_tree(t
         output_dir / "products"
     )
     assert (
-        generated_product(output_dir, "proposal_ai") / "prompts/compose_persuasive_text.v2.md"
+        generated_product(output_dir, "proposal_ai") / "prompts/compose_persuasive_text.v1.md"
     ).read_bytes() == (
-        PRODUCTS_ROOT / "proposal_ai/prompts/compose_persuasive_text.v2.md"
+        PRODUCTS_ROOT / "proposal_ai/prompts/compose_persuasive_text.v1.md"
     ).read_bytes()
     saved = json.loads((output_dir / "manifest.json").read_text())
     assert saved["enabled_products"]["proposal_ai"] == {
