@@ -99,6 +99,7 @@ def test_angle_placeholders_are_caught_but_comparisons_pass() -> None:
     assert "placeholder" in violations(CLEAN + " Hello <client_name>.")
     for placeholder in ("<client.name>", "<client/email>", "<client:name>", "<Client Name>"):
         assert "placeholder" in violations(CLEAN + f" Hello {placeholder}.")
+        assert "placeholder" in violations(CLEAN + f" Hello{placeholder}, hi.")
     assert "placeholder" not in violations(CLEAN + " I keep latency <50ms and uptime >99%.")
     assert "placeholder" not in violations(CLEAN + " I can implement the condition x<y && a>b.")
     assert "placeholder" not in violations(CLEAN + " I can implement comparisons x<y and a>b.")

@@ -168,6 +168,10 @@ def _forbidden_patterns() -> list[str]:
         "Hello <client/email>, I can help.",
         "Hello <client:name>, I can help.",
         "Hello <Client Name>, I can help.",
+        # glued to the salutation: a word on one side only is still a placeholder (round 16)
+        "Hello<client_name>, I can help.",
+        "Dear<client.name>, I can help.",
+        "Hi<client/email>, I can help.",
         "Best regards, Your Name",
         "Based on the information I'm working from here, I can help.",
         "I can't truthfully claim HubSpot experience.",

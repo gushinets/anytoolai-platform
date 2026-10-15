@@ -1534,11 +1534,30 @@ class TestPersuasiveTextInputValidator:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Code review round 15: a syntactically valid pattern must not hold the worker."""
-        monkeypatch.setattr(persuasive_text, "_FORBIDDEN_PATTERN_TIMEOUT_SECONDS", 0.05)
+        monkeypatch.setattr(persuasive_text, "_FORBIDDEN_PATTERNS_BUDGET_SECONDS", 0.05)
         with pytest.raises(ActionInputValidationError, match="did not finish"):
             PersuasiveTextCrossValidator().validate(
                 input_payload={"constraints": {"forbidden_patterns": ["(?:a|aa)+$"]}},
                 output={"text": "a" * 60 + "!"},
+            )
+
+    def test_the_time_bound_covers_the_whole_pattern_list(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Code review round 16: many patterns each under the bound must not add up past it.
+        The clock advances 0.4s per search, so the third harmless pattern finds no budget left."""
+        clock = iter(0.4 * step for step in range(100))
+        monkeypatch.setattr(persuasive_text, "_monotonic", lambda: next(clock))
+        monkeypatch.setattr(persuasive_text, "_FORBIDDEN_PATTERNS_BUDGET_SECONDS", 1.0)
+        validator = PersuasiveTextCrossValidator()
+        validator.validate(
+            input_payload={"constraints": {"forbidden_patterns": ["zzz1", "zzz2"]}},
+            output={"text": "plain text"},
+        )
+        with pytest.raises(ActionInputValidationError, match="did not finish"):
+            validator.validate(
+                input_payload={"constraints": {"forbidden_patterns": ["zzz1", "zzz2", "zzz3"]}},
+                output={"text": "plain text"},
             )
 
 

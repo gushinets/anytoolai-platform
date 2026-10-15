@@ -31,7 +31,7 @@ workflows:
           # Square, curly and double-brace placeholders, a name signature and meta-commentary make a text unsendable, so they fail
           # validation (case-insensitive regexes). Long dashes are only a style rule: the prompt asks
           # for none and the eval script counts them, but a run must not fail over one.
-          constraints.forbidden_patterns: 'literal:["\\[[^\\]\\n]{1,80}\\]","\\{[^{}\\n]{1,80}\\}","(?<!\\w)<[^\\W\\d][\\w ./:-]{0,39}>(?!\\w)","\\{\\{|\\}\\}","\\byour name\\b","based on the information i(?:.m| am| have| was| can)","truthfully (claim|say)","as an ai (?:language )?model","as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\\b"]'
+          constraints.forbidden_patterns: 'literal:["\\[[^\\]\\n]{1,80}\\]","\\{[^{}\\n]{1,80}\\}","(?<!\\w)<[^\\W\\d][\\w ./:-]{0,39}>|<[^\\W\\d][\\w ./:-]{0,39}>(?!\\w)","\\{\\{|\\}\\}","\\byour name\\b","based on the information i(?:.m| am| have| was| can)","truthfully (claim|say)","as an ai (?:language )?model","as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\\b"]'
           constraints.claims_to_avoid: steps.detect_gaps.output.issues
         output_mapping:
           context.workflow_output.text: steps.compose_persuasive_text.output.text
