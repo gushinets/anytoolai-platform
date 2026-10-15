@@ -47,6 +47,8 @@ _NUMBER_TOKEN = re.compile(
 )
 _SCALE = {"k": 1000, "K": 1000, "M": 1_000_000}
 _GROUP_SEPARATORS = str.maketrans("", "", ",.\u00a0\u202f\x20")
+# the typographic hyphens join a word like "-" does ("3 500\u2011word", "GPT\u20114.1"); dashes do not
+_HYPHENS = str.maketrans("\u2010\u2011", "--")
 
 
 def _without_names(value: str) -> str:
@@ -84,7 +86,8 @@ def _unscaled_numbers(match: re.Match[str]) -> set[str]:
 
 
 def _numbers(value: str) -> set[str]:
-    return {number for match in _NUMBER_TOKEN.finditer(_without_names(value)) for number in _token_numbers(match)}
+    value = _without_names(value.translate(_HYPHENS))
+    return {number for match in _NUMBER_TOKEN.finditer(value) for number in _token_numbers(match)}
 
 
 def numbers_absent_from_context(text: str, context: Any) -> list[str]:

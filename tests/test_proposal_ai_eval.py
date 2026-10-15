@@ -50,6 +50,10 @@ def test_numbers_are_read_both_ways_and_ordinary_ai_phrases_pass() -> None:
     assert "invented_number" not in violations("I can write 3 posts of 500 words.", order=order)
     assert "invented_number" in violations("I can write 4 posts of 500 words.", order=order)
     assert "invented_number" in violations("I have completed 3500 projects.", order=order)
+    for hyphen in ("\u2010", "\u2011"):
+        typographic = {**EN_ORDER, "task_text": f"Need 3 500{hyphen}word blog posts"}
+        assert "invented_number" not in violations("I can write 3 posts of 500 words.", order=typographic)
+        assert "invented_number" in violations("I have completed 3,500 posts.", order=typographic)
     for separator in (",", "\u00a0", "\u202f"):
         grouped = {**EN_ORDER, "task_text": f"Write a 3{separator}500-word article"}
         assert "invented_number" not in violations("I can write a 3500-word article.", order=grouped)

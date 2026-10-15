@@ -1383,6 +1383,15 @@ class TestPersuasiveTextProductConstraints:
                 {"task_text": "Need 3 500-word blog posts"},
                 "I can write 3 posts of 500 words.",
             ),
+            # a typographic hyphen is a hyphen, in a unit and in a name
+            *(
+                (
+                    {"numbers_must_appear_in_context": True},
+                    {"task_text": f"Need 3 500{hyphen}word blog posts on GPT{hyphen}4.1{hyphen}mini"},
+                    f"I can write 3 posts of 500 words each with GPT{hyphen}4.1{hyphen}mini.",
+                )
+                for hyphen in ("\u2010", "\u2011")
+            ),
             (
                 {"numbers_must_appear_in_context": True},
                 {"task_text": "We have 12 100 clients"},
@@ -1530,6 +1539,14 @@ class TestPersuasiveTextProductConstraints:
                     ("3 projects, 200 clients", "My fixed fee is 3 200 EUR."),
                     ("We have 12 100 clients", "We have 12 clients."),
                 ]
+            ),
+            *(
+                (
+                    {"numbers_must_appear_in_context": True},
+                    {"task_text": f"Need 3 500{hyphen}word blog posts"},
+                    "I can write 3,500 posts.",
+                )
+                for hyphen in ("\u2010", "\u2011")
             ),
         ],
     )
