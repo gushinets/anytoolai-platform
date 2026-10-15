@@ -144,6 +144,13 @@ def test_a_space_grouped_amount_is_one_number_never_its_parts() -> None:
     assert "invented_number" not in violations("My fee is 3200.50 EUR.", order=order, profile=profile)
 
 
+def test_a_scaled_amount_keeps_its_exact_fraction() -> None:
+    order = {**EN_ORDER, "task_text": "Automate my CRM"}
+    profile = "My fixed fee is $1.2345k"
+    assert "invented_number" not in violations("My fee is $1,234.50.", order=order, profile=profile)
+    assert "invented_number" in violations("My fee is $1,234.", order=order, profile=profile)
+
+
 def test_identifiers_do_not_offer_their_digits_as_numbers() -> None:
     for task_text in ("Integrate GPT-4o", "Need 4K footage"):
         order = {**EN_ORDER, "task_text": task_text}

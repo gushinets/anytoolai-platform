@@ -1347,6 +1347,12 @@ class TestPersuasiveTextProductConstraints:
                 {"freelancer_positioning": "My fixed fee is $20k, 1.5M rows processed"},
                 "My fixed fee is $20,000 for 1,500,000 rows, or $20k as I usually say.",
             ),
+            # a scaled fraction keeps its exact value
+            (
+                {"numbers_must_appear_in_context": True},
+                {"freelancer_positioning": "My fixed fee is $1.2345k, a call is $0.0005k a second"},
+                "My fixed fee is $1,234.50, a call is $0.5 a second.",
+            ),
             ({"plain_text_lists": "forbidden"}, {}, "a) is how the quote starts, then prose."),
             ({"plain_text_lists": "forbidden"}, {}, "– Pavel, the dash line is a signature."),
             # a space-grouped amount is one magnitude, however it is restated
@@ -1538,6 +1544,7 @@ class TestPersuasiveTextProductConstraints:
                     ("My fixed fee is 12 500.75 EUR", "My fixed fee is 500.75 EUR."),
                     ("3 projects, 200 clients", "My fixed fee is 3 200 EUR."),
                     ("We have 12 100 clients", "We have 12 clients."),
+                    ("My fixed fee is $1.2345k", "My fixed fee is $1,234."),
                 ]
             ),
             *(

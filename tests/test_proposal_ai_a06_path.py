@@ -112,6 +112,12 @@ def test_a_space_grouped_fee_may_be_restated() -> None:
     _validate_fee("My fixed fee is 3 200,50 EUR", "My fixed fee is 3200.50 EUR.")
 
 
+def test_a_scaled_fee_keeps_its_exact_fraction() -> None:
+    _validate_fee("My fixed fee is $1.2345k", "My fixed fee is $1,234.50.")
+    with pytest.raises(StructuredOutputValidationError):
+        _validate_fee("My fixed fee is $1.2345k", "My fixed fee is $1,234.")
+
+
 @pytest.mark.parametrize("hyphen", ["-", "‐", "‑"])
 def test_a_typographic_hyphen_separates_a_count_from_a_hyphenated_unit(hyphen: str) -> None:
     profile = f"Wrote 3 500{hyphen}word posts last week"

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from decimal import Decimal
 from typing import Any, Iterator, Mapping
 
 import re2
@@ -59,8 +60,8 @@ def _without_names(value: str) -> str:
 def _scaled(number: str, scale: str | None) -> str:
     if not scale:
         return number
-    whole, _, fraction = number.partition(".")
-    return str(int(whole) * _SCALE[scale] + (int(fraction) * _SCALE[scale] // 10 ** len(fraction) if fraction else 0))
+    whole, _, fraction = format(Decimal(number) * _SCALE[scale], "f").partition(".")  # exact: 1.2345k is 1234.5
+    return _number(whole, fraction)
 
 
 def _number(whole_digits: str, fraction: str = "") -> str:
