@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 import unicodedata
 from pathlib import Path
 
@@ -23,7 +24,6 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     ScoreMatchByRubricInputValidator,
     SynthesizeAngleCrossValidator,
 )
-from anytoolai_platform_actions.structured_llm.cross_validation import persuasive_text
 from anytoolai_platform_core.actions.runner import ActionInputValidationError
 from anytoolai_platform_core.structured_output.errors import StructuredOutputValidationError
 
@@ -1542,34 +1542,35 @@ class TestPersuasiveTextInputValidator:
                 input_payload={"constraints": {"forbidden_patterns": ["a" * 201]}}
             )
 
-    def test_a_pattern_that_backtracks_forever_fails_the_action_within_the_bound(
-        self, monkeypatch: pytest.MonkeyPatch
+    @pytest.mark.parametrize(
+        "pattern",
+        [
+            "a{1000000}",  # 234 MiB under a backtracking engine (code review round 20)
+            "(a{1000}){1000}",
+            "(?<!\\w)x",  # lookaround: not RE2 syntax
+            "(a)\\1",  # backreference: not RE2 syntax
+        ],
+    )
+    def test_rejects_a_pattern_re2_cannot_compile_before_any_provider_call(
+        self, pattern: str
     ) -> None:
-        """Code review round 15: a syntactically valid pattern must not hold the worker."""
-        monkeypatch.setattr(persuasive_text, "_FORBIDDEN_PATTERNS_BUDGET_SECONDS", 0.05)
-        with pytest.raises(ActionInputValidationError, match="did not finish"):
-            PersuasiveTextCrossValidator().validate(
-                input_payload={"constraints": {"forbidden_patterns": ["(?:a|aa)+$"]}},
-                output={"text": "a" * 60 + "!"},
-            )
+        with pytest.raises(ActionInputValidationError, match="invalid regular expression"):
+            self.validator.validate(input_payload={"constraints": {"forbidden_patterns": [pattern]}})
 
-    def test_the_time_bound_covers_the_whole_pattern_list(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Code review round 16: many patterns each under the bound must not add up past it.
-        The clock advances 0.4s per search, so the third harmless pattern finds no budget left."""
-        clock = iter(0.4 * step for step in range(100))
-        monkeypatch.setattr(persuasive_text, "_monotonic", lambda: next(clock))
-        monkeypatch.setattr(persuasive_text, "_FORBIDDEN_PATTERNS_BUDGET_SECONDS", 1.0)
-        validator = PersuasiveTextCrossValidator()
-        validator.validate(
-            input_payload={"constraints": {"forbidden_patterns": ["zzz1", "zzz2"]}},
-            output={"text": "plain text"},
+    def test_a_backtracking_pattern_runs_in_linear_time_on_a_long_output(self) -> None:
+        """Rounds 15-16: RE2 has no backtracking, so 32 copies on 100k characters stay instant."""
+        started = time.perf_counter()
+        PersuasiveTextCrossValidator().validate(
+            input_payload={"constraints": {"forbidden_patterns": ["(?:a|aa)+$"] * 32}},
+            output={"text": "a" * 100_000 + "!"},
         )
-        with pytest.raises(ActionInputValidationError, match="did not finish"):
-            validator.validate(
-                input_payload={"constraints": {"forbidden_patterns": ["zzz1", "zzz2", "zzz3"]}},
-                output={"text": "plain text"},
+        assert time.perf_counter() - started < 1.0  # noqa: PLR2004
+
+    def test_a_merge_tag_in_any_alphabet_is_matched(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            PersuasiveTextCrossValidator().validate(
+                input_payload={"constraints": {"forbidden_patterns": ["%\\pL[\\pL\\pN_.]{0,39}%"]}},
+                output={"text": "Hello %ИМЯ%, I can help."},
             )
 
 

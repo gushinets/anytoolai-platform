@@ -13,6 +13,7 @@ from typing import Any
 
 import jsonschema
 import pytest
+import re2
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 PRODUCT_DIR = (
@@ -156,6 +157,13 @@ def _forbidden_patterns() -> list[str]:
     return json.loads(raw.removeprefix("literal:"))
 
 
+def _matches(pattern: str, text: str, *, ignore_case: bool = True) -> bool:
+    """Runs a forbidden pattern on the engine A06 runs it on (RE2), not on stdlib `re`."""
+    options = re2.Options()
+    options.case_sensitive = not ignore_case
+    return re2.compile(pattern, options).search(text) is not None
+
+
 @pytest.mark.parametrize(
     "bad_text",
     [
@@ -186,7 +194,7 @@ def _forbidden_patterns() -> list[str]:
     ],
 )
 def test_forbidden_patterns_catch_placeholders_and_meta_phrases(bad_text: str) -> None:
-    assert any(re.search(pattern, bad_text, re.IGNORECASE) for pattern in _forbidden_patterns())
+    assert any(_matches(pattern, bad_text) for pattern in _forbidden_patterns())
 
 
 @pytest.mark.parametrize(
@@ -201,7 +209,7 @@ def test_forbidden_patterns_catch_placeholders_and_meta_phrases(bad_text: str) -
     ],
 )
 def test_ordinary_phrases_are_not_meta_commentary(fine_text: str) -> None:
-    assert not any(re.search(pattern, fine_text, re.IGNORECASE) for pattern in _forbidden_patterns())
+    assert not any(_matches(pattern, fine_text) for pattern in _forbidden_patterns())
 
 
 @pytest.mark.parametrize(
@@ -214,13 +222,16 @@ def test_ordinary_phrases_are_not_meta_commentary(fine_text: str) -> None:
     ],
 )
 def test_first_person_ai_meta_commentary_is_caught(bad_text: str) -> None:
-    assert any(re.search(pattern, bad_text, re.IGNORECASE) for pattern in _forbidden_patterns())
+    assert any(_matches(pattern, bad_text) for pattern in _forbidden_patterns())
 
 
 def test_a_long_dash_is_a_style_rule_not_a_validation_failure() -> None:
     """A run failed twice in a row over an em dash in a Russian text; the prompt keeps the rule,
     the eval script counts it, the validator no longer rejects it."""
-    assert not any(re.search(pattern, "Fast \u2014 and clean. Fast \u2013 too.") for pattern in _forbidden_patterns())
+    assert not any(
+        _matches(pattern, "Fast \u2014 and clean. Fast \u2013 too.", ignore_case=False)
+        for pattern in _forbidden_patterns()
+    )
 
 
 @pytest.mark.parametrize(
@@ -232,7 +243,7 @@ def test_compose_fixtures_pass_the_workflow_forbidden_patterns(fixture_name: str
         "response_json"
     ]["text"]
     for pattern in _forbidden_patterns():
-        assert not re.search(pattern, text, re.IGNORECASE), pattern
+        assert not _matches(pattern, text), pattern
 
 
 @pytest.mark.parametrize(

@@ -105,7 +105,7 @@ def test_angle_placeholders_are_caught_but_numeric_comparisons_pass() -> None:
         assert "placeholder" in violations(CLEAN + f" Hello {placeholder}.")
     # fail closed: brackets around words are a placeholder even in a comparison
     assert "placeholder" in violations(CLEAN + " I can implement the condition x<y && a>b.")
-    for marker in ("<%=client_name%>", "<@client_name>", "<$name>", "%FIRST_NAME%", "%client.name%"):
+    for marker in ("<%=client_name%>", "<@client_name>", "<$name>", "%FIRST_NAME%", "%client.name%", "%\u0418\u041c\u042f%"):
         assert "placeholder" in violations(CLEAN + f" Hello {marker}.")
     assert "placeholder" not in violations(CLEAN + " I keep latency <50ms and uptime >99%.")
     assert "placeholder" not in violations(CLEAN + " I keep latency <=50ms and uptime >99%.")

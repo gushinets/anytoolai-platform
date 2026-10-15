@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import re
-import time
 from typing import Any, Iterator, Mapping
 
-import regex
+import re2
 from anytoolai_platform_core.actions.runner import ActionInputValidationError
 
 from ._markup import _has_disallowed_plain_text_markup, _has_html_tag, _has_list, _has_visible_text
@@ -121,17 +120,21 @@ def _context_strings(value: Any) -> Iterator[str]:
         yield str(value)
 
 
-# A caller's forbidden_patterns run through the `regex` package, not `re`: its matcher resists
-# catastrophic backtracking and takes a timeout, so pathological patterns (a caller bug, the input
-# schema accepts any expression and any number of them) cannot hold a worker beyond this bound on
-# a long model output. The bound covers the whole list: each search gets what is left of it.
-# Compiling is bounded by the input schema (at most 32 patterns of at most 200 characters), which
-# the action runner enforces before this module sees the payload; the validator below repeats the
-# bound for callers that skip the schema.
-_FORBIDDEN_PATTERNS_BUDGET_SECONDS = 1.0
+# A caller's forbidden_patterns run on Google RE2, not on a backtracking engine (`re`, `regex`):
+# RE2 matches in linear time, caps its memory and refuses a repetition count above 1000 at
+# compile time, so no pattern within the schema bounds (at most 32 patterns of at most 200
+# characters) can hold a worker or exhaust its memory, whatever the model output. The price is the
+# RE2 syntax: no lookaround or backreference, and `\w`, `\d`, `\s`, `\b` are ASCII (use `\pL` for
+# any letter). An expression RE2 cannot compile is a caller bug, rejected before any provider call.
 _FORBIDDEN_PATTERNS_MAX_ITEMS = 32
 _FORBIDDEN_PATTERN_MAX_LENGTH = 200
-_monotonic = time.monotonic  # replaced by tests
+
+
+def _compile_forbidden_pattern(pattern: str) -> re2._Regexp:
+    options = re2.Options()
+    options.case_sensitive = False  # "Your Name" must also catch "your name"
+    options.log_errors = False  # a caller's bad pattern is reported by the exception, not stderr
+    return re2.compile(pattern, options)
 
 
 class PersuasiveTextInputValidator:
@@ -156,8 +159,8 @@ class PersuasiveTextInputValidator:
                     f"{_FORBIDDEN_PATTERN_MAX_LENGTH} characters"
                 )
             try:
-                regex.compile(pattern)
-            except (regex.error, TypeError) as exc:
+                _compile_forbidden_pattern(pattern)
+            except (re2.error, TypeError) as exc:
                 raise ActionInputValidationError(
                     f"constraints.forbidden_patterns has an invalid regular expression: {exc}"
                 ) from exc
@@ -207,21 +210,8 @@ class PersuasiveTextCrossValidator:
             raise _cross_validation_error("text_missing_markup_for_html_format")
 
         # Product-level rules (ANY-656): all generic, so any A06 caller can opt in.
-        # Case-insensitive on purpose: "Your Name" must also catch "your name".
-        deadline = _monotonic() + _FORBIDDEN_PATTERNS_BUDGET_SECONDS
         for pattern in constraints.get("forbidden_patterns") or []:
-            try:
-                remaining = deadline - _monotonic()
-                if remaining <= 0:
-                    raise TimeoutError
-                match = regex.search(pattern, text, regex.IGNORECASE, timeout=remaining)
-            except TimeoutError as exc:
-                # Not a model mistake: retrying the model would run the same patterns again.
-                raise ActionInputValidationError(
-                    "constraints.forbidden_patterns did not finish within "
-                    f"{_FORBIDDEN_PATTERNS_BUDGET_SECONDS}s on the model output (at entry "
-                    f"{_truncated_repr(pattern)})"
-                ) from exc
+            match = _compile_forbidden_pattern(pattern).search(text)
             if match:
                 raise _cross_validation_error(
                     f"text_matches_forbidden_pattern:{_truncated_repr(match.group(0))}"

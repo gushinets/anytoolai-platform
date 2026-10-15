@@ -60,6 +60,7 @@ def _validate(text: str) -> None:
         "Hello <#name>, I can help.",
         "Hello %FIRST_NAME%, I can help.",
         "Hello %client.name%, I can help.",
+        "Hello %\u0418\u041c\u042f%, I can help.",
         # fail closed: brackets around words are rejected even in a comparison
         "I can implement the condition x<y && a>b.",
         "I can implement x<y and a> 10.",

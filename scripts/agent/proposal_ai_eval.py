@@ -22,10 +22,18 @@ import time
 import urllib.request
 from pathlib import Path
 
+import re2
+
 from anytoolai_platform_actions.structured_llm.cross_validation.persuasive_text import numbers_absent_from_context
 
 ORDERS_PATH = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "proposal_ai_eval" / "orders.json"
-PLACEHOLDER = re.compile(r"\[[^\]\n]{1,80}\]|\{[^{}\n]{1,80}\}|\{\{|\}\}|\byour name\b|<[^\s\d<>=][^<>\n]{0,79}>|%[^\W\d][\w.]{0,39}%", re.IGNORECASE)
+# RE2, like the A06 validator that runs the same placeholder patterns (`\pL` is any letter there).
+_RE2_IGNORE_CASE = re2.Options()
+_RE2_IGNORE_CASE.case_sensitive = False
+PLACEHOLDER = re2.compile(
+    r"\[[^\]\n]{1,80}\]|\{[^{}\n]{1,80}\}|\{\{|\}\}|\byour name\b|<[^\s\d<>=][^<>\n]{0,79}>|%\pL[\pL\pN_.]{0,39}%",
+    _RE2_IGNORE_CASE,
+)
 META = re.compile(
     r"based on the information i(?:.m| am| have| was| can)|truthfully|as an ai (?:language )?model"
     r"|as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\b|my listed experience|haven.t specified"
