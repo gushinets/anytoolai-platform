@@ -95,18 +95,18 @@ def test_decimals_and_names_with_digits_are_not_evidence_for_standalone_numbers(
     assert "invented_number" in violations("I have delivered 8 projects on n8n.", order=order, profile="n8n")
 
 
-def test_angle_placeholders_are_caught_but_comparisons_pass() -> None:
+def test_angle_placeholders_are_caught_but_numeric_comparisons_pass() -> None:
     assert "placeholder" in violations(CLEAN + " Hello <client_name>.")
     for placeholder in ("<client.name>", "<client/email>", "<client:name>", "<Client Name>"):
         assert "placeholder" in violations(CLEAN + f" Hello {placeholder}.")
         assert "placeholder" in violations(CLEAN + f" Hello{placeholder}, hi.")
         assert "placeholder" in violations(CLEAN + f" Hello{placeholder}there.")
+    for placeholder in ("<Имя или фамилия>", "<client and/or company>"):
+        assert "placeholder" in violations(CLEAN + f" Hello {placeholder}.")
+    # fail closed: brackets around words are a placeholder even in a comparison
+    assert "placeholder" in violations(CLEAN + " I can implement the condition x<y && a>b.")
     assert "placeholder" not in violations(CLEAN + " I keep latency <50ms and uptime >99%.")
-    assert "placeholder" not in violations(CLEAN + " I can implement the condition x<y && a>b.")
-    assert "placeholder" not in violations(CLEAN + " I can implement comparisons x<y and a>b.")
-    assert "placeholder" not in violations(CLEAN + " The guard alpha<beta and gamma>delta holds.")
-    assert "placeholder" not in violations(CLEAN + " I can implement x<y and a> 10.")
-    assert "placeholder" not in violations(CLEAN + " The branch runs if a<b or c>d holds.")
+    assert "placeholder" not in violations(CLEAN + " Budget < 500 and timeline > 2 weeks works.")
 
 
 def test_explicit_groupings_are_one_number_and_dotted_dates_are_three() -> None:

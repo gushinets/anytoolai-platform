@@ -168,8 +168,13 @@ def _forbidden_patterns() -> list[str]:
         "Hello <client/email>, I can help.",
         "Hello <client:name>, I can help.",
         "Hello <Client Name>, I can help.",
-        # glued to words on either side is still a placeholder (rounds 16, 17): a comparison is
-        # told apart by its content (a conjunction between the operands), not by its neighbours
+        # Any <...> span that starts with a letter is a placeholder, whatever surrounds or fills
+        # it (code review rounds 15-18). Fail closed: a comparison written with brackets around
+        # words costs one retry, a missed placeholder ships an unsendable proposal.
+        "Hello <Имя или фамилия>, I can help.",
+        "Hello <client and/or company>, I can help.",
+        "I can implement the condition x<y && a>b.",
+        "I can implement x<y and a> 10.",
         "Hello<client_name>, I can help.",
         "Dear<client.name>, I can help.",
         "Hi<client/email>, I can help.",
@@ -193,12 +198,6 @@ def test_forbidden_patterns_catch_placeholders_and_meta_phrases(bad_text: str) -
         "I will follow your namespace conventions.",
         "Budget < 500 and timeline > 2 weeks works for me.",
         "I keep latency <50ms and uptime >99% on every integration.",
-        "I can implement the condition x<y && a>b.",
-        # a placeholder is never glued to a word, a comparison always is (code review round 15)
-        "I can implement comparisons x<y and a>b.",
-        "The guard alpha<beta and gamma>delta holds.",
-        "I can implement x<y and a> 10.",
-        "The branch runs if a<b or c>d holds.",
     ],
 )
 def test_ordinary_phrases_are_not_meta_commentary(fine_text: str) -> None:
