@@ -26,8 +26,10 @@ from ._shared import (
 # grammar, whose trailing letters are a unit and are ignored ("16GB", "12V", "60Hz", "50ms", "2FA",
 # "3500-word", "10th"), except that a whole suffix "k"/"K"/"M" scales the number ("$20k" is 20000,
 # "4K" is 4000, "1.5M" is 1500000; "5km" is 5). There is no unit list and no case rule: a word starts
-# with a letter or with a digit, and that is the whole decision. Who may assert a number (the client's
-# budget is not the freelancer's fee) is not a lexical question and is not decided here.
+# with a letter or with a digit, and that is the whole decision. Fixed contract (ANY-656): whether a
+# digit inside a word is a quantity ("4K" footage, "2FA") and who may assert a number (the client's
+# budget is not the freelancer's fee) are semantic questions; they are not decided here and are not
+# bugs of this rule. A false rejection of a realistic input is.
 _NAME = re.compile(r"(?<!\w)[^\W\d_]\w*(?:[.-]\w+)*")  # a word that starts with a letter
 _NUMBER_TOKEN = re.compile(
     r"""(?<![^\W_])(?:  # not after a letter or digit
