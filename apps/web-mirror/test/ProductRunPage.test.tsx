@@ -912,6 +912,37 @@ describe("ProductRunPage", () => {
     },
   );
 
+  it.each([429, 403])(
+    "keeps the Idempotency-Key when a Try again after a garbled /start 200 meets an edge HTML %i",
+    async (status) => {
+      // A 200 is the strongest sign the session was created, even when its body cannot be read.
+      const garbledOk = new Response("<html>ok</html>", { status: 200, headers: { "Content-Type": "text/html" } });
+      const htmlEdgeRejection = new Response(`<html>${status}</html>`, {
+        status,
+        headers: { "Content-Type": "text/html" },
+      });
+      const { client, calls } = makeClient({
+        ...happyPathRoutes(),
+        [ROUTES.START]: [garbledOk, htmlEdgeRejection, startResponse()],
+      });
+
+      renderPage({ client });
+      await waitForForm();
+      fillValidForm();
+      submit();
+      await waitFor(() => expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy());
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+      await waitFor(() => expect(calls.filter((call) => call.key === ROUTES.START)).toHaveLength(2));
+      await waitFor(() => expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy());
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+      await waitForResult();
+      const startCalls = calls.filter((call) => call.key === ROUTES.START);
+      expect(startCalls).toHaveLength(3);
+      expect(new Set(startCalls.map((call) => idempotencyKeyOf(call))).size).toBe(1);
+    },
+  );
+
   it("starts a genuinely new logical submission (new Idempotency-Key) after a terminal execution failure, instead of replaying the dead session", async () => {
     const SECOND_SESSION_ROUTE = "GET /v1/scenario-sessions/session_2";
     const { client, calls } = makeClient({

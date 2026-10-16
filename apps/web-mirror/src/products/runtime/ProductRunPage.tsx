@@ -413,9 +413,9 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   // Editing any field after a failure makes the next submit build a genuinely new handle instead.
   // Declared before `busy` below, which reads it.
   const [pendingStart, setPendingStart] = useState<{ prepared: PreparedScenarioStart; input: V } | null>(null);
-  // Every prepared start any attempt of which (first, automatic retry or a manual "Try again") had an
-  // ambiguous outcome: that attempt may have created the session, so no later rejection the edge
-  // sends for the same key can settle it (see the 4xx branch in runStart()).
+  // Every prepared start any attempt of which (first, automatic retry or a manual "Try again") ended
+  // in neither a success nor a definite rejection: that attempt may have created the session, so no
+  // later rejection the edge sends for the same key can settle it (see the 4xx branch in runStart()).
   const ambiguousStartsRef = useRef(new WeakSet<PreparedScenarioStart>());
   // True while the run on screen is the attached session (no local submit since): "Try again"
   // re-polls it instead of validating an empty form or starting a second, quota-spending run.
@@ -679,7 +679,10 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       // session/job and charged quota) before the response was lost -- `pendingStart` (with its
       // Idempotency-Key) stays exactly as set by the caller, so a retry collapses onto whatever the
       // backend actually did rather than risk a second, quota-consuming start. See `busy`'s own
-      // comment for why this is also why a mode switch must stay blocked here.
+      // comment for why this is also why a mode switch must stay blocked here. Recorded for the
+      // key: anything that is neither a success nor a definite rejection (a 5xx, a timeout, a 200
+      // whose body was garbled) may have created the session, so a later edge 4xx cannot settle it.
+      ambiguousStartsRef.current.add(prepared);
       setPhase({ kind: "retryable-error", reason: "startFailed" });
       return;
     }
