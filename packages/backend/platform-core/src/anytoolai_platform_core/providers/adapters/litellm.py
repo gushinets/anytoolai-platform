@@ -170,7 +170,7 @@ class LiteLLMProviderAdapter:
         if request.reasoning_effort is not None:
             kwargs["reasoning_effort"] = request.reasoning_effort.value
             # LiteLLM's static model registry rejects the parameter for a model it does not list
-            # yet (for example a brand-new OpenAI model) although the API accepts it. Allowing it
+            # yet (a brand-new OpenAI model) although the API accepts it. Allowing it
             # per request covers the direct path and the router; the router entry in
             # litellm_router.yaml covers calls that carry no explicit effort.
             kwargs["allowed_openai_params"] = ["reasoning_effort"]

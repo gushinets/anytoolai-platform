@@ -15,7 +15,7 @@ dependencies = [
   "alembic>=1.13",
   "asyncpg>=0.29",
   "pyyaml>=6.0",
-  "litellm>=1.89.3",
+  "litellm==1.105.1",
   "pydantic-ai-slim>=2.2.0",
   "jsonschema>=4.26.0",
   "psycopg[binary]>=3.2",

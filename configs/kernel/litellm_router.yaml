@@ -4,8 +4,8 @@ model_list:
       model: openai/gpt-6-luna
       api_key: env/OPENAI_API_KEY
       reasoning_effort: medium
-      # LiteLLM's static model registry does not list gpt-6-luna yet, so it would reject this
-      # parameter as unsupported although the API accepts it.
+      # Kept although LiteLLM 1.105.1 lists gpt-6-luna: a model its static registry does not list
+      # yet would have this parameter rejected as unsupported although the API accepts it.
       allowed_openai_params: [reasoning_effort]
 
 router_settings:
