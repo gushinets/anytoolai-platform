@@ -880,6 +880,38 @@ describe("ProductRunPage", () => {
     },
   );
 
+  it.each([429, 403])(
+    "keeps the Idempotency-Key when a manual Try again after ambiguous /start attempts meets an edge HTML %i",
+    async (status) => {
+      // The attempt history belongs to the key, not to one submit: the edge rejecting the third,
+      // manual request still settles nothing about the first two.
+      const htmlBadGateway = () => new Response("<html>502</html>", { status: 502, headers: { "Content-Type": "text/html" } });
+      const htmlEdgeRejection = new Response(`<html>${status}</html>`, {
+        status,
+        headers: { "Content-Type": "text/html" },
+      });
+      const { client, calls } = makeClient({
+        ...happyPathRoutes(),
+        [ROUTES.START]: [htmlBadGateway(), htmlBadGateway(), htmlEdgeRejection, startResponse()],
+      });
+
+      renderPage({ client });
+      await waitForForm();
+      fillValidForm();
+      submit();
+      await waitFor(() => expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy());
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+      await waitFor(() => expect(calls.filter((call) => call.key === ROUTES.START)).toHaveLength(3));
+      await waitFor(() => expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy());
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+      await waitForResult();
+      const startCalls = calls.filter((call) => call.key === ROUTES.START);
+      expect(startCalls).toHaveLength(4);
+      expect(new Set(startCalls.map((call) => idempotencyKeyOf(call))).size).toBe(1);
+    },
+  );
+
   it("starts a genuinely new logical submission (new Idempotency-Key) after a terminal execution failure, instead of replaying the dead session", async () => {
     const SECOND_SESSION_ROUTE = "GET /v1/scenario-sessions/session_2";
     const { client, calls } = makeClient({

@@ -413,6 +413,10 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   // Editing any field after a failure makes the next submit build a genuinely new handle instead.
   // Declared before `busy` below, which reads it.
   const [pendingStart, setPendingStart] = useState<{ prepared: PreparedScenarioStart; input: V } | null>(null);
+  // Every prepared start any attempt of which (first, automatic retry or a manual "Try again") had an
+  // ambiguous outcome: that attempt may have created the session, so no later rejection the edge
+  // sends for the same key can settle it (see the 4xx branch in runStart()).
+  const ambiguousStartsRef = useRef(new WeakSet<PreparedScenarioStart>());
   // True while the run on screen is the attached session (no local submit since): "Try again"
   // re-polls it instead of validating an empty form or starting a second, quota-spending run.
   const attachActiveRef = useRef(false);
@@ -615,8 +619,8 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     // One automatic retry of an ambiguous failure (network, timeout, 5xx). It reuses the prepared
     // handle, so the same Idempotency-Key makes it safe: the backend returns the session it already
     // created instead of spending quota twice. A definite 4xx is never retried.
-    const retried = !controller?.signal.aborted && !result.ok && isAmbiguousFailure(result.error);
-    if (retried) {
+    if (!controller?.signal.aborted && !result.ok && isAmbiguousFailure(result.error)) {
+      ambiguousStartsRef.current.add(prepared);
       result = await prepared.execute(client, startOptions);
     }
     if (controller?.signal.aborted) {
@@ -646,16 +650,18 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         return;
       }
       if (
-        (result.error.type === "backend_error" || (result.error.type === "invalid_response" && !retried)) &&
+        (result.error.type === "backend_error" ||
+          (result.error.type === "invalid_response" && !ambiguousStartsRef.current.has(prepared))) &&
         result.error.status >= 400 &&
         result.error.status < 500
       ) {
         // A 4xx without the platform envelope (a proxy's HTML or empty 422) is just as definite, but
-        // only for the first attempt: on the automatic retry it is the edge rejecting that second
-        // request (an HTML 429/403), which says nothing about whether the first, ambiguous one
-        // created the session -- so it falls through to the ambiguous branch below and keeps the
-        // key. An enveloped 4xx on the retry is the backend itself, which would have replayed a
-        // session the same key had already created, so it stays definite.
+        // only while no attempt with this key has been ambiguous: after one, it is the edge
+        // rejecting this later request (an HTML 429/403, on the automatic retry or a manual "Try
+        // again"), which says nothing about whether the ambiguous attempt created the session -- so
+        // it falls through to the ambiguous branch below and keeps the key. An enveloped 4xx is the
+        // backend itself, which would have replayed a session the same key had already created, so
+        // it stays definite.
         // Code review finding: a definite 4xx here (`scenario_not_found`, `idempotency_key_conflict`,
         // `scenario_input_invalid`/`scenario_frontend_invalid`, `guest_identity_required`, ...;
         // `quota_exhausted`/`guest_identity_not_found` were already peeled off above) means the
