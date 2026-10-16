@@ -1353,6 +1353,12 @@ class TestPersuasiveTextProductConstraints:
                 {"freelancer_positioning": "My fixed fee is $1.2345k, a call is $0.0005k a second"},
                 "My fixed fee is $1,234.50, a call is $0.5 a second.",
             ),
+            # a digit-leading hyphenated range keeps its upper bound
+            (
+                {"numbers_must_appear_in_context": True},
+                {"freelancer_positioning": "I can complete a 2-to-3-week project, 3-to-5-page websites"},
+                "I can complete it in 2 to 3 weeks and build websites of 3 to 5 pages.",
+            ),
             ({"plain_text_lists": "forbidden"}, {}, "a) is how the quote starts, then prose."),
             ({"plain_text_lists": "forbidden"}, {}, "– Pavel, the dash line is a signature."),
             # a space-grouped amount is one magnitude, however it is restated
@@ -1545,6 +1551,7 @@ class TestPersuasiveTextProductConstraints:
                     ("3 projects, 200 clients", "My fixed fee is 3 200 EUR."),
                     ("We have 12 100 clients", "We have 12 clients."),
                     ("My fixed fee is $1.2345k", "My fixed fee is $1,234."),
+                    ("I can complete a 2-to-3-week project", "I can complete it in 2 to 4 weeks."),
                 ]
             ),
             *(

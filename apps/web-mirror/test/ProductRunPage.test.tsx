@@ -823,6 +823,33 @@ describe("ProductRunPage", () => {
     expect(calls.filter((call) => call.key === ROUTES.START)).toHaveLength(1);
   });
 
+  it("unlocks the form after a 4xx /start rejection with no error envelope, and resubmits with a new Idempotency-Key", async () => {
+    // A proxy or older API can answer 422 with HTML: the rejection is just as definite as an
+    // enveloped one, so the form must not stay locked replaying the same rejected key.
+    const htmlUnprocessable = new Response("<html>422</html>", {
+      status: 422,
+      headers: { "Content-Type": "text/html" },
+    });
+    const { client, calls } = makeClient({
+      ...happyPathRoutes(),
+      [ROUTES.START]: [htmlUnprocessable, startResponse()],
+    });
+
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/could not start test product/i));
+    expect((screen.getByLabelText("Text") as HTMLTextAreaElement).disabled).toBe(false);
+
+    submit();
+    await waitForResult();
+    const startCalls = calls.filter((call) => call.key === ROUTES.START);
+    expect(startCalls).toHaveLength(2);
+    expect(idempotencyKeyOf(startCalls[0]!)).not.toBe(idempotencyKeyOf(startCalls[1]!));
+  });
+
   it("starts a genuinely new logical submission (new Idempotency-Key) after a terminal execution failure, instead of replaying the dead session", async () => {
     const SECOND_SESSION_ROUTE = "GET /v1/scenario-sessions/session_2";
     const { client, calls } = makeClient({

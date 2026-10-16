@@ -192,13 +192,16 @@ class LiteLLMProviderAdapter:
         or a router alias whose deployment sets no effort. A direct model (Atom Lab) that names no
         effort runs at the model's own default effort, which the adapter does not know (every
         OpenAI model since GPT-5 defaults to medium), so it is treated as reasoning and the
-        provider applies its default temperature."""
-        # ponytail: a non-reasoning direct model (gpt-4o) also runs at the provider default; carry
-        # the model catalog's reasoning_supported into the request if one ever needs another value.
+        provider applies its default temperature, unless LiteLLM's model registry lists the model
+        without reasoning support (GPT-4o): that model takes the requested temperature. A model the
+        registry does not list stays on the reasoning default."""
         if request.reasoning_effort is not None:
             return request.reasoning_effort is ReasoningEffort.none
         if request.model_addressing is ProviderModelAddressing.direct:
-            return False
+            try:
+                return not litellm.get_model_info(request.model).get("supports_reasoning")
+            except Exception:  # LiteLLM raises a bare Exception for a model it does not list
+                return False
         for deployment in getattr(self._router, "model_list", None) or []:
             if deployment.get("model_name") == request.model:
                 effort = (deployment.get("litellm_params") or {}).get("reasoning_effort")

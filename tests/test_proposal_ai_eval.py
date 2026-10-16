@@ -151,6 +151,13 @@ def test_a_scaled_amount_keeps_its_exact_fraction() -> None:
     assert "invented_number" in violations("My fee is $1,234.", order=order, profile=profile)
 
 
+def test_a_digit_leading_hyphenated_range_keeps_its_upper_bound() -> None:
+    order = {**EN_ORDER, "task_text": "Automate my CRM"}
+    profile = "I can complete a 2-to-3-week project"
+    assert "invented_number" not in violations("Done in 2 to 3 weeks.", order=order, profile=profile)
+    assert "invented_number" in violations("Done in 2 to 4 weeks.", order=order, profile=profile)
+
+
 def test_identifiers_do_not_offer_their_digits_as_numbers() -> None:
     for task_text in ("Integrate GPT-4o", "Need 4K footage"):
         order = {**EN_ORDER, "task_text": task_text}

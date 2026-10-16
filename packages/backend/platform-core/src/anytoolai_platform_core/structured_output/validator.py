@@ -27,11 +27,32 @@ class StructuredOutputValidationResult:
     contract: StructuredOutputContract
 
 
+_TOLERATED_RAW_CONTROLS = frozenset("\t\n\r")
+
+
 def parse_json_value(raw: str) -> Any:
+    """Model output may break a JSON string with a raw newline or tab; any other raw control is
+    malformed. A NUL is malformed raw or escaped: PostgreSQL JSONB cannot store it, so it would
+    fail persistence after the output had already passed validation."""
+    if any(char < " " and char not in _TOLERATED_RAW_CONTROLS for char in raw):
+        raise StructuredOutputMalformedJsonError("Malformed JSON")
     try:
-        return parse_strict_json(raw, allow_control_chars=True)
+        value = parse_strict_json(raw, allow_control_chars=True)
     except json.JSONDecodeError as exc:
         raise StructuredOutputMalformedJsonError("Malformed JSON") from exc
+    if _contains_nul(value):
+        raise StructuredOutputMalformedJsonError("Malformed JSON")
+    return value
+
+
+def _contains_nul(value: Any) -> bool:
+    if isinstance(value, str):
+        return "\x00" in value
+    if isinstance(value, dict):
+        return any(_contains_nul(key) or _contains_nul(item) for key, item in value.items())
+    if isinstance(value, list):
+        return any(_contains_nul(item) for item in value)
+    return False
 
 
 def parse_json_object(raw: str) -> dict[str, Any]:

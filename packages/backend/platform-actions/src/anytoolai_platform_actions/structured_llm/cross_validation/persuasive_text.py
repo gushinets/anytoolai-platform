@@ -33,7 +33,9 @@ from ._shared import (
 # digit inside a word is a quantity ("4K" footage, "2FA") and who may assert a number (the client's
 # budget is not the freelancer's fee) are semantic questions; they are not decided here and are not
 # bugs of this rule. A false rejection of a realistic input is.
-_NAME = re.compile(r"(?<!\w)[^\W\d_]\w*(?:[.-]\w+)*")  # a word that starts with a letter
+# A word that starts with a letter. Not right after "<digit>-": that is a numeric range
+# ("2-to-3-week" keeps its 3); a name like "GPT-4.1-mini" starts at its letter and absorbs its hyphens.
+_NAME = re.compile(r"(?<!\w)(?<!\d-)[^\W\d_]\w*(?:[.-]\w+)*")
 _NUMBER_TOKEN = re.compile(
     r"""(?<![^\W_])(?:  # not after a letter or digit
     (?P<date>\d{1,2}[./]\d{1,2}[./]\d{2,4})                              # 10.5.2024, 05/01/24: three numbers

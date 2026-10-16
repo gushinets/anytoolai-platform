@@ -267,7 +267,6 @@ def test_litellm_adapter_keeps_the_policy_temperature_on_the_router_path_without
         "openai/gpt-5.5",
         "openai/gpt-5.6-sol",
         "openai/gpt-6.1-sol",
-        "openai/gpt-4o",
     ],
 )
 def test_litellm_adapter_runs_a_direct_model_without_an_effort_at_the_provider_defaults(
@@ -291,6 +290,33 @@ def test_litellm_adapter_runs_a_direct_model_without_an_effort_at_the_provider_d
     )
 
     assert "temperature" not in direct_calls[0]
+    assert "reasoning_effort" not in direct_calls[0]
+
+
+@pytest.mark.parametrize("model", ["openai/gpt-4o", "openai/gpt-4.1-mini"])
+def test_litellm_adapter_forwards_the_temperature_for_a_direct_non_reasoning_model(
+    model: str,
+) -> None:
+    """LiteLLM's registry lists these models without reasoning support, so the run-local
+    temperature is honoured instead of falling back to the provider default."""
+    direct_calls: list[dict[str, object]] = []
+
+    async def direct_completion(**kwargs: object) -> object:
+        direct_calls.append(dict(kwargs))
+        return make_router_response(model=model.removeprefix("openai/"))
+
+    adapter = LiteLLMProviderAdapter(
+        RecordingRouter(make_router_response()), direct_completion=direct_completion
+    )
+    asyncio.run(
+        adapter.complete(
+            make_request(
+                model=model, model_addressing=ProviderModelAddressing.direct, temperature=0.2
+            )
+        )
+    )
+
+    assert direct_calls[0]["temperature"] == 0.2
     assert "reasoning_effort" not in direct_calls[0]
 
 

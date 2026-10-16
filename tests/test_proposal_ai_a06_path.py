@@ -118,6 +118,21 @@ def test_a_scaled_fee_keeps_its_exact_fraction() -> None:
         _validate_fee("My fixed fee is $1.2345k", "My fixed fee is $1,234.")
 
 
+@pytest.mark.parametrize(
+    ("profile", "faithful", "altered"),
+    [
+        ("I can complete a 2-to-3-week project", "in 2 to 3 weeks", "in 2 to 4 weeks"),
+        ("We build 3-to-5-page websites", "websites of 3 to 5 pages", "websites of 3 to 6 pages"),
+    ],
+)
+def test_a_digit_leading_hyphenated_range_keeps_its_upper_bound(
+    profile: str, faithful: str, altered: str
+) -> None:
+    _validate_fee(profile, f"I can deliver {faithful}.")
+    with pytest.raises(StructuredOutputValidationError):
+        _validate_fee(profile, f"I can deliver {altered}.")
+
+
 @pytest.mark.parametrize("hyphen", ["-", "‐", "‑"])
 def test_a_typographic_hyphen_separates_a_count_from_a_hyphenated_unit(hyphen: str) -> None:
     profile = f"Wrote 3 500{hyphen}word posts last week"

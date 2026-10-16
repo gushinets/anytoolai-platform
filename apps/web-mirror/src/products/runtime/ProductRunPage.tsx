@@ -644,7 +644,12 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         setPhase({ kind: "retryable-error", reason: "tryAgain" });
         return;
       }
-      if (result.error.type === "backend_error" && result.error.status < 500) {
+      if (
+        (result.error.type === "backend_error" || result.error.type === "invalid_response") &&
+        result.error.status >= 400 &&
+        result.error.status < 500
+      ) {
+        // A 4xx without the platform envelope (a proxy's HTML or empty 422) is just as definite.
         // Code review finding: a definite 4xx here (`scenario_not_found`, `idempotency_key_conflict`,
         // `scenario_input_invalid`/`scenario_frontend_invalid`, `guest_identity_required`, ...;
         // `quota_exhausted`/`guest_identity_not_found` were already peeled off above) means the
