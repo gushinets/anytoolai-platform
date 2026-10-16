@@ -24,7 +24,8 @@ export function ResultView({ text, onCopy, embedded = false, secondaryAction }: 
   const [copyState, setCopyState] = useState<"idle" | "copying" | "copied" | "error">("idle");
   const anchorRef = useRef<HTMLSpanElement>(null);
   // The Copy button is disabled while copying, and a disabled button drops keyboard focus. Remember
-  // it if it had focus and give focus back once the copy settles.
+  // it if it had focus and give focus back once the copy settles -- only if focus is still lost:
+  // a user who moved it elsewhere meanwhile keeps it there.
   const refocusRef = useRef<HTMLElement | null>(null);
 
   // Last resort when the clipboard is blocked (embedded browsers): select the text so the user can
@@ -38,7 +39,10 @@ export function ResultView({ text, onCopy, embedded = false, secondaryAction }: 
 
   useEffect(() => {
     if (copyState !== "copying" && refocusRef.current) {
-      refocusRef.current.focus();
+      const active = document.activeElement;
+      if (!active || active === document.body) {
+        refocusRef.current.focus();
+      }
       refocusRef.current = null;
     }
   }, [copyState]);
