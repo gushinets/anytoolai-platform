@@ -113,3 +113,28 @@ def test_artifact_service_persists_created_artifact_once_after_transaction_rollb
     assert "credentials" not in event["properties"]
     assert "access_token" not in event["properties"]
     assert "large_provider_payload" not in event["properties"]
+
+
+def test_debug_artifact_stores_raw_output_postgresql_cannot_hold(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    """Output rejected for a NUL or an unpaired surrogate reaches the debug artifact as-is; saving
+    it must not fail the run's failure path."""
+    with transaction_boundary(session_factory) as session:
+        ArtifactService(
+            ArtifactRepository(session), EventEmitter(EventLogRepository(session))
+        ).create_structured_output_debug_artifact(
+            tenant_id="tenant_demo",
+            region="eu-central",
+            product_id="kernel_demo",
+            frontend_id="kernel_demo_ce",
+            scenario_session_id="scenario_session_demo",
+            job_id="job_demo",
+            action_run_id="action_run_demo",
+            raw_output_text='{"text":"a\x00b\ud800c"}',
+        )
+
+    with transaction_boundary(session_factory) as session:
+        stored = session.execute(sa.select(artifacts_table.c.content_text)).scalar_one()
+
+    assert stored == '{"text":"a�b�c"}'

@@ -72,6 +72,29 @@ def test_provider_output_keeps_a_raw_newline_and_tab_at_the_structured_output_bo
     assert result.normalized_output == {"text": "First.\n\tSecond."}
 
 
+@pytest.mark.parametrize(
+    "raw",
+    [
+        '{"text":"hello\\ud800world"}',
+        '{"text":"hello\\udc00world"}',
+        '{"\\ud800":"hello"}',
+        '{"text":"hello\ud800world"}',
+    ],
+    ids=["escaped-high", "escaped-low", "escaped-key", "raw-high"],
+)
+def test_provider_output_rejects_an_unpaired_surrogate(raw: str) -> None:
+    """PostgreSQL JSONB rejects an unpaired surrogate, so it must fail validation (and be retried),
+    not persistence."""
+    with pytest.raises(StructuredOutputMalformedJsonError):
+        validate_structured_output(raw, schema=_TEXT_SCHEMA)
+
+
+def test_provider_output_keeps_a_surrogate_pair_as_its_character() -> None:
+    result = validate_structured_output('{"text":"ok \\ud83d\\ude00"}', schema=_TEXT_SCHEMA)
+
+    assert result.normalized_output == {"text": "ok \U0001f600"}
+
+
 def test_config_owned_literal_json_stays_strict_about_control_characters() -> None:
     from anytoolai_platform_core.common.strict_json import parse_strict_json
 

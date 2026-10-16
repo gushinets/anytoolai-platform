@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from anytoolai_platform_core.common.storable_text import is_unstorable_char
 from anytoolai_platform_core.common.strict_json import parse_strict_json
 from anytoolai_platform_core.structured_output.errors import (
     StructuredOutputMalformedJsonError,
@@ -32,26 +33,30 @@ _TOLERATED_RAW_CONTROLS = frozenset("\t\n\r")
 
 def parse_json_value(raw: str) -> Any:
     """Model output may break a JSON string with a raw newline or tab; any other raw control is
-    malformed. A NUL is malformed raw or escaped: PostgreSQL JSONB cannot store it, so it would
-    fail persistence after the output had already passed validation."""
+    malformed. A NUL or an unpaired surrogate (`\\ud800` without its pair) is malformed raw or
+    escaped: PostgreSQL JSONB cannot store either, so it would fail persistence after the output
+    had already passed validation. A valid pair decodes to one character (an emoji) and passes."""
     if any(char < " " and char not in _TOLERATED_RAW_CONTROLS for char in raw):
         raise StructuredOutputMalformedJsonError("Malformed JSON")
     try:
         value = parse_strict_json(raw, allow_control_chars=True)
     except json.JSONDecodeError as exc:
         raise StructuredOutputMalformedJsonError("Malformed JSON") from exc
-    if _contains_nul(value):
+    if _contains_unstorable_char(value):
         raise StructuredOutputMalformedJsonError("Malformed JSON")
     return value
 
 
-def _contains_nul(value: Any) -> bool:
+def _contains_unstorable_char(value: Any) -> bool:
     if isinstance(value, str):
-        return "\x00" in value
+        return any(is_unstorable_char(char) for char in value)
     if isinstance(value, dict):
-        return any(_contains_nul(key) or _contains_nul(item) for key, item in value.items())
+        return any(
+            _contains_unstorable_char(key) or _contains_unstorable_char(item)
+            for key, item in value.items()
+        )
     if isinstance(value, list):
-        return any(_contains_nul(item) for item in value)
+        return any(_contains_unstorable_char(item) for item in value)
     return False
 
 
