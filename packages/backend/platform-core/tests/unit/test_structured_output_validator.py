@@ -95,6 +95,23 @@ def test_provider_output_keeps_a_surrogate_pair_as_its_character() -> None:
     assert result.normalized_output == {"text": "ok \U0001f600"}
 
 
+def _nested(depth: int) -> str:
+    """An object of the given total depth: the top-level object plus `depth - 1` nested arrays."""
+    return '{"text":"a","extra":' + "[" * (depth - 1) + "0" + "]" * (depth - 1) + "}"
+
+
+@pytest.mark.parametrize("depth", [65, 501, 100_001])
+def test_provider_output_nested_too_deep_is_malformed_not_a_recursion_error(depth: int) -> None:
+    with pytest.raises(StructuredOutputMalformedJsonError):
+        validate_structured_output(_nested(depth), schema=_TEXT_SCHEMA)
+
+
+def test_provider_output_nested_to_the_depth_limit_passes() -> None:
+    result = validate_structured_output(_nested(64), schema=_TEXT_SCHEMA)
+
+    assert result.normalized_output["text"] == "a"
+
+
 def test_config_owned_literal_json_stays_strict_about_control_characters() -> None:
     from anytoolai_platform_core.common.strict_json import parse_strict_json
 
