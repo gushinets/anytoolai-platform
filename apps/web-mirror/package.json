@@ -12,7 +12,7 @@
     "@anytoolai/ce-kit": "workspace:*",
     "@anytoolai/shared-ui": "workspace:*",
     "@anytoolai/web-result-kit": "workspace:*",
-    "next": "^15.5.24",
+    "next": "^15.5.27",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "use-intl": "^4.14.6"
