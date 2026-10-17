@@ -67,6 +67,18 @@ closed if a declared ref has no matching class, since `platform-core` must not i
 
 `generate_proposal` must never become a platform action type. ProposalAI uses `text.compose_persuasive_text` through product-specific MVP-B action config.
 
+## A06 `text.compose_persuasive_text` caller constraints
+
+`input.constraints` (closed object) carries `tone`, `length`, `language`, `format` and four optional rules that stay product-neutral so any A06 caller can opt in:
+
+- `forbidden_patterns` (array of RE2 regular expressions): `PersuasiveTextCrossValidator` rejects `text` when any pattern matches, case-insensitively (placeholders, boilerplate signatures, a banned dash). Patterns run on Google RE2, which matches in linear time, caps its memory and refuses a repetition count above 1000, so no caller pattern can hold a worker or exhaust its memory; the input schema allows at most 32 patterns of at most 200 characters each. RE2 syntax has no lookaround or backreference, and `\w`, `\d`, `\s`, `\b` are ASCII (use `\pL` for any letter). `PersuasiveTextInputValidator` rejects a pattern RE2 cannot compile before any provider call.
+  ProposalAI treats any unfilled template marker as a placeholder, failing closed: a `<...>` span whose first character is not a space, a digit or `=` (`<client_name>`, `<%= name %>`, `<@name>`), and a `%NAME%` merge tag. A comparison with brackets around words is rejected too (the kernel's plain-text check already reads most of them as HTML), costing one retry, while a missed placeholder would ship an unsendable proposal. Numeric comparisons (`<50ms`, `<=50ms`, `< 500`) and percentages (`99%`) pass; `$NAME` and `__NAME__` are left to the prompt because technical prose uses them (`$PATH`, `__init__`).
+- `plain_text_lists` (`allowed` | `forbidden`): `forbidden` rejects a CommonMark list, a line that starts with a bullet character, or two or more lines that start with a dash or a lettered marker (`a)`), on top of the kernel-wide plain_text policy that allows lists (ANY-502).
+- `numbers_must_appear_in_context` (boolean): every number in `text` must occur in `input.context`, compared by value: grouped amounts (`1,500`, `1.234,50`, `3 200`) are one number, a dotted date is three, a word that starts with a letter is a name and offers no number (`GPT-4o`, `n8n`), a word that starts with a digit is a quantity whose unit is ignored (`16GB`, `12V`) and whose `k`/`M` suffix scales it (`$20k`). It catches invented amounts, dates and durations without domain knowledge. Fixed contract: it does not classify a digit inside a word (`4K`, `2FA` are quantities 4000 and 2 to it, not resolutions or acronyms) and it does not decide who asserted a number (a client budget in `context` is evidence for the same amount in `text`); both are semantic questions and belong to a separate check, not to this one. A finding of either kind is by design; a false rejection of a realistic input is a bug.
+- `claims_to_avoid` (array of objects with a required `description`): prompt-level only. The caller lists statements the text must not assert, for example gaps found by A04. It is a constraint and not a `context` field because the mapping DSL rejects dotted `context.*` input targets.
+
+A failed cross-validation is a PydanticAI validation retry, so the model gets another attempt before the user sees an error.
+
 ## A03 `text.score_multidimensional_axes` contract
 
 Strict, closed (`additionalProperties: false`) schemas — `kernel.schemas.score_multidim_input_v1` / `kernel.schemas.score_multidim_output_v1`:

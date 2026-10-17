@@ -36,6 +36,36 @@
         "format": {
           "type": "string",
           "enum": ["plain_text", "markdown", "html"]
+        },
+        "forbidden_patterns": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "plain_text_lists": {
+          "type": "string",
+          "enum": ["allowed", "forbidden"]
+        },
+        "numbers_must_appear_in_context": {
+          "type": "boolean"
+        },
+        "claims_to_avoid": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": ["description"],
+            "additionalProperties": true
+          }
         }
       },
       "additionalProperties": false

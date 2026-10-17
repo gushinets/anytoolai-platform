@@ -18,7 +18,7 @@ committed release order. PrepaidRequest and ReplyDraft remain modes of the later
 
 ## Recommended Build Order
 
-1. ProposalAI: `A06` for v1; `A09 -> A06` remains a later option.
+1. ProposalAI: `A04 -> A06` (A04 finds experience gaps the proposal must not claim and returns them as a separate block); `A09 -> A06` remains a later option.
 2. Client Message Decoder: `A01 -> A07`, with `A04` optional.
 3. Scope Creep Guard: `A11 -> A07`; comparison results and request data to `A10`.
 4. Send-Ready: `A04 + A03`, then a user-selected gap to `A08` in a second scenario run.

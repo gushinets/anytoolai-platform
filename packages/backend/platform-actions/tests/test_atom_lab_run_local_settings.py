@@ -52,9 +52,9 @@ def test_run_local_prompt_model_and_reasoning_survive_validation_retry() -> None
         prompt_ref="kernel_demo.extract_structured_fields.v1",
         prompt_version=1,
         provider_policy=base_policy.__class__(
-            **{**base_policy.__dict__, "model": "openai/gpt-5.4-mini", "fallback_policy": None}
+            **{**base_policy.__dict__, "model": "openai/gpt-6-luna", "fallback_policy": None}
         ),
-        model_id="openai/gpt-5.4-mini",
+        model_id="openai/gpt-6-luna",
         reasoning_effort=ReasoningEffort.high,
     )
     request = ActionExecutorRequest(
@@ -80,6 +80,6 @@ def test_run_local_prompt_model_and_reasoning_survive_validation_retry() -> None
     for provider_request in gateway.requests:
         assert provider_request.prompt.startswith("Edited prompt unique to this run")
         assert "unique input" in provider_request.prompt
-        assert provider_request.policy_override.model == "openai/gpt-5.4-mini"
+        assert provider_request.policy_override.model == "openai/gpt-6-luna"
         assert provider_request.model_addressing is ProviderModelAddressing.direct
         assert provider_request.reasoning_effort is ReasoningEffort.high

@@ -58,14 +58,13 @@ function renderReady() {
 describe("ProposalAI product definition", () => {
   it("revalidates only the edited invalid field using its current product rules", async () => {
     const { calls } = renderReady();
-    const task = await screen.findByLabelText("Describe the task");
-    const positioning = screen.getByLabelText("Your positioning");
+    const task = await screen.findByLabelText(/^Describe the task/);
+    const positioning = screen.getByLabelText(/^Your experience and strengths/);
     fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
     expect(task.getAttribute("aria-invalid")).toBe("true");
     // Required, whitespace and maxLength are the actual product validator's rules.
     for (const [value, message] of [
       ["   ", "Task description: required."],
-      [" padded ", "Task description: no leading or trailing whitespace."],
       ["x".repeat(4001), "Task description: 4,000 characters maximum."],
     ]) {
       fireEvent.change(task, { target: { value: "Build a landing page." } });
@@ -80,7 +79,7 @@ describe("ProposalAI product definition", () => {
     fireEvent.blur(task);
     expect(task.getAttribute("aria-invalid")).toBe("false");
     expect(positioning.getAttribute("aria-invalid")).toBe("true");
-    expect(screen.getByText("Your positioning: required.")).toBeTruthy();
+    expect(screen.getByText("Your experience and strengths: required.")).toBeTruthy();
     expect(calls.filter((call) => call.key === ROUTES.START)).toHaveLength(0);
   });
 
@@ -107,23 +106,19 @@ describe("ProposalAI product definition", () => {
 
   it("validates its own fields client-side, mirroring generate_input.schema.json", async () => {
     const { calls } = renderReady();
-    await waitFor(() => expect(screen.getByLabelText("Describe the task")).toBeTruthy());
+    await waitFor(() => expect(screen.getByLabelText(/^Describe the task/)).toBeTruthy());
 
-    fireEvent.change(screen.getByLabelText("Your positioning"), { target: { value: " padded " } });
+    // Pasted text with outer whitespace is trimmed, not rejected (see the toInput test below).
+    fireEvent.change(screen.getByLabelText(/^Your experience and strengths/), { target: { value: " padded\n" } });
     fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
 
     expect(await screen.findByText("Task description: required.")).toBeTruthy();
-    expect(screen.getByText("Your positioning: no leading or trailing whitespace.")).toBeTruthy();
-    const taskField = screen.getByLabelText("Describe the task");
-    const positioningField = screen.getByLabelText("Your positioning");
+    expect(screen.queryByText(/Your experience and strengths:/)).toBeNull();
+    const taskField = screen.getByLabelText(/^Describe the task/);
+    const positioningField = screen.getByLabelText(/^Your experience and strengths/);
     expect(taskField.getAttribute("aria-describedby")).toBe("proposal-ai-task-help proposal-ai-task-error");
-    expect(positioningField.getAttribute("aria-describedby")).toBe(
-      "proposal-ai-positioning-help proposal-ai-positioning-error",
-    );
+    expect(positioningField.getAttribute("aria-describedby")).toBe("proposal-ai-positioning-help");
     for (const id of taskField.getAttribute("aria-describedby")!.split(" ")) {
-      expect(document.getElementById(id)).toBeTruthy();
-    }
-    for (const id of positioningField.getAttribute("aria-describedby")!.split(" ")) {
       expect(document.getElementById(id)).toBeTruthy();
     }
     expect(calls.some((call) => call.key === ROUTES.START)).toBe(false);
@@ -131,10 +126,10 @@ describe("ProposalAI product definition", () => {
 
   it("maps the default warm style to the snake_case input schema and omits language", async () => {
     const { calls } = renderReady();
-    await waitFor(() => expect(screen.getByLabelText("Describe the task")).toBeTruthy());
+    await waitFor(() => expect(screen.getByLabelText(/^Describe the task/)).toBeTruthy());
 
-    fireEvent.change(screen.getByLabelText("Describe the task"), { target: { value: "Build a landing page." } });
-    fireEvent.change(screen.getByLabelText("Your positioning"), { target: { value: "Frontend freelancer." } });
+    fireEvent.change(screen.getByLabelText(/^Describe the task/), { target: { value: "Build a landing page." } });
+    fireEvent.change(screen.getByLabelText(/^Your experience and strengths/), { target: { value: "Frontend freelancer." } });
     fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
 
     await waitFor(() => expect(screen.getByText(PROPOSAL_TEXT)).toBeTruthy());
@@ -147,10 +142,10 @@ describe("ProposalAI product definition", () => {
 
   it("maps the selected confident style to the firm backend value", async () => {
     const { calls } = renderReady();
-    await waitFor(() => expect(screen.getByLabelText("Describe the task")).toBeTruthy());
+    await waitFor(() => expect(screen.getByLabelText(/^Describe the task/)).toBeTruthy());
 
-    fireEvent.change(screen.getByLabelText("Describe the task"), { target: { value: "Build a landing page." } });
-    fireEvent.change(screen.getByLabelText("Your positioning"), { target: { value: "Frontend freelancer." } });
+    fireEvent.change(screen.getByLabelText(/^Describe the task/), { target: { value: "Build a landing page." } });
+    fireEvent.change(screen.getByLabelText(/^Your experience and strengths/), { target: { value: "Frontend freelancer." } });
     fireEvent.click(screen.getByRole("radio", { name: "Confident & direct" }));
     fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
 
@@ -164,9 +159,9 @@ describe("ProposalAI product definition", () => {
 
   it("renders the canonical `text` field and copies it through the copy_result next action", async () => {
     const { calls } = renderReady();
-    await waitFor(() => expect(screen.getByLabelText("Describe the task")).toBeTruthy());
-    fireEvent.change(screen.getByLabelText("Describe the task"), { target: { value: "Build a landing page." } });
-    fireEvent.change(screen.getByLabelText("Your positioning"), { target: { value: "Frontend freelancer." } });
+    await waitFor(() => expect(screen.getByLabelText(/^Describe the task/)).toBeTruthy());
+    fireEvent.change(screen.getByLabelText(/^Describe the task/), { target: { value: "Build a landing page." } });
+    fireEvent.change(screen.getByLabelText(/^Your experience and strengths/), { target: { value: "Frontend freelancer." } });
     fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
     await waitFor(() => expect(screen.getByText(PROPOSAL_TEXT)).toBeTruthy());
     const copyButton = screen.getByRole("button", { name: "Copy" });
@@ -195,8 +190,8 @@ describe("ProposalAI product definition", () => {
       [ROUTES.NEXT_ACTION]: [],
     }, { [ROUTES.RESULT]: 2 });
     render(<ProposalAIProduct client={routed.client} />);
-    const task = await screen.findByLabelText("Describe the task") as HTMLTextAreaElement;
-    const positioning = screen.getByLabelText("Your positioning") as HTMLTextAreaElement;
+    const task = await screen.findByLabelText(/^Describe the task/) as HTMLTextAreaElement;
+    const positioning = screen.getByLabelText(/^Your experience and strengths/) as HTMLTextAreaElement;
     fireEvent.change(task, { target: { value: "Build a landing page." } });
     fireEvent.change(positioning, { target: { value: "Frontend freelancer." } });
     fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
@@ -239,8 +234,8 @@ describe("ProposalAI product definition", () => {
       [ROUTES.SESSION]: [sessionResponse(), sessionResponse()],
     }, { [ROUTES.RESULT]: 2 });
     render(<ProposalAIProduct client={routed.client} />);
-    fireEvent.change(await screen.findByLabelText("Describe the task"), { target: { value: "Build a landing page." } });
-    fireEvent.change(screen.getByLabelText("Your positioning"), { target: { value: "Frontend freelancer." } });
+    fireEvent.change(await screen.findByLabelText(/^Describe the task/), { target: { value: "Build a landing page." } });
+    fireEvent.change(screen.getByLabelText(/^Your experience and strengths/), { target: { value: "Frontend freelancer." } });
     fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
     await waitFor(() => expect(routed.calls.filter((call) => call.key === ROUTES.RESULT)).toHaveLength(1));
     expect(screen.getAllByRole("status")).toHaveLength(1);
@@ -273,8 +268,8 @@ describe("ProposalAI product definition", () => {
       [ROUTES.RESULT]: [resultResponse(IDS, { output: { text: longProposal } })],
     });
     render(<ProposalAIProduct client={routed.client} />);
-    fireEvent.change(await screen.findByLabelText("Describe the task"), { target: { value: "Build a landing page." } });
-    fireEvent.change(screen.getByLabelText("Your positioning"), { target: { value: "Frontend freelancer." } });
+    fireEvent.change(await screen.findByLabelText(/^Describe the task/), { target: { value: "Build a landing page." } });
+    fireEvent.change(screen.getByLabelText(/^Your experience and strengths/), { target: { value: "Frontend freelancer." } });
     fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
     const previousResult = await screen.findByText(/^A detailed proposal\./);
 
@@ -304,8 +299,8 @@ describe("ProposalAI product definition", () => {
       ],
     });
     render(<ProposalAIProduct client={routed.client} />);
-    fireEvent.change(await screen.findByLabelText("Describe the task"), { target: { value: "Build a landing page." } });
-    fireEvent.change(screen.getByLabelText("Your positioning"), { target: { value: "Frontend freelancer." } });
+    fireEvent.change(await screen.findByLabelText(/^Describe the task/), { target: { value: "Build a landing page." } });
+    fireEvent.change(screen.getByLabelText(/^Your experience and strengths/), { target: { value: "Frontend freelancer." } });
 
     for (const [submitLabel, resultText, remaining] of [
       ["Generate proposal", "Proposal 1", 2],
@@ -333,8 +328,8 @@ describe("ProposalAI product definition", () => {
       [ROUTES.RESULT]: [resultResponse(IDS, { output: { text: PROPOSAL_TEXT } })],
     }, { [ROUTES.QUOTA]: 1 });
     render(<ProposalAIProduct client={routed.client} />);
-    fireEvent.change(await screen.findByLabelText("Describe the task"), { target: { value: "Build a landing page." } });
-    fireEvent.change(screen.getByLabelText("Your positioning"), { target: { value: "Frontend freelancer." } });
+    fireEvent.change(await screen.findByLabelText(/^Describe the task/), { target: { value: "Build a landing page." } });
+    fireEvent.change(screen.getByLabelText(/^Your experience and strengths/), { target: { value: "Frontend freelancer." } });
     await waitFor(() => expect(routed.calls.filter((call) => call.key === ROUTES.QUOTA)).toHaveLength(1));
 
     fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
@@ -344,8 +339,111 @@ describe("ProposalAI product definition", () => {
   });
 
   it("treats a result without a string `text` field as unusable rather than rendering something else", () => {
-    expect(proposalAiDefinition.extractResult({ text: "ok" })).toBe("ok");
+    expect(proposalAiDefinition.extractResult({ text: "ok", gaps: [] })).toEqual({ text: "ok", gaps: [] });
     expect(proposalAiDefinition.extractResult({ angle: "x", rationale: "y" })).toBeNull();
-    expect(proposalAiDefinition.extractResult({ text: 42 })).toBeNull();
+    expect(proposalAiDefinition.extractResult({ text: 42, gaps: [] })).toBeNull();
+  });
+
+  it("keeps only gaps that carry a description and tolerates a missing gaps list", () => {
+    expect(proposalAiDefinition.extractResult({ text: "ok" })).toEqual({ text: "ok", gaps: [] });
+    expect(
+      proposalAiDefinition.extractResult({
+        text: "ok",
+        gaps: [{ category: "experience_gap", description: "No HubSpot." }, { description: 3 }, "x", null],
+      }),
+    ).toEqual({ text: "ok", gaps: [{ description: "No HubSpot." }] });
+  });
+
+  it("sends the proposal language only when one is chosen, and trims pasted outer whitespace", async () => {
+    const { calls } = renderReady();
+    fireEvent.change(await screen.findByLabelText(/^Describe the task/), { target: { value: "Build a landing page.\n" } });
+    fireEvent.change(screen.getByLabelText(/^Your experience and strengths/), { target: { value: "  Frontend freelancer.\n\n" } });
+    const language = screen.getByLabelText("Proposal language") as HTMLSelectElement;
+    expect(language.value).toBe("auto");
+    expect(within(language).getAllByRole("option")).toHaveLength(8);
+    fireEvent.change(language, { target: { value: "de" } });
+    fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+
+    await waitFor(() => expect(calls.some((call) => call.key === ROUTES.START)).toBe(true));
+    const startCall = calls.find((call) => call.key === ROUTES.START);
+    expect(JSON.parse(startCall?.init.body as string)).toMatchObject({
+      input: {
+        task_text: "Build a landing page.",
+        freelancer_positioning: "Frontend freelancer.",
+        tone: "warm",
+        language: "de",
+      },
+    });
+  });
+
+  it("marks both text fields required, caps them, and shows a counter only near the limit", async () => {
+    renderReady();
+    const task = (await screen.findByLabelText(/^Describe the task/)) as HTMLTextAreaElement;
+    const positioning = screen.getByLabelText(/^Your experience and strengths/) as HTMLTextAreaElement;
+    for (const field of [task, positioning]) {
+      expect(field.getAttribute("aria-required")).toBe("true");
+      // no hard cap: a paste over the limit must stay visible and get the counter and the error
+      expect(field.maxLength).toBe(-1);
+    }
+    expect(screen.getAllByText("(required)")).toHaveLength(2);
+    expect(screen.queryByText(/\/ 4000/)).toBeNull();
+
+    fireEvent.change(task, { target: { value: "x".repeat(3501) } });
+    expect(screen.getByText("3501 / 4000")).toBeTruthy();
+    // the visible number is not a live region; a hidden status announces the state change only
+    expect(screen.getByText("3501 / 4000").getAttribute("aria-hidden")).toBe("true");
+    expect(screen.getByText("Approaching the limit of 4000 characters.").getAttribute("aria-live")).toBe("polite");
+
+    fireEvent.change(task, { target: { value: "x".repeat(3999) } });
+    expect(screen.getByText("Approaching the limit of 4000 characters.")).toBeTruthy();
+
+    fireEvent.change(task, { target: { value: "x".repeat(4100) } });
+    expect(task.value).toHaveLength(4100);
+    expect(screen.getByText("4100 / 4000")).toBeTruthy();
+    expect(screen.getByText("Over the limit of 4000 characters.")).toBeTruthy();
+
+    // counted like the validation: code points of the trimmed text, not UTF-16 units or padding
+    fireEvent.change(task, { target: { value: "\u{1F600}".repeat(3000) + "\n\n" } });
+    expect(screen.queryByText(/\/ 4000/)).toBeNull();
+    expect(screen.queryByText("Approaching the limit of 4000 characters.")).toBeNull();
+  });
+
+  it("shows the experience gaps under the proposal and copies only the proposal text", async () => {
+    const routed = makeClient({
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
+      [ROUTES.QUOTA]: [quotaResponse(IDS, { limit_count: 10, remaining_count: 10 }), quotaResponse(IDS, { limit_count: 10, remaining_count: 9 })],
+      [ROUTES.START]: [startResponse()],
+      [ROUTES.SESSION]: [sessionResponse()],
+      [ROUTES.RESULT]: [
+        resultResponse(IDS, {
+          output: {
+            text: PROPOSAL_TEXT,
+            gaps: [{ category: "experience_gap", description: "The task needs HubSpot, which is not in your experience.", severity: "high" }],
+          },
+        }),
+      ],
+      [ROUTES.NEXT_ACTION]: [sessionResponse()],
+    });
+    render(<ProposalAIProduct client={routed.client} />);
+    fireEvent.change(await screen.findByLabelText(/^Describe the task/), { target: { value: "Build a landing page." } });
+    fireEvent.change(screen.getByLabelText(/^Your experience and strengths/), { target: { value: "Frontend freelancer." } });
+    fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+
+    const gaps = await screen.findByRole("region", { name: "Not covered by your experience" });
+    expect(within(gaps).getByText("The task needs HubSpot, which is not in your experience.")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith(PROPOSAL_TEXT));
+  });
+
+  it("hides the gaps block when the list is empty", async () => {
+    renderReady();
+    fireEvent.change(await screen.findByLabelText(/^Describe the task/), { target: { value: "Build a landing page." } });
+    fireEvent.change(screen.getByLabelText(/^Your experience and strengths/), { target: { value: "Frontend freelancer." } });
+    fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+
+    await waitFor(() => expect(screen.getByText(PROPOSAL_TEXT)).toBeTruthy());
+    expect(screen.queryByRole("region", { name: "Not covered by your experience" })).toBeNull();
   });
 });

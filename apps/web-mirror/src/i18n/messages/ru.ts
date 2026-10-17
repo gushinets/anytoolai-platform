@@ -38,11 +38,11 @@ export const ru: Shape<typeof en> = {
     copying: "Копируем…",
     copied: "Скопировано",
     copyFailed: "Не удалось скопировать текст. Выделите его выше и скопируйте вручную.",
+    selectText: "Выделить текст",
   },
   // These label-colon fragments do not require agreement with `{field}`'s grammatical number.
   validation: {
     required: "{field}: обязательное поле.",
-    outerWhitespace: "{field}: уберите пробелы в начале или конце.",
     maxLength: "{field}: не более {maxLength, plural, one {# символ} few {# символа} many {# символов} other {# символа}}.",
   },
 };

@@ -53,7 +53,7 @@ from tests.support.sqlite_harness import build_sqlite_runtime_engine
 CONFIG_ROOT = Path(__file__).resolve().parents[3] / "configs" / "kernel"
 ACCESS_CODE = "private-access-code"
 LIVE_TOKEN = "server-only-live-token"
-MODEL_ID = "openai/gpt-5.4-mini"
+MODEL_ID = "openai/gpt-6-luna"
 INPUTS = {
     "A01": {
         "source_text": "Срок 30 сентября",
@@ -131,7 +131,7 @@ def app(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[FastAPI]:
                 snapshot={
                     "items": [
                         {
-                            "model_id": "gpt-5.4-mini",
+                            "model_id": "gpt-6-luna",
                             "compatibility": "compatible",
                             "reason": "confirmed_openai_text_gpt",
                             "reasoning_supported": True,
@@ -361,7 +361,7 @@ def _change_catalog(app, **changes):
     [
         {"model_id": "openai/missing"},
         {"model_id": "anthropic/claude"},
-        {"model_id": "gpt-5.4-mini"},
+        {"model_id": "gpt-6-luna"},
     ],
 )
 def test_model_must_be_present_addressable_and_compatible(app, updates):

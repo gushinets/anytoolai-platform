@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 import unicodedata
 from pathlib import Path
 
@@ -18,6 +19,7 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     ScoreMultidimensionalAxesInputValidator,
     SynthesizeAngleCrossValidator,
     PersuasiveTextCrossValidator,
+    PersuasiveTextInputValidator,
     ScoreMatchByRubricCrossValidator,
     ScoreMatchByRubricInputValidator,
     SynthesizeAngleCrossValidator,
@@ -1265,6 +1267,397 @@ class TestPersuasiveTextCrossValidator:
     def test_rejects(self, input_payload: dict, output: dict | None) -> None:
         with pytest.raises(StructuredOutputValidationError):
             self.validator.validate(input_payload=input_payload, output=output)
+
+
+class TestPersuasiveTextProductConstraints:
+    """ANY-656: forbidden_patterns, plain_text_lists and numbers_must_appear_in_context."""
+
+    def setup_method(self) -> None:
+        self.validator = PersuasiveTextCrossValidator()
+
+    @pytest.mark.parametrize(
+        ("constraints", "context", "text"),
+        [
+            ({"forbidden_patterns": [r"\[[^\]]*\]", "your name"]}, {}, "Hello, I can start today."),
+            ({"plain_text_lists": "forbidden"}, {}, "First paragraph.\n\nSecond paragraph."),
+            ({"plain_text_lists": "allowed"}, {}, "- one\n- two"),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Build 5 pages for 3 200 EUR", "freelancer_positioning": "4 years"},
+                "I have 4 years of experience and can build 5 pages for 3,200 EUR.",
+            ),
+            ({"numbers_must_appear_in_context": True}, {}, "No digits at all."),
+            # numbers are compared by value: "2024-05-01" covers "May 1" and "05/01" covers "5/1"
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Deadline 2024-05-01"},
+                "I can deliver by May 1.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Due 05/01"},
+                "Due 5/1 works for me.",
+            ),
+            # a decimal is one number, a dotted date is three, and a name with a digit is no number
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "About 1.5 hours a day, n8n flows"},
+                "I can give 1.5 hours a day and build n8n flows.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Due 10.5.2024"},
+                "I can deliver by May 5, 2024, or on the 10th.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Due 10.05.2024"},
+                "I can deliver by May 5, 2024.",
+            ),
+            # a European amount is one number too
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Budget €1.234,50"},
+                "My price is €1234.50, that is €1,234.50.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Budget 12.500,00"},
+                "12500 is fine.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Price 1.500 EUR"},
+                "1500 EUR is fine.",
+            ),
+            # an explicit grouping is one number, read the same way on both sides
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Budget is $1,500"},
+                "I can do it for $1500, or $1,500 as you wrote.",
+            ),
+            # a word that starts with a digit is a quantity: its unit is ignored, a k/M suffix scales it
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Keep latency under 50ms, 2h of work, 16GB RAM, 10MB uploads, 12V, 60Hz"},
+                "Under 50 ms, 2 hours, 16 GB of RAM, 10 MB uploads, 12 volts and 60 Hz.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"freelancer_positioning": "My fixed fee is $20k, 1.5M rows processed"},
+                "My fixed fee is $20,000 for 1,500,000 rows, or $20k as I usually say.",
+            ),
+            # one structural rule, not a list of formats: apostrophe groups, signs and scaled fractions
+            *(
+                (
+                    {"numbers_must_appear_in_context": True},
+                    {"freelancer_positioning": context},
+                    text,
+                )
+                for context, text in [
+                    ("My fixed fee is CHF 1'500.", "My fixed fee is CHF 1500, that is CHF 1,500."),
+                    ("My fixed fee is CHF 1\u2019500.", "My fixed fee is CHF 1500."),
+                    ("My fixed fee is CHF 1'500.50.", "My fixed fee is CHF 1500.50."),
+                    ("My fixed fee is CHF 1\u2019500,50.", "My fixed fee is CHF 1500,50."),
+                    ("I delivered +20% revenue growth and cut costs by -15%.", "I delivered 20% growth and -15% costs."),
+                    ("I delivered \u221220% churn.", "I delivered -20% churn."),
+                    ("Reports take 10-20% less time over 2-3 weeks.", "Reports take 10 to 20% less time over 2 or 3 weeks."),
+                    ("My rate is $1.234k.", "My rate is $1,234."),
+                    ("I processed .5M rows.", "I processed 500,000 rows."),
+                    ("I processed 1,234,000 rows.", "I processed 1234000 rows."),
+                    ("Budget \u20b91,50,000.", "Budget \u20b9150000."),
+                ]
+            ),
+            # a scaled fraction keeps its exact value
+            (
+                {"numbers_must_appear_in_context": True},
+                {"freelancer_positioning": "My fixed fee is $1.2345k, a call is $0.0005k a second"},
+                "My fixed fee is $1,234.50, a call is $0.5 a second.",
+            ),
+            # a digit-leading hyphenated range keeps its upper bound
+            (
+                {"numbers_must_appear_in_context": True},
+                {"freelancer_positioning": "I can complete a 2-to-3-week project, 3-to-5-page websites"},
+                "I can complete it in 2 to 3 weeks and build websites of 3 to 5 pages.",
+            ),
+            ({"plain_text_lists": "forbidden"}, {}, "a) is how the quote starts, then prose."),
+            ({"plain_text_lists": "forbidden"}, {}, "– Pavel, the dash line is a signature."),
+            # a space-grouped amount is one magnitude, however it is restated
+            (
+                {"numbers_must_appear_in_context": True},
+                {"freelancer_positioning": "My fixed fee is 3 200,50 EUR"},
+                "My fixed fee is 3200.50 EUR, that is 3,200.5 EUR.",
+            ),
+            # the no-break spaces are explicit separators like the comma
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Write a 3\u202f500-word article"},
+                "I can write a 3500-word article.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Write a 3\u00a0500-word article"},
+                "I can write a 3500-word article.",
+            ),
+            # an explicit comma still groups thousands before a hyphenated unit
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Write a 3,500-word article"},
+                "I can write a 3500-word article.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Write a 3500-word article"},
+                "A 3,500-word article is fine.",
+            ),
+            # a space before a group that starts a hyphenated unit separates two numbers
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Need 3 500-word blog posts"},
+                "I can write 3 posts of 500 words.",
+            ),
+            # a typographic hyphen is a hyphen, in a unit and in a name
+            *(
+                (
+                    {"numbers_must_appear_in_context": True},
+                    {"task_text": f"Need 3 500{hyphen}word blog posts on GPT{hyphen}4.1{hyphen}mini"},
+                    f"I can write 3 posts of 500 words each with GPT{hyphen}4.1{hyphen}mini.",
+                )
+                for hyphen in ("\u2010", "\u2011")
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "We have 12 100 clients"},
+                "I will handle 12 100 clients, that is 12,100.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Budget 3200 EUR"},
+                "Your budget of 3,200 EUR is clear.",
+            ),
+            ({"numbers_must_appear_in_context": False}, {}, "Invented 999 EUR is not checked."),
+        ],
+    )
+    def test_accepts(self, constraints: dict, context: dict, text: str) -> None:
+        self.validator.validate(
+            input_payload={"context": context, "constraints": constraints}, output={"text": text}
+        )
+
+    @pytest.mark.parametrize(
+        ("constraints", "context", "text"),
+        [
+            ({"forbidden_patterns": [r"\[[^\]]*\]"]}, {}, "Hello [Client Name]."),
+            ({"forbidden_patterns": ["your name"]}, {}, "Regards, Your Name"),
+            ({"forbidden_patterns": ["\u2014"]}, {}, "Fast \u2014 and clean."),
+            ({"plain_text_lists": "forbidden"}, {}, "- one\n- two"),
+            ({"plain_text_lists": "forbidden"}, {}, "1. one\n2. two"),
+            ({"plain_text_lists": "forbidden"}, {}, "• one\n• two"),
+            # one visible bullet is already a list (code review round 15)
+            ({"plain_text_lists": "forbidden"}, {}, "• I can build it.\n\nI have API experience."),
+            ({"plain_text_lists": "forbidden"}, {}, "\u2013 one\n\u2013 two"),
+            ({"plain_text_lists": "forbidden"}, {}, "a) one\nb) two"),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Budget 500 EUR"},
+                "I can do it for 350 EUR.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"freelancer_positioning": "Make and n8n automation"},
+                "Ready in 3 days.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Need 3 500-word blog posts"},
+                "I can write 4 posts of 500 words.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Make and n8n automation"},
+                "I have delivered 8 projects.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Budget €1.234,50"},
+                "My price is €50.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Price 1.500 EUR"},
+                "500 EUR.",
+            ),
+            # a scaled quantity has one magnitude
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Need 4K footage, budget $20k"},
+                "I have delivered 4 projects for $20.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "About 20 hours"},
+                "My fee is $20k.",
+            ),
+            # a word that starts with a letter is a name and offers no number
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Integrate GPT-4o"},
+                "I have delivered 4 projects.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Need 4K footage"},
+                "I have delivered 4 projects.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Set up 2FA and H.265 for ANY-656"},
+                "2 factors, 265 streams, 656 users, 56 of them new.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Integrate GPT-4.1-mini and V2.1 of the API"},
+                "I have completed 1 project.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Integrate gpt_4o, use task_id_42"},
+                "I have delivered 4 projects and completed 42 more.",
+            ),
+            # a grouped figure never switches magnitude: 1,500 is not 1.5 and 1.5 is not 1,500
+            (
+                {"numbers_must_appear_in_context": True},
+                {"freelancer_positioning": "I have 1.5 years of experience"},
+                "I have delivered 1,500 projects.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Budget $1,500"},
+                "My price is $1.5.",
+            ),
+            # the digit groups of an explicit grouping are not standalone numbers
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Budget is $1,500"},
+                "My price is $500.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Budget is $1,234.50"},
+                "My price is $234.50.",
+            ),
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "About 1.5 hours a day"},
+                "I can give 5 hours a day.",
+            ),
+            # a space before a group that starts a hyphenated unit separates two numbers, never 3500
+            (
+                {"numbers_must_appear_in_context": True},
+                {"task_text": "Need 3 500-word blog posts"},
+                "I have completed 3500 projects.",
+            ),
+            # a space-grouped number is one magnitude: none of its groups is a separate number
+            *(
+                (
+                    {"numbers_must_appear_in_context": True},
+                    {"freelancer_positioning": context},
+                    text,
+                )
+                for context, text in [
+                    ("My fixed fee is 3 200,50 EUR", "My fixed fee is 50 EUR."),
+                    ("My fixed fee is 3 200,50 EUR", "My fixed fee is 200,50 EUR."),
+                    ("My fixed fee is 3 200,50 EUR", "My fixed fee is 3 EUR."),
+                    ("My fixed fee is 12 500.75 EUR", "My fixed fee is 75 EUR."),
+                    ("My fixed fee is 12 500.75 EUR", "My fixed fee is 500.75 EUR."),
+                    ("3 projects, 200 clients", "My fixed fee is 3 200 EUR."),
+                    ("We have 12 100 clients", "We have 12 clients."),
+                    ("My fixed fee is $1.2345k", "My fixed fee is $1,234."),
+                    ("My fixed fee is CHF 1'500.", "My fixed fee is CHF 500."),
+                    ("My fixed fee is CHF 1'500.", "My fixed fee is CHF 1."),
+                    ("My fixed fee is CHF 1\u2019500.", "My fixed fee is CHF 500."),
+                    ("My fixed fee is CHF 1'500.50.", "My fixed fee is CHF 500.50."),
+                    ("My fixed fee is CHF 1\u2019500,50.", "My fixed fee is CHF 500,50."),
+                    ("I delivered +20% revenue growth.", "I delivered -20% revenue growth."),
+                    ("My fixed fee is +200 EUR.", "My fixed fee is -200 EUR."),
+                    ("My fixed fee is -200 EUR.", "My fixed fee is 200 EUR."),
+                    ("My rate is $1.234k.", "My rate is $1,234,000."),
+                    ("I processed .5M rows.", "I processed 5,000,000 rows."),
+                    ("Budget \u20b91,50,000.", "Budget \u20b950."),
+                    ("I can complete a 2-to-3-week project", "I can complete it in 2 to 4 weeks."),
+                ]
+            ),
+            *(
+                (
+                    {"numbers_must_appear_in_context": True},
+                    {"task_text": f"Need 3 500{hyphen}word blog posts"},
+                    "I can write 3,500 posts.",
+                )
+                for hyphen in ("\u2010", "\u2011")
+            ),
+        ],
+    )
+    def test_rejects(self, constraints: dict, context: dict, text: str) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"context": context, "constraints": constraints},
+                output={"text": text},
+            )
+
+
+class TestPersuasiveTextInputValidator:
+    def setup_method(self) -> None:
+        self.validator = PersuasiveTextInputValidator()
+
+    def test_accepts_missing_and_valid_patterns(self) -> None:
+        self.validator.validate(input_payload={})
+        self.validator.validate(input_payload={"constraints": {"forbidden_patterns": [r"\{\{"]}})
+
+    def test_rejects_invalid_regular_expression(self) -> None:
+        with pytest.raises(ActionInputValidationError):
+            self.validator.validate(input_payload={"constraints": {"forbidden_patterns": ["["]}})
+
+    def test_rejects_an_oversized_pattern_list_before_compiling_any_of_it(self) -> None:
+        """Code review round 17: compiling is bounded by count and length, not by the clock."""
+        self.validator.validate(input_payload={"constraints": {"forbidden_patterns": ["a"] * 32}})
+        with pytest.raises(ActionInputValidationError, match="at most 32"):
+            self.validator.validate(
+                input_payload={"constraints": {"forbidden_patterns": ["a"] * 33}}
+            )
+        with pytest.raises(ActionInputValidationError, match="longer than 200"):
+            self.validator.validate(
+                input_payload={"constraints": {"forbidden_patterns": ["a" * 201]}}
+            )
+
+    @pytest.mark.parametrize(
+        "pattern",
+        [
+            "a{1000000}",  # 234 MiB under a backtracking engine (code review round 20)
+            "(a{1000}){1000}",
+            "(?<!\\w)x",  # lookaround: not RE2 syntax
+            "(a)\\1",  # backreference: not RE2 syntax
+        ],
+    )
+    def test_rejects_a_pattern_re2_cannot_compile_before_any_provider_call(
+        self, pattern: str
+    ) -> None:
+        with pytest.raises(ActionInputValidationError, match="invalid regular expression"):
+            self.validator.validate(input_payload={"constraints": {"forbidden_patterns": [pattern]}})
+
+    def test_a_backtracking_pattern_runs_in_linear_time_on_a_long_output(self) -> None:
+        """Rounds 15-16: RE2 has no backtracking, so 32 copies on 100k characters stay instant."""
+        started = time.perf_counter()
+        PersuasiveTextCrossValidator().validate(
+            input_payload={"constraints": {"forbidden_patterns": ["(?:a|aa)+$"] * 32}},
+            output={"text": "a" * 100_000 + "!"},
+        )
+        assert time.perf_counter() - started < 1.0  # noqa: PLR2004
+
+    def test_a_merge_tag_in_any_alphabet_is_matched(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            PersuasiveTextCrossValidator().validate(
+                input_payload={"constraints": {"forbidden_patterns": ["%\\pL[\\pL\\pN_.]{0,39}%"]}},
+                output={"text": "Hello %ИМЯ%, I can help."},
+            )
 
 
 def _axis(axis_id: str, **extra: object) -> dict:

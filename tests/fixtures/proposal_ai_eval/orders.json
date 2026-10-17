@@ -1,0 +1,127 @@
+{
+  "freelancer_positioning": "Автоматизация на Make.com и n8n. Telegram Bot API, расшифровка голосовых через Whisper + Groq, агентные сценарии. Реальные кейсы: парсер цен Mauser/Digitex через API в Google Sheets; обмен данными с ERP через JSON API; массовая генерация документов из Excel.",
+  "orders": [
+    {
+      "id": "en-short-make-telegram",
+      "task_text": "Need a Make.com scenario that sends a Telegram notification when a row changes in a Google Sheet. Budget $150.",
+      "expect_language": "en",
+      "expect_gap": false
+    },
+    {
+      "id": "ru-short-voice-bot",
+      "task_text": "Нужен Telegram-бот, который принимает голосовые сообщения и расшифровывает их в текст.",
+      "expect_language": "ru",
+      "expect_gap": false
+    },
+    {
+      "id": "en-gap-hubspot",
+      "task_text": "We need someone to integrate our web forms with HubSpot CRM and set up deal pipelines. HubSpot experience is required.",
+      "expect_language": "en",
+      "expect_gap": true
+    },
+    {
+      "id": "ru-gap-amocrm",
+      "task_text": "Требуется настроить интеграцию сайта с amoCRM: сделки, воронки, автоматические задачи менеджерам. Опыт работы с amoCRM обязателен.",
+      "expect_language": "ru",
+      "expect_gap": true
+    },
+    {
+      "id": "en-similar-price-parser",
+      "task_text": "Looking for an automation specialist to collect competitor prices every day into Google Sheets. Please mention a similar project you have done.",
+      "expect_language": "en",
+      "expect_gap": false,
+      "asks_similar_project": true
+    },
+    {
+      "id": "ru-similar-price-parser",
+      "task_text": "Нужно регулярно собирать цены конкурентов в Google Sheets. Просьба упомянуть похожий проект.",
+      "expect_language": "ru",
+      "expect_gap": false,
+      "asks_similar_project": true
+    },
+    {
+      "id": "en-long-erp-budget",
+      "task_text": "We run a mid-size distribution company and need a reliable data exchange between our ERP and an online store. The ERP exposes a JSON API; orders must flow from the store to the ERP every 15 minutes and stock levels back to the store. Errors must be logged and the team notified in Telegram. We need documentation and a short handover call. Fixed price EUR 2,000-3,000, deadline 3 weeks.",
+      "expect_language": "en",
+      "expect_gap": false
+    },
+    {
+      "id": "ru-long-documents-budget",
+      "task_text": "Нужно автоматизировать выпуск договоров и актов: данные лежат в Excel, из них нужно массово генерировать документы по шаблонам и складывать в папку на диске. Важно, чтобы можно было запускать без программиста. Бюджет 50 000 руб., срок 2 недели.",
+      "expect_language": "ru",
+      "expect_gap": false
+    },
+    {
+      "id": "en-deadline-whisper",
+      "task_text": "Transcribe voice notes from a Telegram group with Whisper and summarize them with an LLM. Need it working in 5 days.",
+      "expect_language": "en",
+      "expect_gap": false
+    },
+    {
+      "id": "en-gap-salesforce",
+      "task_text": "Build n8n workflows that sync Salesforce leads to Slack. Salesforce API experience is required.",
+      "expect_language": "en",
+      "expect_gap": true
+    },
+    {
+      "id": "fl-en-zapier-shopify",
+      "expect_language": "en",
+      "expect_gap": true,
+      "task_text": "Hi, we sell supplements on Shopify and want to automate our order flow. When an order comes in it should go to our 3PL via their API, create a customer record in Klaviyo and post a summary in Slack. Currently done by hand by 2 people. Looking for someone with Shopify and Klaviyo experience who can start this week. Please share a similar project. Budget: $400-600."
+    },
+    {
+      "id": "fl-en-airtable-cleanup",
+      "expect_language": "en",
+      "expect_gap": false,
+      "task_text": "Need help cleaning and merging 3 Excel files with customer data (about 8,000 rows each) into one Google Sheet. Remove duplicates, fix phone number formats, and flag rows with missing emails. One-time job. Fixed budget $120. Need it done by Friday."
+    },
+    {
+      "id": "fl-en-ai-agent",
+      "expect_language": "en",
+      "expect_gap": false,
+      "task_text": "We are building an internal AI assistant that answers employee questions from our documents. Looking for a freelancer to set up the agent workflow (n8n or similar), connect it to Telegram and add a simple approval step before answers are sent. We already have an OpenAI account. Ongoing work possible. Hourly rate negotiable."
+    },
+    {
+      "id": "fl-en-wordpress-gap",
+      "expect_language": "en",
+      "expect_gap": true,
+      "task_text": "Looking for a WordPress developer to build a custom WooCommerce plugin: product bundles with dynamic pricing and a REST endpoint for our mobile app. PHP and WooCommerce hooks experience is a must. Please send links to plugins you have built."
+    },
+    {
+      "id": "fl-en-scraper",
+      "expect_language": "en",
+      "expect_gap": false,
+      "task_text": "I need a script that collects product prices and stock status from 15 supplier websites twice a day and writes them into a Google Sheet, with a notification in Telegram when a price changes by more than 10%. Some sites need login. Python or no-code, I don't care. Budget around 250 USD, ongoing maintenance later."
+    },
+    {
+      "id": "fl-en-voice-crm-gap",
+      "expect_language": "en",
+      "expect_gap": true,
+      "task_text": "We run a small clinic. Patients send voice messages in WhatsApp and our admin types them into Pipedrive by hand. We want the voice messages transcribed automatically and a deal created in Pipedrive with the key details. Experience with Pipedrive API required. Budget 500 EUR."
+    },
+    {
+      "id": "fl-ru-telegram-shop",
+      "expect_language": "ru",
+      "expect_gap": false,
+      "task_text": "Нужен Telegram-бот для приёма заказов от клиентов: клиент пишет, бот уточняет детали, записывает заказ в Google Таблицу и присылает мне уведомление. Ещё нужна ежедневная сводка заказов в 9 утра. Бюджет 15 000 рублей, срок неделя. Если есть похожие работы, пришлите."
+    },
+    {
+      "id": "fl-ru-1c-gap",
+      "expect_language": "ru",
+      "expect_gap": true,
+      "task_text": "Ищем специалиста для обмена данными между 1С:Управление торговлей и сайтом на Bitrix: заказы, остатки, цены. Обязателен опыт работы с 1С и обменом по протоколу CommerceML. Оплата по договору, объём обсуждается."
+    },
+    {
+      "id": "fl-ru-docs-generation",
+      "expect_language": "ru",
+      "expect_gap": false,
+      "task_text": "Из Excel-таблицы с данными по сотрудникам нужно автоматически формировать приказы и справки по готовым шаблонам Word и складывать их в папки по подразделениям. Таблица обновляется раз в месяц, строк около 400. Хочется, чтобы кадровик мог запускать сам. Бюджет по договорённости."
+    },
+    {
+      "id": "fl-en-vague",
+      "expect_language": "en",
+      "expect_gap": false,
+      "task_text": "Need an automation expert. Will explain details in chat. Fast and cheap please."
+    }
+  ]
+}

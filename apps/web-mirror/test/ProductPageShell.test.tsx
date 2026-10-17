@@ -28,6 +28,11 @@ import {
 import { TEST_PRODUCT_IDS, TEST_PRODUCT_MESSAGES_EN, testProductDefinition } from "./fixtures/testProductDefinition";
 import { englishForAllLocales } from "./support/renderWithI18n";
 
+/** ProposalAI labels end with a localized "(required)" marker, so match the start of the label. */
+function labelStartingWith(label: string): RegExp {
+  return new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`);
+}
+
 const PROPOSAL_IDS = { productId: "proposal_ai", scenarioId: "proposal_ai.generate_v1" } as const;
 const CUW_IDS = { productId: "client_update_writer", scenarioId: "client_update_writer.update_v1" } as const;
 
@@ -121,8 +126,8 @@ describe("ProductPageShell locale rendering", () => {
     switchTo(locale);
 
     expect(await screen.findByRole("button", { name: messages.generate.submit })).toBeTruthy();
-    expect(screen.getByLabelText(messages.fields.taskText)).toBeTruthy();
-    expect(screen.getByLabelText(messages.fields.freelancerPositioning)).toBeTruthy();
+    expect(screen.getByLabelText(labelStartingWith(messages.fields.taskText))).toBeTruthy();
+    expect(screen.getByLabelText(labelStartingWith(messages.fields.freelancerPositioning))).toBeTruthy();
     expect(screen.getByText(messages.fields.toneLegend)).toBeTruthy();
     expect(screen.getByLabelText(messages.toneOptions.warm)).toBeTruthy();
     expect(screen.getByLabelText(messages.toneOptions.neutral)).toBeTruthy();
@@ -338,22 +343,20 @@ describe("UI locale is independent of scenario input and state", () => {
     };
   }
 
-  it("keeps entered values when the UI locale changes (and back) -- ProposalAI's web UI has no output-language field to leak into", async () => {
-    // ANY-521 removed the language input from ProposalAI's web UI entirely (output language now
-    // derives from task_text); independence from UI locale holds trivially since there is no
-    // UI-locale-adjacent field left to touch. toInput() never reading the UI locale is what the
-    // other ProposalAI tests (wire values, translated labels) already prove indirectly.
+  it("keeps entered values when the UI locale changes (and back)", async () => {
+    // The proposal-language select defaults to "auto" (the task's language) and is independent of
+    // the UI locale: switching the interface never changes what `toInput()` sends.
     const { calls } = renderShell(registered("proposal_ai"), happyRoutes(PROPOSAL_IDS));
     const en = PROPOSAL_AI_MESSAGES.en.fields;
     const ru = PROPOSAL_AI_MESSAGES.ru.fields;
-    await screen.findByLabelText(en.taskText);
-    fireEvent.change(screen.getByLabelText(en.taskText), { target: { value: "Build a landing page." } });
-    fireEvent.change(screen.getByLabelText(en.freelancerPositioning), { target: { value: "Frontend freelancer." } });
+    await screen.findByLabelText(labelStartingWith(en.taskText));
+    fireEvent.change(screen.getByLabelText(labelStartingWith(en.taskText)), { target: { value: "Build a landing page." } });
+    fireEvent.change(screen.getByLabelText(labelStartingWith(en.freelancerPositioning)), { target: { value: "Frontend freelancer." } });
 
     switchTo("ru");
 
-    expect(valueOf(screen.getByLabelText(ru.taskText))).toBe("Build a landing page.");
-    expect(valueOf(screen.getByLabelText(ru.freelancerPositioning))).toBe("Frontend freelancer.");
+    expect(valueOf(screen.getByLabelText(labelStartingWith(ru.taskText)))).toBe("Build a landing page.");
+    expect(valueOf(screen.getByLabelText(labelStartingWith(ru.freelancerPositioning)))).toBe("Frontend freelancer.");
 
     switchTo("en");
     fireEvent.click(screen.getByRole("button", { name: PROPOSAL_AI_MESSAGES.en.generate.submit }));
@@ -367,7 +370,7 @@ describe("UI locale is independent of scenario input and state", () => {
 
   it("sends the untranslated wire value for a tone chosen while its label is translated", async () => {
     const { calls } = renderShell(registered("proposal_ai"), happyRoutes(PROPOSAL_IDS));
-    await screen.findByLabelText(PROPOSAL_AI_MESSAGES.en.fields.taskText);
+    await screen.findByLabelText(labelStartingWith(PROPOSAL_AI_MESSAGES.en.fields.taskText));
     switchTo("ru");
     const ru = PROPOSAL_AI_MESSAGES.ru;
     const warmRadio = screen.getByLabelText(ru.toneOptions.warm) as HTMLInputElement;
@@ -377,8 +380,8 @@ describe("UI locale is independent of scenario input and state", () => {
     expect([warmRadio.value, neutralRadio.value, firmRadio.value]).toEqual(["warm", "neutral", "firm"]);
     expect(warmRadio.checked).toBe(true); // emptyValues.tone defaults to "warm"
 
-    fireEvent.change(screen.getByLabelText(ru.fields.taskText), { target: { value: "Task" } });
-    fireEvent.change(screen.getByLabelText(ru.fields.freelancerPositioning), { target: { value: "Me" } });
+    fireEvent.change(screen.getByLabelText(labelStartingWith(ru.fields.taskText)), { target: { value: "Task" } });
+    fireEvent.change(screen.getByLabelText(labelStartingWith(ru.fields.freelancerPositioning)), { target: { value: "Me" } });
     fireEvent.click(firmRadio);
     fireEvent.click(screen.getByRole("button", { name: ru.generate.submit }));
 
@@ -426,7 +429,7 @@ describe("UI locale is independent of scenario input and state", () => {
       [routes.START]: [errorResponse(500, "internal_error")],
     });
     const en = PROPOSAL_AI_MESSAGES.en;
-    await screen.findByLabelText(en.fields.taskText);
+    await screen.findByLabelText(labelStartingWith(en.fields.taskText));
 
     fireEvent.click(screen.getByRole("button", { name: en.generate.submit }));
     expect(await screen.findAllByText("Task description: required.")).toBeTruthy();
@@ -435,8 +438,8 @@ describe("UI locale is independent of scenario input and state", () => {
     const required = HOST_MESSAGES.ru.validation.required;
     expect(screen.getByText(required.replace("{field}", PROPOSAL_AI_MESSAGES.ru.fieldNames.taskText))).toBeTruthy();
 
-    fireEvent.change(screen.getByLabelText(PROPOSAL_AI_MESSAGES.ru.fields.taskText), { target: { value: "Task" } });
-    fireEvent.change(screen.getByLabelText(PROPOSAL_AI_MESSAGES.ru.fields.freelancerPositioning), {
+    fireEvent.change(screen.getByLabelText(labelStartingWith(PROPOSAL_AI_MESSAGES.ru.fields.taskText)), { target: { value: "Task" } });
+    fireEvent.change(screen.getByLabelText(labelStartingWith(PROPOSAL_AI_MESSAGES.ru.fields.freelancerPositioning)), {
       target: { value: "Me" },
     });
     fireEvent.click(screen.getByRole("button", { name: PROPOSAL_AI_MESSAGES.ru.generate.submit }));
@@ -448,7 +451,7 @@ describe("UI locale is independent of scenario input and state", () => {
     switchTo("de");
     expect(screen.getByText(startFailed("de"))).toBeTruthy();
     expect(screen.queryByText(startFailed("ru"))).toBeNull();
-    expect(valueOf(screen.getByLabelText(PROPOSAL_AI_MESSAGES.de.fields.taskText))).toBe("Task");
+    expect(valueOf(screen.getByLabelText(labelStartingWith(PROPOSAL_AI_MESSAGES.de.fields.taskText)))).toBe("Task");
   });
 
   it("stays grammatically safe for a plural field name in French and German (code review finding)", async () => {
@@ -517,8 +520,8 @@ describe("All tools link", () => {
 
   it("warns that leaving loses the result while a run is in flight, dismissable with Escape", async () => {
     renderProposal();
-    fireEvent.change(await screen.findByLabelText(en.fields.taskText), { target: { value: "Redesign our landing page" } });
-    fireEvent.change(screen.getByLabelText(en.fields.freelancerPositioning), { target: { value: "Product designer" } });
+    fireEvent.change(await screen.findByLabelText(labelStartingWith(en.fields.taskText)), { target: { value: "Redesign our landing page" } });
+    fireEvent.change(screen.getByLabelText(labelStartingWith(en.fields.freelancerPositioning)), { target: { value: "Product designer" } });
     fireEvent.click(screen.getByRole("button", { name: en.generate.submit }));
 
     const tooltip = await screen.findByRole("tooltip");
@@ -534,8 +537,8 @@ describe("All tools link", () => {
 
   it("reveals the warning on the first touch tap while a run is in flight, instead of leaving in that tap", async () => {
     renderProposal();
-    fireEvent.change(await screen.findByLabelText(en.fields.taskText), { target: { value: "Redesign our landing page" } });
-    fireEvent.change(screen.getByLabelText(en.fields.freelancerPositioning), { target: { value: "Product designer" } });
+    fireEvent.change(await screen.findByLabelText(labelStartingWith(en.fields.taskText)), { target: { value: "Redesign our landing page" } });
+    fireEvent.change(screen.getByLabelText(labelStartingWith(en.fields.freelancerPositioning)), { target: { value: "Product designer" } });
     fireEvent.click(screen.getByRole("button", { name: en.generate.submit }));
     const link = await screen.findByRole("link", { name: /All tools/ });
     const wrap = link.parentElement as HTMLElement;
@@ -551,8 +554,8 @@ describe("All tools link", () => {
 
   it("hides the touch-revealed warning again when the user taps elsewhere, and reveals it on the next tap", async () => {
     renderProposal();
-    fireEvent.change(await screen.findByLabelText(en.fields.taskText), { target: { value: "Redesign our landing page" } });
-    fireEvent.change(screen.getByLabelText(en.fields.freelancerPositioning), { target: { value: "Product designer" } });
+    fireEvent.change(await screen.findByLabelText(labelStartingWith(en.fields.taskText)), { target: { value: "Redesign our landing page" } });
+    fireEvent.change(screen.getByLabelText(labelStartingWith(en.fields.freelancerPositioning)), { target: { value: "Product designer" } });
     fireEvent.click(screen.getByRole("button", { name: en.generate.submit }));
     const link = await screen.findByRole("link", { name: /All tools/ });
     const wrap = link.parentElement as HTMLElement;
@@ -581,8 +584,8 @@ describe("All tools link", () => {
     fireEvent.touchStart(link);
     fireEvent.click(link);
 
-    fireEvent.change(await screen.findByLabelText(en.fields.taskText), { target: { value: "Redesign our landing page" } });
-    fireEvent.change(screen.getByLabelText(en.fields.freelancerPositioning), { target: { value: "Product designer" } });
+    fireEvent.change(await screen.findByLabelText(labelStartingWith(en.fields.taskText)), { target: { value: "Redesign our landing page" } });
+    fireEvent.change(screen.getByLabelText(labelStartingWith(en.fields.freelancerPositioning)), { target: { value: "Product designer" } });
     fireEvent.click(screen.getByRole("button", { name: en.generate.submit }));
     await screen.findByRole("tooltip");
 

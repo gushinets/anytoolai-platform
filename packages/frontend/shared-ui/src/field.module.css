@@ -5,10 +5,15 @@
   background: var(--color-surface-card);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-input);
-  min-height: 44px;
   padding: 10px 12px;
   color: var(--color-text);
   font: inherit;
+}
+
+/* Zero specificity on purpose: a product class that sets its own min-height (a tall textarea) wins
+ * whatever the CSS bundle order is, instead of tying with `.field` at equal specificity. */
+:where(.field) {
+  min-height: 44px;
 }
 
 .field::placeholder {

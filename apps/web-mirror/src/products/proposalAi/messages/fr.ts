@@ -10,10 +10,16 @@ export const fr: Shape<typeof en> = {
     taskText: "Décrivez la mission",
     taskTextPlaceholder: "Collez la mission, le brief ou l’offre du client.",
     taskTextHelp: "Indiquez l’objectif, les livrables, les contraintes et le calendrier si possible.",
-    freelancerPositioning: "Votre positionnement",
+    freelancerPositioning: "Votre expérience et vos points forts",
     freelancerPositioningPlaceholder: "Décrivez l’expérience et les points forts qui font de vous le bon profil.",
-    freelancerPositioningHelp: "N’avancez que ce que vous pouvez assumer : la proposition n’inventera pas d’expérience.",
+    freelancerPositioningHelp: "La proposition repose uniquement sur ce que vous écrivez ici. Indiquez des faits vérifiables : outils, projets, résultats.",
     toneLegend: "Style de la proposition",
+    required: "obligatoire",
+    languageLabel: "Langue de la proposition",
+    languageHelp: "Ce n’est pas la langue de l’interface. Par défaut, la proposition est rédigée dans la langue de la mission.",
+    languageAuto: "Comme la mission",
+    counterNear: "Vous approchez de la limite de {max} caractères.",
+    counterOver: "Limite de {max} caractères dépassée.",
   },
   toneOptions: {
     warm: "Chaleureux et personnel",
@@ -22,7 +28,11 @@ export const fr: Shape<typeof en> = {
   },
   fieldNames: {
     taskText: "La description de la mission",
-    freelancerPositioning: "Votre positionnement",
+    freelancerPositioning: "Votre expérience et vos points forts",
+  },
+  result: {
+    gapsTitle: "Ce que votre expérience ne couvre pas",
+    gapsHint: "La proposition ne l’affirme pas. Complétez-le vous-même ou passez-le sous silence.",
   },
   generate: {
     submit: "Générer la proposition",

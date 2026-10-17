@@ -267,6 +267,24 @@ describe("Client Update Writer product definitions", () => {
     }
   });
 
+  it("trims pasted outer whitespace instead of rejecting it, and sends the trimmed values", async () => {
+    const ids = MODE_IDS.update;
+    const { routes, queues } = bootAndHappyPathRoutes(ids, { text: "Done.", call_to_action: "Reply." });
+    const { client, calls } = makeClient(queues);
+
+    render(<ProductRunPage definition={updateDefinition} client={client} />);
+    await waitFor(() => expect(screen.getByLabelText("Progress notes")).toBeTruthy());
+    fireEvent.change(screen.getByLabelText("Progress notes"), { target: { value: "  Redesign is done.\n\n" } });
+    fireEvent.click(screen.getByRole("radio", { name: "warm" }));
+    fireEvent.click(screen.getByRole("button", { name: "Write update" }));
+
+    await waitFor(() => expect(calls.some((call) => call.key === routes.START)).toBe(true));
+    const startCall = calls.find((call) => call.key === routes.START);
+    expect(JSON.parse(startCall?.init.body as string)).toMatchObject({
+      input: { progress_notes: "Redesign is done.", tone: "warm" },
+    });
+  });
+
   it("Update mode validates progress_notes/tone and maps them to update_input_v1", async () => {
     const ids = MODE_IDS.update;
     const { routes, queues } = bootAndHappyPathRoutes(ids, {
@@ -703,8 +721,8 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
       [routes.RUNTIME_CONFIG]: [runtimeConfigResponse(ids)],
       [routes.GUEST_IDENTITY]: [guestIdentityResponse()],
       [routes.QUOTA]: [quotaResponse(ids)],
-      // Same Idempotency-Key handle retries START a second time -- both return the same session.
-      [routes.START]: [startResponse(), startResponse()],
+      // The start succeeds once; Try again follows its known session instead of starting again.
+      [routes.START]: [startResponse()],
       // First poll GET fails outright (connection loss); the retry's poll GET then succeeds.
       [routes.SESSION]: [errorResponse(500, "internal_error"), sessionResponse()],
       [routes.RESULT]: [resultResponse(ids, { output: { text: "Reattached." } })],
@@ -731,11 +749,10 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     await waitFor(() => expect(screen.getByText("Reattached.")).toBeTruthy());
 
-    // Reattached to the same logical run via the same Idempotency-Key, not a fresh one.
-    const startCalls = calls.filter((call) => call.key === routes.START);
-    expect(startCalls).toHaveLength(2);
-    expect(idempotencyKeyOf(startCalls[0]!)).toBeTruthy();
-    expect(idempotencyKeyOf(startCalls[1]!)).toBe(idempotencyKeyOf(startCalls[0]!));
+    // Reattached to the same logical run by polling the session the start created, not by
+    // sending the start again.
+    expect(calls.filter((call) => call.key === routes.START)).toHaveLength(1);
+    expect(calls.filter((call) => call.key === routes.SESSION)).toHaveLength(2);
     expect((screen.getByRole("radio", { name: "Update" }) as HTMLInputElement).disabled).toBe(false);
   });
 
@@ -756,7 +773,7 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
       // First START attempt is itself ambiguous (a lost/failed response, not a clean rejection);
       // the retry with the same Idempotency-Key is what the real backend would collapse onto
       // whatever it actually did with the first one.
-      [routes.START]: [errorResponse(500, "internal_error"), startResponse()],
+      [routes.START]: [errorResponse(500, "internal_error"), errorResponse(500, "internal_error"), startResponse()],
       [routes.SESSION]: [sessionResponse()],
       [routes.RESULT]: [resultResponse(ids, { output: { text: "Reattached from start." } })],
     });
@@ -783,9 +800,10 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
     await waitFor(() => expect(screen.getByText("Reattached from start.")).toBeTruthy());
 
     const startCalls = calls.filter((call) => call.key === routes.START);
-    expect(startCalls).toHaveLength(2);
+    // Two attempts from the automatic retry, then the user's "Try again": one key throughout.
+    expect(startCalls).toHaveLength(3);
     expect(idempotencyKeyOf(startCalls[0]!)).toBeTruthy();
-    expect(idempotencyKeyOf(startCalls[1]!)).toBe(idempotencyKeyOf(startCalls[0]!));
+    expect(new Set(startCalls.map((call) => idempotencyKeyOf(call))).size).toBe(1);
     expect((screen.getByRole("radio", { name: "Update" }) as HTMLInputElement).disabled).toBe(false);
   });
 

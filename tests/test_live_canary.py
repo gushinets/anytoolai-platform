@@ -109,7 +109,7 @@ def test_select_atom_lab_model_uses_requested_compatible_model_and_supported_eff
     catalog = {
         "items": [
             {
-                "model_id": "openai/gpt-5.4-mini",
+                "model_id": "openai/gpt-6-luna",
                 "compatibility": "compatible",
                 "reasoning_supported": True,
                 "allowed_reasoning_efforts": ["low", "high"],
@@ -123,9 +123,9 @@ def test_select_atom_lab_model_uses_requested_compatible_model_and_supported_eff
         ]
     }
 
-    selected = module._select_atom_lab_model(catalog, requested_model_id="openai/gpt-5.4-mini")
+    selected = module._select_atom_lab_model(catalog, requested_model_id="openai/gpt-6-luna")
 
-    assert selected == ("openai/gpt-5.4-mini", ("low", "high"))
+    assert selected == ("openai/gpt-6-luna", ("low", "high"))
 
 
 def test_select_atom_lab_model_prefers_reasoning_capable_model_when_not_pinned() -> None:
@@ -153,23 +153,23 @@ def test_select_atom_lab_model_addresses_raw_catalog_id_for_run_admission() -> N
     module = load_live_canary_module()
     catalog = {
         "items": [{
-            "model_id": "gpt-5.4-mini", "compatibility": "compatible",
+            "model_id": "gpt-6-luna", "compatibility": "compatible",
             "reasoning_supported": True, "allowed_reasoning_efforts": ["high"],
         }]
     }
 
     assert module._select_atom_lab_model(
-        catalog, requested_model_id="openai/gpt-5.4-mini",
-    ) == ("openai/gpt-5.4-mini", ("high",))
+        catalog, requested_model_id="openai/gpt-6-luna",
+    ) == ("openai/gpt-6-luna", ("high",))
 
 
 @pytest.mark.parametrize(
     ("mutate", "response_model_id", "expected"),
     [
-        (lambda rows: rows, "gpt-5.4-mini-2026-09-01", True),
+        (lambda rows: rows, "gpt-6-luna-2026-09-01", True),
         (
             lambda rows: [{**rows[0], "gateway_model": "openai/gpt-5.4"}, rows[1]],
-            "gpt-5.4-mini-2026-09-01",
+            "gpt-6-luna-2026-09-01",
             False,
         ),
         (
@@ -183,7 +183,7 @@ def test_select_atom_lab_model_addresses_raw_catalog_id_for_run_admission() -> N
                     },
                 },
             ],
-            "gpt-5.4-mini-2026-09-01",
+            "gpt-6-luna-2026-09-01",
             False,
         ),
         (
@@ -197,7 +197,7 @@ def test_select_atom_lab_model_addresses_raw_catalog_id_for_run_admission() -> N
                     },
                 },
             ],
-            "gpt-5.4-mini-2026-09-01",
+            "gpt-6-luna-2026-09-01",
             False,
         ),
         (lambda rows: rows, "gpt-5.4-2026-09-01", False),
@@ -209,18 +209,18 @@ def test_atom_lab_provider_calls_keep_direct_model_and_effort_across_retries(
     module = load_live_canary_module()
     rows = [
         {
-            "gateway_model": "openai/gpt-5.4-mini",
+            "gateway_model": "openai/gpt-6-luna",
             "metadata": {"model_addressing": "direct", "reasoning_effort": "high"},
         },
         {
-            "gateway_model": "openai/gpt-5.4-mini",
+            "gateway_model": "openai/gpt-6-luna",
             "metadata": {"model_addressing": "direct", "reasoning_effort": "high"},
         },
     ]
 
     assert module._provider_calls_match_atom_lab_request(
         mutate(rows),
-        requested_model_id="openai/gpt-5.4-mini",
+        requested_model_id="openai/gpt-6-luna",
         reasoning_effort="high",
         response_model_id=response_model_id,
     ) is expected
@@ -247,7 +247,7 @@ def test_run_atom_lab_case_replays_idempotently_and_records_verified_evidence(mo
                     "provider": {
                         "policy_ref": "atom_lab.direct",
                         "policy": {"provider": "openai"},
-                        "model_id": "openai/gpt-5.4-mini",
+                        "model_id": "openai/gpt-6-luna",
                         "reasoning_effort": "high",
                         "capability_snapshot_id": "catalog-snapshot-1",
                         "capability_provenance": {"source": "provider"},
@@ -262,7 +262,7 @@ def test_run_atom_lab_case_replays_idempotently_and_records_verified_evidence(mo
                 },
                 "result": None,
                 "diagnostics": {
-                    "requested_model_id": "openai/gpt-5.4-mini",
+                    "requested_model_id": "openai/gpt-6-luna",
                     "requested_reasoning_effort": "high",
                     "response_model_id": None,
                 },
@@ -284,7 +284,7 @@ def test_run_atom_lab_case_replays_idempotently_and_records_verified_evidence(mo
                     "provider": {
                         "policy_ref": "atom_lab.direct",
                         "policy": {"provider": "openai"},
-                        "model_id": "openai/gpt-5.4-mini",
+                        "model_id": "openai/gpt-6-luna",
                         "reasoning_effort": "high",
                         "capability_snapshot_id": "catalog-snapshot-1",
                         "capability_provenance": {"source": "provider"},
@@ -299,9 +299,9 @@ def test_run_atom_lab_case_replays_idempotently_and_records_verified_evidence(mo
                 },
                 "result": {"values": {"marker": "acceptance"}},
                 "diagnostics": {
-                    "requested_model_id": "openai/gpt-5.4-mini",
+                    "requested_model_id": "openai/gpt-6-luna",
                     "requested_reasoning_effort": "high",
-                    "response_model_id": "gpt-5.4-mini-2026-09-01",
+                    "response_model_id": "gpt-6-luna-2026-09-01",
                 },
                 "created_at": "2026-09-24T10:00:00Z",
                 "finished_at": "2026-09-24T10:00:02Z",
@@ -341,7 +341,7 @@ def test_run_atom_lab_case_replays_idempotently_and_records_verified_evidence(mo
         module,
         "_fetch_atom_lab_provider_calls",
         lambda engine, session_id: fetched_sessions.append(session_id) or [{
-            "gateway_model": "openai/gpt-5.4-mini",
+            "gateway_model": "openai/gpt-6-luna",
             "metadata": {"model_addressing": "direct", "reasoning_effort": "high"},
         }],
     )
@@ -353,7 +353,7 @@ def test_run_atom_lab_case_replays_idempotently_and_records_verified_evidence(mo
             atom_id="A01",
             input_payload={"source_text": "acceptance", "fields": [], "strict": False},
         ),
-        prompt="Use the requested language.", model_id="openai/gpt-5.4-mini",
+        prompt="Use the requested language.", model_id="openai/gpt-6-luna",
         reasoning_effort="high", access_code="lab-secret", timeout=3.0,
     )
 
@@ -361,8 +361,8 @@ def test_run_atom_lab_case_replays_idempotently_and_records_verified_evidence(mo
     assert case.run_id == "run-1"
     assert case.action_run_id == "action-1"
     assert case.artifact_id == "artifact-1"
-    assert case.requested_model_id == "openai/gpt-5.4-mini"
-    assert case.response_model_id == "gpt-5.4-mini-2026-09-01"
+    assert case.requested_model_id == "openai/gpt-6-luna"
+    assert case.response_model_id == "gpt-6-luna-2026-09-01"
     assert case.reasoning_effort == "high"
     assert case.input_valid is True
     assert case.result_valid is True
@@ -404,7 +404,7 @@ def test_atom_lab_http_failure_marks_cost_unknown_when_ledger_recovery_fails(
             atom_id="A01",
             input_payload={"source_text": "acceptance", "fields": [], "strict": False},
         ),
-        prompt="Prompt", model_id="openai/gpt-5.4-mini", reasoning_effort=None,
+        prompt="Prompt", model_id="openai/gpt-6-luna", reasoning_effort=None,
         access_code="lab-secret", timeout=1.0,
     )
 
@@ -443,7 +443,7 @@ def test_atom_lab_worker_lease_loss_with_empty_ledger_stops_costed_matrix(monkey
             atom_id="A01",
             input_payload={"source_text": "acceptance", "fields": [], "strict": False},
         ),
-        prompt="Prompt", model_id="openai/gpt-5.4-mini", reasoning_effort=None,
+        prompt="Prompt", model_id="openai/gpt-6-luna", reasoning_effort=None,
         access_code="lab-secret", timeout=1.0,
     )
 
@@ -469,7 +469,7 @@ def test_atom_lab_ambiguous_admission_replays_once_then_fails_cost_closed(monkey
             atom_id="A01",
             input_payload={"source_text": "acceptance", "fields": [], "strict": False},
         ),
-        prompt="Prompt", model_id="openai/gpt-5.4-mini", reasoning_effort=None,
+        prompt="Prompt", model_id="openai/gpt-6-luna", reasoning_effort=None,
         access_code="lab-secret", timeout=1.0,
     )
 
@@ -501,7 +501,7 @@ def test_atom_lab_blank_admission_ids_replay_once_then_fail_cost_closed(monkeypa
             atom_id="A01",
             input_payload={"source_text": "acceptance", "fields": [], "strict": False},
         ),
-        prompt="Prompt", model_id="openai/gpt-5.4-mini", reasoning_effort=None,
+        prompt="Prompt", model_id="openai/gpt-6-luna", reasoning_effort=None,
         access_code="lab-secret", timeout=1.0,
     )
 
@@ -537,7 +537,7 @@ def test_atom_lab_success_requires_actual_model_and_completion_date(
                 "input": {"source_text": "acceptance", "fields": [], "strict": False},
                 "prompt": {"content": "Prompt"},
                 "provider": {
-                    "model_id": "openai/gpt-5.4-mini", "reasoning_effort": None,
+                    "model_id": "openai/gpt-6-luna", "reasoning_effort": None,
                 },
                 "preset": {"id": None, "version": None},
             },
@@ -547,7 +547,7 @@ def test_atom_lab_success_requires_actual_model_and_completion_date(
             },
             "result": {"values": {"marker": "acceptance"}},
             "diagnostics": {
-                "requested_model_id": "openai/gpt-5.4-mini",
+                "requested_model_id": "openai/gpt-6-luna",
                 "requested_reasoning_effort": None,
                 "response_model_id": response_model_id,
             },
@@ -569,7 +569,7 @@ def test_atom_lab_success_requires_actual_model_and_completion_date(
             atom_id="A01",
             input_payload={"source_text": "acceptance", "fields": [], "strict": False},
         ),
-        prompt="Prompt", model_id="openai/gpt-5.4-mini", reasoning_effort=None,
+        prompt="Prompt", model_id="openai/gpt-6-luna", reasoning_effort=None,
         access_code="lab-secret", timeout=1.0,
     )
 
@@ -615,7 +615,7 @@ def test_atom_lab_success_rejects_result_outside_repository_output_contract(
                 "atom_id": "A01", "input": input_payload,
                 "prompt": {"content": "Prompt"},
                 "provider": {
-                    "model_id": "openai/gpt-5.4-mini", "reasoning_effort": None,
+                    "model_id": "openai/gpt-6-luna", "reasoning_effort": None,
                 },
                 "preset": {"id": None, "version": None},
             },
@@ -625,9 +625,9 @@ def test_atom_lab_success_rejects_result_outside_repository_output_contract(
             },
             "result": invalid_result,
             "diagnostics": {
-                "requested_model_id": "openai/gpt-5.4-mini",
+                "requested_model_id": "openai/gpt-6-luna",
                 "requested_reasoning_effort": None,
-                "response_model_id": "gpt-5.4-mini-2026-09-01",
+                "response_model_id": "gpt-6-luna-2026-09-01",
             },
             "finished_at": "2026-09-24T10:00:02Z",
         },
@@ -642,7 +642,7 @@ def test_atom_lab_success_rejects_result_outside_repository_output_contract(
     result = module._run_atom_lab_case(
         "http://api", object(),
         case=module.AtomLabCase(atom_id="A01", input_payload=input_payload),
-        prompt="Prompt", model_id="openai/gpt-5.4-mini", reasoning_effort=None,
+        prompt="Prompt", model_id="openai/gpt-6-luna", reasoning_effort=None,
         access_code="lab-secret", timeout=1.0,
         output_schema=atom.output_schema,
         output_validator=validator,
@@ -668,7 +668,7 @@ def test_atom_lab_idempotency_mismatch_fails_cost_closed(monkeypatch, replay_out
                 "input": {"source_text": "acceptance", "fields": [], "strict": False},
                 "prompt": {"content": "Prompt"},
                 "provider": {
-                    "model_id": "openai/gpt-5.4-mini", "reasoning_effort": None,
+                    "model_id": "openai/gpt-6-luna", "reasoning_effort": None,
                 },
                 "preset": {"id": None, "version": None},
             },
@@ -678,7 +678,7 @@ def test_atom_lab_idempotency_mismatch_fails_cost_closed(monkeypatch, replay_out
             },
             "result": {"values": {"marker": "acceptance"}},
             "diagnostics": {
-                "requested_model_id": "openai/gpt-5.4-mini",
+                "requested_model_id": "openai/gpt-6-luna",
                 "requested_reasoning_effort": None,
                 "response_model_id": "gpt-5.4-2026-09-01",
             },
@@ -711,7 +711,7 @@ def test_atom_lab_idempotency_mismatch_fails_cost_closed(monkeypatch, replay_out
             atom_id="A01",
             input_payload={"source_text": "acceptance", "fields": [], "strict": False},
         ),
-        prompt="Prompt", model_id="openai/gpt-5.4-mini", reasoning_effort=None,
+        prompt="Prompt", model_id="openai/gpt-6-luna", reasoning_effort=None,
         access_code="lab-secret", timeout=1.0,
     )
 
@@ -747,7 +747,7 @@ def test_atom_lab_nonterminal_poll_loss_fails_cost_closed(monkeypatch, poll_outc
             atom_id="A01",
             input_payload={"source_text": "acceptance", "fields": [], "strict": False},
         ),
-        prompt="Prompt", model_id="openai/gpt-5.4-mini", reasoning_effort=None,
+        prompt="Prompt", model_id="openai/gpt-6-luna", reasoning_effort=None,
         access_code="lab-secret", timeout=0.0 if poll_outcome == "deadline" else 1.0,
     )
 
@@ -779,7 +779,7 @@ def test_run_atom_lab_reuses_catalog_prompts_and_adds_supported_reasoning_combin
         if url.endswith("/models"):
             return {
                 "items": [{
-                    "model_id": "gpt-5.4-mini", "compatibility": "compatible",
+                    "model_id": "gpt-6-luna", "compatibility": "compatible",
                     "reasoning_supported": True,
                     "allowed_reasoning_efforts": ["low", "high"],
                 }]
@@ -851,7 +851,7 @@ def test_run_atom_lab_stops_after_worker_lease_loss_leaves_cost_unknown(monkeypa
             ]
         if url.endswith("/models"):
             return {"items": [{
-                "model_id": "gpt-5.4-mini", "compatibility": "compatible",
+                "model_id": "gpt-6-luna", "compatibility": "compatible",
                 "reasoning_supported": True, "allowed_reasoning_efforts": ["high"],
             }]}
         raise AssertionError(url)
@@ -895,7 +895,7 @@ def test_main_routes_atom_lab_surface_to_existing_canary_and_separate_evidence_r
     monkeypatch.setenv(_TEST_DATABASE_URL_ENV, "postgresql://u:p@127.0.0.1:5432/db")
     monkeypatch.setenv(module.LIVE_CANARY_SURFACE_ENV_VAR, module.ATOM_LAB_SURFACE)
     monkeypatch.setenv(module.ATOM_LAB_ACCESS_CODE_ENV_VAR, "lab-secret")
-    monkeypatch.setenv(module.ATOM_LAB_MODEL_ID_ENV_VAR, "openai/gpt-5.4-mini")
+    monkeypatch.setenv(module.ATOM_LAB_MODEL_ID_ENV_VAR, "openai/gpt-6-luna")
     captured: dict = {}
 
     def fake_run_atom_lab(*args, **kwargs):
@@ -912,7 +912,7 @@ def test_main_routes_atom_lab_surface_to_existing_canary_and_separate_evidence_r
 
     assert module.main() == 0
     assert captured["access_code"] == "lab-secret"
-    assert captured["requested_model_id"] == "openai/gpt-5.4-mini"
+    assert captured["requested_model_id"] == "openai/gpt-6-luna"
     assert captured["output_root"].as_posix().endswith(".agent/live-canary/atom-lab")
 
 
@@ -1473,7 +1473,7 @@ def test_write_evidence_report_counts_atom_lab_reasoning_combinations(tmp_path) 
     reasoning = module.EvidenceCase(
         label="A01-reasoning-high", scenario_id="atom-lab.A01-reasoning-high",
         kind="reasoning", status="pass", session_id="session", job_id="job",
-        error_code=None, error_message=None, steps=(), requested_model_id="openai/gpt-5.4-mini",
+        error_code=None, error_message=None, steps=(), requested_model_id="openai/gpt-6-luna",
         reasoning_effort="high", input_valid=True, result_valid=True,
     )
 

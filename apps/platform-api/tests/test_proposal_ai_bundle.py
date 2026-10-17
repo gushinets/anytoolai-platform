@@ -70,11 +70,16 @@ class _FixedFixtureProviderAdapter(FakeProviderAdapter):
     (e.g. the weak-input variant) so the run's own output can be asserted against it, without any
     change to product or platform runtime code."""
 
-    def __init__(self, fixture_root: Path, *, fixture_key: str) -> None:
+    def __init__(self, fixture_root: Path, *, fixture_key: str, action_config_id: str) -> None:
         super().__init__(fixture_root)
         self._forced_fixture_key = fixture_key
+        self._forced_action_config_id = action_config_id
 
     async def complete(self, request: ResolvedProviderRequest) -> ProviderResponse:
+        # ProposalAI v2 runs two actions (gap detection, then the proposal): only the named one is
+        # pinned, the other keeps its natural fixture.
+        if request.action_config_id != self._forced_action_config_id:
+            return await super().complete(request)
         return await super().complete(replace(request, fixture_key=self._forced_fixture_key))
 
 
@@ -121,7 +126,7 @@ def test_proposal_ai_happy_path_invokes_a06_once_and_produces_canonical_artifact
     assert processed.id == started["job_id"]
     assert processed.status is JobStatus.succeeded
     assert processed.result_artifact_id is not None
-    assert _provider_call_count(session_factory, job_id=started["job_id"]) == 1
+    assert _provider_call_count(session_factory, job_id=started["job_id"]) == 2
 
     session_response = asyncio.run(
         request_platform_api(
@@ -145,8 +150,9 @@ def test_proposal_ai_happy_path_invokes_a06_once_and_produces_canonical_artifact
     assert result_response.status_code == HTTPStatus.OK
     result_body = result_response.json()
     assert result_body["workflow_id"] == "proposal_ai.generate_v1"
-    assert result_body["schema_ref"] == "kernel.schemas.compose_persuasive_text_output_v1"
-    assert set(result_body["output"]) == {"text"}
+    assert result_body["schema_ref"] == "proposal_ai.generate_output_v1"
+    assert set(result_body["output"]) == {"text", "gaps"}
+    assert result_body["output"]["gaps"] == []
     assert isinstance(result_body["output"]["text"], str)
     assert 1 <= len(result_body["output"]["text"]) <= 4000
 
@@ -217,7 +223,7 @@ def test_proposal_ai_weak_but_non_empty_input_still_passes_schema_and_completes(
 
     assert processed is not None
     assert processed.status is JobStatus.succeeded
-    assert _provider_call_count(session_factory, job_id=started["job_id"]) == 1
+    assert _provider_call_count(session_factory, job_id=started["job_id"]) == 2
 
 
 def test_proposal_ai_weak_input_end_to_end_produces_the_checked_in_weak_fixture_artifact(
@@ -250,7 +256,11 @@ def test_proposal_ai_weak_input_end_to_end_produces_the_checked_in_weak_fixture_
         app,
         session_factory,
         provider_adapters={
-            "fake": _FixedFixtureProviderAdapter(FIXTURE_ROOT, fixture_key=weak_fixture_key)
+            "fake": _FixedFixtureProviderAdapter(
+                FIXTURE_ROOT,
+                fixture_key=weak_fixture_key,
+                action_config_id="proposal_ai.compose_persuasive_text_v1",
+            )
         },
     )
     processed = asyncio.run(worker.process_next_job())
@@ -269,7 +279,60 @@ def test_proposal_ai_weak_input_end_to_end_produces_the_checked_in_weak_fixture_
         )
     )
     assert result_response.status_code == HTTPStatus.OK
-    assert result_response.json()["output"] == {"text": expected_text}
+    assert result_response.json()["output"] == {"text": expected_text, "gaps": []}
+
+
+def test_proposal_ai_returns_detected_experience_gaps_next_to_the_text(
+    app: Any,
+    request_platform_api,
+    session_factory: SessionFactory,
+) -> None:
+    """The gaps step output reaches the final artifact (`gaps`) and the proposal step still
+    produces `text`: two provider calls, one per step."""
+    gaps_fixture_key = "proposal_ai.detect_experience_gaps_v1.with_gaps"
+    expected_gaps = json.loads(
+        (FIXTURE_ROOT / f"{gaps_fixture_key}.json").read_text(encoding="utf-8")
+    )["response_json"]["issues"]
+
+    started = _start(
+        app,
+        request_platform_api,
+        input_payload={
+            "task_text": "Integrate our forms with HubSpot CRM. Must have experience with HubSpot CRM.",
+            "freelancer_positioning": "Make.com and n8n automations, Telegram bots.",
+        },
+        request_id="req_start_gaps",
+    )
+
+    worker = _build_worker(
+        app,
+        session_factory,
+        provider_adapters={
+            "fake": _FixedFixtureProviderAdapter(
+                FIXTURE_ROOT,
+                fixture_key=gaps_fixture_key,
+                action_config_id="proposal_ai.detect_experience_gaps_v1",
+            )
+        },
+    )
+    processed = asyncio.run(worker.process_next_job())
+    worker.dispose()
+
+    assert processed is not None
+    assert processed.status is JobStatus.succeeded
+    assert _provider_call_count(session_factory, job_id=started["job_id"]) == 2
+    result_response = asyncio.run(
+        request_platform_api(
+            app,
+            "GET",
+            f"/v1/results/{processed.result_artifact_id}",
+            request_id="req_result_gaps",
+        )
+    )
+    assert result_response.status_code == HTTPStatus.OK
+    output = result_response.json()["output"]
+    assert output["gaps"] == expected_gaps
+    assert isinstance(output["text"], str) and output["text"]
 
 
 @pytest.mark.parametrize(

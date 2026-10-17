@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { Button, Card, Toast } from "@anytoolai/shared-ui";
 import { GeneratedTextRenderer } from "@anytoolai/web-result-kit";
 import { useHostT } from "../i18n";
@@ -22,8 +22,33 @@ export type ResultViewProps = {
 export function ResultView({ text, onCopy, embedded = false, secondaryAction }: ResultViewProps) {
   const t = useHostT();
   const [copyState, setCopyState] = useState<"idle" | "copying" | "copied" | "error">("idle");
+  const anchorRef = useRef<HTMLSpanElement>(null);
+  // The Copy button is disabled while copying, and a disabled button drops keyboard focus. Remember
+  // it if it had focus and give focus back once the copy settles -- only if focus is still lost:
+  // a user who moved it elsewhere meanwhile keeps it there.
+  const refocusRef = useRef<HTMLElement | null>(null);
 
-  function handleCopy() {
+  // Last resort when the clipboard is blocked (embedded browsers): select the text so the user can
+  // copy it with the keyboard or the system menu.
+  function handleSelectText() {
+    const textElement = anchorRef.current?.nextElementSibling;
+    if (textElement) {
+      window.getSelection()?.selectAllChildren(textElement);
+    }
+  }
+
+  useEffect(() => {
+    if (copyState !== "copying" && refocusRef.current) {
+      const active = document.activeElement;
+      if (!active || active === document.body) {
+        refocusRef.current.focus();
+      }
+      refocusRef.current = null;
+    }
+  }, [copyState]);
+
+  function handleCopy(event: MouseEvent<HTMLButtonElement>) {
+    refocusRef.current = document.activeElement === event.currentTarget ? event.currentTarget : null;
     if (!onCopy) {
       setCopyState("error");
       return;
@@ -45,13 +70,25 @@ export function ResultView({ text, onCopy, embedded = false, secondaryAction }: 
       {copyState === "copied" ? t("result.copied") : copyState === "copying" ? t("result.copying") : t("result.copy")}
     </Button>
   );
+  // "Select text" sits in the same row as Copy: it is the fallback for the same action.
+  const selectButton =
+    copyState === "error" ? (
+      <Button variant="secondary" onClick={handleSelectText}>
+        {t("result.selectText")}
+      </Button>
+    ) : null;
   return (
     <Container className={styles.stack}>
+      {/* Empty marker: the text element right after it is what "Select text" selects. */}
+      <span ref={anchorRef} hidden />
       <GeneratedTextRenderer text={text} />
-      {secondaryAction ? <div className={styles.actions}>{copyButton}{secondaryAction}</div> : copyButton}
-      {copyState === "error" ? (
-        <Toast variant="error">{t("result.copyFailed")}</Toast>
-      ) : null}
+      {/* Always wrapped: a wrapper that appeared only on error would remount the Copy button and drop its focus. */}
+      <div className={styles.actions}>
+        {copyButton}
+        {selectButton}
+        {secondaryAction}
+      </div>
+      {copyState === "error" ? <Toast variant="error">{t("result.copyFailed")}</Toast> : null}
     </Container>
   );
 }

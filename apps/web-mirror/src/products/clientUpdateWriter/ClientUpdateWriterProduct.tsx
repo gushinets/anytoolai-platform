@@ -8,8 +8,9 @@ import { ResultView } from "../../components/ResultView";
 import { useProductT } from "../../i18n";
 import {
   collectFieldErrors,
-  optionalTrimmedFieldError,
-  requiredTrimmedFieldError,
+  optionalBackendTrimmedFieldError,
+  requiredBackendTrimmedFieldError,
+  trimBackendWhitespace,
   type FieldError,
 } from "../runtime/fieldValidation";
 import type { ProductDefinition, ProductFieldsProps, ProductResultProps, ProductRunEvent } from "../runtime/productDefinition";
@@ -103,7 +104,7 @@ type UpdateValues = { progressNotes: string; tone: Tone | "" };
 
 function validateUpdate(values: UpdateValues): Partial<Record<keyof UpdateValues, FieldError>> {
   return collectFieldErrors<UpdateValues>([
-    ["progressNotes", requiredTrimmedFieldError(values.progressNotes, LONG_FIELD_MAX_LENGTH)],
+    ["progressNotes", requiredBackendTrimmedFieldError(values.progressNotes, LONG_FIELD_MAX_LENGTH)],
     ["tone", toneError(values.tone)],
   ]);
 }
@@ -136,7 +137,7 @@ export const updateDefinition: ProductDefinition<UpdateValues, ClientUpdateWrite
   messageScope: "update",
   emptyValues: { progressNotes: "", tone: "neutral" },
   validate: validateUpdate,
-  toInput: (values) => ({ progress_notes: values.progressNotes, tone: values.tone }),
+  toInput: (values) => ({ progress_notes: trimBackendWhitespace(values.progressNotes), tone: values.tone }),
   extractResult: extractComposeReplyResult,
   Fields: UpdateFields,
   Result: ClientUpdateWriterResultView,
@@ -148,8 +149,8 @@ type ReplyDraftValues = { clientMessage: string; replyGoal: string; tone: Tone |
 
 function validateReplyDraft(values: ReplyDraftValues): Partial<Record<keyof ReplyDraftValues, FieldError>> {
   return collectFieldErrors<ReplyDraftValues>([
-    ["clientMessage", requiredTrimmedFieldError(values.clientMessage, LONG_FIELD_MAX_LENGTH)],
-    ["replyGoal", requiredTrimmedFieldError(values.replyGoal, LONG_FIELD_MAX_LENGTH)],
+    ["clientMessage", requiredBackendTrimmedFieldError(values.clientMessage, LONG_FIELD_MAX_LENGTH)],
+    ["replyGoal", requiredBackendTrimmedFieldError(values.replyGoal, LONG_FIELD_MAX_LENGTH)],
     ["tone", toneError(values.tone)],
   ]);
 }
@@ -196,7 +197,11 @@ export const replyDraftDefinition: ProductDefinition<ReplyDraftValues, ClientUpd
   messageScope: "reply_draft",
   emptyValues: { clientMessage: "", replyGoal: "", tone: "neutral" },
   validate: validateReplyDraft,
-  toInput: (values) => ({ client_message: values.clientMessage, reply_goal: values.replyGoal, tone: values.tone }),
+  toInput: (values) => ({
+    client_message: trimBackendWhitespace(values.clientMessage),
+    reply_goal: trimBackendWhitespace(values.replyGoal),
+    tone: values.tone,
+  }),
   extractResult: extractComposeReplyResult,
   Fields: ReplyDraftFields,
   Result: ClientUpdateWriterResultView,
@@ -208,9 +213,9 @@ type PrepaidRequestValues = { billingNotes: string; billingAmount: string; billi
 
 function validatePrepaidRequest(values: PrepaidRequestValues): Partial<Record<keyof PrepaidRequestValues, FieldError>> {
   return collectFieldErrors<PrepaidRequestValues>([
-    ["billingNotes", requiredTrimmedFieldError(values.billingNotes, LONG_FIELD_MAX_LENGTH)],
-    ["billingAmount", requiredTrimmedFieldError(values.billingAmount, SHORT_FIELD_MAX_LENGTH)],
-    ["billingDueDate", optionalTrimmedFieldError(values.billingDueDate, SHORT_FIELD_MAX_LENGTH)],
+    ["billingNotes", requiredBackendTrimmedFieldError(values.billingNotes, LONG_FIELD_MAX_LENGTH)],
+    ["billingAmount", requiredBackendTrimmedFieldError(values.billingAmount, SHORT_FIELD_MAX_LENGTH)],
+    ["billingDueDate", optionalBackendTrimmedFieldError(values.billingDueDate, SHORT_FIELD_MAX_LENGTH)],
     ["tone", toneError(values.tone)],
   ]);
 }
@@ -271,9 +276,9 @@ export const prepaidRequestDefinition: ProductDefinition<PrepaidRequestValues, C
   validate: validatePrepaidRequest,
   toInput: (values) => ({
     billing_context: {
-      notes: values.billingNotes,
-      amount: values.billingAmount,
-      ...(values.billingDueDate.trim() ? { due_date: values.billingDueDate } : {}),
+      notes: trimBackendWhitespace(values.billingNotes),
+      amount: trimBackendWhitespace(values.billingAmount),
+      ...(trimBackendWhitespace(values.billingDueDate) ? { due_date: trimBackendWhitespace(values.billingDueDate) } : {}),
     },
     tone: values.tone,
   }),

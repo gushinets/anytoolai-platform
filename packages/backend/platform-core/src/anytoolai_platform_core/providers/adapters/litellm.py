@@ -18,6 +18,7 @@ from anytoolai_platform_core.providers.models import (
     ProviderModelAddressing,
     ProviderResponse,
     ProviderUsage,
+    ReasoningEffort,
     ResolvedProviderRequest,
 )
 from anytoolai_platform_core.structured_output.schemas import normalize_schema_mapping
@@ -168,6 +169,13 @@ class LiteLLMProviderAdapter:
         }
         if request.reasoning_effort is not None:
             kwargs["reasoning_effort"] = request.reasoning_effort.value
+            # LiteLLM's static model registry rejects the parameter for a model it does not list
+            # yet (for example a brand-new OpenAI model) although the API accepts it. Allowing it
+            # per request covers the direct path and the router; the router entry in
+            # litellm_router.yaml covers calls that carry no explicit effort.
+            kwargs["allowed_openai_params"] = ["reasoning_effort"]
+        if not self._sends_temperature(request):
+            del kwargs["temperature"]
 
         completion = (
             self._direct_completion
@@ -176,6 +184,29 @@ class LiteLLMProviderAdapter:
         )
         response = await completion(**kwargs)
         return _normalize_litellm_response(request, response)
+
+    def _sends_temperature(self, request: ResolvedProviderRequest) -> bool:
+        """A reasoning request takes the model's own temperature: OpenAI's reasoning models document
+        dropping the parameter and answer any value other than the default with a 400. The policy's
+        temperature is sent only where reasoning is known to be off: an explicit effort of `none`,
+        or a router alias whose deployment sets no effort. A direct model (Atom Lab) that names no
+        effort runs at the model's own default effort, which the adapter does not know (every
+        OpenAI model since GPT-5 defaults to medium), so it is treated as reasoning and the
+        provider applies its default temperature, unless LiteLLM's model registry lists the model
+        without reasoning support (GPT-4o): that model takes the requested temperature. A model the
+        registry does not list stays on the reasoning default."""
+        if request.reasoning_effort is not None:
+            return request.reasoning_effort is ReasoningEffort.none
+        if request.model_addressing is ProviderModelAddressing.direct:
+            try:
+                return not litellm.get_model_info(request.model).get("supports_reasoning")
+            except Exception:  # LiteLLM raises a bare Exception for a model it does not list
+                return False
+        for deployment in getattr(self._router, "model_list", None) or []:
+            if deployment.get("model_name") == request.model:
+                effort = (deployment.get("litellm_params") or {}).get("reasoning_effort")
+                return effort in (None, ReasoningEffort.none.value)
+        return True
 
     def _messages_for(self, request: ResolvedProviderRequest) -> list[dict[str, Any]]:
         messages = (
@@ -214,8 +245,16 @@ def load_litellm_router_config(path: Path) -> dict[str, Any]:
     }
 
 
-def build_litellm_router(config_root: Path | None = None) -> Router:
+def build_litellm_adapter(config_root: Path | None = None) -> LiteLLMProviderAdapter:
     config = load_litellm_router_config(default_litellm_router_config_path(config_root))
+    return LiteLLMProviderAdapter(_router_from(config))
+
+
+def build_litellm_router(config_root: Path | None = None) -> Router:
+    return _router_from(load_litellm_router_config(default_litellm_router_config_path(config_root)))
+
+
+def _router_from(config: dict[str, Any]) -> Router:
     router_kwargs = {
         "model_list": config["model_list"],
         **config["router_settings"],
@@ -255,7 +294,9 @@ def _schema_guidance_message(schema: Mapping[str, Any]) -> dict[str, str]:
         "role": "system",
         "content": (
             "Return JSON that matches this schema exactly. "
-            "Do not wrap the JSON in markdown fences.\n"
+            "Do not wrap the JSON in markdown fences. "
+            "Inside JSON strings write line breaks as the escape sequence \\n, never as a "
+            "literal newline.\n"
             f"JSON Schema: {schema_json}"
         ),
     }
