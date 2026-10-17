@@ -112,6 +112,25 @@ def test_a_space_grouped_fee_may_be_restated() -> None:
     _validate_fee("My fixed fee is 3 200,50 EUR", "My fixed fee is 3200.50 EUR.")
 
 
+@pytest.mark.parametrize(
+    ("profile", "faithful", "invented"),
+    [
+        ("My fixed fee is CHF 1'500.", "My fixed fee is CHF 1500.", "My fixed fee is CHF 500."),
+        ("My fixed fee is CHF 1'500.", "My fixed fee is CHF 1,500.", "My fixed fee is CHF 1."),
+        ("My fixed fee is CHF 1’500.", "My fixed fee is CHF 1500.", "My fixed fee is CHF 500."),
+        ("My fixed fee is CHF 1'500.50.", "My fixed fee is CHF 1500.50.", "My fixed fee is CHF 500.50."),
+        ("I delivered +20% revenue growth.", "I delivered 20% revenue growth.", "I delivered -20% revenue growth."),
+        ("My fixed fee is +200 EUR.", "My fixed fee is 200 EUR.", "My fixed fee is -200 EUR."),
+        ("My rate is $1.234k.", "My rate is $1,234.", "My rate is $1,234,000."),
+        ("I processed .5M rows.", "I processed 500,000 rows.", "I processed 5,000,000 rows."),
+    ],
+)
+def test_a_number_is_read_by_its_shape(profile: str, faithful: str, invented: str) -> None:
+    _validate_fee(profile, faithful)
+    with pytest.raises(StructuredOutputValidationError):
+        _validate_fee(profile, invented)
+
+
 def test_a_scaled_fee_keeps_its_exact_fraction() -> None:
     _validate_fee("My fixed fee is $1.2345k", "My fixed fee is $1,234.50.")
     with pytest.raises(StructuredOutputValidationError):

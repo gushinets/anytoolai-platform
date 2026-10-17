@@ -144,6 +144,21 @@ def test_a_space_grouped_amount_is_one_number_never_its_parts() -> None:
     assert "invented_number" not in violations("My fee is 3200.50 EUR.", order=order, profile=profile)
 
 
+def test_a_number_is_read_by_its_shape() -> None:
+    order = {**EN_ORDER, "task_text": "Automate my CRM"}
+    for profile, faithful, invented in (
+        ("My fixed fee is CHF 1'500.", "My fee is CHF 1500.", "My fee is CHF 500."),
+        ("My fixed fee is CHF 1’500.", "My fee is CHF 1,500.", "My fee is CHF 1."),
+        ("My fixed fee is CHF 1'500.50.", "My fee is CHF 1500.50.", "My fee is CHF 500.50."),
+        ("I delivered +20% revenue growth.", "I delivered 20% growth.", "I delivered -20% growth."),
+        ("My fixed fee is +200 EUR.", "My fee is 200 EUR.", "My fee is -200 EUR."),
+        ("My rate is $1.234k.", "My rate is $1,234.", "My rate is $1,234,000."),
+        ("I processed .5M rows.", "I processed 500,000 rows.", "I processed 5,000,000 rows."),
+    ):
+        assert "invented_number" not in violations(faithful, order=order, profile=profile), faithful
+        assert "invented_number" in violations(invented, order=order, profile=profile), invented
+
+
 def test_a_scaled_amount_keeps_its_exact_fraction() -> None:
     order = {**EN_ORDER, "task_text": "Automate my CRM"}
     profile = "My fixed fee is $1.2345k"
