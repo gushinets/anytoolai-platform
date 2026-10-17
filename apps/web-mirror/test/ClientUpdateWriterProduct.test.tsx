@@ -721,8 +721,8 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
       [routes.RUNTIME_CONFIG]: [runtimeConfigResponse(ids)],
       [routes.GUEST_IDENTITY]: [guestIdentityResponse()],
       [routes.QUOTA]: [quotaResponse(ids)],
-      // Same Idempotency-Key handle retries START a second time -- both return the same session.
-      [routes.START]: [startResponse(), startResponse()],
+      // The start succeeds once; Try again follows its known session instead of starting again.
+      [routes.START]: [startResponse()],
       // First poll GET fails outright (connection loss); the retry's poll GET then succeeds.
       [routes.SESSION]: [errorResponse(500, "internal_error"), sessionResponse()],
       [routes.RESULT]: [resultResponse(ids, { output: { text: "Reattached." } })],
@@ -749,11 +749,10 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     await waitFor(() => expect(screen.getByText("Reattached.")).toBeTruthy());
 
-    // Reattached to the same logical run via the same Idempotency-Key, not a fresh one.
-    const startCalls = calls.filter((call) => call.key === routes.START);
-    expect(startCalls).toHaveLength(2);
-    expect(idempotencyKeyOf(startCalls[0]!)).toBeTruthy();
-    expect(idempotencyKeyOf(startCalls[1]!)).toBe(idempotencyKeyOf(startCalls[0]!));
+    // Reattached to the same logical run by polling the session the start created, not by
+    // sending the start again.
+    expect(calls.filter((call) => call.key === routes.START)).toHaveLength(1);
+    expect(calls.filter((call) => call.key === routes.SESSION)).toHaveLength(2);
     expect((screen.getByRole("radio", { name: "Update" }) as HTMLInputElement).disabled).toBe(false);
   });
 

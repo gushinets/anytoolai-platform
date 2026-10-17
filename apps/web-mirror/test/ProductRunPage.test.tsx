@@ -943,6 +943,34 @@ describe("ProductRunPage", () => {
     },
   );
 
+  it.each([429, 403])(
+    "resumes polling the session a start already created on Try again, never re-sending /start (edge HTML %i queued)",
+    async (status) => {
+      // start 200 (S1) -> GET S1 503 -> Try again: re-sending /start could meet an edge 4xx that
+      // releases the key and lets the next try start a second, quota-spending session.
+      const htmlEdgeRejection = new Response(`<html>${status}</html>`, {
+        status,
+        headers: { "Content-Type": "text/html" },
+      });
+      const { client, calls } = makeClient({
+        ...happyPathRoutes(),
+        [ROUTES.START]: [startResponse(), htmlEdgeRejection, startResponse({ scenario_session_id: "session_2" })],
+        [ROUTES.SESSION]: [errorResponse(503, "internal_error"), sessionResponse()],
+      });
+
+      renderPage({ client });
+      await waitForForm();
+      fillValidForm();
+      submit();
+      await waitFor(() => expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy());
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+      await waitForResult();
+      expect(calls.filter((call) => call.key === ROUTES.START)).toHaveLength(1);
+      expect(calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(2);
+    },
+  );
+
   it("starts a genuinely new logical submission (new Idempotency-Key) after a terminal execution failure, instead of replaying the dead session", async () => {
     const SECOND_SESSION_ROUTE = "GET /v1/scenario-sessions/session_2";
     const { client, calls } = makeClient({
