@@ -5,6 +5,7 @@ export default defineConfig({
   timeout: 60_000,
   retries: 0,
   reporter: [["list"], ["json", { outputFile: "playwright-report.json" }]],
-  // a failed run keeps its trace (DOM, console, network) and a screenshot in test-results/
-  use: { trace: "retain-on-failure", screenshot: "only-on-failure" },
+  // a failed run keeps a screenshot and its page snapshot (error-context.md) in test-results/; no
+  // trace: recording one slows the page enough to hide the timing races these smokes must catch
+  use: { screenshot: "only-on-failure" },
 });
