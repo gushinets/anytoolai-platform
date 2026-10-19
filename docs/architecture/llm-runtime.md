@@ -285,8 +285,11 @@ the registry does not list yet.
 
 PydanticAI is not a LiteLLM dependency and was not upgraded with it. Our PydanticAI code runs a
 `FunctionModel` that calls ProviderGateway, so it never sees LiteLLM; the resolver required no
-PydanticAI change, and structured output with validation retries is proven unchanged by
-`atoms-proof`. Upgrade it only under its own ticket.
+PydanticAI change. Validation retries are covered by the `platform-actions` tests in
+`test_pydanticai_runner.py` (schema mismatch, malformed JSON and cross-validator retries) and
+`test_structured_llm_executor_shares_physical_call_budget_across_validation_retries`;
+`atoms-proof` is the deterministic fake-provider smoke of structured results and workflows and does
+not retry. Upgrade PydanticAI only under its own ticket.
 
 Rules:
 
