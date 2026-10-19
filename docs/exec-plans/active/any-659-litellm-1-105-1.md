@@ -5,11 +5,10 @@
 - State: active
 - Owner: agent
 - Created: 2026-10-16
-- Last updated: 2026-10-16
-- Review date: 2026-10-16
-- Next action: operator live check (see Verification); move to `completed/` once merged.
-- Blocker: stacked on ANY-656 (PR #170, not merged). Rebase after it lands and regenerate the lock
-  files with `uv lock` instead of merging them by hand.
+- Last updated: 2026-10-19
+- Review date: 2026-10-19
+- Next action: open the PR; move to `completed/` once merged.
+- Blocker: none. ANY-656 (PR #170) is merged into `main`, and this branch has merged `main`.
 
 ## Goal
 
@@ -75,11 +74,23 @@ Measured on 2026-10-16 against LiteLLM 1.105.1:
   `yarl 1.25.1`, `openai 2.45.0`, `pydantic 2.13.4`, `httpx 0.28.1`, `h2 4.4.1`, `boto3 1.43.114`;
   `pydantic-ai-slim` 2.40.0 (api) / 2.9.0 (worker), unchanged. The new transitive packages add
   about 32 MB per image (botocore 29 MB).
-- Repository checks: `validate-configs`, `validate-architecture`, `validate-docs`,
-  `generate-docs --check`, `frontend-check`, `postgresql-check`, `atoms-proof` (11/11 atoms, 3/3
-  composite workflows) green; freelancer-suite tests 190 passed. The quick-check pytest step had
-  2302 passed and 1 failed: `test_activation_marker_is_readable_by_non_root_api_user`, which needs
-  passwordless `sudo` that the sandbox does not have; it does not touch dependencies.
-- Operator (needs `OPENAI_API_KEY`): `live-canary` on the default alias, and one Atom Lab direct run
-  per {Luna, Sol} × {medium, high} and {gpt-5.4, gpt-5.4-mini} at the default effort; record model,
-  effort, temperature and attempt count from `provider_calls` here.
+- Repository checks (after merging `main`, 2026-10-19): `validate-configs`, `validate-architecture`,
+  `validate-docs`, `generate-docs --check`, `postgresql-check` green; `atoms-proof` 11/11 atoms and
+  3/3 composite workflows on images rebuilt from this tree (`dev-up` reuses existing images, so a
+  stale image can make the proof pass without testing the new SDK: check `litellm` inside the api and
+  worker images). The quick-check pytest step had 2341 passed and 1 failed:
+  `test_activation_marker_is_readable_by_non_root_api_user`, which needs passwordless `sudo` that the
+  sandbox does not have; it does not touch dependencies.
+- Live, 2026-10-19, real OpenAI, LiteLLM 1.105.1:
+  - `live-canary` on the default alias: 11/11 atoms and 3/3 composites passed. The ledger holds 22
+    `provider_calls` rows (one per action run), all `succeeded`, model `gpt-6-luna` through
+    `anytoolai.default_text`, no errors, `physical_call_index` and `transport_attempt_index` at most
+    1 (no hidden retry), 20,075 tokens, $0.0038, 3.8 s on average. The ledger records the policy
+    temperature (1.0) and no effort; the router adds `medium` and the adapter drops the temperature
+    on the wire, which only the wire tests show.
+  - Direct path through the real adapter, one call per case, every one accepted by the API and made
+    with one request: `gpt-6-luna` and `gpt-6.1-sol` at `medium` and `high` send the effort and no
+    temperature; `gpt-5.4` and `gpt-5.4-mini` without an effort send neither; `gpt-5.4` at `none`
+    sends `none` and temperature 0.2; `gpt-4o` sends temperature 0.2 and no effort.
+  - Not run live: the Atom Lab surface of `live-canary` (it needs the access code and the Atom Lab
+    compose stack); its request path is the direct one above.
