@@ -25,6 +25,7 @@ from anytoolai_platform_core.providers.models import (
     ResolvedProviderRequest,
     StructuredOutputMode,
 )
+from providers import wire_adapter
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
@@ -714,3 +715,87 @@ def test_build_litellm_router_uses_repo_default_config_path(
     router = build_litellm_router()
 
     assert router is not None
+
+
+def _wire_adapter(
+    monkeypatch: pytest.MonkeyPatch, bodies: list[dict[str, object]], **options: int
+) -> LiteLLMProviderAdapter:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    return wire_adapter(CONFIG_ROOT, bodies, **options)
+
+
+@pytest.mark.parametrize("model", ["openai/gpt-6-luna", "openai/gpt-6.1-sol"])
+@pytest.mark.parametrize("effort", [ReasoningEffort.medium, ReasoningEffort.high])
+def test_litellm_wire_sends_the_effort_and_no_temperature_for_gpt6_models(
+    monkeypatch: pytest.MonkeyPatch, model: str, effort: ReasoningEffort
+) -> None:
+    bodies: list[dict[str, object]] = []
+    adapter = _wire_adapter(monkeypatch, bodies)
+
+    response = asyncio.run(
+        adapter.complete(
+            make_request(
+                model=model,
+                model_addressing=ProviderModelAddressing.direct,
+                reasoning_effort=effort,
+            )
+        )
+    )
+
+    assert len(bodies) == 1
+    assert bodies[0]["model"] == model.removeprefix("openai/")
+    assert bodies[0]["reasoning_effort"] == effort.value
+    assert "temperature" not in bodies[0]
+    assert response.output_text == '{"ok":true}'
+    assert response.estimated_cost > 0
+
+
+@pytest.mark.parametrize("model", ["openai/gpt-5.4", "openai/gpt-5.4-mini"])
+def test_litellm_wire_keeps_gpt54_behaviour(monkeypatch: pytest.MonkeyPatch, model: str) -> None:
+    bodies: list[dict[str, object]] = []
+    adapter = _wire_adapter(monkeypatch, bodies)
+    direct = {"model": model, "model_addressing": ProviderModelAddressing.direct}
+
+    asyncio.run(adapter.complete(make_request(**direct)))
+    asyncio.run(adapter.complete(make_request(**direct, reasoning_effort=ReasoningEffort.none)))
+
+    default_body, none_body = bodies
+    assert "reasoning_effort" not in default_body
+    assert "temperature" not in default_body
+    assert none_body["reasoning_effort"] == "none"
+    assert none_body["temperature"] == 0.3
+
+
+def test_litellm_wire_routes_the_default_alias_to_luna_at_medium(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bodies: list[dict[str, object]] = []
+
+    asyncio.run(_wire_adapter(monkeypatch, bodies).complete(make_request()))
+
+    assert len(bodies) == 1
+    assert bodies[0]["model"] == "gpt-6-luna"
+    assert bodies[0]["reasoning_effort"] == "medium"
+    assert "temperature" not in bodies[0]
+
+
+@pytest.mark.parametrize(
+    "addressing", [ProviderModelAddressing.policy_alias, ProviderModelAddressing.direct]
+)
+def test_litellm_wire_makes_one_http_attempt_per_adapter_call_on_a_server_error(
+    monkeypatch: pytest.MonkeyPatch, addressing: ProviderModelAddressing
+) -> None:
+    """LiteLLM's own retries stay off (`num_retries=0`): ProviderGateway owns transport retries
+    and must see, and ledger, every physical attempt."""
+    bodies: list[dict[str, object]] = []
+    adapter = _wire_adapter(monkeypatch, bodies, status_code=500)
+    model = (
+        "anytoolai.default_text"
+        if addressing is ProviderModelAddressing.policy_alias
+        else "openai/gpt-5.4"
+    )
+
+    with pytest.raises(Exception, match="provider error"):
+        asyncio.run(adapter.complete(make_request(model=model, model_addressing=addressing)))
+
+    assert len(bodies) == 1
