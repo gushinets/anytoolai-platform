@@ -30,6 +30,46 @@ describe("ResultView", () => {
     await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/could not copy to clipboard/i));
   });
 
+  it.each([true, false])(
+    "leaves focus where the user moved it while the copy was pending (copied: %s)",
+    async (copied) => {
+      let finishCopy: (value: boolean) => void = () => {};
+      const onCopy = vi.fn(() => new Promise<boolean>((resolve) => (finishCopy = resolve)));
+
+      render(
+        <>
+          <ResultView text="Dear client, ..." onCopy={onCopy} />
+          <button type="button">Elsewhere</button>
+        </>,
+      );
+      const copyButton = screen.getByRole("button", { name: "Copy" });
+      copyButton.focus();
+      fireEvent.click(copyButton);
+      await waitFor(() => expect(screen.getByRole("button", { name: "Copying…" })).toBeTruthy());
+      const elsewhere = screen.getByRole("button", { name: "Elsewhere" });
+      elsewhere.focus();
+
+      finishCopy(copied);
+      await waitFor(() => expect(screen.queryByRole("button", { name: "Copying…" })).toBeNull());
+      expect(document.activeElement).toBe(elsewhere);
+    },
+  );
+
+  it("gives focus back to Copy when disabling it dropped focus", async () => {
+    let finishCopy: (value: boolean) => void = () => {};
+    const onCopy = vi.fn(() => new Promise<boolean>((resolve) => (finishCopy = resolve)));
+
+    render(<ResultView text="Dear client, ..." onCopy={onCopy} />);
+    const copyButton = screen.getByRole("button", { name: "Copy" });
+    copyButton.focus();
+    fireEvent.click(copyButton);
+    copyButton.blur(); // what a browser does to a focused button once it is disabled
+
+    finishCopy(true);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
+    expect(document.activeElement).toBe(copyButton);
+  });
+
   it("shows the manual-copy error state, without throwing, when no onCopy is provided", () => {
     render(<ResultView text="Dear client, ..." />);
 

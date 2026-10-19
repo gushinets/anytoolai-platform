@@ -17,6 +17,7 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     GapRewritesCrossValidator,
     GenerateClarifyingQuestionsCrossValidator,
     PersuasiveTextCrossValidator,
+    PersuasiveTextInputValidator,
     ScoreMatchByRubricCrossValidator,
     ScoreMatchByRubricInputValidator,
     ScoreMultidimensionalAxesCrossValidator,
@@ -199,6 +200,7 @@ _EXPECTED_INPUT_VALIDATORS_BY_ACTION_TYPE = {
     "text.compare_and_classify": CompareAndClassifyInputValidator,
     "text.score_match_by_rubric": ScoreMatchByRubricInputValidator,
     "text.score_multidimensional_axes": ScoreMultidimensionalAxesInputValidator,
+    "text.compose_persuasive_text": PersuasiveTextInputValidator,
 }
 
 

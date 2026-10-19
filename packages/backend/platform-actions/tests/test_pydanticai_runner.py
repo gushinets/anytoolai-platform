@@ -77,9 +77,13 @@ def _capture_agent_infos(monkeypatch: pytest.MonkeyPatch) -> list[Any]:
     return captured
 
 
-def test_schema_bound_request_binds_json_schema_into_output_contract(
+def test_schema_bound_request_takes_plain_text_so_our_own_parser_decides(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """PydanticAI's JSON parser rejects a raw newline in a string, or a reply without the JSON
+    wrapper, before any output validator runs. The agent therefore takes plain text and the
+    platform's own validator (tolerant parser, own retry message) is the one that decides. The
+    schema still reaches the model through the adapter's guidance message, not PydanticAI's."""
     captured = _capture_agent_infos(monkeypatch)
     runner = PydanticAIStructuredRunner()
     request = _base_request(response_schema=SCHEMA)
@@ -94,12 +98,48 @@ def test_schema_bound_request_binds_json_schema_into_output_contract(
 
     assert result.structured_output == {"name": "Ada"}
     params = captured[-1].model_request_parameters
-    assert params.output_mode == "prompted"
-    assert params.output_object is not None
-    assert params.output_object.json_schema == SCHEMA
-    # template=False is required: the LiteLLM adapter already injects its own schema
-    # guidance message, so PromptedOutput must not inject a second one.
-    assert params.prompted_output_template is False
+    assert params.output_mode == "text"
+    assert params.output_object is None
+
+
+def test_a_raw_newline_inside_a_json_string_is_accepted() -> None:
+    runner = PydanticAIStructuredRunner()
+    request = _base_request(response_schema=SCHEMA)
+
+    result = asyncio.run(
+        runner.run(
+            request,
+            request_executor=_fixed_executor('{"name": "Ada\n\nLovelace"}'),
+            validation_max_attempts=1,
+        )
+    )
+
+    assert result.structured_output == {"name": "Ada\n\nLovelace"}
+
+
+def test_a_reply_without_the_json_wrapper_gets_our_retry_message_and_can_recover() -> None:
+    runner = PydanticAIStructuredRunner()
+    request = _base_request(response_schema=SCHEMA)
+    seen_prompts: list[str] = []
+
+    async def request_executor(attempt: ProviderRequest) -> ProviderResponse:
+        seen_prompts.append(" ".join(message.content for message in attempt.messages))
+        output = "Ada Lovelace" if len(seen_prompts) == 1 else '{"name": "Ada"}'
+        return ProviderResponse(
+            provider_policy_ref=attempt.provider_policy_ref,
+            provider="fake",
+            model="fake-json-v1",
+            output_text=output,
+            status=ProviderCallStatus.succeeded,
+        )
+
+    result = asyncio.run(
+        runner.run(request, request_executor=request_executor, validation_max_attempts=2)
+    )
+
+    assert result.structured_output == {"name": "Ada"}
+    assert len(seen_prompts) == 2
+    assert "Reply with exactly one JSON object" in seen_prompts[1]
 
 
 def test_schema_less_request_stays_on_text_output(
@@ -207,34 +247,47 @@ def test_schema_missing_top_level_object_type_fails_fast_with_clear_error() -> N
         )
 
 
-def test_schema_with_old_style_ref_fails_fast_with_clear_error() -> None:
-    """StructuredDict's own "type": "object" guard passes for a schema using the old-style
-    "definitions"/"$ref" pair instead of "$defs", but Agent construction then raises a raw
-    KeyError from pydantic's JSON-schema generator -- a different internal exception for the
-    same underlying "cannot bind this schema" condition the previous test covers. Assert it
-    surfaces as the same kind of clear RuntimeError, not the raw KeyError."""
-
-    async def request_executor(_request: ProviderRequest) -> ProviderResponse:
-        raise AssertionError("request_executor should not be called for a malformed schema")
-
+def test_schema_with_old_style_ref_is_validated_by_the_platform_validator() -> None:
+    """The schema is no longer bound as a PydanticAI output type, so pydantic's JSON-schema
+    generator (which choked on the old-style "definitions"/"$ref" pair) is out of the path and the
+    platform's jsonschema validator handles it."""
     runner = PydanticAIStructuredRunner()
     request = _base_request(
-        action_config_id="kernel_demo.old_style_ref_v1",
         response_schema={
             "type": "object",
             "properties": {"child": {"$ref": "#/definitions/Foo"}},
+            "required": ["child"],
             "definitions": {"Foo": {"type": "string"}},
         },
     )
 
-    with pytest.raises(RuntimeError, match="kernel_demo.old_style_ref_v1"):
-        asyncio.run(
-            runner.run(
-                request,
-                request_executor=request_executor,
-                validation_max_attempts=2,
-            )
+    result = asyncio.run(
+        runner.run(request, request_executor=_fixed_executor('{"child": "x"}'), validation_max_attempts=1)
+    )
+
+    assert result.structured_output == {"child": "x"}
+
+
+def test_schema_mismatch_retry_message_names_the_field_and_the_rule() -> None:
+    runner = PydanticAIStructuredRunner()
+    request = _base_request(response_schema=SCHEMA)
+    seen: list[str] = []
+
+    async def request_executor(attempt: ProviderRequest) -> ProviderResponse:
+        seen.append(" ".join(message.content for message in attempt.messages))
+        output = '{"name": 3}' if len(seen) == 1 else '{"name": "Ada"}'
+        return ProviderResponse(
+            provider_policy_ref=attempt.provider_policy_ref,
+            provider="fake",
+            model="fake-json-v1",
+            output_text=output,
+            status=ProviderCallStatus.succeeded,
         )
+
+    result = asyncio.run(runner.run(request, request_executor=request_executor, validation_max_attempts=2))
+
+    assert result.structured_output == {"name": "Ada"}
+    assert "Field name:" in seen[1] and "is not of type 'string'" in seen[1]
 
 
 def test_non_finite_numeric_value_retries_and_then_exhausts() -> None:

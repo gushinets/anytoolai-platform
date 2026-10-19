@@ -4,7 +4,6 @@ from dataclasses import dataclass, replace
 from typing import Any, Awaitable, Callable, Mapping
 
 from pydantic_ai import Agent, ModelRetry, UnexpectedModelBehavior
-from pydantic_ai.exceptions import UserError
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -14,9 +13,10 @@ from pydantic_ai.messages import (
     UserPromptPart,
 )
 from pydantic_ai.models.function import FunctionModel
-from pydantic_ai.output import PromptedOutput, StructuredDict
+from pydantic_ai.output import TextOutput
 from pydantic_ai.tools import RunContext
 from pydantic_ai.usage import RequestUsage
+from jsonschema import ValidationError as JsonSchemaValidationError
 
 from anytoolai_platform_core.providers.models import (
     ProviderMessage,
@@ -40,6 +40,7 @@ class PydanticAIValidationState:
     last_response: ProviderResponse | None = None
     semantic_attempt_index: int = 0
     pydantic_run_id: str | None = None
+    normalized_output: Any = None
 
 
 @dataclass(frozen=True)
@@ -131,71 +132,49 @@ class PydanticAIStructuredRunner:
         if schema is None:
             agent = _build_agent(str)
         else:
-            # Binding an arbitrary config schema as PydanticAI's output contract can fail in more
-            # than one internal way depending on the schema's shape -- StructuredDict itself
-            # raises pydantic_ai.exceptions.UserError for a missing top-level "type": "object",
-            # but e.g. an old-style ("definitions"/"$ref" instead of "$defs") schema passes that
-            # check and instead raises a raw KeyError from pydantic's JSON-schema generator during
-            # Agent construction. Both are the same underlying condition -- this schema cannot be
-            # bound as PydanticAI structured output -- and a config-authoring defect, not a
-            # per-request failure retrying would fix, so wrap the whole schema-dependent
-            # construction and fail fast with the offending action_config_id instead of letting
-            # whichever internal exception pydantic_ai/pydantic happens to raise leak out raw.
-            try:
-                agent = _build_agent(PromptedOutput(StructuredDict(dict(schema)), template=False))
-            except (UserError, KeyError) as exc:
-                # UserError: StructuredDict's own check_object_json_schema() rejects a schema
-                # without a top-level "type": "object" (and no directly resolvable $ref).
-                # KeyError: pydantic's JSON-schema generator raises this raw from Agent()
-                # construction for an old-style "definitions"/"$ref" pair instead of "$defs" --
-                # StructuredDict's own guard doesn't catch that shape. Both are the same
-                # "this config schema cannot be bound as PydanticAI output" authoring defect;
-                # anything else (a real TypeError, assertion, or future pydantic_ai/pydantic
-                # regression) must keep propagating instead of being mislabeled as this.
+            # A schema without a top-level object (and no top-level $ref) is a config-authoring
+            # defect, not a per-request failure retrying would fix: fail fast with the offending
+            # action_config_id instead of burning provider calls on it.
+            if schema.get("type") != "object" and "$ref" not in schema:
                 raise RuntimeError(
                     "response_schema for action_config_id="
-                    f"{request.action_config_id!r} could not be bound as a PydanticAI "
-                    f"structured-output schema: {exc}"
-                ) from exc
-
-        @agent.output_validator
-        def _validate_output(
-            ctx: RunContext[PydanticAIValidationState],
-            data: Any,
-        ) -> Any:
-            ctx.deps.pydantic_run_id = ctx.run_id
-            if ctx.deps.request.response_schema is None:
-                return data
-            # Re-derive from the raw provider text with the same canonical, strict validator
-            # `executor.py`'s `_finalize_response` uses -- not from `data`, PydanticAI's own more
-            # lenient parse of that text (it tolerates markdown fences and other formatting
-            # PydanticAI's own parser accepts, `parse_strict_json` does not). Using one shared
-            # strict check for both the retry loop and the final gate guarantees nothing that
-            # passes here can later fail final validation: a still-fenced or otherwise malformed
-            # response now consumes PydanticAI's own retry budget instead of reaching a false
-            # "success" that crashes downstream.
-            last_response = ctx.deps.last_response
-            assert last_response is not None
-            try:
-                validation_result = validate_structured_output(
-                    last_response.output_text,
-                    schema=dict(ctx.deps.request.response_schema),
+                    f"{request.action_config_id!r} must be a JSON object schema "
+                    '(top-level "type": "object" or a top-level "$ref")'
                 )
-            except StructuredOutputError as exc:
-                raise ModelRetry(str(exc)) from exc
-            normalized_output = validation_result.normalized_output
-            if cross_validator is not None:
+            # The typed binding is TextOutput: PydanticAI hands the raw model text to this function
+            # and the platform's own validator decides. PydanticAI's own JSON parsing (what
+            # PromptedOutput would use) rejects a raw newline inside a string, or a reply without
+            # the JSON wrapper, before any validator runs, so neither the tolerant parser nor the
+            # retry message below would ever be reached.
+            def _parse_output(ctx: RunContext[PydanticAIValidationState], text: str) -> Any:
+                ctx.deps.pydantic_run_id = ctx.run_id
+                last_response = ctx.deps.last_response
+                assert last_response is not None
+                # Same strict check `executor.py`'s `_finalize_response` uses, so nothing that
+                # passes here can later fail final validation.
                 try:
-                    cross_validator.validate(
-                        input_payload=input_payload or {},
-                        output=normalized_output,
+                    validation_result = validate_structured_output(
+                        last_response.output_text,
+                        schema=dict(ctx.deps.request.response_schema),
                     )
-                except StructuredOutputValidationError as exc:
-                    # exc.reason is an internal, field-level correction hint for the
-                    # model's next attempt; it is never the user-facing safe error
-                    # (str(exc)/exc.details.safe_message stay generic for callers).
-                    raise ModelRetry(exc.reason) from exc
-            return normalized_output
+                except StructuredOutputError as exc:
+                    raise ModelRetry(_retry_message(exc)) from exc
+                normalized_output = validation_result.normalized_output
+                ctx.deps.normalized_output = normalized_output
+                if cross_validator is not None:
+                    try:
+                        cross_validator.validate(
+                            input_payload=input_payload or {},
+                            output=normalized_output,
+                        )
+                    except StructuredOutputValidationError as exc:
+                        # exc.reason is an internal, field-level correction hint for the model's
+                        # next attempt; it is never the user-facing safe error (str(exc)/
+                        # exc.details.safe_message stay generic for callers).
+                        raise ModelRetry(exc.reason) from exc
+                return normalized_output
+
+            agent = _build_agent(TextOutput(_parse_output))
 
         try:
             result = await agent.run(
@@ -229,6 +208,20 @@ class PydanticAIStructuredRunner:
             ),
             pydantic_run_id=result.run_id,
         )
+
+
+def _retry_message(exc: StructuredOutputError) -> str:
+    """What the model sees after a failed attempt. A schema mismatch names the offending path and
+    the rule (the exception message alone is generic), a malformed reply says what to return."""
+    detail = ""
+    cause = exc.__cause__
+    if isinstance(cause, JsonSchemaValidationError):
+        path = "/".join(str(part) for part in cause.absolute_path) or "(root)"
+        detail = f" Field {path}: {cause.message}."
+    return (
+        f"{exc}.{detail} Reply with exactly one JSON object that matches the schema, with all "
+        "text inside its string fields and nothing before or after it."
+    )
 
 
 def _messages_from_pydantic_history(

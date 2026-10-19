@@ -38,13 +38,13 @@ export const pt: Shape<typeof en> = {
     copying: "Copiando…",
     copied: "Copiado",
     copyFailed: "Não foi possível copiar para a área de transferência. Copie o texto acima manualmente.",
+    selectText: "Selecionar texto",
   },
-  // Code review finding: outerWhitespace/maxLength made `{field}` the subject of "pode"/"deve"
+  // Code review finding: maxLength made `{field}` the subject of "pode"/"deve"
   // (which agree in number: pode/podem, deve/devem) -- every message is now a label-colon-fragment
   // instead, matching `required`'s already-safe shape.
   validation: {
     required: "{field}: campo obrigatório.",
-    outerWhitespace: "{field}: sem espaços no início ou no fim.",
     maxLength: "{field}: máximo {maxLength, plural, one {# caractere} many {# de caracteres} other {# caracteres}}.",
   },
 };

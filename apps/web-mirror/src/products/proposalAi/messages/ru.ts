@@ -12,8 +12,14 @@ export const ru: Shape<typeof en> = {
     taskTextHelp: "Если известны, укажите цель, ожидаемые результаты, ограничения и сроки.",
     freelancerPositioning: "Ваш опыт и сильные стороны",
     freelancerPositioningPlaceholder: "Опишите опыт и навыки, которые пригодятся в этом проекте.",
-    freelancerPositioningHelp: "Указывайте только то, что можете подтвердить: сервис не будет придумывать за вас опыт и достижения.",
+    freelancerPositioningHelp: "Текст строится только на том, что здесь написано. Указывайте проверяемые факты: инструменты, кейсы, результаты.",
     toneLegend: "Тон предложения",
+    required: "обязательно",
+    languageLabel: "Язык предложения",
+    languageHelp: "Не язык интерфейса. По умолчанию предложение пишется на языке задачи.",
+    languageAuto: "Как в задаче",
+    counterNear: "Вы приближаетесь к лимиту в {max} символов.",
+    counterOver: "Превышен лимит в {max} символов.",
   },
   toneOptions: {
     warm: "Дружелюбный",
@@ -22,7 +28,11 @@ export const ru: Shape<typeof en> = {
   },
   fieldNames: {
     taskText: "Описание задачи",
-    freelancerPositioning: "Опыт и сильные стороны",
+    freelancerPositioning: "Ваш опыт и сильные стороны",
+  },
+  result: {
+    gapsTitle: "Чего нет в вашем опыте",
+    gapsHint: "Предложение этого не заявляет. Добавьте сами или не упоминайте.",
   },
   generate: {
     submit: "Составить предложение",

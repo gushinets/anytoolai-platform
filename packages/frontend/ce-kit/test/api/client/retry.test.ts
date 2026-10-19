@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { assertRetryAllowed, delay, isRetryable } from "../../../src/api/client/retry";
+import { assertRetryAllowed, delay, isAmbiguousFailure, isRetryable } from "../../../src/api/client/retry";
 
 describe("assertRetryAllowed", () => {
   it("allows a retry policy on GET", () => {
@@ -84,5 +84,29 @@ describe("delay", () => {
 
     await vi.advanceTimersByTimeAsync(0);
     expect(spy).toHaveBeenCalled();
+  });
+});
+
+describe("isAmbiguousFailure", () => {
+  it("is true where the backend may already have acted: network, timeout and 5xx", () => {
+    expect(isAmbiguousFailure({ type: "network_error", message: "boom" })).toBe(true);
+    expect(isAmbiguousFailure({ type: "timeout" })).toBe(true);
+    expect(
+      isAmbiguousFailure({ type: "backend_error", status: 502, code: "bad_gateway", message: "x", requestId: "r" }),
+    ).toBe(true);
+  });
+
+  it("is true for a 5xx without the error envelope (a proxy's HTML 502, an empty 503)", () => {
+    expect(isAmbiguousFailure({ type: "invalid_response", status: 502, message: "x" })).toBe(true);
+    expect(isAmbiguousFailure({ type: "invalid_response", status: 503, message: "x" })).toBe(true);
+  });
+
+  it("is false for a definite 4xx, an aborted request and an unparsable 2xx or 4xx", () => {
+    expect(
+      isAmbiguousFailure({ type: "backend_error", status: 422, code: "invalid", message: "x", requestId: "r" }),
+    ).toBe(false);
+    expect(isAmbiguousFailure({ type: "aborted" })).toBe(false);
+    expect(isAmbiguousFailure({ type: "invalid_response", status: 200, message: "x" })).toBe(false);
+    expect(isAmbiguousFailure({ type: "invalid_response", status: 404, message: "x" })).toBe(false);
   });
 });

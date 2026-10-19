@@ -7,6 +7,7 @@ from anytoolai_platform_core.artifacts.correlation import (
 )
 from anytoolai_platform_core.artifacts.models import ArtifactRecord, ArtifactStatus
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
+from anytoolai_platform_core.common.storable_text import storable_text
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.replay import (
     ReplayTimestampSequencer,
@@ -108,7 +109,8 @@ class ArtifactService:
                 action_run_id=action_run_id,
                 artifact_type="structured_output_debug_raw",
                 status=ArtifactStatus.failed,
-                content_text=raw_output_text,
+                # the output failed validation, so it may hold what PostgreSQL cannot store
+                content_text=storable_text(raw_output_text),
                 metadata={} if metadata is None else dict(metadata),
             )
         )

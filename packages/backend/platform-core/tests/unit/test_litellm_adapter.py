@@ -31,8 +31,9 @@ CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
 
 
 class RecordingRouter:
-    def __init__(self, response: object) -> None:
+    def __init__(self, response: object, model_list: list[dict[str, object]] | None = None) -> None:
         self.response = response
+        self.model_list = model_list or []
         self.calls: list[dict[str, object]] = []
 
     async def acompletion(
@@ -136,14 +137,16 @@ def test_litellm_adapter_sends_direct_lab_model_and_reasoning_without_alias_subs
 
     async def direct_completion(**kwargs: object) -> object:
         direct_calls.append(dict(kwargs))
-        return make_router_response(model="gpt-5.4-mini")
+        return make_router_response(model="gpt-6-luna")
 
-    adapter = LiteLLMProviderAdapter(router, direct_completion=direct_completion)
+    adapter = LiteLLMProviderAdapter(
+        router, direct_completion=direct_completion
+    )
 
     asyncio.run(
         adapter.complete(
             make_request(
-                model="openai/gpt-5.4-mini",
+                model="openai/gpt-6-luna",
                 model_addressing=ProviderModelAddressing.direct,
                 reasoning_effort=ReasoningEffort.high,
             )
@@ -153,17 +156,192 @@ def test_litellm_adapter_sends_direct_lab_model_and_reasoning_without_alias_subs
     assert router.calls == []
     assert direct_calls == [
         {
-            "model": "openai/gpt-5.4-mini",
+            "model": "openai/gpt-6-luna",
             "messages": [
                 {"role": "system", "content": "You are structured"},
                 {"role": "user", "content": "Return JSON"},
             ],
-            "temperature": 0.3,
             "timeout": 60.0,
             "num_retries": 0,
             "reasoning_effort": "high",
+            # a model LiteLLM does not list yet would otherwise reject the parameter
+            "allowed_openai_params": ["reasoning_effort"],
         }
     ]
+
+
+@pytest.mark.parametrize(
+    ("effort", "sends_temperature"),
+    [
+        (None, False),
+        (ReasoningEffort.none, True),
+        (ReasoningEffort.low, False),
+        (ReasoningEffort.medium, False),
+        (ReasoningEffort.high, False),
+        (ReasoningEffort.max, False),
+    ],
+)
+def test_litellm_adapter_omits_temperature_for_a_direct_reasoning_model_unless_effort_is_none(
+    effort: ReasoningEffort | None, sends_temperature: bool
+) -> None:
+    """OpenAI reasoning models take only the default temperature, so an explicit reasoning effort
+    drops the policy's temperature from the request, and so does a direct model that names none but
+    is the one the router config runs at medium; effort none keeps it."""
+    router = RecordingRouter(make_router_response())
+    direct_calls: list[dict[str, object]] = []
+
+    async def direct_completion(**kwargs: object) -> object:
+        direct_calls.append(dict(kwargs))
+        return make_router_response(model="gpt-6-luna")
+
+    adapter = LiteLLMProviderAdapter(
+        router, direct_completion=direct_completion
+    )
+    asyncio.run(
+        adapter.complete(
+            make_request(
+                model="openai/gpt-6-luna",
+                model_addressing=ProviderModelAddressing.direct,
+                reasoning_effort=effort,
+            )
+        )
+    )
+
+    assert ("temperature" in direct_calls[0]) is sends_temperature
+
+
+def _deployment(effort: str | None) -> dict[str, object]:
+    params: dict[str, object] = {"model": "openai/gpt-6-luna"}
+    if effort is not None:
+        params["reasoning_effort"] = effort
+    return {"model_name": "anytoolai.default_text", "litellm_params": params}
+
+
+@pytest.mark.parametrize(
+    ("effort", "sends_temperature"),
+    [("medium", False), ("high", False), ("none", True), (None, True)],
+)
+def test_litellm_adapter_drops_temperature_when_the_router_deployment_reasons(
+    effort: str | None, sends_temperature: bool
+) -> None:
+    """The routed default alias carries no explicit effort in the request; the router adds its own
+    medium. The request that reaches the router must already be without temperature then."""
+    router = RecordingRouter(make_router_response(), model_list=[_deployment(effort)])
+
+    asyncio.run(LiteLLMProviderAdapter(router).complete(make_request()))
+
+    assert ("temperature" in router.calls[0]) is sends_temperature
+
+
+def test_litellm_adapter_uses_the_shipped_router_config_to_drop_temperature_for_the_default_alias(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    config = load_litellm_router_config(default_litellm_router_config_path(CONFIG_ROOT))
+    router = RecordingRouter(make_router_response(), model_list=config["model_list"])
+
+    asyncio.run(LiteLLMProviderAdapter(router).complete(make_request()))
+
+    assert "temperature" not in router.calls[0]
+
+
+def test_litellm_adapter_keeps_the_temperature_for_an_alias_the_router_does_not_describe() -> None:
+    router = RecordingRouter(make_router_response(), model_list=[_deployment("medium")])
+
+    asyncio.run(LiteLLMProviderAdapter(router).complete(make_request(model="another.alias")))
+
+    assert router.calls[0]["temperature"] == 0.3
+
+
+def test_litellm_adapter_keeps_the_policy_temperature_on_the_router_path_without_an_effort() -> None:
+    router = RecordingRouter(make_router_response())
+    asyncio.run(LiteLLMProviderAdapter(router).complete(make_request()))
+
+    assert router.calls[0]["temperature"] == 0.3
+
+
+@pytest.mark.parametrize(
+    "model",
+    [
+        "openai/gpt-6-sol",
+        "openai/gpt-5.5",
+        "openai/gpt-5.6-sol",
+        "openai/gpt-6.1-sol",
+    ],
+)
+def test_litellm_adapter_runs_a_direct_model_without_an_effort_at_the_provider_defaults(
+    model: str,
+) -> None:
+    """Any catalog model Atom Lab selects, not a hand-kept list: with no effort named, the model's
+    own default effort (medium since GPT-5) is unknown to the adapter, so neither an effort nor a
+    temperature is sent and the provider applies its defaults."""
+    direct_calls: list[dict[str, object]] = []
+
+    async def direct_completion(**kwargs: object) -> object:
+        direct_calls.append(dict(kwargs))
+        return make_router_response(model=model.removeprefix("openai/"))
+
+    adapter = LiteLLMProviderAdapter(
+        RecordingRouter(make_router_response(), model_list=[_deployment("medium")]),
+        direct_completion=direct_completion,
+    )
+    asyncio.run(
+        adapter.complete(make_request(model=model, model_addressing=ProviderModelAddressing.direct))
+    )
+
+    assert "temperature" not in direct_calls[0]
+    assert "reasoning_effort" not in direct_calls[0]
+
+
+@pytest.mark.parametrize("model", ["openai/gpt-4o", "openai/gpt-4.1-mini"])
+def test_litellm_adapter_forwards_the_temperature_for_a_direct_non_reasoning_model(
+    model: str,
+) -> None:
+    """LiteLLM's registry lists these models without reasoning support, so the run-local
+    temperature is honoured instead of falling back to the provider default."""
+    direct_calls: list[dict[str, object]] = []
+
+    async def direct_completion(**kwargs: object) -> object:
+        direct_calls.append(dict(kwargs))
+        return make_router_response(model=model.removeprefix("openai/"))
+
+    adapter = LiteLLMProviderAdapter(
+        RecordingRouter(make_router_response()), direct_completion=direct_completion
+    )
+    asyncio.run(
+        adapter.complete(
+            make_request(
+                model=model, model_addressing=ProviderModelAddressing.direct, temperature=0.2
+            )
+        )
+    )
+
+    assert direct_calls[0]["temperature"] == 0.2
+    assert "reasoning_effort" not in direct_calls[0]
+
+
+def test_litellm_adapter_keeps_the_temperature_for_a_direct_model_at_explicit_none() -> None:
+    direct_calls: list[dict[str, object]] = []
+
+    async def direct_completion(**kwargs: object) -> object:
+        direct_calls.append(dict(kwargs))
+        return make_router_response(model="gpt-5.5")
+
+    adapter = LiteLLMProviderAdapter(
+        RecordingRouter(make_router_response()), direct_completion=direct_completion
+    )
+    asyncio.run(
+        adapter.complete(
+            make_request(
+                model="openai/gpt-5.5",
+                model_addressing=ProviderModelAddressing.direct,
+                reasoning_effort=ReasoningEffort.none,
+            )
+        )
+    )
+
+    assert direct_calls[0]["temperature"] == 0.3
+    assert direct_calls[0]["reasoning_effort"] == "none"
 
 
 def test_litellm_adapter_does_not_inherit_reasoning_for_direct_model_when_omitted() -> None:
@@ -173,14 +351,16 @@ def test_litellm_adapter_does_not_inherit_reasoning_for_direct_model_when_omitte
 
     async def direct_completion(**kwargs: object) -> object:
         direct_calls.append(dict(kwargs))
-        return make_router_response(model="gpt-5.4-mini")
+        return make_router_response(model="gpt-6-luna")
 
-    adapter = LiteLLMProviderAdapter(router, direct_completion=direct_completion)
+    adapter = LiteLLMProviderAdapter(
+        router, direct_completion=direct_completion
+    )
 
     asyncio.run(
         adapter.complete(
             make_request(
-                model="openai/gpt-5.4-mini",
+                model="openai/gpt-6-luna",
                 model_addressing=ProviderModelAddressing.direct,
                 reasoning_effort=None,
             )
@@ -308,7 +488,7 @@ def test_litellm_adapter_does_not_inject_conflicting_response_format() -> None:
         "role": "system",
         "content": (
             "Return JSON that matches this schema exactly. "
-            'Do not wrap the JSON in markdown fences.\nJSON Schema: {"additionalProperties":false,"properties":{"ok":{"type":"boolean"}},"required":["ok"],"type":"object"}'
+            'Do not wrap the JSON in markdown fences. Inside JSON strings write line breaks as the escape sequence \\n, never as a literal newline.\nJSON Schema: {"additionalProperties":false,"properties":{"ok":{"type":"boolean"}},"required":["ok"],"type":"object"}'
         ),
     }
     assert router.calls[0]["messages"][1:] == [
@@ -340,7 +520,7 @@ def test_litellm_adapter_includes_schema_guidance_with_prompt_fallback() -> None
             "role": "system",
             "content": (
                 "Return JSON that matches this schema exactly. "
-                'Do not wrap the JSON in markdown fences.\nJSON Schema: {"additionalProperties":false,"properties":{"summary":{"type":"string"}},"required":["summary"],"type":"object"}'
+                'Do not wrap the JSON in markdown fences. Inside JSON strings write line breaks as the escape sequence \\n, never as a literal newline.\nJSON Schema: {"additionalProperties":false,"properties":{"summary":{"type":"string"}},"required":["summary"],"type":"object"}'
             ),
         },
         {"role": "user", "content": "hello world"},
@@ -386,7 +566,7 @@ def test_litellm_adapter_serializes_nested_frozen_schema_values() -> None:
         "role": "system",
         "content": (
             "Return JSON that matches this schema exactly. "
-            'Do not wrap the JSON in markdown fences.\nJSON Schema: {"additionalProperties":false,"properties":{"outer":{"additionalProperties":false,"properties":{"items":{"items":{"type":"integer"},"type":"array"},"value":{"type":"string"}},"required":["value","items"],"type":"object"}},"required":["outer"],"type":"object"}'
+            'Do not wrap the JSON in markdown fences. Inside JSON strings write line breaks as the escape sequence \\n, never as a literal newline.\nJSON Schema: {"additionalProperties":false,"properties":{"outer":{"additionalProperties":false,"properties":{"items":{"items":{"type":"integer"},"type":"array"},"value":{"type":"string"}},"required":["value","items"],"type":"object"}},"required":["outer"],"type":"object"}'
         ),
     }
 
@@ -405,7 +585,9 @@ def test_litellm_adapter_serializes_real_registry_schema_before_dispatch() -> No
         "role": "system",
         "content": (
             "Return JSON that matches this schema exactly. "
-            "Do not wrap the JSON in markdown fences.\n"
+            "Do not wrap the JSON in markdown fences. "
+            "Inside JSON strings write line breaks as the escape sequence \\n, never as a "
+            "literal newline.\n"
             "JSON Schema: "
             '{"additionalProperties":false,"properties":{"confidence":{"additionalProperties":{"maximum":1,"minimum":0,"type":"number"},"type":"object"},"missing_fields":{"items":{"minLength":1,"type":"string"},"type":"array"},"values":{"additionalProperties":true,"type":"object"}},"required":["values","missing_fields"],"type":"object"}'
         ),

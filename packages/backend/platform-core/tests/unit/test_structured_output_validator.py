@@ -5,7 +5,14 @@ from anytoolai_platform_core.structured_output.errors import StructuredOutputMal
 from anytoolai_platform_core.structured_output.validator import (
     parse_json_object,
     parse_json_value,
+    validate_structured_output,
 )
+
+_TEXT_SCHEMA = {
+    "type": "object",
+    "properties": {"text": {"type": "string"}},
+    "additionalProperties": True,
+}
 
 
 @pytest.mark.parametrize("token", ["NaN", "Infinity", "-Infinity"])
@@ -35,3 +42,78 @@ def test_parse_json_object_rejects_markdown_fenced_text() -> None:
 def test_parse_json_object_rejects_empty_string() -> None:
     with pytest.raises(StructuredOutputMalformedJsonError):
         parse_json_object("")
+
+
+def test_provider_output_may_contain_a_raw_newline_inside_a_string() -> None:
+    """Some models write paragraph breaks as a literal newline inside the JSON string. The text is
+    kept exactly; a config-owned literal stays strict (see test_strict_json)."""
+    assert parse_json_object('{"text":"First.\n\nSecond."}') == {"text": "First.\n\nSecond."}
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        '{"text":"hello\x00world"}',
+        '{"text":"hello\\u0000world"}',
+        '{"te\\u0000xt":"hello"}',
+        '{"text":"bell\x07"}',
+    ],
+    ids=["raw-nul", "escaped-nul", "escaped-nul-key", "raw-bell"],
+)
+def test_provider_output_rejects_a_nul_or_a_raw_control_other_than_a_line_break(raw: str) -> None:
+    """Only a raw newline/tab is tolerated; a NUL cannot be persisted to PostgreSQL JSONB at all."""
+    with pytest.raises(StructuredOutputMalformedJsonError):
+        validate_structured_output(raw, schema=_TEXT_SCHEMA)
+
+
+def test_provider_output_keeps_a_raw_newline_and_tab_at_the_structured_output_boundary() -> None:
+    result = validate_structured_output('{"text":"First.\n\tSecond."}', schema=_TEXT_SCHEMA)
+
+    assert result.normalized_output == {"text": "First.\n\tSecond."}
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        '{"text":"hello\\ud800world"}',
+        '{"text":"hello\\udc00world"}',
+        '{"\\ud800":"hello"}',
+        '{"text":"hello\ud800world"}',
+    ],
+    ids=["escaped-high", "escaped-low", "escaped-key", "raw-high"],
+)
+def test_provider_output_rejects_an_unpaired_surrogate(raw: str) -> None:
+    """PostgreSQL JSONB rejects an unpaired surrogate, so it must fail validation (and be retried),
+    not persistence."""
+    with pytest.raises(StructuredOutputMalformedJsonError):
+        validate_structured_output(raw, schema=_TEXT_SCHEMA)
+
+
+def test_provider_output_keeps_a_surrogate_pair_as_its_character() -> None:
+    result = validate_structured_output('{"text":"ok \\ud83d\\ude00"}', schema=_TEXT_SCHEMA)
+
+    assert result.normalized_output == {"text": "ok \U0001f600"}
+
+
+def _nested(depth: int) -> str:
+    """An object of the given total depth: the top-level object plus `depth - 1` nested arrays."""
+    return '{"text":"a","extra":' + "[" * (depth - 1) + "0" + "]" * (depth - 1) + "}"
+
+
+@pytest.mark.parametrize("depth", [65, 501, 100_001])
+def test_provider_output_nested_too_deep_is_malformed_not_a_recursion_error(depth: int) -> None:
+    with pytest.raises(StructuredOutputMalformedJsonError):
+        validate_structured_output(_nested(depth), schema=_TEXT_SCHEMA)
+
+
+def test_provider_output_nested_to_the_depth_limit_passes() -> None:
+    result = validate_structured_output(_nested(64), schema=_TEXT_SCHEMA)
+
+    assert result.normalized_output["text"] == "a"
+
+
+def test_config_owned_literal_json_stays_strict_about_control_characters() -> None:
+    from anytoolai_platform_core.common.strict_json import parse_strict_json
+
+    with pytest.raises(ValueError, match="control character"):
+        parse_strict_json('{"a":"x\ny"}')

@@ -1,9 +1,21 @@
 workflows:
   - workflow_id: proposal_ai.generate_v1
-    version: 1
+    version: 2
     input_schema_ref: proposal_ai.generate_input_v1
-    output_schema_ref: kernel.schemas.compose_persuasive_text_output_v1
+    output_schema_ref: proposal_ai.generate_output_v1
+    # A04 -> A06. A04 reads the client's task as `source_text` and the freelancer's experience as
+    # its own `context` (no string concatenation needed); its `experience_gap` issues are both
+    # returned to the user as `gaps` and handed to A06 as `constraints.claims_to_avoid`
+    # (a dotted `context.*` input target is not allowed by the mapping DSL).
     steps:
+      - step_id: detect_gaps
+        action_config_id: proposal_ai.detect_experience_gaps_v1
+        input_mapping:
+          source_text: scenario.input.task_text
+          context: scenario.input.freelancer_positioning
+          taxonomy: 'literal:["experience_gap"]'
+        output_mapping:
+          context.workflow_output.gaps: steps.detect_gaps.output.issues
       - step_id: compose_persuasive_text
         action_config_id: proposal_ai.compose_persuasive_text_v1
         input_mapping:
@@ -12,4 +24,14 @@ workflows:
           constraints.tone: '?scenario.input.tone'
           constraints.language: '?scenario.input.language'
           constraints.format: 'literal:"plain_text"'
-          constraints.length: 'literal:4000'
+          # About 250 words; the model is asked for less, this is the hard ceiling.
+          constraints.length: 'literal:1800'
+          constraints.plain_text_lists: 'literal:"forbidden"'
+          constraints.numbers_must_appear_in_context: 'literal:true'
+          # Square, curly and double-brace placeholders, a name signature and meta-commentary make a text unsendable, so they fail
+          # validation (case-insensitive regexes). Long dashes are only a style rule: the prompt asks
+          # for none and the eval script counts them, but a run must not fail over one.
+          constraints.forbidden_patterns: 'literal:["\\[[^\\]\\n]{1,80}\\]","\\{[^{}\\n]{1,80}\\}","<[^\\s\\d<>=][^<>\\n]{0,79}>","%\\pL[\\pL\\pN_.]{0,39}%","\\{\\{|\\}\\}","\\byour name\\b","based on the information i(?:.m| am| have| was| can)","truthfully (claim|say)","as an ai (?:language )?model","as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\\b"]'
+          constraints.claims_to_avoid: steps.detect_gaps.output.issues
+        output_mapping:
+          context.workflow_output.text: steps.compose_persuasive_text.output.text

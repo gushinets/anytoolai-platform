@@ -312,3 +312,24 @@ def _has_disallowed_plain_text_markup(value: str) -> bool:
                 if inline_token.type == "inline" and _TASK_LIST_CHECKBOX_RE.match(inline_token.content):
                     return True
     return False
+
+
+# Plain-text list markers a CommonMark parser does not treat as lists. A bullet character at the
+# start of a line is a list item even alone (prose never starts with one); a dash or a lettered
+# marker ("a)", "(b)") can start a sentence, a signature or a quote, so two such lines are a list
+# and one is not.
+_BULLET_LINE = re.compile(r"^\s*[•●▪‣]\s+\S")
+_PLAIN_LIST_LINE = re.compile(r"^\s*(?:[–—]|\(?[A-Za-z]\))\s+\S")
+
+
+def _has_list(value: str) -> bool:
+    """True when the text is a CommonMark ordered or unordered list, has a line that starts with a
+    bullet character, or has two or more lines that start with a dash or a lettered marker."""
+    if any(
+        token.type in ("bullet_list_open", "ordered_list_open") for token in _tokenize_markdown(value)
+    ):
+        return True
+    lines = value.splitlines()
+    if any(_BULLET_LINE.match(line) for line in lines):
+        return True
+    return sum(bool(_PLAIN_LIST_LINE.match(line)) for line in lines) >= 2  # noqa: PLR2004

@@ -60,7 +60,7 @@ def _policy(*, model: str) -> ProviderPolicy:
 def test_gateway_uses_immutable_run_policy_model_and_reasoning() -> None:
     """Catches re-resolving the default alias after a lab snapshot was accepted."""
     base_policy = _policy(model="anytoolai.default_text")
-    local_policy = _policy(model="openai/gpt-5.4-mini")
+    local_policy = _policy(model="openai/gpt-6-luna")
     registry = ConfigRegistry(
         loaded_from=None,
         tenants={},
@@ -106,6 +106,6 @@ def test_gateway_uses_immutable_run_policy_model_and_reasoning() -> None:
 
     assert len(adapter.requests) == 1
     resolved = adapter.requests[0]
-    assert resolved.model == "openai/gpt-5.4-mini"
+    assert resolved.model == "openai/gpt-6-luna"
     assert resolved.model_addressing is ProviderModelAddressing.direct
     assert resolved.reasoning_effort is ReasoningEffort.high

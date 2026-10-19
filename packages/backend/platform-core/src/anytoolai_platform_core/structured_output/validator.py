@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from anytoolai_platform_core.common.storable_text import is_unstorable_char
 from anytoolai_platform_core.common.strict_json import parse_strict_json
 from anytoolai_platform_core.structured_output.errors import (
     StructuredOutputMalformedJsonError,
@@ -27,11 +28,44 @@ class StructuredOutputValidationResult:
     contract: StructuredOutputContract
 
 
+_TOLERATED_RAW_CONTROLS = frozenset("\t\n\r")
+# Deeper model output is malformed: every later pass over it (normalization, JSON Schema,
+# persistence) is recursive, and no product schema nests anywhere near this.
+_MAX_JSON_DEPTH = 64
+
+
 def parse_json_value(raw: str) -> Any:
+    """Model output may break a JSON string with a raw newline or tab; any other raw control is
+    malformed. A NUL or an unpaired surrogate (`\\ud800` without its pair) is malformed raw or
+    escaped: PostgreSQL JSONB cannot store either, so it would fail persistence after the output
+    had already passed validation. A valid pair decodes to one character (an emoji) and passes.
+    Nesting deeper than `_MAX_JSON_DEPTH` is malformed too, so it is retried instead of crashing a
+    recursive pass with RecursionError."""
+    if any(char < " " and char not in _TOLERATED_RAW_CONTROLS for char in raw):
+        raise StructuredOutputMalformedJsonError("Malformed JSON")
     try:
-        return parse_strict_json(raw)
-    except json.JSONDecodeError as exc:
+        value = parse_strict_json(raw, allow_control_chars=True)
+    except (json.JSONDecodeError, RecursionError) as exc:
         raise StructuredOutputMalformedJsonError("Malformed JSON") from exc
+    if not _is_storable(value):
+        raise StructuredOutputMalformedJsonError("Malformed JSON")
+    return value
+
+
+def _is_storable(value: Any) -> bool:
+    """Iterative, so any depth json.loads returns is walked: bounded depth, no unstorable char."""
+    stack = [(value, 1)]
+    while stack:
+        item, depth = stack.pop()
+        if isinstance(item, str):
+            if any(is_unstorable_char(char) for char in item):
+                return False
+        elif isinstance(item, (dict, list)):
+            if depth > _MAX_JSON_DEPTH:
+                return False
+            children = [*item.keys(), *item.values()] if isinstance(item, dict) else item
+            stack.extend((child, depth + 1) for child in children)
+    return True
 
 
 def parse_json_object(raw: str) -> dict[str, Any]:

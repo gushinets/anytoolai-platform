@@ -55,7 +55,7 @@ def test_snapshot_builder_captures_registry_definitions_and_typed_local_settings
             atom_id="A01",
             input_payload={"source_text": "snapshot input", "fields": []},
             prompt="Edited lab prompt",
-            model_id="openai/gpt-5.4-mini",
+            model_id="openai/gpt-6-luna",
             reasoning_effort=ReasoningEffort.high,
             capability_snapshot_id="capability_fixture_v1",
             capability_provenance={"source": "fixture", "version": "1"},
@@ -83,7 +83,7 @@ def test_snapshot_builder_captures_registry_definitions_and_typed_local_settings
     settings = load_run_local_action_settings(registry, record)
     assert settings.run_id == record.id
     assert settings.prompt == "Edited lab prompt"
-    assert settings.provider_policy.model == "openai/gpt-5.4-mini"
+    assert settings.provider_policy.model == "openai/gpt-6-luna"
     assert settings.reasoning_effort is ReasoningEffort.high
 
 
@@ -99,7 +99,7 @@ def test_snapshot_compatibility_rejects_registry_drift_before_action_execution()
             atom_id="A01",
             input_payload={"source_text": "snapshot input", "fields": []},
             prompt="Edited lab prompt",
-            model_id="openai/gpt-5.4-mini",
+            model_id="openai/gpt-6-luna",
             reasoning_effort=None,
             capability_snapshot_id="capability_fixture_v1",
             capability_provenance={"source": "fixture", "version": "1"},

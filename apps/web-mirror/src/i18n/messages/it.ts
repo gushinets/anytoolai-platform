@@ -1,7 +1,6 @@
-// Italian host messages (ICU); typographic ’ only. Register: formal/impersonal throughout (infinitive
-// or "Lei" possessive, e.g. "la sua identità") -- code review finding: `retry`/`result.copy` (and the
-// matching submit buttons in ProposalAI/Client Update Writer's own messages) used the informal "tu"
-// imperative instead, inconsistent with every other string on the same page.
+// Italian host messages (ICU); typographic ’ only. Register: formal "Lei" throughout. Instructions are
+// the polite imperative ("Riprovi", "Copi", "Ricarichi la pagina"), never the infinitive or the
+// informal "tu" imperative, so every product page reads the same way.
 import type { Shape } from "../messageTypes";
 import type { en } from "./en";
 
@@ -13,41 +12,41 @@ export const it: Shape<typeof en> = {
     runInProgress: "Un’elaborazione è in corso. Se esce ora, non vedrà il risultato e la quota non verrà ripristinata.",
   },
   loading: "Caricamento di {product}…",
-  unavailable: "{product} non è disponibile al momento. Ricaricare la pagina.",
+  unavailable: "{product} non è disponibile al momento. Ricarichi la pagina.",
   quotaExhausted: "Le esecuzioni di {product} a disposizione sono esaurite per ora.",
-  resultFetchFailed: "Il risultato è pronto, ma non è stato possibile caricarlo. Riprovare.",
+  resultFetchFailed: "Il risultato è pronto, ma non è stato possibile caricarlo. Riprovi.",
   starting: "Avvio in corso…",
   generating: "Generazione in corso…",
-  identityUnavailable: "Non è stato possibile verificare la sua identità. Ricaricare la pagina e riprovare.",
-  retry: "Riprovare",
+  identityUnavailable: "Non è stato possibile verificare la sua identità. Ricarichi la pagina e riprovi.",
+  retry: "Riprovi",
   formLabel: "Modulo {product}",
   workspace: {
     inputTitle: "I suoi dati",
     previousDetails: "Risultato basato sui dati precedenti",
-    backToInputs: "Tornare ai dati",
+    backToInputs: "Torni ai dati",
     newTask: "Nuova attività",
     handoffOpening: "Apertura del passaggio successivo…",
-    handoffStay: "Restare su questa pagina",
-    handoffFailed: "Impossibile aprire il passaggio successivo. Riprovare.",
+    handoffStay: "Resti su questa pagina",
+    handoffFailed: "Impossibile aprire il passaggio successivo. Riprovi.",
   },
   errors: {
-    startFailed: "Impossibile avviare {product}. Riprovare.",
-    timeout: "L’operazione richiede più tempo del previsto. Riprovare.",
-    connectionLost: "Connessione persa durante l’attesa del risultato. Riprovare.",
-    tryAgain: "Riprovare.",
+    startFailed: "Impossibile avviare {product}. Riprovi.",
+    timeout: "L’operazione richiede più tempo del previsto. Riprovi.",
+    connectionLost: "Connessione persa durante l’attesa del risultato. Riprovi.",
+    tryAgain: "Riprovi.",
   },
   result: {
-    copy: "Copiare",
+    copy: "Copi",
     copying: "Copia in corso…",
     copied: "Copiato",
-    copyFailed: "Impossibile copiare negli appunti. Copiare manualmente il testo qui sopra.",
+    copyFailed: "Impossibile copiare negli appunti. Copi manualmente il testo qui sopra.",
+    selectText: "Selezioni il testo",
   },
-  // Code review finding: outerWhitespace/maxLength made `{field}` the subject of "deve" (which
+  // Code review finding: maxLength made `{field}` the subject of "deve" (which
   // agrees in number: deve/devono) -- every message is now a label-colon-fragment instead, matching
   // `required`'s already-safe shape (normalized to "{field}: ..." order for consistency).
   validation: {
     required: "{field}: campo obbligatorio.",
-    outerWhitespace: "{field}: niente spazi all’inizio o alla fine.",
     maxLength: "{field}: massimo {maxLength, plural, one {# carattere} many {# di caratteri} other {# caratteri}}.",
   },
 };

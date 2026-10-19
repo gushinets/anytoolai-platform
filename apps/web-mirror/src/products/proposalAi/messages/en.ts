@@ -10,10 +10,16 @@ export const en = {
     taskText: "Describe the task",
     taskTextPlaceholder: "Paste the client's task, brief, or job post.",
     taskTextHelp: "Include the goal, deliverables, constraints, and timeline when available.",
-    freelancerPositioning: "Your positioning",
+    freelancerPositioning: "Your experience and strengths",
     freelancerPositioningPlaceholder: "Describe the experience and strengths that make you a good fit.",
-    freelancerPositioningHelp: "Use only claims you can stand behind—the proposal will not invent experience.",
+    freelancerPositioningHelp: "The proposal is built only from what you write here. Give checkable facts: tools, cases, results.",
     toneLegend: "Proposal style",
+    required: "required",
+    languageLabel: "Proposal language",
+    languageHelp: "Not the interface language. By default the proposal is written in the language of the task.",
+    languageAuto: "Same as the task",
+    counterNear: "Approaching the limit of {max} characters.",
+    counterOver: "Over the limit of {max} characters.",
   },
   toneOptions: {
     warm: "Warm & personable",
@@ -24,7 +30,11 @@ export const en = {
   // input labels above.
   fieldNames: {
     taskText: "Task description",
-    freelancerPositioning: "Your positioning",
+    freelancerPositioning: "Your experience and strengths",
+  },
+  result: {
+    gapsTitle: "Not covered by your experience",
+    gapsHint: "The proposal does not claim these. Cover them yourself or leave them out.",
   },
   generate: {
     submit: "Generate proposal",

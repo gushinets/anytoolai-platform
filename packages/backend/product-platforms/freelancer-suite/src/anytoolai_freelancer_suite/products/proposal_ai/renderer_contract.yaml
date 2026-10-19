@@ -1,13 +1,25 @@
 renderer_contract:
   scenario_id: proposal_ai.generate_v1
-  output_schema_ref: kernel.schemas.compose_persuasive_text_output_v1
+  output_schema_ref: proposal_ai.generate_output_v1
+  # apps/web-mirror/src/products/proposalAi renders the parts in this order; this file pins the
+  # contract that renderer is built against, not the renderer.
+  parts:
+    - part_id: proposal
+      field: text
+      description: >-
+        The copy-ready proposal body, verbatim, no wrapping or reformatting. It is the only copy
+        target and the only text a successful copy is recorded for (`copy_result`).
+    - part_id: experience_gaps
+      field: gaps
+      description: >-
+        Requirements of the task that the freelancer's stated experience does not cover, each with
+        `category` (always `experience_gap`), `description`, `severity` and optional `evidence`.
+        Informational, shown next to the proposal and never copied. An empty list is valid and the
+        block is hidden.
   canonical_field: text
   next_action: copy_result
   excluded_fields: [angle, rationale, model, provider]
   description: >-
-    The copy-ready proposal body is exactly the A06 output field `text` -- verbatim, no wrapping
-    or reformatting. ProposalAI v1 has no angle/rationale distinction (angle-driven persuasion is
-    out of scope for v1) and never exposes model, provider, or other hidden product fields in the
-    rendered result. apps/web-mirror (ANY-243) renders this field as-is and records a successful
-    copy as the `copy_result` next action; this file pins the contract ANY-243's renderer
-    implementation is built against, not the renderer implementation itself.
+    ProposalAI never exposes angle, rationale, model, provider or other hidden product fields in the
+    rendered result. `gaps` is the A04 `experience_gap` issue list and is not part of the proposal
+    text.

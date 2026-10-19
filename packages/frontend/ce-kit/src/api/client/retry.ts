@@ -28,6 +28,20 @@ export function isRetryable(error: PlatformApiError): boolean {
 }
 
 /**
+ * Whether a failed request leaves it unknown if the backend already acted on it: a lost response, a
+ * timeout or a 5xx, with or without the backend's error envelope (a proxy's HTML 502 or an empty
+ * 503 is `invalid_response`, and just as ambiguous). Repeating it is only safe for a request that
+ * carries an Idempotency-Key (a scenario start); a definite 4xx, an aborted request and a 2xx the
+ * client could not parse (deterministic) are not ambiguous.
+ */
+export function isAmbiguousFailure(error: PlatformApiError): boolean {
+  if (isRetryable(error)) {
+    return true;
+  }
+  return (error.type === "backend_error" || error.type === "invalid_response") && error.status >= 500;
+}
+
+/**
  * Resolves after `ms`, or immediately if `signal` aborts first -- the caller distinguishes the two
  * outcomes via `signal.aborted` after this settles. Always removes its listener/timer so an
  * already-settled retry loop can't leak either.

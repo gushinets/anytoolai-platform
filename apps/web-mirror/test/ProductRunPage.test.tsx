@@ -487,6 +487,57 @@ describe("ProductRunPage", () => {
     expect(calls.some((call) => call.key === ROUTES.NEXT_ACTION)).toBe(false);
   });
 
+  it("falls back to the legacy copy command when the clipboard API is blocked", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: vi.fn(() => Promise.reject(new Error("denied"))) },
+    });
+    const execCommand = vi.fn(() => true);
+    Object.defineProperty(document, "execCommand", { configurable: true, value: execCommand });
+    const { client } = makeClient(happyPathRoutes());
+
+    try {
+      renderPage({ client });
+      await waitForForm();
+      fillValidForm();
+      submit();
+      await waitForResult();
+
+      // the page moves focus to the result heading once; wait for that, or it can land after the
+      // button focus below and make the assertion race on a slow runner
+      const resultHeading = document.getElementById("product-result-heading");
+      await waitFor(() => expect(document.activeElement).toBe(resultHeading));
+      const copyButton = screen.getByRole("button", { name: "Copy" });
+      copyButton.focus();
+      fireEvent.click(copyButton);
+
+      await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
+      expect(execCommand).toHaveBeenCalledWith("copy");
+      // the temporary textarea must not leave the keyboard user's focus behind
+      expect(document.activeElement).toBe(copyButton);
+    } finally {
+      Reflect.deleteProperty(document, "execCommand");
+    }
+  });
+
+  it("offers to select the text for a manual copy when every copy path fails", async () => {
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined });
+    const { client } = makeClient(happyPathRoutes());
+
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+    await waitForResult();
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+
+    const select = await screen.findByRole("button", { name: "Select text" });
+    // same row as Copy, not a separate block under the error
+    expect(select.parentElement).toBe(screen.getByRole("button", { name: "Copy" }).parentElement);
+    fireEvent.click(select);
+    expect(window.getSelection()?.toString()).toContain(RESULT_TEXT);
+  });
+
   it("starts another run from the result with a cleared form and refreshed quota", async () => {
     const { client, calls } = makeClient({
       ...happyPathRoutes(),
@@ -696,7 +747,7 @@ describe("ProductRunPage", () => {
   it("preserves entered form values and retries with the same Idempotency-Key after a retryable start failure", async () => {
     const { client, calls } = makeClient({
       ...happyPathRoutes(),
-      [ROUTES.START]: [errorResponse(500, "internal_error"), startResponse()],
+      [ROUTES.START]: [errorResponse(500, "internal_error"), errorResponse(500, "internal_error"), startResponse()],
     });
 
     renderPage({ client });
@@ -713,10 +764,212 @@ describe("ProductRunPage", () => {
 
     await waitForResult();
     const startCalls = calls.filter((call) => call.key === ROUTES.START);
-    expect(startCalls).toHaveLength(2);
+    // The first submit already retried once on its own (500, 500), then "Try again" succeeded.
+    expect(startCalls).toHaveLength(3);
     expect(idempotencyKeyOf(startCalls[0]!)).toBeTruthy();
+    expect(new Set(startCalls.map((call) => idempotencyKeyOf(call))).size).toBe(1);
+  });
+
+  it("retries an ambiguous /start failure once on its own with the same Idempotency-Key", async () => {
+    const { client, calls } = makeClient({
+      ...happyPathRoutes(),
+      [ROUTES.START]: [errorResponse(500, "internal_error"), startResponse()],
+    });
+
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+
+    await waitForResult();
+    const startCalls = calls.filter((call) => call.key === ROUTES.START);
+    expect(startCalls).toHaveLength(2);
     expect(idempotencyKeyOf(startCalls[0]!)).toBe(idempotencyKeyOf(startCalls[1]!));
   });
+
+  it("retries a 5xx that carries no error envelope (a proxy's HTML 502) with the same Idempotency-Key", async () => {
+    const htmlBadGateway = new Response("<html><body>502 Bad Gateway</body></html>", {
+      status: 502,
+      headers: { "Content-Type": "text/html" },
+    });
+    const { client, calls } = makeClient({
+      ...happyPathRoutes(),
+      [ROUTES.START]: [htmlBadGateway, startResponse()],
+    });
+
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+
+    await waitForResult();
+    const startCalls = calls.filter((call) => call.key === ROUTES.START);
+    expect(startCalls).toHaveLength(2);
+    expect(idempotencyKeyOf(startCalls[0]!)).toBe(idempotencyKeyOf(startCalls[1]!));
+  });
+
+  it("never retries a definite 4xx /start rejection automatically", async () => {
+    const { client, calls } = makeClient({
+      ...happyPathRoutes(),
+      [ROUTES.START]: [errorResponse(422, "scenario_input_invalid"), startResponse()],
+    });
+
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/could not start test product/i));
+    expect(calls.filter((call) => call.key === ROUTES.START)).toHaveLength(1);
+  });
+
+  it("unlocks the form after a 4xx /start rejection with no error envelope, and resubmits with a new Idempotency-Key", async () => {
+    // A proxy or older API can answer 422 with HTML: the rejection is just as definite as an
+    // enveloped one, so the form must not stay locked replaying the same rejected key.
+    const htmlUnprocessable = new Response("<html>422</html>", {
+      status: 422,
+      headers: { "Content-Type": "text/html" },
+    });
+    const { client, calls } = makeClient({
+      ...happyPathRoutes(),
+      [ROUTES.START]: [htmlUnprocessable, startResponse()],
+    });
+
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/could not start test product/i));
+    expect((screen.getByLabelText("Text") as HTMLTextAreaElement).disabled).toBe(false);
+
+    submit();
+    await waitForResult();
+    const startCalls = calls.filter((call) => call.key === ROUTES.START);
+    expect(startCalls).toHaveLength(2);
+    expect(idempotencyKeyOf(startCalls[0]!)).not.toBe(idempotencyKeyOf(startCalls[1]!));
+  });
+
+  it.each([429, 403])(
+    "keeps the Idempotency-Key when the automatic retry of an ambiguous /start meets an edge HTML %i",
+    async (status) => {
+      // The first POST may have created the session before its response was lost; the edge
+      // rejecting the retry proves nothing about it, so "Try again" must replay the same key.
+      const htmlBadGateway = new Response("<html>502</html>", { status: 502, headers: { "Content-Type": "text/html" } });
+      const htmlEdgeRejection = new Response(`<html>${status}</html>`, {
+        status,
+        headers: { "Content-Type": "text/html" },
+      });
+      const { client, calls } = makeClient({
+        ...happyPathRoutes(),
+        [ROUTES.START]: [htmlBadGateway, htmlEdgeRejection, startResponse()],
+      });
+
+      renderPage({ client });
+      await waitForForm();
+      fillValidForm();
+      submit();
+
+      await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/could not start test product/i));
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+      await waitForResult();
+      const startCalls = calls.filter((call) => call.key === ROUTES.START);
+      expect(startCalls).toHaveLength(3);
+      expect(new Set(startCalls.map((call) => idempotencyKeyOf(call))).size).toBe(1);
+    },
+  );
+
+  it.each([429, 403])(
+    "keeps the Idempotency-Key when a manual Try again after ambiguous /start attempts meets an edge HTML %i",
+    async (status) => {
+      // The attempt history belongs to the key, not to one submit: the edge rejecting the third,
+      // manual request still settles nothing about the first two.
+      const htmlBadGateway = () => new Response("<html>502</html>", { status: 502, headers: { "Content-Type": "text/html" } });
+      const htmlEdgeRejection = new Response(`<html>${status}</html>`, {
+        status,
+        headers: { "Content-Type": "text/html" },
+      });
+      const { client, calls } = makeClient({
+        ...happyPathRoutes(),
+        [ROUTES.START]: [htmlBadGateway(), htmlBadGateway(), htmlEdgeRejection, startResponse()],
+      });
+
+      renderPage({ client });
+      await waitForForm();
+      fillValidForm();
+      submit();
+      await waitFor(() => expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy());
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+      await waitFor(() => expect(calls.filter((call) => call.key === ROUTES.START)).toHaveLength(3));
+      await waitFor(() => expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy());
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+      await waitForResult();
+      const startCalls = calls.filter((call) => call.key === ROUTES.START);
+      expect(startCalls).toHaveLength(4);
+      expect(new Set(startCalls.map((call) => idempotencyKeyOf(call))).size).toBe(1);
+    },
+  );
+
+  it.each([429, 403])(
+    "keeps the Idempotency-Key when a Try again after a garbled /start 200 meets an edge HTML %i",
+    async (status) => {
+      // A 200 is the strongest sign the session was created, even when its body cannot be read.
+      const garbledOk = new Response("<html>ok</html>", { status: 200, headers: { "Content-Type": "text/html" } });
+      const htmlEdgeRejection = new Response(`<html>${status}</html>`, {
+        status,
+        headers: { "Content-Type": "text/html" },
+      });
+      const { client, calls } = makeClient({
+        ...happyPathRoutes(),
+        [ROUTES.START]: [garbledOk, htmlEdgeRejection, startResponse()],
+      });
+
+      renderPage({ client });
+      await waitForForm();
+      fillValidForm();
+      submit();
+      await waitFor(() => expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy());
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+      await waitFor(() => expect(calls.filter((call) => call.key === ROUTES.START)).toHaveLength(2));
+      await waitFor(() => expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy());
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+      await waitForResult();
+      const startCalls = calls.filter((call) => call.key === ROUTES.START);
+      expect(startCalls).toHaveLength(3);
+      expect(new Set(startCalls.map((call) => idempotencyKeyOf(call))).size).toBe(1);
+    },
+  );
+
+  it.each([429, 403])(
+    "resumes polling the session a start already created on Try again, never re-sending /start (edge HTML %i queued)",
+    async (status) => {
+      // start 200 (S1) -> GET S1 503 -> Try again: re-sending /start could meet an edge 4xx that
+      // releases the key and lets the next try start a second, quota-spending session.
+      const htmlEdgeRejection = new Response(`<html>${status}</html>`, {
+        status,
+        headers: { "Content-Type": "text/html" },
+      });
+      const { client, calls } = makeClient({
+        ...happyPathRoutes(),
+        [ROUTES.START]: [startResponse(), htmlEdgeRejection, startResponse({ scenario_session_id: "session_2" })],
+        [ROUTES.SESSION]: [errorResponse(503, "internal_error"), sessionResponse()],
+      });
+
+      renderPage({ client });
+      await waitForForm();
+      fillValidForm();
+      submit();
+      await waitFor(() => expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy());
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+      await waitForResult();
+      expect(calls.filter((call) => call.key === ROUTES.START)).toHaveLength(1);
+      expect(calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(2);
+    },
+  );
 
   it("starts a genuinely new logical submission (new Idempotency-Key) after a terminal execution failure, instead of replaying the dead session", async () => {
     const SECOND_SESSION_ROUTE = "GET /v1/scenario-sessions/session_2";
@@ -973,7 +1226,7 @@ describe("ProductRunPage", () => {
     const events: ProductRunEvent[] = [];
     const { client } = makeClient({
       ...happyPathRoutes(),
-      [ROUTES.START]: [errorResponse(500, "internal_error"), startResponse()],
+      [ROUTES.START]: [errorResponse(500, "internal_error"), errorResponse(500, "internal_error"), startResponse()],
     });
 
     renderPage({ client, onEvent: (event) => events.push(event) });
@@ -1484,7 +1737,7 @@ describe("ProductRunPage", () => {
     const ambiguousBusyStates: boolean[] = [];
     const { client: ambiguousClient } = makeClient({
       ...happyPathRoutes(),
-      [ROUTES.START]: [errorResponse(500, "internal_error"), startResponse()],
+      [ROUTES.START]: [errorResponse(500, "internal_error"), errorResponse(500, "internal_error"), startResponse()],
     });
     renderPage({ client: ambiguousClient, onLockedChange: (busy) => ambiguousBusyStates.push(busy) });
     await waitForForm();
