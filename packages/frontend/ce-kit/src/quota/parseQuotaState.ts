@@ -14,7 +14,14 @@ function isIsoTimestamp(value: string): boolean {
   if (match === null) {
     return false;
   }
-  const [year, month, day, hour, minute, second] = match.slice(1, 7).map(Number);
+  const [year, month, day, hour, minute, second] = match.slice(1, 7).map(Number) as [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+  ];
   const offsetHour = Number(match[7] ?? 0);
   const offsetMinute = Number(match[8] ?? 0);
   const date = new Date(Date.UTC(year, month - 1, day));
