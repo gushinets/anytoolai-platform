@@ -267,9 +267,29 @@ MVP-A dependency intent:
 
 ```text
 pydantic-ai-slim with only required extras
-litellm
+litellm==1.105.1 (exact pin)
 pydantic 2.x pinned by the backend lockfile
 ```
+
+LiteLLM is pinned exactly because each release changes its model registry and parameter handling:
+an upgrade is its own ticket, never a side effect of `uv lock --upgrade`. Its wire behaviour is
+locked by the `test_litellm_wire_*` tests in `platform-core/tests/unit/test_litellm_adapter.py`,
+which run the real SDK against a mocked HTTP transport and assert the request body: the reasoning
+effort and temperature per model, and one HTTP attempt per adapter call.
+
+LiteLLM 1.105.1 (ANY-659) brings `boto3`/`botocore`, the HTTP/2 stack (`h2`, `hpack`,
+`hyperframe`) and `pydantic-settings` as transitive dependencies; no AnyToolAI code uses them.
+Its registry now lists `gpt-6-luna` and `gpt-6.1-sol`, but `allowed_openai_params:
+[reasoning_effort]` stays in the adapter and `litellm_router.yaml` as the guard for the next model
+the registry does not list yet.
+
+PydanticAI is not a LiteLLM dependency and was not upgraded with it. Our PydanticAI code runs a
+`FunctionModel` that calls ProviderGateway, so it never sees LiteLLM; the resolver required no
+PydanticAI change. Validation retries are covered by the `platform-actions` tests in
+`test_pydanticai_runner.py` (schema mismatch, malformed JSON and cross-validator retries) and
+`test_structured_llm_executor_shares_physical_call_budget_across_validation_retries`;
+`atoms-proof` is the deterministic fake-provider smoke of structured results and workflows and does
+not retry. Upgrade PydanticAI only under its own ticket.
 
 Rules:
 
