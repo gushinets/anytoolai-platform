@@ -45,6 +45,9 @@ jobs:
       - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
         with:
           version: 10.34.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @anytoolai/acceptance-builder-smoke exec playwright install --with-deps chromium
       - name: Boot dev Compose stack (waits for platform-api healthy)
