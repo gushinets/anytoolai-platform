@@ -1347,6 +1347,27 @@ class TestPersuasiveTextProductConstraints:
                 {"freelancer_positioning": "My fixed fee is $20k, 1.5M rows processed"},
                 "My fixed fee is $20,000 for 1,500,000 rows, or $20k as I usually say.",
             ),
+            # one structural rule, not a list of formats: apostrophe groups, signs and scaled fractions
+            *(
+                (
+                    {"numbers_must_appear_in_context": True},
+                    {"freelancer_positioning": context},
+                    text,
+                )
+                for context, text in [
+                    ("My fixed fee is CHF 1'500.", "My fixed fee is CHF 1500, that is CHF 1,500."),
+                    ("My fixed fee is CHF 1\u2019500.", "My fixed fee is CHF 1500."),
+                    ("My fixed fee is CHF 1'500.50.", "My fixed fee is CHF 1500.50."),
+                    ("My fixed fee is CHF 1\u2019500,50.", "My fixed fee is CHF 1500,50."),
+                    ("I delivered +20% revenue growth and cut costs by -15%.", "I delivered 20% growth and -15% costs."),
+                    ("I delivered \u221220% churn.", "I delivered -20% churn."),
+                    ("Reports take 10-20% less time over 2-3 weeks.", "Reports take 10 to 20% less time over 2 or 3 weeks."),
+                    ("My rate is $1.234k.", "My rate is $1,234."),
+                    ("I processed .5M rows.", "I processed 500,000 rows."),
+                    ("I processed 1,234,000 rows.", "I processed 1234000 rows."),
+                    ("Budget \u20b91,50,000.", "Budget \u20b9150000."),
+                ]
+            ),
             # a scaled fraction keeps its exact value
             (
                 {"numbers_must_appear_in_context": True},
@@ -1551,6 +1572,17 @@ class TestPersuasiveTextProductConstraints:
                     ("3 projects, 200 clients", "My fixed fee is 3 200 EUR."),
                     ("We have 12 100 clients", "We have 12 clients."),
                     ("My fixed fee is $1.2345k", "My fixed fee is $1,234."),
+                    ("My fixed fee is CHF 1'500.", "My fixed fee is CHF 500."),
+                    ("My fixed fee is CHF 1'500.", "My fixed fee is CHF 1."),
+                    ("My fixed fee is CHF 1\u2019500.", "My fixed fee is CHF 500."),
+                    ("My fixed fee is CHF 1'500.50.", "My fixed fee is CHF 500.50."),
+                    ("My fixed fee is CHF 1\u2019500,50.", "My fixed fee is CHF 500,50."),
+                    ("I delivered +20% revenue growth.", "I delivered -20% revenue growth."),
+                    ("My fixed fee is +200 EUR.", "My fixed fee is -200 EUR."),
+                    ("My fixed fee is -200 EUR.", "My fixed fee is 200 EUR."),
+                    ("My rate is $1.234k.", "My rate is $1,234,000."),
+                    ("I processed .5M rows.", "I processed 5,000,000 rows."),
+                    ("Budget \u20b91,50,000.", "Budget \u20b950."),
                     ("I can complete a 2-to-3-week project", "I can complete it in 2 to 4 weeks."),
                 ]
             ),

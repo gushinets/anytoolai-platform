@@ -15,13 +15,22 @@ from ._shared import (
     _truncated_repr,
 )
 
-# The number formats a brief or a proposal is read in. Each token is one of these, longest form
-# first, and yields the numbers it means (a dotted date is three). A text number is covered when the
-# context has a token offering it. A number is compared by value ("05" is 5, "1,500" is 1500) and
-# never by its digit groups, so a "$1,500" budget never offers "$500" as a price. A grouped figure
-# has one magnitude whatever the separator: "1.500" is 1500, never 1.5, and "3 200,50" is 3200.5,
-# never 3, 200 or 50, so a brief's "1.5 years" cannot cover a claimed "1,500 projects" and a
-# "3 200 EUR" fee cannot cover "3 EUR" (ambiguity fails closed).
+# How a brief or a proposal is read for numbers. There is no list of locale formats: a number token
+# is an optional sign, digit groups joined by separators (".", ",", "'", "\u2019", a no-break space,
+# or a plain space before exactly three digits that do not start a hyphenated unit) and an optional
+# "k"/"K"/"M" scale, and its shape alone decides what it means:
+#   1. the last separator is "." or "," and differs from the one grouping before it: a fraction
+#      ("1,234.50", "1.234,50", "3 200,50", "1'500.50");
+#   2. one repeated separator before groups of three digits (or Indian "1,50,000"): thousands
+#      ("1,500", "1.500", "1'500", "3 200", "1,234,000") -- "1.500" is 1500, never 1.5, so
+#      ambiguity fails closed -- except that a single "." or "," before a scale is the decimal mark
+#      ("$1.234k" is 1234, "1,5k" is 1500);
+#   3. a single "." or "," before any other group: a fraction ("1.5", "12,50", ".5M" is 500000);
+#   4. anything else is a sequence of numbers, each offered on its own (a date "10.5.2024", "1.2.3").
+# A number is compared by value ("05" is 5, "1,500" is 1500) and never by its digit groups, so a
+# "$1,500" budget never offers "$500" and a "CHF 1'500" fee never offers "CHF 1". The sign is part
+# of the value ("-20%" is not "+20%", "+20" is 20) when nothing but space or punctuation precedes it:
+# "10-20%", "2-3 weeks" and "2-to-3-week" are ranges. "3 500-word" is 3 and 500.
 #
 # Letters next to digits are decided by one rule, the first character of the word: a word that starts
 # with a letter is a name and offers no number at all ("n8n", "v2", "GPT-4.1-mini", "gpt_4o",
@@ -37,19 +46,15 @@ from ._shared import (
 # ("2-to-3-week" keeps its 3); a name like "GPT-4.1-mini" starts at its letter and absorbs its hyphens.
 _NAME = re.compile(r"(?<!\w)(?<!\d-)[^\W\d_]\w*(?:[.-]\w+)*")
 _NUMBER_TOKEN = re.compile(
-    r"""(?<![^\W_])(?:  # not after a letter or digit
-    (?P<date>\d{1,2}[./]\d{1,2}[./]\d{2,4})                              # 10.5.2024, 05/01/24: three numbers
-  | (?P<us>\d{1,3}(?:,\d{3})+)(?P<us_fraction>\.\d+)?                     # 1,500 and 1,234.50
-  | (?P<eu>\d{1,3}(?:\.\d{3})+)(?P<eu_fraction>,\d+)?                     # 1.500 and 1.234,50
-  | (?P<nbsp>\d{1,3}(?:[\u00a0\u202f]\d{3})+)(?P<nbsp_fraction>[.,]\d+)?  # 3\u202f500: an explicit group
-  | (?P<space>\d{1,3}(?:\x20\d{3})+)(?P<space_fraction>[.,]\d+)?(?!-[^\W\d_])  # 3 200 is 3200; "3 500-word" is 3 and 500
-  | (?P<decimal>\d+)(?P<decimal_fraction>[.,]\d+)                         # 1.5 and 1,5
-  | (?P<integer>\d+)
-)(?!\d)(?P<scale>[kKM](?![^\W\d_]))?""",
+    r"""(?<![^\W_])                                 # not after a letter, digit or underscore
+    (?P<sign>[-+\u2212](?=[.,]?\d))?
+    (?P<body>(?:\d+|[.,]\d+)(?:(?:[.,'\u2019\u00a0\u202f]|\x20(?=\d{3}(?!\d|-[^\W\d_])))\d+)*)
+    (?P<scale>[kKM](?![^\W\d_]))?""",
     re.VERBOSE,
 )
 _SCALE = {"k": 1000, "K": 1000, "M": 1_000_000}
-_GROUP_SEPARATORS = str.maketrans("", "", ",.\u00a0\u202f\x20")
+_DECIMAL_MARKS = ".,"
+_MINUS = ("-", "\u2212")
 # the typographic hyphens join a word like "-" does ("3 500\u2011word", "GPT\u20114.1"); dashes do not
 _HYPHENS = str.maketrans("\u2010\u2011", "--")
 
@@ -59,33 +64,50 @@ def _without_names(value: str) -> str:
     return _NAME.sub(lambda m: " " if any(c.isdigit() for c in m.group(0)) else m.group(0), value)
 
 
-def _scaled(number: str, scale: str | None) -> str:
-    if not scale:
-        return number
-    whole, _, fraction = format(Decimal(number) * _SCALE[scale], "f").partition(".")  # exact: 1.2345k is 1234.5
-    return _number(whole, fraction)
+def _is_grouped(groups: list[str], separators: list[str]) -> bool:
+    """Digit groups split by one repeated separator: 1,500 / 1.234.567 / 1'500 / 3 200 / 1,50,000."""
+    if len(set(separators)) != 1 or len(groups[-1]) != 3:
+        return False
+    first, middle = groups[0], groups[1:-1]
+    if len(first) <= 3 and all(len(group) == 3 for group in middle):
+        return True
+    return separators[0] == "," and len(first) <= 2 and all(len(group) == 2 for group in middle)  # lakh
 
 
-def _number(whole_digits: str, fraction: str = "") -> str:
-    """A number by value: "05" is 5, "1234" with fraction "50" is 1234.5."""
-    fraction = fraction.rstrip("0")
-    return str(int(whole_digits)) + (f".{fraction}" if fraction else "")
+def _magnitude(body: str, scaled: bool) -> Decimal | None:
+    """The one value a token body means by the rules above, or None for a sequence of numbers."""
+    if body[0] in _DECIMAL_MARKS:
+        return Decimal("0." + body[1:]) if body[1:].isdigit() else None
+    parts = re.split(r"(\D)", body)
+    groups, separators = parts[0::2], parts[1::2]
+    if not separators:
+        return Decimal(body)
+    *grouping, last = separators
+    if last in _DECIMAL_MARKS and grouping and last not in grouping and _is_grouped(groups[:-1], grouping):
+        return Decimal("".join(groups[:-1]) + "." + groups[-1])
+    if _is_grouped(groups, separators) and not (scaled and not grouping and last in _DECIMAL_MARKS):
+        return Decimal("".join(groups))
+    if not grouping and last in _DECIMAL_MARKS:
+        return Decimal(groups[0] + "." + groups[1])
+    return None
+
+
+def _canonical(value: Decimal) -> str:
+    """A number by value: "05" is 5, "1234.50" is 1234.5, "-0" is 0."""
+    text = format(value, "f")
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return "0" if text == "-0" else text
 
 
 def _token_numbers(match: re.Match[str]) -> set[str]:
-    return {_scaled(number, match.group("scale")) for number in _unscaled_numbers(match)}
-
-
-def _unscaled_numbers(match: re.Match[str]) -> set[str]:
-    groups = match.groupdict()
-    if groups["date"]:
-        return {_number(part) for part in re.split(r"[./]", groups["date"])}
-    if groups["decimal"]:
-        return {_number(groups["decimal"], groups["decimal_fraction"][1:])}
-    if groups["integer"]:
-        return {_number(groups["integer"])}
-    kind = next(kind for kind in ("us", "eu", "nbsp", "space") if groups[kind])
-    return {_number(groups[kind].translate(_GROUP_SEPARATORS), (groups[f"{kind}_fraction"] or "")[1:])}
+    body, scale = match.group("body"), match.group("scale")
+    value = _magnitude(body, scaled=scale is not None)
+    if value is None:
+        return {_canonical(Decimal(group)) for group in re.split(r"\D", body) if group}
+    if scale:
+        value *= _SCALE[scale]  # exact: 1.2345k is 1234.5
+    return {_canonical(-value if match.group("sign") in _MINUS else value)}
 
 
 def _numbers(value: str) -> set[str]:

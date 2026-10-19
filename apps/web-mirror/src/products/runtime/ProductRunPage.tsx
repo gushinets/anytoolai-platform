@@ -413,6 +413,13 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   // Editing any field after a failure makes the next submit build a genuinely new handle instead.
   // Declared before `busy` below, which reads it.
   const [pendingStart, setPendingStart] = useState<{ prepared: PreparedScenarioStart; input: V } | null>(null);
+  // What this page knows about each prepared start (its Idempotency-Key), across every runStart():
+  // whether it was ever sent, and the session it created once a start succeeded. A key is released
+  // only on proof that nothing was created (see the 4xx branch in runStart()), never by listing the
+  // outcomes that might have; and a start known to have created a session is never sent again --
+  // "Try again" resumes polling that session (see submitCurrentValues()).
+  const sentStartsRef = useRef(new WeakSet<PreparedScenarioStart>());
+  const startedSessionsRef = useRef(new WeakMap<PreparedScenarioStart, string>());
   // True while the run on screen is the attached session (no local submit since): "Try again"
   // re-polls it instead of validating an empty form or starting a second, quota-spending run.
   const attachActiveRef = useRef(false);
@@ -611,12 +618,16 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     // regardless of which controller (if any) controllerRef points to by the time each resolves.
     const controller = controllerRef.current;
     const startOptions = { signal: controller?.signal, timeoutMs: START_TIMEOUT_MS };
+    // Only the answer to a key's very first send can prove the key created nothing: every later
+    // send follows one whose outcome may have created the session.
+    let firstSend = !sentStartsRef.current.has(prepared);
+    sentStartsRef.current.add(prepared);
     let result = await prepared.execute(client, startOptions);
     // One automatic retry of an ambiguous failure (network, timeout, 5xx). It reuses the prepared
     // handle, so the same Idempotency-Key makes it safe: the backend returns the session it already
     // created instead of spending quota twice. A definite 4xx is never retried.
-    const retried = !controller?.signal.aborted && !result.ok && isAmbiguousFailure(result.error);
-    if (retried) {
+    if (!controller?.signal.aborted && !result.ok && isAmbiguousFailure(result.error)) {
+      firstSend = false;
       result = await prepared.execute(client, startOptions);
     }
     if (controller?.signal.aborted) {
@@ -646,16 +657,17 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         return;
       }
       if (
-        (result.error.type === "backend_error" || (result.error.type === "invalid_response" && !retried)) &&
+        (result.error.type === "backend_error" ||
+          (result.error.type === "invalid_response" && firstSend)) &&
         result.error.status >= 400 &&
         result.error.status < 500
       ) {
         // A 4xx without the platform envelope (a proxy's HTML or empty 422) is just as definite, but
-        // only for the first attempt: on the automatic retry it is the edge rejecting that second
-        // request (an HTML 429/403), which says nothing about whether the first, ambiguous one
-        // created the session -- so it falls through to the ambiguous branch below and keeps the
-        // key. An enveloped 4xx on the retry is the backend itself, which would have replayed a
-        // session the same key had already created, so it stays definite.
+        // only as the answer to the key's first send: for any later send it is the edge rejecting
+        // that request (an HTML 429/403), which says nothing about what an earlier send of the same
+        // key created -- so it falls through to the ambiguous branch below and keeps the key. An
+        // enveloped 4xx is the backend itself, which would have replayed a session the same key had
+        // already created, so it stays definite.
         // Code review finding: a definite 4xx here (`scenario_not_found`, `idempotency_key_conflict`,
         // `scenario_input_invalid`/`scenario_frontend_invalid`, `guest_identity_required`, ...;
         // `quota_exhausted`/`guest_identity_not_found` were already peeled off above) means the
@@ -677,6 +689,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       setPhase({ kind: "retryable-error", reason: "startFailed" });
       return;
     }
+    startedSessionsRef.current.set(prepared, result.value.scenarioSessionId);
     setPhase({ kind: "running", scenarioSessionId: result.value.scenarioSessionId });
     void runPoll(result.value.scenarioSessionId);
   }
@@ -910,6 +923,15 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       setPendingStart({ prepared, input: values });
     }
     activeInputRef.current = values;
+    // This start already created its session (only its polling failed): follow that session instead
+    // of sending the start again, which an edge could answer with a 4xx that releases the key.
+    const startedSession = startedSessionsRef.current.get(prepared);
+    if (startedSession !== undefined) {
+      attachActiveRef.current = false;
+      setPhase({ kind: "running", scenarioSessionId: startedSession });
+      void runPoll(startedSession);
+      return;
+    }
     beginStart(prepared);
   }
 
