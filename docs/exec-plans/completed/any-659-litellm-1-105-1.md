@@ -2,13 +2,11 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-10-16
 - Last updated: 2026-10-19
-- Review date: 2026-10-19
-- Next action: open the PR; move to `completed/` once merged.
-- Blocker: none. ANY-656 (PR #170) is merged into `main`, and this branch has merged `main`.
+- Open follow-up: before closing ANY-679, check its vulnerability range against `aiohttp` 3.14.5.
 
 ## Goal
 
