@@ -5,3 +5,6 @@ packages:
   - "tests/e2e/*"
 allowBuilds:
   esbuild: true
+overrides:
+  # next 15.x pins postcss to 8.4.31 exactly (GHSA-6g55/GHSA-r28c/GHSA-fxqj); drop with Next 16.
+  "next>postcss": "^8.5.23"
