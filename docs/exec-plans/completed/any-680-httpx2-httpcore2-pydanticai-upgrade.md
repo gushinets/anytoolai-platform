@@ -2,12 +2,11 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-10-20
 - Last updated: 2026-10-20
-- Review date: 2026-10-20
-- Next action: wait for required CI on PR #188, then confirm Dependabot marks the alerts fixed after merge.
+- Completed: 2026-10-20
 - Blocker: none
 
 ## Goal
@@ -67,4 +66,4 @@ concurrency-limited models and OTel paths are not used. All alerts are fixed by 
 - `full-check` end to end: it stops at the `quick-check` sudo failure above, so its product-suite
   steps have not run locally; CI covers them.
 - PydanticAI cost comparison after `genai-prices` 0.1.13.
-- Required CI on the PR.
+- Required CI on the PR, then Dependabot marking the alerts fixed after merge.
