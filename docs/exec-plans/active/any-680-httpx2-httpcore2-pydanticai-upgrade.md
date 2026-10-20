@@ -7,7 +7,7 @@
 - Created: 2026-10-20
 - Last updated: 2026-10-20
 - Review date: 2026-10-20
-- Next action: open PR, then confirm Dependabot marks the alerts fixed after merge.
+- Next action: wait for required CI on PR #188, then confirm Dependabot marks the alerts fixed after merge.
 - Blocker: none
 
 ## Goal
@@ -55,8 +55,16 @@ concurrency-limited models and OTel paths are not used. All alerts are fixed by 
 - `quick-check`: 2341 passed; one failure, `test_activation_marker_is_readable_by_non_root_api_user`,
   needs passwordless sudo, which this environment lacks.
 - `platform-actions` tests pass with `-W error::DeprecationWarning`.
+- Images for `infra/docker/platform-{api,worker}.Dockerfile` rebuilt with `--no-cache`: `httpx2` and
+  `httpcore2` 2.15.1, `pydantic-ai-slim` and `pydantic-graph` 2.58.0, `genai-prices` 0.1.13,
+  `httpx2-jsfetch` not installed.
+- `atoms-proof` on the rebuilt images: 11/11 atoms and 3/3 composite workflows pass.
+- `postgresql-check` passes.
+- `frontend-check` passes.
 
 ## Remaining
 
-- Image install check for `infra/docker/platform-{api,worker}.Dockerfile`, `full-check`,
-  `postgresql-check`, `atoms-proof`, CI.
+- `full-check` end to end: it stops at the `quick-check` sudo failure above, so its product-suite
+  steps have not run locally; CI covers them.
+- PydanticAI cost comparison after `genai-prices` 0.1.13.
+- Required CI on the PR.
