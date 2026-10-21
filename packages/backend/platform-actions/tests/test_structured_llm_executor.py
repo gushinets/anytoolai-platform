@@ -194,9 +194,9 @@ def test_platform_actions_package_declares_runtime_dependencies() -> None:
     sources = pyproject["tool"]["uv"]["sources"]
 
     assert "anytoolai-platform-core" in dependencies
-    assert "pydantic-ai-slim>=2.2.0" in dependencies
+    assert "pydantic-ai-slim>=2.53.0" in dependencies
     assert "sqlalchemy>=2.0" in dependencies
-    assert "pydantic-ai-slim>=2.2.0" not in core_dependencies
+    assert "pydantic-ai-slim>=2.53.0" not in core_dependencies
     assert sources["anytoolai-platform-core"] == {
         "path": "../platform-core",
         "editable": True,
