@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 
 import pytest
+import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 NODE_MAJOR = (ROOT / ".nvmrc").read_text().strip().removeprefix("v").split(".")[0]
@@ -81,3 +82,34 @@ def test_postgres_major_matches_base_compose() -> None:
         want = STAGED_POSTGRES_MAJORS.get(name, expected)
         for tag in tags:
             assert tag_major(tag) == want, f"{name}: postgres:{tag or '<none>'} must pin {want}"
+
+
+class _ComposeLoader(yaml.SafeLoader):
+    """Compose-only tags (`!override`, `!reset`) are irrelevant to the postgres image and volume."""
+
+
+_ComposeLoader.add_multi_constructor("!", lambda loader, suffix, node: None)
+
+
+@pytest.mark.parametrize(
+    ("overlay", "volume"),
+    [
+        ("docker-compose.prod.yml", "postgres18-data"),
+        ("docker-compose.atom-lab.yml", "atom-lab-postgres18-data"),
+    ],
+)
+def test_overlay_postgres_resolves_to_pg18_on_new_volume(overlay: str, volume: str) -> None:
+    """Overlays hold no `image:` line, so assert what they resolve to, not just what they pin."""
+
+    def postgres(path: Path) -> dict:
+        return yaml.load(path.read_text(), Loader=_ComposeLoader)["services"]["postgres"]
+
+    base, over = postgres(BASE_COMPOSE), postgres(COMPOSE_DIR / overlay)
+    image = over.get("image", base["image"])
+    assert tag_major(image.removeprefix("postgres:")) == tag_major(
+        POSTGRES_IMAGE.findall(BASE_COMPOSE.read_text())[0]
+    )
+    assert f"{volume}:/var/lib/postgresql" in over["volumes"]
+    assert (
+        volume in yaml.load((COMPOSE_DIR / overlay).read_text(), Loader=_ComposeLoader)["volumes"]
+    )
