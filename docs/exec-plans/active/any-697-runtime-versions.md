@@ -24,6 +24,10 @@ PostgreSQL source of truth is the base `infra/compose/docker-compose.yml`.
   (`postgres18-data`, `atom-lab-postgres18-data`); old PostgreSQL 16 volumes stay for rollback.
 - `tests/architecture/test_runtime_versions_match.py` fails on version drift.
 - Runbook: "Upgrading PostgreSQL 16 to 18" in `infra/deployment/README.md`.
+- Runner: `prod-quiesce` and `prod-recovery-postgres-up`, sharing the drain and PostgreSQL-only
+  helpers with `atom-lab-quiesce`/`atom-lab-recovery-postgres-up`, so the production cut-over
+  runs on locked, bounded, fail-closed commands instead of hand-written shell. Aborting a quiesce
+  goes through `prod-up`/`prod-ready`; no separate `prod-resume`.
 
 ## Out of scope
 

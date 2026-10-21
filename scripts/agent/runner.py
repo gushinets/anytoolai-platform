@@ -2063,24 +2063,28 @@ def _atom_lab_down_locked() -> int:
 
 
 def _atom_lab_nonterminal_job_count(inputs: AtomLabDeploymentInputs) -> int:
+    return _nonterminal_job_count(_atom_lab_compose_command(), inputs.compose_env)
+
+
+def _nonterminal_job_count(compose_command: Sequence[str], env: dict[str, str]) -> int:
     query = (
         "SELECT count(*) FROM platform.jobs AS j "
         "WHERE j.status IN ('created', 'running');"
     )
     completed = subprocess.run(
         [
-            *_atom_lab_compose_command(),
+            *compose_command,
             "exec",
             "-T",
             "postgres",
             "sh",
             "-c",
             'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "$1"',
-            "atom-lab-quiesce",
+            "quiesce",
             query,
         ],
         cwd=ROOT,
-        env=inputs.compose_env,
+        env=env,
         capture_output=True,
         text=True,
         check=False,
@@ -2118,41 +2122,61 @@ def _atom_lab_quiesce_locked() -> int:
         print(f"LAB010: Atom Lab quiesce preflight failed: {exc}", file=sys.stderr)
         return 1
 
-    exit_code = run_with_env(
-        [*_atom_lab_compose_command(), "stop", "platform-api"],
+    exit_code = _drain_and_stop_worker(
+        _atom_lab_compose_command(),
         inputs.compose_env,
+        lambda: _atom_lab_nonterminal_job_count(inputs),
+        float(inputs.compose_env.get("ANYTOOLAI_ATOM_LAB_QUIESCE_TIMEOUT", "600")),
+        "LAB010",
+    )
+    if exit_code == 0:
+        print("Atom Lab is quiesced; PostgreSQL remains running for a consistent backup")
+    return exit_code
+
+
+def _drain_and_stop_worker(
+    compose_command: Sequence[str],
+    env: dict[str, str],
+    count_jobs: Callable[[], int],
+    timeout: float,
+    code: str,
+) -> int:
+    """Stop the API, wait for every job to leave created/running, then stop the worker.
+
+    PostgreSQL keeps running for the backup. On a query error or timeout the worker stays up
+    and nonzero is returned: ingress/API must stay closed and no backup may be taken.
+    """
+    exit_code = run_with_env(
+        [*compose_command, "stop", "platform-api"],
+        env,
         timeout=COMPOSE_TEARDOWN_TIMEOUT_SECONDS,
     )
     if exit_code != 0:
         return exit_code
 
-    timeout = float(inputs.compose_env.get("ANYTOOLAI_ATOM_LAB_QUIESCE_TIMEOUT", "600"))
     deadline = time.monotonic() + timeout
     while True:
         try:
-            nonterminal_count = _atom_lab_nonterminal_job_count(inputs)
+            nonterminal_count = count_jobs()
         except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
-            print(f"LAB010: could not verify the deployment queue: {exc}", file=sys.stderr)
+            print(f"{code}: could not verify the deployment queue: {exc}", file=sys.stderr)
             return 1
         if nonterminal_count == 0:
             break
         if time.monotonic() >= deadline:
             print(
-                f"LAB010: {nonterminal_count} deployment job(s) remain non-terminal; "
+                f"{code}: {nonterminal_count} deployment job(s) remain non-terminal; "
                 "ingress/API must stay closed and no backup may be taken",
                 file=sys.stderr,
             )
             return 1
         time.sleep(min(2.0, max(0.0, deadline - time.monotonic())))
 
-    exit_code = run_with_env(
-        [*_atom_lab_compose_command(), "stop", "platform-worker"],
-        inputs.compose_env,
+    return run_with_env(
+        [*compose_command, "stop", "platform-worker"],
+        env,
         timeout=COMPOSE_TEARDOWN_TIMEOUT_SECONDS,
     )
-    if exit_code == 0:
-        print("Atom Lab is quiesced; PostgreSQL remains running for a consistent backup")
-    return exit_code
 
 
 def atom_lab_resume() -> int:
@@ -2196,19 +2220,31 @@ def atom_lab_recovery_postgres_up() -> int:
 
 
 def _atom_lab_existing_services(inputs: AtomLabDeploymentInputs) -> frozenset[str]:
+    return _existing_services(_atom_lab_compose_command(), inputs.compose_env)
+
+
+def _existing_services(compose_command: Sequence[str], env: dict[str, str]) -> frozenset[str]:
     completed = subprocess.run(
-        [*_atom_lab_compose_command(), "ps", "--all", "--services"],
+        [*compose_command, "ps", "--all", "--services"],
         cwd=ROOT,
-        env=inputs.compose_env,
+        env=env,
         capture_output=True,
         text=True,
         check=False,
         timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
     )
     if completed.returncode != 0:
-        raise RuntimeError("could not inspect existing Atom Lab services")
+        raise RuntimeError("could not inspect existing Compose services")
     return frozenset(
         service.strip() for service in completed.stdout.splitlines() if service.strip()
+    )
+
+
+def _postgres_only_up(compose_command: Sequence[str], env: dict[str, str]) -> int:
+    timeout = math.ceil(float(env.get("ANYTOOLAI_READY_TIMEOUT", "90")))
+    return run_with_env(
+        [*compose_command, "up", "-d", "--wait", "--wait-timeout", str(timeout), "postgres"],
+        env,
     )
 
 
@@ -2229,19 +2265,7 @@ def _atom_lab_recovery_postgres_up_locked() -> int:
         print(f"LAB012: Atom Lab recovery PostgreSQL preflight failed: {exc}", file=sys.stderr)
         return 1
 
-    timeout = math.ceil(float(inputs.compose_env.get("ANYTOOLAI_READY_TIMEOUT", "90")))
-    exit_code = run_with_env(
-        [
-            *_atom_lab_compose_command(),
-            "up",
-            "-d",
-            "--wait",
-            "--wait-timeout",
-            str(timeout),
-            "postgres",
-        ],
-        inputs.compose_env,
-    )
+    exit_code = _postgres_only_up(_atom_lab_compose_command(), inputs.compose_env)
     if exit_code == 0:
         print(
             "Atom Lab recovery PostgreSQL is healthy; migrate, API, and worker remain stopped"
@@ -2920,6 +2944,77 @@ def prod_down() -> int:
         return 1
 
 
+# Maintenance commands use base + prod only: the live overlay needs deployment-profile
+# variables that only prod-up generates, and it does not change the postgres service.
+def prod_quiesce() -> int:
+    try:
+        with _prod_deployment_lock():
+            return _prod_quiesce_locked()
+    except DeploymentLockError as exc:
+        print(f"PROD007: {exc}", file=sys.stderr)
+        return 1
+
+
+def _prod_quiesce_locked() -> int:
+    try:
+        inputs = _deployment_inputs()
+        timeout = float(inputs.compose_env.get("ANYTOOLAI_PROD_QUIESCE_TIMEOUT", "600"))
+        if not math.isfinite(timeout) or timeout <= 0:
+            raise ValueError("ANYTOOLAI_PROD_QUIESCE_TIMEOUT must be a positive, finite number")
+        if not _prod_stack_running():
+            raise RuntimeError("production stack is not running")
+    except ValueError as exc:
+        print(f"PROD001: {exc}", file=sys.stderr)
+        return 2
+    except (FileNotFoundError, OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
+        print(f"PROD008: production quiesce preflight failed: {exc}", file=sys.stderr)
+        return 1
+
+    compose_command = _prod_compose_command()
+    exit_code = _drain_and_stop_worker(
+        compose_command,
+        inputs.compose_env,
+        lambda: _nonterminal_job_count(compose_command, inputs.compose_env),
+        timeout,
+        "PROD008",
+    )
+    if exit_code == 0:
+        print("Production is quiesced; PostgreSQL remains running for a consistent backup")
+    return exit_code
+
+
+def prod_recovery_postgres_up() -> int:
+    try:
+        with _prod_deployment_lock():
+            return _prod_recovery_postgres_up_locked()
+    except DeploymentLockError as exc:
+        print(f"PROD007: {exc}", file=sys.stderr)
+        return 1
+
+
+def _prod_recovery_postgres_up_locked() -> int:
+    try:
+        inputs = _deployment_inputs()
+        existing_services = _existing_services(_prod_compose_command(), inputs.compose_env)
+        unsafe_services = sorted(existing_services - {"postgres"})
+        if unsafe_services:
+            raise RuntimeError(
+                "PostgreSQL-only bootstrap requires application containers to be removed; "
+                f"existing services: {', '.join(unsafe_services)}"
+            )
+    except ValueError as exc:
+        print(f"PROD001: {exc}", file=sys.stderr)
+        return 2
+    except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
+        print(f"PROD009: production PostgreSQL-only preflight failed: {exc}", file=sys.stderr)
+        return 1
+
+    exit_code = _postgres_only_up(_prod_compose_command(), inputs.compose_env)
+    if exit_code == 0:
+        print("Production PostgreSQL is healthy; migrate, API, and worker remain stopped")
+    return exit_code
+
+
 def prod_fake_down() -> int:
     return run_with_env(
         _prod_fake_compose_command("down", "--remove-orphans"),
@@ -2990,6 +3085,8 @@ COMMANDS = {
     "prod-ready": prod_ready,
     "prod-status": prod_status,
     "prod-down": prod_down,
+    "prod-quiesce": prod_quiesce,
+    "prod-recovery-postgres-up": prod_recovery_postgres_up,
     "prod-smoke": prod_smoke,
 }
 
