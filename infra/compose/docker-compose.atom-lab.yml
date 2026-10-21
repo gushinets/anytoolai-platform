@@ -19,7 +19,7 @@ services:
     ports: !override
       - "127.0.0.1:${ANYTOOLAI_ATOM_LAB_POSTGRES_PORT:-5432}:5432"
     volumes:
-      - atom-lab-postgres-data:/var/lib/postgresql/data
+      - atom-lab-postgres18-data:/var/lib/postgresql
     restart: unless-stopped
     deploy:
       resources:
@@ -67,4 +67,4 @@ services:
           memory: ${ANYTOOLAI_ATOM_LAB_WORKER_MEMORY_LIMIT:?Atom Lab worker memory limit is required}
 
 volumes:
-  atom-lab-postgres-data:
+  atom-lab-postgres18-data:

@@ -228,6 +228,31 @@ accepted starts per UTC day, and one active run. They are backend limits, not a 
 promise. Change them only in `.env.atom-lab`, keep them off the worker, and rerun deployment plus
 readiness after review.
 
+#### Upgrading PostgreSQL 16 to 18
+
+The PostgreSQL 18 image moved `PGDATA` to `/var/lib/postgresql/18/docker`, so the prod and Atom
+Lab overlays now mount their volume at `/var/lib/postgresql` under **new names**
+(`postgres18-data`, `atom-lab-postgres18-data`). The old PostgreSQL 16 volumes
+(`postgres-data`, `atom-lab-postgres-data`) are never mounted by the new revision and stay intact
+for rollback. Deploying the new revision without the steps below starts an empty database.
+
+- **Dev and agent stacks** have no volume: `dev-down` then `dev-up` gives a fresh PostgreSQL 18.
+  If a local overlay keeps a PostgreSQL 16 volume, `pg_dump -Fc` it first or recreate it.
+- **Prod and Atom Lab** (dump/restore; do not use `pg_upgrade`):
+  1. While still on the PostgreSQL 16 revision, close ingress, quiesce, and take a verified
+     custom-format dump as described under "Backup, recovery, and rollback".
+  2. Run the matching `down` command (never with `--volumes`) and check out the PostgreSQL 18
+     revision.
+  3. Start only PostgreSQL (`atom-lab-recovery-postgres-up` for Atom Lab; `up -d postgres` for
+     prod), then `pg_restore` the dump into the empty `$POSTGRES_DB`. Do not run `migrate` first.
+  4. Run the normal `up` and readiness, confirm `alembic current` is head and row counts in
+     `jobs`, `action_runs`, `provider_calls`, and `platform.event_log` match the source, then
+     reopen ingress.
+- **Rollback:** `down`, check out the PostgreSQL 16 revision, `up`. It mounts the untouched old
+  volume. Data written after the cut-over is not carried back; dump from 18 first if needed.
+- Remove the old volume only after the 18 deployment is accepted and a fresh verified backup of
+  it exists.
+
 #### Backup, recovery, and rollback
 
 If the target Atom Lab PostgreSQL database already exists, back it up before every migration or
