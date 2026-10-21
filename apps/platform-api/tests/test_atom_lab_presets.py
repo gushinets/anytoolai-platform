@@ -851,3 +851,16 @@ def test_source_run_accepts_default_scope_and_rejects_cross_scope(app: FastAPI) 
     )
     assert rejected.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
     assert rejected.json()["error"]["code"] == "preset_source_run_invalid"
+
+
+@pytest.mark.parametrize("path", ["/v1/atom-lab/presets", "/v1/atom-lab/presets/missing/versions"])
+@pytest.mark.parametrize(
+    "cursor",
+    ["-" * 50_000, "-" * 50_000 + "!", "A" * 2000 + "==="],
+    ids=["dashes", "dashes-bang", "excess-padding"],
+)
+def test_list_cursors_reject_long_malformed_input(app: FastAPI, path: str, cursor: str) -> None:
+    response = asyncio.run(_request(app, "GET", f"{path}?cursor={cursor}"))
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["error"]["code"] == "invalid_cursor"

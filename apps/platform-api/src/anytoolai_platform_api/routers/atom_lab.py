@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import re
+import string
 from datetime import UTC, datetime
 from http import HTTPStatus
 from pathlib import Path
@@ -117,10 +118,11 @@ _POSTGRESQL_INTEGER_MAX = 2_147_483_647
 _IDEMPOTENCY_KEY_MAX_LENGTH = 128
 _RUN_PAGE_DEFAULT = 20
 _RUN_PAGE_MAX = 100
-_RUN_CURSOR_MAX_LENGTH = 1024
+_CURSOR_MAX_LENGTH = 1024
 _RUN_CURSOR_PARTS = 3
 _RUN_CURSOR_VERSION = "runs-v1"
 _RUN_ID_MAX_LENGTH = 128
+_URLSAFE_BASE64_ALPHABET = frozenset(string.ascii_letters + string.digits + "-_")
 _RUN_ID_PATTERN = re.compile(r"[A-Za-z0-9_-]+")
 
 
@@ -365,7 +367,7 @@ def list_runs(
     session_factory: Annotated[Any, Depends(get_atom_lab_run_session_factory)],
     settings: Annotated[Settings, Depends(get_settings)],
     limit: Annotated[int, Query(ge=1, le=_RUN_PAGE_MAX)] = _RUN_PAGE_DEFAULT,
-    cursor: Annotated[str | None, Query(max_length=_RUN_CURSOR_MAX_LENGTH)] = None,
+    cursor: Annotated[str | None, Query(max_length=_CURSOR_MAX_LENGTH)] = None,
 ) -> AtomLabRunListResponse:
     before = _decode_run_cursor(cursor) if cursor is not None else None
     try:
@@ -451,8 +453,6 @@ def _encode_run_cursor(created_at: datetime, run_id: str) -> str:
 
 def _decode_run_cursor(cursor: str) -> tuple[datetime, str]:
     try:
-        if len(cursor) > _RUN_CURSOR_MAX_LENGTH:
-            raise ValueError
         value = json.loads(_decode_urlsafe_base64(cursor))
         if (
             not isinstance(value, list)
@@ -1185,9 +1185,15 @@ def _decode_version_cursor(cursor: str) -> int:
 
 
 def _decode_urlsafe_base64(value: str) -> bytes:
-    if re.fullmatch(r"[A-Za-z0-9_-]+={0,2}", value) is None:
-        raise ValueError
+    # Shared by every cursor decoder: bound the input before any per-character work.
     unpadded = value.rstrip("=")
+    if (
+        len(value) > _CURSOR_MAX_LENGTH
+        or not unpadded
+        or value.endswith("===")
+        or not _URLSAFE_BASE64_ALPHABET.issuperset(unpadded)
+    ):
+        raise ValueError
     padded = unpadded + "=" * (-len(unpadded) % 4)
     if value not in {unpadded, padded}:
         raise ValueError
