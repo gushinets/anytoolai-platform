@@ -230,11 +230,24 @@ readiness after review.
 
 #### Upgrading PostgreSQL 16 to 18
 
-The PostgreSQL 18 image moved `PGDATA` to `/var/lib/postgresql/18/docker`, so the prod and Atom
-Lab overlays now mount their volume at `/var/lib/postgresql` under **new names**
-(`postgres18-data`, `atom-lab-postgres18-data`). The old PostgreSQL 16 volumes
-(`postgres-data`, `atom-lab-postgres-data`) are never mounted by the new revision and stay intact
-for rollback. Deploying the new revision without the steps below starts an empty database.
+The rollout is staged in two revisions, because step 1 below needs `prod-quiesce` on the
+revision that is still running PostgreSQL 16:
+
+1. **Tooling revision.** Dev, agent, and CI use PostgreSQL 18; the prod and Atom Lab overlays
+   still pin `postgres:16` with their existing volumes, and the runner gains `prod-quiesce` and
+   `prod-recovery-postgres-up`. Deploy it the normal way (`prod-up`, `atom-lab-up`); no data
+   moves.
+2. **Switch revision.** The prod and Atom Lab overlays move to PostgreSQL 18. The 18 image moved
+   `PGDATA` to `/var/lib/postgresql/18/docker`, so they mount their volume at
+   `/var/lib/postgresql` under **new names** (`postgres18-data`, `atom-lab-postgres18-data`). The
+   old PostgreSQL 16 volumes (`postgres-data`, `atom-lab-postgres-data`) are never mounted by it
+   and stay intact for rollback. Deploy it only with the steps below; otherwise it starts an
+   empty database.
+
+Before step 1, confirm the deployed revision has the tooling:
+`python scripts/agent/runner.py --help` must list `prod-quiesce` (prod) and `atom-lab-quiesce`
+(Atom Lab). "PostgreSQL 16 revision" below means that tooling revision, and "PostgreSQL 18
+revision" means the switch revision.
 
 - **Dev and agent stacks** have no volume: `dev-down` then `dev-up` gives a fresh PostgreSQL 18.
   If a local overlay keeps a PostgreSQL 16 volume, `pg_dump -Fc` it first or recreate it.
