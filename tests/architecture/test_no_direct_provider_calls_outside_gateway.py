@@ -348,9 +348,10 @@ def test_concatenated_provider_host_is_detected_in_js(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     offenders = check_provider_api_host_references(tmp_path, ())
-    assert len(offenders) == 2, offenders
-    assert any("client.ts" in o and "api.openai.com" in o for o in offenders)
-    assert any("template.ts" in o and "api.anthropic.com" in o for o in offenders)
+    assert sorted(offenders) == [
+        "client.ts references 'api.openai.com (folded, line 1)'",
+        "template.ts references 'api.anthropic.com (folded, line 2)'",
+    ]
 
 
 def test_concatenated_provider_host_is_detected_in_python(tmp_path: Path) -> None:
@@ -365,9 +366,10 @@ def test_concatenated_provider_host_is_detected_in_python(tmp_path: Path) -> Non
         'def url(host: str) -> str:\n    return "https://api." + host\n', encoding="utf-8"
     )
     offenders = check_provider_api_host_references(tmp_path, ())
-    assert len(offenders) == 2, offenders
-    assert any("client.py" in o and "api.openai.com" in o for o in offenders)
-    assert any("fstring.py" in o and "api.mistral.ai" in o for o in offenders)
+    assert sorted(offenders) == [
+        "client.py references 'api.openai.com (folded, line 2)'",
+        "fstring.py references 'api.mistral.ai (folded, line 2)'",
+    ]
 
 
 def test_host_fragment_imported_from_allowed_root_is_still_resolved(tmp_path: Path) -> None:
@@ -379,8 +381,6 @@ def test_host_fragment_imported_from_allowed_root_is_still_resolved(tmp_path: Pa
         encoding="utf-8",
     )
     offenders = check_provider_api_host_references(tmp_path, (allowed,))
-    assert len(offenders) == 1, offenders
-    assert "consumer.py" in offenders[0] and "api.openai.com" in offenders[0]
     # The allowed module itself never gets reported, even though it's now part of the resolver
     # graph — only the disallowed consumer that completed the host is.
-    assert not any("constants.py" in o for o in offenders)
+    assert offenders == ["consumer.py references 'api.openai.com (folded, line 2)'"]
