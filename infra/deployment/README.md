@@ -238,16 +238,73 @@ for rollback. Deploying the new revision without the steps below starts an empty
 
 - **Dev and agent stacks** have no volume: `dev-down` then `dev-up` gives a fresh PostgreSQL 18.
   If a local overlay keeps a PostgreSQL 16 volume, `pg_dump -Fc` it first or recreate it.
-- **Prod and Atom Lab** (dump/restore; do not use `pg_upgrade`):
-  1. While still on the PostgreSQL 16 revision, close ingress, quiesce, and take a verified
-     custom-format dump as described under "Backup, recovery, and rollback".
-  2. Run the matching `down` command (never with `--volumes`) and check out the PostgreSQL 18
-     revision.
-  3. Start only PostgreSQL (`atom-lab-recovery-postgres-up` for Atom Lab; `up -d postgres` for
-     prod), then `pg_restore` the dump into the empty `$POSTGRES_DB`. Do not run `migrate` first.
-  4. Run the normal `up` and readiness, confirm `alembic current` is head and row counts in
-     `jobs`, `action_runs`, `provider_calls`, and `platform.event_log` match the source, then
-     reopen ingress.
+- **Atom Lab** (dump/restore; do not use `pg_upgrade`):
+  1. While still on the PostgreSQL 16 revision, close ingress, run `atom-lab-quiesce`, and take a
+     verified custom-format dump as described under "Backup, recovery, and rollback".
+  2. Run `atom-lab-down` (never `down --volumes`) and check out the PostgreSQL 18 revision.
+  3. Run `atom-lab-recovery-postgres-up`, then `pg_restore --exit-on-error` the dump into the empty
+     `$POSTGRES_DB` with the `anytoolai-atom-lab` commands shown under "Backup, recovery, and
+     rollback". Do not run `migrate` first.
+  4. Run `atom-lab-up` and `atom-lab-ready`, confirm `alembic current` is head and the row counts
+     below match the source, then reopen ingress.
+- **Prod** (`anytoolai-prod`; there is no `prod-quiesce`, so drain by hand). Every command uses the
+  fixed project, the same Compose files and the same env file as `prod-up`:
+
+  ```bash
+  PROD="docker compose --project-name anytoolai-prod --env-file infra/compose/.env.prod \
+    -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.prod.yml \
+    -f infra/compose/docker-compose.live.yml"
+  # With ANYTOOLAI_VPS_135_NETWORKS=1 also append: -f infra/compose/docker-compose.vps-135.yml
+  PSQL='psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc'
+  ```
+
+  The maintenance owner holds exclusive ownership from step 1 through step 5; no other shell or
+  automation may run `prod-*` or Compose commands in that window.
+
+  1. **Drain, on the PostgreSQL 16 revision.** Close ingress, then stop the API so no new run can
+     be accepted: `$PROD stop platform-api`. Leave the worker running until nothing is in flight:
+
+     ```bash
+     until [ "$($PROD exec -T postgres sh -c "$PSQL \"SELECT count(*) FROM platform.jobs \
+       WHERE status IN ('created','running')\"")" = 0 ]; do sleep 5; done
+     $PROD stop platform-worker
+     ```
+
+     If this does not converge, keep ingress closed, do not dump, and inspect the worker logs
+     (`$PROD logs platform-worker`); to abort, `$PROD start platform-api platform-worker`.
+  2. **Dump and verify.** With only PostgreSQL still running:
+
+     ```bash
+     umask 077
+     $PROD exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' \
+       > /operator/backups/anytoolai-prod-YYYYMMDDTHHMMSSZ.dump
+     ```
+
+     Record the checksum, commit, Alembic head, UTC time, and the source row counts (below). Prove
+     the dump restores by running `pg_restore` into a separate empty database on this PostgreSQL 16
+     instance (`createdb` first) and comparing counts; a file existing is not evidence. Drop that
+     check database afterwards.
+  3. **Switch revision.** `python scripts/agent/runner.py prod-down` (preserves volumes), then check
+     out the PostgreSQL 18 revision.
+  4. **PostgreSQL-only boot and restore, before `migrate` can run.** Start only the database in the
+     same project; `--no-deps` guarantees `migrate`, API and worker stay down:
+
+     ```bash
+     $PROD up -d --no-deps postgres
+     $PROD exec -T postgres sh -c 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+     $PROD exec -T postgres sh -c "$PSQL 'show server_version'"      # must be 18.x
+     $PROD exec -T postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --exit-on-error' \
+       < /operator/backups/anytoolai-prod-YYYYMMDDTHHMMSSZ.dump
+     ```
+
+     Verify the version is 18, the volume is `anytoolai-prod_postgres18-data`
+     (`docker volume ls`), the row counts match the source, and `alembic_version` equals the
+     recorded head. Do not proceed to step 5 on any mismatch; `prod-down` and roll back instead.
+  5. Run `python scripts/agent/runner.py prod-up` (migrate is then a no-op) and `prod-ready`,
+     confirm the same counts, then reopen ingress.
+
+  Row counts to compare (source vs. restored): `platform.jobs`, `platform.action_runs`,
+  `platform.provider_calls`, `platform.event_log`, plus `alembic_version`.
 - **Rollback:** `down`, check out the PostgreSQL 16 revision, `up`. It mounts the untouched old
   volume. Data written after the cut-over is not carried back; dump from 18 first if needed.
 - Remove the old volume only after the 18 deployment is accepted and a fresh verified backup of
