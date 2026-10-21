@@ -283,13 +283,17 @@ Its registry now lists `gpt-6-luna` and `gpt-6.1-sol`, but `allowed_openai_param
 [reasoning_effort]` stays in the adapter and `litellm_router.yaml` as the guard for the next model
 the registry does not list yet.
 
-PydanticAI is not a LiteLLM dependency and was not upgraded with it. Our PydanticAI code runs a
-`FunctionModel` that calls ProviderGateway, so it never sees LiteLLM; the resolver required no
-PydanticAI change. Validation retries are covered by the `platform-actions` tests in
-`test_pydanticai_runner.py` (schema mismatch, malformed JSON and cross-validator retries) and
+PydanticAI is not a LiteLLM dependency and was not upgraded with it (ANY-659). ANY-680 raised it
+to 2.58.0 (lower bound `>=2.53.0`) because every `pydantic-ai-slim` version below 2.53.0 has an open
+security advisory (web chat UI, `web_fetch`, SSRF, remote content, concurrency-limited models, OTel
+events), and to align the previously mixed 2.2/2.9/2.40 locks. None of those paths is used: our code
+runs a `FunctionModel` that calls ProviderGateway, so it never sees LiteLLM or PydanticAI's HTTP
+clients. The same change moves the transitive `httpx2`/`httpcore2` to 2.15.1. Validation retries are
+covered by the `platform-actions` tests in `test_pydanticai_runner.py` (schema mismatch, malformed
+JSON and cross-validator retries) and
 `test_structured_llm_executor_shares_physical_call_budget_across_validation_retries`;
 `atoms-proof` is the deterministic fake-provider smoke of structured results and workflows and does
-not retry. Upgrade PydanticAI only under its own ticket.
+not retry.
 
 Rules:
 
