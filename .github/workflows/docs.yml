@@ -1,5 +1,7 @@
 name: docs
 on: [pull_request]
+permissions:
+  contents: read
 jobs:
   docs:
     runs-on: ubuntu-latest
