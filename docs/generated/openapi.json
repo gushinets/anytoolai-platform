@@ -3325,7 +3325,6 @@
             "schema": {
               "anyOf": [
                 {
-                  "maxLength": 1024,
                   "type": "string"
                 },
                 {

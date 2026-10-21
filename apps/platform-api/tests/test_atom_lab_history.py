@@ -611,3 +611,12 @@ def test_history_does_not_use_artifacts_from_another_scope(app):
             .values(tenant_id="other")
         )
     assert _get(app, "/" + run.id).json()["result"] is None
+
+
+@pytest.mark.parametrize(
+    "cursor",
+    ["-" * 1000, "-" * 1000 + "!", "A" * 900 + "===", "-" * 5000, "=" * 5000],
+    ids=["dashes", "dashes-bang", "excess-padding", "over-limit", "all-padding"],
+)
+def test_history_cursor_rejects_long_malformed_input(app, cursor):
+    _error(_get(app, "?cursor=" + cursor), 422, "invalid_cursor")
