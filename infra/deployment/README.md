@@ -238,24 +238,48 @@ for rollback. Deploying the new revision without the steps below starts an empty
 
 - **Dev and agent stacks** have no volume: `dev-down` then `dev-up` gives a fresh PostgreSQL 18.
   If a local overlay keeps a PostgreSQL 16 volume, `pg_dump -Fc` it first or recreate it.
-- **Atom Lab** (dump/restore; do not use `pg_upgrade`):
+- **Atom Lab** (dump/restore; do not use `pg_upgrade`). Keep `ANYTOOLAI_POSTGRES_DB` in
+  `.env.atom-lab` unchanged: the dump is restored into that same database, not into a recovery
+  database.
+
+  ```bash
+  LAB="docker compose --project-name anytoolai-atom-lab --env-file infra/compose/.env.atom-lab \
+    -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.atom-lab.yml"
+  PSQL='psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc'
+  ```
+
   1. While still on the PostgreSQL 16 revision, close ingress, run `atom-lab-quiesce`, and take a
-     verified custom-format dump as described under "Backup, recovery, and rollback".
+     verified custom-format dump as described under "Backup, recovery, and rollback". Record the
+     source row counts and Alembic head (below).
   2. Run `atom-lab-down` (never `down --volumes`) and check out the PostgreSQL 18 revision.
-  3. Run `atom-lab-recovery-postgres-up`, then `pg_restore --exit-on-error` the dump into the empty
-     `$POSTGRES_DB` with the `anytoolai-atom-lab` commands shown under "Backup, recovery, and
-     rollback". Do not run `migrate` first.
-  4. Run `atom-lab-up` and `atom-lab-ready`, confirm `alembic current` is head and the row counts
-     below match the source, then reopen ingress.
-- **Prod** (`anytoolai-prod`; there is no `prod-quiesce`, so drain by hand). Every command uses the
-  fixed project, the same Compose files and the same env file as `prod-up`:
+  3. Start only PostgreSQL on the new, empty `atom-lab-postgres18-data` volume and restore into
+     `$POSTGRES_DB`. Do not run `migrate` first:
+
+     ```bash
+     python scripts/agent/runner.py atom-lab-recovery-postgres-up
+     $LAB exec -T postgres sh -c "$PSQL 'show server_version'"      # must be 18.x
+     $LAB exec -T postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --exit-on-error' \
+       < /operator/backups/anytoolai-atom-lab-YYYYMMDDTHHMMSSZ.dump
+     ```
+
+     Verify the row counts and `alembic_version` match the recorded source values. On any mismatch
+     stop here: `atom-lab-down` and roll back.
+  4. Run `python scripts/agent/runner.py atom-lab-down` (no `--volumes`; the restored volume is
+     kept). This is required: `atom-lab-up` refuses with `LAB006` while any container, including
+     PostgreSQL alone, is running.
+  5. Run `atom-lab-up` and `atom-lab-ready`, confirm the same counts, then reopen ingress.
+- **Prod** (`anytoolai-prod`; there is no `prod-quiesce`, so drain by hand). The commands use the
+  fixed project and `.env.prod` like `prod-up`, but only the base and prod Compose files.
+  `prod-up` generates the live overlay's deployment-profile variables at runtime, so a manual
+  command that includes `docker-compose.live.yml` (or `docker-compose.vps-135.yml`) fails
+  interpolation. Neither overlay changes `postgres`, and `stop`/`exec` address the running
+  containers by project and service name, so the base + prod set is enough here:
 
   ```bash
   PROD="docker compose --project-name anytoolai-prod --env-file infra/compose/.env.prod \
-    -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.prod.yml \
-    -f infra/compose/docker-compose.live.yml"
-  # With ANYTOOLAI_VPS_135_NETWORKS=1 also append: -f infra/compose/docker-compose.vps-135.yml
+    -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.prod.yml"
   PSQL='psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc'
+  $PROD config --quiet      # dry run: must succeed before step 1
   ```
 
   The maintenance owner holds exclusive ownership from step 1 through step 5; no other shell or
