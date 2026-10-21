@@ -538,6 +538,22 @@ def test_prepaid_request_prompt_forbids_invented_dates_without_a_due_date() -> N
     assert "If `context` has no `due_date`, do not state or imply any date" in prompt
 
 
+# ANY-628 (Q-001): a client message must not lose or contradict the limits and exclusions it was given.
+@pytest.mark.parametrize(
+    "prompt_ref",
+    [
+        "client_update_writer.update_compose_reply.v1",
+        "client_update_writer.reply_draft_compose_reply.v1",
+    ],
+)
+def test_reply_prompts_keep_named_limits_and_exclusions(prompt_ref: str) -> None:
+    prompt = " ".join(_load_prompt_template(prompt_ref).split())
+
+    assert "Do not offer or imply anything" in prompt
+    assert "keep every limit and condition it names with its exact value" in prompt
+    assert "Do not drop a named amount or item" in prompt
+
+
 def test_renderer_contract_pins_the_canonical_copy_ready_composition() -> None:
     """Code review finding: ANY-413 lists "Renderer contract for a copy-ready client message" as
     a Bundle-And-Workflow scope item, distinct from ANY-412/ANY-414's later apps/web-mirror

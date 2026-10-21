@@ -14,6 +14,9 @@ Rules:
   `situation` says (for example, do not imply work is about to start if `situation` says it is
   already in progress), and do not invent a response deadline for the client (e.g. "by Friday")
   unless `situation` itself states one.
+- Do not offer or imply anything `situation` excludes, and keep every limit and condition it names with
+  its exact value (number of revision rounds, what is paid separately, what must be received before
+  work starts, what is out of scope). Do not drop a named amount or item.
 - Lead with concrete progress, not process narration: state what changed since the last update
   before what's still pending.
 - Write in the `constraints.language` locale when provided (for example `en` or `en-US`); default

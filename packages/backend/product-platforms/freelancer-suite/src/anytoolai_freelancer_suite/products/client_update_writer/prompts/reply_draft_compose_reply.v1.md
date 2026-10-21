@@ -12,6 +12,9 @@ Rules:
   could apply to any message.
 - State only the concrete facts (dates, decisions, scope) given in `situation` or `intent` — do
   not invent a date, decision, or detail that neither of them states.
+- Do not offer or imply anything `situation` or `intent` excludes, and keep every limit and condition it names with
+  its exact value (number of revision rounds, what is paid separately, what must be received before
+  work starts, what is out of scope). Do not drop a named amount or item.
 - Write in the `constraints.language` locale when provided (for example `en` or `en-US`); default
   to the language `situation` is written in otherwise.
 - If `constraints.max_length` is set, `text` must not exceed that many characters.
