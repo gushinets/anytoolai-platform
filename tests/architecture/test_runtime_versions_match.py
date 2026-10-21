@@ -23,6 +23,8 @@ REQUIRED_POSTGRES_FILES = (
 )
 # No overlay is staged: every compose file and workflow follows the base compose major.
 STAGED_POSTGRES_MAJORS: dict[str, str] = {}
+# The base-compose comparison alone passes if every file drifts together, so pin the target major.
+POSTGRES_TARGET_MAJOR = "18"
 
 
 def tag_major(tag: str | None) -> str | None:
@@ -71,7 +73,9 @@ def test_dockerfile_node_major_matches_nvmrc() -> None:
 def test_postgres_major_matches_base_compose() -> None:
     base_tags = POSTGRES_IMAGE.findall(BASE_COMPOSE.read_text())
     expected = tag_major(base_tags[0]) if base_tags else None
-    assert expected, "base compose must pin a numeric postgres major"
+    assert expected == POSTGRES_TARGET_MAJOR, (
+        f"base compose must pin postgres {POSTGRES_TARGET_MAJOR}"
+    )
     paths = [*COMPOSE_DIR.glob("*.yml"), *WORKFLOWS_DIR.glob("*.yml")]
     found = {p.name: POSTGRES_IMAGE.findall(p.read_text()) for p in paths}
     for path in REQUIRED_POSTGRES_FILES:
@@ -106,9 +110,7 @@ def test_overlay_postgres_resolves_to_pg18_on_new_volume(overlay: str, volume: s
 
     base, over = postgres(BASE_COMPOSE), postgres(COMPOSE_DIR / overlay)
     image = over.get("image", base["image"])
-    assert tag_major(image.removeprefix("postgres:")) == tag_major(
-        POSTGRES_IMAGE.findall(BASE_COMPOSE.read_text())[0]
-    )
+    assert tag_major(image.removeprefix("postgres:")) == POSTGRES_TARGET_MAJOR
     assert f"{volume}:/var/lib/postgresql" in over["volumes"]
     assert (
         volume in yaml.load((COMPOSE_DIR / overlay).read_text(), Loader=_ComposeLoader)["volumes"]
