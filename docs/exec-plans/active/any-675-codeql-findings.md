@@ -8,7 +8,7 @@
 - Created: 2026-10-21
 - Last updated: 2026-10-21
 - Review date: 2026-10-28
-- Next action: open the PR, then record the outcome table for alerts #1-#7 after the repeat CodeQL run.
+- Next action: record the outcome table for alerts #1-#7 after the repeat CodeQL run.
 - Blocker: none
 
 ## Goal

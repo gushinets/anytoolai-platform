@@ -367,7 +367,7 @@ def list_runs(
     session_factory: Annotated[Any, Depends(get_atom_lab_run_session_factory)],
     settings: Annotated[Settings, Depends(get_settings)],
     limit: Annotated[int, Query(ge=1, le=_RUN_PAGE_MAX)] = _RUN_PAGE_DEFAULT,
-    cursor: Annotated[str | None, Query(max_length=_CURSOR_MAX_LENGTH)] = None,
+    cursor: str | None = None,
 ) -> AtomLabRunListResponse:
     before = _decode_run_cursor(cursor) if cursor is not None else None
     try:
@@ -1186,10 +1186,11 @@ def _decode_version_cursor(cursor: str) -> int:
 
 def _decode_urlsafe_base64(value: str) -> bytes:
     # Shared by every cursor decoder: bound the input before any per-character work.
+    if len(value) > _CURSOR_MAX_LENGTH:
+        raise ValueError
     unpadded = value.rstrip("=")
     if (
-        len(value) > _CURSOR_MAX_LENGTH
-        or not unpadded
+        not unpadded
         or value.endswith("===")
         or not _URLSAFE_BASE64_ALPHABET.issuperset(unpadded)
     ):
