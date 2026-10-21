@@ -9,7 +9,7 @@ requires-python = ">=3.12"
 dependencies = [
     "anytoolai-platform-core",
     "markdown-it-py>=3.0.0",
-    "pydantic-ai-slim>=2.2.0",
+    "pydantic-ai-slim>=2.53.0",
     "google-re2>=1.1",
     "sqlalchemy>=2.0",
 ]
