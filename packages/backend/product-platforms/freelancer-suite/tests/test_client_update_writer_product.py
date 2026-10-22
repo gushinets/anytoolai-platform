@@ -556,6 +556,8 @@ def test_prepaid_request_prompt_forbids_invented_dates_without_a_due_date() -> N
             "client_update_writer.reply_draft_compose_reply.v1",
             (
                 "Do not offer or imply anything",
+                "Do not offer or imply anything `intent` excludes",
+                "`intent` may decline or counter a term in `situation`",
                 "keep its exact value and status",
                 "a term the client only requests is never stated as accepted",
             ),
