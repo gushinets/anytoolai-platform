@@ -35,11 +35,11 @@ Evidence baselines: Platform `79a2ada5b790f959a40b3e08451ef9ed8d97da5b`;
 Portal `79dc3f4d204aec4ac9552e3d1da3481553cc8aef`.
 These are inspected source snapshots, not deployment or conformance claims.
 
-| Operation / request direction | Producer | Consumer | Verification status |
+| Operation / request direction | Payload producer | Payload consumer / receiver | Verification status |
 | --- | --- | --- | --- |
 | `GET /internal/v1/capability-manifest`: Portal -> Kernel | Kernel endpoint not implemented | Portal typed HTTP client implemented against provisional schema and independent SIMULATED fixtures | Local mock/client CI PASS; real producer deferred |
 | `GET /internal/v1/access-snapshots/{user_id}`: Kernel -> Portal | Portal paid-access producer not implemented | Kernel snapshot client/cache/revision floor not implemented | Target contract only |
-| `POST /internal/v1/access-invalidations`: Portal -> Kernel | Kernel receiver not implemented | Portal invalidation delivery not implemented | Target contract only |
+| `POST /internal/v1/access-invalidations`: Portal -> Kernel | Portal invalidation producer/delivery not implemented | Kernel receiver endpoint not implemented | Target contract only |
 
 Portal already publishes immutable `commercial_mapping_revisions` through a
 restricted operator path and serves approved catalog terms from PostgreSQL.
