@@ -54,7 +54,8 @@ The freelancer's name and gender are not in the input, yet the models introduce 
   already failed once on P01. If live shows repeats, assess ANY-597 (model and temperature) before
   strengthening the text.
 - Neutral constructions ("я могу") read drier than "Готова помочь".
-- "Unless the input states them" allows a signature when the freelancer put their name in the
-  positioning; QA did not cover that case.
+- "Unless the input explicitly gives them as the freelancer's own" allows a signature when the
+  freelancer put their name in the positioning; QA did not cover that case. A name in the client's
+  message or signature is the client's, not the freelancer's.
 - The branch is stacked on ANY-628 (PR #197); a rewrite of its `Form` section in review could
   conflict.
