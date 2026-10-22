@@ -14,6 +14,11 @@ Rules:
   `situation` says (for example, do not imply work is about to start if `situation` says it is
   already in progress), and do not invent a response deadline for the client (e.g. "by Friday")
   unless `situation` itself states one.
+- Do not offer or imply anything `situation` excludes, and keep a limit or condition it names as
+  agreed with the client (number of revision rounds, what is paid separately, what must be received
+  before work starts) with its exact value. Internal notes (the freelancer's own costs,
+  subcontractors, private figures) are not client-facing terms: leave them out unless `situation`
+  says to share them.
 - Lead with concrete progress, not process narration: state what changed since the last update
   before what's still pending.
 - Write in the `constraints.language` locale when provided (for example `en` or `en-US`); default
