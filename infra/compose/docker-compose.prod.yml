@@ -23,6 +23,10 @@ x-postgres-credentials: &postgres-credentials
 
 services:
   postgres:
+    # Staged PostgreSQL 18 rollout (ANY-697): this overlay keeps postgres:16 and its existing
+    # volume until the revision with prod-quiesce/prod-recovery-postgres-up is deployed here;
+    # a follow-up switches it to 18 using the runbook in infra/deployment/README.md.
+    image: postgres:16
     # Not published to the host by default (unlike dev) — platform-api/platform-worker
     # reach it over the compose network as `postgres:5432`. Add an explicit `ports:` entry
     # here (or in a local, uncommitted overlay) if an operator genuinely needs external

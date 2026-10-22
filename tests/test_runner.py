@@ -3776,6 +3776,119 @@ def test_atom_lab_existing_services_uses_compose_all_service_names(monkeypatch) 
     assert captured["command"][-3:] == ["ps", "--all", "--services"]
 
 
+def _prod_maintenance_runner(monkeypatch, tmp_path, values=PROD_LIVE_VALUES):
+    runner = load_runner_module()
+    inputs = runner.DeploymentInputs(("proposal_ai",), frozenset(), dict(values))
+    commands = []
+    monkeypatch.setattr(
+        runner, "_prod_deployment_lock_path", lambda: tmp_path / "prod-deployment.lock"
+    )
+    monkeypatch.setattr(runner, "_deployment_inputs", lambda: inputs)
+    monkeypatch.setattr(runner, "_prod_stack_running", lambda: True)
+    monkeypatch.setattr(runner.time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda command, env, **kwargs: commands.append(list(command)) or 0,
+    )
+    return runner, commands
+
+
+def test_prod_quiesce_drains_jobs_with_base_and_prod_compose_only(
+    monkeypatch, tmp_path, capsys
+) -> None:
+    runner, commands = _prod_maintenance_runner(monkeypatch, tmp_path)
+    counts = iter([3, 0])
+    monkeypatch.setattr(runner, "_nonterminal_job_count", lambda command, env: next(counts))
+
+    assert runner.prod_quiesce() == 0
+    assert [command[-2:] for command in commands] == [
+        ["stop", "platform-api"],
+        ["stop", "platform-worker"],
+    ]
+    for command in commands:
+        assert command[command.index("--project-name") + 1] == "anytoolai-prod"
+        assert str(runner.COMPOSE_PROD_FILE) in command
+        assert str(runner.COMPOSE_LIVE_FILE) not in command
+    assert "PostgreSQL remains running" in capsys.readouterr().out
+
+
+def test_prod_quiesce_query_error_keeps_worker_running_and_fails_closed(
+    monkeypatch, tmp_path, capsys
+) -> None:
+    runner, commands = _prod_maintenance_runner(monkeypatch, tmp_path)
+
+    def failing_count(command, env):
+        raise RuntimeError("could not inspect non-terminal deployment jobs")
+
+    monkeypatch.setattr(runner, "_nonterminal_job_count", failing_count)
+
+    assert runner.prod_quiesce() == 1
+    assert [command[-1] for command in commands] == ["platform-api"]
+    assert "PROD008: could not verify the deployment queue" in capsys.readouterr().err
+
+
+def test_prod_quiesce_timeout_keeps_worker_running_and_blocks_backup(
+    monkeypatch, tmp_path, capsys
+) -> None:
+    runner, commands = _prod_maintenance_runner(
+        monkeypatch, tmp_path, PROD_LIVE_VALUES | {"ANYTOOLAI_PROD_QUIESCE_TIMEOUT": "1"}
+    )
+    clock = iter([0.0, 2.0])
+    monkeypatch.setattr(runner, "_nonterminal_job_count", lambda command, env: 1)
+    monkeypatch.setattr(runner.time, "monotonic", lambda: next(clock))
+
+    assert runner.prod_quiesce() == 1
+    assert [command[-1] for command in commands] == ["platform-api"]
+    assert "no backup may be taken" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("timeout_value", ["inf", "nan", "0"])
+def test_prod_quiesce_rejects_invalid_timeout_before_compose(
+    monkeypatch, tmp_path, capsys, timeout_value
+) -> None:
+    runner, commands = _prod_maintenance_runner(
+        monkeypatch,
+        tmp_path,
+        PROD_LIVE_VALUES | {"ANYTOOLAI_PROD_QUIESCE_TIMEOUT": timeout_value},
+    )
+
+    assert runner.prod_quiesce() == 2
+    assert commands == []
+    assert "ANYTOOLAI_PROD_QUIESCE_TIMEOUT must be a positive, finite number" in (
+        capsys.readouterr().err
+    )
+
+
+def test_prod_recovery_postgres_up_waits_for_postgres_only(
+    monkeypatch, tmp_path, capsys
+) -> None:
+    runner, commands = _prod_maintenance_runner(monkeypatch, tmp_path)
+    monkeypatch.setattr(runner, "_existing_services", lambda command, env: frozenset())
+
+    assert runner.prod_recovery_postgres_up() == 0
+    (command,) = commands
+    assert command[-6:] == ["up", "-d", "--wait", "--wait-timeout", "90", "postgres"]
+    assert command[command.index("--project-name") + 1] == "anytoolai-prod"
+    assert str(runner.COMPOSE_LIVE_FILE) not in command
+    assert "migrate, API, and worker remain stopped" in capsys.readouterr().out
+
+
+def test_prod_recovery_postgres_up_refuses_application_containers(
+    monkeypatch, tmp_path, capsys
+) -> None:
+    runner, commands = _prod_maintenance_runner(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        runner,
+        "_existing_services",
+        lambda command, env: frozenset({"postgres", "platform-worker"}),
+    )
+
+    assert runner.prod_recovery_postgres_up() == 1
+    assert commands == []
+    assert "PROD009" in capsys.readouterr().err
+
+
 def test_atom_lab_runbook_orders_recovery_bootstrap_and_protects_secrets() -> None:
     runner = load_runner_module()
     runbook = (runner.ROOT / "infra" / "deployment" / "README.md").read_text(
