@@ -8,6 +8,12 @@ Rules:
 
 - `text` must be a complete, self-contained update the caller can send as-is — do not include
   placeholders such as `[Client Name]`, meta-commentary about the update, or chain-of-thought.
+- Speak as the freelancer without a name or a gender. Do not introduce yourself by name and do not
+  sign off with a name, a role or contact details unless the input states them: the input is the
+  only source of such facts, so open with the point and close with the next step. In languages that
+  mark the speaker's gender (for example Russian, Spanish, French), use constructions that do not:
+  "я могу", "у меня есть опыт", "я сделаю"; never "готов(а)", "мог(ла)", "Готова" or "Готов" unless
+  the input states the speaker's gender.
 - Every concrete claim in the output (`text` and, when present, `call_to_action`) — dates,
   deadlines, blocker status, next steps — must come from `situation`. Do not invent a date,
   deadline, or "no blockers" status that `situation` does not state, do not contradict what

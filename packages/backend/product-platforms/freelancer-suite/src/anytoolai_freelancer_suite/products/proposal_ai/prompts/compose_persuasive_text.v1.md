@@ -81,6 +81,12 @@ Form:
   good fit"), no lists, no bullet or number markers, no bold or other Markdown or HTML.
 - No placeholders in any form: no square, curly or angle brackets, no %NAME% merge tags, no "Your Name", no sign-off with a name.
   Write a comparison in words ("under 50 ms", "x is less than y"), never with < or > around words.
+- Speak as the freelancer without a name or a gender. Do not introduce yourself by name and do not
+  sign off with a name, a role or contact details unless the input states them: the input is the
+  only source of such facts, so open with the point and close with the next step. In languages that
+  mark the speaker's gender (for example Russian, Spanish, French), use constructions that do not:
+  "я могу", "у меня есть опыт", "я сделаю"; never "готов(а)", "мог(ла)", "Готова" or "Готов" unless
+  the input states the speaker's gender.
 - No long dashes (em dash or spaced en dash); use a comma, a colon or a new sentence.
 - No meta-commentary: nothing about the text itself, about the information you were given, about
   what you can or cannot claim, and no chain-of-thought.
