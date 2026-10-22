@@ -57,6 +57,18 @@ redaction rules.
 OpenAPI-contract drift check, build), and the implemented Freelancer suite tests. Kernel and browser
 smoke commands will be added only when feature issues deliver real vertical slices.
 
+## Security scanning
+
+`.github/workflows/trivy.yml` runs Trivy on pull requests, pushes to `main`, weekly on Monday at
+03:17 UTC, and manually through GitHub Actions. It scans the repository lockfiles, including dev
+dependencies, and Dockerfile misconfigurations. Every run saves a `trivy-filesystem-sarif` artifact;
+non-PR runs also publish results to GitHub Security under `trivy-filesystem`.
+
+This workflow is advisory: findings use exit code 0 and it is not a required PR check. Scanner or
+report-upload errors remain visible as workflow failures. Existing required checks are unchanged.
+It does not build or scan production images; GitHub's existing secret scanning and push protection
+remain separate.
+
 ## MVPs
 
 - MVP-A1: Atom Runtime Proof — backend proof of all 11 typed atoms individually and in composite workflows, with deterministic and live-provider evidence.
