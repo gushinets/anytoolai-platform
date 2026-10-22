@@ -10,6 +10,7 @@ LINK_PATTERN = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
 INDEX_PATH_PATTERN = re.compile(r"`([^\`]+(?:\.md|/))`")
 ACTIVE_FIELDS = ("Owner", "Last updated", "Review date", "Next action", "Blocker")
 REQUIRED_INDEX_LINKS = (
+    "integrations/payment-portal.md",
     "product-specs/mvp-scope-source-of-truth.md",
     "architecture/platform-boundaries.md",
     "architecture/package-layering.md",
