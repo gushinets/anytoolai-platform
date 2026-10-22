@@ -99,7 +99,7 @@ python scripts/agent/runner.py full-check
 
 ## PostgreSQL environment assumptions
 
-- CI uses the `postgres:16` service and maintenance database `postgres`.
+- CI uses the `postgres:18` service and maintenance database `postgres`.
 - `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` is
   `postgresql+psycopg://anytoolai:anytoolai@127.0.0.1:5432/postgres` in CI.
 - The maintenance role can create/drop databases and terminate connections to disposable DBs.
