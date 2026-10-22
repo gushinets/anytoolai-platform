@@ -47,8 +47,10 @@ configuration, wire fixtures, generated artifacts or Region Resolver changes.
 - Review regression cases also reproduced false acceptance of a path hidden in
   an HTML comment or mentioned only in prose. Required entries now use the
   existing Markdown-link and backtick-path patterns after removing comments.
-- The focused documentation suite covers nine cases, including preserved
-  Markdown, backtick and fragment-link entries.
+- The focused documentation suite covers 14 cases, including Markdown,
+  backtick, fragment and equivalent `./`/`..` relative-path entries. External
+  URLs cannot stand in for required local entries. Four equivalent-path cases
+  reproduced a review regression before path comparison was normalized.
 - `python scripts/agent/runner.py validate-docs`: passed.
 - Canonical `quick-check` before the review corrections passed: 2,368 passed,
   7 skipped and 486 deselected. This is earlier-run evidence, not a claim for

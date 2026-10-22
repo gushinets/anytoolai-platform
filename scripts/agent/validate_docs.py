@@ -49,8 +49,13 @@ def validate(root: Path = ROOT) -> list[str]:
         match.group(1).strip().split(maxsplit=1)[0].strip("<>").split("#", 1)[0]
         for match in LINK_PATTERN.finditer(index_text)
     )
+    resolved_index_paths = {
+        (docs / target).resolve()
+        for target in indexed_paths
+        if target and not re.match(r"^[a-z][a-z0-9+.-]*:", target, re.I)
+    }
     for target in REQUIRED_INDEX_LINKS:
-        if target not in indexed_paths:
+        if (docs / target).resolve() not in resolved_index_paths:
             errors.append(
                 f"[DOC002] docs/index.md: missing required link {target!r}. {GUIDANCE}"
             )

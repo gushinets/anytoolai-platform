@@ -51,6 +51,10 @@ def seed_docs(root: Path, *, active_state: str = "active") -> None:
         "[Portal](integrations/payment-portal.md)",
         "`integrations/payment-portal.md`",
         "[Portal](integrations/payment-portal.md#ownership-and-sources)",
+        "[Portal](./integrations/payment-portal.md)",
+        "`./integrations/payment-portal.md`",
+        "[Portal](integrations/../integrations/payment-portal.md)",
+        "`integrations/../integrations/payment-portal.md`",
     ],
 )
 def test_validate_accepts_normalized_plan_and_links(tmp_path, entry: str) -> None:
@@ -86,6 +90,7 @@ def test_validate_rejects_broken_link(tmp_path) -> None:
         "<!-- integrations/payment-portal.md -->",
         "<!--\n[Portal](integrations/payment-portal.md)\n-->",
         "The path integrations/payment-portal.md has no index entry.",
+        "[External](https://example.test/integrations/payment-portal.md)",
     ],
 )
 def test_validate_requires_portal_index_entry_even_when_file_exists(
