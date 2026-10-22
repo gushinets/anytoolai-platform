@@ -12,7 +12,7 @@ ifeq ($(strip $(PYTHON)),)
 $(error No Python 3.12+ interpreter found (checked python3, python); set PYTHON=/path/to/python3.12+ or install Python 3.12+)
 endif
 
-.PHONY: doctor quick-check frontend-check full-check validate-configs validate-architecture validate-docs generate-docs check-generated-docs dev-up dev-ready dev-status dev-down dev-smoke live-canary atom-lab-up atom-lab-ready atom-lab-status atom-lab-quiesce atom-lab-resume atom-lab-recovery-postgres-up atom-lab-down atom-lab-smoke prod-up prod-ready prod-status prod-down prod-smoke collect-context
+.PHONY: doctor quick-check frontend-check full-check validate-configs validate-architecture validate-docs generate-docs check-generated-docs dev-up dev-ready dev-status dev-down dev-smoke live-canary atom-lab-up atom-lab-ready atom-lab-status atom-lab-quiesce atom-lab-resume atom-lab-recovery-postgres-up atom-lab-down atom-lab-smoke prod-up prod-ready prod-status prod-down prod-quiesce prod-recovery-postgres-up prod-smoke collect-context
 
 # doctor is the one target that stays on the bare $(PYTHON) interpreter (never `uv run`): its own
 # job is diagnosing a broken/incomplete environment (missing modules, missing uv itself), so it
@@ -114,6 +114,12 @@ prod-status:
 
 prod-down:
 	uv run python scripts/agent/runner.py prod-down
+
+prod-quiesce:
+	uv run python scripts/agent/runner.py prod-quiesce
+
+prod-recovery-postgres-up:
+	uv run python scripts/agent/runner.py prod-recovery-postgres-up
 
 prod-smoke:
 	uv run python scripts/agent/runner.py prod-smoke
