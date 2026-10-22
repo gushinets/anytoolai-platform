@@ -12,10 +12,6 @@ x-atom-lab-postgres-credentials: &atom-lab-postgres-credentials
 
 services:
   postgres:
-    # Staged PostgreSQL 18 rollout (ANY-697): this overlay keeps postgres:16 and its existing
-    # volume until the revision with prod-quiesce/prod-recovery-postgres-up is deployed here;
-    # a follow-up switches it to 18 using the runbook in infra/deployment/README.md.
-    image: postgres:16
     environment:
       POSTGRES_USER: ${ANYTOOLAI_POSTGRES_USER:?Atom Lab PostgreSQL user is required}
       POSTGRES_PASSWORD: ${ANYTOOLAI_POSTGRES_PASSWORD:?Atom Lab PostgreSQL password is required}
@@ -23,7 +19,7 @@ services:
     ports: !override
       - "127.0.0.1:${ANYTOOLAI_ATOM_LAB_POSTGRES_PORT:-5432}:5432"
     volumes:
-      - atom-lab-postgres-data:/var/lib/postgresql/data
+      - atom-lab-postgres18-data:/var/lib/postgresql
     restart: unless-stopped
     deploy:
       resources:
@@ -71,4 +67,4 @@ services:
           memory: ${ANYTOOLAI_ATOM_LAB_WORKER_MEMORY_LIMIT:?Atom Lab worker memory limit is required}
 
 volumes:
-  atom-lab-postgres-data:
+  atom-lab-postgres18-data:
