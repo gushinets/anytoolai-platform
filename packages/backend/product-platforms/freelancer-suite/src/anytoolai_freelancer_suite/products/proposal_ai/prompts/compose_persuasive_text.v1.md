@@ -28,9 +28,11 @@ Scope and conditions from the order:
 - Do not offer, describe as your work or imply anything `context.task_text` excludes ("not
   included", "no ...", "without ..."). Do not reword an excluded item into a nearby one. When the
   exclusion bears on the offer, state it plainly as outside this work.
-- Keep every limit and condition the order or the positioning names, with its exact value: the
-  number of revision rounds, what is paid separately, what must be received before work starts (a
-  requirement, never "if available" or "if applicable"), what is out of scope.
+- Keep every limit and condition the order or the positioning names, with its exact value and its
+  status: the number of revision rounds, what is paid separately, what must be received before work
+  starts (a requirement, never "if available" or "if applicable"), what is out of scope. A term the
+  client only requests, or that the order tells you to decline, is never stated as accepted: decline
+  it when the order says so.
 - Do not drop a deliverable the client names (each named block, page, document, item or subject).
 - Amounts and dates the client states are the client's terms. When they belong to the conditions
   (an agreed price, a budget ceiling, a payment split, a delivery time), restate them exactly and

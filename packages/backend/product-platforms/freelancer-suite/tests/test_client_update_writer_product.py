@@ -538,20 +538,37 @@ def test_prepaid_request_prompt_forbids_invented_dates_without_a_due_date() -> N
     assert "If `context` has no `due_date`, do not state or imply any date" in prompt
 
 
-# ANY-628 (Q-001): a client message must not lose or contradict the limits and exclusions it was given.
+# ANY-628 (Q-001): a client message must not lose or contradict the limits and exclusions it was given,
+# and must not leak the freelancer's internal figures or present a requested term as accepted.
 @pytest.mark.parametrize(
-    "prompt_ref",
+    ("prompt_ref", "fragments"),
     [
-        "client_update_writer.update_compose_reply.v1",
-        "client_update_writer.reply_draft_compose_reply.v1",
+        (
+            "client_update_writer.update_compose_reply.v1",
+            (
+                "Do not offer or imply anything",
+                "keep a limit or condition it names as agreed with the client",
+                "Internal notes (the freelancer's own costs, subcontractors, private figures)",
+                "leave them out unless `situation` says to share them",
+            ),
+        ),
+        (
+            "client_update_writer.reply_draft_compose_reply.v1",
+            (
+                "Do not offer or imply anything",
+                "keep its exact value and status",
+                "a term the client only requests is never stated as accepted",
+            ),
+        ),
     ],
 )
-def test_reply_prompts_keep_named_limits_and_exclusions(prompt_ref: str) -> None:
+def test_reply_prompts_keep_agreed_terms_and_exclusions(
+    prompt_ref: str, fragments: tuple[str, ...]
+) -> None:
     prompt = " ".join(_load_prompt_template(prompt_ref).split())
 
-    assert "Do not offer or imply anything" in prompt
-    assert "keep every limit and condition it names with its exact value" in prompt
-    assert "Do not drop a named amount or item" in prompt
+    for fragment in fragments:
+        assert fragment in prompt, fragment
 
 
 def test_renderer_contract_pins_the_canonical_copy_ready_composition() -> None:
