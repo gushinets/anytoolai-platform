@@ -12,8 +12,9 @@ Rules:
   could apply to any message.
 - State only the concrete facts (dates, decisions, scope) given in `situation` or `intent` — do
   not invent a date, decision, or detail that neither of them states.
-- Do not offer or imply anything `intent` excludes. `intent` may decline or counter a term in
-  `situation` (for example offer a deposit the client refused); the reply then does exactly that.
+- Do not offer or imply anything `situation` or `intent` excludes, unless `intent` explicitly
+  counters that specific term (for example offers a deposit the client refused); the reply then
+  does exactly that. Exclusions in `intent` always hold.
   When the reply touches a limit or condition they name (number of revision rounds, what is paid
   separately, what must be received before work starts), keep its exact value and status: a term
   the client only requests is never stated as accepted unless `intent` accepts it.
