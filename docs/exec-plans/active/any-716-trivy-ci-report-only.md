@@ -7,7 +7,7 @@
 - Created: 2026-10-22
 - Last updated: 2026-10-22
 - Review date: 2026-10-29
-- Next action: confirm the PR Trivy run and finish local quick-check; merge remains owner-controlled.
+- Next action: owner review/merge of PR #199, then confirm main-branch Code Scanning publication.
 - Blocker: none
 - Linear: https://linear.app/paveldik/issue/ANY-716/podklyuchit-trivy-v-ci-anytoolai-platform-bez-blokirovki-pr
 
@@ -44,8 +44,9 @@ and enforcement are follow-up scope, not claims made by this filesystem scan.
 - [x] Publish SARIF artifact and main-branch Code Scanning results with minimal permissions.
 - [x] Document triggers, coverage and non-blocking behavior.
 - [x] Create only missing Linear tasks for current dependency and Dockerfile findings.
-- [ ] Finish repository quick-check; workflow validation and the scan with known findings passed.
-- [ ] Review the final diff and open a PR; confirm actual GitHub scan evidence.
+- [x] Repository quick-check, workflow validation and the scan with known findings passed.
+- [x] Independent review found no defects; [PR #199](https://github.com/gushinets/anytoolai-platform/pull/199)
+  is open and its actual Trivy job/artifact were verified.
 
 ## Validation
 
@@ -53,9 +54,12 @@ and enforcement are follow-up scope, not claims made by this filesystem scan.
 - Baseline experiment on main `6a0c3427`: Trivy 0.74.0 with a fresh DB matched all 24 Dependabot
   alerts exactly and found two High and three Low Dockerfile misconfigurations.
 - [x] actionlint 1.7.12; local SARIF scan exited 0 with 29 findings, including Critical certifi.
-- [ ] `python scripts/agent/runner.py quick-check`
+- [x] `python scripts/agent/runner.py quick-check`: 2367 passed, 7 skipped, 486 deselected;
+  one existing Pydantic TypedDict warning, no failures (Windows, 687.68 seconds).
 - [x] `python scripts/agent/runner.py validate-docs`
-- [ ] Actual PR workflow run: successful scan and downloadable SARIF artifact.
+- [x] [PR Trivy run](https://github.com/gushinets/anytoolai-platform/actions/runs/39759689115):
+  Trivy 0.76.1 passed; downloaded SARIF contains all 29 findings, including Critical certifi,
+  dev-only Vitest and five Dockerfile findings. Code Scanning publication was correctly skipped.
 
 ## Decision log
 
@@ -69,7 +73,7 @@ and enforcement are follow-up scope, not claims made by this filesystem scan.
 
 | Date | Progress | Next |
 |---|---|---|
-| 2026-10-22 | Implemented the workflow; actionlint, docs checks, report-only SARIF experiment and independent review passed. Created and read back ANY-717 through ANY-726. | Confirm actual PR scan and local quick-check; main publication follows merge. |
+| 2026-10-22 | Implemented the workflow; actionlint, docs checks, report-only SARIF experiment and independent review passed. Created and read back ANY-717 through ANY-726. | Local quick-check passed; PR scan and downloaded artifact verified. Owner review/merge; main publication follows merge. |
 
 ## Remediation coverage
 
