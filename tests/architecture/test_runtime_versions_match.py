@@ -21,12 +21,10 @@ REQUIRED_POSTGRES_FILES = (
     COMPOSE_DIR / "docker-compose.agent.yml",
     WORKFLOWS_DIR / "backend.yml",
 )
-# Staged PostgreSQL 18 rollout (ANY-698): overlays with live data stay on 16 until the revision
-# that adds prod-quiesce is deployed; the follow-up that switches them empties this mapping.
-STAGED_POSTGRES_MAJORS = {
-    "docker-compose.prod.yml": "18",
-    "docker-compose.atom-lab.yml": "18",
-}
+# No overlay is staged: every compose file and workflow follows the base compose major.
+STAGED_POSTGRES_MAJORS: dict[str, str] = {}
+# The base-compose comparison alone passes if every file drifts together, so pin the target major.
+POSTGRES_TARGET_MAJOR = "18"
 
 
 def tag_major(tag: str | None) -> str | None:
@@ -75,7 +73,9 @@ def test_dockerfile_node_major_matches_nvmrc() -> None:
 def test_postgres_major_matches_base_compose() -> None:
     base_tags = POSTGRES_IMAGE.findall(BASE_COMPOSE.read_text())
     expected = tag_major(base_tags[0]) if base_tags else None
-    assert expected, "base compose must pin a numeric postgres major"
+    assert expected == POSTGRES_TARGET_MAJOR, (
+        f"base compose must pin postgres {POSTGRES_TARGET_MAJOR}"
+    )
     paths = [*COMPOSE_DIR.glob("*.yml"), *WORKFLOWS_DIR.glob("*.yml")]
     found = {p.name: POSTGRES_IMAGE.findall(p.read_text()) for p in paths}
     for path in REQUIRED_POSTGRES_FILES:
