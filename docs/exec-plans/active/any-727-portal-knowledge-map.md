@@ -7,7 +7,7 @@
 - Created: 2026-10-23
 - Last updated: 2026-10-23
 - Review date: 2026-10-23
-- Next action: finish canonical checks and sequential independent review; open the linked PR
+- Next action: complete final-SHA CI and independent review in PR 204; await human merge
 - Blocker: none
 
 ## Goal and scope
@@ -30,7 +30,7 @@ configuration, wire fixtures, generated artifacts or Region Resolver changes.
 - [x] Write the map and root navigation; add the required entry and PR Peer impact.
 - [ ] Run focused docs tests, validate-docs and supported canonical checks; record results and limitations.
 - [ ] Commit; obtain fresh Astra xhigh then fresh Sol max review of identical base/head SHAs. Restart the cycle after fixes.
-- [ ] Open the PR linked to ANY-728 and its companion PR; leave merge to a human.
+- [x] Open [PR 204](https://github.com/gushinets/anytoolai-platform/pull/204), linked to ANY-728 and [Portal PR 146](https://github.com/gushinets/payments-portal/pull/146); leave merge to a human.
 
 ## Review focus
 
@@ -43,8 +43,16 @@ configuration, wire fixtures, generated artifacts or Region Resolver changes.
 ## Evidence
 
 - Initial repository doctor: passed on Windows, Python 3.12.10, Node 24.18.0.
-- The new missing-index test failed before the required entry was added; all four docs tests now pass.
+- The original missing-index case failed before the required entry was added.
+- Review regression cases also reproduced false acceptance of a path hidden in
+  an HTML comment or mentioned only in prose. Required entries now use the
+  existing Markdown-link and backtick-path patterns after removing comments.
+- The focused documentation suite covers nine cases, including preserved
+  Markdown, backtick and fragment-link entries.
 - `python scripts/agent/runner.py validate-docs`: passed.
-- Canonical `quick-check` is running. Final check results and sequential reviews
-  will be recorded on the linked PR against its immutable commit SHA, so review
-  evidence does not require changing the reviewed commit.
+- Canonical `quick-check` before the review corrections passed: 2,368 passed,
+  7 skipped and 486 deselected. This is earlier-run evidence, not a claim for
+  subsequent commits.
+- Platform main's unrelated PostgreSQL 18 overlay update was merged without
+  conflicts. Final-SHA CI and sequential Astra/Sol results are tracked in
+  [PR 204](https://github.com/gushinets/anytoolai-platform/pull/204).

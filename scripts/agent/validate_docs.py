@@ -38,13 +38,19 @@ def validate(root: Path = ROOT) -> list[str]:
                 )
 
     index_text = (docs / "index.md").read_text(encoding="utf-8")
-    for target in INDEX_PATH_PATTERN.findall(index_text):
+    index_text = re.sub(r"<!--.*?-->", "", index_text, flags=re.DOTALL)
+    indexed_paths = INDEX_PATH_PATTERN.findall(index_text)
+    for target in indexed_paths:
         if not (docs / target).resolve().exists():
             errors.append(
                 f"[DOC001] docs/index.md: broken indexed path {target!r}. {GUIDANCE}"
             )
+    indexed_paths.extend(
+        match.group(1).strip().split(maxsplit=1)[0].strip("<>").split("#", 1)[0]
+        for match in LINK_PATTERN.finditer(index_text)
+    )
     for target in REQUIRED_INDEX_LINKS:
-        if target not in index_text:
+        if target not in indexed_paths:
             errors.append(
                 f"[DOC002] docs/index.md: missing required link {target!r}. {GUIDANCE}"
             )
