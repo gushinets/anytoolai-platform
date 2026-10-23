@@ -6,9 +6,9 @@
 - Owner: agent
 - Linear: ANY-629
 - Created: 2026-10-22
-- Last updated: 2026-10-22
+- Last updated: 2026-10-23
 - Review date: 2026-10-29
-- Next action: rebase onto `main` after ANY-628 (PR #197) merges, open the PR, then confirm behavior in the ANY-631 live acceptance run.
+- Next action: review and merge PR #198, then confirm the behavior in the ANY-631 live acceptance run.
 - Blocker: none
 
 ## Goal
@@ -57,5 +57,5 @@ The freelancer's name and gender are not in the input, yet the models introduce 
 - "Unless the input explicitly gives them as the freelancer's own" allows a signature when the
   freelancer put their name in the positioning; QA did not cover that case. A name in the client's
   message or signature is the client's, not the freelancer's.
-- The branch is stacked on ANY-628 (PR #197); a rewrite of its `Form` section in review could
-  conflict.
+- The rule does not govern the closing: each prompt's own rules do (ProposalAI requires one concrete
+  next step, the reply drafts forbid an invented `call_to_action`).
