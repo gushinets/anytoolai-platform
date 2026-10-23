@@ -588,7 +588,7 @@ the production project or active profile. If Compose startup or readiness fails,
 command is interrupted before `active-profile` is replaced, `prod-up` stops the candidate
 project without deleting its PostgreSQL volume; investigate before restarting production.
 Once that marker is in place, an interrupt leaves the stack up. The activation directory
-and marker are non-secret and are published as `0755` and `0644` so the non-root API user
+and marker are non-secret and are published as `0755` and `0644` so the non-root API and worker users
 can read them after a restrictive umask.
 Each deployment uses a new immutable profile directory. A failed redeploy leaves the previous
 container bind source intact for restarts; old profiles are removed only after readiness passes.
@@ -659,6 +659,12 @@ services:
         target: /run/secrets/squid-ca.pem
         read_only: true
 ```
+
+The worker runs as non-root `platform-worker` (UID/GID 999), so the mounted PEM must be readable
+by it. A Squid CA certificate is public: publish it as `0644` (or grant UID 999 read access via
+ACL), never `0777`. A root-owned `0600` PEM fails with `EACCES` on provider TLS calls. After
+switching to this image, verify the custom CA under the non-root worker, for example
+`docker compose ... exec platform-worker python -c "open('/run/secrets/squid-ca.pem').close()"`.
 
 Do not commit the CA or override containing an operator path. A normal CONNECT tunnel needs no
 custom CA. For an override, use an operator-owned Compose invocation that includes base, prod,

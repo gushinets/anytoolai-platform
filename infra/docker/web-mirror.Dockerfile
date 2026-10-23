@@ -13,11 +13,12 @@ RUN test -n "$NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS"
 RUN pnpm --filter @anytoolai/web-mirror build
 
 FROM node:24-slim AS runtime
-WORKDIR /app
-RUN corepack enable
+WORKDIR /app/apps/web-mirror
 ARG ANYTOOLAI_WEB_BASE_PATH
 ENV NODE_ENV=production
 ENV ANYTOOLAI_WEB_BASE_PATH=$ANYTOOLAI_WEB_BASE_PATH
 COPY --from=build /app /app
+RUN chown -R node:node .next
+USER node
 EXPOSE 3000
-CMD ["pnpm", "--filter", "@anytoolai/web-mirror", "exec", "next", "start", "-p", "3000"]
+CMD ["node", "node_modules/next/dist/bin/next", "start", "-p", "3000"]
