@@ -333,3 +333,56 @@ def _has_list(value: str) -> bool:
     if any(_BULLET_LINE.match(line) for line in lines):
         return True
     return sum(bool(_PLAIN_LIST_LINE.match(line)) for line in lines) >= 2  # noqa: PLR2004
+
+
+# A fill-in-the-blank slot: square brackets that hold a field label the sender should fill in
+# ("[Your Name]", "[Project Description]", "[Price]", "[Имя клиента]", "[Insert date]"). No bracket
+# shape (case, word count) tells "[Ваше имя]" from "[Project brief]", and a field word anywhere in
+# the brackets also catches prose ("[Client update]", "[Your request was received]"), so a slot is a
+# label whose head word names a field -- the last word in English, usually the first in Russian, so
+# either end counts -- or that starts with a fill-in verb. "your", "client", "ваш" only modify a
+# head and decide nothing. Genuine Markdown links (inline, full, collapsed and shortcut references
+# with a real definition) are resolved by the parser and skipped; a malformed or undefined reference
+# stays text and is checked. Code spans are code, not message text, and are not checked. Curly and
+# angle brackets are legitimate in code and HTML; a product opts in through A06 forbidden_patterns.
+# ponytail: EN/RU field-word list; a slot whose head word is not listed ("[Scope]") passes -- extend
+# _SLOT_HEAD when live output shows one, or for another language.
+_BRACKETED = re.compile(r"\[([^\[\]\n]{1,60})\]")
+_LABEL_WORD = re.compile(r"[^\W\d_]\w*(?:-\w+)*")
+_SLOT_HEAD = re.compile(
+    r"names?|information|info|details|contacts?|e-?mail|phone|number|date|deadline|address|company"
+    r"|title|position|signature|link|url|website|description|price|cost|rate|fee|budget|amount"
+    r"|timeline|duration"
+    r"|имя|имени|фамили\w*|контакт\w*|данн(?:ые|ых)|телефон\w*|почт\w*|дат[аеуы]|срок\w*|адрес\w*"
+    r"|компани\w*|названи\w*|должност\w*|подпис\w*|ссылк\w*|описани\w*|цен[аеуы]|стоимост\w*"
+    r"|ставк\w*|сумм[аеуы]|бюджет\w*",
+    re.IGNORECASE,
+)
+_FILL_IN_VERB = re.compile(r"insert|enter|add|укажите|вставьте|введите", re.IGNORECASE)
+
+
+def _is_slot_label(label: str) -> bool:
+    words = _LABEL_WORD.findall(label)
+    if not words:
+        return False
+    return bool(
+        _SLOT_HEAD.fullmatch(words[0])
+        or _SLOT_HEAD.fullmatch(words[-1])
+        or _FILL_IN_VERB.fullmatch(words[0])
+    )
+
+
+def _find_unfilled_placeholder(text: str) -> str | None:
+    """The first bracketed field slot in the message text of `text` (outside genuine Markdown
+    links and code), or None."""
+    in_link = 0
+    for token in _flatten_tokens(_MARKDOWN_RENDERER.parse(text)):
+        if token.type == "link_open":
+            in_link += 1
+        elif token.type == "link_close":
+            in_link -= 1
+        elif token.type == "text" and not in_link:
+            for match in _BRACKETED.finditer(token.content):
+                if _is_slot_label(match.group(1)):
+                    return match.group(0)
+    return None

@@ -7,11 +7,16 @@ from typing import Any, Iterator, Mapping
 import re2
 from anytoolai_platform_core.actions.runner import ActionInputValidationError
 
-from ._markup import _has_disallowed_plain_text_markup, _has_html_tag, _has_list, _has_visible_text
+from ._markup import (
+    _find_unfilled_placeholder,
+    _has_disallowed_plain_text_markup,
+    _has_html_tag,
+    _has_list,
+    _has_visible_text,
+)
 from ._shared import (
     _coerce_integer_valued,
     _cross_validation_error,
-    _find_unfilled_placeholder,
     _require_output,
     _truncated_repr,
 )

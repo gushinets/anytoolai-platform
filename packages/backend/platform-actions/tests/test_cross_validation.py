@@ -2201,8 +2201,15 @@ class TestUnfilledPlaceholder:
             "[your name]",
             "[Project Name]",
             "[Insert date]",
+            "[Project Description]",
+            "[Price]",
+            "[Deadline]",
             "[Ваше имя]",
+            "[Имя клиента]",
             "[Контактные данные]",
+            # Not a link: a reference definition without a destination, an undefined reference.
+            "[Client Name]\n\n[Client Name]:",
+            "[Client Name][missing]",
         ],
     )
     def test_rejects_slot(self, atom: str, slot: str) -> None:
@@ -2219,6 +2226,12 @@ class TestUnfilledPlaceholder:
             "Plain (parentheses) and {braces}.",
             "Read [the guide](https://example.com) and [ref][id].",
             "He wrote it [sic], [FYI] the [Draft] of [Project X] is attached.",
+            # A field word that is not the head of a label is ordinary prose (code review #2).
+            "The status is [Client update] for this sprint.",
+            "He wrote [Your request was received] in his reply.",
+            "Write [Add-on] here.",
+            "Use `[Your Name]` as the template token.",
+            "Read [the guide][g].\n\n[g]: https://example.com/guide",
             "Read [Project brief] for details.\n\n[Project brief]: https://example.com/brief",
             # A shortcut reference whose label is a field word is still a link once defined.
             "Send it to [Client Name].\n\n[client  name]: https://example.com/client",

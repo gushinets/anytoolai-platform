@@ -3,12 +3,13 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from ._markup import (
+    _find_unfilled_placeholder,
     _has_disallowed_plain_text_markup,
     _has_html_tag,
     _has_markup,
     _has_visible_text,
 )
-from ._shared import _coerce_integer_valued, _cross_validation_error, _find_unfilled_placeholder, _truncated_repr
+from ._shared import _coerce_integer_valued, _cross_validation_error, _truncated_repr
 
 
 class ComposeReplyCrossValidator:

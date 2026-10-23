@@ -20,10 +20,15 @@ existing validation retry runs. The check is built in because A07's input schema
 
 ## Decisions
 
-- A slot is a square-bracket group (1-60 characters, no nesting, no newline) whose words name a
-  field to fill in (EN/RU field words: `your`, `name`, `contact`, `date`, `client`, `ваш`, `имя`,
-  `контакт`, ...). A bracket shape alone cannot tell `[Ваше имя]` from `[Project brief]`.
-- Accepted: `[1]`, `[1, 2]`, `[x]`, `[ ]`, `[...]`, `[sic]`, `[FYI]`, `[Project X]`, inline and full-reference Markdown links and shortcut references defined by `[label]: url` in the same text.
+- A slot is a square-bracket label (1-60 characters, no nesting, no newline) whose head word names a
+  field (first or last word: `name`, `description`, `price`, `deadline`, `имя`, `дата`, ...) or that
+  starts with a fill-in verb (`insert`, `enter`, `add`, `укажите`, `вставьте`, `введите`). A field
+  word elsewhere in the label is prose (code review #2): `[Client update]`,
+  `[Your request was received]`. A bracket shape alone cannot tell `[Ваше имя]` from
+  `[Project brief]`, hence the EN/RU word list; an unlisted head (`[Scope]`) passes.
+- Accepted: `[1]`, `[1, 2]`, `[x]`, `[ ]`, `[...]`, `[sic]`, `[FYI]`, `[Project X]`, code spans, and
+  Markdown links the parser resolves (inline links, references with a real definition). A definition
+  without a destination or an undefined reference stays text and is checked (code review #2).
 - No exemption for slots that appear in the action input (code review #1, P1): a `[Client Name]` in
   the brief is still unfilled in the output.
 - Not covered: `{name}`, `<name>`, `%NAME%` (legitimate in code/HTML); products opt in through A06

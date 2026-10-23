@@ -89,37 +89,3 @@ def _reject_duplicate_ids(items: Any, *, id_field: str, error_label: str) -> Non
                 f"Action input validation failed: duplicate {error_label} '{item_id}'."
             )
         seen_ids.add(item_id)
-
-
-# A fill-in-the-blank slot: square brackets that name a field the sender should fill in
-# ("[Your Name]", "[Contact Information]", "[Client Name]", "[Ваше имя]"). Any bracket would also
-# catch ordinary prose ("[sic]", "[FYI]", "[Project brief]") and no shape (case, word count) tells
-# "[Ваше имя]" from "[Project brief]", so a slot is a bracket whose words name a field. Bracket
-# content is bounded (1-60 characters, no nesting, no newline), so matching stays linear. Markdown
-# links ("[a](u)", "[a][id]") and shortcut references whose "[label]: url" definition is in the
-# text are not slots. Curly and angle brackets are legitimate in code and HTML, so they are not
-# covered here; a product opts in through A06 forbidden_patterns.
-# ponytail: EN/RU field words only; extend _FIELD_WORD when a product ships another language.
-_BRACKETED = re.compile(r"(?<!\])\[([^\[\]\n]{1,60})\](?![(\[:])")
-_REFERENCE_DEFINITION = re.compile(r"^ {0,3}\[([^\[\]\n]{1,60})\]:", re.MULTILINE)
-_FIELD_WORD = re.compile(
-    r"\b(?:your|name|names|contact|contacts|e-?mail|phone|date|address|company|title|signature"
-    r"|client|recipient|insert|link|url|website"
-    r"|ваш\w*|имя|имени|фамили\w*|контакт\w*|телефон\w*|почт\w*|дат[аеуы]|подпис\w*|компани\w*"
-    r"|должност\w*|адрес\w*|клиент\w*|укажите|вставьте)\b",
-    re.IGNORECASE,
-)
-
-
-def _reference_label(label: str) -> str:
-    """CommonMark matches reference labels case-insensitively with whitespace collapsed."""
-    return " ".join(label.split()).casefold()
-
-
-def _find_unfilled_placeholder(text: str) -> str | None:
-    """The first bracketed field slot in `text`, or None."""
-    defined = {_reference_label(m.group(1)) for m in _REFERENCE_DEFINITION.finditer(text)}
-    for match in _BRACKETED.finditer(text):
-        if _reference_label(match.group(1)) not in defined and _FIELD_WORD.search(match.group(1)):
-            return match.group(0)
-    return None
