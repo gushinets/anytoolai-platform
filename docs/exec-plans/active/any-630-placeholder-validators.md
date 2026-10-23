@@ -14,7 +14,7 @@
 
 `PersuasiveTextCrossValidator` (A06) and `ComposeReplyCrossValidator` (A07) accepted text such as
 `[Your Name]` / `[Contact Information]` although the prompts forbid placeholders. Both now reject a
-bracketed slot via the shared `_find_unfilled_placeholder` (`cross_validation/_shared.py`), so the
+bracketed slot via the shared `_find_unfilled_placeholder` (`cross_validation/_markup.py`), so the
 existing validation retry runs. The check is built in because A07's input schema is closed (no
 `forbidden_patterns`) and `kernel_demo` would otherwise stay unprotected.
 
