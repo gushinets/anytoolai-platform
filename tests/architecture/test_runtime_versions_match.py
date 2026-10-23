@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 
 import pytest
+import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 NODE_MAJOR = (ROOT / ".nvmrc").read_text().strip().removeprefix("v").split(".")[0]
@@ -20,12 +21,10 @@ REQUIRED_POSTGRES_FILES = (
     COMPOSE_DIR / "docker-compose.agent.yml",
     WORKFLOWS_DIR / "backend.yml",
 )
-# Staged PostgreSQL 18 rollout (ANY-697): overlays with live data stay on 16 until the revision
-# that adds prod-quiesce is deployed; the follow-up that switches them empties this mapping.
-STAGED_POSTGRES_MAJORS = {
-    "docker-compose.prod.yml": "16",
-    "docker-compose.atom-lab.yml": "16",
-}
+# No overlay is staged: every compose file and workflow follows the base compose major.
+STAGED_POSTGRES_MAJORS: dict[str, str] = {}
+# The base-compose comparison alone passes if every file drifts together, so pin the target major.
+POSTGRES_TARGET_MAJOR = "18"
 
 
 def tag_major(tag: str | None) -> str | None:
@@ -74,7 +73,9 @@ def test_dockerfile_node_major_matches_nvmrc() -> None:
 def test_postgres_major_matches_base_compose() -> None:
     base_tags = POSTGRES_IMAGE.findall(BASE_COMPOSE.read_text())
     expected = tag_major(base_tags[0]) if base_tags else None
-    assert expected, "base compose must pin a numeric postgres major"
+    assert expected == POSTGRES_TARGET_MAJOR, (
+        f"base compose must pin postgres {POSTGRES_TARGET_MAJOR}"
+    )
     paths = [*COMPOSE_DIR.glob("*.yml"), *WORKFLOWS_DIR.glob("*.yml")]
     found = {p.name: POSTGRES_IMAGE.findall(p.read_text()) for p in paths}
     for path in REQUIRED_POSTGRES_FILES:
@@ -85,3 +86,32 @@ def test_postgres_major_matches_base_compose() -> None:
         want = STAGED_POSTGRES_MAJORS.get(name, expected)
         for tag in tags:
             assert tag_major(tag) == want, f"{name}: postgres:{tag or '<none>'} must pin {want}"
+
+
+class _ComposeLoader(yaml.SafeLoader):
+    """Compose-only tags (`!override`, `!reset`) are irrelevant to the postgres image and volume."""
+
+
+_ComposeLoader.add_multi_constructor("!", lambda loader, suffix, node: None)
+
+
+@pytest.mark.parametrize(
+    ("overlay", "volume"),
+    [
+        ("docker-compose.prod.yml", "postgres18-data"),
+        ("docker-compose.atom-lab.yml", "atom-lab-postgres18-data"),
+    ],
+)
+def test_overlay_postgres_resolves_to_pg18_on_new_volume(overlay: str, volume: str) -> None:
+    """Overlays hold no `image:` line, so assert what they resolve to, not just what they pin."""
+
+    def postgres(path: Path) -> dict:
+        return yaml.load(path.read_text(), Loader=_ComposeLoader)["services"]["postgres"]
+
+    base, over = postgres(BASE_COMPOSE), postgres(COMPOSE_DIR / overlay)
+    image = over.get("image", base["image"])
+    assert tag_major(image.removeprefix("postgres:")) == POSTGRES_TARGET_MAJOR
+    assert f"{volume}:/var/lib/postgresql" in over["volumes"]
+    assert (
+        volume in yaml.load((COMPOSE_DIR / overlay).read_text(), Loader=_ComposeLoader)["volumes"]
+    )

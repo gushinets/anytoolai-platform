@@ -10,6 +10,10 @@ This directory is the system of record for agents. Keep it current. If a decisio
 - `core-beliefs.md` — golden principles.
 - `glossary.md` — common terms.
 
+## Integrations
+
+- [Payment Portal](integrations/payment-portal.md) — ownership, current/target contracts, peer evidence and change workflow.
+
 ## Architecture
 
 - `architecture/platform-boundaries.md`
