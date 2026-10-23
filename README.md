@@ -83,6 +83,11 @@ analysis does not import test coverage or external analyzer reports. To add thos
 the project to CI-based analysis and disable automatic analysis first; the two methods must not
 run together. See [SonarQube automatic analysis](https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/automatic-analysis).
 
+The initial scan also reports Python version/test-classification and source-encoding warnings,
+and cannot parse `extensions/kernel-demo-ce/tsconfig.json`, which extends a generated `.wxt`
+configuration. The report must not be treated as proof of complete analysis coverage; those
+warnings need separate follow-up.
+
 ## MVPs
 
 - MVP-A1: Atom Runtime Proof — backend proof of all 11 typed atoms individually and in composite workflows, with deterministic and live-provider evidence.
