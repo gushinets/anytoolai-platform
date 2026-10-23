@@ -160,18 +160,23 @@ up front:
 
 1. What is read: the text the reader sees in the requested format. `html` is reduced to its visible
    text, `markdown` is rendered first, `plain_text` is read literally. Formatting inside the brackets
-   disappears (`[**Your Name**]`, `[<b>Your Name</b>]` read as `[Your Name]`). A genuine Markdown link
+   disappears (`[**Your Name**]`, `[<b>Your Name</b>]` read as `[Your Name]`), a line break or block
+   boundary is whitespace (`[Your<br>Name]`), and invisible format characters such as a zero-width
+   space are dropped. A genuine Markdown link
    loses its brackets. An undefined reference or a definition without a destination stays literal
    and is checked. Code (`<code>`, `<pre>`, Markdown code spans and blocks) is not read.
-2. What is a slot: a bracketed label in which every word is a slot word and at least one word names
-   a field. Slot words are a closed English and Russian vocabulary of field words (`name`, `price`,
-   `deadline`, `имя`, `срок`, ...) and fillers (`your`, `client`, `full`, `here`, `insert`, `ваш`,
-   `укажите`, ...). One word outside the vocabulary makes the brackets prose: `[Price is fixed]`,
-   `[Client update]`, `[Your request was received]`, `[Project brief]`, `[sic]`, `[FYI]`.
+2. What is a slot: a bracketed label made only of slot words and blank or separator characters
+   (whitespace, `/ , & . : - _ …`), with at least one word that names a field. Slot words are a
+   closed English and Russian vocabulary of field words (`name`, `price`, `deadline`, `имя`, `срок`,
+   ...) and fillers (`your`, `client`, `full`, `here`, `insert`, `ваш`, `укажите`, ...), so
+   `[Price:]`, `[Your Name: ____]` and `[YOUR_NAME]` are slots. Any other character means a filled
+   value or prose: a word outside the vocabulary (`[Price is fixed]`, `[Client update]`,
+   `[Project brief]`, `[sic]`, `[FYI]`) or a digit or sign (`[Price: $100]`, `[Rate: 5%]`).
 
-So a slot is missed only when its label has a word outside the vocabulary (`[Your Awesome Name]`),
-and prose is rejected only when it is made of slot words alone (`[Project Price]` as a heading),
-which the contract defines as a slot. A slot is rejected even when the action input carries it: a
+So a slot is missed only when its label holds a word or character outside the contract
+(`[Your Awesome Name]`, `[Price: TBD]`), and prose is rejected only when it is made of slot words and
+separators alone (`[Project Price]` as a heading), which the contract defines as a slot. Only ASCII
+square brackets are read. A slot is rejected even when the action input carries it: a
 `[Client Name]` in the brief is still unfilled in the reply.
 
 Curly and angle brackets and `%NAME%` are not checked by default because they are legitimate in code

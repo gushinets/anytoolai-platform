@@ -5,7 +5,7 @@
 - State: active
 - Owner: agent
 - Created: 2026-10-23
-- Last updated: 2026-10-24 (code review #3)
+- Last updated: 2026-10-24 (code review #4)
 - Review date: 2026-10-23
 - Next action: PR review; move to `completed/` once merged.
 - Blocker: none
@@ -24,12 +24,17 @@ existing validation retry runs. The check is built in because A07's input schema
   two-part contract, because each open-world rule left a new bypass or false rejection for the next
   review:
   1. Read what the reader sees in the requested format (`_reader_text`, shared with
-     `_has_visible_text`): formatting inside brackets disappears, genuine Markdown links lose their
+     `_has_visible_text`): formatting inside brackets disappears, line breaks and block boundaries
+     are whitespace, invisible format characters are dropped, genuine Markdown links lose their
      brackets, malformed or undefined references stay literal, code is not read.
-  2. A slot is a label in which every word is in the closed EN/RU slot vocabulary (field words plus
-     fillers) and at least one word is a field word.
-- Boundary: a slot with a word outside the vocabulary passes (`[Your Awesome Name]`); prose made of
-  slot words alone (`[Project Price]`) is a slot by definition. Extend the vocabulary from live data.
+  2. A slot is a label made only of words from the closed EN/RU slot vocabulary (field words plus
+     fillers) and separators (whitespace, `/ , & . : - _ …`), with at least one field word.
+- Code review #4 found both parts too loose: digits and signs were ignored (`[Price: $100]` was a
+  slot) and `<br>`/block boundaries were dropped (`[Your<br>Name]` passed). Part 2 now covers every
+  character of the label, not only its words, and part 1 keeps visible breaks.
+- Boundary: a slot with a word or character outside the contract passes (`[Your Awesome Name]`,
+  `[Price: TBD]`); prose made of slot words and separators alone (`[Project Price]`) is a slot by
+  definition; only ASCII square brackets are read. Extend the vocabulary from live data.
 - Tests are one corpus of slot labels and one of prose labels, each run through A06 and A07 in
   `plain_text`, `markdown` and `html` with every spelling the reader still sees as brackets.
 - No exemption for slots that appear in the action input (code review #1, P1): a `[Client Name]` in

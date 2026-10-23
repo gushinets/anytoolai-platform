@@ -141,6 +141,17 @@ _NON_RENDERED_ELEMENTS = frozenset(
 _CODE_ELEMENTS = frozenset({"code", "pre"})
 _TEXT_BARRIER = "\x00"
 
+# A line break or a block boundary is visible whitespace: "<p>Dear [Your<br>Name]</p>" shows
+# "[Your" and "Name]" on two lines, not "[YourName]". Inline elements ("<b>", "<span>") add nothing.
+# ponytail: element names only; CSS `display` is not resolved, same as _NON_RENDERED_ELEMENTS.
+_LINE_BREAK_ELEMENTS = frozenset(
+    {
+        "address", "article", "aside", "blockquote", "br", "dd", "details", "div", "dl", "dt",
+        "figcaption", "figure", "footer", "h1", "h2", "h3", "h4", "h5", "h6", "header", "hr", "li",
+        "main", "nav", "ol", "p", "section", "summary", "table", "td", "th", "tr", "ul",
+    }
+)
+
 _RP_IMPLICIT_CLOSE_START_TAGS = frozenset({"rb", "rt", "rtc", "rp"})
 _RP_IMPLICIT_CLOSE_END_TAGS = frozenset({"ruby", "rtc"})
 
@@ -209,8 +220,7 @@ class _HtmlTextExtractor(HTMLParser):
             self._namespace_contexts.append((tag, False))
         if tag in _RP_IMPLICIT_CLOSE_START_TAGS and self._open_non_rendered[-1:] == ["rp"]:
             self._open_non_rendered.pop()
-        if self._skip_code and tag in _CODE_ELEMENTS:
-            self.parts.append(_TEXT_BARRIER)
+        self._mark_boundary(tag)
         if tag in self._skipped:
             self._open_non_rendered.append(tag)
 
@@ -224,8 +234,15 @@ class _HtmlTextExtractor(HTMLParser):
         if was_foreign or tag not in self._skipped:
             self.handle_endtag(tag)
 
+    def _mark_boundary(self, tag: str) -> None:
+        if self._skip_code and tag in _CODE_ELEMENTS:
+            self.parts.append(_TEXT_BARRIER)
+        elif tag in _LINE_BREAK_ELEMENTS:
+            self.parts.append("\n")
+
     def handle_endtag(self, tag: str) -> None:
         self.saw_element_tag = True
+        self._mark_boundary(tag)
         _close_innermost(self._namespace_contexts, tag, key=lambda context: context[0])
         if tag in _RP_IMPLICIT_CLOSE_END_TAGS and self._open_non_rendered[-1:] == ["rp"]:
             self._open_non_rendered.pop()
@@ -349,27 +366,31 @@ def _has_list(value: str) -> bool:
 
 
 # A fill-in-the-blank slot: a bracketed label the sender was meant to replace ("[Your Name]",
-# "[Your Full Name Here]", "[Project Price]", "[Insert date]", "[Имя клиента]", "[Укажите срок]").
-# The contract has two parts, so its boundary is known instead of found by review:
+# "[Your Full Name Here]", "[Project Price]", "[Insert date]", "[Price:]", "[YOUR_NAME]",
+# "[Имя клиента]", "[Укажите срок]"). The contract has two parts, so its boundary is known instead
+# of found by review:
 #   1. What is read: the text the reader sees in the requested format (`_reader_text`). Formatting
 #      inside the brackets disappears ("[**Your Name**]", "[<b>Your Name</b>]" read "[Your Name]"),
-#      a genuine Markdown link loses its brackets, an undefined reference or a definition without a
-#      destination stays literal, and code ("<code>", "<pre>", Markdown code spans and blocks) is
-#      not read at all.
-#   2. What is a slot: a label whose every word is a slot word (_SLOT_FIELD or _SLOT_FILLER) and at
-#      least one word names a field (_SLOT_FIELD). One word outside the vocabulary makes the
-#      brackets prose: "[Price is fixed]", "[Client update]", "[Your request was received]",
-#      "[Project brief]", "[sic]", "[FYI]". A label without a field word is prose too ("[Here]").
-# So a slot is missed only when its label has a word outside the vocabulary ("[Your Awesome Name]"),
-# and prose is rejected only when it consists of slot words alone ("[Project Price]" as a heading),
-# which this contract defines as a slot. Curly and angle brackets are legitimate in code and HTML;
-# a product opts in through A06 forbidden_patterns.
+#      a line break or block boundary is whitespace ("[Your<br>Name]"), invisible format
+#      characters (zero-width space, soft hyphen) are dropped, a genuine Markdown link loses its
+#      brackets, an undefined reference or a definition without a destination stays literal, and
+#      code ("<code>", "<pre>", Markdown code spans and blocks) is not read at all.
+#   2. What is a slot: a label made only of slot words (_SLOT_FIELD or _SLOT_FILLER) and blank or
+#      separator characters (_SLOT_SEPARATORS), with at least one field word. Any other character
+#      means a filled value or prose: a word outside the vocabulary ("[Price is fixed]",
+#      "[Client update]", "[Project brief]", "[sic]", "[FYI]"), a digit or a sign ("[Price: $100]",
+#      "[Date: 2026-10-24]", "[Rate: 5%]"). A label without a field word is prose too ("[Here]").
+# So a slot is missed only when its label holds a word or character outside the contract
+# ("[Your Awesome Name]", "[Price: TBD]"), and prose is rejected only when it consists of slot
+# words and separators alone ("[Project Price]" as a heading), which this contract defines as a
+# slot. Only ASCII square brackets are read; full-width "［ ］" and "【 】" are not. Curly and angle
+# brackets are legitimate in code and HTML; a product opts in through A06 forbidden_patterns.
 # ponytail: EN/RU vocabulary; extend it when live output shows a missed label or a product ships
 # another language.
 _SLOT_FIELD = (
-    r"names?|fullname|information|info|details|contacts?|e-?mail|phone|number|date|time|deadline"
-    r"|address|company|title|position|role|signature|link|url|website|portfolio|description|price"
-    r"|cost|rate|fee|budget|amount|total|timeline|duration|location"
+    r"names?|fullname|information|info|details|contacts?|email|mail|phone|number|date|time"
+    r"|deadline|address|company|title|position|role|signature|link|url|website|portfolio"
+    r"|description|price|cost|rate|fee|budget|amount|total|timeline|duration|location"
     r"|имя|имени|фамили\w*|отчеств\w*|контакт\w*|данн(?:ые|ых)|телефон\w*|почт\w*|дат[аеуы]"
     r"|срок\w*|адрес\w*|компани\w*|названи\w*|должност\w*|подпис\w*|ссылк\w*|сайт\w*|описани\w*"
     r"|цен[аеуы]|стоимост\w*|ставк\w*|сумм[аеуы]|бюджет\w*|реквизит\w*|номер\w*"
@@ -377,7 +398,7 @@ _SLOT_FIELD = (
 _SLOT_FILLER = (
     r"your|yours|my|our|their|his|her|client|client's|clients|customer|customer's|recipient"
     r"|recipient's|company's|project|project's|business|legal|full|first|last|middle|job|start|end"
-    r"|delivery|due|hourly|final|estimated|home|work|mobile|office|personal|team|agency"
+    r"|delivery|due|hourly|final|estimated|home|work|mobile|office|personal|team|agency|e"
     r"|here|goes|go|of|the|a|an|to|for|and|or|with|in|insert|enter|add|type|write|put|fill|please"
     r"|ваш\w*|мо[йеёия]|мои|наш\w*|клиент\w*|заказчик\w*|проект\w*|полн\w*|электронн\w*"
     r"|мобильн\w*|рабоч\w*|итогов\w*|начал\w*|окончани\w*|сдач\w*|оплат\w*"
@@ -385,22 +406,33 @@ _SLOT_FILLER = (
 )
 _SLOT_FIELD_WORD = re.compile(_SLOT_FIELD, re.IGNORECASE)
 _SLOT_WORD = re.compile(f"{_SLOT_FIELD}|{_SLOT_FILLER}", re.IGNORECASE)
-_BRACKETED = re.compile(r"\[([^\[\]\x00]{1,60})\]")
-_LABEL_WORD = re.compile(r"[^\W\d_][\w']*(?:-[\w']+)*")
+# A word is letters and apostrophes only, so "_" and "-" separate words ("[YOUR_NAME]",
+# "[Client-Name]", "e-mail"); a blank ("[Name: ____]", "[Price:]") is separators alone.
+_LABEL_WORD = re.compile(r"[^\W\d_](?:[^\W\d_]|')*")
+_SLOT_SEPARATORS = re.compile(r"[\s/,&.:_\-\u2026]*")
+# No nested brackets, so a bounded label stays linear.
+_BRACKETED = re.compile(r"\[([^\[\]\x00]{1,100})\]")
 
 
 def _is_slot_label(label: str) -> bool:
-    words = _LABEL_WORD.findall(label.replace("\u2019", "'"))
+    label = label.replace("\u2019", "'")
+    words = _LABEL_WORD.findall(label)
     return (
         bool(words)
+        and _SLOT_SEPARATORS.fullmatch(_LABEL_WORD.sub(" ", label)) is not None
         and all(_SLOT_WORD.fullmatch(word) for word in words)
         and any(_SLOT_FIELD_WORD.fullmatch(word) for word in words)
     )
 
 
+def _without_format_characters(value: str) -> str:
+    return "".join(char for char in value if unicodedata.category(char) != "Cf")
+
+
 def _find_unfilled_placeholder(text: str, text_format: Any) -> str | None:
     """The first slot (see the contract above) in what the reader of `text` sees, or None."""
-    for match in _BRACKETED.finditer(_reader_text(text, text_format, skip_code=True)):
+    visible = _without_format_characters(_reader_text(text, text_format, skip_code=True))
+    for match in _BRACKETED.finditer(visible):
         if _is_slot_label(match.group(1)):
             return " ".join(match.group(0).split())
     return None

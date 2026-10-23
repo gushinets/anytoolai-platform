@@ -2198,6 +2198,14 @@ _SLOT_LABELS = [
     "Your Name Here",
     "Name of your company",
     "Date and Time",
+    # Blank values and separators (code review #4).
+    "Price:",
+    "Your Name: ____",
+    "YOUR_NAME",
+    "Client-Name",
+    "e-mail",
+    "Your Name\u200b",
+    "Your Full Legal Name and Contact Information and Phone Number Here",
     "Ваше имя",
     "Имя клиента",
     "Контактные данные",
@@ -2223,6 +2231,12 @@ _PROSE_LABELS = [
     "Your request was received",
     "Price is fixed",
     "Deadline has moved",
+    # Filled values (code review #4).
+    "Price: $100",
+    "Date: 2026-10-24",
+    "Rate: 5%",
+    "Phone: +1 (415) 555-0100",
+    "Name 2",
     "Цена фиксирована",
     "Ваш запрос получен",
 ]
@@ -2235,7 +2249,12 @@ def _slot_spellings(label: str, text_format: str) -> list[str]:
         split = f"[{head} *{tail}*]" if head else f"[*{label}*]"
         return [f"[{label}]", f"**[{label}]**", f"[**{label}**]", split, f"\\[{label}\\]"]
     if text_format == "html":
-        return [f"[{label}]", f"[<b>{label}</b>]", f"&#91;{label}&#93;"]
+        head, _, tail = label.partition(" ")
+        spellings = [f"[{label}]", f"[<b>{label}</b>]", f"&#91;{label}&#93;"]
+        if tail:
+            # A visible line break or block boundary inside the brackets (code review #4).
+            spellings += [f"[{head}<br>{tail}]", f"[{head}</p><p>{tail}]"]
+        return spellings
     return [f"[{label}]"]
 
 
