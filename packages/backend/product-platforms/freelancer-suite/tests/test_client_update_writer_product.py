@@ -538,6 +538,42 @@ def test_prepaid_request_prompt_forbids_invented_dates_without_a_due_date() -> N
     assert "If `context` has no `due_date`, do not state or imply any date" in prompt
 
 
+# ANY-628 (Q-001): a client message must not lose or contradict the limits and exclusions it was given,
+# and must not leak the freelancer's internal figures or present a requested term as accepted.
+@pytest.mark.parametrize(
+    ("prompt_ref", "fragments"),
+    [
+        (
+            "client_update_writer.update_compose_reply.v1",
+            (
+                "Do not offer or imply anything",
+                "keep a limit or condition it names as agreed with the client",
+                "Internal notes (the freelancer's own costs, subcontractors, private figures)",
+                "leave them out unless `situation` says to share them",
+            ),
+        ),
+        (
+            "client_update_writer.reply_draft_compose_reply.v1",
+            (
+                "Do not offer or imply anything",
+                "Do not offer or imply anything `situation` or `intent` excludes",
+                "unless `intent` explicitly counters that specific term",
+                "Exclusions in `intent` always hold",
+                "keep its exact value and status",
+                "a term the client only requests is never stated as accepted",
+            ),
+        ),
+    ],
+)
+def test_reply_prompts_keep_agreed_terms_and_exclusions(
+    prompt_ref: str, fragments: tuple[str, ...]
+) -> None:
+    prompt = " ".join(_load_prompt_template(prompt_ref).split())
+
+    for fragment in fragments:
+        assert fragment in prompt, fragment
+
+
 def test_renderer_contract_pins_the_canonical_copy_ready_composition() -> None:
     """Code review finding: ANY-413 lists "Renderer contract for a copy-ready client message" as
     a Bundle-And-Workflow scope item, distinct from ANY-412/ANY-414's later apps/web-mirror

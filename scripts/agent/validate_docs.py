@@ -10,6 +10,7 @@ LINK_PATTERN = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
 INDEX_PATH_PATTERN = re.compile(r"`([^\`]+(?:\.md|/))`")
 ACTIVE_FIELDS = ("Owner", "Last updated", "Review date", "Next action", "Blocker")
 REQUIRED_INDEX_LINKS = (
+    "integrations/payment-portal.md",
     "product-specs/mvp-scope-source-of-truth.md",
     "architecture/platform-boundaries.md",
     "architecture/package-layering.md",
@@ -37,13 +38,24 @@ def validate(root: Path = ROOT) -> list[str]:
                 )
 
     index_text = (docs / "index.md").read_text(encoding="utf-8")
-    for target in INDEX_PATH_PATTERN.findall(index_text):
+    index_text = re.sub(r"<!--.*?-->", "", index_text, flags=re.DOTALL)
+    indexed_paths = INDEX_PATH_PATTERN.findall(index_text)
+    for target in indexed_paths:
         if not (docs / target).resolve().exists():
             errors.append(
                 f"[DOC001] docs/index.md: broken indexed path {target!r}. {GUIDANCE}"
             )
+    indexed_paths.extend(
+        match.group(1).strip().split(maxsplit=1)[0].strip("<>").split("#", 1)[0]
+        for match in LINK_PATTERN.finditer(index_text)
+    )
+    resolved_index_paths = {
+        (docs / target).resolve()
+        for target in indexed_paths
+        if target and not re.match(r"^[a-z][a-z0-9+.-]*:", target, re.I)
+    }
     for target in REQUIRED_INDEX_LINKS:
-        if target not in index_text:
+        if (docs / target).resolve() not in resolved_index_paths:
             errors.append(
                 f"[DOC002] docs/index.md: missing required link {target!r}. {GUIDANCE}"
             )

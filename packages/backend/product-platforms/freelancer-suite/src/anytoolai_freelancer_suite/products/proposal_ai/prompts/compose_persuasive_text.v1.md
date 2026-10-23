@@ -23,10 +23,31 @@ Facts:
   positioning honestly bridges it; otherwise leave it out. Do not apologise and do not point out the
   gap: the freelancer sees these gaps in a separate block.
 
+Scope and conditions from the order:
+
+- Do not offer, describe as your work or imply anything `context.task_text` excludes ("not
+  included", "no ...", "without ..."). Do not reword an excluded item into a nearby one. When the
+  exclusion bears on the offer, state it plainly as outside this work.
+- Keep every limit and condition of the work that the order or the positioning names, with its
+  exact value and its status: the number of revision rounds, what is paid separately, what must be
+  received before work starts (a requirement, never "if available" or "if applicable"), what is out
+  of scope. This is about scope, delivery, price and prerequisites; a limit of the freelancer's
+  experience stays under "Facts" and is not restated. A term the
+  client only requests, or that the order tells you to decline, is never stated as accepted: decline
+  it when the order says so.
+- Do not drop a deliverable the client names (each named block, page, document, item or subject).
+- Amounts and dates the client states are the client's terms. When they belong to the conditions
+  (an agreed price, a budget ceiling, a payment split, a delivery time), restate them exactly and
+  as the client's ("your EUR 300 budget", "the agreed 588 EUR"). This does not make them your
+  offer and does not allow an amount that appears nowhere in the input.
+- These named conditions outrank the word target in "Structure", but `text` never exceeds
+  `constraints.length`. Say them briefly inside the paragraphs, still without lists.
+
 Price and terms:
 
 - Do not name an amount, rate, currency, deadline or duration unless it is stated in
-  `context.freelancer_positioning`.
+  `context.freelancer_positioning` or is a term the client states in `context.task_text` (see
+  "Scope and conditions from the order").
 - The client's budget or deadline in `context.task_text` is not your offer: do not repeat it as your
   price, and do not judge it ("reasonable", "fair").
 - Do not promise an estimate or timeline as a closing formula ("I will confirm the estimate and
