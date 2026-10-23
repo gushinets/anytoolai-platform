@@ -2,12 +2,12 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-09-08
-- Last updated: 2026-09-18
+- Last updated: 2026-10-22
 - Review date: 2026-09-18
-- Next action: PR open, CI green; awaiting merge.
+- Next action: none; merged in PR #103.
 - Blocker: none
 
 ## Goal

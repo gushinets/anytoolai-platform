@@ -1,0 +1,117 @@
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+import pytest
+import yaml
+
+ROOT = Path(__file__).resolve().parents[2]
+NODE_MAJOR = (ROOT / ".nvmrc").read_text().strip().removeprefix("v").split(".")[0]
+COMPOSE_DIR = ROOT / "infra" / "compose"
+WORKFLOWS_DIR = ROOT / ".github" / "workflows"
+BASE_COMPOSE = COMPOSE_DIR / "docker-compose.yml"
+# Every image reference is captured whatever its tag, so floating tags (`lts`, `latest`) or a
+# missing tag cannot slip past as "no match".
+POSTGRES_IMAGE = re.compile(r"""image:\s*["']?postgres(?::([^\s"']+))?["']?\s*$""", re.MULTILINE)
+NODE_IMAGE = re.compile(r"^FROM\s+node(?::(\S+))?", re.MULTILINE)
+# Files that must keep pinning PostgreSQL; deleting the image line fails instead of passing.
+REQUIRED_POSTGRES_FILES = (
+    BASE_COMPOSE,
+    COMPOSE_DIR / "docker-compose.agent.yml",
+    WORKFLOWS_DIR / "backend.yml",
+)
+# No overlay is staged: every compose file and workflow follows the base compose major.
+STAGED_POSTGRES_MAJORS: dict[str, str] = {}
+# The base-compose comparison alone passes if every file drifts together, so pin the target major.
+POSTGRES_TARGET_MAJOR = "18"
+
+
+def tag_major(tag: str | None) -> str | None:
+    """Return the explicit numeric major of an image tag, or None for floating/missing tags."""
+    match = re.match(r"(\d+)(?:[.-]|$)", tag or "")
+    return match.group(1) if match else None
+
+
+@pytest.mark.parametrize(
+    ("tag", "major"),
+    [
+        ("24-slim", "24"),
+        ("24.11-slim", "24"),
+        ("18", "18"),
+        ("18.6-bookworm", "18"),
+        ("lts-slim", None),
+        ("latest", None),
+        ("alpine", None),
+        (None, None),
+    ],
+)
+def test_tag_major_rejects_floating_and_missing_tags(tag, major) -> None:
+    assert tag_major(tag) == major
+
+
+def test_image_patterns_capture_unpinned_references() -> None:
+    assert NODE_IMAGE.findall("FROM node:24-slim AS build\nFROM node:lts-slim AS runtime\n") == [
+        "24-slim",
+        "lts-slim",
+    ]
+    assert POSTGRES_IMAGE.findall("    image: postgres:latest\n    image: postgres\n") == [
+        "latest",
+        "",
+    ]
+
+
+def test_dockerfile_node_major_matches_nvmrc() -> None:
+    dockerfiles = sorted((ROOT / "infra" / "docker").glob("*.Dockerfile"))
+    found = {p.name: NODE_IMAGE.findall(p.read_text()) for p in dockerfiles}
+    assert any(found.values()), "no node base images found"
+    for name, tags in found.items():
+        for tag in tags:
+            assert tag_major(tag) == NODE_MAJOR, f"{name}: node:{tag} must pin major {NODE_MAJOR}"
+
+
+def test_postgres_major_matches_base_compose() -> None:
+    base_tags = POSTGRES_IMAGE.findall(BASE_COMPOSE.read_text())
+    expected = tag_major(base_tags[0]) if base_tags else None
+    assert expected == POSTGRES_TARGET_MAJOR, (
+        f"base compose must pin postgres {POSTGRES_TARGET_MAJOR}"
+    )
+    paths = [*COMPOSE_DIR.glob("*.yml"), *WORKFLOWS_DIR.glob("*.yml")]
+    found = {p.name: POSTGRES_IMAGE.findall(p.read_text()) for p in paths}
+    for path in REQUIRED_POSTGRES_FILES:
+        assert found.get(path.name), f"{path.name} must pin a postgres image"
+    for name in STAGED_POSTGRES_MAJORS:
+        assert found.get(name), f"{name} must pin its staged postgres major"
+    for name, tags in found.items():
+        want = STAGED_POSTGRES_MAJORS.get(name, expected)
+        for tag in tags:
+            assert tag_major(tag) == want, f"{name}: postgres:{tag or '<none>'} must pin {want}"
+
+
+class _ComposeLoader(yaml.SafeLoader):
+    """Compose-only tags (`!override`, `!reset`) are irrelevant to the postgres image and volume."""
+
+
+_ComposeLoader.add_multi_constructor("!", lambda loader, suffix, node: None)
+
+
+@pytest.mark.parametrize(
+    ("overlay", "volume"),
+    [
+        ("docker-compose.prod.yml", "postgres18-data"),
+        ("docker-compose.atom-lab.yml", "atom-lab-postgres18-data"),
+    ],
+)
+def test_overlay_postgres_resolves_to_pg18_on_new_volume(overlay: str, volume: str) -> None:
+    """Overlays hold no `image:` line, so assert what they resolve to, not just what they pin."""
+
+    def postgres(path: Path) -> dict:
+        return yaml.load(path.read_text(), Loader=_ComposeLoader)["services"]["postgres"]
+
+    base, over = postgres(BASE_COMPOSE), postgres(COMPOSE_DIR / overlay)
+    image = over.get("image", base["image"])
+    assert tag_major(image.removeprefix("postgres:")) == POSTGRES_TARGET_MAJOR
+    assert f"{volume}:/var/lib/postgresql" in over["volumes"]
+    assert (
+        volume in yaml.load((COMPOSE_DIR / overlay).read_text(), Loader=_ComposeLoader)["volumes"]
+    )

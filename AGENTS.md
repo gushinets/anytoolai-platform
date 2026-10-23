@@ -19,6 +19,13 @@ Read these first:
 9. `docs/product-specs/mvp-a2-client-surfaces.md`
 10. `docs/agent/harness-engineering-map.md`
 
+## Neighboring project
+
+Read the [Payment Portal integration map](docs/integrations/payment-portal.md)
+for identity, scope, product/metric identity, paid-access or cross-app journey
+changes. It separates current implementation from target contracts and records
+peer sources, verification limits and the cross-repository change workflow.
+
 ## Current MVP
 
 MVP-A1: Atom Runtime Proof.

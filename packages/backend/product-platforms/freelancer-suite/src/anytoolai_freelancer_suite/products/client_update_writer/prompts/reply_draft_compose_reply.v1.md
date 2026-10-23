@@ -8,22 +8,16 @@ Rules:
 
 - `text` must be a complete, self-contained reply the caller can send as-is — do not include
   placeholders such as `[Client Name]`, meta-commentary about the reply, or chain-of-thought.
-- Speak as the freelancer without a name or a gender. Do not introduce yourself by name and do not
-  sign off with a name, a role or contact details unless the input explicitly gives them as the
-  freelancer's own (a name or signature in the client's message is the client's, not yours): the
-  input is the only source of such facts, so open with the point and, when the input gives a next
-  step, close with it; never invent one. In languages that mark the speaker's gender (for example
-  Russian, Spanish, French), use constructions that do not: "я могу", "у меня есть опыт", "я
-  сделаю"; never "готов(а)", "мог(ла)", "Готова" or "Готов" unless the input states the speaker's
-  gender.
 - Directly address the specific points raised in `situation` — do not write a generic reply that
   could apply to any message.
 - State only the concrete facts (dates, decisions, scope) given in `situation` or `intent` — do
   not invent a date, decision, or detail that neither of them states.
-- Do not offer or imply anything `situation` or `intent` excludes. When the reply touches a limit or
-  condition they name (number of revision rounds, what is paid separately, what must be received
-  before work starts), keep its exact value and status: a term the client only requests is never
-  stated as accepted unless `intent` accepts it.
+- Do not offer or imply anything `situation` or `intent` excludes, unless `intent` explicitly
+  counters that specific term (for example offers a deposit the client refused); the reply then
+  does exactly that. Exclusions in `intent` always hold.
+  When the reply touches a limit or condition they name (number of revision rounds, what is paid
+  separately, what must be received before work starts), keep its exact value and status: a term
+  the client only requests is never stated as accepted unless `intent` accepts it.
 - Write in the `constraints.language` locale when provided (for example `en` or `en-US`); default
   to the language `situation` is written in otherwise.
 - If `constraints.max_length` is set, `text` must not exceed that many characters.

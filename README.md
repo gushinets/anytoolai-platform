@@ -57,6 +57,37 @@ redaction rules.
 OpenAPI-contract drift check, build), and the implemented Freelancer suite tests. Kernel and browser
 smoke commands will be added only when feature issues deliver real vertical slices.
 
+## Security scanning
+
+`.github/workflows/trivy.yml` runs Trivy on pull requests, pushes to `main`, weekly on Monday at
+03:17 UTC, and manually through GitHub Actions. It scans the repository lockfiles, including dev
+dependencies, and Dockerfile misconfigurations. Every run saves a `trivy-filesystem-sarif` artifact;
+non-PR runs also publish results to GitHub Security under `trivy-filesystem`.
+
+This workflow is advisory: findings use exit code 0 and it is not a required PR check. Scanner or
+report-upload errors remain visible as workflow failures. Existing required checks are unchanged.
+It does not build or scan production images; GitHub's existing secret scanning and push protection
+remain separate.
+
+SonarQube Cloud analyzes the repository as one public project on the **Free** plan:
+[anytoolai-platform](https://sonarcloud.io/project/overview?id=gushinets_anytoolai-platform),
+in the `gushinets` organization. Its GitHub App is installed with selected-repository access to
+`gushinets/anytoolai-platform`; automatic import of other repositories is disabled.
+SonarQube's automatic analysis runs on pushes to `main` and pull requests targeting `main`.
+The initial import also analyzes up to five recently active pull requests.
+
+SonarQube reports are advisory. Its native Quality Gate check may report findings, but it is not a
+required check in the `protect main` ruleset and does not block merging PRs. No scanner workflow,
+`SONAR_TOKEN`, or Quality Gate waiting step is needed for this automatic integration. Automatic
+analysis does not import test coverage or external analyzer reports. To add those later, switch
+the project to CI-based analysis and disable automatic analysis first; the two methods must not
+run together. See [SonarQube automatic analysis](https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/automatic-analysis).
+
+The initial scan also reports Python version/test-classification and source-encoding warnings,
+and cannot parse `extensions/kernel-demo-ce/tsconfig.json`, which extends a generated `.wxt`
+configuration. The report must not be treated as proof of complete analysis coverage; those
+warnings need separate follow-up.
+
 ## MVPs
 
 - MVP-A1: Atom Runtime Proof — backend proof of all 11 typed atoms individually and in composite workflows, with deterministic and live-provider evidence.
