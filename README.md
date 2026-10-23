@@ -69,6 +69,20 @@ report-upload errors remain visible as workflow failures. Existing required chec
 It does not build or scan production images; GitHub's existing secret scanning and push protection
 remain separate.
 
+SonarQube Cloud analyzes the repository as one public project on the **Free** plan:
+[anytoolai-platform](https://sonarcloud.io/project/overview?id=gushinets_anytoolai-platform),
+in the `gushinets` organization. Its GitHub App is installed with selected-repository access to
+`gushinets/anytoolai-platform`; automatic import of other repositories is disabled.
+SonarQube's automatic analysis runs on pushes to `main` and pull requests targeting `main`.
+The initial import also analyzes up to five recently active pull requests.
+
+SonarQube reports are advisory. Its native Quality Gate check may report findings, but it is not a
+required check in the `protect main` ruleset and does not block merging PRs. No scanner workflow,
+`SONAR_TOKEN`, or Quality Gate waiting step is needed for this automatic integration. Automatic
+analysis does not import test coverage or external analyzer reports. To add those later, switch
+the project to CI-based analysis and disable automatic analysis first; the two methods must not
+run together. See [SonarQube automatic analysis](https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/automatic-analysis).
+
 ## MVPs
 
 - MVP-A1: Atom Runtime Proof — backend proof of all 11 typed atoms individually and in composite workflows, with deterministic and live-provider evidence.
