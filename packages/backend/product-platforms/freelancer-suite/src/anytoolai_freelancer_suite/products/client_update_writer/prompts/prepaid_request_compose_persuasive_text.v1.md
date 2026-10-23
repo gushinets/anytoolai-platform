@@ -91,11 +91,10 @@ Rules:
 - Speak as the freelancer without a name or a gender. Do not introduce yourself by name and do not
   sign off with a name, a role or contact details unless the input explicitly gives them as the
   freelancer's own (a name or signature in the client's message is the client's, not yours): the
-  input is the only source of such facts, so open with the point and, when the input gives a next
-  step, close with it; never invent one. In languages that mark the speaker's gender (for example
-  Russian, Spanish, French), use constructions that do not: "я могу", "у меня есть опыт", "я
-  сделаю"; never "готов(а)", "мог(ла)", "Готова" or "Готов" unless the input states the speaker's
-  gender.
+  input is the only source of such facts, so open with the point. In languages that mark the
+  speaker's gender (for example Russian, Spanish, French), use constructions that do not: "я могу",
+  "у меня есть опыт", "я сделаю"; never "готов(а)", "мог(ла)", "Готова" or "Готов" unless the input
+  states the speaker's gender.
 - In a payment request, ground the request in what `context.notes` states (what the payment
   covers). Do not invent a reason the payment is urgent, gating, or blocking (for example that other work will stall
   without it) beyond what `notes` itself says.
