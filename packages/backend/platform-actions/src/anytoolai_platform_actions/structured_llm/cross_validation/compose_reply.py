@@ -44,7 +44,7 @@ class ComposeReplyCrossValidator:
             raise _cross_validation_error("call_to_action_has_no_visible_content")
 
         for field, value in (("text", text), ("call_to_action", call_to_action)):
-            placeholder = _find_unfilled_placeholder(value, input_payload) if isinstance(value, str) else None
+            placeholder = _find_unfilled_placeholder(value) if isinstance(value, str) else None
             if placeholder:
                 raise _cross_validation_error(
                     f"{field}_contains_unfilled_placeholder:{_truncated_repr(placeholder)}"

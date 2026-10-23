@@ -155,9 +155,13 @@ The cross-validators of `compose_persuasive_text` (A06) and `compose_reply` (A07
 fill-in-the-blank slot in square brackets (`[Your Name]`, `[Contact Information]`, `[Ваше имя]`) in
 `text` and, for A07, in `call_to_action`. The reason (`text_contains_unfilled_placeholder:<slot>`)
 goes to PydanticAI as a validation retry; after the last validation attempt the action fails, as it
-does for length and markup violations. A slot is `[`, a letter of any script, 1-59 word characters
-or ` .'/,&-`, `]`, not followed by `(`, `[` or `:`. Numbered references (`[1]`), checkboxes (`[x]`),
-`[...]`, Markdown links and any bracketed phrase quoted verbatim from the action input are accepted.
+does for length and markup violations. A slot is a square-bracket group whose words name a field to
+fill in (`your`, `name`, `contact`, `email`, `date`, `client`, `insert`, `ваш`, `имя`, `контакт`, ...;
+English and Russian), because no shape of the brackets alone tells `[Ваше имя]` from
+`[Project brief]`. Ordinary bracketed prose (`[sic]`, `[FYI]`, `[Project X]`), numbered references
+(`[1]`), checkboxes (`[x]`), Markdown links and shortcut references defined by a `[label]: url` line
+in the same text are accepted. A slot is rejected even when the action input carries it: a
+`[Client Name]` in the brief is still unfilled in the reply.
 
 Curly and angle brackets and `%NAME%` are not checked by default because they are legitimate in code
 and HTML; a product opts in through A06 `constraints.forbidden_patterns`. This check backs up the

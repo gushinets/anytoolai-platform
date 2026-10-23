@@ -5,7 +5,7 @@
 - State: active
 - Owner: agent
 - Created: 2026-10-23
-- Last updated: 2026-10-23
+- Last updated: 2026-10-24
 - Review date: 2026-10-23
 - Next action: PR review; move to `completed/` once merged.
 - Blocker: none
@@ -20,10 +20,12 @@ existing validation retry runs. The check is built in because A07's input schema
 
 ## Decisions
 
-- A slot is `[` + a letter of any script + 1-59 word characters or ` .'/,&-` + `]`, not followed by
-  `(`, `[` or `:` and not preceded by `]` (Markdown links/references).
-- Accepted: `[1]`, `[1, 2]`, `[x]`, `[ ]`, `[A]`, `[...]`, and any bracketed phrase that appears
-  verbatim in the action input (a quoted `[Project X]` subject).
+- A slot is a square-bracket group (1-60 characters, no nesting, no newline) whose words name a
+  field to fill in (EN/RU field words: `your`, `name`, `contact`, `date`, `client`, `ваш`, `имя`,
+  `контакт`, ...). A bracket shape alone cannot tell `[Ваше имя]` from `[Project brief]`.
+- Accepted: `[1]`, `[1, 2]`, `[x]`, `[ ]`, `[...]`, `[sic]`, `[FYI]`, `[Project X]`, inline and full-reference Markdown links and shortcut references defined by `[label]: url` in the same text.
+- No exemption for slots that appear in the action input (code review #1, P1): a `[Client Name]` in
+  the brief is still unfilled in the output.
 - Not covered: `{name}`, `<name>`, `%NAME%` (legitimate in code/HTML); products opt in through A06
   `forbidden_patterns` as ProposalAI does. Gender forms and "Меня зовут …" stay with the prompts.
 - Failure after the second validation attempt fails the action, same as length and markup rules.

@@ -2194,7 +2194,16 @@ class TestUnfilledPlaceholder:
     @pytest.mark.parametrize("atom", ["a06", "a07"])
     @pytest.mark.parametrize(
         "slot",
-        ["[Your Name]", "[Contact Information]", "[Client Name]", "[your name]", "[Ваше имя]"],
+        [
+            "[Your Name]",
+            "[Contact Information]",
+            "[Client Name]",
+            "[your name]",
+            "[Project Name]",
+            "[Insert date]",
+            "[Ваше имя]",
+            "[Контактные данные]",
+        ],
     )
     def test_rejects_slot(self, atom: str, slot: str) -> None:
         with pytest.raises(StructuredOutputValidationError) as exc:
@@ -2209,6 +2218,10 @@ class TestUnfilledPlaceholder:
             "Done [x] and todo [ ] and option [A] and [...] and […].",
             "Plain (parentheses) and {braces}.",
             "Read [the guide](https://example.com) and [ref][id].",
+            "He wrote it [sic], [FYI] the [Draft] of [Project X] is attached.",
+            "Read [Project brief] for details.\n\n[Project brief]: https://example.com/brief",
+            # A shortcut reference whose label is a field word is still a link once defined.
+            "Send it to [Client Name].\n\n[client  name]: https://example.com/client",
         ],
     )
     def test_accepts_ordinary_brackets(self, atom: str, text: str) -> None:
@@ -2219,12 +2232,19 @@ class TestUnfilledPlaceholder:
             self._check("a07", "Fine.", call_to_action="Call [Your Name]")
         assert "call_to_action_contains_unfilled" in exc.value.reason
 
+    # A slot the caller's own input already carries is still unfilled (code review P1).
     @pytest.mark.parametrize(
-        ("atom", "payload"),
-        [("a06", {"context": "Subject: [Project X]"}), ("a07", {"situation": "Subject: [Project X]"})],
+        ("atom", "payload", "text"),
+        [
+            ("a06", {"context": "Sign as [Your Name]"}, "Best regards,\n[Your Name]"),
+            (
+                "a07",
+                {"situation": "Write to [Client Name]", "intent": "Reply", "tone": "warm"},
+                "Dear [Client Name], thanks for the brief.",
+            ),
+        ],
     )
-    def test_accepts_slot_quoted_from_input(self, atom: str, payload: dict) -> None:
-        self._check(atom, "Re: [Project X] is on track.", payload)
+    def test_rejects_slot_present_in_input(self, atom: str, payload: dict, text: str) -> None:
         with pytest.raises(StructuredOutputValidationError) as exc:
-            self._check(atom, "Re: [Project Y] is on track.", payload)
+            self._check(atom, text, payload)
         assert "unfilled_placeholder" in exc.value.reason
