@@ -53,6 +53,15 @@ apps/web-mirror -> ce-kit -> platform API
 apps/web-mirror -> web-result-kit
 ```
 
+## Payment Portal boundary
+
+The separate Portal owns identity, legal acceptance, discovery and the cabinet;
+its target also owns commercial mappings and paid-access decisions. Kernel owns
+execution, artifacts and runtime usage/quota enforcement. Current Kernel runs
+guest quotas; authenticated paid integration is future work. The
+[integration map](docs/integrations/payment-portal.md) records both repositories'
+actual state, the three target request directions and enablement dependencies.
+
 ## Runtime principle
 
 ```text

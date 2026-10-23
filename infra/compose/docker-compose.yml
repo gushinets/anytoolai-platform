@@ -10,7 +10,7 @@ x-postgres-credentials: &postgres-credentials
 
 services:
   postgres:
-    image: postgres:16
+    image: postgres:18
     environment:
       POSTGRES_USER: ${ANYTOOLAI_POSTGRES_USER:-anytoolai}
       POSTGRES_PASSWORD: ${ANYTOOLAI_POSTGRES_PASSWORD:-anytoolai}

@@ -2,12 +2,12 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-09-15
-- Last updated: 2026-09-21
+- Last updated: 2026-10-22
 - Review date: 2026-09-21
-- Next action: wait for CI on the pushed head and for the merge decision; no open code findings.
+- Next action: none; merged in PR #127.
 - Blocker: none
 
 ## Goal
