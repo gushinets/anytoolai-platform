@@ -136,6 +136,11 @@ _NON_RENDERED_ELEMENTS = frozenset(
 # "An rp element's end tag can be omitted if [it] is immediately followed by an rb, rt, rtc or
 # rp element, or if there is no more content in the parent element" (HTML spec, optional tags).
 # ponytail: the parent is assumed to be ruby/rtc -- an `rp` anywhere else is invalid HTML.
+# Code is not message text: the placeholder check reads around it, and a code element breaks a
+# bracket so "[Your <code>x</code> Name]" is not read as one label.
+_CODE_ELEMENTS = frozenset({"code", "pre"})
+_TEXT_BARRIER = "\x00"
+
 _RP_IMPLICIT_CLOSE_START_TAGS = frozenset({"rb", "rt", "rtc", "rp"})
 _RP_IMPLICIT_CLOSE_END_TAGS = frozenset({"ruby", "rtc"})
 
@@ -177,9 +182,11 @@ class _HtmlTextExtractor(HTMLParser):
     and `saw_element_tag` is whether any real element tag occurred at all (comments, doctypes,
     processing instructions and CDATA render nothing and don't count)."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, skip_code: bool = False) -> None:
         super().__init__(convert_charrefs=True)
         self.parts: list[str] = []
+        self._skip_code = skip_code
+        self._skipped = _NON_RENDERED_ELEMENTS | (_CODE_ELEMENTS if skip_code else frozenset())
         self.saw_element_tag = False
         self._open_non_rendered: list[str] = []
         # (tag, is_foreign) per namespace switch: an svg/math root enters foreign content, an
@@ -202,7 +209,9 @@ class _HtmlTextExtractor(HTMLParser):
             self._namespace_contexts.append((tag, False))
         if tag in _RP_IMPLICIT_CLOSE_START_TAGS and self._open_non_rendered[-1:] == ["rp"]:
             self._open_non_rendered.pop()
-        if tag in _NON_RENDERED_ELEMENTS:
+        if self._skip_code and tag in _CODE_ELEMENTS:
+            self.parts.append(_TEXT_BARRIER)
+        if tag in self._skipped:
             self._open_non_rendered.append(tag)
 
     def handle_startendtag(self, tag: str, attrs: Any) -> None:
@@ -212,7 +221,7 @@ class _HtmlTextExtractor(HTMLParser):
         # *before* the start tag, which may itself switch namespace (svg `<title/>`).
         was_foreign = self._foreign_root() is not None
         self.handle_starttag(tag, attrs)
-        if was_foreign or tag not in _NON_RENDERED_ELEMENTS:
+        if was_foreign or tag not in self._skipped:
             self.handle_endtag(tag)
 
     def handle_endtag(self, tag: str) -> None:
@@ -227,8 +236,8 @@ class _HtmlTextExtractor(HTMLParser):
             self.parts.append(data)
 
 
-def _parse_html(value: str) -> _HtmlTextExtractor:
-    extractor = _HtmlTextExtractor()
+def _parse_html(value: str, *, skip_code: bool = False) -> _HtmlTextExtractor:
+    extractor = _HtmlTextExtractor(skip_code=skip_code)
     extractor.feed(value)
     extractor.close()
     return extractor
@@ -242,8 +251,22 @@ def _has_html_tag(value: str) -> bool:
     return _parse_html(value).saw_element_tag
 
 
-def _html_text_content(value: str) -> str:
-    return "".join(_parse_html(value).parts)
+def _html_text_content(value: str, *, skip_code: bool = False) -> str:
+    return "".join(_parse_html(value, skip_code=skip_code).parts)
+
+
+def _reader_text(value: str, text_format: Any, *, skip_code: bool = False) -> str:
+    """The text the reader of `value` sees in the format it will be rendered as."""
+    if text_format == "html":
+        return _html_text_content(value, skip_code=skip_code)
+    if text_format == "markdown":
+        # Rendering first makes every markdown construct (code spans/blocks, entities, raw
+        # HTML passthrough, links and reference definitions) reduce to the one question the
+        # HTML extractor already answers.
+        return _html_text_content(_HTML_RENDERER.render(value), skip_code=skip_code)
+    # plain_text / omitted: copied to the client literally, never parsed. Disallowed markup is
+    # a separate check (`_has_disallowed_plain_text_markup`).
+    return value
 
 
 def _has_visible_text(value: str, text_format: Any) -> bool:
@@ -254,17 +277,7 @@ def _has_visible_text(value: str, text_format: Any) -> bool:
     Code review findings this shape replaces a format-blind token walk for: plain_text was
     entity-decoded like markup ("&nbsp;" rejected as blank), and a regex tag-strip counted
     `<style>`/`<script>`/`<template>` content as visible text."""
-    if text_format == "html":
-        rendered = _html_text_content(value)
-    elif text_format == "markdown":
-        # Rendering first makes every markdown construct (code spans/blocks, entities, raw
-        # HTML passthrough) reduce to the one question the HTML extractor already answers.
-        rendered = _html_text_content(_HTML_RENDERER.render(value))
-    else:
-        # plain_text / omitted: copied to the client literally, never parsed. Disallowed
-        # markup is a separate check (`_has_disallowed_plain_text_markup`).
-        rendered = value
-    return rendered.strip() != ""
+    return _reader_text(value, text_format).strip() != ""
 
 
 def _tokenize_markdown(value: str) -> list[Any]:
@@ -335,54 +348,59 @@ def _has_list(value: str) -> bool:
     return sum(bool(_PLAIN_LIST_LINE.match(line)) for line in lines) >= 2  # noqa: PLR2004
 
 
-# A fill-in-the-blank slot: square brackets that hold a field label the sender should fill in
-# ("[Your Name]", "[Project Description]", "[Price]", "[Имя клиента]", "[Insert date]"). No bracket
-# shape (case, word count) tells "[Ваше имя]" from "[Project brief]", and a field word anywhere in
-# the brackets also catches prose ("[Client update]", "[Your request was received]"), so a slot is a
-# label whose head word names a field -- the last word in English, usually the first in Russian, so
-# either end counts -- or that starts with a fill-in verb. "your", "client", "ваш" only modify a
-# head and decide nothing. Genuine Markdown links (inline, full, collapsed and shortcut references
-# with a real definition) are resolved by the parser and skipped; a malformed or undefined reference
-# stays text and is checked. Code spans are code, not message text, and are not checked. Curly and
-# angle brackets are legitimate in code and HTML; a product opts in through A06 forbidden_patterns.
-# ponytail: EN/RU field-word list; a slot whose head word is not listed ("[Scope]") passes -- extend
-# _SLOT_HEAD when live output shows one, or for another language.
-_BRACKETED = re.compile(r"\[([^\[\]\n]{1,60})\]")
-_LABEL_WORD = re.compile(r"[^\W\d_]\w*(?:-\w+)*")
-_SLOT_HEAD = re.compile(
-    r"names?|information|info|details|contacts?|e-?mail|phone|number|date|deadline|address|company"
-    r"|title|position|signature|link|url|website|description|price|cost|rate|fee|budget|amount"
-    r"|timeline|duration"
-    r"|имя|имени|фамили\w*|контакт\w*|данн(?:ые|ых)|телефон\w*|почт\w*|дат[аеуы]|срок\w*|адрес\w*"
-    r"|компани\w*|названи\w*|должност\w*|подпис\w*|ссылк\w*|описани\w*|цен[аеуы]|стоимост\w*"
-    r"|ставк\w*|сумм[аеуы]|бюджет\w*",
-    re.IGNORECASE,
+# A fill-in-the-blank slot: a bracketed label the sender was meant to replace ("[Your Name]",
+# "[Your Full Name Here]", "[Project Price]", "[Insert date]", "[Имя клиента]", "[Укажите срок]").
+# The contract has two parts, so its boundary is known instead of found by review:
+#   1. What is read: the text the reader sees in the requested format (`_reader_text`). Formatting
+#      inside the brackets disappears ("[**Your Name**]", "[<b>Your Name</b>]" read "[Your Name]"),
+#      a genuine Markdown link loses its brackets, an undefined reference or a definition without a
+#      destination stays literal, and code ("<code>", "<pre>", Markdown code spans and blocks) is
+#      not read at all.
+#   2. What is a slot: a label whose every word is a slot word (_SLOT_FIELD or _SLOT_FILLER) and at
+#      least one word names a field (_SLOT_FIELD). One word outside the vocabulary makes the
+#      brackets prose: "[Price is fixed]", "[Client update]", "[Your request was received]",
+#      "[Project brief]", "[sic]", "[FYI]". A label without a field word is prose too ("[Here]").
+# So a slot is missed only when its label has a word outside the vocabulary ("[Your Awesome Name]"),
+# and prose is rejected only when it consists of slot words alone ("[Project Price]" as a heading),
+# which this contract defines as a slot. Curly and angle brackets are legitimate in code and HTML;
+# a product opts in through A06 forbidden_patterns.
+# ponytail: EN/RU vocabulary; extend it when live output shows a missed label or a product ships
+# another language.
+_SLOT_FIELD = (
+    r"names?|fullname|information|info|details|contacts?|e-?mail|phone|number|date|time|deadline"
+    r"|address|company|title|position|role|signature|link|url|website|portfolio|description|price"
+    r"|cost|rate|fee|budget|amount|total|timeline|duration|location"
+    r"|имя|имени|фамили\w*|отчеств\w*|контакт\w*|данн(?:ые|ых)|телефон\w*|почт\w*|дат[аеуы]"
+    r"|срок\w*|адрес\w*|компани\w*|названи\w*|должност\w*|подпис\w*|ссылк\w*|сайт\w*|описани\w*"
+    r"|цен[аеуы]|стоимост\w*|ставк\w*|сумм[аеуы]|бюджет\w*|реквизит\w*|номер\w*"
 )
-_FILL_IN_VERB = re.compile(r"insert|enter|add|укажите|вставьте|введите", re.IGNORECASE)
+_SLOT_FILLER = (
+    r"your|yours|my|our|their|his|her|client|client's|clients|customer|customer's|recipient"
+    r"|recipient's|company's|project|project's|business|legal|full|first|last|middle|job|start|end"
+    r"|delivery|due|hourly|final|estimated|home|work|mobile|office|personal|team|agency"
+    r"|here|goes|go|of|the|a|an|to|for|and|or|with|in|insert|enter|add|type|write|put|fill|please"
+    r"|ваш\w*|мо[йеёия]|мои|наш\w*|клиент\w*|заказчик\w*|проект\w*|полн\w*|электронн\w*"
+    r"|мобильн\w*|рабоч\w*|итогов\w*|начал\w*|окончани\w*|сдач\w*|оплат\w*"
+    r"|здесь|сюда|тут|укажите|вставьте|введите|впишите|и|или|для|по"
+)
+_SLOT_FIELD_WORD = re.compile(_SLOT_FIELD, re.IGNORECASE)
+_SLOT_WORD = re.compile(f"{_SLOT_FIELD}|{_SLOT_FILLER}", re.IGNORECASE)
+_BRACKETED = re.compile(r"\[([^\[\]\x00]{1,60})\]")
+_LABEL_WORD = re.compile(r"[^\W\d_][\w']*(?:-[\w']+)*")
 
 
 def _is_slot_label(label: str) -> bool:
-    words = _LABEL_WORD.findall(label)
-    if not words:
-        return False
-    return bool(
-        _SLOT_HEAD.fullmatch(words[0])
-        or _SLOT_HEAD.fullmatch(words[-1])
-        or _FILL_IN_VERB.fullmatch(words[0])
+    words = _LABEL_WORD.findall(label.replace("\u2019", "'"))
+    return (
+        bool(words)
+        and all(_SLOT_WORD.fullmatch(word) for word in words)
+        and any(_SLOT_FIELD_WORD.fullmatch(word) for word in words)
     )
 
 
-def _find_unfilled_placeholder(text: str) -> str | None:
-    """The first bracketed field slot in the message text of `text` (outside genuine Markdown
-    links and code), or None."""
-    in_link = 0
-    for token in _flatten_tokens(_MARKDOWN_RENDERER.parse(text)):
-        if token.type == "link_open":
-            in_link += 1
-        elif token.type == "link_close":
-            in_link -= 1
-        elif token.type == "text" and not in_link:
-            for match in _BRACKETED.finditer(token.content):
-                if _is_slot_label(match.group(1)):
-                    return match.group(0)
+def _find_unfilled_placeholder(text: str, text_format: Any) -> str | None:
+    """The first slot (see the contract above) in what the reader of `text` sees, or None."""
+    for match in _BRACKETED.finditer(_reader_text(text, text_format, skip_code=True)):
+        if _is_slot_label(match.group(1)):
+            return " ".join(match.group(0).split())
     return None

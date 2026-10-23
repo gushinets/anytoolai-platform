@@ -230,7 +230,7 @@ class PersuasiveTextCrossValidator:
         if text_format == "html" and not _has_html_tag(text):
             raise _cross_validation_error("text_missing_markup_for_html_format")
 
-        placeholder = _find_unfilled_placeholder(text)
+        placeholder = _find_unfilled_placeholder(text, text_format)
         if placeholder:
             raise _cross_validation_error(
                 f"text_contains_unfilled_placeholder:{_truncated_repr(placeholder)}"

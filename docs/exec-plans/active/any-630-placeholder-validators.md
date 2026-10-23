@@ -5,7 +5,7 @@
 - State: active
 - Owner: agent
 - Created: 2026-10-23
-- Last updated: 2026-10-24
+- Last updated: 2026-10-24 (code review #3)
 - Review date: 2026-10-23
 - Next action: PR review; move to `completed/` once merged.
 - Blocker: none
@@ -20,15 +20,18 @@ existing validation retry runs. The check is built in because A07's input schema
 
 ## Decisions
 
-- A slot is a square-bracket label (1-60 characters, no nesting, no newline) whose head word names a
-  field (first or last word: `name`, `description`, `price`, `deadline`, `имя`, `дата`, ...) or that
-  starts with a fill-in verb (`insert`, `enter`, `add`, `укажите`, `вставьте`, `введите`). A field
-  word elsewhere in the label is prose (code review #2): `[Client update]`,
-  `[Your request was received]`. A bracket shape alone cannot tell `[Ваше имя]` from
-  `[Project brief]`, hence the EN/RU word list; an unlisted head (`[Scope]`) passes.
-- Accepted: `[1]`, `[1, 2]`, `[x]`, `[ ]`, `[...]`, `[sic]`, `[FYI]`, `[Project X]`, code spans, and
-  Markdown links the parser resolves (inline links, references with a real definition). A definition
-  without a destination or an undefined reference stays text and is checked (code review #2).
+- Code review #3 replaced the rules of rounds 1-2 (any field word, then the first or last word) with a
+  two-part contract, because each open-world rule left a new bypass or false rejection for the next
+  review:
+  1. Read what the reader sees in the requested format (`_reader_text`, shared with
+     `_has_visible_text`): formatting inside brackets disappears, genuine Markdown links lose their
+     brackets, malformed or undefined references stay literal, code is not read.
+  2. A slot is a label in which every word is in the closed EN/RU slot vocabulary (field words plus
+     fillers) and at least one word is a field word.
+- Boundary: a slot with a word outside the vocabulary passes (`[Your Awesome Name]`); prose made of
+  slot words alone (`[Project Price]`) is a slot by definition. Extend the vocabulary from live data.
+- Tests are one corpus of slot labels and one of prose labels, each run through A06 and A07 in
+  `plain_text`, `markdown` and `html` with every spelling the reader still sees as brackets.
 - No exemption for slots that appear in the action input (code review #1, P1): a `[Client Name]` in
   the brief is still unfilled in the output.
 - Not covered: `{name}`, `<name>`, `%NAME%` (legitimate in code/HTML); products opt in through A06

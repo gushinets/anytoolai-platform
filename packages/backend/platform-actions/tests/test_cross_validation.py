@@ -4,6 +4,7 @@ import json
 import time
 import unicodedata
 from pathlib import Path
+from typing import Any
 
 import pytest
 from anytoolai_platform_actions.structured_llm.cross_validation import (
@@ -2178,86 +2179,158 @@ class TestScoreMatchByRubricCrossValidatorOverflow:
             )
 
 
+# ANY-630 placeholder contract, one corpus for A06 and A07 in every output format: a new case from
+# a review or live output is one more row here, not one more test.
+_SLOT_LABELS = [
+    "Your Name",
+    "your name",
+    "Contact Information",
+    "Client Name",
+    "Client's Name",
+    "Client\u2019s Name",
+    "Project Name",
+    "Project Description",
+    "Price",
+    "Project Price",
+    "Deadline",
+    "Insert date",
+    "Your Full Name Here",
+    "Your Name Here",
+    "Name of your company",
+    "Date and Time",
+    "Ваше имя",
+    "Имя клиента",
+    "Контактные данные",
+    "Укажите срок",
+    "Дата оплаты",
+]
+_PROSE_LABELS = [
+    "sic",
+    "FYI",
+    "Draft",
+    "Here",
+    "A",
+    "x",
+    " ",
+    "1",
+    "1, 2",
+    "...",
+    "\u2026",
+    "Add-on",
+    "Project X",
+    "Project brief",
+    "Client update",
+    "Your request was received",
+    "Price is fixed",
+    "Deadline has moved",
+    "Цена фиксирована",
+    "Ваш запрос получен",
+]
+
+
+def _slot_spellings(label: str, text_format: str) -> list[str]:
+    """Ways the reader still sees "[label]" in `text_format`."""
+    if text_format == "markdown":
+        head, _, tail = label.rpartition(" ")
+        split = f"[{head} *{tail}*]" if head else f"[*{label}*]"
+        return [f"[{label}]", f"**[{label}]**", f"[**{label}**]", split, f"\\[{label}\\]"]
+    if text_format == "html":
+        return [f"[{label}]", f"[<b>{label}</b>]", f"&#91;{label}&#93;"]
+    return [f"[{label}]"]
+
+
+def _message(text_format: str, fragment: str) -> str:
+    if text_format == "html":
+        return f"<p>Best regards,</p><p>{fragment}</p>"
+    return f"Best regards,\n\n{fragment}"
+
+
+def _validate_placeholder_case(atom: str, text_format: str, text: str, **extra: Any) -> None:
+    if atom == "a07":
+        ComposeReplyCrossValidator().validate(
+            input_payload={
+                "constraints": {"output_format": text_format},
+                **extra.get("payload", {}),
+            },
+            output={"text": text, **extra.get("output", {})},
+        )
+    else:
+        PersuasiveTextCrossValidator().validate(
+            input_payload={"constraints": {"format": text_format}, **extra.get("payload", {})},
+            output={"text": text},
+        )
+
+
+_ATOMS = ["a06", "a07"]
+_FORMATS = ["plain_text", "markdown", "html"]
+
+
 class TestUnfilledPlaceholder:
-    """A06 and A07 share one bracket-slot rule (ANY-630)."""
+    @pytest.mark.parametrize("atom", _ATOMS)
+    @pytest.mark.parametrize("text_format", _FORMATS)
+    @pytest.mark.parametrize("label", _SLOT_LABELS)
+    def test_rejects_slot(self, atom: str, text_format: str, label: str) -> None:
+        for spelling in _slot_spellings(label, text_format):
+            with pytest.raises(StructuredOutputValidationError) as exc:
+                _validate_placeholder_case(atom, text_format, _message(text_format, spelling))
+            assert "text_contains_unfilled_placeholder" in exc.value.reason, spelling
 
-    @staticmethod
-    def _check(atom: str, text: str, payload: dict | None = None, call_to_action: str | None = None):
-        output = {"text": text}
-        if atom == "a07":
-            if call_to_action is not None:
-                output["call_to_action"] = call_to_action
-            ComposeReplyCrossValidator().validate(input_payload=payload or {}, output=output)
-        else:
-            PersuasiveTextCrossValidator().validate(input_payload=payload or {}, output=output)
+    @pytest.mark.parametrize("atom", _ATOMS)
+    @pytest.mark.parametrize("text_format", _FORMATS)
+    @pytest.mark.parametrize("label", _PROSE_LABELS)
+    def test_accepts_prose(self, atom: str, text_format: str, label: str) -> None:
+        text = _message(text_format, f"He wrote [{label}] here.")
+        _validate_placeholder_case(atom, text_format, text)
 
-    @pytest.mark.parametrize("atom", ["a06", "a07"])
+    @pytest.mark.parametrize("atom", _ATOMS)
     @pytest.mark.parametrize(
-        "slot",
+        ("text_format", "text"),
         [
-            "[Your Name]",
-            "[Contact Information]",
-            "[Client Name]",
-            "[your name]",
-            "[Project Name]",
-            "[Insert date]",
-            "[Project Description]",
-            "[Price]",
-            "[Deadline]",
-            "[Ваше имя]",
-            "[Имя клиента]",
-            "[Контактные данные]",
-            # Not a link: a reference definition without a destination, an undefined reference.
-            "[Client Name]\n\n[Client Name]:",
-            "[Client Name][missing]",
+            # Genuine links lose their brackets; code is not message text.
+            ("markdown", "Read [Your Name](https://example.com)."),
+            ("markdown", "Read [Your Name][n].\n\n[n]: https://example.com"),
+            ("markdown", "Read [Your Name].\n\n[your  name]: https://example.com"),
+            ("markdown", "Use `[Your Name]` as the token."),
+            ("markdown", "```\n[Your Name]\n```"),
+            ("html", "<p>Use <code>[Your Name]</code> as the token.</p>"),
+            ("html", "<pre>[Your Name]</pre>"),
         ],
     )
-    def test_rejects_slot(self, atom: str, slot: str) -> None:
-        with pytest.raises(StructuredOutputValidationError) as exc:
-            self._check(atom, f"Reply sent.\n\nBest regards,\n{slot}")
-        assert "unfilled_placeholder" in exc.value.reason
+    def test_accepts_links_and_code(self, atom: str, text_format: str, text: str) -> None:
+        _validate_placeholder_case(atom, text_format, text)
 
-    @pytest.mark.parametrize("atom", ["a06", "a07"])
+    @pytest.mark.parametrize("atom", _ATOMS)
     @pytest.mark.parametrize(
         "text",
         [
-            "See [1] and [12] and [1, 2].",
-            "Done [x] and todo [ ] and option [A] and [...] and […].",
-            "Plain (parentheses) and {braces}.",
-            "Read [the guide](https://example.com) and [ref][id].",
-            "He wrote it [sic], [FYI] the [Draft] of [Project X] is attached.",
-            # A field word that is not the head of a label is ordinary prose (code review #2).
-            "The status is [Client update] for this sprint.",
-            "He wrote [Your request was received] in his reply.",
-            "Write [Add-on] here.",
-            "Use `[Your Name]` as the template token.",
-            "Read [the guide][g].\n\n[g]: https://example.com/guide",
-            "Read [Project brief] for details.\n\n[Project brief]: https://example.com/brief",
-            # A shortcut reference whose label is a field word is still a link once defined.
-            "Send it to [Client Name].\n\n[client  name]: https://example.com/client",
+            # Not a link: a definition without a destination, an undefined reference.
+            "Dear [Client Name], thanks.\n\n[Client Name]:",
+            "Dear [Client Name][missing], thanks.",
         ],
     )
-    def test_accepts_ordinary_brackets(self, atom: str, text: str) -> None:
-        self._check(atom, text, {"constraints": {"format": "markdown", "output_format": "markdown"}})
+    def test_rejects_malformed_reference(self, atom: str, text: str) -> None:
+        with pytest.raises(StructuredOutputValidationError) as exc:
+            _validate_placeholder_case(atom, "markdown", text)
+        assert "text_contains_unfilled_placeholder" in exc.value.reason
 
     def test_rejects_slot_in_call_to_action(self) -> None:
         with pytest.raises(StructuredOutputValidationError) as exc:
-            self._check("a07", "Fine.", call_to_action="Call [Your Name]")
-        assert "call_to_action_contains_unfilled" in exc.value.reason
+            _validate_placeholder_case(
+                "a07", "plain_text", "Fine.", output={"call_to_action": "Call [Your Name]"}
+            )
+        assert "call_to_action_contains_unfilled_placeholder" in exc.value.reason
 
-    # A slot the caller's own input already carries is still unfilled (code review P1).
+    # A slot the caller's own input already carries is still unfilled (code review #1, P1).
     @pytest.mark.parametrize(
-        ("atom", "payload", "text"),
+        ("atom", "payload"),
         [
-            ("a06", {"context": "Sign as [Your Name]"}, "Best regards,\n[Your Name]"),
-            (
-                "a07",
-                {"situation": "Write to [Client Name]", "intent": "Reply", "tone": "warm"},
-                "Dear [Client Name], thanks for the brief.",
-            ),
+            ("a06", {"context": "Sign as [Your Name]"}),
+            ("a07", {"situation": "Write to [Your Name]"}),
         ],
     )
-    def test_rejects_slot_present_in_input(self, atom: str, payload: dict, text: str) -> None:
+    def test_rejects_slot_present_in_input(self, atom: str, payload: dict) -> None:
         with pytest.raises(StructuredOutputValidationError) as exc:
-            self._check(atom, text, payload)
-        assert "unfilled_placeholder" in exc.value.reason
+            _validate_placeholder_case(
+                atom, "plain_text", "Dear [Your Name], thanks.", payload=payload
+            )
+        assert "text_contains_unfilled_placeholder" in exc.value.reason

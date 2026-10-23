@@ -155,16 +155,24 @@ The cross-validators of `compose_persuasive_text` (A06) and `compose_reply` (A07
 fill-in-the-blank slot in square brackets (`[Your Name]`, `[Contact Information]`, `[Ваше имя]`) in
 `text` and, for A07, in `call_to_action`. The reason (`text_contains_unfilled_placeholder:<slot>`)
 goes to PydanticAI as a validation retry; after the last validation attempt the action fails, as it
-does for length and markup violations. A slot is a square-bracket label whose head word names a
-field to fill in (`[Your Name]`, `[Project Description]`, `[Price]`, `[Имя клиента]`) or that starts
-with a fill-in verb (`[Insert date]`, `[Укажите срок]`). The head is the last word in English and
-usually the first in Russian, so either end counts; modifiers such as `your`, `client` and `ваш`
-decide nothing, and the field words cover English and Russian only. Bracketed prose (`[sic]`,
-`[FYI]`, `[Project X]`, `[Client update]`, `[Your request was received]`), numbered references
-(`[1]`), checkboxes (`[x]`) and code spans are accepted. Markdown links are resolved by the parser: an
-inline link or a reference with a real definition is accepted, while a definition without a
-destination or an undefined reference stays text and is checked. A slot is rejected even when the
-action input carries it: a `[Client Name]` in the brief is still unfilled in the reply.
+does for length and markup violations. The check is a two-part contract, so its boundary is known
+up front:
+
+1. What is read: the text the reader sees in the requested format. `html` is reduced to its visible
+   text, `markdown` is rendered first, `plain_text` is read literally. Formatting inside the brackets
+   disappears (`[**Your Name**]`, `[<b>Your Name</b>]` read as `[Your Name]`). A genuine Markdown link
+   loses its brackets. An undefined reference or a definition without a destination stays literal
+   and is checked. Code (`<code>`, `<pre>`, Markdown code spans and blocks) is not read.
+2. What is a slot: a bracketed label in which every word is a slot word and at least one word names
+   a field. Slot words are a closed English and Russian vocabulary of field words (`name`, `price`,
+   `deadline`, `имя`, `срок`, ...) and fillers (`your`, `client`, `full`, `here`, `insert`, `ваш`,
+   `укажите`, ...). One word outside the vocabulary makes the brackets prose: `[Price is fixed]`,
+   `[Client update]`, `[Your request was received]`, `[Project brief]`, `[sic]`, `[FYI]`.
+
+So a slot is missed only when its label has a word outside the vocabulary (`[Your Awesome Name]`),
+and prose is rejected only when it is made of slot words alone (`[Project Price]` as a heading),
+which the contract defines as a slot. A slot is rejected even when the action input carries it: a
+`[Client Name]` in the brief is still unfilled in the reply.
 
 Curly and angle brackets and `%NAME%` are not checked by default because they are legitimate in code
 and HTML; a product opts in through A06 `constraints.forbidden_patterns`. This check backs up the
