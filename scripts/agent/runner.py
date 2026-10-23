@@ -45,7 +45,7 @@ PROD_COMPOSE_PROJECT = "anytoolai-prod"
 PROD_FAKE_COMPOSE_PROJECT = "anytoolai-prod-fake"
 ATOM_LAB_COMPOSE_PROJECT = "anytoolai-atom-lab"
 PROFILE_VERSION_HEX_LENGTH = 32
-# The non-root API user is not the operator who writes this non-secret state.
+# The non-root API and worker users are not the operator who writes this non-secret state.
 # umask must not leave the bind-mounted directory or marker owner-only.
 ACTIVATION_STATE_DIRECTORY_MODE = 0o755
 ACTIVATION_MARKER_FILE_MODE = 0o644

@@ -588,7 +588,7 @@ the production project or active profile. If Compose startup or readiness fails,
 command is interrupted before `active-profile` is replaced, `prod-up` stops the candidate
 project without deleting its PostgreSQL volume; investigate before restarting production.
 Once that marker is in place, an interrupt leaves the stack up. The activation directory
-and marker are non-secret and are published as `0755` and `0644` so the non-root API user
+and marker are non-secret and are published as `0755` and `0644` so the non-root API and worker users
 can read them after a restrictive umask.
 Each deployment uses a new immutable profile directory. A failed redeploy leaves the previous
 container bind source intact for restarts; old profiles are removed only after readiness passes.
