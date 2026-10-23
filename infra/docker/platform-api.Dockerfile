@@ -8,7 +8,7 @@
 # ENTRYPOINT to run `anytoolai-platform-migrate` directly instead of this script -- see
 # docker-compose.yml. Alembic/psycopg are main dependencies (not dev-only), so both targets
 # can run migrations.
-FROM ghcr.io/astral-sh/uv:0.11.19 AS uv-bin
+FROM ghcr.io/astral-sh/uv:0.13.4 AS uv-bin
 
 FROM python:3.12-slim AS base
 COPY --from=uv-bin /uv /usr/local/bin/uv

@@ -27,6 +27,11 @@ In scope:
 
 Out of scope:
 
+## Peer impact
+
+<!-- For integration changes, record the peer SHA inspected, affected contract/map,
+and linked peer issue/PR. Otherwise write None with a reason. -->
+
 ## Architecture boundaries
 
 - [ ] platform-core does not import product-platforms
