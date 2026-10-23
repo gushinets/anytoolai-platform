@@ -8,7 +8,7 @@ from ._markup import (
     _has_markup,
     _has_visible_text,
 )
-from ._shared import _coerce_integer_valued, _cross_validation_error
+from ._shared import _coerce_integer_valued, _cross_validation_error, _find_unfilled_placeholder, _truncated_repr
 
 
 class ComposeReplyCrossValidator:
@@ -42,6 +42,13 @@ class ComposeReplyCrossValidator:
             call_to_action, output_format
         ):
             raise _cross_validation_error("call_to_action_has_no_visible_content")
+
+        for field, value in (("text", text), ("call_to_action", call_to_action)):
+            placeholder = _find_unfilled_placeholder(value, input_payload) if isinstance(value, str) else None
+            if placeholder:
+                raise _cross_validation_error(
+                    f"{field}_contains_unfilled_placeholder:{_truncated_repr(placeholder)}"
+                )
 
         max_length = _coerce_integer_valued(constraints.get("max_length"))
         if max_length is not None and len(text) > max_length:

@@ -149,6 +149,20 @@ LiteLLM does not independently enforce a second JSON schema for the same action.
 
 AnytoolAI still owns final validation because artifacts, user-safe errors, and action contracts are platform behavior. The final validator persists raw provider output for debugging and normalized output for downstream steps.
 
+### Unfilled placeholders in composed text
+
+The cross-validators of `compose_persuasive_text` (A06) and `compose_reply` (A07) reject a
+fill-in-the-blank slot in square brackets (`[Your Name]`, `[Contact Information]`, `[Ваше имя]`) in
+`text` and, for A07, in `call_to_action`. The reason (`text_contains_unfilled_placeholder:<slot>`)
+goes to PydanticAI as a validation retry; after the last validation attempt the action fails, as it
+does for length and markup violations. A slot is `[`, a letter of any script, 1-59 word characters
+or ` .'/,&-`, `]`, not followed by `(`, `[` or `:`. Numbered references (`[1]`), checkboxes (`[x]`),
+`[...]`, Markdown links and any bracketed phrase quoted verbatim from the action input are accepted.
+
+Curly and angle brackets and `%NAME%` are not checked by default because they are legitimate in code
+and HTML; a product opts in through A06 `constraints.forbidden_patterns`. This check backs up the
+prompt rule against placeholders and does not replace it.
+
 ## In-process SDK decision
 
 MVP-A uses LiteLLM SDK in-process.

@@ -10,7 +10,9 @@ from anytoolai_platform_core.actions.runner import ActionInputValidationError
 from ._markup import _has_disallowed_plain_text_markup, _has_html_tag, _has_list, _has_visible_text
 from ._shared import (
     _coerce_integer_valued,
+    _context_strings,
     _cross_validation_error,
+    _find_unfilled_placeholder,
     _require_output,
     _truncated_repr,
 )
@@ -122,19 +124,6 @@ def numbers_absent_from_context(text: str, context: Any) -> list[str]:
     return sorted(_numbers(text) - allowed, key=len)
 
 
-def _context_strings(value: Any) -> Iterator[str]:
-    if isinstance(value, str):
-        yield value
-    elif isinstance(value, Mapping):
-        for item in value.values():
-            yield from _context_strings(item)
-    elif isinstance(value, (list, tuple)):
-        for item in value:
-            yield from _context_strings(item)
-    elif isinstance(value, (int, float)) and not isinstance(value, bool):
-        yield str(value)
-
-
 # A caller's forbidden_patterns run on Google RE2, not on a backtracking engine (`re`, `regex`):
 # RE2 matches in linear time, caps its memory and refuses a repetition count above 1000 at
 # compile time, so no pattern within the schema bounds (at most 32 patterns of at most 200
@@ -223,6 +212,12 @@ class PersuasiveTextCrossValidator:
         # decorative token (a plain paragraph is valid Markdown too).
         if text_format == "html" and not _has_html_tag(text):
             raise _cross_validation_error("text_missing_markup_for_html_format")
+
+        placeholder = _find_unfilled_placeholder(text, input_payload)
+        if placeholder:
+            raise _cross_validation_error(
+                f"text_contains_unfilled_placeholder:{_truncated_repr(placeholder)}"
+            )
 
         # Product-level rules (ANY-656): all generic, so any A06 caller can opt in.
         for pattern in constraints.get("forbidden_patterns") or []:

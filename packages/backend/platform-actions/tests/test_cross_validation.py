@@ -2176,3 +2176,55 @@ class TestScoreMatchByRubricCrossValidatorOverflow:
                     "gaps": [],
                 },
             )
+
+
+class TestUnfilledPlaceholder:
+    """A06 and A07 share one bracket-slot rule (ANY-630)."""
+
+    @staticmethod
+    def _check(atom: str, text: str, payload: dict | None = None, call_to_action: str | None = None):
+        output = {"text": text}
+        if atom == "a07":
+            if call_to_action is not None:
+                output["call_to_action"] = call_to_action
+            ComposeReplyCrossValidator().validate(input_payload=payload or {}, output=output)
+        else:
+            PersuasiveTextCrossValidator().validate(input_payload=payload or {}, output=output)
+
+    @pytest.mark.parametrize("atom", ["a06", "a07"])
+    @pytest.mark.parametrize(
+        "slot",
+        ["[Your Name]", "[Contact Information]", "[Client Name]", "[your name]", "[Ваше имя]"],
+    )
+    def test_rejects_slot(self, atom: str, slot: str) -> None:
+        with pytest.raises(StructuredOutputValidationError) as exc:
+            self._check(atom, f"Reply sent.\n\nBest regards,\n{slot}")
+        assert "unfilled_placeholder" in exc.value.reason
+
+    @pytest.mark.parametrize("atom", ["a06", "a07"])
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "See [1] and [12] and [1, 2].",
+            "Done [x] and todo [ ] and option [A] and [...] and […].",
+            "Plain (parentheses) and {braces}.",
+            "Read [the guide](https://example.com) and [ref][id].",
+        ],
+    )
+    def test_accepts_ordinary_brackets(self, atom: str, text: str) -> None:
+        self._check(atom, text, {"constraints": {"format": "markdown", "output_format": "markdown"}})
+
+    def test_rejects_slot_in_call_to_action(self) -> None:
+        with pytest.raises(StructuredOutputValidationError) as exc:
+            self._check("a07", "Fine.", call_to_action="Call [Your Name]")
+        assert "call_to_action_contains_unfilled" in exc.value.reason
+
+    @pytest.mark.parametrize(
+        ("atom", "payload"),
+        [("a06", {"context": "Subject: [Project X]"}), ("a07", {"situation": "Subject: [Project X]"})],
+    )
+    def test_accepts_slot_quoted_from_input(self, atom: str, payload: dict) -> None:
+        self._check(atom, "Re: [Project X] is on track.", payload)
+        with pytest.raises(StructuredOutputValidationError) as exc:
+            self._check(atom, "Re: [Project Y] is on track.", payload)
+        assert "unfilled_placeholder" in exc.value.reason

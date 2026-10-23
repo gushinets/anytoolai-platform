@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 import re
 from datetime import date
-from typing import Any, Mapping
+from typing import Any, Iterator, Mapping
 
 from anytoolai_platform_core.actions.runner import ActionInputValidationError
 from anytoolai_platform_core.structured_output.errors import StructuredOutputValidationError
@@ -89,3 +89,34 @@ def _reject_duplicate_ids(items: Any, *, id_field: str, error_label: str) -> Non
                 f"Action input validation failed: duplicate {error_label} '{item_id}'."
             )
         seen_ids.add(item_id)
+
+
+def _context_strings(value: Any) -> Iterator[str]:
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, Mapping):
+        for item in value.values():
+            yield from _context_strings(item)
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            yield from _context_strings(item)
+    elif isinstance(value, (int, float)) and not isinstance(value, bool):
+        yield str(value)
+
+
+# A fill-in-the-blank slot in square brackets: "[Your Name]", "[Contact Information]", "[Ваше имя]".
+# Bounded on purpose (a letter of any script first, then 1-59 word characters or " .'/,&-", no
+# nesting, no newline) so it stays linear and does not catch "[1]", "[1, 2]", "[x]", "[ ]", "[A]",
+# "[...]". Markdown links/references ("[a](u)", "[a][id]", "[id]: u") are not slots. Curly and
+# angle brackets are legitimate in code and HTML, so they are not covered here.
+_PLACEHOLDER = re.compile(r"(?<!\])\[([^\W\d_][\w .'/,&-]{1,59})\](?![(\[:])")
+
+
+def _find_unfilled_placeholder(text: str, input_payload: Mapping[str, Any]) -> str | None:
+    """The first bracketed slot in `text` that the caller's input does not itself contain
+    verbatim (a client's "[Project X]" subject line may be quoted), or None."""
+    source = "\n".join(_context_strings(input_payload))
+    for match in _PLACEHOLDER.finditer(text):
+        if match.group(0) not in source:
+            return match.group(0)
+    return None
