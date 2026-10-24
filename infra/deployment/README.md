@@ -660,10 +660,13 @@ services:
         read_only: true
 ```
 
-The worker runs as non-root `platform-worker` (UID/GID 999), so the mounted PEM must be readable
-by it. A Squid CA certificate is public: publish it as `0644` (or grant UID 999 read access via
-ACL), never `0777`. A root-owned `0600` PEM fails with `EACCES` on provider TLS calls. After
-switching to this image, verify the custom CA under the non-root worker, for example
+The worker runs as non-root `platform-worker`, so the mounted PEM must be readable by it. The
+numeric UID/GID is allocated by the base image and is not pinned: query it before granting access,
+for example `docker compose ... run --rm --no-deps --entrypoint id platform-worker -u` (and `-g`),
+and repeat after rebuilding the image. A Squid CA certificate is public: publish it as `0644` (or
+grant that UID read access via ACL), never `0777`. A root-owned `0600` PEM fails with `EACCES` on
+provider TLS calls. After switching to this image, verify the custom CA under the non-root worker,
+for example
 `docker compose ... exec platform-worker python -c "open('/run/secrets/squid-ca.pem').close()"`.
 
 Do not commit the CA or override containing an operator path. A normal CONNECT tunnel needs no
