@@ -164,7 +164,9 @@ up front:
    boundary is whitespace (`[Your<br>Name]`), and invisible format characters such as a zero-width
    space are dropped. A genuine Markdown link
    loses its brackets. An undefined reference or a definition without a destination stays literal
-   and is checked. Code (`<code>`, `<pre>`, Markdown code spans and blocks) is not read.
+   and is checked. Code (`<code>`, `<pre>`, Markdown code spans and blocks) is not read, and visible
+   code breaks a label. Hidden content (`<template>`, `<script>`, `<style>`, ...) is not read and
+   breaks nothing: `[Your<template><code>x</code></template> Name]` reads as `[Your Name]`.
 2. What is a slot: a bracketed label made only of slot words and blank or separator characters
    (whitespace, `/ , & . : - _ …`), with at least one word that names a field. Slot words are a
    closed English and Russian vocabulary of field words (`name`, `price`, `deadline`, `имя`, `срок`,

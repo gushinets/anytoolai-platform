@@ -2247,13 +2247,24 @@ def _slot_spellings(label: str, text_format: str) -> list[str]:
     if text_format == "markdown":
         head, _, tail = label.rpartition(" ")
         split = f"[{head} *{tail}*]" if head else f"[*{label}*]"
-        return [f"[{label}]", f"**[{label}]**", f"[**{label}**]", split, f"\\[{label}\\]"]
+        spellings = [f"[{label}]", f"**[{label}]**", f"[**{label}**]", split, f"\\[{label}\\]"]
+        if head:
+            # Raw HTML in Markdown: hidden code marks no boundary (code review #6).
+            spellings.append(f"[{head}<template><code>x</code></template> {tail}]")
+        return spellings
     if text_format == "html":
         head, _, tail = label.partition(" ")
         spellings = [f"[{label}]", f"[<b>{label}</b>]", f"&#91;{label}&#93;"]
         if tail:
             # A visible line break or block boundary inside the brackets (code review #4).
-            spellings += [f"[{head}<br>{tail}]", f"[{head}</p><p>{tail}]"]
+            spellings += [
+                f"[{head}<br>{tail}]",
+                f"[{head}</p><p>{tail}]",
+                # Hidden content marks no boundary (code review #6), nor does a stray end tag.
+                f"[{head}<template><code>x</code></template> {tail}]",
+                f"[{head}<script>x<br>y</script> {tail}]",
+                f"[{head}</code> {tail}]",
+            ]
         return spellings
     return [f"[{label}]"]
 
@@ -2313,6 +2324,9 @@ class TestUnfilledPlaceholder:
             ("markdown", "```\n[Your Name]\n```"),
             ("html", "<p>Use <code>[Your Name]</code> as the token.</p>"),
             ("html", "<pre>[Your Name]</pre>"),
+            # Visible code inside the brackets still breaks the label.
+            ("html", "<p>Dear [Your <code>x</code> Name],</p>"),
+            ("markdown", "Dear [Your `x` Name],"),
         ],
     )
     def test_accepts_links_and_code(self, atom: str, text_format: str, text: str) -> None:

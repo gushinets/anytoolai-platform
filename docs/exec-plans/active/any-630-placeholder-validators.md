@@ -5,7 +5,7 @@
 - State: active
 - Owner: agent
 - Created: 2026-10-23
-- Last updated: 2026-10-24 (code review #4)
+- Last updated: 2026-10-26 (code review #6)
 - Review date: 2026-10-23
 - Next action: PR review; move to `completed/` once merged.
 - Blocker: none
@@ -26,7 +26,9 @@ existing validation retry runs. The check is built in because A07's input schema
   1. Read what the reader sees in the requested format (`_reader_text`, shared with
      `_has_visible_text`): formatting inside brackets disappears, line breaks and block boundaries
      are whitespace, invisible format characters are dropped, genuine Markdown links lose their
-     brackets, malformed or undefined references stay literal, code is not read.
+     brackets, malformed or undefined references stay literal, code is not read and breaks a
+     label, hidden content (`<template>`, `<script>`, ...) is not read and marks no boundary (code
+     review #6).
   2. A slot is a label made only of words from the closed EN/RU slot vocabulary (field words plus
      fillers) and separators (whitespace, `/ , & . : - _ …`), with at least one field word.
 - Code review #4 found both parts too loose: digits and signs were ignored (`[Price: $100]` was a

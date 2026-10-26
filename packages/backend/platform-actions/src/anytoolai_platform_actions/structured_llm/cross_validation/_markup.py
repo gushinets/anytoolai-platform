@@ -220,7 +220,9 @@ class _HtmlTextExtractor(HTMLParser):
             self._namespace_contexts.append((tag, False))
         if tag in _RP_IMPLICIT_CLOSE_START_TAGS and self._open_non_rendered[-1:] == ["rp"]:
             self._open_non_rendered.pop()
-        self._mark_boundary(tag)
+        # A boundary is visible output like data: only an element in visible context marks one.
+        if not self._open_non_rendered:
+            self._mark_boundary(tag)
         if tag in self._skipped:
             self._open_non_rendered.append(tag)
 
@@ -242,11 +244,15 @@ class _HtmlTextExtractor(HTMLParser):
 
     def handle_endtag(self, tag: str) -> None:
         self.saw_element_tag = True
-        self._mark_boundary(tag)
+        # A stray end tag of an element that is not open renders nothing, so it marks no code
+        # boundary ("[Your</code> Name]" still reads "[Your Name]").
+        closes_open_code = tag in _CODE_ELEMENTS and tag in self._open_non_rendered
         _close_innermost(self._namespace_contexts, tag, key=lambda context: context[0])
         if tag in _RP_IMPLICIT_CLOSE_END_TAGS and self._open_non_rendered[-1:] == ["rp"]:
             self._open_non_rendered.pop()
         _close_innermost(self._open_non_rendered, tag)
+        if not self._open_non_rendered and (closes_open_code or tag not in _CODE_ELEMENTS):
+            self._mark_boundary(tag)
 
     def handle_data(self, data: str) -> None:
         if not self._open_non_rendered:
