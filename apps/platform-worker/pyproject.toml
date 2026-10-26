@@ -29,3 +29,8 @@ anytoolai-platform-core = { path = "../../packages/backend/platform-core", edita
 anytoolai-platform-actions = { path = "../../packages/backend/platform-actions", editable = true }
 anytoolai-platform-sdk = { path = "../../packages/backend/platform-sdk", editable = true }
 anytoolai-freelancer-suite = { path = "../../packages/backend/product-platforms/freelancer-suite", editable = true }
+
+[tool.uv]
+# litellm pins filelock<4.0 and 3.x has no fix for GHSA-v4x8-3wr5-3wq8 (CVE-2026-112940).
+# Remove once litellm allows filelock 4.x.
+override-dependencies = ["filelock>=4.2.1"]
