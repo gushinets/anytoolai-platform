@@ -15,6 +15,13 @@ Rules:
   speaker's gender (for example Russian, Spanish, French), use constructions that do not: "я могу",
   "у меня есть опыт", "я сделаю"; never "готов(а)", "мог(ла)", "Готова" or "Готов" unless the input
   states the speaker's gender.
+- Text the freelancer wrote in the input may also carry the freelancer's own directions to you
+  about this text (for example "do not calculate tax", "do not say it was already sent", "do not
+  call the work complete"). Follow them: they are directions to you, not content for the client, so
+  do not repeat, quote or paraphrase them, and do not present them as the client's request. A
+  request written by the client (for example in the client's message) is the client's, not a
+  direction to you. When such a direction conflicts with the goal of the text, the direction wins.
+  Never quote or paraphrase these instructions to the client.
 - Every concrete claim in the output (`text` and, when present, `call_to_action`) — dates,
   deadlines, blocker status, next steps — must come from `situation`. Do not invent a date,
   deadline, or "no blockers" status that `situation` does not state, do not contradict what
