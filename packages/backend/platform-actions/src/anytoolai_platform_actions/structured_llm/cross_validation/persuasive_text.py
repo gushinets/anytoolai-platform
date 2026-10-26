@@ -7,7 +7,13 @@ from typing import Any, Iterator, Mapping
 import re2
 from anytoolai_platform_core.actions.runner import ActionInputValidationError
 
-from ._markup import _has_disallowed_plain_text_markup, _has_html_tag, _has_list, _has_visible_text
+from ._markup import (
+    _find_unfilled_placeholder,
+    _has_disallowed_plain_text_markup,
+    _has_html_tag,
+    _has_list,
+    _has_visible_text,
+)
 from ._shared import (
     _coerce_integer_valued,
     _cross_validation_error,
@@ -223,6 +229,12 @@ class PersuasiveTextCrossValidator:
         # decorative token (a plain paragraph is valid Markdown too).
         if text_format == "html" and not _has_html_tag(text):
             raise _cross_validation_error("text_missing_markup_for_html_format")
+
+        placeholder = _find_unfilled_placeholder(text, text_format)
+        if placeholder:
+            raise _cross_validation_error(
+                f"text_contains_unfilled_placeholder:{_truncated_repr(placeholder)}"
+            )
 
         # Product-level rules (ANY-656): all generic, so any A06 caller can opt in.
         for pattern in constraints.get("forbidden_patterns") or []:
