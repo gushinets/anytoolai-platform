@@ -149,6 +149,42 @@ LiteLLM does not independently enforce a second JSON schema for the same action.
 
 AnytoolAI still owns final validation because artifacts, user-safe errors, and action contracts are platform behavior. The final validator persists raw provider output for debugging and normalized output for downstream steps.
 
+### Unfilled placeholders in composed text
+
+The cross-validators of `compose_persuasive_text` (A06) and `compose_reply` (A07) reject a
+fill-in-the-blank slot in square brackets (`[Your Name]`, `[Contact Information]`, `[Ваше имя]`) in
+`text` and, for A07, in `call_to_action`. The reason (`text_contains_unfilled_placeholder:<slot>`)
+goes to PydanticAI as a validation retry; after the last validation attempt the action fails, as it
+does for length and markup violations. The check is a two-part contract, so its boundary is known
+up front:
+
+1. What is read: the text the reader sees in the requested format. `html` is reduced to its visible
+   text, `markdown` is rendered first, `plain_text` is read literally. Formatting inside the brackets
+   disappears (`[**Your Name**]`, `[<b>Your Name</b>]` read as `[Your Name]`), a line break or block
+   boundary is whitespace (`[Your<br>Name]`), and invisible format characters such as a zero-width
+   space are dropped. A genuine Markdown link
+   loses its brackets. An undefined reference or a definition without a destination stays literal
+   and is checked. Code (`<code>`, `<pre>`, Markdown code spans and blocks) is not read, and visible
+   code breaks a label. Hidden content (`<template>`, `<script>`, `<style>`, ...) is not read and
+   breaks nothing: `[Your<template><code>x</code></template> Name]` reads as `[Your Name]`.
+2. What is a slot: a bracketed label made only of slot words and blank or separator characters
+   (whitespace, `/ , & . : - _ …`), with at least one word that names a field. Slot words are a
+   closed English and Russian vocabulary of field words (`name`, `price`, `deadline`, `имя`, `срок`,
+   ...) and fillers (`your`, `client`, `full`, `here`, `insert`, `ваш`, `укажите`, ...), so
+   `[Price:]`, `[Your Name: ____]` and `[YOUR_NAME]` are slots. Any other character means a filled
+   value or prose: a word outside the vocabulary (`[Price is fixed]`, `[Client update]`,
+   `[Project brief]`, `[sic]`, `[FYI]`) or a digit or sign (`[Price: $100]`, `[Rate: 5%]`).
+
+So a slot is missed only when its label holds a word or character outside the contract
+(`[Your Awesome Name]`, `[Price: TBD]`), and prose is rejected only when it is made of slot words and
+separators alone (`[Project Price]` as a heading), which the contract defines as a slot. Only ASCII
+square brackets are read. A slot is rejected even when the action input carries it: a
+`[Client Name]` in the brief is still unfilled in the reply.
+
+Curly and angle brackets and `%NAME%` are not checked by default because they are legitimate in code
+and HTML; a product opts in through A06 `constraints.forbidden_patterns`. This check backs up the
+prompt rule against placeholders and does not replace it.
+
 ## In-process SDK decision
 
 MVP-A uses LiteLLM SDK in-process.

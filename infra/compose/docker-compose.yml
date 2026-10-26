@@ -37,6 +37,9 @@ services:
       postgres:
         condition: service_healthy
     entrypoint: ["uv", "run", "--project", "apps/platform-api", "--no-sync", "anytoolai-platform-migrate"]
+    # The image's HTTP HEALTHCHECK does not apply to this one-shot, HTTP-less service.
+    healthcheck:
+      disable: true
   platform-api:
     build:
       context: ../..
@@ -73,12 +76,8 @@ services:
         condition: service_completed_successfully
     ports:
       - "${ANYTOOLAI_API_PORT:-8000}:8000"
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
-      interval: 2s
-      timeout: 3s
-      retries: 30
-      start_period: 10s
+    # Healthcheck comes from the image (platform-api.Dockerfile HEALTHCHECK); a `healthcheck:`
+    # block here would silently replace it.
   platform-worker:
     build:
       context: ../..
