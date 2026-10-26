@@ -1,4 +1,4 @@
-"""Client Update Writer prompts carry the same author-directions rule (ANY-592, ANY-619)."""
+"""Client-facing prompts carry the same author-directions rule (ANY-592, ANY-619, ANY-620)."""
 
 from pathlib import Path
 
@@ -10,6 +10,7 @@ PROMPTS = [
     "client_update_writer/prompts/update_compose_reply.v1.md",
     "client_update_writer/prompts/reply_draft_compose_reply.v1.md",
     "client_update_writer/prompts/prepaid_request_compose_persuasive_text.v1.md",
+    "proposal_ai/prompts/compose_persuasive_text.v1.md",
 ]
 
 RULE = (
