@@ -392,6 +392,9 @@ test.describe("ProposalAI web product", () => {
       await submitAndWaitForResult(page);
       if (remainingAfter > 0) {
         await page.getByRole("button", { name: "New task" }).click();
+        // "New task" focuses the first field one frame later; filling before that lands the
+        // second field's text in the first one.
+        await expect(page.locator("#proposal-ai-task-text")).toBeFocused();
         await expect(page.locator("#proposal-ai-task-text")).toBeEmpty();
         await expect(page.locator("#proposal-ai-positioning")).toBeEmpty();
         await expect(page.getByText(`${remainingAfter} of 10 proposals remaining.`)).toBeVisible();
@@ -402,6 +405,7 @@ test.describe("ProposalAI web product", () => {
     // wouldn't prove the authoritative 429 path, so block that advisory call for the final attempt.
     await page.route("**/v1/products/proposal_ai/quota**", (route) => route.abort());
     await page.getByRole("button", { name: "New task" }).click();
+    await expect(page.locator("#proposal-ai-task-text")).toBeFocused();
     await expect(page.locator("#proposal-ai-task-text")).toBeEmpty();
     await expect(page.locator("#proposal-ai-positioning")).toBeEmpty();
     await fillValidForm(page);
