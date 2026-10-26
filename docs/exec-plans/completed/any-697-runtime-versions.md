@@ -2,13 +2,13 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-10-21
-- Last updated: 2026-10-21
-- Review date: 2026-10-21
-- Next action: merge and deploy this tooling revision to prod and Atom Lab, then open the
-  follow-up that switches their overlays to PostgreSQL 18 (see "Staged rollout").
+- Last updated: 2026-10-25
+- Review date: 2026-10-25
+- Next action: none. The operator-run VPS data migration follows the runbook in
+  `infra/deployment/README.md` and is not tracked by this plan.
 - Blocker: none
 
 ## Goal
@@ -20,8 +20,9 @@ PostgreSQL source of truth is the base `infra/compose/docker-compose.yml`.
 
 - `web-mirror.Dockerfile`: `node:24-slim` in both stages.
 - `postgres:18` in base and agent compose and the `backend.yml` service container.
-- Prod and Atom Lab overlays stay on `postgres:16` with their existing volumes in this revision
-  (see "Staged rollout").
+- Prod and Atom Lab overlays moved to PostgreSQL 18 in the switch revision (ANY-714): volumes
+  `postgres18-data` / `atom-lab-postgres18-data` mounted at `/var/lib/postgresql`; the old
+  PostgreSQL 16 volumes stay for rollback.
 - `tests/architecture/test_runtime_versions_match.py` fails on version drift.
 - Runbook: "Upgrading PostgreSQL 16 to 18" in `infra/deployment/README.md`.
 - Runner: `prod-quiesce` and `prod-recovery-postgres-up`, sharing the drain and PostgreSQL-only
@@ -31,14 +32,13 @@ PostgreSQL source of truth is the base `infra/compose/docker-compose.yml`.
 
 ## Staged rollout
 
-Step 1 of the cut-over runs `prod-quiesce` on the revision still running PostgreSQL 16, so that
-command must be deployed before the switch. This PR is the tooling revision; the follow-up is the
-switch revision:
+Step 1 of the cut-over runs `prod-quiesce` on the revision still running PostgreSQL 16, so the
+command had to be deployed before the switch. It landed in two revisions:
 
-- set `postgres:18` in the prod and Atom Lab overlays (or drop their `image:` pin), mount
-  `postgres18-data` / `atom-lab-postgres18-data` at `/var/lib/postgresql`;
-- empty `STAGED_POSTGRES_MAJORS` in `tests/architecture/test_runtime_versions_match.py`;
-- deploy only with the runbook in `infra/deployment/README.md`.
+- tooling revision (ANY-713, PR #194): Node 24, PostgreSQL 18 for dev/agent/CI, `prod-quiesce`,
+  `prod-recovery-postgres-up`, the runbook, and the drift test with prod and Atom Lab staged on 16;
+- switch revision (ANY-714, PR #195): prod and Atom Lab overlays on PostgreSQL 18 and the new
+  volumes, `STAGED_POSTGRES_MAJORS` emptied.
 
 ## Out of scope
 
