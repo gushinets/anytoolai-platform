@@ -3,12 +3,13 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from ._markup import (
+    _find_unfilled_placeholder,
     _has_disallowed_plain_text_markup,
     _has_html_tag,
     _has_markup,
     _has_visible_text,
 )
-from ._shared import _coerce_integer_valued, _cross_validation_error
+from ._shared import _coerce_integer_valued, _cross_validation_error, _truncated_repr
 
 
 class ComposeReplyCrossValidator:
@@ -42,6 +43,15 @@ class ComposeReplyCrossValidator:
             call_to_action, output_format
         ):
             raise _cross_validation_error("call_to_action_has_no_visible_content")
+
+        for field, value in (("text", text), ("call_to_action", call_to_action)):
+            if not isinstance(value, str):
+                continue
+            placeholder = _find_unfilled_placeholder(value, output_format)
+            if placeholder:
+                raise _cross_validation_error(
+                    f"{field}_contains_unfilled_placeholder:{_truncated_repr(placeholder)}"
+                )
 
         max_length = _coerce_integer_valued(constraints.get("max_length"))
         if max_length is not None and len(text) > max_length:
