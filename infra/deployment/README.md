@@ -5,7 +5,8 @@ Covers the Proposal AI public web stack (`web-mirror`, `platform-api`, `platform
 
 ## Compose layout
 
-- `docker-compose.yml` — base, shared by dev and prod (services, healthchecks, ports, `depends_on`).
+- `docker-compose.yml` — base, shared by dev and prod (services, ports, `depends_on`; app
+  healthchecks live in the images, see "Health checks" below).
 - `docker-compose.override.yml` — dev defaults + hot-reload. Auto-merged by a bare
   `docker compose up` run from this directory, and also passed explicitly by `runner.py`/`make dev-up`.
 - `docker-compose.prod.yml` — prod overlay. Never auto-merged; always passed explicitly.
@@ -716,7 +717,7 @@ Compose config boots — not just that it's syntactically valid:
   and needs no API keys), then poll until it completes, reporting an explicit `N/11` result. This
   is the only thing that proves **`platform-worker`** is actually healthy — it has no Docker
   healthcheck and no HTTP surface of its own (`infra/docker/platform-worker.Dockerfile` is a
-  plain DB-polling loop with no `healthcheck:` in `docker-compose.yml`), so `docker compose ps`
+  plain DB-polling loop with no `HEALTHCHECK`, see "Health checks" below), so `docker compose ps`
   reporting it as "running" only means the process hasn't crashed, not that it's consuming jobs
   from the queue. A stopped or wedged `platform-worker` (`docker compose stop platform-worker`)
   makes `*-smoke` fail with a clear `SMOKE00x` error instead of hanging or silently reporting
@@ -733,6 +734,28 @@ CI runs both legs on every PR, as two independent parallel jobs in
 `.github/workflows/backend.yml`: `compose-smoke-dev` boots dev, runs `dev-smoke`, tears down;
 `compose-smoke-prod` boots `prod-fake-up` with disposable test credentials and `kernel_demo`,
 runs `prod-smoke`, then tears down. The public `prod-up` path is live-only.
+
+## Health checks
+
+App healthchecks are image-level `HEALTHCHECK`s (Trivy DS-0026, ANY-726). Compose does not
+redefine them: a `healthcheck:` block in any overlay silently replaces the image's check.
+
+| Service | Check | Proves | Trivy DS-0026 |
+|---|---|---|---|
+| `platform-api` | `GET /health` from inside the container (`base` stage, so dev and prod) | uvicorn answers HTTP; **liveness only**, no database check | fixed |
+| `migrate` | disabled in `docker-compose.yml` (one-shot, no HTTP) | — | n/a (same image) |
+| `web-mirror` | `GET /v1/products/<first ANYTOOLAI_ENABLED_PRODUCT_IDS>/runtime-config` through Next | Next answers and its `/v1/*` rewrite reaches API for the right product; `unhealthy` while API is down | fixed |
+| `platform-worker` | none | — | **accepted, still reported** |
+
+`web-mirror` waits on `platform-api` via `depends_on: condition: service_healthy`.
+
+`platform-worker` accepted risk: it has no HTTP surface or heartbeat, so a process-exists or
+`SELECT 1` probe would report a wedged poll loop as healthy, and nothing acts on `unhealthy`
+(`restart: unless-stopped` only restarts an exited process; no service waits on the worker's
+health). Jobs on a lost worker are recovered by the advisory-lock lease and reconciliation
+sweep, and `*-smoke` is the real liveness proof (see "Verifying end-to-end"). The finding stays
+visible in the report-only Trivy run; there is no `.trivyignore`. Upgrade path: a heartbeat the
+poll loop refreshes plus a `HEALTHCHECK` on its freshness.
 
 ## Migrations and scaling
 

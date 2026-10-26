@@ -15,6 +15,10 @@ COPY --from=uv-bin /uv /usr/local/bin/uv
 WORKDIR /app
 COPY . .
 RUN chmod +x infra/docker/platform-api-entrypoint.sh
+# Liveness of the uvicorn HTTP process (`/health` does not touch the database). Lives in `base` so
+# dev and prod share it; the one-shot `migrate` service disables it in docker-compose.yml.
+HEALTHCHECK --interval=2s --timeout=3s --start-period=10s --retries=30 \
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
 
 FROM base AS dev
 RUN uv sync --project apps/platform-api --frozen --group dev

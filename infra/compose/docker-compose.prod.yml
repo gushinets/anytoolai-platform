@@ -97,21 +97,8 @@ services:
         condition: service_healthy
     ports:
       - "127.0.0.1:${ANYTOOLAI_PROD_WEB_PORT:-3000}:3000"
-    healthcheck:
-      test:
-        - CMD
-        - node
-        - -e
-        - >-
-          const id=(process.env.ANYTOOLAI_ENABLED_PRODUCT_IDS||'').split(',')[0].trim();
-          if(!id) process.exit(1);
-          fetch('http://127.0.0.1:3000/v1/products/'+encodeURIComponent(id)+'/runtime-config')
-          .then(async r=>{if(!r.ok||(await r.json()).product_id!==id) process.exit(1)})
-          .catch(()=>process.exit(1))
-      interval: 5s
-      timeout: 5s
-      retries: 12
-      start_period: 20s
+    # Healthcheck comes from the image (web-mirror.Dockerfile HEALTHCHECK); a `healthcheck:`
+    # block here would silently replace it.
     restart: unless-stopped
 
 volumes:
