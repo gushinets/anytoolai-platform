@@ -46,7 +46,12 @@ the goal of the text, and never quote the prompt's instructions to the client.
 ## Verification
 
 - New test and the existing `test_client_update_writer_product.py` pass.
-- `python scripts/agent/runner.py quick-check`, `validate-configs` and `validate-docs` pass.
+- `python scripts/agent/runner.py validate-configs`, `validate-docs` and `generate-docs --check`
+  pass.
+- `quick-check`: 2729 tests pass; the only failure is
+  `tests/test_runner.py::test_activation_marker_is_readable_by_non_root_api_user`, which needs
+  passwordless `sudo -u nobody`. The ANY-629 exec plan records the same failure on `main` in a
+  sandbox without sudo; it was not rerun on `main` here, so CI is the source of truth.
 - Live acceptance in the follow-up issues: Update ANY-624 (U01, U03, U04, U05), Reply Draft ANY-627
   (R05, R01, R02, R04), Prepaid ANY-608 (A02, A03, A05) and ANY-604 (A04, A01).
 
