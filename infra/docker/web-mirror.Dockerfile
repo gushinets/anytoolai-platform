@@ -20,4 +20,12 @@ ENV NODE_ENV=production
 ENV ANYTOOLAI_WEB_BASE_PATH=$ANYTOOLAI_WEB_BASE_PATH
 COPY --from=build /app /app
 EXPOSE 3000
+# Next answers and its same-origin /v1/* rewrite reaches platform-api for the first enabled
+# product. Unhealthy while the API is down or ANYTOOLAI_ENABLED_PRODUCT_IDS is unset.
+HEALTHCHECK --interval=5s --timeout=5s --start-period=20s --retries=12 \
+    CMD ["node", "-e", "const id=(process.env.ANYTOOLAI_ENABLED_PRODUCT_IDS||'').split(',')[0].trim(); \
+if(!id) process.exit(1); \
+fetch('http://127.0.0.1:3000/v1/products/'+encodeURIComponent(id)+'/runtime-config') \
+.then(async r=>{if(!r.ok||(await r.json()).product_id!==id) process.exit(1)}) \
+.catch(()=>process.exit(1))"]
 CMD ["pnpm", "--filter", "@anytoolai/web-mirror", "exec", "next", "start", "-p", "3000"]
