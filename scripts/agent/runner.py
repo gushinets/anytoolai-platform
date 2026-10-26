@@ -2868,7 +2868,7 @@ def _prod_fake_ready(*, env: dict[str, str] | None = None) -> int:
     root_services = _prod_fake_root_services(env)
     if root_services:
         print(
-            f"PROD007: {', '.join(root_services)} must run as a non-root user (ANY-725)",
+            f"PROD010: {', '.join(root_services)} must run as a non-root user (ANY-725)",
             file=sys.stderr,
         )
         return 1

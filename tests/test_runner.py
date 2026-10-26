@@ -2170,7 +2170,7 @@ def test_prod_fake_ready_rejects_root_service(monkeypatch, capsys) -> None:
     monkeypatch.setattr(runner, "_prod_fake_root_services", lambda env: ["web-mirror"])
 
     assert runner._prod_fake_ready() == 1
-    assert "PROD007: web-mirror must run as a non-root user" in capsys.readouterr().err
+    assert "PROD010: web-mirror must run as a non-root user" in capsys.readouterr().err
 
 
 def test_prod_fake_root_services_flags_uid_zero_and_failed_exec(monkeypatch) -> None:
