@@ -13,12 +13,13 @@ RUN test -n "$NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS"
 RUN pnpm --filter @anytoolai/web-mirror build
 
 FROM node:24-slim AS runtime
-WORKDIR /app
-RUN corepack enable
+WORKDIR /app/apps/web-mirror
 ARG ANYTOOLAI_WEB_BASE_PATH
 ENV NODE_ENV=production
 ENV ANYTOOLAI_WEB_BASE_PATH=$ANYTOOLAI_WEB_BASE_PATH
 COPY --from=build /app /app
+RUN chown -R node:node .next
+USER node
 EXPOSE 3000
 # Next answers and its same-origin /v1/* rewrite reaches platform-api for the first enabled
 # product. Unhealthy while the API is down or ANYTOOLAI_ENABLED_PRODUCT_IDS is unset.
@@ -28,4 +29,4 @@ if(!id) process.exit(1); \
 fetch('http://127.0.0.1:3000/v1/products/'+encodeURIComponent(id)+'/runtime-config') \
 .then(async r=>{if(!r.ok||(await r.json()).product_id!==id) process.exit(1)}) \
 .catch(()=>process.exit(1))"]
-CMD ["pnpm", "--filter", "@anytoolai/web-mirror", "exec", "next", "start", "-p", "3000"]
+CMD ["node", "node_modules/next/dist/bin/next", "start", "-p", "3000"]
