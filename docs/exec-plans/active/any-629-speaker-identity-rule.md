@@ -98,8 +98,11 @@ Review follow-up (code-review #4):
   has or has not happened so far stays in the past, with that exact pair as the example.
 - "Use a plural" could invent a team for a solo freelancer. The plural is now allowed only where the
   input itself speaks in the plural; otherwise an impersonal or nominal phrase ("макеты отправлены").
-- Live rerun (CU-U-RU-10 and a solo-author update with impersonal notes, 6 runs each; the other
-  Client Update Writer cases and ProposalAI, checked for an invented "мы"): pending.
+- Merge with `main` (ANY-620 author-directions rule in the same four prompts): the first merge
+  resolution took `main`'s side and dropped this rule; it is restored next to the ANY-620 rule.
+- Live rerun on the merged code (CU-U-RU-10 and a solo-author update with impersonal notes, 6 runs
+  each; the other Client Update Writer cases and ProposalAI, checked for an invented "мы"):
+  pending. An earlier attempt did not run: the stack was stopped during it.
 
 ## Risks
 
