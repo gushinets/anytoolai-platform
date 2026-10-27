@@ -45,6 +45,8 @@ the goal of the text, and never quote the prompt's instructions to the client.
 - The test lists the ProposalAI path.
 - After the first P01 live run the rule says "not even as your own plan or offer" in all four
   prompts (see the decision log).
+- After the second P01 live run the ProposalAI `Price and terms:` closing-formula bullet also bans
+  saying when or how price, cost or timing will be discussed or agreed (ProposalAI only).
 
 ## Out of scope
 
@@ -68,10 +70,13 @@ the goal of the text, and never quote the prompt's instructions to the client.
   - First wording: the prompt was quoted in none of the 3 runs and no run named a price or a
     timeline, but run 2 retold the direction ("обсудить детали проекта без предварительного
     определения цены и сроков").
-  - Refined wording: the prompt was quoted in none of the 3 runs, no run named a price or a timeline
-    and none retold the direction. Run 2 closed with "После этого можно согласовать стоимость и
-    сроки", which follows the direction as a next step; it breaks the existing "no estimate or
-    timeline as a closing formula" rule, not this one.
+  - Refined wording: the prompt was quoted in none of the 3 runs and no run named a price or a
+    timeline, but run 2 closed with "После этого можно согласовать стоимость и сроки": the
+    direction surfaced as a next-step offer (PR review: blocking).
+  - Refined wording plus the `Price and terms:` ban: the prompt was quoted in none of the 3 runs, no
+    run named a price or a timeline, and none mentioned price, cost or timing or when they would be
+    agreed. Out of scope, seen in passing: a long dash in run 2 ("Следующий шаг — созвон") and a
+    gendered "я делал" in run 3.
 
 ## Decision log
 
@@ -82,6 +87,11 @@ the goal of the text, and never quote the prompt's instructions to the client.
 
 - 2026-10-27: after P01 run 2 retold the direction as the freelancer's own plan, the rule adds
   "not even as your own plan or offer" in all four prompts; the test carries the new wording.
+
+- 2026-10-27: the PR review rejected "После этого можно согласовать стоимость и сроки" as the
+  direction surfacing as an offer. The fix extends ProposalAI's own closing-formula bullet in
+  `Price and terms:` instead of the shared rule, so the Client Update Writer prompts and the
+  verbatim test stay as they are.
 
 ## Risks
 
