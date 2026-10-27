@@ -6,9 +6,9 @@
 - Owner: agent
 - Linear: ANY-629
 - Created: 2026-10-22
-- Last updated: 2026-10-23
+- Last updated: 2026-10-27
 - Review date: 2026-10-29
-- Next action: review and merge PR #198, then confirm the behavior in the ANY-631 live acceptance run.
+- Next action: review and merge the reopen fix (gendered past tense and "чтобы я ..."), then move this plan to `completed/`.
 - Blocker: none
 
 ## Goal
@@ -47,6 +47,31 @@ The freelancer's name and gender are not in the input, yet the models introduce 
 - Live acceptance (ANY-631, needs `OPENAI_API_KEY`): P01 has no "Меня зовут …" and no "Готова", P02
   has no signature placeholder, no result contains "мог(ла)" or "готов(а)", and `warm` tone still
   reads naturally with neutral constructions.
+
+## Reopen 2026-10-27: gendered verbs in live outputs
+
+Basic acceptance on GPT-6 Luna still produced speaker gender without it in the input: "чтобы я мог
+изучить", "чтобы я начал", "чтобы я мог перейти", "новую дату пока не обещал", "я сама задаю". The
+rule named only adjectives ("готов(а)", "мог(ла)"), so the model did not treat the past tense,
+"чтобы я" with a verb and "сам"/"сама" as gendered.
+
+- The shared rule now names those forms and gives neutral replacements (present or future tense,
+  impersonal phrases), keeps the stated-gender exception and says to change wording, not facts.
+- ProposalAI: the closing request ("Пришлите ..., чтобы я ...") is where the form slipped, so the
+  `Structure` next-step line gives the neutral closing; the old Russian line in `Language` now points
+  to the shared rule instead of repeating a weaker copy.
+
+Live check on the dev live stack (synthetic inputs modelled on the reopen cases, `warm` tone):
+
+| Product | Before (`main`) | After |
+| -- | -- | -- |
+| ProposalAI, no stated gender | 3 of 6 runs gendered ("чтобы я мог", "чтобы я начал", "чтобы я приступил") | 0 of 10 |
+| ProposalAI, feminine author stated | feminine forms kept | feminine forms kept ("работала", "сделала") |
+| Client Update Writer update, reply draft | 0 of 9 (cases did not reproduce) | 0 of 18 |
+| Client Update Writer prepaid request | not run | 0 of 5 |
+
+Facts, amounts, dates and actions stayed as in the input. Client Update Writer did not reproduce on
+these inputs before the fix, so its result shows no regression, not a fix.
 
 ## Risks
 

@@ -18,9 +18,14 @@ RULE = (
     "not sign off with a name, a role or contact details unless the input explicitly gives them as "
     "the freelancer's own (a name or signature in the client's message is the client's, not "
     "yours): the input is the only source of such facts, so open with the point. In "
-    "languages that mark the speaker's gender (for example Russian, Spanish, French), use "
-    'constructions that do not: "я могу", "у меня есть опыт", "я сделаю"; never "готов(а)", '
-    '"мог(ла)", "Готова" or "Готов" unless the input states the speaker\'s gender.'
+    "languages that mark the speaker's gender (for example Russian, Spanish, French), write about "
+    "yourself only in forms that do not, unless the input states the speaker's gender. In Russian "
+    'the first-person past tense (with or without "я"), "чтобы я" with a verb and "сам"/"сама" '
+    'mark gender just like "готов"/"готова": use the present or future tense or an impersonal '
+    'phrase ("я могу", "у меня есть опыт", "я сделаю", "после этого начну", "чтобы начать работу", '
+    '"новую дату пока не обещаю", "требования задаю я"), never "готов(а)", "мог(ла)", "чтобы я '
+    'мог", "чтобы я начал", "не обещал", "я сама" or "Готова". Change the wording, not the facts, '
+    "amounts, dates or actions."
 )
 
 
