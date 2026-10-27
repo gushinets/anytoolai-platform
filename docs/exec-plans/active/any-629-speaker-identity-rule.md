@@ -92,6 +92,15 @@ request): 0 of 16 gendered. CU-U-RU-10 keeps "новую дату заверше
 runs; one run wrote "пока не обещаем" (present tense, still not gendered), so the tense rule is
 not a guarantee either.
 
+Review follow-up (code-review #4):
+
+- CU-U-RU-10 turned "пока не обещали" into "пока не обещаем" in 1 of 4 runs. The rule now says what
+  has or has not happened so far stays in the past, with that exact pair as the example.
+- "Use a plural" could invent a team for a solo freelancer. The plural is now allowed only where the
+  input itself speaks in the plural; otherwise an impersonal or nominal phrase ("макеты отправлены").
+- Live rerun (CU-U-RU-10 and a solo-author update with impersonal notes, 6 runs each; the other
+  Client Update Writer cases and ProposalAI, checked for an invented "мы"): pending.
+
 ## Risks
 
 - A prompt rule is not a guarantee: the model may still sign or use gender. The Russian gender line
