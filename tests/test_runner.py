@@ -2154,6 +2154,7 @@ def test_prod_fake_ready_waits_for_health(monkeypatch) -> None:
         return Response()
 
     monkeypatch.setattr(runner.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(runner, "_prod_fake_root_services", lambda env: [])
 
     assert runner._prod_fake_ready() == 0
     assert requested_urls == [
@@ -2161,6 +2162,31 @@ def test_prod_fake_ready_waits_for_health(monkeypatch) -> None:
         "http://127.0.0.1:3000/",
         "http://127.0.0.1:3000/v1/products/kernel_demo/runtime-config",
     ]
+
+
+def test_prod_fake_ready_rejects_root_service(monkeypatch, capsys) -> None:
+    runner = load_runner_module()
+    monkeypatch.setattr(runner, "_wait_for_http_ok", lambda url, timeout: True)
+    monkeypatch.setattr(runner, "_prod_fake_root_services", lambda env: ["web-mirror"])
+
+    assert runner._prod_fake_ready() == 1
+    assert "PROD010: web-mirror must run as a non-root user" in capsys.readouterr().err
+
+
+def test_prod_fake_root_services_flags_uid_zero_and_failed_exec(monkeypatch) -> None:
+    runner = load_runner_module()
+    results = {"platform-worker": ("999\n", 0), "web-mirror": ("0\n", 0)}
+
+    def fake_run(command, **kwargs):
+        stdout, code = results[command[command.index("-T") + 1]]
+        return subprocess.CompletedProcess(command, code, stdout, "")
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    assert runner._prod_fake_root_services({}) == ["web-mirror"]
+    results["web-mirror"] = ("", 1)
+    assert runner._prod_fake_root_services({}) == ["web-mirror"]
+    results["web-mirror"] = ("1000\n", 0)
+    assert runner._prod_fake_root_services({}) == []
 
 
 def test_prod_fake_ready_rejects_unhealthy_web(monkeypatch, capsys) -> None:
@@ -2184,6 +2210,7 @@ def test_prod_fake_ready_uses_prod_port_variable_not_dev_port(monkeypatch) -> No
     monkeypatch.setenv("ANYTOOLAI_PROD_API_PORT", "18900")
     monkeypatch.setenv("ANYTOOLAI_PROD_WEB_PORT", "19300")
     monkeypatch.delenv("ANYTOOLAI_READY_TIMEOUT", raising=False)
+    monkeypatch.setattr(runner, "_prod_fake_root_services", lambda env: [])
 
     class Response:
         status = 200

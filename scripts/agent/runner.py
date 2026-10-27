@@ -45,7 +45,7 @@ PROD_COMPOSE_PROJECT = "anytoolai-prod"
 PROD_FAKE_COMPOSE_PROJECT = "anytoolai-prod-fake"
 ATOM_LAB_COMPOSE_PROJECT = "anytoolai-atom-lab"
 PROFILE_VERSION_HEX_LENGTH = 32
-# The non-root API user is not the operator who writes this non-secret state.
+# The non-root API and worker users are not the operator who writes this non-secret state.
 # umask must not leave the bind-mounted directory or marker owner-only.
 ACTIVATION_STATE_DIRECTORY_MODE = 0o755
 ACTIVATION_MARKER_FILE_MODE = 0o644
@@ -56,6 +56,7 @@ DEV_DEFAULT_POSTGRES_DB = "anytoolai"
 # Bounds `docker compose ps` calls when the Docker daemon is unresponsive. `down` needs longer
 # than the worker's 60s stop grace period; `up`/`--build` can take minutes on a cold build.
 COMPOSE_QUERY_TIMEOUT_SECONDS = 60
+PROD_NON_ROOT_SERVICES = ("platform-worker", "web-mirror")
 COMPOSE_STACK_QUERY_TIMEOUT_SECONDS = 10
 COMPOSE_TEARDOWN_TIMEOUT_SECONDS = 180
 # `doctor`'s tool probes are a one-off diagnostic, not a hot path, so this is generous on purpose:
@@ -2824,6 +2825,24 @@ def _stop_failed_prod_fake_candidate() -> None:
         )
 
 
+def _prod_fake_root_services(env: dict[str, str]) -> list[str]:
+    """Return the production services whose container process runs as UID 0 (or cannot be read)."""
+    root_services = []
+    for service in PROD_NON_ROOT_SERVICES:
+        completed = subprocess.run(
+            [*_prod_fake_compose_command(), "exec", "-T", service, "id", "-u"],
+            cwd=ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
+        )
+        if completed.returncode != 0 or completed.stdout.strip() in {"", "0"}:
+            root_services.append(service)
+    return root_services
+
+
 def _prod_fake_ready(*, env: dict[str, str] | None = None) -> int:
     try:
         if env is None:
@@ -2846,6 +2865,13 @@ def _prod_fake_ready(*, env: dict[str, str] | None = None) -> int:
                 file=sys.stderr,
             )
             return 1
+    root_services = _prod_fake_root_services(env)
+    if root_services:
+        print(
+            f"PROD010: {', '.join(root_services)} must run as a non-root user (ANY-725)",
+            file=sys.stderr,
+        )
+        return 1
     print(f"API: http://127.0.0.1:{api_port}")
     print(f"Web: http://127.0.0.1:{web_port}")
     print("Credential-free production smoke environment is ready")
