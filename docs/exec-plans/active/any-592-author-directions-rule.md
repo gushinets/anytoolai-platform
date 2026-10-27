@@ -77,6 +77,14 @@ the goal of the text, and never quote the prompt's instructions to the client.
     run named a price or a timeline, and none mentioned price, cost or timing or when they would be
     agreed. Out of scope, seen in passing: a long dash in run 2 ("Следующий шаг — созвон") and a
     gendered "я делал" in run 3.
+  - Same prompt, second round with the ANY-631 P02 regression check (EN, neutral): P01 x3 clean
+    (no quoted prompt, no price, timing or "when it will be agreed"); P02 x3 kept "Your budget
+    ceiling is USD 1,200" and "the final fee must be agreed after inspecting the theme" with its
+    status in every run.
+  - Rejected variant (not committed): an exception "a condition the client states about when or how
+    the price or timing is agreed is the client's term" kept P02 x3 but broke P01 x3: every run
+    retold the freelancer's direction as such a condition ("Цену и сроки обсудим отдельно", "Цену
+    и сроки не указываю до обсуждения", "Цену и сроки обсудим после этого").
 
 ## Decision log
 
@@ -92,6 +100,10 @@ the goal of the text, and never quote the prompt's instructions to the client.
   direction surfacing as an offer. The fix extends ProposalAI's own closing-formula bullet in
   `Price and terms:` instead of the shared rule, so the Client Update Writer prompts and the
   verbatim test stay as they are.
+- 2026-10-27: the PR re-review feared the ban would drop a client's fee condition (P02 "final fee
+  must be agreed after inspecting the theme"). P02 x3 on the committed prompt kept it every time;
+  an explicit exception for client-stated price or timing conditions broke P01 x3, because the
+  freelancer's direction and the client's order share `task_text`. The ban stays unchanged.
 
 ## Risks
 
@@ -105,6 +117,9 @@ the goal of the text, and never quote the prompt's instructions to the client.
   may answer a direction as the client's request ("as you asked, without a price"). P01 shows it.
 - "These instructions" may be read as the freelancer's directions, not the prompt's. P01 did not
   quote the prompt in 6 runs; if it does later, the last sentence changes in every prompt.
+- The `Price and terms:` ban could still suppress a client-stated condition about when the price
+  or timing is agreed in an order unlike P02; the "Scope and conditions from the order" rules are
+  the only guard. ANY-631 P02 shows it live.
 - The refined wording reaches the Client Update Writer prompts without their own live rerun; their
   acceptance issues (ANY-624, ANY-627, ANY-608, ANY-604) run on it.
 - Changing the wording after live touches every prompt that carries it; the test keeps them in sync.
