@@ -43,6 +43,9 @@ py-modules = []
 
 [tool.uv]
 default-groups = ["dev"]
+# litellm pins filelock<4.0 and 3.x has no fix for GHSA-v4x8-3wr5-3wq8 (CVE-2026-112940).
+# Remove once litellm allows filelock 4.x.
+override-dependencies = ["filelock>=4.2.1,<5"]
 
 [tool.ruff]
 target-version = "py312"
