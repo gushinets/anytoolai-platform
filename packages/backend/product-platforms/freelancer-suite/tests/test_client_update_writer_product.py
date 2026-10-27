@@ -751,3 +751,23 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     assert "without stating or endorsing any value" in prompt
     assert '"Net 30 after invoice"' in prompt
     assert "Rules A–C never ask the client to report a payment" in prompt
+
+
+# ANY-625: the Reply Draft reply states every fact, decision and promised action from `intent`
+# (QA R05 lost "I will send a corrected invoice") and every constraint the client states (R04 lost
+# "don't add pages"). Only live runs (ANY-627) prove the behavior; this pins the rule text.
+def test_reply_draft_prompt_states_every_intent_item_and_client_constraint() -> None:
+    prompt = " ".join(
+        _load_prompt_template("client_update_writer.reply_draft_compose_reply.v1").split()
+    )
+
+    for fragment in (
+        "Directly address each specific point raised in `situation` (every question, request "
+        "and constraint the client states",
+        "State in `text` every fact, decision and action `intent` gives for the client",
+        "each with its exact value, even when `situation` did not ask about it",
+        "Such a fact, decision or promised action is content for the client, not a direction to "
+        "you; only a direction about how to write the reply",
+        "is followed without being stated",
+    ):
+        assert fragment in prompt, fragment
