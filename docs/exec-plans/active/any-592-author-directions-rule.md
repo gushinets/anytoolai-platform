@@ -8,8 +8,7 @@
 - Created: 2026-10-26
 - Last updated: 2026-10-27
 - Review date: 2026-11-02
-- Next action: ANY-620 copies the rule into ProposalAI (PR #219); review and merge the ANY-621 PR,
-  then run B04 live three times.
+- Next action: review and merge the ANY-621 PR (#220).
 - Blocker: none
 
 ## Goal
@@ -77,7 +76,6 @@ the goal of the text, and never quote the prompt's instructions to the client.
 
 ## Out of scope
 
-- ProposalAI client-text prompt (ANY-620).
 - Other B04 defects (`deliverables`, quotes in `evidence`): ANY-590, acceptance ANY-614.
 - Other defects of the same QA cases: completeness and units in U01/U03/U05 (ANY-593, ANY-623),
   R05 actions (ANY-594, ANY-625), A02 payment terms (ANY-589, ANY-605), A04 (ANY-588).

@@ -1,4 +1,4 @@
-"""Client-facing prompts carry the same author-directions rule (ANY-592, ANY-619, ANY-620)."""
+"""Freelancer prompts carry the same author-directions rules (ANY-592, ANY-619-ANY-621)."""
 
 from pathlib import Path
 
