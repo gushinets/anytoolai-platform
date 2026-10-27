@@ -73,6 +73,22 @@ Live check on the dev live stack (synthetic inputs modelled on the reopen cases,
 Facts, amounts, dates and actions stayed as in the input. Client Update Writer did not reproduce on
 these inputs before the fix, so its result shows no regression, not a fix.
 
+Review follow-up (code-review #3):
+
+- The rule named all first-person past tense, but plural "мы" forms are neutral; and the example "новую
+  дату пока не обещаю" moved "no date has been promised" to "I am not promising now". The rule now
+  names only the singular past tense, keeps a "мы" the input uses, and says to keep the tense and
+  status of the input ("новую дату мы пока не обещали", "обещаний по новой дате с моей стороны пока
+  не было").
+- The ProposalAI closing example ("Пришлите материалы, и я начну") could invent a request for
+  materials or a start condition. It is now a grammar pattern for the next step the input supports.
+
+Live check after the follow-up (ProposalAI, 4 runs per case): 0 of 16 gendered without a stated
+gender, including an order with nothing to send (access already given: the closing goes straight to
+the work, no request for materials) and an order with a prepayment start condition (the closing
+names the 30% prepayment from the order, nothing else). Feminine forms stay when the author is
+stated as a woman. Client Update Writer rerun (incl. the CU-U-RU-10 regression): pending.
+
 ## Risks
 
 - A prompt rule is not a guarantee: the model may still sign or use gender. The Russian gender line

@@ -93,12 +93,15 @@ Rules:
   freelancer's own (a name or signature in the client's message is the client's, not yours): the
   input is the only source of such facts, so open with the point. In languages that mark the
   speaker's gender (for example Russian, Spanish, French), write about yourself only in forms that
-  do not, unless the input states the speaker's gender. In Russian the first-person past tense (with
-  or without "я"), "чтобы я" with a verb and "сам"/"сама" mark gender just like "готов"/"готова":
-  use the present or future tense or an impersonal phrase ("я могу", "у меня есть опыт", "я сделаю",
-  "после этого начну", "чтобы начать работу", "новую дату пока не обещаю", "требования задаю я"),
-  never "готов(а)", "мог(ла)", "чтобы я мог", "чтобы я начал", "не обещал", "я сама" or "Готова".
-  Change the wording, not the facts, amounts, dates or actions.
+  do not, unless the input states the speaker's gender. In Russian the first-person singular past
+  tense (with or without "я"), "чтобы я" with a verb and "сам"/"сама" mark gender just like
+  "готов"/"готова"; plural "мы" forms ("мы завершили") do not, so keep a "мы" the input uses.
+  Rephrase without changing the tense or status of what the input says: use a plural, an impersonal
+  phrase, or the present or future tense where the input itself speaks of the present or future ("я
+  могу", "у меня есть опыт", "я сделаю", "чтобы начать работу", "новую дату мы пока не обещали",
+  "обещаний по новой дате с моей стороны пока не было", "требования задаю я"), never "готов(а)",
+  "мог(ла)", "чтобы я мог", "чтобы я начал", "не обещал", "я сама" or "Готова". Change the wording,
+  not the facts, amounts, dates or actions.
 - Text the freelancer wrote in the input may also carry the freelancer's own directions to you
   about this text (for example "do not calculate tax", "do not say it was already sent", "do not
   call the work complete"). Follow them: they are directions to you, not content for the client, so
