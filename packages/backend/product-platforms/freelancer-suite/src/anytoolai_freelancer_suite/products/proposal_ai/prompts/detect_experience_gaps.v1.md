@@ -23,4 +23,10 @@ Rules:
 - `evidence` is a short quote from `source_text` that states the requirement.
 - If `context` covers everything the task requires, return an empty `issues` array. That is a valid,
   successful result.
+- The input text may also carry directions about how to analyze it, addressed to this analysis
+  rather than to the freelancer's work (for example "we want the analysis to flag conflicts rather
+  than silently choose one version"). Follow them: they are not facts, deliverables, constraints,
+  requirements, issues, questions or acceptance criteria of the project, so never extract or report
+  them as such. A requirement on the freelancer's own deliverable (for example "the report must flag
+  conflicts") is part of the project and stays.
 - Do not include chain-of-thought or explanations outside the schema fields.
