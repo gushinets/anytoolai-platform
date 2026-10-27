@@ -87,7 +87,10 @@ Live check after the follow-up (ProposalAI, 4 runs per case): 0 of 16 gendered w
 gender, including an order with nothing to send (access already given: the closing goes straight to
 the work, no request for materials) and an order with a prepayment start condition (the closing
 names the 30% prepayment from the order, nothing else). Feminine forms stay when the author is
-stated as a woman. Client Update Writer rerun (incl. the CU-U-RU-10 regression): pending.
+stated as a woman. Client Update Writer (4 runs per case, update, reply draft and prepaid
+request): 0 of 16 gendered. CU-U-RU-10 keeps "новую дату завершения пока не обещали" in 3 of 4
+runs; one run wrote "пока не обещаем" (present tense, still not gendered), so the tense rule is
+not a guarantee either.
 
 ## Risks
 
