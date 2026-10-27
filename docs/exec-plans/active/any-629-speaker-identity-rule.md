@@ -101,8 +101,11 @@ Review follow-up (code-review #4):
 - Merge with `main` (ANY-620 author-directions rule in the same four prompts): the first merge
   resolution took `main`'s side and dropped this rule; it is restored next to the ANY-620 rule.
 - Live rerun on the merged code (CU-U-RU-10 and a solo-author update with impersonal notes, 6 runs
-  each; the other Client Update Writer cases and ProposalAI, checked for an invented "мы"):
-  pending. An earlier attempt did not run: the stack was stopped during it.
+  each; the other Client Update Writer cases, 2 runs each; ProposalAI, 3 runs per case, checked
+  for an invented "мы"): CU-U-RU-10 keeps "новую дату завершения пока не обещали" in 6 of 6
+  runs; the solo-author update stays singular or impersonal in 6 of 6 ("макеты отправлены",
+  "жду", no "мы"); 0 gendered forms and no invented "мы" in the other 6 Client Update Writer
+  and 12 ProposalAI runs.
 
 ## Risks
 
