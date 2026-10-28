@@ -6,9 +6,9 @@
 - Owner: agent
 - Linear: ANY-629
 - Created: 2026-10-22
-- Last updated: 2026-10-23
+- Last updated: 2026-10-27
 - Review date: 2026-10-29
-- Next action: review and merge PR #198, then confirm the behavior in the ANY-631 live acceptance run.
+- Next action: review and merge the reopen fix (gendered past tense and "чтобы я ..."), then move this plan to `completed/`.
 - Blocker: none
 
 ## Goal
@@ -47,6 +47,65 @@ The freelancer's name and gender are not in the input, yet the models introduce 
 - Live acceptance (ANY-631, needs `OPENAI_API_KEY`): P01 has no "Меня зовут …" and no "Готова", P02
   has no signature placeholder, no result contains "мог(ла)" or "готов(а)", and `warm` tone still
   reads naturally with neutral constructions.
+
+## Reopen 2026-10-27: gendered verbs in live outputs
+
+Basic acceptance on GPT-6 Luna still produced speaker gender without it in the input: "чтобы я мог
+изучить", "чтобы я начал", "чтобы я мог перейти", "новую дату пока не обещал", "я сама задаю". The
+rule named only adjectives ("готов(а)", "мог(ла)"), so the model did not treat the past tense,
+"чтобы я" with a verb and "сам"/"сама" as gendered.
+
+- The shared rule now names those forms and gives neutral replacements (present or future tense,
+  impersonal phrases), keeps the stated-gender exception and says to change wording, not facts.
+- ProposalAI: the closing request ("Пришлите ..., чтобы я ...") is where the form slipped, so the
+  `Structure` next-step line gives the neutral closing; the old Russian line in `Language` now points
+  to the shared rule instead of repeating a weaker copy.
+
+Live check on the dev live stack (synthetic inputs modelled on the reopen cases, `warm` tone):
+
+| Product | Before (`main`) | After |
+| -- | -- | -- |
+| ProposalAI, no stated gender | 3 of 6 runs gendered ("чтобы я мог", "чтобы я начал", "чтобы я приступил") | 0 of 10 |
+| ProposalAI, feminine author stated | feminine forms kept | feminine forms kept ("работала", "сделала") |
+| Client Update Writer update, reply draft | 0 of 9 (cases did not reproduce) | 0 of 18 |
+| Client Update Writer prepaid request | not run | 0 of 5 |
+
+Facts, amounts, dates and actions stayed as in the input. Client Update Writer did not reproduce on
+these inputs before the fix, so its result shows no regression, not a fix.
+
+Review follow-up (code-review #3):
+
+- The rule named all first-person past tense, but plural "мы" forms are neutral; and the example "новую
+  дату пока не обещаю" moved "no date has been promised" to "I am not promising now". The rule now
+  names only the singular past tense, keeps a "мы" the input uses, and says to keep the tense and
+  status of the input ("новую дату мы пока не обещали", "обещаний по новой дате с моей стороны пока
+  не было").
+- The ProposalAI closing example ("Пришлите материалы, и я начну") could invent a request for
+  materials or a start condition. It is now a grammar pattern for the next step the input supports.
+
+Live check after the follow-up (ProposalAI, 4 runs per case): 0 of 16 gendered without a stated
+gender, including an order with nothing to send (access already given: the closing goes straight to
+the work, no request for materials) and an order with a prepayment start condition (the closing
+names the 30% prepayment from the order, nothing else). Feminine forms stay when the author is
+stated as a woman. Client Update Writer (4 runs per case, update, reply draft and prepaid
+request): 0 of 16 gendered. CU-U-RU-10 keeps "новую дату завершения пока не обещали" in 3 of 4
+runs; one run wrote "пока не обещаем" (present tense, still not gendered), so the tense rule is
+not a guarantee either.
+
+Review follow-up (code-review #4):
+
+- CU-U-RU-10 turned "пока не обещали" into "пока не обещаем" in 1 of 4 runs. The rule now says what
+  has or has not happened so far stays in the past, with that exact pair as the example.
+- "Use a plural" could invent a team for a solo freelancer. The plural is now allowed only where the
+  input itself speaks in the plural; otherwise an impersonal or nominal phrase ("макеты отправлены").
+- Merge with `main` (ANY-620 author-directions rule in the same four prompts): the first merge
+  resolution took `main`'s side and dropped this rule; it is restored next to the ANY-620 rule.
+- Live rerun on the merged code (CU-U-RU-10 and a solo-author update with impersonal notes, 6 runs
+  each; the other Client Update Writer cases, 2 runs each; ProposalAI, 3 runs per case, checked
+  for an invented "мы"): CU-U-RU-10 keeps "новую дату завершения пока не обещали" in 6 of 6
+  runs; the solo-author update stays singular or impersonal in 6 of 6 ("макеты отправлены",
+  "жду", no "мы"); 0 gendered forms and no invented "мы" in the other 6 Client Update Writer
+  and 12 ProposalAI runs.
 
 ## Risks
 
