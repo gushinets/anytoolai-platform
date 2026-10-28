@@ -130,6 +130,13 @@ the goal of the text, and never quote the prompt's instructions to the client.
     runs and greets Jordan in only 1 of 6 (ANY-589, ANY-605); U04 never shows the internal
     note against the checklist as a contradiction (ANY-593, ANY-623); the third Spanish U04 run
     asks the hold question twice, in `text` and in `call_to_action`.
+- ANY-592 R05 rerun after ANY-625 (#222) changed the Reply Draft prompt, 2026-10-28 (PR review:
+  blocking; branch at `31fc11ff`, which contains `5cd6d894`, same setup as above):
+  - R05 (RU) x3 and R05 in Spanish x3: every run admits the typo, promises to send the corrected
+    invoice and never says it was already sent; no direction is retold and the prompt is not
+    quoted; `call_to_action` is empty in all six.
+  - Borderline, not a retelling: the third Spanish run says "le avisaré únicamente si es posible
+    adelantar la entrega", carrying "prometer solo avisar" over too literally.
 - Live acceptance in the follow-up issues: Update ANY-624 (U01, U03, U04, U05), Reply Draft ANY-627
   (R05, R01, R02, R04), Prepaid ANY-608 (A02, A03, A05) and ANY-604 (A04, A01).
 - ProposalAI P01 live x3 (ANY-620, RU, warm, input verbatim from ANY-631), 2026-10-27:
