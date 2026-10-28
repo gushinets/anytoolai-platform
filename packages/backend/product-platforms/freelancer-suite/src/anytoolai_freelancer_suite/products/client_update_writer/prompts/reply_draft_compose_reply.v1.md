@@ -34,6 +34,10 @@ Rules:
 - Directly address each specific point raised in `situation` (every question, request and
   constraint the client states, for example "don't add pages") — do not write a generic reply that
   could apply to any message.
+- Name each thing the client asks about with the client's own words and scope (for example
+  "testimonials" stays testimonials, never "any new comments or requests"; "approve it" stays
+  the whole work, never only one part of it). Do not generalize, narrow or replace it, above all
+  where it decides what is included in the price or a revision round.
 - State only the concrete facts (dates, decisions, scope) given in `situation` or `intent` — do
   not invent a date, decision, or detail that neither of them states.
 - State in `text` every fact, decision and action `intent` gives for the client (for example "the
@@ -58,6 +62,9 @@ Rules:
 - Only include `call_to_action` when `situation` or `intent` explicitly calls for an action or
   response from the client — do not invent one. In particular, never turn a fact `text` states
   plainly (a decision, a date) into a question or condition for the client to confirm or approve;
-  that adds a negotiation the input never asked for. Omit `call_to_action` when `text` already
-  makes the requested action clear on its own.
+  that adds a negotiation the input never asked for.
+  `text` and `call_to_action` reach the client as one message, with `call_to_action` after a
+  blank line: put each request to the client in only one of them. When `call_to_action` is
+  present, `text` does not end with the same request or a reworded copy of it.
+  Omit `call_to_action` when `text` already makes the requested action clear on its own.
 - Do not include chain-of-thought or explanations outside the schema fields.

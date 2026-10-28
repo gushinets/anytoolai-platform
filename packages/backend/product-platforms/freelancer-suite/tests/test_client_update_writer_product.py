@@ -771,3 +771,35 @@ def test_reply_draft_prompt_states_every_intent_item_and_client_constraint() -> 
         "is followed without being stated",
     ):
         assert fragment in prompt, fragment
+
+
+# ANY-626: Reply Draft names what the client asks about in the client's own words and scope (QA
+# R01 turned "testimonials" into "any new comments or requests"). Live runs prove it (ANY-627).
+def test_reply_draft_prompt_keeps_the_client_subject_and_scope() -> None:
+    prompt = " ".join(
+        _load_prompt_template("client_update_writer.reply_draft_compose_reply.v1").split()
+    )
+
+    assert "Name each thing the client asks about with the client's own words and scope" in prompt
+    assert "Do not generalize, narrow or replace it" in prompt
+
+
+# ANY-626: the frontend appends `call_to_action` to `text`, so a request stated in both reaches the
+# client twice (QA R01, R02). Update composes the same two fields, so it carries the same rule.
+@pytest.mark.parametrize(
+    "prompt_ref",
+    [
+        "client_update_writer.reply_draft_compose_reply.v1",
+        "client_update_writer.update_compose_reply.v1",
+    ],
+)
+def test_compose_reply_prompt_states_each_client_request_once(prompt_ref: str) -> None:
+    prompt = " ".join(_load_prompt_template(prompt_ref).split())
+
+    for fragment in (
+        "`text` and `call_to_action` reach the client as one message, with `call_to_action` after "
+        "a blank line: put each request to the client in only one of them.",
+        "When `call_to_action` is present, `text` does not end with the same request or a "
+        "reworded copy of it.",
+    ):
+        assert fragment in prompt, fragment

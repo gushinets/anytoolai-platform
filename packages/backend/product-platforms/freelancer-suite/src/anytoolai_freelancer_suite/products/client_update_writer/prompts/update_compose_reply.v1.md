@@ -54,4 +54,7 @@ Rules:
 - Only include `call_to_action` when the client needs to do something before the next update (for
   example confirm a decision or provide missing information). Omit it when no client action is
   needed yet.
+  `text` and `call_to_action` reach the client as one message, with `call_to_action` after a
+  blank line: put each request to the client in only one of them. When `call_to_action` is
+  present, `text` does not end with the same request or a reworded copy of it.
 - Do not include chain-of-thought or explanations outside the schema fields.
