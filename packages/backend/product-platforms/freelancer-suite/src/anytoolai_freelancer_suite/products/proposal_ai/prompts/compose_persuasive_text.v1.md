@@ -39,14 +39,15 @@ Scope and conditions from the order:
 
 Terms:
 
-`context.task_text` is written by the freelancer: it carries the client's request and may also
-carry the freelancer's own decisions about it (see the rule on the freelancer's directions in
-"Form"). A term is a price or budget, a payment split, a deadline or duration, a limit such as
-the number of revision rounds, or a guarantee. The work the client asks for (pages, templates,
-blocks, documents) is scope, not a term: offer it as your work under "Scope and conditions from the
-order", without calling it proposed or not agreed. This section is the only rule for terms and their
-values. Give each term the status of the first rule below that applies, and make that status
-explicit in the text, never leave it implied by merely restating the term:
+`context.task_text` is written by the freelancer: it carries the client's request and may also carry
+the freelancer's own decisions about it (see the rule on the freelancer's directions in "Form"). A
+term is a condition of the deal: a price or budget, a payment split, a delivery date or deadline,
+the length of the engagement, a limit such as the number of revision rounds, or a guarantee. What
+the client asks you to deliver is scope, not a term, including its size or length (6 templates, a
+45-minute handover, 600 to 800 characters per card): offer it as your work under "Scope and
+conditions from the order", without calling it proposed or not agreed. This section is the only rule
+for terms and their values. Give each term the status of the first rule below that applies, and make
+that status explicit in the text, never leave it implied by merely restating the term:
 
 1. The freelancer decides it: `context.freelancer_positioning` or the freelancer's own direction
    in `context.task_text` accepts it, declines it or makes a counteroffer with a concrete value

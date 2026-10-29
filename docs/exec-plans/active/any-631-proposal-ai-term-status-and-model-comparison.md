@@ -102,8 +102,7 @@ The gaps language defect (ANY-771), Docker dependency cache (ANY-770), changing 
     agreed" x 3: the second round is not accepted, the agreed one round stays.
   - These were short API probes on `luna/medium` of a prompt that code review #2 then found still
     inconsistent; they are superseded by the web-form regression of the final prompt on both
-    finalists (in progress, recorded here when it completes) and are not evidence for the final
-    prompt.
+    finalists below and are not evidence for the final prompt.
 - Code review #2: the status of a client term was defined in five places (a sentence in the limits
   rule, the three-status rule, "Amounts and dates the client states", and the value whitelist and
   "is not your offer" under "Price and terms"), so every fix to one place contradicted another. The
@@ -121,20 +120,32 @@ The gaps language defect (ANY-771), Docker dependency cache (ANY-770), changing 
   non-Cyrillic text English and skipped Spanish, so whole Spanish, Dutch and German answers passed.
   Both are replaced, not patched:
   - Each order lists its terms with the expected status (`not_accepted`, `agreed`, `accepted`,
-    `offered`, `open`). In every sentence that names a term's value, the status marker nearest to the
-    value decides: an acceptance, a refusal (an acceptance word after a negation or a refusal verb,
-    "decline", "does not cover", "нереален"), the client's proposal ("proposed", a ceiling) or an
-    open term ("will be agreed after the call"). Nearest, because a governing verb covers a list
-    while an unrelated "agreed in advance" in the same sentence must not decide the term. Markers
-    exist for EN, RU and ES.
+    `offered`, `open`); the verdict per term is ok, error or unverified (code review #4: a two-valued
+    oracle turned every ambiguity into a silent pass). A status marker is an acceptance, a refusal,
+    the client's proposal ("proposed", a ceiling), an open term ("will be agreed after the call") or
+    an offer, with markers for EN, RU and ES. A negation counts only when bound to the verb: at most
+    two words in between and no comma, colon, semicolon or "but", so "I do not code, but I accept
+    your budget" is an acceptance. The markers in the value's own clause decide; with none there the
+    sentence decides when its markers all point one way, otherwise the mention is unverified.
+    `not_accepted` needs an explicit refusal or proposal ("will be agreed later" is not a refusal);
+    `agreed` and `accepted` need an explicit confirmation, or for agreed terms one confirmation of
+    the whole agreed set; `open` needs an open marker; a missing term is an error.
   - The language is detected from function words for en, es, de, nl, fr, it and pt and from the
     Cyrillic share for ru; a text no language leads clearly is `language_unverified`, a manual read,
     never "ok".
-  - Calibrated on 224 real outputs of these orders from the comparison and the regressions: 214
-    pass, 10 are flagged and all 10 are real failures (a whole answer in German or Spanish, or a
-    budget restated with no status by the first Terms version). The language check flags every one
-    of the 10 known wrong-language answers among 624 outputs and no correct one.
-  - Unit tests assert that the review's examples are rejected ("I accept your USD 150 budget and
+  - Calibrated on 234 real outputs of these orders from the comparison, the regressions and the
+    behavioral checks: 200 ok, 16 errors, 18 unverified. Every error is a real failure (a whole
+    answer in German or Spanish, a budget restated with no status by the first Terms version, a
+    ceiling left "open" instead of stated as the client's proposal); the unverified ones are an
+    agreed amount that recurs inside the refusal of a new request, or agreed terms listed without
+    any confirmation, and are read by hand. The language check flags every one of the 10 known
+    wrong-language answers among 624 outputs and no correct one.
+  - The unrelated eval tests that the review #3 change deleted by mistake (numbers across the task
+    and the profile, grouped, decimal and scaled amounts, dates, placeholders, identifiers with
+    digits, the protocol order set) are restored unchanged.
+  - Unit tests assert that the examples of reviews #3 and #4 are errors or unverified, never ok
+    ("I do not code, but I accept your USD 150 budget", "Your EUR 300 budget will be agreed later",
+    an omitted open fee, "The project will cost USD 400"), that the earlier examples are rejected ("I accept your USD 150 budget and
     the 3-day deadline", "I accept the EUR 300 budget and offer EUR 800", "Бюджет до 80 000 ₽
     согласован и принят. Срок в 2 рабочих дня подтверждаю."), that EN to Spanish, Dutch and German
     and ES to English are wrong-language, and that correct live answers pass.
@@ -271,3 +282,28 @@ Config switches as read back from the worker (UTC):
   stock worker kept running) and ran nothing; the experiment worker took jobs from the second
   attempt on, the stock worker paused, as `gateway_model` per step shows for every run.
 - 2026-10-29T13:55:02Z gpt-6-luna medium worker: model: openai/gpt-6-luna reasoning_effort: medium allowed_openai_params: [reasoning_effort]
+
+## Final-prompt web-form regression (code reviews #2 to #4)
+
+Every pass: P01, P02, P04, P05 x 5 and every `terms.json` order x 3 through the ProposalAI web form
+on `gpt-6-luna` / `medium` and `gpt-6-luna` / `high` (switch read back from the worker), the stack
+rebuilt with the prompt under test. Each pass that changed the prompt was followed by a full rerun.
+
+1. First Terms version (`46dc6a59` before its last fix), 94 runs: P04 broke, 2/5 on medium and 1/5 on
+   high. Rule 1 ("the freelancer decides it") took the order's "do not invent a replacement budget" as
+   a decision about the budget, and rule 5 let a conflicting budget be restated with no status
+   ("Your stated budget is EUR 300"). Fixed: rule 1 applies only to a direction that accepts,
+   declines or counters that very term; rule 5 says the client's term is proposed, not agreed. A P04
+   x 5 probe on both finalists then gave 10/10 explicit status.
+2. `46dc6a59`, 94 runs: every automatic check passed, but reading showed P02 calling the requested
+   templates and handover "proposed, not agreed", because the term definition included "a number of
+   pages, items". Fixed in `63bb3e49`: the requested work is scope, not a term; a regression order
+   for it was added.
+3. `63bb3e49`, 100 runs, judged with the review #4 checks and read by hand: P02 still called the
+   45-minute handover "proposed, not agreed" (3 runs), because the definition still listed "a
+   deadline or duration". Fixed: a term is a condition of the deal (price, payment, delivery date or
+   deadline, length of the engagement, limits such as revision rounds, guarantees); what the client
+   asks to have delivered, including its size or length, is scope. Also in this pass: 2 whole answers
+   in German (ANY-771) and 1 form error after 60 s (ANY-777); no critical error.
+4. The prompt with the role-based term definition: rerun in progress.
+

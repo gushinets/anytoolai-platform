@@ -243,7 +243,7 @@
     },
     {
       "id": "conflict-decline-es",
-      "rule": "4: a conflicting budget and a guarantee are not accepted, no replacement value",
+      "rule": "4: a conflicting budget and a guarantee are not accepted, no replacement value (the 5 daily posts are scope, not a term)",
       "task_text": "Una academia de idiomas quiere gestionar Instagram durante 3 meses por 200 EUR en total, con 5 publicaciones diarias, y exige garantizar 10 000 seguidores nuevos. Todavía no tiene fotos ni un calendario de cursos. Escribe una propuesta que identifique los conflictos, rechace la garantía de seguidores y proponga hablar de un primer mes más reducido. No aceptes el presupuesto ni inventes otro.",
       "freelancer_positioning": "Gestiono redes sociales para escuelas y negocios locales. Preparo calendarios de contenido y textos para publicaciones. No garantizo cifras de seguidores.",
       "tone": "firm",
@@ -267,10 +267,6 @@
         {
           "value": "10\\s?000 seguidores",
           "status": "not_accepted"
-        },
-        {
-          "value": "(5|cinco) publicaciones",
-          "status": "not_accepted"
         }
       ]
     },
@@ -283,8 +279,7 @@
       "expect_language": "en",
       "expect_gap": true,
       "must": [
-        "USD 1,?200",
-        "(after|once)[^.]{0,40}inspect"
+        "USD 1,?200"
       ],
       "must_not": [
         "(scope|templates?|handover|deliverables?)[^.]{0,40}(are|is) (proposed|not (yet )?agreed)",

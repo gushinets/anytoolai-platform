@@ -321,7 +321,8 @@ def test_terms_have_one_prioritized_rule() -> None:
 
     for fragment in (
         "This section is the only rule for terms and their values",
-        "is scope, not a term: offer it as your work",  # final regression: scope was labelled "not agreed"
+        "What the client asks you to deliver is scope, not a term, including its size or length",  # regression: a 45-minute handover was labelled "not agreed"
+        "A term is a condition of the deal",
         "Give each term the status of the first rule below that applies",
         "1. The freelancer decides it:",  # explicit acceptance, decline or counteroffer wins
         "an accepted change replaces the earlier term",

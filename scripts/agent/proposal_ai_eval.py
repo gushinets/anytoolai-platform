@@ -9,7 +9,7 @@ stay manual.
     .quick-check-venv/bin/python scripts/agent/proposal_ai_eval.py --api-url http://localhost:8000 --orders tests/fixtures/proposal_ai_eval/terms.json
 
 An order may carry its own `freelancer_positioning`, `tone` and `language` (they win over the file's
-and the flags'), `terms`: the expected status of each client term (see `term_status_errors`), and
+and the flags'), `terms`: the expected status of each client term (see `check_terms`), and
 `must` / `must_not`: regular expressions (case-insensitive) the proposal has to contain or must not
 contain. terms.json is the regression set for the status of client terms
 (ANY-631): run it after any change to how ProposalAI states prices, deadlines and limits.
@@ -89,16 +89,29 @@ def detect_language(text: str) -> str | None:
     return lang if best >= 0.12 * len(words) and best >= 1.5 * second else None
 
 
-# Status of a client term (ANY-631 "Terms"). In each sentence that names the term's value, the
-# status marker nearest to the value decides: an acceptance, a refusal (an acceptance word with a
-# negation right before it, or decline/reject/does not cover), the client's proposal (proposed, a
-# ceiling) or a term left open ("will be agreed after the call"). Nearest, because a governing verb
-# covers a list ("I cannot accept EUR 300, unlimited revisions or ...") while an unrelated "agreed"
-# elsewhere in the sentence ("rounds agreed in advance") must not decide this term.
-_NEGATION = (
-    r"(?:\bnot\b|n['’]t\b|\bnever\b|\bcannot\b|\bno\b|\btampoco\b|\bni\b|\bне\b|\bни\b"
-    r"|\bdeclin\w*|\brefus\w*|\brechaz\w*|\bотказ\w*|\bотклоня\w*)"
+# Status of a client term (ANY-631 "Terms"). The verdict per term has three values: ok, fail, or
+# unverified (a manual read). Anything the words do not settle is unverified, never ok.
+#
+# A status marker is an acceptance, a refusal (an acceptance or offer with a negation bound to it, or
+# decline / does not cover / нереален), the client's proposal (proposed, a ceiling), an open term
+# ("will be agreed after the call") or an offer. A negation counts only when it is bound to the verb:
+# at most two words in between and no comma, colon, semicolon or "but" (so "I do not code, but I
+# accept your budget" accepts). The markers in the value's own clause decide, with none there the
+# sentence's; when the deciding markers point both ways the mention is unverified, never guessed.
+_BOUND_NEGATION = re.compile(
+    r"(?:\b(?:not|never|cannot|no|tampoco|ni|не|ни)\b|n['’]t\b|\b(?:declin\w*|refus\w*|rechaz\w*|отказ\w*|отклоня\w*))"
+    r"(?:[ \t]+(?!(?:but|however|pero|sino|но|однако)\b)[\w'’-]+){0,2}[ \t]*$",
+    re.IGNORECASE,
 )
+# One confirmation of the whole agreed set ("Подтверждаю согласованные условия: ..."), after which the
+# agreed terms are listed without a marker each.
+_CONFIRM_AGREED_SET = re.compile(
+    r"\bconfirm\w* (?:the |all )?(?:agreed |following )?(?:terms|conditions)|\bconfirmo lo acordado\b"
+    r"|\bconfirmo (?:las |los )?(?:condiciones|t[ée]rminos)|\bподтвержда\w* (?:согласованн\w* )?(?:услови|объ[её]м|параметр)",
+    re.IGNORECASE,
+)
+_CLAUSE_BREAK = re.compile(r"[,;:—–]|\s(?:but|however|pero|sino|но|однако)\s", re.IGNORECASE)
+_POLARITY = {"positive": "+", "refusal": "-", "proposal": "-", "open": "o", "offer": "f"}
 _POSITIVE = re.compile(
     r"\baccept\w*|\bagree to\b|\bagreed\b|\bconfirm\w*|\bapprove\w*|\bguarantee(?:s|d to)?\b(?! (?:a |the )?top)"
     r"|\bincluded\b|\bI(?:.ll| will)? include\b|\btake on\b"
@@ -109,15 +122,17 @@ _POSITIVE = re.compile(
 _REFUSAL = re.compile(
     r"\bdeclin\w*|\breject\w*|does not cover|doesn.t cover|\bno cubre\b|не покрыва\w*|\brather than\b|\brechaz\w*"
     r"|\bотклоня\w*|\bотказ\w*|\bunrealistic\b|not realistic|unworkable|no es realista|\bнереал\w*"
-    r"|does not fit|doesn.t fit|\bno encaja\b|\bне подходит\b|\bсогласован\w* \w+ нет\b",
+    r"|does not fit|doesn.t fit|\bno encaja\b|\bне подходит\b|\bсогласован\w* \w+ нет\b"
+    r"|do(?:es)? not support|doesn.t support|\bno permite\b|\bне позволя\w*",
     re.IGNORECASE,
 )
 _PROPOSAL = re.compile(r"\bpropos\w*|\bpropuest\w*|\bпредлож\w*|\bпредел\w*|\bпотол\w*", re.IGNORECASE)
 _OPEN = re.compile(
-    r"(?:will|can|could|would|must|is to|are to|to) be agreed|remains? to be agreed|agreed (?:afterwards?|later)"
+    r"(?:will|can|could|would|must|is to|are to|to) be agreed|remains? to be agreed|agreed (?:afterwards?|later|only after)"
+    r"|only after (?:the|that|a|our) [\w-]+ call"
     r"|remains? open|stays? open|open for discussion"
-    r"|not (?:yet )?fixed|not tied to a fixed|not a fixed|requested (?:target|timing)|preferred timing"
-    r"|after (?:the|a|our) [\w-]+ (?:call|inspection|review)|after (?:inspect|review)\w*|until (?:the )?theme is inspected"
+    r"|not (?:yet )?fixed|not tied to a fixed|not a fixed|not (?:yet )?confirmed|not a confirmed|requested (?:target|timing)|preferred timing"
+    r"|after (?:the|a|our) [\w-]+ (?:call|inspection)|after inspect\w*|until (?:the )?theme (?:is|has been) inspected"
     r"|\bне зафиксирован\w*|\bпосле оценки|\bдо оценки|\bбудет согласован\w*|\bpor acordar|\bse acordar\w*",
     re.IGNORECASE,
 )
@@ -125,64 +140,80 @@ _OFFER = re.compile(r"\boffer\w*|\bpropose\b|\bquote\b|\bofrezco\b|\bpropongo\b|
 
 
 def _markers(sentence: str) -> list[tuple[int, int, str]]:
-    """(start, end, kind) of every status marker; kind is positive, refusal, proposal, open or offer."""
+    """(start, end, kind) of every status marker in a sentence."""
     found = [(m.start(), m.end(), "open") for m in _OPEN.finditer(sentence)]
 
     def inside_open(m: re.Match) -> bool:
         return any(s <= m.start() < e for s, e, _ in found)
 
+    def negated(m: re.Match) -> bool:
+        return bool(_BOUND_NEGATION.search(sentence[: m.start()]))
+
     for m in _POSITIVE.finditer(sentence):
-        if inside_open(m):
-            continue
-        negated = re.search(_NEGATION + r"[^.;:!?]{0,25}$", sentence[: m.start()], re.IGNORECASE)
-        found.append((m.start(), m.end(), "refusal" if negated else "positive"))
+        if not inside_open(m):
+            found.append((m.start(), m.end(), "refusal" if negated(m) else "positive"))
     found += [(m.start(), m.end(), "refusal") for m in _REFUSAL.finditer(sentence)]
     found += [(m.start(), m.end(), "proposal") for m in _PROPOSAL.finditer(sentence) if not inside_open(m)]
-    for m in _OFFER.finditer(sentence):
-        negated = re.search(_NEGATION + r"[^.;:!?]{0,15}$", sentence[: m.start()], re.IGNORECASE)
-        found.append((m.start(), m.end(), "refusal" if negated else "offer"))
+    found += [(m.start(), m.end(), "refusal" if negated(m) else "offer") for m in _OFFER.finditer(sentence)]
     return found
 
 
-def _nearest_kinds(text: str, value: str) -> list[str | None]:
-    """For every mention of the value: the kind of the nearest marker in its sentence (None: no marker)."""
+def _mention_kinds(text: str, value: str) -> list[str | None]:
+    """For each mention of the value: the deciding marker kind, "mixed" when the deciding markers (its
+    own clause's, or with none there its sentence's) point both ways, or None when there is none."""
     kinds = []
     for sentence in re.split(r"(?<=[.!?])\s+|\n+", text):
         marks = _markers(sentence)
+        breaks = [0] + [b.start() for b in _CLAUSE_BREAK.finditer(sentence)] + [len(sentence)]
         for v in re.finditer(value, sentence, re.IGNORECASE):
-            def distance(mark: tuple[int, int, str]) -> int:
-                return max(0, mark[0] - v.end(), v.start() - mark[1])
-            kinds.append(min(marks, key=distance)[2] if marks else None)
+            lo = max(b for b in breaks if b <= v.start())
+            hi = min(b for b in breaks if b >= v.end())
+            own = [m for m in marks if lo <= m[0] < hi]
+            pool = own or marks
+            if not pool:
+                kinds.append(None)
+                continue
+            if {"+", "-"} <= {_POLARITY[m[2]] for m in pool}:
+                kinds.append("mixed")  # the words point both ways: never pick one by distance
+                continue
+            nearest = min(pool, key=lambda m: max(0, m[0] - v.end(), v.start() - m[1]))
+            kinds.append(nearest[2])
     return kinds
 
 
-def term_status_errors(text: str, terms: list[dict]) -> list[str]:
-    """Each expected term status that the text does not show. `value` is a regular expression for
-    the term's value; `status` is `not_accepted` (declined, or the client's proposal and not agreed),
-    `agreed` (restated at least once without a refusal; one confirmation often covers several terms
-    and the value may recur inside a refusal of something else), `accepted`
-    (an acceptance next to it: a change the freelancer accepts), `offered` (the freelancer's own
-    value, offered) or `open` (left for discussion; the value may be absent)."""
-    errors = []
+def check_terms(text: str, terms: list[dict]) -> dict[str, list[str]]:
+    """`errors`: a term whose status the text contradicts or omits; `unverified`: a term the words do
+    not settle (read it by hand). `value` is a regular expression for the term's value; `status`:
+    `not_accepted` (explicitly declined, or the client's proposal and not agreed; "open" is not a
+    refusal), `agreed` and `accepted` (explicitly confirmed or accepted; an agreed term may also be
+    listed, unmarked, after one confirmation of the whole agreed set), `offered` (the freelancer's
+    own value, offered) or `open` (kept open for later). A missing term is an error for every status."""
+    errors, unverified = [], []
     for term in terms:
-        kinds, status = _nearest_kinds(text, term["value"]), term["status"]
-        if status == "open":
-            ok = "positive" not in kinds
-        elif not kinds:
-            ok = False
+        kinds, status = _mention_kinds(text, term["value"]), term["status"]
+        has = set(kinds)
+        if not kinds:
+            verdict = "fail"
         elif status == "not_accepted":
-            ok = "positive" not in kinds and any(kind in ("refusal", "proposal", "open") for kind in kinds)
-        elif status == "agreed":
-            ok = any(kind in ("positive", None) for kind in kinds)
-        elif status == "accepted":
-            ok = "positive" in kinds and "refusal" not in kinds
+            verdict = "fail" if "positive" in has else "ok" if has & {"refusal", "proposal"} else "unverified" if "mixed" in has else "fail"
+        elif status in ("agreed", "accepted"):
+            if "positive" in has and "refusal" not in has:
+                verdict = "ok"
+            elif status == "agreed" and has <= {None} and _CONFIRM_AGREED_SET.search(text):
+                verdict = "ok"  # listed after one confirmation of the whole agreed set
+            elif has <= {"refusal", "proposal", "open", "offer"}:
+                verdict = "fail"
+            else:
+                verdict = "unverified"
         elif status == "offered":
-            ok = "offer" in kinds
+            verdict = "ok" if "offer" in has else "unverified" if has & {None, "mixed"} else "fail"
+        elif status == "open":
+            verdict = "fail" if "positive" in has else "ok" if has & {"open", "proposal"} else "unverified" if has & {None, "mixed"} else "fail"
         else:
             raise ValueError(f"unknown term status {status!r}")
-        if not ok:
-            errors.append(f"{term['value']} should be {status}, nearest markers {kinds}")
-    return errors
+        if verdict != "ok":
+            (errors if verdict == "fail" else unverified).append(f"{term['value']}: expected {status}, found {kinds or 'no mention'}")
+    return {"errors": errors, "unverified": unverified}
 
 
 def _is_heading_like(line: str) -> bool:
@@ -198,11 +229,13 @@ def check_proposal(
     `language_unverified` for a manual read, never as correct."""
     lines = [line for line in text.splitlines() if line.strip()]
     language = detect_language(text)
+    terms = check_terms(text, order.get("terms", []))
     expected = (expect_language or order["expect_language"]).split("-")[0]
     return {
         "wrong_language": language is not None and language != expected,
         "language_unverified": language is None,
-        "term_status": bool(term_status_errors(text, order.get("terms", []))),
+        "term_status": bool(terms["errors"]),
+        "term_unverified": bool(terms["unverified"]),
         "placeholder": bool(PLACEHOLDER.search(text)),
         "meta_phrase": bool(META.search(text)),
         "invented_number": _has_invented_number(text, order["task_text"], profile),
