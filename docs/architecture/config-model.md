@@ -24,7 +24,8 @@ Runtime state / Events / Artifacts / Sessions = database.
 
 Registry ownership is explicit and read-only:
 
-- `product.yaml` owns product identity, platform, scenario list, and explicit `quota_policy_ref`.
+- `product.yaml` owns product identity, platform, scenario list, explicit `quota_policy_ref`,
+  `commercial_admission_enabled`, and `usage_metrics`.
 - `frontends.yaml` is required for every product and is the only allowed source of frontend definitions.
 - `analytics.yaml` is optional; when analytics are configured it is the only allowed source of analytics definitions.
 - `prompts.yaml` owns prompt ids and prompt asset paths for each product.
@@ -73,6 +74,42 @@ Quota policy is repo-configured and product-owned:
 
 Config validation must run in CI and before runtime startup. Broken references must fail startup.
 Missing owned files and missing explicit fields must fail validation with structured diagnostics.
+
+## Technical capability declarations
+
+Every product explicitly declares `commercial_admission_enabled` (a boolean) and
+`usage_metrics` (a list, including `[]` for products with no metrics):
+
+```yaml
+commercial_admission_enabled: false
+usage_metrics:
+  - metric_key: proposal_ai.test_generations
+    unit: generation
+    enabled: false
+```
+
+Each metric has exactly `metric_key`, `unit`, and `enabled`. Ownership derives from its
+containing product; a separate `product_id` in a metric declaration is rejected. Product ids,
+metric keys and units must be nonblank strings, and flags must be actual booleans. Metric keys
+are unique across the complete composed registry, even when disabled. Invalid declarations
+prevent registry construction with structured file/field diagnostics. Core/SDK mirror these
+typed declarations; the Core registry freezes the metric list and nested definitions.
+
+The ordinary six-product configuration keeps commercial admission disabled for every product.
+Only ProposalAI (`proposal_ai.test_generations`, unit `generation`) and Brief Decoder
+(`brief_decoder.test_analyses`, unit `analysis`) declare test metrics, also disabled. These
+declarations do not approve production charging, quantities, failure or refund semantics.
+Guest quota, frontend enablement, scenarios and deployment product allowlists do not imply
+commercial admission or metrics. Deployment-profile copying preserves the declarations.
+
+`products.capabilities.project_capability_manifest` is a pure Core projection of all registered
+products and declared metrics, including disabled entries. It takes an explicit scope and
+returns immutable semantics without storage, provider, network or clock access. The semantic
+`manifest_version` is `sha256:` plus the SHA-256 of compact UTF-8 JSON (`ensure_ascii=False`),
+with object keys sorted recursively, products sorted by `product_id`, and metrics sorted by
+`metric_key`. Only `schema_version`, `tenant_id`, `region`, `products` and `usage_metrics` enter
+the hash. A generation timestamp and the digest itself are excluded. HTTP serving, scope
+authorization and response-model publication are subsequent ANY-711 steps.
 
 ## Provider policy ownership
 

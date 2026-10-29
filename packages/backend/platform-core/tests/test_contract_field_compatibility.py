@@ -33,6 +33,9 @@ from anytoolai_platform_core.products.models import (
 from anytoolai_platform_core.products.models import (
     ProductDefinition as CoreProductDefinition,
 )
+from anytoolai_platform_core.products.models import (
+    UsageMetricDefinition as CoreUsageMetricDefinition,
+)
 from anytoolai_platform_core.prompts.models import PromptRef as CorePromptRef
 from anytoolai_platform_core.providers.models import (
     ProviderPolicy as CoreProviderPolicy,
@@ -88,6 +91,7 @@ from anytoolai_platform_sdk.contracts import (
     ScenarioDefinition,
     ScenarioSessionStatus,
     StructuredOutputMode,
+    UsageMetricDefinition,
     WorkflowDefinition,
     WorkflowStepDefinition,
 )
@@ -111,6 +115,7 @@ def core_dataclass_fields(model: type[Any]) -> set[str]:
         (FrontendDefinition, CoreFrontendDefinition),
         (HandoffDefinition, CoreHandoffDefinition),
         (ProductDefinition, CoreProductDefinition),
+        (UsageMetricDefinition, CoreUsageMetricDefinition),
         (PromptRef, CorePromptRef),
         (ProviderPolicy, CoreProviderPolicy),
         (QuotaPolicy, CoreQuotaPolicy),

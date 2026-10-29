@@ -7,8 +7,8 @@
 - Created: 2026-10-29
 - Last updated: 2026-10-29
 - Review date: 2026-10-29
-- Next action: implement the specified steps only after an explicit implementation request; application implementation has not started.
-- Blocker: none at the architecture/planning level; dependency preparation and runtime verification remain future work.
+- Next action: Step 1 is implemented and its required focused checks pass; await an explicit request for Step 2. Steps 2–4 have not started.
+- Blocker: none for the Step 1 implementation/required focused checks; the broader quick-check has an environment-only sudo prerequisite failure. HTTP/consumer/runtime verification belongs to subsequent steps.
 - Development branch: `feature/ANY-711`, created by the owner from Kernel `main`.
 - Review outcome: the accepted design is unchanged; all four accepted review clarifications are incorporated.
 - Canonical plan: `docs/exec-plans/active/ANY-711-implementation-plan.md` in Kernel. Do not create a second independent Portal plan.
@@ -377,7 +377,7 @@ Runtime verification stays NOT_RUN until implementation and execution actually o
 
 ## 5. Sequential Implementation Steps
 
-- [ ] Step 1 — Declare and validate technical capabilities
+- [x] Step 1 — Declare and validate technical capabilities
 - [ ] Step 2 — Serve an authenticated manifest in the trusted RU scope
 - [ ] Step 3 — Publish and verify the producer contract
 - [ ] Step 4 — Prove real HTTP interoperability with an isolated Portal client
@@ -490,6 +490,90 @@ Report the implemented behavior, changed files, verification results, remaining 
 **Proposed commit**
 
 `ANY-711 - Declare and validate Kernel capability vocabulary`
+
+**Execution record — 2026-10-29**
+
+Implementation is confined to Step 1 in Kernel. No Portal files were changed.
+
+Prerequisites verified:
+
+- Branch `feature/ANY-711`, clean initial worktree, HEAD
+  `745ac90322202ea1eb1c48c45daaa9a9a369e326` (the reviewed plan commit).
+  Local `main`/`origin/main` and GitHub `main` (independently read through the GitHub connector)
+  agree at `3c639c0a7de53c54cb6ce88e56a5813b73e76739`. No history or branch changes.
+- Read-only Portal HEAD remains `2bb07d778edc5ea56011b0034ba24b0702ede81f`.
+  Inspected its manifest contract/client digest and accepted authority chain; no Portal
+  imports, environment preparation or consumer execution was needed for this step.
+- `python3.12 scripts/agent/runner.py quick-check --bootstrap-only`: **PASS** after an
+  authorized network-enabled retry; the sandbox-only attempt failed on PyPI DNS.
+  Existing locks were preserved. `.quick-check-venv/bin/python scripts/agent/runner.py doctor`:
+  **PASS** (optional Docker availability warning).
+
+Implemented:
+
+- Required explicit `commercial_admission_enabled` and typed `usage_metrics` in Core/SDK,
+  all six owned product YAMLs and the shared fixture product. The ordinary vocabulary has
+  six disabled products and exactly the two approved disabled metric/owner/unit declarations.
+- Loader checks for actual booleans, nonblank product/metric/unit strings, list/mapping
+  shape, required metric fields, unsupported fields (including a foreign owner) and global
+  metric-key uniqueness, including disabled declarations. Errors retain structured source
+  diagnostics. Registry freezing includes nested metric definitions and metadata.
+- Pure `products/capabilities.py` projection and semantic version; no storage, network,
+  provider, clock or runtime-policy dependency. Complete disabled inventory, immutability,
+  semantic sensitivity, ordering/reload/concurrency stability, UTF-8 serialization and the
+  accepted independent positive digest are covered.
+- Deployment-profile regression tests preserve both enabled and disabled declarations in
+  canonical and unmetered quota modes; the existing copying implementation needed no change.
+  Updated config-model and add-product documentation. Default bundle constants, guest quota,
+  runtime routes, scope settings and deployment activation are unchanged.
+
+Verification on the working tree:
+
+```bash
+.quick-check-venv/bin/python -m pytest -o addopts= -q \
+  packages/backend/platform-core/tests/unit/test_config_loader.py \
+  packages/backend/platform-core/tests/test_contract_field_compatibility.py \
+  packages/backend/platform-sdk/tests/test_contracts_importable.py \
+  apps/platform-api/tests/test_bundle_composition.py \
+  tests/architecture/test_bundle_composition_parity.py \
+  apps/platform-api/tests/test_capability_projection.py \
+  tests/test_validate_configs.py
+```
+
+- Focused Step 1 suite plus projection/profile regressions: **PASS — 226 passed**
+  after final strict-string/invalid-binary-value checks (earlier run: 221 passed).
+- `runner.py validate-configs`, `runner.py validate-architecture`,
+  `runner.py validate-docs`, `runner.py generate-docs --check`: **PASS**.
+- Changed-file `ruff format --check`: **PASS**, all 11 changed Python files formatted.
+- Raw changed-file `ruff check`: **FAIL — 25 pre-existing findings**. Comparison against
+  HEAD using identical paths/rules: **PASS — no new findings**. Existing counts are
+  loader 15 → 15, loader tests 10 → 8, config-validator tests 2 → 2; all other changed
+  Python files have zero findings. No blanket suppression or unrelated lint cleanup.
+- `runner.py quick-check`: **FAIL — 2810 passed, 1 failed, 486 deselected, 1 warning**
+  (30m39s). Setup and config/architecture/docs guards passed in the network-enabled retry;
+  the earlier sandbox-only attempt failed during editable-package setup on PyPI DNS.
+  The only failing test is unchanged
+  `tests/test_runner.py::test_activation_marker_is_readable_by_non_root_api_user`:
+  the network-enabled run cannot execute `sudo -n -u nobody` because sudo requires a password.
+  A standalone sandbox rerun also **FAILS**, reporting `no new privileges` and a sudo
+  configuration ownership warning. Runner, activation and this test are unchanged;
+  no sudo/host configuration was modified. A fully green baseline requires an environment
+  permitting this existing passwordless cross-user check. Deselected slow tests are not PASS
+  evidence. The final SDK strict-string delta was verified by the 226-test focused rerun
+  and repeated config/architecture/docs and Ruff checks above.
+- `git diff --check`: **PASS**; implementation, tests and documentation diff reviewed.
+
+For explicit `anytoolai/ru`, the ordinary disabled semantic version is
+`sha256:478761c681d02330ed052aabe5e1b472dc1c2ee56d79a568a8009f4b4503a694`.
+The enabled immutable test-registry copy matches the independently accepted example
+`sha256:a39bac9f210a6ac67e97e117f8481a5954dc3f36bdaab2fd54c7522b27d6ec29`.
+This is pure projection evidence, not a real HTTP/Portal conformance result.
+
+Limitations: Steps 2–4 (trusted RU composition/authentication, HTTP endpoint, producer artifacts
+and actual Portal interoperability) are **NOT_RUN / not implemented**. Full-check, PostgreSQL,
+Compose/atom smoke, deployed TLS and production commercial approval are **NOT_RUN** for this
+step. No database, financial operation or deployment was started. Nothing was staged,
+committed or pushed; no branch was switched and no subsequent step was started.
 
 ### Step 2 — Serve an authenticated manifest in the trusted RU scope
 

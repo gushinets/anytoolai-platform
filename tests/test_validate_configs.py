@@ -120,6 +120,41 @@ def test_build_profile_transforms_only_enabled_product_and_preserves_full_tree(t
     }
 
 
+@pytest.mark.parametrize("unmetered", [False, True])
+@pytest.mark.parametrize("admission_enabled", [False, True])
+def test_deployment_profiles_preserve_capability_declarations(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    unmetered: bool,
+    admission_enabled: bool,
+) -> None:
+    fixture_package = tmp_path / "fixture_package"
+    fixture_products = fixture_package / "products"
+    shutil.copytree(PRODUCTS_ROOT, fixture_products)
+    monkeypatch.setattr(
+        validate_configs.FreelancerSuiteBundle, "_package_dir", lambda self: fixture_package
+    )
+    for product_id in ("proposal_ai", "brief_decoder"):
+        path = fixture_products / product_id / "product.yaml"
+        product = yaml.safe_load(path.read_text(encoding="utf-8"))
+        product["commercial_admission_enabled"] = admission_enabled
+        product["usage_metrics"][0]["enabled"] = admission_enabled
+        path.write_text(yaml.safe_dump(product), encoding="utf-8")
+    output_dir = tmp_path / "freelancer-suite"
+    validate_configs.build_deployment_profile(
+        output_dir, ["proposal_ai", "brief_decoder"], {"proposal_ai"} if unmetered else set()
+    )
+    source_registry = validate_configs.load_registry()
+    copied_registry = validate_configs.ConfigLoader(
+        validate_configs.ROOT / "configs/kernel",
+        extra_product_roots=sorted((output_dir / "products").iterdir()),
+    ).load()
+    for product_id, source in source_registry.products.items():
+        copied = copied_registry.products[product_id]
+        assert copied.commercial_admission_enabled == source.commercial_admission_enabled
+        assert copied.usage_metrics == source.usage_metrics
+
+
 def test_build_profile_rejects_source_change_during_snapshot(monkeypatch, tmp_path):
     fixture_package = tmp_path / "fixture_package"
     fixture_products = fixture_package / "products"
