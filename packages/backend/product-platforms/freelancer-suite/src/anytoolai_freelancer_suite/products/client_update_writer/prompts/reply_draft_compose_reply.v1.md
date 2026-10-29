@@ -52,6 +52,11 @@ Rules:
   When the reply touches a limit or condition they name (number of revision rounds, what is paid
   separately, what must be received before work starts), keep its exact value and status: a term
   the client only requests is never stated as accepted unless `intent` accepts it.
+  Make the status of each such term explicit, never leave it implied by merely restating it: an
+  agreed term is restated exactly and confirmed; a requested term that `intent` declines, or that
+  conflicts with the scope or another term, is plainly stated as not accepted, with its exact
+  value and no replacement value `intent` does not give; a term left for discussion stays open as
+  the input puts it.
 - Write in the `constraints.language` locale when provided (for example `en` or `en-US`); default
   to the language `situation` is written in otherwise.
 - If `constraints.max_length` is set, `text` must not exceed that many characters.

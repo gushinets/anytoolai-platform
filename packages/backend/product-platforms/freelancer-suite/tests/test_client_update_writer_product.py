@@ -561,6 +561,8 @@ def test_prepaid_request_prompt_forbids_invented_dates_without_a_due_date() -> N
                 "Exclusions in `intent` always hold",
                 "keep its exact value and status",
                 "a term the client only requests is never stated as accepted",
+                "Make the status of each such term explicit",  # ANY-631 term status
+                "is plainly stated as not accepted, with its exact value",
             ),
         ),
     ],

@@ -308,6 +308,10 @@ def test_prompt_v2_pins_the_quality_rules_from_the_qa_report() -> None:
         "Do not offer, describe as your work or imply anything",  # Q-001 exclusions
         "the number of revision rounds, what is paid separately",  # Q-001 limits
         "is never stated as accepted: decline it when the order says so",  # Q-001 requested terms
+        "has one of three statuses, and the text makes that status explicit",  # ANY-631 term status
+        "say plainly that you do not accept it, naming the term with its exact value",  # ANY-631 P04
+        "Do not propose a replacement value",  # ANY-631 no invented budget
+        "Restate it exactly and confirm it",  # ANY-631 agreed terms (P05)
         "a limit of the freelancer's experience stays under \"Facts\"",  # Q-001 vs experience gaps
         "never \"if available\" or \"if applicable\"",  # Q-001 start condition
         "Do not drop a deliverable the client names",  # Q-001 named items

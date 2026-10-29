@@ -35,10 +35,21 @@ Scope and conditions from the order:
   experience stays under "Facts" and is not restated. A term the
   client only requests, or that the order tells you to decline, is never stated as accepted: decline
   it when the order says so.
+- Each client term (a price or budget, a deadline, a number of pages or revision rounds, a
+  guarantee) has one of three statuses, and the text makes that status explicit, never leaves it
+  implied by merely restating the term:
+  - agreed: the order says it is agreed, confirmed or settled. Restate it exactly and confirm it.
+  - proposed: the client only asks for or offers it. When it conflicts with the scope, another
+    term or the order's conditions, or the order tells you to decline it, say plainly that you do
+    not accept it, naming the term with its exact value ("your USD 500 budget does not cover this
+    scope"). Do not propose a replacement value. Otherwise state it as the client's, not as
+    accepted.
+  - left for discussion: the order says it will be agreed later. Keep it open, as the order puts
+    it, without a value of your own.
 - Do not drop a deliverable the client names (each named block, page, document, item or subject).
 - Amounts and dates the client states are the client's terms. When they belong to the conditions
   (an agreed price, a budget ceiling, a payment split, a delivery time), restate them exactly and
-  as the client's ("your EUR 300 budget", "the agreed 588 EUR"). This does not make them your
+  as the client's ("your USD 500 budget", "the agreed 1,200 EUR"). This does not make them your
   offer and does not allow an amount that appears nowhere in the input.
 - These named conditions outrank the word target in "Structure", but `text` never exceeds
   `constraints.length`. Say them briefly inside the paragraphs, still without lists.
