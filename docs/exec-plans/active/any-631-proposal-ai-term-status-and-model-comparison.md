@@ -305,5 +305,29 @@ rebuilt with the prompt under test. Each pass that changed the prompt was follow
    deadline, length of the engagement, limits such as revision rounds, guarantees); what the client
    asks to have delivered, including its size or length, is scope. Also in this pass: 2 whole answers
    in German (ANY-771) and 1 form error after 60 s (ANY-777); no critical error.
-4. The prompt with the role-based term definition: rerun in progress.
+4. `26b64ddd`, the shipping prompt, 2026-10-29, 100 runs (P01 x 5 on medium has 4 runs: one form
+   page did not load in 30 s and no session started). Judged with the review #4 checks; every flagged
+   output and the requested-scope wording of every P02 and `ceiling-and-scope-en` output read by hand.
+
+   | Configuration | P01 | P02 | P04 | P05 | terms set | Median UI, s | p90 UI, s |
+   | --- | --- | --- | --- | --- | --- | --- | --- |
+   | luna / high | 5/5 | 4/5 | 5/5 | 5/5 | 30/30 | 27.1 | 40.2 |
+   | luna / medium | 4/5 | 5/5 | 5/5 | 5/5 | 29/30 | 20.7 | 31.1 |
+
+   Every run that is not ok:
+   - luna / high P02 #2 `scenario_session_01793297466819954240_0000000027_62c9714b4dbd4770a4da12637d8a5a61`:
+     the whole answer in Spanish for an English order (ANY-771).
+   - luna / medium `agreed-confirm-ru` #1 `scenario_session_01793296610947619548_0000000102_4747ba9853db451bb71d36968af9d378`:
+     critical; the agreed price, deadline and payments are called "client's terms, not yet agreed"
+     although the order says the client agreed them (rule 5 applied instead of rule 2).
+   - luna / medium P01 #3: the form page did not load within 30 s; no run, not a model result.
+   - Read by hand and ok: luna / high `agreed-plus-conflict-es` #2 (the agreed 240 EUR recurs inside
+     the refusal of the new request, so the check leaves it unverified).
+
+   The scope fix held: no P02 or `ceiling-and-scope-en` output calls the requested templates or the
+   handover proposed or not agreed. P04 states EUR 300 as not accepted in 10/10.
+
+Result: `gpt-6-luna` / `high` passes the shipping prompt with zero critical errors (the one failure
+is the output language, ANY-771); `gpt-6-luna` / `medium` has one critical error. The recommendation
+`gpt-6-luna` / `high` (ANY-776) stands on the shipping prompt.
 
