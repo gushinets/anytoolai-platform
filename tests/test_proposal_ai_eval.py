@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -187,3 +188,28 @@ def test_identifiers_do_not_offer_their_digits_as_numbers() -> None:
     order = {**EN_ORDER, "task_text": "Need 12V at 60Hz, budget $20k"}
     assert "invented_number" not in violations("12 volts at 60 Hz for $20,000.", order=order)
     assert "invented_number" in violations("My fee is $20.", order=order)
+
+
+def test_terms_set_checks_the_status_of_client_terms() -> None:
+    """terms.json (ANY-631): every order names its rule, its patterns compile, a correct proposal
+    passes and the defect each review found is caught."""
+    terms = json.loads((proposal_ai_eval.ORDERS_PATH.parent / "terms.json").read_text(encoding="utf-8"))
+    orders = {order["id"]: order for order in terms["orders"]}
+    for order in orders.values():
+        assert order["rule"] and order["must"], order["id"]
+        for pattern in order["must"] + order["must_not"]:
+            re.compile(pattern)
+
+    def flagged(order_id: str, text: str) -> set[str]:
+        order = orders[order_id]
+        checks = proposal_ai_eval.check_proposal(text, [], order, order["freelancer_positioning"])
+        return {name for name in ("missing_required", "forbidden_present") if checks[name] is True}
+
+    counter = "I do not accept the EUR 300 budget or the 48-hour deadline. I offer EUR 800 for a smaller 5-page first phase."
+    assert flagged("counteroffer-en", counter) == set()
+    assert flagged("counteroffer-en", counter.replace("EUR 800", "EUR 900")) == {"missing_required", "forbidden_present"}
+    accepted = "I accept the second revision round instead of the one-round limit; EUR 1,500 and the 5 pages stay as agreed."
+    assert flagged("limit-change-accepted-en", accepted) == set()
+    assert "forbidden_present" in flagged("limit-change-accepted-en", "I do not accept a second revision round; EUR 1,500 stays.")
+    assert flagged("conflict-decline-es", "Tampoco acepto su presupuesto de 200 EUR.") == set()
+    assert "forbidden_present" in flagged("conflict-decline-es", "Acepto el presupuesto de 200 EUR.")

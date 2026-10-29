@@ -6,6 +6,12 @@ Facts about experience, tone distinguishability and "similar project in the firs
 stay manual.
 
     .quick-check-venv/bin/python scripts/agent/proposal_ai_eval.py --api-url http://localhost:8000 [--tone warm] [--language ru]
+    .quick-check-venv/bin/python scripts/agent/proposal_ai_eval.py --api-url http://localhost:8000 --orders tests/fixtures/proposal_ai_eval/terms.json
+
+An order may carry its own `freelancer_positioning`, `tone` and `language` (they win over the file's
+and the flags'), and `must` / `must_not`: regular expressions (case-insensitive) the proposal has to
+contain or must not contain. terms.json is the regression set for the status of client terms
+(ANY-631): run it after any change to how ProposalAI states prices, deadlines and limits.
 
 (the quick-check environment, because the number check is imported from the A06 validator)
 
@@ -80,6 +86,8 @@ def check_proposal(
         "long_dash": bool(LONG_DASH.search(text)),
         "too_long": len(text.split()) > MAX_WORDS,
         "missing_gap": bool(order.get("expect_gap")) and not gaps,
+        "missing_required": any(not re.search(p, text, re.IGNORECASE) for p in order.get("must", [])),
+        "forbidden_present": any(re.search(p, text, re.IGNORECASE) for p in order.get("must_not", [])),
         "words": len(text.split()),
     }
 
@@ -120,21 +128,25 @@ def main() -> int:
     parser.add_argument("--language", help="explicit proposal language, default: the task's language")
     parser.add_argument("--timeout", type=float, default=120.0)
     parser.add_argument("--save-json", type=Path, help="also write the raw outputs here")
+    parser.add_argument("--orders", type=Path, default=ORDERS_PATH, help="order set, default: orders.json")
     args = parser.parse_args()
 
-    fixture = json.loads(ORDERS_PATH.read_text(encoding="utf-8"))
-    profile = fixture["freelancer_positioning"]
+    fixture = json.loads(args.orders.read_text(encoding="utf-8"))
     rows, raw, failed = [], {}, False
     for order in fixture["orders"]:
+        profile = order.get("freelancer_positioning", fixture.get("freelancer_positioning"))
+        language = order.get("language", args.language)
         try:
-            output = run_order(args.api_url, order, profile, tone=args.tone, language=args.language, timeout=args.timeout)
+            output = run_order(
+                args.api_url, order, profile, tone=order.get("tone", args.tone), language=language, timeout=args.timeout
+            )
         except (OSError, RuntimeError, TimeoutError, KeyError, ValueError) as exc:
             rows.append(f"| {order['id']} | run failed: {exc} |")
             failed = True
             continue
         raw[order["id"]] = output
         checks = check_proposal(
-            output["text"], output.get("gaps", []), order, profile, expect_language=args.language
+            output["text"], output.get("gaps", []), order, profile, expect_language=language
         )
         violations = [name for name, value in checks.items() if value is True]
         failed = failed or bool(violations)

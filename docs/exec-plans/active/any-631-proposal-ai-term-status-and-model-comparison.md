@@ -100,8 +100,22 @@ The gaps language defect (ANY-771), Docker dependency cache (ANY-770), changing 
     agreed."
   - Reply Draft, same message, `reply_goal` "Decline the second revision round; one round stays as
     agreed" x 3: the second round is not accepted, the agreed one round stays.
-  - These checks ran after the comparison: they only exercise the new exceptions, which none of the
-    comparison cases trigger, so the comparison results stand.
+  - These were short API probes on `luna/medium` of a prompt that code review #2 then found still
+    inconsistent; they are superseded by the web-form regression of the final prompt on both
+    finalists (in progress, recorded here when it completes) and are not evidence for the final
+    prompt.
+- Code review #2: the status of a client term was defined in five places (a sentence in the limits
+  rule, the three-status rule, "Amounts and dates the client states", and the value whitelist and
+  "is not your offer" under "Price and terms"), so every fix to one place contradicted another. The
+  ProposalAI prompt now has one "Terms" section that is the only rule for terms and their values:
+  the first applying rule wins (1 the freelancer's own decision in the positioning or a direction
+  in the order, 2 agreed, 3 left for discussion, 4 a conflicting client request, 5 otherwise the
+  client's term), and one "Values" rule allows a value only as a client's term or the freelancer's
+  own. Reply Draft states the same order with `intent` as the freelancer's decision. A structural
+  test keeps the scattered wording from coming back.
+- Regression set: `tests/fixtures/proposal_ai_eval/terms.json` (9 orders, rules 1-5, EN/RU/ES,
+  including both review examples), run with `scripts/agent/proposal_ai_eval.py --orders`; a
+  `must` / `must_not` match is evidence, the outputs are still read by hand.
 
 ## Results (2026-10-29, prompt `369e0775`, 410 runs through the web form)
 

@@ -290,8 +290,6 @@ def test_prompt_v2_pins_the_quality_rules_from_the_qa_report() -> None:
     for fragment in (
         "Never rename, generalize",  # D-01
         "constraints.claims_to_avoid",  # D-15
-        "Do not name an amount, rate, currency, deadline or duration",  # D-04
-        "is not your offer",  # D-04 client budget
         "No placeholders",  # D-03
         "must not retell the client's task",  # D-05
         "No headings",  # D-06
@@ -307,23 +305,41 @@ def test_prompt_v2_pins_the_quality_rules_from_the_qa_report() -> None:
         "Scope and conditions from the order",  # Q-001
         "Do not offer, describe as your work or imply anything",  # Q-001 exclusions
         "the number of revision rounds, what is paid separately",  # Q-001 limits
-        "is never stated as accepted unless the order or the positioning explicitly accepts it",  # Q-001
-        "decline it when the order says so",  # Q-001 requested terms
-        "has one of three statuses, and the text makes that status explicit",  # ANY-631 term status
-        "say plainly that you do not accept it, naming the term with its exact value",  # ANY-631 P04
-        "Do not invent a replacement value",  # ANY-631 no invented budget
-        "When the order or the positioning explicitly accepts it, state it as accepted",  # review #1 P1
-        "a counteroffer the order tells you to make",  # review #1 P2
-        "then use exactly that value",
-        "Restate it exactly and confirm it",  # ANY-631 agreed terms (P05)
         "a limit of the freelancer's experience stays under \"Facts\"",  # Q-001 vs experience gaps
         "never \"if available\" or \"if applicable\"",  # Q-001 start condition
         "Do not drop a deliverable the client names",  # Q-001 named items
-        "restate them exactly and as the client's",  # Q-001 client amounts
         "outrank the word target",  # Q-001 vs length
     ):
         assert fragment in prompt, fragment
 
+
+
+def test_terms_have_one_prioritized_rule() -> None:
+    """ANY-631 code reviews #1 and #2: the status of a client term was defined in five places that
+    contradicted each other after every fix. One "Terms" section now decides it, first rule wins."""
+    prompt = " ".join(_load_prompt("prompts/compose_persuasive_text.v1.md").split())
+
+    for fragment in (
+        "This section is the only rule for terms and their values",
+        "Give each term the status of the first rule below that applies",
+        "1. The freelancer decides it:",  # explicit acceptance, decline or counteroffer wins
+        "an accepted change replaces the earlier term",
+        "a counteroffer is made with exactly the given value",
+        "Only a direction that accepts, declines or counters this very term decides it",  # review #2 regression
+        "2. The order says it is agreed, confirmed or settled: restate it exactly and confirm it",
+        "3. The order says it will be agreed or discussed later: keep it open",
+        "4. The client asks for or offers it and it conflicts with the scope",
+        "say plainly that you do not accept it, naming the term with its exact value",
+        "5. Otherwise it is the client's proposal: restate it exactly as the client's and say that it is proposed, not agreed",
+        "never state it as accepted or as your own offer or price",  # D-04 client budget
+        "Values: name an amount, rate, currency, date, deadline or duration only when the input states it",  # D-04
+        "or in a direction under rule 1",  # a counteroffer the freelancer directs is an allowed value
+        "never offer a replacement value that rule 1 does not give",
+    ):
+        assert fragment in prompt, fragment
+    # the rules that used to restate term status or the value whitelist elsewhere must not come back
+    for scattered in ("Price and terms:", "is never stated as accepted unless", "is not your offer", "Amounts and dates the client states"):
+        assert scattered not in prompt, scattered
 
 def test_gap_prompt_is_scoped_to_experience_gaps() -> None:
     prompt = _load_prompt("prompts/detect_experience_gaps.v1.md")
