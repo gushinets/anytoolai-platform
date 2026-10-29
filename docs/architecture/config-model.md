@@ -111,7 +111,9 @@ with object keys sorted recursively, products sorted by `product_id`, and metric
 the hash. A generation timestamp and the digest itself are excluded. The API serves this projection
 through its authenticated internal manifest route in the validated trusted tenant/region scope. See the
 [receiver configuration](../../infra/deployment/README.md#portal-capability-manifest-receiver-any-711).
-Generated contract publication and real Portal HTTP conformance remain subsequent ANY-711 steps.
+The [producer contract](../contracts/kernel-capability-manifest/v1/README.md) publishes the generated
+serialization schema, canonical positive/negative fixtures, byte checksums and independent digest
+checks. Real Portal TCP HTTP conformance remains ANY-711 Step 4.
 
 ## Provider policy ownership
 

@@ -1,0 +1,610 @@
+{
+  "missing-field": {
+    "schema_version": 1,
+    "tenant_id": "anytoolai",
+    "region": "ru",
+    "manifest_version": "sha256:a39bac9f210a6ac67e97e117f8481a5954dc3f36bdaab2fd54c7522b27d6ec29",
+    "generated_at": "2026-10-15T00:00:00Z",
+    "products": [
+      {
+        "product_id": "acceptance_builder",
+        "enabled": false
+      },
+      {
+        "product_id": "brief_decoder",
+        "enabled": true
+      },
+      {
+        "product_id": "client_update_writer",
+        "enabled": false
+      },
+      {
+        "product_id": "kernel_demo",
+        "enabled": false
+      },
+      {
+        "product_id": "proposal_ai",
+        "enabled": true
+      },
+      {
+        "product_id": "task_finder",
+        "enabled": false
+      }
+    ]
+  },
+  "unknown-field": {
+    "schema_version": 1,
+    "tenant_id": "anytoolai",
+    "region": "ru",
+    "manifest_version": "sha256:a39bac9f210a6ac67e97e117f8481a5954dc3f36bdaab2fd54c7522b27d6ec29",
+    "generated_at": "2026-10-15T00:00:00Z",
+    "products": [
+      {
+        "product_id": "acceptance_builder",
+        "enabled": false
+      },
+      {
+        "product_id": "brief_decoder",
+        "enabled": true
+      },
+      {
+        "product_id": "client_update_writer",
+        "enabled": false
+      },
+      {
+        "product_id": "kernel_demo",
+        "enabled": false
+      },
+      {
+        "product_id": "proposal_ai",
+        "enabled": true
+      },
+      {
+        "product_id": "task_finder",
+        "enabled": false
+      }
+    ],
+    "usage_metrics": [
+      {
+        "metric_key": "proposal_ai.test_generations",
+        "product_id": "proposal_ai",
+        "unit": "generation",
+        "enabled": true
+      },
+      {
+        "metric_key": "brief_decoder.test_analyses",
+        "product_id": "brief_decoder",
+        "unit": "analysis",
+        "enabled": true
+      }
+    ],
+    "metadata": {}
+  },
+  "unsupported-schema": {
+    "schema_version": 2,
+    "tenant_id": "anytoolai",
+    "region": "ru",
+    "manifest_version": "sha256:a39bac9f210a6ac67e97e117f8481a5954dc3f36bdaab2fd54c7522b27d6ec29",
+    "generated_at": "2026-10-15T00:00:00Z",
+    "products": [
+      {
+        "product_id": "acceptance_builder",
+        "enabled": false
+      },
+      {
+        "product_id": "brief_decoder",
+        "enabled": true
+      },
+      {
+        "product_id": "client_update_writer",
+        "enabled": false
+      },
+      {
+        "product_id": "kernel_demo",
+        "enabled": false
+      },
+      {
+        "product_id": "proposal_ai",
+        "enabled": true
+      },
+      {
+        "product_id": "task_finder",
+        "enabled": false
+      }
+    ],
+    "usage_metrics": [
+      {
+        "metric_key": "proposal_ai.test_generations",
+        "product_id": "proposal_ai",
+        "unit": "generation",
+        "enabled": true
+      },
+      {
+        "metric_key": "brief_decoder.test_analyses",
+        "product_id": "brief_decoder",
+        "unit": "analysis",
+        "enabled": true
+      }
+    ]
+  },
+  "boolean-schema-version": {
+    "schema_version": true,
+    "tenant_id": "anytoolai",
+    "region": "ru",
+    "manifest_version": "sha256:a39bac9f210a6ac67e97e117f8481a5954dc3f36bdaab2fd54c7522b27d6ec29",
+    "generated_at": "2026-10-15T00:00:00Z",
+    "products": [
+      {
+        "product_id": "acceptance_builder",
+        "enabled": false
+      },
+      {
+        "product_id": "brief_decoder",
+        "enabled": true
+      },
+      {
+        "product_id": "client_update_writer",
+        "enabled": false
+      },
+      {
+        "product_id": "kernel_demo",
+        "enabled": false
+      },
+      {
+        "product_id": "proposal_ai",
+        "enabled": true
+      },
+      {
+        "product_id": "task_finder",
+        "enabled": false
+      }
+    ],
+    "usage_metrics": [
+      {
+        "metric_key": "proposal_ai.test_generations",
+        "product_id": "proposal_ai",
+        "unit": "generation",
+        "enabled": true
+      },
+      {
+        "metric_key": "brief_decoder.test_analyses",
+        "product_id": "brief_decoder",
+        "unit": "analysis",
+        "enabled": true
+      }
+    ]
+  },
+  "wrong-enabled-type": {
+    "schema_version": 1,
+    "tenant_id": "anytoolai",
+    "region": "ru",
+    "manifest_version": "sha256:a39bac9f210a6ac67e97e117f8481a5954dc3f36bdaab2fd54c7522b27d6ec29",
+    "generated_at": "2026-10-15T00:00:00Z",
+    "products": [
+      {
+        "product_id": "acceptance_builder",
+        "enabled": "false"
+      },
+      {
+        "product_id": "brief_decoder",
+        "enabled": true
+      },
+      {
+        "product_id": "client_update_writer",
+        "enabled": false
+      },
+      {
+        "product_id": "kernel_demo",
+        "enabled": false
+      },
+      {
+        "product_id": "proposal_ai",
+        "enabled": true
+      },
+      {
+        "product_id": "task_finder",
+        "enabled": false
+      }
+    ],
+    "usage_metrics": [
+      {
+        "metric_key": "proposal_ai.test_generations",
+        "product_id": "proposal_ai",
+        "unit": "generation",
+        "enabled": true
+      },
+      {
+        "metric_key": "brief_decoder.test_analyses",
+        "product_id": "brief_decoder",
+        "unit": "analysis",
+        "enabled": true
+      }
+    ]
+  },
+  "invalid-timestamp": {
+    "schema_version": 1,
+    "tenant_id": "anytoolai",
+    "region": "ru",
+    "manifest_version": "sha256:a39bac9f210a6ac67e97e117f8481a5954dc3f36bdaab2fd54c7522b27d6ec29",
+    "generated_at": "2026-02-30T00:00:00Z",
+    "products": [
+      {
+        "product_id": "acceptance_builder",
+        "enabled": false
+      },
+      {
+        "product_id": "brief_decoder",
+        "enabled": true
+      },
+      {
+        "product_id": "client_update_writer",
+        "enabled": false
+      },
+      {
+        "product_id": "kernel_demo",
+        "enabled": false
+      },
+      {
+        "product_id": "proposal_ai",
+        "enabled": true
+      },
+      {
+        "product_id": "task_finder",
+        "enabled": false
+      }
+    ],
+    "usage_metrics": [
+      {
+        "metric_key": "proposal_ai.test_generations",
+        "product_id": "proposal_ai",
+        "unit": "generation",
+        "enabled": true
+      },
+      {
+        "metric_key": "brief_decoder.test_analyses",
+        "product_id": "brief_decoder",
+        "unit": "analysis",
+        "enabled": true
+      }
+    ]
+  },
+  "naive-timestamp": {
+    "schema_version": 1,
+    "tenant_id": "anytoolai",
+    "region": "ru",
+    "manifest_version": "sha256:a39bac9f210a6ac67e97e117f8481a5954dc3f36bdaab2fd54c7522b27d6ec29",
+    "generated_at": "2026-10-15T00:00:00",
+    "products": [
+      {
+        "product_id": "acceptance_builder",
+        "enabled": false
+      },
+      {
+        "product_id": "brief_decoder",
+        "enabled": true
+      },
+      {
+        "product_id": "client_update_writer",
+        "enabled": false
+      },
+      {
+        "product_id": "kernel_demo",
+        "enabled": false
+      },
+      {
+        "product_id": "proposal_ai",
+        "enabled": true
+      },
+      {
+        "product_id": "task_finder",
+        "enabled": false
+      }
+    ],
+    "usage_metrics": [
+      {
+        "metric_key": "proposal_ai.test_generations",
+        "product_id": "proposal_ai",
+        "unit": "generation",
+        "enabled": true
+      },
+      {
+        "metric_key": "brief_decoder.test_analyses",
+        "product_id": "brief_decoder",
+        "unit": "analysis",
+        "enabled": true
+      }
+    ]
+  },
+  "duplicate-product": {
+    "schema_version": 1,
+    "tenant_id": "anytoolai",
+    "region": "ru",
+    "manifest_version": "sha256:3ee13529064f5b61530f97210b4110369a6c85022a46a4d0faf47cf3e66462ce",
+    "generated_at": "2026-10-15T00:00:00Z",
+    "products": [
+      {
+        "product_id": "acceptance_builder",
+        "enabled": false
+      },
+      {
+        "product_id": "brief_decoder",
+        "enabled": true
+      },
+      {
+        "product_id": "client_update_writer",
+        "enabled": false
+      },
+      {
+        "product_id": "kernel_demo",
+        "enabled": false
+      },
+      {
+        "product_id": "proposal_ai",
+        "enabled": true
+      },
+      {
+        "product_id": "task_finder",
+        "enabled": false
+      },
+      {
+        "product_id": "acceptance_builder",
+        "enabled": false
+      }
+    ],
+    "usage_metrics": [
+      {
+        "metric_key": "proposal_ai.test_generations",
+        "product_id": "proposal_ai",
+        "unit": "generation",
+        "enabled": true
+      },
+      {
+        "metric_key": "brief_decoder.test_analyses",
+        "product_id": "brief_decoder",
+        "unit": "analysis",
+        "enabled": true
+      }
+    ]
+  },
+  "duplicate-metric": {
+    "schema_version": 1,
+    "tenant_id": "anytoolai",
+    "region": "ru",
+    "manifest_version": "sha256:fc95d022aaab68e58748e2c9bdc0d837caf921df5390910e3b8841c10630a68b",
+    "generated_at": "2026-10-15T00:00:00Z",
+    "products": [
+      {
+        "product_id": "acceptance_builder",
+        "enabled": false
+      },
+      {
+        "product_id": "brief_decoder",
+        "enabled": true
+      },
+      {
+        "product_id": "client_update_writer",
+        "enabled": false
+      },
+      {
+        "product_id": "kernel_demo",
+        "enabled": false
+      },
+      {
+        "product_id": "proposal_ai",
+        "enabled": true
+      },
+      {
+        "product_id": "task_finder",
+        "enabled": false
+      }
+    ],
+    "usage_metrics": [
+      {
+        "metric_key": "proposal_ai.test_generations",
+        "product_id": "proposal_ai",
+        "unit": "generation",
+        "enabled": true
+      },
+      {
+        "metric_key": "brief_decoder.test_analyses",
+        "product_id": "brief_decoder",
+        "unit": "analysis",
+        "enabled": true
+      },
+      {
+        "metric_key": "proposal_ai.test_generations",
+        "product_id": "proposal_ai",
+        "unit": "generation",
+        "enabled": true
+      }
+    ]
+  },
+  "invalid-reference": {
+    "schema_version": 1,
+    "tenant_id": "anytoolai",
+    "region": "ru",
+    "manifest_version": "sha256:812ec27f50b63396de4cdbd8c4e86dc5d0e01ed24276efb6851938baa8b796bc",
+    "generated_at": "2026-10-15T00:00:00Z",
+    "products": [
+      {
+        "product_id": "acceptance_builder",
+        "enabled": false
+      },
+      {
+        "product_id": "brief_decoder",
+        "enabled": true
+      },
+      {
+        "product_id": "client_update_writer",
+        "enabled": false
+      },
+      {
+        "product_id": "kernel_demo",
+        "enabled": false
+      },
+      {
+        "product_id": "proposal_ai",
+        "enabled": true
+      },
+      {
+        "product_id": "task_finder",
+        "enabled": false
+      }
+    ],
+    "usage_metrics": [
+      {
+        "metric_key": "proposal_ai.test_generations",
+        "product_id": "absent-product",
+        "unit": "generation",
+        "enabled": true
+      },
+      {
+        "metric_key": "brief_decoder.test_analyses",
+        "product_id": "brief_decoder",
+        "unit": "analysis",
+        "enabled": true
+      }
+    ]
+  },
+  "digest-mismatch": {
+    "schema_version": 1,
+    "tenant_id": "anytoolai",
+    "region": "ru",
+    "manifest_version": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "generated_at": "2026-10-15T00:00:00Z",
+    "products": [
+      {
+        "product_id": "acceptance_builder",
+        "enabled": false
+      },
+      {
+        "product_id": "brief_decoder",
+        "enabled": true
+      },
+      {
+        "product_id": "client_update_writer",
+        "enabled": false
+      },
+      {
+        "product_id": "kernel_demo",
+        "enabled": false
+      },
+      {
+        "product_id": "proposal_ai",
+        "enabled": true
+      },
+      {
+        "product_id": "task_finder",
+        "enabled": false
+      }
+    ],
+    "usage_metrics": [
+      {
+        "metric_key": "proposal_ai.test_generations",
+        "product_id": "proposal_ai",
+        "unit": "generation",
+        "enabled": true
+      },
+      {
+        "metric_key": "brief_decoder.test_analyses",
+        "product_id": "brief_decoder",
+        "unit": "analysis",
+        "enabled": true
+      }
+    ]
+  },
+  "wrong-tenant": {
+    "schema_version": 1,
+    "tenant_id": "other",
+    "region": "ru",
+    "manifest_version": "sha256:ff73060f627e2ce7e1fb6883ab9f96f2526a7e8e540cb6e46419eb3d6cf7037f",
+    "generated_at": "2026-10-15T00:00:00Z",
+    "products": [
+      {
+        "product_id": "acceptance_builder",
+        "enabled": false
+      },
+      {
+        "product_id": "brief_decoder",
+        "enabled": true
+      },
+      {
+        "product_id": "client_update_writer",
+        "enabled": false
+      },
+      {
+        "product_id": "kernel_demo",
+        "enabled": false
+      },
+      {
+        "product_id": "proposal_ai",
+        "enabled": true
+      },
+      {
+        "product_id": "task_finder",
+        "enabled": false
+      }
+    ],
+    "usage_metrics": [
+      {
+        "metric_key": "proposal_ai.test_generations",
+        "product_id": "proposal_ai",
+        "unit": "generation",
+        "enabled": true
+      },
+      {
+        "metric_key": "brief_decoder.test_analyses",
+        "product_id": "brief_decoder",
+        "unit": "analysis",
+        "enabled": true
+      }
+    ]
+  },
+  "wrong-region": {
+    "schema_version": 1,
+    "tenant_id": "anytoolai",
+    "region": "other",
+    "manifest_version": "sha256:da5c51779f9ef50bc94c7a2cbc8d4f78a983b6a2917ae7327e21f54cb6125edf",
+    "generated_at": "2026-10-15T00:00:00Z",
+    "products": [
+      {
+        "product_id": "acceptance_builder",
+        "enabled": false
+      },
+      {
+        "product_id": "brief_decoder",
+        "enabled": true
+      },
+      {
+        "product_id": "client_update_writer",
+        "enabled": false
+      },
+      {
+        "product_id": "kernel_demo",
+        "enabled": false
+      },
+      {
+        "product_id": "proposal_ai",
+        "enabled": true
+      },
+      {
+        "product_id": "task_finder",
+        "enabled": false
+      }
+    ],
+    "usage_metrics": [
+      {
+        "metric_key": "proposal_ai.test_generations",
+        "product_id": "proposal_ai",
+        "unit": "generation",
+        "enabled": true
+      },
+      {
+        "metric_key": "brief_decoder.test_analyses",
+        "product_id": "brief_decoder",
+        "unit": "analysis",
+        "enabled": true
+      }
+    ]
+  }
+}

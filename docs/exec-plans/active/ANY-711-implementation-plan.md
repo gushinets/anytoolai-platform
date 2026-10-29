@@ -7,8 +7,8 @@
 - Created: 2026-10-29
 - Last updated: 2026-10-29
 - Review date: 2026-10-29
-- Next action: Step 2 is implemented and its required 139-test focused suite passes; await an explicit request for Step 3. Steps 3–4 have not started.
-- Blocker: none for Step 2 implementation. Quick-check stops at generated-artifact freshness pending Step 3; one unchanged deployment test requires passwordless sudo. Consumer/TCP verification belongs to Step 4.
+- Next action: Step 3 is implemented and its required focused checks pass; await an explicit request for Step 4. Step 4 has not started.
+- Blocker: none for Step 3 implementation. Generated-artifact freshness is restored. Broad quick-check is not green: its run was interrupted after one observed failure, and the unchanged passwordless-sudo test independently fails. Consumer/TCP verification belongs to Step 4.
 - Development branch: `feature/ANY-711`, created by the owner from Kernel `main`.
 - Review outcome: the accepted design is unchanged; all four accepted review clarifications are incorporated.
 - Canonical plan: `docs/exec-plans/active/ANY-711-implementation-plan.md` in Kernel. Do not create a second independent Portal plan.
@@ -379,7 +379,7 @@ Runtime verification stays NOT_RUN until implementation and execution actually o
 
 - [x] Step 1 — Declare and validate technical capabilities
 - [x] Step 2 — Serve an authenticated manifest in the trusted RU scope
-- [ ] Step 3 — Publish and verify the producer contract
+- [x] Step 3 — Publish and verify the producer contract
 - [ ] Step 4 — Prove real HTTP interoperability with an isolated Portal client
 
 ### Step 1 — Declare and validate technical capabilities
@@ -927,6 +927,132 @@ Report the implemented behavior, changed files, verification results, remaining 
 **Proposed commit**
 
 `ANY-711 - Publish manifest contract and compatibility fixtures`
+
+**Execution record — 2026-10-29 (Step 3)**
+
+Implementation is confined to Step 3 in Kernel. Portal sources/artifacts remain read-only;
+Step 4 has not started.
+
+Prerequisites verified:
+
+- Initial worktree clean; branch `feature/ANY-711`, HEAD
+  `ea5a9f77458082b7d56fd7704b225afe7ece2759` contains completed Steps 1–2.
+  Local `main` and `origin/main` remain `3c639c0a7de53c54cb6ce88e56a5813b73e76739`.
+- Read root/applicable instructions, overall goal, shared decisions, invariants and full
+  Step 3 prompt; inspected response/OpenAPI/docs/type generation and the peer's v1
+  schema, fixtures and independent checker. Portal remains clean at
+  `2bb07d778edc5ea56011b0034ba24b0702ede81f`. No Portal environment preparation or
+  application imports were performed.
+- Existing managed Python environment: `runner.py doctor` **PASS**, optional Docker warning.
+  The host has no `python` alias; checks use `.quick-check-venv/bin/python`.
+  Endpoint and projection prerequisites are confirmed by the focused suites below.
+- Frontend dependencies were absent. Initial sandbox `pnpm` invocation failed creating
+  its external store; authorized `pnpm install --frozen-lockfile` **PASS** with the
+  available pnpm 11.25.0 / openapi-typescript 7.13.0. Lockfiles/package manifests unchanged.
+
+Implemented:
+
+- `openapi/generate.py` exports draft-2020-12 schema from the actual
+  `CapabilityManifestResponse.model_json_schema(mode="serialization")`.
+  `docs_generation.py` includes `capability-manifest-v1.schema.json` in ordinary
+  generation/freshness checks. Both JSON outputs are parsed as header-free JSON;
+  Markdown retains source-header assertions. Tests cover deterministic rendering,
+  committed-artifact freshness and exact model correspondence. Resolved local references
+  prove correspondence with the actual OpenAPI success schema, despite `$defs` versus
+  `components/schemas` layouts; wire fields named like annotations are not discarded.
+- Kernel-owned `docs/contracts/kernel-capability-manifest/v1/`: contract README,
+  unchanged positive fixture/digest bytes, ordinary disabled example, 13 deliberately
+  corrupt consumer payloads and `SHA256SUMS`. Positive byte hash remains
+  `25f39800090615eeba04cb27ab020332d0cf7cf7250fac6d2e5c38754c89b354`;
+  semantic version remains
+  `sha256:a39bac9f210a6ac67e97e117f8481a5954dc3f36bdaab2fd54c7522b27d6ec29`.
+  The disabled example independently pins
+  `sha256:478761c681d02330ed052aabe5e1b472dc1c2ee56d79a568a8009f4b4503a694`.
+- Offline checker validates byte hashes, schema, strict protocol integer, aware/valid
+  timestamps, unique identities, metric references, exact RU scope and independent digest.
+  Explicit timestamp validation avoids relying on jsonschema's absent optional date-time
+  package. It verifies the existing Portal positive/digest copies byte-for-byte and compares
+  resolved schema constraints without importing Portal application code. Baseline contract
+  tests exercise the checker, tampered peer copies, material changes, timestamp/order stability,
+  ordinary disabled serialization and enabled immutable test-registry serialization through
+  the actual handler/model. This is direct handler evidence, not TCP HTTP/client evidence.
+- Regenerated config registry (RU), OpenAPI JSON/Markdown and CE-kit API types through the
+  existing tools. Updated config/integration documentation and index navigation. Historical
+  simulated evidence is unchanged; no runtime fixture import, competing handwritten schema,
+  extra wire field or shared runtime package was added.
+
+Verification:
+
+```bash
+.quick-check-venv/bin/python -m pytest -o addopts= -q \
+  tests/test_docs_generation.py \
+  apps/platform-api/tests/test_capability_manifest_contract.py \
+  apps/platform-api/tests/test_capability_projection.py
+.quick-check-venv/bin/python -m pytest -o addopts= -q \
+  packages/backend/platform-core/tests/unit/test_config_loader.py \
+  apps/platform-api/tests/test_startup_config_validation.py tests/test_validate_docs.py
+.quick-check-venv/bin/python -m pytest -o addopts= -q apps/platform-api/tests/test_capability_manifest.py
+.quick-check-venv/bin/python scripts/agent/check_capability_manifest_contract.py --portal-root ../payments-portal
+.quick-check-venv/bin/python scripts/agent/runner.py generate-docs
+.quick-check-venv/bin/python scripts/agent/runner.py generate-docs --check
+.quick-check-venv/bin/python scripts/agent/runner.py validate-docs
+.quick-check-venv/bin/python scripts/agent/runner.py validate-configs
+.quick-check-venv/bin/python scripts/agent/runner.py validate-architecture
+pnpm --dir packages/frontend/ce-kit run generate-api-types
+pnpm --dir packages/frontend/ce-kit run generate-api-types:check
+pnpm --dir packages/frontend/ce-kit run typecheck
+pnpm --dir packages/frontend/ce-kit run test
+pnpm --dir packages/frontend/ce-kit run lint
+.quick-check-venv/bin/python scripts/agent/runner.py quick-check
+.quick-check-venv/bin/python -m pytest -o addopts= -q \
+  tests/test_runner.py::test_activation_marker_is_readable_by_non_root_api_user
+```
+
+Actual results:
+
+- Final contract/docs/projection suite: **PASS — 45 passed in 15.50s** (earlier run: 44).
+- Loader/startup/docs regressions: **PASS — 121 passed in 23.89s**. These include invalid
+  producer declaration/startup refusal; they are distinct from corrupt consumer fixtures.
+- Manifest API/security regressions: **PASS — 48 passed in 48.28s**, executed outside sandbox
+  because Step 2 had established sandbox ASGI/thread-wakeup stalls.
+- Offline fixture/digest/schema/Portal-copy checker: **PASS**. Additionally loaded only the
+  stdlib definitions of Portal's existing `scripts/check_kernel_manifest_contract.py` via
+  `runpy.run_path` (no `main` or application imports): its `validate_manifest` accepts both
+  positive examples, rejects all 13 corrupt payloads, and its `semantic_digest` agrees with
+  both independent pins. No mock server, Portal settings, typed HTTP client or preflight ran.
+- Generation, freshness, config/architecture/docs guards: **PASS**. LiteLLM's pre-existing
+  optional remote cost-map lookup cannot resolve in sandbox and falls back to its bundled map;
+  generation still succeeds deterministically.
+- API type generation/freshness and CE-kit typecheck/lint: **PASS**. CE-kit unit suite:
+  **PASS — 323 passed across 38 files**.
+- New Python checker/test module: Ruff check/format **PASS**. Four directly formatted Python
+  files: **PASS**. Existing Ruff counts unchanged: OpenAPI generator 1 → 1,
+  docs generator 8 → 8, docs tests 8 → 8; no new findings. The docs generator's pre-existing
+  whole-file format failure is independently reproduced from HEAD; no unrelated cleanup.
+- Broad `quick-check`: **INTERRUPTED / not a complete-suite PASS**. Dependency setup and
+  config/architecture/docs/freshness gates passed. Pytest reached the reported 84% checkpoint
+  with one observed failure before the owned pytest was deliberately interrupted after all
+  Step 3 focused checks completed and the existing environment failure was independently
+  confirmed. Interruption also produced the previously observed pytest `tmp_path` teardown
+  `KeyError`; the wrapper exited `1` without a final test-count summary. Only owned baseline
+  pytest PID `555060` (matched by its exact dedicated basetemp) received SIGINT; no unrelated
+  process/stack was stopped. Unfinished/excluded tests are not PASS evidence. The last added
+  serialization/reference regression is covered by the final 45-test focused rerun above.
+- Standalone unchanged
+  `tests/test_runner.py::test_activation_marker_is_readable_by_non_root_api_user`:
+  **FAIL — 1 failed in 0.44s**. `sudo -n -u nobody` reports `sudo: a password is required`,
+  reproducing the Step 1/2 environment limitation. Runner, activation implementation and this
+  test are unchanged; no sudo/host configuration was modified. A fully green baseline still
+  requires an environment supporting this existing cross-user check and a completed full run.
+- `git diff --check`: **PASS**; production generation, artifacts/types, checker/tests and
+  documentation diff reviewed. Portal still clean; dependency locks and staging index unchanged.
+
+Remaining limitations: actual TCP HTTP → unchanged Portal client, complete temporary
+test configuration, pre-import dotenv isolation and manual serve/probe procedures remain
+**NOT_RUN / Step 4**. Full-check, PostgreSQL concurrency, Compose/atoms smoke, deployed
+TLS/private-zone controls and production commercial approval are **NOT_RUN** for this step.
+No real billing calls, migrations, deployment or data changes. No staging, commits, pushes,
+branch/history changes or subsequent implementation steps.
 
 ### Step 4 — Prove real HTTP interoperability with an isolated Portal client
 

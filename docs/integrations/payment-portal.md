@@ -65,8 +65,11 @@ existing working data is neither migrated nor relabelled. See the
 The peer was rechecked read-only at `2bb07d778edc5ea56011b0034ba24b0702ede81f`.
 Its current settings support configured sources; the older production prohibition below is a
 historical observation, not current enablement authority. Historical simulated fixture evidence
-above remains unchanged. Generated producer contract publication is Step 3; actual TCP HTTP
-interoperability with the unchanged Portal client is Step 4. Neither is claimed by Step 2 tests.
+above remains unchanged. The [Kernel-owned v1 contract](../contracts/kernel-capability-manifest/v1/README.md)
+now publishes a generated serialization schema, canonical positive/negative fixtures and byte
+checksums. Offline checks retain the Portal positive bytes and independent semantic version,
+and compare resolved standalone/OpenAPI/Portal schema constraints. Actual TCP HTTP interoperability
+with the unchanged Portal client remains Step 4; artifact checks do not establish that result.
 
 ## Dependencies before real integration
 
