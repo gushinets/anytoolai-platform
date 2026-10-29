@@ -41,8 +41,10 @@ Terms:
 
 `context.task_text` is written by the freelancer: it carries the client's request and may also
 carry the freelancer's own decisions about it (see the rule on the freelancer's directions in
-"Form"). A term is a price or budget, a payment split, a deadline or duration, a number of pages,
-items or revision rounds, or a guarantee. This section is the only rule for terms and their
+"Form"). A term is a price or budget, a payment split, a deadline or duration, a limit such as
+the number of revision rounds, or a guarantee. The work the client asks for (pages, templates,
+blocks, documents) is scope, not a term: offer it as your work under "Scope and conditions from the
+order", without calling it proposed or not agreed. This section is the only rule for terms and their
 values. Give each term the status of the first rule below that applies, and make that status
 explicit in the text, never leave it implied by merely restating the term:
 

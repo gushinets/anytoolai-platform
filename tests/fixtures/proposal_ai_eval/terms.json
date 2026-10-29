@@ -159,6 +159,23 @@
         "EUR (?!200\\b)\\d",
         "\\d+ EUR(?<!200 EUR)"
       ]
+    },
+    {
+      "id": "ceiling-and-scope-en",
+      "rule": "3 and 5: the budget ceiling is the client's proposal and the fee stays open; the requested work is scope offered as the freelancer's work, never called proposed or not agreed",
+      "task_text": "Northlake Books needs a Shopify accessibility review, not a redesign. Audit 6 templates: home, collection, product, cart, search, contact. Deliver a prioritized issue spreadsheet with reproduction steps and a 45-minute handover. Check keyboard use, focus, labels and contrast against WCAG 2.2 AA. No certification or legal compliance guarantee. We can provide staging access on 8 October 2026; the report is needed by 16 October if access arrives on time. Theme edits, third-party checkout and app remediation are excluded. Budget ceiling USD 1,200; final fee must be agreed after inspecting the theme.",
+      "freelancer_positioning": "I am a frontend developer who has performed manual keyboard and screen-reader checks on two ecommerce projects. I use browser devtools and axe as aids, and document limitations clearly. I am not a certified accessibility auditor and have no Shopify Plus experience.",
+      "tone": "neutral",
+      "expect_language": "en",
+      "expect_gap": true,
+      "must": [
+        "USD 1,?200",
+        "(after|once)[^.]{0,40}inspect"
+      ],
+      "must_not": [
+        "(scope|templates?|handover|deliverables?)[^.]{0,40}(are|is) (proposed|not (yet )?agreed)",
+        "USD (?!1,?200\\b)\\d"
+      ]
     }
   ]
 }
