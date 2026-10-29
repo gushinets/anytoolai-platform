@@ -307,10 +307,14 @@ def test_prompt_v2_pins_the_quality_rules_from_the_qa_report() -> None:
         "Scope and conditions from the order",  # Q-001
         "Do not offer, describe as your work or imply anything",  # Q-001 exclusions
         "the number of revision rounds, what is paid separately",  # Q-001 limits
-        "is never stated as accepted: decline it when the order says so",  # Q-001 requested terms
+        "is never stated as accepted unless the order or the positioning explicitly accepts it",  # Q-001
+        "decline it when the order says so",  # Q-001 requested terms
         "has one of three statuses, and the text makes that status explicit",  # ANY-631 term status
         "say plainly that you do not accept it, naming the term with its exact value",  # ANY-631 P04
-        "Do not propose a replacement value",  # ANY-631 no invented budget
+        "Do not invent a replacement value",  # ANY-631 no invented budget
+        "When the order or the positioning explicitly accepts it, state it as accepted",  # review #1 P1
+        "a counteroffer the order tells you to make",  # review #1 P2
+        "then use exactly that value",
         "Restate it exactly and confirm it",  # ANY-631 agreed terms (P05)
         "a limit of the freelancer's experience stays under \"Facts\"",  # Q-001 vs experience gaps
         "never \"if available\" or \"if applicable\"",  # Q-001 start condition

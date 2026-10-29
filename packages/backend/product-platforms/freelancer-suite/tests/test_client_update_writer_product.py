@@ -563,6 +563,9 @@ def test_prepaid_request_prompt_forbids_invented_dates_without_a_due_date() -> N
                 "a term the client only requests is never stated as accepted",
                 "Make the status of each such term explicit",  # ANY-631 term status
                 "is plainly stated as not accepted, with its exact value",
+                "a requested term that `intent` explicitly accepts",  # review #1 P1
+                "the change replaces the earlier term",
+                "or that `intent` does not accept and that conflicts with the scope or another term",
             ),
         ),
     ],

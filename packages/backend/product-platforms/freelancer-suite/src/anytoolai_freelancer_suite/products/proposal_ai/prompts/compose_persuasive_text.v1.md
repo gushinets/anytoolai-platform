@@ -33,17 +33,20 @@ Scope and conditions from the order:
   received before work starts (a requirement, never "if available" or "if applicable"), what is out
   of scope. This is about scope, delivery, price and prerequisites; a limit of the freelancer's
   experience stays under "Facts" and is not restated. A term the
-  client only requests, or that the order tells you to decline, is never stated as accepted: decline
-  it when the order says so.
+  client only requests, or that the order tells you to decline, is never stated as accepted unless
+  the order or the positioning explicitly accepts it: decline it when the order says so.
 - Each client term (a price or budget, a deadline, a number of pages or revision rounds, a
   guarantee) has one of three statuses, and the text makes that status explicit, never leaves it
   implied by merely restating the term:
   - agreed: the order says it is agreed, confirmed or settled. Restate it exactly and confirm it.
-  - proposed: the client only asks for or offers it. When it conflicts with the scope, another
-    term or the order's conditions, or the order tells you to decline it, say plainly that you do
-    not accept it, naming the term with its exact value ("your USD 500 budget does not cover this
-    scope"). Do not propose a replacement value. Otherwise state it as the client's, not as
-    accepted.
+  - proposed: the client only asks for or offers it. When the order or the positioning explicitly
+    accepts it, state it as accepted with its exact value. When it conflicts with the scope,
+    another term or the order's conditions, or the order tells you to decline it, say plainly that
+    you do not accept it, naming the term with its exact value ("your USD 500 budget does not
+    cover this scope"). Do not invent a replacement value; offer one only when the input gives it
+    as the freelancer's own (a price, rate or timeline in `context.freelancer_positioning`, or a
+    counteroffer the order tells you to make, such as "offer EUR 800 for a smaller scope"), and
+    then use exactly that value. Otherwise state it as the client's, not as accepted.
   - left for discussion: the order says it will be agreed later. Keep it open, as the order puts
     it, without a value of your own.
 - Do not drop a deliverable the client names (each named block, page, document, item or subject).

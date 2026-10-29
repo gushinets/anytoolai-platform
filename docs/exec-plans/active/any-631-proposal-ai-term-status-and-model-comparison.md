@@ -86,6 +86,22 @@ The gaps language defect (ANY-771), Docker dependency cache (ANY-770), changing 
 - `python scripts/agent/runner.py quick-check`
 - Freelancer Suite prompt-fragment tests.
 - Live: P04 and P05 x 3 on `gpt-6-luna`/`medium` with the new rule (2026-10-29): P04 3/3, P05 3/3.
+- Code review #1 fixes (an explicitly accepted change to an agreed term is stated as accepted; a
+  counteroffer is allowed only when the freelancer supplies its exact value), live on
+  `gpt-6-luna`/`medium` through the API, 2026-10-29:
+  - ProposalAI P04 x 3 (no counteroffer in the input): EUR 300 not accepted, no replacement value.
+  - ProposalAI, order "decline EUR 300 and the 48-hour deadline, offer EUR 800 for a smaller 5-page
+    first phase" x 3: EUR 300 and 48 hours declined, exactly EUR 800 for 5 pages offered, no other
+    amount.
+  - ProposalAI, agreed one revision round for USD 400 by 20 November, order "accept a second round
+    at no extra cost" x 3: the second round is stated as accepted, USD 400 and the date confirmed.
+  - Reply Draft, client "We agreed one revision round; can we have two?", `reply_goal` "Agree to two
+    revision rounds" x 3: "Yes, we can have two revision rounds instead of the one we originally
+    agreed."
+  - Reply Draft, same message, `reply_goal` "Decline the second revision round; one round stays as
+    agreed" x 3: the second round is not accepted, the agreed one round stays.
+  - These checks ran after the comparison: they only exercise the new exceptions, which none of the
+    comparison cases trigger, so the comparison results stand.
 
 ## Results (2026-10-29, prompt `369e0775`, 410 runs through the web form)
 
@@ -116,3 +132,106 @@ Full report and every output: ANY-631 comment and attachment "ANY-631: полн�
   luna / high 1/110, ANY-771); the web form giving up after 60 s while the scenario still finished
   (ANY-777); `gpt-6.1-terra` / `medium` returning text without the JSON wrapper (8 of 20 first
   attempts, 2 visible errors); one form error after 33 s with an unknown cause.
+
+## Acceptance audit (code review #1)
+
+Per case and configuration: usable runs, critical errors, time and estimated cost per run. Stage 1
+and stage 2 runs of the two finalists are counted together (20 per case).
+
+| Configuration | Case | Usable | Critical | Median, s | Mean, s | Mean USD per run |
+|---|---|---|---|---|---|---|
+| luna-medium | P01 | 20/20 | 0 | 22.6 | 23.1 | 0.00133 |
+| luna-medium | P02 | 19/20 | 0 | 27.1 | 26.7 | 0.00154 |
+| luna-medium | P04 | 17/20 | 0 | 20.5 | 20.2 | 0.00096 |
+| luna-medium | P05 | 20/20 | 0 | 18.5 | 18.9 | 0.00088 |
+| luna-high | P01 | 20/20 | 0 | 33.6 | 35.5 | 0.00185 |
+| luna-high | P02 | 19/20 | 0 | 44.2 | 43.9 | 0.00227 |
+| luna-high | P04 | 20/20 | 0 | 28.1 | 28.2 | 0.00125 |
+| luna-high | P05 | 20/20 | 0 | 22.5 | 24.4 | 0.00115 |
+| terra-medium | P01 | 5/5 | 0 | 11.5 | 10.8 | 0.00418 |
+| terra-medium | P02 | 4/5 | 0 | 21.5 | 21.0 | 0.01065 |
+| terra-medium | P04 | 4/5 | 0 | 11.9 | 11.8 | 0.00406 |
+| terra-medium | P05 | 5/5 | 0 | 9.5 | 11.2 | 0.00418 |
+| terra-high | P01 | 5/5 | 0 | 11.9 | 12.5 | 0.00494 |
+| terra-high | P02 | 5/5 | 0 | 29.0 | 28.3 | 0.01217 |
+| terra-high | P04 | 5/5 | 0 | 18.0 | 17.7 | 0.00603 |
+| terra-high | P05 | 5/5 | 0 | 11.9 | 12.6 | 0.00486 |
+| sol-medium | P01 | 5/5 | 0 | 14.0 | 14.4 | 0.00776 |
+| sol-medium | P02 | 5/5 | 0 | 16.0 | 15.6 | 0.00921 |
+| sol-medium | P04 | 5/5 | 0 | 16.0 | 16.0 | 0.01130 |
+| sol-medium | P05 | 5/5 | 0 | 11.4 | 12.0 | 0.00774 |
+| sol-high | P01 | 5/5 | 0 | 29.0 | 27.8 | 0.01463 |
+| sol-high | P02 | 5/5 | 0 | 31.1 | 31.2 | 0.01730 |
+| sol-high | P04 | 5/5 | 0 | 33.6 | 32.6 | 0.02105 |
+| sol-high | P05 | 5/5 | 0 | 18.5 | 19.6 | 0.01202 |
+| luna-medium-v | V1 | 4/5 | 0 | 27.1 | 27.9 | 0.00152 |
+| luna-medium-v | V2 | 5/5 | 0 | 22.5 | 21.7 | 0.00122 |
+| luna-medium-v | V3 | 5/5 | 0 | 20.5 | 21.3 | 0.00121 |
+| luna-medium-v | V4 | 5/5 | 0 | 16.0 | 14.8 | 0.00067 |
+| luna-medium-v | V5 | 5/5 | 0 | 24.6 | 24.7 | 0.00137 |
+| luna-medium-v | V6 | 5/5 | 0 | 22.5 | 21.6 | 0.00115 |
+| luna-high-v | V1 | 4/5 | 0 | 25.0 | 26.6 | 0.00166 |
+| luna-high-v | V2 | 5/5 | 0 | 27.1 | 29.2 | 0.00178 |
+| luna-high-v | V3 | 5/5 | 0 | 24.5 | 21.7 | 0.00140 |
+| luna-high-v | V4 | 5/5 | 0 | 18.0 | 18.6 | 0.00098 |
+| luna-high-v | V5 | 5/5 | 0 | 27.1 | 30.6 | 0.00178 |
+| luna-high-v | V6 | 5/5 | 0 | 27.1 | 28.7 | 0.00148 |
+| luna-mixed | P01 | 20/20 | 0 | 28.1 | 29.1 | 0.00165 |
+| luna-mixed | P02 | 18/20 | 0 | 35.7 | 36.8 | 0.00211 |
+| luna-mixed | P04 | 19/20 | 0 | 27.1 | 29.3 | 0.00146 |
+| luna-mixed | P05 | 20/20 | 0 | 22.5 | 23.7 | 0.00113 |
+| luna-mixed-v | V1 | 5/5 | 0 | 29.3 | 27.5 | 0.00169 |
+| luna-mixed-v | V2 | 5/5 | 0 | 22.5 | 23.1 | 0.00146 |
+| luna-mixed-v | V3 | 5/5 | 0 | 20.5 | 22.7 | 0.00141 |
+| luna-mixed-v | V4 | 5/5 | 0 | 18.0 | 17.8 | 0.00092 |
+| luna-mixed-v | V5 | 5/5 | 0 | 27.1 | 27.8 | 0.00172 |
+| luna-mixed-v | V6 | 5/5 | 0 | 29.1 | 32.2 | 0.00187 |
+
+Time runs from form submit to the visible result or visible error. Two terra / medium runs that an early driver version waited out to its 240 s timeout have no user-visible time and are left out of the timing. Run numbers count within a configuration; the session id is unique. A `-v` configuration is the same model and reasoning on variants V1-V6.
+
+Failed runs (session: cause, as recorded in the manual review):
+
+- luna-medium P04 #4 `scenario_session_01793267689044280560_0000000075_af359fdb9f3a412d8c33799fa7156c63`: весь текст на испанском при английском заказе (бюджет при этом отклонён)
+- luna-medium P04 #6 `scenario_session_01793273011078900823_0000000112_95ae827e40c9432982eacc275a522913`: весь текст на нидерландском при английском заказе (бюджет при этом отклонён)
+- luna-medium P04 #9 `scenario_session_01793273312318190289_0000000172_320b44d65ede422185bee7d4342159c2`: весь текст на испанском при английском заказе (бюджет назван «propuesto, no acuerdo»)
+- luna-medium P02 #12 `scenario_session_01793273588129677667_0000000227_b2bd6966a54d4b1ab721c692519fe96f`: текст не на английском
+- luna-high P02 #7 `scenario_session_01793275622431794188_0000000127_d6bfb7a97ee64e10ab50dffd5b083b59`: форма показала ошибку через 60 с (лимит ожидания клиента 60 000 мс); сессия на сервере завершилась успешно около 70 с, с повторной попыткой compose
+- terra-medium P02 #3 `scenario_session_01793268902366245427_0000000050_51ac6b159c9c4559a8493133554b7680`: compose_persuasive_text дважды вернул текст без JSON-обёртки (malformed_json, обе попытки валидации), сессия failed; форма показала ошибку
+- terra-medium P04 #5 `scenario_session_01793269273457414468_0000000095_998338e35f3248cd9328e8a684230c66`: compose_persuasive_text дважды вернул текст без JSON-обёртки (malformed_json, обе попытки валидации), сессия failed; форма показала ошибку
+- luna-medium-v V1 #2 `scenario_session_01793274108002520181_0000000332_bff5ec4ba8eb40ee9ef3b3a0a653d404`: текст не на английском
+- luna-high-v V1 #2 `scenario_session_01793277038435477678_0000000332_8d97803838ed472fbd5cba108b8a1322`: весь текст на испанском при английском заказе V1 (USD 150 назван «propuesto, no acordado»)
+- luna-mixed P04 #6 `scenario_session_01793279334882393721_0000000117_63257aea8d6e4ab280098cd3ef37b8d1`: весь текст на немецком при английском заказе (бюджет при этом отклонён)
+- luna-mixed P02 #12 `scenario_session_01793280097551390879_0000000232_01f21f8d10904033a1aaa84fc6a493d4`: весь текст на испанском при английском заказе
+- luna-mixed P02 #19 `scenario_session_01793280990371256844_0000000372_533ae3fbdbdf4f96870b6b8e31d52c5f`: форма показала ошибку через 33 с, хотя сценарий завершился за 32 с без повторов и результат отдаётся (HTTP 200); причина на стороне клиента/API не установлена, логи API потеряны при перезапуске
+
+Model and reasoning check: 410 runs, 820 session x step pairs in `provider_calls`; mismatches: 0
+
+How the model and reasoning were verified, so that no configuration was swapped silently:
+
+- Every switch copied an edited router config into the running api and worker containers,
+  restarted them and read `model` and `reasoning_effort` back from the worker's own config file;
+  the log below is that read-back. The script asserts that the requested and the read-back values
+  match.
+- Every run must have started after the switch to its own configuration and before the next one.
+- Every LLM step of every run is checked in `provider_calls`: `model` must be the configuration's
+  model and `gateway_model` the alias of that step (`anytoolai.default_text`; in the mixed
+  experiment `anytoolai.default_text_high` for `compose_persuasive_text` only). The reasoning effort
+  itself is not stored per call, so it is proven by the alias and the read-back of that alias.
+
+Config switches as read back from the worker (UTC):
+
+- 2026-10-29T09:48:12Z gpt-6-luna medium worker: model: openai/gpt-6-luna reasoning_effort: medium allowed_openai_params: [reasoning_effort]
+- 2026-10-29T09:58:03Z gpt-6-luna high worker: model: openai/gpt-6-luna reasoning_effort: high allowed_openai_params: [reasoning_effort]
+- 2026-10-29T10:11:26Z gpt-6.1-terra medium worker: model: openai/gpt-6.1-terra reasoning_effort: medium allowed_openai_params: [reasoning_effort]
+- 2026-10-29T10:27:14Z gpt-6.1-terra high worker: model: openai/gpt-6.1-terra reasoning_effort: high allowed_openai_params: [reasoning_effort]
+- 2026-10-29T10:35:31Z gpt-6.1-sol medium worker: model: openai/gpt-6.1-sol reasoning_effort: medium allowed_openai_params: [reasoning_effort]
+- 2026-10-29T10:42:41Z gpt-6.1-sol high worker: model: openai/gpt-6.1-sol reasoning_effort: high allowed_openai_params: [reasoning_effort]
+- 2026-10-29T10:54:46Z gpt-6-luna medium worker: model: openai/gpt-6-luna reasoning_effort: medium allowed_openai_params: [reasoning_effort]
+- 2026-10-29T11:13:45Z gpt-6-luna medium worker: model: openai/gpt-6-luna reasoning_effort: medium allowed_openai_params: [reasoning_effort]
+- 2026-10-29T11:51:54Z gpt-6-luna high worker: model: openai/gpt-6-luna reasoning_effort: high allowed_openai_params: [reasoning_effort]
+- 2026-10-29T12:42:40Z gpt-6-luna medium worker: model: openai/gpt-6-luna reasoning_effort: medium allowed_openai_params: [reasoning_effort]
+- 2026-10-29T12:55:00Z mixed experiment: detect_gaps -> `anytoolai.default_text` (medium), compose ->
+  `anytoolai.default_text_high` (high). The first attempt failed (read-only product configs, the
+  stock worker kept running) and ran nothing; the experiment worker took jobs from the second
+  attempt on, the stock worker paused, as `gateway_model` per step shows for every run.
+- 2026-10-29T13:55:02Z gpt-6-luna medium worker: model: openai/gpt-6-luna reasoning_effort: medium allowed_openai_params: [reasoning_effort]
