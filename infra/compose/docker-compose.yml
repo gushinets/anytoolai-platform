@@ -47,6 +47,12 @@ services:
       target: prod
     environment:
       <<: *postgres-credentials
+      ANYTOOLAI_TENANT_ID: ${ANYTOOLAI_TENANT_ID:-anytoolai}
+      ANYTOOLAI_REGION: ${ANYTOOLAI_REGION:-ru}
+      # Receiver credentials belong only to the API. Unset variables are omitted by Compose;
+      # explicitly malformed (including empty) values fail application validation.
+      ANYTOOLAI_PORTAL_SERVICE_TOKEN:
+      ANYTOOLAI_PORTAL_SERVICE_TOKEN_PREVIOUS:
       # platform-api itself checks internal_only scenarios' X-Live-Canary-Token header against
       # this (ScenarioRuntimeService.start_session()) -- unset by default so normal dev-up/
       # quick-check stays credential-free; only live-canary (ANY-221) needs a real token.

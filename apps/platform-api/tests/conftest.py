@@ -63,7 +63,7 @@ def platform_api_app_factory(session_factory: SessionFactory):
     def _make(*, guest_id: str) -> Any:
         with transaction_boundary(session_factory) as session:
             GuestIdentityRepository(session).create(
-                GuestIdentityRecord(id=guest_id, tenant_id="anytoolai", region="default")
+                GuestIdentityRecord(id=guest_id, tenant_id="anytoolai", region="ru")
             )
         application = create_app(config_root=CONFIG_ROOT)
         application.state.runtime = replace(

@@ -804,3 +804,58 @@ existing runtime rows and worker logs by technical ID instead of starting a dupl
   examples in `docs/architecture/runtime-storage.md` and
   `docs/exec-plans/active/a13-postgresql-concurrency-and-ce-scope.md` — CI config and docs for
   manual test invocations, untouched by this compose split.
+
+## Portal capability manifest receiver (ANY-711)
+
+The API exposes `GET /internal/v1/capability-manifest?tenant_id=anytoolai&region=ru`.
+It reads the complete immutable registry, including disabled products and metrics, without
+storage or provider access. Ordinary configuration declares all six products and the two
+approved test metrics disabled; this endpoint does not enable commercial admission.
+
+`ANYTOOLAI_TENANT_ID` and `ANYTOOLAI_REGION` select the trusted API scope (defaults:
+`anytoolai` and `ru`). Both must exist in the loaded registry or startup fails. Runtime routes
+use these same settings. Worker execution retains the scope carried by each job. Changing the
+baseline creates no migration, reset or relabelling of existing `default` data; operators must
+resolve any required historical data preservation before deploying a scope change. Broader
+regional isolation remains ANY-282.
+
+Configure `ANYTOOLAI_PORTAL_SERVICE_TOKEN` only in the receiver API's operator environment or
+secret store. The base Compose file passes it through only when supplied; it is absent from
+worker and frontend environments. Unconfigured receivers return safe `503 manifest_unavailable`
+while guest and public runtime-config routes retain their ordinary behavior. Explicit empty or
+malformed values fail startup. Tokens accept 32–256 ASCII Bearer characters (letters, digits,
+`._~+/-`, with optional trailing `=` padding). Use a cryptographically random secret of at least
+32 random bytes; syntax validation alone does not establish entropy. Settings repr/JSON and
+validation messages redact secrets.
+
+Portal sends the secret in `Authorization: Bearer <secret>` over TLS with certificate
+verification. The credential identifies the trusted Portal caller, authorizes only manifest
+read and binds to the configured tenant/region. Missing, invalid or duplicate credentials return
+`401` with `WWW-Authenticate: Bearer`; an authenticated wrong or ambiguous scope returns `403`.
+Missing required query fields return the normal safe `422` envelope. Errors preserve request
+correlation; internal responses have `Cache-Control: no-store`. All requests carrying `Origin`,
+including browser preflight, are rejected, and internal routes bypass public CORS handling.
+The deployment activation gate also protects the manifest; it is not a readiness exemption.
+
+For rotation, use one bounded rollout window:
+
+1. Generate a new independent secret; configure it as `ANYTOOLAI_PORTAL_SERVICE_TOKEN` and
+   configure the old secret as `ANYTOOLAI_PORTAL_SERVICE_TOKEN_PREVIOUS`. Restart the API.
+2. Switch the Portal's server-side `KERNEL_SERVICE_TOKEN`, then verify the new credential.
+3. Remove `ANYTOOLAI_PORTAL_SERVICE_TOKEN_PREVIOUS` and restart the API before closing the
+   rollout window. Verify the removed token receives `401` and the new token still succeeds.
+
+At most two distinct receiver tokens are accepted. A previous token without a distinct current
+token fails startup. The previous slot is an operator-controlled overlap, with no automatic
+expiry; do not leave it configured after rotation. Use independent secrets for each direction,
+environment and regional connection. Guest/user, demo, Atom Lab, live-canary and reverse-direction
+credentials grant no manifest authority. Retain private-zone network controls and the existing
+production loopback API binding. TLS and network deployment are operator-owned prerequisites;
+local API tests do not establish a deployed TLS connection or production commercial approval.
+
+`create_app(config_root=..., bundles=...)` forwards explicit bundle sequences unchanged to
+`build_runtime`: they replace the default product bundles. Omission or `None` preserves the six
+standard products. Temporary complete configurations can use this seam through the real
+ConfigLoader without mutating global defaults. The real TCP/Portal consumer conformance harness
+and its manual procedures belong to Step 4 of the
+[canonical plan](../../docs/exec-plans/active/ANY-711-implementation-plan.md).

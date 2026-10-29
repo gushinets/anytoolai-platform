@@ -108,8 +108,10 @@ returns immutable semantics without storage, provider, network or clock access. 
 `manifest_version` is `sha256:` plus the SHA-256 of compact UTF-8 JSON (`ensure_ascii=False`),
 with object keys sorted recursively, products sorted by `product_id`, and metrics sorted by
 `metric_key`. Only `schema_version`, `tenant_id`, `region`, `products` and `usage_metrics` enter
-the hash. A generation timestamp and the digest itself are excluded. HTTP serving, scope
-authorization and response-model publication are subsequent ANY-711 steps.
+the hash. A generation timestamp and the digest itself are excluded. The API serves this projection
+through its authenticated internal manifest route in the validated trusted tenant/region scope. See the
+[receiver configuration](../../infra/deployment/README.md#portal-capability-manifest-receiver-any-711).
+Generated contract publication and real Portal HTTP conformance remain subsequent ANY-711 steps.
 
 ## Provider policy ownership
 

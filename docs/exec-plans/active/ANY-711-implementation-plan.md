@@ -7,8 +7,8 @@
 - Created: 2026-10-29
 - Last updated: 2026-10-29
 - Review date: 2026-10-29
-- Next action: Step 1 is implemented and its required focused checks pass; await an explicit request for Step 2. Steps 2–4 have not started.
-- Blocker: none for the Step 1 implementation/required focused checks; the broader quick-check has an environment-only sudo prerequisite failure. HTTP/consumer/runtime verification belongs to subsequent steps.
+- Next action: Step 2 is implemented and its required 139-test focused suite passes; await an explicit request for Step 3. Steps 3–4 have not started.
+- Blocker: none for Step 2 implementation. Quick-check stops at generated-artifact freshness pending Step 3; one unchanged deployment test requires passwordless sudo. Consumer/TCP verification belongs to Step 4.
 - Development branch: `feature/ANY-711`, created by the owner from Kernel `main`.
 - Review outcome: the accepted design is unchanged; all four accepted review clarifications are incorporated.
 - Canonical plan: `docs/exec-plans/active/ANY-711-implementation-plan.md` in Kernel. Do not create a second independent Portal plan.
@@ -378,7 +378,7 @@ Runtime verification stays NOT_RUN until implementation and execution actually o
 ## 5. Sequential Implementation Steps
 
 - [x] Step 1 — Declare and validate technical capabilities
-- [ ] Step 2 — Serve an authenticated manifest in the trusted RU scope
+- [x] Step 2 — Serve an authenticated manifest in the trusted RU scope
 - [ ] Step 3 — Publish and verify the producer contract
 - [ ] Step 4 — Prove real HTTP interoperability with an isolated Portal client
 
@@ -691,6 +691,135 @@ Report the implemented behavior, changed files, verification results, remaining 
 **Proposed commit**
 
 `ANY-711 - Serve authenticated RU capability manifest`
+
+**Execution record — 2026-10-29 (Step 2)**
+
+Implementation is confined to Step 2 in Kernel. Portal remains read-only; Steps 3–4
+have not started.
+
+Prerequisites verified:
+
+- Initial worktree clean; branch `feature/ANY-711`, HEAD
+  `b9e994c2c72a29cfb8e80b32016cfa85c29c841a` contains completed Step 1.
+  Local `main` and `origin/main` remain `3c639c0a7de53c54cb6ce88e56a5813b73e76739`.
+- Read the applicable Kernel instructions, architecture/conventions/harness documentation,
+  overall goal, shared decisions, invariants and full Step 2 execution prompt. Rechecked the
+  peer scope/auth/manifest contract and provisional schema read-only; Portal HEAD remains
+  `2bb07d778edc5ea56011b0034ba24b0702ede81f`. No Portal imports or environment setup.
+- Existing `.quick-check-venv` available; `runner.py doctor`: **PASS** (optional Docker warning).
+  Step 1 declaration/projection prerequisites are present; focused projection/config tests are
+  included below.
+
+Implemented:
+
+- `create_app(..., bundles=...)` forwards the exact sequence to `build_runtime()`.
+  Omission/`None` preserves standard composition; explicit sequences replace defaults, including
+  `[]`. Tests copy complete kernel/fixture product configuration through the actual ConfigLoader,
+  reject malformed temporary declarations and prove later default apps still contain six products.
+  API/worker/config-validator default bundle constants and worker source remain unchanged.
+- Trusted `ANYTOOLAI_TENANT_ID` / `ANYTOOLAI_REGION` settings, default `anytoolai/ru`, validated
+  against loaded tenants/regions at composition. The checked-in region and bounded API seed/scope
+  assertions now use RU. Existing runtime routes already consume these settings. A future-zone
+  temporary fixture demonstrates configurable scope without an RU-only branch. No working data,
+  migrations, relabelling or resets were involved; workers retain job-carried scope.
+- Real `/internal/v1/capability-manifest` router and API-owned named models with no SDK metadata.
+  Complete pure registry projection, aware UTC timestamp and unchanged semantic hashing. Ordinary
+  output includes all six disabled products and both disabled approved test metrics, independently
+  reproducing `sha256:478761c681d02330ed052aabe5e1b472dc1c2ee56d79a568a8009f4b4503a694`.
+- Dedicated Portal Bearer receiver credentials, safe syntax, redacted settings/validation,
+  constant-time current/previous comparisons and distinct-current rotation validation. Authority
+  binds caller, configured tenant/region and manifest-read permission. Duplicate Authorization
+  headers and ambiguous scope are rejected. Configured auth failures yield `401` + Bearer challenge;
+  authenticated authorization failures yield `403`. Missing receiver config yields safe `503`
+  independently of guest/public routes; malformed explicit config fails startup. Unexpected producer
+  failure yields the existing safe `500` envelope and supports recovery without partial success.
+- All internal requests carrying `Origin` (including OPTIONS) are refused. Internal routes bypass
+  public CORS and return `Cache-Control: no-store`; public CORS remains covered. Activation and
+  request correlation remain intact. Compose passes receiver secrets only to API and preserves
+  production loopback binding. Deployment/integration docs describe configuration and the bounded
+  two-key rotation procedure. The previous slot has operator-controlled removal/restart, without
+  automatic expiry; the documented rotation window must be closed explicitly.
+
+Verification commands (the first command is the required focused suite; the two broader
+selections below were interrupted as recorded):
+
+```bash
+.quick-check-venv/bin/python -m pytest -o addopts= -q \
+  apps/platform-api/tests/test_{capability_manifest,bootstrap,bundle_composition,startup_config_validation,capability_projection,runtime_config,health}.py \
+  tests/architecture/test_bundle_composition_parity.py tests/test_validate_configs.py
+
+.quick-check-venv/bin/python -m pytest -o addopts= -q \
+  apps/platform-api/tests/test_capability_manifest.py \
+  apps/platform-worker/tests/test_atom_lab_execution.py -m 'not postgresql and not slow'
+
+.quick-check-venv/bin/python -m pytest -o addopts= -q -m 'not postgresql and not slow' \
+  apps/platform-api/tests/test_{bootstrap,bundle_composition,startup_config_validation,capability_projection,runtime_config,health,access_logging,identity_quota_api,results_api,client_events_api,handoffs_api,demo_api,atom_lab_access,atom_lab_runs,proposal_ai_bundle,client_update_writer_bundle,scenario_runtime_router,atom_lab_history,atom_lab_presets}.py \
+  tests/architecture/test_bundle_composition_parity.py tests/test_validate_configs.py tests/test_runner.py
+
+.quick-check-venv/bin/python -m pytest -o addopts= -q \
+  apps/platform-api/tests/test_access_logging.py \
+  tests/test_runner.py::test_prod_compose_command_uses_fixed_project_and_prod_files \
+  tests/test_runner.py::test_prod_fake_up_does_not_pass_live_secrets_to_compose \
+  tests/test_runner.py::test_live_compose_gates_api_mutations_and_worker_on_activation_marker \
+  tests/test_runner.py::test_prod_up_stops_candidate_on_interrupt_before_activation \
+  tests/test_runner.py::test_prod_up_does_not_teardown_after_activation_if_announcement_fails \
+  tests/test_runner.py::test_failed_deployment_keeps_active_bind_source_for_restart \
+  tests/test_runner.py::test_activation_marker_is_readable_by_non_root_api_user
+
+.quick-check-venv/bin/python scripts/agent/runner.py validate-configs
+.quick-check-venv/bin/python scripts/agent/runner.py validate-architecture
+.quick-check-venv/bin/python scripts/agent/runner.py validate-docs
+.quick-check-venv/bin/python -m pytest -o addopts= -q tests/test_validate_docs.py
+.quick-check-venv/bin/python scripts/agent/runner.py generate-docs --check
+.quick-check-venv/bin/python scripts/agent/runner.py quick-check
+```
+
+Actual results:
+
+- Final required manifest/security/factory/scope/runtime-config/bootstrap/projection/composition
+  suite: **PASS — 139 passed in 3m47s**, including the added RU guest/provider-call/exact-forwarding
+  assertions. Earlier standalone manifest suite: **PASS — 47 passed**. No case is silently skipped
+  in the 139-test required selection.
+- Optional broader manifest/worker run: **INTERRUPTED — 119 passed, 2 deselected in 15m38s** before
+  interruption; not a complete-suite PASS. Optional expanded API/deployment run: **INTERRUPTED**
+  before completion; pytest also raised a `tmp_path` teardown `KeyError` during interruption.
+  Both owned processes were observed waiting in host `rq_qos_wait` (disk I/O throttling); no
+  unrelated processes were stopped. The temporarily paused owned process was resumed before
+  interruption, and both optional runs exited. PostgreSQL/slow cases were explicitly excluded.
+  Required checks were then rerun as a separate bounded selection; no excluded/interrupted case
+  is counted as full PASS evidence.
+- Focused activation/Compose/access-logging regressions: **9 passed, 1 failed in 1.58s**.
+  The sole failure is unchanged
+  `tests/test_runner.py::test_activation_marker_is_readable_by_non_root_api_user`:
+  `sudo -n -u nobody` reports `sudo: a password is required`. This reproduces the Step 1
+  environment limitation; runner/activation code and this test are unchanged. No sudo/host
+  configuration was changed. Compose checks are mocked; the access-log test cleans up its own
+  ephemeral local server. No real stack was started.
+- Config, architecture and documentation guards: **PASS**, both directly and through quick-check.
+- Documentation tests: **PASS — 14 passed**.
+- Primary/new Python files (six production files and the new test module): Ruff check/format
+  **PASS**. Across all 18 changed Python files, raw Ruff check retains **19 pre-existing findings**;
+  per-file comparison against HEAD: **PASS — no new findings**. Six older fixture/test files have
+  pre-existing format failures; changed region literals do not introduce formatting regressions.
+- `generate-docs --check`: **FAIL — expected pending Step 3 regeneration** of
+  `docs/generated/config-registry.md`, `docs/generated/openapi.json` and `docs/generated/openapi.md`.
+  These generated artifacts were not edited, and producer schema/fixture/type publication was not
+  started. Full-check is consequently not green at this intermediate step.
+- `quick-check`: initial sandbox attempt **FAIL** at editable-package setup on PyPI DNS;
+  authorized retry outside sandbox restores all six editable packages using existing locks,
+  passes config/architecture/docs guards, then **FAILS** at the same generated-artifact freshness
+  gate before its pytest stage. This is separate from the historical Step 1 sudo failure.
+- Sandbox ASGI test attempts were interrupted after event-loop/thread wakeup stalls; the unchanged
+  health test reproduces the same stall (bounded 20-second run exits `124`). Actual API test results
+  above come from authorized execution outside sandbox, using local fixtures/resources.
+- `git diff --check`: **PASS**; implementation, tests, deployment wiring and documentation reviewed.
+
+Remaining gates: producer artifacts/freshness and generated frontend types (Step 3), real TCP HTTP
+with the unchanged Portal client and isolated enabled two-product configuration (Step 4).
+PostgreSQL production concurrency, full-check, Compose/atom smoke, deployed TLS/private network
+controls and production commercial approval are **NOT_RUN** for Step 2. Only isolated local test
+resources were used. No purchases, paid runtime, external financial operations or deployment.
+No staging, commits, pushes, branch/history changes or subsequent implementation steps.
 
 ### Step 3 — Publish and verify the producer contract
 

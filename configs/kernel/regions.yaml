@@ -1,4 +1,4 @@
-default_region: default
+default_region: ru
 regions:
-  - region: default
-    display_name: Default MVP Region
+  - region: ru
+    display_name: AnytoolAI RU

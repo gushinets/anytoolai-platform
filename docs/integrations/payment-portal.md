@@ -53,6 +53,21 @@ and [local conformance handoff](https://github.com/gushinets/payments-portal/blo
 `LOCAL_SPEC_CONFORMANCE=PASS` is historical local CI evidence;
 `REAL_KERNEL_CONFORMANCE=DEFERRED_NOT_IMPLEMENTED` remains explicit.
 
+## ANY-711 implementation progress (2026-10-29)
+
+Kernel now implements the private manifest endpoint with scoped Portal Bearer authentication,
+rotation and browser refusal. Trusted API scope defaults to `anytoolai/ru` and is validated
+against the loaded registry. All six ordinary products and both approved test metrics remain
+disabled and are included in the complete response. Runtime routes use the same trusted scope;
+existing working data is neither migrated nor relabelled. See the
+[receiver configuration and rotation procedure](../../infra/deployment/README.md#portal-capability-manifest-receiver-any-711).
+
+The peer was rechecked read-only at `2bb07d778edc5ea56011b0034ba24b0702ede81f`.
+Its current settings support configured sources; the older production prohibition below is a
+historical observation, not current enablement authority. Historical simulated fixture evidence
+above remains unchanged. Generated producer contract publication is Step 3; actual TCP HTTP
+interoperability with the unchanged Portal client is Step 4. Neither is claimed by Step 2 tests.
+
 ## Dependencies before real integration
 
 - **Identity:** canonical paid-access identity is Portal's authenticated UUID

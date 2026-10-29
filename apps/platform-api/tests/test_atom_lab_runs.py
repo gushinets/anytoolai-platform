@@ -230,7 +230,7 @@ def test_run_preserves_every_atom_payload_through_real_workflow_mapping(app, ato
         scenario = ScenarioSessionRepository(session).get(
             wire["scenario_session_id"],
             tenant_id="anytoolai",
-            region="default",
+            region="ru",
             product_id="kernel_demo",
             frontend_id="kernel_demo_web",
         )
@@ -487,12 +487,12 @@ def test_bounded_preset_id_is_safe_for_postgresql_lookup(app):
 def test_preset_reference_is_provenance_and_never_merges_saved_payload(app):
     atom = get_atom_catalog_entry(app.state.runtime.config_registry, "A01")
 
-    identity = AtomLabPresetIdentityRecord(tenant_id="anytoolai", region="default", atom_id="A01")
+    identity = AtomLabPresetIdentityRecord(tenant_id="anytoolai", region="ru", atom_id="A01")
     version = AtomLabPresetVersionRecord(
         preset_id=identity.id,
         version=1,
         tenant_id="anytoolai",
-        region="default",
+        region="ru",
         name="Preset",
         description="",
         atom_id="A01",

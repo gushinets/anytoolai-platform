@@ -649,7 +649,7 @@ def test_handoff_lifecycle_advisory_lock_uses_one_backend_through_recovery(
                 created["handoff_token"],
                 AcceptHandoffCommand(
                     tenant_id="anytoolai",
-                    region="default",
+                    region="ru",
                 ),
             )
 
@@ -795,7 +795,7 @@ def test_postgresql_quota_recovery_finalizes_without_router_transaction() -> Non
                 created["handoff_token"],
                 AcceptHandoffCommand(
                     tenant_id="anytoolai",
-                    region="default",
+                    region="ru",
                 ),
             )
         assert acceptance_error.value.error_code == "quota_exhausted"
@@ -831,7 +831,7 @@ def test_postgresql_quota_recovery_finalizes_without_router_transaction() -> Non
             ).mark_failed(
                 created["handoff_id"],
                 tenant_id="anytoolai",
-                region="default",
+                region="ru",
                 error_code="quota_exhausted",
             )
             handoff_failed_count = session.execute(
@@ -950,7 +950,7 @@ def _expired_preview(
         ).get_preview(
             handoff_token,
             tenant_id="anytoolai",
-            region="default",
+            region="ru",
         )
 
 

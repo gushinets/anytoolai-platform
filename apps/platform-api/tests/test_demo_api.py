@@ -239,7 +239,7 @@ def test_demo_maps_public_key_to_fixed_live_scenario_and_input(
         stored = ScenarioSessionRepository(session).get_in_scope(
             body["scenario_session_id"],
             tenant_id="anytoolai",
-            region="default",
+            region="ru",
         )
         guest_count = session.execute(
             sa.select(sa.func.count()).select_from(guest_identities_table)
@@ -311,7 +311,7 @@ def test_demo_rejects_start_after_fifty_accepted_utc_day_sessions(
                 ScenarioSessionRecord(
                     id=f"scenario_session_daily_{index}",
                     tenant_id="anytoolai",
-                    region="default",
+                    region="ru",
                     product_id="kernel_demo",
                     frontend_id="web_mirror",
                     scenario_id="kernel_demo.composite_evaluate_match_live_smoke_v1",
@@ -342,7 +342,7 @@ def test_demo_gate_ignores_other_frontends_even_for_allowlisted_scenarios(
                 ScenarioSessionRecord(
                     id=f"scenario_session_other_frontend_{index}",
                     tenant_id="anytoolai",
-                    region="default",
+                    region="ru",
                     product_id="kernel_demo",
                     frontend_id="kernel_demo_ce",
                     scenario_id="kernel_demo.composite_evaluate_match_live_smoke_v1",
