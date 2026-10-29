@@ -7,7 +7,7 @@
 - Created: 2026-10-29
 - Last updated: 2026-10-29
 - Review date: 2026-10-29
-- Next action: Step 3 is implemented and its required focused checks pass; await an explicit request for Step 4. Step 4 has not started.
+- Next action: Step 3 review findings REV-1 and REV-2 are fixed and focused checks pass; await an explicit request for Step 4. Step 4 has not started.
 - Blocker: none for Step 3 implementation. Generated-artifact freshness is restored. Broad quick-check is not green: its run was interrupted after one observed failure, and the unchanged passwordless-sudo test independently fails. Consumer/TCP verification belongs to Step 4.
 - Development branch: `feature/ANY-711`, created by the owner from Kernel `main`.
 - Review outcome: the accepted design is unchanged; all four accepted review clarifications are incorporated.
@@ -1053,6 +1053,63 @@ test configuration, pre-import dotenv isolation and manual serve/probe procedure
 TLS/private-zone controls and production commercial approval are **NOT_RUN** for this step.
 No real billing calls, migrations, deployment or data changes. No staging, commits, pushes,
 branch/history changes or subsequent implementation steps.
+
+**Review remediation — 2026-10-29 (Step 3, REV-1 / REV-2)**
+
+Started from clean `feature/ANY-711`, local Step 3 commit
+`b4125eca027f23a6db457c83eda8cc01dededc67`; the owner requested fixes after local review.
+`runner.py doctor`: **PASS**, optional Docker warning. Scope remains the offline contract
+checker, its regression tests/negative fixture and documentation; Step 4 is not started.
+
+- **REV-1 — fixed:** schema comparison refuses validation keywords alongside `$ref` with
+  `unsupported_reference_siblings`, rather than overwriting the referenced constraints.
+  Pure local references and their ignored annotations/definition containers remain supported.
+  Tests reproduce the actual incompatible peer-schema case (referenced `unit.minLength=2`
+  plus sibling `minLength=1`), reject additional validation siblings, and preserve annotated
+  references. This is a bounded comparison oracle, not a new general schema-equivalence engine.
+- **REV-2 — fixed:** explicit timestamp checking limits offset hours to `00–23` and minutes
+  to `00–59`, preventing `datetime.fromisoformat` from normalizing invalid offsets such as
+  `+00:60`. Added an `invalid-offset` consumer fault fixture and changed only the negative
+  fixture checksum. Tests cover positive/negative signs, overflowing hours/minutes and valid
+  boundary offsets with the optional JSON Schema format checker explicitly disabled.
+  Positive fixture bytes, both semantic pins, default-disabled fixture and generated API
+  artifacts remain unchanged. Portal source/artifacts are unchanged.
+
+Verification commands:
+
+```bash
+.quick-check-venv/bin/python -m pytest -o addopts= -q --tb=no \
+  apps/platform-api/tests/test_capability_manifest_contract.py -k 'reference or timezone'
+.quick-check-venv/bin/python -m pytest -o addopts= -q \
+  tests/test_docs_generation.py apps/platform-api/tests/test_capability_manifest_contract.py \
+  apps/platform-api/tests/test_capability_projection.py tests/test_validate_docs.py
+.quick-check-venv/bin/python scripts/agent/check_capability_manifest_contract.py --portal-root ../payments-portal
+.quick-check-venv/bin/python scripts/agent/runner.py generate-docs --check
+.quick-check-venv/bin/python scripts/agent/runner.py validate-docs
+.quick-check-venv/bin/python scripts/agent/runner.py validate-architecture
+.quick-check-venv/bin/python scripts/agent/runner.py validate-configs
+.quick-check-venv/bin/python -m ruff check \
+  scripts/agent/check_capability_manifest_contract.py apps/platform-api/tests/test_capability_manifest_contract.py
+.quick-check-venv/bin/python -m ruff format --check \
+  scripts/agent/check_capability_manifest_contract.py apps/platform-api/tests/test_capability_manifest_contract.py
+git diff --check
+```
+
+- Regression selection against the original checker: **FAIL as expected — 8 failed, 10 passed,
+  17 deselected**. The failures reproduce both review findings; valid-boundary checks already pass.
+- Final contract/docs/projection/docs-validator suite with fixes: **PASS — 77 passed in 17.38s**.
+- Real read-only Portal artifact-copy check and all fixture/schema/digest checks: **PASS**.
+  There are now 14 negative fixture cases. The additional invalid-offset case is Kernel-owned;
+  no new claim is made about the historical Portal stdlib checker's timestamp strictness.
+- Generated-artifact freshness, docs/config/architecture guards: **PASS**. The pre-existing
+  optional LiteLLM cost-map network lookup falls back to the bundled map in sandbox.
+- Both changed Python modules: Ruff check and formatting **PASS**. `git diff --check`: **PASS**;
+  final diff reviewed and staging index remains empty.
+
+No dependency, runtime/API model, frontend or generated-artifact change was needed. Full
+quick-check/frontend/DB/Compose/TCP suites were not rerun for these offline-checker fixes;
+the previously recorded incomplete baseline and passwordless-sudo limitation remain unchanged.
+No staging, new commit, push, branch switch, deployment, database or financial operation.
 
 ### Step 4 — Prove real HTTP interoperability with an isolated Portal client
 

@@ -606,5 +606,52 @@
         "enabled": true
       }
     ]
+  },
+  "invalid-offset": {
+    "schema_version": 1,
+    "tenant_id": "anytoolai",
+    "region": "ru",
+    "manifest_version": "sha256:a39bac9f210a6ac67e97e117f8481a5954dc3f36bdaab2fd54c7522b27d6ec29",
+    "generated_at": "2026-10-15T00:00:00+00:60",
+    "products": [
+      {
+        "product_id": "acceptance_builder",
+        "enabled": false
+      },
+      {
+        "product_id": "brief_decoder",
+        "enabled": true
+      },
+      {
+        "product_id": "client_update_writer",
+        "enabled": false
+      },
+      {
+        "product_id": "kernel_demo",
+        "enabled": false
+      },
+      {
+        "product_id": "proposal_ai",
+        "enabled": true
+      },
+      {
+        "product_id": "task_finder",
+        "enabled": false
+      }
+    ],
+    "usage_metrics": [
+      {
+        "metric_key": "proposal_ai.test_generations",
+        "product_id": "proposal_ai",
+        "unit": "generation",
+        "enabled": true
+      },
+      {
+        "metric_key": "brief_decoder.test_analyses",
+        "product_id": "brief_decoder",
+        "unit": "analysis",
+        "enabled": true
+      }
+    ]
   }
 }

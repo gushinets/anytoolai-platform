@@ -26,6 +26,7 @@ NEGATIVE_CASES = {
     "wrong-enabled-type": "wire",
     "invalid-timestamp": "wire",
     "naive-timestamp": "wire",
+    "invalid-offset": "wire",
     "duplicate-product": "duplicate_product",
     "duplicate-metric": "duplicate_metric",
     "invalid-reference": "metric_owner",
@@ -67,7 +68,9 @@ def validate_manifest(payload: Any, schema: dict[str, Any]) -> None:
     timestamp = payload["generated_at"]
     require(
         re.fullmatch(
-            r"\d{4}-\d\d-\d\d[Tt]\d\d:\d\d:\d\d(?:\.\d+)?(?:[Zz]|[+-]\d\d:\d\d)", timestamp
+            r"\d{4}-\d\d-\d\d[Tt]\d\d:\d\d:\d\d(?:\.\d+)?"
+            r"(?:[Zz]|[+-](?:[01]\d|2[0-3]):[0-5]\d)",
+            timestamp,
         )
         is not None,
         "wire",
@@ -99,11 +102,16 @@ def resolve_schema(value: Any, root: dict[str, Any]) -> Any:
     if "$ref" in value:
         reference = value["$ref"]
         require(reference.startswith("#/"), "nonlocal_reference")
+        # Reference siblings are conjunctive constraints, never replacement values.
+        # This oracle supports only references plus the annotations/containers it ignores.
+        require(
+            set(value) <= {"$ref", "$defs", "$schema", "title", "description"},
+            "unsupported_reference_siblings",
+        )
         target = root
         for part in reference[2:].split("/"):
             target = target[part.replace("~1", "/").replace("~0", "~")]
-        siblings = {key: item for key, item in value.items() if key != "$ref"}
-        return resolve_schema({**target, **siblings}, root)
+        return resolve_schema(target, root)
     resolved = {}
     for key, item in value.items():
         if key in {"$defs", "$schema", "title", "description"}:

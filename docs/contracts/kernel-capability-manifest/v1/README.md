@@ -20,6 +20,8 @@ The standalone schema uses `$defs`; OpenAPI uses `components/schemas`.
 Tests resolve local references and compare all wire constraints, excluding only
 schema-document annotations (`$schema`, titles, descriptions and definition containers).
 The retained Portal schema has different definition names but identical resolved constraints.
+References may carry the ignored annotations/definition containers listed above. Other sibling
+keywords cause an explicit checker failure: their conjunctive constraints are not merged or ignored.
 There is no separately handwritten Kernel schema. JSON artifacts have no Markdown
 headers; generated Markdown retains its canonical-source header.
 
@@ -86,8 +88,8 @@ changes alter it. Fixtures and pins are reviewed data, not regenerated from runt
 
 [invalid-manifests.json](fixtures/invalid-manifests.json) contains deliberately corrupt
 consumer payloads: missing/extra fields, unsupported/boolean schema version, nonboolean
-flags, invalid/naive timestamps, duplicate products/metrics, nonexistent owners,
-wrong digest and wrong tenant/region. Reference/scope faults retain matching digests
+flags, invalid/naive timestamps and invalid timezone offsets, duplicate products/metrics,
+nonexistent owners, wrong digest and wrong tenant/region. Reference/scope faults retain matching digests
 to isolate rejection reasons. These are fault injections, **not possible successful
 producer configurations**. Producer refusal is covered separately by ConfigLoader and
 manifest startup/security tests; invalid declarations fail configuration loading.
