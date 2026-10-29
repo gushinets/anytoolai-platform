@@ -113,9 +113,31 @@ The gaps language defect (ANY-771), Docker dependency cache (ANY-770), changing 
   client's term), and one "Values" rule allows a value only as a client's term or the freelancer's
   own. Reply Draft states the same order with `intent` as the freelancer's decision. A structural
   test keeps the scattered wording from coming back.
-- Regression set: `tests/fixtures/proposal_ai_eval/terms.json` (9 orders, rules 1-5, EN/RU/ES,
-  including both review examples), run with `scripts/agent/proposal_ai_eval.py --orders`; a
-  `must` / `must_not` match is evidence, the outputs are still read by hand.
+- Regression set: `tests/fixtures/proposal_ai_eval/terms.json` (10 orders, rules 1-5, EN/RU/ES,
+  including the examples of code reviews #1 and #2), run with
+  `scripts/agent/proposal_ai_eval.py --orders`.
+- Code review #3: the automatic checks themselves were the wrong model. The set only checked that an
+  amount was present, so "I accept your USD 150 budget" passed; the language check called every
+  non-Cyrillic text English and skipped Spanish, so whole Spanish, Dutch and German answers passed.
+  Both are replaced, not patched:
+  - Each order lists its terms with the expected status (`not_accepted`, `agreed`, `accepted`,
+    `offered`, `open`). In every sentence that names a term's value, the status marker nearest to the
+    value decides: an acceptance, a refusal (an acceptance word after a negation or a refusal verb,
+    "decline", "does not cover", "нереален"), the client's proposal ("proposed", a ceiling) or an
+    open term ("will be agreed after the call"). Nearest, because a governing verb covers a list
+    while an unrelated "agreed in advance" in the same sentence must not decide the term. Markers
+    exist for EN, RU and ES.
+  - The language is detected from function words for en, es, de, nl, fr, it and pt and from the
+    Cyrillic share for ru; a text no language leads clearly is `language_unverified`, a manual read,
+    never "ok".
+  - Calibrated on 224 real outputs of these orders from the comparison and the regressions: 214
+    pass, 10 are flagged and all 10 are real failures (a whole answer in German or Spanish, or a
+    budget restated with no status by the first Terms version). The language check flags every one
+    of the 10 known wrong-language answers among 624 outputs and no correct one.
+  - Unit tests assert that the review's examples are rejected ("I accept your USD 150 budget and
+    the 3-day deadline", "I accept the EUR 300 budget and offer EUR 800", "Бюджет до 80 000 ₽
+    согласован и принят. Срок в 2 рабочих дня подтверждаю."), that EN to Spanish, Dutch and German
+    and ES to English are wrong-language, and that correct live answers pass.
 
 ## Results (2026-10-29, prompt `369e0775`, 410 runs through the web form)
 

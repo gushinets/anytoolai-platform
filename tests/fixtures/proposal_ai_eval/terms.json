@@ -15,6 +15,20 @@
       "must_not": [
         "USD (?!150\\b)\\d",
         "\\$\\s?\\d"
+      ],
+      "terms": [
+        {
+          "value": "USD 150",
+          "status": "not_accepted"
+        },
+        {
+          "value": "(3|three)[- ]day",
+          "status": "not_accepted"
+        },
+        {
+          "value": "unlimited (logo )?concepts",
+          "status": "not_accepted"
+        }
       ]
     },
     {
@@ -35,6 +49,20 @@
       "must_not": [
         "не принима",
         "не принят"
+      ],
+      "terms": [
+        {
+          "value": "36\\s?000",
+          "status": "agreed"
+        },
+        {
+          "value": "20 ноября",
+          "status": "agreed"
+        },
+        {
+          "value": "3\\s?000 ₽",
+          "status": "agreed"
+        }
       ]
     },
     {
@@ -53,6 +81,20 @@
       "must_not": [
         "(not accept|don.t accept|cannot accept|can.t accept|decline)[^.]{0,60}(second|two|additional) (revision )?round",
         "USD (?!400\\b)\\d"
+      ],
+      "terms": [
+        {
+          "value": "(second|two) (revision )?rounds?",
+          "status": "accepted"
+        },
+        {
+          "value": "USD 400",
+          "status": "agreed"
+        },
+        {
+          "value": "20 November",
+          "status": "agreed"
+        }
       ]
     },
     {
@@ -73,6 +115,20 @@
         "(?<!no )(?<!tampoco )acepto (añadir )?(las )?15",
         "\\d+ EUR(?<!240 EUR)",
         "EUR \\d"
+      ],
+      "terms": [
+        {
+          "value": "240 EUR",
+          "status": "agreed"
+        },
+        {
+          "value": "15 fotos",
+          "status": "not_accepted"
+        },
+        {
+          "value": "5 de diciembre",
+          "status": "not_accepted"
+        }
       ]
     },
     {
@@ -90,6 +146,16 @@
       "must_not": [
         "(not accept|don.t accept|cannot accept|can.t accept|decline)[^.]{0,60}(second|two|additional) (revision )?round",
         "EUR (?!1,?500\\b)\\d"
+      ],
+      "terms": [
+        {
+          "value": "(second|two) (revision )?rounds?",
+          "status": "accepted"
+        },
+        {
+          "value": "EUR 1,?500",
+          "status": "agreed"
+        }
       ]
     },
     {
@@ -106,6 +172,20 @@
       ],
       "must_not": [
         "EUR (?!300\\b|800\\b)\\d"
+      ],
+      "terms": [
+        {
+          "value": "EUR 300",
+          "status": "not_accepted"
+        },
+        {
+          "value": "48[- ]hour",
+          "status": "not_accepted"
+        },
+        {
+          "value": "EUR 800",
+          "status": "offered"
+        }
       ]
     },
     {
@@ -122,6 +202,16 @@
       "must_not": [
         "(USD|EUR|\\$)\\s?\\d",
         "I will deliver (the first drafts )?(by|in) (early )?January"
+      ],
+      "terms": [
+        {
+          "value": "\\bfee\\b",
+          "status": "open"
+        },
+        {
+          "value": "January",
+          "status": "open"
+        }
       ]
     },
     {
@@ -139,6 +229,16 @@
       "must_not": [
         "(подтверждаю|принимаю)[^.]{0,40}80\\s?000",
         "согласованн\\w* цен\\w*[^.]{0,20}80\\s?000"
+      ],
+      "terms": [
+        {
+          "value": "80\\s?000",
+          "status": "not_accepted"
+        },
+        {
+          "value": "(2|два) рабочих дн",
+          "status": "not_accepted"
+        }
       ]
     },
     {
@@ -158,6 +258,20 @@
         "(?<!no )(?<!tampoco )garantizo (los |las )?10\\s?000",
         "EUR (?!200\\b)\\d",
         "\\d+ EUR(?<!200 EUR)"
+      ],
+      "terms": [
+        {
+          "value": "200 EUR",
+          "status": "not_accepted"
+        },
+        {
+          "value": "10\\s?000 seguidores",
+          "status": "not_accepted"
+        },
+        {
+          "value": "(5|cinco) publicaciones",
+          "status": "not_accepted"
+        }
       ]
     },
     {
@@ -175,6 +289,16 @@
       "must_not": [
         "(scope|templates?|handover|deliverables?)[^.]{0,40}(are|is) (proposed|not (yet )?agreed)",
         "USD (?!1,?200\\b)\\d"
+      ],
+      "terms": [
+        {
+          "value": "USD 1,?200",
+          "status": "not_accepted"
+        },
+        {
+          "value": "final fee",
+          "status": "open"
+        }
       ]
     }
   ]
