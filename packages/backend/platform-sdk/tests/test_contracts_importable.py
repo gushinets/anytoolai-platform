@@ -14,6 +14,7 @@ from anytoolai_platform_sdk.contracts import (
     ProviderPolicy,
     QuotaPolicy,
     ScenarioDefinition,
+    UsageMetricDefinition,
     WorkflowDefinition,
 )
 from pydantic import ValidationError
@@ -76,6 +77,55 @@ def test_prompt_ref_contract_is_validatable() -> None:
 def test_missing_required_fields_fail_validation() -> None:
     with pytest.raises(ValidationError):
         ActionDefinition.model_validate({"action_type": "text.extract_structured_fields"})
+
+
+@pytest.mark.parametrize("field", ["commercial_admission_enabled", "usage_metrics"])
+def test_product_requires_explicit_capability_fields(field: str) -> None:
+    product = load_yaml(KERNEL_DEMO / "product.yaml")
+    del product[field]
+    with pytest.raises(ValidationError):
+        ProductDefinition.model_validate(product)
+
+
+@pytest.mark.parametrize("value", ["false", 0, 1, None])
+def test_product_admission_requires_an_actual_boolean(value: object) -> None:
+    product = load_yaml(KERNEL_DEMO / "product.yaml")
+    product["commercial_admission_enabled"] = value
+    with pytest.raises(ValidationError):
+        ProductDefinition.model_validate(product)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("metric_key", ""),
+        ("metric_key", "  "),
+        ("metric_key", 1),
+        ("metric_key", b"demo.test_units"),
+        ("unit", ""),
+        ("unit", "\t"),
+        ("unit", True),
+        ("unit", b"unit"),
+        ("enabled", "true"),
+        ("enabled", 1),
+        ("enabled", None),
+        ("product_id", "different_owner"),
+        ("unknown", False),
+    ],
+)
+def test_usage_metric_contract_rejects_invalid_declarations(field: str, value: object) -> None:
+    metric = {"metric_key": "demo.test_units", "unit": "unit", "enabled": False}
+    metric[field] = value
+    with pytest.raises(ValidationError):
+        UsageMetricDefinition.model_validate(metric)
+
+
+@pytest.mark.parametrize("field", ["metric_key", "unit", "enabled"])
+def test_usage_metric_contract_requires_every_declaration_field(field: str) -> None:
+    metric = {"metric_key": "demo.test_units", "unit": "unit", "enabled": False}
+    del metric[field]
+    with pytest.raises(ValidationError):
+        UsageMetricDefinition.model_validate(metric)
 
 
 def test_invalid_enum_values_fail_validation() -> None:

@@ -21,6 +21,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/v1/capability-manifest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Capability Manifest */
+        get: operations["get_capability_manifest_internal_v1_capability_manifest_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/atom-lab/atoms": {
         parameters: {
             query?: never;
@@ -838,6 +855,47 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** CapabilityManifestResponse */
+        CapabilityManifestResponse: {
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Manifest Version */
+            manifest_version: string;
+            /** Products */
+            products: components["schemas"]["CapabilityProductResponse"][];
+            /** Region */
+            region: string;
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: 1;
+            /** Tenant Id */
+            tenant_id: string;
+            /** Usage Metrics */
+            usage_metrics: components["schemas"]["CapabilityMetricResponse"][];
+        };
+        /** CapabilityMetricResponse */
+        CapabilityMetricResponse: {
+            /** Enabled */
+            enabled: boolean;
+            /** Metric Key */
+            metric_key: string;
+            /** Product Id */
+            product_id: string;
+            /** Unit */
+            unit: string;
+        };
+        /** CapabilityProductResponse */
+        CapabilityProductResponse: {
+            /** Enabled */
+            enabled: boolean;
+            /** Product Id */
+            product_id: string;
+        };
         /** ClientEventRequest */
         ClientEventRequest: {
             /** Event Id */
@@ -1213,6 +1271,74 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+        };
+    };
+    get_capability_manifest_internal_v1_capability_manifest_get: {
+        parameters: {
+            query: {
+                tenant_id: string;
+                region: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CapabilityManifestResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

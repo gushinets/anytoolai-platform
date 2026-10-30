@@ -12,6 +12,7 @@ Version: 0.1.0
 | Method | Path | Operation ID | Responses |
 |---|---|---|---|
 | GET | /health | health_health_get | 200 |
+| GET | /internal/v1/capability-manifest | get_capability_manifest_internal_v1_capability_manifest_get | 200, 401, 403, 422, 500, 503 |
 | GET | /v1/atom-lab/atoms | list_atoms_v1_atom_lab_atoms_get | 200, 401, 422, 503 |
 | GET | /v1/atom-lab/atoms/{atom_id} | get_atom_v1_atom_lab_atoms__atom_id__get | 200, 401, 404, 422, 503 |
 | GET | /v1/atom-lab/models | list_models_v1_atom_lab_models_get | 200, 401, 422, 503 |
@@ -69,6 +70,9 @@ Version: 0.1.0
 - AtomLabRunSummaryResponse
 - AtomLabSchemaRefsResponse
 - AtomLabVersionedSchemaRefResponse
+- CapabilityManifestResponse
+- CapabilityMetricResponse
+- CapabilityProductResponse
 - ClientEventRequest
 - ClientEventResponse
 - DemoRunRequest

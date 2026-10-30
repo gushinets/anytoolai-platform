@@ -591,6 +591,7 @@ project without deleting its PostgreSQL volume; investigate before restarting pr
 Once that marker is in place, an interrupt leaves the stack up. The activation directory
 and marker are non-secret and are published as `0755` and `0644` so the non-root API and worker users
 can read them after a restrictive umask.
+
 Each deployment uses a new immutable profile directory. A failed redeploy leaves the previous
 container bind source intact for restarts; old profiles are removed only after readiness passes.
 The candidate worker verifies its profile but waits for `active-profile` to name its generation
@@ -804,3 +805,85 @@ existing runtime rows and worker logs by technical ID instead of starting a dupl
   examples in `docs/architecture/runtime-storage.md` and
   `docs/exec-plans/active/a13-postgresql-concurrency-and-ce-scope.md` — CI config and docs for
   manual test invocations, untouched by this compose split.
+
+## Portal capability manifest receiver (ANY-711)
+
+The API exposes `GET /internal/v1/capability-manifest?tenant_id=anytoolai&region=ru`.
+It reads the complete immutable registry, including disabled products and metrics, without
+storage or provider access. Ordinary configuration declares all six products and the two
+approved test metrics disabled; this endpoint does not enable commercial admission.
+
+`ANYTOOLAI_TENANT_ID` and `ANYTOOLAI_REGION` select the trusted API scope (defaults:
+`anytoolai` and `ru`). Both must exist in the loaded registry or startup fails. Runtime routes
+use these same settings. Worker execution retains the scope carried by each job. Changing the
+baseline creates no migration, reset or relabelling of existing `default` data; operators must
+resolve any required historical data preservation before deploying a scope change. Broader
+regional isolation remains ANY-282.
+
+Configure `ANYTOOLAI_PORTAL_SERVICE_TOKEN` only in the receiver API's operator environment or
+secret store. The base Compose file passes it through only when supplied; it is absent from
+worker and frontend environments. Unconfigured receivers return safe `503 manifest_unavailable`
+while guest and public runtime-config routes retain their ordinary behavior. Explicit empty or
+malformed values fail startup. Tokens accept 32–256 ASCII Bearer characters (letters, digits,
+`._~+/-`, with optional trailing `=` padding). Use a cryptographically random secret of at least
+32 random bytes; syntax validation alone does not establish entropy. Settings repr/JSON and
+validation messages redact secrets.
+
+Portal sends the secret in `Authorization: Bearer <secret>` over TLS with certificate
+verification. The credential identifies the trusted Portal caller, authorizes only manifest
+read and binds to the configured tenant/region. Missing, invalid or duplicate credentials return
+`401` with `WWW-Authenticate: Bearer`; an authenticated wrong or ambiguous scope returns `403`.
+Missing required query fields return the normal safe `422` envelope. Errors preserve request
+correlation; internal responses have `Cache-Control: no-store`. All requests carrying `Origin`,
+including browser preflight, are rejected, and internal routes bypass public CORS handling.
+The deployment activation gate also protects the manifest; it is not a readiness exemption.
+
+For rotation, use one bounded rollout window:
+
+1. Generate a new independent secret; configure it as `ANYTOOLAI_PORTAL_SERVICE_TOKEN` and
+   configure the old secret as `ANYTOOLAI_PORTAL_SERVICE_TOKEN_PREVIOUS`. Restart the API.
+2. Switch the Portal's server-side `KERNEL_SERVICE_TOKEN`, then verify the new credential.
+3. Remove `ANYTOOLAI_PORTAL_SERVICE_TOKEN_PREVIOUS` and restart the API before closing the
+   rollout window. Verify the removed token receives `401` and the new token still succeeds.
+
+At most two distinct receiver tokens are accepted. A previous token without a distinct current
+token fails startup. The previous slot is an operator-controlled overlap, with no automatic
+expiry; do not leave it configured after rotation. Use independent secrets for each direction,
+environment and regional connection. Guest/user, demo, Atom Lab, live-canary and reverse-direction
+credentials grant no manifest authority. Retain private-zone network controls and the existing
+production loopback API binding. TLS and network deployment are operator-owned prerequisites;
+local API tests do not establish a deployed TLS connection or production commercial approval.
+
+`create_app(config_root=..., bundles=...)` forwards explicit bundle sequences unchanged to
+`build_runtime`: they replace the default product bundles. Omission or `None` preserves the six
+standard products. Temporary complete configurations can use this seam through the real
+ConfigLoader without mutating global defaults. The Kernel-owned `manifest-conformance` command
+now verifies this configuration over ephemeral loopback TCP using the unchanged Portal typed
+client in a fresh isolated process. It requires no database, Docker or full Portal/LBX stack.
+
+Prepare the peer from Portal root with `python3.12 scripts/repo.py sync-api` (existing lock,
+root `.venv`, no migrations). From Kernel root:
+
+```bash
+.quick-check-venv/bin/python scripts/agent/runner.py manifest-conformance \
+  --portal-root ../payments-portal \
+  --portal-python ../payments-portal/.venv/bin/python
+```
+
+The automated command generates its own disposable secrets and cleans up its own resources.
+Manual QA uses the same harness: `--mode serve-test` keeps only the real test-configured Kernel
+available; `--mode probe --kernel-base-url http://127.0.0.1:<printed-port>` invokes the isolated
+Portal client with the explicit peer arguments above. Both manual processes require the same
+new disposable `ANY711_CONFORMANCE_TOKEN` in their environments, never in arguments/URLs/logs.
+The [complete secret setup, exact commands and cleanup procedure](../../docs/contracts/kernel-capability-manifest/v1/README.md#manual-isolated-qa)
+also explains the pre-import patches blocking both Portal dotenv paths.
+
+Local automated HTTP, poisoned-dotenv isolation, 92 Portal client/source regressions and manual
+serve/probe/interrupt cleanup passed on 2026-10-29. The producer base is
+`7634eb09533846268a96ade004bca518c580b588` plus the Step 4 diff, consumer
+`2bb07d778edc5ea56011b0034ba24b0702ede81f`. All six products and both approved test metrics
+are checked against the actual loaded registry. Instrumented storage/provider calls remain zero.
+These results prove local code/HTTP interoperability with TEST-ONLY vocabulary; deployed TLS,
+private-zone controls, production commercial approval and financial/paid execution are unproven.
+Full verification results remain in the
+[canonical plan](../../docs/exec-plans/completed/ANY-711-implementation-plan.md).

@@ -13,6 +13,7 @@ from anytoolai_platform_sdk.contracts.product import (
     FrontendDefinition,
     FrontendType,
     ProductDefinition,
+    UsageMetricDefinition,
 )
 from anytoolai_platform_sdk.contracts.prompt import PromptRef
 from anytoolai_platform_sdk.contracts.provider import (
@@ -64,6 +65,7 @@ __all__ = [
     "ScenarioDefinition",
     "ScenarioSessionStatus",
     "StructuredOutputMode",
+    "UsageMetricDefinition",
     "WorkflowDefinition",
     "WorkflowStepDefinition",
 ]

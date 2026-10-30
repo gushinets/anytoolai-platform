@@ -88,7 +88,7 @@ def _create_test_app(
             GuestIdentityRecord(
                 id="guest_demo",
                 tenant_id="anytoolai",
-                region="default",
+                region="ru",
             )
         )
     app = create_app(config_root=CONFIG_ROOT)
@@ -150,7 +150,7 @@ def _mark_running(
         scenario = ScenarioSessionRepository(session).get_in_scope(
             scenario_session_id,
             tenant_id="anytoolai",
-            region="default",
+            region="ru",
         )
         assert scenario is not None
         ScenarioSessionService(
@@ -171,7 +171,7 @@ def _mark_completed(
         scenario = ScenarioSessionRepository(session).get_in_scope(
             scenario_session_id,
             tenant_id="anytoolai",
-            region="default",
+            region="ru",
         )
         assert scenario is not None
         if job.status is JobStatus.created:
@@ -185,7 +185,7 @@ def _mark_completed(
             scenario = ScenarioSessionRepository(session).get_in_scope(
                 scenario_session_id,
                 tenant_id="anytoolai",
-                region="default",
+                region="ru",
             )
             assert scenario is not None
 
@@ -229,7 +229,7 @@ def _mark_failed(
         scenario = ScenarioSessionRepository(session).get_in_scope(
             scenario_session_id,
             tenant_id="anytoolai",
-            region="default",
+            region="ru",
         )
         assert scenario is not None
         if job.status is JobStatus.created:
@@ -243,7 +243,7 @@ def _mark_failed(
             scenario = ScenarioSessionRepository(session).get_in_scope(
                 scenario_session_id,
                 tenant_id="anytoolai",
-                region="default",
+                region="ru",
             )
             assert scenario is not None
 
@@ -292,7 +292,7 @@ def test_start_scenario_creates_session_and_linked_job(
         scenario = ScenarioSessionRepository(session).get_in_scope(
             data["scenario_session_id"],
             tenant_id="anytoolai",
-            region="default",
+            region="ru",
         )
         job = JobRepository(session).get(data["job_id"])
 
@@ -778,7 +778,7 @@ def test_start_then_real_worker_execution_preserves_a12_runtime_correlation(
         scenario = ScenarioSessionRepository(session).get_in_scope(
             started["scenario_session_id"],
             tenant_id="anytoolai",
-            region="default",
+            region="ru",
         )
         job = JobRepository(session).get(started["job_id"])
         artifacts = list(
@@ -893,7 +893,7 @@ def test_get_scenario_session_returns_failed_checkpoint_for_preclaim_canceled_jo
         scenario = ScenarioSessionRepository(session).get_in_scope(
             started["scenario_session_id"],
             tenant_id="anytoolai",
-            region="default",
+            region="ru",
         )
         assert scenario is not None
         assert scenario.current_checkpoint_id == PROCESSING_CHECKPOINT_ID
@@ -1025,7 +1025,7 @@ def test_get_scenario_session_returns_safe_404_for_persisted_scenario_version_mi
         scenario = ScenarioSessionRepository(session).get_in_scope(
             started["scenario_session_id"],
             tenant_id="anytoolai",
-            region="default",
+            region="ru",
         )
         assert scenario is not None
         ScenarioSessionRepository(session).update(

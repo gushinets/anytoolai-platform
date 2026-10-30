@@ -10,11 +10,19 @@ REQUEST_ID_HEADER = "X-Request-ID"
 
 
 class ApiError(Exception):
-    def __init__(self, *, status_code: int, code: str, message: str) -> None:
+    def __init__(
+        self,
+        *,
+        status_code: int,
+        code: str,
+        message: str,
+        headers: dict[str, str] | None = None,
+    ) -> None:
         super().__init__(message)
         self.status_code = status_code
         self.code = code
         self.message = message
+        self.headers = headers
 
 
 class AtomLabApiError(Exception):
@@ -44,12 +52,15 @@ def platform_error_to_api_error(error: PlatformError, *, status_code: int) -> Ap
 
 
 async def api_error_handler(request: Request, exc: ApiError) -> JSONResponse:
-    return _error_response(
+    response = _error_response(
         request,
         status_code=exc.status_code,
         code=exc.code,
         message=exc.message,
     )
+    if exc.headers:
+        response.headers.update(exc.headers)
+    return response
 
 
 async def atom_lab_api_error_handler(request: Request, exc: AtomLabApiError) -> JSONResponse:
@@ -145,6 +156,8 @@ def _error_response(
         },
     )
     response.headers[REQUEST_ID_HEADER] = request_id
+    if request.url.path.startswith("/internal/"):
+        response.headers["Cache-Control"] = "no-store"
     return response
 
 

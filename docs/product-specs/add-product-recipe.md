@@ -33,6 +33,14 @@ must stay inside, and `tests/architecture/` for the tests that enforce it.
    products — see `apps/platform-api/tests/test_bundle_composition.py` for the loader's
    required-evidence suite (happy path, missing-root, duplicate-id in both orderings, invalid
    cross-reference) against a minimal test-only fixture bundle.
+   Every `product.yaml` must explicitly declare `commercial_admission_enabled` and
+   `usage_metrics`. Start with `commercial_admission_enabled: false`; use `usage_metrics: []`
+   when no technical metrics are declared. Each metric declares exactly
+   a globally unique nonblank `metric_key`, a nonblank `unit`, and a boolean `enabled`; ownership
+   comes from the containing product. Disabled keys still participate in duplicate detection.
+   See [technical capability declarations](../architecture/config-model.md#technical-capability-declarations).
+   Guest quotas and runtime deployment enablement do not approve commercial admission or
+   charging vocabulary; deployment profiles preserve these separate declarations.
 3. **Prompts.** Add prompt files under the bundle (e.g. `shared/prompts/`), referenced from action
    configs by `prompt_ref`. Prompts never live in `platform-core`, `platform-actions`, or in any
    extension.

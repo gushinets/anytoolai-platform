@@ -133,7 +133,7 @@ def assert_scenario_runtime_correlation(
         scenario = ScenarioSessionRepository(session).get_in_scope(
             scenario_session_id,
             tenant_id="anytoolai",
-            region="default",
+            region="ru",
         )
         job = JobRepository(session).get(job_id)
         action_run = (

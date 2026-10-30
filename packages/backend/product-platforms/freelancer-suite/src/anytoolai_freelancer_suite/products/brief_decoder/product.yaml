@@ -4,3 +4,8 @@ display_name: Brief Decoder
 scenarios:
   - brief_decoder.decode_v1
 quota_policy_ref: brief_decoder.guest_quota_v1
+commercial_admission_enabled: false
+usage_metrics:
+  - metric_key: brief_decoder.test_analyses
+    unit: analysis
+    enabled: false

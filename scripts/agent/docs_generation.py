@@ -37,6 +37,9 @@ GENERATED_SOURCES = {
     "event-catalog.md": "configs/kernel/platform_events.yaml",
     "openapi.md": "anytoolai_platform_api.openapi.generate.build_openapi_schema()",
     "openapi.json": "anytoolai_platform_api.openapi.generate.build_openapi_schema()",
+    "capability-manifest-v1.schema.json": (
+        "anytoolai_platform_api.schemas.CapabilityManifestResponse (serialization)"
+    ),
 }
 
 
@@ -232,7 +235,11 @@ def render_openapi_json() -> str:
 
 
 def render_documents() -> dict[str, str]:
-    from anytoolai_platform_api.openapi.generate import build_openapi_schema, render_openapi_json
+    from anytoolai_platform_api.openapi.generate import (
+        build_openapi_schema,
+        render_capability_manifest_schema_json,
+        render_openapi_json,
+    )
 
     schema = build_openapi_schema()
     return {
@@ -242,6 +249,7 @@ def render_documents() -> dict[str, str]:
         "event-catalog.md": render_event_catalog(),
         "openapi.md": _render_openapi_markdown(schema),
         "openapi.json": render_openapi_json(schema),
+        "capability-manifest-v1.schema.json": render_capability_manifest_schema_json(),
     }
 
 

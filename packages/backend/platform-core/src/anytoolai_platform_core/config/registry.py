@@ -13,7 +13,11 @@ from anytoolai_platform_core.actions.models import (
     ActionDefinition,
 )
 from anytoolai_platform_core.handoffs.models import HandoffDefinition
-from anytoolai_platform_core.products.models import FrontendDefinition, ProductDefinition
+from anytoolai_platform_core.products.models import (
+    FrontendDefinition,
+    ProductDefinition,
+    UsageMetricDefinition,
+)
 from anytoolai_platform_core.providers.models import ProviderPolicy
 from anytoolai_platform_core.quotas.models import QuotaPolicy
 from anytoolai_platform_core.scenarios.models import ScenarioDefinition
@@ -83,10 +87,15 @@ def _freeze_frontend(definition: FrontendDefinition) -> FrontendDefinition:
     return replace(definition, metadata=_freeze_value(definition.metadata))
 
 
+def _freeze_usage_metric(definition: UsageMetricDefinition) -> UsageMetricDefinition:
+    return replace(definition, metadata=_freeze_value(definition.metadata))
+
+
 def _freeze_product(definition: ProductDefinition) -> ProductDefinition:
     return replace(
         definition,
         frontends=tuple(_freeze_frontend(frontend) for frontend in definition.frontends),
+        usage_metrics=tuple(_freeze_usage_metric(metric) for metric in definition.usage_metrics),
         scenarios=tuple(definition.scenarios),
         analytics=_freeze_value(definition.analytics),
         metadata=_freeze_value(definition.metadata),

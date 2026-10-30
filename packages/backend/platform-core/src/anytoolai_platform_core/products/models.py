@@ -20,10 +20,21 @@ class FrontendDefinition:
 
 
 @dataclass(frozen=True)
+class UsageMetricDefinition:
+    metric_key: str
+    unit: str
+    enabled: bool
+    schema_version: int = 1
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class ProductDefinition:
     product_id: str
     product_platform: str
     display_name: str
+    commercial_admission_enabled: bool
+    usage_metrics: tuple[UsageMetricDefinition, ...]
     frontends: tuple[FrontendDefinition, ...] = field(default_factory=tuple)
     scenarios: tuple[str, ...] = field(default_factory=tuple)
     quota_policy_ref: str | None = None
@@ -32,5 +43,6 @@ class ProductDefinition:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "usage_metrics", tuple(self.usage_metrics))
         object.__setattr__(self, "frontends", tuple(self.frontends))
         object.__setattr__(self, "scenarios", tuple(self.scenarios))

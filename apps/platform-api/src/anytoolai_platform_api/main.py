@@ -3,7 +3,8 @@ from __future__ import annotations
 import logging
 import os
 import re
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
+from http import HTTPStatus
 from pathlib import Path
 from time import perf_counter
 from uuid import uuid4
@@ -21,6 +22,7 @@ from anytoolai_platform_api.errors import (
     unhandled_exception_handler,
 )
 from anytoolai_platform_api.routers.atom_lab import router as atom_lab_router
+from anytoolai_platform_api.routers.capability_manifest import router as capability_manifest_router
 from anytoolai_platform_api.routers.client_events import router as client_events_router
 from anytoolai_platform_api.routers.demo import router as demo_router
 from anytoolai_platform_api.routers.handoffs import router as handoffs_router
@@ -38,10 +40,12 @@ from anytoolai_platform_core.common.logging import (
     log_event,
     reset_log_context,
 )
+from anytoolai_platform_sdk import ProductBundle
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import Response
+from starlette.types import Receive, Scope, Send
 
 CORS_ORIGINS_ENV = "ANYTOOLAI_API_CORS_ORIGINS"
 CHROME_EXTENSION_ORIGIN_REGEX = r"^chrome-extension://[a-p]{32}$"
@@ -50,14 +54,27 @@ PREACTIVATION_READ_METHODS = frozenset({"GET", "HEAD"})
 PREACTIVATION_RUNTIME_CONFIG_PATH = re.compile(r"^/v1/products/[^/]+/runtime-config$")
 
 
+class PublicCORSMiddleware(CORSMiddleware):
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http" and scope["path"].startswith("/internal/"):
+            await self.app(scope, receive, send)
+            return
+        await super().__call__(scope, receive, send)
+
+
 def create_app(
     config_root: Path | None = None,
     *,
     database_url: str | None = None,
+    bundles: Sequence[ProductBundle] | None = None,
 ) -> FastAPI:
     configure_json_logging("platform-api")
-    runtime = build_runtime(config_root, database_url=database_url)
+    runtime = build_runtime(config_root, database_url=database_url, bundles=bundles)
     settings = Settings.from_env(include_atom_lab_run_limits=False)
+    if settings.default_tenant_id not in runtime.config_registry.tenants:
+        raise ValueError("Configured tenant is absent from the registry")
+    if settings.default_region not in runtime.config_registry.regions:
+        raise ValueError("Configured region is absent from the registry")
     if settings.enabled_product_ids is not None:
         unknown = settings.enabled_product_ids - runtime.config_registry.products.keys()
         if unknown:
@@ -71,6 +88,7 @@ def create_app(
     _install_error_handlers(app)
 
     app.include_router(health_router)
+    app.include_router(capability_manifest_router)
     app.include_router(atom_lab_router)
     app.include_router(demo_router)
     app.include_router(identity_quota_router)
@@ -84,7 +102,7 @@ def create_app(
 
 def _install_cors(app: FastAPI) -> None:
     app.add_middleware(
-        CORSMiddleware,
+        PublicCORSMiddleware,
         allow_origins=_configured_cors_origins(),
         allow_origin_regex=CHROME_EXTENSION_ORIGIN_REGEX,
         allow_methods=["GET", "POST", "OPTIONS"],
@@ -136,7 +154,16 @@ def _install_request_context(app: FastAPI) -> None:
         token = bind_log_context(request_id=request_id)
         started = perf_counter()
         try:
-            if _deployment_request_is_blocked(request):
+            if request.url.path.startswith("/internal/") and "origin" in request.headers:
+                response = await api_error_handler(
+                    request,
+                    ApiError(
+                        status_code=HTTPStatus.FORBIDDEN,
+                        code="browser_access_forbidden",
+                        message="Internal service endpoints do not allow browser access.",
+                    ),
+                )
+            elif _deployment_request_is_blocked(request):
                 response = await api_error_handler(
                     request,
                     ApiError(
@@ -148,6 +175,8 @@ def _install_request_context(app: FastAPI) -> None:
             else:
                 response = await call_next(request)
             response.headers[REQUEST_ID_HEADER] = request_id
+            if request.url.path.startswith("/internal/"):
+                response.headers["Cache-Control"] = "no-store"
             apply_atom_lab_cache_policy(request, response)
             log_event(
                 logger,

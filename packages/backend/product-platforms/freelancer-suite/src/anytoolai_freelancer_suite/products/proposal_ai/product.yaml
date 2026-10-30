@@ -4,3 +4,8 @@ display_name: ProposalAI
 scenarios:
   - proposal_ai.generate_v1
 quota_policy_ref: proposal_ai.guest_quota_v1
+commercial_admission_enabled: false
+usage_metrics:
+  - metric_key: proposal_ai.test_generations
+    unit: generation
+    enabled: false

@@ -11,3 +11,6 @@ Makefile text eol=lf
 *.tsx text eol=lf
 *.json text eol=lf
 *.md text eol=lf
+
+# Preserve canonical manifest checksum bytes on every checkout.
+/docs/contracts/kernel-capability-manifest/v1/fixtures/valid-manifest.digest text eol=lf

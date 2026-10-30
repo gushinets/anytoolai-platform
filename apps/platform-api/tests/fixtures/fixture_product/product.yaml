@@ -3,3 +3,5 @@ product_platform: fixture_platform
 display_name: Fixture Product
 scenarios:
   - fixture_product.single_action_v1
+commercial_admission_enabled: false
+usage_metrics: []

@@ -47,3 +47,5 @@ scenarios:
   - kernel_demo.composite_evaluate_match_live_smoke_v1
   - kernel_demo.composite_shape_and_write_live_smoke_v1
 quota_policy_ref: kernel_demo.guest_quota_v1
+commercial_admission_enabled: false
+usage_metrics: []

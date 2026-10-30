@@ -42,6 +42,7 @@ from anytoolai_platform_core.products.models import (
     FrontendDefinition,
     FrontendType,
     ProductDefinition,
+    UsageMetricDefinition,
 )
 from anytoolai_platform_core.providers.models import (
     ProviderPolicy,
@@ -300,6 +301,42 @@ def _parse_optional_bool_field(
         raise InvalidConfigShapeError(
             file_path,
             f"{field_name} must be a boolean if set",
+            config_id=config_id,
+            ref_type=field_name,
+            ref_value=_stringify_config_value(raw_value),
+        )
+    return raw_value
+
+
+def _parse_required_bool_field(
+    raw_value: Any,
+    *,
+    field_name: str,
+    file_path: Path,
+    config_id: str,
+) -> bool:
+    if not isinstance(raw_value, bool):
+        raise InvalidConfigShapeError(
+            file_path,
+            f"{field_name} must be a boolean",
+            config_id=config_id,
+            ref_type=field_name,
+            ref_value=_stringify_config_value(raw_value),
+        )
+    return raw_value
+
+
+def _parse_nonblank_string_field(
+    raw_value: Any,
+    *,
+    field_name: str,
+    file_path: Path,
+    config_id: str,
+) -> str:
+    if not isinstance(raw_value, str) or not raw_value.strip():
+        raise InvalidConfigShapeError(
+            file_path,
+            f"{field_name} must be a nonblank string",
             config_id=config_id,
             ref_type=field_name,
             ref_value=_stringify_config_value(raw_value),
@@ -1396,11 +1433,32 @@ class ConfigLoader:
 
             self._require_fields(
                 product_data,
-                required=["product_id", "product_platform", "display_name"],
+                required=[
+                    "product_id",
+                    "product_platform",
+                    "display_name",
+                    "commercial_admission_enabled",
+                    "usage_metrics",
+                ],
+                not_none_fields=["commercial_admission_enabled", "usage_metrics"],
                 noun="Product definition",
                 path=product_file,
                 config_id=product_id,
             )
+
+            product_id = _parse_nonblank_string_field(
+                product_id,
+                field_name="product_id",
+                file_path=product_file,
+                config_id=product_dir.name,
+            )
+            commercial_admission_enabled = _parse_required_bool_field(
+                product_data["commercial_admission_enabled"],
+                field_name="commercial_admission_enabled",
+                file_path=product_file,
+                config_id=product_id,
+            )
+            usage_metrics = self._parse_usage_metrics(product_data, product_file, product_id)
 
             self._check_duplicate(
                 id_type="product_id",
@@ -1469,6 +1527,8 @@ class ConfigLoader:
                 product_id=product_id,
                 product_platform=product_platform,
                 display_name=display_name,
+                commercial_admission_enabled=commercial_admission_enabled,
+                usage_metrics=usage_metrics,
                 frontends=frontends,
                 scenarios=scenarios,
                 quota_policy_ref=quota_policy_ref,
@@ -1478,6 +1538,74 @@ class ConfigLoader:
             self._remember_source("product", product_id, product_file)
         except ConfigError as error:
             self._append_error(error)
+
+    def _parse_usage_metrics(
+        self, product_data: dict[str, Any], path: Path, product_id: str
+    ) -> tuple[UsageMetricDefinition, ...]:
+        declarations = product_data["usage_metrics"]
+        if not isinstance(declarations, list):
+            raise InvalidConfigShapeError(
+                path,
+                "usage_metrics must be a list",
+                config_id=product_id,
+                ref_type="usage_metrics",
+                ref_value=type(declarations).__name__,
+            )
+        metrics: list[UsageMetricDefinition] = []
+        for declaration in declarations:
+            item = self._require_mapping_entry(
+                declaration,
+                file_path=path,
+                config_id=product_id,
+                entry_type="usage metric",
+                ref_type="usage_metrics",
+            )
+            if any(not isinstance(key, str) for key in item):
+                raise InvalidConfigShapeError(
+                    path,
+                    "usage metric field names must be strings",
+                    config_id=product_id,
+                    ref_type="usage_metrics",
+                    ref_value="<non-string field>",
+                )
+            _reject_unexpected_mapping_keys(
+                item,
+                allowed_keys={"metric_key", "unit", "enabled"},
+                field_name="usage metric",
+                file_path=path,
+                config_id=product_id,
+            )
+            self._require_fields(
+                item,
+                required=["metric_key", "unit", "enabled"],
+                not_none_fields=["enabled"],
+                noun="Usage metric",
+                path=path,
+                config_id=product_id,
+            )
+            metrics.append(
+                UsageMetricDefinition(
+                    metric_key=_parse_nonblank_string_field(
+                        item["metric_key"],
+                        field_name="metric_key",
+                        file_path=path,
+                        config_id=product_id,
+                    ),
+                    unit=_parse_nonblank_string_field(
+                        item["unit"],
+                        field_name="unit",
+                        file_path=path,
+                        config_id=product_id,
+                    ),
+                    enabled=_parse_required_bool_field(
+                        item["enabled"],
+                        field_name="enabled",
+                        file_path=path,
+                        config_id=product_id,
+                    ),
+                )
+            )
+        return tuple(metrics)
 
     def _load_frontends(
         self,
@@ -2158,7 +2286,22 @@ class ConfigLoader:
         except ConfigError as error:
             self._append_error(error)
 
+    def _validate_usage_metric_uniqueness(self) -> None:
+        metric_sources: dict[str, Path] = {}
+        for product_id, product in self.products.items():
+            path = self._source_for("product", product_id, self.config_root)
+            for metric in product.usage_metrics:
+                if metric.metric_key in metric_sources:
+                    self._append_error(
+                        DuplicateConfigIdError(
+                            "metric_key", metric.metric_key, metric_sources[metric.metric_key], path
+                        )
+                    )
+                else:
+                    metric_sources[metric.metric_key] = path
+
     def _validate_cross_references(self) -> None:
+        self._validate_usage_metric_uniqueness()
         for action_type, action_def in self.action_definitions.items():
             source_path = self._source_for(
                 "action_definition",

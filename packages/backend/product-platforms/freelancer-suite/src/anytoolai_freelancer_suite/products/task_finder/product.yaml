@@ -4,3 +4,5 @@ display_name: Task Finder
 scenarios:
   - task_finder.fit_v1
 quota_policy_ref: task_finder.guest_quota_v1
+commercial_admission_enabled: false
+usage_metrics: []

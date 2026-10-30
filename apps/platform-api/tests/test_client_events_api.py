@@ -52,16 +52,16 @@ def _create_test_app(session_factory: SessionFactory):
     with transaction_boundary(session_factory) as session:
         guest_repository = GuestIdentityRepository(session)
         guest_repository.create(
-            GuestIdentityRecord(id="guest_demo", tenant_id="anytoolai", region="default")
+            GuestIdentityRecord(id="guest_demo", tenant_id="anytoolai", region="ru")
         )
         guest_repository.create(
-            GuestIdentityRecord(id="guest_other", tenant_id="anytoolai", region="default")
+            GuestIdentityRecord(id="guest_other", tenant_id="anytoolai", region="ru")
         )
         ScenarioSessionRepository(session).create(
             ScenarioSessionRecord(
                 id="scenario_session_demo",
                 tenant_id="anytoolai",
-                region="default",
+                region="ru",
                 product_id="kernel_demo",
                 frontend_id="web_mirror",
                 scenario_id="kernel_demo.single_action_smoke_v1",
@@ -72,7 +72,7 @@ def _create_test_app(session_factory: SessionFactory):
             ScenarioSessionRecord(
                 id="scenario_session_owned_by_guest_demo",
                 tenant_id="anytoolai",
-                region="default",
+                region="ru",
                 product_id="kernel_demo",
                 frontend_id="web_mirror",
                 scenario_id="kernel_demo.single_action_smoke_v1",
@@ -85,7 +85,7 @@ def _create_test_app(session_factory: SessionFactory):
             ScenarioSessionRecord(
                 id="scenario_session_owned_by_user_demo",
                 tenant_id="anytoolai",
-                region="default",
+                region="ru",
                 product_id="kernel_demo",
                 frontend_id="web_mirror",
                 scenario_id="kernel_demo.single_action_smoke_v1",
@@ -97,7 +97,7 @@ def _create_test_app(session_factory: SessionFactory):
             ScenarioSessionRecord(
                 id="scenario_session_owned_by_guest_demo_with_a_user_id",
                 tenant_id="anytoolai",
-                region="default",
+                region="ru",
                 product_id="kernel_demo",
                 frontend_id="web_mirror",
                 scenario_id="kernel_demo.single_action_smoke_v1",
@@ -185,7 +185,7 @@ def test_client_event_is_recorded(session_factory: SessionFactory) -> None:
     assert rows[0]["product_id"] == "kernel_demo"
     assert rows[0]["frontend_id"] == "web_mirror"
     assert rows[0]["tenant_id"] == "anytoolai"
-    assert rows[0]["region"] == "default"
+    assert rows[0]["region"] == "ru"
     assert rows[0]["properties"]["web_session_id"] == DEFAULT_WEB_SESSION_ID
     assert rows[0]["properties"]["mode"] == "one_run"
     assert rows[0]["properties"]["field_count"] == 3
