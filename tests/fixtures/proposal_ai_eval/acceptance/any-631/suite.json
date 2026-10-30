@@ -1,24 +1,86 @@
 {
   "id": "any-631-review-5-prompt",
-  "description": "ANY-631 live acceptance of the code review #5 ProposalAI prompt (compose_persuasive_text.v1.md sha256 f6e696dd..., committed in 02a7f39c): 150 runs through the web form, 2026-10-29. Thresholds come from ANY-631 only; a group without an approved threshold stays PENDING.",
-  "orders": ["../../qa_cases.json", "../../terms.json"],
+  "description": "ANY-631 live acceptance of the code review #5 ProposalAI prompt (compose_persuasive_text.v1.md sha256 f6e696dd..., committed in 02a7f39c): 150 runs through the web form, 2026-10-29. Thresholds come from ANY-631 and its team lead decisions only; a group without an approved threshold stays PENDING.",
+  "orders": [
+    "../../qa_cases.json",
+    "../../terms.json"
+  ],
   "runs": "runs.jsonl",
   "verdicts": "verdicts.jsonl",
   "max_median_latency_ms": 60000,
   "thresholds": [
     {
       "series": "final-luna-medium",
-      "cases": ["P01", "P02", "P04", "P05"],
+      "cases": [
+        "P01",
+        "P02",
+        "P04",
+        "P05"
+      ],
       "min_usable": 4,
       "of": 5,
       "source": "ANY-631 stage 1: at most one unusable result of 5 per case"
     },
     {
       "series": "final-luna-high",
-      "cases": ["P01", "P02", "P04", "P05"],
+      "cases": [
+        "P01",
+        "P02",
+        "P04",
+        "P05"
+      ],
       "min_usable": 4,
       "of": 5,
       "source": "ANY-631 stage 1: at most one unusable result of 5 per case"
+    },
+    {
+      "series": "final-luna-medium",
+      "cases": [
+        "conflict-decline-en",
+        "agreed-confirm-ru",
+        "agreed-change-accepted-en",
+        "agreed-plus-conflict-es",
+        "limit-change-accepted-en",
+        "counteroffer-en",
+        "left-open-en",
+        "ceiling-stays-client-ru",
+        "conflict-decline-es",
+        "ceiling-and-scope-en"
+      ],
+      "min_usable": 3,
+      "of": 3,
+      "source": "ANY-631 team lead decision, 2026-10-30: regression set by terms, 3 runs per configuration, 3/3 usable"
+    },
+    {
+      "series": "final-luna-high",
+      "cases": [
+        "conflict-decline-en",
+        "agreed-confirm-ru",
+        "agreed-change-accepted-en",
+        "agreed-plus-conflict-es",
+        "limit-change-accepted-en",
+        "counteroffer-en",
+        "left-open-en",
+        "ceiling-stays-client-ru",
+        "conflict-decline-es",
+        "ceiling-and-scope-en"
+      ],
+      "min_usable": 3,
+      "of": 3,
+      "source": "ANY-631 team lead decision, 2026-10-30: regression set by terms, 3 runs per configuration, 3/3 usable"
+    },
+    {
+      "series": "agreed-luna-medium",
+      "cases": [
+        "P05",
+        "agreed-confirm-ru",
+        "agreed-plus-conflict-es",
+        "agreed-change-accepted-en",
+        "conflict-decline-es"
+      ],
+      "min_usable": 10,
+      "of": 10,
+      "source": "ANY-631 team lead decision, 2026-10-30: strengthened luna/medium series, 10 runs per case, 10/10 usable"
     }
   ]
 }

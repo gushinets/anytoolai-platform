@@ -8,14 +8,13 @@
 - Created: 2026-10-29
 - Last updated: 2026-10-30
 - Review date: 2026-11-05
-- Next action: a human reviewer confirms or corrects every verdict of the pass 5 acceptance suite
-  (`proposal_ai_eval.py review`); the team lead approves thresholds for the groups that have none
-  (terms orders x 3, agreed terms x 10) and the recommendation (`gpt-6-luna` / `high`); then move
-  this plan to `completed/`. Follow-ups: ANY-776 (switch the model), ANY-777 (60 s form wait),
-  ANY-771 (output language).
-- Blocker: the pass 5 acceptance is PENDING until a person confirms the verdicts (code review #6
-  below). If it passes, the prompt is qualified on both `gpt-6-luna` / `medium` (the current product
-  policy) and `gpt-6-luna` / `high`, so it does not depend on ANY-776.
+- Next action: fix the output language defect (ANY-771; the check must cover the gaps block and the
+  proposal text) and the 60 s form wait (ANY-777), then repeat the live run and `accept` against
+  the approved thresholds (team lead decision, ANY-631 comment, 2026-10-30). ANY-631 acceptance is
+  not closed before that. `gpt-6-luna` / `high` stays the preferred model; the switch is ANY-776.
+- Blocker: the pass 5 acceptance suite is FAIL under the approved thresholds (three groups of 3
+  runs have 2 usable: ANY-771 twice, ANY-777 once). No critical error: the prompt itself is not
+  the cause. ANY-631 and ANY-595 statuses stay as they are.
 
 ## Goal
 
@@ -415,14 +414,21 @@ contract:
   violation, a confirmed "no") or PENDING. The suite is FAIL on a critical error, a group below its
   approved threshold or a series median latency above 60 s; PENDING while a decision is open or a
   group has no approved threshold; otherwise PASS. Thresholds are only the approved ones: P01, P02,
-  P04, P05 x 5 per finalist use the stage 1 rule (at most one unusable of 5); the terms orders x 3 and
-  the agreed terms x 10 have none yet, so they stay PENDING until the team lead sets them.
+  P04, P05 x 5 per finalist use the stage 1 rule (at most one unusable of 5). The team lead approved
+  (ANY-631 comment, 2026-10-30): every terms order x 3 per configuration needs 3/3 usable, every
+  agreed-terms order x 10 on `luna/medium` needs 10/10, critical errors stay at zero.
 - Evidence: `tests/fixtures/proposal_ai_eval/acceptance/any-631/` holds the 150 pass 5 runs
   (`runs.jsonl`: prompt hashes `f6e696dd...` and `f7608a3a...` read from the worker that served
   every run, equal to commit `02a7f39c`; model and reasoning from the switch read-back, matching
   `provider_calls`), `verdicts.jsonl` with the agent's 586 suggestions (every output read again,
   with a quote and reason per criterion; one `unknown`: P02 medium #4 never states "not a redesign")
-  and no decision yet, and `suite.json`. `accept` reports PENDING.
+  and, after review, the confirmed decisions of the reviewer (586 of 586, all "yes"), and
+  `suite.json`.
+- Result with the approved thresholds: `accept` reports FAIL. Passing: P01, P02, P04, P05 x 5 on
+  both finalists, the 5 agreed-terms orders x 10 (10/10 each), 17 of 20 terms groups, median
+  latency 19.5 to 30.1 s per series. Failing: `conflict-decline-en` on `medium` and on `high` (one
+  whole answer in Spanish each, ANY-771) and `conflict-decline-es` on `high` (the form gave up
+  after 60 s, ANY-777), each 2 of 3 usable. A critical error: none.
 - Tests: CLI runs for PENDING (suggestion only, stale hash, unknown), PASS (a non-critical failure
   within the threshold, a long-dash warning), FAIL (critical verdict, forbidden amount, missed
   threshold, slow series) and a missing threshold; the review #6 wordings leave the run pending;
