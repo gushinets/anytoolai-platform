@@ -1,32 +1,53 @@
-"""Manual evaluation of ProposalAI against the fixed order set (tests/fixtures/proposal_ai_eval).
+"""ProposalAI evaluation: collect outputs, check what a text match can prove, accept on human verdicts.
 
-Runs every order through a running platform-api + worker (one fresh guest per order, the guest
-quota is lifetime), then applies the automatic checks from the QA protocol that need no LLM judge.
-Facts about experience, tone distinguishability and "similar project in the first two sentences"
-stay manual.
+Three steps, each its own command (the quick-check environment, because the number check is imported
+from the A06 validator):
 
-    .quick-check-venv/bin/python scripts/agent/proposal_ai_eval.py --api-url http://localhost:8000 [--tone warm] [--language ru]
-    .quick-check-venv/bin/python scripts/agent/proposal_ai_eval.py --api-url http://localhost:8000 --orders tests/fixtures/proposal_ai_eval/terms.json
+    .quick-check-venv/bin/python scripts/agent/proposal_ai_eval.py run --api-url http://localhost:8000 \
+        --orders tests/fixtures/proposal_ai_eval/terms.json --series luna-medium --out runs.jsonl [--repeats 3] \
+        [--compose-project anytoolai-xxxxxxxx]
+    .quick-check-venv/bin/python scripts/agent/proposal_ai_eval.py review --suite suite.json --reviewer <id>
+    .quick-check-venv/bin/python scripts/agent/proposal_ai_eval.py accept --suite suite.json
 
-An order may carry its own `freelancer_positioning`, `tone` and `language` (they win over the file's
-and the flags'), `terms`: the expected status of each client term (see `check_terms`), and
-`must` / `must_not`: regular expressions (case-insensitive) the proposal has to contain or must not
-contain. terms.json is the regression set for the status of client terms
-(ANY-631): run it after any change to how ProposalAI states prices, deadlines and limits.
+`run` sends every order through a running platform-api + worker (one fresh guest per run, the guest
+quota is lifetime) and appends one record per run to `--out`: input, full output, session, timing and,
+with `--compose-project` (a local dev-live stack), the prompt hashes and model read from the running
+worker and every provider call with its cost. A failed or timed-out run is recorded too. Exit code 0
+when the records are written, whatever the model did; 1 only when they cannot be.
 
-(the quick-check environment, because the number check is imported from the A06 validator)
+Formal checks need no judgement and are recomputed from the stored output by `review` and `accept`:
+placeholders, meta phrases, lists or headings, length, a required literal (`must`), a forbidden amount
+(`must_not`, a critical error), the language (a clearly wrong language makes the run unusable, an
+unclear one leaves it pending), long dashes (a warning). A number absent from the order and the
+positioning is shown to the reviewer, never decided here.
 
-Exit code 1 when any order has a hard violation. The report is Markdown on stdout.
+Meaning is never decided by a regular expression. Each order lists `criteria`, questions a human
+answers yes, no or unknown for every output (see tests/fixtures/proposal_ai_eval/qa_cases.json), and
+every run also has `no-critical-error`. Verdicts live in a JSONL file next to the runs, one line per run
+and criterion with the agent's `suggestion` and the human `decision` (null until a person confirms
+it); the last line for a run and criterion wins, and it counts only for the answer whose hash it
+carries. `review` walks the reviewer through every open decision.
+
+`accept` is offline and deterministic. A run is PASS (usable), FAIL (unusable: runtime error, formal
+violation or a criterion confirmed "no") or PENDING; a confirmed "no" on a critical criterion or a
+forbidden amount is a critical error. The suite is FAIL on any critical error, a group below its
+threshold or a series median latency above the limit; otherwise PENDING while a decision is open, a run
+is not verified or a group has no approved threshold; otherwise PASS. Exit code 0 only for PASS.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
+import statistics
+import subprocess
 import sys
 import time
 import urllib.request
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 import re2
@@ -89,151 +110,6 @@ def detect_language(text: str) -> str | None:
     return lang if best >= 0.12 * len(words) and best >= 1.5 * second else None
 
 
-# Status of a client term (ANY-631 "Terms"). The check finds definite errors; it never passes a term,
-# every term without an error needs a human verdict (see `check_terms`).
-#
-# A status marker is an acceptance, a refusal (an acceptance or offer with a negation bound to it, or
-# decline / does not cover / нереален), the client's proposal (proposed, a ceiling), an open term
-# ("will be agreed after the call") or an offer. A negation counts only when it is bound to the verb:
-# at most two words in between and no comma, colon, semicolon or "but" (so "I do not code, but I
-# accept your budget" accepts). The markers in the value's own clause decide, with none there the
-# sentence's; when the deciding markers point both ways the mention is "mixed", never guessed.
-_BOUND_NEGATION = re.compile(
-    r"(?:\b(?:not|never|cannot|no|tampoco|ni|не|ни)\b|n['’]t\b|\b(?:declin\w*|refus\w*|rechaz\w*|отказ\w*|отклоня\w*))"
-    r"(?:[ \t]+(?!(?:but|however|pero|sino|но|однако)\b)[\w'’-]+){0,2}[ \t]*$",
-    re.IGNORECASE,
-)
-# One confirmation of the whole agreed set ("Подтверждаю согласованные условия: ..."), after which the
-# agreed terms are listed without a marker each.
-_CONFIRM_AGREED_SET = re.compile(
-    r"\bconfirm\w* (?:the |all )?(?:agreed |following )?(?:terms|conditions)|\bconfirmo lo acordado\b"
-    r"|\bconfirmo (?:las |los )?(?:condiciones|t[ée]rminos)|\bподтвержда\w* (?:согласованн\w* )?(?:услови|объ[её]м|параметр)",
-    re.IGNORECASE,
-)
-_CLAUSE_BREAK = re.compile(r"[,;:—–]|\s(?:but|however|pero|sino|но|однако)\s", re.IGNORECASE)
-_POLARITY = {"positive": "+", "refusal": "-", "proposal": "-", "open": "o", "offer": "f"}
-_POSITIVE = re.compile(
-    r"\baccept\w*|\bagree to\b|\bagreed\b|\bconfirm\w*|\bapprove\w*|\bguarantee(?:s|d to)?\b(?! (?:a |the )?top)"
-    r"|\bincluded\b|\bI(?:.ll| will)? include\b|\btake on\b"
-    r"|\bacept\w*|\bconfirm\w*|\bacordad\w*|\bincluid\w*|\bgarantiz(?:o|ar|aré|amos)\b"
-    r"|\bпринима\w*|\bпринят\w*|\bподтвержд\w*|\bсогласован\w*+(?! \w+ нет)|\bвключ[её]н\w*|\bгарантир\w*",
-    re.IGNORECASE,
-)
-_REFUSAL = re.compile(
-    r"\bdeclin\w*|\breject\w*|does not cover|doesn.t cover|\bno cubre\b|не покрыва\w*|\brather than\b|\brechaz\w*"
-    r"|\bотклоня\w*|\bотказ\w*|\bunrealistic\b|not realistic|unworkable|no es realista|\bнереал\w*"
-    r"|does not fit|doesn.t fit|\bno encaja\b|\bне подходит\b|\bсогласован\w* \w+ нет\b"
-    r"|do(?:es)? not support|doesn.t support|\bno permite\b|\bне позволя\w*",
-    re.IGNORECASE,
-)
-_PROPOSAL = re.compile(r"\bpropos\w*|\bpropuest\w*|\bпредлож\w*|\bпредел\w*|\bпотол\w*", re.IGNORECASE)
-_OPEN = re.compile(
-    r"(?:will|can|could|would|must|is to|are to|to) be agreed|remains? to be agreed|agreed (?:afterwards?|later|only after)"
-    r"|only after (?:the|that|a|our) [\w-]+ call"
-    r"|remains? open|stays? open|open for discussion"
-    r"|not (?:yet )?fixed|not tied to a fixed|not a fixed|not (?:yet )?confirmed|not a confirmed|requested (?:target|timing)|preferred timing"
-    r"|after (?:the|a|our) [\w-]+ (?:call|inspection)|after inspect\w*|until (?:the )?theme (?:is|has been) inspected"
-    r"|\bне зафиксирован\w*|\bпосле оценки|\bдо оценки|\bбудет согласован\w*|\bpor acordar|\bse acordar\w*",
-    re.IGNORECASE,
-)
-_OFFER = re.compile(r"\boffer\w*|\bpropose\b|\bquote\b|\bofrezco\b|\bpropongo\b|\bпредлага\w*", re.IGNORECASE)
-
-
-def _markers(sentence: str) -> list[tuple[int, int, str]]:
-    """(start, end, kind) of every status marker in a sentence."""
-    found = [(m.start(), m.end(), "open") for m in _OPEN.finditer(sentence)]
-
-    def inside_open(m: re.Match) -> bool:
-        return any(s <= m.start() < e for s, e, _ in found)
-
-    def negated(m: re.Match) -> bool:
-        return bool(_BOUND_NEGATION.search(sentence[: m.start()]))
-
-    for m in _POSITIVE.finditer(sentence):
-        if not inside_open(m):
-            found.append((m.start(), m.end(), "refusal" if negated(m) else "positive"))
-    found += [(m.start(), m.end(), "refusal") for m in _REFUSAL.finditer(sentence)]
-    found += [(m.start(), m.end(), "proposal") for m in _PROPOSAL.finditer(sentence) if not inside_open(m)]
-    found += [(m.start(), m.end(), "refusal" if negated(m) else "offer") for m in _OFFER.finditer(sentence)]
-    return found
-
-
-def _mention_kinds(text: str, value: str) -> list[str | None]:
-    """For each mention of the value: the deciding marker kind, "mixed" when the deciding markers (its
-    own clause's, or with none there its sentence's) point both ways, or None when there is none."""
-    kinds = []
-    for sentence in re.split(r"(?<=[.!?])\s+|\n+", text):
-        marks = _markers(sentence)
-        breaks = [0] + [b.start() for b in _CLAUSE_BREAK.finditer(sentence)] + [len(sentence)]
-        for v in re.finditer(value, sentence, re.IGNORECASE):
-            lo = max(b for b in breaks if b <= v.start())
-            hi = min(b for b in breaks if b >= v.end())
-            own = [m for m in marks if lo <= m[0] < hi]
-            pool = own or marks
-            if not pool:
-                kinds.append(None)
-                continue
-            if {"+", "-"} <= {_POLARITY[m[2]] for m in pool}:
-                kinds.append("mixed")  # the words point both ways: never pick one by distance
-                continue
-            nearest = min(pool, key=lambda m: max(0, m[0] - v.end(), v.start() - m[1]))
-            kinds.append(nearest[2])
-    return kinds
-
-
-def check_terms(text: str, terms: list[dict]) -> dict[str, list[str]]:
-    """Errors in the status of client terms, and the terms that need a human verdict.
-
-    The automatic check never passes a term: words can show that a status is wrong or missing, not
-    that it is right (ANY-631 code reviews #3 to #5 each found a wording that an "ok" let through).
-    So every term is either an `error` (a definite violation) or `needs_verdict` (read by hand).
-
-    `value` is a regular expression for the term's value; `status` is the decision the order needs:
-    `declined` (the freelancer was told to decline it: an explicit refusal, a proposal is not enough),
-    `not_agreed` (the client's term that stays a proposal: a refusal or "proposed, not agreed"),
-    `agreed` / `accepted` (confirmed or accepted), `offered` (the freelancer's own value, offered) or
-    `open` (left for later; `condition` is a regular expression the same sentence must also match,
-    for example "after the theme is inspected"). A missing term is an error for every status."""
-    errors, needs_verdict = [], []
-    for term in terms:
-        kinds, status = _mention_kinds(text, term["value"]), term["status"]
-        has = set(kinds)
-        problem = None
-        if not kinds:
-            problem = "no mention"
-        elif status == "declined":
-            if "positive" in has:
-                problem = "stated as accepted"
-            elif "refusal" not in has:
-                problem = "no explicit refusal"
-        elif status == "not_agreed":
-            if "positive" in has:
-                problem = "stated as accepted"
-            elif not has & {"refusal", "proposal"}:
-                problem = "no explicit status"
-        elif status in ("agreed", "accepted"):
-            if "positive" not in has and has & {"refusal", "proposal"}:
-                problem = "stated as not agreed or refused"
-            elif "refusal" in has and status == "accepted":
-                problem = "stated as refused"
-        elif status == "offered":
-            if "offer" not in has:
-                problem = "not offered"
-        elif status == "open":
-            if "positive" in has:
-                problem = "stated as accepted"
-            elif term.get("condition") and not any(
-                re.search(term["value"], s, re.IGNORECASE) and re.search(term["condition"], s, re.IGNORECASE)
-                for s in re.split(r"(?<=[.!?])\s+|\n+", text)
-            ):
-                problem = f"open without its condition /{term['condition']}/"
-        else:
-            raise ValueError(f"unknown term status {status!r}")
-        label = f"{term['value']}: needs {status}, found {kinds or 'no mention'}"
-        (errors if problem else needs_verdict).append(label + (f" ({problem})" if problem else ""))
-    return {"errors": errors, "needs_verdict": needs_verdict}
-
-
 def _is_heading_like(line: str) -> bool:
     stripped = line.strip()
     return 0 < len(stripped) <= 60 and stripped[-1] not in ".!?:;,…" and len(stripped.split()) <= 8
@@ -242,18 +118,15 @@ def _is_heading_like(line: str) -> bool:
 def check_proposal(
     text: str, gaps: list, order: dict, profile: str, *, expect_language: str | None = None
 ) -> dict[str, bool | int]:
-    """Hard checks (True means violated) plus the word count. `expect_language` overrides the
-    order's own (an explicit `--language`). A language the detector cannot tell apart is reported as
-    `language_unverified` for a manual read, never as correct."""
+    """Formal checks (True means violated) plus the word count. `expect_language` overrides the
+    order's own (an explicit `language`). A language the detector cannot tell apart is reported as
+    `language_unverified`, never as correct."""
     lines = [line for line in text.splitlines() if line.strip()]
     language = detect_language(text)
-    terms = check_terms(text, order.get("terms", []))
     expected = (expect_language or order["expect_language"]).split("-")[0]
     return {
         "wrong_language": language is not None and language != expected,
         "language_unverified": language is None,
-        "term_status": bool(terms["errors"]),
-        "term_needs_verdict": bool(terms["needs_verdict"]) and not terms["errors"],
         "placeholder": bool(PLACEHOLDER.search(text)),
         "meta_phrase": bool(META.search(text)),
         "invented_number": _has_invented_number(text, order["task_text"], profile),
@@ -268,6 +141,149 @@ def check_proposal(
     }
 
 
+# What each formal finding does to a run. `invented_number` and `language_unverified` are not here:
+# the first is a hint for the reviewer, the second leaves the run pending.
+CRITICAL_CHECKS = ("forbidden_present",)
+UNUSABLE_CHECKS = (
+    "wrong_language", "placeholder", "meta_phrase", "list_or_heading", "too_long", "missing_gap", "missing_required",
+)
+WARNING_CHECKS = ("long_dash",)
+
+NO_CRITICAL_ERROR = {
+    "id": "no-critical-error",
+    "kind": "requirement",
+    "critical": True,
+    "question": "Is there no unagreed price or term stated as accepted, no invented commitment or amount, no lost "
+    "mandatory condition (exclusion, revision limit, paid changes, start prerequisite) and no promise of excluded work?",
+}
+
+
+def criteria_for(order: dict) -> list[dict]:
+    return [NO_CRITICAL_ERROR, *order.get("criteria", [])]
+
+
+def answer_hash(output: dict) -> str:
+    return "sha256:" + hashlib.sha256(json.dumps(output, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+
+
+def read_jsonl(path: Path) -> list[dict]:
+    if not path.exists():
+        return []
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def latest_verdicts(rows: list[dict]) -> dict[tuple[str, str], dict]:
+    return {(row["run_id"], row["criterion_id"]): row for row in rows}
+
+
+def formal_checks(run: dict, order: dict) -> dict[str, bool | int]:
+    output = run["output"]
+    return check_proposal(
+        output["text"], output.get("gaps", []), order, run["input"]["freelancer_positioning"],
+        expect_language=run["input"].get("language"),
+    )
+
+
+def judge_run(run: dict, order: dict, verdicts: dict[tuple[str, str], dict]) -> dict:
+    """usable / critical are True, False or None (not established yet)."""
+    fails, critical_fails, pending, warnings = [], [], [], []
+    if run["runtime_status"] != "ok":
+        fails.append(f"runtime: {run['runtime_status']}: {run.get('error') or ''}".strip())
+    if not run.get("prompt_sha256") or not run.get("model") or not run.get("reasoning_effort"):
+        pending.append("prompt version or model not read from the running stack")
+    critical_open = False
+    if run.get("output"):
+        checks = formal_checks(run, order)
+        fails += [name for name in UNUSABLE_CHECKS if checks[name]]
+        critical_fails += [name for name in CRITICAL_CHECKS if checks[name]]
+        warnings += [name for name in WARNING_CHECKS if checks[name]]
+        if checks["language_unverified"]:
+            pending.append("language not detected")
+        digest = answer_hash(run["output"])
+        for criterion in criteria_for(order):
+            row = verdicts.get((run["run_id"], criterion["id"]))
+            decision = row.get("decision") if row and row.get("answer_hash") == digest else None
+            answer = decision["answer"] if decision else None
+            if answer == "no":
+                (critical_fails if criterion["critical"] else fails).append(
+                    f"{criterion['id']}: {decision.get('reason') or 'no'}"
+                )
+            elif answer != "yes":
+                pending.append(f"{criterion['id']}: {'unknown' if answer else 'not confirmed'}")
+                critical_open = critical_open or criterion["critical"]
+    elif run["runtime_status"] == "ok":
+        fails.append("no output")
+    usable = False if fails or critical_fails else (None if pending else True)
+    critical = True if critical_fails else (None if critical_open else False)
+    status = {True: "PASS", False: "FAIL", None: "PENDING"}[usable]
+    return {"status": status, "usable": usable, "critical": critical, "reasons": critical_fails + fails + pending,
+            "warnings": warnings}
+
+
+def load_suite(path: Path) -> tuple[dict, dict[str, dict], list[dict], dict[tuple[str, str], dict]]:
+    suite = json.loads(path.read_text(encoding="utf-8"))
+    orders = {}
+    for orders_path in suite["orders"]:
+        fixture = json.loads((path.parent / orders_path).read_text(encoding="utf-8"))
+        for order in fixture["orders"]:
+            orders[order["id"]] = order
+    runs = read_jsonl(path.parent / suite["runs"])
+    return suite, orders, runs, latest_verdicts(read_jsonl(path.parent / suite["verdicts"]))
+
+
+def accept(suite: dict, orders: dict[str, dict], runs: list[dict], verdicts: dict) -> tuple[str, list[str]]:
+    judged = [(run, judge_run(run, orders[run["case_id"]], verdicts)) for run in runs]
+    fails, pending, lines = [], [], []
+    critical = [run["run_id"] for run, j in judged if j["critical"] is True]
+    if critical:
+        fails.append(f"critical errors: {', '.join(critical)}")
+    if any(j["critical"] is None for _, j in judged):
+        pending.append("critical errors not ruled out in every run")
+    groups: dict[tuple[str, str], list[dict]] = {}
+    for run, j in judged:
+        groups.setdefault((run["series"], run["case_id"]), []).append(j)
+    lines += ["| Series | Case | Runs | Usable | Unusable | Pending | Threshold | Group |", "|---|---|---|---|---|---|---|---|"]
+    for (series, case_id), js in sorted(groups.items()):
+        usable = sum(j["usable"] is True for j in js)
+        unusable = sum(j["usable"] is False for j in js)
+        rule = next((t for t in suite.get("thresholds", []) if t["series"] == series and case_id in t["cases"]), None)
+        if rule is None:
+            verdict, threshold = "PENDING", "none approved"
+            pending.append(f"{series} {case_id}: no approved threshold")
+        else:
+            threshold = f"{rule['min_usable']}/{rule['of']}"
+            if len(js) != rule["of"]:
+                verdict = "PENDING"
+                pending.append(f"{series} {case_id}: {len(js)} runs, the threshold is for {rule['of']}")
+            elif usable >= rule["min_usable"]:
+                verdict = "PASS"
+            elif len(js) - unusable < rule["min_usable"]:
+                verdict = "FAIL"
+                fails.append(f"{series} {case_id}: {usable} usable, needs {threshold}")
+            else:
+                verdict = "PENDING"
+                pending.append(f"{series} {case_id}: threshold {threshold} not decided yet")
+        lines.append(f"| {series} | {case_id} | {len(js)} | {usable} | {unusable} | {len(js) - usable - unusable} | {threshold} | {verdict} |")
+    lines += ["", "| Series | Median latency, s | Limit, s |", "|---|---|---|"]
+    for series in sorted({run["series"] for run in runs}):
+        latencies = [run["latency_ms"] for run in runs if run["series"] == series and run.get("latency_ms") is not None]
+        median = statistics.median(latencies) if latencies else None
+        limit = suite["max_median_latency_ms"]
+        if median is None:
+            pending.append(f"{series}: no latency recorded")
+        elif median > limit:
+            fails.append(f"{series}: median latency {median / 1000:.1f} s above {limit / 1000:.0f} s")
+        lines.append(f"| {series} | {'-' if median is None else f'{median / 1000:.1f}'} | {limit / 1000:.0f} |")
+    lines += ["", "Runs that are not PASS or carry a warning:", ""]
+    for run, j in judged:
+        if j["status"] != "PASS" or j["warnings"]:
+            notes = "; ".join(j["reasons"] + [f"warning: {w}" for w in j["warnings"]])
+            lines.append(f"- {j['status']}{' critical' if j['critical'] else ''} `{run['run_id']}`: {notes}")
+    status = "FAIL" if fails else ("PENDING" if pending else "PASS")
+    head = [f"# Suite {suite['id']}: {status}", ""] + [f"- FAIL: {x}" for x in fails] + [f"- PENDING: {x}" for x in sorted(set(pending))]
+    return status, head + [""] + lines
+
+
 def _request(url: str, *, payload: dict | None = None, method: str = "GET") -> dict:
     data = json.dumps(payload).encode() if payload is not None else None
     headers = {"Accept": "application/json", **({"Content-Type": "application/json"} if data else {})}
@@ -275,69 +291,177 @@ def _request(url: str, *, payload: dict | None = None, method: str = "GET") -> d
         return json.loads(response.read())
 
 
-def run_order(api_url: str, order: dict, profile: str, *, tone: str, language: str | None, timeout: float) -> dict:
-    guest_id = _request(f"{api_url}/v1/identity/guest", method="POST")["guest_id"]
-    scenario_input = {"task_text": order["task_text"], "freelancer_positioning": profile, "tone": tone}
+PROMPTS = Path("packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/proposal_ai/prompts")
+
+
+def _docker(project: str, service: str, *command: str) -> str:
+    return subprocess.run(
+        ["docker", "exec", f"{project}-{service}-1", *command], check=True, capture_output=True, text=True
+    ).stdout
+
+
+def read_stack(project: str) -> dict:
+    """The prompt hashes and the model entries as the running worker has them."""
+    hashes = {}
+    for line in _docker(project, "platform-worker", "sh", "-c", f"sha256sum /app/{PROMPTS}/*.md").splitlines():
+        digest, path = line.split()
+        hashes[Path(path).name] = digest
+    import yaml  # noqa: PLC0415 - only `run --compose-project` needs it
+
+    router = yaml.safe_load(_docker(project, "platform-worker", "cat", "/app/configs/kernel/litellm_router.yaml"))
+    models = {entry["model_name"]: entry["litellm_params"] for entry in router["model_list"]}
+    return {"prompt_sha256": hashes, "models": models}
+
+
+def read_provider_calls(project: str, session_id: str) -> list[dict]:
+    # ponytail: dev-live database credentials; another stack needs its own.
+    sql = (
+        "select coalesce(json_agg(row_to_json(c) order by c.created_at), '[]') from (select step_id, model, gateway_model,"
+        " semantic_attempt_index, status, latency_ms, estimated_cost, created_at from platform.provider_calls"
+        f" where scenario_session_id = '{session_id}') c"
+    )
+    rows = json.loads(_docker(project, "postgres", "psql", "-U", "produser", "-d", "proddb", "-Atc", sql))
+    for row in rows:
+        row.pop("created_at")
+    return rows
+
+
+def _git_state() -> dict:
+    sha = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+    dirty = bool(subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True).stdout.strip())
+    return {"git_sha": sha or None, "git_dirty": dirty}
+
+
+def run_once(args: argparse.Namespace, order: dict, attempt: int, profile: str, stack: dict | None) -> dict:
+    scenario_input = {"task_text": order["task_text"], "freelancer_positioning": profile, "tone": order.get("tone", args.tone)}
+    language = order.get("language", args.language)
     if language:
         scenario_input["language"] = language
-    start = _request(
-        f"{api_url}/v1/products/proposal_ai/scenarios/proposal_ai.generate_v1/start",
-        payload={"frontend_id": "web_mirror", "guest_id": guest_id, "input": scenario_input},
-        method="POST",
-    )
-    session_url = f"{api_url}/v1/scenario-sessions/{start['scenario_session_id']}"
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        session = _request(session_url)
-        if session["status"] == "completed":
-            return _request(f"{api_url}/v1/results/{session['result_artifact_id']}")["output"]
-        if session["status"] == "failed":
-            raise RuntimeError(f"session failed: {session}")
-        time.sleep(1.0)
-    raise TimeoutError(f"timed out waiting for {session_url}")
+    record = {
+        "run_id": f"{args.series}-{order['id']}-{attempt}-{uuid.uuid4().hex[:8]}", "series": args.series,
+        "case_id": order["id"], "attempt": attempt, "channel": "api", "session_id": None,
+        "started_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), **_git_state(),
+        "prompt_sha256": stack and stack["prompt_sha256"], "model": None, "reasoning_effort": None,
+        "input": scenario_input, "output": None, "runtime_status": "ok", "error": None,
+        "latency_ms": None, "estimated_cost": None, "provider_calls": None,
+    }
+    started = time.monotonic()
+    try:
+        guest_id = _request(f"{args.api_url}/v1/identity/guest", method="POST")["guest_id"]
+        start = _request(
+            f"{args.api_url}/v1/products/proposal_ai/scenarios/proposal_ai.generate_v1/start",
+            payload={"frontend_id": "web_mirror", "guest_id": guest_id, "input": scenario_input},
+            method="POST",
+        )
+        record["session_id"] = start["scenario_session_id"]
+        session_url = f"{args.api_url}/v1/scenario-sessions/{record['session_id']}"
+        while True:
+            session = _request(session_url)
+            if session["status"] == "completed":
+                record["output"] = _request(f"{args.api_url}/v1/results/{session['result_artifact_id']}")["output"]
+                break
+            if session["status"] == "failed":
+                raise RuntimeError(f"session failed: {session.get('status')}")
+            if time.monotonic() - started > args.timeout:
+                raise TimeoutError(f"no result after {args.timeout:.0f} s")
+            time.sleep(1.0)
+    except (OSError, RuntimeError, TimeoutError, KeyError, ValueError) as exc:
+        record["runtime_status"], record["error"] = "error", str(exc)
+    record["latency_ms"] = round((time.monotonic() - started) * 1000)
+    if stack and record["session_id"]:
+        calls = read_provider_calls(args.compose_project, record["session_id"])
+        record["provider_calls"] = calls
+        costs = [call["estimated_cost"] for call in calls]
+        record["estimated_cost"] = sum(costs) if costs and None not in costs else None
+        aliases = {call["gateway_model"] for call in calls}
+        if len(aliases) == 1:
+            params = stack["models"].get(aliases.pop(), {})
+            record["model"], record["reasoning_effort"] = params.get("model"), params.get("reasoning_effort")
+    return record
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--api-url", required=True)
-    parser.add_argument("--tone", default="warm", choices=["neutral", "warm", "firm"])
-    parser.add_argument("--language", help="explicit proposal language, default: the task's language")
-    parser.add_argument("--timeout", type=float, default=120.0)
-    parser.add_argument("--save-json", type=Path, help="also write the raw outputs here")
-    parser.add_argument("--orders", type=Path, default=ORDERS_PATH, help="order set, default: orders.json")
-    args = parser.parse_args()
-
+def command_run(args: argparse.Namespace) -> int:
     fixture = json.loads(args.orders.read_text(encoding="utf-8"))
-    rows, raw, failed = [], {}, False
-    for order in fixture["orders"]:
-        profile = order.get("freelancer_positioning", fixture.get("freelancer_positioning"))
-        language = order.get("language", args.language)
-        try:
-            output = run_order(
-                args.api_url, order, profile, tone=order.get("tone", args.tone), language=language, timeout=args.timeout
-            )
-        except (OSError, RuntimeError, TimeoutError, KeyError, ValueError) as exc:
-            rows.append(f"| {order['id']} | run failed: {exc} |")
-            failed = True
+    stack = read_stack(args.compose_project) if args.compose_project else None
+    try:
+        with args.out.open("a", encoding="utf-8") as out:
+            for attempt in range(1, args.repeats + 1):
+                for order in fixture["orders"]:
+                    profile = order.get("freelancer_positioning", fixture.get("freelancer_positioning"))
+                    record = run_once(args, order, attempt, profile, stack)
+                    out.write(json.dumps(record, ensure_ascii=False) + "\n")
+                    out.flush()
+                    print(f"{record['run_id']} {record['runtime_status']} {record['latency_ms']} ms", flush=True)
+    except OSError as exc:
+        print(f"cannot write {args.out}: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def command_review(args: argparse.Namespace) -> int:
+    suite, orders, runs, verdicts = load_suite(args.suite)
+    path = args.suite.parent / suite["verdicts"]
+    shown = None
+    for run in runs:
+        if not run.get("output"):
             continue
-        raw[order["id"]] = output
-        checks = check_proposal(
-            output["text"], output.get("gaps", []), order, profile, expect_language=language
-        )
-        violations = [name for name, value in checks.items() if value is True]
-        failed = failed or bool(violations)
-        rows.append(
-            f"| {order['id']} | {checks['words']} words, {len(output.get('gaps', []))} gaps | "
-            + (", ".join(violations) or "ok")
-            + " |"
-        )
-    if args.save_json:
-        args.save_json.write_text(json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8")
-    opening = [" ".join(out["text"].split()[:5]).lower() for out in raw.values()]
-    print("| order | size | violations |\n|---|---|---|")
-    print("\n".join(rows))
-    print(f"\nRepeated openings (first five words): {len(opening) - len(set(opening))}")
-    return 1 if failed else 0
+        order, digest = orders[run["case_id"]], answer_hash(run["output"])
+        for criterion in criteria_for(order):
+            row = verdicts.get((run["run_id"], criterion["id"]))
+            if row and row.get("answer_hash") == digest and row.get("decision"):
+                continue
+            suggestion = row.get("suggestion") if row and row.get("answer_hash") == digest else None
+            if shown != run["run_id"]:
+                shown = run["run_id"]
+                print(f"\n=== {run['run_id']} ({run['model']}, {run['reasoning_effort']})\n{run['output']['text']}\n")
+                if formal_checks(run, order)["invented_number"]:
+                    print("Note: a number that is not in the order or the positioning.")
+            print(f"\n[{criterion['id']}{', critical' if criterion['critical'] else ''}] {criterion['question']}")
+            if suggestion:
+                print(f"Agent: {suggestion['answer']} - {suggestion.get('reason', '')} | quote: {suggestion.get('quote', '')}")
+            answer = input("y = yes, n = no, u = unknown, s = skip, q = quit > ").strip().lower()
+            if answer == "q":
+                return 0
+            if answer not in ("y", "n", "u"):
+                continue
+            reason = input("Reason > ").strip() if answer in ("n", "u") else (suggestion or {}).get("reason")
+            new = {
+                "run_id": run["run_id"], "criterion_id": criterion["id"], "answer_hash": digest, "suggestion": suggestion,
+                "decision": {"answer": {"y": "yes", "n": "no", "u": "unknown"}[answer], "reason": reason,
+                             "reviewer": args.reviewer,
+                             "reviewed_at": datetime.now(timezone.utc).isoformat(timespec="seconds")},
+            }
+            with path.open("a", encoding="utf-8") as out:
+                out.write(json.dumps(new, ensure_ascii=False) + "\n")
+    return 0
+
+
+def command_accept(args: argparse.Namespace) -> int:
+    status, lines = accept(*load_suite(args.suite))
+    print("\n".join(lines))
+    return 0 if status == "PASS" else 1
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    commands = parser.add_subparsers(dest="command", required=True)
+    run = commands.add_parser("run", help="collect outputs from a running stack")
+    run.add_argument("--api-url", required=True)
+    run.add_argument("--orders", type=Path, default=ORDERS_PATH, help="order set, default: orders.json")
+    run.add_argument("--series", required=True, help="the configuration under test, for example luna-medium")
+    run.add_argument("--out", type=Path, required=True, help="runs JSONL, appended to")
+    run.add_argument("--repeats", type=int, default=1)
+    run.add_argument("--tone", default="warm", choices=["neutral", "warm", "firm"])
+    run.add_argument("--language", help="explicit proposal language, default: the task's language")
+    run.add_argument("--timeout", type=float, default=120.0)
+    run.add_argument("--compose-project", help="local stack to read the prompt hashes, model and provider calls from")
+    review = commands.add_parser("review", help="confirm or correct every open verdict")
+    review.add_argument("--suite", type=Path, required=True)
+    review.add_argument("--reviewer", required=True, help="who confirms, recorded in every decision")
+    accept_parser = commands.add_parser("accept", help="offline suite verdict from runs and confirmed verdicts")
+    accept_parser.add_argument("--suite", type=Path, required=True)
+    args = parser.parse_args(argv)
+    return {"run": command_run, "review": command_review, "accept": command_accept}[args.command](args)
 
 
 if __name__ == "__main__":

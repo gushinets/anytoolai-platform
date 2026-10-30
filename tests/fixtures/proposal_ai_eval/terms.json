@@ -1,5 +1,5 @@
 {
-  "description": "ANY-631 regression set for the status of client terms in ProposalAI (the prompt's Terms section, rules 1-5). Each order names the rule it exercises. `must` / `must_not` are case-insensitive regular expressions; a match is evidence, not a verdict: read every flagged output.",
+  "description": "ANY-631 regression set for the status of client terms in ProposalAI (the prompt's Terms section, rules 1-5). Each order names the rule it exercises. `must` / `must_not` are literal checks only: a value that has to appear and amounts that must not appear (a forbidden amount is a critical error). `criteria` are questions a human answers for every output; see qa_cases.json for the kinds.",
   "orders": [
     {
       "id": "conflict-decline-en",
@@ -16,18 +16,24 @@
         "USD (?!150\\b)\\d",
         "\\$\\s?\\d"
       ],
-      "terms": [
+      "criteria": [
         {
-          "value": "USD 150",
-          "status": "not_agreed"
+          "id": "budget-not-agreed",
+          "kind": "not_agreed",
+          "critical": false,
+          "question": "Is USD 150 stated as the client's budget that is not accepted (proposed and not agreed, or refused), never as accepted or as the freelancer's price?"
         },
         {
-          "value": "(3|three)[- ]day",
-          "status": "declined"
+          "id": "deadline-declined",
+          "kind": "declined",
+          "critical": false,
+          "question": "Is the 3-day deadline refused in so many words?"
         },
         {
-          "value": "unlimited (logo )?concepts",
-          "status": "declined"
+          "id": "concepts-declined",
+          "kind": "declined",
+          "critical": false,
+          "question": "Are unlimited logo concepts refused in so many words?"
         }
       ]
     },
@@ -46,22 +52,18 @@
         "(два|2) раунда",
         "бриф"
       ],
-      "must_not": [
-        "не принима",
-        "не принят"
-      ],
-      "terms": [
+      "criteria": [
         {
-          "value": "36\\s?000",
-          "status": "agreed"
+          "id": "agreed-confirmed",
+          "kind": "agreed",
+          "critical": true,
+          "question": "Are the agreed 36 000 ₽, the 20 November deadline, the 18 000 + 18 000 ₽ payments and 3 000 ₽ per extra card restated and confirmed, never called proposed or not agreed?"
         },
         {
-          "value": "20 ноября",
-          "status": "agreed"
-        },
-        {
-          "value": "3\\s?000 ₽",
-          "status": "agreed"
+          "id": "brief-before-start",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Is the brief with product details required before the work starts?"
         }
       ]
     },
@@ -79,21 +81,20 @@
         "20 November"
       ],
       "must_not": [
-        "(not accept|don.t accept|cannot accept|can.t accept|decline)[^.]{0,60}(second|two|additional) (revision )?round",
         "USD (?!400\\b)\\d"
       ],
-      "terms": [
+      "criteria": [
         {
-          "value": "(second|two) (revision )?rounds?",
-          "status": "accepted"
+          "id": "second-round-accepted",
+          "kind": "accepted",
+          "critical": false,
+          "question": "Is the second revision round accepted at no extra cost?"
         },
         {
-          "value": "USD 400",
-          "status": "agreed"
-        },
-        {
-          "value": "20 November",
-          "status": "agreed"
+          "id": "agreed-confirmed",
+          "kind": "agreed",
+          "critical": true,
+          "question": "Are USD 400 and delivery on 20 November 2026 confirmed as agreed, never called proposed or not agreed?"
         }
       ]
     },
@@ -112,22 +113,21 @@
         "15 fotos"
       ],
       "must_not": [
-        "(?<!no )(?<!tampoco )acepto (añadir )?(las )?15",
         "\\d+ EUR(?<!240 EUR)",
         "EUR \\d"
       ],
-      "terms": [
+      "criteria": [
         {
-          "value": "240 EUR",
-          "status": "agreed"
+          "id": "agreed-confirmed",
+          "kind": "agreed",
+          "critical": true,
+          "question": "Are the agreed 8 edited photos for 240 EUR by 12 December 2026 confirmed, never called proposed or not agreed?"
         },
         {
-          "value": "15 fotos",
-          "status": "declined"
-        },
-        {
-          "value": "5 de diciembre",
-          "status": "declined"
+          "id": "new-request-declined",
+          "kind": "declined",
+          "critical": false,
+          "question": "Is the new request (15 more photos and delivery on 5 December for the same price) refused in so many words, with no new price?"
         }
       ]
     },
@@ -144,17 +144,20 @@
         "EUR 1,?500"
       ],
       "must_not": [
-        "(not accept|don.t accept|cannot accept|can.t accept|decline)[^.]{0,60}(second|two|additional) (revision )?round",
         "EUR (?!1,?500\\b)\\d"
       ],
-      "terms": [
+      "criteria": [
         {
-          "value": "(second|two) (revision )?rounds?",
-          "status": "accepted"
+          "id": "second-round-accepted",
+          "kind": "accepted",
+          "critical": false,
+          "question": "Is the second revision round accepted in place of the one-round limit?"
         },
         {
-          "value": "EUR 1,?500",
-          "status": "agreed"
+          "id": "agreed-kept",
+          "kind": "agreed",
+          "critical": true,
+          "question": "Do EUR 1,500 and the 5 pages stay as agreed, never called proposed or not agreed?"
         }
       ]
     },
@@ -173,18 +176,24 @@
       "must_not": [
         "EUR (?!300\\b|800\\b)\\d"
       ],
-      "terms": [
+      "criteria": [
         {
-          "value": "EUR 300",
-          "status": "declined"
+          "id": "budget-declined",
+          "kind": "declined",
+          "critical": false,
+          "question": "Is the EUR 300 budget refused in so many words?"
         },
         {
-          "value": "48[- ]hour",
-          "status": "declined"
+          "id": "deadline-declined",
+          "kind": "declined",
+          "critical": false,
+          "question": "Is the 48-hour deadline refused in so many words?"
         },
         {
-          "value": "EUR 800",
-          "status": "offered"
+          "id": "counteroffer",
+          "kind": "offered",
+          "critical": false,
+          "question": "Does the freelancer offer EUR 800 as their own price for a smaller 5-page first phase built after the copy arrives?"
         }
       ]
     },
@@ -200,18 +209,26 @@
         "discovery call"
       ],
       "must_not": [
-        "(USD|EUR|\\$)\\s?\\d",
-        "I will deliver (the first drafts )?(by|in) (early )?January"
+        "(USD|EUR|\\$)\\s?\\d"
       ],
-      "terms": [
+      "criteria": [
         {
-          "value": "\\bfee\\b",
-          "status": "open",
-          "condition": "discovery call|the call|that call"
+          "id": "fee-open",
+          "kind": "open",
+          "critical": false,
+          "question": "Are the fee and the number of additional emails left to be agreed after the discovery call, with no amount?"
         },
         {
-          "value": "January",
-          "status": "open"
+          "id": "date-open",
+          "kind": "open",
+          "critical": false,
+          "question": "Is early January 2027 kept as the client's wish that is not fixed, not promised as a deadline?"
+        },
+        {
+          "id": "analytics-excluded",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Is analytics setup kept out of the work?"
         }
       ]
     },
@@ -227,18 +244,24 @@
         "80\\s?000",
         "(2|два) рабочих дн"
       ],
-      "must_not": [
-        "(подтверждаю|принимаю)[^.]{0,40}80\\s?000",
-        "согласованн\\w* цен\\w*[^.]{0,20}80\\s?000"
-      ],
-      "terms": [
+      "criteria": [
         {
-          "value": "80\\s?000",
-          "status": "not_agreed"
+          "id": "ceiling-not-agreed",
+          "kind": "not_agreed",
+          "critical": false,
+          "question": "Is the 80 000 ₽ ceiling stated as the client's budget that is not an agreed price, with the final price after the estimate?"
         },
         {
-          "value": "(2|два) рабочих дн",
-          "status": "declined"
+          "id": "deadline-declined",
+          "kind": "declined",
+          "critical": false,
+          "question": "Is the 2-working-day deadline refused in so many words?"
+        },
+        {
+          "id": "no-invented-date",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Does the answer avoid naming any date or duration of its own?"
         }
       ]
     },
@@ -255,19 +278,21 @@
         "200 EUR"
       ],
       "must_not": [
-        "(?<!no )(?<!tampoco )acepto (el|tu|su) presupuesto",
-        "(?<!no )(?<!tampoco )garantizo (los |las )?10[\\s.]?000",
         "EUR (?!200\\b)\\d",
         "\\d+ EUR(?<!200 EUR)"
       ],
-      "terms": [
+      "criteria": [
         {
-          "value": "200 EUR",
-          "status": "declined"
+          "id": "budget-declined",
+          "kind": "declined",
+          "critical": false,
+          "question": "Is the 200 EUR total budget refused in so many words?"
         },
         {
-          "value": "10[\\s.]?000 seguidores",
-          "status": "declined"
+          "id": "guarantee-declined",
+          "kind": "declined",
+          "critical": false,
+          "question": "Is the guarantee of 10 000 new followers refused in so many words?"
         }
       ]
     },
@@ -283,18 +308,32 @@
         "USD 1,?200"
       ],
       "must_not": [
-        "(scope|templates?|handover|deliverables?)[^.]{0,40}(are|is) (proposed|not (yet )?agreed)",
         "USD (?!1,?200\\b)\\d"
       ],
-      "terms": [
+      "criteria": [
         {
-          "value": "USD 1,?200",
-          "status": "not_agreed"
+          "id": "ceiling-not-agreed",
+          "kind": "not_agreed",
+          "critical": false,
+          "question": "Is the USD 1,200 ceiling stated as the client's budget that is not an agreed fee?"
         },
         {
-          "value": "final fee",
-          "status": "open",
-          "condition": "inspect"
+          "id": "fee-open-after-inspection",
+          "kind": "open",
+          "critical": false,
+          "question": "Does the final fee stay to be agreed after inspecting the theme (the condition may be in another sentence)?"
+        },
+        {
+          "id": "scope-not-a-term",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Are the requested templates, spreadsheet and 45-minute handover stated as the work, never called proposed or not agreed?"
+        },
+        {
+          "id": "exclusions-kept",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Are redesign, theme edits, third-party checkout, app remediation, certification and a legal compliance guarantee kept out of the work?"
         }
       ]
     }

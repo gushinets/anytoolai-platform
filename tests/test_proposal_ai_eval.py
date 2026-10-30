@@ -220,50 +220,142 @@ def test_identifiers_do_not_offer_their_digits_as_numbers() -> None:
     assert "invented_number" in violations("My fee is $20.", order=order)
 
 
-def test_terms_set_checks_the_status_of_client_terms() -> None:
-    """terms.json (ANY-631): every order names its rule and the decision each term needs. The status
-    check finds definite errors and never passes a term: a term without an error needs a human
-    verdict. Every counterexample below got through an earlier version (code reviews #3 to #5)."""
-    terms = json.loads((proposal_ai_eval.ORDERS_PATH.parent / "terms.json").read_text(encoding="utf-8"))
-    orders = {order["id"]: order for order in terms["orders"]}
-    for order in orders.values():
-        assert order["rule"] and order["terms"], order["id"]
-        for pattern in order.get("must", []) + order.get("must_not", []) + [term["value"] for term in order["terms"]]:
-            re.compile(pattern)
+FIXTURES = proposal_ai_eval.ORDERS_PATH.parent
+KINDS = {"declined", "not_agreed", "agreed", "accepted", "offered", "open", "requirement"}
 
-    def outcome(order_id: str, text: str) -> str:
-        result = proposal_ai_eval.check_terms(text, orders[order_id]["terms"])
-        assert result["errors"] or result["needs_verdict"], "every term is an error or needs a verdict"
-        return "error" if result["errors"] else "needs_verdict"
 
-    # an unagreed price or deadline stated as accepted (review #3)
-    assert outcome("conflict-decline-en", "I accept your USD 150 budget and the 3-day deadline for this project. I do not accept unlimited logo concepts.") == "error"
-    assert outcome("counteroffer-en", "I accept the EUR 300 budget and offer EUR 800 for a smaller first phase. I do not accept the 48-hour deadline.") == "error"
-    assert outcome("ceiling-stays-client-ru", "Бюджет до 80 000 ₽ согласован и принят. Срок в 2 рабочих дня подтверждаю.") == "error"
-    assert outcome("limit-change-accepted-en", "I do not accept a second revision round; EUR 1,500 stays as agreed.") == "error"
-    assert outcome("conflict-decline-es", "Acepto el presupuesto de 200 EUR y garantizo 10 000 seguidores.") == "error"
-    # a negation in another clause, a declined term only left open, an omitted or unstatused term (review #4)
-    assert outcome("conflict-decline-en", "I do not code, but I accept your USD 150 budget. I do not accept the 3-day deadline or unlimited logo concepts.") == "error"
-    assert outcome("counteroffer-en", "Your EUR 300 budget will be agreed later. I do not accept the 48-hour deadline. I offer EUR 800 for a smaller phase.") == "error"
-    assert outcome("conflict-decline-en", "Your request is for a logo and templates on a USD 150 budget. I do not accept the 3-day deadline or unlimited concepts.") == "error"
-    assert outcome("left-open-en", "I can rewrite the welcome email and the four-email trial sequence. Analytics setup is outside this work.") == "error"
-    # a decline the freelancer ordered, written only as "a proposal, not agreed" (review #5)
-    assert outcome("conflict-decline-es", "El presupuesto de 200 EUR es una propuesta del cliente, no un acuerdo. La garantía de 10 000 seguidores también es una propuesta del cliente, no un acuerdo. No propongo otra suma.") == "error"
-    assert outcome("conflict-decline-en", "Your USD 150 budget is your proposal, not an agreed price. I do not accept the 3-day deadline. Unlimited logo concepts are your proposal, not agreed.") == "error"
-    # the fee is open only after the theme is inspected; dropping that condition is an error (review #5)
-    assert outcome("ceiling-and-scope-en", "Your USD 1,200 budget is proposed, not agreed. The final fee is proposed, not agreed.") == "error"
-    # an agreed term called not agreed (the shipping-prompt regression on luna/medium)
-    assert outcome("agreed-confirm-ru", "Стоимость 36 000 ₽, сдача до 20 ноября и 3 000 ₽ за карточку указаны как условия клиента, но пока не согласованы.") == "error"
+def test_criteria_are_questions_and_fixture_checks_are_literal() -> None:
+    """Meaning is a human question; `must_not` may only forbid amounts (code reviews #3 to #6 found
+    a new wording that every semantic regular expression misread)."""
+    for name in ("terms.json", "qa_cases.json"):
+        for order in json.loads((FIXTURES / name).read_text(encoding="utf-8"))["orders"]:
+            ids = [criterion["id"] for criterion in order["criteria"]]
+            assert len(ids) == len(set(ids)) and "no-critical-error" not in ids, order["id"]
+            for criterion in order["criteria"]:
+                assert criterion["kind"] in KINDS and criterion["question"].endswith("?"), criterion
+                assert isinstance(criterion["critical"], bool), criterion
+            for pattern in order.get("must", []) + order.get("must_not", []):
+                re.compile(pattern)
+            for pattern in order.get("must_not", []):
+                assert "\\d" in pattern, f"{order['id']}: must_not forbids amounts only: {pattern}"
 
-    # correct proposals (from the live runs) are never errors, and never pass without a human verdict
-    for order_id, text in (
-        ("conflict-decline-en", "Your USD 150 budget is your proposal, not an agreed price. I do not accept the 3-day deadline or unlimited logo concepts."),
-        ("counteroffer-en", "I do not accept the EUR 300 budget or the 48-hour deadline. I offer EUR 800 for a smaller 5-page first phase."),
-        ("ceiling-stays-client-ru", "Срок в 2 рабочих дня нереален и не принимается. Ваш бюджет до 80 000 ₽ является предложенным пределом, а не согласованной ценой."),
-        ("limit-change-accepted-en", "I accept the second revision round instead of the one-round limit; EUR 1,500 and the 5 pages stay as agreed."),
-        ("conflict-decline-es", "No acepto el presupuesto de 200 EUR. Tampoco acepto garantizar 10 000 seguidores nuevos."),
-        ("left-open-en", "The number of additional emails and the fee will be agreed after the discovery call. Early January 2027 is your requested target, but the date is not fixed yet."),
-        ("agreed-confirm-ru", "Подтверждаю согласованные условия: 12 карточек, итого 36 000 ₽. Сдача до 18:00 20 ноября 2026. Сверх 12 карточек по 3 000 ₽."),
-        ("ceiling-and-scope-en", "Your USD 1,200 budget ceiling is a proposal, not an agreed fee; the final fee remains to be agreed after inspecting the theme."),
+
+ORDER = {
+    "id": "counteroffer-en",
+    "task_text": "A client wants a 12-page site within 48 hours for EUR 300. Decline both and offer EUR 800 for 5 pages.",
+    "expect_language": "en",
+    "must": ["EUR 800"],
+    "must_not": ["EUR (?!300\\b|800\\b)\\d"],
+    "criteria": [{"id": "budget-declined", "kind": "declined", "critical": False, "question": "Is EUR 300 refused?"}],
+}
+PROFILE_EN = "I build Webflow marketing sites for small businesses and agree timelines after the content arrives."
+TEXT = (
+    "I build Webflow marketing sites for small businesses, and this project is close to the work I do for my clients. "
+    "I do not accept the EUR 300 budget or the 48-hour deadline for the full site with all of its pages. "
+    "I offer EUR 800 for a smaller first phase of 5 pages, and I will start it once the copy and the images arrive."
+)
+
+
+def make_run(run_id: str, text: str = TEXT, **fields) -> dict:
+    return {
+        "run_id": run_id, "series": "luna-medium", "case_id": ORDER["id"], "attempt": 1, "channel": "web_form",
+        "session_id": f"s-{run_id}", "prompt_sha256": {"compose_persuasive_text.v1.md": "abc"}, "model": "openai/gpt-6-luna",
+        "reasoning_effort": "medium", "input": {"task_text": ORDER["task_text"], "freelancer_positioning": PROFILE_EN, "tone": "firm"},
+        "output": {"text": text, "gaps": []}, "runtime_status": "ok", "error": None, "latency_ms": 20000, **fields,
+    }
+
+
+def decide(run: dict, answers: dict[str, str]) -> list[dict]:
+    digest = proposal_ai_eval.answer_hash(run["output"])
+    return [
+        {"run_id": run["run_id"], "criterion_id": criterion, "answer_hash": digest, "suggestion": None,
+         "decision": {"answer": answer, "reason": None if answer == "yes" else "read", "reviewer": "qa", "reviewed_at": "2026-10-30T00:00:00+00:00"}}
+        for criterion, answer in answers.items()
+    ]
+
+
+def run_accept(tmp_path: Path, runs: list[dict], verdicts: list[dict], thresholds: list[dict] | None = None, capsys=None) -> tuple[int, str]:
+    (tmp_path / "orders.json").write_text(json.dumps({"orders": [ORDER]}), encoding="utf-8")
+    (tmp_path / "runs.jsonl").write_text("".join(json.dumps(r) + "\n" for r in runs), encoding="utf-8")
+    (tmp_path / "verdicts.jsonl").write_text("".join(json.dumps(v) + "\n" for v in verdicts), encoding="utf-8")
+    suite = {
+        "id": "t", "orders": ["orders.json"], "runs": "runs.jsonl", "verdicts": "verdicts.jsonl", "max_median_latency_ms": 60000,
+        "thresholds": [{"series": "luna-medium", "cases": [ORDER["id"]], "min_usable": 2, "of": 3}] if thresholds is None else thresholds,
+    }
+    (tmp_path / "suite.json").write_text(json.dumps(suite), encoding="utf-8")
+    code = proposal_ai_eval.main(["accept", "--suite", str(tmp_path / "suite.json")])
+    return code, capsys.readouterr().out
+
+
+YES = {"no-critical-error": "yes", "budget-declined": "yes"}
+
+
+def test_accept_is_pending_until_a_human_confirms_every_criterion(tmp_path: Path, capsys) -> None:
+    runs = [make_run(f"r{i}") for i in range(3)]
+    # an agent suggestion is not a decision, and a decision for another answer does not count
+    suggested = [{**row, "decision": None, "suggestion": {"answer": "yes", "reviewer": "agent"}} for row in decide(runs[0], YES)]
+    stale = [{**row, "answer_hash": "sha256:other"} for row in decide(runs[1], YES)]
+    code, out = run_accept(tmp_path, runs, suggested + stale + decide(runs[2], {**YES, "budget-declined": "unknown"}), capsys=capsys)
+    assert code == 1 and out.startswith("# Suite t: PENDING")
+    assert "budget-declined: not confirmed" in out and "budget-declined: unknown" in out
+
+
+def test_accept_passes_with_confirmed_verdicts_and_a_non_critical_failure_within_the_threshold(tmp_path: Path, capsys) -> None:
+    runs = [make_run("r0"), make_run("r1", text=TEXT + " Long dashes — are a warning only."), make_run("r2")]
+    verdicts = decide(runs[0], YES) + decide(runs[1], YES) + decide(runs[2], {**YES, "budget-declined": "no"})
+    code, out = run_accept(tmp_path, runs, verdicts, capsys=capsys)
+    assert code == 0 and out.startswith("# Suite t: PASS"), out
+    assert "| luna-medium | counteroffer-en | 3 | 2 | 1 | 0 | 2/3 | PASS |" in out
+    assert "warning: long_dash" in out
+
+
+def test_accept_fails_on_a_critical_error_a_missed_threshold_or_slow_runs(tmp_path: Path, capsys) -> None:
+    runs = [make_run(f"r{i}") for i in range(3)]
+    verdicts = [row for run in runs for row in decide(run, YES)]
+    critical = decide(runs[0], {**YES, "no-critical-error": "no"})
+    code, out = run_accept(tmp_path, runs, verdicts + critical, capsys=capsys)
+    assert code == 1 and "FAIL: critical errors: r0" in out
+    # a forbidden amount is a critical error without any verdict
+    code, out = run_accept(tmp_path, [make_run("r0", text=TEXT + " Or EUR 500 for less.")] + runs[1:], verdicts, capsys=capsys)
+    assert code == 1 and "FAIL critical `r0`: forbidden_present" in out
+    # two runs a person rejected and one runtime error leave 0 of 3 usable
+    failed = [make_run("r0", runtime_status="ui_error", error="form gave up after 60 s")] + runs[1:]
+    rejected = [row for run in runs[1:] for row in decide(run, {**YES, "budget-declined": "no"})]
+    code, out = run_accept(tmp_path, failed, rejected, capsys=capsys)
+    assert code == 1 and "FAIL: luna-medium counteroffer-en: 0 usable, needs 2/3" in out
+    slow = [make_run(f"r{i}", latency_ms=61000) for i in range(3)]
+    code, out = run_accept(tmp_path, slow, [row for run in slow for row in decide(run, YES)], capsys=capsys)
+    assert code == 1 and "median latency 61.0 s above 60 s" in out
+
+
+def test_accept_never_invents_a_threshold(tmp_path: Path, capsys) -> None:
+    runs = [make_run(f"r{i}") for i in range(3)]
+    code, out = run_accept(tmp_path, runs, [row for run in runs for row in decide(run, YES)], thresholds=[], capsys=capsys)
+    assert code == 1 and "PENDING: luna-medium counteroffer-en: no approved threshold" in out
+
+
+def test_formal_checks_leave_every_wording_of_a_term_to_the_reviewer() -> None:
+    """The review #6 wordings: whatever the text says about a term, the formal checks neither pass nor
+    fail it; only the forbidden amount and the required value are literal."""
+    for text in (
+        TEXT.replace("I offer EUR 800", "I propose EUR 800"),
+        TEXT.replace("I do not accept the EUR 300 budget or", "The EUR 300 budget is not agreed. I do not accept"),
     ):
-        assert outcome(order_id, text) == "needs_verdict", (order_id, text)
+        judged = proposal_ai_eval.judge_run(make_run("r", text=text), ORDER, {})
+        assert judged["status"] == "PENDING" and judged["critical"] is None, judged
+        assert not any(reason.startswith(("budget", "forbidden", "missing")) and "confirmed" not in reason for reason in judged["reasons"])
+
+
+def test_the_any_631_suite_is_consistent() -> None:
+    """The committed live acceptance: every verdict belongs to a stored run, a criterion of its order and
+    the exact answer it judged, and the offline verdict is the same on every call."""
+    path = FIXTURES / "acceptance" / "any-631" / "suite.json"
+    suite, orders, runs, verdicts = proposal_ai_eval.load_suite(path)
+    by_id = {run["run_id"]: run for run in runs}
+    assert len(by_id) == len(runs) == 150
+    for (run_id, criterion_id), row in verdicts.items():
+        run = by_id[run_id]
+        assert criterion_id in {c["id"] for c in proposal_ai_eval.criteria_for(orders[run["case_id"]])}
+        assert row["answer_hash"] == proposal_ai_eval.answer_hash(run["output"])
+        assert row["decision"] is None or row["decision"]["reviewer"] != "agent"
+    assert proposal_ai_eval.accept(*proposal_ai_eval.load_suite(path)) == proposal_ai_eval.accept(suite, orders, runs, verdicts)

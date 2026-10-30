@@ -8,12 +8,14 @@
 - Created: 2026-10-29
 - Last updated: 2026-10-30
 - Review date: 2026-11-05
-- Next action: team lead decision on the recommendation (`gpt-6-luna` / `high`); then move this
-  plan to `completed/`. Follow-ups: ANY-776 (switch the model), ANY-777 (60 s form wait), ANY-771
-  (output language).
-- Blocker: none. Dependency: the prompt is qualified on both `gpt-6-luna` / `medium` (the current
-  product policy) and `gpt-6-luna` / `high` (pass 5 below), so it does not depend on ANY-776; ANY-776
-  stays the separate model decision.
+- Next action: a human reviewer confirms or corrects every verdict of the pass 5 acceptance suite
+  (`proposal_ai_eval.py review`); the team lead approves thresholds for the groups that have none
+  (terms orders x 3, agreed terms x 10) and the recommendation (`gpt-6-luna` / `high`); then move
+  this plan to `completed/`. Follow-ups: ANY-776 (switch the model), ANY-777 (60 s form wait),
+  ANY-771 (output language).
+- Blocker: the pass 5 acceptance is PENDING until a person confirms the verdicts (code review #6
+  below). If it passes, the prompt is qualified on both `gpt-6-luna` / `medium` (the current product
+  policy) and `gpt-6-luna` / `high`, so it does not depend on ANY-776.
 
 ## Goal
 
@@ -116,7 +118,7 @@ The gaps language defect (ANY-771), Docker dependency cache (ANY-770), changing 
   test keeps the scattered wording from coming back.
 - Regression set: `tests/fixtures/proposal_ai_eval/terms.json` (10 orders, rules 1-5, EN/RU/ES,
   including the examples of code reviews #1 and #2), run with
-  `scripts/agent/proposal_ai_eval.py --orders`.
+  `scripts/agent/proposal_ai_eval.py run --orders` (the CLI since code review #6).
 - Code review #3: the automatic checks themselves were the wrong model. The set only checked that an
   amount was present, so "I accept your USD 150 budget" passed; the language check called every
   non-Cyrillic text English and skipped Spanish, so whole Spanish, Dutch and German answers passed.
@@ -153,7 +155,8 @@ The gaps language defect (ANY-771), Docker dependency cache (ANY-770), changing 
     and ES to English are wrong-language, and that correct live answers pass.
 - Code review #5: the oracle still returned ok for a term the order told the freelancer to decline
   when the text only called it the client's proposal, and for an open fee that dropped its
-  condition. Both come from the same wrong shape: a check that can say ok. Replaced:
+  condition. Both come from the same wrong shape: a check that can say ok. Replaced (and deleted
+  in code review #6, see the acceptance procedure below):
   - `check_terms` has two outcomes only: error (definitely wrong) or needs a human verdict. Every
     client term goes to a human verdict unless it is definitely wrong; nothing passes on markers.
   - The expected status is the decision the order asks for: `declined` (an explicit refusal is
@@ -363,7 +366,8 @@ rebuilt with the prompt under test. Each pass that changed the prompt was follow
    | luna / medium | 50/50 | 5/5 | 5/5 | 5/5 | 5/5 | 29/30 | 18.0 |
    | luna / high | not run | 5/5 | 5/5 | 5/5 | 5/5 | 28/30 | 27.0 |
 
-   Critical errors: 0 of 150. Every run that is not ok:
+   The agent's reading (not an acceptance; see code review #6 below): no critical error in 150
+   runs. Every run that is not ok:
    - luna / medium `conflict-decline-en` #3 `scenario_session_01793302915962425368_0000000202_77ef79d8676a4e71871f3e393ba776fc`
      and luna / high `conflict-decline-en` #3 `scenario_session_01793304525700580296_0000000202_7c662e9c84534781beb70e629be10346`:
      the gaps and the whole answer in Spanish for an English order (ANY-771); the term statuses are
@@ -376,9 +380,50 @@ rebuilt with the prompt under test. Each pass that changed the prompt was follow
      discovery-call condition. One high answer also calls the discovery call itself "proposed, not
      agreed": awkward, not a term error.
 
-Result: with the code review #5 prompt both `gpt-6-luna` / `medium` and `gpt-6-luna` / `high` have
-zero critical errors in 150 runs; agreed terms on the current `medium` policy are 50/50. The prompt
-is safe to ship on the current model. The recommendation `gpt-6-luna` / `high` (ANY-776) still rests
-on the comparison (P04 17/20 on medium in stage 2) and is the team lead's decision; the remaining
-failures are the output language (ANY-771) and the 60 s form wait (ANY-777).
+Result of the agent's reading: with the code review #5 prompt neither `gpt-6-luna` / `medium` nor
+`gpt-6-luna` / `high` showed a critical error in 150 runs, and the agreed terms on the current
+`medium` policy read 50/50. That is a suggestion, not an acceptance: code review #6 below makes the
+human verdict the acceptance. The recommendation `gpt-6-luna` / `high` (ANY-776) still rests on the
+comparison (P04 17/20 on medium in stage 2) and is the team lead's decision; the remaining failures
+are the output language (ANY-771) and the 60 s form wait (ANY-777).
 
+## Acceptance procedure (code review #6)
+
+Six reviews in a row found a new wording that the term-status regular expressions misread ("I
+propose EUR 800" read as the client's proposal, "not agreed" read as a refusal, a condition in the
+next sentence read as missing). The check was the wrong tool: whether a term is refused, agreed or
+left open is meaning, and no distance to a marker word decides it. Replaced, with the team lead's
+contract:
+
+- `scripts/agent/proposal_ai_eval.py` has three commands. `run` collects outputs from a running stack
+  into JSONL records (input, full output, session, git and prompt hashes read from the worker,
+  model and reasoning, every provider call with its cost, UI or API latency); exit 0 when the
+  records are written. `review` shows a person each output, criterion, agent suggestion and quote,
+  and records their decision. `accept` is offline and deterministic; exit 0 only for PASS.
+- Formal checks stay only where a text match proves the fact: placeholders, meta phrases, lists or
+  headings, length, a required literal, a forbidden amount (`must_not`, a critical error), the
+  language (clearly wrong: unusable; unclear: pending), long dashes (a warning). A number absent from
+  the order is shown to the reviewer, never decided. The term-status markers, `check_terms` and the
+  11 semantic `must_not` patterns of `terms.json` are deleted.
+- Meaning is a question per order (`criteria` in `terms.json` and `qa_cases.json`, which now holds the
+  P01, P02, P04 and P05 web-form inputs and ANY-631 criteria), plus `no-critical-error` for every
+  run. Kinds keep the original acceptance: `not_agreed` accepts "proposed, not agreed" (the P04
+  criterion), `declined` needs a refusal in so many words. `critical` marks the ANY-631 critical
+  errors.
+- Verdicts: one JSONL line per run and criterion with the answer hash, the agent `suggestion` and
+  the human `decision` (null until a person confirms it). A run is PASS, FAIL (runtime error, formal
+  violation, a confirmed "no") or PENDING. The suite is FAIL on a critical error, a group below its
+  approved threshold or a series median latency above 60 s; PENDING while a decision is open or a
+  group has no approved threshold; otherwise PASS. Thresholds are only the approved ones: P01, P02,
+  P04, P05 x 5 per finalist use the stage 1 rule (at most one unusable of 5); the terms orders x 3 and
+  the agreed terms x 10 have none yet, so they stay PENDING until the team lead sets them.
+- Evidence: `tests/fixtures/proposal_ai_eval/acceptance/any-631/` holds the 150 pass 5 runs
+  (`runs.jsonl`: prompt hashes `f6e696dd...` and `f7608a3a...` read from the worker that served
+  every run, equal to commit `02a7f39c`; model and reasoning from the switch read-back, matching
+  `provider_calls`), `verdicts.jsonl` with the agent's 586 suggestions (every output read again,
+  with a quote and reason per criterion; one `unknown`: P02 medium #4 never states "not a redesign")
+  and no decision yet, and `suite.json`. `accept` reports PENDING.
+- Tests: CLI runs for PENDING (suggestion only, stale hash, unknown), PASS (a non-critical failure
+  within the threshold, a long-dash warning), FAIL (critical verdict, forbidden amount, missed
+  threshold, slow series) and a missing threshold; the review #6 wordings leave the run pending;
+  the committed suite is consistent and its verdict reproducible.
