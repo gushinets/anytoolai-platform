@@ -400,9 +400,10 @@ def check_runs(runs: list[dict], groups: dict[tuple[str, str], dict], orders: di
             raise SuiteError(f"run {run['run_id']}: input is not the input of case {run['case_id']}")
         if run["runtime_status"] == "ok" and not run.get("session_id"):
             raise SuiteError(f"run {run['run_id']}: a result without a scenario session")
-        if run.get("session_id") in sessions:
+        if run.get("session_id") in sessions:  # a run that failed before its session started has none
             raise SuiteError(f"run {run['run_id']}: session {run['session_id']} already counted for another run")
-        sessions.add(run.get("session_id"))
+        if run.get("session_id"):
+            sessions.add(run["session_id"])
         seen_ids.add(run["run_id"])
         seen.add(key)
 

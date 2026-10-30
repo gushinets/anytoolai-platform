@@ -665,6 +665,14 @@ def test_one_scenario_session_is_one_run(tmp_path: Path, capsys) -> None:
     assert code == 2 and "a result without a scenario session" in out
 
 
+def test_runs_that_failed_before_a_session_started_do_not_share_one(tmp_path: Path, capsys) -> None:
+    runs = attempts(3)
+    for run in runs[:2]:
+        run.update(session_id=None, runtime_status="ui_error", error="form failed before the request", output=None)
+    code, out = run_accept(tmp_path, runs, confirmed(runs[2:]), capsys)
+    assert code == 1 and "invalid suite" not in out and "FAIL: luna-medium counteroffer-en" in out
+
+
 def test_only_a_named_human_decides(tmp_path: Path, capsys) -> None:
     """Code review #7: an agent-authored `decision` is a suggestion, whatever its answer."""
     runs = attempts(3)
