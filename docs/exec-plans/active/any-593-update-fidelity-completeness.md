@@ -1,4 +1,4 @@
-# Execution Plan: Client Update Writer update fidelity
+# Execution Plan: Client Update Writer update fidelity and completeness
 
 ## Status
 
@@ -7,20 +7,21 @@
 - Created: 2026-10-30
 - Last updated: 2026-10-31
 - Review date: 2026-10-31
-- Next action: Complete automated validation; live acceptance follows in ANY-624.
-- Blocker: quick-check reports stale docs/generated/openapi.json before reaching baseline pytest.
+- Next action: Live acceptance in ANY-624; rerun packaging and generated-doc checks when unblocked.
+- Blocker: PyPI DNS prevents wheel build; docs/generated/openapi.json remains stale.
 
 ## Goal
 
 ANY-622: For client-facing facts included in the update, preserve the readiness/agreement
 status, quantities with units and counted objects, identifiers and scope exclusions stated in
-the freelancer's input. Fidelity does not require exhaustive inclusion or authorize disclosure
-of internal details or author directions. Add no unstated work, steps, results or findings.
+the freelancer's input. ANY-623 additionally requires every client-facing result, blocker,
+request and next step, with explicit unknowns, within the length limit. Neither rule authorizes
+disclosure of internal details or author directions. Add no unstated work, steps, results or findings.
 
 ## Scope
 
-In scope: the Update v1 prompt and a Python regression test pinning its instruction.
-Completeness (ANY-623), live acceptance (ANY-624), model selection, speaker identity,
+In scope: the Update v1 fidelity and completeness rules and Python regression tests pinning them.
+Live acceptance (ANY-624), model selection, speaker identity,
 author directions and call-to-action composition remain separate work. Existing terms and
 exclusion rules from ANY-625/626/628 remain intact.
 
@@ -41,9 +42,19 @@ provider policies and prompt reference/version remain unchanged.
 - [x] Add one fidelity rule after the existing factuality rule.
 - [x] Add a normalized prompt-content regression test using the product's existing approach.
 - [x] Run doctor, product tests, quick-check and documentation validation; record the gate failure.
+- [x] Confirm ANY-623 completeness with the user and replace the contradictory ANY-622 caveat.
+- [x] Pin client-facing inclusion, concrete requests, findings, totals and unknowns in a regression test.
+- [x] Validate ANY-623 changes and record results, including environment failures.
 
 ## Validation
 
+- ANY-623: 224 Freelancer Suite tests passed, including completeness, fidelity, author-direction
+  and speaker-identity coverage. One packaging test failed because isolated `uv build` could not
+  download `setuptools>=68` from PyPI (DNS failure); reproduced with the runner's writable cache.
+- ANY-623: doctor, config and documentation validation, and `git diff --check` passed.
+- ANY-623: `generate-docs --check` initially hit a LiteLLM import error while fetching its remote
+  model-cost map. With `LITELLM_LOCAL_MODEL_COST_MAP=True`, it reached `DOCGEN001` for the existing
+  stale OpenAPI file. No generated files or runtime dependencies were changed.
 - Doctor passed using the IDE-configured Python 3.14.4 environment; no runtime pins changed.
 - Product tests and shared author-direction/speaker-identity tests: 67 passed.
 - Config, architecture and documentation validators passed inside quick-check.
@@ -65,6 +76,7 @@ additional exit criteria for ANY-624.
 | 2026-10-30 | Keep the existing prompt version and runtime | This is a product instruction correction, with no new execution contract |
 | 2026-10-31 | Separate disclosure, inclusion and fidelity | Preserving included facts must neither leak internal data nor require exhaustive reporting |
 | 2026-10-31 | Keep ANY-624's exact cases, languages and repetition count | Broader evaluation must not silently expand a separate task's acceptance contract |
+| 2026-10-31 | User explicitly authorized ANY-623 implementation in chat after the completeness question | Require all client-facing results, blockers, requests and next steps; supersede the ANY-622 non-exhaustive caveat; Linear was not updated |
 
 ## Progress log
 
@@ -74,6 +86,8 @@ additional exit criteria for ANY-624.
 | 2026-10-30 | 67 tests passed; validators passed; quick-check stopped at stale OpenAPI | Resolve generated-artifact drift separately, then rerun quick-check |
 | 2026-10-31 | Replaced the blanket transfer instruction with fidelity of included client-facing facts; updated regression coverage for disclosure and length precedence | Run product tests and repository checks |
 | 2026-10-31 | Doctor and all 224 Freelancer Suite tests passed; config, architecture and docs validation passed; quick-check still stopped at local OpenAPI drift | Live acceptance stays in ANY-624 |
+| 2026-10-31 | ANY-623 completeness rule and regression test added; fidelity rule now delegates inclusion to completeness; doctor passed | Run automated validation; live acceptance stays in ANY-624 |
+| 2026-10-31 | ANY-623: 224 tests passed, packaging blocked by PyPI DNS; config/docs validators and diff check passed; generated-doc check confirmed existing OpenAPI drift with the local model-cost map | Live acceptance in ANY-624; rerun blocked checks separately |
 
 ## Open questions
 
