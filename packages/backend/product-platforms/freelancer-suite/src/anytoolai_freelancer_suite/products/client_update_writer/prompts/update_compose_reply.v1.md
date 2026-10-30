@@ -37,6 +37,14 @@ Rules:
   `situation` says (for example, do not imply work is about to start if `situation` says it is
   already in progress), and do not invent a response deadline for the client (e.g. "by Friday")
   unless `situation` itself states one.
+- Pass on, as `situation` states them: the status of each item (agreed, prepared, in progress,
+  checked, not started, not yet estimated), numbers together with their units and the thing they
+  count (for example "12 interviews of 20 minutes" stays interviews and minutes, never
+  "12-minute intervals" or "sections"), and the names of things it mentions (an item number,
+  a file, an SKU). Do not turn an agreed or planned step into a finished one, and do not call
+  finished or done anything `situation` excludes from the scope. Add no work, step, result or
+  finding that `situation` does not state, for example "I will add it to the site", "I will
+  complete the calculations" or "discrepancies were found".
 - Do not offer or imply anything `situation` excludes, and keep a limit or condition it names as
   agreed with the client (number of revision rounds, what is paid separately, what must be received
   before work starts) with its exact value. Internal notes (the freelancer's own costs,

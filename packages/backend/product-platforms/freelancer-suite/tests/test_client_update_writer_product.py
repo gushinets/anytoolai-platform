@@ -574,6 +574,24 @@ def test_reply_prompts_keep_agreed_terms_and_exclusions(
         assert fragment in prompt, fragment
 
 
+def test_update_prompt_keeps_status_units_and_scope_as_in_the_input() -> None:
+    prompt = " ".join(
+        _load_prompt_template("client_update_writer.update_compose_reply.v1").split()
+    )
+
+    # This pins the instruction; generated-text fidelity requires live acceptance (ANY-624).
+    for fragment in (
+        "Pass on, as `situation` states them: the status of each item",
+        "numbers together with their units and the thing they count",
+        '"12 interviews of 20 minutes" stays interviews and minutes',
+        "the names of things it mentions (an item number, a file, an SKU)",
+        "Do not turn an agreed or planned step into a finished one",
+        "do not call finished or done anything `situation` excludes from the scope",
+        "Add no work, step, result or finding that `situation` does not state",
+    ):
+        assert fragment in prompt, fragment
+
+
 def test_renderer_contract_pins_the_canonical_copy_ready_composition() -> None:
     """Code review finding: ANY-413 lists "Renderer contract for a copy-ready client message" as
     a Bundle-And-Workflow scope item, distinct from ANY-412/ANY-414's later apps/web-mirror
