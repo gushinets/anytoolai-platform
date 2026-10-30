@@ -7,10 +7,10 @@
 - Created: 2026-10-29
 - Last updated: 2026-10-30
 - Review date: 2026-10-30
-- Next action: P1-3/P1-4/P1-5 are corrected and focused working-tree verification passed; rerun required CI after publication. Local passwordless sudo remains unavailable.
-- Blocker: local full-check requires unavailable passwordless sudo; the isolated full PostgreSQL run also exposed the unchanged worker test's six-second startup assumption. No current full-check or native Windows PASS is claimed. Deployed TLS/private-zone controls and production commercial approval remain unproven.
+- Next action: publish the verified PR #225 service-authentication/scope handoff amendment below; ANY-766 consumes the documented convention for the two future operations.
+- Blocker: none for the documentation amendment. Historical local sudo/worker-startup limitations remain recorded below; deployed TLS/private-zone controls and production commercial approval remain separate unproven gates.
 - Development branch: `feature/ANY-711`, created by the owner from Kernel `main`.
-- Review outcome: the accepted design is unchanged; all four accepted review clarifications are incorporated.
+- Review outcome: the accepted design is unchanged; all four accepted review clarifications are incorporated. The PR #225 low-severity handoff finding is addressed by the concrete three-operation convention below.
 - Canonical plan: `docs/exec-plans/completed/ANY-711-implementation-plan.md` in Kernel. Do not create a second independent Portal plan.
 
 ## 1. Goal & Final Expected Outcome
@@ -1681,11 +1681,51 @@ Keep one compact handoff in this canonical Kernel plan and contract/integration 
 - Confirmation that Portal application changes were unnecessary, or an explicitly
   demonstrated narrow incompatibility with its owner.
 
-Preserve the agreed request directions:
+### Service-authentication and scope handoff for ANY-766
 
-- Portal → Kernel manifest: implemented by this ticket.
-- Portal → Kernel invalidation: future operation requiring explicit authorization.
-- Kernel → Portal AccessSnapshot: separate receiver credential and future implementation.
+The normative [three-operation convention](../../integrations/payment-portal.md#service-authentication-and-scope-convention-any-711-handoff)
+closes [PR #225's handoff finding](https://github.com/gushinets/anytoolai-platform/pull/225#discussion_r4421487994).
+ANY-711 implements only manifest read; the following future settings/permissions are a
+concrete ANY-766 implementation contract, not a claim of present runtime support:
+
+- **Portal → Kernel manifest:** existing Portal `KERNEL_SERVICE_TOKEN` matches Kernel's
+  `ANYTOOLAI_PORTAL_SERVICE_TOKEN` (optional `_PREVIOUS` receiver slot), with `manifest:read`.
+- **Portal → Kernel invalidation:** reuse that directional credential pair. ANY-766 adds
+  `PortalPermission.ACCESS_INVALIDATE` (`access:invalidate`), explicitly granted by trusted
+  Kernel receiver policy; current manifest-only authority does not enable invalidation.
+  Check JSON-body tenant/region against the principal before touching the exact canonical
+  `(tenant_id, region, user_id)` cache/floor key; query values cannot override body scope.
+- **Kernel → Portal AccessSnapshot:** independent future Kernel sender setting
+  `ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN` matches Portal receiver `KERNEL_ACCESS_SERVICE_TOKEN`
+  (optional `_PREVIOUS` slot), with `access-snapshot:read`. The UUID path comes from authenticated
+  Portal identity; query tenant/region must match the receiver principal's trusted scope.
+  Portal resolves the UUID only within that scope; Kernel validates the full response tuple.
+- **Common policy:** one Bearer header over verified TLS; receiver-owned scope is configured by
+  Kernel `ANYTOOLAI_TENANT_ID` / `ANYTOOLAI_REGION` and Portal `INSTANCE_TENANT_ID` /
+  `INSTANCE_REGION` (`anytoolai/ru`). Request values only narrow authority. Missing/invalid/
+  duplicate credentials return `401` with a Bearer challenge; insufficient permissions or
+  wrong/ambiguous scope return `403`. Reject `Origin`/preflight and apply `no-store` on all
+  success/error paths. Retain the snapshot's unknown-user `404` and known-empty-user `200`.
+- **Rotation:** per direction/environment/regional connection, independently generated
+  secrets; receiver accepts distinct current+previous with identical scope/permissions,
+  sender switches, then previous is removed and its `401` verified. Bound the overlap;
+  revoke compromised tokens from both slots immediately. Detailed settings and procedure
+  are in the linked convention and existing manifest deployment instructions.
+
+This amendment was requested by the owner on 2026-10-30. Portal settings and the accepted
+access-contract design were inspected read-only at `2bb07d778edc5ea56011b0034ba24b0702ede81f`.
+It changes documentation only; snapshot/invalidation implementation and paid execution remain
+ANY-766 work.
+
+Documentation amendment verification on 2026-10-30:
+
+- **PASS:** managed-environment `runner.py doctor`, `runner.py validate-docs` and
+  `runner.py generate-docs --check` (generated documentation is current).
+- **PASS — 21 passed:** `tests/test_validate_docs.py` and `tests/test_docs_generation.py`,
+  run with the managed interpreter and `-o addopts= -q`; no skips or deselection.
+- **PASS:** `git diff --check`; the amendment changes only this plan and the integration map.
+- Runtime/full-check/Portal suites were **NOT_RERUN** for this documentation-only amendment.
+  The earlier implementation evidence and operational limitations remain recorded above.
 
 Preserve ownership boundaries:
 
