@@ -26,7 +26,8 @@ answers yes, no or unknown for every output (see tests/fixtures/proposal_ai_eval
 every run also has `no-critical-error`. Verdicts live in a JSONL file next to the runs, one line per run
 and criterion with the agent's `suggestion` and the human `decision` (null until a person confirms
 it); the last line for a run and criterion wins, and it counts only for the answer whose hash it
-carries. `review` walks the reviewer through every open decision.
+carries. `review` walks the reviewer through every open decision; `--redo RUN_ID/CRITERION_ID` decides one again. The agent's reason is copied
+only when the decision matches the agent's answer; otherwise the reviewer gives their own.
 
 `accept` is offline and deterministic. A run is PASS (usable), FAIL (unusable: runtime error, formal
 violation or a criterion confirmed "no") or PENDING; a confirmed "no" on a critical criterion or a
@@ -407,8 +408,11 @@ def command_review(args: argparse.Namespace) -> int:
             continue
         order, digest = orders[run["case_id"]], answer_hash(run["output"])
         for criterion in criteria_for(order):
-            row = verdicts.get((run["run_id"], criterion["id"]))
-            if row and row.get("answer_hash") == digest and row.get("decision"):
+            key = (run["run_id"], criterion["id"])
+            if args.redo and f"{key[0]}/{key[1]}" not in args.redo:
+                continue
+            row = verdicts.get(key)
+            if not args.redo and row and row.get("answer_hash") == digest and row.get("decision"):
                 continue
             suggestion = row.get("suggestion") if row and row.get("answer_hash") == digest else None
             if shown != run["run_id"]:
@@ -424,10 +428,17 @@ def command_review(args: argparse.Namespace) -> int:
                 return 0
             if answer not in ("y", "n", "u"):
                 continue
-            reason = input("Reason > ").strip() if answer in ("n", "u") else (suggestion or {}).get("reason")
+            decided = {"y": "yes", "n": "no", "u": "unknown"}[answer]
+            # The agent's reason explains the agent's answer; any other decision needs the reviewer's own.
+            if suggestion and suggestion["answer"] == decided:
+                reason = suggestion.get("reason")
+            elif decided == "yes" and not suggestion:
+                reason = None
+            else:
+                reason = input("Your reason > ").strip() or None
             new = {
                 "run_id": run["run_id"], "criterion_id": criterion["id"], "answer_hash": digest, "suggestion": suggestion,
-                "decision": {"answer": {"y": "yes", "n": "no", "u": "unknown"}[answer], "reason": reason,
+                "decision": {"answer": decided, "reason": reason,
                              "reviewer": args.reviewer,
                              "reviewed_at": datetime.now(timezone.utc).isoformat(timespec="seconds")},
             }
@@ -458,6 +469,9 @@ def main(argv: list[str] | None = None) -> int:
     review = commands.add_parser("review", help="confirm or correct every open verdict")
     review.add_argument("--suite", type=Path, required=True)
     review.add_argument("--reviewer", required=True, help="who confirms, recorded in every decision")
+    review.add_argument(
+        "--redo", action="append", metavar="RUN_ID/CRITERION_ID", help="decide this one again (repeatable); only these are shown"
+    )
     accept_parser = commands.add_parser("accept", help="offline suite verdict from runs and confirmed verdicts")
     accept_parser.add_argument("--suite", type=Path, required=True)
     args = parser.parse_args(argv)

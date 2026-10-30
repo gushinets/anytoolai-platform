@@ -359,3 +359,30 @@ def test_the_any_631_suite_is_consistent() -> None:
         assert row["answer_hash"] == proposal_ai_eval.answer_hash(run["output"])
         assert row["decision"] is None or row["decision"]["reviewer"] != "agent"
     assert proposal_ai_eval.accept(*proposal_ai_eval.load_suite(path)) == proposal_ai_eval.accept(suite, orders, runs, verdicts)
+
+
+def test_review_copies_the_agents_reason_only_for_the_same_answer(tmp_path: Path, monkeypatch) -> None:
+    run = make_run("r0")
+    digest = proposal_ai_eval.answer_hash(run["output"])
+    suggestion = {"answer": "unknown", "reviewer": "agent", "reason": "agent doubt", "quote": None}
+    row = {"run_id": "r0", "criterion_id": "budget-declined", "answer_hash": digest, "suggestion": suggestion, "decision": None}
+    (tmp_path / "orders.json").write_text(json.dumps({"orders": [ORDER]}), encoding="utf-8")
+    (tmp_path / "runs.jsonl").write_text(json.dumps(run) + "\n", encoding="utf-8")
+    (tmp_path / "verdicts.jsonl").write_text(json.dumps(row) + "\n", encoding="utf-8")
+    suite = {"id": "t", "orders": ["orders.json"], "runs": "runs.jsonl", "verdicts": "verdicts.jsonl",
+             "max_median_latency_ms": 60000, "thresholds": []}
+    (tmp_path / "suite.json").write_text(json.dumps(suite), encoding="utf-8")
+    # no-critical-error: y with no suggestion; budget-declined: y against the agent's unknown, own reason
+    answers = iter(["y", "y", "refused in the second sentence"])
+    monkeypatch.setattr("builtins.input", lambda _prompt="": next(answers))
+    args = ["review", "--suite", str(tmp_path / "suite.json"), "--reviewer", "qa"]
+    assert proposal_ai_eval.main(args) == 0
+    decisions = {r["criterion_id"]: r["decision"] for r in proposal_ai_eval.read_jsonl(tmp_path / "verdicts.jsonl") if r["decision"]}
+    assert decisions["budget-declined"]["reason"] == "refused in the second sentence"
+    # --redo shows only the named decision; a matching answer keeps the agent's reason
+    row["suggestion"] = {**suggestion, "answer": "yes", "reason": "agent reason"}
+    (tmp_path / "verdicts.jsonl").write_text(json.dumps(row) + "\n", encoding="utf-8")
+    monkeypatch.setattr("builtins.input", lambda _prompt="": "y")
+    assert proposal_ai_eval.main([*args, "--redo", "r0/budget-declined"]) == 0
+    last = proposal_ai_eval.read_jsonl(tmp_path / "verdicts.jsonl")[-1]
+    assert last["criterion_id"] == "budget-declined" and last["decision"]["reason"] == "agent reason"
