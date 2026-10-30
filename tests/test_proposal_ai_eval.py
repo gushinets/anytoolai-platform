@@ -545,11 +545,11 @@ def test_the_historical_any_631_series_is_a_fail_for_the_known_reasons() -> None
     assert "`final-luna-high-conflict-decline-es-1`: runtime: ui_error" in report
     assert "`final-luna-medium-conflict-decline-en-3`: wrong_language; wrong_gaps_language" in report
     assert "evidence: browser artifact missing" in report
-    # a human "yes" on the language of German gap descriptions is shown to the reviewer again
+    # the reviewer confirmed that the German gap descriptions are a wrong language: no contradiction left
     suite, orders, runs, verdicts = proposal_ai_eval.load_suite(SUITE_PATH)
     run = next(r for r in runs if r["run_id"] == "final-luna-high-P02-3")
     judged = proposal_ai_eval.judge_run(run, orders["P02"], verdicts)
-    assert judged["reopen"] == ["language-confirmed"]
+    assert judged["reopen"] == [] and "wrong_gaps_language" in judged["reasons"]
 
 
 def test_the_program_cannot_be_empty_and_runs_keep_the_input_of_their_case(tmp_path: Path, capsys) -> None:
