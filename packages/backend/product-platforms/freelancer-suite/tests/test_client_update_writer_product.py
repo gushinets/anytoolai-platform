@@ -610,16 +610,20 @@ def test_update_prompt_requires_every_client_facing_fact_and_names_unknowns() ->
 
     # This pins the instruction; generated-text completeness requires live acceptance (ANY-624).
     for fragment in (
-        "Include in `text` or `call_to_action` every result, blocker, request to the client "
-        "and next step that `situation` addresses to the client",
-        "a finished deliverable and the step that follows it",
+        "Include in `text` or `call_to_action` every client-relevant result, blocker, request "
+        "to the client and next step mentioned in `situation`",
+        "including raw progress notes not phrased as a message to the client",
+        "A notes format does not make progress facts private",
+        "Include a finished deliverable and the step that follows it",
         "sending both mockups for comments",
         'name the items, such as "transcripts of interviews 11 and 12"',
         "the total the progress is counted against",
         "the concrete findings made so far (such as mismatched article numbers)",
         "not known yet, not counted or cannot be estimated, say so in those terms",
         "do not leave it out and do not fill it in",
-        "internal notes and the freelancer's directions to you stay out",
+        "The internal-note disclosure rule below still applies",
+        "the freelancer's directions to you are followed, never reported",
+        "leave them out unless `situation` says to share them",
         "`constraints.max_length` still applies",
         "keep requests, blockers and the next step before detail",
         "the author-direction rule above wins",
@@ -627,6 +631,7 @@ def test_update_prompt_requires_every_client_facing_fact_and_names_unknowns() ->
         assert fragment in prompt, fragment
 
     assert "not a requirement to include every input detail" not in prompt
+    assert "`situation` addresses to the client" not in prompt
 
 
 def test_renderer_contract_pins_the_canonical_copy_ready_composition() -> None:

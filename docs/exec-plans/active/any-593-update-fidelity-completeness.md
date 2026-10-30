@@ -7,7 +7,7 @@
 - Created: 2026-10-30
 - Last updated: 2026-10-31
 - Review date: 2026-10-31
-- Next action: Live acceptance in ANY-624; rerun packaging and generated-doc checks when unblocked.
+- Next action: Live acceptance ANY-624; rerun blocked packaging and generated-doc checks.
 - Blocker: PyPI DNS prevents wheel build; docs/generated/openapi.json remains stale.
 
 ## Goal
@@ -15,7 +15,8 @@
 ANY-622: For client-facing facts included in the update, preserve the readiness/agreement
 status, quantities with units and counted objects, identifiers and scope exclusions stated in
 the freelancer's input. ANY-623 additionally requires every client-facing result, blocker,
-request and next step, with explicit unknowns, within the length limit. Neither rule authorizes
+request and next step mentioned in raw progress notes, even without addressing the client,
+with explicit unknowns, within the length limit. Neither rule authorizes
 disclosure of internal details or author directions. Add no unstated work, steps, results or findings.
 
 ## Scope
@@ -45,9 +46,15 @@ provider policies and prompt reference/version remain unchanged.
 - [x] Confirm ANY-623 completeness with the user and replace the contradictory ANY-622 caveat.
 - [x] Pin client-facing inclusion, concrete requests, findings, totals and unknowns in a regression test.
 - [x] Validate ANY-623 changes and record results, including environment failures.
+- [x] Remove both explicit-address qualifiers; distinguish raw progress notes from private details.
+- [x] Record the confirmed completeness decision in parent ANY-593 (comment ID
+  `65afeef7-41bd-4a88-8f6e-b6c1cb1bab5d` on
+  [ANY-593](https://linear.app/paveldik/issue/ANY-593/client-update-writer-update-ne-iskazhat-status-edinicy-i-sleduyushij)).
 
 ## Validation
 
+- Review fix: 80 focused product, author-direction and speaker-identity tests passed;
+  doctor, config/docs validation and `git diff --check` passed. Live generation was not run.
 - ANY-623: 224 Freelancer Suite tests passed, including completeness, fidelity, author-direction
   and speaker-identity coverage. One packaging test failed because isolated `uv build` could not
   download `setuptools>=68` from PyPI (DNS failure); reproduced with the runner's writable cache.
@@ -77,6 +84,8 @@ additional exit criteria for ANY-624.
 | 2026-10-31 | Separate disclosure, inclusion and fidelity | Preserving included facts must neither leak internal data nor require exhaustive reporting |
 | 2026-10-31 | Keep ANY-624's exact cases, languages and repetition count | Broader evaluation must not silently expand a separate task's acceptance contract |
 | 2026-10-31 | User explicitly authorized ANY-623 implementation in chat after the completeness question | Require all client-facing results, blockers, requests and next steps; supersede the ANY-622 non-exhaustive caveat; Linear was not updated |
+| 2026-10-31 | Require relevant facts mentioned in raw notes regardless of direct client address | U03's SKU findings and unknown count are progress facts; private details retain the disclosure rule |
+| 2026-10-31 | Recorded the user-confirmed completeness decision in parent ANY-593, comment `65afeef7-41bd-4a88-8f6e-b6c1cb1bab5d`; reread and verified | Review P2 acceptance condition is now recorded; live acceptance remains in ANY-624 |
 
 ## Progress log
 
@@ -88,6 +97,7 @@ additional exit criteria for ANY-624.
 | 2026-10-31 | Doctor and all 224 Freelancer Suite tests passed; config, architecture and docs validation passed; quick-check still stopped at local OpenAPI drift | Live acceptance stays in ANY-624 |
 | 2026-10-31 | ANY-623 completeness rule and regression test added; fidelity rule now delegates inclusion to completeness; doctor passed | Run automated validation; live acceptance stays in ANY-624 |
 | 2026-10-31 | ANY-623: 224 tests passed, packaging blocked by PyPI DNS; config/docs validators and diff check passed; generated-doc check confirmed existing OpenAPI drift with the local model-cost map | Live acceptance in ANY-624; rerun blocked checks separately |
+| 2026-10-31 | Review P1: removed both direct-address qualifiers, pinned raw-note inclusion and private-detail disclosure boundaries; 80 focused tests and config/docs checks passed | P2 remains blocked by unavailable Linear tools; GitHub thread reads also failed due to connectivity |
 
 ## Open questions
 
