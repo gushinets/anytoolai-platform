@@ -21,7 +21,7 @@
           "id": "budget-not-agreed",
           "kind": "not_agreed",
           "critical": false,
-          "question": "Is USD 150 stated as the client's budget that is not accepted (proposed and not agreed, or refused), never as accepted or as the freelancer's price?"
+          "question": "Is USD 150 explicitly marked as the client's budget that is not agreed (proposed and not agreed, or refused)?"
         },
         {
           "id": "deadline-declined",
@@ -34,8 +34,16 @@
           "kind": "declined",
           "critical": false,
           "question": "Are unlimited logo concepts refused in so many words?"
+        },
+        {
+          "id": "unagreed-terms-not-accepted",
+          "kind": "requirement",
+          "critical": true,
+          "violation_type": "unagreed_term_accepted",
+          "question": "Is none of the client's USD 150 budget, 3-day deadline or unlimited logo concepts stated as accepted, agreed or as the freelancer's own?"
         }
-      ]
+      ],
+      "expect_gaps_language": "en"
     },
     {
       "id": "agreed-confirm-ru",
@@ -57,15 +65,18 @@
           "id": "agreed-confirmed",
           "kind": "agreed",
           "critical": true,
-          "question": "Are the agreed 36 000 ₽, the 20 November deadline, the 18 000 + 18 000 ₽ payments and 3 000 ₽ per extra card restated and confirmed, never called proposed or not agreed?"
+          "question": "Are the agreed 36 000 ₽, the 20 November deadline, the 18 000 + 18 000 ₽ payments and 3 000 ₽ per extra card restated and confirmed, never called proposed or not agreed?",
+          "violation_type": "lost_mandatory_condition"
         },
         {
           "id": "brief-before-start",
           "kind": "requirement",
           "critical": true,
-          "question": "Is the brief with product details required before the work starts?"
+          "question": "Is the brief with product details required before the work starts?",
+          "violation_type": "lost_mandatory_condition"
         }
-      ]
+      ],
+      "expect_gaps_language": "ru"
     },
     {
       "id": "agreed-change-accepted-en",
@@ -94,9 +105,11 @@
           "id": "agreed-confirmed",
           "kind": "agreed",
           "critical": true,
-          "question": "Are USD 400 and delivery on 20 November 2026 confirmed as agreed, never called proposed or not agreed?"
+          "question": "Are USD 400 and delivery on 20 November 2026 confirmed as agreed, never called proposed or not agreed?",
+          "violation_type": "lost_mandatory_condition"
         }
-      ]
+      ],
+      "expect_gaps_language": "en"
     },
     {
       "id": "agreed-plus-conflict-es",
@@ -121,15 +134,24 @@
           "id": "agreed-confirmed",
           "kind": "agreed",
           "critical": true,
-          "question": "Are the agreed 8 edited photos for 240 EUR by 12 December 2026 confirmed, never called proposed or not agreed?"
+          "question": "Are the agreed 8 edited photos for 240 EUR by 12 December 2026 confirmed, never called proposed or not agreed?",
+          "violation_type": "lost_mandatory_condition"
         },
         {
           "id": "new-request-declined",
           "kind": "declined",
           "critical": false,
           "question": "Is the new request (15 more photos and delivery on 5 December for the same price) refused in so many words, with no new price?"
+        },
+        {
+          "id": "unagreed-terms-not-accepted",
+          "kind": "requirement",
+          "critical": true,
+          "violation_type": "unagreed_term_accepted",
+          "question": "Is none of the new request (15 more photos, delivery on 5 December, the same price) stated as accepted or agreed?"
         }
-      ]
+      ],
+      "expect_gaps_language": "es"
     },
     {
       "id": "limit-change-accepted-en",
@@ -157,9 +179,11 @@
           "id": "agreed-kept",
           "kind": "agreed",
           "critical": true,
-          "question": "Do EUR 1,500 and the 5 pages stay as agreed, never called proposed or not agreed?"
+          "question": "Do EUR 1,500 and the 5 pages stay as agreed, never called proposed or not agreed?",
+          "violation_type": "lost_mandatory_condition"
         }
-      ]
+      ],
+      "expect_gaps_language": "en"
     },
     {
       "id": "counteroffer-en",
@@ -194,8 +218,16 @@
           "kind": "offered",
           "critical": false,
           "question": "Does the freelancer offer EUR 800 as their own price for a smaller 5-page first phase built after the copy arrives?"
+        },
+        {
+          "id": "unagreed-terms-not-accepted",
+          "kind": "requirement",
+          "critical": true,
+          "violation_type": "unagreed_term_accepted",
+          "question": "Is none of the client's EUR 300 budget or 48-hour deadline stated as accepted, agreed or as the freelancer's own?"
         }
-      ]
+      ],
+      "expect_gaps_language": "en"
     },
     {
       "id": "left-open-en",
@@ -228,9 +260,11 @@
           "id": "analytics-excluded",
           "kind": "requirement",
           "critical": true,
-          "question": "Is analytics setup kept out of the work?"
+          "question": "Is analytics setup kept out of the work?",
+          "violation_type": "promised_excluded_work"
         }
-      ]
+      ],
+      "expect_gaps_language": "en"
     },
     {
       "id": "ceiling-stays-client-ru",
@@ -261,9 +295,18 @@
           "id": "no-invented-date",
           "kind": "requirement",
           "critical": true,
-          "question": "Does the answer avoid naming any date or duration of its own?"
+          "question": "Does the answer avoid naming any date or duration of its own?",
+          "violation_type": "invented_amount_or_commitment"
+        },
+        {
+          "id": "unagreed-terms-not-accepted",
+          "kind": "requirement",
+          "critical": true,
+          "violation_type": "unagreed_term_accepted",
+          "question": "Is none of the client's 80 000 ₽ ceiling or 2-working-day deadline stated as accepted, agreed or as the freelancer's own price or term?"
         }
-      ]
+      ],
+      "expect_gaps_language": "ru"
     },
     {
       "id": "conflict-decline-es",
@@ -293,8 +336,16 @@
           "kind": "declined",
           "critical": false,
           "question": "Is the guarantee of 10 000 new followers refused in so many words?"
+        },
+        {
+          "id": "unagreed-terms-not-accepted",
+          "kind": "requirement",
+          "critical": true,
+          "violation_type": "unagreed_term_accepted",
+          "question": "Is none of the client's 200 EUR total budget or the guarantee of 10 000 new followers stated as accepted, agreed or as the freelancer's own?"
         }
-      ]
+      ],
+      "expect_gaps_language": "es"
     },
     {
       "id": "ceiling-and-scope-en",
@@ -333,9 +384,18 @@
           "id": "exclusions-kept",
           "kind": "requirement",
           "critical": true,
-          "question": "Are redesign, theme edits, third-party checkout, app remediation, certification and a legal compliance guarantee kept out of the work?"
+          "question": "Are redesign, theme edits, third-party checkout, app remediation, certification and a legal compliance guarantee kept out of the work?",
+          "violation_type": "promised_excluded_work"
+        },
+        {
+          "id": "unagreed-terms-not-accepted",
+          "kind": "requirement",
+          "critical": true,
+          "violation_type": "unagreed_term_accepted",
+          "question": "Is none of the client's USD 1,200 ceiling stated as an agreed fee or as the freelancer's own?"
         }
-      ]
+      ],
+      "expect_gaps_language": "en"
     }
   ]
 }

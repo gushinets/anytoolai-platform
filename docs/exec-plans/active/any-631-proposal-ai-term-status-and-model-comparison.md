@@ -14,10 +14,11 @@
   frontend poll limit. Closing the ANY-631 acceptance is the team lead's decision (ANY-631 comment,
   2026-10-30: after those two fixes and a repeat live run against the approved thresholds).
   `gpt-6-luna` / `high` stays the preferred model; the switch is ANY-776.
-- Blocker: none for this PR. The pass 5 suite is FAIL under the approved thresholds only because of
-  two defects tracked outside it: three groups of 3 runs have 2 usable (ANY-771 twice, ANY-777
-  once). No critical error: the prompt rule is not the cause. ANY-631 and ANY-595 statuses stay as
-  they are.
+- Blocker: none for this PR. The pass 5 suite is FAIL under the approved thresholds, and stays FAIL
+  until the repeat live run: ANY-771 (the output language, now also found in the gap descriptions) and
+  ANY-777 (the 60 s form wait) are tracked outside this PR. No critical error is established: the
+  prompt rule is not the cause. 100 review questions are open (see "Acceptance system fixes") and need
+  the reviewer, not the agent. ANY-631 and ANY-595 statuses stay as they are.
 
 ## Goal
 
@@ -439,3 +440,40 @@ contract:
   within the threshold, a long-dash warning), FAIL (critical verdict, forbidden amount, missed
   threshold, slow series) and a missing threshold; the review #6 wordings leave the run pending;
   the committed suite is consistent and its verdict reproducible.
+
+## Acceptance system fixes (code review #7)
+
+The review found that the acceptance could still pass on missing evidence. Fixed in
+`scripts/agent/proposal_ai_eval.py`, no semantic regular expression added:
+
+- `suite.json` holds the mandatory `program` (series, cases, attempts, usable results needed, channel,
+  model, reasoning, prompt hashes; shared values in `defaults`). Every planned group is judged, found
+  or not. Missing runs are PENDING; a repeated `run_id`, a repeated (series, case, attempt), a run
+  outside the program or a program that plans a case twice is a corrupt suite (exit code 2). The
+  approved matrix (33 groups, 150 attempts) is pinned by a test.
+- Groups: PASS only when every attempt is in, decided and enough are usable; FAIL when the threshold can
+  no longer be reached; otherwise PENDING (4 PASS + 1 PENDING at 4/5 is PENDING). Any confirmed critical
+  error, or a series median latency above 60 s, fails the suite.
+- Language: the text and every gap description are checked (`expect_language`, `expect_gaps_language`
+  set in the fixtures). A clearly wrong language is a non-critical FAIL; an undeterminable one is a
+  `language-confirmed` question for the reviewer. The detector still reads function words only.
+- Origin: a `web_form` group needs `channel=web_form` and an `origin` record (UI outcome, UI time,
+  browser trace). A run without it, or from the API runner, is PENDING, never a pass; a UI error is a
+  FAIL even when the server finished later. The stored runs are not changed: they carry no `origin`.
+- Critical errors: a critical criterion names one violation (`violation_type`: unagreed term accepted,
+  invented amount or commitment, lost mandatory condition, promised excluded work). The mixed
+  "not agreed" questions of P04 and `conflict-decline-en` are split from the new critical
+  `unagreed-terms-not-accepted` question of each order that has client terms. A critical "no" next to a
+  "yes" on `no-critical-error` is reported as a contradiction, fails the run and is shown to the
+  reviewer again.
+- Verdicts carry `answer_hash`, `input_hash` and `criterion_hash` (id, kind, criticality, question); a
+  verdict counts only while all three match. The 586 confirmed decisions were appended again with the
+  hashes (`carried_over`: same answer and input, criterion text unchanged since the verdict commit);
+  the history lines stay. A threshold change keeps every verdict.
+- Result on the stored 150 runs: FAIL. New reasons found by the language check: Spanish or German
+  gap descriptions in `final-luna-medium-ceiling-and-scope-en-1`, `-2`, `-3`, `final-luna-high-P02-2`,
+  `-3`, `final-luna-high-conflict-decline-en-1` and `-3` (the `conflict-decline-en-3` runs also have a wrong-language text) and `final-luna-high-ceiling-and-scope-en-3`: six groups fail. 100 of 670
+  questions are open: 76 `unagreed-terms-not-accepted`, 16 reworded `budget-*` and 8
+  `language-confirmed`, to be answered with `review`; none was decided by the agent.
+- Tests: the listed invariants (empty, missing and duplicated runs, threshold table, language of gaps,
+  API against web form, changed answer, input or criterion, contradiction) and the historical FAIL.

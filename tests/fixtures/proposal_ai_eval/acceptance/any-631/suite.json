@@ -1,6 +1,6 @@
 {
   "id": "any-631-review-5-prompt",
-  "description": "ANY-631 live acceptance of the code review #5 ProposalAI prompt (compose_persuasive_text.v1.md sha256 f6e696dd..., committed in 02a7f39c): 150 runs through the web form, 2026-10-29. Thresholds come from ANY-631 and its team lead decisions only; a group without an approved threshold stays PENDING.",
+  "description": "ANY-631 live acceptance of the code review #5 ProposalAI prompt (compose_persuasive_text.v1.md sha256 f6e696dd..., committed in 02a7f39c): 150 runs through the web form, 2026-10-29. Thresholds come from ANY-631 and its team lead decisions only; a group without an approved threshold stays PENDING. `program` is the mandatory test plan: a series and case planned but missing is PENDING, a run outside it is a corrupt suite.",
   "orders": [
     "../../qa_cases.json",
     "../../terms.json"
@@ -8,7 +8,15 @@
   "runs": "runs.jsonl",
   "verdicts": "verdicts.jsonl",
   "max_median_latency_ms": 60000,
-  "thresholds": [
+  "defaults": {
+    "channel": "web_form",
+    "model": "openai/gpt-6-luna",
+    "prompt_sha256": {
+      "compose_persuasive_text.v1.md": "f6e696ddd69d3f7d9a118183c1ba51b9f9b393dbc6b1cef674a83382c595aae6",
+      "detect_experience_gaps.v1.md": "f7608a3a6301ebe050a87e23a7d57b0432ed553f1b78f6ea9d804f950d57723d"
+    }
+  },
+  "program": [
     {
       "series": "final-luna-medium",
       "cases": [
@@ -17,8 +25,9 @@
         "P04",
         "P05"
       ],
+      "attempts": 5,
       "min_usable": 4,
-      "of": 5,
+      "reasoning_effort": "medium",
       "source": "ANY-631 stage 1: at most one unusable result of 5 per case"
     },
     {
@@ -29,8 +38,9 @@
         "P04",
         "P05"
       ],
+      "attempts": 5,
       "min_usable": 4,
-      "of": 5,
+      "reasoning_effort": "high",
       "source": "ANY-631 stage 1: at most one unusable result of 5 per case"
     },
     {
@@ -47,8 +57,9 @@
         "conflict-decline-es",
         "ceiling-and-scope-en"
       ],
+      "attempts": 3,
       "min_usable": 3,
-      "of": 3,
+      "reasoning_effort": "medium",
       "source": "ANY-631 team lead decision, 2026-10-30: regression set by terms, 3 runs per configuration, 3/3 usable"
     },
     {
@@ -65,8 +76,9 @@
         "conflict-decline-es",
         "ceiling-and-scope-en"
       ],
+      "attempts": 3,
       "min_usable": 3,
-      "of": 3,
+      "reasoning_effort": "high",
       "source": "ANY-631 team lead decision, 2026-10-30: regression set by terms, 3 runs per configuration, 3/3 usable"
     },
     {
@@ -78,8 +90,9 @@
         "agreed-change-accepted-en",
         "conflict-decline-es"
       ],
+      "attempts": 10,
       "min_usable": 10,
-      "of": 10,
+      "reasoning_effort": "medium",
       "source": "ANY-631 team lead decision, 2026-10-30: strengthened luna/medium series, 10 runs per case, 10/10 usable"
     }
   ]

@@ -222,18 +222,23 @@ def test_identifiers_do_not_offer_their_digits_as_numbers() -> None:
 
 FIXTURES = proposal_ai_eval.ORDERS_PATH.parent
 KINDS = {"declined", "not_agreed", "agreed", "accepted", "offered", "open", "requirement"}
+CRITICAL = proposal_ai_eval.CRITICAL_VIOLATIONS
+SUITE_PATH = FIXTURES / "acceptance" / "any-631" / "suite.json"
 
 
 def test_criteria_are_questions_and_fixture_checks_are_literal() -> None:
     """Meaning is a human question; `must_not` may only forbid amounts (code reviews #3 to #6 found
-    a new wording that every semantic regular expression misread)."""
+    a new wording that every semantic regular expression misread). A critical criterion names its
+    violation, so no criterion mixes a critical violation with a minor one."""
     for name in ("terms.json", "qa_cases.json"):
         for order in json.loads((FIXTURES / name).read_text(encoding="utf-8"))["orders"]:
             ids = [criterion["id"] for criterion in order["criteria"]]
             assert len(ids) == len(set(ids)) and "no-critical-error" not in ids, order["id"]
+            assert order["expect_gaps_language"] in {"en", "ru", "es"}, order["id"]
             for criterion in order["criteria"]:
                 assert criterion["kind"] in KINDS and criterion["question"].endswith("?"), criterion
                 assert isinstance(criterion["critical"], bool), criterion
+                assert criterion["critical"] == (criterion.get("violation_type") in CRITICAL), criterion
             for pattern in order.get("must", []) + order.get("must_not", []):
                 re.compile(pattern)
             for pattern in order.get("must_not", []):
@@ -244,9 +249,14 @@ ORDER = {
     "id": "counteroffer-en",
     "task_text": "A client wants a 12-page site within 48 hours for EUR 300. Decline both and offer EUR 800 for 5 pages.",
     "expect_language": "en",
+    "expect_gaps_language": "en",
     "must": ["EUR 800"],
     "must_not": ["EUR (?!300\\b|800\\b)\\d"],
-    "criteria": [{"id": "budget-declined", "kind": "declined", "critical": False, "question": "Is EUR 300 refused?"}],
+    "criteria": [
+        {"id": "budget-declined", "kind": "declined", "critical": False, "question": "Is EUR 300 refused?"},
+        {"id": "terms-not-accepted", "kind": "requirement", "critical": True, "violation_type": "unagreed_term_accepted",
+         "question": "Is none of the client's terms stated as accepted?"},
+    ],
 }
 PROFILE_EN = "I build Webflow marketing sites for small businesses and agree timelines after the content arrives."
 TEXT = (
@@ -254,84 +264,207 @@ TEXT = (
     "I do not accept the EUR 300 budget or the 48-hour deadline for the full site with all of its pages. "
     "I offer EUR 800 for a smaller first phase of 5 pages, and I will start it once the copy and the images arrive."
 )
+HASHES = {"compose_persuasive_text.v1.md": "abc"}
+SPANISH_GAPS = [{"description": "No se menciona experiencia con Shopify en tu perfil."}]
+YES = {"no-critical-error": "yes", "budget-declined": "yes", "terms-not-accepted": "yes"}
 
 
-def make_run(run_id: str, text: str = TEXT, **fields) -> dict:
+def make_run(run_id: str, text: str = TEXT, attempt: int = 1, case: str = ORDER["id"], **fields) -> dict:
     return {
-        "run_id": run_id, "series": "luna-medium", "case_id": ORDER["id"], "attempt": 1, "channel": "web_form",
-        "session_id": f"s-{run_id}", "prompt_sha256": {"compose_persuasive_text.v1.md": "abc"}, "model": "openai/gpt-6-luna",
+        "run_id": run_id, "series": "luna-medium", "case_id": case, "attempt": attempt, "channel": "web_form",
+        "origin": {"ui_outcome": "result", "ui_latency_ms": 20000, "trace": f"trace/{run_id}.zip"},
+        "session_id": f"s-{run_id}", "prompt_sha256": HASHES, "model": "openai/gpt-6-luna",
         "reasoning_effort": "medium", "input": {"task_text": ORDER["task_text"], "freelancer_positioning": PROFILE_EN, "tone": "firm"},
         "output": {"text": text, "gaps": []}, "runtime_status": "ok", "error": None, "latency_ms": 20000, **fields,
     }
 
 
-def decide(run: dict, answers: dict[str, str]) -> list[dict]:
-    digest = proposal_ai_eval.answer_hash(run["output"])
+def decide(run: dict, answers: dict[str, str], order: dict = ORDER) -> list[dict]:
+    criteria = {c["id"]: c for c in proposal_ai_eval.criteria_for(order, run)}
     return [
-        {"run_id": run["run_id"], "criterion_id": criterion, "answer_hash": digest, "suggestion": None,
-         "decision": {"answer": answer, "reason": None if answer == "yes" else "read", "reviewer": "qa", "reviewed_at": "2026-10-30T00:00:00+00:00"}}
+        {"run_id": run["run_id"], "criterion_id": criterion, "answer_hash": proposal_ai_eval.answer_hash(run["output"]),
+         "input_hash": proposal_ai_eval.input_hash(run), "criterion_hash": proposal_ai_eval.criterion_hash(criteria[criterion]),
+         "suggestion": None,
+         "decision": {"answer": answer, "reason": None if answer == "yes" else "read", "violation_type": None,
+                      "reviewer": "qa", "reviewed_at": "2026-10-30T00:00:00+00:00"}}
         for criterion, answer in answers.items()
     ]
 
 
-def run_accept(tmp_path: Path, runs: list[dict], verdicts: list[dict], thresholds: list[dict] | None = None, capsys=None) -> tuple[int, str]:
-    (tmp_path / "orders.json").write_text(json.dumps({"orders": [ORDER]}), encoding="utf-8")
+def write_suite(tmp_path: Path, runs: list[dict], verdicts: list[dict], program: list[dict] | None = None, orders: list[dict] | None = None) -> Path:
+    (tmp_path / "orders.json").write_text(json.dumps({"orders": orders or [ORDER, {**ORDER, "id": "other"}]}), encoding="utf-8")
     (tmp_path / "runs.jsonl").write_text("".join(json.dumps(r) + "\n" for r in runs), encoding="utf-8")
     (tmp_path / "verdicts.jsonl").write_text("".join(json.dumps(v) + "\n" for v in verdicts), encoding="utf-8")
     suite = {
         "id": "t", "orders": ["orders.json"], "runs": "runs.jsonl", "verdicts": "verdicts.jsonl", "max_median_latency_ms": 60000,
-        "thresholds": [{"series": "luna-medium", "cases": [ORDER["id"]], "min_usable": 2, "of": 3}] if thresholds is None else thresholds,
+        "defaults": {"channel": "web_form", "model": "openai/gpt-6-luna", "prompt_sha256": HASHES},
+        "program": program if program is not None else [
+            {"series": "luna-medium", "cases": [ORDER["id"]], "attempts": 3, "min_usable": 2, "reasoning_effort": "medium"}
+        ],
     }
     (tmp_path / "suite.json").write_text(json.dumps(suite), encoding="utf-8")
-    code = proposal_ai_eval.main(["accept", "--suite", str(tmp_path / "suite.json")])
-    return code, capsys.readouterr().out
+    return tmp_path / "suite.json"
 
 
-YES = {"no-critical-error": "yes", "budget-declined": "yes"}
+def run_accept(tmp_path: Path, runs: list[dict], verdicts: list[dict], capsys, **kwargs) -> tuple[int, str]:
+    code = proposal_ai_eval.main(["accept", "--suite", str(write_suite(tmp_path, runs, verdicts, **kwargs))])
+    captured = capsys.readouterr()
+    return code, captured.out + captured.err
+
+
+def confirmed(runs: list[dict], answers: dict[str, str] = YES) -> list[dict]:
+    return [row for run in runs for row in decide(run, answers)]
+
+
+def attempts(count: int, **fields) -> list[dict]:
+    return [make_run(f"r{i}", attempt=i + 1, **fields) for i in range(count)]
+
+
+GRID = [{"series": "luna-medium", "cases": [ORDER["id"]], "attempts": 5, "min_usable": 4, "reasoning_effort": "medium"}]
+
+
+def grid_suite(tmp_path: Path, capsys, *kinds: str) -> tuple[int, str]:
+    """Five runs at 4/5: pass, fail (a minor criterion is no), pending (nothing confirmed), critical."""
+    runs, verdicts = attempts(5), []
+    for run, kind in zip(runs, kinds, strict=True):
+        answers = {"pass": YES, "fail": {**YES, "budget-declined": "no"}, "critical": {**YES, "terms-not-accepted": "no"}}
+        if kind != "pending":
+            verdicts += decide(run, answers[kind])
+    return run_accept(tmp_path, runs, verdicts, capsys, program=GRID)
+
+
+def test_a_group_is_decided_by_the_runs_it_can_still_reach(tmp_path: Path, capsys) -> None:
+    for kinds, status in (
+        (["pass"] * 5, "PASS"),
+        (["pass"] * 4 + ["fail"], "PASS"),
+        (["pass"] * 4 + ["pending"], "PENDING"),
+        (["pass"] * 3 + ["fail"] * 2, "FAIL"),
+        (["pass"] * 4 + ["critical"], "FAIL"),
+        (["pass"] * 3 + ["fail", "pending"], "PENDING"),
+    ):
+        code, out = grid_suite(tmp_path, capsys, *kinds)
+        assert out.startswith(f"# Suite t: {status}") and code == (0 if status == "PASS" else 1), (kinds, out)
+
+
+def test_a_missing_run_group_or_case_is_never_a_pass(tmp_path: Path, capsys) -> None:
+    code, out = run_accept(tmp_path, [], [], capsys)
+    assert code == 1 and out.startswith("# Suite t: PENDING") and "3 of 3 runs missing" in out
+    two_cases = [
+        {"series": "luna-medium", "cases": [ORDER["id"], "other"], "attempts": 3, "min_usable": 2, "reasoning_effort": "medium"}
+    ]
+    runs = attempts(3)
+    code, out = run_accept(tmp_path, runs, confirmed(runs), capsys, program=two_cases)
+    assert code == 1 and out.startswith("# Suite t: PENDING") and "luna-medium other: 3 of 3 runs missing" in out
+
+
+def test_a_corrupt_suite_is_an_error_not_a_verdict(tmp_path: Path, capsys) -> None:
+    runs = attempts(3)
+    # a case removed from the program leaves its runs unplanned
+    code, out = run_accept(tmp_path, runs, confirmed(runs), capsys, program=[])
+    assert code == 2 and out.startswith("invalid suite:") and "not in the program" in out
+    # three copies of one run, and three runs for one attempt
+    for copies in ([runs[0]] * 3, [make_run(f"c{i}") for i in range(3)]):
+        code, out = run_accept(tmp_path, copies, confirmed(copies), capsys)
+        assert code == 2 and "duplicate run" in out
+    # an attempt beyond the plan, and a case planned twice
+    code, out = run_accept(tmp_path, [make_run("x", attempt=4)], [], capsys)
+    assert code == 2 and "not in the program" in out
+    twice = [{"series": "luna-medium", "cases": [ORDER["id"]], "attempts": 3, "min_usable": 2, "reasoning_effort": "medium"}] * 2
+    code, out = run_accept(tmp_path, [], [], capsys, program=twice)
+    assert code == 2 and "planned twice" in out
+
+
+def test_every_part_of_the_answer_is_checked_for_its_language(tmp_path: Path, capsys) -> None:
+    """The ANY-631 gaps: an English order answered in English with Spanish (or German) gap descriptions."""
+    gaps = {"text": TEXT, "gaps": SPANISH_GAPS}
+    runs = attempts(3)
+    runs[0]["output"] = gaps
+    strict = [{"series": "luna-medium", "cases": [ORDER["id"]], "attempts": 3, "min_usable": 3, "reasoning_effort": "medium"}]
+    judged = proposal_ai_eval.judge_run(runs[0], ORDER, dict(proposal_ai_eval.latest_verdicts(decide(runs[0], YES))))
+    assert judged["status"] == "FAIL" and judged["reasons"][0] == "wrong_gaps_language"
+    code, out = run_accept(tmp_path, runs, confirmed(runs), capsys, program=strict)
+    assert code == 1 and "FAIL `r0`: wrong_gaps_language" in out
+    # a gap too short to tell is for the reviewer: pending until they confirm the language
+    runs = attempts(3)
+    runs[0]["output"] = {"text": TEXT, "gaps": [{"description": "No HubSpot."}]}
+    code, out = run_accept(tmp_path, runs, confirmed(runs), capsys)
+    assert code == 1 and "PENDING `r0`: language-confirmed: not confirmed" in out
+    code, out = run_accept(tmp_path, runs, confirmed(runs) + decide(runs[0], {"language-confirmed": "yes"}), capsys)
+    assert code == 0, out
+
+
+def test_an_api_result_or_a_web_form_error_never_satisfies_a_web_form_group(tmp_path: Path, capsys) -> None:
+    # the server answered after the form gave up (74 s against a 60 s limit): a failure, not a success
+    late = [make_run(f"r{i}", attempt=i + 1, origin={"ui_outcome": "error", "ui_latency_ms": 60000, "trace": "t.zip"}) for i in range(3)]
+    code, out = run_accept(tmp_path, late, confirmed(late), capsys)
+    assert code == 1 and "FAIL: luna-medium counteroffer-en" in out and "web form showed error after 60000 ms" in out
+    # an API run, or a record that only claims the channel, is not the evidence the group asks for
+    for fields in ({"channel": "api", "origin": None}, {"origin": None}):
+        runs = attempts(3, **fields)
+        code, out = run_accept(tmp_path, runs, confirmed(runs), capsys)
+        assert code == 1 and out.startswith("# Suite t: PENDING"), out
+    assert "channel is 'api', the program requires 'web_form'" in out or "no web form origin" in out
+
+
+def test_a_verdict_counts_only_for_the_answer_input_and_criterion_it_judged(tmp_path: Path, capsys) -> None:
+    runs = attempts(3)
+    rows = confirmed(runs)
+    code, out = run_accept(tmp_path, runs, rows, capsys)
+    assert code == 0, out
+    # the question changed, the answer did not
+    reworded = {**ORDER, "criteria": [{**ORDER["criteria"][0], "question": "Is EUR 300 clearly refused?"}, ORDER["criteria"][1]]}
+    code, out = run_accept(tmp_path, runs, rows, capsys, orders=[reworded, {**ORDER, "id": "other"}])
+    assert code == 1 and out.startswith("# Suite t: PENDING") and "budget-declined: not confirmed" in out
+    # the input changed
+    changed = [{**run, "input": {**run["input"], "tone": "warm"}} for run in runs]
+    code, out = run_accept(tmp_path, changed, rows, capsys)
+    assert code == 1 and out.startswith("# Suite t: PENDING")
+    # only a threshold changed: the same verdicts still count
+    stricter = [{"series": "luna-medium", "cases": [ORDER["id"]], "attempts": 3, "min_usable": 3, "reasoning_effort": "medium"}]
+    code, out = run_accept(tmp_path, runs, rows, capsys, program=stricter)
+    assert code == 0, out
+
+
+def test_a_critical_detail_cannot_hide_behind_the_general_answer(tmp_path: Path, capsys) -> None:
+    runs = attempts(3)
+    rows = confirmed(runs[1:]) + decide(runs[0], {**YES, "terms-not-accepted": "no"})
+    code, out = run_accept(tmp_path, runs, rows, capsys)
+    assert code == 1 and "FAIL: critical errors: r0" in out and "contradiction: no-critical-error is yes but terms-not-accepted is no" in out
+
+
+def test_confirmed_verdicts_and_thresholds_give_a_pass(tmp_path: Path, capsys) -> None:
+    runs = [make_run("r0"), make_run("r1", text=TEXT + " Long dashes — are a warning only.", attempt=2), make_run("r2", attempt=3)]
+    verdicts = decide(runs[0], YES) + decide(runs[1], YES) + decide(runs[2], {**YES, "budget-declined": "no"})
+    code, out = run_accept(tmp_path, runs, verdicts, capsys)
+    assert code == 0 and out.startswith("# Suite t: PASS"), out
+    assert "| luna-medium | counteroffer-en | 3 | 3 | 2 | 1 | 0 | 2/3 | PASS |" in out and "warning: long_dash" in out
 
 
 def test_accept_is_pending_until_a_human_confirms_every_criterion(tmp_path: Path, capsys) -> None:
-    runs = [make_run(f"r{i}") for i in range(3)]
+    runs = attempts(3)
     # an agent suggestion is not a decision, and a decision for another answer does not count
     suggested = [{**row, "decision": None, "suggestion": {"answer": "yes", "reviewer": "agent"}} for row in decide(runs[0], YES)]
     stale = [{**row, "answer_hash": "sha256:other"} for row in decide(runs[1], YES)]
-    code, out = run_accept(tmp_path, runs, suggested + stale + decide(runs[2], {**YES, "budget-declined": "unknown"}), capsys=capsys)
+    code, out = run_accept(tmp_path, runs, suggested + stale + decide(runs[2], {**YES, "budget-declined": "unknown"}), capsys)
     assert code == 1 and out.startswith("# Suite t: PENDING")
     assert "budget-declined: not confirmed" in out and "budget-declined: unknown" in out
 
 
-def test_accept_passes_with_confirmed_verdicts_and_a_non_critical_failure_within_the_threshold(tmp_path: Path, capsys) -> None:
-    runs = [make_run("r0"), make_run("r1", text=TEXT + " Long dashes — are a warning only."), make_run("r2")]
-    verdicts = decide(runs[0], YES) + decide(runs[1], YES) + decide(runs[2], {**YES, "budget-declined": "no"})
-    code, out = run_accept(tmp_path, runs, verdicts, capsys=capsys)
-    assert code == 0 and out.startswith("# Suite t: PASS"), out
-    assert "| luna-medium | counteroffer-en | 3 | 2 | 1 | 0 | 2/3 | PASS |" in out
-    assert "warning: long_dash" in out
-
-
 def test_accept_fails_on_a_critical_error_a_missed_threshold_or_slow_runs(tmp_path: Path, capsys) -> None:
-    runs = [make_run(f"r{i}") for i in range(3)]
-    verdicts = [row for run in runs for row in decide(run, YES)]
-    critical = decide(runs[0], {**YES, "no-critical-error": "no"})
-    code, out = run_accept(tmp_path, runs, verdicts + critical, capsys=capsys)
+    runs = attempts(3)
+    code, out = run_accept(tmp_path, runs, confirmed(runs) + decide(runs[0], {**YES, "no-critical-error": "no"}), capsys)
     assert code == 1 and "FAIL: critical errors: r0" in out
     # a forbidden amount is a critical error without any verdict
-    code, out = run_accept(tmp_path, [make_run("r0", text=TEXT + " Or EUR 500 for less.")] + runs[1:], verdicts, capsys=capsys)
+    forbidden = [make_run("r0", text=TEXT + " Or EUR 500 for less.")] + runs[1:]
+    code, out = run_accept(tmp_path, forbidden, confirmed(forbidden), capsys)
     assert code == 1 and "FAIL critical `r0`: forbidden_present" in out
     # two runs a person rejected and one runtime error leave 0 of 3 usable
     failed = [make_run("r0", runtime_status="ui_error", error="form gave up after 60 s")] + runs[1:]
-    rejected = [row for run in runs[1:] for row in decide(run, {**YES, "budget-declined": "no"})]
-    code, out = run_accept(tmp_path, failed, rejected, capsys=capsys)
-    assert code == 1 and "FAIL: luna-medium counteroffer-en: 0 usable, needs 2/3" in out
-    slow = [make_run(f"r{i}", latency_ms=61000) for i in range(3)]
-    code, out = run_accept(tmp_path, slow, [row for run in slow for row in decide(run, YES)], capsys=capsys)
+    code, out = run_accept(tmp_path, failed, confirmed(runs[1:], {**YES, "budget-declined": "no"}), capsys)
+    assert code == 1 and "FAIL: luna-medium counteroffer-en: 0 usable, 3 failed, needs 2/3" in out
+    slow = attempts(3, latency_ms=61000, origin={"ui_outcome": "result", "ui_latency_ms": 61000, "trace": "t.zip"})
+    code, out = run_accept(tmp_path, slow, confirmed(slow), capsys)
     assert code == 1 and "median latency 61.0 s above 60 s" in out
-
-
-def test_accept_never_invents_a_threshold(tmp_path: Path, capsys) -> None:
-    runs = [make_run(f"r{i}") for i in range(3)]
-    code, out = run_accept(tmp_path, runs, [row for run in runs for row in decide(run, YES)], thresholds=[], capsys=capsys)
-    assert code == 1 and "PENDING: luna-medium counteroffer-en: no approved threshold" in out
 
 
 def test_formal_checks_leave_every_wording_of_a_term_to_the_reviewer() -> None:
@@ -343,42 +476,78 @@ def test_formal_checks_leave_every_wording_of_a_term_to_the_reviewer() -> None:
     ):
         judged = proposal_ai_eval.judge_run(make_run("r", text=text), ORDER, {})
         assert judged["status"] == "PENDING" and judged["critical"] is None, judged
-        assert not any(reason.startswith(("budget", "forbidden", "missing")) and "confirmed" not in reason for reason in judged["reasons"])
+        assert all("not confirmed" in reason for reason in judged["reasons"]), judged
+
+
+def test_the_approved_any_631_matrix_is_pinned() -> None:
+    """Removing a group from suite.json must not go unnoticed: 33 groups, 150 attempts, all web form."""
+    suite, orders, runs, _ = proposal_ai_eval.load_suite(SUITE_PATH)
+    groups = proposal_ai_eval.program_groups(suite, orders)
+    p_cases, terms = ["P01", "P02", "P04", "P05"], [
+        "conflict-decline-en", "agreed-confirm-ru", "agreed-change-accepted-en", "agreed-plus-conflict-es",
+        "limit-change-accepted-en", "counteroffer-en", "left-open-en", "ceiling-stays-client-ru", "conflict-decline-es",
+        "ceiling-and-scope-en",
+    ]
+    expected = {}
+    for series, effort in (("final-luna-medium", "medium"), ("final-luna-high", "high")):
+        expected |= {(series, case): (5, 4, effort) for case in p_cases} | {(series, case): (3, 3, effort) for case in terms}
+    expected |= {
+        ("agreed-luna-medium", case): (10, 10, "medium")
+        for case in ("P05", "agreed-confirm-ru", "agreed-plus-conflict-es", "agreed-change-accepted-en", "conflict-decline-es")
+    }
+    assert {key: (g["attempts"], g["min_usable"], g["reasoning_effort"]) for key, g in groups.items()} == expected
+    assert len(groups) == 33 and sum(g["attempts"] for g in groups.values()) == 150 == len(runs)
+    assert {g["channel"] for g in groups.values()} == {"web_form"} and {g["model"] for g in groups.values()} == {"openai/gpt-6-luna"}
+    assert suite["max_median_latency_ms"] == 60000
 
 
 def test_the_any_631_suite_is_consistent() -> None:
-    """The committed live acceptance: every verdict belongs to a stored run, a criterion of its order and
-    the exact answer it judged, and the offline verdict is the same on every call."""
-    path = FIXTURES / "acceptance" / "any-631" / "suite.json"
-    suite, orders, runs, verdicts = proposal_ai_eval.load_suite(path)
+    """Every stored verdict belongs to a stored run, a criterion of its order and the exact answer,
+    input and criterion text it judged, and the runs are the program's runs."""
+    suite, orders, runs, verdicts = proposal_ai_eval.load_suite(SUITE_PATH)
     by_id = {run["run_id"]: run for run in runs}
     assert len(by_id) == len(runs) == 150
     for (run_id, criterion_id), row in verdicts.items():
         run = by_id[run_id]
-        assert criterion_id in {c["id"] for c in proposal_ai_eval.criteria_for(orders[run["case_id"]])}
+        criteria = {c["id"]: c for c in proposal_ai_eval.criteria_for(orders[run["case_id"]], run)}
         assert row["answer_hash"] == proposal_ai_eval.answer_hash(run["output"])
-        assert row["decision"] is None or row["decision"]["reviewer"] != "agent"
-    assert proposal_ai_eval.accept(*proposal_ai_eval.load_suite(path)) == proposal_ai_eval.accept(suite, orders, runs, verdicts)
+        assert row["input_hash"] == proposal_ai_eval.input_hash(run)
+        if criterion_id in criteria:
+            assert row["decision"] is None or row["decision"]["reviewer"] != "agent"
+    assert proposal_ai_eval.accept(*proposal_ai_eval.load_suite(SUITE_PATH)) == proposal_ai_eval.accept(suite, orders, runs, verdicts)
+
+
+def test_the_historical_any_631_series_is_a_fail_for_the_known_reasons() -> None:
+    """The approved thresholds and the stored runs, nothing else: FAIL. Besides the three failures of the
+    first pass, the language check of the gap descriptions finds the Spanish and German ones."""
+    status, lines = proposal_ai_eval.accept(*proposal_ai_eval.load_suite(SUITE_PATH))
+    report = "\n".join(lines)
+    assert status == "FAIL"
+    for run_id in (
+        "final-luna-medium-ceiling-and-scope-en-1", "final-luna-medium-ceiling-and-scope-en-2",
+        "final-luna-high-P02-2", "final-luna-high-P02-3",
+    ):
+        assert f"FAIL `{run_id}`: wrong_gaps_language" in report, run_id
+    assert "FAIL `final-luna-high-conflict-decline-es-1`: runtime: ui_error" in report
+    assert "FAIL `final-luna-medium-conflict-decline-en-3`: wrong_language; wrong_gaps_language" in report
+    # the stored runs carry no web form evidence: pending, not invented
+    assert "evidence: no web form origin" in report
 
 
 def test_review_copies_the_agents_reason_only_for_the_same_answer(tmp_path: Path, monkeypatch) -> None:
+    order = {**ORDER, "criteria": ORDER["criteria"][:1]}
     run = make_run("r0")
-    digest = proposal_ai_eval.answer_hash(run["output"])
     suggestion = {"answer": "unknown", "reviewer": "agent", "reason": "agent doubt", "quote": None}
-    row = {"run_id": "r0", "criterion_id": "budget-declined", "answer_hash": digest, "suggestion": suggestion, "decision": None}
-    (tmp_path / "orders.json").write_text(json.dumps({"orders": [ORDER]}), encoding="utf-8")
-    (tmp_path / "runs.jsonl").write_text(json.dumps(run) + "\n", encoding="utf-8")
-    (tmp_path / "verdicts.jsonl").write_text(json.dumps(row) + "\n", encoding="utf-8")
-    suite = {"id": "t", "orders": ["orders.json"], "runs": "runs.jsonl", "verdicts": "verdicts.jsonl",
-             "max_median_latency_ms": 60000, "thresholds": []}
-    (tmp_path / "suite.json").write_text(json.dumps(suite), encoding="utf-8")
+    row = {**decide(run, {"budget-declined": "yes"}, order)[0], "suggestion": suggestion, "decision": None}
+    suite = write_suite(tmp_path, [run], [row], orders=[order])
     # no-critical-error: y with no suggestion; budget-declined: y against the agent's unknown, own reason
     answers = iter(["y", "y", "refused in the second sentence"])
     monkeypatch.setattr("builtins.input", lambda _prompt="": next(answers))
-    args = ["review", "--suite", str(tmp_path / "suite.json"), "--reviewer", "qa"]
+    args = ["review", "--suite", str(suite), "--reviewer", "qa"]
     assert proposal_ai_eval.main(args) == 0
-    decisions = {r["criterion_id"]: r["decision"] for r in proposal_ai_eval.read_jsonl(tmp_path / "verdicts.jsonl") if r["decision"]}
-    assert decisions["budget-declined"]["reason"] == "refused in the second sentence"
+    decisions = {r["criterion_id"]: r for r in proposal_ai_eval.read_jsonl(tmp_path / "verdicts.jsonl") if r["decision"]}
+    assert decisions["budget-declined"]["decision"]["reason"] == "refused in the second sentence"
+    assert decisions["budget-declined"]["input_hash"] == proposal_ai_eval.input_hash(run) and decisions["budget-declined"]["criterion_hash"]
     # --redo shows only the named decision; a matching answer keeps the agent's reason
     row["suggestion"] = {**suggestion, "answer": "yes", "reason": "agent reason"}
     (tmp_path / "verdicts.jsonl").write_text(json.dumps(row) + "\n", encoding="utf-8")
@@ -386,3 +555,15 @@ def test_review_copies_the_agents_reason_only_for_the_same_answer(tmp_path: Path
     assert proposal_ai_eval.main([*args, "--redo", "r0/budget-declined"]) == 0
     last = proposal_ai_eval.read_jsonl(tmp_path / "verdicts.jsonl")[-1]
     assert last["criterion_id"] == "budget-declined" and last["decision"]["reason"] == "agent reason"
+
+
+def test_review_asks_again_for_the_general_answer_that_a_critical_detail_contradicts(tmp_path: Path, monkeypatch) -> None:
+    run = make_run("r0")
+    rows = decide(run, {**YES, "terms-not-accepted": "no"})
+    suite = write_suite(tmp_path, [run], rows)
+    prompts = {"Violation": "unagreed_term_accepted", "reason": "own reason"}
+    monkeypatch.setattr("builtins.input", lambda prompt="": next((v for k, v in prompts.items() if k in prompt), "n"))
+    assert proposal_ai_eval.main(["review", "--suite", str(suite), "--reviewer", "qa"]) == 0
+    last = proposal_ai_eval.read_jsonl(tmp_path / "verdicts.jsonl")[-1]
+    assert last["criterion_id"] == "no-critical-error" and last["decision"]["answer"] == "no"
+    assert last["decision"]["violation_type"] == "unagreed_term_accepted"
