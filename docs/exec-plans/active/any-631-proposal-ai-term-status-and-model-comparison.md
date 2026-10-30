@@ -518,3 +518,19 @@ expectation to prove each datum against. The rule is now stated once and applied
   run of the series (PENDING until then); an API time never stands in for it.
 - Tests: one negative test per finding, plus the pinned cases of the committed suite.
 
+### Expected FAIL and PENDING of the stored series: where each is fixed
+
+`accept` on the stored 150 runs reports FAIL, and that is the correct result of this PR: the evaluator
+measures, it does not fix the product. Every reason is owned outside it:
+
+| Reason in the report | Groups | Fixed in |
+|---|---|---|
+| Gap descriptions (and in two runs the proposal text) in another language than the task | `final-luna-high` P02, `ceiling-and-scope-en`, `conflict-decline-en`; `final-luna-medium` `ceiling-and-scope-en`, `conflict-decline-en` | ANY-771 |
+| The form gave up after 60 s while the server finished later | `final-luna-high` `conflict-decline-es` | ANY-777 |
+| `evidence: browser artifact missing` / no UI time on every stored run, hence PENDING groups and series latency | all other groups | the repeat live run through the web form (last step of ANY-631), which must save the Playwright trace, UI outcome and UI time per run |
+
+Not changed by this PR, by decision: the product code behind ANY-771 and ANY-777, the stored runs (they
+keep no `origin`, and none is reconstructed), the approved thresholds. A review finding that only
+restates one of these rows is not a defect of the evaluator. ANY-631 is closed only after the two
+fixes and a passing repeat live run.
+
