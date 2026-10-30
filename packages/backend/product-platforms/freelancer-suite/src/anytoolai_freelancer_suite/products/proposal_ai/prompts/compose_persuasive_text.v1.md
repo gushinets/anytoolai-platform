@@ -49,23 +49,29 @@ conditions from the order", without calling it proposed or not agreed. This sect
 for terms and their values. Give each term the status of the first rule below that applies, and make
 that status explicit in the text, never leave it implied by merely restating the term:
 
-1. The freelancer decides it: `context.freelancer_positioning` or the freelancer's own direction
-   in `context.task_text` accepts it, declines it or makes a counteroffer with a concrete value
+1. The freelancer decides it: `context.freelancer_positioning` or the freelancer's own direction in
+   `context.task_text` accepts it, declines it or makes a counteroffer with a concrete value
    ("accept a second revision round", "decline the EUR 300 budget", "offer EUR 800 for a smaller
    scope"). Do exactly that: an accepted term is stated as accepted with its exact value, and an
-   accepted change replaces the earlier term; a declined term is stated as not accepted; a
-   counteroffer is made with exactly the given value. Only a direction that accepts, declines or
-   counters this very term decides it; a direction that only limits what you may write about it
-   ("do not invent a replacement budget", "do not name a price") does not, so go on to the next rule.
-2. The order says it is agreed, confirmed or settled: restate it exactly and confirm it.
+   accepted change replaces the earlier term; a declined term is refused in so many words ("I do not
+   accept your EUR 300 budget", "no acepto ...", "не принимаю ..."), and calling it a proposal or
+   not agreed is not a refusal; a counteroffer is made with exactly the given value. Only a
+   direction that accepts, declines or counters this very term decides it; a direction that only
+   limits what you may write about it ("do not invent a replacement budget", "do not name a price")
+   does not, so go on to the next rule.
+2. The order says it is agreed, confirmed or settled: restate it exactly and confirm it, never call
+   it proposed, requested or not agreed. A statement of agreement ("the client agreed ...", "клиент
+   согласовал ...", "ya acordó ...") covers every term it introduces, including the terms listed in
+   the sentences after it.
 3. The order says it will be agreed or discussed later: keep it open, as the order puts it, without
    a value of your own.
 4. The client asks for or offers it and it conflicts with the scope, another term or the order's
    conditions: say plainly that you do not accept it, naming the term with its exact value ("your
    USD 500 budget does not cover this scope").
-5. Otherwise it is the client's proposal: restate it exactly as the client's and say that it is
-   proposed, not agreed ("your USD 500 budget is your proposal, not an agreed price"); never state
-   it as accepted or as your own offer or price, and do not judge it ("reasonable", "fair").
+5. Otherwise, only for a term the order never calls agreed, it is the client's proposal: restate it
+   exactly as the client's and say that it is proposed, not agreed ("your USD 500 budget is your
+   proposal, not an agreed price"); never state it as accepted or as your own offer or price, and do
+   not judge it ("reasonable", "fair").
 
 Values: name an amount, rate, currency, date, deadline or duration only when the input states it,
 as a client's term or as the freelancer's own value (in `context.freelancer_positioning` or in a

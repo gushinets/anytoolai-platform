@@ -19,15 +19,15 @@
       "terms": [
         {
           "value": "USD 150",
-          "status": "not_accepted"
+          "status": "not_agreed"
         },
         {
           "value": "(3|three)[- ]day",
-          "status": "not_accepted"
+          "status": "declined"
         },
         {
           "value": "unlimited (logo )?concepts",
-          "status": "not_accepted"
+          "status": "declined"
         }
       ]
     },
@@ -123,11 +123,11 @@
         },
         {
           "value": "15 fotos",
-          "status": "not_accepted"
+          "status": "declined"
         },
         {
           "value": "5 de diciembre",
-          "status": "not_accepted"
+          "status": "declined"
         }
       ]
     },
@@ -176,11 +176,11 @@
       "terms": [
         {
           "value": "EUR 300",
-          "status": "not_accepted"
+          "status": "declined"
         },
         {
           "value": "48[- ]hour",
-          "status": "not_accepted"
+          "status": "declined"
         },
         {
           "value": "EUR 800",
@@ -206,7 +206,8 @@
       "terms": [
         {
           "value": "\\bfee\\b",
-          "status": "open"
+          "status": "open",
+          "condition": "discovery call|the call|that call"
         },
         {
           "value": "January",
@@ -233,11 +234,11 @@
       "terms": [
         {
           "value": "80\\s?000",
-          "status": "not_accepted"
+          "status": "not_agreed"
         },
         {
           "value": "(2|два) рабочих дн",
-          "status": "not_accepted"
+          "status": "declined"
         }
       ]
     },
@@ -255,18 +256,18 @@
       ],
       "must_not": [
         "(?<!no )(?<!tampoco )acepto (el|tu|su) presupuesto",
-        "(?<!no )(?<!tampoco )garantizo (los |las )?10\\s?000",
+        "(?<!no )(?<!tampoco )garantizo (los |las )?10[\\s.]?000",
         "EUR (?!200\\b)\\d",
         "\\d+ EUR(?<!200 EUR)"
       ],
       "terms": [
         {
           "value": "200 EUR",
-          "status": "not_accepted"
+          "status": "declined"
         },
         {
-          "value": "10\\s?000 seguidores",
-          "status": "not_accepted"
+          "value": "10[\\s.]?000 seguidores",
+          "status": "declined"
         }
       ]
     },
@@ -288,11 +289,12 @@
       "terms": [
         {
           "value": "USD 1,?200",
-          "status": "not_accepted"
+          "status": "not_agreed"
         },
         {
           "value": "final fee",
-          "status": "open"
+          "status": "open",
+          "condition": "inspect"
         }
       ]
     }

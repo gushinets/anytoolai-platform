@@ -6,12 +6,14 @@
 - Owner: agent
 - Linear: ANY-631
 - Created: 2026-10-29
-- Last updated: 2026-10-29
+- Last updated: 2026-10-30
 - Review date: 2026-11-05
 - Next action: team lead decision on the recommendation (`gpt-6-luna` / `high`); then move this
   plan to `completed/`. Follow-ups: ANY-776 (switch the model), ANY-777 (60 s form wait), ANY-771
   (output language).
-- Blocker: none
+- Blocker: none. Dependency: the prompt is qualified on both `gpt-6-luna` / `medium` (the current
+  product policy) and `gpt-6-luna` / `high` (pass 5 below), so it does not depend on ANY-776; ANY-776
+  stays the separate model decision.
 
 ## Goal
 
@@ -118,7 +120,7 @@ The gaps language defect (ANY-771), Docker dependency cache (ANY-770), changing 
 - Code review #3: the automatic checks themselves were the wrong model. The set only checked that an
   amount was present, so "I accept your USD 150 budget" passed; the language check called every
   non-Cyrillic text English and skipped Spanish, so whole Spanish, Dutch and German answers passed.
-  Both are replaced, not patched:
+  Both are replaced, not patched (the term oracle was replaced again in code review #5, below):
   - Each order lists its terms with the expected status (`not_accepted`, `agreed`, `accepted`,
     `offered`, `open`); the verdict per term is ok, error or unverified (code review #4: a two-valued
     oracle turned every ambiguity into a silent pass). A status marker is an acceptance, a refusal,
@@ -149,6 +151,26 @@ The gaps language defect (ANY-771), Docker dependency cache (ANY-770), changing 
     the 3-day deadline", "I accept the EUR 300 budget and offer EUR 800", "Бюджет до 80 000 ₽
     согласован и принят. Срок в 2 рабочих дня подтверждаю."), that EN to Spanish, Dutch and German
     and ES to English are wrong-language, and that correct live answers pass.
+- Code review #5: the oracle still returned ok for a term the order told the freelancer to decline
+  when the text only called it the client's proposal, and for an open fee that dropped its
+  condition. Both come from the same wrong shape: a check that can say ok. Replaced:
+  - `check_terms` has two outcomes only: error (definitely wrong) or needs a human verdict. Every
+    client term goes to a human verdict unless it is definitely wrong; nothing passes on markers.
+  - The expected status is the decision the order asks for: `declined` (an explicit refusal is
+    required; a proposal or "not agreed" is an error), `not_agreed` (the client's term, stated as
+    proposed or refused, never accepted), `agreed`, `accepted`, `offered`, and `open` with an
+    optional `condition` that must appear in the same sentence as the term (`ceiling-and-scope-en`:
+    the final fee is agreed after inspecting the theme; `left-open-en`: after the discovery call).
+  - Unit tests assert that the review #5 counterexamples are errors ("La garantía de 10 000
+    seguidores también es una propuesta del cliente", "The final fee is proposed, not agreed") and
+    that correct answers go to a human verdict, never ok.
+  - Re-judged with this oracle, pass 4 had three answers that call a budget the order declines only
+    "the client's proposal" (`conflict-decline-es`: 2 on medium, 1 on high), so pass 4's "terms set
+    30/30" for high was wrong. Prompt fixes: a declined term is refused in so many words, and calling
+    it proposed or not agreed is not a refusal (rule 1); only a direction that accepts, declines or
+    counters that very term decides it (rule 1); a statement of agreement covers every term it
+    introduces, including the terms listed after it (rule 2, the critical medium failure of pass 4);
+    rule 5 applies only to a term the order never calls agreed. The same three points in Reply Draft.
 
 ## Results (2026-10-29, prompt `369e0775`, 410 runs through the web form)
 
@@ -327,7 +349,36 @@ rebuilt with the prompt under test. Each pass that changed the prompt was follow
    The scope fix held: no P02 or `ceiling-and-scope-en` output calls the requested templates or the
    handover proposed or not agreed. P04 states EUR 300 as not accepted in 10/10.
 
-Result: `gpt-6-luna` / `high` passes the shipping prompt with zero critical errors (the one failure
-is the output language, ANY-771); `gpt-6-luna` / `medium` has one critical error. The recommendation
-`gpt-6-luna` / `high` (ANY-776) stands on the shipping prompt.
+   Re-judged with the code review #5 oracle, pass 4 also had three declined budgets stated only as
+   the client's proposal (`conflict-decline-es` medium #2, #3 and high #1), so the terms set was
+   27/30 on high and 26/30 on medium, not 30/30 and 29/30.
+5. Code review #5 prompt, 2026-10-29/30, 150 runs: first the agreed terms on the current product
+   policy `gpt-6-luna` / `medium` (P05, `agreed-confirm-ru`, `agreed-plus-conflict-es`,
+   `agreed-change-accepted-en`, `conflict-decline-es` x 10), then the full regression on both
+   finalists. Judged with the review #5 oracle; every term-bearing output (124) read by hand, and
+   every P01, P02 and P05 output scanned for "proposed / not agreed" next to the requested work.
+
+   | Configuration | Agreed terms x 10 | P01 | P02 | P04 | P05 | terms set | Median UI, s |
+   | --- | --- | --- | --- | --- | --- | --- | --- |
+   | luna / medium | 50/50 | 5/5 | 5/5 | 5/5 | 5/5 | 29/30 | 18.0 |
+   | luna / high | not run | 5/5 | 5/5 | 5/5 | 5/5 | 28/30 | 27.0 |
+
+   Critical errors: 0 of 150. Every run that is not ok:
+   - luna / medium `conflict-decline-en` #3 `scenario_session_01793302915962425368_0000000202_77ef79d8676a4e71871f3e393ba776fc`
+     and luna / high `conflict-decline-en` #3 `scenario_session_01793304525700580296_0000000202_7c662e9c84534781beb70e629be10346`:
+     the gaps and the whole answer in Spanish for an English order (ANY-771); the term statuses are
+     right. The gaps step answered in Spanish in 6 of these 100 runs, and the proposal followed it twice.
+   - luna / high `conflict-decline-es` #1 `scenario_session_01793304030387357943_0000000142_e03e1d6bbeb0487e81a9047e223f32de`:
+     the form gave up after 60 s; the scenario completed after 74 s with a correct answer (ANY-777).
+   - Read by hand and ok: two `conflict-decline-es` refusals the check missed (the guarantee refused
+     without the number, and "10.000" with a dot; the fixture now accepts the dot), one explicit "I
+     do not accept unlimited concepts" next to "agreed in advance", and two open fees with their
+     discovery-call condition. One high answer also calls the discovery call itself "proposed, not
+     agreed": awkward, not a term error.
+
+Result: with the code review #5 prompt both `gpt-6-luna` / `medium` and `gpt-6-luna` / `high` have
+zero critical errors in 150 runs; agreed terms on the current `medium` policy are 50/50. The prompt
+is safe to ship on the current model. The recommendation `gpt-6-luna` / `high` (ANY-776) still rests
+on the comparison (P04 17/20 on medium in stage 2) and is the team lead's decision; the remaining
+failures are the output language (ANY-771) and the 60 s form wait (ANY-777).
 

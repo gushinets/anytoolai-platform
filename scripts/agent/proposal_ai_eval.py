@@ -89,15 +89,15 @@ def detect_language(text: str) -> str | None:
     return lang if best >= 0.12 * len(words) and best >= 1.5 * second else None
 
 
-# Status of a client term (ANY-631 "Terms"). The verdict per term has three values: ok, fail, or
-# unverified (a manual read). Anything the words do not settle is unverified, never ok.
+# Status of a client term (ANY-631 "Terms"). The check finds definite errors; it never passes a term,
+# every term without an error needs a human verdict (see `check_terms`).
 #
 # A status marker is an acceptance, a refusal (an acceptance or offer with a negation bound to it, or
 # decline / does not cover / нереален), the client's proposal (proposed, a ceiling), an open term
 # ("will be agreed after the call") or an offer. A negation counts only when it is bound to the verb:
 # at most two words in between and no comma, colon, semicolon or "but" (so "I do not code, but I
 # accept your budget" accepts). The markers in the value's own clause decide, with none there the
-# sentence's; when the deciding markers point both ways the mention is unverified, never guessed.
+# sentence's; when the deciding markers point both ways the mention is "mixed", never guessed.
 _BOUND_NEGATION = re.compile(
     r"(?:\b(?:not|never|cannot|no|tampoco|ni|не|ни)\b|n['’]t\b|\b(?:declin\w*|refus\w*|rechaz\w*|отказ\w*|отклоня\w*))"
     r"(?:[ \t]+(?!(?:but|however|pero|sino|но|однако)\b)[\w'’-]+){0,2}[ \t]*$",
@@ -182,38 +182,56 @@ def _mention_kinds(text: str, value: str) -> list[str | None]:
 
 
 def check_terms(text: str, terms: list[dict]) -> dict[str, list[str]]:
-    """`errors`: a term whose status the text contradicts or omits; `unverified`: a term the words do
-    not settle (read it by hand). `value` is a regular expression for the term's value; `status`:
-    `not_accepted` (explicitly declined, or the client's proposal and not agreed; "open" is not a
-    refusal), `agreed` and `accepted` (explicitly confirmed or accepted; an agreed term may also be
-    listed, unmarked, after one confirmation of the whole agreed set), `offered` (the freelancer's
-    own value, offered) or `open` (kept open for later). A missing term is an error for every status."""
-    errors, unverified = [], []
+    """Errors in the status of client terms, and the terms that need a human verdict.
+
+    The automatic check never passes a term: words can show that a status is wrong or missing, not
+    that it is right (ANY-631 code reviews #3 to #5 each found a wording that an "ok" let through).
+    So every term is either an `error` (a definite violation) or `needs_verdict` (read by hand).
+
+    `value` is a regular expression for the term's value; `status` is the decision the order needs:
+    `declined` (the freelancer was told to decline it: an explicit refusal, a proposal is not enough),
+    `not_agreed` (the client's term that stays a proposal: a refusal or "proposed, not agreed"),
+    `agreed` / `accepted` (confirmed or accepted), `offered` (the freelancer's own value, offered) or
+    `open` (left for later; `condition` is a regular expression the same sentence must also match,
+    for example "after the theme is inspected"). A missing term is an error for every status."""
+    errors, needs_verdict = [], []
     for term in terms:
         kinds, status = _mention_kinds(text, term["value"]), term["status"]
         has = set(kinds)
+        problem = None
         if not kinds:
-            verdict = "fail"
-        elif status == "not_accepted":
-            verdict = "fail" if "positive" in has else "ok" if has & {"refusal", "proposal"} else "unverified" if "mixed" in has else "fail"
+            problem = "no mention"
+        elif status == "declined":
+            if "positive" in has:
+                problem = "stated as accepted"
+            elif "refusal" not in has:
+                problem = "no explicit refusal"
+        elif status == "not_agreed":
+            if "positive" in has:
+                problem = "stated as accepted"
+            elif not has & {"refusal", "proposal"}:
+                problem = "no explicit status"
         elif status in ("agreed", "accepted"):
-            if "positive" in has and "refusal" not in has:
-                verdict = "ok"
-            elif status == "agreed" and has <= {None} and _CONFIRM_AGREED_SET.search(text):
-                verdict = "ok"  # listed after one confirmation of the whole agreed set
-            elif has <= {"refusal", "proposal", "open", "offer"}:
-                verdict = "fail"
-            else:
-                verdict = "unverified"
+            if "positive" not in has and has & {"refusal", "proposal"}:
+                problem = "stated as not agreed or refused"
+            elif "refusal" in has and status == "accepted":
+                problem = "stated as refused"
         elif status == "offered":
-            verdict = "ok" if "offer" in has else "unverified" if has & {None, "mixed"} else "fail"
+            if "offer" not in has:
+                problem = "not offered"
         elif status == "open":
-            verdict = "fail" if "positive" in has else "ok" if has & {"open", "proposal"} else "unverified" if has & {None, "mixed"} else "fail"
+            if "positive" in has:
+                problem = "stated as accepted"
+            elif term.get("condition") and not any(
+                re.search(term["value"], s, re.IGNORECASE) and re.search(term["condition"], s, re.IGNORECASE)
+                for s in re.split(r"(?<=[.!?])\s+|\n+", text)
+            ):
+                problem = f"open without its condition /{term['condition']}/"
         else:
             raise ValueError(f"unknown term status {status!r}")
-        if verdict != "ok":
-            (errors if verdict == "fail" else unverified).append(f"{term['value']}: expected {status}, found {kinds or 'no mention'}")
-    return {"errors": errors, "unverified": unverified}
+        label = f"{term['value']}: needs {status}, found {kinds or 'no mention'}"
+        (errors if problem else needs_verdict).append(label + (f" ({problem})" if problem else ""))
+    return {"errors": errors, "needs_verdict": needs_verdict}
 
 
 def _is_heading_like(line: str) -> bool:
@@ -235,7 +253,7 @@ def check_proposal(
         "wrong_language": language is not None and language != expected,
         "language_unverified": language is None,
         "term_status": bool(terms["errors"]),
-        "term_unverified": bool(terms["unverified"]),
+        "term_needs_verdict": bool(terms["needs_verdict"]) and not terms["errors"],
         "placeholder": bool(PLACEHOLDER.search(text)),
         "meta_phrase": bool(META.search(text)),
         "invented_number": _has_invented_number(text, order["task_text"], profile),

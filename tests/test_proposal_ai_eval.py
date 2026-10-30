@@ -221,10 +221,9 @@ def test_identifiers_do_not_offer_their_digits_as_numbers() -> None:
 
 
 def test_terms_set_checks_the_status_of_client_terms() -> None:
-    """terms.json (ANY-631): every order names its rule and the expected status of its terms. The
-    status oracle has three outcomes (ok, error, unverified); anything the words do not settle goes to
-    a manual read, never to ok. Each counterexample below passed an earlier version (code reviews #3
-    and #4)."""
+    """terms.json (ANY-631): every order names its rule and the decision each term needs. The status
+    check finds definite errors and never passes a term: a term without an error needs a human
+    verdict. Every counterexample below got through an earlier version (code reviews #3 to #5)."""
     terms = json.loads((proposal_ai_eval.ORDERS_PATH.parent / "terms.json").read_text(encoding="utf-8"))
     orders = {order["id"]: order for order in terms["orders"]}
     for order in orders.values():
@@ -232,32 +231,39 @@ def test_terms_set_checks_the_status_of_client_terms() -> None:
         for pattern in order.get("must", []) + order.get("must_not", []) + [term["value"] for term in order["terms"]]:
             re.compile(pattern)
 
-    def verdict(order_id: str, text: str) -> str:
+    def outcome(order_id: str, text: str) -> str:
         result = proposal_ai_eval.check_terms(text, orders[order_id]["terms"])
-        return "error" if result["errors"] else "unverified" if result["unverified"] else "ok"
+        assert result["errors"] or result["needs_verdict"], "every term is an error or needs a verdict"
+        return "error" if result["errors"] else "needs_verdict"
 
-    # critical errors: an unagreed price or deadline stated as accepted (review #3)
-    assert verdict("conflict-decline-en", "I accept your USD 150 budget and the 3-day deadline for this project. I do not accept unlimited logo concepts.") == "error"
-    assert verdict("counteroffer-en", "I accept the EUR 300 budget and offer EUR 800 for a smaller first phase. I do not accept the 48-hour deadline.") == "error"
-    assert verdict("ceiling-stays-client-ru", "Бюджет до 80 000 ₽ согласован и принят. Срок в 2 рабочих дня подтверждаю.") == "error"
-    assert verdict("limit-change-accepted-en", "I do not accept a second revision round; EUR 1,500 stays as agreed.") == "error"
-    assert verdict("conflict-decline-es", "Acepto el presupuesto de 200 EUR, garantizo 10 000 seguidores y 5 publicaciones diarias.") == "error"
-    # a negation in another clause does not turn an acceptance into a refusal (review #4)
-    assert verdict("conflict-decline-en", "I do not code, but I accept your USD 150 budget. I do not accept the 3-day deadline or unlimited logo concepts.") == "error"
-    # a declined budget that is only left open is not declined (review #4)
-    assert verdict("counteroffer-en", "Your EUR 300 budget will be agreed later. I do not accept the 48-hour deadline. I offer EUR 800 for a smaller phase.") == "error"
-    # a term with no status, or a named open term left out, is not explicit (reviews #3 and #4)
-    assert verdict("conflict-decline-en", "Your request is for a logo and templates on a USD 150 budget. I do not accept the 3-day deadline or unlimited concepts.") == "error"
-    assert verdict("left-open-en", "I can rewrite the welcome email and the four-email trial sequence. Analytics setup is outside this work.") == "error"
-    # an agreed amount restated with no confirmation is not confirmed: read it by hand (review #4)
-    assert verdict("agreed-change-accepted-en", "The project will cost USD 400. I accept the second revision round. Delivery on 20 November 2026 is confirmed.") == "unverified"
+    # an unagreed price or deadline stated as accepted (review #3)
+    assert outcome("conflict-decline-en", "I accept your USD 150 budget and the 3-day deadline for this project. I do not accept unlimited logo concepts.") == "error"
+    assert outcome("counteroffer-en", "I accept the EUR 300 budget and offer EUR 800 for a smaller first phase. I do not accept the 48-hour deadline.") == "error"
+    assert outcome("ceiling-stays-client-ru", "Бюджет до 80 000 ₽ согласован и принят. Срок в 2 рабочих дня подтверждаю.") == "error"
+    assert outcome("limit-change-accepted-en", "I do not accept a second revision round; EUR 1,500 stays as agreed.") == "error"
+    assert outcome("conflict-decline-es", "Acepto el presupuesto de 200 EUR y garantizo 10 000 seguidores.") == "error"
+    # a negation in another clause, a declined term only left open, an omitted or unstatused term (review #4)
+    assert outcome("conflict-decline-en", "I do not code, but I accept your USD 150 budget. I do not accept the 3-day deadline or unlimited logo concepts.") == "error"
+    assert outcome("counteroffer-en", "Your EUR 300 budget will be agreed later. I do not accept the 48-hour deadline. I offer EUR 800 for a smaller phase.") == "error"
+    assert outcome("conflict-decline-en", "Your request is for a logo and templates on a USD 150 budget. I do not accept the 3-day deadline or unlimited concepts.") == "error"
+    assert outcome("left-open-en", "I can rewrite the welcome email and the four-email trial sequence. Analytics setup is outside this work.") == "error"
+    # a decline the freelancer ordered, written only as "a proposal, not agreed" (review #5)
+    assert outcome("conflict-decline-es", "El presupuesto de 200 EUR es una propuesta del cliente, no un acuerdo. La garantía de 10 000 seguidores también es una propuesta del cliente, no un acuerdo. No propongo otra suma.") == "error"
+    assert outcome("conflict-decline-en", "Your USD 150 budget is your proposal, not an agreed price. I do not accept the 3-day deadline. Unlimited logo concepts are your proposal, not agreed.") == "error"
+    # the fee is open only after the theme is inspected; dropping that condition is an error (review #5)
+    assert outcome("ceiling-and-scope-en", "Your USD 1,200 budget is proposed, not agreed. The final fee is proposed, not agreed.") == "error"
+    # an agreed term called not agreed (the shipping-prompt regression on luna/medium)
+    assert outcome("agreed-confirm-ru", "Стоимость 36 000 ₽, сдача до 20 ноября и 3 000 ₽ за карточку указаны как условия клиента, но пока не согласованы.") == "error"
 
-    # correct proposals (from the live runs): refusal, proposal, a governing verb over a list, open terms
-    assert verdict("conflict-decline-en", "I do not accept your USD 150 budget or the 3-day deadline for this scope. I also do not accept unlimited logo concepts.") == "ok"
-    assert verdict("counteroffer-en", "I do not accept the EUR 300 budget or the 48-hour deadline. I offer EUR 800 for a smaller 5-page first phase.") == "ok"
-    assert verdict("ceiling-stays-client-ru", "Срок в 2 рабочих дня нереален и не принимается. Ваш бюджет до 80 000 ₽ является предложенным пределом, а не согласованной ценой.") == "ok"
-    assert verdict("limit-change-accepted-en", "I accept the second revision round instead of the one-round limit; EUR 1,500 and the 5 pages stay as agreed.") == "ok"
-    assert verdict("conflict-decline-es", "No acepto el presupuesto de 200 EUR ni el ritmo de 5 publicaciones diarias. Tampoco acepto garantizar 10 000 seguidores nuevos.") == "ok"
-    assert verdict("left-open-en", "The number of additional emails and the fee will be agreed after the discovery call. Early January 2027 is your requested target, but the date is not fixed yet.") == "ok"
-    assert verdict("agreed-confirm-ru", "Подтверждаю согласованные условия: 12 карточек, итого 36 000 ₽. Сдача до 18:00 20 ноября 2026. Сверх 12 карточек по 3 000 ₽.") == "ok"
-    assert verdict("left-open-en", "The fee is accepted and I will deliver in early January, as agreed.") == "error"
+    # correct proposals (from the live runs) are never errors, and never pass without a human verdict
+    for order_id, text in (
+        ("conflict-decline-en", "Your USD 150 budget is your proposal, not an agreed price. I do not accept the 3-day deadline or unlimited logo concepts."),
+        ("counteroffer-en", "I do not accept the EUR 300 budget or the 48-hour deadline. I offer EUR 800 for a smaller 5-page first phase."),
+        ("ceiling-stays-client-ru", "Срок в 2 рабочих дня нереален и не принимается. Ваш бюджет до 80 000 ₽ является предложенным пределом, а не согласованной ценой."),
+        ("limit-change-accepted-en", "I accept the second revision round instead of the one-round limit; EUR 1,500 and the 5 pages stay as agreed."),
+        ("conflict-decline-es", "No acepto el presupuesto de 200 EUR. Tampoco acepto garantizar 10 000 seguidores nuevos."),
+        ("left-open-en", "The number of additional emails and the fee will be agreed after the discovery call. Early January 2027 is your requested target, but the date is not fixed yet."),
+        ("agreed-confirm-ru", "Подтверждаю согласованные условия: 12 карточек, итого 36 000 ₽. Сдача до 18:00 20 ноября 2026. Сверх 12 карточек по 3 000 ₽."),
+        ("ceiling-and-scope-en", "Your USD 1,200 budget ceiling is a proposal, not an agreed fee; the final fee remains to be agreed after inspecting the theme."),
+    ):
+        assert outcome(order_id, text) == "needs_verdict", (order_id, text)

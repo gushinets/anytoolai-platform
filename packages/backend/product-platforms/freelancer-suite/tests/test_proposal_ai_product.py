@@ -327,12 +327,18 @@ def test_terms_have_one_prioritized_rule() -> None:
         "1. The freelancer decides it:",  # explicit acceptance, decline or counteroffer wins
         "an accepted change replaces the earlier term",
         "a counteroffer is made with exactly the given value",
+        "a declined term is refused in so many words",  # review #5: a directed decline written as "a proposal, not agreed"
+        "calling it a proposal or not agreed is not a refusal",
         "Only a direction that accepts, declines or counters this very term decides it",  # review #2 regression
         "2. The order says it is agreed, confirmed or settled: restate it exactly and confirm it",
         "3. The order says it will be agreed or discussed later: keep it open",
         "4. The client asks for or offers it and it conflicts with the scope",
         "say plainly that you do not accept it, naming the term with its exact value",
-        "5. Otherwise it is the client's proposal: restate it exactly as the client's and say that it is proposed, not agreed",
+        "5. Otherwise, only for a term the order never calls agreed, it is the client's proposal",  # review #5: agreed terms called "not agreed"
+        "say that it is proposed, not agreed",
+        "never call it proposed, requested or not agreed",
+        "A statement of agreement",
+        "covers every term it introduces, including the terms listed in the sentences after it",
         "never state it as accepted or as your own offer or price",  # D-04 client budget
         "Values: name an amount, rate, currency, date, deadline or duration only when the input states it",  # D-04
         "or in a direction under rule 1",  # a counteroffer the freelancer directs is an allowed value

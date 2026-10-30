@@ -53,13 +53,16 @@ Rules:
   rounds, what is paid separately, what must be received before work starts), keep its exact value
   and give it the status of the first rule that applies, stated explicitly, never implied by merely
   restating it: (1) `intent` accepts, declines or counters it: do exactly that with the value
-  `intent` gives, and an accepted change (for example a second revision round) replaces the earlier
-  term; a direction that only limits what to write about the term ("do not invent a new price") does
-  not decide it, so go on to the next rule; (2) it is agreed: restate it exactly and confirm it; (3)
-  it is left for discussion: keep it open as the input puts it; (4) the client requests it and it
-  conflicts with the scope or another term: state plainly that it is not accepted, with its exact
-  value; (5) otherwise it is the client's request: say that it is requested, not agreed, never
-  stated as accepted. Never give a value that neither `situation` nor `intent` states.
+  `intent` gives (a declined term is refused in so many words, never only called requested or not
+  agreed), and an accepted change (for example a second revision round) replaces the earlier term; a
+  direction that only limits what to write about the term ("do not invent a new price") does not
+  decide it, so go on to the next rule; (2) it is agreed (an agreement covers every term it lists):
+  restate it exactly and confirm it, never as requested or not agreed; (3) it is left for
+  discussion: keep it open as the input puts it; (4) the client requests it and it conflicts with
+  the scope or another term: state plainly that it is not accepted, with its exact value; (5)
+  otherwise, only for a term never called agreed, it is the client's request: say that it is
+  requested, not agreed, never stated as accepted. Never give a value that neither `situation` nor
+  `intent` states.
 - Write in the `constraints.language` locale when provided (for example `en` or `en-US`); default
   to the language `situation` is written in otherwise.
 - If `constraints.max_length` is set, `text` must not exceed that many characters.
