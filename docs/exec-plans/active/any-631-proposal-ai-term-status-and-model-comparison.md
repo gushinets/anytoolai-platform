@@ -477,3 +477,26 @@ The review found that the acceptance could still pass on missing evidence. Fixed
   `language-confirmed`, to be answered with `review`; none was decided by the agent.
 - Tests: the listed invariants (empty, missing and duplicated runs, threshold table, language of gaps,
   API against web form, changed answer, input or criterion, contradiction) and the historical FAIL.
+
+### Second pass (six open review findings)
+
+- An empty `program`, or a block without cases, is a corrupt suite (exit code 2).
+- A run keeps the input of its case: task text, positioning, tone and language are compared with the
+  fixture; a mismatch is a corrupt suite, whatever the human verdicts say.
+- Web form evidence is the Playwright result already in the run record: `origin` with the UI outcome
+  (`result` or `error`), a finite UI time, the browser artifact (`trace`, a path next to the suite) and
+  its `trace_sha256`. The file is read and its hash compared; no new storage or attestation. The
+  stored 150 runs carry none and say so in the report (`evidence: browser artifact missing`).
+- Missing evidence keeps a run PENDING behind a non-critical failure; a confirmed critical error stays
+  FAIL. A group fails when its failures alone make the threshold unreachable (a failure stands
+  whatever the missing evidence turns out to be), and passes only with no run pending.
+- P02: `fee-open-after-inspection` is split into `fee-left-open` and `fee-after-inspection`, both
+  critical (`lost_mandatory_condition`). The reviewer's earlier "yes" for the combined question is only
+  a suggestion for the two new ones: 32 questions to decide.
+- `violation_type` is part of `criterion_hash`. The decisions whose question did not change were
+  carried over once more (`carried_over`), so only the split criterion is asked again.
+- A human "yes" on `language-confirmed` for a run where the language check found a wrong language
+  (`final-luna-high-P02-3`, German gaps) fails the run and is shown to the reviewer again.
+- Tests: empty program, other input for the right case, API run as web form, missing artifact or wrong
+  hash, missing evidence behind a non-critical failure, the P02 fee conditions, changed `violation_type`.
+

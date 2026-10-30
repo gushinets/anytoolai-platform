@@ -51,6 +51,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import re
 import statistics
 import subprocess
@@ -213,7 +214,8 @@ def input_hash(run: dict) -> str:
 
 
 def criterion_hash(criterion: dict) -> str:
-    return _digest({key: criterion[key] for key in ("id", "kind", "critical", "question")})
+    return _digest({**{key: criterion[key] for key in ("id", "kind", "critical", "question")},
+                    "violation_type": criterion.get("violation_type")})
 
 
 def read_jsonl(path: Path) -> list[dict]:
@@ -243,23 +245,34 @@ def formal_checks(run: dict, order: dict) -> dict[str, bool | int]:
     )
 
 
-def evidence_problems(run: dict, group: dict) -> list[str]:
+def _number(value: object) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value >= 0
+
+
+def evidence_problems(run: dict, group: dict, base: Path | None = None) -> list[str]:
     """What the program requires of a run's origin and configuration; any mismatch means the run is not
-    the evidence the group asks for."""
+    the evidence the group asks for. The browser artifact is read from disk and its hash compared."""
     problems = [
         f"{field} is {run.get(field)!r}, the program requires {group[field]!r}"
         for field in ("channel", "model", "reasoning_effort", "prompt_sha256")
         if run.get(field) != group[field]
     ]
+    if group["channel"] != WEB_FORM:
+        return problems
     origin = run.get("origin") or {}
-    if group["channel"] == WEB_FORM and not (
-        origin.get("ui_outcome") and origin.get("ui_latency_ms") is not None and origin.get("trace")
-    ):
-        problems.append("no web form origin (UI outcome, UI time and browser trace)")
+    if origin.get("ui_outcome") not in ("result", "error") or not _number(origin.get("ui_latency_ms")):
+        problems.append("no web form observation (UI outcome and UI time)")
+    artifact = (base / origin["trace"]) if base and isinstance(origin.get("trace"), str) else None
+    if artifact is None or not artifact.is_file() or not artifact.resolve().is_relative_to(base.resolve()):
+        problems.append("browser artifact missing")
+    elif hashlib.sha256(artifact.read_bytes()).hexdigest() != origin.get("trace_sha256"):
+        problems.append("browser artifact does not match its sha256")
     return problems
 
 
-def judge_run(run: dict, order: dict, verdicts: dict[tuple[str, str], dict], group: dict | None = None) -> dict:
+def judge_run(
+    run: dict, order: dict, verdicts: dict[tuple[str, str], dict], group: dict | None = None, base: Path | None = None
+) -> dict:
     """usable / critical are True, False or None (not established yet)."""
     fails, critical_fails, pending, warnings = [], [], [], []
     if run["runtime_status"] != "ok":
@@ -267,18 +280,21 @@ def judge_run(run: dict, order: dict, verdicts: dict[tuple[str, str], dict], gro
     origin = run.get("origin") or {}
     if origin.get("ui_outcome") not in (None, "result"):
         fails.append(f"web form showed {origin['ui_outcome']} after {origin.get('ui_latency_ms')} ms")
-    if group:
-        pending += [f"evidence: {problem}" for problem in evidence_problems(run, group)]
-    critical_open, answers, reopen = False, {}, False
+    evidence = [f"evidence: {problem}" for problem in evidence_problems(run, group, base)] if group else []
+    critical_open, answers, reopen = False, {}, []
     if run.get("output"):
         checks = formal_checks(run, order)
         fails += [name for name in UNUSABLE_CHECKS if checks[name]]
         critical_fails += [name for name in CRITICAL_CHECKS if checks[name]]
         warnings += [name for name in WARNING_CHECKS if checks[name]]
+        wrong_language = checks["wrong_language"] or checks["wrong_gaps_language"]
         for criterion in criteria_for(order, run):
             row = verdict_for(run, criterion, verdicts)
             decision = row.get("decision") if row else None
             answers[criterion["id"]] = answer = decision["answer"] if decision else None
+            if criterion["id"] == LANGUAGE_CONFIRMED and answer == "yes" and wrong_language:
+                reopen.append(LANGUAGE_CONFIRMED)
+                fails.append("language-confirmed is yes but the language check found a wrong language; decide it again")
             if answer == "no":
                 (critical_fails if criterion["critical"] else fails).append(
                     f"{criterion['id']}: {decision.get('reason') or 'no'}"
@@ -288,14 +304,15 @@ def judge_run(run: dict, order: dict, verdicts: dict[tuple[str, str], dict], gro
                 critical_open = critical_open or criterion["critical"]
         detailed = [c["id"] for c in criteria_for(order) if c["critical"] and c["id"] != NO_CRITICAL_ERROR["id"] and answers.get(c["id"]) == "no"]
         if detailed and answers.get(NO_CRITICAL_ERROR["id"]) == "yes":
-            reopen = True
+            reopen.append(NO_CRITICAL_ERROR["id"])
             critical_fails.append(f"contradiction: no-critical-error is yes but {', '.join(detailed)} is no; decide it again")
     elif run["runtime_status"] == "ok":
         fails.append("no output")
-    usable = False if fails or critical_fails else (None if pending else True)
+    # Missing evidence keeps a run PENDING behind any non-critical failure; a critical error stays FAIL.
+    status = "FAIL" if critical_fails else "PENDING" if evidence else "FAIL" if fails else "PENDING" if pending else "PASS"
     critical = True if critical_fails else (None if critical_open else False)
-    status = {True: "PASS", False: "FAIL", None: "PENDING"}[usable]
-    return {"status": status, "usable": usable, "critical": critical, "reasons": critical_fails + fails + pending,
+    return {"status": status, "usable": {"PASS": True, "FAIL": False, "PENDING": None}[status], "critical": critical,
+            "quality_failed": bool(fails or critical_fails), "reasons": critical_fails + fails + evidence + pending,
             "warnings": warnings, "reopen": reopen}
 
 
@@ -307,17 +324,22 @@ def load_suite(path: Path) -> tuple[dict, dict[str, dict], list[dict], dict[tupl
         for order in fixture["orders"]:
             orders[order["id"]] = order
     runs = read_jsonl(path.parent / suite["runs"])
+    suite["_dir"] = path.parent
     return suite, orders, runs, latest_verdicts(read_jsonl(path.parent / suite["verdicts"]))
 
 
 def program_groups(suite: dict, orders: dict[str, dict]) -> dict[tuple[str, str], dict]:
     """One group per series and case; a block of the program shares everything but the case."""
     groups: dict[tuple[str, str], dict] = {}
+    if not suite.get("program"):
+        raise SuiteError("program: nothing is planned")
     for block in suite["program"]:
         group = {**suite.get("defaults", {}), **block}
         missing = {"series", "cases", "attempts", "min_usable", "channel", "model", "reasoning_effort", "prompt_sha256"} - group.keys()
         if missing or not 0 < group["min_usable"] <= group["attempts"]:
             raise SuiteError(f"program block {block.get('series')}: missing {sorted(missing)} or an impossible threshold")
+        if not group["cases"]:
+            raise SuiteError(f"program block {group['series']}: no cases")
         for case_id in group["cases"]:
             if case_id not in orders:
                 raise SuiteError(f"program: {case_id} is not an order of the suite")
@@ -327,8 +349,9 @@ def program_groups(suite: dict, orders: dict[str, dict]) -> dict[tuple[str, str]
     return groups
 
 
-def check_runs(runs: list[dict], groups: dict[tuple[str, str], dict]) -> None:
-    """Raise SuiteError for runs the program does not allow: repeated, unplanned or outside its attempts."""
+def check_runs(runs: list[dict], groups: dict[tuple[str, str], dict], orders: dict[str, dict]) -> None:
+    """Raise SuiteError for runs the program does not allow: repeated, unplanned, outside its attempts or
+    sent with another input than their case."""
     seen_ids, seen = set(), set()
     for run in runs:
         key = (run["series"], run["case_id"], run["attempt"])
@@ -337,14 +360,19 @@ def check_runs(runs: list[dict], groups: dict[tuple[str, str], dict]) -> None:
             raise SuiteError(f"duplicate run {run['run_id']} ({key})")
         if group is None or not 1 <= run["attempt"] <= group["attempts"]:
             raise SuiteError(f"run {run['run_id']} is not in the program ({key})")
+        order = orders[run["case_id"]]
+        for field in ("task_text", "freelancer_positioning", "tone", "language"):
+            if field in order and run["input"].get(field) != order[field]:
+                raise SuiteError(f"run {run['run_id']}: {field} is not the one of case {run['case_id']}")
         seen_ids.add(run["run_id"])
         seen.add(key)
 
 
 def accept(suite: dict, orders: dict[str, dict], runs: list[dict], verdicts: dict) -> tuple[str, list[str]]:
     groups = program_groups(suite, orders)
-    check_runs(runs, groups)
-    judged = [(run, judge_run(run, orders[run["case_id"]], verdicts, groups[(run["series"], run["case_id"])])) for run in runs]
+    check_runs(runs, groups, orders)
+    judged = [(run, judge_run(run, orders[run["case_id"]], verdicts, groups[(run["series"], run["case_id"])], suite.get("_dir")))
+              for run in runs]
     fails, pending, lines = [], [], []
     critical = [run["run_id"] for run, j in judged if j["critical"] is True]
     if critical:
@@ -357,18 +385,20 @@ def accept(suite: dict, orders: dict[str, dict], runs: list[dict], verdicts: dic
     lines += ["| Series | Case | Attempts | Found | Usable | Failed | Open | Threshold | Group |", "|---|---|---|---|---|---|---|---|---|"]
     for key, group in sorted(groups.items()):
         found = by_group.get(key, [])
-        usable, failed = sum(j["status"] == "PASS" for j in found), sum(j["status"] == "FAIL" for j in found)
+        usable, failed = sum(j["status"] == "PASS" for j in found), sum(j["quality_failed"] for j in found)
+        decided_fail = sum(j["status"] == "FAIL" for j in found)
         attempts, needed = group["attempts"], group["min_usable"]
         threshold, name = f"{needed}/{attempts}", f"{key[0]} {key[1]}"
-        if attempts - failed < needed:
+        open_ = attempts - usable - decided_fail
+        if attempts - failed < needed:  # the failures stand whatever the missing evidence turns out to be
             verdict = "FAIL"
             fails.append(f"{name}: {usable} usable, {failed} failed, needs {threshold}")
-        elif usable + failed < attempts:
+        elif open_:
             verdict = "PENDING"
-            pending.append(f"{name}: {attempts - len(found)} of {attempts} runs missing, {len(found) - usable - failed} not decided")
+            pending.append(f"{name}: {attempts - len(found)} of {attempts} runs missing, {len(found) - usable - decided_fail} not decided")
         else:
             verdict = "PASS"
-        lines.append(f"| {key[0]} | {key[1]} | {attempts} | {len(found)} | {usable} | {failed} | {attempts - usable - failed} | {threshold} | {verdict} |")
+        lines.append(f"| {key[0]} | {key[1]} | {attempts} | {len(found)} | {usable} | {failed} | {open_} | {threshold} | {verdict} |")
     lines += ["", "| Series | Median latency, s | Limit, s |", "|---|---|---|"]
     limit = suite["max_median_latency_ms"]
     for series in sorted({key[0] for key in groups}):
@@ -376,7 +406,7 @@ def accept(suite: dict, orders: dict[str, dict], runs: list[dict], verdicts: dic
             (run.get("origin") or {}).get("ui_latency_ms", run.get("latency_ms"))
             for run in runs if run["series"] == series
         ]
-        latencies = [value for value in latencies if value is not None]
+        latencies = [value for value in latencies if _number(value)]
         median = statistics.median(latencies) if latencies else None
         if median is None:
             pending.append(f"{series}: no latency recorded")
@@ -515,13 +545,13 @@ def command_review(args: argparse.Namespace) -> int:
         if not run.get("output"):
             continue
         order = orders[run["case_id"]]
-        contradiction = judge_run(run, order, verdicts)["reopen"]
+        reopen = judge_run(run, order, verdicts)["reopen"]
         for criterion in criteria_for(order, run):
             key = (run["run_id"], criterion["id"])
             if args.redo and f"{key[0]}/{key[1]}" not in args.redo:
                 continue
             row = verdict_for(run, criterion, verdicts)
-            reopened = contradiction and criterion["id"] == NO_CRITICAL_ERROR["id"]
+            reopened = criterion["id"] in reopen
             if not args.redo and not reopened and row and row.get("decision"):
                 continue
             suggestion = row.get("suggestion") if row else None
@@ -534,7 +564,7 @@ def command_review(args: argparse.Namespace) -> int:
                     print("Note: a number that is not in the order or the positioning.")
             print(f"\n[{criterion['id']}{', critical' if criterion['critical'] else ''}] {criterion['question']}")
             if reopened:
-                print("Contradiction: a detailed critical criterion of this run is no. Decide this one again.")
+                print("This decision contradicts another finding of this run (see accept). Decide it again.")
             if suggestion:
                 print(f"Agent: {suggestion['answer']} - {suggestion.get('reason', '')} | quote: {suggestion.get('quote', '')}")
             answer = input("y = yes, n = no, u = unknown, s = skip, q = quit > ").strip().lower()

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import re
@@ -269,10 +270,14 @@ SPANISH_GAPS = [{"description": "No se menciona experiencia con Shopify en tu pe
 YES = {"no-critical-error": "yes", "budget-declined": "yes", "terms-not-accepted": "yes"}
 
 
+def trace_hash(run_id: str) -> str:
+    return hashlib.sha256(f"trace-{run_id}".encode()).hexdigest()
+
+
 def make_run(run_id: str, text: str = TEXT, attempt: int = 1, case: str = ORDER["id"], **fields) -> dict:
     return {
         "run_id": run_id, "series": "luna-medium", "case_id": case, "attempt": attempt, "channel": "web_form",
-        "origin": {"ui_outcome": "result", "ui_latency_ms": 20000, "trace": f"trace/{run_id}.zip"},
+        "origin": {"ui_outcome": "result", "ui_latency_ms": 20000, "trace": f"trace/{run_id}.zip", "trace_sha256": trace_hash(run_id)},
         "session_id": f"s-{run_id}", "prompt_sha256": HASHES, "model": "openai/gpt-6-luna",
         "reasoning_effort": "medium", "input": {"task_text": ORDER["task_text"], "freelancer_positioning": PROFILE_EN, "tone": "firm"},
         "output": {"text": text, "gaps": []}, "runtime_status": "ok", "error": None, "latency_ms": 20000, **fields,
@@ -293,6 +298,9 @@ def decide(run: dict, answers: dict[str, str], order: dict = ORDER) -> list[dict
 
 def write_suite(tmp_path: Path, runs: list[dict], verdicts: list[dict], program: list[dict] | None = None, orders: list[dict] | None = None) -> Path:
     (tmp_path / "orders.json").write_text(json.dumps({"orders": orders or [ORDER, {**ORDER, "id": "other"}]}), encoding="utf-8")
+    (tmp_path / "trace").mkdir(exist_ok=True)
+    for run in runs:  # the browser artifact of a run, where its record names the conventional one
+        (tmp_path / "trace" / f"{run['run_id']}.zip").write_bytes(f"trace-{run['run_id']}".encode())
     (tmp_path / "runs.jsonl").write_text("".join(json.dumps(r) + "\n" for r in runs), encoding="utf-8")
     (tmp_path / "verdicts.jsonl").write_text("".join(json.dumps(v) + "\n" for v in verdicts), encoding="utf-8")
     suite = {
@@ -360,7 +368,8 @@ def test_a_missing_run_group_or_case_is_never_a_pass(tmp_path: Path, capsys) -> 
 def test_a_corrupt_suite_is_an_error_not_a_verdict(tmp_path: Path, capsys) -> None:
     runs = attempts(3)
     # a case removed from the program leaves its runs unplanned
-    code, out = run_accept(tmp_path, runs, confirmed(runs), capsys, program=[])
+    only_other = [{"series": "luna-medium", "cases": ["other"], "attempts": 3, "min_usable": 2, "reasoning_effort": "medium"}]
+    code, out = run_accept(tmp_path, runs, confirmed(runs), capsys, program=only_other)
     assert code == 2 and out.startswith("invalid suite:") and "not in the program" in out
     # three copies of one run, and three runs for one attempt
     for copies in ([runs[0]] * 3, [make_run(f"c{i}") for i in range(3)]):
@@ -395,7 +404,7 @@ def test_every_part_of_the_answer_is_checked_for_its_language(tmp_path: Path, ca
 
 def test_an_api_result_or_a_web_form_error_never_satisfies_a_web_form_group(tmp_path: Path, capsys) -> None:
     # the server answered after the form gave up (74 s against a 60 s limit): a failure, not a success
-    late = [make_run(f"r{i}", attempt=i + 1, origin={"ui_outcome": "error", "ui_latency_ms": 60000, "trace": "t.zip"}) for i in range(3)]
+    late = [make_run(f"r{i}", attempt=i + 1, origin={**make_run(f"r{i}")["origin"], "ui_outcome": "error", "ui_latency_ms": 60000}) for i in range(3)]
     code, out = run_accept(tmp_path, late, confirmed(late), capsys)
     assert code == 1 and "FAIL: luna-medium counteroffer-en" in out and "web form showed error after 60000 ms" in out
     # an API run, or a record that only claims the channel, is not the evidence the group asks for
@@ -403,7 +412,8 @@ def test_an_api_result_or_a_web_form_error_never_satisfies_a_web_form_group(tmp_
         runs = attempts(3, **fields)
         code, out = run_accept(tmp_path, runs, confirmed(runs), capsys)
         assert code == 1 and out.startswith("# Suite t: PENDING"), out
-    assert "channel is 'api', the program requires 'web_form'" in out or "no web form origin" in out
+        assert "evidence:" in out
+    assert "no web form observation" in out
 
 
 def test_a_verdict_counts_only_for_the_answer_input_and_criterion_it_judged(tmp_path: Path, capsys) -> None:
@@ -462,7 +472,9 @@ def test_accept_fails_on_a_critical_error_a_missed_threshold_or_slow_runs(tmp_pa
     failed = [make_run("r0", runtime_status="ui_error", error="form gave up after 60 s")] + runs[1:]
     code, out = run_accept(tmp_path, failed, confirmed(runs[1:], {**YES, "budget-declined": "no"}), capsys)
     assert code == 1 and "FAIL: luna-medium counteroffer-en: 0 usable, 3 failed, needs 2/3" in out
-    slow = attempts(3, latency_ms=61000, origin={"ui_outcome": "result", "ui_latency_ms": 61000, "trace": "t.zip"})
+    slow = attempts(3, latency_ms=61000, origin=None)
+    for run in slow:
+        run["origin"] = {**make_run(run["run_id"])["origin"], "ui_latency_ms": 61000}
     code, out = run_accept(tmp_path, slow, confirmed(slow), capsys)
     assert code == 1 and "median latency 61.0 s above 60 s" in out
 
@@ -518,8 +530,9 @@ def test_the_any_631_suite_is_consistent() -> None:
 
 
 def test_the_historical_any_631_series_is_a_fail_for_the_known_reasons() -> None:
-    """The approved thresholds and the stored runs, nothing else: FAIL. Besides the three failures of the
-    first pass, the language check of the gap descriptions finds the Spanish and German ones."""
+    """The approved thresholds and the stored runs, nothing else: FAIL. The language check of the gap
+    descriptions finds the Spanish and German ones; the stored runs carry no browser artifact, so every
+    run stays PENDING behind its failure and the failures alone fail their groups."""
     status, lines = proposal_ai_eval.accept(*proposal_ai_eval.load_suite(SUITE_PATH))
     report = "\n".join(lines)
     assert status == "FAIL"
@@ -527,11 +540,71 @@ def test_the_historical_any_631_series_is_a_fail_for_the_known_reasons() -> None
         "final-luna-medium-ceiling-and-scope-en-1", "final-luna-medium-ceiling-and-scope-en-2",
         "final-luna-high-P02-2", "final-luna-high-P02-3",
     ):
-        assert f"FAIL `{run_id}`: wrong_gaps_language" in report, run_id
-    assert "FAIL `final-luna-high-conflict-decline-es-1`: runtime: ui_error" in report
-    assert "FAIL `final-luna-medium-conflict-decline-en-3`: wrong_language; wrong_gaps_language" in report
-    # the stored runs carry no web form evidence: pending, not invented
-    assert "evidence: no web form origin" in report
+        assert f"PENDING `{run_id}`: wrong_gaps_language" in report, run_id
+    assert "FAIL: final-luna-high P02: 0 usable, 2 failed, needs 4/5" in report
+    assert "`final-luna-high-conflict-decline-es-1`: runtime: ui_error" in report
+    assert "`final-luna-medium-conflict-decline-en-3`: wrong_language; wrong_gaps_language" in report
+    assert "evidence: browser artifact missing" in report
+    # a human "yes" on the language of German gap descriptions is shown to the reviewer again
+    suite, orders, runs, verdicts = proposal_ai_eval.load_suite(SUITE_PATH)
+    run = next(r for r in runs if r["run_id"] == "final-luna-high-P02-3")
+    judged = proposal_ai_eval.judge_run(run, orders["P02"], verdicts)
+    assert judged["reopen"] == ["language-confirmed"]
+
+
+def test_the_program_cannot_be_empty_and_runs_keep_the_input_of_their_case(tmp_path: Path, capsys) -> None:
+    for program in ([], [{"series": "luna-medium", "cases": [], "attempts": 3, "min_usable": 2, "reasoning_effort": "medium"}]):
+        code, out = run_accept(tmp_path, [], [], capsys, program=program)
+        assert code == 2 and "invalid suite" in out, out
+    # the right case_id with a simplified task text is not that case, whatever a person says about it
+    runs = attempts(3)
+    runs[1]["input"] = {**runs[1]["input"], "task_text": "Build me a website."}
+    code, out = run_accept(tmp_path, runs, confirmed(runs), capsys)
+    assert code == 2 and "r1: task_text is not the one of case counteroffer-en" in out
+
+
+def test_missing_ui_evidence_keeps_a_failed_run_pending(tmp_path: Path, capsys) -> None:
+    """A non-critical failure does not hide that the run is not verified; a critical one still fails."""
+    runs = attempts(3)
+    runs[0]["origin"] = None
+    rows = confirmed(runs[1:]) + decide(runs[0], {**YES, "budget-declined": "no"})
+    code, out = run_accept(tmp_path, runs, rows, capsys)
+    assert code == 1 and out.startswith("# Suite t: PENDING") and "PENDING `r0`: budget-declined: read" in out
+    rows = confirmed(runs[1:]) + decide(runs[0], {**YES, "terms-not-accepted": "no"})
+    code, out = run_accept(tmp_path, runs, rows, capsys)
+    assert code == 1 and out.startswith("# Suite t: FAIL") and "FAIL critical `r0`" in out
+
+
+def test_the_browser_artifact_is_read_and_its_hash_compared(tmp_path: Path, capsys) -> None:
+    runs = attempts(3)
+    runs[0]["origin"] = {**runs[0]["origin"], "trace": "trace/elsewhere.zip"}
+    code, out = run_accept(tmp_path, runs, confirmed(runs), capsys)
+    assert code == 1 and "PENDING `r0`: evidence: browser artifact missing" in out
+    runs = attempts(3)
+    runs[0]["origin"] = {**runs[0]["origin"], "trace_sha256": "0" * 64}
+    code, out = run_accept(tmp_path, runs, confirmed(runs), capsys)
+    assert code == 1 and "evidence: browser artifact does not match its sha256" in out
+    runs = attempts(3)
+    runs[0]["origin"] = {**runs[0]["origin"], "ui_latency_ms": True}
+    code, out = run_accept(tmp_path, runs, confirmed(runs), capsys)
+    assert code == 1 and "evidence: no web form observation" in out
+
+
+def test_a_changed_violation_type_asks_for_the_decision_again(tmp_path: Path, capsys) -> None:
+    runs = attempts(3)
+    rows = confirmed(runs)
+    retyped = {**ORDER, "criteria": [ORDER["criteria"][0], {**ORDER["criteria"][1], "violation_type": "promised_excluded_work"}]}
+    code, out = run_accept(tmp_path, runs, rows, capsys, orders=[retyped, {**ORDER, "id": "other"}])
+    assert code == 1 and "terms-not-accepted: not confirmed" in out
+
+
+def test_losing_the_fee_condition_of_the_p02_orders_is_a_critical_error() -> None:
+    for name, case in (("qa_cases.json", "P02"), ("terms.json", "ceiling-and-scope-en")):
+        order = next(o for o in json.loads((FIXTURES / name).read_text(encoding="utf-8"))["orders"] if o["id"] == case)
+        criteria = {c["id"]: c for c in order["criteria"]}
+        assert "fee-open-after-inspection" not in criteria
+        for criterion_id in ("fee-left-open", "fee-after-inspection"):
+            assert criteria[criterion_id]["critical"] and criteria[criterion_id]["violation_type"] == "lost_mandatory_condition"
 
 
 def test_review_copies_the_agents_reason_only_for_the_same_answer(tmp_path: Path, monkeypatch) -> None:

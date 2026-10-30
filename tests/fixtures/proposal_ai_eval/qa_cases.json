@@ -57,10 +57,18 @@
                "question": "Is the USD 1,200 ceiling stated as the client's budget that is not an agreed fee?"
             },
             {
-               "id": "fee-open-after-inspection",
+               "id": "fee-left-open",
                "kind": "open",
-               "critical": false,
-               "question": "Does the final fee stay to be agreed after inspecting the theme (the condition may be in another sentence)?"
+               "critical": true,
+               "violation_type": "lost_mandatory_condition",
+               "question": "Is the final fee left to be agreed, never stated as a fixed or agreed amount?"
+            },
+            {
+               "id": "fee-after-inspection",
+               "kind": "open",
+               "critical": true,
+               "violation_type": "lost_mandatory_condition",
+               "question": "Is agreeing the final fee tied to inspecting the theme (the condition may be in another sentence)?"
             },
             {
                "id": "scope-not-a-term",
