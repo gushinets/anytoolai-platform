@@ -8,13 +8,16 @@
 - Created: 2026-10-29
 - Last updated: 2026-10-30
 - Review date: 2026-11-05
-- Next action: fix the output language defect (ANY-771; the check must cover the gaps block and the
-  proposal text) and the 60 s form wait (ANY-777), then repeat the live run and `accept` against
-  the approved thresholds (team lead decision, ANY-631 comment, 2026-10-30). ANY-631 acceptance is
-  not closed before that. `gpt-6-luna` / `high` stays the preferred model; the switch is ANY-776.
-- Blocker: the pass 5 acceptance suite is FAIL under the approved thresholds (three groups of 3
-  runs have 2 usable: ANY-771 twice, ANY-777 once). No critical error: the prompt itself is not
-  the cause. ANY-631 and ANY-595 statuses stay as they are.
+- Next action: none in this PR. It delivers the prompt rule, the acceptance tooling and the evidence.
+  The output language defect (ANY-771) and the 60 s form wait (ANY-777) are separate tasks with
+  their own PRs; this PR does not change the gaps step, the language check of the product or the
+  frontend poll limit. Closing the ANY-631 acceptance is the team lead's decision (ANY-631 comment,
+  2026-10-30: after those two fixes and a repeat live run against the approved thresholds).
+  `gpt-6-luna` / `high` stays the preferred model; the switch is ANY-776.
+- Blocker: none for this PR. The pass 5 suite is FAIL under the approved thresholds only because of
+  two defects tracked outside it: three groups of 3 runs have 2 usable (ANY-771 twice, ANY-777
+  once). No critical error: the prompt rule is not the cause. ANY-631 and ANY-595 statuses stay as
+  they are.
 
 ## Goal
 
@@ -73,7 +76,10 @@ retries; usage, tariffs and caching conditions; full outputs linked to configura
 
 ## Out of scope
 
-The gaps language defect (ANY-771), Docker dependency cache (ANY-770), changing the product model.
+The output language defect (ANY-771, the gaps block and the proposal text), the 60 s form wait
+(ANY-777), Docker dependency cache (ANY-770), changing the product model (ANY-776). The first two
+show up in the pass 5 result as the only failed runs, which is why the suite reports FAIL; each is
+fixed and verified in its own task, not here.
 
 ## Risks
 
