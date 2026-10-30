@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+import io
 import json
 import re
+import zipfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -246,9 +248,12 @@ def test_criteria_are_questions_and_fixture_checks_are_literal() -> None:
                 assert "\\d" in pattern, f"{order['id']}: must_not forbids amounts only: {pattern}"
 
 
+PROFILE_EN = "I build Webflow marketing sites for small businesses and agree timelines after the content arrives."
 ORDER = {
     "id": "counteroffer-en",
     "task_text": "A client wants a 12-page site within 48 hours for EUR 300. Decline both and offer EUR 800 for 5 pages.",
+    "freelancer_positioning": PROFILE_EN,
+    "tone": "firm",
     "expect_language": "en",
     "expect_gaps_language": "en",
     "must": ["EUR 800"],
@@ -259,7 +264,6 @@ ORDER = {
          "question": "Is none of the client's terms stated as accepted?"},
     ],
 }
-PROFILE_EN = "I build Webflow marketing sites for small businesses and agree timelines after the content arrives."
 TEXT = (
     "I build Webflow marketing sites for small businesses, and this project is close to the work I do for my clients. "
     "I do not accept the EUR 300 budget or the 48-hour deadline for the full site with all of its pages. "
@@ -270,8 +274,17 @@ SPANISH_GAPS = [{"description": "No se menciona experiencia con Shopify en tu pe
 YES = {"no-critical-error": "yes", "budget-declined": "yes", "terms-not-accepted": "yes"}
 
 
+def trace_bytes(run_id: str) -> bytes:
+    """A minimal Playwright trace: the trace events and the network log that names the run's session."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as trace:
+        trace.writestr(zipfile.ZipInfo("trace.trace", (2026, 10, 30, 0, 0, 0)), "{}")
+        trace.writestr(zipfile.ZipInfo("0-trace.network", (2026, 10, 30, 0, 0, 0)), f"GET /v1/scenario-sessions/s-{run_id}")
+    return buffer.getvalue()
+
+
 def trace_hash(run_id: str) -> str:
-    return hashlib.sha256(f"trace-{run_id}".encode()).hexdigest()
+    return hashlib.sha256(trace_bytes(run_id)).hexdigest()
 
 
 def make_run(run_id: str, text: str = TEXT, attempt: int = 1, case: str = ORDER["id"], **fields) -> dict:
@@ -279,7 +292,7 @@ def make_run(run_id: str, text: str = TEXT, attempt: int = 1, case: str = ORDER[
         "run_id": run_id, "series": "luna-medium", "case_id": case, "attempt": attempt, "channel": "web_form",
         "origin": {"ui_outcome": "result", "ui_latency_ms": 20000, "trace": f"trace/{run_id}.zip", "trace_sha256": trace_hash(run_id)},
         "session_id": f"s-{run_id}", "prompt_sha256": HASHES, "model": "openai/gpt-6-luna",
-        "reasoning_effort": "medium", "input": {"task_text": ORDER["task_text"], "freelancer_positioning": PROFILE_EN, "tone": "firm"},
+        "reasoning_effort": "medium", "input": proposal_ai_eval.case_input(ORDER),
         "output": {"text": text, "gaps": []}, "runtime_status": "ok", "error": None, "latency_ms": 20000, **fields,
     }
 
@@ -296,15 +309,20 @@ def decide(run: dict, answers: dict[str, str], order: dict = ORDER) -> list[dict
     ]
 
 
-def write_suite(tmp_path: Path, runs: list[dict], verdicts: list[dict], program: list[dict] | None = None, orders: list[dict] | None = None) -> Path:
-    (tmp_path / "orders.json").write_text(json.dumps({"orders": orders or [ORDER, {**ORDER, "id": "other"}]}), encoding="utf-8")
+def write_suite(
+    tmp_path: Path, runs: list[dict], verdicts: list[dict], program: list[dict] | None = None,
+    orders: list[dict] | None = None, traces: dict[str, bytes] | None = None, pins: list[dict] | None = None,
+) -> Path:
+    orders = orders or [ORDER, {**ORDER, "id": "other"}]
+    (tmp_path / "orders.json").write_text(json.dumps({"orders": orders}), encoding="utf-8")
     (tmp_path / "trace").mkdir(exist_ok=True)
     for run in runs:  # the browser artifact of a run, where its record names the conventional one
-        (tmp_path / "trace" / f"{run['run_id']}.zip").write_bytes(f"trace-{run['run_id']}".encode())
+        (tmp_path / "trace" / f"{run['run_id']}.zip").write_bytes((traces or {}).get(run["run_id"], trace_bytes(run["run_id"])))
     (tmp_path / "runs.jsonl").write_text("".join(json.dumps(r) + "\n" for r in runs), encoding="utf-8")
     (tmp_path / "verdicts.jsonl").write_text("".join(json.dumps(v) + "\n" for v in verdicts), encoding="utf-8")
     suite = {
         "id": "t", "orders": ["orders.json"], "runs": "runs.jsonl", "verdicts": "verdicts.jsonl", "max_median_latency_ms": 60000,
+        "cases": {order["id"]: proposal_ai_eval.case_hash(order) for order in pins or orders},
         "defaults": {"channel": "web_form", "model": "openai/gpt-6-luna", "prompt_sha256": HASHES},
         "program": program if program is not None else [
             {"series": "luna-medium", "cases": [ORDER["id"]], "attempts": 3, "min_usable": 2, "reasoning_effort": "medium"}
@@ -428,7 +446,7 @@ def test_a_verdict_counts_only_for_the_answer_input_and_criterion_it_judged(tmp_
     # the input changed
     changed = [{**run, "input": {**run["input"], "tone": "warm"}} for run in runs]
     code, out = run_accept(tmp_path, changed, rows, capsys)
-    assert code == 1 and out.startswith("# Suite t: PENDING")
+    assert code == 2 and "input is not the input of case" in out
     # only a threshold changed: the same verdicts still count
     stricter = [{"series": "luna-medium", "cases": [ORDER["id"]], "attempts": 3, "min_usable": 3, "reasoning_effort": "medium"}]
     code, out = run_accept(tmp_path, runs, rows, capsys, program=stricter)
@@ -560,7 +578,7 @@ def test_the_program_cannot_be_empty_and_runs_keep_the_input_of_their_case(tmp_p
     runs = attempts(3)
     runs[1]["input"] = {**runs[1]["input"], "task_text": "Build me a website."}
     code, out = run_accept(tmp_path, runs, confirmed(runs), capsys)
-    assert code == 2 and "r1: task_text is not the one of case counteroffer-en" in out
+    assert code == 2 and "r1: input is not the input of case counteroffer-en" in out
 
 
 def test_missing_ui_evidence_keeps_a_failed_run_pending(tmp_path: Path, capsys) -> None:
@@ -605,6 +623,98 @@ def test_losing_the_fee_condition_of_the_p02_orders_is_a_critical_error() -> Non
         assert "fee-open-after-inspection" not in criteria
         for criterion_id in ("fee-left-open", "fee-after-inspection"):
             assert criteria[criterion_id]["critical"] and criteria[criterion_id]["violation_type"] == "lost_mandatory_condition"
+
+
+def test_the_input_is_the_whole_input_of_the_case(tmp_path: Path, capsys) -> None:
+    """Code review #7: an unapproved `language` (or any other key) in the input of an EN case."""
+    for extra in ({"language": "es"}, {"model_hint": "x"}):
+        runs = attempts(3)
+        runs[0]["input"] = {**runs[0]["input"], **extra}
+        code, out = run_accept(tmp_path, runs, confirmed(runs), capsys)
+        assert code == 2 and "r0: input is not the input of case" in out, extra
+    runs = attempts(3)
+    runs[0]["input"] = {key: value for key, value in runs[0]["input"].items() if key != "tone"}
+    code, out = run_accept(tmp_path, runs, confirmed(runs), capsys)
+    assert code == 2
+
+
+def test_a_case_changed_after_its_approval_is_a_corrupt_suite(tmp_path: Path, capsys) -> None:
+    """Code review #7: deleting a question from the fixture must not weaken the test unnoticed."""
+    runs = attempts(3)
+    weaker = {**ORDER, "criteria": ORDER["criteria"][:1]}
+    code, out = run_accept(tmp_path, runs, confirmed(runs), capsys, orders=[weaker, {**ORDER, "id": "other"}],
+                           pins=[ORDER, {**ORDER, "id": "other"}])
+    assert code == 2 and "case counteroffer-en is not the one that was approved" in out
+    unpinned = write_suite(tmp_path, runs, confirmed(runs))
+    suite = json.loads(unpinned.read_text(encoding="utf-8"))
+    suite["cases"] = {}
+    unpinned.write_text(json.dumps(suite), encoding="utf-8")
+    assert proposal_ai_eval.main(["accept", "--suite", str(unpinned)]) == 2
+
+
+def test_one_scenario_session_is_one_run(tmp_path: Path, capsys) -> None:
+    """Code review #7: three copies of one generation under different run ids are not three runs."""
+    runs = attempts(3)
+    for run in runs:
+        run["session_id"] = "s-r0"
+    code, out = run_accept(tmp_path, runs, confirmed(runs), capsys)
+    assert code == 2 and "session s-r0 already counted" in out
+    runs = attempts(3)
+    runs[1]["session_id"] = None
+    code, out = run_accept(tmp_path, runs, confirmed(runs), capsys)
+    assert code == 2 and "a result without a scenario session" in out
+
+
+def test_only_a_named_human_decides(tmp_path: Path, capsys) -> None:
+    """Code review #7: an agent-authored `decision` is a suggestion, whatever its answer."""
+    runs = attempts(3)
+    for broken in ({"reviewer": "agent"}, {"reviewer": "Agent "}, {"reviewer": ""}, {"reviewer": None}, {"reviewed_at": None}):
+        rows = confirmed(runs[1:]) + decide(runs[0], YES)
+        for row in rows[-3:]:
+            row["decision"] = {**row["decision"], **broken}
+        code, out = run_accept(tmp_path, runs, rows, capsys)
+        assert code == 1 and "PENDING `r0`" in out and "not confirmed" in out, broken
+    rows = confirmed(runs[1:]) + [{k: v for k, v in row.items() if k != "decision"} for row in decide(runs[0], YES)]
+    code, out = run_accept(tmp_path, runs, rows, capsys)
+    assert code == 1 and "PENDING `r0`" in out
+
+
+def test_a_file_with_a_hash_is_not_a_browser_trace(tmp_path: Path, capsys) -> None:
+    """Code review #7: the hash proves the file is unchanged, the content must prove it is this run's trace."""
+    wrong_session = io.BytesIO()
+    with zipfile.ZipFile(wrong_session, "w") as trace:
+        trace.writestr("trace.trace", "{}")
+        trace.writestr("0-trace.network", "GET /v1/scenario-sessions/s-other")
+    for content in (b"trace-r0", wrong_session.getvalue(), trace_bytes("r0")[:-30]):
+        runs = attempts(3)
+        runs[0]["origin"] = {**runs[0]["origin"], "trace_sha256": hashlib.sha256(content).hexdigest()}
+        code, out = run_accept(tmp_path, runs, confirmed(runs), capsys, traces={"r0": content})
+        assert code == 1 and out.startswith("# Suite t: PENDING")
+        assert "PENDING `r0`: evidence: browser artifact is not a Playwright trace of this session" in out
+
+
+def test_latency_is_judged_only_from_the_verified_ui_times_of_every_planned_run(tmp_path: Path, capsys) -> None:
+    """Code review #7: one slow run of an unfinished series is not a verdict; an API time is not a UI time."""
+    slow = make_run("r0", origin={**make_run("r0")["origin"], "ui_latency_ms": 65000})
+    code, out = run_accept(tmp_path, [slow], confirmed([slow]), capsys)
+    assert code == 1 and out.startswith("# Suite t: PENDING") and "UI time verified for 1 of 3 planned runs" in out
+    assert "above 60 s" not in out
+    api_slow = attempts(3, latency_ms=90000)
+    for run in api_slow:
+        run["origin"] = None
+    code, out = run_accept(tmp_path, api_slow, confirmed(api_slow), capsys)
+    assert out.startswith("# Suite t: PENDING") and "above 60 s" not in out
+    # all three verified: the median decides, exactly 60 s passes
+    edge = [make_run(f"r{i}", attempt=i + 1, origin={**make_run(f"r{i}")["origin"], "ui_latency_ms": 60000}) for i in range(3)]
+    code, out = run_accept(tmp_path, edge, confirmed(edge), capsys)
+    assert code == 0, out
+
+
+def test_the_committed_suite_pins_every_case_it_plans() -> None:
+    suite, orders, runs, _ = proposal_ai_eval.load_suite(SUITE_PATH)
+    planned = {case for block in suite["program"] for case in block["cases"]}
+    assert set(suite["cases"]) == planned and len(planned) == 14
+    assert all(suite["cases"][case] == proposal_ai_eval.case_hash(orders[case]) for case in planned)
 
 
 def test_review_copies_the_agents_reason_only_for_the_same_answer(tmp_path: Path, monkeypatch) -> None:

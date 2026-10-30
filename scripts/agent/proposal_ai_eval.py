@@ -59,6 +59,7 @@ import sys
 import time
 import urllib.request
 import uuid
+import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -218,6 +219,19 @@ def criterion_hash(criterion: dict) -> str:
                     "violation_type": criterion.get("violation_type")})
 
 
+def case_input(order: dict) -> dict:
+    """The whole input a run of this case must carry: no key more, no key less."""
+    return {key: order[key] for key in ("task_text", "freelancer_positioning", "tone", "language") if key in order}
+
+
+def case_hash(order: dict) -> str:
+    """Everything the approval of a case rests on: its input, its literal checks and expected languages,
+    and every question asked about it."""
+    checks = {key: order.get(key) for key in ("expect_language", "expect_gaps_language", "expect_gap", "must", "must_not")}
+    return _digest({"input": case_input(order), "checks": checks,
+                    "criteria": sorted(criterion_hash(c) for c in criteria_for(order))})
+
+
 def read_jsonl(path: Path) -> list[dict]:
     if not path.exists():
         return []
@@ -234,7 +248,12 @@ def verdict_for(run: dict, criterion: dict, verdicts: dict) -> dict | None:
     same = row and (row.get("answer_hash"), row.get("input_hash"), row.get("criterion_hash")) == (
         answer_hash(run["output"]), input_hash(run), criterion_hash(criterion)
     )
-    return row if same else None
+    if not same:
+        return None
+    decision = row.get("decision")
+    human = decision and all(isinstance(decision.get(key), str) and decision[key].strip() for key in ("reviewer", "reviewed_at"))
+    # a decision counts only with a named human reviewer; "agent" is reserved for suggestions
+    return row if human and decision["reviewer"].strip().lower() != "agent" else {**row, "decision": None}
 
 
 def formal_checks(run: dict, order: dict) -> dict[str, bool | int]:
@@ -267,7 +286,21 @@ def evidence_problems(run: dict, group: dict, base: Path | None = None) -> list[
         problems.append("browser artifact missing")
     elif hashlib.sha256(artifact.read_bytes()).hexdigest() != origin.get("trace_sha256"):
         problems.append("browser artifact does not match its sha256")
+    elif not _is_trace_of(artifact, run.get("session_id")):
+        problems.append("browser artifact is not a Playwright trace of this session")
     return problems
+
+
+def _is_trace_of(path: Path, session_id: str | None) -> bool:
+    """A Playwright trace is a ZIP with `trace.trace` and a network log; the network log names the
+    session this run started, so the file cannot be another run's or a text file with a hash."""
+    if not session_id or not zipfile.is_zipfile(path):
+        return False
+    with zipfile.ZipFile(path) as trace:
+        names = trace.namelist()
+        return "trace.trace" in names and any(
+            name.endswith(".network") and session_id.encode() in trace.read(name) for name in names
+        )
 
 
 def judge_run(
@@ -312,7 +345,7 @@ def judge_run(
     status = "FAIL" if critical_fails else "PENDING" if evidence else "FAIL" if fails else "PENDING" if pending else "PASS"
     critical = True if critical_fails else (None if critical_open else False)
     return {"status": status, "usable": {"PASS": True, "FAIL": False, "PENDING": None}[status], "critical": critical,
-            "quality_failed": bool(fails or critical_fails), "reasons": critical_fails + fails + evidence + pending,
+            "quality_failed": bool(fails or critical_fails), "verified": not evidence, "reasons": critical_fails + fails + evidence + pending,
             "warnings": warnings, "reopen": reopen}
 
 
@@ -346,13 +379,16 @@ def program_groups(suite: dict, orders: dict[str, dict]) -> dict[tuple[str, str]
             if (group["series"], case_id) in groups:
                 raise SuiteError(f"program: {group['series']} {case_id} planned twice")
             groups[(group["series"], case_id)] = group
+    for case_id in {key[1] for key in groups}:
+        if suite.get("cases", {}).get(case_id) != case_hash(orders[case_id]):
+            raise SuiteError(f"case {case_id} is not the one that was approved (its input, checks or questions changed)")
     return groups
 
 
 def check_runs(runs: list[dict], groups: dict[tuple[str, str], dict], orders: dict[str, dict]) -> None:
     """Raise SuiteError for runs the program does not allow: repeated, unplanned, outside its attempts or
     sent with another input than their case."""
-    seen_ids, seen = set(), set()
+    seen_ids, seen, sessions = set(), set(), set()
     for run in runs:
         key = (run["series"], run["case_id"], run["attempt"])
         group = groups.get(key[:2])
@@ -360,10 +396,13 @@ def check_runs(runs: list[dict], groups: dict[tuple[str, str], dict], orders: di
             raise SuiteError(f"duplicate run {run['run_id']} ({key})")
         if group is None or not 1 <= run["attempt"] <= group["attempts"]:
             raise SuiteError(f"run {run['run_id']} is not in the program ({key})")
-        order = orders[run["case_id"]]
-        for field in ("task_text", "freelancer_positioning", "tone", "language"):
-            if field in order and run["input"].get(field) != order[field]:
-                raise SuiteError(f"run {run['run_id']}: {field} is not the one of case {run['case_id']}")
+        if run["input"] != case_input(orders[run["case_id"]]):
+            raise SuiteError(f"run {run['run_id']}: input is not the input of case {run['case_id']}")
+        if run["runtime_status"] == "ok" and not run.get("session_id"):
+            raise SuiteError(f"run {run['run_id']}: a result without a scenario session")
+        if run.get("session_id") in sessions:
+            raise SuiteError(f"run {run['run_id']}: session {run['session_id']} already counted for another run")
+        sessions.add(run.get("session_id"))
         seen_ids.add(run["run_id"])
         seen.add(key)
 
@@ -402,14 +441,13 @@ def accept(suite: dict, orders: dict[str, dict], runs: list[dict], verdicts: dic
     lines += ["", "| Series | Median latency, s | Limit, s |", "|---|---|---|"]
     limit = suite["max_median_latency_ms"]
     for series in sorted({key[0] for key in groups}):
-        latencies = [
-            (run.get("origin") or {}).get("ui_latency_ms", run.get("latency_ms"))
-            for run in runs if run["series"] == series
-        ]
+        planned = sum(group["attempts"] for key, group in groups.items() if key[0] == series)
+        # only UI times of verified web form runs; a missing run or an API time never stands in for one
+        latencies = [(run.get("origin") or {}).get("ui_latency_ms") for run, j in judged if run["series"] == series and j["verified"]]
         latencies = [value for value in latencies if _number(value)]
-        median = statistics.median(latencies) if latencies else None
+        median = statistics.median(latencies) if len(latencies) == planned else None
         if median is None:
-            pending.append(f"{series}: no latency recorded")
+            pending.append(f"{series}: UI time verified for {len(latencies)} of {planned} planned runs")
         elif median > limit:
             fails.append(f"{series}: median latency {median / 1000:.1f} s above {limit / 1000:.0f} s")
         lines.append(f"| {series} | {'-' if median is None else f'{median / 1000:.1f}'} | {limit / 1000:.0f} |")

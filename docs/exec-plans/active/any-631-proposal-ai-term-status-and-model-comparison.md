@@ -17,8 +17,8 @@
 - Blocker: none for this PR. The pass 5 suite is FAIL under the approved thresholds, and stays FAIL
   until the repeat live run: ANY-771 (the output language, now also found in the gap descriptions) and
   ANY-777 (the 60 s form wait) are tracked outside this PR. No critical error is established: the
-  prompt rule is not the cause. 100 review questions are open (see "Acceptance system fixes") and need
-  the reviewer, not the agent. ANY-631 and ANY-595 statuses stay as they are.
+  prompt rule is not the cause. every review question is answered by the reviewer (686 current decisions).
+  ANY-631 and ANY-595 statuses stay as they are.
 
 ## Goal
 
@@ -492,11 +492,29 @@ The review found that the acceptance could still pass on missing evidence. Fixed
   whatever the missing evidence turns out to be), and passes only with no run pending.
 - P02: `fee-open-after-inspection` is split into `fee-left-open` and `fee-after-inspection`, both
   critical (`lost_mandatory_condition`). The reviewer's earlier "yes" for the combined question is only
-  a suggestion for the two new ones: 32 questions to decide.
+  a suggestion for the two new ones; the reviewer decided all 32.
 - `violation_type` is part of `criterion_hash`. The decisions whose question did not change were
   carried over once more (`carried_over`), so only the split criterion is asked again.
 - A human "yes" on `language-confirmed` for a run where the language check found a wrong language
   (`final-luna-high-P02-3`, German gaps) fails the run and is shown to the reviewer again.
 - Tests: empty program, other input for the right case, API run as web form, missing artifact or wrong
   hash, missing evidence behind a non-critical failure, the P02 fee conditions, changed `violation_type`.
+
+### Third pass (code review #7): one model instead of six checks
+
+The six findings had one cause: `accept` computed over whatever the records contained, with no approved
+expectation to prove each datum against. The rule is now stated once and applied to everything:
+
+- **Approved snapshot.** `suite.json` `cases` pins every planned case by `case_hash` (its whole input,
+  literal checks, expected languages and every question). A fixture that no longer matches is a corrupt
+  suite (exit code 2) until the hash is renewed in its own commit, so a deleted question or a changed
+  language cannot weaken the acceptance unnoticed.
+- **Closed validation before any count.** A run's input equals the case input exactly (no key more or
+  less, so an injected `language` fails); a scenario session belongs to one run and a result needs one;
+  a decision counts only with a named human reviewer other than `agent` and a review time; the browser
+  artifact must be a ZIP with `trace.trace` and a network log naming the run's session, besides its
+  hash.
+- **Totals only from what is verified.** The median UI time needs the verified UI time of every planned
+  run of the series (PENDING until then); an API time never stands in for it.
+- Tests: one negative test per finding, plus the pinned cases of the committed suite.
 

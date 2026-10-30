@@ -1,6 +1,6 @@
 {
   "id": "any-631-review-5-prompt",
-  "description": "ANY-631 live acceptance of the code review #5 ProposalAI prompt (compose_persuasive_text.v1.md sha256 f6e696dd..., committed in 02a7f39c): 150 runs through the web form, 2026-10-29. Thresholds come from ANY-631 and its team lead decisions only; a group without an approved threshold stays PENDING. `program` is the mandatory test plan: a series and case planned but missing is PENDING, a run outside it is a corrupt suite.",
+  "description": "ANY-631 live acceptance of the code review #5 ProposalAI prompt (compose_persuasive_text.v1.md sha256 f6e696dd..., committed in 02a7f39c): 150 runs through the web form, 2026-10-29. Thresholds come from ANY-631 and its team lead decisions only; a group without an approved threshold stays PENDING. `program` is the mandatory test plan: a series and case planned but missing is PENDING, a run outside it is a corrupt suite. `cases` pins each case as approved (input, literal checks, expected languages and every question): a changed fixture is a corrupt suite until the hash is renewed in its own commit.",
   "orders": [
     "../../qa_cases.json",
     "../../terms.json"
@@ -95,5 +95,21 @@
       "reasoning_effort": "medium",
       "source": "ANY-631 team lead decision, 2026-10-30: strengthened luna/medium series, 10 runs per case, 10/10 usable"
     }
-  ]
+  ],
+  "cases": {
+    "P01": "sha256:f42f06d9cd267f2c707a22f2595e72db180097a164c0a2d4ce7d8ab8a0d58efc",
+    "P02": "sha256:63135837bf1bfb2c5247573203437b5034c982f23568481da261061cac6102d3",
+    "P04": "sha256:2432537348616bfbe74e4d9cff24fa94e979bd595c14713dd9741683eb5ff7aa",
+    "P05": "sha256:fdb2a660c15b1b3a605861bb23dee95262b6b827be039c4ede8e20384c524f5b",
+    "agreed-change-accepted-en": "sha256:c39a6bd151c4c972dcee1fcb49f5093a6d88100b7217b5ec819c9aff22ca6a44",
+    "agreed-confirm-ru": "sha256:aa2e087732eb49ad7192cbbf4355b199b06cd5800562f84144362290d1553e72",
+    "agreed-plus-conflict-es": "sha256:267cc881e622aba37a006db6798f5d617fa6779699369d4a524419c7953dbc39",
+    "ceiling-and-scope-en": "sha256:280c5b7811e85680354b3ab076d4a26b1adde9e494bfefbebc526e298d834665",
+    "ceiling-stays-client-ru": "sha256:06f21717c39fb70e13ddc2530a514d043cf979b8969eb0420accfe45d1086536",
+    "conflict-decline-en": "sha256:2351edd4aa5b3fac8a27b8bce775acf9897501b6237f9440ccaec9cd6cafdc33",
+    "conflict-decline-es": "sha256:9a7d4577cef084e1f7cf869fa85179997bb23a377bda2db25336b9363cbecd78",
+    "counteroffer-en": "sha256:52d0a501db030e6a753aa671ef530c17ff147e7028ce9d269855aa476a77add1",
+    "left-open-en": "sha256:bc9d562023bad70fedd4a4a3a194be4950d6e0b635f33f599bac403e13f467c4",
+    "limit-change-accepted-en": "sha256:e25e0318ef7ee089a06dfb742bff5412035df1c9c0e8861f94f5c6e25ea51846"
+  }
 }
