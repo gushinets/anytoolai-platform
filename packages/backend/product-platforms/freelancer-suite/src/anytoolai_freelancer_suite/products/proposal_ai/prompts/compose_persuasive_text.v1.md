@@ -29,27 +29,57 @@ Scope and conditions from the order:
   included", "no ...", "without ..."). Do not reword an excluded item into a nearby one. When the
   exclusion bears on the offer, state it plainly as outside this work.
 - Keep every limit and condition of the work that the order or the positioning names, with its
-  exact value and its status: the number of revision rounds, what is paid separately, what must be
-  received before work starts (a requirement, never "if available" or "if applicable"), what is out
-  of scope. This is about scope, delivery, price and prerequisites; a limit of the freelancer's
-  experience stays under "Facts" and is not restated. A term the
-  client only requests, or that the order tells you to decline, is never stated as accepted: decline
-  it when the order says so.
+  exact value and its status (see "Terms"): the number of revision rounds, what is paid
+  separately, what must be received before work starts (a requirement, never "if available" or
+  "if applicable"), what is out of scope. This is about scope, delivery, price and prerequisites; a
+  limit of the freelancer's experience stays under "Facts" and is not restated.
 - Do not drop a deliverable the client names (each named block, page, document, item or subject).
-- Amounts and dates the client states are the client's terms. When they belong to the conditions
-  (an agreed price, a budget ceiling, a payment split, a delivery time), restate them exactly and
-  as the client's ("your EUR 300 budget", "the agreed 588 EUR"). This does not make them your
-  offer and does not allow an amount that appears nowhere in the input.
 - These named conditions outrank the word target in "Structure", but `text` never exceeds
   `constraints.length`. Say them briefly inside the paragraphs, still without lists.
 
-Price and terms:
+Terms:
 
-- Do not name an amount, rate, currency, deadline or duration unless it is stated in
-  `context.freelancer_positioning` or is a term the client states in `context.task_text` (see
-  "Scope and conditions from the order").
-- The client's budget or deadline in `context.task_text` is not your offer: do not repeat it as your
-  price, and do not judge it ("reasonable", "fair").
+`context.task_text` is written by the freelancer: it carries the client's request and may also carry
+the freelancer's own decisions about it (see the rule on the freelancer's directions in "Form"). A
+term is a condition of the deal: a price or budget, a payment split, a delivery date or deadline,
+the length of the engagement, a limit such as the number of revision rounds, or a guarantee. What
+the client asks you to deliver is scope, not a term, including its size or length (6 templates, a
+45-minute handover, 600 to 800 characters per card): offer it as your work under "Scope and
+conditions from the order", without calling it proposed or not agreed. This section is the only rule
+for terms and their values. Give each term the status of the first rule below that applies, and make
+that status explicit in the text, never leave it implied by merely restating the term:
+
+1. The freelancer decides it: `context.freelancer_positioning` or the freelancer's own direction in
+   `context.task_text` accepts it, declines it or makes a counteroffer with a concrete value
+   ("accept a second revision round", "decline the EUR 300 budget", "offer EUR 800 for a smaller
+   scope"). Do exactly that: an accepted term is stated as accepted with its exact value, and an
+   accepted change replaces the earlier term; a declined term is refused in so many words ("I do not
+   accept your EUR 300 budget", "no acepto ...", "не принимаю ..."), and calling it a proposal or
+   not agreed is not a refusal; a counteroffer is made with exactly the given value. Only a
+   direction that accepts, declines or counters this very term decides it; a direction that only
+   limits what you may write about it ("do not invent a replacement budget", "do not name a price")
+   does not, so go on to the next rule.
+2. The order says it is agreed, confirmed or settled: restate it exactly and confirm it, never call
+   it proposed, requested or not agreed. A statement of agreement ("the client agreed ...", "клиент
+   согласовал ...", "ya acordó ...") covers every term it introduces, including the terms listed in
+   the sentences after it.
+3. The order says it will be agreed or discussed later: keep it open, as the order puts it, without
+   a value of your own.
+4. The client asks for or offers it and it conflicts with the scope, another term or the order's
+   conditions: say plainly that you do not accept it, naming the term with its exact value ("your
+   USD 500 budget does not cover this scope").
+5. Otherwise, only for a term the order never calls agreed, it is the client's proposal: restate it
+   exactly as the client's and say that it is proposed, not agreed ("your USD 500 budget is your
+   proposal, not an agreed price"); never state it as accepted or as your own offer or price, and do
+   not judge it ("reasonable", "fair").
+
+Values: name an amount, rate, currency, date, deadline or duration only when the input states it,
+as a client's term or as the freelancer's own value (in `context.freelancer_positioning` or in a
+direction under rule 1). Never invent one, and never offer a replacement value that rule 1 does not
+give.
+
+Closing:
+
 - Do not promise an estimate or timeline as a closing formula ("I will confirm the estimate and
   timeline"), and do not say when or how price, cost or timing will be discussed or agreed ("after
   the call we can agree on cost and timing"). Mention them only when the order itself asks for a

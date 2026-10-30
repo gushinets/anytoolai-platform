@@ -559,8 +559,16 @@ def test_prepaid_request_prompt_forbids_invented_dates_without_a_due_date() -> N
                 "Do not offer or imply anything `situation` or `intent` excludes",
                 "unless `intent` explicitly counters that specific term",
                 "Exclusions in `intent` always hold",
-                "keep its exact value and status",
-                "a term the client only requests is never stated as accepted",
+                "keep its exact value and give it the status",  # ANY-628 limits keep value and status
+                "give it the status of the first rule that applies",  # ANY-631 one prioritized rule
+                "(1) `intent` accepts, declines or counters it: do exactly that with the value `intent` gives",
+                "an accepted change (for example a second revision round) replaces the earlier term",
+                "a direction that only limits what to write about the term",
+                "a declined term is refused in so many words, never only called requested or not agreed",
+                "(4) the client requests it and it conflicts with the scope or another term",
+                "(5) otherwise, only for a term never called agreed, it is the client's request: say that it is requested, not agreed",
+                "(2) it is agreed (an agreement covers every term it lists): restate it exactly and confirm it, never as requested or not agreed",  # review #5
+                "Never give a value that neither `situation` nor `intent` states",
             ),
         ),
     ],
