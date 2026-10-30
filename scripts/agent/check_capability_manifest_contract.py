@@ -187,7 +187,7 @@ def main() -> int:
     print("MANIFEST_ARTIFACT_CONTRACT=PASS")
     if args.portal_root is not None:
         print("PORTAL_ARTIFACT_COPY=PASS")
-    print("REAL_HTTP_CONFORMANCE=NOT_RUN_STEP_4")
+    print("REAL_HTTP_CONFORMANCE=NOT_RUN_BY_OFFLINE_CHECK")
     return 0
 
 

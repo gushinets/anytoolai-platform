@@ -591,6 +591,7 @@ project without deleting its PostgreSQL volume; investigate before restarting pr
 Once that marker is in place, an interrupt leaves the stack up. The activation directory
 and marker are non-secret and are published as `0755` and `0644` so the non-root API and worker users
 can read them after a restrictive umask.
+
 Each deployment uses a new immutable profile directory. A failed redeploy leaves the previous
 container bind source intact for restarts; old profiles are removed only after readiness passes.
 The candidate worker verifies its profile but waits for `active-profile` to name its generation
@@ -856,6 +857,33 @@ local API tests do not establish a deployed TLS connection or production commerc
 `create_app(config_root=..., bundles=...)` forwards explicit bundle sequences unchanged to
 `build_runtime`: they replace the default product bundles. Omission or `None` preserves the six
 standard products. Temporary complete configurations can use this seam through the real
-ConfigLoader without mutating global defaults. The real TCP/Portal consumer conformance harness
-and its manual procedures belong to Step 4 of the
-[canonical plan](../../docs/exec-plans/active/ANY-711-implementation-plan.md).
+ConfigLoader without mutating global defaults. The Kernel-owned `manifest-conformance` command
+now verifies this configuration over ephemeral loopback TCP using the unchanged Portal typed
+client in a fresh isolated process. It requires no database, Docker or full Portal/LBX stack.
+
+Prepare the peer from Portal root with `python3.12 scripts/repo.py sync-api` (existing lock,
+root `.venv`, no migrations). From Kernel root:
+
+```bash
+.quick-check-venv/bin/python scripts/agent/runner.py manifest-conformance \
+  --portal-root ../payments-portal \
+  --portal-python ../payments-portal/.venv/bin/python
+```
+
+The automated command generates its own disposable secrets and cleans up its own resources.
+Manual QA uses the same harness: `--mode serve-test` keeps only the real test-configured Kernel
+available; `--mode probe --kernel-base-url http://127.0.0.1:<printed-port>` invokes the isolated
+Portal client with the explicit peer arguments above. Both manual processes require the same
+new disposable `ANY711_CONFORMANCE_TOKEN` in their environments, never in arguments/URLs/logs.
+The [complete secret setup, exact commands and cleanup procedure](../../docs/contracts/kernel-capability-manifest/v1/README.md#manual-isolated-qa)
+also explains the pre-import patches blocking both Portal dotenv paths.
+
+Local automated HTTP, poisoned-dotenv isolation, 92 Portal client/source regressions and manual
+serve/probe/interrupt cleanup passed on 2026-10-29. The producer base is
+`7634eb09533846268a96ade004bca518c580b588` plus the Step 4 diff, consumer
+`2bb07d778edc5ea56011b0034ba24b0702ede81f`. All six products and both approved test metrics
+are checked against the actual loaded registry. Instrumented storage/provider calls remain zero.
+These results prove local code/HTTP interoperability with TEST-ONLY vocabulary; deployed TLS,
+private-zone controls, production commercial approval and financial/paid execution are unproven.
+Full verification results remain in the
+[canonical plan](../../docs/exec-plans/completed/ANY-711-implementation-plan.md).

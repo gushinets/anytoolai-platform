@@ -59,23 +59,15 @@ def test_config_registry_surfaces_provider_policy_and_action_config_fields() -> 
     assert "| " + " | ".join(action_config_fields) + " |" in first
 
     for ref, policy in registry.provider_policies.items():
-        row = (
-            "| "
-            + " | ".join(
-                module._format_field_value(getattr(policy, name)) for name in provider_policy_fields
-            )
-            + " |"
-        )
+        row = "| " + " | ".join(
+            module._format_field_value(getattr(policy, name)) for name in provider_policy_fields
+        ) + " |"
         assert row in first, f"row for provider policy {ref} must render every field, in order"
 
     for ref, config in registry.action_configurations.items():
-        row = (
-            "| "
-            + " | ".join(
-                module._format_field_value(getattr(config, name)) for name in action_config_fields
-            )
-            + " |"
-        )
+        row = "| " + " | ".join(
+            module._format_field_value(getattr(config, name)) for name in action_config_fields
+        ) + " |"
         assert row in first, f"row for action config {ref} must render every field, in order"
 
 

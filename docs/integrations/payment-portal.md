@@ -68,8 +68,22 @@ historical observation, not current enablement authority. Historical simulated f
 above remains unchanged. The [Kernel-owned v1 contract](../contracts/kernel-capability-manifest/v1/README.md)
 now publishes a generated serialization schema, canonical positive/negative fixtures and byte
 checksums. Offline checks retain the Portal positive bytes and independent semantic version,
-and compare resolved standalone/OpenAPI/Portal schema constraints. Actual TCP HTTP interoperability
-with the unchanged Portal client remains Step 4; artifact checks do not establish that result.
+and compare resolved standalone/OpenAPI/Portal schema constraints.
+
+Step 4 now proves real **local** TCP HTTP interoperability: the unchanged Portal typed client
+at `2bb07d778edc5ea56011b0034ba24b0702ede81f` consumes the real Kernel router/middleware,
+ordinary disabled inventory and a complete isolated test-enabled configuration. The producer
+is `feature/ANY-711` at `7634eb09533846268a96ade004bca518c580b588` plus its uncommitted
+Step 4 diff. Six products, both exact metric/owner/unit declarations, `anytoolai/ru`, independent
+digest, auth/scope/rotation, safe failure/retry/recovery, restart/order stability and side-effect-free
+concurrency pass. Poisoned-dotenv isolation, 92 unchanged Portal consumer regressions and manual
+serve/probe/interrupt cleanup also pass. Portal source/artifacts remain unchanged.
+
+See the [reproducible automated/manual procedure and evidence](../contracts/kernel-capability-manifest/v1/README.md#real-kernel--portal-http-conformance).
+The harness starts no database, Portal stack, billing worker, webhook or LBX client and reads no
+working `.env`. `CONFIGURED_SOURCE` describes the client source, not sales approval. This result
+does not relabel the historical SIMULATED evidence above. Actual deployed TLS/private network
+controls, production metric approval and paid-access/usage behavior remain separate gates.
 
 ## Dependencies before real integration
 

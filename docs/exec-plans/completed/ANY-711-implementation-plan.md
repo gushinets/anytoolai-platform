@@ -2,16 +2,16 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: mixed
 - Created: 2026-10-29
-- Last updated: 2026-10-29
-- Review date: 2026-10-29
-- Next action: Step 3 review findings REV-1 and REV-2 are fixed and focused checks pass; await an explicit request for Step 4. Step 4 has not started.
-- Blocker: none for Step 3 implementation. Generated-artifact freshness is restored. Broad quick-check is not green: its run was interrupted after one observed failure, and the unchanged passwordless-sudo test independently fails. Consumer/TCP verification belongs to Step 4.
+- Last updated: 2026-10-30
+- Review date: 2026-10-30
+- Next action: All four functional steps and the owner-requested scope audit are complete. Review feature/ANY-711 and run the original baseline in its intended Linux CI environment. Local passwordless sudo remains unavailable.
+- Blocker: no functional manifest blocker. The unchanged original baseline requires passwordless sudo unavailable on this host; no current full-check PASS is claimed. Deployed TLS/private-zone controls and production commercial approval remain unproven.
 - Development branch: `feature/ANY-711`, created by the owner from Kernel `main`.
 - Review outcome: the accepted design is unchanged; all four accepted review clarifications are incorporated.
-- Canonical plan: `docs/exec-plans/active/ANY-711-implementation-plan.md` in Kernel. Do not create a second independent Portal plan.
+- Canonical plan: `docs/exec-plans/completed/ANY-711-implementation-plan.md` in Kernel. Do not create a second independent Portal plan.
 
 ## 1. Goal & Final Expected Outcome
 
@@ -66,6 +66,9 @@ This outcome does not establish production commercial approval, purchases, paid 
 or usage enforcement.
 
 ## 2. Current State & Reusable Implementation
+
+This section preserves the pre-implementation research snapshot. Actual implementation and
+verification results are recorded under each completed step and the owner-requested rollback/audit.
 
 ### Observed baselines
 
@@ -372,15 +375,15 @@ creation of its local dependency environment during the authorized future verifi
   isolation and canary tests.
 - **Reproducible manual QA and durable handoff:** Step 4 and section 7.
 
-All Functional DoD criteria have a responsible step and verification.
-Runtime verification stays NOT_RUN until implementation and execution actually occur.
+All Functional DoD criteria have a responsible step and verification. Their actual results are
+recorded under the completed steps below; planning-time NOT_RUN entries remain historical evidence.
 
 ## 5. Sequential Implementation Steps
 
 - [x] Step 1 — Declare and validate technical capabilities
 - [x] Step 2 — Serve an authenticated manifest in the trusted RU scope
 - [x] Step 3 — Publish and verify the producer contract
-- [ ] Step 4 — Prove real HTTP interoperability with an isolated Portal client
+- [x] Step 4 — Prove real HTTP interoperability with an isolated Portal client
 
 ### Step 1 — Declare and validate technical capabilities
 
@@ -1337,6 +1340,230 @@ Report the implemented behavior, changed files, verification results, remaining 
 **Proposed commit**
 
 `ANY-711 - Verify isolated real Portal Kernel manifest interoperability`
+
+**Actual Step 4 progress — 2026-10-29**
+
+Baseline rechecked: Kernel `feature/ANY-711` at
+`7634eb09533846268a96ade004bca518c580b588`; Portal `ANY-715` at
+`2bb07d778edc5ea56011b0034ba24b0702ede81f`. Both tracked worktrees were clean before
+implementation. These producer results cover that SHA **plus the uncommitted Step 4 diff**;
+no new commit was created. Portal compatibility matches the approved plan.
+
+Prerequisites:
+
+- System `python3` cannot import `tomllib`; the prepared Kernel managed Python is 3.12.13.
+  `.quick-check-venv/bin/python scripts/agent/runner.py doctor`: **PASS**.
+- From Portal root, `python3.12 scripts/repo.py sync-api`: **PASS**, using its existing lock
+  and root `.venv`. No Portal source/lock/artifact changes, `apps/api/.venv`, migration,
+  database or full stack were needed.
+- The first sandboxed TCP attempt was **BLOCKED** by socket creation permissions. The
+  authorized local verification was then run outside that sandbox. An initial sandboxed
+  TestClient regression run was interrupted without a result and rerun outside sandbox.
+  Neither attempt is counted as PASS.
+
+Implemented only in Kernel:
+
+- `runner.py manifest-conformance` dispatches to the new bounded harness, with required
+  explicit peer root/interpreter for consumer operations and no fallback peer environment.
+- `manifest_producer.py` loads ordinary composition separately, makes complete temporary
+  kernel/five-product-root copies for enabled/order/material/invalid scenarios, and uses
+  `create_app`, real build_runtime/ConfigLoader, router/middleware and loopback TCP. It
+  verifies later omitted/None default composition remains unchanged.
+- `manifest_consumer.py` loads the existing stdlib test helper before the first Portal
+  settings/client import. Allowlisted processes inherit no application/provider/DB/LBX/SMTP/
+  Sentry credentials. Scoped patches block explicit dotenv loading and force `_env_file=None`
+  through the original BaseSettings constructor. Read guards reject working dotenv content
+  access in both producer and consumer. The synthetic poisoned-file regression spies on both
+  paths, verifies safe singleton/explicit settings and no LBX client, and exercises the read
+  tripwires. Original Settings validation and Portal client code are unchanged.
+- Healthy probes use real HTTP and the existing source/preflight/client lifecycle. Producer
+  failure injection changes only its registry dependency; malformed payload injections remain
+  in separately labelled existing consumer regressions. Instrumentation rejects storage,
+  engine/session or ProviderGateway access.
+- Added environment-only-token `serve-test`/`probe` modes, failure cleanup and safe diagnostics;
+  added DB-free safety regressions to quick-check. The offline artifact checker now reports
+  `NOT_RUN_BY_OFFLINE_CHECK`, avoiding a stale global Step 4 status.
+- Updated contract/integration/deployment procedures with exact automated/manual commands,
+  private disposable-token transfer/cleanup, observed SHAs, evidence and remaining gates.
+  Historical SIMULATED evidence and ordinary checked-in disabled config remain unchanged.
+
+Actual verification:
+
+```bash
+.quick-check-venv/bin/python scripts/agent/runner.py manifest-conformance \
+  --portal-root ../payments-portal --portal-python ../payments-portal/.venv/bin/python
+.quick-check-venv/bin/python -m pytest -o addopts= -q \
+  apps/platform-api/tests/test_capability_manifest.py \
+  apps/platform-api/tests/test_capability_manifest_contract.py \
+  apps/platform-api/tests/test_capability_projection.py \
+  apps/platform-api/tests/test_bundle_composition.py \
+  tests/architecture/test_bundle_composition_parity.py tests/test_manifest_conformance.py
+.quick-check-venv/bin/python -m pytest -o addopts= -q \
+  tests/test_manifest_conformance.py tests/test_docs_generation.py \
+  tests/test_validate_docs.py tests/test_quick_check.py
+.quick-check-venv/bin/python -m pytest -o addopts= -q tests/test_manifest_conformance.py
+.quick-check-venv/bin/python scripts/agent/runner.py full-check
+.quick-check-venv/bin/python scripts/agent/runner.py validate-docs
+.quick-check-venv/bin/python scripts/agent/runner.py generate-docs --check
+.quick-check-venv/bin/python scripts/agent/check_capability_manifest_contract.py --portal-root ../payments-portal
+```
+
+- Final automated harness: **PASS**. Real TCP verifies six products and both exact
+  metric/owner/unit declarations, `anytoolai/ru`, references and independent digest. Ordinary
+  output matches `sha256:478761c681d02330ed052aabe5e1b472dc1c2ee56d79a568a8009f4b4503a694`;
+  enabled output matches the unchanged positive pin
+  `sha256:a39bac9f210a6ac67e97e117f8481a5954dc3f36bdaab2fd54c7522b27d6ec29`.
+  Material metric disablement produces
+  `sha256:46c39e140370c19d0f4dc3914996672cd8bcb080d735a2b27cffbd842fbba221`.
+- Authentication/scope/browser refusal, current+previous overlap, revoked-token rejection
+  after process restart, safe correlated 500/no partial 200, bounded retry/exhaustion/recovery,
+  invalid startup refusal, changed timestamps, root order, fresh-process version stability and
+  eight concurrent typed reads: **PASS**. Instrumented storage/provider call counts: **0**.
+- Poisoned dotenv/read-spy regression: **PASS**. Existing Portal
+  `test_kernel_manifest_client.py` + `test_source_composition.py`, executed through the same
+  pre-import bootstrap in the final automated run: **PASS — 92 passed in 4.31s**. No skips.
+- Manual `serve-test` + `probe` using the same disposable environment-only secret, followed
+  by interrupt/owned-process cleanup: **PASS**. A local driver invoked the exact runner modes
+  above in separate subprocesses, checked the positive inventory/digest and token absence from
+  stdout/stderr, then interrupted only its newly created process group. No shared service stopped.
+- Focused producer/contract/composition/harness suite: **PASS — 138 passed in 49.14s**.
+  Docs/generation/quick-check/harness suite: **PASS — 50 passed in 20.11s**.
+  After adding three final origin/diagnostic safety cases, the harness suite was rerun:
+  **PASS — 19 passed in 0.50s** after the final cleanup/portability review fixes.
+- The frontend and product-suite stages that the failing sequential baseline cannot reach
+  were run independently: `.quick-check-venv/bin/python scripts/agent/runner.py frontend-check`
+  **PASS** (lint, typecheck, tests including Chromium, generated API type drift and builds);
+  `.quick-check-venv/bin/python -m pytest -o addopts= -q packages/backend/product-platforms/freelancer-suite/tests`
+  **PASS — 211 passed in 14.55s**.
+- Ruff check/format for all new Python modules/tests and the changed offline checker:
+  **PASS**. Existing runner/quick-check formatting outside changed lines was preserved.
+- Standalone docs validation, generated freshness, real read-only Portal artifact-copy/schema/
+  checksum/digest check and `git diff --check`: **PASS**. Optional LiteLLM cost-map lookup in
+  sandbox fell back to its bundled map; the HTTP harness explicitly uses the local map.
+- Canonical full-check with the original baseline: **FAIL — 1 failed, 2916 passed, 486 deselected, 1 warning in
+  1624.52s (27:04)**. The only failure is unchanged
+  `tests/test_runner.py::test_activation_marker_is_readable_by_non_root_api_user`:
+  `sudo: a password is required` when running as `nobody`. An independent focused rerun
+  reproduced **1 failed in 0.30s** for the same environment requirement. No sudo policy or
+  unrelated activation code/test was changed, and this failure was not skipped or hidden.
+  Config, architecture, docs and generated freshness gates in the baseline pass. The
+  `not slow` selection deselected 486 tests; no success is claimed for them. The warning
+  is from the existing LiteLLM/Pydantic TypedDict ReadOnly contract. Because full-check
+  short-circuits on this baseline failure, frontend and product-suite stages were verified
+  separately as recorded above. The final harness safety changes were additionally verified
+  by the final 19-case suite and the final real-HTTP run; this initial run did not establish a full-check PASS.
+
+Final semantic/diff review checked the actual producer path, complete config copies, unchanged
+consumer validation/default composition, both dotenv boundaries, credential redaction, bounded
+owned-resource cleanup, artifact freshness and preservation of peer/unrelated files. Review fixes
+give the parent ownership of child scratch directories so they are removed even after forced
+termination, and model venv path resolution without requiring Windows symlink privileges in CI.
+Timeout/readiness-failure regressions verify scratch removal. No feature findings remain.
+No runtime API/Core/SDK/config/dependency/schema change was required in Step 4.
+
+Operational limits: PostgreSQL, atoms-proof and production Compose smoke were **NOT_RUN** for
+this DB-free harness change; their actual disposable-resource/CI gates remain. Deployed TLS and
+private-zone network controls are **NOT_RUN**; production metric/commercial approval and paid
+financial/execution/usage behavior are **NOT_ESTABLISHED**. Local CONFIGURED_SOURCE provenance
+does not promote historical SIMULATED mappings. No staging, commit, push, branch switch,
+merge/rebase, deployment, external financial operation or subsequent implementation step.
+
+**Withdrawn local-environment workaround — 2026-10-29; reversed 2026-10-30**
+
+The follow-up workaround split the original real-UID test into unprivileged mode checks and a
+separate root-only CI command. The owner subsequently requested its complete reversal because
+this changed an unrelated deployment gate to accommodate the local sudo policy. The original
+check is intentional: the non-root API/worker must read the operator-owned activation marker.
+It skips on Windows; the original PR #148 passed Ubuntu baseline and full-check in
+[GitHub Actions](https://github.com/gushinets/anytoolai-platform/actions/runs/36241685294).
+
+The withdrawn version had a successful local full-check (2925 backend tests, 88 Chromium tests,
+211 product tests), but omitted real cross-UID execution locally. That result applies only to the
+withdrawn test arrangement and does **not** establish a PASS for the restored baseline. The
+original environment-dependent failure recorded above remains the applicable full-check result.
+No sudo policy, system permissions or production activation behavior was changed.
+
+**Owner-requested rollback and four-step scope audit — 2026-10-30**
+
+- Review baseline: main/merge-base `3c639c0a7de53c54cb6ce88e56a5813b73e76739`;
+  branch `feature/ANY-711`, HEAD `7634eb09533846268a96ade004bca518c580b588`, plus the
+  uncommitted Step 4 diff. The review includes committed Steps 1–3 and local Step 4 files.
+- P1-1 (non-blocking scope expansion): **RESOLVED**. Restored `tests/test_runner.py` and
+  `.github/workflows/backend.yml` byte-for-byte to HEAD/main. Removed only the added
+  `activation-permissions-check` function/dispatch, its three harness tests and deployment
+  instructions. The original sudo test remains in the ordinary baseline, without new markers,
+  skips or ignored failures. Kept the Step 4 manifest harness and its runner entry point.
+- The completed-plan location records functional completion of the four approved steps;
+  it does not imply all local, CI or production gates passed. Canonical links remain valid.
+- P1-2 (non-blocking diff noise): **RESOLVED**. Reverted six unrelated formatting hunks in
+  the config loader, its unit tests and docs-generation tests to main's formatting. AST
+  comparison against HEAD confirms these reversions have no semantic effect.
+
+Four-step audit results against main:
+
+- **Step 1:** Core/SDK declarations, strict loader checks and registry freezing implement
+  the approved explicit capability vocabulary. Parsed comparison of all six product YAMLs
+  proves their existing contents are unchanged after removing the two new capability fields;
+  all new admission/metric flags remain false. No guest quota/provider/runtime policy changed.
+- **Step 2:** RU defaults, shared trusted scope, factory bundle forwarding, scoped service
+  auth and internal CORS/cache behavior are explicit plan requirements. AST comparison of
+  all eleven changed pre-existing API test modules/conftest proves their only semantic edit
+  is `default` to `ru`; assertions, markers and control flow are preserved. Activation,
+  worker, migration and durable storage behavior were not rewritten.
+- **Step 3:** Generated OpenAPI retains every old path and component schema unchanged;
+  only the manifest route and its three DTO schemas are added. Contract/schema checks and
+  independent fixture pins remain strict. The explicit date-time validation compensates for
+  jsonschema's optional format dependency by rejecting invalid input, with negative tests;
+  it does not skip or accept an unverified payload. No dependency/lock or existing gate changed.
+- **Step 4:** dotenv/settings patches, disabled plugin autoload, synthetic settings, local
+  cost-map selection and side-effect guards stay within new, isolated harness processes.
+  They implement the approved pre-import isolation and DB-free conformance requirements.
+  Healthy reads use the actual application factory/config/registry/router over TCP and the
+  unchanged Portal typed client. Fault injection changes only the test dependency. No working
+  dotenv, Portal source, checked-in enabled config or shared service is modified.
+- Cross-cutting check: `.github/`, lockfiles, project dependency configuration, Docker images,
+  worker sources and the existing architecture/config validators have no diff from main.
+  The quick-check change only adds the new harness safety test target; its selection and
+  failure handling are unchanged. Runner retains only the planned manifest command addition.
+  No additional environment workarounds or weakened existing gates were found in this scope.
+
+Post-rollback verification (managed Kernel Python 3.12.13; no dependencies/tooling changed):
+
+```bash
+LITELLM_LOCAL_MODEL_COST_MAP=True .quick-check-venv/bin/python -m pytest -o addopts= -q \
+  packages/backend/platform-core/tests/unit/test_config_loader.py \
+  packages/backend/platform-core/tests/test_contract_field_compatibility.py \
+  packages/backend/platform-sdk/tests/test_contracts_importable.py \
+  apps/platform-api/tests/test_capability_projection.py \
+  apps/platform-api/tests/test_capability_manifest.py \
+  apps/platform-api/tests/test_capability_manifest_contract.py \
+  apps/platform-api/tests/test_bundle_composition.py \
+  tests/architecture/test_bundle_composition_parity.py \
+  tests/test_manifest_conformance.py tests/test_docs_generation.py \
+  tests/test_validate_docs.py tests/test_validate_configs.py tests/test_quick_check.py
+.quick-check-venv/bin/python scripts/agent/runner.py manifest-conformance \
+  --portal-root ../payments-portal --portal-python ../payments-portal/.venv/bin/python
+LITELLM_LOCAL_MODEL_COST_MAP=True .quick-check-venv/bin/python -m pytest -o addopts= -q \
+  tests/test_runner.py::test_activation_marker_is_readable_by_non_root_api_user
+```
+
+- Focused suite: **PASS — 362 passed in 100.13s**, no skips or deselection.
+- Real TCP ordinary/test/reordered/material, scope/auth/rotation/revocation, safe failure,
+  retry/recovery, restart/concurrency, invalid configuration and dotenv isolation: **PASS**.
+  Actual Portal regressions: **92 passed in 4.12s**, no skips. Instrumented side-effect calls: **0**.
+- Original restored sudo test: **FAIL — 1 failed in 0.34s**, outside sandbox,
+  `sudo: a password is required`. The test is byte-identical to main and is neither excluded
+  from the canonical baseline nor replaced. This is the expected local environment limitation.
+- `doctor`, `validate-configs`, `validate-architecture`, `validate-docs`,
+  `generate-docs --check`, read-only Portal artifact comparison and new-module Ruff/format:
+  **PASS**. Rollback-boundary comparisons and `git diff --check`: **PASS**.
+- Full-check was **NOT_RERUN** after rollback: the exact restored failure above already
+  prevents a green local result. Earlier frontend/product results remain historical; their
+  implementation is unchanged. No new CI, privileged UID, PostgreSQL/Compose/atoms smoke,
+  deployed TLS or commercial-approval PASS is claimed.
+- Final review preserves the Step 4 feature work and completed canonical-plan links. Portal
+  remains clean at `2bb07d778edc5ea56011b0034ba24b0702ede81f`. Branch/HEAD and empty index
+  are preserved; no stage, commit, push, branch switch, merge/rebase or deployment.
 
 ## 6. Final Verification & Review
 

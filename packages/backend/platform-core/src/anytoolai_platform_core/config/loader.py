@@ -671,7 +671,9 @@ class ConfigLoader:
         missing = [
             name
             for name in required
-            if not (data.get(name) is not None if name in not_none_fields else bool(data.get(name)))
+            if not (
+                data.get(name) is not None if name in not_none_fields else bool(data.get(name))
+            )
         ]
         if missing:
             raise InvalidConfigShapeError(

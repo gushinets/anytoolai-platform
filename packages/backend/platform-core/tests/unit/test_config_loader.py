@@ -426,7 +426,9 @@ def test_loader_rejects_duplicate_handoff_mapping_target_with_identity(
         "      summary.title: artifact.content_json.title",
         "      summary.title: artifact.content_json.fields",
     ]
-    other_field_name = "preview_mapping" if field_name == "context_mapping" else "context_mapping"
+    other_field_name = (
+        "preview_mapping" if field_name == "context_mapping" else "context_mapping"
+    )
     valid_mapping = [
         f"    {other_field_name}:",
         "      title: artifact.content_json.title",
@@ -529,9 +531,7 @@ def test_loader_accepts_non_conflicting_handoff_mapping_siblings(
     assert getattr(handoff, field_name) == sibling_mapping
 
 
-def test_handoff_smoke_source_scenario_guarantees_deadline_field_regardless_of_caller_input() -> (
-    None
-):
+def test_handoff_smoke_source_scenario_guarantees_deadline_field_regardless_of_caller_input() -> None:
     registry = ConfigLoader(CONFIG_ROOT).load()
 
     scenario = registry.get_scenario("kernel_demo.handoff_smoke_source_v1")
@@ -549,9 +549,7 @@ def test_handoff_smoke_source_scenario_guarantees_deadline_field_regardless_of_c
         input_mapping=step.input_mapping,
         scenario_input={
             "source_text": "irrelevant caller text",
-            "fields": [
-                {"name": "unrelated", "type": "string", "description": "x", "required": False}
-            ],
+            "fields": [{"name": "unrelated", "type": "string", "description": "x", "required": False}],
             "strict": False,
         },
         step_outputs={},
