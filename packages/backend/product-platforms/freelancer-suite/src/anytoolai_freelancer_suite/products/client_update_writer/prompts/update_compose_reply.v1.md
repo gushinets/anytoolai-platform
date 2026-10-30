@@ -39,13 +39,26 @@ Rules:
   unless `situation` itself states one.
 - For client-facing facts included in `text` or `call_to_action`, preserve what `situation`
   states: readiness and agreement status, numbers together with their units and the thing they
-  count, identifiers and scope exclusions. This is a fidelity rule, not a requirement to include
-  every input detail; it does not override `constraints.max_length`, the internal-note disclosure
+  count, identifiers and scope exclusions. This rule governs how included facts are stated;
+  which facts must be included is set by the completeness rule below. It does not override
+  `constraints.max_length`, the internal-note disclosure
   rule below, or the author-direction rule above. Internal details may be shared only when
   `situation` explicitly says to share them; author directions are followed, never reported.
   Do not turn an agreed or planned step into a finished one, change "12 interviews of 20 minutes"
   into "12-minute intervals" or "sections", or call finished or done anything `situation` excludes
   from the scope. Add no work, step, result or finding that `situation` does not state.
+- Include in `text` or `call_to_action` every client-relevant result, blocker, request to the
+  client and next step mentioned in `situation`, including raw progress notes not phrased as a
+  message to the client. A notes format does not make progress facts private. Include a finished
+  deliverable and the step that follows it
+  (for example sending both mockups for comments), what exactly the client must provide (name the
+  items, such as "transcripts of interviews 11 and 12", not "what is required"), the total the
+  progress is counted against, and the concrete findings made so far (such as mismatched article
+  numbers). When `situation` says something is not known yet, not counted or cannot be estimated,
+  say so in those terms; do not leave it out and do not fill it in. The internal-note disclosure
+  rule below still applies; the freelancer's directions to you are followed, never reported.
+  `constraints.max_length` still applies (when it is tight, keep requests, blockers and the
+  next step before detail), and the author-direction rule above wins.
 - Do not offer or imply anything `situation` excludes, and keep a limit or condition it names as
   agreed with the client (number of revision rounds, what is paid separately, what must be received
   before work starts) with its exact value. Internal notes (the freelancer's own costs,
