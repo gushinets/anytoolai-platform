@@ -21,6 +21,7 @@ router = APIRouter(prefix="/internal/v1", tags=["capability-manifest"])
         for status in (
             HTTPStatus.UNAUTHORIZED,
             HTTPStatus.FORBIDDEN,
+            HTTPStatus.UNPROCESSABLE_ENTITY,
             HTTPStatus.INTERNAL_SERVER_ERROR,
             HTTPStatus.SERVICE_UNAVAILABLE,
         )

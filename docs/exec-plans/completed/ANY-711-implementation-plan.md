@@ -7,8 +7,8 @@
 - Created: 2026-10-29
 - Last updated: 2026-10-30
 - Review date: 2026-10-30
-- Next action: All four functional steps and the owner-requested scope audit are complete. Review feature/ANY-711 and run the original baseline in its intended Linux CI environment. Local passwordless sudo remains unavailable.
-- Blocker: no functional manifest blocker. The unchanged original baseline requires passwordless sudo unavailable on this host; no current full-check PASS is claimed. Deployed TLS/private-zone controls and production commercial approval remain unproven.
+- Next action: P1-3/P1-4/P1-5 are corrected and focused working-tree verification passed; rerun required CI after publication. Local passwordless sudo remains unavailable.
+- Blocker: local full-check requires unavailable passwordless sudo; the isolated full PostgreSQL run also exposed the unchanged worker test's six-second startup assumption. No current full-check or native Windows PASS is claimed. Deployed TLS/private-zone controls and production commercial approval remain unproven.
 - Development branch: `feature/ANY-711`, created by the owner from Kernel `main`.
 - Review outcome: the accepted design is unchanged; all four accepted review clarifications are incorporated.
 - Canonical plan: `docs/exec-plans/completed/ANY-711-implementation-plan.md` in Kernel. Do not create a second independent Portal plan.
@@ -1564,6 +1564,63 @@ LITELLM_LOCAL_MODEL_COST_MAP=True .quick-check-venv/bin/python -m pytest -o addo
 - Final review preserves the Step 4 feature work and completed canonical-plan links. Portal
   remains clean at `2bb07d778edc5ea56011b0034ba24b0702ede81f`. Branch/HEAD and empty index
   are preserved; no stage, commit, push, branch switch, merge/rebase or deployment.
+
+**Post-review corrections — 2026-10-30**
+
+The owner authorized applying the jointly verified remediation after the correctness,
+architecture and DoD passes against `main`. Starting point: clean `feature/ANY-711`,
+HEAD `e627bf296a6476efcca839a0328cf1a5683555e2`, merge-base
+`3c639c0a7de53c54cb6ce88e56a5813b73e76739`. This is a narrow follow-up to the same
+canonical plan; the four implemented steps and accepted scope remain unchanged.
+
+- [x] **P1-3:** align `assert_scenario_runtime_correlation` with the trusted RU baseline.
+  Its two callers already create RU identities/scenarios. Preserve every correlation assertion.
+- [x] **P1-4:** add an anchored LF rule for the canonical `valid-manifest.digest`.
+  Preserve fixture/pin bytes, semantic versions and strict checksum verification.
+- [x] **P1-5:** explicitly declare `422 ErrorResponse` on the manifest route and regenerate
+  OpenAPI/CE-kit types. Cover both missing query fields with real HTTP-envelope/OpenAPI
+  regression assertions.
+- [x] Verify the applied working-tree corrections and record actual results below.
+
+Before application, a disposable copy of this exact HEAD proved the combined five-file patch:
+12 affected real PostgreSQL API/worker cases, 130 focused tests, strict Git Windows-style
+checkout filters, generated-artifact checks, TypeScript and real Kernel/unchanged Portal TCP
+conformance (92 Portal regressions, zero instrumented side-effect calls) passed. OpenAPI changed
+only the manifest 422 description/schema reference; all success/component schemas and canonical
+fixture bytes were identical. These are pre-application results, not a new CI run.
+
+The disposable full `postgresql-check` had 485 passed and one unrelated worker-entrypoint
+failure. After preparing that copy's normal frozen-lock worker environment, the existing test's
+fixed six-second delay still preceded readiness. A separate unmodified real uv/worker probe
+observed DB readiness at 8.68 seconds; SIGTERM then exited with code 0 and closed its connections.
+No worker, test timing, sudo policy, workflow, marker or skip was changed for these corrections.
+Native Windows/required CI must rerun after publication; deployed TLS/commercial gates remain
+separate. Portal source and its independent contract artifacts remain read-only.
+
+Applied working-tree verification on 2026-10-30:
+
+- **PASS:** `runner.py doctor`, `generate-docs`, `generate-docs --check`, `validate-docs`,
+  offline manifest/Portal contract-copy checker, generated CE-kit type freshness, TypeScript
+  `tsc --noEmit` with CE-kit's unchanged tsconfig, and Ruff check/format for the changed API modules.
+- **PASS — 132 passed, no skips/deselection:** manifest API, contract and projection tests,
+  docs-generation tests and manifest-harness safety tests. Includes both new missing-query
+  HTTP/OpenAPI regression cases for P1-5.
+- **PASS — 12 passed, no skips/deselection:** `test_atom_runtime_matrix.py::test_atom_runtime_matrix`
+  and `test_scenario_runtime_api.py::test_start_then_real_worker_execution_preserves_a12_runtime_correlation`,
+  using only a newly owned ephemeral PostgreSQL 18 instance. Container/tmpfs data were removed.
+- **PASS:** canonical `manifest-conformance --portal-root ../payments-portal --portal-python
+  ../payments-portal/.venv/bin/python`: ordinary/test/reordered/material responses, auth/scope,
+  rotation/revocation, failure/retry/recovery, restart/concurrency, zero instrumented storage/provider
+  calls and **92 unchanged Portal regression tests**.
+- **PASS:** real Git `core.autocrlf=true` filters retain canonical fixture bytes and strict checksums.
+  All five fix/artifact files match the previously verified candidate byte-for-byte. The OpenAPI
+  delta is confined to this operation's 422 description/reference; all component/success schemas
+  and independent contract fixture bytes are preserved.
+- Full local quick-check/full-check, full PostgreSQL gate and native Windows/remote CI were
+  **NOT_RERUN** after application. Prior broad results and their sudo/worker-startup limitations
+  remain explicit above. No existing test/gate was weakened or excluded to obtain these results.
+- Final whitespace check passed. Changes remain unstaged in the same branch; no commit, push,
+  deployment or shared database operation. Portal remains clean at the same inspected SHA.
 
 ## 6. Final Verification & Review
 

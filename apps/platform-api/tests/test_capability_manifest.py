@@ -18,6 +18,7 @@ from anytoolai_platform_api import bootstrap, main
 from anytoolai_platform_api.dependencies import get_config_registry
 from anytoolai_platform_api.main import create_app
 from anytoolai_platform_api.manifest_auth import PortalPrincipal, authenticate_portal
+from anytoolai_platform_api.schemas import ErrorResponse
 from anytoolai_platform_api.settings import Settings
 from anytoolai_platform_core.config.errors import RegistryLoadError
 from anytoolai_platform_core.identity.repository import GuestIdentityRepository
@@ -469,6 +470,22 @@ def test_openapi_declares_named_models_and_bearer_auth() -> None:
         "/CapabilityManifestResponse"
     )
     assert TOKEN not in json.dumps(schema)
+
+
+@pytest.mark.parametrize("url", [PATH + "?tenant_id=anytoolai", PATH + "?region=ru"])
+def test_query_validation_error_matches_openapi_error_contract(url: str) -> None:
+    client = client_for_app()
+    response = read(client, url=url, headers={"X-Request-ID": "req_manifest_validation"})
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    ErrorResponse.model_validate(response.json())
+    assert response.json()["error"]["code"] == "request_validation_failed"
+    assert response.headers["X-Request-ID"] == "req_manifest_validation"
+    assert response.headers["Cache-Control"] == "no-store"
+    operation = client.app.openapi()["paths"][PATH]["get"]
+    assert operation["responses"]["422"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ErrorResponse"
+    }
 
 
 def test_compose_receiver_secrets_are_api_only_and_prod_keeps_loopback() -> None:
