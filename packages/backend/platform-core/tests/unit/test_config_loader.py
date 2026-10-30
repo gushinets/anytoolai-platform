@@ -124,6 +124,160 @@ def test_loader_builds_registry_from_current_tree() -> None:
         registry.products["another"] = product
 
 
+@pytest.mark.parametrize("field", ["commercial_admission_enabled", "usage_metrics"])
+def test_loader_requires_explicit_capability_fields(tmp_path: Path, field: str) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products/kernel_demo/product.yaml"
+    data = _load_yaml(path)
+    del data[field]
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    assert any(
+        isinstance(error, InvalidConfigShapeError)
+        and error.file_path == path
+        and error.config_id == "kernel_demo"
+        and field in error.message
+        for error in exc_info.value.errors
+    )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("product_id", "   "),
+        ("product_id", 123),
+        ("product_id", True),
+        ("product_id", b"kernel_demo"),
+        ("commercial_admission_enabled", "false"),
+        ("commercial_admission_enabled", 0),
+        ("commercial_admission_enabled", []),
+        ("usage_metrics", {}),
+        ("usage_metrics", "metric"),
+        ("usage_metrics", ["metric"]),
+        ("usage_metrics", [None]),
+        ("usage_metrics", [{}]),
+        ("usage_metrics", [{1: False, "other": True}]),
+    ],
+)
+def test_loader_rejects_invalid_capability_fields(
+    tmp_path: Path, field: str, value: object
+) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products/kernel_demo/product.yaml"
+    data = _load_yaml(path)
+    data[field] = value
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    assert any(
+        isinstance(error, InvalidConfigShapeError) and error.file_path == path
+        for error in exc_info.value.errors
+    )
+
+
+@pytest.mark.parametrize("field", ["commercial_admission_enabled", "usage_metrics"])
+def test_loader_rejects_null_capability_fields(tmp_path: Path, field: str) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products/kernel_demo/product.yaml"
+    data = _load_yaml(path)
+    data[field] = None
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    assert any(
+        isinstance(error, InvalidConfigShapeError) and field in error.message
+        for error in exc_info.value.errors
+    )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("metric_key", ""),
+        ("metric_key", " \n "),
+        ("metric_key", 123),
+        ("metric_key", False),
+        ("metric_key", b"demo.test_units"),
+        ("unit", ""),
+        ("unit", "\t"),
+        ("unit", 1),
+        ("unit", True),
+        ("unit", b"unit"),
+        ("enabled", "true"),
+        ("enabled", 1),
+        ("enabled", None),
+        ("product_id", "other_product"),
+        ("unexpected", False),
+    ],
+)
+def test_loader_rejects_invalid_usage_metric_declarations(
+    tmp_path: Path, field: str, value: object
+) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products/kernel_demo/product.yaml"
+    data = _load_yaml(path)
+    metric = {"metric_key": "demo.test_units", "unit": "unit", "enabled": False}
+    metric[field] = value
+    data["usage_metrics"] = [metric]
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    assert any(
+        isinstance(error, InvalidConfigShapeError)
+        and error.file_path == path
+        and error.config_id == "kernel_demo"
+        for error in exc_info.value.errors
+    )
+
+
+@pytest.mark.parametrize("missing", ["metric_key", "unit", "enabled"])
+def test_loader_requires_every_usage_metric_field(tmp_path: Path, missing: str) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products/kernel_demo/product.yaml"
+    data = _load_yaml(path)
+    metric = {"metric_key": "demo.test_units", "unit": "unit", "enabled": False}
+    del metric[missing]
+    data["usage_metrics"] = [metric]
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    assert any(
+        isinstance(error, InvalidConfigShapeError) and missing in error.message
+        for error in exc_info.value.errors
+    )
+
+
+def test_loader_rejects_duplicate_disabled_metrics_within_one_product(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products/kernel_demo/product.yaml"
+    data = _load_yaml(path)
+    metric = {"metric_key": "demo.test_units", "unit": "unit", "enabled": False}
+    data["usage_metrics"] = [metric, dict(metric)]
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    assert any(
+        isinstance(error, DuplicateConfigIdError)
+        and error.ref_type == "metric_key"
+        and error.first_file == path
+        and error.second_file == path
+        for error in exc_info.value.errors
+    )
+
+
 @pytest.mark.parametrize(
     ("field", "value", "message"),
     [

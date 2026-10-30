@@ -3072,6 +3072,13 @@ def prod_smoke() -> int:
     return run([sys.executable, "scripts/agent/kernel_demo_smoke.py", api_url])
 
 
+def manifest_conformance(argv: Sequence[str] = ()) -> int:
+    try:
+        return run([quick_check_python(), "scripts/agent/manifest_conformance.py", *argv])
+    except KeyboardInterrupt:
+        return 130
+
+
 COMMANDS = {
     "doctor": doctor,
     "validate-configs": validate_configs,
@@ -3092,6 +3099,7 @@ COMMANDS = {
     "dev-smoke": dev_smoke,
     "atoms-proof": atoms_proof,
     "live-canary": live_canary,
+    "manifest-conformance": manifest_conformance,
     "client-handoff-smoke": client_handoff_smoke,
     "proposal-ai-smoke": proposal_ai_smoke,
     "client-update-writer-smoke": client_update_writer_smoke,
@@ -3166,8 +3174,11 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments and arguments[0] == "manifest-conformance":
+        return manifest_conformance(arguments[1:])
     try:
-        args = parse_args(sys.argv[1:] if argv is None else argv)
+        args = parse_args(arguments)
     except SystemExit as exc:
         return int(exc.code)
     if args.product is not None or args.quota_mode is not None:

@@ -4,6 +4,8 @@ import importlib.util
 import json
 from pathlib import Path
 
+from anytoolai_platform_api.schemas import CapabilityManifestResponse
+
 
 def load_module():
     path = Path(__file__).resolve().parents[1] / "scripts" / "agent" / "docs_generation.py"
@@ -22,9 +24,9 @@ def test_generated_documents_are_deterministic_and_source_marked() -> None:
     assert first == second
     assert set(first) == set(module.GENERATED_SOURCES)
     for name, content in first.items():
-        if name == "openapi.json":
-            # Raw OpenAPI schema consumed by openapi-typescript codegen: must stay valid JSON,
-            # so it carries no human-readable header.
+        if name.endswith(".json"):
+            assert isinstance(json.loads(content), dict)
+            assert "Generated file. Do not edit by hand." not in content
             continue
         assert "Generated file. Do not edit by hand." in content
         assert module.GENERATED_SOURCES[name] in content
@@ -89,6 +91,36 @@ def test_openapi_json_is_valid_and_matches_the_live_schema() -> None:
 
     assert "/v1/products/{product_id}/runtime-config" in schema["paths"]
     assert schema == build_openapi_schema()
+
+
+def test_manifest_schema_matches_serialization_model_and_openapi_success() -> None:
+    checker_path = (
+        Path(__file__).resolve().parents[1] / "scripts/agent/check_capability_manifest_contract.py"
+    )
+    spec = importlib.util.spec_from_file_location("manifest_checker", checker_path)
+    assert spec is not None and spec.loader is not None
+    checker = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(checker)
+
+    documents = load_module().render_documents()
+    schema = json.loads(documents["capability-manifest-v1.schema.json"])
+    assert schema == {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        **CapabilityManifestResponse.model_json_schema(mode="serialization"),
+    }
+    openapi = json.loads(documents["openapi.json"])
+    operation = openapi["paths"]["/internal/v1/capability-manifest"]["get"]
+    success = operation["responses"]["200"]["content"]["application/json"]["schema"]
+    assert success == {"$ref": "#/components/schemas/CapabilityManifestResponse"}
+    assert checker.resolve_schema(schema, schema) == checker.resolve_schema(success, openapi)
+    assert operation["security"] == [{"PortalServiceBearer": []}]
+    assert {item["name"] for item in operation["parameters"]} == {"tenant_id", "region"}
+
+
+def test_all_generated_documents_are_fresh() -> None:
+    root = Path(__file__).resolve().parents[1]
+    for name, rendered in load_module().render_documents().items():
+        assert (root / "docs/generated" / name).read_bytes() == rendered.encode("utf-8"), name
 
 
 def test_openapi_exposes_closed_enums_for_the_boundary_fields() -> None:

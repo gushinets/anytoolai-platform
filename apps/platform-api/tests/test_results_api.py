@@ -45,7 +45,7 @@ def _seed_result(
     session,
     *,
     tenant_id: str = "anytoolai",
-    region: str = "default",
+    region: str = "ru",
     artifact_type: str = "structured_output",
     action_run_id: str | None = None,
     content_json: Any = None,

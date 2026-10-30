@@ -105,7 +105,7 @@ def test_postgresql_demo_daily_gate_rejects_fifty_first_utc_run(
                 ScenarioSessionRecord(
                     id=f"scenario_session_demo_pg_daily_{index}",
                     tenant_id="anytoolai",
-                    region="default",
+                    region="ru",
                     product_id="kernel_demo",
                     frontend_id="web_mirror",
                     scenario_id="kernel_demo.composite_evaluate_match_live_smoke_v1",

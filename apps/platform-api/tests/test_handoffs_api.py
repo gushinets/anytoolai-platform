@@ -62,7 +62,7 @@ def _seed_source(session) -> tuple[str, str]:
     scenario = ScenarioSessionRepository(session).create(
         ScenarioSessionRecord(
             tenant_id="anytoolai",
-            region="default",
+            region="ru",
             product_id="kernel_demo",
             frontend_id="kernel_demo_ce",
             scenario_id="kernel_demo.handoff_smoke_source_v1",

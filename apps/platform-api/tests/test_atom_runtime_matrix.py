@@ -126,7 +126,7 @@ def _run_single_action_scenario_and_assert_full_path(
     guest_id = f"guest_atom_matrix_{case.action_type}"
     with transaction_boundary(session_factory) as session:
         GuestIdentityRepository(session).create(
-            GuestIdentityRecord(id=guest_id, tenant_id="anytoolai", region="default")
+            GuestIdentityRecord(id=guest_id, tenant_id="anytoolai", region="ru")
         )
 
     started = asyncio.run(

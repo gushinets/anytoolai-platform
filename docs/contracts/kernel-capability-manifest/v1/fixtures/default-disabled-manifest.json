@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "tenant_id": "anytoolai",
+  "region": "ru",
+  "manifest_version": "sha256:478761c681d02330ed052aabe5e1b472dc1c2ee56d79a568a8009f4b4503a694",
+  "generated_at": "2026-10-15T00:00:00Z",
+  "products": [
+    {
+      "product_id": "acceptance_builder",
+      "enabled": false
+    },
+    {
+      "product_id": "brief_decoder",
+      "enabled": false
+    },
+    {
+      "product_id": "client_update_writer",
+      "enabled": false
+    },
+    {
+      "product_id": "kernel_demo",
+      "enabled": false
+    },
+    {
+      "product_id": "proposal_ai",
+      "enabled": false
+    },
+    {
+      "product_id": "task_finder",
+      "enabled": false
+    }
+  ],
+  "usage_metrics": [
+    {
+      "metric_key": "brief_decoder.test_analyses",
+      "product_id": "brief_decoder",
+      "unit": "analysis",
+      "enabled": false
+    },
+    {
+      "metric_key": "proposal_ai.test_generations",
+      "product_id": "proposal_ai",
+      "unit": "generation",
+      "enabled": false
+    }
+  ]
+}

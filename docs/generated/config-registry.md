@@ -9,7 +9,7 @@ Canonical source: configs/kernel via ConfigLoader.
 
 ## Regions
 
-- default
+- ru
 
 ## Provider policies
 

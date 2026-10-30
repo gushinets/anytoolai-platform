@@ -13,6 +13,7 @@ This directory is the system of record for agents. Keep it current. If a decisio
 ## Integrations
 
 - [Payment Portal](integrations/payment-portal.md) — ownership, current/target contracts, peer evidence and change workflow.
+- [Kernel Capability Manifest v1](contracts/kernel-capability-manifest/v1/README.md) — generated producer schema, canonical fixtures, byte checksums and independent semantic checks.
 
 ## Architecture
 
@@ -93,6 +94,8 @@ This directory is the system of record for agents. Keep it current. If a decisio
 
 - `generated/db-schema.md`
 - `generated/openapi.md`
+- `generated/openapi.json`
+- `generated/capability-manifest-v1.schema.json`
 - `generated/config-registry.md`
 - `generated/action-registry.md`
 - `generated/event-catalog.md`

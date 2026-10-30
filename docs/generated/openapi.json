@@ -1373,6 +1373,113 @@
         "title": "AtomLabVersionedSchemaRefResponse",
         "type": "object"
       },
+      "CapabilityManifestResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "generated_at": {
+            "format": "date-time",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "manifest_version": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "title": "Manifest Version",
+            "type": "string"
+          },
+          "products": {
+            "items": {
+              "$ref": "#/components/schemas/CapabilityProductResponse"
+            },
+            "title": "Products",
+            "type": "array"
+          },
+          "region": {
+            "minLength": 1,
+            "title": "Region",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "tenant_id": {
+            "minLength": 1,
+            "title": "Tenant Id",
+            "type": "string"
+          },
+          "usage_metrics": {
+            "items": {
+              "$ref": "#/components/schemas/CapabilityMetricResponse"
+            },
+            "title": "Usage Metrics",
+            "type": "array"
+          }
+        },
+        "required": [
+          "schema_version",
+          "tenant_id",
+          "region",
+          "manifest_version",
+          "generated_at",
+          "products",
+          "usage_metrics"
+        ],
+        "title": "CapabilityManifestResponse",
+        "type": "object"
+      },
+      "CapabilityMetricResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "metric_key": {
+            "minLength": 1,
+            "title": "Metric Key",
+            "type": "string"
+          },
+          "product_id": {
+            "minLength": 1,
+            "title": "Product Id",
+            "type": "string"
+          },
+          "unit": {
+            "minLength": 1,
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "metric_key",
+          "product_id",
+          "unit",
+          "enabled"
+        ],
+        "title": "CapabilityMetricResponse",
+        "type": "object"
+      },
+      "CapabilityProductResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "product_id": {
+            "minLength": 1,
+            "title": "Product Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "product_id",
+          "enabled"
+        ],
+        "title": "CapabilityProductResponse",
+        "type": "object"
+      },
       "ClientEventRequest": {
         "additionalProperties": false,
         "properties": {
@@ -2360,6 +2467,12 @@
         "title": "WebClientEventType",
         "type": "string"
       }
+    },
+    "securitySchemes": {
+      "PortalServiceBearer": {
+        "scheme": "bearer",
+        "type": "http"
+      }
     }
   },
   "info": {
@@ -2390,6 +2503,102 @@
         "summary": "Health",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/internal/v1/capability-manifest": {
+      "get": {
+        "operationId": "get_capability_manifest_internal_v1_capability_manifest_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "title": "Tenant Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "region",
+            "required": true,
+            "schema": {
+              "title": "Region",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilityManifestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "PortalServiceBearer": []
+          }
+        ],
+        "summary": "Get Capability Manifest",
+        "tags": [
+          "capability-manifest"
         ]
       }
     },

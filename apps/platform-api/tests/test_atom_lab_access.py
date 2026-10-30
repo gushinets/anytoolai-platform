@@ -336,7 +336,7 @@ def _seed_result(session_factory: SessionFactory, *, runtime_scope: str | None) 
         scenario = ScenarioSessionRepository(session).create(
             ScenarioSessionRecord(
                 tenant_id="anytoolai",
-                region="default",
+                region="ru",
                 product_id="kernel_demo",
                 frontend_id="kernel_demo_ce",
                 scenario_id="kernel_demo.handoff_smoke_source_v1",
@@ -411,13 +411,13 @@ def _seed_client_event_session(
             GuestIdentityRecord(
                 id="guest_client_event_scope",
                 tenant_id="anytoolai",
-                region="default",
+                region="ru",
             )
         )
         scenario = ScenarioSessionRepository(session).create(
             ScenarioSessionRecord(
                 tenant_id="anytoolai",
-                region="default",
+                region="ru",
                 product_id="kernel_demo",
                 frontend_id="web_mirror",
                 scenario_id="kernel_demo.single_action_smoke_v1",

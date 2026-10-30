@@ -1,0 +1,110 @@
+{
+  "$defs": {
+    "CapabilityMetricResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "metric_key": {
+          "minLength": 1,
+          "title": "Metric Key",
+          "type": "string"
+        },
+        "product_id": {
+          "minLength": 1,
+          "title": "Product Id",
+          "type": "string"
+        },
+        "unit": {
+          "minLength": 1,
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "metric_key",
+        "product_id",
+        "unit",
+        "enabled"
+      ],
+      "title": "CapabilityMetricResponse",
+      "type": "object"
+    },
+    "CapabilityProductResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "product_id": {
+          "minLength": 1,
+          "title": "Product Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "product_id",
+        "enabled"
+      ],
+      "title": "CapabilityProductResponse",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "manifest_version": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Manifest Version",
+      "type": "string"
+    },
+    "products": {
+      "items": {
+        "$ref": "#/$defs/CapabilityProductResponse"
+      },
+      "title": "Products",
+      "type": "array"
+    },
+    "region": {
+      "minLength": 1,
+      "title": "Region",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "tenant_id": {
+      "minLength": 1,
+      "title": "Tenant Id",
+      "type": "string"
+    },
+    "usage_metrics": {
+      "items": {
+        "$ref": "#/$defs/CapabilityMetricResponse"
+      },
+      "title": "Usage Metrics",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "tenant_id",
+    "region",
+    "manifest_version",
+    "generated_at",
+    "products",
+    "usage_metrics"
+  ],
+  "title": "CapabilityManifestResponse",
+  "type": "object"
+}

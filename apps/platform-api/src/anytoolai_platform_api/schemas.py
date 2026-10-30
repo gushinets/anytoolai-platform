@@ -17,7 +17,35 @@ from anytoolai_platform_core.providers.models import (
 )
 from anytoolai_platform_core.quotas.models import QuotaDimension, QuotaPeriod, QuotaUnit
 from anytoolai_platform_core.scenarios.models import ScenarioSessionStatus
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+
+
+class CapabilityProductResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    product_id: str = Field(min_length=1)
+    enabled: bool
+
+
+class CapabilityMetricResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    metric_key: str = Field(min_length=1)
+    product_id: str = Field(min_length=1)
+    unit: str = Field(min_length=1)
+    enabled: bool
+
+
+class CapabilityManifestResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal[1]
+    tenant_id: str = Field(min_length=1)
+    region: str = Field(min_length=1)
+    manifest_version: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    generated_at: AwareDatetime
+    products: list[CapabilityProductResponse]
+    usage_metrics: list[CapabilityMetricResponse]
 
 
 class RuntimeRendererHintResponse(BaseModel):
