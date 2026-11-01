@@ -574,6 +574,35 @@ def test_reply_prompts_keep_agreed_terms_and_exclusions(
         assert fragment in prompt, fragment
 
 
+@pytest.mark.parametrize(
+    "fragment",
+    (
+        "For client-facing facts included in `text` or `call_to_action`",
+        "readiness and agreement status",
+        "numbers together with their units and the thing they count, "
+        "identifiers and scope exclusions",
+        "not a requirement to include every input detail",
+        "does not override `constraints.max_length`, the internal-note disclosure rule below, "
+        "or the author-direction rule above",
+        "Internal details may be shared only when `situation` explicitly says to share them",
+        "author directions are followed, never reported",
+        "Internal notes (the freelancer's own costs, subcontractors, private figures)",
+        "leave them out unless `situation` says to share them",
+        "Do not turn an agreed or planned step into a finished one",
+        'change "12 interviews of 20 minutes" into "12-minute intervals" or "sections"',
+        "call finished or done anything `situation` excludes from the scope",
+        "Add no work, step, result or finding that `situation` does not state",
+    ),
+)
+def test_update_prompt_keeps_only_included_client_facts_faithful(fragment: str) -> None:
+    prompt = " ".join(
+        _load_prompt_template("client_update_writer.update_compose_reply.v1").split()
+    )
+
+    # This pins the instruction; generated-text fidelity requires live acceptance (ANY-624).
+    assert fragment in prompt, fragment
+
+
 def test_renderer_contract_pins_the_canonical_copy_ready_composition() -> None:
     """Code review finding: ANY-413 lists "Renderer contract for a copy-ready client message" as
     a Bundle-And-Workflow scope item, distinct from ANY-412/ANY-414's later apps/web-mirror
