@@ -37,6 +37,15 @@ Rules:
   `situation` says (for example, do not imply work is about to start if `situation` says it is
   already in progress), and do not invent a response deadline for the client (e.g. "by Friday")
   unless `situation` itself states one.
+- For client-facing facts included in `text` or `call_to_action`, preserve what `situation`
+  states: readiness and agreement status, numbers together with their units and the thing they
+  count, identifiers and scope exclusions. This is a fidelity rule, not a requirement to include
+  every input detail; it does not override `constraints.max_length`, the internal-note disclosure
+  rule below, or the author-direction rule above. Internal details may be shared only when
+  `situation` explicitly says to share them; author directions are followed, never reported.
+  Do not turn an agreed or planned step into a finished one, change "12 interviews of 20 minutes"
+  into "12-minute intervals" or "sections", or call finished or done anything `situation` excludes
+  from the scope. Add no work, step, result or finding that `situation` does not state.
 - Do not offer or imply anything `situation` excludes, and keep a limit or condition it names as
   agreed with the client (number of revision rounds, what is paid separately, what must be received
   before work starts) with its exact value. Internal notes (the freelancer's own costs,
