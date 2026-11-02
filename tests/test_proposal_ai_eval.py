@@ -725,6 +725,47 @@ def test_the_committed_suite_pins_every_case_it_plans() -> None:
     assert all(suite["cases"][case] == proposal_ai_eval.case_hash(orders[case]) for case in planned)
 
 
+def test_a_run_of_another_configuration_says_nothing_about_this_one(tmp_path: Path, capsys) -> None:
+    """Code review #9 (ARCH-2): a sol run with a minor or critical failure is not a defect of the luna group;
+    the same failure on a luna run still is."""
+    strict = [{"series": "luna-medium", "cases": [ORDER["id"]], "attempts": 3, "min_usable": 3, "reasoning_effort": "medium"}]
+    for field, value in (("model", "openai/gpt-6.1-sol"), ("reasoning_effort", "high"), ("prompt_sha256", {"x": "y"})):
+        for answers in ({**YES, "budget-declined": "no"}, {**YES, "terms-not-accepted": "no"}):
+            runs = attempts(3)
+            runs[2][field] = value
+            code, out = run_accept(tmp_path, runs, confirmed(runs[:2]) + decide(runs[2], answers), capsys, program=strict)
+            assert code == 1 and out.startswith("# Suite t: PENDING"), (field, out)
+            assert "critical errors" not in out and "PENDING `r2`: not this configuration" in out and "(not counted)" in out
+    runs = attempts(3)
+    code, out = run_accept(tmp_path, runs, confirmed(runs[:2]) + decide(runs[2], {**YES, "budget-declined": "no"}), capsys, program=strict)
+    assert code == 1 and "FAIL: luna-medium counteroffer-en: 2 usable, 1 failed, needs 3/3" in out
+
+
+def test_the_collector_sends_exactly_the_input_accept_expects(tmp_path: Path, monkeypatch) -> None:
+    """Code review #9: the default order set has a shared positioning and no tone; the collected record must
+    still be the input of its case."""
+    def fake_request(url: str, *, payload: dict | None = None, method: str = "GET") -> dict:
+        if url.endswith("/identity/guest"):
+            return {"guest_id": "g"}
+        if url.endswith("/start"):
+            fake_request.sent.append(payload["input"])
+            return {"scenario_session_id": f"s{len(fake_request.sent)}"}
+        if "/scenario-sessions/" in url:
+            return {"status": "completed", "result_artifact_id": "a"}
+        return {"output": {"text": "x", "gaps": []}}
+    fake_request.sent = []
+    monkeypatch.setattr(proposal_ai_eval, "_request", fake_request)
+    out = tmp_path / "runs.jsonl"
+    assert proposal_ai_eval.main(["run", "--api-url", "http://api", "--series", "s", "--out", str(out)]) == 0
+    fixture = json.loads(proposal_ai_eval.ORDERS_PATH.read_text(encoding="utf-8"))
+    orders = {order["id"]: order for order in proposal_ai_eval.normalized_orders(fixture)}
+    records = proposal_ai_eval.read_jsonl(out)
+    assert len(records) == len(orders) and all(r["input"] == proposal_ai_eval.case_input(orders[r["case_id"]]) for r in records)
+    assert records[0]["input"]["tone"] == "warm" and records[0]["input"]["freelancer_positioning"] == fixture["freelancer_positioning"]
+    groups = {("s", case): {"attempts": 1} for case in orders}
+    proposal_ai_eval.check_runs(records, groups, orders)
+
+
 def test_review_copies_the_agents_reason_only_for_the_same_answer(tmp_path: Path, monkeypatch) -> None:
     order = {**ORDER, "criteria": ORDER["criteria"][:1]}
     run = make_run("r0")

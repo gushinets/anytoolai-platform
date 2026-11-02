@@ -219,6 +219,17 @@ def criterion_hash(criterion: dict) -> str:
                     "violation_type": criterion.get("violation_type")})
 
 
+DEFAULT_TONE = "warm"
+
+
+def normalized_orders(fixture: dict) -> list[dict]:
+    """The orders of a fixture with its defaults applied (the shared positioning, the default tone): the
+    one form the collector sends, the case hash pins and `accept` compares."""
+    defaults = {"tone": DEFAULT_TONE, **({"freelancer_positioning": fixture["freelancer_positioning"]}
+                                         if "freelancer_positioning" in fixture else {})}
+    return [{**defaults, **order} for order in fixture["orders"]]
+
+
 def case_input(order: dict) -> dict:
     """The whole input a run of this case must carry: no key more, no key less."""
     return {key: order[key] for key in ("task_text", "freelancer_positioning", "tone", "language") if key in order}
@@ -268,14 +279,19 @@ def _number(value: object) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value >= 0
 
 
-def evidence_problems(run: dict, group: dict, base: Path | None = None) -> list[str]:
-    """What the program requires of a run's origin and configuration; any mismatch means the run is not
-    the evidence the group asks for. The browser artifact is read from disk and its hash compared."""
-    problems = [
+def config_mismatches(run: dict, group: dict) -> list[str]:
+    """A run made with another channel, model, reasoning or prompt is not an observation of this group."""
+    return [
         f"{field} is {run.get(field)!r}, the program requires {group[field]!r}"
         for field in ("channel", "model", "reasoning_effort", "prompt_sha256")
         if run.get(field) != group[field]
     ]
+
+
+def evidence_problems(run: dict, group: dict, base: Path | None = None) -> list[str]:
+    """What a run of this group still has to prove: the web form observation and its browser artifact.
+    The browser artifact is read from disk and its hash compared."""
+    problems: list[str] = []
     if group["channel"] != WEB_FORM:
         return problems
     origin = run.get("origin") or {}
@@ -314,6 +330,7 @@ def judge_run(
     if origin.get("ui_outcome") not in (None, "result"):
         fails.append(f"web form showed {origin['ui_outcome']} after {origin.get('ui_latency_ms')} ms")
     evidence = [f"evidence: {problem}" for problem in evidence_problems(run, group, base)] if group else []
+    foreign = [f"not this configuration: {problem}" for problem in config_mismatches(run, group)] if group else []
     critical_open, answers, reopen = False, {}, []
     if run.get("output"):
         checks = formal_checks(run, order)
@@ -341,12 +358,18 @@ def judge_run(
             critical_fails.append(f"contradiction: no-critical-error is yes but {', '.join(detailed)} is no; decide it again")
     elif run["runtime_status"] == "ok":
         fails.append("no output")
+    if foreign:
+        # Another configuration says nothing about this one: no usable, failed or critical count, and the
+        # attempt stays open. Its own findings are kept in the reasons for diagnosis.
+        return {"status": "PENDING", "usable": None, "critical": False, "quality_failed": False, "verified": False,
+                "reasons": foreign + [f"(not counted) {reason}" for reason in critical_fails + fails] + evidence + pending,
+                "warnings": warnings, "reopen": reopen}
     # Missing evidence keeps a run PENDING behind any non-critical failure; a critical error stays FAIL.
     status = "FAIL" if critical_fails else "PENDING" if evidence else "FAIL" if fails else "PENDING" if pending else "PASS"
     critical = True if critical_fails else (None if critical_open else False)
     return {"status": status, "usable": {"PASS": True, "FAIL": False, "PENDING": None}[status], "critical": critical,
-            "quality_failed": bool(fails or critical_fails), "verified": not evidence, "reasons": critical_fails + fails + evidence + pending,
-            "warnings": warnings, "reopen": reopen}
+            "quality_failed": bool(fails or critical_fails), "verified": not evidence,
+            "reasons": critical_fails + fails + evidence + pending, "warnings": warnings, "reopen": reopen}
 
 
 def load_suite(path: Path) -> tuple[dict, dict[str, dict], list[dict], dict[tuple[str, str], dict]]:
@@ -354,7 +377,7 @@ def load_suite(path: Path) -> tuple[dict, dict[str, dict], list[dict], dict[tupl
     orders = {}
     for orders_path in suite["orders"]:
         fixture = json.loads((path.parent / orders_path).read_text(encoding="utf-8"))
-        for order in fixture["orders"]:
+        for order in normalized_orders(fixture):
             orders[order["id"]] = order
     runs = read_jsonl(path.parent / suite["runs"])
     suite["_dir"] = path.parent
@@ -510,11 +533,8 @@ def _git_state() -> dict:
     return {"git_sha": sha or None, "git_dirty": dirty}
 
 
-def run_once(args: argparse.Namespace, order: dict, attempt: int, profile: str, stack: dict | None) -> dict:
-    scenario_input = {"task_text": order["task_text"], "freelancer_positioning": profile, "tone": order.get("tone", args.tone)}
-    language = order.get("language", args.language)
-    if language:
-        scenario_input["language"] = language
+def run_once(args: argparse.Namespace, order: dict, attempt: int, stack: dict | None) -> dict:
+    scenario_input = case_input(order)  # exactly the approved input, never a command-line override
     record = {
         "run_id": f"{args.series}-{order['id']}-{attempt}-{uuid.uuid4().hex[:8]}", "series": args.series,
         "case_id": order["id"], "attempt": attempt, "channel": "api", "origin": None, "session_id": None,
@@ -564,9 +584,8 @@ def command_run(args: argparse.Namespace) -> int:
     try:
         with args.out.open("a", encoding="utf-8") as out:
             for attempt in range(1, args.repeats + 1):
-                for order in fixture["orders"]:
-                    profile = order.get("freelancer_positioning", fixture.get("freelancer_positioning"))
-                    record = run_once(args, order, attempt, profile, stack)
+                for order in normalized_orders(fixture):
+                    record = run_once(args, order, attempt, stack)
                     out.write(json.dumps(record, ensure_ascii=False) + "\n")
                     out.flush()
                     print(f"{record['run_id']} {record['runtime_status']} {record['latency_ms']} ms", flush=True)
@@ -653,8 +672,6 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--series", required=True, help="the configuration under test, for example luna-medium")
     run.add_argument("--out", type=Path, required=True, help="runs JSONL, appended to")
     run.add_argument("--repeats", type=int, default=1)
-    run.add_argument("--tone", default="warm", choices=["neutral", "warm", "firm"])
-    run.add_argument("--language", help="explicit proposal language, default: the task's language")
     run.add_argument("--timeout", type=float, default=120.0)
     run.add_argument("--compose-project", help="local stack to read the prompt hashes, model and provider calls from")
     review = commands.add_parser("review", help="confirm or correct every open verdict")

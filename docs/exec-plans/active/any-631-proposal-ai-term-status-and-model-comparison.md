@@ -6,18 +6,19 @@
 - Owner: agent
 - Linear: ANY-631
 - Created: 2026-10-29
-- Last updated: 2026-10-30
+- Last updated: 2026-11-02
 - Review date: 2026-11-05
-- Next action: none in this PR. It delivers the prompt rule, the acceptance tooling and the evidence.
-  The output language defect (ANY-771) and the 60 s form wait (ANY-777) are separate tasks with
-  their own PRs; this PR does not change the gaps step, the language check of the product or the
-  frontend poll limit. Closing the ANY-631 acceptance is the team lead's decision (ANY-631 comment,
-  2026-10-30: after those two fixes and a repeat live run against the approved thresholds).
-  `gpt-6-luna` / `high` stays the preferred model; the switch is ANY-776.
+- Next action: none in this PR (#226): it delivers the prompt rule, the acceptance evaluator and the
+  evidence, against the closed list of guarantees in "Scope of PR #226". The web form collector for the
+  repeat live run is a second PR of ANY-631 (see that section). The output language defect (ANY-771)
+  and the 60 s form wait (ANY-777) are separate tasks with their own PRs. Closing the ANY-631
+  acceptance is the team lead's decision (ANY-631 comment, 2026-10-30: after those two fixes and a
+  repeat live run against the approved thresholds). `gpt-6-luna` / `high` stays the preferred model;
+  the switch is ANY-776.
 - Blocker: none for this PR. The pass 5 suite is FAIL under the approved thresholds, and stays FAIL
   until the repeat live run: ANY-771 (the output language, now also found in the gap descriptions) and
   ANY-777 (the 60 s form wait) are tracked outside this PR. No critical error is established: the
-  prompt rule is not the cause. every review question is answered by the reviewer (686 current decisions).
+  prompt rule is not the cause. Every review question is answered by the reviewer (686 current decisions).
   ANY-631 and ANY-595 statuses stay as they are.
 
 ## Goal
@@ -533,4 +534,46 @@ Not changed by this PR, by decision: the product code behind ANY-771 and ANY-777
 keep no `origin`, and none is reconstructed), the approved thresholds. A review finding that only
 restates one of these rows is not a defect of the evaluator. ANY-631 is closed only after the two
 fixes and a passing repeat live run.
+
+## Scope of PR #226 (closed list of guarantees)
+
+Code review #9 showed that without a closed list every review adds a new guarantee. PR #226 promises
+exactly these, for the evaluator (`accept` and `review`) on stored runs:
+
+1. The approved program and every planned case are pinned (`program`, `cases`); an empty, changed or
+   inconsistent suite is invalid (exit code 2), never a verdict.
+2. A run is counted only with the exact input of its case, its own scenario session and a planned,
+   unique attempt; the collector sends exactly that input (`normalized_orders`, `case_input`: one
+   definition for collection, case hash and check).
+3. A run of another channel, model, reasoning or prompt is not an observation of the group: it is not
+   counted as usable, failed or critical, and the attempt stays open (code review #9, ARCH-2).
+4. A decision counts only from a named human reviewer, for the answer, input and criterion it judged.
+5. Missing web form evidence never yields PASS; a confirmed critical error or an unreachable threshold
+   fails the suite; the latency limit is judged only on the verified UI time of every planned run.
+6. The text and every gap description are checked for their language.
+7. The stored series gives the same FAIL on every run of `accept`, with every reason owned outside this
+   PR (see "Expected FAIL and PENDING").
+
+Not promised by PR #226, by decision: a collector that produces web form evidence, and the acceptance
+criteria of P01/P02 beyond the approved questions (asked of the team lead, code review #9).
+
+## Second PR of ANY-631: the web form collector
+
+The committed `run` command collects through the API only; the web form runs of passes 1 to 5 used a
+throwaway Playwright script that is not part of the repository and saves no trace. So no tracked tool
+can yet produce the web form evidence `accept` requires. That collector is part of ANY-631 (the repeat
+live run needs it) but not of PR #226: it can only be proven on the live run it exists for, after ANY-771
+and ANY-777. Its PR, before the repeat live run, owns these code review #9 findings:
+
+- a tracked Playwright collector next to `tests/e2e/proposal-ai-smoke` that sends `case_input`, records
+  the UI outcome and time, saves the trace with its sha256 and fills free attempt slots of the program
+  instead of restarting at attempt 1 when it appends to a file;
+- the trace check built from a real exported trace, in both formats (`context.tracing` with
+  `trace.trace`, Playwright Test with `0-trace.trace` and `0-trace.network`), not from a hand-made file;
+- the observed model from the provider call ledger (`provider_calls.model`) compared with the planned
+  one, mixed or other models reported; reasoning marked unconfirmed unless read back at execution;
+- an unknown cost (`NaN` from PostgreSQL, NULL) kept as unknown, never zero, without losing the record;
+- the code revision of the runs pinned (clean build with the model override outside the tracked tree,
+  or an expected build SHA plus the allowed override);
+- one end-to-end test: `run` on stubbed HTTP and ledger, then `accept` takes its records.
 
