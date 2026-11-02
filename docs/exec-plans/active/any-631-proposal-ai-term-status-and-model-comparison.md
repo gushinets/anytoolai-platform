@@ -31,11 +31,15 @@ configuration that meets the quality and time thresholds below.
 
 ## Scope
 
-- `proposal_ai/prompts/compose_persuasive_text.v1.md`: each client term (price or budget, deadline,
-  pages or rounds, guarantee) is agreed, proposed or left for discussion, and the text makes that
-  status explicit. A proposed term that conflicts with the scope or another term, or that the order
-  declines, is stated as not accepted with its exact value and no replacement value. Agreed terms
-  (P05) are restated and confirmed. Examples no longer reuse acceptance-case values.
+- `proposal_ai/prompts/compose_persuasive_text.v1.md` (final Terms section): a term is a condition of
+  the deal (price or budget, payment split, date or deadline, engagement length, a limit such as the
+  number of revision rounds, a guarantee). What the client asks to be delivered, including its size or
+  length (6 templates, a 45-minute handover), is scope, not a term: offered as the work, never called
+  proposed or not agreed. Each term takes the first status that applies: decided by the freelancer
+  (accepted with its value, refused in so many words, or a counteroffer with the given value), agreed
+  in the order (restated and confirmed), left for later (kept open, no value of its own), or a client
+  term that conflicts with the scope or another term (stated as not accepted with its exact value, no
+  replacement value). Examples no longer reuse acceptance-case values.
 - `client_update_writer/prompts/reply_draft_compose_reply.v1.md`: the same status rule, decided by
   `intent` (same class of problem as ANY-628).
 - Prompt-fragment tests in both products. Prompt versions stay `v1` (precedent ANY-628, ANY-629).
@@ -576,4 +580,19 @@ and ANY-777. Its PR, before the repeat live run, owns these code review #9 findi
 - the code revision of the runs pinned (clean build with the model override outside the tracked tree,
   or an expected build SHA plus the allowed override);
 - one end-to-end test: `run` on stubbed HTTP and ledger, then `accept` takes its records.
+
+### Fourth pass (code review #10)
+
+- A trace is recognised in both Playwright formats (`trace.trace` or `<n>-trace.trace` with its network
+  log); a damaged archive (bad CRC) is no trace instead of a crash.
+- A form error before the session started is verified by the trace structure alone (there is no
+  session to name), so it counts as a failure, not as an open attempt; a result still needs a session.
+- Language: every passage of 12 words or more is checked, so a Russian body with an English paragraph
+  is a wrong language; Russian needs its own letters (ы or э, none of і ї є ґ ў), so Ukrainian or
+  Bulgarian text is unverified, never Russian. Three stored runs now have Russian gap descriptions too
+  short to tell and get a `language-confirmed` question.
+- The program is validated at the boundary: integer attempts and thresholds, a known channel, a named
+  model and reasoning, prompt hashes; one series is one configuration.
+- The Scope section above now states the final Terms rules (scope is not a term; decline and
+  counteroffer).
 

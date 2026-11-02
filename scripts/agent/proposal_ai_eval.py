@@ -85,6 +85,7 @@ LONG_DASH = re.compile(r"—| – ")
 LIST_OR_HEADING_LINE = re.compile(r"^\s*(#{1,6}\s|[-*+•]\s|\d+[.)]\s)")
 MAX_WORDS = 250
 GAP_MIN_WORDS = 6  # a gap description is one short sentence
+PASSAGE_MIN_WORDS = 12
 
 
 def _has_invented_number(text: str, *sources: str) -> bool:
@@ -115,7 +116,9 @@ def detect_language(text: str, min_words: int = 20) -> str | None:
     """`ru` for a mainly Cyrillic text, otherwise the language whose function words lead clearly;
     None when no language leads clearly (the caller reports it as unverified, never as correct)."""
     if _cyrillic_share(text) > 0.5:
-        return "ru"
+        # Ukrainian and Bulgarian are Cyrillic too: Russian has ы or э and none of і ї є ґ ў
+        lowered = text.lower()
+        return "ru" if re.search("[ыэ]", lowered) and not re.search("[іїєґў]", lowered) else None
     words = re.findall(r"[^\W\d_]+", text.lower())
     if len(words) < min_words:
         return None
@@ -138,10 +141,12 @@ def check_proposal(
     lines = [line for line in text.splitlines() if line.strip()]
     language = detect_language(text)
     expected = (expect_language or order["expect_language"]).split("-")[0]
+    # every passage, not only the whole: a Russian body with an English paragraph is not Russian
+    passages = [detect_language(passage, PASSAGE_MIN_WORDS) for passage in re.split(r"\n\s*\n", text) if passage.strip()]
     gap_expected = order.get("expect_gaps_language")
     gap_languages = [detect_language(gap["description"], GAP_MIN_WORDS) for gap in gaps] if gap_expected else []
     return {
-        "wrong_language": language is not None and language != expected,
+        "wrong_language": any(found not in (None, expected) for found in [language, *passages]),
         "wrong_gaps_language": any(found not in (None, gap_expected) for found in gap_languages),
         "language_unverified": language is None or None in gap_languages,
         "placeholder": bool(PLACEHOLDER.search(text)),
@@ -179,6 +184,7 @@ NO_CRITICAL_ERROR = {
 }
 LANGUAGE_CONFIRMED = "language-confirmed"
 WEB_FORM = "web_form"
+CHANNELS = ("api", WEB_FORM)
 
 
 class SuiteError(ValueError):
@@ -302,21 +308,33 @@ def evidence_problems(run: dict, group: dict, base: Path | None = None) -> list[
         problems.append("browser artifact missing")
     elif hashlib.sha256(artifact.read_bytes()).hexdigest() != origin.get("trace_sha256"):
         problems.append("browser artifact does not match its sha256")
-    elif not _is_trace_of(artifact, run.get("session_id")):
+    elif not _is_trace_of(artifact, run.get("session_id"), before_session=_failed_before_session(run)):
         problems.append("browser artifact is not a Playwright trace of this session")
     return problems
 
 
-def _is_trace_of(path: Path, session_id: str | None) -> bool:
-    """A Playwright trace is a ZIP with `trace.trace` and a network log; the network log names the
-    session this run started, so the file cannot be another run's or a text file with a hash."""
-    if not session_id or not zipfile.is_zipfile(path):
+def _failed_before_session(run: dict) -> bool:
+    """The form showed an error before the scenario started: there is no session the trace could name."""
+    return not run.get("session_id") and not run.get("output") and (run.get("origin") or {}).get("ui_outcome") == "error"
+
+
+def _is_trace_of(path: Path, session_id: str | None, *, before_session: bool = False) -> bool:
+    """A Playwright trace is a ZIP with a context trace (`trace.trace`, or `<n>-trace.trace` from
+    Playwright Test) and a network log; the network log names the session this run started, so the file
+    cannot be another run's or a text file with a hash. A run that failed before its session started
+    needs the trace structure only. A damaged archive is no trace."""
+    if not (session_id or before_session) or not zipfile.is_zipfile(path):
         return False
-    with zipfile.ZipFile(path) as trace:
-        names = trace.namelist()
-        return "trace.trace" in names and any(
-            name.endswith(".network") and session_id.encode() in trace.read(name) for name in names
-        )
+    try:
+        with zipfile.ZipFile(path) as trace:
+            names = trace.namelist()
+            has_trace = any(re.fullmatch(r"(\d+-)?trace\.trace", name) for name in names)
+            network = [name for name in names if re.fullmatch(r"(\d+-)?trace\.network", name)]
+            if not has_trace or not network:
+                return False
+            return before_session or any(session_id.encode() in trace.read(name) for name in network)
+    except (zipfile.BadZipFile, OSError):
+        return False
 
 
 def judge_run(
@@ -387,13 +405,24 @@ def load_suite(path: Path) -> tuple[dict, dict[str, dict], list[dict], dict[tupl
 def program_groups(suite: dict, orders: dict[str, dict]) -> dict[tuple[str, str], dict]:
     """One group per series and case; a block of the program shares everything but the case."""
     groups: dict[tuple[str, str], dict] = {}
+    configurations: dict[str, tuple] = {}
     if not suite.get("program"):
         raise SuiteError("program: nothing is planned")
     for block in suite["program"]:
         group = {**suite.get("defaults", {}), **block}
         missing = {"series", "cases", "attempts", "min_usable", "channel", "model", "reasoning_effort", "prompt_sha256"} - group.keys()
-        if missing or not 0 < group["min_usable"] <= group["attempts"]:
-            raise SuiteError(f"program block {block.get('series')}: missing {sorted(missing)} or an impossible threshold")
+        if missing:
+            raise SuiteError(f"program block {block.get('series')}: missing {sorted(missing)}")
+        counts = [group["attempts"], group["min_usable"]]
+        if any(type(value) is not int for value in counts) or not 0 < group["min_usable"] <= group["attempts"]:
+            raise SuiteError(f"program block {group['series']}: attempts and min_usable must be integers, 0 < min_usable <= attempts")
+        if group["channel"] not in CHANNELS or not isinstance(group["prompt_sha256"], dict) or not all(
+            isinstance(group[key], str) and group[key] for key in ("series", "model", "reasoning_effort")
+        ):
+            raise SuiteError(f"program block {group['series']}: channel must be one of {CHANNELS}, model and reasoning named")
+        configuration = tuple(json.dumps(group[key], sort_keys=True) for key in ("channel", "model", "reasoning_effort", "prompt_sha256"))
+        if configurations.setdefault(group["series"], configuration) != configuration:
+            raise SuiteError(f"program: series {group['series']} is planned with two configurations")
         if not group["cases"]:
             raise SuiteError(f"program block {group['series']}: no cases")
         for case_id in group["cases"]:

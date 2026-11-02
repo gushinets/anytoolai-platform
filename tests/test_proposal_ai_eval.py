@@ -766,6 +766,72 @@ def test_the_collector_sends_exactly_the_input_accept_expects(tmp_path: Path, mo
     proposal_ai_eval.check_runs(records, groups, orders)
 
 
+def _zip(members: dict[str, str]) -> bytes:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        for name, content in members.items():
+            archive.writestr(zipfile.ZipInfo(name, (2026, 11, 2, 0, 0, 0)), content)
+    return buffer.getvalue()
+
+
+def test_a_trace_is_recognised_in_both_playwright_formats_and_a_damaged_one_is_not(tmp_path: Path, capsys) -> None:
+    """Code review #10: a Playwright Test export (`0-trace.trace`) is a trace; a CRC-damaged member is none."""
+    test_runner = _zip({"test.trace": "{}", "0-trace.trace": "{}", "0-trace.network": "GET /v1/scenario-sessions/s-r0",
+                        "0-trace.stacks": "{}"})
+    damaged = trace_bytes("r0").replace(b"s-r0", b"s-rX")
+    for content, verified in ((test_runner, True), (damaged, False), (_zip({"test.trace": "s-r0"}), False)):
+        runs = attempts(3)
+        runs[0]["origin"] = {**runs[0]["origin"], "trace_sha256": hashlib.sha256(content).hexdigest()}
+        code, out = run_accept(tmp_path, runs, confirmed(runs), capsys, traces={"r0": content})
+        assert (code == 0) is verified and "Traceback" not in out, out
+
+
+def test_a_form_error_before_the_session_started_is_a_verified_failure(tmp_path: Path, capsys) -> None:
+    """Code review #10: 4 PASS and 1 genuine error before /start at 4/5 is PASS, not PENDING forever."""
+    runs = attempts(5)
+    runs[4].update(session_id=None, output=None, runtime_status="ui_error", error="start request failed")
+    runs[4]["origin"] = {**runs[4]["origin"], "ui_outcome": "error"}
+    content = _zip({"trace.trace": "{}", "trace.network": "GET /products/proposal_ai"})
+    runs[4]["origin"]["trace_sha256"] = hashlib.sha256(content).hexdigest()
+    code, out = run_accept(tmp_path, runs, confirmed(runs[:4]), capsys, program=GRID, traces={"r4": content})
+    assert code == 0 and "| luna-medium | counteroffer-en | 5 | 5 | 4 | 1 | 0 | 4/5 | PASS |" in out, out
+    # a result still needs its session
+    runs[4].update(runtime_status="ok", output={"text": TEXT, "gaps": []})
+    code, out = run_accept(tmp_path, runs, confirmed(runs), capsys, program=GRID, traces={"r4": content})
+    assert code == 2 and "a result without a scenario session" in out
+
+
+def test_a_russian_body_with_an_english_paragraph_or_another_cyrillic_language_is_not_russian() -> None:
+    order = {**EN_ORDER, "expect_language": "ru"}
+    body = (
+        "Подготовлю дизайн лендинга в Figma: мобильную и десктопную версии, блок расписания и кнопку записи "
+        "в существующий WhatsApp. Тексты и фото предоставит студия, разработка сайта не входит в мою работу.\n\n"
+        "Мой опыт: лендинги для небольших сервисных компаний, где важны читаемость и удобная запись клиентов."
+    )
+    closing = "\n\nPlease send the approved content and photos so we can discuss the next steps and prepare the Figma design."
+    assert proposal_ai_eval.check_proposal(body, [], order, PROFILE)["wrong_language"] is False
+    assert proposal_ai_eval.check_proposal(body + closing, [], order, PROFILE)["wrong_language"] is True
+    ukrainian = (
+        "Підготую дизайн лендингу в Figma: мобільну і десктопну версії, блок розкладу та кнопку запису в "
+        "існуючий WhatsApp. Тексти й фото надасть студія, розробка сайту не входить у мою роботу."
+    )
+    checks = proposal_ai_eval.check_proposal(ukrainian, [], order, PROFILE)
+    assert checks["wrong_language"] is False and checks["language_unverified"] is True
+
+
+def test_the_program_is_validated_at_the_suite_boundary(tmp_path: Path, capsys) -> None:
+    """Code review #10: a typo in the channel must not switch off the web form evidence; numbers are numbers."""
+    base = {"series": "luna-medium", "cases": [ORDER["id"]], "attempts": 3, "min_usable": 2, "reasoning_effort": "medium"}
+    for broken in ({"channel": "web-form"}, {"attempts": "3"}, {"min_usable": True}, {"attempts": 0, "min_usable": 0},
+                   {"model": ""}, {"prompt_sha256": "abc"}):
+        code, out = run_accept(tmp_path, [], [], capsys, program=[{**base, **broken}])
+        assert code == 2 and "invalid suite" in out and "Traceback" not in out, broken
+    # one series is one configuration
+    two = [base, {**base, "cases": ["other"], "model": "openai/gpt-6.1-sol", "reasoning_effort": "high"}]
+    code, out = run_accept(tmp_path, [], [], capsys, program=two)
+    assert code == 2 and "series luna-medium is planned with two configurations" in out
+
+
 def test_review_copies_the_agents_reason_only_for_the_same_answer(tmp_path: Path, monkeypatch) -> None:
     order = {**ORDER, "criteria": ORDER["criteria"][:1]}
     run = make_run("r0")
