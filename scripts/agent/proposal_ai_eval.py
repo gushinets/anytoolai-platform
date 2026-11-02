@@ -112,19 +112,26 @@ _FUNCTION_WORDS = {
 }
 
 
+OTHER_CYRILLIC = re.compile(r"[іїєґўјљњћђџѓќѕ]|ъ(?![еёюя])|\bще\b")
+
+
 def detect_language(text: str, min_words: int = 20) -> str | None:
     """`ru` for a mainly Cyrillic text, otherwise the language whose function words lead clearly;
     None when no language leads clearly (the caller reports it as unverified, never as correct)."""
     if _cyrillic_share(text) > 0.5:
-        # Ukrainian and Bulgarian are Cyrillic too: Russian has ы or э and none of і ї є ґ ў
-        lowered = text.lower()
-        return "ru" if re.search("[ыэ]", lowered) and not re.search("[іїєґў]", lowered) else None
+        # Russian unless a mark of another Cyrillic language shows: Ukrainian/Belarusian і ї є ґ ў, Serbian
+        # and Macedonian ј љ њ ћ ђ џ ѓ ќ ѕ, Bulgarian ъ before a consonant ("във", "бъдат") or "ще".
+        # ponytail: letter marks only; a Bulgarian passage without ъ or "ще" still reads as Russian.
+        return None if OTHER_CYRILLIC.search(text.lower()) else "ru"
     words = re.findall(r"[^\W\d_]+", text.lower())
     if len(words) < min_words:
         return None
     hits = sorted(((sum(word in vocab for word in words), lang) for lang, vocab in _FUNCTION_WORDS.items()), reverse=True)
-    (best, lang), (second, _) = hits[0], hits[1]
-    return lang if best >= 2 and best >= 0.12 * len(words) and best >= 1.5 * second else None
+    (best, lang), (_, other) = hits[0], hits[1]
+    # the lead counts only the words that tell the two apart: "de" and "para" are Spanish and Portuguese
+    own = sum(word in _FUNCTION_WORDS[lang] - _FUNCTION_WORDS[other] for word in words)
+    theirs = sum(word in _FUNCTION_WORDS[other] - _FUNCTION_WORDS[lang] for word in words)
+    return lang if best >= 2 and best >= 0.12 * len(words) and own >= max(1, 1.5 * theirs) else None
 
 
 def _is_heading_like(line: str) -> bool:
@@ -142,13 +149,18 @@ def check_proposal(
     language = detect_language(text)
     expected = (expect_language or order["expect_language"]).split("-")[0]
     # every passage, not only the whole: a Russian body with an English paragraph is not Russian
-    passages = [detect_language(passage, PASSAGE_MIN_WORDS) for passage in re.split(r"\n\s*\n", text) if passage.strip()]
+    # a long passage the detector cannot tell (a Bulgarian paragraph in a Russian text) goes to the human
+    passages = [
+        detect_language(passage, PASSAGE_MIN_WORDS)
+        for passage in re.split(r"\n\s*\n", text)
+        if len(re.findall(r"[^\W\d_]+", passage)) >= PASSAGE_MIN_WORDS
+    ]
     gap_expected = order.get("expect_gaps_language")
     gap_languages = [detect_language(gap["description"], GAP_MIN_WORDS) for gap in gaps] if gap_expected else []
     return {
         "wrong_language": any(found not in (None, expected) for found in [language, *passages]),
         "wrong_gaps_language": any(found not in (None, gap_expected) for found in gap_languages),
-        "language_unverified": language is None or None in gap_languages,
+        "language_unverified": None in [language, *passages, *gap_languages],
         "placeholder": bool(PLACEHOLDER.search(text)),
         "meta_phrase": bool(META.search(text)),
         "invented_number": _has_invented_number(text, order["task_text"], profile),
@@ -330,7 +342,7 @@ def _is_trace_of(path: Path, session_id: str | None, *, before_session: bool = F
             names = trace.namelist()
             has_trace = any(re.fullmatch(r"(\d+-)?trace\.trace", name) for name in names)
             network = [name for name in names if re.fullmatch(r"(\d+-)?trace\.network", name)]
-            if not has_trace or not network:
+            if not has_trace or not network or trace.testzip() is not None:  # testzip reads every file's CRC
                 return False
             return before_session or any(session_id.encode() in trace.read(name) for name in network)
     except (zipfile.BadZipFile, OSError):

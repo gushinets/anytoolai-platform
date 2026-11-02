@@ -596,3 +596,18 @@ and ANY-777. Its PR, before the repeat live run, owns these code review #9 findi
 - The Scope section above now states the final Terms rules (scope is not a term; decline and
   counteroffer).
 
+### Fifth pass (code review #11)
+
+- A long passage the detector cannot tell goes to the human even when the whole text reads as the
+  expected language: a Russian body with a Bulgarian paragraph is `language_unverified`, not Russian.
+- Russian is now Cyrillic without a mark of another Cyrillic language (Ukrainian/Belarusian і ї є ґ ў,
+  Serbian/Macedonian ј љ њ ћ ђ џ ѓ ќ ѕ, Bulgarian ъ before a consonant or "ще"). The fourth pass required
+  ы or э, which left short Russian paragraphs undetermined; checking every passage made that visible.
+- Two leading languages are compared only on the words that tell them apart ("de" and "para" are both
+  Spanish and Portuguese), so a short Spanish passage is Spanish.
+- A trace of a form error before the session is read in full (`testzip`), so a CRC-damaged archive is
+  no evidence there either.
+- The stored series gives the same result as before: FAIL, no new question. The detector now
+  recognises some gap descriptions that earlier needed `language-confirmed`; those recorded answers
+  are no longer used.
+

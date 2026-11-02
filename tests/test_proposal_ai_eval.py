@@ -795,6 +795,12 @@ def test_a_form_error_before_the_session_started_is_a_verified_failure(tmp_path:
     runs[4]["origin"]["trace_sha256"] = hashlib.sha256(content).hexdigest()
     code, out = run_accept(tmp_path, runs, confirmed(runs[:4]), capsys, program=GRID, traces={"r4": content})
     assert code == 0 and "| luna-medium | counteroffer-en | 5 | 5 | 4 | 1 | 0 | 4/5 | PASS |" in out, out
+    # code review #11: a CRC-damaged trace is no evidence before the session either
+    damaged = content.replace(b"proposal_ai", b"proposal_xx")
+    runs[4]["origin"]["trace_sha256"] = hashlib.sha256(damaged).hexdigest()
+    code, out = run_accept(tmp_path, runs, confirmed(runs[:4]), capsys, program=GRID, traces={"r4": damaged})
+    assert code == 1 and "PENDING" in out and "Traceback" not in out, out
+    runs[4]["origin"]["trace_sha256"] = hashlib.sha256(content).hexdigest()
     # a result still needs its session
     runs[4].update(runtime_status="ok", output={"text": TEXT, "gaps": []})
     code, out = run_accept(tmp_path, runs, confirmed(runs), capsys, program=GRID, traces={"r4": content})
@@ -817,6 +823,22 @@ def test_a_russian_body_with_an_english_paragraph_or_another_cyrillic_language_i
     )
     checks = proposal_ai_eval.check_proposal(ukrainian, [], order, PROFILE)
     assert checks["wrong_language"] is False and checks["language_unverified"] is True
+    # code review #11: a Russian body decides the whole text, a Bulgarian paragraph still goes to the human
+    bulgarian = (
+        "\n\nЩе подготвя дизайна на лендинга във Figma с мобилна и настолна версия, блок с разписание и бутон "
+        "за записване, а текстовете и снимките ще бъдат предоставени от студиото."
+    )
+    checks = proposal_ai_eval.check_proposal(body + bulgarian, [], order, PROFILE)
+    assert checks["wrong_language"] is False and checks["language_unverified"] is True
+    assert proposal_ai_eval.check_proposal(body, [], order, PROFILE)["language_unverified"] is False
+    # a short Russian paragraph without ы or э is Russian; Spanish leads Portuguese on the words that differ
+    short = "Цену и сроки оставим до обсуждения. Предлагаю созвониться: покажу портфолио и обсудим детали лендинга."
+    assert proposal_ai_eval.detect_language(short, proposal_ai_eval.PASSAGE_MIN_WORDS) == "ru"
+    spanish = (
+        "Mi experiencia gestionando redes sociales para escuelas y negocios locales incluye preparar calendarios "
+        "de contenido y textos para publicaciones, tareas aplicables a Instagram de una academia."
+    )
+    assert proposal_ai_eval.detect_language(spanish, proposal_ai_eval.PASSAGE_MIN_WORDS) == "es"
 
 
 def test_the_program_is_validated_at_the_suite_boundary(tmp_path: Path, capsys) -> None:
