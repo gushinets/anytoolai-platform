@@ -1,0 +1,409 @@
+{
+  "description": "ANY-631 regression set for the status of client terms in ProposalAI (the prompt's Terms section, rules 1-5). Each order names the rule it exercises. `must` / `must_not` are literal checks only: a value that has to appear and amounts that must not appear (a forbidden amount is a critical error). `criteria` are questions a human answers for every output; see qa_cases.json for the kinds.",
+  "orders": [
+    {
+      "id": "conflict-decline-en",
+      "rule": "4: a client budget and deadline that conflict with the scope are stated as not accepted, no replacement value",
+      "task_text": "A bakery owner wants a new logo, a 20-page brand guide and social media templates within 3 days for USD 150. She expects unlimited logo concepts until she likes one. Her current brand photos will be ready in two weeks. Write a proposal that points out what conflicts, declines unlimited concepts and offers to discuss a smaller first step. Do not accept the deadline or suggest a different price.",
+      "freelancer_positioning": "I am a brand designer working in Illustrator and Figma. I have designed logos and short brand guides for local food businesses. I work with a fixed number of concept rounds agreed in advance.",
+      "tone": "firm",
+      "expect_language": "en",
+      "expect_gap": false,
+      "must": [
+        "USD 150"
+      ],
+      "must_not": [
+        "USD (?!150\\b)\\d",
+        "\\$\\s?\\d"
+      ],
+      "criteria": [
+        {
+          "id": "budget-not-agreed",
+          "kind": "not_agreed",
+          "critical": false,
+          "question": "Is USD 150 explicitly marked as the client's budget that is not agreed (proposed and not agreed, or refused)?"
+        },
+        {
+          "id": "deadline-declined",
+          "kind": "declined",
+          "critical": false,
+          "question": "Is the 3-day deadline refused in so many words?"
+        },
+        {
+          "id": "concepts-declined",
+          "kind": "declined",
+          "critical": false,
+          "question": "Are unlimited logo concepts refused in so many words?"
+        },
+        {
+          "id": "unagreed-terms-not-accepted",
+          "kind": "requirement",
+          "critical": true,
+          "violation_type": "unagreed_term_accepted",
+          "question": "Is none of the client's USD 150 budget, 3-day deadline or unlimited logo concepts stated as accepted, agreed or as the freelancer's own?"
+        }
+      ],
+      "expect_gaps_language": "en"
+    },
+    {
+      "id": "agreed-confirm-ru",
+      "rule": "2: every agreed term is restated exactly and confirmed, none is declined",
+      "task_text": "Клиент согласовал тексты для 12 карточек товаров интернет-магазина чая: по 600–800 знаков каждая, итого 36 000 ₽. Сдача всех текстов в Google Docs до 18:00 по Москве 20 ноября 2026. Включены два раунда правок в течение 3 рабочих дней после сдачи; новые карточки сверх 12 оплачиваются отдельно по 3 000 ₽. Фото и SEO-оптимизация не входят. Оплата 50% = 18 000 ₽ до начала, 18 000 ₽ после сдачи. Нужно подтверждение условий.",
+      "freelancer_positioning": "Пишу продающие тексты для интернет-магазинов, работаю по брифу и тону бренда клиента. Бриф с характеристиками товаров нужен до начала работы.",
+      "tone": "neutral",
+      "expect_language": "ru",
+      "expect_gap": false,
+      "must": [
+        "36\\s?000",
+        "18\\s?000",
+        "3\\s?000",
+        "(два|2) раунда",
+        "бриф"
+      ],
+      "criteria": [
+        {
+          "id": "agreed-confirmed",
+          "kind": "agreed",
+          "critical": true,
+          "question": "Are the agreed 36 000 ₽, the 20 November deadline, the 18 000 + 18 000 ₽ payments and 3 000 ₽ per extra card restated and confirmed, never called proposed or not agreed?",
+          "violation_type": "lost_mandatory_condition"
+        },
+        {
+          "id": "brief-before-start",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Is the brief with product details required before the work starts?",
+          "violation_type": "lost_mandatory_condition"
+        }
+      ],
+      "expect_gaps_language": "ru"
+    },
+    {
+      "id": "agreed-change-accepted-en",
+      "rule": "1: the freelancer accepts a change to an agreed limit; it is stated as accepted and replaces the earlier term (code review #1 P1)",
+      "task_text": "The client and I agreed a landing page design in Figma with one revision round for USD 400, delivery on 20 November 2026. The client now asks for a second revision round. Accept the second round at no extra cost and confirm the other agreed terms.",
+      "freelancer_positioning": "I am a UI designer working in Figma. I design landing pages for small service businesses.",
+      "tone": "neutral",
+      "expect_language": "en",
+      "expect_gap": false,
+      "must": [
+        "(second|two) (revision )?round",
+        "USD 400",
+        "20 November"
+      ],
+      "must_not": [
+        "USD (?!400\\b)\\d"
+      ],
+      "criteria": [
+        {
+          "id": "second-round-accepted",
+          "kind": "accepted",
+          "critical": false,
+          "question": "Is the second revision round accepted at no extra cost?"
+        },
+        {
+          "id": "agreed-confirmed",
+          "kind": "agreed",
+          "critical": true,
+          "question": "Are USD 400 and delivery on 20 November 2026 confirmed as agreed, never called proposed or not agreed?",
+          "violation_type": "lost_mandatory_condition"
+        }
+      ],
+      "expect_gaps_language": "en"
+    },
+    {
+      "id": "agreed-plus-conflict-es",
+      "rule": "2 and 4 together: the agreed terms are confirmed, the client's new conflicting request is not accepted, no new price",
+      "task_text": "Marta, dueña de una tienda online de cerámica, ya acordó conmigo 8 fotos de producto editadas por 240 EUR, con entrega el 12 de diciembre de 2026. Ahora pide también 15 fotos más y entrega el 5 de diciembre, por el mismo precio. La sesión de fotos y la impresión no están incluidas. Escribe una respuesta que confirme lo acordado y que no acepte el nuevo pedido en esas condiciones, sin inventar un precio nuevo.",
+      "freelancer_positioning": "Edito fotos de producto para tiendas online con Lightroom y Photoshop. He trabajado con marcas pequeñas de artesanía. Necesito las fotos originales antes de empezar.",
+      "tone": "warm",
+      "expect_language": "es",
+      "language": "es",
+      "expect_gap": false,
+      "must": [
+        "240 EUR",
+        "12 de diciembre",
+        "15 fotos"
+      ],
+      "must_not": [
+        "\\d+ EUR(?<!240 EUR)",
+        "EUR \\d"
+      ],
+      "criteria": [
+        {
+          "id": "agreed-confirmed",
+          "kind": "agreed",
+          "critical": true,
+          "question": "Are the agreed 8 edited photos for 240 EUR by 12 December 2026 confirmed, never called proposed or not agreed?",
+          "violation_type": "lost_mandatory_condition"
+        },
+        {
+          "id": "new-request-declined",
+          "kind": "declined",
+          "critical": false,
+          "question": "Is the new request (15 more photos and delivery on 5 December for the same price) refused in so many words, with no new price?"
+        },
+        {
+          "id": "unagreed-terms-not-accepted",
+          "kind": "requirement",
+          "critical": true,
+          "violation_type": "unagreed_term_accepted",
+          "question": "Is none of the new request (15 more photos, delivery on 5 December, the same price) stated as accepted or agreed?"
+        }
+      ],
+      "expect_gaps_language": "es"
+    },
+    {
+      "id": "limit-change-accepted-en",
+      "rule": "1 over 4: explicit acceptance of a change wins over the conflict with the earlier limit (code review #2 P2)",
+      "task_text": "We agreed a 5-page Webflow site for EUR 1,500 with one revision round. The client asks for a second revision round. I accept it instead of our previously agreed one-round limit; the price and the 5 pages stay as agreed.",
+      "freelancer_positioning": "I build Webflow marketing sites for small businesses.",
+      "tone": "firm",
+      "expect_language": "en",
+      "expect_gap": false,
+      "must": [
+        "(second|two) (revision )?round",
+        "EUR 1,?500"
+      ],
+      "must_not": [
+        "EUR (?!1,?500\\b)\\d"
+      ],
+      "criteria": [
+        {
+          "id": "second-round-accepted",
+          "kind": "accepted",
+          "critical": false,
+          "question": "Is the second revision round accepted in place of the one-round limit?"
+        },
+        {
+          "id": "agreed-kept",
+          "kind": "agreed",
+          "critical": true,
+          "question": "Do EUR 1,500 and the 5 pages stay as agreed, never called proposed or not agreed?",
+          "violation_type": "lost_mandatory_condition"
+        }
+      ],
+      "expect_gaps_language": "en"
+    },
+    {
+      "id": "counteroffer-en",
+      "rule": "1: a counteroffer the freelancer directs in the order is made with exactly that value; the client's value is declined (code reviews #1 and #2 P2)",
+      "task_text": "A client wants a fully custom 12-page Webflow site within 48 hours for EUR 300. Copy and images arrive next week. Decline the EUR 300 budget and the 48-hour deadline, and offer EUR 800 for a smaller 5-page first phase, built after the copy arrives.",
+      "freelancer_positioning": "I build Webflow marketing sites and can scope work after reviewing content. My past work includes small business sites, but I have no search-ranking case studies. I only commit to timelines once dependencies and review rounds are agreed.",
+      "tone": "firm",
+      "expect_language": "en",
+      "expect_gap": false,
+      "must": [
+        "EUR 800",
+        "EUR 300"
+      ],
+      "must_not": [
+        "EUR (?!300\\b|800\\b)\\d"
+      ],
+      "criteria": [
+        {
+          "id": "budget-declined",
+          "kind": "declined",
+          "critical": false,
+          "question": "Is the EUR 300 budget refused in so many words?"
+        },
+        {
+          "id": "deadline-declined",
+          "kind": "declined",
+          "critical": false,
+          "question": "Is the 48-hour deadline refused in so many words?"
+        },
+        {
+          "id": "counteroffer",
+          "kind": "offered",
+          "critical": false,
+          "question": "Does the freelancer offer EUR 800 as their own price for a smaller 5-page first phase built after the copy arrives?"
+        },
+        {
+          "id": "unagreed-terms-not-accepted",
+          "kind": "requirement",
+          "critical": true,
+          "violation_type": "unagreed_term_accepted",
+          "question": "Is none of the client's EUR 300 budget or 48-hour deadline stated as accepted, agreed or as the freelancer's own?"
+        }
+      ],
+      "expect_gaps_language": "en"
+    },
+    {
+      "id": "left-open-en",
+      "rule": "3: terms left for discussion stay open without a value of the freelancer's own",
+      "task_text": "A SaaS startup needs onboarding emails rewritten: a welcome email and a 4-email trial sequence. The number of additional emails and the fee will be agreed after a 30-minute discovery call. They would like the first drafts in early January 2027, but the date is not fixed yet. Analytics setup is excluded.",
+      "freelancer_positioning": "I write lifecycle and onboarding emails for B2B SaaS products. I have rewritten trial sequences for two startups. I agree the scope and fee only after a discovery call.",
+      "tone": "neutral",
+      "expect_language": "en",
+      "expect_gap": false,
+      "must": [
+        "discovery call"
+      ],
+      "must_not": [
+        "(USD|EUR|\\$)\\s?\\d"
+      ],
+      "criteria": [
+        {
+          "id": "fee-open",
+          "kind": "open",
+          "critical": false,
+          "question": "Are the fee and the number of additional emails left to be agreed after the discovery call, with no amount?"
+        },
+        {
+          "id": "date-open",
+          "kind": "open",
+          "critical": false,
+          "question": "Is early January 2027 kept as the client's wish that is not fixed, not promised as a deadline?"
+        },
+        {
+          "id": "analytics-excluded",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Is analytics setup kept out of the work?",
+          "violation_type": "promised_excluded_work"
+        }
+      ],
+      "expect_gaps_language": "en"
+    },
+    {
+      "id": "ceiling-stays-client-ru",
+      "rule": "5 and 4: a budget ceiling stays the client's (not accepted as the price, not declined); the conflicting deadline is not accepted",
+      "task_text": "Стартап просит дизайн 5 экранов мобильного приложения доставки за 2 рабочих дня. Описание API и тексты интерфейса будут только через неделю. Бюджет до 80 000 ₽, окончательная цена после оценки. Иконки берутся из готовой библиотеки, анимации не входят. Нужно ответить, что срок нереален, и предложить реальный порядок работы, не придумывая даты.",
+      "freelancer_positioning": "Проектирую интерфейсы мобильных приложений в Figma. Делаю макеты по готовым текстам и данным API. Сроки называю только после получения всех материалов.",
+      "tone": "firm",
+      "expect_language": "ru",
+      "expect_gap": false,
+      "must": [
+        "80\\s?000",
+        "(2|два) рабочих дн"
+      ],
+      "criteria": [
+        {
+          "id": "ceiling-not-agreed",
+          "kind": "not_agreed",
+          "critical": false,
+          "question": "Is the 80 000 ₽ ceiling stated as the client's budget that is not an agreed price, with the final price after the estimate?"
+        },
+        {
+          "id": "deadline-declined",
+          "kind": "declined",
+          "critical": false,
+          "question": "Is the 2-working-day deadline refused in so many words?"
+        },
+        {
+          "id": "no-invented-date",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Does the answer avoid naming any date or duration of its own?",
+          "violation_type": "invented_amount_or_commitment"
+        },
+        {
+          "id": "unagreed-terms-not-accepted",
+          "kind": "requirement",
+          "critical": true,
+          "violation_type": "unagreed_term_accepted",
+          "question": "Is none of the client's 80 000 ₽ ceiling or 2-working-day deadline stated as accepted, agreed or as the freelancer's own price or term?"
+        }
+      ],
+      "expect_gaps_language": "ru"
+    },
+    {
+      "id": "conflict-decline-es",
+      "rule": "4: a conflicting budget and a guarantee are not accepted, no replacement value (the 5 daily posts are scope, not a term)",
+      "task_text": "Una academia de idiomas quiere gestionar Instagram durante 3 meses por 200 EUR en total, con 5 publicaciones diarias, y exige garantizar 10 000 seguidores nuevos. Todavía no tiene fotos ni un calendario de cursos. Escribe una propuesta que identifique los conflictos, rechace la garantía de seguidores y proponga hablar de un primer mes más reducido. No aceptes el presupuesto ni inventes otro.",
+      "freelancer_positioning": "Gestiono redes sociales para escuelas y negocios locales. Preparo calendarios de contenido y textos para publicaciones. No garantizo cifras de seguidores.",
+      "tone": "firm",
+      "expect_language": "es",
+      "language": "es",
+      "expect_gap": false,
+      "must": [
+        "200 EUR"
+      ],
+      "must_not": [
+        "EUR (?!200\\b)\\d",
+        "\\d+ EUR(?<!200 EUR)"
+      ],
+      "criteria": [
+        {
+          "id": "budget-declined",
+          "kind": "declined",
+          "critical": false,
+          "question": "Is the 200 EUR total budget refused in so many words?"
+        },
+        {
+          "id": "guarantee-declined",
+          "kind": "declined",
+          "critical": false,
+          "question": "Is the guarantee of 10 000 new followers refused in so many words?"
+        },
+        {
+          "id": "unagreed-terms-not-accepted",
+          "kind": "requirement",
+          "critical": true,
+          "violation_type": "unagreed_term_accepted",
+          "question": "Is none of the client's 200 EUR total budget or the guarantee of 10 000 new followers stated as accepted, agreed or as the freelancer's own?"
+        }
+      ],
+      "expect_gaps_language": "es"
+    },
+    {
+      "id": "ceiling-and-scope-en",
+      "rule": "3 and 5: the budget ceiling is the client's proposal and the fee stays open; the requested work is scope offered as the freelancer's work, never called proposed or not agreed",
+      "task_text": "Northlake Books needs a Shopify accessibility review, not a redesign. Audit 6 templates: home, collection, product, cart, search, contact. Deliver a prioritized issue spreadsheet with reproduction steps and a 45-minute handover. Check keyboard use, focus, labels and contrast against WCAG 2.2 AA. No certification or legal compliance guarantee. We can provide staging access on 8 October 2026; the report is needed by 16 October if access arrives on time. Theme edits, third-party checkout and app remediation are excluded. Budget ceiling USD 1,200; final fee must be agreed after inspecting the theme.",
+      "freelancer_positioning": "I am a frontend developer who has performed manual keyboard and screen-reader checks on two ecommerce projects. I use browser devtools and axe as aids, and document limitations clearly. I am not a certified accessibility auditor and have no Shopify Plus experience.",
+      "tone": "neutral",
+      "expect_language": "en",
+      "expect_gap": true,
+      "must": [
+        "USD 1,?200"
+      ],
+      "must_not": [
+        "USD (?!1,?200\\b)\\d"
+      ],
+      "criteria": [
+        {
+          "id": "ceiling-not-agreed",
+          "kind": "not_agreed",
+          "critical": false,
+          "question": "Is the USD 1,200 ceiling stated as the client's budget that is not an agreed fee?"
+        },
+        {
+          "id": "fee-left-open",
+          "kind": "open",
+          "critical": true,
+          "violation_type": "lost_mandatory_condition",
+          "question": "Is the final fee left to be agreed, never stated as a fixed or agreed amount?"
+        },
+        {
+          "id": "fee-after-inspection",
+          "kind": "open",
+          "critical": true,
+          "violation_type": "lost_mandatory_condition",
+          "question": "Is agreeing the final fee tied to inspecting the theme (the condition may be in another sentence)?"
+        },
+        {
+          "id": "scope-not-a-term",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Are the requested templates, spreadsheet and 45-minute handover stated as the work, never called proposed or not agreed?"
+        },
+        {
+          "id": "exclusions-kept",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Are redesign, theme edits, third-party checkout, app remediation, certification and a legal compliance guarantee kept out of the work?",
+          "violation_type": "promised_excluded_work"
+        },
+        {
+          "id": "unagreed-terms-not-accepted",
+          "kind": "requirement",
+          "critical": true,
+          "violation_type": "unagreed_term_accepted",
+          "question": "Is none of the client's USD 1,200 ceiling stated as an agreed fee or as the freelancer's own?"
+        }
+      ],
+      "expect_gaps_language": "en"
+    }
+  ]
+}

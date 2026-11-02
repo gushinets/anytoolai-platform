@@ -559,8 +559,16 @@ def test_prepaid_request_prompt_forbids_invented_dates_without_a_due_date() -> N
                 "Do not offer or imply anything `situation` or `intent` excludes",
                 "unless `intent` explicitly counters that specific term",
                 "Exclusions in `intent` always hold",
-                "keep its exact value and status",
-                "a term the client only requests is never stated as accepted",
+                "keep its exact value and give it the status",  # ANY-628 limits keep value and status
+                "give it the status of the first rule that applies",  # ANY-631 one prioritized rule
+                "(1) `intent` accepts, declines or counters it: do exactly that with the value `intent` gives",
+                "an accepted change (for example a second revision round) replaces the earlier term",
+                "a direction that only limits what to write about the term",
+                "a declined term is refused in so many words, never only called requested or not agreed",
+                "(4) the client requests it and it conflicts with the scope or another term",
+                "(5) otherwise, only for a term never called agreed, it is the client's request: say that it is requested, not agreed",
+                "(2) it is agreed (an agreement covers every term it lists): restate it exactly and confirm it, never as requested or not agreed",  # review #5
+                "Never give a value that neither `situation` nor `intent` states",
             ),
         ),
     ],
@@ -581,7 +589,7 @@ def test_reply_prompts_keep_agreed_terms_and_exclusions(
         "readiness and agreement status",
         "numbers together with their units and the thing they count, "
         "identifiers and scope exclusions",
-        "not a requirement to include every input detail",
+        "which facts must be included is set by the completeness rule below",
         "does not override `constraints.max_length`, the internal-note disclosure rule below, "
         "or the author-direction rule above",
         "Internal details may be shared only when `situation` explicitly says to share them",
@@ -601,6 +609,37 @@ def test_update_prompt_keeps_only_included_client_facts_faithful(fragment: str) 
 
     # This pins the instruction; generated-text fidelity requires live acceptance (ANY-624).
     assert fragment in prompt, fragment
+
+
+def test_update_prompt_requires_every_client_facing_fact_and_names_unknowns() -> None:
+    prompt = " ".join(
+        _load_prompt_template("client_update_writer.update_compose_reply.v1").split()
+    )
+
+    # This pins the instruction; generated-text completeness requires live acceptance (ANY-624).
+    for fragment in (
+        "Include in `text` or `call_to_action` every client-relevant result, blocker, request "
+        "to the client and next step mentioned in `situation`",
+        "including raw progress notes not phrased as a message to the client",
+        "A notes format does not make progress facts private",
+        "Include a finished deliverable and the step that follows it",
+        "sending both mockups for comments",
+        'name the items, such as "transcripts of interviews 11 and 12"',
+        "the total the progress is counted against",
+        "the concrete findings made so far (such as mismatched article numbers)",
+        "not known yet, not counted or cannot be estimated, say so in those terms",
+        "do not leave it out and do not fill it in",
+        "The internal-note disclosure rule below still applies",
+        "the freelancer's directions to you are followed, never reported",
+        "leave them out unless `situation` says to share them",
+        "`constraints.max_length` still applies",
+        "keep requests, blockers and the next step before detail",
+        "the author-direction rule above wins",
+    ):
+        assert fragment in prompt, fragment
+
+    assert "not a requirement to include every input detail" not in prompt
+    assert "`situation` addresses to the client" not in prompt
 
 
 def test_renderer_contract_pins_the_canonical_copy_ready_composition() -> None:
