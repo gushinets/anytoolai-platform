@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import concurrent.futures
 import importlib.util
 import json
 import os
@@ -17,6 +18,14 @@ import yaml
 
 from tests.test_atoms_proof import load_atoms_proof_module
 from tests.test_quick_check import load_quick_check_module
+
+
+@pytest.fixture(autouse=True)
+def isolated_deployment_lock_profile(monkeypatch, tmp_path):
+    # Lifecycle tests must neither mutate the real operator profile nor share its locks.
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "local"))
 
 
 def load_runner_module():
@@ -4226,3 +4235,176 @@ def test_atom_lab_canary_run_ids_reject_stale_or_incomplete_manifest(tmp_path) -
 
     with pytest.raises(ValueError, match="missing or invalid"):
         runner._atom_lab_canary_run_ids(manifest)
+
+
+@pytest.mark.parametrize("project", ["prod", "atom_lab"])
+def test_deployment_lock_path_is_shared_across_checkouts(monkeypatch, tmp_path, project):
+    runner = load_runner_module()
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "local"))
+    path = getattr(runner, f"_{project}_deployment_lock_path")
+    first = path()
+    checkout = tmp_path / "other-checkout"
+    checkout.mkdir()
+    monkeypatch.chdir(checkout)
+    monkeypatch.setattr(runner, "ROOT", checkout)
+    monkeypatch.setenv("TMPDIR", str(checkout))
+    assert path() == first
+    assert (
+        runner._prod_deployment_lock_path().parent == runner._atom_lab_deployment_lock_path().parent
+    )
+    with runner._DeploymentLock(first, "test"):
+        assert first.is_file()
+        if os.name != "nt":
+            assert stat.S_IMODE(first.parent.stat().st_mode) == stat.S_IRWXU
+            assert stat.S_IMODE(first.stat().st_mode) == (stat.S_IRUSR | stat.S_IWUSR)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX ownership, modes and symlink semantics")
+@pytest.mark.parametrize(
+    "substitution",
+    [
+        "directory_mode",
+        "directory_link",
+        "directory_owner",
+        "file_link",
+        "file_owner",
+        "file_mode",
+        "hardlink",
+        "fifo",
+        "ancestor_mode",
+    ],
+)
+def test_deployment_lock_rejects_unsafe_storage(monkeypatch, tmp_path, substitution):
+    runner = load_runner_module()
+    directory = tmp_path / "locks"
+    directory.mkdir(mode=0o700)
+    path = directory / "deploy.lock"
+    target = tmp_path / "untouched"
+    target.write_bytes(b"unchanged")
+    if substitution == "directory_mode":
+        directory.chmod(0o755)
+    elif substitution == "directory_link":
+        directory.rmdir()
+        directory.symlink_to(tmp_path, target_is_directory=True)
+    elif substitution == "directory_owner":
+        monkeypatch.setattr(runner.os, "geteuid", lambda: directory.stat().st_uid + 1)
+    elif substitution == "file_link":
+        path.symlink_to(target)
+    elif substitution == "hardlink":
+        path.hardlink_to(target)
+    elif substitution == "fifo":
+        os.mkfifo(path, mode=0o600)
+    elif substitution == "ancestor_mode":
+        tmp_path.chmod(0o777)
+    else:
+        path.write_bytes(b"marker")
+        path.chmod(0o600)
+        if substitution == "file_mode":
+            path.chmod(0o644)
+        else:
+            real_fstat = runner.os.fstat
+
+            def foreign_owner(fd):
+                info = list(real_fstat(fd))
+                info[4] += 1
+                return os.stat_result(info)
+
+            monkeypatch.setattr(runner.os, "fstat", foreign_owner)
+    with (
+        pytest.raises(runner.DeploymentLockError, match="unsafe lock"),
+        runner._DeploymentLock(path, "test"),
+    ):
+        pytest.fail("unsafe storage accepted")
+    assert target.read_bytes() == b"unchanged"
+
+
+@pytest.mark.parametrize("project", ["prod", "atom_lab"])
+@pytest.mark.parametrize("crash", [False, True])
+def test_deployment_lock_cross_checkout_process_release(monkeypatch, tmp_path, project, crash):
+    runner = load_runner_module()
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "local"))
+    # Load a separate copy of the runner from a different checkout and working directory.
+    checkout = tmp_path / "checkout"
+    checkout.mkdir()
+    script = checkout / "scripts" / "agent" / "runner.py"
+    script.parent.mkdir(parents=True)
+    shutil.copyfile(Path(runner.__file__), script)
+    code = """
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location('runner', sys.argv[1])
+runner = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(runner)
+with getattr(runner, '_' + sys.argv[2] + '_deployment_lock')():
+    print('locked', flush=True)
+    sys.stdin.readline()
+"""
+    with subprocess.Popen(
+        [sys.executable, "-c", code, str(script), project],
+        cwd=checkout,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    ) as child:
+        try:
+            # Bound readiness waits so a broken child cannot hang the test suite.
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                ready = pool.submit(child.stdout.readline)
+                try:
+                    assert ready.result(timeout=15).strip() == "locked"
+                except BaseException:
+                    child.kill()
+                    raise
+            lock = getattr(runner, f"_{project}_deployment_lock")
+            with pytest.raises(runner.DeploymentLockError, match="already running"), lock():
+                pytest.fail("competing checkout acquired lock")
+            if crash:
+                child.kill()
+            else:
+                child.stdin.write("exit\n")
+                child.stdin.flush()
+            child.wait(timeout=15)
+            if not crash:
+                assert child.returncode == 0, child.stderr.read()
+            with lock():
+                pass
+        finally:
+            if child.poll() is None:
+                child.kill()
+                child.wait(timeout=15)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX directory permission enforcement")
+@pytest.mark.parametrize("project", ["prod", "atom_lab"])
+def test_deployment_lock_unsafe_directory_stops_before_compose(
+    monkeypatch, tmp_path, capsys, project
+):
+    runner = load_runner_module()
+    path = getattr(runner, f"_{project}_deployment_lock_path")()
+    path.parent.mkdir(mode=0o700, parents=True)
+    path.parent.chmod(0o755)
+    if project == "prod":
+        monkeypatch.setattr(runner, "_prod_up_locked", lambda: pytest.fail("reached Compose"))
+        assert runner.prod_up() == 1
+    else:
+        monkeypatch.setattr(runner, "_atom_lab_up_locked", lambda: pytest.fail("reached Compose"))
+        assert runner.atom_lab_up() == 1
+    assert "unsafe lock directory" in capsys.readouterr().err
+
+
+def test_deployment_lock_open_permission_error_is_not_contention(monkeypatch, tmp_path):
+    runner = load_runner_module()
+
+    def denied(*args, **kwargs):
+        raise PermissionError(runner.errno.EACCES, "access denied")
+
+    monkeypatch.setattr(runner.os, "open", denied)
+    with (
+        pytest.raises(runner.DeploymentLockError, match="could not open"),
+        runner._DeploymentLock(tmp_path / "deploy.lock", "test"),
+    ):
+        pytest.fail("permission denied file opened")

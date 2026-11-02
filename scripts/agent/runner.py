@@ -9,6 +9,7 @@ import os
 import shutil
 import signal
 import socket
+import stat
 import subprocess
 import sys
 import tempfile
@@ -22,7 +23,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from http import HTTPStatus
 from pathlib import Path
-from typing import NamedTuple
+from typing import BinaryIO, NamedTuple
 from urllib.parse import quote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -2579,6 +2580,77 @@ class DeploymentLockError(RuntimeError):
 ProductionDeploymentLockError = DeploymentLockError
 
 
+def _deployment_lock_dir() -> Path:
+    # One deploy user must share locks across checkouts and shells, regardless of TMPDIR.
+    if os.name == "nt":
+        return Path(os.environ["LOCALAPPDATA"]) / "anytoolai" / "deployment-locks"
+    return Path.home() / ".local" / "state" / "anytoolai" / "deployment-locks"
+
+
+def _prepare_deployment_lock_directory(path: Path) -> None:
+    missing = []
+    parent = path.parent
+    while not parent.exists():
+        missing.append(parent)
+        parent = parent.parent
+    for parent in reversed(missing):
+        parent.mkdir(mode=0o700, exist_ok=True)
+    directory = path.parent.lstat()
+    if (
+        not stat.S_ISDIR(directory.st_mode)
+        or getattr(directory, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
+    ):
+        raise OSError(f"unsafe lock directory {path.parent}: links are not allowed")
+    if os.name != "nt":
+        if directory.st_uid != os.geteuid() or directory.st_mode & 0o077:
+            raise OSError(
+                f"unsafe lock directory {path.parent}: requires owner-only permissions (0700)"
+            )
+        # Writable ancestors could let another user replace the private directory itself.
+        for parent in (path.parent, *path.parent.parents):
+            info = parent.lstat()
+            if not stat.S_ISDIR(info.st_mode) or (
+                info.st_mode & 0o022 and not info.st_mode & stat.S_ISVTX
+            ):
+                raise OSError(f"unsafe lock directory ancestor {parent}")
+            if parent == Path.home():
+                break
+
+
+def _open_deployment_lock(path: Path) -> BinaryIO:
+    _prepare_deployment_lock_directory(path)
+    try:
+        info = path.lstat()
+    except FileNotFoundError:
+        pass
+    else:
+        if (
+            not stat.S_ISREG(info.st_mode)
+            or getattr(info, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
+        ):
+            raise OSError(f"unsafe lock file {path}: requires a regular file without links")
+    flags = os.O_RDWR | os.O_CREAT
+    if os.name == "nt":
+        flags |= os.O_BINARY
+    else:
+        flags |= os.O_NOFOLLOW | os.O_CLOEXEC | os.O_NONBLOCK
+    fd = os.open(path, flags, 0o600)
+    try:
+        info = os.fstat(fd)
+        if (
+            not stat.S_ISREG(info.st_mode)
+            or info.st_nlink != 1
+            or (os.name != "nt" and (info.st_uid != os.geteuid() or info.st_mode & 0o077))
+        ):
+            raise OSError(
+                f"unsafe lock file {path}: requires a private, owned regular file with one link"
+            )
+        return os.fdopen(fd, "r+b")
+    except BaseException:
+        os.close(fd)
+        raise
+
+
 class _DeploymentLock:
     """Cross-process host lock guarding a fixed Compose project."""
 
@@ -2590,8 +2662,12 @@ class _DeploymentLock:
     def __enter__(self) -> "_DeploymentLock":
         handle = None
         try:
-            self._path.parent.mkdir(parents=True, exist_ok=True)
-            handle = self._path.open("a+b")
+            handle = _open_deployment_lock(self._path)
+        except OSError as exc:
+            raise DeploymentLockError(
+                f"could not open {self._operation} lock {self._path}: {exc}"
+            ) from exc
+        try:
             if os.name == "nt":
                 import msvcrt
 
@@ -2627,12 +2703,7 @@ class _DeploymentLock:
 
 
 def _prod_deployment_lock_path() -> Path:
-    # The Compose project name is host-global, so the lock must not live under ROOT/.agent:
-    # separate worktrees/clones could otherwise mutate the same anytoolai-prod project concurrently.
-    # Production targets a Linux VPS, so use the fixed host /tmp namespace instead of TMPDIR,
-    # which may legitimately differ between shells/worktrees and would defeat cross-process locking.
-    lock_root = Path(tempfile.gettempdir()) if os.name == "nt" else Path("/tmp")
-    return lock_root / f"{PROD_COMPOSE_PROJECT}.deployment.lock"
+    return _deployment_lock_dir() / f"{PROD_COMPOSE_PROJECT}.deployment.lock"
 
 
 def _prod_deployment_lock() -> _DeploymentLock:
@@ -2640,8 +2711,7 @@ def _prod_deployment_lock() -> _DeploymentLock:
 
 
 def _atom_lab_deployment_lock_path() -> Path:
-    lock_root = Path(tempfile.gettempdir()) if os.name == "nt" else Path("/tmp")
-    return lock_root / f"{ATOM_LAB_COMPOSE_PROJECT}.deployment.lock"
+    return _deployment_lock_dir() / f"{ATOM_LAB_COMPOSE_PROJECT}.deployment.lock"
 
 
 def _atom_lab_deployment_lock() -> _DeploymentLock:

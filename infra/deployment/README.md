@@ -887,3 +887,20 @@ These results prove local code/HTTP interoperability with TEST-ONLY vocabulary; 
 private-zone controls, production commercial approval and financial/paid execution are unproven.
 Full verification results remain in the
 [canonical plan](../../docs/exec-plans/completed/ANY-711-implementation-plan.md).
+
+### Deployment lock storage
+
+Run every prod and Atom Lab lifecycle command on a host as the **same system deploy user**.
+All checkouts share persistent locks in `~/.local/state/anytoolai/deployment-locks` on POSIX,
+or `%LOCALAPPDATA%\anytoolai\deployment-locks` on Windows (protected by the user profile ACL).
+Different system users do not share these locks. Keep the profile location consistent across
+interactive shells, cron and service jobs; TMPDIR and checkout paths do not affect lock identity.
+The runner creates the POSIX lock directory as 0700 and files as 0600, and rejects unsafe owners,
+permissions, links or writable directory ancestors. Correct unsafe permissions as the deploy user;
+do not use chmod 777. Keep Windows profile ACLs restricted to the deploy user and administrators.
+
+During migration, stop all lifecycle commands from old checkouts before using the new runner:
+old runners use `/tmp` locks and cannot coordinate with the new location. Once no old runner is
+active, old `/tmp/anytoolai-prod.deployment.lock` and `/tmp/anytoolai-atom-lab.deployment.lock`
+markers can be removed. Never delete the new persistent lock files during operation; process
+exit (including a crash) releases the lock automatically.
