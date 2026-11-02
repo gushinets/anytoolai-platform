@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import ctypes
 import errno
 import hashlib
 import importlib.util
@@ -25,6 +26,9 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import BinaryIO, NamedTuple
 from urllib.parse import quote, urlsplit
+
+if os.name != "nt":
+    import pwd
 
 ROOT = Path(__file__).resolve().parents[2]
 QUICK_CHECK_VENV = ROOT / ".quick-check-venv"
@@ -2580,11 +2584,31 @@ class DeploymentLockError(RuntimeError):
 ProductionDeploymentLockError = DeploymentLockError
 
 
-def _deployment_lock_dir() -> Path:
-    # One deploy user must share locks across checkouts and shells, regardless of TMPDIR.
+def _deployment_user_home() -> Path:
     if os.name == "nt":
-        return Path(os.environ["LOCALAPPDATA"]) / "anytoolai" / "deployment-locks"
-    return Path.home() / ".local" / "state" / "anytoolai" / "deployment-locks"
+        shell = ctypes.WinDLL("shell32", use_last_error=True)
+        query = shell.SHGetFolderPathW
+        query.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_int,
+            ctypes.c_void_p,
+            ctypes.c_uint,
+            ctypes.c_wchar_p,
+        ]
+        query.restype = ctypes.c_long
+        buffer = ctypes.create_unicode_buffer(32768)
+        # CSIDL_PROFILE identifies the current token's profile, not USERPROFILE/HOME overrides.
+        if query(None, 40, None, 0, buffer) < 0 or not buffer.value:
+            raise DeploymentLockError("could not determine the deployment user's system profile")
+        return Path(buffer.value).resolve(strict=True)
+    return Path(pwd.getpwuid(os.geteuid()).pw_dir).resolve(strict=True)
+
+
+def _deployment_lock_dir() -> Path:
+    home = _deployment_user_home()
+    if os.name == "nt":
+        return home / "AppData" / "Local" / "anytoolai" / "deployment-locks"
+    return home / ".local" / "state" / "anytoolai" / "deployment-locks"
 
 
 def _validate_windows_lock_permissions(paths: list[Path]) -> None:
@@ -2610,19 +2634,19 @@ def _validate_windows_lock_permissions(paths: list[Path]) -> None:
 
 
 def _prepare_deployment_lock_directory(path: Path) -> None:
-    home = Path.home()
+    home = _deployment_user_home()
     if not path.is_absolute() or ".." in path.parts or not path.is_relative_to(home):
         raise OSError(f"unsafe lock directory {path.parent}: must be inside the user profile")
-    directories = []
-    for parent in (path.parent, *path.parent.parents):
-        directories.append(parent)
-        if parent == home:
-            break
-    # Check from the profile down before creating anything beneath an existing ancestor.
+    directories = [path.parent, *path.parent.parents]
+    # Check from the filesystem root down before creating anything beneath an existing ancestor.
     for directory in reversed(directories):
         try:
             info = directory.lstat()
         except FileNotFoundError:
+            if not directory.is_relative_to(home):
+                raise OSError(
+                    f"unsafe lock directory {directory}: missing system ancestor"
+                ) from None
             directory.mkdir(mode=0o700, exist_ok=True)
             info = directory.lstat()
         if (
@@ -2630,10 +2654,19 @@ def _prepare_deployment_lock_directory(path: Path) -> None:
             or getattr(info, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
         ):
             raise OSError(f"unsafe lock directory {directory}: links are not allowed")
-        if os.name != "nt" and (info.st_uid not in {0, os.geteuid()} or info.st_mode & 0o022):
-            raise OSError(
-                f"unsafe lock directory {directory}: untrusted owner or writable permissions"
+        if os.name != "nt":
+            trusted_owner = info.st_uid in {0, os.geteuid()}
+            # Root-owned sticky /tmp cannot rename the next deploy-owned directory.
+            protected_child = (
+                info.st_uid == 0
+                and info.st_mode & stat.S_ISVTX
+                and directory != path.parent
+                and directories[directories.index(directory) - 1].lstat().st_uid == os.geteuid()
             )
+            if not trusted_owner or (info.st_mode & 0o022 and not protected_child):
+                raise OSError(
+                    f"unsafe lock directory {directory}: untrusted owner or writable permissions"
+                )
     info = path.parent.lstat()
     if os.name != "nt" and (info.st_uid != os.geteuid() or info.st_mode & 0o077):
         raise OSError(

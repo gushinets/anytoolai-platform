@@ -1,9 +1,13 @@
 # Fail closed: inspect SIDs and rights, never localized icacls text or account names.
 $ErrorActionPreference = 'Stop'
+# Python may inherit PS7's PSModulePath; Windows PowerShell must load its own system modules.
+$env:PSModulePath = "$PSHOME\Modules"
 try {
     $sidType = [System.Security.Principal.SecurityIdentifier]
     $currentSid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-    $trusted = @($currentSid, 'S-1-5-18', 'S-1-5-32-544') # User, SYSTEM, Administrators.
+    # Deploy user, SYSTEM, Administrators and the Windows servicing owner TrustedInstaller.
+    $trusted = @($currentSid, 'S-1-5-18', 'S-1-5-32-544',
+        'S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464')
     $unsafeRights = [System.Security.AccessControl.FileSystemRights]::Write -bor
         [System.Security.AccessControl.FileSystemRights]::Delete -bor
         [System.Security.AccessControl.FileSystemRights]::DeleteSubdirectoriesAndFiles -bor
@@ -20,11 +24,27 @@ try {
         if ($null -eq $raw.DiscretionaryAcl) {
             throw "Unrestricted lock path DACL: $path"
         }
+        $profile = [Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile)
+        $insideProfile = $path.TrimEnd('\') -eq $profile.TrimEnd('\') -or
+            $path.StartsWith($profile.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)
+        $rights = $unsafeRights
+        if (-not $insideProfile) {
+            # Creating siblings is safe; replacing a protected child or changing its parent is not.
+            $rights = [System.Security.AccessControl.FileSystemRights]::Delete -bor
+                [System.Security.AccessControl.FileSystemRights]::DeleteSubdirectoriesAndFiles -bor
+                [System.Security.AccessControl.FileSystemRights]::ChangePermissions -bor
+                [System.Security.AccessControl.FileSystemRights]::TakeOwnership
+        }
         foreach ($rule in $acl.GetAccessRules($true, $true, $sidType)) {
+            $inheritOnly = ($rule.PropagationFlags -band
+                [System.Security.AccessControl.PropagationFlags]::InheritOnly) -ne 0
+            if ($inheritOnly -and (-not $insideProfile -or $rule.IdentityReference.Value -eq 'S-1-3-0')) {
+                continue # CREATOR OWNER applies only to descendants, whose owners are checked.
+            }
             # Conservatively reject untrusted write grants even when deny rules also exist.
             if ($rule.AccessControlType -eq 'Allow' -and
                 $trusted -notcontains $rule.IdentityReference.Value -and
-                ($rule.FileSystemRights -band $unsafeRights) -ne 0) {
+                ($rule.FileSystemRights -band $rights) -ne 0) {
                 throw "Untrusted write/delete/ownership grant on lock path: $path"
             }
         }

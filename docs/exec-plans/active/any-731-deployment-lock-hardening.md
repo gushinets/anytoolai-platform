@@ -65,3 +65,29 @@ architecture and whitespace checks pass; no new Ruff findings in added code. Win
 and Docker smoke remain unverified locally. Isolated Windows test profiles receive private ACLs
 so tests do not rely on permissive CI workspace inheritance. Existing Compose-error mocks now
 allow real ACL inspection instead of intercepting PowerShell calls.
+
+## Review round 2: canonical identity and namespace ancestry
+
+All four requested findings verified; inline PR replies were read before editing.
+
+- Derive the canonical POSIX home from pwd.getpwuid(euid), and the Windows profile from
+  SHGetFolderPathW(CSIDL_PROFILE), rather than profile environment variables. Canonicalize once
+  per lookup and build the lock path from that account identity.
+- Check the complete namespace to the filesystem root. Root-owned sticky ancestors are safe
+  only with a deploy-owned next child; foreign sticky owners and writable non-sticky parents
+  are rejected, including those above the profile. Windows checks ancestor delete/permission
+  rights separately from harmless sibling-creation rights and trusts the system TrustedInstaller.
+- Accept inherit-only CREATOR OWNER entries; retain rejection of other untrusted inheritance
+  grants within the profile. Child ownership and existing file ACLs are still checked.
+- Reset Windows PowerShell's PSModulePath to PSHOME/Modules before loading any cmdlet. This
+  addresses the documented PS7 -> Python -> Windows PowerShell module-version conflict seen
+  in the failed Windows baseline. No security inspection is bypassed.
+- Add live-holder replacement tests above HOME, account-identity and cross-process environment
+  tests, and Windows CREATOR OWNER / Everyone inheritance / PS7-module-path regressions.
+- Isolate test profiles under the real system temp/profile namespace, independent of shared
+  checkout permissions. Restore mocks before profile cleanup.
+
+Validation: 39 targeted checks passed on Linux with 7 Windows-only cases skipped. Complete
+runner suite retains only the existing passwordless-sudo activation-marker failure. Doctor,
+architecture, docs and whitespace checks passed. Real Windows green remains pending an
+explicitly authorized push and CI run; there is no local Windows executor.

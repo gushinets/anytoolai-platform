@@ -891,21 +891,32 @@ Full verification results remain in the
 ## Deployment lock storage
 
 Run every prod and Atom Lab lifecycle command on a host as the **same system deploy user**.
-All checkouts share persistent locks in `~/.local/state/anytoolai/deployment-locks` on POSIX,
-or `%LOCALAPPDATA%\anytoolai\deployment-locks` on Windows (protected by the user profile ACL).
-Different system users do not share these locks. Keep the profile location consistent across
-interactive shells, cron and service jobs; TMPDIR and checkout paths do not affect lock identity.
-The runner creates the POSIX lock directory as 0700 and files as 0600, and rejects unsafe owners,
-permissions, links or untrusted/writable directory ancestors through the user profile. Correct unsafe permissions as the deploy user;
-do not use chmod 777; a sticky bit does not make a writable ancestor safe.
-On Windows, system PowerShell validates owners and DACLs for the profile-to-lock directory chain
-and existing lock files. Only the deploy user, SYSTEM and Administrators may own these paths or
-hold write, delete or permission-changing grants. Intermediate junctions/reparse points and
-paths outside the user profile are rejected. ACL inspection failure also blocks deployment;
-correct the ACLs or profile layout instead of bypassing the check.
+All checkouts share persistent locks in `<account-home>/.local/state/anytoolai/deployment-locks`
+on POSIX, or `<system-profile>\AppData\Local\anytoolai\deployment-locks` on Windows.
+POSIX uses the effective UID's account-database home; Windows queries the current token's system
+profile. The canonical path is independent of HOME, USERPROFILE, LOCALAPPDATA, TMPDIR and checkout.
+Different system users do not share these locks.
+
+The runner checks the full directory chain to the filesystem root, including parents above the
+profile that could rename it. POSIX ancestors must be owned by root or the deploy user and must
+not be group/other writable. A root-owned sticky directory is allowed only when its next child
+is deploy-owned; a foreign-owned sticky directory is unsafe. The final directory and files are
+created as 0700/0600 and must remain private and deploy-owned. Correct unsafe permissions as the
+deploy user; do not use chmod 777.
+
+Windows validates owners and DACLs through the filesystem root and on existing lock files.
+The deploy user, SYSTEM, Administrators and TrustedInstaller are trusted owners/writers.
+Above the system profile, sibling creation alone is allowed; untrusted delete/rename or
+permission-changing grants are rejected. Within the profile, untrusted write grants are rejected,
+including inheritance grants; inherit-only CREATOR OWNER is allowed because it grants rights to
+the checked child owner. Intermediate junctions/reparse points are rejected. Windows PowerShell
+uses only its own system modules, independent of inherited PowerShell 7 module paths. Inspection
+failure blocks deployment; correct the ACLs or layout instead of bypassing the check.
 
 During migration, stop all lifecycle commands from old checkouts before using the new runner:
-old runners use `/tmp` locks and cannot coordinate with the new location. Once no old runner is
+old runners use `/tmp` locks and cannot coordinate with the new location. Windows checkouts
+that previously followed a redirected LOCALAPPDATA must also be stopped before switching to
+the canonical system-profile location. Once no old runner is
 active, old `/tmp/anytoolai-prod.deployment.lock` and `/tmp/anytoolai-atom-lab.deployment.lock`
 markers can be removed. Never delete the new persistent lock files during operation; process
 exit (including a crash) releases the lock automatically.

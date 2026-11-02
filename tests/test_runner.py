@@ -12,12 +12,35 @@ import tempfile
 import time
 import urllib.parse
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
 
 from tests.test_atoms_proof import load_atoms_proof_module
 from tests.test_quick_check import load_quick_check_module
+
+if os.name != "nt":
+    import pwd
+
+
+@pytest.fixture
+def tmp_path(monkeypatch):
+    # Exercise real namespace ancestry from a system temp location, not a shared checkout.
+    root = (
+        load_runner_module(isolate_profile=False)._deployment_user_home()
+        / "AppData"
+        / "Local"
+        / "Temp"
+        if os.name == "nt"
+        else Path("/tmp")
+    )
+    with tempfile.TemporaryDirectory(prefix="anytoolai-runner-", dir=root) as directory:
+        try:
+            yield Path(directory)
+        finally:
+            # Tests may mock shutil.rmtree/os.open; restore them before cleaning the profile.
+            monkeypatch.undo()
 
 
 @pytest.fixture(autouse=True)
@@ -45,13 +68,16 @@ def isolated_deployment_lock_profile(monkeypatch, tmp_path):
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "local"))
 
 
-def load_runner_module():
+def load_runner_module(*, isolate_profile=True):
     module_path = Path(__file__).resolve().parents[1] / "scripts" / "agent" / "runner.py"
     spec = importlib.util.spec_from_file_location("runner_module", module_path)
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    if isolate_profile:
+        test_home = Path(os.environ["USERPROFILE"] if os.name == "nt" else os.environ["HOME"])
+        module._deployment_user_home = lambda: test_home
     return module
 
 
@@ -4360,12 +4386,18 @@ import importlib.util, sys
 spec = importlib.util.spec_from_file_location('runner', sys.argv[1])
 runner = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(runner)
+from pathlib import Path
+runner._deployment_user_home = lambda: Path(sys.argv[3])
 with getattr(runner, '_' + sys.argv[2] + '_deployment_lock')():
     print('locked', flush=True)
     sys.stdin.readline()
 """
+    child_env = dict(os.environ)
+    for key in ("HOME", "USERPROFILE", "LOCALAPPDATA", "TMPDIR"):
+        child_env[key] = str(checkout / "different-environment")
     with subprocess.Popen(
-        [sys.executable, "-c", code, str(script), project],
+        [sys.executable, "-c", code, str(script), project, str(tmp_path)],
+        env=child_env,
         cwd=checkout,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
@@ -4424,30 +4456,41 @@ def test_deployment_lock_open_permission_error_is_not_contention(monkeypatch, tm
     def denied(*args, **kwargs):
         raise PermissionError(runner.errno.EACCES, "access denied")
 
-    monkeypatch.setattr(runner.os, "open", denied)
-    with (
-        pytest.raises(runner.DeploymentLockError, match="could not open"),
-        runner._DeploymentLock(tmp_path / "deploy.lock", "test"),
-    ):
-        pytest.fail("permission denied file opened")
+    with monkeypatch.context() as patch:
+        patch.setattr(runner.os, "open", denied)
+        with (
+            pytest.raises(runner.DeploymentLockError, match="could not open"),
+            runner._DeploymentLock(tmp_path / "deploy.lock", "test"),
+        ):
+            pytest.fail("permission denied file opened")
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX directory ownership regression")
-@pytest.mark.parametrize("mode", [0o755, 0o1777])
-def test_deployment_lock_foreign_ancestor_replacement_with_live_holder(monkeypatch, tmp_path, mode):
+@pytest.mark.parametrize("mode", [0o755, 0o1777, 0o777])
+@pytest.mark.parametrize("location", ["inside", "above"])
+def test_deployment_lock_unsafe_ancestor_replacement_with_live_holder(
+    monkeypatch, tmp_path, mode, location
+):
     runner = load_runner_module()
+    home = tmp_path
+    if location == "above":
+        (tmp_path / "unsafe-parent").mkdir(mode=0o700)
+        home = tmp_path / "unsafe-parent" / "deploy-home"
+        home.mkdir(mode=0o700)
+        monkeypatch.setattr(runner, "_deployment_user_home", lambda: home)
     path = runner._prod_deployment_lock_path()
     runner._prepare_deployment_lock_directory(path)
     code = """
 import runpy, sys
 from pathlib import Path
 runner = runpy.run_path(sys.argv[1])
+runner['_DeploymentLock'].__enter__.__globals__['_deployment_user_home'] = lambda: Path(sys.argv[3])
 with runner['_DeploymentLock'](Path(sys.argv[2]), 'holder'):
     print('locked', flush=True)
     sys.stdin.readline()
 """
     with subprocess.Popen(
-        [sys.executable, "-c", code, runner.__file__, str(path)],
+        [sys.executable, "-c", code, runner.__file__, str(path), str(home)],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -4461,21 +4504,22 @@ with runner['_DeploymentLock'](Path(sys.argv[2]), 'holder'):
                 except BaseException:
                     child.kill()
                     raise
-            ancestor = path.parent.parent
+            ancestor = path.parent.parent if location == "inside" else home.parent
             ancestor.chmod(mode)
             # Model the attacker's UID without requiring chown/root in the test environment.
             real_lstat = Path.lstat
 
             def foreign_ancestor(directory, *args, **kwargs):
                 info = real_lstat(directory, *args, **kwargs)
-                if directory == ancestor:
+                if directory == ancestor and not (location == "above" and mode & stat.S_IWOTH):
                     fields = list(info)
                     fields[4] = os.geteuid() + 1
                     return os.stat_result(fields)
                 return info
 
             monkeypatch.setattr(Path, "lstat", foreign_ancestor)
-            path.parent.rename(ancestor / "held-locks")
+            replaced = path.parent if location == "inside" else home
+            replaced.rename(ancestor / "held-locks")
             with (
                 pytest.raises(runner.DeploymentLockError, match="untrusted owner"),
                 runner._prod_deployment_lock(),
@@ -4566,3 +4610,60 @@ def test_windows_lock_acl_inspection_fails_closed(monkeypatch, tmp_path, outcome
     else:
         with pytest.raises(OSError, match="unsafe lock permissions"):
             runner._validate_windows_lock_permissions([tmp_path])
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX account database")
+def test_deployment_identity_uses_account_home_not_environment(monkeypatch, tmp_path):
+    runner = load_runner_module(isolate_profile=False)
+    monkeypatch.setattr(pwd, "getpwuid", lambda uid: SimpleNamespace(pw_dir=str(tmp_path)))
+    first = runner._prod_deployment_lock_path()
+    for key in ("HOME", "USERPROFILE", "LOCALAPPDATA"):
+        monkeypatch.setenv(key, str(tmp_path / "different-profile"))
+    assert runner._prod_deployment_lock_path() == first
+    assert first.is_relative_to(tmp_path)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows system profile API")
+def test_windows_deployment_identity_ignores_profile_environment(monkeypatch, tmp_path):
+    runner = load_runner_module(isolate_profile=False)
+    first = runner._prod_deployment_lock_path()
+    for key in ("HOME", "USERPROFILE", "LOCALAPPDATA"):
+        monkeypatch.setenv(key, str(tmp_path / "different-profile"))
+    assert runner._prod_deployment_lock_path() == first
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows inherit-only ACL and PS7 module environment")
+@pytest.mark.parametrize("sid", ["S-1-3-0", "S-1-1-0"])
+def test_windows_lock_inherit_only_owner_and_module_environment(monkeypatch, tmp_path, sid):
+    runner = load_runner_module()
+    path = runner._prod_deployment_lock_path()
+    runner._prepare_deployment_lock_directory(path)
+    subprocess.run(
+        ["icacls.exe", str(path.parent), "/grant", f"*{sid}:(OI)(CI)(IO)F"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    # Force the known PS7 -> Python -> Windows PowerShell failure mode.
+    inherited_modules = os.environ.get("PSMODULEPATH", "")
+    pwsh = shutil.which("pwsh.exe")
+    if pwsh is not None:
+        inherited_modules = str(Path(pwsh).parent / "Modules") + ";" + inherited_modules
+    monkeypatch.setenv("PSMODULEPATH", inherited_modules)
+    try:
+        if sid == "S-1-3-0":
+            with runner._prod_deployment_lock():
+                pass
+        else:
+            with (
+                pytest.raises(runner.DeploymentLockError, match="unsafe lock permissions"),
+                runner._prod_deployment_lock(),
+            ):
+                pytest.fail("untrusted inherit-only write grant accepted")
+    finally:
+        subprocess.run(
+            ["icacls.exe", str(path.parent), "/remove:g", f"*{sid}"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
