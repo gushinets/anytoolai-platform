@@ -106,3 +106,19 @@ Windows baseline and Sonar gate must be rechecked after the next authorized push
 Local follow-up validation: 39 targeted tests passed, 8 Windows-only cases skipped. Documentation,
 architecture and whitespace checks pass. The remote Windows/gate result remains unverified until
 these changes are pushed. Quality Gate thresholds and issue statuses were not changed.
+
+## Review round 3: preserve the account-home namespace
+
+Verified that resolve() erased account-home aliases and their unsafe parents before inspection.
+Removed profile resolution on both platforms: the account-derived lexical path now reaches the
+same complete root-to-leaf lstat/ACL checks. All symlinked/junction profiles are explicitly
+unsupported, including safe aliases; document this closed boundary rather than adding another
+alias traversal mechanism. Added a live-process regression holding target A's flock while the
+account-home alias is switched between two private targets, with safe and writable alias parents.
+Targeted validation: 41 tests passed on Linux, 9 Windows-only cases skipped; added a Windows
+account-profile junction regression as well. Complete runner tests retain only the existing
+activation-marker failure requiring passwordless sudo. Doctor, architecture, docs and whitespace
+checks pass; no new Ruff findings in changed code.
+The prior remote HEAD d3fe5ba6 now has green Windows baseline and Sonar Quality Gate. These new
+round-3 changes are local and require their own CI validation. No automatic commit/push or
+review-thread writes.

@@ -894,7 +894,10 @@ Run every prod and Atom Lab lifecycle command on a host as the **same system dep
 All checkouts share persistent locks in `<account-home>/.local/state/anytoolai/deployment-locks`
 on POSIX, or `<system-profile>\AppData\Local\anytoolai\deployment-locks` on Windows.
 POSIX uses the effective UID's account-database home; Windows queries the current token's system
-profile. The canonical path is independent of HOME, USERPROFILE, LOCALAPPDATA, TMPDIR and checkout.
+profile. The account-derived path is independent of HOME, USERPROFILE, LOCALAPPDATA, TMPDIR and
+checkout. The runner preserves the original path for inspection: symlinks/junctions anywhere in
+the profile path (including a safe linked home) are unsupported and fail closed. Configure a
+direct account-home path instead; resolving an alias first would hide who can replace it.
 Different system users do not share these locks.
 
 The runner checks the full directory chain to the filesystem root, including parents above the

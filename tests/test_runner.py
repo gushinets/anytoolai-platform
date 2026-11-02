@@ -4676,3 +4676,97 @@ def test_windows_lock_inherit_only_owner_and_module_environment(monkeypatch, tmp
             capture_output=True,
             text=True,
         )
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX account-home alias swap with live flock holder")
+@pytest.mark.parametrize("parent_mode", [0o700, 0o777])
+def test_deployment_lock_rejects_account_home_alias_swap(monkeypatch, tmp_path, parent_mode):
+    runner = load_runner_module(isolate_profile=False)
+    homes = [tmp_path / "deploy-home-A", tmp_path / "deploy-home-B"]
+    paths = []
+    for home in homes:
+        home.mkdir(mode=0o700)
+        monkeypatch.setattr(
+            pwd, "getpwuid", lambda uid, home=home: SimpleNamespace(pw_dir=str(home))
+        )
+        path = runner._prod_deployment_lock_path()
+        runner._prepare_deployment_lock_directory(path)
+        paths.append(path)
+    namespace = tmp_path / "alias-parent"
+    namespace.mkdir(mode=parent_mode)
+    alias = namespace / "account-home"
+    alias.symlink_to(homes[0], target_is_directory=True)
+    monkeypatch.setattr(pwd, "getpwuid", lambda uid: SimpleNamespace(pw_dir=str(alias)))
+    assert runner._deployment_user_home() == alias
+    # Model the first process's lock under the formerly resolved target, while the alias changes.
+    code = """
+import fcntl, os, sys
+fd = os.open(sys.argv[1], os.O_RDWR | os.O_CREAT, 0o600)
+fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+print('locked', flush=True)
+sys.stdin.readline()
+os.close(fd)
+"""
+    with subprocess.Popen(
+        [sys.executable, "-c", code, str(paths[0])],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    ) as child:
+        try:
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                ready = pool.submit(child.stdout.readline)
+                try:
+                    assert ready.result(timeout=15).strip() == "locked"
+                except BaseException:
+                    child.kill()
+                    raise
+            for target in homes:
+                alias.unlink()
+                alias.symlink_to(target, target_is_directory=True)
+                with (
+                    pytest.raises(runner.DeploymentLockError, match="unsafe lock directory"),
+                    runner._prod_deployment_lock(),
+                ):
+                    pytest.fail("account-home alias selected an independent lock inode")
+                assert child.poll() is None
+            assert not paths[1].exists()
+        finally:
+            child.kill()
+            child.wait(timeout=15)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows account-profile junction")
+def test_windows_account_profile_junction_is_not_resolved(monkeypatch, tmp_path):
+    runner = load_runner_module(isolate_profile=False)
+    target = tmp_path / "real-profile"
+    target.mkdir()
+    alias = tmp_path / "profile-alias"
+    subprocess.run(
+        ["cmd.exe", "/c", "mklink", "/J", str(alias), str(target)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    class ProfileQuery:
+        def __call__(self, hwnd, folder, token, flags, buffer):
+            buffer.value = str(alias)
+            return 0
+
+    monkeypatch.setattr(
+        runner.ctypes,
+        "WinDLL",
+        lambda *args, **kwargs: SimpleNamespace(SHGetFolderPathW=ProfileQuery()),
+    )
+    try:
+        assert runner._deployment_user_home() == alias
+        with (
+            pytest.raises(runner.DeploymentLockError, match="links are not allowed"),
+            runner._prod_deployment_lock(),
+        ):
+            pytest.fail("account-profile junction selected a resolved namespace")
+        assert not (target / "AppData").exists()
+    finally:
+        alias.rmdir()

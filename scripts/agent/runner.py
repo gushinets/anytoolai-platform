@@ -2600,8 +2600,9 @@ def _deployment_user_home() -> Path:
         # CSIDL_PROFILE identifies the current token's profile, not USERPROFILE/HOME overrides.
         if query(None, 40, None, 0, buffer) < 0 or not buffer.value:
             raise DeploymentLockError("could not determine the deployment user's system profile")
-        return Path(buffer.value).resolve(strict=True)
-    return Path(pwd.getpwuid(os.geteuid()).pw_dir).resolve(strict=True)
+        # Keep aliases visible to the root-to-leaf lstat checks; resolving hides their parents.
+        return Path(buffer.value)
+    return Path(pwd.getpwuid(os.geteuid()).pw_dir)
 
 
 def _deployment_lock_dir() -> Path:
