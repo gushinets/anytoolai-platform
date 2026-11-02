@@ -49,3 +49,19 @@ cross-checkout process exclusion and automatic release on exit. No dependencies 
 - Split unsafe-open errors from contention, retain persistent inodes and OS process locking.
 - Updated operator instructions with single-user scope, permissions and old-runner migration.
 - Baseline limitation above remains visible; no unrelated test or permission changes were made.
+
+## Review fixes (2026-11-02)
+
+Both security findings verified against current code and PR inline comments/replies read.
+Removed the sticky-bit exception and now require trusted POSIX owners through the profile boundary.
+Check each directory from the profile downward before creating descendants; reject intermediate
+reparse points on Windows. Windows system PowerShell inspects owner SIDs and DACL grants for
+all directories and existing lock files; failures block deployment. No dependencies added.
+Added live-holder directory-replacement regressions with modeled foreign ownership, real Windows
+ACL/junction tests, and platform-independent fail-closed inspection tests.
+Targeted validation: 35 passed, 4 Windows-only tests skipped on Linux. Complete runner suite
+has only the existing activation-marker failure requiring passwordless sudo. Documentation,
+architecture and whitespace checks pass; no new Ruff findings in added code. Windows execution
+and Docker smoke remain unverified locally. Isolated Windows test profiles receive private ACLs
+so tests do not rely on permissive CI workspace inheritance. Existing Compose-error mocks now
+allow real ACL inspection instead of intercepting PowerShell calls.

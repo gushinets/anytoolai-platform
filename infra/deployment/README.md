@@ -361,9 +361,9 @@ For an existing deployment, first close the Atom Lab ingress, then quiesce the a
 python scripts/agent/runner.py atom-lab-quiesce
 ```
 
-`atom-lab-quiesce` holds the host-global lifecycle lock, stops the API so no new run can be
-accepted, leaves the worker running until every job in this deployment database (Atom Lab,
-`/demo`, or ordinary runtime) has left `created`/`running`, and only then stops the worker.
+`atom-lab-quiesce` holds the per-user lifecycle lock shared across checkouts and stops the API
+so no new run can be accepted, leaves the worker running until every job in this deployment
+database (Atom Lab, `/demo`, or ordinary runtime) has left `created`/`running`, and only then stops the worker.
 PostgreSQL remains running. If the command returns nonzero, keep ingress
 closed, do not take a backup, and inspect `atom-lab-status` and worker logs. After resolving the
 problem, either rerun quiesce or abort the maintenance window with the idempotent
@@ -583,9 +583,9 @@ Inspect the printed `Enabled products: proposal_ai` and `Quota modes:
 proposal_ai=unmetered` before Compose starts. `prod-up` generates an ignored deployment profile,
 then force-recreates base + prod + live Compose, waits for API and web HTTP, and checks the
 same mounted profile fingerprint and policy references inside API and worker. It never falls
-back to fake. A host-level deployment lock covers profile generation through readiness,
-activation, and failure cleanup; a concurrent `prod-up` exits with `PROD007` before touching
-the production project or active profile. If Compose startup or readiness fails, or the
+back to fake. A per-user deployment lock shared across checkouts covers profile generation
+through readiness, activation, and failure cleanup; a concurrent `prod-up` exits with `PROD007`
+before touching the production project or active profile. If Compose startup or readiness fails, or the
 command is interrupted before `active-profile` is replaced, `prod-up` stops the candidate
 project without deleting its PostgreSQL volume; investigate before restarting production.
 Once that marker is in place, an interrupt leaves the stack up. The activation directory
@@ -888,7 +888,7 @@ private-zone controls, production commercial approval and financial/paid executi
 Full verification results remain in the
 [canonical plan](../../docs/exec-plans/completed/ANY-711-implementation-plan.md).
 
-### Deployment lock storage
+## Deployment lock storage
 
 Run every prod and Atom Lab lifecycle command on a host as the **same system deploy user**.
 All checkouts share persistent locks in `~/.local/state/anytoolai/deployment-locks` on POSIX,
@@ -896,8 +896,13 @@ or `%LOCALAPPDATA%\anytoolai\deployment-locks` on Windows (protected by the user
 Different system users do not share these locks. Keep the profile location consistent across
 interactive shells, cron and service jobs; TMPDIR and checkout paths do not affect lock identity.
 The runner creates the POSIX lock directory as 0700 and files as 0600, and rejects unsafe owners,
-permissions, links or writable directory ancestors. Correct unsafe permissions as the deploy user;
-do not use chmod 777. Keep Windows profile ACLs restricted to the deploy user and administrators.
+permissions, links or untrusted/writable directory ancestors through the user profile. Correct unsafe permissions as the deploy user;
+do not use chmod 777; a sticky bit does not make a writable ancestor safe.
+On Windows, system PowerShell validates owners and DACLs for the profile-to-lock directory chain
+and existing lock files. Only the deploy user, SYSTEM and Administrators may own these paths or
+hold write, delete or permission-changing grants. Intermediate junctions/reparse points and
+paths outside the user profile are rejected. ACL inspection failure also blocks deployment;
+correct the ACLs or profile layout instead of bypassing the check.
 
 During migration, stop all lifecycle commands from old checkouts before using the new runner:
 old runners use `/tmp` locks and cannot coordinate with the new location. Once no old runner is

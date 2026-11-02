@@ -2587,34 +2587,60 @@ def _deployment_lock_dir() -> Path:
     return Path.home() / ".local" / "state" / "anytoolai" / "deployment-locks"
 
 
+def _validate_windows_lock_permissions(paths: list[Path]) -> None:
+    try:
+        result = subprocess.run(
+            [
+                "powershell.exe",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                Path(__file__).with_name("deployment_lock_acl.ps1").read_text(encoding="utf-8"),
+            ],
+            input=json.dumps([str(path) for path in paths]),
+            capture_output=True,
+            text=True,
+            timeout=COMPOSE_STACK_QUERY_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise OSError(f"unsafe lock permissions: Windows ACL inspection failed: {exc}") from exc
+    if result.returncode != 0 or result.stdout.strip() != "deployment-lock-acl-ok":
+        raise OSError(f"unsafe lock permissions: {result.stderr.strip()}")
+
+
 def _prepare_deployment_lock_directory(path: Path) -> None:
-    missing = []
-    parent = path.parent
-    while not parent.exists():
-        missing.append(parent)
-        parent = parent.parent
-    for parent in reversed(missing):
-        parent.mkdir(mode=0o700, exist_ok=True)
-    directory = path.parent.lstat()
-    if (
-        not stat.S_ISDIR(directory.st_mode)
-        or getattr(directory, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
-    ):
-        raise OSError(f"unsafe lock directory {path.parent}: links are not allowed")
-    if os.name != "nt":
-        if directory.st_uid != os.geteuid() or directory.st_mode & 0o077:
+    home = Path.home()
+    if not path.is_absolute() or ".." in path.parts or not path.is_relative_to(home):
+        raise OSError(f"unsafe lock directory {path.parent}: must be inside the user profile")
+    directories = []
+    for parent in (path.parent, *path.parent.parents):
+        directories.append(parent)
+        if parent == home:
+            break
+    # Check from the profile down before creating anything beneath an existing ancestor.
+    for directory in reversed(directories):
+        try:
+            info = directory.lstat()
+        except FileNotFoundError:
+            directory.mkdir(mode=0o700, exist_ok=True)
+            info = directory.lstat()
+        if (
+            not stat.S_ISDIR(info.st_mode)
+            or getattr(info, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
+        ):
+            raise OSError(f"unsafe lock directory {directory}: links are not allowed")
+        if os.name != "nt" and (info.st_uid not in {0, os.geteuid()} or info.st_mode & 0o022):
             raise OSError(
-                f"unsafe lock directory {path.parent}: requires owner-only permissions (0700)"
+                f"unsafe lock directory {directory}: untrusted owner or writable permissions"
             )
-        # Writable ancestors could let another user replace the private directory itself.
-        for parent in (path.parent, *path.parent.parents):
-            info = parent.lstat()
-            if not stat.S_ISDIR(info.st_mode) or (
-                info.st_mode & 0o022 and not info.st_mode & stat.S_ISVTX
-            ):
-                raise OSError(f"unsafe lock directory ancestor {parent}")
-            if parent == Path.home():
-                break
+    info = path.parent.lstat()
+    if os.name != "nt" and (info.st_uid != os.geteuid() or info.st_mode & 0o077):
+        raise OSError(
+            f"unsafe lock directory {path.parent}: requires owner-only permissions (0700)"
+        )
+    if os.name == "nt":
+        _validate_windows_lock_permissions(directories)
 
 
 def _open_deployment_lock(path: Path) -> BinaryIO:
@@ -2629,6 +2655,8 @@ def _open_deployment_lock(path: Path) -> BinaryIO:
             or getattr(info, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
         ):
             raise OSError(f"unsafe lock file {path}: requires a regular file without links")
+        if os.name == "nt":
+            _validate_windows_lock_permissions([path])
     flags = os.O_RDWR | os.O_CREAT
     if os.name == "nt":
         flags |= os.O_BINARY

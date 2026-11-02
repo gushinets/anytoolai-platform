@@ -22,6 +22,23 @@ from tests.test_quick_check import load_quick_check_module
 
 @pytest.fixture(autouse=True)
 def isolated_deployment_lock_profile(monkeypatch, tmp_path):
+    # A synthetic profile must have private ACLs even when pytest runs under a shared CI workspace.
+    if os.name == "nt":
+        account = os.environ["USERDOMAIN"] + "\\" + os.environ["USERNAME"]
+        subprocess.run(
+            [
+                "icacls.exe",
+                str(tmp_path),
+                "/inheritance:r",
+                "/grant:r",
+                f"{account}:(OI)(CI)F",
+                "*S-1-5-18:(OI)(CI)F",
+                "*S-1-5-32-544:(OI)(CI)F",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
     # Lifecycle tests must neither mutate the real operator profile nor share its locks.
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
@@ -4037,13 +4054,14 @@ def test_atom_lab_up_fails_closed_when_compose_stack_probe_fails(
         dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
     )
     monkeypatch.setattr(runner, "_atom_lab_deployment_inputs", lambda: inputs)
-    monkeypatch.setattr(
-        runner.subprocess,
-        "run",
-        lambda command, **kwargs: subprocess.CompletedProcess(
-            command, 1, "", "daemon unavailable"
-        ),
-    )
+    real_run = runner.subprocess.run
+
+    def failed_compose(command, **kwargs):
+        if command[0] == "powershell.exe":
+            return real_run(command, **kwargs)
+        return subprocess.CompletedProcess(command, 1, "", "daemon unavailable")
+
+    monkeypatch.setattr(runner.subprocess, "run", failed_compose)
     monkeypatch.setattr(
         runner,
         "_check_ports_available",
@@ -4333,6 +4351,10 @@ def test_deployment_lock_cross_checkout_process_release(monkeypatch, tmp_path, p
     script = checkout / "scripts" / "agent" / "runner.py"
     script.parent.mkdir(parents=True)
     shutil.copyfile(Path(runner.__file__), script)
+    shutil.copyfile(
+        Path(runner.__file__).with_name("deployment_lock_acl.ps1"),
+        script.with_name("deployment_lock_acl.ps1"),
+    )
     code = """
 import importlib.util, sys
 spec = importlib.util.spec_from_file_location('runner', sys.argv[1])
@@ -4408,3 +4430,139 @@ def test_deployment_lock_open_permission_error_is_not_contention(monkeypatch, tm
         runner._DeploymentLock(tmp_path / "deploy.lock", "test"),
     ):
         pytest.fail("permission denied file opened")
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX directory ownership regression")
+@pytest.mark.parametrize("mode", [0o755, 0o1777])
+def test_deployment_lock_foreign_ancestor_replacement_with_live_holder(monkeypatch, tmp_path, mode):
+    runner = load_runner_module()
+    path = runner._prod_deployment_lock_path()
+    runner._prepare_deployment_lock_directory(path)
+    code = """
+import runpy, sys
+from pathlib import Path
+runner = runpy.run_path(sys.argv[1])
+with runner['_DeploymentLock'](Path(sys.argv[2]), 'holder'):
+    print('locked', flush=True)
+    sys.stdin.readline()
+"""
+    with subprocess.Popen(
+        [sys.executable, "-c", code, runner.__file__, str(path)],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    ) as child:
+        try:
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                ready = pool.submit(child.stdout.readline)
+                try:
+                    assert ready.result(timeout=15).strip() == "locked"
+                except BaseException:
+                    child.kill()
+                    raise
+            ancestor = path.parent.parent
+            ancestor.chmod(mode)
+            # Model the attacker's UID without requiring chown/root in the test environment.
+            real_lstat = Path.lstat
+
+            def foreign_ancestor(directory, *args, **kwargs):
+                info = real_lstat(directory, *args, **kwargs)
+                if directory == ancestor:
+                    fields = list(info)
+                    fields[4] = os.geteuid() + 1
+                    return os.stat_result(fields)
+                return info
+
+            monkeypatch.setattr(Path, "lstat", foreign_ancestor)
+            path.parent.rename(ancestor / "held-locks")
+            with (
+                pytest.raises(runner.DeploymentLockError, match="untrusted owner"),
+                runner._prod_deployment_lock(),
+            ):
+                pytest.fail("second deployment acquired a replacement lock inode")
+            assert not path.exists()
+            assert child.poll() is None
+        finally:
+            child.kill()
+            child.wait(timeout=15)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows DACL enforcement")
+@pytest.mark.parametrize("target_kind", ["ancestor", "directory", "file"])
+def test_deployment_lock_rejects_permissive_windows_acl(tmp_path, target_kind):
+    runner = load_runner_module()
+    path = runner._prod_deployment_lock_path()
+    with runner._prod_deployment_lock():
+        pass
+    target = {"ancestor": path.parent.parent, "directory": path.parent, "file": path}[target_kind]
+    subprocess.run(
+        ["icacls.exe", str(target), "/grant", "*S-1-1-0:M"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    try:
+        with (
+            pytest.raises(runner.DeploymentLockError, match="unsafe lock permissions"),
+            runner._prod_deployment_lock(),
+        ):
+            pytest.fail("Everyone may mutate the lock path")
+    finally:
+        subprocess.run(
+            ["icacls.exe", str(target), "/remove:g", "*S-1-1-0"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows intermediate junction regression")
+def test_deployment_lock_rejects_windows_ancestor_junction(tmp_path):
+    runner = load_runner_module()
+    path = runner._prod_deployment_lock_path()
+    path.parent.parent.parent.mkdir(parents=True)
+    target = tmp_path / "shared-storage"
+    target.mkdir()
+    junction = path.parent.parent
+    subprocess.run(
+        ["cmd.exe", "/c", "mklink", "/J", str(junction), str(target)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    try:
+        with (
+            pytest.raises(runner.DeploymentLockError, match="links are not allowed"),
+            runner._prod_deployment_lock(),
+        ):
+            pytest.fail("intermediate junction accepted")
+        assert not (target / "deployment-locks").exists()
+    finally:
+        junction.rmdir()
+
+
+@pytest.mark.parametrize("outcome", ["ok", "failure", "empty", "missing", "timeout"])
+def test_windows_lock_acl_inspection_fails_closed(monkeypatch, tmp_path, outcome):
+    runner = load_runner_module()
+
+    def inspect(command, **kwargs):
+        assert command[0] == "powershell.exe"
+        assert json.loads(kwargs["input"]) == [str(tmp_path)]
+        if outcome == "missing":
+            raise FileNotFoundError("PowerShell unavailable")
+        if outcome == "timeout":
+            raise subprocess.TimeoutExpired(command, kwargs["timeout"])
+        return subprocess.CompletedProcess(
+            command,
+            1 if outcome == "failure" else 0,
+            "deployment-lock-acl-ok\n" if outcome == "ok" else "",
+            "ACL error",
+        )
+
+    monkeypatch.setattr(runner.subprocess, "run", inspect)
+    if outcome == "ok":
+        runner._validate_windows_lock_permissions([tmp_path])
+    else:
+        with pytest.raises(OSError, match="unsafe lock permissions"):
+            runner._validate_windows_lock_permissions([tmp_path])
