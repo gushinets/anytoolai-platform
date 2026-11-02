@@ -4591,7 +4591,15 @@ def test_windows_lock_acl_inspection_fails_closed(monkeypatch, tmp_path, outcome
     runner = load_runner_module()
 
     def inspect(command, **kwargs):
-        assert command[0] == "powershell.exe"
+        assert command == [
+            "powershell.exe",
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "RemoteSigned",
+            "-File",
+            str(Path(runner.__file__).with_name("deployment_lock_acl.ps1")),
+        ]
         assert json.loads(kwargs["input"]) == [str(tmp_path)]
         if outcome == "missing":
             raise FileNotFoundError("PowerShell unavailable")
@@ -4633,13 +4641,14 @@ def test_windows_deployment_identity_ignores_profile_environment(monkeypatch, tm
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows inherit-only ACL and PS7 module environment")
-@pytest.mark.parametrize("sid", ["S-1-3-0", "S-1-1-0"])
+@pytest.mark.parametrize("sid", ["S-1-3-0", "S-1-3-4", "S-1-1-0"])
 def test_windows_lock_inherit_only_owner_and_module_environment(monkeypatch, tmp_path, sid):
     runner = load_runner_module()
     path = runner._prod_deployment_lock_path()
     runner._prepare_deployment_lock_directory(path)
+    inheritance = "(OI)(CI)" if sid == "S-1-3-4" else "(OI)(CI)(IO)"
     subprocess.run(
-        ["icacls.exe", str(path.parent), "/grant", f"*{sid}:(OI)(CI)(IO)F"],
+        ["icacls.exe", str(path.parent), "/grant", f"*{sid}:{inheritance}F"],
         check=True,
         capture_output=True,
         text=True,
@@ -4651,7 +4660,7 @@ def test_windows_lock_inherit_only_owner_and_module_environment(monkeypatch, tmp
         inherited_modules = str(Path(pwsh).parent / "Modules") + ";" + inherited_modules
     monkeypatch.setenv("PSMODULEPATH", inherited_modules)
     try:
-        if sid == "S-1-3-0":
+        if sid in {"S-1-3-0", "S-1-3-4"}:
             with runner._prod_deployment_lock():
                 pass
         else:

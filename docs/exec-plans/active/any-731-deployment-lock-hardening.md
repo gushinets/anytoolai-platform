@@ -91,3 +91,18 @@ Validation: 39 targeted checks passed on Linux with 7 Windows-only cases skipped
 runner suite retains only the existing passwordless-sudo activation-marker failure. Doctor,
 architecture, docs and whitespace checks passed. Real Windows green remains pending an
 explicitly authorized push and CI run; there is no local Windows executor.
+
+## Quality gate and Windows follow-up
+
+Sonar PR gate failed security rating on file contents passed through PowerShell -Command, plus
+an automatic-variable naming smell. Invoke the fixed tracked helper with -File and process-only
+RemoteSigned instead; retain JSON stdin, fail-closed behavior and system module isolation.
+Rename the PowerShell profile variable. The Windows run for 7dddb0aa cleared module loading but
+failed on OWNER RIGHTS grants produced by Python's own 0700 directory creation. Treat this SID
+as the already-verified object's owner, not as an unrelated principal, and add positive/negative
+owner-placeholder coverage. Include offending SID/rights in ACL errors for precise diagnosis.
+Windows baseline and Sonar gate must be rechecked after the next authorized push.
+
+Local follow-up validation: 39 targeted tests passed, 8 Windows-only cases skipped. Documentation,
+architecture and whitespace checks pass. The remote Windows/gate result remains unverified until
+these changes are pushed. Quality Gate thresholds and issue statuses were not changed.

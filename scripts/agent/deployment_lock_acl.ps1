@@ -24,9 +24,9 @@ try {
         if ($null -eq $raw.DiscretionaryAcl) {
             throw "Unrestricted lock path DACL: $path"
         }
-        $profile = [Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile)
-        $insideProfile = $path.TrimEnd('\') -eq $profile.TrimEnd('\') -or
-            $path.StartsWith($profile.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)
+        $deployProfileRoot = [Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile)
+        $insideProfile = $path.TrimEnd('\') -eq $deployProfileRoot.TrimEnd('\') -or
+            $path.StartsWith($deployProfileRoot.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)
         $rights = $unsafeRights
         if (-not $insideProfile) {
             # Creating siblings is safe; replacing a protected child or changing its parent is not.
@@ -36,6 +36,9 @@ try {
                 [System.Security.AccessControl.FileSystemRights]::TakeOwnership
         }
         foreach ($rule in $acl.GetAccessRules($true, $true, $sidType)) {
+            if ($rule.IdentityReference.Value -eq 'S-1-3-4') {
+                continue # OWNER RIGHTS is scoped to the object owner, verified as trusted above.
+            }
             $inheritOnly = ($rule.PropagationFlags -band
                 [System.Security.AccessControl.PropagationFlags]::InheritOnly) -ne 0
             if ($inheritOnly -and (-not $insideProfile -or $rule.IdentityReference.Value -eq 'S-1-3-0')) {
@@ -45,7 +48,7 @@ try {
             if ($rule.AccessControlType -eq 'Allow' -and
                 $trusted -notcontains $rule.IdentityReference.Value -and
                 ($rule.FileSystemRights -band $rights) -ne 0) {
-                throw "Untrusted write/delete/ownership grant on lock path: $path"
+                throw "Untrusted grant $($rule.IdentityReference.Value) ($($rule.FileSystemRights)) on lock path: $path"
             }
         }
     }

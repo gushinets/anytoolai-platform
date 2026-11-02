@@ -908,9 +908,11 @@ Windows validates owners and DACLs through the filesystem root and on existing l
 The deploy user, SYSTEM, Administrators and TrustedInstaller are trusted owners/writers.
 Above the system profile, sibling creation alone is allowed; untrusted delete/rename or
 permission-changing grants are rejected. Within the profile, untrusted write grants are rejected,
-including inheritance grants; inherit-only CREATOR OWNER is allowed because it grants rights to
-the checked child owner. Intermediate junctions/reparse points are rejected. Windows PowerShell
-uses only its own system modules, independent of inherited PowerShell 7 module paths. Inspection
+including inheritance grants. OWNER RIGHTS is evaluated as the verified object owner, and
+inherit-only CREATOR OWNER is allowed because it grants rights to the checked child owner. Intermediate junctions/reparse points are rejected. Windows PowerShell
+uses only its own system modules, independent of inherited PowerShell 7 module paths, and runs
+the fixed local helper via -File with process-only RemoteSigned policy. Machine policy is unchanged.
+Inspection
 failure blocks deployment; correct the ACLs or layout instead of bypassing the check.
 
 During migration, stop all lifecycle commands from old checkouts before using the new runner:
