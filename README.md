@@ -59,15 +59,32 @@ smoke commands will be added only when feature issues deliver real vertical slic
 
 ## Security scanning
 
-`.github/workflows/trivy.yml` runs Trivy on pull requests, pushes to `main`, weekly on Monday at
-03:17 UTC, and manually through GitHub Actions. It scans the repository lockfiles, including dev
-dependencies, and Dockerfile misconfigurations. Every run saves a `trivy-filesystem-sarif` artifact;
-non-PR runs also publish results to GitHub Security under `trivy-filesystem`.
+`.github/workflows/backend.yml` calls the reusable `.github/workflows/trivy.yml` on pull requests
+and pushes to `main`. Trivy also runs weekly on Monday at 03:17 UTC and manually through GitHub
+Actions. It scans repository lockfiles, including dev dependencies, and Dockerfile
+misconfigurations. Every run saves a `trivy-filesystem-sarif` artifact; non-PR runs also publish
+results to GitHub Security under `trivy-filesystem`.
 
-This workflow is advisory: findings use exit code 0 and it is not a required PR check. Scanner or
-report-upload errors remain visible as workflow failures. Existing required checks are unchanged.
-It does not build or scan production images; GitHub's existing secret scanning and push protection
-remain separate.
+High and Critical dependency vulnerabilities fail the scan and the existing required `full-check`
+status. Lower-severity vulnerabilities and Dockerfile misconfigurations stay visible in the report.
+No baseline or suppression file is used. To run the same dependency gate locally with Trivy 0.76.1
+from a clean checkout:
+
+```bash
+trivy fs --scanners vuln --include-dev-deps --severity HIGH,CRITICAL --exit-code 1 .
+```
+
+The scan does not build or scan production images; secret scanning and push protection remain
+separate. A fresh vulnerability database requires network access.
+
+`.github/dependabot.yml` enables weekly updates for all Python manifests through `uv`, the root
+pnpm workspace and standalone agent-script npm project, GitHub Actions, Dockerfiles and Compose
+images. Version updates wait seven days after release; security updates bypass this cooldown.
+Python and JavaScript version updates group the same dependency across directories, keeping each
+dependency (including LiteLLM) in its own PR. Dependabot does not auto-merge. Its PRs must still be
+triaged by a human: assign a real Linear issue, set the title to `ANY-<number> - <summary>`, and add
+the matching URL under `## Linear issue` before the metadata check can pass. Review all affected
+manifests/locks and preserve cross-file runtime-version constraints before merging.
 
 SonarQube Cloud analyzes the repository as one public project on the **Free** plan:
 [anytoolai-platform](https://sonarcloud.io/project/overview?id=gushinets_anytoolai-platform),

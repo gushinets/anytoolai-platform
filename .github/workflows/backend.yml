@@ -26,9 +26,20 @@ jobs:
       - run: uv sync --frozen --group dev
       - run: uv run python scripts/agent/runner.py doctor
       - run: uv run python scripts/agent/runner.py quick-check
+  trivy:
+    uses: ./.github/workflows/trivy.yml
+    permissions:
+      contents: read
+      security-events: write
   full-check:
+    needs: trivy
+    # A failed scan must fail this required status, rather than skip the job.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
+      - name: Require a successful Trivy dependency scan
+        if: ${{ needs.trivy.result != 'success' }}
+        run: exit 1
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           persist-credentials: false
