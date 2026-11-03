@@ -361,9 +361,9 @@ For an existing deployment, first close the Atom Lab ingress, then quiesce the a
 python scripts/agent/runner.py atom-lab-quiesce
 ```
 
-`atom-lab-quiesce` holds the host-global lifecycle lock, stops the API so no new run can be
-accepted, leaves the worker running until every job in this deployment database (Atom Lab,
-`/demo`, or ordinary runtime) has left `created`/`running`, and only then stops the worker.
+`atom-lab-quiesce` holds the per-user lifecycle lock shared across checkouts and stops the API
+so no new run can be accepted, leaves the worker running until every job in this deployment
+database (Atom Lab, `/demo`, or ordinary runtime) has left `created`/`running`, and only then stops the worker.
 PostgreSQL remains running. If the command returns nonzero, keep ingress
 closed, do not take a backup, and inspect `atom-lab-status` and worker logs. After resolving the
 problem, either rerun quiesce or abort the maintenance window with the idempotent
@@ -583,9 +583,9 @@ Inspect the printed `Enabled products: proposal_ai` and `Quota modes:
 proposal_ai=unmetered` before Compose starts. `prod-up` generates an ignored deployment profile,
 then force-recreates base + prod + live Compose, waits for API and web HTTP, and checks the
 same mounted profile fingerprint and policy references inside API and worker. It never falls
-back to fake. A host-level deployment lock covers profile generation through readiness,
-activation, and failure cleanup; a concurrent `prod-up` exits with `PROD007` before touching
-the production project or active profile. If Compose startup or readiness fails, or the
+back to fake. A per-user deployment lock shared across checkouts covers profile generation
+through readiness, activation, and failure cleanup; a concurrent `prod-up` exits with `PROD007`
+before touching the production project or active profile. If Compose startup or readiness fails, or the
 command is interrupted before `active-profile` is replaced, `prod-up` stops the candidate
 project without deleting its PostgreSQL volume; investigate before restarting production.
 Once that marker is in place, an interrupt leaves the stack up. The activation directory
@@ -887,3 +887,44 @@ These results prove local code/HTTP interoperability with TEST-ONLY vocabulary; 
 private-zone controls, production commercial approval and financial/paid execution are unproven.
 Full verification results remain in the
 [canonical plan](../../docs/exec-plans/completed/ANY-711-implementation-plan.md).
+
+## Deployment lock storage
+
+Run every prod and Atom Lab lifecycle command on a host as the **same system deploy user**.
+All checkouts share persistent locks in `<account-home>/.local/state/anytoolai/deployment-locks`
+on POSIX, or `<system-profile>\AppData\Local\anytoolai\deployment-locks` on Windows.
+POSIX uses the effective UID's account-database home; Windows queries the current token's system
+profile. The account-derived path is independent of HOME, USERPROFILE, LOCALAPPDATA, TMPDIR and
+checkout. The runner preserves the original path for inspection: symlinks/junctions anywhere in
+the profile path (including a safe linked home) are unsupported and fail closed. Configure a
+direct account-home path instead; resolving an alias first would hide who can replace it.
+Different system users do not share these locks.
+
+The runner checks the full directory chain to the filesystem root, including parents above the
+profile that could rename it. POSIX ancestors must be owned by root or the deploy user and must
+not be group/other writable. A root-owned sticky directory is allowed only when its next child
+is deploy-owned; a foreign-owned sticky directory is unsafe. The final directory and files are
+created as 0700/0600 and must remain private and deploy-owned. Correct unsafe permissions as the
+deploy user; do not use chmod 777.
+
+Windows validates owners and DACLs through the filesystem root and on existing lock files.
+The deploy user, SYSTEM, Administrators and TrustedInstaller are trusted owners/writers.
+Above the system profile, sibling creation alone is allowed; untrusted delete/rename or
+permission-changing grants are rejected. Within the profile, untrusted write grants are rejected,
+including inheritance grants. Lock files also reject untrusted ReadData grants: a read-only
+descriptor can hold the byte lock. This is checked before locking for both existing and newly
+created files, including inherited ACLs; ordinary ancestor read/list grants remain allowed.
+OWNER RIGHTS is evaluated as the verified object owner, and
+inherit-only CREATOR OWNER is allowed because it grants rights to the checked child owner. Intermediate junctions/reparse points are rejected. Windows PowerShell
+uses only its own system modules, independent of inherited PowerShell 7 module paths, and runs
+the fixed local helper via -File with process-only RemoteSigned policy. Machine policy is unchanged.
+Inspection
+failure blocks deployment; correct the ACLs or layout instead of bypassing the check.
+
+During migration, stop all lifecycle commands from old checkouts before using the new runner:
+old runners use `/tmp` locks and cannot coordinate with the new location. Windows checkouts
+that previously followed a redirected LOCALAPPDATA must also be stopped before switching to
+the canonical system-profile location. Once no old runner is
+active, old `/tmp/anytoolai-prod.deployment.lock` and `/tmp/anytoolai-atom-lab.deployment.lock`
+markers can be removed. Never delete the new persistent lock files during operation; process
+exit (including a crash) releases the lock automatically.
