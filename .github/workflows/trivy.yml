@@ -1,10 +1,7 @@
-name: Trivy security report
+name: Trivy security
 
 on:
-  pull_request:
-  push:
-    branches:
-      - main
+  workflow_call:
   schedule:
     - cron: '17 3 * * 1'
   workflow_dispatch:
@@ -13,12 +10,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: trivy-${{ github.ref }}
+  group: trivy-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   filesystem:
-    name: Trivy filesystem (report only)
+    name: Trivy dependencies and Dockerfile report
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -37,10 +34,14 @@ jobs:
           scanners: vuln,misconfig
           format: sarif
           output: trivy-results.sarif
-          # Findings are advisory; scanner failures remain visible.
+          # Preserve all findings; the next step gates dependency vulnerabilities.
           exit-code: '0'
         env:
           TRIVY_INCLUDE_DEV_DEPS: 'true'
+      - name: Reject High and Critical dependency vulnerabilities
+        run: >-
+          trivy fs --cache-dir "$GITHUB_WORKSPACE/.cache/trivy"
+          --scanners vuln --include-dev-deps --severity HIGH,CRITICAL --exit-code 1 .
       - name: Upload SARIF artifact
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

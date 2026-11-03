@@ -1,0 +1,54 @@
+version: 2
+updates:
+  - package-ecosystem: uv
+    directories:
+      - /
+      - /apps/platform-api
+      - /apps/platform-worker
+      - /packages/backend/platform-core
+      - /packages/backend/platform-actions
+      - /packages/backend/platform-sdk
+      - /packages/backend/product-platforms/freelancer-suite
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    # Keep each dependency's manifests and independent locks together in one PR.
+    groups:
+      python-dependencies:
+        patterns: ["*"]
+        group-by: dependency-name
+
+  - package-ecosystem: npm
+    directories:
+      - /
+      - /scripts/agent
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      javascript-dependencies:
+        patterns: ["*"]
+        group-by: dependency-name
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+
+  - package-ecosystem: docker
+    directory: /infra/docker
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+
+  - package-ecosystem: docker-compose
+    directory: /infra/compose
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
