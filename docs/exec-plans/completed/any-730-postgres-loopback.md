@@ -3,12 +3,12 @@
 ## Status
 
 - Created: 2026-11-03
-- State: active
+- State: completed
 - Owner: agent
 - Last updated: 2026-11-03
 - Review date: 2026-11-10
-- Next action: owner review; rerun full baseline in a working test environment.
-- Blocker: full baseline did not complete; see validation limits below.
+- Next action: none for implementation; pending CI checks remain merge gates.
+- Blocker: none for implementation; local validation limits are retained below.
 - Goal: restrict dev/agent PostgreSQL host publication to IPv4 loopback.
 
 ## Implementation plan
@@ -53,3 +53,18 @@ Relevant contracts: docs/agent/worktree-runtime.md and infra/deployment/README.m
   progress it was stopped (SIGINT did not complete; SIGTERM ended the process). No
   final failure traceback was produced, so causes of those two failures are unverified.
   This is not a passing full baseline. Focused tests passed independently.
+
+## Review follow-up and completion — 2026-11-03
+
+- Updated deployment and worktree instructions to require Docker Engine >=28.0.0
+  for loopback remote isolation under default bridge networking. Older Linux Engines
+  require an upgrade or adequate host firewall rules; shared-network deployments need
+  a second-host check on the same L2 segment. Doctor does not enforce daemon version.
+- Source: https://docs.docker.com/engine/network/port-publishing/ and
+  [PR review finding](https://github.com/gushinets/anytoolai-platform/pull/232#discussion_r4452388630).
+- CI on reviewed head 1241d990: full-check, baseline (ubuntu-latest), atoms-proof,
+  postgresql-quota-concurrency, compose-smoke-dev and compose-smoke-prod passed.
+  [Backend run](https://github.com/gushinets/anytoolai-platform/actions/runs/41602926107).
+  Windows baseline and CodeRabbit were still pending at this follow-up; no all-green
+  claim is made. Historical local baseline limitations above remain accurate.
+- Implementation completed at the user's request; moved this plan to completed.

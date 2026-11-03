@@ -32,6 +32,10 @@ ANYTOOLAI_READY_TIMEOUT. Agents should discover endpoints from dev-status rather
 PostgreSQL is published only on `127.0.0.1`. Use the database URL printed by
 `dev-status` for host connections; the agent stack uses `127.0.0.1:55432`. API and worker
 continue connecting over the Compose network at `postgres:5432`.
+For remote isolation, use Docker Engine 28.0.0 or newer; older Linux Engines can expose
+localhost-published ports to hosts on the same L2 segment. Upgrade or enforce host firewall
+rules, and verify from a second host on shared networks. See the
+[deployment prerequisites](../../infra/deployment/README.md#compose-layout).
 
 Postgres credentials (ANYTOOLAI_POSTGRES_USER/PASSWORD/DB) default to `anytoolai` for all three
 and can be overridden the same way as the port variables. `platform-api` runs with hot-reload in

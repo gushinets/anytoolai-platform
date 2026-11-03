@@ -34,9 +34,18 @@ before starting — and neither one runs migrations itself. See "Migrations and 
 
 Dev PostgreSQL is published only on `127.0.0.1`, using `ANYTOOLAI_POSTGRES_PORT`
 (default 5432 for direct Compose; discover worktree ports with `dev-status`). The standalone
-agent stack uses `127.0.0.1:55432`. These publications do not provide access through the
-host's network IP. API/worker use `postgres:5432` inside Compose; production publishes no
-PostgreSQL host port.
+agent stack uses `127.0.0.1:55432`. API/worker use `postgres:5432` inside Compose;
+production publishes no PostgreSQL host port.
+
+Relying on loopback publication to prevent remote access requires **Docker Engine 28.0.0
+or newer** with the default bridge networking configuration. On older Linux Engines, hosts
+on the same L2 segment can reach localhost-published ports; see
+[Docker's port-publishing warning](https://docs.docker.com/engine/network/port-publishing/).
+Upgrade older Engines or enforce host firewall rules that block remote access to these
+publications. `doctor` checks tool availability, not the daemon version; check it with
+`docker version --format '{{.Server.Version}}'`. On shared or untrusted networks, verify
+inaccessibility from a second host on the same L2 segment; a refused connection from the
+Docker host itself is not a substitute for this check.
 
 ## Credentials
 
