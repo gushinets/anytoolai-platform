@@ -32,6 +32,12 @@ exit) that applies Alembic migrations to head. `platform-api`/`platform-worker` 
 `depends_on: migrate: condition: service_completed_successfully`, so both wait for it to finish
 before starting — and neither one runs migrations itself. See "Migrations and scaling" below.
 
+Dev PostgreSQL is published only on `127.0.0.1`, using `ANYTOOLAI_POSTGRES_PORT`
+(default 5432 for direct Compose; discover worktree ports with `dev-status`). The standalone
+agent stack uses `127.0.0.1:55432`. These publications do not provide access through the
+host's network IP. API/worker use `postgres:5432` inside Compose; production publishes no
+PostgreSQL host port.
+
 ## Credentials
 
 `ANYTOOLAI_POSTGRES_USER`, `ANYTOOLAI_POSTGRES_PASSWORD`, `ANYTOOLAI_POSTGRES_DB` default to
