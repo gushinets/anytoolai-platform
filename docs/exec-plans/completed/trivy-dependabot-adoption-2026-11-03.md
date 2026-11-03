@@ -5,7 +5,7 @@
 - State: completed
 - Owner: agent
 - Created: 2026-11-03
-- Last updated: 2026-11-03
+- Last updated: 2026-11-04
 - Review date: 2026-11-10
 - Next action: review/merge after successful PR checks; confirm hosted Dependabot runs after merge.
 - Blocker: none
@@ -84,6 +84,21 @@ Additional validation passed:
 The full application suite was not rerun locally for this CI/configuration change. The checks
 above predate publication; hosted CI results are recorded on the PR linked from ANY-813.
 Actual Dependabot update jobs start after the configuration reaches the default branch.
+
+### Composite-action coverage fix (2026-11-04)
+
+The GitHub Actions update entry now explicitly includes `/` and
+`/.github/actions/compose-stack-check`. The root scope covers workflow files and root action
+manifests, but does not recursively cover nested composite actions; see the
+[Dependabot directory reference](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference#directories-or-directory)
+and [upstream file fetcher](https://github.com/dependabot/dependabot-core/blob/main/github_actions/lib/dependabot/github_actions/file_fetcher.rb).
+
+The regression test discovers actual composite-action manifests under `.github/actions` and
+requires their directories alongside the root workflow scope. It failed on the old configuration
+with `/.github/actions/compose-stack-check` missing, then passed with the fix. The focused test and
+existing runtime-version, PR-metadata and Atom Lab workflow tests passed (26 tests), as did doctor,
+the current SchemaStore Dependabot schema, architecture validation, documentation validation and
+`git diff --check`. Fresh hosted CI and independent reviews remain PR checks.
 
 ## Decision log
 

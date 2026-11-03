@@ -33,7 +33,9 @@ updates:
         group-by: dependency-name
 
   - package-ecosystem: github-actions
-    directory: /
+    directories:
+      - /
+      - /.github/actions/compose-stack-check
     schedule:
       interval: weekly
     cooldown:
