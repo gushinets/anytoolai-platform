@@ -20,7 +20,9 @@ import yaml
 from tests.test_atoms_proof import load_atoms_proof_module
 from tests.test_quick_check import load_quick_check_module
 
-if os.name != "nt":
+if os.name == "nt":
+    import msvcrt
+else:
     import pwd
 
 
@@ -4770,3 +4772,100 @@ def test_windows_account_profile_junction_is_not_resolved(monkeypatch, tmp_path)
         assert not (target / "AppData").exists()
     finally:
         alias.rmdir()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows read-only descriptors and inherited DACLs")
+@pytest.mark.parametrize("access", ["private", "existing_read", "inherited_read"])
+def test_windows_deployment_lock_rejects_untrusted_file_read_access(tmp_path, access):
+    runner = load_runner_module()
+    path = runner._prod_deployment_lock_path()
+    runner._prepare_deployment_lock_directory(path)
+    if access == "private":
+        with runner._prod_deployment_lock():
+            assert path.is_file()
+        with runner._prod_deployment_lock():
+            pass
+        return
+
+    if access == "existing_read":
+        with runner._prod_deployment_lock():
+            pass
+        target, grant = path, "*S-1-1-0:R"
+    else:
+        target, grant = path.parent, "*S-1-1-0:(OI)(CI)(IO)R"
+    subprocess.run(
+        ["icacls.exe", str(target), "/grant", grant],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    try:
+        # Directory read/list grants are allowed; only the lock file's data must be private.
+        runner._prepare_deployment_lock_directory(path)
+        if access == "existing_read":
+            # Reproduce the CRT contract with an actual read-only descriptor and byte lock.
+            with path.open("rb") as reader:
+                msvcrt.locking(reader.fileno(), msvcrt.LK_NBLCK, 1)
+                try:
+                    with (
+                        pytest.raises(runner.DeploymentLockError, match="unsafe lock permissions"),
+                        runner._prod_deployment_lock(),
+                    ):
+                        pytest.fail("public read-only lock file reached process locking")
+                finally:
+                    reader.seek(0)
+                    msvcrt.locking(reader.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            assert not path.exists()
+            with (
+                pytest.raises(runner.DeploymentLockError, match="unsafe lock permissions"),
+                runner._prod_deployment_lock(),
+            ):
+                pytest.fail("new lock file inherited untrusted read access")
+            assert path.is_file()
+            path.unlink()  # Windows deletion also verifies the rejected file handle was closed.
+    finally:
+        subprocess.run(
+            ["icacls.exe", str(target), "/remove:g", "*S-1-1-0"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+
+@pytest.mark.parametrize("existing", [False, True])
+def test_deployment_lock_checks_windows_file_acl_after_open_and_closes_on_failure(
+    monkeypatch, tmp_path, existing
+):
+    runner = load_runner_module()
+    path = tmp_path / "deploy.lock"
+    if existing:
+        path.write_bytes(b"marker")
+    # Exercise Windows control flow without replacing the host OS used by pathlib/pytest.
+    windows_os = SimpleNamespace(
+        **(vars(os) | {"name": "nt", "O_BINARY": getattr(os, "O_BINARY", 0)})
+    )
+    descriptors = []
+    checks = []
+
+    def open_file(*args):
+        fd = os.open(*args)
+        descriptors.append(fd)
+        return fd
+
+    def reject_acl(paths):
+        checks.extend(paths)
+        assert descriptors and path.is_file()
+        assert stat.S_ISREG(os.fstat(descriptors[0]).st_mode)
+        raise OSError("unsafe lock permissions: untrusted read grant")
+
+    windows_os.open = open_file
+    monkeypatch.setattr(runner, "os", windows_os)
+    monkeypatch.setattr(runner, "_prepare_deployment_lock_directory", lambda path: None)
+    monkeypatch.setattr(runner, "_validate_windows_lock_permissions", reject_acl)
+    with pytest.raises(OSError, match="untrusted read grant"):
+        runner._open_deployment_lock(path)
+    assert checks == [path]
+    with pytest.raises(OSError) as closed:
+        os.fstat(descriptors[0])
+    assert closed.value.errno == runner.errno.EBADF

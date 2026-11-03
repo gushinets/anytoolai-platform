@@ -35,6 +35,10 @@ try {
                 [System.Security.AccessControl.FileSystemRights]::ChangePermissions -bor
                 [System.Security.AccessControl.FileSystemRights]::TakeOwnership
         }
+        if ([System.IO.File]::Exists($path)) {
+            # A read-only descriptor can acquire a byte-range lock; files must be private.
+            $rights = $rights -bor [System.Security.AccessControl.FileSystemRights]::ReadData
+        }
         foreach ($rule in $acl.GetAccessRules($true, $true, $sidType)) {
             if ($rule.IdentityReference.Value -eq 'S-1-3-4') {
                 continue # OWNER RIGHTS is scoped to the object owner, verified as trusted above.
@@ -44,7 +48,7 @@ try {
             if ($inheritOnly -and (-not $insideProfile -or $rule.IdentityReference.Value -eq 'S-1-3-0')) {
                 continue # CREATOR OWNER applies only to descendants, whose owners are checked.
             }
-            # Conservatively reject untrusted write grants even when deny rules also exist.
+            # Conservatively reject untrusted grants even when deny rules also exist.
             if ($rule.AccessControlType -eq 'Allow' -and
                 $trusted -notcontains $rule.IdentityReference.Value -and
                 ($rule.FileSystemRights -band $rights) -ne 0) {

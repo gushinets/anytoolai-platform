@@ -122,3 +122,16 @@ checks pass; no new Ruff findings in changed code.
 The prior remote HEAD d3fe5ba6 now has green Windows baseline and Sonar Quality Gate. These new
 round-3 changes are local and require their own CI validation. No automatic commit/push or
 review-thread writes.
+
+## Review round 4: private Windows lock-file data access
+
+Verified the DACL mask allows ReadData, and the Microsoft CRT contract permits byte locking
+through a read-only descriptor. Add ReadData to the unsafe rights for files only; keep directory
+read/list permissions allowed. Validate every opened file after fstat, including inherited ACLs
+on newly created files, before acquiring msvcrt locking. Existing cleanup closes failed handles.
+Add native Windows read-only locking, inherited-read and private-file control regressions.
+Unrelated local ANY-629 plan edits remain untouched. Validation: 43 targeted checks passed on
+Linux, 12 Windows-only cases skipped. This includes platform-independent checks that newly
+created and existing Windows files are validated after opening and that rejected descriptors
+are closed. Native Windows read-only locking/inherited-ACL cases require Windows CI. Doctor,
+architecture, documentation and whitespace checks pass; no automatic GitHub writes.

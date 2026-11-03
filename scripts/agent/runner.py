@@ -2691,8 +2691,6 @@ def _open_deployment_lock(path: Path) -> BinaryIO:
             or getattr(info, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
         ):
             raise OSError(f"unsafe lock file {path}: requires a regular file without links")
-        if os.name == "nt":
-            _validate_windows_lock_permissions([path])
     flags = os.O_RDWR | os.O_CREAT
     if os.name == "nt":
         flags |= os.O_BINARY
@@ -2709,6 +2707,9 @@ def _open_deployment_lock(path: Path) -> BinaryIO:
             raise OSError(
                 f"unsafe lock file {path}: requires a private, owned regular file with one link"
             )
+        if os.name == "nt":
+            # New files may inherit grants too; inspect before taking the byte-range lock.
+            _validate_windows_lock_permissions([path])
         return os.fdopen(fd, "r+b")
     except BaseException:
         os.close(fd)
