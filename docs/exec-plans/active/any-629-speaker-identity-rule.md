@@ -118,3 +118,69 @@ Review follow-up (code-review #4):
   message or signature is the client's, not the freelancer's.
 - The rule does not govern the closing: each prompt's own rules do (ProposalAI requires one concrete
   next step, the reply drafts forbid an invented `call_to_action`).
+
+
+## ANY-595: exact A01 live acceptance, 2026-11-03
+
+The user authorized three paid repetitions of the original QA A01 case to close the remaining
+speaker-placeholder evidence gap in ANY-595. ANY-811 is a separate task and is not a prerequisite
+for this acceptance. No product code or configuration changed.
+
+Environment: clean revision `177a9e0e3cf05fb2c6fe229b58f803e4d9f7fd96`; canonical
+`dev-live-up --product client_update_writer` and `dev-web`; Russian UI, Prepaid Request mode,
+`warm` tone, empty due date, amount `15 000 RUB`. Date is Asia/Krasnoyarsk; UTC run timestamps
+are 2026-11-02 17:36–17:37. Each repetition submitted the real web form in a fresh browser context.
+Actual model `gpt-6-luna` is confirmed by all three provider-call rows. The router config specifies
+`medium`; execution metadata has null `reasoning_effort`, so actual reasoning is not independently
+confirmed. Each session has exactly one successful physical provider call, semantic/transport
+attempt 1, no fallback. Total estimated cost: USD 0.000999235.
+
+Prompt `client_update_writer.prepaid_request_compose_persuasive_text.v1` SHA-256:
+`a6a884e0bcf61bfebf96d29bc71f307b3c54f0f1bd113f04c4f41973c7934f0b`.
+
+Exact billing notes (same in all three requests):
+
+> Елена, начинаем дизайн презентации на 12 слайдов. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.
+
+Result: **PASS 3/3 for the ANY-595 A01 criterion**. No invented freelancer name, signature,
+`мог(ла)`, `готов(а)` or other speaker-gender placeholder. All three outputs keep 15 000 RUB,
+50%, the client name and the pre-start payment condition, add no urgency or deadline and do not
+say the invoice was sent. This is a finite sample, not a guarantee for future generations.
+
+Separate content caveat, outside this speaker-placeholder check: all three omit the remainder
+payment after final PDF/PPTX delivery; run 3 also omits that payment details will be in a separate
+invoice. These omissions are recorded, not presented as a fully verified send-ready result.
+
+Full visible output and backend correlation:
+
+### A01 repetition 1
+
+- Session: `scenario_session_01793641013515532939_0000000004_3b8a97b635264d72b9e91ae9f3c391f1`
+- Submitted: `2026-11-02T17:36:53.396Z`; visible result after 9.509 s.
+- Estimated cost: USD 0.000603175.
+
+> Елена, для начала дизайна презентации на 12 слайдов прошу внести предоплату 15 000 RUB — 50% от согласованной общей стоимости. Реквизиты будут в отдельном счёте. Пожалуйста, сообщите, когда отправите оплату.
+
+### A01 repetition 2
+
+- Session: `scenario_session_01793641027760849787_0000000009_42f3c54eb4844d288a4c35ff21512f24`
+- Submitted: `2026-11-02T17:37:07.644Z`; visible result after 7.623 s.
+- Estimated cost: USD 0.000196530.
+
+> Елена, для начала дизайна презентации на 12 слайдов предусмотрена предоплата 15 000 RUB (50% от согласованной общей стоимости). Реквизиты будут в отдельном счёте. Пожалуйста, сообщите, когда отправите предоплату.
+
+### A01 repetition 3
+
+- Session: `scenario_session_01793641039610112932_0000000014_bb61dd7275e04f959b633375c6a4d8e1`
+- Submitted: `2026-11-02T17:37:19.509Z`; visible result after 5.580 s.
+- Estimated cost: USD 0.000199530.
+
+> Елена, для начала дизайна презентации на 12 слайдов прошу внести предоплату 15 000 RUB (50% от согласованной стоимости). Пожалуйста, сообщите, когда оплата будет отправлена.
+
+Verification for this acceptance: managed Python 3.12 `doctor`, config/architecture/docs validation
+and generated-doc drift checks passed. `quick-check`: 2974 passed, 486 deselected, one failed:
+`test_activation_marker_is_readable_by_non_root_api_user` requires passwordless `sudo -u nobody`;
+this environment returned `sudo: interactive authentication is required`. This is the same
+environment limitation already recorded above, not a passing baseline. `validate-docs` and
+`git diff --check` passed for the report. The temporary web host and Docker live stack were stopped
+after collecting evidence; no issue status or external comment was changed.
