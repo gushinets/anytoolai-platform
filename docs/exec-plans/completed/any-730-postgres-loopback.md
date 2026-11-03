@@ -86,3 +86,16 @@ Relevant contracts: docs/agent/worktree-runtime.md and infra/deployment/README.m
   or provider calls are needed for this test-only change.
 - Final targeted run including runner Compose-file wiring: 11 passed; Ruff and
   git diff --check passed. Corrected the moved execution-plan link in PR #232.
+
+## SonarCloud follow-up — 2026-11-03
+
+- Plan: add frozen dependency resolution and disable builds for the new Compose-test
+  command, then run that exact CI command and documentation checks.
+- SonarCloud on e1bb44dd reported githubactions:S8541 and githubactions:S8544 on the
+  newly added uv run step. Added --frozen and --no-build; dependencies are already
+  installed by the preceding uv sync --frozen --group dev step. No rule suppression,
+  dependency or unrelated workflow changes.
+- Exact CI command uv run --frozen --no-build python -m pytest
+  tests/compose/test_postgres_ports.py passed: 8 tests. Doctor, validate-docs and
+  git diff --check passed. Remote SonarCloud reanalysis requires a pushed commit;
+  no passing remote quality gate is claimed for this local fix.
