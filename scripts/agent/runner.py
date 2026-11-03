@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import ctypes
 import errno
 import hashlib
 import importlib.util
@@ -9,6 +10,7 @@ import os
 import shutil
 import signal
 import socket
+import stat
 import subprocess
 import sys
 import tempfile
@@ -22,8 +24,11 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from http import HTTPStatus
 from pathlib import Path
-from typing import NamedTuple
+from typing import BinaryIO, NamedTuple
 from urllib.parse import quote, urlsplit
+
+if os.name != "nt":
+    import pwd
 
 ROOT = Path(__file__).resolve().parents[2]
 QUICK_CHECK_VENV = ROOT / ".quick-check-venv"
@@ -2579,6 +2584,138 @@ class DeploymentLockError(RuntimeError):
 ProductionDeploymentLockError = DeploymentLockError
 
 
+def _deployment_user_home() -> Path:
+    if os.name == "nt":
+        shell = ctypes.WinDLL("shell32", use_last_error=True)
+        query = shell.SHGetFolderPathW
+        query.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_int,
+            ctypes.c_void_p,
+            ctypes.c_uint,
+            ctypes.c_wchar_p,
+        ]
+        query.restype = ctypes.c_long
+        buffer = ctypes.create_unicode_buffer(32768)
+        # CSIDL_PROFILE identifies the current token's profile, not USERPROFILE/HOME overrides.
+        if query(None, 40, None, 0, buffer) < 0 or not buffer.value:
+            raise DeploymentLockError("could not determine the deployment user's system profile")
+        # Keep aliases visible to the root-to-leaf lstat checks; resolving hides their parents.
+        return Path(buffer.value)
+    return Path(pwd.getpwuid(os.geteuid()).pw_dir)
+
+
+def _deployment_lock_dir() -> Path:
+    home = _deployment_user_home()
+    if os.name == "nt":
+        return home / "AppData" / "Local" / "anytoolai" / "deployment-locks"
+    return home / ".local" / "state" / "anytoolai" / "deployment-locks"
+
+
+def _validate_windows_lock_permissions(paths: list[Path]) -> None:
+    try:
+        result = subprocess.run(
+            [
+                "powershell.exe",
+                "-NoProfile",
+                "-NonInteractive",
+                "-ExecutionPolicy",
+                "RemoteSigned",
+                "-File",
+                str(Path(__file__).with_name("deployment_lock_acl.ps1")),
+            ],
+            input=json.dumps([str(path) for path in paths]),
+            capture_output=True,
+            text=True,
+            timeout=COMPOSE_STACK_QUERY_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise OSError(f"unsafe lock permissions: Windows ACL inspection failed: {exc}") from exc
+    if result.returncode != 0 or result.stdout.strip() != "deployment-lock-acl-ok":
+        raise OSError(f"unsafe lock permissions: {result.stderr.strip()}")
+
+
+def _prepare_deployment_lock_directory(path: Path) -> None:
+    home = _deployment_user_home()
+    if not path.is_absolute() or ".." in path.parts or not path.is_relative_to(home):
+        raise OSError(f"unsafe lock directory {path.parent}: must be inside the user profile")
+    directories = [path.parent, *path.parent.parents]
+    # Check from the filesystem root down before creating anything beneath an existing ancestor.
+    for directory in reversed(directories):
+        try:
+            info = directory.lstat()
+        except FileNotFoundError:
+            if not directory.is_relative_to(home):
+                raise OSError(
+                    f"unsafe lock directory {directory}: missing system ancestor"
+                ) from None
+            directory.mkdir(mode=0o700, exist_ok=True)
+            info = directory.lstat()
+        if (
+            not stat.S_ISDIR(info.st_mode)
+            or getattr(info, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
+        ):
+            raise OSError(f"unsafe lock directory {directory}: links are not allowed")
+        if os.name != "nt":
+            trusted_owner = info.st_uid in {0, os.geteuid()}
+            # Root-owned sticky /tmp cannot rename the next deploy-owned directory.
+            protected_child = (
+                info.st_uid == 0
+                and info.st_mode & stat.S_ISVTX
+                and directory != path.parent
+                and directories[directories.index(directory) - 1].lstat().st_uid == os.geteuid()
+            )
+            if not trusted_owner or (info.st_mode & 0o022 and not protected_child):
+                raise OSError(
+                    f"unsafe lock directory {directory}: untrusted owner or writable permissions"
+                )
+    info = path.parent.lstat()
+    if os.name != "nt" and (info.st_uid != os.geteuid() or info.st_mode & 0o077):
+        raise OSError(
+            f"unsafe lock directory {path.parent}: requires owner-only permissions (0700)"
+        )
+    if os.name == "nt":
+        _validate_windows_lock_permissions(directories)
+
+
+def _open_deployment_lock(path: Path) -> BinaryIO:
+    _prepare_deployment_lock_directory(path)
+    try:
+        info = path.lstat()
+    except FileNotFoundError:
+        pass
+    else:
+        if (
+            not stat.S_ISREG(info.st_mode)
+            or getattr(info, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
+        ):
+            raise OSError(f"unsafe lock file {path}: requires a regular file without links")
+    flags = os.O_RDWR | os.O_CREAT
+    if os.name == "nt":
+        flags |= os.O_BINARY
+    else:
+        flags |= os.O_NOFOLLOW | os.O_CLOEXEC | os.O_NONBLOCK
+    fd = os.open(path, flags, 0o600)
+    try:
+        info = os.fstat(fd)
+        if (
+            not stat.S_ISREG(info.st_mode)
+            or info.st_nlink != 1
+            or (os.name != "nt" and (info.st_uid != os.geteuid() or info.st_mode & 0o077))
+        ):
+            raise OSError(
+                f"unsafe lock file {path}: requires a private, owned regular file with one link"
+            )
+        if os.name == "nt":
+            # New files may inherit grants too; inspect before taking the byte-range lock.
+            _validate_windows_lock_permissions([path])
+        return os.fdopen(fd, "r+b")
+    except BaseException:
+        os.close(fd)
+        raise
+
+
 class _DeploymentLock:
     """Cross-process host lock guarding a fixed Compose project."""
 
@@ -2590,8 +2727,12 @@ class _DeploymentLock:
     def __enter__(self) -> "_DeploymentLock":
         handle = None
         try:
-            self._path.parent.mkdir(parents=True, exist_ok=True)
-            handle = self._path.open("a+b")
+            handle = _open_deployment_lock(self._path)
+        except OSError as exc:
+            raise DeploymentLockError(
+                f"could not open {self._operation} lock {self._path}: {exc}"
+            ) from exc
+        try:
             if os.name == "nt":
                 import msvcrt
 
@@ -2627,12 +2768,7 @@ class _DeploymentLock:
 
 
 def _prod_deployment_lock_path() -> Path:
-    # The Compose project name is host-global, so the lock must not live under ROOT/.agent:
-    # separate worktrees/clones could otherwise mutate the same anytoolai-prod project concurrently.
-    # Production targets a Linux VPS, so use the fixed host /tmp namespace instead of TMPDIR,
-    # which may legitimately differ between shells/worktrees and would defeat cross-process locking.
-    lock_root = Path(tempfile.gettempdir()) if os.name == "nt" else Path("/tmp")
-    return lock_root / f"{PROD_COMPOSE_PROJECT}.deployment.lock"
+    return _deployment_lock_dir() / f"{PROD_COMPOSE_PROJECT}.deployment.lock"
 
 
 def _prod_deployment_lock() -> _DeploymentLock:
@@ -2640,8 +2776,7 @@ def _prod_deployment_lock() -> _DeploymentLock:
 
 
 def _atom_lab_deployment_lock_path() -> Path:
-    lock_root = Path(tempfile.gettempdir()) if os.name == "nt" else Path("/tmp")
-    return lock_root / f"{ATOM_LAB_COMPOSE_PROJECT}.deployment.lock"
+    return _deployment_lock_dir() / f"{ATOM_LAB_COMPOSE_PROJECT}.deployment.lock"
 
 
 def _atom_lab_deployment_lock() -> _DeploymentLock:
