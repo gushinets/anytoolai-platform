@@ -68,3 +68,21 @@ Relevant contracts: docs/agent/worktree-runtime.md and infra/deployment/README.m
   Windows baseline and CodeRabbit were still pending at this follow-up; no all-green
   claim is made. Historical local baseline limitations above remain accurate.
 - Implementation completed at the user's request; moved this plan to completed.
+
+## Review follow-up — round 2, 2026-11-03
+
+- Added daemon-free Docker Compose CLI regression tests in
+  `tests/compose/test_postgres_ports.py` for the resolved base+dev default and port override,
+  standalone agent, base+prod (no publication), and base+Atom Lab default/override.
+  Each published case requires exactly one TCP mapping with loopback host IP and the
+  expected host/target ports. Ambient operator settings and .env files are excluded.
+- Two negative cases resolve an added dev overlay with a wildcard publication and
+  verify that the same security assertion rejects the resulting merged configuration.
+- Wired these tests into the required compose-smoke-prod job before stack startup.
+  Docker-free baseline retains the existing raw-YAML checks; missing Compose or failed
+  config resolution fails the dedicated check instead of silently skipping it.
+- Validation: 10 focused tests passed, covering eight resolved-Compose cases and two
+  original YAML cases. Doctor and documentation validation passed. No live containers
+  or provider calls are needed for this test-only change.
+- Final targeted run including runner Compose-file wiring: 11 passed; Ruff and
+  git diff --check passed. Corrected the moved execution-plan link in PR #232.
