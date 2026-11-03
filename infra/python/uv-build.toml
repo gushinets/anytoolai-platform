@@ -1,0 +1,11 @@
+build-constraint-dependencies = ["setuptools==82.0.1", "wheel==0.46.3", "packaging==26.2"]
+
+# pip install and build use this file via --config-file. Project sync reads
+# the matching build-constraint-dependencies in each locked project pyproject.toml.
+# tests/test_quick_check.py rejects drift between those mirrors and this source.
+# full-check also installs these exact requirements before --no-build-isolation.
+# When updating pins, run the slow tests in tests/test_quick_check.py (empty-cache
+# build/install/sync probes), full-check and both application Docker builds.
+# Keep packaging compatible with the runtime locks: full-check shares their venv.
+# After changing pins, update the five project mirrors and run uv lock --project
+# for each root listed by git ls-files "*uv.lock". Never hand-edit lockfiles.
