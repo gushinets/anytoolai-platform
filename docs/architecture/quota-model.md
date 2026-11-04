@@ -127,8 +127,10 @@ not cancel execution: an eventual successful result still consumes its reservati
 PostgreSQL suites cover atomic acceptance/finalization/recovery, terminal arbitration and bucket
 history; `test_execution_readback_postgresql.py` proves readback, guest HTTP refresh, historical
 contribution, scoped unknown/error behavior and transition dimensions. Frontend parser/component
-checks cover busy versus exhausted and retry identity. Stage 5 still owns cutover/quiesce/deployment
-proof; stages 1–4 do not authorize mixed old/new workers or deployment activation.
+checks cover busy versus exhausted and retry identity. Stage 5 provides the
+[quiesce/cutover/rollback procedure](../../infra/deployment/execution-metering-cutover.md) and
+[ANY-766 mechanism handoff](../handoffs/ANY-507-execution-metering.md). Actual gate results and
+activation limits remain in the plan's stage-5 checkpoint. Never mix old/new admission or workers.
 
 ## Periods and windows
 

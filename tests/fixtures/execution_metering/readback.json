@@ -1,0 +1,21 @@
+{
+  "unobserved": null,
+  "busy": {
+    "quantity": 1,
+    "used": 0,
+    "successful_used": 0,
+    "legacy_used": 0,
+    "reserved": 1,
+    "remaining": 1,
+    "available": 0
+  },
+  "exhausted": {
+    "quantity": 1,
+    "used": 1,
+    "successful_used": 1,
+    "legacy_used": 0,
+    "reserved": 0,
+    "remaining": 0,
+    "available": 0
+  }
+}
