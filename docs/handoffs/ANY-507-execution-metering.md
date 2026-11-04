@@ -4,8 +4,8 @@ Implementation baseline: stage 1 `805110b7`, stage 2 `98c92121`, stage 3 `02639e
 `6b83e7b2`. Stage-5 tests/procedure are the accompanying working-tree change; no reviewed PR/SHA
 or production activation is claimed. Pin the reviewed final SHA before ANY-766 consumes this
 handoff. The [execution plan](../exec-plans/active/ANY-507-implementation-plan.md#10-stage-5-checkpoint--2026-11-04)
-records actual gates and limitations. [ANY-766](../exec-plans/active/ANY-766-implementation-plan.md)
-remains the consumer's plan and was used read-only.
+records actual gates and limitations. [ANY-766](https://linear.app/paveldik/issue/ANY-766)
+owns the consuming integration.
 
 ## Implemented Core contract
 
@@ -91,7 +91,8 @@ Owner/bucket/read time are intentionally supplied by the actual read rather than
 retained verbatim, never refunded or relabelled successful. Busy is retryable without a paywall;
 exhaustion is final used reaching Q. New cycles never move old jobs/replay to a different bucket.
 
-Migration head is `0016`, following `0015`. Use the
+Migration head is `0017`, following storage preparation at `0016`. It reconciles guest historical
+usage against consumed reservations without changing total usage, active reserves or results. Use the
 [quiesce/backup/migrate/rollback procedure](../../infra/deployment/execution-metering-cutover.md).
 Storage preparation can preserve nonterminal history; **application cutover requires a successful
 full queue drain**. After new reservations exist, old-code rollback requires consistent backup
