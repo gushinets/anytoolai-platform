@@ -26,9 +26,20 @@ jobs:
       - run: uv sync --locked --group dev --config-file infra/python/uv-build.toml
       - run: uv run --no-sync python scripts/agent/runner.py doctor
       - run: uv run --no-sync python scripts/agent/runner.py quick-check
+  trivy:
+    uses: ./.github/workflows/trivy.yml
+    permissions:
+      contents: read
+      security-events: write
   full-check:
+    needs: trivy
+    # A failed scan must fail this required status, rather than skip the job.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
+      - name: Require a successful Trivy dependency scan
+        if: ${{ needs.trivy.result != 'success' }}
+        run: exit 1
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           persist-credentials: false
@@ -82,8 +93,8 @@ jobs:
         with:
           version: "0.13.4"
       - run: uv sync --locked --group dev --config-file infra/python/uv-build.toml
-      - name: Boot prod Compose overlay (test secrets, waits for platform-api healthy)
-        run: uv run --no-sync python scripts/agent/runner.py prod-fake-up
+      - name: Verify resolved PostgreSQL port publications
+        run: uv run --frozen --no-build python -m pytest tests/compose/test_postgres_ports.py
         env:
           ANYTOOLAI_POSTGRES_USER: ci_produser
           ANYTOOLAI_POSTGRES_PASSWORD: ci_testpass123
