@@ -17,6 +17,12 @@ class JobStatus(StrEnum):
     canceled = "canceled"
 
 
+class JobConsumptionMode(StrEnum):
+    legacy = "legacy"
+    unmetered = "unmetered"
+    reserved = "reserved"
+
+
 @dataclass(frozen=True)
 class WorkflowStepDefinition:
     step_id: str
@@ -51,6 +57,7 @@ class JobRecord:
     workflow_version: int
     id: str = field(default_factory=lambda: new_id("job"))
     status: JobStatus = JobStatus.created
+    consumption_mode: JobConsumptionMode = JobConsumptionMode.legacy
     input_artifact_id: str | None = None
     result_artifact_id: str | None = None
     error_code: str | None = None

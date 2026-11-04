@@ -337,6 +337,7 @@ class JobRepository:
             "scenario_session_id",
             "workflow_id",
             "workflow_version",
+            "consumption_mode",
             "created_at",
         )
         for field_name in immutable_fields:
