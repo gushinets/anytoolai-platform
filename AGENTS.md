@@ -131,6 +131,11 @@ The required GitHub status checks for `main` are:
 by `atoms-proof`; the separate `frontend` and `docs` workflows are covered by `full-check` and are
 not duplicate required checks. `live-canary` remains an optional credentialed scheduled check.
 
+CI makes `full-check` fail when the reusable Trivy dependency scan fails. Its blocking threshold
+is High/Critical, including dev dependencies; lower-severity and Dockerfile findings remain in
+SARIF. Do not suppress findings to pass CI. Dependabot PRs need a real matching Linear issue and
+the same title/body metadata as human PRs; do not bypass that check or invent an issue ID.
+
 Full check:
 
 ```bash
