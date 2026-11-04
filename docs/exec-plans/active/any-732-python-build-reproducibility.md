@@ -2,13 +2,13 @@
 
 ## Status
 
-- State: blocked
+- State: active
 - Owner: agent
 - Created: 2026-11-03
-- Last updated: 2026-11-03
-- Review date: 2026-11-03
-- Next action: Run the complete gate on CI with passwordless sudo and Windows baseline
-- Blocker: Host requires interactive sudo for an existing cross-user permissions test
+- Last updated: 2026-11-04
+- Review date: 2026-11-04
+- Next action: Inspect CI on the corrected PR head
+- Blocker: None for the workflow fixes; full local baseline still needs passwordless sudo
 
 ## Goal
 
@@ -80,3 +80,17 @@ blocked on that validation environment. No GitHub writes were made.
 
 All changed Python lines pass the existing Ruff rules; pre-existing lint findings remain.
 `git diff --check` passes. A sanitized context bundle was collected for the sudo failure.
+
+## Merge-regression follow-up — 2026-11-04
+
+The merge from main dropped prod-fake-up and moved its environment onto the port test. It also
+introduced a frozen uv run that fails the prepared-environment policy test. Restore the boot
+step/environment, switch the port test to --no-sync, and add a lifecycle regression before
+pushing the corrected PR head. Keep the existing unconditional teardown.
+
+The workflow now runs the port test with --no-sync, boots prod with its original test
+environment, then runs smoke and unconditional teardown. The new workflow regression checks
+that ordering and environment placement. Local validation: 8 workflow-policy tests passed;
+11 port/lifecycle/architecture tests passed; documentation validation and diff whitespace
+checks passed. Changed test lines introduce no Ruff findings. Push the corrected head and use
+its CI results for the full gate; the earlier head's statuses do not establish acceptance.

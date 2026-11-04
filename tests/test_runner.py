@@ -546,6 +546,31 @@ def test_required_backend_workflow_runs_canonical_postgresql_check() -> None:
     )
 
 
+def test_compose_smoke_prod_checks_ports_then_boots_before_smoke_and_always_tears_down() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    workflow = yaml.safe_load(
+        (repo_root / ".github/workflows/backend.yml").read_text(encoding="utf-8")
+    )
+    steps = workflow["jobs"]["compose-smoke-prod"]["steps"]
+    run_steps = [step for step in steps if "run" in step]
+    prefix = "uv run --no-sync python scripts/agent/runner.py "
+    assert [step["run"] for step in run_steps] == [
+        "uv sync --locked --group dev --config-file infra/python/uv-build.toml",
+        "uv run --no-sync python -m pytest tests/compose/test_postgres_ports.py",
+        prefix + "prod-fake-up",
+        prefix + "prod-smoke",
+        prefix + "prod-fake-down",
+    ]
+    boot, teardown = run_steps[2], run_steps[-1]
+    assert "if" not in boot
+    assert teardown["if"] == "always()"
+    assert boot["env"] == teardown["env"]
+    assert boot["env"]["ANYTOOLAI_ENABLED_PRODUCT_IDS"] == "kernel_demo"
+    for key in ("ANYTOOLAI_POSTGRES_USER", "ANYTOOLAI_POSTGRES_PASSWORD", "ANYTOOLAI_POSTGRES_DB"):
+        assert boot["env"][key]
+    assert "env" not in run_steps[1]
+
+
 def _compose_stack_check_action() -> dict:
     repo_root = Path(__file__).resolve().parents[1]
     return yaml.safe_load(
