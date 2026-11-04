@@ -85,6 +85,8 @@ This directory is the system of record for agents. Keep it current. If a decisio
 - `tasks/a11-preclaim-cancellation-scenario-identity.md`
 - `tasks/a11-scenario-identity-metadata-deduplication.md`
 - `handoffs/a11-job-lifecycle-worker-review-remediation.md`
+- [ANY-507 execution metering](handoffs/ANY-507-execution-metering.md) — implemented internal
+  contract for ANY-766, readback fixtures and cutover/rollback procedure.
 
 ## Experiments
 

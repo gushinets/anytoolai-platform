@@ -1,0 +1,62 @@
+{
+  "verification_date": "2026-11-04",
+  "implementation_baseline": "6b83e7b2",
+  "scope": "local disposable fixture databases; no production or Portal acceptance",
+  "postgresql_version": "18.6 (Debian 18.6-1.pgdg13+2)",
+  "postgresql_image": "postgres@sha256:bc8d7bdd54dc38115ef954fef07f30a96bb2b5b080effa692e0093f03eabac8f",
+  "backup_restore": {
+    "0015": {
+      "sha256": "6692f0b4cda503de6111674015bfeb3be0b95c7da1b01a97a03919afb1c74525",
+      "row_counts": {
+        "action_runs": 1,
+        "artifacts": 1,
+        "atom_lab_admission_scopes": 0,
+        "atom_lab_preset_versions": 0,
+        "atom_lab_presets": 0,
+        "atom_lab_runs": 0,
+        "event_log": 1,
+        "guest_identities": 1,
+        "guest_quota_usage": 4,
+        "jobs": 5,
+        "model_catalog_state": 0,
+        "product_handoffs": 1,
+        "provider_calls": 1,
+        "scenario_sessions": 1
+      },
+      "restore_equal": true
+    },
+    "0016": {
+      "sha256": "c4c442bea7e44dd639ecae0b48e9eccfccb5c20999ac30ca7d10af3aa6cda8c0",
+      "row_counts": {
+        "action_runs": 3,
+        "artifacts": 5,
+        "atom_lab_admission_scopes": 0,
+        "atom_lab_preset_versions": 0,
+        "atom_lab_presets": 0,
+        "atom_lab_runs": 0,
+        "event_log": 42,
+        "execution_reservations": 4,
+        "guest_identities": 2,
+        "guest_quota_usage": 5,
+        "jobs": 9,
+        "model_catalog_state": 0,
+        "paid_allowance_usage": 2,
+        "product_handoffs": 1,
+        "provider_calls": 3,
+        "scenario_sessions": 5
+      },
+      "restore_equal": true
+    }
+  },
+  "checks": [
+    "0015 terminal history preserved on migration",
+    "real custom-format dump/restore before and after migration",
+    "reserved/consumed/released history restored exactly",
+    "PostgreSQL process restart retains both restored databases",
+    "recomposed worker and changed-allowance replay do not debit again",
+    "repeat upgrade head preserves history",
+    "downgrade refuses new reservation history",
+    "old-code rollback database matches the pre-cutover backup"
+  ],
+  "production_activation": "not performed"
+}
