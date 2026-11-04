@@ -94,7 +94,7 @@ jobs:
           version: "0.13.4"
       - run: uv sync --locked --group dev --config-file infra/python/uv-build.toml
       - name: Verify resolved PostgreSQL port publications
-        run: uv run --no-sync python -m pytest tests/compose/test_postgres_ports.py
+        run: uv run --no-sync --no-build python -m pytest tests/compose/test_postgres_ports.py
       - name: Boot prod Compose overlay (test secrets, waits for platform-api healthy)
         run: uv run --no-sync python scripts/agent/runner.py prod-fake-up
         env:

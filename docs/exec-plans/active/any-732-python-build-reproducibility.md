@@ -7,7 +7,7 @@
 - Created: 2026-11-03
 - Last updated: 2026-11-04
 - Review date: 2026-11-04
-- Next action: Inspect CI on the corrected PR head
+- Next action: Verify SonarCloud on the head with the targeted port-test build restriction
 - Blocker: None for the workflow fixes; full local baseline still needs passwordless sudo
 
 ## Goal
@@ -94,3 +94,15 @@ that ordering and environment placement. Local validation: 8 workflow-policy tes
 11 port/lifecycle/architecture tests passed; documentation validation and diff whitespace
 checks passed. Changed test lines introduce no Ruff findings. Push the corrected head and use
 its CI results for the full gate; the earlier head's statuses do not establish acceptance.
+
+## SonarCloud follow-up — 2026-11-04
+
+On 50e8a5ef the quality gate has one remaining annotation: the port-test invocation lacks
+--no-build. Add it specifically to the --no-sync command, which uses dependencies prepared by
+the earlier locked sync. Update the lifecycle regression and run the exact invocation.
+Installation and editable/isolated build paths remain enabled with pinned build constraints.
+No rule exclusions, issue-state changes or quality-gate threshold changes are needed.
+
+Validation: the port-test command with uv 0.13.4 passed all 8 tests; the 8 related workflow
+regressions passed. Documentation validation and git diff --check passed. Remote SonarCloud
+status must be verified on the pushed fix; the previous failing check belongs to 50e8a5ef.

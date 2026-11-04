@@ -556,7 +556,7 @@ def test_compose_smoke_prod_checks_ports_then_boots_before_smoke_and_always_tear
     prefix = "uv run --no-sync python scripts/agent/runner.py "
     assert [step["run"] for step in run_steps] == [
         "uv sync --locked --group dev --config-file infra/python/uv-build.toml",
-        "uv run --no-sync python -m pytest tests/compose/test_postgres_ports.py",
+        "uv run --no-sync --no-build python -m pytest tests/compose/test_postgres_ports.py",
         prefix + "prod-fake-up",
         prefix + "prod-smoke",
         prefix + "prod-fake-down",
