@@ -14,9 +14,7 @@ pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
 
 
 @pytest.mark.parametrize("drain", [True, False])
-def test_quiesce_checks_the_entire_legacy_queue_before_stopping_worker(
-    monkeypatch, capsys, drain
-):
+def test_quiesce_checks_the_entire_legacy_queue_before_stopping_worker(monkeypatch, capsys, drain):
     with provision_database(
         database_name_prefix="any507_drain",
         upgrade_target="0015",
@@ -121,4 +119,66 @@ def test_failed_0016_migration_rolls_back_ddl_counters_and_version_then_retries(
             config.attributes["connection"] = connection
             command.upgrade(config, "head")
             assert _snapshot(connection, old) == before
-            assert connection.scalar(sa.text("SELECT version_num FROM alembic_version")) == "0016"
+            assert connection.scalar(sa.text("SELECT version_num FROM alembic_version")) == "0017"
+
+
+@pytest.mark.parametrize("new_bucket", [False, True])
+def test_cutover_classifies_old_admission_after_0016_as_legacy(new_bucket):
+    with provision_database(
+        database_name_prefix="any507_prepared_cutover",
+        upgrade_target="0015",
+        skip_reason="prepared guest history cutover",
+    ) as (engine, config, _):
+        old = sa.MetaData(schema="platform")
+        with engine.begin() as connection:
+            old.reflect(connection, schema="platform")
+            _seed_0015(connection, old)
+            config.attributes["connection"] = connection
+            command.upgrade(config, "0016")
+
+        # Use only the old schema/writer, including the defaults on a new usage row.
+        usage = old.tables["platform.guest_quota_usage"]
+        bucket_id = "old_usage_0"
+        with engine.begin() as connection:
+            if new_bucket:
+                previous = dict(
+                    connection.execute(sa.select(usage).where(usage.c.id == bucket_id))
+                    .mappings()
+                    .one()
+                )
+                bucket_id = "after_preparation"
+                connection.execute(
+                    usage.insert().values(
+                        **{
+                            **previous,
+                            "id": bucket_id,
+                            "period_key": "after_preparation",
+                            "used_count": 1,
+                        }
+                    )
+                )
+            else:
+                connection.execute(
+                    usage.update()
+                    .where(usage.c.id == bucket_id)
+                    .values(used_count=usage.c.used_count + 1)
+                )
+            before = _snapshot(connection, old)
+
+        with engine.begin() as connection:
+            config.attributes["connection"] = connection
+            command.upgrade(config, "head")
+            assert _snapshot(connection, old) == before
+            counters = connection.execute(
+                sa.text(
+                    "SELECT used_count, legacy_used_count, reserved_count "
+                    "FROM platform.guest_quota_usage WHERE id = :id"
+                ),
+                {"id": bucket_id},
+            ).one()
+            assert tuple(counters) == (1, 1, 0)
+            current = sa.MetaData(schema="platform")
+            current.reflect(connection, schema="platform")
+            first = _snapshot(connection, current)
+            command.upgrade(config, "head")
+            assert _snapshot(connection, current) == first

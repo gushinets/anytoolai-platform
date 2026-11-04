@@ -7,7 +7,7 @@
 - Created: 2026-11-04
 - Last updated: 2026-11-04
 - Review date: 2026-11-04
-- Next action: stop after stage 5 verification/handoff; resolve the recorded activation gates and pin a reviewed delivery SHA before any deployment or separately authorized ANY-766 work.
+- Next action: obtain green activation gates and pin a reviewed delivery SHA before deployment; the guest-history cutover now uses `0017`.
 - Blocker: canonical quick/full gates still fail because passwordless sudo is unavailable; production activation remains deferred.
 
 ## 1. Basis, version and scope

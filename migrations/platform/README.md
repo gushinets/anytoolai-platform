@@ -25,6 +25,10 @@ Email capture and paywall intent remain separate access-lite slices.
 Revision `0016` prepares execution metering storage: guest reserved/historical counters, immutable
 paid buckets, execution reservations and server-owned job consumption mode. Existing counters and
 runtime history are preserved. The migration itself does not switch admission or charging.
+Revision `0017` runs during quiesced application cutover and reconciles guest historical usage as
+total used minus consumed guest reservations. It includes old admissions after `0016` preparation
+without resetting successful usage, active reserves, paid buckets or results. Do not resume old
+admission after this reconciliation; ordinary later `upgrade head` calls are no-ops.
 PostgreSQL deferred checks reject a committed `reserved` job without its reservation.
 Downgrade refuses to discard paid/reservation history. ANY-507 stage 2 now connects reservation
 admission for new metered starts; stage 3 implements terminal consumption/release and recovery.

@@ -76,7 +76,7 @@ owner-only. The source remains closed and unmodified throughout verification.
 Inventory `scenario_sessions`, `jobs`, `action_runs`, `provider_calls`, `artifacts`, `event_log`,
 `guest_identities`, `guest_quota_usage`, `email_captures`, `paywall_intents`, `product_handoffs`,
 `atom_lab_runs`, `atom_lab_presets`, `model_catalog_state` and any other existing platform tables.
-If already at `0016`, also inventory `paid_allowance_usage` and `execution_reservations`.
+If already at `0016` or later, also inventory `paid_allowance_usage` and `execution_reservations`.
 Retain source column lists for comparing history after migration, excluding only newly added columns.
 
 ## Migrate and activate compatible applications
@@ -85,14 +85,22 @@ Retain source column lists for comparing history after migration, excluding only
    and its compatible API/worker/web images and configuration. Preserve the database volume and
    trusted tenant/region; do not rename historical scopes or identities.
 2. Run `prod-up`. Its existing one-shot `migrate` service applies the real Alembic chain before
-   API/worker startup; it must exit zero. The head for this delivery is `0016`, after `0015`.
-   A database already at `0016` receives a no-op migration. No direct Compose application `up`
+   API/worker startup; it must exit zero. The head for this delivery is `0017`, after `0016`.
+   Revision `0017` reconciles historical guest usage, including old admission after `0016` storage
+   preparation: `legacy_used_count = used_count - count(consumed guest reservations)` per bucket.
+   Both tables are write-locked during reconciliation; total usage, active reserves, paid buckets
+   and runtime/result history are unchanged. A negative historical contribution fails the migration
+   rather than discarding successful usage. Keep old admission stopped from this migration through
+   activation; `0017` is part of application cutover, not a separately resumable preparation step.
+   A database already at `0017` receives a no-op migration. No direct Compose application `up`
    or `start` may bypass deployment-profile, activation or readiness gates.
 3. Run `prod-ready`, inspect migrate/API/worker logs and verify the head and preserved history.
    Every old job remains `consumption_mode=legacy`; guest `used_count` is unchanged,
    `legacy_used_count` equals pre-cutover used, and `reserved_count=0` at a fresh `0015` upgrade.
-   Existing `0016` counters/reservations must instead match their backup exactly. No historical
-   reservation is synthesized, including for legacy terminal jobs or legacy replay.
+   For a prepared `0016` database, compare the reconciled historical contribution with the equation
+   above; every other counter and all reservation/result history must match the backup exactly.
+   Existing `0017` history must match its backup exactly. No historical reservation is synthesized,
+   including for legacy terminal jobs or legacy replay.
 4. While public ingress remains closed, exercise an approved disposable guest through the same
    deployed start → worker → canonical Result API path. Check reserve before execution, exactly
    one consumption after success, failure release, same-key replay and busy versus exhausted
@@ -111,7 +119,7 @@ The queue check still covers every job in its shared database.
 
 Migration failure, history mismatch or failed smoke keeps admission closed. Do not run old code
 against a database that has accepted new reservations. PostgreSQL transactional DDL rolls back a
-failed `0016` migration; verify `alembic_version`, columns and original rows before deciding to
+failed migration; verify `alembic_version`, columns and original rows before deciding to
 retry or resume. Existing Compose migration/readiness failure gates remain mandatory.
 
 After **any** new reservation or paid bucket exists, `alembic downgrade` is refused. Even if a
