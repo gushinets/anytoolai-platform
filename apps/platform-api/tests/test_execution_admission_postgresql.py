@@ -25,6 +25,7 @@ from anytoolai_platform_core.quotas.execution_repository import (
     ExecutionReservationRepository,
     PaidAllowanceUsageRepository,
 )
+from anytoolai_platform_core.quotas.finalization import release_execution
 from anytoolai_platform_core.quotas.models import (
     ExecutionOwner,
     ExecutionOwnerKind,
@@ -191,6 +192,15 @@ def test_last_unit_competitors_get_capacity_reserved_without_candidate_rows(runt
     assert len(rows(factory, jobs_table)) == 1
     assert len(rows(factory, execution_reservations_table)) == 1
     assert rows(factory, paid_allowance_usage_table)[0]["used_count"] == 0
+    audits = [e for e in rows(factory, event_log_table) if e["event_type"] == "quota.capacity_reserved"]
+    assert len(audits) == 5
+    for event in audits:
+        assert event["user_id"] == grant.owner.owner_id
+        assert event["scenario_session_id"] and event["job_id"]
+        assert event["properties"]["allowance_id"] == grant.allowance_id
+        assert event["properties"]["available_count"] == 0
+        assert event["properties"]["remaining_count"] == 1
+        assert not event["properties"]["exhausted"]
 
 
 def test_replay_uses_original_bucket_after_cycle_change_and_terminal_failure(runtime):
@@ -510,7 +520,7 @@ def test_busy_handoff_http_rolls_back_claim_and_can_retry_same_token(runtime):
     )
     app.state.runtime = replace(app.state.runtime, config_registry=registry)
     with transaction_boundary(factory) as session:
-        start(session, registry)
+        occupied = start(session, registry)
         source, artifact = _seed_source(session)
     created = _create(app, source, artifact).json()
     path = f"/v1/handoffs/{created['handoff_token']}/accept"
@@ -520,21 +530,28 @@ def test_busy_handoff_http_rolls_back_claim_and_can_retry_same_token(runtime):
     handoff = rows(factory, product_handoffs_table)[0]
     assert handoff["status"].value == "created"
     assert handoff["target_job_id"] is None and handoff["error_code"] is None
+    audits = [e for e in rows(factory, event_log_table) if e["event_type"] == "quota.capacity_reserved"]
+    assert len(audits) == 1
+    assert audits[0]["handoff_id"] == created["handoff_id"]
+    assert audits[0]["job_id"] and audits[0]["scenario_session_id"]
+    assert audits[0]["properties"]["reserved_count"] == 1
+    assert not audits[0]["properties"]["exhausted"]
     assert len(rows(factory, jobs_table)) == 2  # occupied target capacity and historical source
     assert not any(
         event["event_type"] == "handoff.failed" for event in rows(factory, event_log_table)
     )
-    # Guest policy changes are supported; increasing capacity proves the same consent is retryable.
-    registry = replace(
-        registry, quotas={**registry.quotas, policy.quota_policy_id: replace(policy, limit_count=2)}
-    )
-    app.state.runtime = replace(app.state.runtime, config_registry=registry)
+    # Terminal release restores the same allowance; consent/token/guest remain unchanged.
+    with transaction_boundary(factory) as session:
+        session.execute(
+            sa.update(jobs_table).where(jobs_table.c.id == occupied.job_id).values(status="failed")
+        )
+        assert release_execution(session, occupied.job_id).applied
     accepted = asyncio.run(_request(app, "POST", path, {}))
     assert accepted.status_code == 200
     replay = asyncio.run(_request(app, "POST", path, {}))
     assert replay.json() == accepted.json()
     assert len(rows(factory, execution_reservations_table)) == 2
-    assert rows(factory, guest_quota_usage_table)[0]["reserved_count"] == 2
+    assert rows(factory, guest_quota_usage_table)[0]["reserved_count"] == 1
     assert all(
         row["consumption_mode"] is JobConsumptionMode.reserved
         for row in rows(factory, jobs_table)

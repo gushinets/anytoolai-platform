@@ -7,7 +7,7 @@ from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Session
 
 from anytoolai_platform_core.common.time import utc_now
-from anytoolai_platform_core.quotas.models import QuotaDimension, QuotaUsageRecord
+from anytoolai_platform_core.quotas.models import ExecutionOwner, QuotaDimension, QuotaUsageRecord
 from anytoolai_platform_core.storage.db import (
     GUEST_QUOTA_USAGE_DIMENSION_CONSTRAINT_NAME,
     guest_quota_usage_table,
@@ -65,6 +65,21 @@ class QuotaUsageRepository:
         row = (
             self._session.execute(
                 sa.select(guest_quota_usage_table).where(guest_quota_usage_table.c.id == usage_id)
+            )
+            .mappings()
+            .one_or_none()
+        )
+        return None if row is None else _record_from_row(row)
+
+    def get_owned(self, owner: ExecutionOwner, bucket_id: str) -> QuotaUsageRecord | None:
+        row = (
+            self._session.execute(
+                sa.select(guest_quota_usage_table).where(
+                    guest_quota_usage_table.c.id == bucket_id,
+                    guest_quota_usage_table.c.tenant_id == owner.tenant_id,
+                    guest_quota_usage_table.c.region == owner.region,
+                    guest_quota_usage_table.c.guest_id == owner.owner_id,
+                )
             )
             .mappings()
             .one_or_none()

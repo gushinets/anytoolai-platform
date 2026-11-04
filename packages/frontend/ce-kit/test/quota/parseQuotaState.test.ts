@@ -12,11 +12,36 @@ const VALID_PAYLOAD = {
   period: "lifetime",
   limit_count: 3,
   used_count: 1,
+  successful_used_count: 1,
+  legacy_used_count: 0,
+  reserved_count: 0,
+  available_count: 2,
+  read_at: "2026-11-04T00:00:00Z",
   remaining_count: 2,
   exhausted: false,
 };
 
 describe("parseQuotaState", () => {
+  it("distinguishes occupied capacity from exhaustion and preserves historical contribution", () => {
+    expect(parseQuotaState({
+      ...VALID_PAYLOAD, limit_count: 2, used_count: 1, legacy_used_count: 1,
+      successful_used_count: 0, remaining_count: 1, reserved_count: 1, available_count: 0,
+    })).toMatchObject({ exhausted: false, usedCount: 1, legacyUsedCount: 1, successfulUsedCount: 0, reservedCount: 1, availableCount: 0 });
+  });
+
+  it("rejects missing, contradictory, unsafe counters and invalid read times", () => {
+    for (const key of ["reserved_count", "available_count", "legacy_used_count", "successful_used_count", "read_at"]) {
+      const payload: Record<string, unknown> = { ...VALID_PAYLOAD };
+      delete payload[key];
+      expect(parseQuotaState(payload)).toBeNull();
+    }
+    for (const patch of [
+      { reserved_count: -1 }, { legacy_used_count: true }, { available_count: 0 },
+      { used_count: 0.5 }, { used_count: Number.NaN }, { reserved_count: Number.POSITIVE_INFINITY },
+      { legacy_used_count: 1 }, { exhausted: true }, { limit_count: Number.MAX_SAFE_INTEGER + 1 },
+      { read_at: "2026-11-04T00:00:00" }, { read_at: "2026-02-31T00:00:00Z" },
+    ]) expect(parseQuotaState({ ...VALID_PAYLOAD, ...patch })).toBeNull();
+  });
   it("returns null for a non-object payload", () => {
     expect(parseQuotaState(null)).toBeNull();
     expect(parseQuotaState("guest_123")).toBeNull();
@@ -44,6 +69,11 @@ describe("parseQuotaState", () => {
       period: "lifetime",
       limitCount: 3,
       usedCount: 1,
+      successfulUsedCount: 1,
+      legacyUsedCount: 0,
+      reservedCount: 0,
+      availableCount: 2,
+      readAt: "2026-11-04T00:00:00Z",
       remainingCount: 2,
       exhausted: false,
       resetsAt: null,

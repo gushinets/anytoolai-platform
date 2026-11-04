@@ -7,10 +7,11 @@ export const de: Shape<typeof en> = {
   nav: {
     label: "Tools",
     allTools: "Alle Tools",
-    runInProgress: "Ein Lauf ist in Arbeit. Wenn Sie jetzt gehen, sehen Sie das Ergebnis nicht und das Kontingent wird nicht zurückgegeben.",
+    runInProgress: "Ein Durchlauf läuft. Wenn du gehst, wird er fortgesetzt; ein erfolgreiches Ergebnis verbraucht einen Durchlauf.",
   },
   loading: "{product} wird geladen…",
   unavailable: "{product} ist derzeit nicht verfügbar. Bitte laden Sie die Seite neu.",
+  quotaReserved: "Jetzt verfügbar: {available}. In Bearbeitung: {reserved}.",
   quotaExhausted: "Sie haben vorerst alle Ihre {product}-Durchläufe verbraucht.",
   resultFetchFailed: "Ihr Ergebnis ist fertig, konnte aber nicht geladen werden. Bitte versuchen Sie es erneut.",
   starting: "Wird gestartet…",
@@ -28,6 +29,7 @@ export const de: Shape<typeof en> = {
     handoffFailed: "Der nächste Schritt konnte nicht geöffnet werden. Bitte versuchen Sie es erneut.",
   },
   errors: {
+    quotaCapacityReserved: "Die Kapazität ist vorübergehend belegt. Bitte versuche es gleich noch einmal.",
     startFailed: "{product} konnte nicht gestartet werden. Bitte versuchen Sie es erneut.",
     timeout: "Das dauert länger als erwartet. Bitte versuchen Sie es erneut.",
     connectionLost: "Die Verbindung ging beim Warten auf Ihr Ergebnis verloren. Bitte versuchen Sie es erneut.",
