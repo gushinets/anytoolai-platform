@@ -241,7 +241,7 @@ composition/loader seams. Follow Kernel AGENTS and coding conventions.
 **Stop:** no migration, runtime type/service, endpoint or frontend implementation in this stage.
 Stages 1–5 remain unstarted.
 
-### Stage 1. Add storage and migration
+### Stage 1. Add storage and migration — done
 
 **Outcome:** counters/reservations without changing historical usage.
 **Components:** Alembic, SQLAlchemy tables, records and repositories.

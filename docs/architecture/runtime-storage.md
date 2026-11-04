@@ -11,6 +11,8 @@ It covers the design that was implemented for:
 - `platform.artifacts`
 - `platform.guest_identities`
 - `platform.guest_quota_usage`
+- `platform.paid_allowance_usage`
+- `platform.execution_reservations`
 - `platform.product_handoffs`
 - `platform.atom_lab_runs`
 - `platform.model_catalog_state`
@@ -87,6 +89,54 @@ For the Provider Gateway ADR-0007 realignment:
   restores the legacy target-session index for the historical revision boundary
 - `0012_atom_lab_runs.py` adds the immutable Atom Lab admission snapshot linked one-to-one to its
   scenario session and job; action/artifact links remain nullable until execution creates them
+- `0016_execution_reservations.py` prepares success-only metering storage without activating the
+  admission/finalization mechanism; its stage boundary is described below
+
+### Execution metering storage (ANY-507 stage 1)
+
+Revision `0016` appends to `0015`. It preserves every existing identity, scope, usage count and runtime
+row. Guest usage gains `reserved_count=0` and `legacy_used_count=used_count`. Successful guest usage
+will be the difference `used_count - legacy_used_count`; migration never labels historical attempts
+as successful and never refunds or reassigns a window. Historical usage may exceed a later policy
+limit, so the new guest constraints do not require `used_count <= limit_count`.
+
+`paid_allowance_usage` stores one bucket per `tenant_id + region + allowance_id`, independent of
+guest policies/windows. Its owner/product/metric/unit/quantity tuple is immutable: repository
+insert-or-select rejects conflicting bindings, and a PostgreSQL trigger rejects direct SQL
+rebinding. Quantity and used/reserved counters are `BIGINT`; quantity is limited to `0..2^53-1`,
+counters are nonnegative, and their sum cannot exceed quantity. The typed `PaidAllowance` excludes
+boolean/fractional quantities and requires a canonical Portal UUID owner. Metric and unit strings
+come from the registry; checking their product membership belongs to stage-2 admission, not storage.
+A read returns no row for an unobserved allowance and creates no bucket.
+
+`execution_reservations` stores the original owner, session/job, product/scenario/frontend,
+guest-or-paid bucket, optional replay namespace/key/hash and final result linkage. Foreign keys
+protect all bucket/runtime/handoff/result references. Checks require exactly one bucket matching the
+owner kind, complete replay identity (mandatory for paid), and a final artifact only for `consumed`.
+`handoff` replay uses the stable runtime handoff ID. Unique constraints cover session, job, and
+`tenant + region + owner kind/id + product + scenario + namespace + replay key`; allowance ID is
+excluded so replay can retain its original bucket across cycles. Repository creation validates
+owner/scope/product/scenario/frontend links and exposes no generic identity-changing update.
+
+Jobs gain the server-owned `JobConsumptionMode`: `legacy | unmetered | reserved`. Existing jobs and
+the current admission path remain `legacy` during this storage-only stage. The compatibility debit
+increments both guest `used_count` and `legacy_used_count`; reserve-on-admission and new `reserved` or
+`unmetered` job creation are connected in stage 2. Job repository updates cannot change the mode.
+PostgreSQL deferred constraint triggers require exactly one reservation for a `reserved` job and no
+reservation for other modes, at transaction completion. This permits job-then-reservation insertion
+while rejecting a committed reserved job with a missing reservation. SQLite metadata construction
+does not provide this PostgreSQL trigger guarantee.
+
+`PaidAllowanceUsageRepository` and `ExecutionReservationRepository` live in
+`quotas/execution_repository.py`, accept the caller's `Session`, and never commit or roll back it.
+They supply storage binding, creation and lookup only. Reservation counter transitions, transactional
+replay orchestration, publication/release/recovery, HTTP readback and Portal authority are later
+ANY-507/ANY-766 stages. No result-availability or paid-access implementation is claimed here.
+
+Downgrade to `0015` is refused once paid buckets or reservations exist; restoring an old runtime after
+activation requires the coordinated backup/quiesce procedure from the
+[execution plan](../exec-plans/active/ANY-507-implementation-plan.md). Upgrade was designed to leave
+old tables intact, and repeated `upgrade head` does not backfill legacy usage a second time.
 
 ### Atom Lab run snapshots
 

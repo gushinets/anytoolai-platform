@@ -13,8 +13,14 @@ from anytoolai_platform_core.actions.models import ActionRunStatus
 from anytoolai_platform_core.artifacts.models import ArtifactStatus
 from anytoolai_platform_core.handoffs.models import HandoffStartPolicy, HandoffStatus
 from anytoolai_platform_core.providers.models import ProviderCallStatus
+from anytoolai_platform_core.quotas.models import (
+    MAX_ALLOWANCE_QUANTITY,
+    ExecutionOwnerKind,
+    ExecutionReplayNamespace,
+    ReservationState,
+)
 from anytoolai_platform_core.scenarios.models import ScenarioSessionStatus
-from anytoolai_platform_core.workflows.models import JobStatus
+from anytoolai_platform_core.workflows.models import JobConsumptionMode, JobStatus
 
 PLATFORM_SCHEMA = "platform"
 
@@ -269,6 +275,12 @@ jobs_table = sa.Table(
     sa.Column("workflow_id", sa.String(length=128), nullable=False),
     sa.Column("workflow_version", sa.Integer(), nullable=False),
     sa.Column("status", _enum_type(JobStatus, "job_status"), nullable=False),
+    sa.Column(
+        "consumption_mode",
+        _enum_type(JobConsumptionMode, "job_consumption_mode"),
+        nullable=False,
+        server_default=JobConsumptionMode.legacy.value,
+    ),
     sa.Column("input_artifact_id", sa.String(length=128)),
     sa.Column("result_artifact_id", sa.String(length=128)),
     sa.Column("error_code", sa.String(length=128)),
@@ -614,11 +626,18 @@ guest_quota_usage_table = sa.Table(
     sa.Column("period_key", sa.String(length=128), nullable=False),
     sa.Column("limit_count", sa.Integer(), nullable=False),
     sa.Column("used_count", sa.Integer(), nullable=False),
+    sa.Column("reserved_count", sa.Integer(), nullable=False, server_default="0"),
+    sa.Column("legacy_used_count", sa.Integer(), nullable=False, server_default="0"),
     sa.Column("created_at", utc_datetime, nullable=False),
     sa.Column("updated_at", utc_datetime, nullable=False),
     sa.Column("metadata", json_document, nullable=False),
     sa.CheckConstraint("limit_count >= 0", name="ck_guest_quota_usage_limit_count"),
     sa.CheckConstraint("used_count >= 0", name="ck_guest_quota_usage_used_count"),
+    sa.CheckConstraint("reserved_count >= 0", name="ck_guest_quota_usage_reserved_count"),
+    sa.CheckConstraint(
+        "legacy_used_count >= 0 AND legacy_used_count <= used_count",
+        name="ck_guest_quota_usage_legacy_used_count",
+    ),
     sa.ForeignKeyConstraint(
         ["guest_id"],
         [f"{PLATFORM_SCHEMA}.guest_identities.id"],
@@ -635,6 +654,109 @@ guest_quota_usage_table = sa.Table(
         "product_id",
         "quota_policy_id",
     ),
+)
+
+paid_allowance_usage_table = sa.Table(
+    "paid_allowance_usage",
+    runtime_metadata,
+    sa.Column("id", sa.String(128), primary_key=True),
+    sa.Column("tenant_id", sa.String(128), nullable=False),
+    sa.Column("region", sa.String(64), nullable=False),
+    sa.Column("owner_id", sa.String(128), nullable=False),
+    sa.Column("allowance_id", sa.String(128), nullable=False),
+    sa.Column("product_id", sa.String(128), nullable=False),
+    sa.Column("metric_key", sa.String(128), nullable=False),
+    sa.Column("unit", sa.String(128), nullable=False),
+    sa.Column("quantity", sa.BigInteger(), nullable=False),
+    sa.Column("used_count", sa.BigInteger(), nullable=False, server_default="0"),
+    sa.Column("reserved_count", sa.BigInteger(), nullable=False, server_default="0"),
+    sa.Column("created_at", utc_datetime, nullable=False),
+    sa.Column("updated_at", utc_datetime, nullable=False),
+    sa.UniqueConstraint(
+        "tenant_id", "region", "allowance_id", name="uq_paid_allowance_usage_scope_allowance",
+    ),
+    sa.CheckConstraint(
+        f"quantity BETWEEN 0 AND {MAX_ALLOWANCE_QUANTITY}",
+        name="ck_paid_allowance_usage_quantity",
+    ),
+    sa.CheckConstraint(
+        "used_count >= 0 AND reserved_count >= 0 AND used_count + reserved_count <= quantity",
+        name="ck_paid_allowance_usage_counts",
+    ),
+    sa.Index("ix_paid_allowance_usage_owner", "tenant_id", "region", "owner_id"),
+)
+
+execution_reservations_table = sa.Table(
+    "execution_reservations",
+    runtime_metadata,
+    sa.Column("id", sa.String(128), primary_key=True),
+    sa.Column("tenant_id", sa.String(128), nullable=False),
+    sa.Column("region", sa.String(64), nullable=False),
+    sa.Column("owner_kind", _enum_type(ExecutionOwnerKind, "execution_owner_kind"), nullable=False),
+    sa.Column("owner_id", sa.String(128), nullable=False),
+    sa.Column("product_id", sa.String(128), nullable=False),
+    sa.Column("scenario_id", sa.String(128), nullable=False),
+    sa.Column("frontend_id", sa.String(128), nullable=False),
+    sa.Column("scenario_session_id", sa.String(128), nullable=False),
+    sa.Column("job_id", sa.String(128), nullable=False),
+    sa.Column("guest_quota_usage_id", sa.String(128)),
+    sa.Column("paid_allowance_usage_id", sa.String(128)),
+    sa.Column(
+        "replay_namespace", _enum_type(ExecutionReplayNamespace, "execution_replay_namespace"),
+    ),
+    sa.Column("replay_key", sa.String(256)),
+    sa.Column("request_hash", sa.String(64)),
+    sa.Column("handoff_id", sa.String(128)),
+    sa.Column("state", _enum_type(ReservationState, "execution_reservation_state"), nullable=False),
+    sa.Column("result_artifact_id", sa.String(128)),
+    sa.Column("created_at", utc_datetime, nullable=False),
+    sa.Column("updated_at", utc_datetime, nullable=False),
+    sa.Column("finalized_at", utc_datetime),
+    sa.UniqueConstraint("scenario_session_id", name="uq_execution_reservations_session"),
+    sa.UniqueConstraint("job_id", name="uq_execution_reservations_job"),
+    sa.UniqueConstraint(
+        "tenant_id", "region", "owner_kind", "owner_id", "product_id", "scenario_id",
+        "replay_namespace", "replay_key", name="uq_execution_reservations_owner_replay",
+    ),
+    sa.CheckConstraint(
+        "(owner_kind = 'guest' AND guest_quota_usage_id IS NOT NULL "
+        "AND paid_allowance_usage_id IS NULL) OR "
+        "(owner_kind = 'portal_user' AND guest_quota_usage_id IS NULL "
+        "AND paid_allowance_usage_id IS NOT NULL)",
+        name="ck_execution_reservations_bucket",
+    ),
+    sa.CheckConstraint(
+        "(replay_namespace IS NULL AND replay_key IS NULL AND request_hash IS NULL "
+        "AND owner_kind = 'guest') OR "
+        "(replay_namespace IS NOT NULL AND replay_key IS NOT NULL AND replay_key <> '' "
+        "AND request_hash IS NOT NULL AND length(request_hash) = 64)",
+        name="ck_execution_reservations_replay",
+    ),
+    sa.CheckConstraint(
+        "replay_namespace <> 'handoff' OR (handoff_id IS NOT NULL AND replay_key = handoff_id)",
+        name="ck_execution_reservations_handoff_replay",
+    ),
+    sa.CheckConstraint(
+        "(state = 'consumed' AND result_artifact_id IS NOT NULL AND finalized_at IS NOT NULL) "
+        "OR (state = 'released' AND result_artifact_id IS NULL AND finalized_at IS NOT NULL) "
+        "OR (state = 'reserved' AND result_artifact_id IS NULL AND finalized_at IS NULL)",
+        name="ck_execution_reservations_final_result",
+    ),
+    *(
+        sa.ForeignKeyConstraint(
+            [column], [f"{PLATFORM_SCHEMA}.{table}.id"], name=f"fk_execution_reservations_{name}",
+        )
+        for column, table, name in (
+            ("scenario_session_id", "scenario_sessions", "session"),
+            ("job_id", "jobs", "job"),
+            ("guest_quota_usage_id", "guest_quota_usage", "guest_bucket"),
+            ("paid_allowance_usage_id", "paid_allowance_usage", "paid_bucket"),
+            ("result_artifact_id", "artifacts", "result"),
+            ("handoff_id", "product_handoffs", "handoff"),
+        )
+    ),
+    sa.Index("ix_execution_reservations_guest_bucket", "guest_quota_usage_id"),
+    sa.Index("ix_execution_reservations_paid_bucket", "paid_allowance_usage_id"),
 )
 
 product_handoffs_table = sa.Table(
@@ -780,6 +902,8 @@ runtime_tables = {
     "artifacts": artifacts_table,
     "guest_identities": guest_identities_table,
     "guest_quota_usage": guest_quota_usage_table,
+    "paid_allowance_usage": paid_allowance_usage_table,
+    "execution_reservations": execution_reservations_table,
     "product_handoffs": product_handoffs_table,
     "event_log": event_log_table,
 }
