@@ -218,9 +218,28 @@ class QuotaState:
     period_key: str
     limit_count: int
     used_count: int
+    successful_used_count: int
+    legacy_used_count: int
+    reserved_count: int
+    available_count: int
     remaining_count: int
     exhausted: bool
     resets_at: datetime | None
+    read_at: datetime
+
+
+@dataclass(frozen=True)
+class ConsumptionReadback:
+    owner: ExecutionOwner
+    bucket: QuotaUsageRecord | PaidAllowanceUsageRecord
+    quantity: int
+    used: int
+    successful_used: int
+    legacy_used: int
+    reserved: int
+    remaining: int
+    available: int
+    read_at: datetime
 
 
 @dataclass(frozen=True)

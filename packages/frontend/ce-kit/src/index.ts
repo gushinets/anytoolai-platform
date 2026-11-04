@@ -22,6 +22,7 @@ export {
   isHandoffTargetSchemaInvalid,
   isIdempotencyKeyConflict,
   isQuotaExhausted,
+  isQuotaCapacityReserved,
   isResultNotFound,
   isResultUnavailable,
   isScenarioActionConflict,

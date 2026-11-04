@@ -170,7 +170,10 @@ coordination pre-emptively.
 
 Only successfully created scenario sessions count toward 50. Invalid access codes, invalid input,
 busy responses, and failed pre-start validation do not consume the demo limit. A workflow that is
-accepted and later fails does consume one run because it may already have incurred provider cost.
+accepted and later fails still counts toward this demo admission limit. This is a separate
+anti-abuse count of accepted demo sessions, not the product quota counter: under ANY-507 a failed
+metered execution releases its product-quota reservation without consumption. The daily demo count
+does not change or refund when that execution fails.
 
 ## Page Experience
 

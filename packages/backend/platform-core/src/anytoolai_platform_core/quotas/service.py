@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 
 import sqlalchemy as sa
@@ -18,6 +18,8 @@ from anytoolai_platform_core.handoffs.repository import HandoffRepository
 from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.identity.service import GuestIdentityNotFoundError
 from anytoolai_platform_core.quotas.models import (
+    ExecutionOwner,
+    ExecutionOwnerKind,
     QuotaDimension,
     QuotaPolicy,
     QuotaState,
@@ -28,6 +30,7 @@ from anytoolai_platform_core.quotas.periods import (
     UnsupportedQuotaPeriodError,
     resolve_quota_period,
 )
+from anytoolai_platform_core.quotas.readback import consumption_from_bucket
 from anytoolai_platform_core.quotas.repository import QuotaUsageRepository
 from anytoolai_platform_core.storage.db import event_log_table
 from anytoolai_platform_core.storage.transactions import (
@@ -595,7 +598,10 @@ def _state_from_usage(
     policy: QuotaPolicy,
     resolved_period: ResolvedQuotaPeriod,
 ) -> QuotaState:
-    remaining_count = max(policy.limit_count - record.used_count, 0)
+    readback = consumption_from_bucket(
+        ExecutionOwner(record.tenant_id, record.region, ExecutionOwnerKind.guest, record.guest_id),
+        replace(record, limit_count=policy.limit_count),
+    )
     return QuotaState(
         guest_id=record.guest_id,
         product_id=record.product_id,
@@ -608,9 +614,14 @@ def _state_from_usage(
         period_key=record.period_key,
         limit_count=policy.limit_count,
         used_count=record.used_count,
-        remaining_count=remaining_count,
-        exhausted=remaining_count <= 0,
+        successful_used_count=readback.successful_used,
+        legacy_used_count=readback.legacy_used,
+        reserved_count=readback.reserved,
+        available_count=readback.available,
+        remaining_count=readback.remaining,
+        exhausted=readback.remaining == 0,
         resets_at=resolved_period.ends_at,
+        read_at=readback.read_at,
     )
 
 
@@ -634,9 +645,14 @@ def _state_from_empty_usage(
         period_key=resolved_period.period_key,
         limit_count=policy.limit_count,
         used_count=0,
+        successful_used_count=0,
+        legacy_used_count=0,
+        reserved_count=0,
+        available_count=policy.limit_count,
         remaining_count=policy.limit_count,
         exhausted=policy.limit_count <= 0,
         resets_at=resolved_period.ends_at,
+        read_at=utc_now(),
     )
 
 
@@ -687,6 +703,10 @@ def _emit_quota_event(
         "period_key": state.period_key,
         "limit_count": state.limit_count,
         "used_count": state.used_count,
+        "successful_used_count": state.successful_used_count,
+        "legacy_used_count": state.legacy_used_count,
+        "reserved_count": state.reserved_count,
+        "available_count": state.available_count,
         "remaining_count": state.remaining_count,
         "exhausted": state.exhausted,
     }

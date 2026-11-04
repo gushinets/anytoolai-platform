@@ -7,6 +7,7 @@ export const de: Shape<typeof en> = {
   notFound: "Dieser Übergabe-Link ist ungültig.",
   loadFailed: "Beim Laden dieser Übergabe ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
   retry: "Erneut versuchen",
+  capacityReserved: "Die Kapazität ist vorübergehend belegt. Bitte versuche es gleich noch einmal.",
   actionFailed: "Die Aktion konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut.",
   fields: {
     from: "Von",

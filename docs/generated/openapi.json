@@ -1894,6 +1894,10 @@
       "QuotaStateResponse": {
         "additionalProperties": false,
         "properties": {
+          "available_count": {
+            "title": "Available Count",
+            "type": "integer"
+          },
           "dimension_key": {
             "title": "Dimension Key",
             "type": "string"
@@ -1905,6 +1909,10 @@
           "guest_id": {
             "title": "Guest Id",
             "type": "string"
+          },
+          "legacy_used_count": {
+            "title": "Legacy Used Count",
+            "type": "integer"
           },
           "limit_count": {
             "title": "Limit Count",
@@ -1924,8 +1932,17 @@
             "title": "Quota Policy Id",
             "type": "string"
           },
+          "read_at": {
+            "format": "date-time",
+            "title": "Read At",
+            "type": "string"
+          },
           "remaining_count": {
             "title": "Remaining Count",
+            "type": "integer"
+          },
+          "reserved_count": {
+            "title": "Reserved Count",
             "type": "integer"
           },
           "resets_at": {
@@ -1951,6 +1968,10 @@
             ],
             "title": "Scenario Id"
           },
+          "successful_used_count": {
+            "title": "Successful Used Count",
+            "type": "integer"
+          },
           "unit": {
             "$ref": "#/components/schemas/QuotaUnit"
           },
@@ -1969,8 +1990,13 @@
           "period",
           "limit_count",
           "used_count",
+          "successful_used_count",
+          "legacy_used_count",
+          "reserved_count",
+          "available_count",
           "remaining_count",
-          "exhausted"
+          "exhausted",
+          "read_at"
         ],
         "title": "QuotaStateResponse",
         "type": "object"
@@ -4461,15 +4487,20 @@
             "content": {
               "application/json": {
                 "example": {
+                  "available_count": 1,
                   "dimension_key": "kernel_demo",
                   "exhausted": false,
                   "guest_id": "guest_123",
+                  "legacy_used_count": 0,
                   "limit_count": 3,
                   "period": "lifetime",
                   "product_id": "kernel_demo",
                   "quota_dimension": "product",
                   "quota_policy_id": "kernel_demo.guest_quota_v1",
+                  "read_at": "2026-11-04T00:00:00Z",
                   "remaining_count": 2,
+                  "reserved_count": 1,
+                  "successful_used_count": 1,
                   "unit": "scenario_run",
                   "used_count": 1
                 },

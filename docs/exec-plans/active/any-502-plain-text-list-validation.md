@@ -60,7 +60,9 @@ blockquotes/HTML.
 
 ### Out of scope
 
-- Quota-consumption timing (`quota.consumed` fires at `scenario.started`, before provider call).
+- Quota-consumption timing. At this plan's 2026-09 baseline, consumption occurred on start;
+  ANY-507 later supersedes that behavior with reserve-on-start and canonical-success consumption
+  (see [current quota contract](../../architecture/quota-model.md)).
 - User-facing validation-error specificity/messaging.
 - Any change to `_has_markup`/`_has_markdown`/`_has_html_construct`/`_has_html_tag` semantics.
 - Any other atom (A01-A05 don't touch `_markup.py`).

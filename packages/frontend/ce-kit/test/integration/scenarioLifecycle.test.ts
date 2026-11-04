@@ -10,6 +10,35 @@ import { createInMemoryAsyncStorage } from "../../src/storage/inMemoryAsyncStora
 import { createFakePlatformServer } from "./fakePlatformServer";
 
 describe("scenario lifecycle integration (create guest -> quota -> keyed start -> retry -> poll)", () => {
+  it("keeps one logical start retryable after busy capacity is released", async () => {
+    const server = createFakePlatformServer({ quotaLimit: 1 });
+    const client = new PlatformApiClient({ baseUrl: "https://api.example.com", fetchImpl: server.fetchImpl });
+    const identity = await client.createGuestIdentity({ storage: createInMemoryAsyncStorage() });
+    if (!identity.ok) throw new Error("expected identity");
+    const request = {
+      productId: "kernel_demo", scenarioId: "kernel_demo.single_action_smoke_v1",
+      frontendId: "kernel_demo_ce", input: { text: "hello" }, guestId: identity.value.guestId,
+    };
+    const occupied = await prepareScenarioStart(request).execute(client);
+    if (!occupied.ok) throw new Error("expected first start");
+    const prepared = prepareScenarioStart(request);
+    const busy = await prepared.execute(client);
+    expect(busy).toMatchObject({ ok: false, error: { status: 429, code: "quota_capacity_reserved" } });
+    expect(await getQuota(client, request)).toMatchObject({ ok: true, value: {
+      usedCount: 0, reservedCount: 1, remainingCount: 1, availableCount: 0, exhausted: false,
+    } });
+    server.failSession(occupied.value.scenarioSessionId);
+    expect(await getQuota(client, request)).toMatchObject({ ok: true, value: {
+      usedCount: 0, reservedCount: 0, remainingCount: 1, availableCount: 1, exhausted: false,
+    } });
+    const accepted = await prepared.execute(client);
+    if (!accepted.ok) throw new Error("expected retry after release");
+    expect(await prepared.execute(client)).toEqual(accepted);
+    await pollScenarioSession(client, accepted.value.scenarioSessionId, { intervalMs: 1 });
+    expect(await getQuota(client, request)).toMatchObject({ ok: true, value: {
+      usedCount: 1, reservedCount: 0, remainingCount: 0, availableCount: 0, exhausted: true,
+    } });
+  });
   it("retries the same prepared start with the original session/job and consumes one quota unit", async () => {
     const server = createFakePlatformServer({ quotaLimit: 3, pollsUntilComplete: 2 });
     const client = new PlatformApiClient({ baseUrl: "https://api.example.com", fetchImpl: server.fetchImpl });
@@ -44,11 +73,11 @@ describe("scenario lifecycle integration (create guest -> quota -> keyed start -
     expect(retryAttempt.value.jobId).toBe(firstAttempt.value.jobId);
 
     const quotaAfterRetry = await getQuota(client, { productId: "kernel_demo", guestId: identity.guestId });
-    expect(quotaAfterRetry).toMatchObject({ ok: true, value: { usedCount: 1, remainingCount: 2 } });
-    expect(server.getUsedCount(identity.guestId)).toBe(1);
+    expect(quotaAfterRetry).toMatchObject({ ok: true, value: { usedCount: 0, reservedCount: 1, remainingCount: 3, availableCount: 2 } });
+    expect(server.getUsedCount(identity.guestId)).toBe(0);
 
     // A separate prepared operation (a genuinely new submission) gets a different session and
-    // consumes a second quota unit -- proving the dedup above wasn't just "any repeat call".
+    // reserves a second quota unit -- proving the dedup above wasn't just "any repeat call".
     const secondScenario = await prepareScenarioStart({
       productId: "kernel_demo",
       scenarioId: "kernel_demo.single_action_smoke_v1",
@@ -61,7 +90,7 @@ describe("scenario lifecycle integration (create guest -> quota -> keyed start -
     expect(secondScenario.value.scenarioSessionId).not.toBe(firstAttempt.value.scenarioSessionId);
 
     const quotaAfterSecond = await getQuota(client, { productId: "kernel_demo", guestId: identity.guestId });
-    expect(quotaAfterSecond).toMatchObject({ ok: true, value: { usedCount: 2 } });
+    expect(quotaAfterSecond).toMatchObject({ ok: true, value: { usedCount: 0, reservedCount: 2 } });
 
     const polled = await pollScenarioSession(client, firstAttempt.value.scenarioSessionId, {
       intervalMs: 1,
@@ -83,9 +112,9 @@ describe("scenario lifecycle integration (create guest -> quota -> keyed start -
       },
     });
 
-    // Polling never mutated quota -- only the two prior scenario starts did.
+    // The fake worker completes the first run during polling; only that success is consumed.
     const quotaAfterPoll = await getQuota(client, { productId: "kernel_demo", guestId: identity.guestId });
-    expect(quotaAfterPoll).toMatchObject({ ok: true, value: { usedCount: 2 } });
+    expect(quotaAfterPoll).toMatchObject({ ok: true, value: { usedCount: 1, reservedCount: 1 } });
 
     // The terminal snapshot's resultArtifactId feeds straight into getResult() -- CE-kit callers
     // never construct this id themselves.
@@ -146,6 +175,8 @@ describe("scenario lifecycle integration (create guest -> quota -> keyed start -
     const first = await prepareScenarioStart(request).execute(client);
     expect(first.ok).toBe(true);
 
+    if (!first.ok) throw new Error("expected first start");
+    await pollScenarioSession(client, first.value.scenarioSessionId, { intervalMs: 1 });
     const second = await prepareScenarioStart(request).execute(client);
     expect(second).toEqual({
       ok: false,

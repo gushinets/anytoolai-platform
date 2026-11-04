@@ -128,3 +128,11 @@ LiteLLM / `ProviderGateway` must not independently enforce a second conflicting 
 the same action. `response_schema` stays on AnytoolAI DTOs for platform validation context, and the
 LiteLLM adapter may pass that schema forward as model-facing message guidance, but it does not
 inject an additional `response_format` validation path in MVP-A.
+
+## Result availability and consumption
+
+`results/validation.py` is shared by Result API and metered success finalization. Canonical linkage,
+workflow/schema versions, normalized output and recursive forbidden-field checks must all pass
+before publication and consumption commit together. Artifact persistence or provider success alone
+is insufficient; viewing/copying is unnecessary. Failed output releases capacity without publishing
+a final result. Action/debug artifact recovery does not grant result availability or consume quota.

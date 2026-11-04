@@ -64,11 +64,16 @@ complete source artifact are never stored in the handoff row or returned to the 
 - Token format: `hnd_` plus `secrets.token_urlsafe(32)` (256 bits of random input).
 - Storage: only `sha256(token).hexdigest()` is persisted; plaintext is returned once on creation.
 - Default lifetime: 30 minutes; the service clock and TTL are injectable for tests.
-- Token TTL is enforced before preview, accept, and decline for every lifecycle status.
+- Preview GET and decline enforce TTL for every lifecycle status. New acceptance also requires an
+  unexpired token. An already accepted/consumed handoff instead checks its original replay owner
+  before TTL denial and returns its original target linkage. Reserved executions also verify their
+  stored request hash; deferred/legacy targets use their existing owner linkage without inventing
+  a historical reservation.
 - Only `created` and `viewed` rows transition to durable `expired`. Terminal `accepted`, `consumed`,
   `declined`, and `failed` rows retain their auditable status after token TTL elapses.
-- Unknown tokens return safe `404`; accepting or declining through an expired token returns safe
-  `410` regardless of the stored lifecycle status.
+- Unknown tokens return safe `404`. Declining through an expired token and accepting an unaccepted
+  expired token return safe `410`. The owner-checked accepted replay above remains available after
+  TTL and returns its safe preview/target linkage; it reserves nothing and emits no new transition.
 - Structured application request logs use route templates such as
   `/v1/handoffs/{handoff_token}` and never the plaintext token. The supported API launch disables
   Uvicorn's separate plaintext access logger because it would otherwise log the raw bearer URL;
@@ -79,7 +84,7 @@ complete source artifact are never stored in the handoff row or returned to the 
 ```text
 created -> viewed -> accepted -> consumed
    |          |          \
-   |          |           +-- accepted (deferred target, terminal to repeated acceptance)
+   |          |           +-- accepted (deferred target, idempotent acceptance replay)
    |          +--> declined | expired | failed
    +------------> declined | expired | failed
 ```
@@ -107,9 +112,11 @@ rollback recovery callbacks finish. This is intentionally stronger than a transa
 lock: immediate accept can roll back its temporary `accepted` claim while still owning terminal
 arbitration long enough for quota recovery to commit the durable `failed` outcome.
 
-Concurrent or sequential accept calls cannot both claim the record. A repeated accept returns
-`409 handoff_already_accepted` and does not create another target session, job, quota consumption,
-or accepted event. Declined, consumed, expired, and failed are terminal.
+Concurrent or sequential accept calls cannot both claim the record. An accepted replay checks the
+original owner (and stored request hash for a reserved execution) before token expiry denial and
+returns
+the original target linkage without another session/job/reservation or accepted event. Unaccepted
+tokens still expire normally. Declined, expired and failed remain terminal.
 
 ## Safe preview contract
 
@@ -129,7 +136,8 @@ Target context is separate, is not truncated, and must validate against the targ
 The response never exposes token hashes, mapped target context, source session/job/artifact IDs,
 artifact metadata, prompts, providers/models, or debug fields. An expired token preview returns
 HTTP 200 with `status: expired`, an empty `preview`, and null target session/job identifiers so a
-consent UI can render a safe terminal page without retaining bearer access to terminal details.
+consent UI can render a safe terminal page. This GET redaction does not change the owner-checked
+accept-replay exception described above.
 
 ## Acceptance and session linkage
 
@@ -146,16 +154,21 @@ direction.
 
 Start behavior is config-owned:
 
-- `immediate`: validate and consume target quota, create the target session as
+- `immediate`: validate and reserve target capacity, create the target session as
   `started/processing`, create one `created` target job, attach it, then mark the handoff
   `consumed`. Execution remains queue-and-return; the worker later claims the job.
-- `deferred`: create a target session as `waiting_for_user/handoff_ready`, create no job, consume no
+- `deferred`: create a target session as `waiting_for_user/handoff_ready`, create no job, reserve no
   quota, and leave the handoff `accepted` for a future guarded start/consume operation.
 
 Deferred sessions are valid A12 snapshots: `job_id` is null, there is no result, and
 `allowed_next_actions` is empty. If the immediate job runs, its action runs, provider calls,
 artifacts, and workflow events use the target `scenario_session_id` and retain `handoff_id`; source
 and target execution lineage is never collapsed.
+
+Temporary occupied capacity returns `429 quota_capacity_reserved`, rolls back the acceptance claim,
+keeps the same consent/token retryable and emits no exhaustion or failed-handoff event. Successful
+target publication later consumes once; failure/cancellation releases the original reservation.
+The handoff status `consumed` records target queueing, not quota consumption or result success.
 
 If target orchestration fails after acceptance is claimed, that transaction rolls back. A separate
 transaction changes the original pre-consent row to `failed`, stores a bounded safe error code, and

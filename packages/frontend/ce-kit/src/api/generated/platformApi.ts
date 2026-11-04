@@ -1054,12 +1054,16 @@ export interface components {
         QuotaPeriod: "lifetime" | "calendar_day" | "calendar_week" | "calendar_month";
         /** QuotaStateResponse */
         QuotaStateResponse: {
+            /** Available Count */
+            available_count: number;
             /** Dimension Key */
             dimension_key: string;
             /** Exhausted */
             exhausted: boolean;
             /** Guest Id */
             guest_id: string;
+            /** Legacy Used Count */
+            legacy_used_count: number;
             /** Limit Count */
             limit_count: number;
             period: components["schemas"]["QuotaPeriod"];
@@ -1068,12 +1072,21 @@ export interface components {
             quota_dimension: components["schemas"]["QuotaDimension"];
             /** Quota Policy Id */
             quota_policy_id: string;
+            /**
+             * Read At
+             * Format: date-time
+             */
+            read_at: string;
             /** Remaining Count */
             remaining_count: number;
+            /** Reserved Count */
+            reserved_count: number;
             /** Resets At */
             resets_at?: string | null;
             /** Scenario Id */
             scenario_id?: string | null;
+            /** Successful Used Count */
+            successful_used_count: number;
             unit: components["schemas"]["QuotaUnit"];
             /** Used Count */
             used_count: number;
@@ -2567,15 +2580,20 @@ export interface operations {
                 content: {
                     /**
                      * @example {
+                     *       "available_count": 1,
                      *       "dimension_key": "kernel_demo",
                      *       "exhausted": false,
                      *       "guest_id": "guest_123",
+                     *       "legacy_used_count": 0,
                      *       "limit_count": 3,
                      *       "period": "lifetime",
                      *       "product_id": "kernel_demo",
                      *       "quota_dimension": "product",
                      *       "quota_policy_id": "kernel_demo.guest_quota_v1",
+                     *       "read_at": "2026-11-04T00:00:00Z",
                      *       "remaining_count": 2,
+                     *       "reserved_count": 1,
+                     *       "successful_used_count": 1,
                      *       "unit": "scenario_run",
                      *       "used_count": 1
                      *     }

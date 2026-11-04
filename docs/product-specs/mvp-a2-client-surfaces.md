@@ -37,6 +37,12 @@ Web product pages and optional product extensions use these contracts. Web pages
 `apps/web-mirror`; extensions may open shared result or consent routes but do not own their backend
 state.
 
+ANY-507's reservation-aware guest DTO adds successful/legacy used, reserved, available and read time.
+The shared web runtime refreshes after acceptance and terminal success/release. Temporary
+`429 quota_capacity_reserved` reuses the prepared operation or handoff token/guest without opening
+an exhausted/paywall state; `429 quota_exhausted` means used quota reached its limit. Result-fetch
+retry only reads the same artifact. Backend authority and paid HTTP remain Core/ANY-766-owned.
+
 ## Multi-Product Web Host
 
 Required routes:

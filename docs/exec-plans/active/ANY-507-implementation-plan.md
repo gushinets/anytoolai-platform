@@ -7,14 +7,15 @@
 - Created: 2026-11-04
 - Last updated: 2026-11-04
 - Review date: 2026-11-04
-- Next action: stop after completed stage 3; stage 4 requires a new user instruction.
-- Blocker: none.
+- Next action: stop after stage 4 and its documentation review; stage 5 requires a new user instruction.
+- Blocker: general baseline/full gate requires passwordless sudo; no stage-4 implementation blocker.
 
 ## 1. Basis, version and scope
 
 This repository-local English execution plan preserves the reviewed PLAN-1–3 corrections.
-Stages 1–2 are implemented in `805110b7` and `98c92121`. The current user instruction authorizes
-stage 3 only. Section 6 preserves the historical stage-0 observations; section 7 records stage 3.
+Stages 1–3 are implemented in `805110b7`, `98c92121` and `02639ec7`. The current user instruction
+authorizes stage 4 only. Section 6 preserves the historical stage-0 observations; section 7 records
+stage 3. Stage 4 preserves ANY-766's ownership of paid HTTP/access and interservice integration.
 
 Sources: [ANY-507](https://linear.app/paveldik/issue/ANY-507),
 [parent ANY-504](https://linear.app/paveldik/issue/ANY-504), Mikhail's 2026-11-03 M2 decision,
@@ -311,7 +312,7 @@ repositories and orphan reconciliation.
 completion failure, expired-scenario race, SIGKILL/restart, live lease, lease-connection loss and late
 worker after release.
 
-### Stage 4. Connect readback and client states
+### Stage 4. Connect readback and client states — done
 
 **Outcome:** API/events/guest UI distinguish consumption, reservations and available capacity.
 **Components:** guest quota API, Core readback, event catalog, OpenAPI, CE-kit and shared web/handoff.
@@ -429,6 +430,9 @@ retryable; new metered jobs use terminal arbitration without changing legacy rec
 Portal predecessor handoffs gate only the corresponding integration.
 
 ## 6. Stage-0 checkpoint — 2026-11-04
+
+Historical evidence below describes stage 0 only. Its unstarted stages and debit-on-start observations
+are superseded by the current stage statuses and checkpoints 7–8; they are not current runtime rules.
 
 ### Baseline and verification scope
 
@@ -581,10 +585,10 @@ claimed. Portal ANY-715/765 readiness is not a blocker for the independent ANY-5
 - [x] Freeze shared types, replay/bucket invariants, caller transaction ownership and ANY-766 seams.
 - [x] Recheck Kernel baseline, ANY-711 ancestry and migration graph head.
 - [x] Complete/record the supported stage-0 environment and composition checks.
-- [ ] Stages 1–5 (not started; explicitly outside this turn).
+- At stage 0, stages 1–5 were unstarted and outside that instruction; see later checkpoints.
 
-The user-authorized stopping point is stage 0. Later PostgreSQL/canonical checks and the reviewed
-implementation SHA remain part of the future mechanism handoff, not this preparation checkpoint.
+The stage-0 instruction stopped at preparation. Its later PostgreSQL/canonical checks and reviewed
+implementation handoff were still future work at that checkpoint; later results are recorded below.
 
 ## 7. Stage-3 checkpoint — 2026-11-04
 
@@ -595,4 +599,51 @@ Terminal arbitration, original buckets, causal event backfill and event dimensio
 (602 tests before the final focused fixes); `frontend-check`; 226 product tests;
 `atoms-proof` (11/11 atoms, 3/3 composites); doctor, config, architecture, docs and generated checks.
 
-Stages 4–5 and ANY-766 integration are not started.
+At this stage-3 checkpoint, stages 4–5 and ANY-766 integration were not started.
+
+## 8. Stage-4 checkpoint — 2026-11-04
+
+**Implemented:** scoped single-query `ConsumptionReadback`; expanded guest quota HTTP with
+successful/legacy used, reserved, available and aware read time; atomic reserve/consume/release
+and capacity-rejection events; CE-kit parser/classifier; shared web terminal refresh and same-key/
+same-token busy retry; seven locale catalogs; regenerated OpenAPI/types/event catalog and aligned
+runtime/MVP docs. Unknown buckets stay unobserved; storage failure never becomes zero usage.
+See [quota contracts and ownership](../../architecture/quota-model.md).
+
+**PASS:** `postgresql-check` (615 tests); `frontend-check`; 226 product backend tests; 30 schema/docs
+regressions; doctor, docs/generated checks, focused Ruff and diff checks. Focused proofs additionally
+cover one-query/scoped readback, legacy contribution, exactly-once recovery events, all guest/paid
+terminal releases, last-unit audits and same-token HTTP handoff retry after real release. All 427
+web tests pass; final CE-kit parser/lifecycle/type checks pass.
+
+**PASS:** canonical `atoms-proof` (11/11 atoms, 3/3 composites) and `proposal-ai-smoke` (10/10
+Chromium scenarios) over isolated real API/worker/PostgreSQL with deterministic fake providers.
+These are local mechanism/client proofs, not deployment or Portal evidence.
+
+**FAIL (environment):** final `full-check` with `PYTEST_ADDOPTS=-x` stops in its canonical
+quick-check baseline: 407 passed, 1 failed, 615 deselected. The failed test is
+`tests/test_runner.py::test_activation_marker_is_readable_by_non_root_api_user`:
+`sudo: a password is required`, independently reproduced and also present in stage 3's full-check
+log. Earlier unbounded quick/full runs were interrupted after this failure was confirmed. No test
+bypass/skip or infrastructure change was added; frontend and product checks ran separately.
+Canonical sanitized failure context was collected. This is not a green full-check/activation gate.
+
+**NOT_RUN:** Compose activation and headed extension handoff smoke (no display/Xvfb). Backend HTTP
+handoff, component handoff and Chromium web execution pass separately. ANY-766 retains paid HTTP,
+AccessSnapshot/floor/cache/invalidation, interservice usage/exhaustion and outbox ownership; its plan
+was used read-only. Stage 5/cutover and peer repository changes are not started. Stop after stage 4.
+
+## 9. Documentation review follow-up — 2026-11-04
+
+**Done:** checked current architecture/product/client docs against the implemented Core/API/CE-kit
+contracts and ANY-766's ownership. Corrected stale consumption-at-start text and quota event list,
+old scenario replay/savepoint descriptions, handoff TTL versus accepted replay, terminal-scenario
+arbitration and recovery boundaries. Completed readback/HTTP/event field descriptions and metering
+table inventories. Explicitly separated historical plan evidence and the demo's independent daily
+admission cap from current product quota. Updated older active-plan wording where it implied an
+obsolete current rule; completed historical plans remain evidence of their original implementation.
+
+**PASS:** doctor, `validate-docs`, `generate-docs --check`, 21 documentation/generator tests and diff
+checks. A source cross-check confirms all 6 quota events, 10 readback fields, 5 added HTTP fields and
+both metering tables in current inventories. No remaining contradiction found in the reviewed
+ANY-507 documentation. Runtime code, the ANY-766 plan and stage-5 activation remain unchanged.
