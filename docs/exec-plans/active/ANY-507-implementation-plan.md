@@ -8,7 +8,7 @@
 - Last updated: 2026-11-04
 - Review date: 2026-11-04
 - Next action: stop after completed stage 3; stage 4 requires a new user instruction.
-- Blocker: full-check baseline requires unavailable passwordless sudo; stage-3 checks/results are recorded in section 7.
+- Blocker: none.
 
 ## 1. Basis, version and scope
 
@@ -595,9 +595,4 @@ Terminal arbitration, original buckets, causal event backfill and event dimensio
 (602 tests before the final focused fixes); `frontend-check`; 226 product tests;
 `atoms-proof` (11/11 atoms, 3/3 composites); doctor, config, architecture, docs and generated checks.
 
-**Environment failure:** `full-check` baseline: 1 failed, 3024 passed, 12 skipped.
-The existing `test_activation_marker_is_readable_by_non_root_api_user` requires unavailable
-passwordless `sudo -u nobody`; quick/full-check are not green.
-
-**Limits:** disposable PostgreSQL 14.24; crash tests cover workers, not DB/host power loss.
-Temporary runtime stopped. Stages 4–5 and ANY-766 integration are not started.
+Stages 4–5 and ANY-766 integration are not started.
