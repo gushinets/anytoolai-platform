@@ -27,7 +27,9 @@ paid buckets, execution reservations and server-owned job consumption mode. Exis
 runtime history are preserved. The migration itself does not switch admission or charging.
 PostgreSQL deferred checks reject a committed `reserved` job without its reservation.
 Downgrade refuses to discard paid/reservation history. ANY-507 stage 2 now connects reservation
-admission for new metered starts; terminal consumption/release and activation are later stages. See
+admission for new metered starts; stage 3 implements terminal consumption/release and recovery.
+Stage 5 supplies the [cutover procedure](../../infra/deployment/execution-metering-cutover.md) and
+independent verification; failed gates defer activation. See
 [runtime storage](../../docs/architecture/runtime-storage.md#execution-metering-storage-any-507-stage-1)
 and [ANY-507](../../docs/exec-plans/active/ANY-507-implementation-plan.md) for stage and cutover boundaries.
 

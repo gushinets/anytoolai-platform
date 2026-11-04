@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import replace
+import json
+from dataclasses import asdict, replace
 from datetime import datetime
 from http import HTTPStatus
+from pathlib import Path
 
 import pytest
 import sqlalchemy as sa
@@ -20,6 +22,38 @@ from test_identity_quota_api import _request
 pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
 runtime = runtime_fixture
 GUEST = ExecutionOwner("anytoolai", "ru", ExecutionOwnerKind.guest, "guest_demo")
+
+
+def test_any766_handoff_readback_fixtures_match_paid_storage(runtime):
+    fixture_path = (
+        Path(__file__).resolve().parents[3] / "tests/fixtures/execution_metering/readback.json"
+    )
+    fixtures = json.loads(fixture_path.read_text(encoding="utf-8"))
+    factory, _, registry = runtime
+    grant = allowance()
+
+    def read(bucket):
+        with transaction_boundary(factory) as session:
+            state = read_consumption(session, grant.owner, bucket)
+            if state is None:
+                return None
+            assert state.owner == grant.owner
+            assert state.bucket.allowance == grant
+            assert state.read_at.tzinfo is not None
+            counters = asdict(state)
+            for field in ("owner", "bucket", "read_at"):
+                counters.pop(field)
+            return counters
+
+    assert read("unknown") == fixtures["unobserved"]
+    with transaction_boundary(factory) as session:
+        accepted = start(session, registry, grant)
+    bucket = accepted.reservation.paid_allowance_usage_id
+    assert read(bucket) == fixtures["busy"]
+    final = candidate(runtime, accepted)
+    with transaction_boundary(factory) as session:
+        assert finalize_success(session, accepted.job_id, final, config_registry=registry).applied
+    assert read(bucket) == fixtures["exhausted"]
 
 
 def quota(runtime):

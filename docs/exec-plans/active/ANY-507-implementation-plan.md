@@ -7,15 +7,16 @@
 - Created: 2026-11-04
 - Last updated: 2026-11-04
 - Review date: 2026-11-04
-- Next action: stop after stage 4 and its documentation review; stage 5 requires a new user instruction.
-- Blocker: general baseline/full gate requires passwordless sudo; no stage-4 implementation blocker.
+- Next action: stop after stage 5 verification/handoff; resolve the recorded activation gates and pin a reviewed delivery SHA before any deployment or separately authorized ANY-766 work.
+- Blocker: canonical quick/full gates still fail because passwordless sudo is unavailable; production activation remains deferred.
 
 ## 1. Basis, version and scope
 
 This repository-local English execution plan preserves the reviewed PLAN-1–3 corrections.
-Stages 1–3 are implemented in `805110b7`, `98c92121` and `02639ec7`. The current user instruction
-authorizes stage 4 only. Section 6 preserves the historical stage-0 observations; section 7 records
-stage 3. Stage 4 preserves ANY-766's ownership of paid HTTP/access and interservice integration.
+Stages 1–4 are implemented in `805110b7`, `98c92121`, `02639ec7` and `6b83e7b2`.
+The current user instruction authorizes stage 5 only, including independent cutover rehearsal and
+handoff preparation. Section 6 preserves the historical stage-0 observations; later checkpoints
+record the implementation evidence. ANY-766 retains paid HTTP/access and interservice integration.
 
 Sources: [ANY-507](https://linear.app/paveldik/issue/ANY-507),
 [parent ANY-504](https://linear.app/paveldik/issue/ANY-504), Mikhail's 2026-11-03 M2 decision,
@@ -331,7 +332,7 @@ worker after release.
 **Checks:** HTTP/parser regressions, busy/exhausted states, refresh after success/release, handoff busy
 retry, generated drift and no internal-data leakage.
 
-### Stage 5. Verify cutover and prepare handoff
+### Stage 5. Verify cutover and prepare handoff — verification delivered, activation deferred
 
 **Outcome:** verified mechanism delivery and safe activation procedure.
 **Components:** quiesce/deployment procedure, PostgreSQL suites, canonical checks and evidence.
@@ -349,6 +350,11 @@ ordinary updates preserve history.
 
 **Checks:** successful drain, refusal with unfinished jobs, migration failure, restart/data retention
 and consistent rollback.
+
+**Execution (2026-11-04):** use disposable PostgreSQL and the existing quiesce/Compose/test harness;
+add focused failure/drain regressions, record a real dump/restore rehearsal, publish the operator
+procedure and exact implemented ANY-766 interfaces. Re-run canonical gates and distinguish local
+mechanism evidence from unperformed production activation. Do not change Portal or ANY-766 scope.
 
 ## 4. PostgreSQL evidence and independent acceptance
 
@@ -647,3 +653,57 @@ obsolete current rule; completed historical plans remain evidence of their origi
 checks. A source cross-check confirms all 6 quota events, 10 readback fields, 5 added HTTP fields and
 both metering tables in current inventories. No remaining contradiction found in the reviewed
 ANY-507 documentation. Runtime code, the ANY-766 plan and stage-5 activation remain unchanged.
+
+## 10. Stage-5 checkpoint — 2026-11-04
+
+**Delivered:** [operator cutover/rollback procedure](../../../infra/deployment/execution-metering-cutover.md),
+[ANY-766 internal mechanism handoff](../../handoffs/ANY-507-execution-metering.md), machine-readable
+busy/exhausted/unobserved counter fixtures and focused PostgreSQL cutover regressions. The existing
+quiesce remains the only drain path; `0016` remains storage preparation, not permission to mix old
+and new admission/workers. No production database, Portal source or ANY-766 implementation changed.
+
+**PASS:** three new PostgreSQL 18 tests exercise the runner's exact queue SQL against populated
+`0015` history through a test Compose transport, covering successful drain, refusal while both
+created/running jobs remain, and transactional migration failure after counter DDL with unchanged
+history/version and successful retry. The drain test simulates old-worker completion on another
+connection; it is not a deployed old-worker drain claim. The paid readback fixture test also passes.
+
+**PASS:** real PostgreSQL 18.6 custom-format dump/restore rehearsal before/after `0016`, original-row
+equality, application recomposition and PostgreSQL process restart, retained reserved/consumed/
+released history, same-key replay across allowance change, repeated head upgrade and refused
+downgrade. Restoring the pre-cutover dump into a separate empty database reproduces the old
+`0015` history with no synthesized reservations. The rehearsal used `tests.db_support` disposable
+databases, `_seed_0015` historical fixtures, the existing composed fake-provider worker and the
+container's native `pg_dump`/`pg_restore --exit-on-error`; its independent comparisons cover every
+reflected platform table. Test-only old-worker completion is simulated before the initial dump.
+[Backup checksums and exact row counts](ANY-507-stage5-backup-evidence.json) retain the evidence;
+the dumps contain only disposable fixture data and are not production backups.
+
+**FAIL (environment):** canonical `quick-check` and `full-check`, both with fail-fast only
+(`PYTEST_ADDOPTS=-x`), reproduce
+`tests/test_runner.py::test_activation_marker_is_readable_by_non_root_api_user`:
+`sudo: a password is required`; each reaches 407 passed before that failure. No bypass or ignored
+test was added. `collect-context --failure-file` produced sanitized failure context.
+This is not a green activation gate. Cutover is deferred as required by stage 5; reviewed final
+PR/SHA and an operator-owned deployment window remain delivery/activation prerequisites.
+
+**PASS:** canonical `postgresql-check` on PostgreSQL 18.6 (618 tests, including all three new
+cutover cases). The new readback fixture test was added after this run's collection and passed
+through a separate canonical PostgreSQL invocation with `PYTEST_ADDOPTS=-k` selecting that case;
+final marker collection contains 619 tests. Canonical `frontend-check`, 226 product
+backend tests, 12 focused lifecycle/quiesce tests, 21 docs/generator tests, doctor, docs/generated,
+focused Ruff and diff checks pass. No implemented test was suppressed to obtain these results.
+
+**PASS:** canonical `atoms-proof` over isolated real API/worker/PostgreSQL with deterministic
+providers: 11/11 atoms, 3/3 composites; local evidence `evidence-20261104T103111Z.json` under
+`.agent/atoms-proof/`. This proves mechanism execution, not a production image/provider or Portal.
+
+**NOT_COMPLETED (environment):** credential-free `prod-fake-up` was canceled after a 20-minute
+verification bound (exit 130), still in image `uv sync --frozen --no-dev` downloading dependencies.
+Migration/application startup and Compose smoke were not reached; image activation is not proven.
+Runner failed-candidate cleanup removed the isolated `anytoolai-prod-fake` stack. Both disposable
+PostgreSQL 18 containers were removed, and the temporary local PostgreSQL 14 probe was stopped.
+Headed extension handoff smoke is not run (no display/Xvfb); backend handoff concurrency and terminal
+metering execute in the successful PostgreSQL gate. ANY-766 paid HTTP/access/outbox and peer
+acceptance remain unstarted. Stage-5 verification and handoff preparation stop here; activation
+remains deferred rather than treating failed/incomplete checks as green.
