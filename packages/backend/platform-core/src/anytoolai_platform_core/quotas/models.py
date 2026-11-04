@@ -3,11 +3,16 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from anytoolai_platform_core.common.ids import new_id
 from anytoolai_platform_core.common.time import utc_now
+from anytoolai_platform_core.scenarios.models import ScenarioSessionSnapshot
+
+if TYPE_CHECKING:
+    from anytoolai_platform_core.scenarios.models import ScenarioSessionRecord
+    from anytoolai_platform_core.workflows.models import JobRecord
 
 
 class QuotaUnit(StrEnum):
@@ -127,6 +132,31 @@ class ExecutionReservation:
     created_at: datetime = field(default_factory=utc_now)
     updated_at: datetime = field(default_factory=utc_now)
     finalized_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class ExecutionReplayIdentity:
+    product_id: str
+    scenario_id: str
+    namespace: ExecutionReplayNamespace
+    replay_key: str
+
+
+@dataclass(frozen=True)
+class ExecutionAcceptance(ScenarioSessionSnapshot):
+    """Internal admission result; reservation is absent for legacy/unmetered starts."""
+
+    reservation: ExecutionReservation | None = None
+    is_replay: bool = False
+
+
+@dataclass(frozen=True)
+class ExecutionCandidate:
+    session: ScenarioSessionRecord
+    job: JobRecord
+    replay_identity: ExecutionReplayIdentity | None = None
+    request_hash: str | None = None
+    handoff_id: str | None = None
 
 
 @dataclass(frozen=True)

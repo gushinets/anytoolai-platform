@@ -2,6 +2,47 @@
 
 MVP-A uses guest quota instead of billing.
 
+## ANY-507 staged implementation
+
+Stage 2 replaces accepted-start debit with reservation in ordinary start and immediate handoff.
+Guest admission now checks `used_count + reserved_count < limit_count`; accepted work increments
+only `reserved_count`. Existing `used_count` and `legacy_used_count` are preserved. New metered
+jobs are `reserved`, unmetered starts are `unmetered`, and historical jobs retain `legacy`.
+
+`quotas/execution_service.py:ExecutionReservationService.reserve_execution(session, owner,
+execution, quota_input)` shares this admission boundary with typed paid allowances. It does not
+commit. `ScenarioRuntimeService` owns one candidate savepoint containing session, job, reservation,
+counter and admission events. Its `ExecutionAcceptance` extends the existing internal snapshot with
+`reservation` (including the original bucket) and `is_replay`; the public DTO remains unchanged.
+Concurrent replay losers roll back every candidate write before reading the winner. Guest history
+uses the existing guest lookup without synthesizing reservations; paid replay never uses
+`guest_id=NULL`. Paid keys are mandatory and owner-scoped; allowance ID/access revision are excluded
+from the request hash. The hash otherwise uses the existing canonical JSON hash; paid input omits
+the untrusted body `user_id` and guest identity. Handoff additionally hashes its stable runtime ID.
+
+Typed paid admission checks owner/scope/product/metric/unit and the immutable first allowance
+binding. `PaidAllowance` validates strict integer quantity in `0…2^53−1`. It does not authenticate
+Portal users, select scenario metrics or grant access; those are ANY-766 responsibilities. The
+registry's commercial `enabled` flags are not authority to revoke accepted typed allowance input.
+
+Admission locks use PostgreSQL `FOR NO KEY UPDATE`: competing reservation FK checks already hold
+`KEY SHARE`, so `FOR UPDATE` would introduce a lock-upgrade deadlock. Bucket locks stay held through
+the caller's final admission decision. Caller rejection rolls back the complete acceptance.
+
+When used quota remains but reserves occupy capacity, HTTP returns `429 quota_capacity_reserved`.
+It publishes no exhaustion audit or handoff failure, and the handoff token remains retryable.
+Actual exhaustion retains the critical failed-handoff/audit recovery. Accepted handoff replay checks
+its original owner/hash before token expiry denial and returns the original target linkage.
+Deferred handoff creates no job or reserve. A source session's historical body `user_id` supplies
+no paid authority; paid owner/allowance are explicit internal arguments.
+
+This is an intermediate implementation checkpoint, not activation of the complete mechanism.
+Terminal finalization/release/recovery belong to stage 3; readback fields, transition events and
+client states belong to stage 4; safe activation belongs to stage 5. In particular stage 2 emits no
+`quota.consumed` on admission and does not yet finalize reservations at workflow completion. The A13
+description below records the earlier contract that stage 4 will reconcile across runtime docs.
+See the [execution plan](../exec-plans/active/ANY-507-implementation-plan.md).
+
 ## A13 status
 
 A13 is **backend-complete**. The backend owns guest identity persistence, quota policy resolution,

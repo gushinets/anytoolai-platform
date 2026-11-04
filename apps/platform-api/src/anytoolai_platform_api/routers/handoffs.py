@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import datetime
+from http import HTTPStatus
 from typing import Annotated, Any
 
 from anytoolai_platform_api.dependencies import (
@@ -34,7 +35,7 @@ from anytoolai_platform_core.handoffs.repository import HandoffRepository
 from anytoolai_platform_core.handoffs.service import HandoffAcceptanceExecutionError, HandoffService
 from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.quotas.repository import QuotaUsageRepository
-from anytoolai_platform_core.quotas.service import GuestQuotaService
+from anytoolai_platform_core.quotas.service import QUOTA_CAPACITY_RESERVED, GuestQuotaService
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
 from anytoolai_platform_core.scenarios.service import ScenarioRuntimeService, ScenarioSessionService
 from anytoolai_platform_core.storage.transactions import transaction_boundary
@@ -142,6 +143,12 @@ def accept_handoff(
             except PlatformError as exc:
                 deferred_error = _api_error(exc)
     except HandoffAcceptanceExecutionError as exc:
+        if exc.error_code == QUOTA_CAPACITY_RESERVED:
+            raise ApiError(
+                status_code=HTTPStatus.TOO_MANY_REQUESTS,
+                code=exc.error_code,
+                message="Quota capacity is temporarily reserved.",
+            ) from exc
         with transaction_boundary(session_factory) as failure_session:
             _service(failure_session, registry).mark_failed(
                 exc.handoff_id,
@@ -260,7 +267,7 @@ def _api_error(error: PlatformError) -> ApiError:
         status = 404
     elif error.code == "handoff_expired":
         status = 410
-    elif error.code == "quota_exhausted":
+    elif error.code in {"quota_exhausted", QUOTA_CAPACITY_RESERVED}:
         status = 429
     else:
         status = 409
