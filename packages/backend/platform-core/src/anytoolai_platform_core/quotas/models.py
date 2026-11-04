@@ -11,6 +11,7 @@ from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.scenarios.models import ScenarioSessionSnapshot
 
 if TYPE_CHECKING:
+    from anytoolai_platform_core.artifacts.models import ArtifactRecord
     from anytoolai_platform_core.scenarios.models import ScenarioSessionRecord
     from anytoolai_platform_core.workflows.models import JobRecord
 
@@ -220,3 +221,16 @@ class QuotaState:
     remaining_count: int
     exhausted: bool
     resets_at: datetime | None
+
+
+@dataclass(frozen=True)
+class FinalExecutionResult:
+    job: JobRecord
+    artifact: ArtifactRecord
+
+
+@dataclass(frozen=True)
+class ConsumptionTransition:
+    applied: bool
+    reservation: ExecutionReservation
+    became_exhausted: bool = False

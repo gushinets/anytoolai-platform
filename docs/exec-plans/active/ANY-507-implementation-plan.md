@@ -7,13 +7,14 @@
 - Created: 2026-11-04
 - Last updated: 2026-11-04
 - Review date: 2026-11-04
-- Next action: stop after stage 0; stage 1 requires a subsequent user instruction.
-- Blocker: none for stage 0; PostgreSQL/deployment verification limits for later stages are recorded in section 6.
+- Next action: stop after completed stage 3; stage 4 requires a new user instruction.
+- Blocker: full-check baseline requires unavailable passwordless sudo; stage-3 checks/results are recorded in section 7.
 
 ## 1. Basis, version and scope
 
 This repository-local English execution plan preserves the reviewed PLAN-1–3 corrections.
-The user authorized stage 0 only on 2026-11-04. No runtime implementation is claimed.
+Stages 1–2 are implemented in `805110b7` and `98c92121`. The current user instruction authorizes
+stage 3 only. Section 6 preserves the historical stage-0 observations; section 7 records stage 3.
 
 Sources: [ANY-507](https://linear.app/paveldik/issue/ANY-507),
 [parent ANY-504](https://linear.app/paveldik/issue/ANY-504), Mikhail's 2026-11-03 M2 decision,
@@ -277,7 +278,7 @@ counters/runtime history, and repeated `upgrade head` without data changes.
 **Checks:** concurrent replay, hash conflicts, same key/different owners, invalid first paid binding,
 independent counters and handoff accept/decline/expiry races. Every denial leaves consistent rows.
 
-### Stage 3. Unify finalization and recovery
+### Stage 3. Unify finalization and recovery — done
 
 **Outcome:** one terminal decision per metered job; unknown outcomes cannot produce a free published
 result or duplicate debit.
@@ -579,3 +580,19 @@ claimed. Portal ANY-715/765 readiness is not a blocker for the independent ANY-5
 
 The user-authorized stopping point is stage 0. Later PostgreSQL/canonical checks and the reviewed
 implementation SHA remain part of the future mechanism handoff, not this preparation checkpoint.
+
+## 7. Stage-3 checkpoint — 2026-11-04
+
+**Done:** atomic result publication/debit, terminal release and durable-state-first recovery.
+Terminal arbitration, original buckets, causal event backfill and event dimensions are covered.
+
+**PASS:** 43 focused PostgreSQL tests plus 2 final event-dimension cases; `postgresql-check`
+(602 tests before the final focused fixes); `frontend-check`; 226 product tests;
+`atoms-proof` (11/11 atoms, 3/3 composites); doctor, config, architecture, docs and generated checks.
+
+**Environment failure:** `full-check` baseline: 1 failed, 3024 passed, 12 skipped.
+The existing `test_activation_marker_is_readable_by_non_root_api_user` requires unavailable
+passwordless `sudo -u nobody`; quick/full-check are not green.
+
+**Limits:** disposable PostgreSQL 14.24; crash tests cover workers, not DB/host power loss.
+Temporary runtime stopped. Stages 4–5 and ANY-766 integration are not started.

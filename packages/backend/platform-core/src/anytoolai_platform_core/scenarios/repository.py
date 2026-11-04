@@ -6,7 +6,7 @@ import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from anytoolai_platform_core.scenarios.models import ScenarioSessionRecord
+from anytoolai_platform_core.scenarios.models import ScenarioSessionRecord, ScenarioSessionStatus
 from anytoolai_platform_core.storage.db import scenario_sessions_table
 from anytoolai_platform_core.storage.db_errors import (
     is_expected_unique_violation,
@@ -107,22 +107,17 @@ class ScenarioSessionRepository:
         region: str,
         product_id: str,
         frontend_id: str,
+        for_update: bool = False,
     ) -> ScenarioSessionRecord | None:
-        row = (
-            self._session.execute(
-                sa.select(scenario_sessions_table).where(
-                    scenario_sessions_table.c.id == scenario_session_id,
-                    *_scenario_session_scope_filters(
-                        tenant_id=tenant_id,
-                        region=region,
-                        product_id=product_id,
-                        frontend_id=frontend_id,
-                    ),
-                )
-            )
-            .mappings()
-            .one_or_none()
+        query = sa.select(scenario_sessions_table).where(
+            scenario_sessions_table.c.id == scenario_session_id,
+            *_scenario_session_scope_filters(
+                tenant_id=tenant_id, region=region, product_id=product_id, frontend_id=frontend_id
+            ),
         )
+        if for_update:
+            query = query.with_for_update()
+        row = self._session.execute(query).mappings().one_or_none()
         return None if row is None else ScenarioSessionRecord(**dict(row))
 
     def get_by_idempotency_key(
@@ -199,10 +194,17 @@ class ScenarioSessionRepository:
             region=region,
             product_id=product_id,
             frontend_id=frontend_id,
+            for_update=True,
         )
         if existing is None:
             raise LookupError(f"scenario session not found: {record.id}")
 
+        if existing.status != record.status and existing.status in {
+            ScenarioSessionStatus.completed,
+            ScenarioSessionStatus.failed,
+            ScenarioSessionStatus.expired,
+        }:
+            raise RuntimeError(f"scenario {record.id} is already terminal")
         values = asdict(record)
         values.pop("id")
         values.pop("tenant_id")

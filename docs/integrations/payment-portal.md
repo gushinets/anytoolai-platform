@@ -86,13 +86,18 @@ working `.env`. `CONFIGURED_SOURCE` describes the client source, not sales appro
 does not relabel the historical SIMULATED evidence above. Actual deployed TLS/private network
 controls, production metric approval and paid-access/usage behavior remain separate gates.
 
-## ANY-507 reservation admission checkpoint
+## ANY-507 reservation lifecycle checkpoint
 
 ANY-507 stage 2 (2026-11-04) adds Core-only reservation admission and owner-scoped replay for
 ordinary start and immediate handoff. Typed `ExecutionOwner`/`PaidAllowance` arguments are supplied
 explicitly by trusted internal callers; historical body/source-session `user_id` is not Portal
 authority. No paid HTTP authentication, AccessSnapshot, usage endpoint or wire change is delivered
 by this checkpoint. See the [shared contract and stage boundaries](../exec-plans/active/ANY-507-implementation-plan.md).
+Stage 3 adds one transactional success finalizer/release path for both typed paid and guest buckets,
+shared by ordinary execution and rollback recovery. It returns an applied/replayed
+`ConsumptionTransition` with the original reservation and an exhaustion edge for ANY-766's
+same-transaction outbox integration. No outbox, paid HTTP or Portal contract is added here.
+The peer observation below belongs to stage 2; stage 3 changes no peer wire or authority contract.
 Portal's committed architecture and access specification were rechecked read-only at
 [`94ca83603c12d56e92110e0310553ba8e13af699`](https://github.com/gushinets/payments-portal/commit/94ca83603c12d56e92110e0310553ba8e13af699).
 Its canonical snapshot specification remains V1 with calendar bounds. Proposed V2 and actual paid

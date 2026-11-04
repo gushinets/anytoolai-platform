@@ -37,11 +37,53 @@ Deferred handoff creates no job or reserve. A source session's historical body `
 no paid authority; paid owner/allowance are explicit internal arguments.
 
 This is an intermediate implementation checkpoint, not activation of the complete mechanism.
-Terminal finalization/release/recovery belong to stage 3; readback fields, transition events and
-client states belong to stage 4; safe activation belongs to stage 5. In particular stage 2 emits no
-`quota.consumed` on admission and does not yet finalize reservations at workflow completion. The A13
-description below records the earlier contract that stage 4 will reconcile across runtime docs.
+Stage 3 adds terminal finalization/release/recovery as described below. Readback fields, quota
+transition events and client states belong to stage 4; safe activation belongs to stage 5. Admission
+emits no `quota.consumed`; stage 4 connects the new quota transition events at success/release. The
+A13 description below records the earlier contract that stage 4 will reconcile across runtime docs.
 See the [execution plan](../exec-plans/active/ANY-507-implementation-plan.md).
+
+## ANY-507 stage 3: terminal decisions
+
+`quotas/finalization.py` owns caller-session operations:
+
+- `finalize_success(session, job_id, FinalExecutionResult, config_registry=...)`
+- `release_execution(session, job_id)`
+
+Both return `ConsumptionTransition(applied, reservation, became_exhausted)` and never commit or
+roll back the caller's transaction. The returned reservation carries the original owner, bucket,
+job/session and resulting state/artifact linkage. `became_exhausted` is true only on an applied
+consumption edge; replay and release cannot report it again. ANY-766's explicit exhaustion-outbox
+write attaches after this result and before the same outer commit, including recovery.
+
+The runner constructs a final artifact candidate without publishing it, checks the shared Result
+API availability boundary (`results/validation.py`, including recursive forbidden-key refusal),
+and retains a deep-copied job/artifact candidate with one stable artifact ID. It registers success
+recovery before calling the finalizer. For reserved executions there is no independent final
+artifact row recovery commit. Action/provider/debug artifact recovery remains unchanged.
+
+Under `job -> scenario -> reservation -> original bucket` locks, new success requires a running job,
+an active reservation and a running scenario. Publication, succeeded job, completed scenario,
+reserved decrement and used increment commit together. A competing terminal scenario wins without
+publication or debit: the job fails and its reserve releases, preserving that scenario status.
+Already-consumed success returns its original decision without scenario mutation. A released
+reservation cannot consume later. Runtime metadata writes guard the current job status; scenario
+writes cannot replace a terminal status.
+
+Failure/cancellation, preclaim cancellation, disabled/poison jobs and orphan terminalization release
+through the same operation. Release requires a durable failed/canceled job, never a timeout.
+Recovery checks durable terminal state first, including after an unknown commit. If success recovery
+also fails, failure recovery checks that state again before terminalizing/releasing and backfills
+causal action/provider/workflow events. When expiry wins during success recovery, sanitized child
+references are retained in the same release transaction for step-event backfill, preserving the
+expired scenario and absent final artifact. A committed success remains consumed. A missing reservation
+on a reserved job fails as an integrity error. JobLease still decides liveness; unknown running work
+is not requeued. Legacy/unmetered execution retains its earlier path and legacy debit history.
+
+PostgreSQL proofs live in `apps/platform-api/tests/test_execution_finalization_postgresql.py`:
+publication/commit fault injection, repeated/competing decisions, caller rollback, scenario expiry,
+worker cancellation, lease loss/SIGKILL, late workers and original paid/UTC-window buckets. This is
+mechanism evidence; client readback and deployment activation are later stages.
 
 ## A13 status
 
