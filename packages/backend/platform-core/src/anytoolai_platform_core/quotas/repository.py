@@ -172,6 +172,7 @@ class QuotaUsageRepository:
         )
 
     def consume_if_available(self, record: QuotaUsageRecord) -> QuotaUsageRecord | None:
+        """Keep debit-on-start usage historical until reservation admission replaces this path."""
         result = self._session.execute(
             sa.update(guest_quota_usage_table)
             .where(
@@ -181,6 +182,7 @@ class QuotaUsageRepository:
             )
             .values(
                 used_count=guest_quota_usage_table.c.used_count + 1,
+                legacy_used_count=guest_quota_usage_table.c.legacy_used_count + 1,
                 updated_at=utc_now(),
             )
         )

@@ -555,10 +555,7 @@ def test_handoff_compatibility_revision_repairs_database_stamped_at_0007() -> No
     with _provision_runtime_database(upgrade_target=None) as (engine, alembic_config):
         with engine.begin() as connection:
             alembic_config.attributes["connection"] = connection
-            command.upgrade(alembic_config, "head")
-            connection.execute(sa.text("DROP TABLE platform.atom_lab_preset_versions CASCADE"))
-            connection.execute(sa.text("DROP TABLE platform.atom_lab_presets"))
-            connection.execute(sa.text("DROP TABLE platform.atom_lab_runs"))
+            command.upgrade(alembic_config, "0007")
             connection.execute(sa.text("DROP TABLE platform.product_handoffs"))
             command.stamp(alembic_config, "0007")
 
