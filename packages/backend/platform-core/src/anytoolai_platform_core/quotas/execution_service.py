@@ -4,6 +4,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from anytoolai_platform_core.common.errors import PlatformError
+from anytoolai_platform_core.common.metadata import metadata_str
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.context.execution_context import ExecutionContext
@@ -11,6 +12,11 @@ from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.handoffs.events import emit_handoff_event
 from anytoolai_platform_core.handoffs.repository import HandoffRepository
+from anytoolai_platform_core.quotas.events import (
+    ExecutionQuotaEvent,
+    emit_capacity_reserved,
+    emit_execution_quota_event,
+)
 from anytoolai_platform_core.quotas.execution_repository import (
     ExecutionReservationRepository,
     PaidAllowanceConflictError,
@@ -24,6 +30,7 @@ from anytoolai_platform_core.quotas.models import (
     ExecutionReservation,
     PaidAllowance,
 )
+from anytoolai_platform_core.quotas.readback import read_consumption
 from anytoolai_platform_core.quotas.service import (
     GuestQuotaService,
     QuotaCapacityReservedError,
@@ -90,9 +97,12 @@ class ExecutionReservationService:
             scenario_session_id=scenario.id,
             scenario_chain_id=scenario.scenario_chain_id,
             job_id=job.id,
+            workflow_id=job.workflow_id,
+            workflow_version=job.workflow_version,
             guest_id=owner.owner_id if owner.owner_kind is ExecutionOwnerKind.guest else None,
             user_id=owner.owner_id if owner.owner_kind is ExecutionOwnerKind.portal_user else None,
             handoff_id=execution.handoff_id,
+            acquisition_source=metadata_str(job.metadata, "acquisition_source"),
         )
         if isinstance(quota_input, PaidAllowance):
             self.validate_paid_allowance(owner, scenario.product_id, quota_input)
@@ -141,6 +151,7 @@ class ExecutionReservationService:
                 if latest is None:
                     raise RuntimeError("paid bucket disappeared during admission")
                 if latest.used_count < latest.allowance.quantity:
+                    _register_capacity_recovery(session, reservation, context)
                     raise QuotaCapacityReservedError()
                 register_rollback_recovery_callback(
                     session,
@@ -162,25 +173,56 @@ class ExecutionReservationService:
                 },
             )
         else:
-            self._guest_quota.reserve_for_accepted_start(
-                tenant_id=owner.tenant_id,
-                region=owner.region,
-                product_id=scenario.product_id,
-                frontend_id=scenario.frontend_id,
-                guest_id=owner.owner_id,
-                scenario_id=scenario.scenario_id,
-                scenario_session_id=scenario.id,
-                scenario_chain_id=scenario.scenario_chain_id,
-                handoff_id=execution.handoff_id,
-                validation=quota_input,
-                usage=bucket,
-            )
+            try:
+                self._guest_quota.reserve_for_accepted_start(
+                    tenant_id=owner.tenant_id,
+                    region=owner.region,
+                    product_id=scenario.product_id,
+                    frontend_id=scenario.frontend_id,
+                    guest_id=owner.owner_id,
+                    scenario_id=scenario.scenario_id,
+                    scenario_session_id=scenario.id,
+                    scenario_chain_id=scenario.scenario_chain_id,
+                    handoff_id=execution.handoff_id,
+                    validation=quota_input,
+                    usage=bucket,
+                )
+            except QuotaCapacityReservedError:
+                _register_capacity_recovery(session, reservation, context)
+                raise
+        emit_execution_quota_event(session, ExecutionQuotaEvent.reserved, reservation, context)
         return ExecutionAcceptance(
             scenario_session_id=scenario.id,
             job_id=job.id,
             status=scenario.status,
             reservation=reservation,
         )
+
+
+def _register_capacity_recovery(
+    session: Session, reservation: ExecutionReservation, context: ExecutionContext
+) -> None:
+    # A capacity denial rolls back candidate execution writes. Its audit belongs to the
+    # rejection only: recovery never recreates an execution or terminalizes a handoff.
+    bucket_id = reservation.guest_quota_usage_id
+    if bucket_id is None:
+        bucket_id = reservation.paid_allowance_usage_id
+    if bucket_id is None:
+        raise RuntimeError("capacity rejection lacks a bucket")
+    state = read_consumption(session, reservation.owner, bucket_id)
+    if state is None:
+        raise RuntimeError("capacity rejection lacks its owned bucket")
+
+    def recover(factory: SessionFactory) -> None:
+        with transaction_boundary(factory) as recovery_session:
+            emit_capacity_reserved(recovery_session, state, context, reservation.scenario_id)
+
+    register_rollback_recovery_callback(
+        session,
+        recover,
+        phase=RollbackRecoveryPhase.quota_exhaustion,
+        critical=reservation.handoff_id is not None,
+    )
 
 
 def _recover_paid_exhaustion(

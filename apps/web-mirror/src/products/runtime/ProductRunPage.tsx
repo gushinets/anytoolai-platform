@@ -13,6 +13,7 @@ import {
   isAmbiguousFailure,
   isGuestIdentityNotFound,
   isQuotaExhausted,
+  isQuotaCapacityReserved,
   isResultNotFound,
   isResultUnavailable,
   openHandoffConsent,
@@ -246,7 +247,7 @@ type BootState =
 
 /** Why a run is retryable. A closed reason -- not finished English prose -- so an error already on
  * screen re-renders in the new language when the UI locale changes (`host.errors.<reason>`). */
-type RetryReason = "startFailed" | "timeout" | "connectionLost" | "tryAgain";
+type RetryReason = "startFailed" | "timeout" | "connectionLost" | "tryAgain" | "quotaCapacityReserved";
 
 type Phase<R> =
   | { kind: "idle" }
@@ -467,7 +468,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   // different reason -- that phase means the scenario session already completed and consumed its
   // quota unit, and only the follow-up `GET /results/{id}` failed. There's no `pendingStart` to
   // reattach to (a fresh submit was never on the table), but remounting would still destroy the
-  // only handle the UI has left on an already-paid-for result (`resultArtifactId`), stranding it
+  // only handle the UI has left on a completed result (`resultArtifactId`), stranding it
   // just as permanently as abandoning an ambiguous start would. It never renders the form (see the
   // phase switch below), so this has no effect on the Submit button/fields.
   const busy =
@@ -478,7 +479,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     // (`pendingStart`), an attached handoff session through the session itself. Both may still be
     // running server-side, so abandoning this mount (a mode switch) would lose the only handle.
     (phase.kind === "retryable-error" && (pendingStart !== null || attachActiveRef.current));
-  // An attached (already queued and charged) session that has not started polling yet (runtime config and
+  // An attached (already queued and reserved) session that has not started polling yet (runtime config and
   // identity still loading): a mode switch would drop it before it could attach. A failed boot releases the
   // lock: nothing is running, and a mode switch before the attach began does not forget the persisted
   // session (`useAttachSession`), so a reload still retries it.
@@ -634,11 +635,16 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       return;
     }
     const quotaRejected = !result.ok && isQuotaExhausted(result.error);
-    if (boot.kind === "ready" && boot.hasQuota && guestId && (result.ok || quotaRejected)) {
+    const capacityReserved = !result.ok && isQuotaCapacityReserved(result.error);
+    if (boot.kind === "ready" && boot.hasQuota && guestId && (result.ok || quotaRejected || capacityReserved)) {
       // Read the backend counter after acceptance (or 429); idempotent retries cannot spend it twice.
       refreshQuota(guestId, scenarioId, controller);
     }
     if (!result.ok) {
+      if (capacityReserved) {
+        setPhase({ kind: "retryable-error", reason: "quotaCapacityReserved" });
+        return;
+      }
       if (quotaRejected) {
         setPhase({ kind: "quota-exhausted" });
         return;
@@ -682,9 +688,9 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       }
       // Ambiguous, not necessarily a clean rejection: a network failure/timeout/5xx on the start
       // request itself doesn't tell us whether the backend actually accepted it (created the
-      // session/job and charged quota) before the response was lost -- `pendingStart` (with its
+      // session/job and reserved capacity) before the response was lost -- `pendingStart` (with its
       // Idempotency-Key) stays exactly as set by the caller, so a retry collapses onto whatever the
-      // backend actually did rather than risk a second, quota-consuming start. See `busy`'s own
+      // backend actually did rather than risk a second, capacity-reserving start. See `busy`'s own
       // comment for why this is also why a mode switch must stay blocked here.
       setPhase({ kind: "retryable-error", reason: "startFailed" });
       return;
@@ -729,6 +735,9 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       return;
     }
     const session = polled.result.value;
+    if (boot.kind === "ready" && boot.hasQuota && guestId) {
+      refreshQuota(guestId, scenarioId, controller);
+    }
     if (session.status !== "completed") {
       // `failed`/`expired` land here as genuinely terminal. `waiting_for_user` does too, since
       // this runtime only supports the single-checkpoint "run to completion, then one
@@ -1229,6 +1238,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
           {quota ? (
             <p className={styles.quota} aria-live="polite">
               {tp("quotaRemaining", { remaining: quota.remainingCount, limit: quota.limitCount })}
+              {quota.reservedCount > 0 ? <> {th("quotaReserved", { available: quota.availableCount, reserved: quota.reservedCount })}</> : null}
             </p>
           ) : null}
         </header>

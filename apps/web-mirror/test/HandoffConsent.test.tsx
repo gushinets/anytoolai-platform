@@ -82,6 +82,26 @@ function guestIdentityResponse(guestId = "guest_1"): Response {
 }
 
 describe("HandoffConsent", () => {
+  it("keeps the same handoff and guest retryable while capacity is reserved", async () => {
+    const { client, calls } = makeRoutedClient({
+      [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
+      [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload())],
+      [ACCEPT_ROUTE]: [
+        errorResponse(429, "quota_capacity_reserved"),
+        jsonResponse(200, previewPayload({ status: "consumed" })),
+      ],
+    });
+    render(<HandoffConsent client={client} handoffToken="token_abc" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Accept" }));
+    await screen.findByText("Capacity is temporarily in use. Please try again shortly.");
+    const accept = screen.getByRole("button", { name: "Accept" });
+    expect(accept.hasAttribute("disabled")).toBe(false);
+    fireEvent.click(accept);
+    await screen.findByText("Accepted");
+    expect(calls.filter((call) => call.key === ACCEPT_ROUTE)).toHaveLength(2);
+    expect(calls.filter((call) => call.key === GUEST_IDENTITY_ROUTE)).toHaveLength(1);
+    expect(calls.filter((call) => call.key === PREVIEW_ROUTE)).toHaveLength(1);
+  });
   it("shows a loading state, then the consent view with source/target identity", async () => {
     const { client } = makeRoutedClient({
       [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload())],

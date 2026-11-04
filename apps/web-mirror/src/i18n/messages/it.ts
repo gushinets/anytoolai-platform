@@ -9,10 +9,11 @@ export const it: Shape<typeof en> = {
   nav: {
     label: "Strumenti",
     allTools: "Tutti gli strumenti",
-    runInProgress: "Un’elaborazione è in corso. Se esce ora, non vedrà il risultato e la quota non verrà ripristinata.",
+    runInProgress: "È in corso un’esecuzione. Se esci, continuerà; un risultato riuscito utilizza un’esecuzione.",
   },
   loading: "Caricamento di {product}…",
   unavailable: "{product} non è disponibile al momento. Ricarichi la pagina.",
+  quotaReserved: "Disponibili ora: {available}. In corso: {reserved}.",
   quotaExhausted: "Le esecuzioni di {product} a disposizione sono esaurite per ora.",
   resultFetchFailed: "Il risultato è pronto, ma non è stato possibile caricarlo. Riprovi.",
   starting: "Avvio in corso…",
@@ -30,6 +31,7 @@ export const it: Shape<typeof en> = {
     handoffFailed: "Impossibile aprire il passaggio successivo. Riprovi.",
   },
   errors: {
+    quotaCapacityReserved: "La capacità è temporaneamente occupata. Riprova tra poco.",
     startFailed: "Impossibile avviare {product}. Riprovi.",
     timeout: "L’operazione richiede più tempo del previsto. Riprovi.",
     connectionLost: "Connessione persa durante l’attesa del risultato. Riprovi.",

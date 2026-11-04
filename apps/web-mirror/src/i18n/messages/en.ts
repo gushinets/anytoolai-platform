@@ -6,10 +6,11 @@ export const en = {
   nav: {
     label: "Tools",
     allTools: "All tools",
-    runInProgress: "A run is in progress. If you leave now, you won’t see the result and the quota won’t be restored.",
+    runInProgress: "A run is in progress. If you leave now, it will continue; a successful result uses one run.",
   },
   loading: "Loading {product}…",
   unavailable: "{product} is unavailable right now. Please reload the page.",
+  quotaReserved: "Available now: {available}. In progress: {reserved}.",
   quotaExhausted: "You've used all your {product} runs for now.",
   resultFetchFailed: "Your result is ready, but we couldn't load it. Please try again.",
   starting: "Starting…",
@@ -30,6 +31,7 @@ export const en = {
     handoffFailed: "Could not open the next step. Please try again.",
   },
   errors: {
+    quotaCapacityReserved: "Capacity is temporarily in use. Please try again shortly.",
     startFailed: "Could not start {product}. Please try again.",
     timeout: "This is taking longer than expected. Please try again.",
     connectionLost: "Lost connection while waiting for your result. Please try again.",

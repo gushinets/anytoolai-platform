@@ -10,6 +10,7 @@ import {
   isHandoffActionRefetchable,
   isHandoffGuestIdentityInvalid,
   isHandoffNotFound,
+  isQuotaCapacityReserved,
   refreshGuestIdentity,
   type AsyncStorage,
   type HandoffPreview,
@@ -74,13 +75,13 @@ type ViewState =
   | { kind: "loading" }
   | { kind: "not-found" }
   | { kind: "safe-error" }
-  | { kind: "consent"; preview: HandoffPreview; pending: "accept" | "decline" | null; actionFailed: boolean }
+  | { kind: "consent"; preview: HandoffPreview; pending: "accept" | "decline" | null; actionError: "actionFailed" | "capacityReserved" | null }
   | { kind: "terminal"; preview: HandoffPreview };
 
 function stateForPreview(preview: HandoffPreview): ViewState {
   return isTerminalHandoffStatus(preview.status)
     ? { kind: "terminal", preview }
-    : { kind: "consent", preview, pending: null, actionFailed: false };
+    : { kind: "consent", preview, pending: null, actionError: null };
 }
 
 function viewStateFromResult(result: PlatformApiResult<HandoffPreview>): ViewState {
@@ -96,7 +97,7 @@ function isAlreadyAccepted(error: PlatformApiError): boolean {
 
 /** An Accept error after which the handoff may be accepted anyway: "already accepted" says it is; a lost or
  * unreadable answer (transport failure, timeout, a 2xx body that is not a preview) hides whether it queued
- * (and charged) a target. Only the authoritative preview knows, so both call for one `getHandoff()`. */
+ * (and reserved capacity for) a target. Only the authoritative preview knows, so both call for one `getHandoff()`. */
 function acceptMayHaveGoneThrough(error: PlatformApiError): boolean {
   return isAlreadyAccepted(error) || error.type === "network_error" || error.type === "timeout" || error.type === "invalid_response";
 }
@@ -206,7 +207,7 @@ export function HandoffConsent({ client, handoffToken, canOpenTarget }: HandoffC
   // consumed token unreplayable from the client's side: the backend's current state always wins.
   function showRetryableActionError(): void {
     setState((prev) =>
-      prev.kind === "consent" ? { ...prev, pending: null, actionFailed: true } : prev,
+      prev.kind === "consent" ? { ...prev, pending: null, actionError: "actionFailed" } : prev,
     );
   }
 
@@ -215,6 +216,11 @@ export function HandoffConsent({ client, handoffToken, canOpenTarget }: HandoffC
   // -- gating on `kind` keeps that tied to the accept path explicitly, rather than relying on decline
   // simply never triggering it today.
   async function resolveActionError(kind: "accept" | "decline", error: PlatformApiError): Promise<void> {
+    if (kind === "accept" && isQuotaCapacityReserved(error)) {
+      setState((prev) => prev.kind === "consent"
+        ? { ...prev, pending: null, actionError: "capacityReserved" } : prev);
+      return;
+    }
     if (kind === "accept" && isHandoffGuestIdentityInvalid(error)) {
       // Deterministic and permanent for the current guestId (the record stays non-terminal, so
       // refetching would just return the same actionable preview) -- refreshGuestIdentity() clears
@@ -242,7 +248,7 @@ export function HandoffConsent({ client, handoffToken, canOpenTarget }: HandoffC
       return;
     }
     // A lost Accept response (or a retry's "already accepted"): this authoritative preview names the target
-    // session the Accept already queued (and charged), so reach it the same way as a direct success.
+    // session the Accept already queued (and reserved capacity for), so reach it the same way as a direct success.
     if (kind === "accept" && refetched.ok && (refetched.value.status === "accepted" || refetched.value.status === "consumed")) {
       setState(stateForPreview(refetched.value));
       redirectToAcceptedTarget(refetched.value);
@@ -285,11 +291,11 @@ export function HandoffConsent({ client, handoffToken, canOpenTarget }: HandoffC
     kind: "accept" | "decline",
     mutate: () => Promise<PlatformApiResult<HandoffPreview>>,
   ) {
-    setState((prev) => (prev.kind === "consent" ? { ...prev, pending: kind, actionFailed: false } : prev));
+    setState((prev) => (prev.kind === "consent" ? { ...prev, pending: kind, actionError: null } : prev));
     try {
       const result = await mutate();
       if (!mountedRef.current) {
-        // The Accept already happened server-side (and charged the quota) though the person has left this
+        // The Accept already happened server-side (and reserved capacity) though the person has left this
         // page: keep the session it queued for the target product's next visit, and do not navigate over
         // wherever they went. (Left before any answer arrived, the id is simply unknown.)
         if (result.ok && kind === "accept") {
@@ -415,10 +421,10 @@ export function HandoffConsent({ client, handoffToken, canOpenTarget }: HandoffC
           {guestId === undefined ? (
             <Toast variant="error">{th("identityUnavailable")}</Toast>
           ) : null}
-          {state.actionFailed ? <Toast variant="error">{t("actionFailed")}</Toast> : null}
+          {state.actionError ? <Toast variant="error">{t(state.actionError)}</Toast> : null}
         </>
       ) : null}
-      {/* A spent token still names the target session the accept queued (and charged) until its TTL. If
+      {/* A spent token still names the target session the accept queued (and reserved capacity for) until its TTL. If
           the Accept response was lost and the person reloaded instead of retrying, this is the only way
           to it -- an explicit action, not an automatic jump, because the page may be opened later just to
           look. */}

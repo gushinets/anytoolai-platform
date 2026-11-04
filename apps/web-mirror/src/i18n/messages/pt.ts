@@ -7,10 +7,11 @@ export const pt: Shape<typeof en> = {
   nav: {
     label: "Ferramentas",
     allTools: "Todas as ferramentas",
-    runInProgress: "Uma execução está em andamento. Se você sair agora, não verá o resultado e a cota não será restituída.",
+    runInProgress: "Há uma execução em andamento. Se sair, ela continuará; um resultado bem-sucedido usa uma execução.",
   },
   loading: "Carregando {product}…",
   unavailable: "{product} está indisponível no momento. Recarregue a página.",
+  quotaReserved: "Disponíveis agora: {available}. Em andamento: {reserved}.",
   quotaExhausted: "Você usou todas as execuções de {product} por enquanto.",
   resultFetchFailed: "Seu resultado está pronto, mas não conseguimos carregá-lo. Tente novamente.",
   starting: "Iniciando…",
@@ -28,6 +29,7 @@ export const pt: Shape<typeof en> = {
     handoffFailed: "Não foi possível abrir a próxima etapa. Tente novamente.",
   },
   errors: {
+    quotaCapacityReserved: "A capacidade está temporariamente ocupada. Tente novamente em instantes.",
     startFailed: "Não foi possível iniciar {product}. Tente novamente.",
     timeout: "Está demorando mais do que o esperado. Tente novamente.",
     connectionLost: "A conexão foi perdida enquanto aguardávamos seu resultado. Tente novamente.",

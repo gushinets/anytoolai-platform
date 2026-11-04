@@ -64,35 +64,23 @@ migrated `platform` schema.
 `POST /v1/products/{product_id}/scenarios/{scenario_id}/start` is queue-and-return in A12. It does
 not execute the workflow inline in the API process.
 
-The durable ordering is:
+The acceptance transaction validates product/scenario/frontend/input/workflow/owner and quota,
+creates a `started/processing` session with durable input and one linked `created` job, reserves
+capacity against the original bucket, emits admission events, then commits and returns the stable
+polling snapshot. All candidate rows, counters and events commit together. A replay returns the
+original session/job without another reservation.
 
-1. validate product, scenario, frontend, JSON-object input, workflow, guest identity, and quota;
-2. consume quota for the accepted start when the product has a quota policy;
-3. create `scenario_sessions` row with `status=started`;
-4. persist `current_checkpoint_id=processing`;
-5. persist `metadata["input"]` from the request body;
-6. create one linked `jobs` row with `status=created`;
-7. commit;
-8. return a stable polling payload containing `scenario_session_id`, `job_id`, `status`,
-   `allowed_next_actions`, and optional `result_artifact_id`.
+Capacity uses `used_count + reserved_count < quantity`. `429 quota_capacity_reserved` means active
+reserves temporarily occupy capacity; it leaves no candidate execution and immediate handoff stays
+retryable. `429 quota_exhausted` means used quota reached the limit, preserves the rejection audit
+through rollback recovery, and immediate handoff also durably fails. Missing/unknown guest identity
+returns 422/404 before execution writes. Guest policy selects product-wide or scenario counters;
+paid authority arrives only through trusted typed arguments (ANY-766 owns paid HTTP).
 
-The job create path already enforces that the linked scenario session exists and that the job's
-tenant, region, product, and frontend dimensions match the session.
-
-This commit is the A13 accepted scenario start boundary. Quota is not consumed on frontend click,
-workflow success, validation retry, transport retry, or provider-call count. If quota is exhausted,
-the API creates no session or job, persists the `quota.checked`/`quota.exhausted` audit pair through
-the quota rollback-recovery path, and returns standardized `quota_exhausted` with HTTP `429`.
-Immediate handoff accept additionally terminalizes the handoff as `failed` before that `429` can be
-returned. Missing guest identity for a quota-protected product returns HTTP `422`; an unknown guest
-identity returns HTTP `404`. Both are rejected before quota consumption, session creation, or job
-creation.
-
-Concurrent accepted starts for the same configured guest/product quota dimension are guarded by the
-quota usage row's unique dimension and conditional `used_count < limit_count` update. Product-wide
-policies share one counter across product scenarios; scenario-specific policies use separate
-counters per scenario. Only the first `N` starts for that resolved dimension commit sessions/jobs
-and `quota.consumed`; `N+1` returns `429 quota_exhausted`.
+Success consumes once when the canonical result is accessible, atomically with publication, job and
+scenario completion. Failure/cancellation releases without debit. Neither frontend clicks, provider
+attempts nor retries consume quota. Legacy history remains charged under its original rules.
+See [quota lifecycle/readback](quota-model.md) for counters, transition events and recovery.
 
 If a pre-claim job already has an invalid `scenario_session_id` link or mismatched runtime
 dimensions, the worker terminalizes that poison job as `failed` with a safe integrity error instead
@@ -126,9 +114,12 @@ The worker also advances the linked scenario session:
 - workflow failure: `running -> failed`, `current_checkpoint_id -> failed`
 - worker cancellation after claim: `running -> failed`, `current_checkpoint_id -> failed`
 
-If the workflow runner already terminalized the job before the outer worker error handler runs, the
-worker must still advance the scenario session to the matching terminal state instead of leaving it
-stuck in `running`.
+For reserved jobs, the common finalizer publishes success and completes the running scenario in
+the same transaction; failure/cancellation releases through the same metering service. An already
+consumed/released decision replays without another scenario mutation. A competing terminal scenario
+(such as independently expired) is preserved: late success cannot restore it or publish a result.
+Legacy/unmetered reconciliation also preserves an independently expired scenario while projecting
+an otherwise active session to the durable job outcome. Runtime updates are guarded by current state.
 
 Safe validation errors retain validation-specific codes such as
 `structured_output_validation_failed`. Provider and transport failures retain gateway-owned safe

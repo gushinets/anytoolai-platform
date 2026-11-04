@@ -41,9 +41,14 @@ QUOTA_RESPONSE_EXAMPLE = {
     "period": "lifetime",
     "limit_count": 3,
     "used_count": 1,
+    "successful_used_count": 1,
+    "legacy_used_count": 0,
+    "reserved_count": 1,
+    "available_count": 1,
     "remaining_count": 2,
     "exhausted": False,
     "resets_at": None,
+    "read_at": "2026-11-04T00:00:00Z",
 }
 
 
@@ -141,9 +146,14 @@ def _quota_state_payload(state: QuotaState) -> dict[str, object]:
         "period": state.period.value,
         "limit_count": state.limit_count,
         "used_count": state.used_count,
+        "successful_used_count": state.successful_used_count,
+        "legacy_used_count": state.legacy_used_count,
+        "reserved_count": state.reserved_count,
+        "available_count": state.available_count,
         "remaining_count": state.remaining_count,
         "exhausted": state.exhausted,
         "resets_at": state.resets_at,
+        "read_at": state.read_at,
     }
 
 

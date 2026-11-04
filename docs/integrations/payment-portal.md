@@ -97,7 +97,10 @@ Stage 3 adds one transactional success finalizer/release path for both typed pai
 shared by ordinary execution and rollback recovery. It returns an applied/replayed
 `ConsumptionTransition` with the original reservation and an exhaustion edge for ANY-766's
 same-transaction outbox integration. No outbox, paid HTTP or Portal contract is added here.
-The peer observation below belongs to stage 2; stage 3 changes no peer wire or authority contract.
+Stage 4 adds internal owner-scoped `ConsumptionReadback` plus guest HTTP fields and reservation-aware
+client/events. Unknown buckets remain unobserved and reads never create allowances. Paid HTTP usage,
+interservice delivery and exhaustion outbox remain ANY-766; no peer wire/authority contract changes.
+The peer observation below belongs to stage 2; later stages do not refresh that observation.
 Portal's committed architecture and access specification were rechecked read-only at
 [`94ca83603c12d56e92110e0310553ba8e13af699`](https://github.com/gushinets/payments-portal/commit/94ca83603c12d56e92110e0310553ba8e13af699).
 Its canonical snapshot specification remains V1 with calendar bounds. Proposed V2 and actual paid

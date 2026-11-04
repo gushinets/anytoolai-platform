@@ -33,7 +33,10 @@ groups:
     - guest.created
   quota:
     - quota.checked
+    - quota.reserved
     - quota.consumed
+    - quota.released
+    - quota.capacity_reserved
     - quota.exhausted
   scenario:
     - scenario.started

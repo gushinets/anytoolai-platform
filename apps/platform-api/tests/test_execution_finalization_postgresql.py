@@ -244,8 +244,11 @@ def test_success_recovery_retains_artifact_identity_and_atomic_debit(runtime, mo
     assert_meter(runtime, acceptance, ReservationState.consumed, 1, 0)
     assert rows(factory, scenario_sessions_table)[0]["status"] is ScenarioSessionStatus.completed
     events = rows(factory, event_log_table)
-    for event in ("workflow.started", "workflow.succeeded", "scenario.completed"):
+    for event in (
+        "workflow.started", "workflow.succeeded", "scenario.completed", "quota.reserved", "quota.consumed"
+    ):
         assert sum(e["event_type"] == event for e in events) == 1
+    assert not any(e["event_type"] == "quota.released" for e in events)
     assert rows(factory, action_runs_table) and rows(factory, provider_calls_table)
 
 
@@ -286,6 +289,11 @@ def test_terminal_paths_release_without_publishing_success(runtime, monkeypatch,
         ]
         with transaction_boundary(factory) as session:
             assert not release_execution(session, acceptance.job_id).applied
+        quota_events = [
+            e["event_type"] for e in rows(factory, event_log_table)
+            if e["event_type"] in {"quota.reserved", "quota.consumed", "quota.released"}
+        ]
+        assert sorted(quota_events) == ["quota.released", "quota.reserved"]
     finally:
         worker.dispose()
 

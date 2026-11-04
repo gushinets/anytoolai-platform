@@ -13,6 +13,7 @@ from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository
+from anytoolai_platform_core.quotas.events import ExecutionQuotaEvent, emit_execution_quota_event
 from anytoolai_platform_core.quotas.execution_repository import ExecutionReservationRepository
 from anytoolai_platform_core.quotas.models import (
     ConsumptionTransition,
@@ -85,7 +86,7 @@ def _bucket(reservation: ExecutionReservation) -> tuple[sa.Table, str, sa.Column
 
 
 def _context(
-    job: JobRecord, scenario: ScenarioSessionRecord, reservation: ExecutionReservation
+    job: JobRecord, scenario: ScenarioSessionRecord | None, reservation: ExecutionReservation
 ) -> ExecutionContext:
     return ExecutionContext(
         tenant_id=reservation.owner.tenant_id,
@@ -93,7 +94,7 @@ def _context(
         product_id=reservation.product_id,
         frontend_id=reservation.frontend_id,
         scenario_session_id=reservation.scenario_session_id,
-        scenario_chain_id=scenario.scenario_chain_id,
+        scenario_chain_id=None if scenario is None else scenario.scenario_chain_id,
         job_id=job.id,
         workflow_id=job.workflow_id,
         workflow_version=job.workflow_version,
@@ -181,6 +182,12 @@ def release_execution(session: Session, job_id: str) -> ConsumptionTransition:
     if job.status not in {JobStatus.failed, JobStatus.canceled}:
         raise RuntimeError("release requires terminal failure or cancellation")
     transition = _transition(session, reservation, ReservationState.released)
+    emit_execution_quota_event(
+        session,
+        ExecutionQuotaEvent.released,
+        transition.reservation,
+        _context(job, scenario, transition.reservation),
+    )
     if scenario is not None and scenario.status in {
         ScenarioSessionStatus.started,
         ScenarioSessionStatus.running,
@@ -273,6 +280,12 @@ def finalize_success(
     succeeded = JobRepository(session).mark_succeeded(candidate)
     transition = _transition(
         session, reservation, ReservationState.consumed, result_artifact_id=final_result.artifact.id
+    )
+    emit_execution_quota_event(
+        session,
+        ExecutionQuotaEvent.consumed,
+        transition.reservation,
+        _context(succeeded, scenario, transition.reservation),
     )
     emitter = EventEmitter(EventLogRepository(session))
     emitter.emit(

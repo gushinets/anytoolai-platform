@@ -110,6 +110,53 @@ class TestErrorBoundary extends Component<{ children: ReactNode }, { failed: boo
 }
 
 describe("ProductRunPage", () => {
+  it("retries occupied capacity with the same key and refreshes consumption on success", async () => {
+    const { client, calls } = makeClientCapturingRequests({
+      ...happyPathRoutes(),
+      [ROUTES.START]: [errorResponse(429, "quota_capacity_reserved"), startResponse()],
+      [ROUTES.QUOTA]: [
+        quotaResponse(TEST_PRODUCT_IDS, { limit_count: 1, remaining_count: 1 }),
+        quotaResponse(TEST_PRODUCT_IDS, { limit_count: 1, remaining_count: 1, reserved_count: 1 }),
+        quotaResponse(TEST_PRODUCT_IDS, { limit_count: 1, remaining_count: 1, reserved_count: 1 }),
+        quotaResponse(TEST_PRODUCT_IDS, { limit_count: 1, used_count: 1, remaining_count: 0, exhausted: true }),
+      ],
+    });
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+    await screen.findByText("Capacity is temporarily in use. Please try again shortly.");
+    expect(screen.queryByText("You've used all your Test Product runs for now.")).toBeNull();
+    await screen.findByText(/Available now: 0. In progress: 1./);
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitForResult();
+    const starts = calls.filter((call) => call.key === ROUTES.START);
+    expect(starts).toHaveLength(2);
+    expect(idempotencyKeyOf(starts[0]!)).toBe(idempotencyKeyOf(starts[1]!));
+    await screen.findByText("0 of 1 runs remaining.");
+    expect(screen.getByText(RESULT_TEXT)).toBeTruthy();
+  });
+
+  it("refreshes capacity after terminal failure without starting another execution", async () => {
+    const { client, calls } = makeClient({
+      ...happyPathRoutes(),
+      [ROUTES.SESSION]: [sessionResponse({ status: "failed", result_artifact_id: null })],
+      [ROUTES.QUOTA]: [
+        quotaResponse(TEST_PRODUCT_IDS, { reserved_count: 1 }),
+        quotaResponse(TEST_PRODUCT_IDS, { reserved_count: 1 }),
+        quotaResponse(TEST_PRODUCT_IDS),
+      ],
+    });
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+    await screen.findByText(RUN_FAILED);
+    await waitFor(() => expect(calls.filter((call) => call.key === ROUTES.QUOTA)).toHaveLength(3));
+    await waitFor(() => expect(screen.queryByText(/In progress: 1/)).toBeNull());
+    expect(screen.getByText("3 of 3 runs remaining.")).toBeTruthy();
+    expect(calls.filter((call) => call.key === ROUTES.START)).toHaveLength(1);
+  });
   it("keeps validating an invalid field after correction without starting a scenario", async () => {
     const { client, calls } = makeClient(bootRoutes());
     renderPage({ client });
@@ -541,9 +588,10 @@ describe("ProductRunPage", () => {
   it("starts another run from the result with a cleared form and refreshed quota", async () => {
     const { client, calls } = makeClient({
       ...happyPathRoutes(),
-      // Boot, the refresh after the run was accepted, and the refresh after "New task".
+      // Boot, reserve, completion, then "New task".
       [ROUTES.QUOTA]: [
         quotaResponse(TEST_PRODUCT_IDS),
+        quotaResponse(TEST_PRODUCT_IDS, { used_count: 1, remaining_count: 2 }),
         quotaResponse(TEST_PRODUCT_IDS, { used_count: 1, remaining_count: 2 }),
         quotaResponse(TEST_PRODUCT_IDS, { used_count: 1, remaining_count: 2 }),
       ],
@@ -570,7 +618,7 @@ describe("ProductRunPage", () => {
     await waitFor(() => expect(document.activeElement).toBe(field));
     expect(screen.queryByText(RESULT_TEXT)).toBeNull();
     await waitFor(() => expect(screen.getByText("2 of 3 runs remaining.")).toBeTruthy());
-    expect(calls.filter((call) => call.key === ROUTES.QUOTA)).toHaveLength(3);
+    expect(calls.filter((call) => call.key === ROUTES.QUOTA)).toHaveLength(4);
   });
 
   it("starts another unmetered run without requesting quota", async () => {
@@ -722,7 +770,7 @@ describe("ProductRunPage", () => {
         [ROUTES.SESSION]: [sessionResponse()],
         [ROUTES.RESULT]: [resultResponse(TEST_PRODUCT_IDS)],
       },
-      { [ROUTES.QUOTA]: 2 },
+      { [ROUTES.QUOTA]: 3 },
     );
 
     renderPage({ client });
@@ -731,12 +779,12 @@ describe("ProductRunPage", () => {
     submit();
     await waitForResult();
 
-    // The refresh made after the run was accepted settles first: exhausted, as it would genuinely
-    // be after consuming the run this session just made.
-    resolveCall(ROUTES.QUOTA, 1, quotaResponse(TEST_PRODUCT_IDS, { used_count: 3, remaining_count: 0, exhausted: true }));
+    // Completion refresh settles before the older boot/reserve reads.
+    resolveCall(ROUTES.QUOTA, 2, quotaResponse(TEST_PRODUCT_IDS, { used_count: 3, remaining_count: 0, exhausted: true }));
     await waitFor(() => expect(screen.getByText("0 of 3 runs remaining.")).toBeTruthy());
     // The older boot-time response then arrives; it must not overwrite the newer counter...
     resolveCall(ROUTES.QUOTA, 0, quotaResponse(TEST_PRODUCT_IDS, { used_count: 1, remaining_count: 2 }));
+    resolveCall(ROUTES.QUOTA, 1, quotaResponse(TEST_PRODUCT_IDS, { used_count: 0, reserved_count: 1 }));
     await act(async () => {});
     expect(screen.getByText("0 of 3 runs remaining.")).toBeTruthy();
     // ...and neither may replace the already-completed run.

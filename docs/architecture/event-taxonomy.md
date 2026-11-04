@@ -49,10 +49,13 @@ Current MVP-A runtime-owned emission points:
 
 - guest identity service:
   - `guest.created`
-- guest quota service:
+- quota admission/finalization services:
   - `quota.checked`
-  - `quota.consumed`
-  - `quota.exhausted`
+  - `quota.reserved`
+  - `quota.consumed` (accessible canonical success only)
+  - `quota.released`
+  - `quota.capacity_reserved` (temporary rejected admission)
+  - `quota.exhausted` (used limit reached)
 - scenario session service:
   - `scenario.started`
   - `scenario.checkpoint_reached`
@@ -106,12 +109,27 @@ the `web.*` event). Brief Decoder (ANY-248) uses that hook so the event means "a
 clarifying-question list was rendered"; a zero-question run still renders and the backend still
 records `scenario.completed`, but no `web.result_viewed` is sent.
 
-For A13, `quota.consumed` is emitted only for backend-accepted scenario starts. `quota.exhausted`
-is emitted when the backend rejects a scenario start because the configured guest quota dimension is
-exhausted. Quota events include `quota_dimension` and `quota_dimension_key`; scenario-dimension
-quota events also include `quota_scenario_id`. These events do not depend on frontend clicks,
-workflow success, provider calls, validation retries, transport retries, PydanticAI telemetry, or
-LiteLLM telemetry.
+ANY-507 reserves capacity on accepted start (`quota.reserved`), consumes it only when an accessible
+canonical result is published (`quota.consumed`), and releases it on terminal failure/cancellation
+(`quota.released`). These events commit with their actual state change; replay and losing terminal
+decisions emit none. `result_status` is respectively `reserved`, `consumed` or `released`.
+
+`quota.capacity_reserved` records admission rejected while reserves occupy capacity, with
+`result_status=failed` and `error_code=quota_capacity_reserved`. Its counter snapshot and event
+timestamp retain the observation made before rollback. `quota.exhausted` records a rejected start
+whose used quota reached its limit; it is not the one-time successful-consumption edge. ANY-766's
+future exhaustion outbox uses `ConsumptionTransition.became_exhausted`, not rejection-event counts.
+Frontend clicks, provider calls and retries do not themselves produce consumption.
+
+Reserve/consume/release/capacity events carry owner kind/ID, scope, product/scenario/frontend,
+session/job/workflow, applicable handoff/result, and the original bucket identity. Their properties
+include `quantity`, `used_count`, `successful_used_count`, `legacy_used_count`, `reserved_count`,
+`remaining_count`, `available_count` and `exhausted`; applied transitions also name `reservation_id`.
+Guest bucket properties include `guest_quota_usage_id`, `quota_policy_id`, `quota_dimension`,
+`quota_dimension_key`, `period_key` and `unit`. Paid bucket properties instead include
+`paid_allowance_usage_id`, `allowance_id`, `metric_key` and `unit`. Guest evaluation/rejection events
+(`quota.checked`/`quota.exhausted`) retain their existing policy, period and counter properties,
+including `quota_scenario_id` for scenario-dimension policies. See [quota model](quota-model.md).
 
 For provider events, the event log must persist deterministic correlation to
 `platform.provider_calls` through `provider_call_id`, `action_run_id`, `provider_policy_ref`,
@@ -131,8 +149,11 @@ be:
 
 If immediate handoff acceptance observes target quota exhaustion and then rolls back its accept
 claim, quota recovery must retain one `quota.checked` / `quota.exhausted` pair with the target
-product, frontend, scenario-session/chain, guest, and `handoff_id`. This is the rollback equivalent
-of the ordinary scenario-start path, which commits those same events before returning HTTP 429.
+product, frontend, scenario-session/chain, guest or trusted paid user, and `handoff_id`. The ordinary
+scenario-start path also uses rollback recovery for its final-exhaustion audit.
+Temporary occupancy records `quota.capacity_reserved` and keeps handoff consent retryable; it does
+not emit this exhausted/failed chain. Ordinary rejection audit recovery is non-critical; handoff
+rejection audit recovery is critical.
 Once accept has reached exhausted target quota evaluation under the handoff lifecycle advisory lock,
 quota recovery owns terminal arbitration: decline and expiry must wait and then observe the durable
 `failed` state. The critical recovery transaction recreates the quota pair and emits
@@ -169,7 +190,10 @@ Generated documentation mirrors that source in:
 ### `quota`
 
 - `quota.checked`
+- `quota.reserved`
 - `quota.consumed`
+- `quota.released`
+- `quota.capacity_reserved`
 - `quota.exhausted`
 
 ### `scenario`

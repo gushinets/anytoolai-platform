@@ -606,6 +606,7 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
         quotaResponse(ids, { remaining_count: 3, used_count: 0 }),
         // Refetched once the run is accepted, so the banner already moves on the first mount.
         quotaResponse(ids, { remaining_count: 2, used_count: 1 }),
+        quotaResponse(ids, { remaining_count: 2, used_count: 1 }),
         quotaResponse(MODE_IDS.reply_draft, { remaining_count: 1, used_count: 2 }),
       ],
       [routes.START]: [startResponse()],
