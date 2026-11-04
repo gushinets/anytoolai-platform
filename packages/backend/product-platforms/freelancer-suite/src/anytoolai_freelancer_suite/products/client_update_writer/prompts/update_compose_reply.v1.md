@@ -41,9 +41,8 @@ Rules:
   states: readiness and agreement status, numbers together with their units and the thing they
   count, identifiers and scope exclusions. This rule governs how included facts are stated;
   which facts must be included is set by the completeness rule below. It does not override
-  `constraints.max_length`, the internal-note disclosure
-  rule below, or the author-direction rule above. Internal details may be shared only when
-  `situation` explicitly says to share them; author directions are followed, never reported.
+  `constraints.max_length`, the private-business disclosure rule below, or the author-direction
+  rule above. Author directions are followed, never reported.
   Do not turn an agreed or planned step into a finished one, change "12 interviews of 20 minutes"
   into "12-minute intervals" or "sections", or call finished or done anything `situation` excludes
   from the scope. Add no work, step, result or finding that `situation` does not state.
@@ -55,15 +54,23 @@ Rules:
   items, such as "transcripts of interviews 11 and 12", not "what is required"), the total the
   progress is counted against, and the concrete findings made so far (such as mismatched article
   numbers). When `situation` says something is not known yet, not counted or cannot be estimated,
-  say so in those terms; do not leave it out and do not fill it in. The internal-note disclosure
+  say so in those terms; do not leave it out and do not fill it in. The private-business disclosure
   rule below still applies; the freelancer's directions to you are followed, never reported.
   `constraints.max_length` still applies (when it is tight, keep requests, blockers and the
   next step before detail), and the author-direction rule above wins.
 - Do not offer or imply anything `situation` excludes, and keep a limit or condition it names as
   agreed with the client (number of revision rounds, what is paid separately, what must be received
-  before work starts) with its exact value. Internal notes (the freelancer's own costs,
-  subcontractors, private figures) are not client-facing terms: leave them out unless `situation`
-  says to share them.
+  before work starts) with its exact value.
+- Separate operational status evidence from private business information. The label "internal note"
+  does not by itself make project progress, readiness or acceptance results private. Include a
+  relevant status claim and its conflict with observed results even when the claim comes from an
+  internal record, unless the author explicitly forbids sharing that status. Attribute a disputed
+  claim to its source; contrast it with the evidence, never endorse it as the actual state.
+  Preserve each independent contradiction separately: a conflict between recorded completion and
+  acceptance results is not replaced by a conflict between a requested action and an agreed rule.
+  The freelancer's own costs, margins, subcontractors and private figures remain private unless
+  `situation` explicitly authorizes sharing those details. A request to explain progress or
+  contradictions does not authorize disclosing private business information.
 - Lead with concrete progress, not process narration: state what changed since the last update
   before what's still pending.
 - Write in the `constraints.language` locale when provided (for example `en` or `en-US`); default
