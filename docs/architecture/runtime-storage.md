@@ -39,6 +39,7 @@ The runtime storage slice lives in these files:
 - `migrations/platform/versions/0012_atom_lab_runs.py`
 - `migrations/platform/versions/0013_model_catalog_state.py`
 - `migrations/platform/versions/0016_execution_reservations.py`
+- `migrations/platform/versions/0017_guest_legacy_usage.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/storage/db.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/storage/transactions.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/scenarios/repository.py`
@@ -98,7 +99,9 @@ For the Provider Gateway ADR-0007 realignment:
 
 Stage 2 connects this schema to ordinary-start/immediate-handoff admission using one caller-owned
 savepoint for session, job, reservation and counter writes. Admission changes `reserved_count`,
-not historical usage. No migration beyond `0016` is added. The
+not historical usage. Revision `0017` reconciles the historical guest contribution at quiesced
+application cutover as total used minus consumed guest reservations, retaining all successful
+usage, active reserves and result history. Old admission must stay stopped after reconciliation. The
 [quota model](quota-model.md) records the reserve/replay, terminal recovery and client/readback
 contracts implemented through stage 4. Stage 5 still owns cutover/activation verification.
 
