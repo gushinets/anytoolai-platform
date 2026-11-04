@@ -278,6 +278,11 @@ counters/runtime history, and repeated `upgrade head` without data changes.
 **Checks:** concurrent replay, hash conflicts, same key/different owners, invalid first paid binding,
 independent counters and handoff accept/decline/expiry races. Every denial leaves consistent rows.
 
+**Stage-2 checkpoint (`98c92121`, 2026-11-04):** common guest/typed-paid reservation and owner-scoped
+replay are implemented atomically with session/job creation. Paid bucket bindings are immutable;
+accepted handoff replay precedes expiry checks, deferred handoff reserves nothing, and busy capacity
+leaves acceptance retryable. Paid HTTP/access integration remains ANY-766 scope.
+
 ### Stage 3. Unify finalization and recovery — done
 
 **Outcome:** one terminal decision per metered job; unknown outcomes cannot produce a free published
