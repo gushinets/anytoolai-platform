@@ -25,7 +25,7 @@ from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.identity.service import GuestIdentityService
 from anytoolai_platform_core.quotas.models import QuotaDimension, QuotaPeriod
 from anytoolai_platform_core.quotas.repository import QuotaUsageRepository
-from anytoolai_platform_core.quotas.service import GuestQuotaService, QuotaExhaustedError
+from anytoolai_platform_core.quotas.service import GuestQuotaService, QuotaCapacityReservedError, QuotaExhaustedError
 from anytoolai_platform_core.scenarios.models import (
     ScenarioSessionRecord,
     ScenarioSessionStatus,
@@ -188,7 +188,7 @@ def _seed_handoff_source_graph(
     return scenario, succeeded_job, artifact
 
 
-def _consume_accepted_start(
+def _reserve_accepted_start(
     service: GuestQuotaService,
     *,
     guest_id: str,
@@ -205,7 +205,7 @@ def _consume_accepted_start(
         scenario_id=scenario_id,
     )
     assert validation is not None
-    return service.consume_for_accepted_start(
+    return service.reserve_for_accepted_start(
         tenant_id="anytoolai",
         region="default",
         product_id="kernel_demo",
@@ -293,13 +293,13 @@ def test_product_dimension_shares_quota_across_scenarios(
         guest_id = _create_guest(session)
         service = _quota_service(session)
 
-        first = _consume_accepted_start(
+        first = _reserve_accepted_start(
             service,
             guest_id=guest_id,
             scenario_id="kernel_demo.single_action_smoke_v1",
             scenario_session_id="scenario_session_product_first",
         )
-        second = _consume_accepted_start(
+        second = _reserve_accepted_start(
             service,
             guest_id=guest_id,
             scenario_id="kernel_demo.multi_step_workflow_smoke_v1",
@@ -309,7 +309,7 @@ def test_product_dimension_shares_quota_across_scenarios(
         consumed_events = list(
             session.execute(
                 sa.select(event_log_table)
-                .where(event_log_table.c.event_type == "quota.consumed")
+                .where(event_log_table.c.event_type == "quota.checked")
                 .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
             ).mappings()
         )
@@ -324,7 +324,8 @@ def test_product_dimension_shares_quota_across_scenarios(
     assert usages[0]["quota_dimension"] == "product"
     assert usages[0]["dimension_key"] == "kernel_demo"
     assert usages[0]["scenario_id"] is None
-    assert usages[0]["used_count"] == 2
+    assert usages[0]["used_count"] == 0
+    assert usages[0]["reserved_count"] == 2
     assert consumed_events[-1]["properties"]["scenario_id"] == (
         "kernel_demo.multi_step_workflow_smoke_v1"
     )
@@ -344,7 +345,7 @@ def test_scenario_dimension_uses_independent_counters_and_events(
         service = _quota_service(session, registry=registry)
 
         first_scenario_states = [
-            _consume_accepted_start(
+            _reserve_accepted_start(
                 service,
                 guest_id=guest_id,
                 scenario_id=first_scenario_id,
@@ -352,14 +353,14 @@ def test_scenario_dimension_uses_independent_counters_and_events(
             )
             for index in range(3)
         ]
-        with pytest.raises(QuotaExhaustedError):
-            _consume_accepted_start(
+        with pytest.raises(QuotaCapacityReservedError):
+            _reserve_accepted_start(
                 service,
                 guest_id=guest_id,
                 scenario_id=first_scenario_id,
                 scenario_session_id="scenario_session_first_exhausted",
             )
-        second_scenario_state = _consume_accepted_start(
+        second_scenario_state = _reserve_accepted_start(
             service,
             guest_id=guest_id,
             scenario_id=second_scenario_id,
@@ -372,24 +373,27 @@ def test_scenario_dimension_uses_independent_counters_and_events(
         consumed_event = (
             session.execute(
                 sa.select(event_log_table)
-                .where(event_log_table.c.event_type == "quota.consumed")
+                .where(event_log_table.c.event_type == "quota.checked")
                 .order_by(event_log_table.c.timestamp.desc(), event_log_table.c.event_id.desc())
             )
             .mappings()
             .first()
         )
 
-    assert [state.used_count for state in first_scenario_states if state is not None] == [
+    assert [state.reserved_count for state in first_scenario_states if state is not None] == [
         1,
         2,
         3,
     ]
     assert second_scenario_state is not None
-    assert second_scenario_state.used_count == 1
+    assert second_scenario_state.used_count == 0
+    assert second_scenario_state.reserved_count == 1
     assert second_scenario_state.quota_dimension is QuotaDimension.scenario
     assert second_scenario_state.dimension_key == second_scenario_id
-    assert usages[first_scenario_id]["used_count"] == 3
-    assert usages[second_scenario_id]["used_count"] == 1
+    assert usages[first_scenario_id]["used_count"] == 0
+    assert usages[first_scenario_id]["reserved_count"] == 3
+    assert usages[second_scenario_id]["used_count"] == 0
+    assert usages[second_scenario_id]["reserved_count"] == 1
     assert usages[first_scenario_id]["dimension_key"] == first_scenario_id
     assert usages[second_scenario_id]["dimension_key"] == second_scenario_id
     assert consumed_event is not None
@@ -427,7 +431,7 @@ def test_quota_check_uses_the_current_policy_limit_for_existing_usage(
 ) -> None:
     with transaction_boundary(session_factory) as session:
         guest_id = _create_guest(session)
-        _consume_accepted_start(
+        _reserve_accepted_start(
             _quota_service(session),
             guest_id=guest_id,
             scenario_id="kernel_demo.single_action_smoke_v1",
@@ -445,13 +449,13 @@ def test_quota_check_uses_the_current_policy_limit_for_existing_usage(
         )
         stored_limit = session.execute(sa.select(guest_quota_usage_table.c.limit_count)).scalar_one()
 
-    assert state.used_count == 1
+    assert state.used_count == 0
     assert state.limit_count == 10
-    assert state.remaining_count == 9
+    assert state.remaining_count == 10
     assert stored_limit == 3
 
 
-def test_quota_consume_exhausted_and_repeat_calls(
+def test_quota_reservations_fill_capacity_without_consumption(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
     with transaction_boundary(session_factory) as session:
@@ -459,7 +463,7 @@ def test_quota_consume_exhausted_and_repeat_calls(
         service = _quota_service(session)
 
         states = [
-            _consume_accepted_start(
+            _reserve_accepted_start(
                 service,
                 guest_id=guest_id,
                 scenario_id="kernel_demo.single_action_smoke_v1",
@@ -468,8 +472,8 @@ def test_quota_consume_exhausted_and_repeat_calls(
             )
             for index in range(3)
         ]
-        with pytest.raises(QuotaExhaustedError):
-            _consume_accepted_start(
+        with pytest.raises(QuotaCapacityReservedError):
+            _reserve_accepted_start(
                 service,
                 guest_id=guest_id,
                 scenario_id="kernel_demo.single_action_smoke_v1",
@@ -484,12 +488,13 @@ def test_quota_consume_exhausted_and_repeat_calls(
         )
         event_types = _event_types(session)
 
-    assert [state.used_count for state in states if state is not None] == [1, 2, 3]
-    assert exhausted.used_count == 3
-    assert exhausted.remaining_count == 0
-    assert exhausted.exhausted is True
-    assert event_types.count("quota.consumed") == 3
-    assert event_types.count("quota.exhausted") == 1
+    assert [state.reserved_count for state in states if state is not None] == [1, 2, 3]
+    assert exhausted.used_count == 0
+    assert exhausted.remaining_count == 3
+    assert exhausted.exhausted is False
+    assert event_types.count("quota.checked") == 4
+    assert event_types.count("quota.consumed") == 0
+    assert event_types.count("quota.exhausted") == 0
 
 
 def test_quota_exhaustion_recovery_survives_caller_transaction_rollback(
@@ -502,7 +507,7 @@ def test_quota_exhaustion_recovery_survives_caller_transaction_rollback(
     with pytest.raises(QuotaExhaustedError), transaction_boundary(
         session_factory
     ) as session:
-        _consume_accepted_start(
+        _reserve_accepted_start(
             _quota_service(session, registry=registry),
             guest_id=guest_id,
             scenario_id="kernel_demo.single_action_smoke_v1",
@@ -560,7 +565,7 @@ def test_quota_exhaustion_recovery_keeps_window_resolved_at_validation(
         session_factory
     ) as session:
         service = _quota_service(session, registry=registry, clock=lambda: next(reads))
-        _consume_accepted_start(
+        _reserve_accepted_start(
             service,
             guest_id=guest_id,
             scenario_id="kernel_demo.single_action_smoke_v1",
@@ -593,7 +598,7 @@ def test_handoff_quota_exhaustion_recovery_survives_caller_transaction_rollback(
     with pytest.raises(QuotaExhaustedError), transaction_boundary(
         session_factory
     ) as session:
-        _consume_accepted_start(
+        _reserve_accepted_start(
             _quota_service(session, registry=registry),
             guest_id=guest_id,
             scenario_id="kernel_demo.handoff_smoke_target_v1",

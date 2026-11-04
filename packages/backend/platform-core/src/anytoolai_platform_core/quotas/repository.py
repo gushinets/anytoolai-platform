@@ -64,9 +64,7 @@ class QuotaUsageRepository:
     def get(self, usage_id: str) -> QuotaUsageRecord | None:
         row = (
             self._session.execute(
-                sa.select(guest_quota_usage_table).where(
-                    guest_quota_usage_table.c.id == usage_id
-                )
+                sa.select(guest_quota_usage_table).where(guest_quota_usage_table.c.id == usage_id)
             )
             .mappings()
             .one_or_none()
@@ -166,23 +164,26 @@ class QuotaUsageRepository:
         self._session.execute(
             postgresql.insert(guest_quota_usage_table)
             .values(values)
-            .on_conflict_do_nothing(
-                constraint=GUEST_QUOTA_USAGE_DIMENSION_CONSTRAINT_NAME
-            )
+            .on_conflict_do_nothing(constraint=GUEST_QUOTA_USAGE_DIMENSION_CONSTRAINT_NAME)
         )
 
-    def consume_if_available(self, record: QuotaUsageRecord) -> QuotaUsageRecord | None:
-        """Keep debit-on-start usage historical until reservation admission replaces this path."""
+    def reserve_if_available(self, record: QuotaUsageRecord) -> QuotaUsageRecord | None:
+        # NO KEY UPDATE serializes capacity without upgrading competing reservation FK locks.
+        # Hold it through the caller's final admission decision, including denials.
+        self._session.execute(
+            sa.select(guest_quota_usage_table.c.id)
+            .where(guest_quota_usage_table.c.id == record.id)
+            .with_for_update(key_share=True)
+        ).scalar_one()
         result = self._session.execute(
             sa.update(guest_quota_usage_table)
             .where(
                 guest_quota_usage_table.c.id == record.id,
-                guest_quota_usage_table.c.used_count
+                guest_quota_usage_table.c.used_count + guest_quota_usage_table.c.reserved_count
                 < guest_quota_usage_table.c.limit_count,
             )
             .values(
-                used_count=guest_quota_usage_table.c.used_count + 1,
-                legacy_used_count=guest_quota_usage_table.c.legacy_used_count + 1,
+                reserved_count=guest_quota_usage_table.c.reserved_count + 1,
                 updated_at=utc_now(),
             )
         )
@@ -191,7 +192,7 @@ class QuotaUsageRepository:
             return None
         self._session.flush()
         stored = self.get(record.id)
-        return _require_stored_usage(stored, record.id, "consume")
+        return _require_stored_usage(stored, record.id, "reserve")
 
     def _sync_limit(
         self,

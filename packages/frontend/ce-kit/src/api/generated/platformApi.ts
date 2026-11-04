@@ -2877,21 +2877,12 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Quota exhausted. The backend rejects the scenario start before creating any scenario session or linked job. */
+            /** @description Quota exhausted or capacity temporarily reserved. The rejected start leaves no scenario session, job or reservation. A temporary reserve does not mean the allowance is exhausted. */
             429: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    /**
-                     * @example {
-                     *       "error": {
-                     *         "code": "quota_exhausted",
-                     *         "message": "Guest quota exhausted.",
-                     *         "request_id": "req_123"
-                     *       }
-                     *     }
-                     */
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };

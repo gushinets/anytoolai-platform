@@ -86,6 +86,19 @@ working `.env`. `CONFIGURED_SOURCE` describes the client source, not sales appro
 does not relabel the historical SIMULATED evidence above. Actual deployed TLS/private network
 controls, production metric approval and paid-access/usage behavior remain separate gates.
 
+## ANY-507 reservation admission checkpoint
+
+ANY-507 stage 2 (2026-11-04) adds Core-only reservation admission and owner-scoped replay for
+ordinary start and immediate handoff. Typed `ExecutionOwner`/`PaidAllowance` arguments are supplied
+explicitly by trusted internal callers; historical body/source-session `user_id` is not Portal
+authority. No paid HTTP authentication, AccessSnapshot, usage endpoint or wire change is delivered
+by this checkpoint. See the [shared contract and stage boundaries](../exec-plans/active/ANY-507-implementation-plan.md).
+Portal's committed architecture and access specification were rechecked read-only at
+[`94ca83603c12d56e92110e0310553ba8e13af699`](https://github.com/gushinets/payments-portal/commit/94ca83603c12d56e92110e0310553ba8e13af699).
+Its canonical snapshot specification remains V1 with calendar bounds. Proposed V2 and actual paid
+integration remain ANY-766 work; this observation is not a final ANY-715/765 handoff or deployment
+readiness claim. No peer source or producer/consumer artifact changed.
+
 ## Service authentication and scope convention (ANY-711 handoff)
 
 This is the normative service-authentication handoff for all three operations. ANY-711

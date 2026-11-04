@@ -532,14 +532,17 @@ def test_reservation_uniqueness(engine: sa.Engine, duplicate: str) -> None:
             session.execute(sa.insert(execution_reservations_table).values(raw))
 
 
-def test_legacy_debit_stays_legacy_until_admission_cutover(engine: sa.Engine) -> None:
+def test_reservation_preserves_legacy_debit(engine: sa.Engine) -> None:
     with Session(engine) as session:
         candidate = _reservation(session, guest=True)
         repo = QuotaUsageRepository(session)
+        session.execute(sa.update(guest_quota_usage_table).where(
+            guest_quota_usage_table.c.id == candidate.guest_quota_usage_id
+        ).values(used_count=1, legacy_used_count=1))
         bucket = repo.get(candidate.guest_quota_usage_id)
-        consumed = repo.consume_if_available(bucket)
-        assert consumed.used_count == consumed.legacy_used_count == 1
-        assert consumed.reserved_count == 0
+        reserved = repo.reserve_if_available(bucket)
+        assert reserved.used_count == reserved.legacy_used_count == 1
+        assert reserved.reserved_count == 1
 
 
 @pytest.mark.parametrize(

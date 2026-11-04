@@ -23,7 +23,7 @@ from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.quotas.repository import QuotaUsageRepository
-from anytoolai_platform_core.quotas.service import GuestQuotaService
+from anytoolai_platform_core.quotas.service import QUOTA_CAPACITY_RESERVED, GuestQuotaService
 from anytoolai_platform_core.scenarios.models import ScenarioSessionSnapshot
 from anytoolai_platform_core.scenarios.repository import (
     MAX_IDEMPOTENCY_KEY_LENGTH,
@@ -110,6 +110,14 @@ SAFE_429_EXAMPLE = {
     }
 }
 
+SAFE_CAPACITY_RESERVED_429_EXAMPLE = {
+    "error": {
+        "code": QUOTA_CAPACITY_RESERVED,
+        "message": "Quota capacity is temporarily reserved.",
+        "request_id": "req_123",
+    }
+}
+
 SAFE_IDEMPOTENCY_CONFLICT_409_EXAMPLE = {
     "error": {
         "code": "idempotency_key_conflict",
@@ -186,10 +194,18 @@ SAFE_IDEMPOTENCY_CONFLICT_409_EXAMPLE = {
         429: {
             "model": ErrorResponse,
             "description": (
-                "Quota exhausted. The backend rejects the scenario start before creating any "
-                "scenario session or linked job."
+                "Quota exhausted or capacity temporarily reserved. The rejected start leaves "
+                "no scenario session, job or reservation. A temporary reserve does not mean "
+                "the allowance is exhausted."
             ),
-            "content": {"application/json": {"example": SAFE_429_EXAMPLE}},
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "quota_exhausted": {"value": SAFE_429_EXAMPLE},
+                        "quota_capacity_reserved": {"value": SAFE_CAPACITY_RESERVED_429_EXAMPLE},
+                    }
+                }
+            },
         },
     },
 )
@@ -394,15 +410,19 @@ def _status_code_for_platform_error(error: PlatformError) -> int:
         "scenario_checkpoint_not_actionable",
         "scenario_next_action_not_allowed",
         "idempotency_key_conflict",
+        "paid_allowance_conflict",
     }:
         return 409
-    if error.code == "quota_exhausted":
+    if error.code in {"quota_exhausted", QUOTA_CAPACITY_RESERVED}:
         return 429
     if error.code in {
         "guest_identity_required",
         "scenario_frontend_invalid",
         "scenario_input_invalid",
         "idempotency_key_invalid",
+        "idempotency_key_required",
+        "execution_owner_invalid",
+        "paid_allowance_invalid",
     }:
         return 422
     return 500

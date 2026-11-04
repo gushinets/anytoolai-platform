@@ -4,8 +4,10 @@ from dataclasses import asdict
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.quotas.models import (
     ExecutionOwner,
     ExecutionOwnerKind,
@@ -23,7 +25,22 @@ from anytoolai_platform_core.storage.db import (
     paid_allowance_usage_table,
     scenario_sessions_table,
 )
+from anytoolai_platform_core.storage.db_errors import (
+    is_expected_unique_violation,
+    unique_constraint_columns,
+)
 from anytoolai_platform_core.workflows.models import JobConsumptionMode
+
+REPLAY_CONSTRAINT = "uq_execution_reservations_owner_replay"
+
+
+def is_expected_execution_replay_race(error: IntegrityError) -> bool:
+    return is_expected_unique_violation(
+        error,
+        constraint_name=REPLAY_CONSTRAINT,
+        table_name=execution_reservations_table.name,
+        columns=unique_constraint_columns(execution_reservations_table, REPLAY_CONSTRAINT),
+    )
 
 
 class PaidAllowanceConflictError(ValueError):
@@ -123,9 +140,27 @@ class PaidAllowanceUsageRepository:
             raise PaidAllowanceConflictError("paid allowance binding cannot change")
         return stored
 
+    def reserve_if_available(self, record: PaidAllowanceUsageRecord) -> bool:
+        # Reservation FK checks hold KEY SHARE; FOR UPDATE would deadlock on lock upgrades.
+        self._session.execute(
+            sa.select(paid_allowance_usage_table.c.id)
+            .where(paid_allowance_usage_table.c.id == record.id)
+            .with_for_update(key_share=True)
+        ).scalar_one()
+        table = paid_allowance_usage_table
+        result = self._session.execute(
+            sa.update(table)
+            .where(
+                table.c.id == record.id,
+                table.c.used_count + table.c.reserved_count < table.c.quantity,
+            )
+            .values(reserved_count=table.c.reserved_count + 1, updated_at=utc_now())
+        )
+        return result.rowcount == 1
+
 
 class ExecutionReservationRepository:
-    """Storage only; admission and terminal counter changes belong to later stages."""
+    """Reservation storage; lifecycle counter changes belong to the metering service."""
 
     def __init__(self, session: Session) -> None:
         self._session = session
