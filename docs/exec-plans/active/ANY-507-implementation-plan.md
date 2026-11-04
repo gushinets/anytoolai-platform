@@ -258,7 +258,7 @@ Stages 1–5 remain unstarted.
 **Checks:** clean upgrade, populated `0015` upgrade, constraints, unchanged identities/scopes/
 counters/runtime history, and repeated `upgrade head` without data changes.
 
-### Stage 2. Connect reserve and replay
+### Stage 2. Connect reserve and replay — done
 
 **Outcome:** ordinary start and immediate handoff share guest/typed-paid reservation.
 **Components:** quota/reservation services, scenario runtime, handoff and API error mapping.

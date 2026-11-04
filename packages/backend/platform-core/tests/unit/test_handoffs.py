@@ -448,12 +448,12 @@ def test_handoff_create_view_accept_and_double_accept(
         }
 
     with transaction_boundary(factory) as session:
-        with pytest.raises(HandoffNotActionableError) as error:
-            _service(session, registry).accept(
-                created.handoff_token,
-                AcceptHandoffCommand(tenant_id="anytoolai", region="default"),
-            )
-        assert error.value.code == "handoff_already_accepted"
+        replay = _service(session, registry).accept(
+            created.handoff_token,
+            AcceptHandoffCommand(tenant_id="anytoolai", region="default"),
+        )
+        assert replay.is_replay
+        assert replay.preview == accepted.preview
         _assert_handoff_event_chain_lineage(session, created.preview.handoff_id)
 
 
@@ -1144,11 +1144,20 @@ def test_expired_terminal_handoff_token_is_redacted_without_mutating_state(
         assert expired.target_scenario_session_id is None
         assert expired.target_job_id is None
 
-        with pytest.raises(HandoffExpiredError):
-            service.accept(
+        if terminal_status in {HandoffStatus.accepted, HandoffStatus.consumed}:
+            replay = service.accept(
                 created.handoff_token,
                 AcceptHandoffCommand(tenant_id="anytoolai", region="default"),
             )
+            assert replay.is_replay
+            assert replay.preview.target_scenario_session_id == stored.target_scenario_session_id
+            assert replay.preview.target_job_id == stored.target_job_id
+        else:
+            with pytest.raises(HandoffExpiredError):
+                service.accept(
+                    created.handoff_token,
+                    AcceptHandoffCommand(tenant_id="anytoolai", region="default"),
+                )
         with pytest.raises(HandoffExpiredError):
             service.decline(
                 created.handoff_token,

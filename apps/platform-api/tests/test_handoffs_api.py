@@ -205,8 +205,8 @@ def test_handoff_api_create_preview_accept_decline_and_expiry(
     assert accepted.json()["target_job_id"]
 
     repeated = asyncio.run(_request(app, "POST", f"/v1/handoffs/{token}/accept", {}))
-    assert repeated.status_code == HTTPStatus.CONFLICT
-    assert repeated.json()["error"]["code"] == "handoff_already_accepted"
+    assert repeated.status_code == HTTPStatus.OK
+    assert repeated.json() == accepted.json()
 
     with transaction_boundary(factory) as session:
         session.execute(

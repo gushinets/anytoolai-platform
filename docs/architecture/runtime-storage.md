@@ -94,6 +94,12 @@ For the Provider Gateway ADR-0007 realignment:
 
 ### Execution metering storage (ANY-507 stage 1)
 
+Stage 2 connects this schema to ordinary-start/immediate-handoff admission using one caller-owned
+savepoint for session, job, reservation and counter writes. Admission changes `reserved_count`,
+not historical usage. No migration beyond `0016` is added. The
+[quota stage checkpoint](quota-model.md#any-507-staged-implementation) records the current internal
+interfaces and the terminal/client/activation work that remains outside stage 2.
+
 Revision `0016` appends to `0015`. It preserves every existing identity, scope, usage count and runtime
 row. Guest usage gains `reserved_count=0` and `legacy_used_count=used_count`. Successful guest usage
 will be the difference `used_count - legacy_used_count`; migration never labels historical attempts

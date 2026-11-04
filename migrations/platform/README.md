@@ -24,9 +24,10 @@ Email capture and paywall intent remain separate access-lite slices.
 
 Revision `0016` prepares execution metering storage: guest reserved/historical counters, immutable
 paid buckets, execution reservations and server-owned job consumption mode. Existing counters and
-runtime history are preserved. It does not switch admission or charging; current starts remain
-`legacy`. PostgreSQL deferred checks reject a committed `reserved` job without its reservation.
-Downgrade refuses to discard paid/reservation history. See
+runtime history are preserved. The migration itself does not switch admission or charging.
+PostgreSQL deferred checks reject a committed `reserved` job without its reservation.
+Downgrade refuses to discard paid/reservation history. ANY-507 stage 2 now connects reservation
+admission for new metered starts; terminal consumption/release and activation are later stages. See
 [runtime storage](../../docs/architecture/runtime-storage.md#execution-metering-storage-any-507-stage-1)
 and [ANY-507](../../docs/exec-plans/active/ANY-507-implementation-plan.md) for stage and cutover boundaries.
 

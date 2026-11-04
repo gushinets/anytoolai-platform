@@ -4,12 +4,13 @@ import json
 import os
 import secrets
 from collections.abc import Mapping
-from dataclasses import replace
+from dataclasses import asdict, replace
 from typing import Any
 
 from jsonschema import ValidationError as JsonSchemaValidationError
 from jsonschema import validate as validate_json_schema
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from anytoolai_platform_core.common.errors import PlatformError
 from anytoolai_platform_core.common.hashing import digest_parts
@@ -20,7 +21,29 @@ from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.products.models import FrontendDefinition
-from anytoolai_platform_core.quotas.service import GuestQuotaService
+from anytoolai_platform_core.quotas.execution_repository import (
+    ExecutionReservationRepository,
+    is_expected_execution_replay_race,
+)
+from anytoolai_platform_core.quotas.execution_service import (
+    ExecutionReservationService,
+    PaidAllowanceInvalidError,
+)
+from anytoolai_platform_core.quotas.models import (
+    ExecutionAcceptance,
+    ExecutionCandidate,
+    ExecutionOwner,
+    ExecutionOwnerKind,
+    ExecutionReplayIdentity,
+    ExecutionReplayNamespace,
+    ExecutionReservation,
+    PaidAllowance,
+)
+from anytoolai_platform_core.quotas.service import (
+    GuestIdentityRequiredError,
+    GuestQuotaService,
+    QuotaValidation,
+)
 from anytoolai_platform_core.scenarios.checkpoints import (
     FAILED_CHECKPOINT_ID,
     HANDOFF_READY_CHECKPOINT_ID,
@@ -50,7 +73,11 @@ from anytoolai_platform_core.scenarios.runtime_scope import (
     runtime_scope_metadata,
 )
 from anytoolai_platform_core.structured_output.schemas import normalize_schema_mapping
-from anytoolai_platform_core.workflows.models import JobRecord, WorkflowDefinition
+from anytoolai_platform_core.workflows.models import (
+    JobConsumptionMode,
+    JobRecord,
+    WorkflowDefinition,
+)
 from anytoolai_platform_core.workflows.repository import JobRepository
 
 
@@ -126,6 +153,7 @@ class ScenarioRuntimeService:
         self._job_repository = job_repository
         self._event_emitter = event_emitter
         self._quota_service = quota_service
+        self._reservations = ExecutionReservationService(config_registry, quota_service)
 
     def start_session(
         self,
@@ -142,19 +170,26 @@ class ScenarioRuntimeService:
         idempotency_key: str | None = None,
         live_canary_token: str | None = None,
         runtime_scope: RuntimeScope = RuntimeScope.public,
-    ) -> ScenarioSessionSnapshot:
-        # An empty or whitespace-only header (e.g. a proxy sending "Idempotency-Key: ")
-        # must mean "no key was sent", not a real, distinct empty-string key -- two
-        # different callers both sending a blank header would otherwise be scoped
-        # together as if they shared one key.
-        if idempotency_key is not None:
-            idempotency_key = idempotency_key.strip() or None
-        if idempotency_key is not None and len(idempotency_key) > MAX_IDEMPOTENCY_KEY_LENGTH:
-            raise IdempotencyKeyInvalidError()
+        execution_owner: ExecutionOwner | None = None,
+        paid_allowance: PaidAllowance | None = None,
+    ) -> ExecutionAcceptance:
+        idempotency_key = _normalize_idempotency_key(idempotency_key)
 
         if not isinstance(input_payload, Mapping):
             raise ScenarioInputInvalidError()
 
+        owner = self._execution_owner(tenant_id, region, guest_id, execution_owner)
+        paid = owner is not None and owner.owner_kind is ExecutionOwnerKind.portal_user
+        guest_id = None if paid else guest_id
+        user_id = owner.owner_id if paid else user_id
+        _require_paid_start_inputs(paid, paid_allowance, idempotency_key)
+        replay_identity = (
+            None
+            if idempotency_key is None
+            else ExecutionReplayIdentity(
+                product_id, scenario_id, ExecutionReplayNamespace.start, idempotency_key
+            )
+        )
         idempotency_request_hash = (
             None
             if idempotency_key is None
@@ -165,7 +200,7 @@ class ScenarioRuntimeService:
                 scenario_id=scenario_id,
                 frontend_id=frontend_id,
                 guest_id=guest_id,
-                user_id=user_id,
+                user_id=None if paid else user_id,
                 input_payload=input_payload,
                 runtime_scope=runtime_scope,
             )
@@ -189,32 +224,25 @@ class ScenarioRuntimeService:
         ):
             raise ScenarioNotFoundError()
 
-        # A replay of an already-accepted start must survive config drift since the
-        # original request: the frontend can be disabled, the quota policy
-        # reconfigured/broken, or the guest identity removed in between -- none of
-        # that may block a legitimate retry (browser back-button, fetch-timeout retry,
-        # flaky mobile network -- exactly the cases Idempotency-Key exists for). Look
-        # up an existing match on the raw, unvalidated identifiers *before* running
-        # any product/scenario/frontend/quota validation, which only a genuinely new
-        # request still needs. get_by_idempotency_key() only needs tenant/region/
-        # product/scenario/guest_id/idempotency_key, none of which require resolving
-        # config first.
-        existing = (
-            self._session_repository.get_by_idempotency_key(
-                tenant_id=tenant_id,
-                region=region,
-                product_id=product_id,
-                scenario_id=scenario_id,
-                guest_id=guest_id,
-                idempotency_key=idempotency_key,
+        if replay_identity is not None:
+            replay = (
+                self.find_execution_replay(
+                    self._session_repository.session,
+                    owner,
+                    replay_identity,
+                    idempotency_request_hash,
+                )
+                if owner is not None
+                else self._find_legacy_replay(
+                    tenant_id,
+                    region,
+                    None,
+                    replay_identity,
+                    idempotency_request_hash,
+                )
             )
-            if idempotency_key is not None
-            else None
-        )
-        if existing is not None:
-            if existing.idempotency_request_hash != idempotency_request_hash:
-                raise IdempotencyKeyConflictError()
-            return self._replay_snapshot(existing)
+            if replay is not None:
+                return replay
 
         scenario = self._require_product_scenario(product_id, scenario_id)
         # ANY-221: internal_only scenarios (the 14 kernel_demo "_live_" canary scenarios) exist
@@ -248,111 +276,187 @@ class ScenarioRuntimeService:
             current_checkpoint_id=PROCESSING_CHECKPOINT_ID,
             scenario_chain_id=scenario_session_id,
             source_frontend_instance_id=source_frontend_instance_id,
-            idempotency_key=idempotency_key,
-            idempotency_request_hash=idempotency_request_hash,
+            idempotency_key=None if paid else idempotency_key,
+            idempotency_request_hash=None if paid else idempotency_request_hash,
             metadata={
                 "input": dict(input_payload),
                 **runtime_scope_metadata(runtime_scope),
             },
         )
 
-        # Validate guest identity/quota policy before any write: consume_for_accepted_start()
-        # now requires this result as a parameter, so it is structurally impossible to
-        # reach quota consumption without validating first. Doing this before the
-        # insert-or-select means a request with an invalid/missing/unknown guest_id
-        # fails fast without ever inserting a scenario_sessions row (and the event it
-        # would emit) that would just be rolled back a moment later.
-        quota_validation = (
-            self._quota_service.validate_accepted_start(
-                tenant_id=tenant_id,
-                region=region,
-                product_id=product_id,
-                guest_id=guest_id,
-                scenario_id=scenario.scenario_id,
-            )
-            if self._quota_service is not None
-            else None
+        quota_input = self._quota_input(
+            owner=owner,
+            paid_allowance=paid_allowance,
+            tenant_id=tenant_id,
+            region=region,
+            product_id=product_id,
+            scenario_id=scenario.scenario_id,
+            guest_id=guest_id,
         )
+        try:
+            # Include events, session, job, bucket and reserve in the same candidate savepoint.
+            with self._session_repository.session.begin_nested():
+                stored_session = self._session_service.start(session_record)
+                job, reservation = self._create_execution_job(
+                    stored_session,
+                    workflow,
+                    owner,
+                    quota_input,
+                    replay_identity,
+                    idempotency_request_hash,
+                )
+        except IntegrityError as exc:
+            if not (is_expected_idempotency_race(exc) or is_expected_execution_replay_race(exc)):
+                raise
+            if owner is None or replay_identity is None:
+                raise
+            replay = self.find_execution_replay(
+                self._session_repository.session, owner, replay_identity, idempotency_request_hash
+            )
+            if replay is None:
+                raise RuntimeError("execution replay race without a durable winner") from exc
+            return replay
+        return self._acceptance_snapshot(stored_session, scenario, job, reservation=reservation)
 
-        # The atomic insert-or-select must run before quota consumption: it is the
-        # only thing that can tell N concurrent requests sharing one Idempotency-Key
-        # apart from N genuinely distinct requests (the lookup above only closes the
-        # common sequential-replay case; two concurrent requests for a brand-new key
-        # can both miss it and reach here). Gating quota on its outcome means a losing
-        # duplicate never touches quota at all, instead of racing to consume it and
-        # needing a refund. If quota is exhausted after a fresh insert here, this
-        # error propagates uncaught so the caller's transaction rolls back the insert
-        # (and its scenario.started event) via normal DB rollback, while
-        # GuestQuotaService's already-registered rollback-recovery callback persists
-        # the quota-exhaustion audit trail in an independent transaction.
-        stored_session, inserted = self._session_service.start_or_get_existing(session_record)
-
-        if not inserted:
-            if (
-                idempotency_key is not None
-                and stored_session.idempotency_request_hash != idempotency_request_hash
-            ):
+    def find_execution_replay(
+        self,
+        session: Session,
+        owner: ExecutionOwner,
+        replay_identity: ExecutionReplayIdentity,
+        request_hash: str,
+    ) -> ExecutionAcceptance | None:
+        if session is not self._session_repository.session:
+            raise ValueError("replay must use the runtime's caller-owned Session")
+        reservations = ExecutionReservationRepository(session)
+        reservation = reservations.find_replay(
+            owner=owner,
+            product_id=replay_identity.product_id,
+            scenario_id=replay_identity.scenario_id,
+            namespace=replay_identity.namespace,
+            replay_key=replay_identity.replay_key,
+        )
+        if reservation is not None:
+            if reservation.request_hash != request_hash:
                 raise IdempotencyKeyConflictError()
-            # Re-resolve from the row that actually won the race, not the `scenario`
-            # this (losing) request resolved a moment ago: under a rolling config
-            # deploy that bumps the scenario version between the two concurrent
-            # requests, the winner's stored_session.scenario_version can differ from
-            # this request's locally-resolved scenario.version.
-            return self._replay_snapshot(stored_session)
+            stored = self._session_repository.get_in_scope(
+                reservation.scenario_session_id, tenant_id=owner.tenant_id, region=owner.region
+            )
+            job = self._job_repository.get(reservation.job_id)
+            if stored is None or job is None:
+                raise RuntimeError("reservation lost its execution linkage")
+            scenario = self._require_product_scenario(stored.product_id, stored.scenario_id)
+            return self._acceptance_snapshot(
+                stored, scenario, job, reservation=reservation, is_replay=True
+            )
+        # Historical guest requests have no reservation. Never search guest_id=NULL for paid.
+        if (
+            owner.owner_kind is ExecutionOwnerKind.guest
+            and replay_identity.namespace is ExecutionReplayNamespace.start
+        ):
+            return self._find_legacy_replay(
+                owner.tenant_id,
+                owner.region,
+                owner.owner_id,
+                replay_identity,
+                request_hash,
+            )
+        return None
 
-        if self._quota_service is not None and quota_validation is not None:
-            assert guest_id is not None  # validate_accepted_start already required this
-            self._quota_service.consume_for_accepted_start(
+    def _find_legacy_replay(
+        self,
+        tenant_id: str,
+        region: str,
+        guest_id: str | None,
+        identity: ExecutionReplayIdentity,
+        request_hash: str,
+    ) -> ExecutionAcceptance | None:
+        # NULL guest lookup is retained only for untrusted historical/unmetered requests.
+        # Authenticated paid replay always uses reservation ownership instead.
+        stored = self._session_repository.get_by_idempotency_key(
+            tenant_id=tenant_id,
+            region=region,
+            product_id=identity.product_id,
+            scenario_id=identity.scenario_id,
+            guest_id=guest_id,
+            idempotency_key=identity.replay_key,
+        )
+        if stored is None:
+            return None
+        if stored.idempotency_request_hash != request_hash:
+            raise IdempotencyKeyConflictError()
+        job = self._job_repository.get_latest_for_scenario_session(stored.id)
+        if job is not None and job.consumption_mode is JobConsumptionMode.reserved:
+            raise RuntimeError("reserved job has no matching replay reservation")
+        # Replay resolves current config for next actions without pinning its original version.
+        scenario = self._require_product_scenario(stored.product_id, stored.scenario_id)
+        return self._acceptance_snapshot(stored, scenario, job, is_replay=True)
+
+    @staticmethod
+    def _execution_owner(
+        tenant_id: str,
+        region: str,
+        guest_id: str | None,
+        explicit: ExecutionOwner | None,
+    ) -> ExecutionOwner | None:
+        if explicit is None:
+            if guest_id == "":
+                raise GuestIdentityRequiredError()
+            return (
+                None
+                if guest_id is None
+                else ExecutionOwner(tenant_id, region, ExecutionOwnerKind.guest, guest_id)
+            )
+        if (explicit.tenant_id, explicit.region) != (tenant_id, region) or (
+            explicit.owner_kind is ExecutionOwnerKind.guest and explicit.owner_id != guest_id
+        ):
+            raise PlatformError(
+                "execution_owner_invalid", "Execution owner does not match trusted scope or guest."
+            )
+        return explicit
+
+    def _quota_input(
+        self,
+        *,
+        owner: ExecutionOwner | None,
+        paid_allowance: PaidAllowance | None,
+        tenant_id: str,
+        region: str,
+        product_id: str,
+        scenario_id: str,
+        guest_id: str | None,
+    ) -> QuotaValidation | PaidAllowance | None:
+        if owner is not None and owner.owner_kind is ExecutionOwnerKind.portal_user:
+            if paid_allowance is None:
+                raise PaidAllowanceInvalidError()
+            self._reservations.validate_paid_allowance(owner, product_id, paid_allowance)
+            return paid_allowance
+        if paid_allowance is not None:
+            raise PaidAllowanceInvalidError()
+        return (
+            None
+            if self._quota_service is None
+            else self._quota_service.validate_accepted_start(
                 tenant_id=tenant_id,
                 region=region,
                 product_id=product_id,
-                frontend_id=frontend_id,
                 guest_id=guest_id,
-                scenario_id=scenario.scenario_id,
-                scenario_session_id=stored_session.id,
-                scenario_chain_id=stored_session.scenario_chain_id,
-                validation=quota_validation,
-            )
-
-        job = self._job_repository.create(
-            JobRecord(
-                tenant_id=tenant_id,
-                region=region,
-                product_id=product_id,
-                frontend_id=frontend_id,
-                scenario_session_id=stored_session.id,
-                workflow_id=workflow.workflow_id,
-                workflow_version=workflow.version,
-                metadata={
-                    "guest_id": guest_id,
-                    "user_id": user_id,
-                    "scenario_chain_id": stored_session.scenario_chain_id,
-                    "acquisition_source": frontend_id,
-                },
+                scenario_id=scenario_id,
             )
         )
 
-        return self._snapshot_from_records(
-            session=stored_session,
-            scenario=scenario,
-            job=job,
-        )
-
-    def _replay_snapshot(self, session: ScenarioSessionRecord) -> ScenarioSessionSnapshot:
-        # Deliberately unpinned: a replay must survive config drift, including the
-        # scenario's own configured version moving on since the original accepted
-        # start (an ordinary config deploy, not a code change). Pinning to
-        # session.scenario_version here would 404 every replay of a session whose
-        # scenario was since bumped -- exactly the retry case Idempotency-Key exists
-        # for. scenario is only used below for allowed_next_actions on an
-        # already-completed session; a version-drifted value there is a much smaller,
-        # cosmetic risk than failing the replay outright.
-        scenario = self._require_product_scenario(session.product_id, session.scenario_id)
-        job = self._job_repository.get_latest_for_scenario_session(session.id)
-        return self._snapshot_from_records(
-            session=session,
-            scenario=scenario,
-            job=job,
+    def _acceptance_snapshot(
+        self,
+        session: ScenarioSessionRecord,
+        scenario: ScenarioDefinition,
+        job: JobRecord | None,
+        *,
+        reservation: ExecutionReservation | None = None,
+        is_replay: bool = False,
+    ) -> ExecutionAcceptance:
+        return ExecutionAcceptance(
+            **asdict(self._snapshot_from_records(session=session, scenario=scenario, job=job)),
+            reservation=reservation,
+            is_replay=is_replay,
         )
 
     def create_linked_session(
@@ -373,6 +477,8 @@ class ScenarioRuntimeService:
         user_id: str | None,
         source_frontend_instance_id: str | None,
         queue_workflow: bool,
+        execution_owner: ExecutionOwner | None = None,
+        paid_allowance: PaidAllowance | None = None,
     ) -> LinkedScenarioSessionResult:
         scenario = self._require_product_scenario(product_id, scenario_id)
         # ANY-221: no legitimate handoff ever targets an internal_only (live-canary) scenario --
@@ -388,28 +494,52 @@ class ScenarioRuntimeService:
             raise LookupError(f"workflow not found: {scenario.workflow_id}")
         self._require_valid_workflow_input(workflow, input_payload)
 
-        if queue_workflow and self._quota_service is not None:
-            quota_validation = self._quota_service.validate_accepted_start(
+        owner = self._execution_owner(tenant_id, region, guest_id, execution_owner)
+        paid = owner is not None and owner.owner_kind is ExecutionOwnerKind.portal_user
+        if paid:
+            guest_id, user_id = None, owner.owner_id
+        replay_identity = ExecutionReplayIdentity(
+            product_id, scenario_id, ExecutionReplayNamespace.handoff, handoff_id
+        )
+        request_hash = digest_parts(
+            compute_idempotency_request_hash(
                 tenant_id=tenant_id,
                 region=region,
                 product_id=product_id,
+                scenario_id=scenario_id,
+                frontend_id=frontend_id,
                 guest_id=guest_id,
-                scenario_id=scenario.scenario_id,
+                user_id=None if paid else user_id,
+                input_payload=input_payload,
+            ),
+            handoff_id,
+        )
+        if owner is not None and queue_workflow:
+            replay = self.find_execution_replay(
+                self._session_repository.session, owner, replay_identity, request_hash
             )
-            if quota_validation is not None:
-                assert guest_id is not None  # validate_accepted_start already required this
-                self._quota_service.consume_for_accepted_start(
-                    tenant_id=tenant_id,
-                    region=region,
-                    product_id=product_id,
-                    frontend_id=frontend_id,
-                    guest_id=guest_id,
-                    scenario_id=scenario.scenario_id,
-                    scenario_session_id=scenario_session_id,
-                    scenario_chain_id=scenario_chain_id,
-                    handoff_id=handoff_id,
-                    validation=quota_validation,
+            if replay is not None:
+                stored = self._session_repository.get_in_scope(
+                    replay.scenario_session_id, tenant_id=tenant_id, region=region
                 )
+                if stored is None or replay.job_id is None:
+                    raise RuntimeError("handoff replay lost execution linkage")
+                return LinkedScenarioSessionResult(
+                    session=stored, job=self._job_repository.get(replay.job_id), acceptance=replay
+                )
+        quota_input = (
+            None
+            if not queue_workflow
+            else self._quota_input(
+                owner=owner,
+                paid_allowance=paid_allowance,
+                tenant_id=tenant_id,
+                region=region,
+                product_id=product_id,
+                scenario_id=scenario_id,
+                guest_id=guest_id,
+            )
+        )
 
         session_record = ScenarioSessionRecord(
             id=scenario_session_id,
@@ -437,6 +567,7 @@ class ScenarioRuntimeService:
                 "handoff_id": handoff_id,
                 "source_scenario_session_id": parent_scenario_session_id,
                 "source_artifact_id": source_artifact_id,
+                **({"execution_owner": asdict(owner)} if paid and not queue_workflow else {}),
             },
         )
         event_context = ExecutionContext(
@@ -451,29 +582,74 @@ class ScenarioRuntimeService:
             handoff_id=handoff_id,
             acquisition_source=frontend_id,
         )
-        stored_session = self._session_service.start(session_record, context=event_context)
-        if not queue_workflow:
-            return LinkedScenarioSessionResult(session=stored_session)
+        with self._session_repository.session.begin_nested():
+            stored_session = self._session_service.start(session_record, context=event_context)
+            if not queue_workflow:
+                return LinkedScenarioSessionResult(session=stored_session)
+            job, reservation = self._create_execution_job(
+                stored_session,
+                workflow,
+                owner,
+                quota_input,
+                replay_identity,
+                request_hash,
+                handoff_id=handoff_id,
+            )
+        return LinkedScenarioSessionResult(
+            session=stored_session,
+            job=job,
+            acceptance=self._acceptance_snapshot(
+                stored_session, scenario, job, reservation=reservation
+            ),
+        )
 
+    def _create_execution_job(
+        self,
+        session: ScenarioSessionRecord,
+        workflow: WorkflowDefinition,
+        owner: ExecutionOwner | None,
+        quota_input: QuotaValidation | PaidAllowance | None,
+        replay_identity: ExecutionReplayIdentity | None,
+        request_hash: str | None,
+        *,
+        handoff_id: str | None = None,
+    ) -> tuple[JobRecord, ExecutionReservation | None]:
+        metadata = {
+            "guest_id": session.guest_id,
+            "user_id": session.user_id,
+            "scenario_chain_id": session.scenario_chain_id,
+            "acquisition_source": session.frontend_id,
+        }
+        if handoff_id is not None:
+            metadata["handoff_id"] = handoff_id
         job = self._job_repository.create(
             JobRecord(
-                tenant_id=tenant_id,
-                region=region,
-                product_id=product_id,
-                frontend_id=frontend_id,
-                scenario_session_id=stored_session.id,
+                tenant_id=session.tenant_id,
+                region=session.region,
+                product_id=session.product_id,
+                frontend_id=session.frontend_id,
+                scenario_session_id=session.id,
                 workflow_id=workflow.workflow_id,
                 workflow_version=workflow.version,
-                metadata={
-                    "guest_id": guest_id,
-                    "user_id": user_id,
-                    "scenario_chain_id": scenario_chain_id,
-                    "handoff_id": handoff_id,
-                    "acquisition_source": frontend_id,
-                },
+                consumption_mode=(
+                    JobConsumptionMode.unmetered
+                    if quota_input is None
+                    else JobConsumptionMode.reserved
+                ),
+                metadata=metadata,
             )
         )
-        return LinkedScenarioSessionResult(session=stored_session, job=job)
+        if quota_input is None:
+            return job, None
+        if owner is None:
+            raise RuntimeError("metered execution has no owner")
+        accepted = self._reservations.reserve_execution(
+            self._session_repository.session,
+            owner,
+            ExecutionCandidate(session, job, replay_identity, request_hash, handoff_id),
+            quota_input,
+        )
+        return job, accepted.reservation
 
     def get_session_snapshot(
         self,
@@ -676,14 +852,9 @@ class ScenarioSessionService:
         row and therefore emitted scenario.started; a replay of an existing key must not
         re-emit the event or let the caller re-consume quota.
 
-        Deliberately does not do its own optimistic pre-read: ScenarioRuntimeService.
-        start_session() is this method's only caller, and it already does an
-        equivalent get_by_idempotency_key() lookup immediately before calling this
-        (to let a sequential replay skip validation/quota entirely, not just skip the
-        insert) -- a second identical SELECT here would be redundant on every call. A
-        true sequential duplicate that somehow still reaches this point (or a genuine
-        concurrent race) is caught below via the INSERT's own IntegrityError, which
-        this repository's constraint guarantees will fire.
+        Retained for session-only callers. Execution admission uses a savepoint covering
+        the entire session/job/reservation candidate instead of this narrower helper.
+        There is no optimistic pre-read here; the unique constraint arbitrates insertion.
         """
         if record.idempotency_key is None:
             return self.start(record, context=context), True
@@ -844,6 +1015,25 @@ class ScenarioSessionService:
             },
         )
         return updated
+
+
+def _normalize_idempotency_key(key: str | None) -> str | None:
+    if key is not None:
+        key = key.strip() or None
+    if key is not None and len(key) > MAX_IDEMPOTENCY_KEY_LENGTH:
+        raise IdempotencyKeyInvalidError()
+    return key
+
+
+def _require_paid_start_inputs(
+    paid: bool, allowance: PaidAllowance | None, key: str | None
+) -> None:
+    if allowance is not None and not paid:
+        raise PaidAllowanceInvalidError()
+    if paid and key is None:
+        raise PlatformError(
+            "idempotency_key_required", "Idempotency-Key is required for paid execution."
+        )
 
 
 def compute_idempotency_request_hash(

@@ -340,7 +340,7 @@ def test_start_scenario_idempotency_key_conflict_returns_409_via_http(
     }
 
 
-def test_start_scenario_consumes_guest_quota_and_returns_exhausted_on_n_plus_one(
+def test_start_scenario_reserves_guest_capacity_and_returns_busy_on_n_plus_one(
     session_factory: SessionFactory,
 ) -> None:
     app = _create_test_app(session_factory)
@@ -371,8 +371,8 @@ def test_start_scenario_consumes_guest_quota_and_returns_exhausted_on_n_plus_one
     assert exhausted.status_code == HTTPStatus.TOO_MANY_REQUESTS
     assert exhausted.json() == {
         "error": {
-            "code": "quota_exhausted",
-            "message": "Guest quota exhausted.",
+            "code": "quota_capacity_reserved",
+            "message": "Quota capacity is temporarily reserved.",
             "request_id": "req_quota_exhausted",
         }
     }
@@ -395,8 +395,8 @@ def test_start_scenario_consumes_guest_quota_and_returns_exhausted_on_n_plus_one
 
     assert scenario_count == 3
     assert job_count == 3
-    assert event_types.count("quota.consumed") == 3
-    assert event_types.count("quota.exhausted") == 1
+    assert event_types.count("quota.consumed") == 0
+    assert event_types.count("quota.exhausted") == 0
 
 
 def test_start_scenario_product_quota_dimension_is_shared_across_scenarios(
@@ -431,7 +431,7 @@ def test_start_scenario_product_quota_dimension_is_shared_across_scenarios(
         consumed_events = list(
             session.execute(
                 sa.select(event_log_table)
-                .where(event_log_table.c.event_type == "quota.consumed")
+                .where(event_log_table.c.event_type == "quota.checked")
                 .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
             ).mappings()
         )
@@ -439,7 +439,8 @@ def test_start_scenario_product_quota_dimension_is_shared_across_scenarios(
     assert usage["quota_dimension"] == "product"
     assert usage["dimension_key"] == "kernel_demo"
     assert usage["scenario_id"] is None
-    assert usage["used_count"] == 2
+    assert usage["used_count"] == 0
+    assert usage["reserved_count"] == 2
     assert consumed_events[-1]["properties"]["scenario_id"] == (
         "kernel_demo.multi_step_workflow_smoke_v1"
     )
@@ -1085,11 +1086,14 @@ def test_openapi_contains_scenario_runtime_endpoints() -> None:
         == "guest_identity_required"
     )
     assert (
-        start_operation["responses"]["429"]["content"]["application/json"]["example"]["error"][
+        start_operation["responses"]["429"]["content"]["application/json"]["examples"]["quota_exhausted"]["value"]["error"][
             "code"
         ]
         == "quota_exhausted"
     )
+    assert start_operation["responses"]["429"]["content"]["application/json"]["examples"][
+        "quota_capacity_reserved"
+    ]["value"]["error"]["code"] == "quota_capacity_reserved"
     assert (
         get_operation["responses"]["200"]["content"]["application/json"]["example"][
             "current_checkpoint_id"

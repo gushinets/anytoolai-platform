@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
+from dataclasses import asdict
 from datetime import datetime, timedelta
 
 from anytoolai_platform_core.common.errors import PlatformError
+from anytoolai_platform_core.common.hashing import digest_parts
 from anytoolai_platform_core.common.ids import new_id
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.config.registry import ConfigRegistry
@@ -29,9 +31,18 @@ from anytoolai_platform_core.handoffs.payloads import (
 from anytoolai_platform_core.handoffs.repository import HandoffRepository
 from anytoolai_platform_core.handoffs.tokens import HandoffTokenService
 from anytoolai_platform_core.identity.repository import GuestIdentityRepository
+from anytoolai_platform_core.quotas.execution_repository import ExecutionReservationRepository
+from anytoolai_platform_core.quotas.models import ExecutionOwner, ExecutionOwnerKind, PaidAllowance
+from anytoolai_platform_core.quotas.service import QUOTA_CAPACITY_RESERVED
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
 from anytoolai_platform_core.scenarios.runtime_scope import is_public_runtime_session
-from anytoolai_platform_core.scenarios.service import ScenarioRuntimeService
+from anytoolai_platform_core.scenarios.service import (
+    IdempotencyKeyConflictError,
+    ScenarioRuntimeService,
+    compute_idempotency_request_hash,
+)
+from anytoolai_platform_core.workflows.models import JobConsumptionMode
+from anytoolai_platform_core.workflows.repository import JobRepository
 
 DEFAULT_TOKEN_TTL = timedelta(minutes=30)
 MAX_ERROR_CODE_LENGTH = 128
@@ -186,15 +197,26 @@ class HandoffService:
         record = self._by_token(token, tenant_id=tenant_id, region=region)
         return record.source_product_id, record.target_product_id
 
-    def accept(self, token: str, command: AcceptHandoffCommand) -> HandoffAccepted:
+    def accept(
+        self,
+        token: str,
+        command: AcceptHandoffCommand,
+        *,
+        execution_owner: ExecutionOwner | None = None,
+        paid_allowance: PaidAllowance | None = None,
+    ) -> HandoffAccepted:
         record = self._by_token(token, tenant_id=command.tenant_id, region=command.region)
+        effective_guest_id = self._accepting_guest_id(record, command, execution_owner)
+        # Accepted consent replays its original linkage, even after token TTL or allowance change.
+        if record.status in {HandoffStatus.accepted, HandoffStatus.consumed}:
+            self._require_replay_owner(record, execution_owner, effective_guest_id)
+            return HandoffAccepted(preview=self.build_safe_preview(record), is_replay=True)
         now = self._clock()
         record = self.expire(record, now=now)
         if _token_is_expired(record, now):
             raise HandoffExpiredError()
         if record.status not in {HandoffStatus.created, HandoffStatus.viewed}:
             raise _terminal_error(record.status)
-        effective_guest_id = command.guest_id or record.created_by_guest_id
         if (
             effective_guest_id is not None
             and self._guests.get(
@@ -253,6 +275,8 @@ class HandoffService:
                 user_id=source_session.user_id,
                 source_frontend_instance_id=command.source_frontend_instance_id,
                 queue_workflow=claimed.target_start_policy is HandoffStartPolicy.immediate,
+                execution_owner=execution_owner,
+                paid_allowance=paid_allowance,
             )
             attached = self._repository.attach_target(
                 claimed.id,
@@ -282,12 +306,92 @@ class HandoffService:
             raise
         except Exception as exc:
             error_code = (
-                "quota_exhausted"
-                if isinstance(exc, PlatformError) and exc.code == "quota_exhausted"
+                exc.code
+                if isinstance(exc, PlatformError)
+                and exc.code in {"quota_exhausted", QUOTA_CAPACITY_RESERVED}
                 else "handoff_acceptance_failed"
             )
             raise HandoffAcceptanceExecutionError(claimed.id, error_code) from exc
         return HandoffAccepted(preview=self.build_safe_preview(attached))
+
+    @staticmethod
+    def _accepting_guest_id(
+        record: HandoffRecord,
+        command: AcceptHandoffCommand,
+        owner: ExecutionOwner | None,
+    ) -> str | None:
+        if owner is not None and (owner.tenant_id, owner.region) != (
+            command.tenant_id,
+            command.region,
+        ):
+            raise HandoffSourceInvalidError()
+        if owner is not None and owner.owner_kind is ExecutionOwnerKind.portal_user:
+            return None
+        guest_id = command.guest_id or record.created_by_guest_id
+        if owner is not None and owner.owner_id != guest_id:
+            raise HandoffSourceInvalidError()
+        return guest_id
+
+    def _require_replay_owner(
+        self,
+        record: HandoffRecord,
+        owner: ExecutionOwner | None,
+        guest_id: str | None,
+    ) -> None:
+        if record.target_scenario_session_id is None:
+            raise RuntimeError("accepted handoff has no target session")
+        target = self._scenarios.get_in_scope(
+            record.target_scenario_session_id, tenant_id=record.tenant_id, region=record.region
+        )
+        if target is None:
+            raise RuntimeError("accepted handoff lost its target session")
+        reservation = (
+            None
+            if record.target_job_id is None
+            else ExecutionReservationRepository(self._repository.session).get_by_job(
+                record.target_job_id
+            )
+        )
+        if record.target_job_id is not None:
+            job = JobRepository(self._repository.session).get(record.target_job_id)
+            if job is None or (
+                job.consumption_mode is JobConsumptionMode.reserved and reservation is None
+            ):
+                raise RuntimeError("accepted handoff lost its job/reservation linkage")
+        if reservation is not None:
+            effective_owner = owner
+            if effective_owner is None and guest_id is not None:
+                effective_owner = ExecutionOwner(
+                    record.tenant_id, record.region, ExecutionOwnerKind.guest, guest_id
+                )
+            if reservation.owner != effective_owner:
+                raise HandoffSourceInvalidError()
+            request_hash = digest_parts(
+                compute_idempotency_request_hash(
+                    tenant_id=record.tenant_id,
+                    region=record.region,
+                    product_id=record.target_product_id,
+                    scenario_id=record.target_scenario_id,
+                    frontend_id=record.target_frontend_id,
+                    guest_id=target.guest_id,
+                    user_id=None
+                    if reservation.owner.owner_kind is ExecutionOwnerKind.portal_user
+                    else target.user_id,
+                    input_payload=record.context_payload,
+                ),
+                record.id,
+            )
+            if reservation.request_hash != request_hash:
+                raise IdempotencyKeyConflictError()
+            return
+        stored_owner = target.metadata.get("execution_owner")
+        if stored_owner is not None:
+            if owner is None or asdict(owner) != stored_owner:
+                raise HandoffSourceInvalidError()
+        elif (
+            owner is not None and owner.owner_kind is ExecutionOwnerKind.portal_user
+        ) or record.accepted_by_guest_id != guest_id:
+            raise HandoffSourceInvalidError()
 
     def decline(self, token: str, *, tenant_id: str, region: str) -> HandoffPreview:
         now = self._clock()

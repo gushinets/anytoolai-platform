@@ -146,10 +146,10 @@ class _FakeQuotaRepo:
             )
         return self.rows[key]
 
-    def consume_if_available(self, record: QuotaUsageRecord) -> QuotaUsageRecord | None:
-        if record.used_count >= record.limit_count:
+    def reserve_if_available(self, record: QuotaUsageRecord) -> QuotaUsageRecord | None:
+        if record.used_count + record.reserved_count >= record.limit_count:
             return None
-        updated = replace(record, used_count=record.used_count + 1)
+        updated = replace(record, reserved_count=record.reserved_count + 1)
         self.rows[self._key(vars(record))] = updated
         return updated
 
@@ -225,14 +225,14 @@ def _service(clock: _Clock) -> tuple[GuestQuotaService, _FakeQuotaRepo, _FakeEmi
     return service, repo, emitter
 
 
-def test_consume_uses_window_resolved_at_validation() -> None:
+def test_reserve_uses_window_resolved_at_validation() -> None:
     clock = _Clock(_utc(2026, 9, 30, 23, 59, 59, 999000), _utc(2026, 10, 1))
     service, repo, emitter = _service(clock)
     validation = service.validate_accepted_start(
         tenant_id="t", region="r", product_id="kernel_demo", guest_id="g", scenario_id="s"
     )
     assert validation is not None
-    state = service.consume_for_accepted_start(
+    state = service.reserve_for_accepted_start(
         tenant_id="t",
         region="r",
         product_id="kernel_demo",
@@ -242,12 +242,13 @@ def test_consume_uses_window_resolved_at_validation() -> None:
         scenario_session_id="ss",
         validation=validation,
     )
-    assert clock.reads == 1  # consume must not read the clock again
+    assert clock.reads == 1  # reserve must not read the clock again
     assert [r.period_key for r in repo.rows.values()] == ["day:2026-09-30"]
-    assert state.resets_at == _utc(2026, 10, 1)
+    assert validation.resolved_period.ends_at == _utc(2026, 10, 1)
+    assert state.used_count == 0
+    assert state.reserved_count == 1
     assert [(t, p["period_key"]) for t, p in emitter.events] == [
         ("quota.checked", "day:2026-09-30"),
-        ("quota.consumed", "day:2026-09-30"),
     ]
     assert all("resets_at" not in p for _, p in emitter.events)
 
@@ -267,4 +268,5 @@ def test_check_quota_resolves_window_once_and_exposes_resets_at() -> None:
     assert clock.reads == 1
     assert state.period_key == "day:2026-09-30"
     assert state.resets_at == _utc(2026, 10, 1)
+    assert state.used_count == 0
     assert repo.rows == {}
