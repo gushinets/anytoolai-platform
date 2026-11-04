@@ -917,6 +917,8 @@ class ScenarioSessionService:
         return updated
 
     def mark_running(self, record: ScenarioSessionRecord) -> ScenarioSessionRecord:
+        if record.status is not ScenarioSessionStatus.started:
+            return record
         running_record = replace(
             record,
             status=ScenarioSessionStatus.running,

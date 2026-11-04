@@ -39,12 +39,15 @@ class JobRepository:
         stored = self.get(record.id)
         return _require_stored_job(stored, record.id, "create")
 
-    def get(self, job_id: str) -> JobRecord | None:
-        row = (
-            self._session.execute(sa.select(jobs_table).where(jobs_table.c.id == job_id))
-            .mappings()
-            .one_or_none()
-        )
+    @property
+    def session(self) -> Session:
+        return self._session
+
+    def get(self, job_id: str, *, for_update: bool = False) -> JobRecord | None:
+        query = sa.select(jobs_table).where(jobs_table.c.id == job_id)
+        if for_update:
+            query = query.with_for_update()
+        row = self._session.execute(query).mappings().one_or_none()
         return None if row is None else JobRecord(**dict(row))
 
     def get_latest_for_scenario_session(
@@ -261,10 +264,12 @@ class JobRepository:
         values = asdict(record)
         values.pop("id")
         result = self._session.execute(
-            sa.update(jobs_table).where(jobs_table.c.id == record.id).values(values)
+            sa.update(jobs_table)
+            .where(jobs_table.c.id == record.id, jobs_table.c.status == existing.status)
+            .values(values)
         )
         if result.rowcount == 0:
-            raise LookupError(f"job not found: {record.id}")
+            raise RuntimeError(f"job state changed during update: {record.id}")
         self._session.flush()
         stored = self.get(record.id)
         return _require_stored_job(stored, record.id, "update")

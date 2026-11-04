@@ -168,8 +168,7 @@ class ExecutionReservationRepository:
     def create(self, record: ExecutionReservation) -> ExecutionReservation:
         if record.state is not ReservationState.reserved:
             raise ValueError("new execution reservation must be reserved")
-        self._require_execution_link(record)
-        self._require_bucket_link(record)
+        self.validate_links(record)
         values = asdict(record)
         values.pop("owner")
         self._session.execute(
@@ -219,6 +218,10 @@ class ExecutionReservationRepository:
             .one_or_none()
         )
         return None if row is None else _reservation_record(row)
+
+    def validate_links(self, record: ExecutionReservation) -> None:
+        self._require_execution_link(record)
+        self._require_bucket_link(record)
 
     def _require_execution_link(self, record: ExecutionReservation) -> None:
         linked = self._session.execute(

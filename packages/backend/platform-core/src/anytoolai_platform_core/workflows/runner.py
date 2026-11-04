@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Mapping
+from copy import deepcopy
 from dataclasses import dataclass, replace
 from datetime import timedelta
 from typing import Any
@@ -17,6 +18,7 @@ from anytoolai_platform_core.actions.runner import ActionRunner, _emit_recovered
 from anytoolai_platform_core.artifacts.correlation import (
     build_artifact_correlation_metadata,
 )
+from anytoolai_platform_core.artifacts.models import ArtifactRecord, ArtifactStatus
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.artifacts.service import ArtifactService
 from anytoolai_platform_core.common.errors import PlatformError
@@ -32,6 +34,9 @@ from anytoolai_platform_core.events.replay import (
 from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.providers.gateway import ProviderGatewayExecutionError
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
+from anytoolai_platform_core.quotas.finalization import finalize_success, release_execution
+from anytoolai_platform_core.quotas.models import FinalExecutionResult, ReservationState
+from anytoolai_platform_core.results.validation import resolve_available_workflow_result
 from anytoolai_platform_core.scenarios.correlation import build_scenario_identity_metadata
 from anytoolai_platform_core.storage.db import action_runs_table
 from anytoolai_platform_core.storage.transactions import (
@@ -54,6 +59,7 @@ from anytoolai_platform_core.workflows.mappings import (
     resolve_when_condition,
 )
 from anytoolai_platform_core.workflows.models import (
+    JobConsumptionMode,
     JobRecord,
     JobStatus,
     WorkflowDefinition,
@@ -61,6 +67,8 @@ from anytoolai_platform_core.workflows.models import (
     WorkflowStepDefinition,
 )
 from anytoolai_platform_core.workflows.repository import JobRepository
+
+FINALIZATION_RECOVERY_ERROR = "workflow_finalization_failed"
 
 
 class WorkflowJobService:
@@ -112,6 +120,8 @@ class WorkflowJobService:
         stored = self._repository.cancel_created(job_id, metadata=metadata)
         if stored is None:
             return None
+        if stored.consumption_mode is JobConsumptionMode.reserved:
+            release_execution(self._repository.session, stored.id)
         self._event_emitter.emit(
             "workflow.canceled",
             _context_from_record(stored),
@@ -121,6 +131,8 @@ class WorkflowJobService:
         return stored
 
     def mark_succeeded(self, record: JobRecord) -> JobRecord:
+        if record.consumption_mode is JobConsumptionMode.reserved:
+            raise RuntimeError("reserved success must use finalize_success")
         updated = self._repository.mark_succeeded(record)
         self._event_emitter.emit(
             "workflow.succeeded",
@@ -131,6 +143,10 @@ class WorkflowJobService:
         return updated
 
     def mark_failed(self, record: JobRecord, *, error_code: str) -> JobRecord:
+        replay = self._metered_terminal_replay(record, expected=JobStatus.running)
+        if replay is not None:
+            return replay
+
         failed_record = replace(
             record,
             status=JobStatus.failed,
@@ -139,6 +155,8 @@ class WorkflowJobService:
             completed_at=record.completed_at or utc_now(),
         )
         updated = self._repository.mark_failed(failed_record)
+        if updated.consumption_mode is JobConsumptionMode.reserved:
+            release_execution(self._repository.session, updated.id)
         self._event_emitter.emit(
             "workflow.failed",
             _context_from_record(updated),
@@ -151,6 +169,10 @@ class WorkflowJobService:
         return updated
 
     def mark_failed_from_created(self, record: JobRecord, *, error_code: str) -> JobRecord:
+        replay = self._metered_terminal_replay(record, expected=JobStatus.created)
+        if replay is not None:
+            return replay
+
         failed_record = replace(
             record,
             status=JobStatus.failed,
@@ -159,6 +181,8 @@ class WorkflowJobService:
             completed_at=record.completed_at or utc_now(),
         )
         updated = self._repository.mark_failed_from_created(failed_record)
+        if updated.consumption_mode is JobConsumptionMode.reserved:
+            release_execution(self._repository.session, updated.id)
         self._event_emitter.emit(
             "workflow.failed",
             _context_from_record(updated),
@@ -171,7 +195,13 @@ class WorkflowJobService:
         return updated
 
     def mark_canceled(self, record: JobRecord) -> JobRecord:
+        replay = self._metered_terminal_replay(record, expected=JobStatus.running)
+        if replay is not None:
+            return replay
+
         updated = self._repository.mark_canceled(record)
+        if updated.consumption_mode is JobConsumptionMode.reserved:
+            release_execution(self._repository.session, updated.id)
         self._event_emitter.emit(
             "workflow.canceled",
             _context_from_record(updated),
@@ -179,6 +209,21 @@ class WorkflowJobService:
             properties={"workflow_version": updated.workflow_version},
         )
         return updated
+
+    def _metered_terminal_replay(
+        self, record: JobRecord, *, expected: JobStatus
+    ) -> JobRecord | None:
+        if record.consumption_mode is not JobConsumptionMode.reserved:
+            return None
+        current = self._repository.get(record.id, for_update=True)
+        if current is None:
+            raise LookupError(f"job not found: {record.id}")
+        if current.status is expected:
+            return None
+        if current.status not in {JobStatus.failed, JobStatus.canceled, JobStatus.succeeded}:
+            raise RuntimeError("unexpected metered terminal transition")
+        release_execution(self._repository.session, current.id)
+        return current
 
 
 class SequentialWorkflowRunner:
@@ -333,6 +378,7 @@ class SequentialWorkflowRunner:
             context={},
             step_state={},
         )
+        success_recovery_registered = False
         try:
             self._validate_workflow_input(
                 workflow,
@@ -356,39 +402,55 @@ class SequentialWorkflowRunner:
             )
             state.final_output_source = final_source
             state.result_artifact_id = final_artifact.id
-            job = self._persist_job_state(
-                replace(
-                    job,
-                    result_artifact_id=final_artifact.id,
-                    completed_at=utc_now(),
-                ),
-                state,
-            )
-            job = self._job_service.mark_succeeded(
-                replace(
+            if job.consumption_mode is JobConsumptionMode.reserved:
+                candidate = replace(
                     job,
                     status=JobStatus.succeeded,
                     result_artifact_id=final_artifact.id,
-                    completed_at=job.completed_at or utc_now(),
+                    completed_at=utc_now(),
+                    metadata={
+                        **dict(job.metadata),
+                        "workflow_state": self._workflow_state_metadata(state),
+                    },
                 )
-            )
-            self._register_success_recovery(job)
+                resolve_available_workflow_result(
+                    artifact=final_artifact, job=candidate, config_registry=self._config_registry
+                )
+                final_result = deepcopy(FinalExecutionResult(candidate, final_artifact))
+                self._register_success_recovery(final_result.job, final_result=final_result)
+                success_recovery_registered = True
+                finalize_success(
+                    self._session, job.id, final_result, config_registry=self._config_registry
+                )
+                job = self._job_repository.get(job.id)
+                assert job is not None
+            else:
+                job = self._persist_job_state(
+                    replace(job, result_artifact_id=final_artifact.id, completed_at=utc_now()),
+                    state,
+                )
+                job = self._job_service.mark_succeeded(replace(job, status=JobStatus.succeeded))
+                self._register_success_recovery(job)
             return WorkflowRunResult(
                 job_id=job.id,
                 workflow_id=job.workflow_id,
                 workflow_version=job.workflow_version,
                 status=job.status,
-                output_payload=final_payload,
-                result_artifact_id=final_artifact.id,
+                output_payload=final_payload if job.status is JobStatus.succeeded else None,
+                result_artifact_id=job.result_artifact_id,
                 metadata={"workflow_state": self._workflow_state_metadata(state)},
             )
         except asyncio.CancelledError:
+            if success_recovery_registered:
+                raise
             self._register_cancellation_recovery(
                 self._build_cancellation_recovery_record(job, state),
                 failed_step=state.failed_step,
             )
             raise
         except Exception as exc:
+            if success_recovery_registered:
+                raise
             error_code = self._error_code_for_exception(exc)
             failed_job = self._build_failed_job_record(
                 job,
@@ -691,13 +753,15 @@ class SequentialWorkflowRunner:
         workflow: WorkflowDefinition,
         job: JobRecord,
         payload: dict[str, Any],
-    ) -> Any:
+    ) -> ArtifactRecord:
         self._validate_workflow_output(
             workflow,
             payload,
             schema_ref=workflow.output_schema_ref,
         )
-        return self._artifact_service.create_structured_output_artifact(
+        artifact = ArtifactRecord(
+            artifact_type="structured_output",
+            status=ArtifactStatus.stored,
             tenant_id=job.tenant_id,
             region=job.region,
             product_id=job.product_id,
@@ -719,6 +783,9 @@ class SequentialWorkflowRunner:
                 artifact_role="workflow_result",
             ),
         )
+        if job.consumption_mode is JobConsumptionMode.reserved:
+            return artifact
+        return self._artifact_service.create(artifact)
 
     def _select_final_output(
         self,
@@ -972,14 +1039,19 @@ class SequentialWorkflowRunner:
             phase=RollbackRecoveryPhase.workflow_events,
         )
 
-    def _register_success_recovery(self, job: JobRecord) -> None:
+    def _register_success_recovery(
+        self, job: JobRecord, *, final_result: FinalExecutionResult | None = None
+    ) -> None:
         register_rollback_recovery_callback(
             self._session,
             lambda recovery_session_factory: _recover_succeeded_workflow_row_after_rollback(
                 recovery_session_factory,
                 job,
+                final_result=final_result,
+                config_registry=self._config_registry,
             ),
             phase=RollbackRecoveryPhase.workflow_rows,
+            critical=job.consumption_mode is JobConsumptionMode.reserved,
         )
         register_rollback_recovery_callback(
             self._session,
@@ -1141,7 +1213,14 @@ def _recover_failed_workflow_row_after_rollback(
         action_run_repository = ActionRunRepository(recovery_session)
         artifact_repository = ArtifactRepository(recovery_session)
 
-        existing = repository.get(record.id)
+        existing = repository.get(record.id, for_update=True)
+        if (
+            record.consumption_mode is JobConsumptionMode.reserved
+            and existing is not None
+            and existing.status in {JobStatus.succeeded, JobStatus.failed, JobStatus.canceled}
+        ):
+            release_execution(recovery_session, record.id)
+            return
         recovered_record = _rebuild_failed_workflow_record_for_recovery(
             record,
             action_run_repository=action_run_repository,
@@ -1159,6 +1238,9 @@ def _recover_failed_workflow_row_after_rollback(
                 f"job {record.id} cannot recover failed workflow from {existing.status.value}"
             )
 
+        if record.consumption_mode is JobConsumptionMode.reserved:
+            release_execution(recovery_session, record.id)
+
 
 def _recover_canceled_workflow_row_after_rollback(
     recovery_session_factory: Any,
@@ -1171,7 +1253,14 @@ def _recover_canceled_workflow_row_after_rollback(
         action_run_repository = ActionRunRepository(recovery_session)
         artifact_repository = ArtifactRepository(recovery_session)
 
-        existing = repository.get(record.id)
+        existing = repository.get(record.id, for_update=True)
+        if (
+            record.consumption_mode is JobConsumptionMode.reserved
+            and existing is not None
+            and existing.status in {JobStatus.succeeded, JobStatus.failed, JobStatus.canceled}
+        ):
+            release_execution(recovery_session, record.id)
+            return
         if existing is None or existing.status not in {JobStatus.running, JobStatus.canceled}:
             return
 
@@ -1197,6 +1286,9 @@ def _recover_canceled_workflow_row_after_rollback(
 
         del stored
 
+        if record.consumption_mode is JobConsumptionMode.reserved:
+            release_execution(recovery_session, record.id)
+
 
 def _recover_skipped_action_run_row_after_rollback(
     recovery_session_factory: Any,
@@ -1211,7 +1303,57 @@ def _recover_skipped_action_run_row_after_rollback(
 def _recover_succeeded_workflow_row_after_rollback(
     recovery_session_factory: Any,
     record: JobRecord,
+    *,
+    final_result: FinalExecutionResult | None = None,
+    config_registry: ConfigRegistry | None = None,
 ) -> None:
+    if record.consumption_mode is JobConsumptionMode.reserved:
+        if final_result is None or config_registry is None:
+            raise RuntimeError("metered recovery requires the validated final candidate")
+        try:
+            with transaction_boundary(recovery_session_factory) as recovery_session:
+                transition = finalize_success(
+                    recovery_session, record.id, final_result, config_registry=config_registry
+                )
+                if transition.applied and transition.reservation.state is ReservationState.released:
+                    # Expiry can win after execution rollback. Retain only recovered child
+                    # links for causal backfill; preserve the winning terminal decision.
+                    repository = JobRepository(recovery_session)
+                    terminal = repository.get(record.id)
+                    assert terminal is not None
+                    repository.update(
+                        _rebuild_failed_workflow_record_for_recovery(
+                            replace(
+                                terminal,
+                                metadata={
+                                    **dict(terminal.metadata),
+                                    "workflow_state": record.metadata.get("workflow_state"),
+                                },
+                            ),
+                            action_run_repository=ActionRunRepository(recovery_session),
+                            artifact_repository=ArtifactRepository(recovery_session),
+                            failed_step=None,
+                        )
+                    )
+        except Exception:
+            # A failed/unknown recovery is resolved from durable state again. Preserve child
+            # history and causal backfill even when publication itself cannot be recovered.
+            _recover_failed_workflow_row_after_rollback(
+                recovery_session_factory,
+                replace(
+                    record,
+                    status=JobStatus.failed,
+                    result_artifact_id=None,
+                    error_code=FINALIZATION_RECOVERY_ERROR,
+                    error_message_safe="Workflow finalization failed.",
+                ),
+                failed_step=None,
+            )
+            _recover_failed_workflow_events_after_rollback(
+                recovery_session_factory, record.id, error_code=FINALIZATION_RECOVERY_ERROR
+            )
+            raise
+        return
     with transaction_boundary(recovery_session_factory) as recovery_session:
         repository = JobRepository(recovery_session)
         artifact_repository = ArtifactRepository(recovery_session)
@@ -1453,6 +1595,15 @@ def _emit_recovered_workflow_events(
     record = repository.get(job_id)
     if record is None:
         return
+
+    expected_terminal = {
+        JobStatus.succeeded: "workflow.succeeded",
+        JobStatus.failed: "workflow.failed",
+        JobStatus.canceled: "workflow.canceled",
+    }.get(record.status)
+    if record.consumption_mode is JobConsumptionMode.reserved:
+        terminal_event_type = expected_terminal
+        terminal_error_code = record.error_code if record.status is JobStatus.failed else None
 
     workflow_started_event = event_log_repository.find_event(
         event_type="workflow.started",
