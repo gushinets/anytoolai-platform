@@ -705,6 +705,10 @@ def create_atom_prompt(
                 not runs
                 or AtomLabRunHistoryService.status(runs[0]) is not AtomLabRunStatus.succeeded
                 or runs[0].run.atom_id != atom.atom_id
+                or runs[0].run.input_schema_ref != atom.schema_refs.input.schema_ref
+                or runs[0].run.input_schema_version != atom.schema_refs.input.version
+                or runs[0].run.output_schema_ref != atom.schema_refs.output.schema_ref
+                or runs[0].run.output_schema_version != atom.schema_refs.output.version
                 or runs[0].run.prompt != payload.prompt
                 or (runs[0].run.prompt_source_ref or runs[0].run.prompt_ref) != payload.source_ref
             ):
@@ -772,7 +776,6 @@ def create_preset(
     session_factory: Annotated[Any, Depends(get_atom_lab_session_factory)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> AtomLabPresetCreatedResponse:
-    _validate_preset_payload(payload, registry, settings)
     now = utc_now()
     identity = AtomLabPresetIdentityRecord(
         tenant_id=settings.default_tenant_id,
@@ -791,6 +794,7 @@ def create_preset(
     )
     try:
         with transaction_boundary(session_factory) as session:
+            _validate_preset_payload(payload, registry, settings, AtomLabPromptRepository(session))
             stored = AtomLabPresetRepository(session).create(identity, version)
     except PresetSourceRunError as exc:
         raise _preset_source_invalid() from exc
@@ -850,7 +854,6 @@ def create_preset_version(
     session_factory: Annotated[Any, Depends(get_atom_lab_session_factory)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> AtomLabPresetCreatedResponse:
-    _validate_preset_payload(payload, registry, settings)
     version = _preset_version_record(
         preset_id,
         payload.base_version + 1,
@@ -861,6 +864,7 @@ def create_preset_version(
     )
     try:
         with transaction_boundary(session_factory) as session:
+            _validate_preset_payload(payload, registry, settings, AtomLabPromptRepository(session))
             stored = AtomLabPresetRepository(session).add_version(
                 version,
                 base_version=payload.base_version,
@@ -1023,6 +1027,7 @@ def _validate_preset_payload(
     payload: AtomLabPresetVersionRequest,
     registry: ConfigRegistry,
     settings: Settings,
+    prompt_repository: AtomLabPromptRepository,
 ) -> None:
     try:
         atom = get_atom_catalog_entry(registry, payload.atom_id.value)
@@ -1037,6 +1042,10 @@ def _validate_preset_payload(
         field_errors.append(_field_error("base_action_config_id"))
     if payload.prompt_ref != atom.prompt_ref:
         field_errors.append(_field_error("prompt_ref"))
+    if payload.prompt_source_ref is not None and not _prompt_source_exists(
+        payload.prompt_source_ref, atom, registry, prompt_repository, settings,
+    ):
+        field_errors.append(_field_error("prompt_source_ref"))
     if payload.schema_refs.model_dump(mode="json") != expected_refs:
         field_errors.append(_field_error("schema_refs"))
     if not is_addressable_atom_lab_model(payload.model_id):
@@ -1167,6 +1176,7 @@ def _preset_version_record(
         tenant_id=tenant_id,
         region=region,
         source_run_id=payload.source_run_id,
+        prompt_source_ref=payload.prompt_source_ref,
         created_at=created_at,
     )
 
@@ -1217,6 +1227,7 @@ def _preset_version_response(
         fixed_fields=list(stored.fixed_fields),
         example_input=stored.example_input,
         source_run_id=stored.source_run_id,
+        prompt_source_ref=stored.prompt_source_ref,
     )
 
 

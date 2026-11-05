@@ -463,6 +463,7 @@ function historyPresetConfiguration(detail) {
     },
     prompt: snapshot.prompt?.content,
     prompt_ref: snapshot.prompt?.ref,
+    prompt_source_ref: snapshot.prompt?.source_ref ?? null,
     model_id: snapshot.provider?.model_id,
     reasoning_effort: snapshot.provider?.reasoning_effort ?? null,
     example_input: snapshot.input,
@@ -493,6 +494,7 @@ export function parsePresetVersion(value, expectedPresetId = null, expectedVersi
     || new Set(value.fixed_fields).size !== value.fixed_fields.length
     || !isRecord(value.example_input)
     || !isNullableString(value.source_run_id)
+    || !(value.prompt_source_ref === undefined || isNullableString(value.prompt_source_ref))
     || !isNonEmptyString(value.created_at)
   ) return null;
   return value;
@@ -1962,6 +1964,7 @@ export function bootstrapAtomLab({
     input: cloneJson(configuration.example_input),
     prompt: configuration.prompt,
     prompt_ref: configuration.prompt_ref,
+    promptSourceRef: configuration.prompt_source_ref ?? null,
     modelId: configuration.model_id,
     reasoningEffort: configuration.reasoning_effort,
     sourceRunId: configuration.source_run_id,
@@ -2029,6 +2032,7 @@ export function bootstrapAtomLab({
       fixed_fields: selectedFixedFields(),
       example_input: cloneJson(source?.input ?? getDraftPayload(session)),
       source_run_id: source?.sourceRunId ?? session.sourceRunId,
+      prompt_source_ref: source ? source.promptSourceRef : session.promptSourceRef,
     };
   };
 
@@ -2045,6 +2049,7 @@ export function bootstrapAtomLab({
     fixed_fields: cloneJson(version.fixed_fields),
     example_input: cloneJson(version.example_input),
     source_run_id: version.source_run_id,
+    prompt_source_ref: version.prompt_source_ref ?? null,
   });
 
   const presetFingerprint = (payload) => JSON.stringify(payload);
@@ -2152,8 +2157,10 @@ export function bootstrapAtomLab({
     session.baselinePrompt = restored ? session.basePrompt : configuration.prompt;
     session.presetRef = presetRef;
     session.sourceRunId = sourceRunId;
+    session.promptSourceRef = configuration.prompt_source_ref ?? null;
     restoredHistoryDraft = restored;
     nodes["prompt-editor"].value = session.prompt;
+    renderPromptOptions();
     applyModelSelection(configuration.model_id, configuration.reasoning_effort);
     renderEditor();
     return true;
@@ -3394,6 +3401,8 @@ export function bootstrapAtomLab({
         throw new Error("Список промптов вернул некорректный ответ.");
       }
       draft.promptOptions = options;
+      draft.basePrompt = options.find((option) => option.ref === promptRefFor(draft))?.prompt
+        ?? draft.basePrompt;
       if (session !== draft) return;
       renderPromptOptions();
       nodes["save-prompt"].disabled = Boolean(draft.savingPrompt);
@@ -3859,6 +3868,7 @@ export function bootstrapAtomLab({
       input: cloneJson(configuration.input),
       prompt: configuration.prompt,
       prompt_ref: configuration.prompt_ref,
+      promptSourceRef: configuration.prompt_source_ref ?? null,
       modelId: configuration.model_id,
       reasoningEffort: configuration.reasoning_effort,
       sourceRunId: selectedHistoryDetail.run_id,

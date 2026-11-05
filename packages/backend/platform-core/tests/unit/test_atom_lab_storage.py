@@ -79,9 +79,10 @@ def test_saved_prompts_upgrade_after_execution_metering_and_preserve_scope_on_re
                 assert repository.list_for_atom(tenant_id=tenant, region=region, atom_id=atom) == []
         inspector = sa.inspect(engine)
         assert inspector.has_table("execution_reservations", schema="platform")
-        assert "prompt_source_ref" in {
-            column["name"] for column in inspector.get_columns("atom_lab_runs", schema="platform")
-        }
+        for table in ("atom_lab_runs", "atom_lab_preset_versions"):
+            assert "prompt_source_ref" in {
+                column["name"] for column in inspector.get_columns(table, schema="platform")
+            }
 
 
 @pytest.fixture
@@ -363,6 +364,7 @@ def test_preset_version_number_is_atomic_under_postgresql_concurrency(
         "prompt": "Initial prompt",
         "prompt_ref": "kernel_demo.extract_structured_fields.v1",
         "model_id": "openai/gpt-6-luna",
+        "prompt_source_ref": "product.extract.v1",
         "reasoning_effort": ReasoningEffort.high,
         "fixed_fields": ("fields",),
         "example_input": {"source_text": "fixture", "fields": [], "strict": False},
@@ -413,3 +415,4 @@ def test_preset_version_number_is_atomic_under_postgresql_concurrency(
     assert stored_identity is not None
     assert stored_identity.latest_version == SECOND_VERSION
     assert [version.version for version in versions] == [SECOND_VERSION, 1]
+    assert all(version.prompt_source_ref == "product.extract.v1" for version in versions)

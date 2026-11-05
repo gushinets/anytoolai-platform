@@ -509,6 +509,19 @@
             "title": "Prompt Ref",
             "type": "string"
           },
+          "prompt_source_ref": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9_.-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Source Ref"
+          },
           "reasoning_effort": {
             "anyOf": [
               {
@@ -677,6 +690,19 @@
             "title": "Prompt Ref",
             "type": "string"
           },
+          "prompt_source_ref": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9_.-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Source Ref"
+          },
           "reasoning_effort": {
             "anyOf": [
               {
@@ -778,6 +804,19 @@
             "minLength": 1,
             "title": "Prompt Ref",
             "type": "string"
+          },
+          "prompt_source_ref": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9_.-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Source Ref"
           },
           "reasoning_effort": {
             "anyOf": [

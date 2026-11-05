@@ -82,6 +82,7 @@ Definitions remain in repository configuration; these tables store runtime state
 | fixed_fields | JSON | no |
 | example_input | JSON | no |
 | source_run_id | VARCHAR(128) | yes |
+| prompt_source_ref | VARCHAR(128) | yes |
 | created_at | DATETIME | no |
 
 ## platform.atom_lab_presets

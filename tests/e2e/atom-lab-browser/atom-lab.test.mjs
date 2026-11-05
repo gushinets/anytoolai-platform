@@ -2199,6 +2199,9 @@ test("preset and history parsers fail closed around immutable and paginated cont
   };
   const detail = {...configuration, preset_id: "preset-1", version: 1, created_at: "2026-09-23T00:00:00Z"};
   assert.deepEqual(parsePresetVersion(detail, "preset-1", 1), detail);
+  assert.ok(parsePresetVersion({...detail, prompt_source_ref: null}));
+  assert.ok(parsePresetVersion({...detail, prompt_source_ref: "product.prompt.v1"}));
+  assert.equal(parsePresetVersion({...detail, prompt_source_ref: {ref: "product.prompt.v1"}}), null);
   assert.equal(parsePresetVersion({...detail, atom_id: "A99"}, "preset-1", 1), null);
   assert.equal(parsePresetVersion({...detail, fixed_fields: ["fields", "fields"]}), null);
   assert.ok(parsePresetList({items: [{

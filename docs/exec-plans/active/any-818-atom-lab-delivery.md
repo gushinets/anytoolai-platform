@@ -47,6 +47,48 @@ cause four provider-boundary failures in the working folder; those pass in the c
 The unchanged deployment runner test also fails on the local Temp ACL before its selector
 assertion. No permissions or lock-safety rules were changed. Full required CI remains pending.
 
+## Independent review round 1
+
+Reviewer: GPT-6.1 Sol (`gpt-6.1-sol`), xhigh; reviewed head `b038fb055dabeb345b067d952214b2c6c4cca5cb`.
+All three findings were confirmed and repaired:
+
+- P1: update both current-head assertions to 0018; reflect the historical 0016 schema and assert
+  the exact 0016-to-0017 data transition before upgrading the disposable database to current head.
+- P2: retain prompt origin through history restoration, preset create/version/apply/export and
+  subsequent submissions. Optional preset `prompt_source_ref` is stored by migration 0018;
+  existing presets remain valid with null provenance. New writes validate the referenced prompt
+  against the current atom and tenant/region scope.
+- P2: a saved prompt's successful trial must match both input/output schema references and versions.
+  Tests also cover valid evidence and cross-tenant/cross-region rejection.
+
+Validation: doctor passed; 291 focused API/Core tests passed; all eight targeted PostgreSQL tests
+passed (the three reported migration regressions plus five Atom Lab migration/storage/concurrency
+tests). Canonical frontend-check passed, including 53 Node tests and 97 Chromium journeys.
+The added parser compatibility/negative assertions and three prompt-origin browser journeys also
+passed after the final test edits. Documentation validation and generated-document drift passed.
+All database checks use UUID-named disposable databases via the container's `/postgres` maintenance
+database; the acceptance application database was not migrated or stamped. No provider was called.
+
+The canonical PostgreSQL run completed with two failures and three teardown errors, all connection
+timeouts or unexpected connection closure. The affected cases were:
+
+- `test_failed_0016_migration_rolls_back_ddl_counters_and_version_then_retries` (failed while
+  seeding 0015, before exercising the migration).
+- `test_client_event_rejects_uppercase_mode_value` (connection closed during identity lookup).
+- Teardown of `test_paid_counter_constraints[values0]`,
+  `test_workflow_runner_output_mapping_passes_scenario_input_through_verbatim`, and
+  `test_unavailable_final_candidate_never_consumes_or_publishes[provenance]`.
+
+All five cases passed in a 12-test retry alongside the full targeted migration/Atom Lab PG set.
+The two existing POSIX-only SIGTERM tests were skipped on Windows. Three disposable databases
+left by failed teardowns were individually verified inactive and removed by exact UUID name.
+The broad PostgreSQL command remains a non-green local run; required GitHub CI must confirm it.
+Local diagnostics: `.quick-check-tmp/fix-round1-postgresql.log` and
+`.quick-check-tmp/fix-round1-pg-retry.log` (ignored test artifacts, not PR content).
+
+The next reviewers must inspect the same resulting commit: fresh GPT-6.1 Sol xhigh, then GPT-6 Sol
+xhigh (the user-approved replacement for unavailable GPT-5.6). Leave PR 259 open and do not merge.
+
 ## Publication
 
 Create a codex/any-818 branch, commit only the explicit feature file set, push and create a PR

@@ -47,6 +47,7 @@ from anytoolai_platform_core.workflows.repository import JobRepository
 from fastapi import FastAPI
 from psycopg.types.string import StrDumper
 from pydantic import ValidationError
+from test_atom_lab_presets import _version_payload
 
 from tests.support.sqlite_harness import build_sqlite_runtime_engine
 
@@ -265,6 +266,62 @@ def test_workbench_prompts_are_protected_atom_scoped_and_run_local(app: FastAPI)
             "ref": platform_ref, "version": 1, "base": run.base_prompt,
             "content": edited, "source_ref": saved_ref,
         }
+
+
+@pytest.mark.parametrize("saved_lab_prompt", [False, True])
+def test_prompt_origin_roundtrips_presets_export_and_run_history(app, saved_lab_prompt):
+    product_ref = "client_update_writer.reply_draft_compose_reply.v1"
+    atom = get_atom_catalog_entry(app.state.runtime.config_registry, "A07")
+    configuration = _version_payload(
+        atom_id=atom.atom_id, base_action_config_id=atom.base_action_config_id,
+        schema_refs=atom.schema_refs.model_dump(), prompt=atom.prompt, prompt_ref=atom.prompt_ref,
+        fixed_fields=[], example_input=atom.example_input,
+    )
+
+    async def roundtrip():
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test",
+            headers={"X-Atom-Lab-Access-Code": ACCESS_CODE},
+        ) as client:
+            source_ref = product_ref
+            if saved_lab_prompt:
+                saved = await client.post("/v1/atom-lab/atoms/A07/prompts", json={
+                    "name": "Saved origin", "prompt": configuration["prompt"],
+                    "source_ref": product_ref,
+                })
+                assert saved.status_code == HTTPStatus.CREATED, saved.text
+                source_ref = saved.json()["ref"]
+            payload = {**configuration, "prompt_source_ref": source_ref}
+            created = await client.post("/v1/atom-lab/presets", json=payload)
+            assert created.status_code == HTTPStatus.CREATED, created.text
+            preset_id = created.json()["preset_id"]
+            path = f"/v1/atom-lab/presets/{preset_id}/versions"
+            exported = await client.get(f"{path}/1/export")
+            assert exported.status_code == HTTPStatus.OK, exported.text
+            assert exported.json()["configuration"] == {**payload, "source_run_id": None}
+            updated = await client.post(path, json={
+                **exported.json()["configuration"], "base_version": 1,
+            })
+            assert updated.status_code == HTTPStatus.CREATED, updated.text
+            restored = await client.get(f"{path}/2")
+            assert restored.status_code == HTTPStatus.OK, restored.text
+            restored = restored.json()
+            assert restored["prompt_source_ref"] == source_ref
+            accepted = await client.post("/v1/atom-lab/runs", json=_payload(
+                "A07", prompt=restored["prompt"], prompt_source_ref=restored["prompt_source_ref"],
+                preset_ref={"preset_id": preset_id, "version": 2},
+            ), headers={"Idempotency-Key": "preset-origin"})
+            assert accepted.status_code == HTTPStatus.ACCEPTED, accepted.text
+            history = await client.get(f"/v1/atom-lab/runs/{accepted.json()['run_id']}")
+            assert history.status_code == HTTPStatus.OK, history.text
+            assert history.json()["snapshot"]["prompt"]["source_ref"] == source_ref
+            invalid = await client.post("/v1/atom-lab/presets", json={
+                **payload, "prompt_source_ref": "kernel_demo.extract_structured_fields.v1",
+            })
+            assert invalid.status_code == HTTPStatus.UNPROCESSABLE_ENTITY, invalid.text
+            assert invalid.json()["error"]["field_errors"][0]["path"] == "prompt_source_ref"
+
+    asyncio.run(roundtrip())
 
 
 @pytest.mark.parametrize("atom_id", list(INPUTS))
