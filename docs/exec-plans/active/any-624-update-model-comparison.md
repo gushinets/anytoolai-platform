@@ -7,8 +7,8 @@
 - Created: 2026-11-03
 - Last updated: 2026-11-05
 - Review date: 2026-11-05
-- Next action: owner review of the PR; SonarCloud follow-up is verified
-- Blocker: none for this follow-up; SonarCloud and local regression checks pass
+- Next action: owner review of the validated P1/P2 fixes and PR checks
+- Blocker: none in local validation; post-push PR checks still need verification
 
 ## Goal and scope
 
@@ -758,3 +758,55 @@ sudo changes. Original accepted live inputs, outputs, manifests and agent observ
 byte-identical; no paid provider requests or prompt/model changes. The source fix is pushed;
 this final verification record is documentation-only. Remaining PR CI is independent of the
 confirmed SonarCloud result; no merge or production deployment was performed.
+
+### Review round 1 — P1/P2 implementation authorized
+
+User explicitly requested fixing both findings, adding tests, then commit and push. Both inline
+comments and replies were reread. Reproduction on e2dc93a7 confirmed cross-series PASS with
+mismatched suites/prompts, duplicate or unplanned configurations, and stale router restoration
+on resume. The accepted main/variants data remains consistent: one planned sol/medium series
+per report, common frozen prompt and 270 intact hash-bound human PASS.
+
+Implementation plan:
+1. Load one manifest snapshot for a report and validate a canonical experiment contract before
+   processing results: matching actual suite hashes/prompt revisions, unique planned model/effort
+   pairs, no ambiguous or empty configuration matrix. Keep missing pairs PENDING. Compute the
+   overall result from that validated snapshot, never a last-series suite or a second disk read.
+2. On resume compare the saved original_router mapping with the live entry snapshot as part of
+   manifest validation, before writes/restarts/provider calls. Keep the actual entry text as the
+   restoration target. Existing exception/orphan cleanup and semantic YAML equivalence remain.
+3. Add isolated regressions for inconsistent/consistent experiments and resume drift/stability,
+   prove the failures before implementation, then run focused tests and quick-check. Recompute
+   copies of the accepted reports without changing raw evidence/verdicts or making paid calls.
+4. Commit/push the scoped patch on feature/ANY-624 and verify remote checks for the exact revision.
+   No GitHub comment, review submission or thread resolution is authorized by this request.
+
+Expected load remains one operator/collector on an isolated local evaluation stack; this change
+does not introduce a concurrent-writer protocol, runtime defaults or product prompt changes.
+
+### Review round 1 implementation and validation completed
+
+P1: report generation reads manifests once and validates their experiment contract before
+processing runs or writing output. Suite hashes must match the actual suites and each other;
+prompt revisions must match; planned model/effort pairs must be unique and nonempty, observed
+pairs must be planned and unique. Missing planned pairs remain PENDING. The canonical suite
+and observed pairs flow from this preflight into aggregation; the last manifest is no longer
+the experiment plan. Corrupt experiments raise before overwriting prior reports or verdicts.
+
+P2: resume includes original_router in the manifest-versus-live comparison, before changes.
+The finally block retains the actual entry router text instead of reconstructing a historical
+baseline from the saved manifest. Semantic YAML equivalence permits formatting/comment-only
+changes while preserving the current text on restoration; model or timeout drift aborts without
+a write, restart or browser submission. Existing orphan/exception cleanup remains intact.
+
+Regression cases failed on the previous implementation and pass after the fix. Added 17 cases;
+145 focused Proposal/Update tests pass. Canonical quick-check exits zero: 3,123 passed, 12 standard
+skips and 628 deselected. Config, architecture, documentation and generated-doc checks pass.
+Ruff passes all three changed Python files, and whitespace checks pass. The isolated broad-check
+environment performs real sudo-to-nobody uid 65534; no host policy changes or permission-test skip.
+
+Recomputed separate copies of the accepted main and variant reports with the new code: unchanged
+240/240 and 30/30 human PASS, identical summary values. Original reports, raw evidence and verdicts
+remain hash-identical; no provider calls or product prompt/model changes. Commit and normal push
+of these four scoped files are explicitly authorized. Remote results will be checked for the
+published SHA; inline comments/reviews/threads are not modified without separate permission.

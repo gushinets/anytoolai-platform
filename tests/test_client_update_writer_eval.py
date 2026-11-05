@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import json
 import sys
+from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -253,14 +254,11 @@ def test_empty_report_cannot_pass(tmp_path):
         report_module.summarize(tmp_path)
 
 
-def test_missing_configuration_keeps_overall_pending(tmp_path):
+def test_missing_configuration_keeps_overall_pending():
     suite = {"models": ["openai/gpt-6-luna"], "reasoning": ["medium", "high"]}
-    series = tmp_path / "luna-medium"
-    series.mkdir()
-    (series / "manifest.json").write_text(
-        json.dumps({"model": "openai/gpt-6-luna", "reasoning_effort": "medium"})
+    result = report_module.overall_summary(
+        {"luna-medium": {"status": "PASS"}}, suite, {("openai/gpt-6-luna", "medium")}
     )
-    result = report_module.overall_summary({"luna-medium": {"status": "PASS"}}, tmp_path, suite)
     assert result["status"] == "PENDING"
     assert result["missing_configurations"] == [
         {"model": "openai/gpt-6-luna", "reasoning_effort": "high"}
@@ -471,6 +469,260 @@ def test_collector_dispatches_offline_review_without_docker():
         eval_module.main(["review", "--reviewer", "Putilin", "--directory", "results"])
     offline.assert_called_once_with(["--reviewer", "Putilin", "--directory", "results"])
     collect.assert_not_called()
+
+
+def experiment_manifests():
+    suite = {
+        "cases": [
+            {
+                "id": "case",
+                "progress_notes": "Still in progress.",
+                "criteria": ["Preserves readiness."],
+            }
+        ],
+        "models": ["openai/gpt-6.1-sol"],
+        "reasoning": ["medium", "high"],
+        "repeats": 1,
+        "minimum_usable": 1,
+        "max_median_ui_ms": 60000,
+    }
+    return {
+        effort: {
+            "suite": deepcopy(suite),
+            "model": "openai/gpt-6.1-sol",
+            "reasoning_effort": effort,
+            "prompt_sha256": "fixed-prompt",
+        }
+        for effort in suite["reasoning"]
+    }
+
+
+def write_report_experiment(directory, manifests):
+    verdicts = []
+    for series, manifest in manifests.items():
+        manifest["suite_sha256"] = eval_module.digest(manifest["suite"])
+        run, verdict = reviewed_run()
+        run.update(
+            {field: manifest[field] for field in ("model", "reasoning_effort", "prompt_sha256")}
+        )
+        run["input"] = manifest["suite"]["cases"][0]
+        run.update(
+            {
+                "id": "case-1",
+                "case": "case",
+                "attempt": 1,
+                "origin": {"ui_latency_ms": 1000},
+                "provider_calls": [],
+            }
+        )
+        run["input_sha256"] = eval_module.digest(run["input"])
+        verdict.update({"series": series, "id": run["id"], **review_module.verdict_hashes(run)})
+        report_module.validate_runs(manifest, [run])
+        assert report_module.human_status(run, verdict) == ("PASS", False)
+        path = directory / series
+        path.mkdir()
+        (path / "manifest.json").write_text(json.dumps(manifest))
+        (path / "runs.jsonl").write_text(json.dumps(run) + "\n")
+        verdicts.append(verdict)
+    (directory / "verdicts.jsonl").write_text(
+        "".join(json.dumps(verdict) + "\n" for verdict in verdicts)
+    )
+
+
+@pytest.fixture
+def valid_report_runtime():
+    # These tests exercise experiment identity; browser-proof checks have their own tests.
+    with patch.object(
+        report_module,
+        "evidence_status",
+        return_value=("PENDING", ["human semantic review required"]),
+    ):
+        yield
+
+
+@pytest.mark.usefixtures("valid_report_runtime")
+@pytest.mark.parametrize(
+    "change",
+    [
+        "suite",
+        "prompt",
+        "duplicate",
+        "unplanned_model",
+        "unplanned_effort",
+        "duplicate_models",
+        "duplicate_efforts",
+        "empty_models",
+        "empty_efforts",
+    ],
+)
+def test_report_rejects_inconsistent_experiments_without_overwriting_reports(tmp_path, change):
+    manifests = experiment_manifests()
+    if change == "suite":
+        manifests["medium"]["suite"]["cases"][0]["progress_notes"] = "Different input."
+    elif change == "prompt":
+        manifests["medium"]["prompt_sha256"] = "different-prompt"
+    elif change == "duplicate":
+        for manifest in manifests.values():
+            manifest["suite"]["reasoning"] = ["medium"]
+            manifest["reasoning_effort"] = "medium"
+    elif change == "unplanned_model":
+        manifests["medium"]["model"] = "openai/unplanned"
+    elif change == "unplanned_effort":
+        manifests["medium"]["reasoning_effort"] = "unplanned"
+    else:
+        key = "models" if change.endswith("models") else "reasoning"
+        for manifest in manifests.values():
+            values = manifest["suite"][key]
+            manifest["suite"][key] = values + values if change.startswith("duplicate") else []
+    write_report_experiment(tmp_path, manifests)
+    reports = [tmp_path / name for name in ("summary.json", "report.html", "review-template.jsonl")]
+    for path in reports:
+        path.write_text("previous report")
+    verdicts = (tmp_path / "verdicts.jsonl").read_bytes()
+    with pytest.raises(ValueError):
+        report_module.summarize(tmp_path)
+    assert all(path.read_text() == "previous report" for path in reports)
+    assert (tmp_path / "verdicts.jsonl").read_bytes() == verdicts
+
+
+@pytest.mark.usefixtures("valid_report_runtime")
+@pytest.mark.parametrize("missing_high", [False, True])
+def test_report_accepts_one_consistent_experiment_and_keeps_missing_pairs_pending(
+    tmp_path, missing_high
+):
+    manifests = experiment_manifests()
+    if missing_high:
+        del manifests["high"]
+    write_report_experiment(tmp_path, manifests)
+    result = report_module.summarize(tmp_path)
+    assert result["status"] == ("PENDING" if missing_high else "PASS")
+    assert result["missing_configurations"] == (
+        [{"model": "openai/gpt-6.1-sol", "reasoning_effort": "high"}] if missing_high else []
+    )
+
+
+def test_report_rejects_a_suite_with_a_forged_matching_digest(tmp_path):
+    manifests = experiment_manifests()
+    write_report_experiment(tmp_path, manifests)
+    manifest = manifests["medium"]
+    manifest["suite"]["cases"][0]["progress_notes"] = "Changed after hashing."
+    (tmp_path / "medium/manifest.json").write_text(json.dumps(manifest))
+    with pytest.raises(ValueError, match="suite manifest digest mismatch"):
+        report_module.summarize(tmp_path)
+
+
+def resume_collection(tmp_path):
+    suite = json.loads(eval_module.FIXTURE.read_text())
+    baseline = {
+        "model_list": [
+            {
+                "litellm_params": {
+                    "model": "openai/gpt-6-luna",
+                    "reasoning_effort": "medium",
+                    "timeout": 60,
+                }
+            }
+        ]
+    }
+    prompt = "fixed prompt"
+    manifest = {
+        "suite_sha256": eval_module.digest(suite),
+        "model": "openai/gpt-6.1-sol",
+        "reasoning_effort": "medium",
+        "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
+        "original_router": baseline,
+    }
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest))
+    args = SimpleNamespace(
+        suite=eval_module.FIXTURE,
+        model=manifest["model"],
+        reasoning="medium",
+        repeats=None,
+        out=tmp_path,
+        resume=True,
+        project="local",
+        max_attempts=0,
+    )
+    return args, baseline, prompt
+
+
+@pytest.mark.parametrize(
+    "changed_field,value", [("model", "openai/gpt-6.1-terra"), ("timeout", 120)]
+)
+def test_resume_rejects_live_router_drift_before_writes_or_submissions(
+    tmp_path, changed_field, value
+):
+    args, baseline, prompt = resume_collection(tmp_path)
+    current = deepcopy(baseline)
+    current["model_list"][0]["litellm_params"][changed_field] = value
+    manifest_before = (tmp_path / "manifest.json").read_bytes()
+    with (
+        patch.object(
+            eval_module,
+            "_docker",
+            side_effect=lambda *a: prompt if a[-1].endswith(".md") else json.dumps(current),
+        ),
+        patch.object(eval_module, "_git_state", return_value={}),
+        patch.object(eval_module, "write_router") as write,
+        patch.object(eval_module.subprocess, "run") as browser,
+    ):
+        with pytest.raises(ValueError, match="resume manifest mismatch: original_router"):
+            eval_module.collect(args)
+        write.assert_not_called()
+        browser.assert_not_called()
+    assert (tmp_path / "manifest.json").read_bytes() == manifest_before
+    assert not (tmp_path / "router-restored.txt").exists()
+
+
+@pytest.mark.parametrize("reformat", [False, True])
+def test_resume_accepts_equivalent_baseline_and_restores_actual_entry_text(tmp_path, reformat):
+    args, baseline, prompt = resume_collection(tmp_path)
+    original = (
+        "# Current operator comment\n" + json.dumps(baseline, indent=2) + "\n"
+        if reformat
+        else eval_module.yaml.safe_dump(baseline)
+    )
+    with (
+        patch.object(
+            eval_module,
+            "_docker",
+            side_effect=lambda *a: prompt if a[-1].endswith(".md") else original,
+        ),
+        patch.object(eval_module, "_git_state", return_value={}),
+        patch.object(eval_module, "write_router") as write,
+        patch.object(eval_module.subprocess, "run") as browser,
+    ):
+        eval_module.collect(args)
+        browser.assert_not_called()
+    selected, restored = write.call_args_list
+    selected_params = eval_module.yaml.safe_load(selected.args[1])["model_list"][0][
+        "litellm_params"
+    ]
+    assert selected_params["timeout"] == baseline["model_list"][0]["litellm_params"]["timeout"]
+    assert "openai/gpt-6.1-sol" in selected.args[1]
+    assert restored.args == ("local", original)
+
+
+def test_resume_still_restores_entry_baseline_after_orphaned_attempt(tmp_path):
+    args, baseline, prompt = resume_collection(tmp_path)
+    args.max_attempts = 1
+    first_case = json.loads(args.suite.read_text())["cases"][0]["id"]
+    (tmp_path / f"{first_case}-1.zip.journal.json").write_text('{"phase":"started"}')
+    original = "# Current baseline\n" + json.dumps(baseline)
+    with (
+        patch.object(
+            eval_module,
+            "_docker",
+            side_effect=lambda *a: prompt if a[-1].endswith(".md") else original,
+        ),
+        patch.object(eval_module, "_git_state", return_value={}),
+        patch.object(eval_module, "write_router") as write,
+        patch.object(eval_module.subprocess, "run") as browser,
+        pytest.raises(RuntimeError, match="orphaned browser evidence"),
+    ):
+        eval_module.collect(args)
+    browser.assert_not_called()
+    assert write.call_args.args == ("local", original)
 
 
 def test_review_reasks_critical_error_after_resolving_unknown(tmp_path):

@@ -173,8 +173,9 @@ def collect(args: argparse.Namespace) -> None:
     manifest_path = args.out / "manifest.json"
     if manifest_path.exists():
         saved = json.loads(manifest_path.read_text())
-        original = yaml.safe_dump(saved["original_router"])
-        for field in ("suite_sha256", "model", "reasoning_effort", "prompt_sha256"):
+        for field in (
+            "suite_sha256", "model", "reasoning_effort", "prompt_sha256", "original_router"
+        ):
             if saved[field] != snapshot[field]:
                 raise ValueError(f"resume manifest mismatch: {field}")
     else:

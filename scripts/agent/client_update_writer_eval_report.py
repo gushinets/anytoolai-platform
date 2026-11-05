@@ -108,13 +108,35 @@ def render_run(series: str, run: dict, status: str, case: dict) -> str:
     )
 
 
-def overall_summary(summary: dict, directory: Path, suite: dict) -> dict:
+def validate_experiment(manifests: dict[str, dict]) -> tuple[dict, set[tuple[str, str]]]:
+    if not manifests:
+        raise ValueError("no experiment manifests found")
+    reference = next(iter(manifests.values()))
+    suite = reference["suite"]
+    suite_hash = digest(suite)
+    planned = {(model, effort) for model in suite["models"] for effort in suite["reasoning"]}
+    if not planned or len(planned) != len(suite["models"]) * len(suite["reasoning"]):
+        raise ValueError("empty or duplicate experiment configuration matrix")
+    observed: set[tuple[str, str]] = set()
+    for manifest in manifests.values():
+        if manifest["suite_sha256"] != digest(manifest["suite"]):
+            raise ValueError("suite manifest digest mismatch")
+        if manifest["suite_sha256"] != suite_hash:
+            raise ValueError("experiment suite mismatch")
+        if manifest["prompt_sha256"] != reference["prompt_sha256"]:
+            raise ValueError("experiment prompt mismatch")
+        pair = (manifest["model"], manifest["reasoning_effort"])
+        if pair not in planned:
+            raise ValueError("configuration outside experiment plan")
+        if pair in observed:
+            raise ValueError("duplicate experiment configuration")
+        observed.add(pair)
+    return suite, observed
+
+
+def overall_summary(summary: dict, suite: dict, observed: set[tuple[str, str]]) -> dict:
     if not summary:
         raise ValueError("no experiment manifests found")
-    observed = {
-        (json.loads(path.read_text())["model"], json.loads(path.read_text())["reasoning_effort"])
-        for path in directory.glob("*/manifest.json")
-    }
     missing = [
         {"model": model, "reasoning_effort": effort}
         for model in suite["models"]
@@ -164,15 +186,19 @@ def measured_metrics(runs: list[dict], diagnostics: list[dict], groups: dict) ->
 
 
 def summarize(directory: Path) -> dict:
+    manifests = {
+        path.parent.name: json.loads(path.read_text())
+        for path in sorted(directory.glob("*/manifest.json"))
+    }
+    suite, observed = validate_experiment(manifests)
     verdicts = {(row["series"], row["id"]): row for row in read_jsonl(directory / "verdicts.jsonl")}
     summary = {}
     template = []
     sections = []
-    for manifest_path in sorted(directory.glob("*/manifest.json")):
-        series = manifest_path.parent.name
-        manifest = json.loads(manifest_path.read_text())
-        runs = read_jsonl(manifest_path.parent / "runs.jsonl")
-        diagnostics = read_jsonl(manifest_path.parent / "diagnostics.jsonl")
+    for series, manifest in manifests.items():
+        series_directory = directory / series
+        runs = read_jsonl(series_directory / "runs.jsonl")
+        diagnostics = read_jsonl(series_directory / "diagnostics.jsonl")
         sections.extend(render_run(series, run, "DIAGNOSTIC", run["input"]) for run in diagnostics)
         validate_runs(manifest, runs)
         if len({row["id"] for row in runs}) != len(runs):
@@ -186,7 +212,7 @@ def summarize(directory: Path) -> dict:
             statuses = []
             critical = 0
             for run in group:
-                measured, problems = evidence_status(run, manifest_path.parent)
+                measured, problems = evidence_status(run, series_directory)
                 human, is_critical = human_status(run, verdicts.get((series, run["id"])))
                 status = "FAIL" if "FAIL" in (measured, human) else "PENDING"
                 verified = problems == ["human semantic review required"]
@@ -230,7 +256,7 @@ def summarize(directory: Path) -> dict:
         ):
             state = "FAIL"
         summary[series] = {"status": state, "groups": groups, **metrics}
-    result = overall_summary(summary, directory, manifest["suite"] if summary else {})
+    result = overall_summary(summary, suite, observed)
     (directory / "summary.json").write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
     (directory / "review-template.jsonl").write_text(
         "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in template)
