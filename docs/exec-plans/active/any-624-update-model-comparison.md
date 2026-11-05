@@ -7,8 +7,8 @@
 - Created: 2026-11-03
 - Last updated: 2026-11-05
 - Review date: 2026-11-05
-- Next action: obtain hash-bound human semantic confirmation for the 245 new final outputs
-- Blocker: final human acceptance pending; collection, evidence audit and full-check completed
+- Next action: none for implementation or acceptance; owner may close the issue
+- Blocker: none; final human acceptance, evidence audit, full-check and source commit completed
 
 ## Goal and scope
 
@@ -638,8 +638,29 @@ Their potentially affected criteria remain unknown rather than silently PASS. Th
 not automatically classified as critical defects; non-critical polish is deferred in line with
 the agreed iterative product-testing approach. No prompt tuning during the final series.
 
-Formal reports remain PENDING: 25 imported human PASS and 245 new outputs needing confirmation.
+At completion of collection, formal reports were PENDING: 25 imported human PASS and 245 new
+outputs needing confirmation.
 A complete reviewable report with all inputs/outputs/criteria, separate caveats, audit and successful
 full-check evidence is prepared. The earlier confirmation of 150 targeted outputs does not accept
 these new outputs. Requested a new human decision while proceeding with the authorized local
 commit. No production/default-model change, push, GitHub or Linear write.
+
+### Final human acceptance recorded
+
+Putilin explicitly instructed: "245 - пометь как все хорошо, ошибок нету, а вот 61 расскажи
+детальней". Recorded hash-bound PASS for all 245 new outputs, with named reviewer, UTC timestamp,
+full quotations, exact chat provenance and assistant-as-recorder attribution. The 61 outputs with
+agent caveats are a subset of these 245, not an additional queue. Earlier 25 accepted seed verdicts
+are unchanged. Reports now PASS: 240/240 main, 30/30 variants, no pending decisions or critical
+errors in the confirmed verdicts. Raw runs, manifests, frozen inputs and original agent observations
+remain byte-identical; mutable reports were backed up before acceptance. No additional provider
+calls or source/config/test edits for recording acceptance.
+
+The preserved 61 caveat rows cover overlapping themes: inferred next actions (49), explicit
+not-a-payment-request explanations (21), relative transcript-cutoff references (11), stronger
+operational-hold wording (2), and repeated price-source requests (2). These are historical agent
+observations, not 61 confirmed failures. Full outputs remain available with the accepted verdicts.
+
+Source commit c243cbe3 contains the verified implementation. Full-check passed before that commit;
+this follow-up changes only the acceptance record. No production/default-model change, push,
+GitHub or Linear write. Implementation and agreed final acceptance are complete for this iteration.
