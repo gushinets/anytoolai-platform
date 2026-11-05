@@ -2132,7 +2132,7 @@ export function bootstrapAtomLab({
     nodes["preset-state"].textContent = `${source}. ${changed ? "Есть несохранённый черновик." : unchanged}${
       !presetSourceOverride && session.promptSourceNeedsValidation
         ? " Проверка источника ещё не завершена. Повторить загрузку можно во вкладке «Промпт»."
-        : !presetSourceOverride && session.promptSourceDetached
+        : (presetSourceOverride ?? session).promptSourceDetached
           ? " Исторический источник недоступен. Текст промпта сохранён." : ""
     }`;
     nodes["save-preset"].textContent = selectedPresetVersion ? "Сохранить новую версию" : "Сохранить новый";
@@ -2159,7 +2159,7 @@ export function bootstrapAtomLab({
     if (!option) nodes["model-catalog-warning"].textContent = "Сохранённая модель недоступна. Выберите доступную модель перед запуском.";
   };
 
-  const applyConfigurationToEditor = (configuration, {presetRef = null, sourceRunId = null, restored = false, adapted = false} = {}) => {
+  const applyConfigurationToEditor = (configuration, {presetRef = null, sourceRunId = null, restored = false} = {}) => {
     const atom = catalog.find((item) => item.atom_id === configuration.atom_id);
     if (!atom) return false;
     selectAtom(atom, {force: true, preservePreset: true});
@@ -2170,7 +2170,7 @@ export function bootstrapAtomLab({
     session.presetRef = presetRef;
     session.sourceRunId = sourceRunId;
     session.promptSourceRef = configuration.prompt_source_ref ?? null;
-    session.promptSourceNeedsValidation = adapted && session.promptSourceRef !== null;
+    session.promptSourceNeedsValidation = session.promptSourceRef !== null;
     restoredHistoryDraft = restored;
     nodes["prompt-editor"].value = session.prompt;
     renderPromptOptions();
@@ -3355,6 +3355,21 @@ export function bootstrapAtomLab({
     && isNullableString(option.source_ref)
     && isNullableString(option.source_run_id);
 
+  const fetchPromptOptions = async (draft) => {
+    const options = await protectedJson(promptUrl(draft));
+    if (!Array.isArray(options) || !options.every(validPromptOption)
+      || !options.some((option) => option.ref === draft.atom.prompt_ref)) {
+      throw new Error("Список промптов вернул некорректный ответ.");
+    }
+    return options;
+  };
+
+  const reconcilePromptSource = (draft, options) => {
+    draft.promptSourceDetached = !options.some((option) => option.ref === draft.promptSourceRef);
+    if (draft.promptSourceDetached) draft.promptSourceRef = null;
+    draft.promptSourceNeedsValidation = false;
+  };
+
   const matchesDraftSnapshot = (snapshot) => {
     const model = selectedModelOption()?.modelId;
     if (!model || session.jsonError || session.inputErrors.size > 0) return false;
@@ -3421,25 +3436,21 @@ export function bootstrapAtomLab({
     nodes["retry-prompts"].hidden = true;
     nodes["prompt-load-status"].textContent = "Загрузка промптов…";
     try {
-      const options = await protectedJson(promptUrl(draft));
-      if (!Array.isArray(options) || !options.every(validPromptOption)
-        || !options.some((option) => option.ref === draft.atom.prompt_ref)) {
-        throw new Error("Список промптов вернул некорректный ответ.");
-      }
+      const options = await fetchPromptOptions(draft);
       draft.promptOptions = options;
       const reconcileSource = draft.promptSourceNeedsValidation;
-      if (reconcileSource) {
-        draft.promptSourceDetached = !options.some((option) => option.ref === draft.promptSourceRef);
-        if (draft.promptSourceDetached) draft.promptSourceRef = null;
-        draft.promptSourceNeedsValidation = false;
-      }
+      if (reconcileSource) reconcilePromptSource(draft, options);
       draft.basePrompt = options.find((option) => option.ref === promptRefFor(draft))?.prompt
         ?? draft.basePrompt;
       if (session !== draft) return;
       renderPromptOptions();
       nodes["save-prompt"].disabled = Boolean(draft.savingPrompt);
       nodes["prompt-load-status"].textContent = "";
-      if (reconcileSource) updateDraftState();
+      if (reconcileSource) {
+        updateRunButton();
+        updatePresetEditorDisabled();
+        if (presetEditorActive) renderPresetState();
+      }
     } catch (error) {
       if (session !== draft) return;
       nodes["prompt-load-status"].textContent = error.message;
@@ -3766,7 +3777,7 @@ export function bootstrapAtomLab({
     if (hasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return;
     const historical = cloneJson(selectedPresetVersion);
     const atom = catalog.find((item) => item.atom_id === historical.atom_id);
-    if (!atom || !applyConfigurationToEditor(historical, {adapted: true})) {
+    if (!atom || !applyConfigurationToEditor(historical)) {
       setPresetError("Историческую версию нельзя адаптировать автоматически.");
       return;
     }
@@ -3876,7 +3887,6 @@ export function bootstrapAtomLab({
       presetRef: restoredPresetRef,
       sourceRunId: compatible ? selectedHistoryDetail.run_id : null,
       restored: true,
-      adapted: !compatible,
     })) {
       nodes["history-error"].textContent = "Исторический снимок нельзя восстановить автоматически.";
       return;
@@ -3888,8 +3898,8 @@ export function bootstrapAtomLab({
       ? "Снимок восстановлен как черновик. Для запуска нажмите «Запустить атом»."
       : "Снимок явно адаптирован к текущему контракту без ссылки на устаревший пресет.";
   });
-  nodes["save-history-preset"].addEventListener("click", () => {
-    if (!selectedHistoryDetail || historyOpenInFlight) return;
+  nodes["save-history-preset"].addEventListener("click", async () => {
+    if (!selectedHistoryDetail || !selectedHistoryCompatible || historyOpenInFlight) return;
     if (hasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return;
     const configuration = historyConfiguration(selectedHistoryDetail);
     const atom = catalog.find((item) => item.atom_id === configuration.atom_id);
@@ -3897,7 +3907,7 @@ export function bootstrapAtomLab({
       nodes["history-error"].textContent = "Исторический снимок нельзя сохранить как пресет автоматически.";
       return;
     }
-    startNewPreset({fromHistory: {
+    const source = {
       atom,
       base_action_config_id: configuration.base_action_config_id,
       schema_refs: cloneJson(configuration.schema_refs),
@@ -3908,7 +3918,34 @@ export function bootstrapAtomLab({
       modelId: configuration.model_id,
       reasoningEffort: configuration.reasoning_effort,
       sourceRunId: selectedHistoryDetail.run_id,
-    }, clearSessionPreset: false});
+    };
+    if (source.promptSourceRef !== null) {
+      const ownerSession = session;
+      const ownerDetail = selectedHistoryDetail;
+      const generation = ++historyOpenGeneration;
+      const listGeneration = historyListLoadGeneration;
+      const isCurrent = () => !destroyed && generation === historyOpenGeneration
+        && listGeneration === historyListLoadGeneration && session === ownerSession
+        && selectedHistoryDetail === ownerDetail && !nodes["history-panel"].hidden;
+      historyOpenInFlight = true;
+      updateHistoryControls();
+      nodes["history-error"].textContent = "Проверка источника промпта…";
+      try {
+        const options = await fetchPromptOptions(source);
+        if (!isCurrent()) return;
+        reconcilePromptSource(source, options);
+        nodes["history-error"].textContent = "";
+      } catch (error) {
+        if (isCurrent()) nodes["history-error"].textContent = `${error.message} Повторите сохранение пресета из истории.`;
+        return;
+      } finally {
+        if (generation === historyOpenGeneration) {
+          historyOpenInFlight = false;
+          updateHistoryControls();
+        }
+      }
+    }
+    startNewPreset({fromHistory: source, clearSessionPreset: false});
     showLibrary("presets");
     nodes.status.textContent = "Подготовлен пресет из выбранного снимка истории.";
   });

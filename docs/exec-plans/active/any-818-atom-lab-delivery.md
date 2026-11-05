@@ -152,6 +152,40 @@ Backend and PostgreSQL checks are not repeated for this UI-only repair. The acce
 stays untouched and no provider is called. Fresh entire-PR review of the resulting commit remains
 required before the second-model review; do not merge.
 
+## Independent review round 4
+
+Reviewer: GPT-6.1 Sol (`gpt-6.1-sol`), xhigh; reviewed all 42 PR files at head
+`d0838474fd3d536435e767bc43665e4b1adacaf7` and found one P2: compatible preset/history
+restores and direct history-to-preset saves retain retired product prompt origins because
+source reconciliation was restricted to explicit contract adaptation.
+
+Repair: check every restored editor source independently of schema compatibility, using the
+existing prompt-options parser and reconciliation. Direct history-to-preset creation checks a
+cloned source against the historical atom before opening the preset draft. Failed checks keep
+the history action retryable; session, selection, list and view ownership checks discard stale
+results. Preserve historical text, immutable snapshots, available origins, unrelated current
+drafts and saved-version success feedback. Backend source validation remains strict.
+
+Six new Chromium regressions first failed on the reviewed source. They cover compatible
+preset/history restores with retired product v1 replaced by v2 and with available sources, plus
+direct history saves with both origins. Delayed requests, 503/malformed-list recovery, blocked
+writes, stale navigation, unchanged snapshots, and another atom's input/prompt/origin are checked.
+The 12 focused new/existing origin and adaptation journeys passed. An existing direct-history
+fixture was updated to return its valid origin for the newly required prompt-options read; that
+journey also passed.
+
+Validation: `python scripts/agent/runner.py frontend-check` passed, including lint, typecheck,
+all 53 Atom Lab Node tests, all 110 Chromium journeys, generated API-contract drift and builds.
+Doctor, `validate-docs`, `generate-docs --check` and `git diff --check` passed. Generated docs use
+the managed `.quick-check-venv`; host Chromium and Temp access require the same sandbox escalation
+as earlier rounds. Frontend log: `.quick-check-tmp/fix-round4-frontend-final.log` (ignored diagnostic).
+
+The parent confirmed every required GitHub check passed on the reviewed prior head `d0838474`,
+including full-check, Windows baseline, PostgreSQL, atoms-proof and production Compose smoke.
+No backend or PostgreSQL checks are repeated for this UI-only repair. The acceptance database
+stays untouched and no provider is called. Fresh entire-PR review of the resulting commit remains
+required before the second-model review; do not merge.
+
 ## Publication
 
 Create a codex/any-818 branch, commit only the explicit feature file set, push and create a PR
