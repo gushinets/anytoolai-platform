@@ -536,13 +536,15 @@ def _request(url: str, *, payload: dict | None = None, method: str = "GET") -> d
 PROMPTS = Path("packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/proposal_ai/prompts")
 
 
-def _validate_compose_project(project: str) -> None:
-    if re.fullmatch(r"[a-z0-9][a-z0-9_-]*", project) is None:
+def _parse_compose_project(project: str) -> str:
+    match = re.fullmatch(r"[a-z0-9][a-z0-9_-]*", project)
+    if match is None:
         raise ValueError("invalid Compose project name")
+    return match.group(0)
 
 
 def _docker(project: str, service: str, *command: str) -> str:
-    _validate_compose_project(project)
+    project = _parse_compose_project(project)
     return subprocess.run(
         ["docker", "exec", "--", f"{project}-{service}-1", *command],
         check=True, capture_output=True, text=True

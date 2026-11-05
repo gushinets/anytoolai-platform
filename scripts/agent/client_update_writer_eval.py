@@ -29,7 +29,7 @@ import yaml
 from proposal_ai_eval import (
     _docker,
     _git_state,
-    _validate_compose_project,
+    _parse_compose_project,
     evidence_problems,
     read_jsonl,
 )
@@ -111,7 +111,7 @@ def evidence_status(record: dict, directory: Path) -> tuple[EvaluationStatus, li
 
 
 def write_router(project: str, content: str) -> None:
-    _validate_compose_project(project)
+    project = _parse_compose_project(project)
     container = f"{project}-platform-worker-1"
     subprocess.run(
         [

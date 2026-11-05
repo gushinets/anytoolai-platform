@@ -717,3 +717,29 @@ remain unverified until the updated revision is published and SonarCloud reanaly
 User subsequently explicitly requested "commit and push" for this validated follow-up. Commit
 the five scoped files on feature/ANY-624 and push normally to origin; do not force-push. Remote
 SonarCloud results remain pending until the new revision is analyzed.
+
+### SonarCloud reanalysis of 5ed72a35 — parser boundary follow-up
+
+Reanalysis at 2026-11-05 13:08:32 UTC covers exactly 5ed72a35, so the failure is not stale.
+All three S8705 flows remain: the original two write_router sinks and a newly reported shared
+_docker sink. The flow continues from argparse's project string through each Docker argument;
+the assertion-only custom validator does not break the analyzer's reported flow. Runtime
+negative tests still prove rejection of invalid names; this does not prove remote acceptance.
+No HTTP/LLM route was found, no command-execution exploit is claimed, and no rule suppression.
+
+Implementation plan (continuation of the authorized fix):
+1. Replace the void validator with one shared parser returning the full allowlisted regex match.
+   Construct Docker operands only from that returned value; preserve the exact valid project
+   spelling, rejection rules, -- separators, stdin and router lifecycle.
+2. Keep the existing negative/positive matrices and add a regression per consumer proving the
+   parsed return value, not the original input string, determines the container operand.
+3. Run focused tests and quick-check, commit/push under the user's explicit ongoing publication
+   request, and verify a fresh SonarCloud analysis of that exact commit before claiming resolution.
+   Product prompts and accepted live data remain unchanged. No GitHub comments or reviews.
+
+Implemented the parser boundary: the shared parser returns fullmatch.group(0), and both
+write_router and _docker consume that returned value. Both operand-flow regressions and the
+existing negative/positive matrix pass: 128 focused tests; no new Ruff findings on changed lines.
+Canonical quick-check is running while the small patch is published for exact-SHA SonarCloud
+verification, continuing the user's explicit fix, commit and push request. Remote resolution
+and the current broad-test result are not yet asserted.

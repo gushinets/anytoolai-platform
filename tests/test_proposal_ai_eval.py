@@ -59,6 +59,17 @@ def test_docker_accepts_compose_names_and_separates_options(project: str) -> Non
     )
 
 
+def test_docker_uses_the_parsed_project_operand() -> None:
+    with (
+        patch.object(proposal_ai_eval, "_parse_compose_project", return_value="parsed-project")
+        as parse,
+        patch.object(proposal_ai_eval.subprocess, "run") as run,
+    ):
+        proposal_ai_eval._docker("original-project", "postgres", "true")
+    parse.assert_called_once_with("original-project")
+    assert run.call_args.args[0] == ["docker", "exec", "--", "parsed-project-postgres-1", "true"]
+
+
 def violations(text: str, gaps: list | None = None, order: dict = EN_ORDER, profile: str = PROFILE) -> set[str]:
     checks = proposal_ai_eval.check_proposal(text, gaps or [], order, profile)
     return {name for name, value in checks.items() if value is True}

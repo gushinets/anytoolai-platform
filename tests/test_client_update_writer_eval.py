@@ -151,6 +151,20 @@ def test_write_router_still_rejects_readback_mismatch():
         eval_module.write_router("local", "model_list: []")
 
 
+def test_write_router_uses_the_parsed_project_for_write_restart_and_readback():
+    with (
+        patch.object(eval_module, "_parse_compose_project", return_value="parsed-project") as parse,
+        patch.object(eval_module.subprocess, "run") as run,
+        patch.object(eval_module, "_docker", return_value="content") as readback,
+    ):
+        eval_module.write_router("original-project", "content")
+    parse.assert_called_once_with("original-project")
+    write, restart = run.call_args_list
+    assert write.args[0][6] == "parsed-project-platform-worker-1"
+    assert restart.args[0] == ["docker", "restart", "--", "parsed-project-platform-worker-1"]
+    readback.assert_called_once_with("parsed-project", "platform-worker", "cat", eval_module.ROUTER)
+
+
 report_spec = importlib.util.spec_from_file_location(
     "client_update_writer_eval_report", ROOT / "scripts/agent/client_update_writer_eval_report.py"
 )
