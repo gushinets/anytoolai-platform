@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import importlib.util
+import shutil
+import subprocess
+import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -211,6 +215,8 @@ def test_bootstrap_syncs_root_environment_from_locked_uv_state(monkeypatch, tmp_
         [
             "/usr/local/bin/uv",
             "sync",
+            "--config-file",
+            str(quick_check.ROOT / "infra" / "python" / "uv-build.toml"),
             "--python",
             "/tmp/.quick-check-venv/bin/python",
             "--active",
@@ -223,6 +229,8 @@ def test_bootstrap_syncs_root_environment_from_locked_uv_state(monkeypatch, tmp_
             "/usr/local/bin/uv",
             "pip",
             "install",
+            "--config-file",
+            str(quick_check.ROOT / "infra" / "python" / "uv-build.toml"),
             "--python",
             "/tmp/.quick-check-venv/bin/python",
             "--no-deps",
@@ -233,6 +241,8 @@ def test_bootstrap_syncs_root_environment_from_locked_uv_state(monkeypatch, tmp_
             "/usr/local/bin/uv",
             "pip",
             "install",
+            "--config-file",
+            str(quick_check.ROOT / "infra" / "python" / "uv-build.toml"),
             "--python",
             "/tmp/.quick-check-venv/bin/python",
             "--no-deps",
@@ -389,3 +399,102 @@ def test_main_excludes_slow_tests_from_fast_pytest_path(monkeypatch) -> None:
         str(Path("/tmp/repo/.quick-check-tmp/pytest-runs/run-1234")),
     ]
     assert pytest_command[7:] == quick_check.PYTEST_TARGETS
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("project", [".", "apps/platform-api", "apps/platform-worker"])
+def test_locked_projects_reject_metadata_drift_without_changing_locks(tmp_path, project):
+
+    root = Path(__file__).resolve().parents[1]
+    tracked = subprocess.check_output(
+        ["git", "ls-files", "*pyproject.toml", "*uv.lock"], cwd=root, text=True
+    ).splitlines()
+    for name in tracked:
+        target = tmp_path / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(root / name, target)
+    locks = {path: path.read_bytes() for path in tmp_path.rglob("uv.lock")}
+    command = [
+        shutil.which("uv") or "uv", "lock", "--check",
+        "--project", str(tmp_path / project),
+        "--config-file", str(root / "infra/python/uv-build.toml"),
+        "--cache-dir", str(tmp_path / "cache"),
+    ]
+    good = subprocess.run(command, capture_output=True, text=True, check=False)
+    assert good.returncode == 0, good.stderr
+    metadata = tmp_path / project / "pyproject.toml"
+    metadata.write_text(metadata.read_text().replace('version = "0.1.0"', 'version = "0.1.1"'))
+    stale = subprocess.run(command, capture_output=True, text=True, check=False)
+    assert stale.returncode != 0
+    assert "lockfile" in stale.stderr.lower(), stale.stderr
+    assert all(path.read_bytes() == contents for path, contents in locks.items())
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("operation", ["build", "install", "sync"])
+def test_isolated_build_uses_shared_pins_with_empty_cache(tmp_path, operation):
+
+    root = Path(__file__).resolve().parents[1]
+    config = root / "infra/python/uv-build.toml"
+    pins = tomllib.loads(config.read_text())["build-constraint-dependencies"]
+    project = tmp_path / "probe"
+    project.mkdir()
+    (project / "pyproject.toml").write_text(
+        '[build-system]\nrequires = ["setuptools>=82", "wheel"]\n'
+        'build-backend = "setuptools.build_meta"\n'
+        '[project]\nname = "build-pin-probe"\nversion = "0.1.0"\n'
+    )
+    (project / "setup.py").write_text(
+        "from importlib.metadata import version\nfrom setuptools import setup\n"
+        + "\n".join(
+            f"assert version({name!r}) == {expected!r}"
+            for name, expected in (pin.split("==") for pin in pins)
+        ) + "\nsetup(py_modules=[])\n"
+    )
+    if operation == "sync":
+        with (project / "pyproject.toml").open("a") as metadata:
+            metadata.write("\n[tool.uv]\n" + config.read_text().splitlines()[0] + "\n")
+    uv = shutil.which("uv") or "uv"
+    if operation == "build":
+        command = [uv, "build", "--wheel", str(project)]
+    elif operation == "sync":
+        subprocess.run(
+            [uv, "lock", "--project", str(project), "--python", sys.executable,
+             "--config-file", str(config), "--cache-dir", str(tmp_path / "lock-cache")],
+            check=True,
+        )
+        command = [uv, "sync", "--locked", "--project", str(project)]
+    else:
+        venv = tmp_path / "venv"
+        subprocess.run([uv, "venv", "--python", sys.executable, str(venv)], check=True)
+        python = venv / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
+        command = [uv, "pip", "install", "--python", str(python), "--no-deps", "-e", str(project)]
+    result = subprocess.run(
+        [*command, "--config-file", str(config), "--cache-dir", str(tmp_path / "cache")],
+        capture_output=True, text=True, check=False,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_build_pin_changes_invalidate_bootstrap_fingerprint(tmp_path, monkeypatch):
+    quick_check = load_quick_check_module()
+    source = quick_check.ROOT / "infra/python/uv-build.toml"
+    assert source in quick_check.DEPENDENCY_FINGERPRINT_INPUTS
+    config = tmp_path / "uv-build.toml"
+    config.write_bytes(source.read_bytes())
+    monkeypatch.setattr(quick_check, "DEPENDENCY_FINGERPRINT_INPUTS", [config])
+    before = quick_check.dependency_fingerprint()
+    config.write_text(config.read_text().replace("82.0.1", "82.0.0"))
+    assert quick_check.dependency_fingerprint() != before
+
+
+def test_project_sync_build_constraints_match_shared_source():
+    root = Path(__file__).resolve().parents[1]
+    pins = tomllib.loads((root / "infra/python/uv-build.toml").read_text())[
+        "build-constraint-dependencies"
+    ]
+    locks = subprocess.check_output(["git", "ls-files", "*uv.lock"], cwd=root, text=True)
+    for lock in locks.splitlines():
+        project = root / Path(lock).with_name("pyproject.toml")
+        metadata = tomllib.loads(project.read_text())
+        assert metadata["tool"]["uv"]["build-constraint-dependencies"] == pins, project

@@ -18,7 +18,7 @@ inputs:
     description: >
       Set to "true" to run `quick-check --bootstrap-only` before dev-up. Required by any
       check-command that imports anytoolai_platform_core: that package is only ever installed by
-      quick-check's own .quick-check-venv bootstrap, never by `uv sync --frozen --group dev`
+      quick-check's own .quick-check-venv bootstrap, never by `uv sync --locked --group dev --config-file infra/python/uv-build.toml`
       alone (ANY-390). Without it the check-command step fails fast with ENV001.
     required: false
     default: "false"
@@ -69,21 +69,21 @@ runs:
     - uses: astral-sh/setup-uv@18d369b23da25a81e9458561248e1aafff6a70fa # v10.3.1
       with:
         version: ${{ inputs.uv-version }}
-    - run: uv sync --frozen --group dev
+    - run: uv sync --locked --group dev --config-file infra/python/uv-build.toml
       shell: bash
     - name: Bootstrap .quick-check-venv (ANY-390)
       if: inputs.bootstrap-quick-check == 'true'
-      run: uv run python scripts/agent/runner.py quick-check --bootstrap-only
+      run: uv run --no-sync python scripts/agent/runner.py quick-check --bootstrap-only
       shell: bash
     - name: Boot dev Compose stack (waits for platform-api healthy)
-      run: uv run python scripts/agent/runner.py dev-up
+      run: uv run --no-sync python scripts/agent/runner.py dev-up
       shell: bash
       env:
         ANYTOOLAI_READY_TIMEOUT: ${{ inputs.dev-up-ready-timeout }}
         OPENAI_API_KEY: ${{ inputs.openai-api-key }}
         ANYTOOLAI_LIVE_CANARY_TOKEN: ${{ inputs.live-canary-token }}
     - name: ${{ inputs.check-step-name }}
-      run: uv run python scripts/agent/runner.py ${{ inputs.check-command }}
+      run: uv run --no-sync python scripts/agent/runner.py ${{ inputs.check-command }}
       shell: bash
       env:
         OPENAI_API_KEY: ${{ inputs.openai-api-key }}
@@ -99,14 +99,14 @@ runs:
       if: failure()
       shell: bash
       run: |
-        PROJECT=$(uv run python -c "import sys; sys.path.insert(0, 'scripts/agent'); from runner import runtime_identity; print(runtime_identity().compose_project)")
+        PROJECT=$(uv run --no-sync python -c "import sys; sys.path.insert(0, 'scripts/agent'); from runner import runtime_identity; print(runtime_identity().compose_project)")
         docker compose --project-name "$PROJECT" \
           -f infra/compose/docker-compose.yml \
           -f infra/compose/docker-compose.override.yml \
           logs --no-color
     - name: Tear down dev stack
       if: always()
-      run: uv run python scripts/agent/runner.py dev-down
+      run: uv run --no-sync python scripts/agent/runner.py dev-down
       shell: bash
     # error, not ignore: write_evidence_report() (atoms_proof.py) always runs and never swallows
     # its own exceptions on every exit_code==0 path -- so a genuinely missing evidence file at

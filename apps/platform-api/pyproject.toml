@@ -42,6 +42,8 @@ anytoolai-platform-sdk = { path = "../../packages/backend/platform-sdk", editabl
 anytoolai-platform-actions = { path = "../../packages/backend/platform-actions", editable = true }
 
 [tool.uv]
+# Keep in sync with infra/python/uv-build.toml (checked by tests).
+build-constraint-dependencies = ["setuptools==82.0.1", "wheel==0.46.3", "packaging==26.2"]
 # litellm pins filelock<4.0 and 3.x has no fix for GHSA-v4x8-3wr5-3wq8 (CVE-2026-112940).
 # Remove once litellm allows filelock 4.x.
 override-dependencies = ["filelock>=4.2.1,<5"]
