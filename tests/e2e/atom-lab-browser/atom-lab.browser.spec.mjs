@@ -3810,6 +3810,7 @@ test("preset save exposes backend field errors without losing the draft", async 
           field_errors: [
             {path: "name", message: "Имя не может состоять только из пробелов."},
             {path: "fixed_fields.0", message: "Значение отсутствует в example_input."},
+            {path: "prompt", message: "Укажите текст промпта."},
           ],
         },
         request_id: "request-preset-fields",
@@ -3825,13 +3826,22 @@ test("preset save exposes backend field errors without losing the draft", async 
   await page.locator("#presets-button").click();
   await editPreset(page);
   await page.locator("#preset-name").fill("   ");
+  await showWorkbench(page);
+  await page.locator("#prompt-tab").click();
+  await page.locator("#prompt-editor").fill("   ");
   await editPreset(page);
   await page.locator("#save-preset").click();
 
+  await expect(page.locator("#presets-panel")).toBeVisible();
+  await expect(page.locator("#preset-error")).toBeVisible();
   await expect(page.locator("#preset-error")).toContainText("name: Имя не может состоять только из пробелов.");
   await expect(page.locator("#preset-error")).toContainText("fixed_fields.0: Значение отсутствует в example_input.");
+  await expect(page.locator("#preset-error")).toContainText("prompt: Укажите текст промпта.");
   await expect(page.locator("#preset-name")).toHaveValue("   ");
   await expect(page.locator("#save-preset")).toBeEnabled();
+  await showWorkbench(page);
+  await expect(page.locator("#prompt-editor")).toBeVisible();
+  await expect(page.locator("#prompt-editor")).toHaveValue("   ");
 });
 
 for (const path of ["preset", "history"]) {
@@ -4094,40 +4104,145 @@ test("successful preset write keeps its identity when readback fails", async ({p
   expect(createPosts).toBe(1);
 });
 
-test("preset save rejects the visible invalid editor value instead of storing the last accepted payload", async ({page}) => {
-  let presetPosts = 0;
-  await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
-    const request = route.request();
-    const {pathname} = new URL(request.url());
-    if (pathname === "/v1/atom-lab/presets" && request.method() === "GET") {
-      await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [], next_cursor: null})});
-      return;
+for (const existing of [false, true]) {
+  test(`${existing ? "versioned" : "new"} preset save reveals the invalid editor and preserves the draft through correction`, async ({page}) => {
+    const versions = existing ? [{
+      preset_id: "preset-validation", version: 1, created_at: "2026-09-24T06:00:00Z",
+      name: "Исходный пресет", description: "Сохранённая версия", atom_id: "A06",
+      base_action_config_id: A06.base_action_config_id, schema_refs: A06.schema_refs,
+      prompt: A06.prompt, prompt_ref: A06.prompt_ref, model_id: "openai/gpt-supported",
+      reasoning_effort: "high", fixed_fields: [], example_input: A06.example_input,
+      source_run_id: null,
+    }] : [];
+    const writes = [];
+    await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
+      const request = route.request();
+      const {pathname} = new URL(request.url());
+      if (pathname === "/v1/atom-lab/presets" && request.method() === "GET") {
+        const latest = versions.at(-1);
+        await route.fulfill({contentType: "application/json", body: JSON.stringify({items: latest ? [{
+          ...latest, latest_version: latest.version, updated_at: latest.created_at,
+        }] : [], next_cursor: null})});
+        return;
+      }
+      if (request.method() === "POST" && pathname.startsWith("/v1/atom-lab/presets")) {
+        writes.push({pathname, body: request.postDataJSON()});
+        const stored = {
+          ...writes.at(-1).body, preset_id: "preset-validation", version: versions.length + 1,
+          created_at: "2026-09-24T07:00:00Z",
+        };
+        versions.push(stored);
+        await route.fulfill({status: 201, contentType: "application/json", body: JSON.stringify(stored)});
+        return;
+      }
+      if (pathname === "/v1/atom-lab/presets/preset-validation/versions") {
+        await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [...versions].reverse(), next_cursor: null})});
+        return;
+      }
+      if (pathname.startsWith("/v1/atom-lab/presets/preset-validation/versions/")) {
+        await route.fulfill({contentType: "application/json", body: JSON.stringify(versions[Number(pathname.split("/").at(-1)) - 1])});
+        return;
+      }
+      await route.fallback();
+    });
+
+    await unlockAtom(page, "A06");
+    await page.locator("#presets-button").click();
+    if (existing) await page.locator("#preset-list button").click();
+    else {
+      await showWorkbench(page);
+      await page.locator("#fill-example").click();
     }
-    if (pathname === "/v1/atom-lab/presets" && request.method() === "POST") {
-      presetPosts += 1;
-      await route.abort();
-      return;
-    }
-    await route.fallback();
+    await editPreset(page);
+    await page.locator("#preset-name").fill("Невалидный черновик");
+    await page.locator("#preset-description").fill("Метаданные для исправления");
+    await page.locator("#fixed-fields").getByLabel("context", {exact: true}).check();
+    await showWorkbench(page);
+    await page.locator("#json-mode").click();
+    await page.locator("#json-editor").fill('{"context":');
+    await editPreset(page);
+    await page.locator("#save-preset").click();
+
+    await expect(page.locator("#request-response")).toBeVisible();
+    await expect(page.locator("#presets-panel")).toBeHidden();
+    await expect(page.locator("#status")).toBeVisible();
+    await expect(page.locator("#status")).toContainText("Исправьте входные данные");
+    await expect(page.locator("#json-editor")).toBeVisible();
+    await expect(page.locator("#json-editor")).toBeFocused();
+    await expect(page.locator("#json-editor")).toHaveValue('{"context":');
+    await expect(page.locator("#validation-errors")).toBeVisible();
+    await page.locator("#validation-errors").getByRole("button", {name: /JSON/}).click();
+    await expect(page.locator("#json-editor")).toBeFocused();
+    expect(writes).toHaveLength(0);
+
+    const corrected = {...A06.example_input, objective: "Исправленная цель"};
+    await page.locator("#json-editor").fill(JSON.stringify(corrected));
+    await expect(page.locator("#validation-errors")).toBeEmpty();
+    await editPreset(page);
+    await expect(page.locator("#preset-name")).toHaveValue("Невалидный черновик");
+    await expect(page.locator("#preset-description")).toHaveValue("Метаданные для исправления");
+    await expect(page.locator("#fixed-fields").getByLabel("context", {exact: true})).toBeChecked();
+    if (existing) await expect(page.locator("#preset-version-select")).toHaveValue("1");
+    await page.locator("#save-preset").click();
+    await expect(page.locator("#preset-state")).toContainText(`Сохранена неизменяемая версия ${existing ? 2 : 1}`);
+    expect(writes).toEqual([{
+      pathname: existing ? "/v1/atom-lab/presets/preset-validation/versions" : "/v1/atom-lab/presets",
+      body: expect.objectContaining({
+        name: "Невалидный черновик", description: "Метаданные для исправления",
+        example_input: corrected, fixed_fields: ["context"],
+        ...(existing ? {base_version: 1} : {}),
+      }),
+    }]);
+
+    await showWorkbench(page);
+    await page.locator("#json-mode").click();
+    await page.locator("#json-editor").fill("{}");
+    await expect(page.locator("#validation-errors")).toBeVisible();
+    await expect(page.locator("#validation-errors li")).toHaveCount(2);
+    await expect(page.locator("#validation-errors")).toContainText("Обязательное поле");
   });
+}
 
+test("an untouched empty draft stays quiet but returning edited input to empty keeps validation visible", async ({page}) => {
+  page.on("dialog", (dialog) => dialog.accept());
   await unlockAtom(page, "A06");
-  await showWorkbench(page);
-  await page.locator("#fill-example").click();
-  await page.locator("#presets-button").click();
-  await editPreset(page);
-  await page.locator("#preset-name").fill("Невалидный черновик");
-  await showWorkbench(page);
+  await expect(page.locator("#validation-errors")).toBeEmpty();
   await page.locator("#json-mode").click();
-  await showWorkbench(page);
-  await page.locator("#json-editor").fill('{"context":');
-  await editPreset(page);
-  await page.locator("#save-preset").click();
+  await expect(page.locator("#validation-errors")).toBeEmpty();
+  await page.locator("#json-editor").fill(JSON.stringify(A06.example_input));
+  await expect(page.locator("#validation-errors")).toBeEmpty();
+  await page.locator("#json-editor").fill("{}");
+  await expect(page.locator("#validation-errors li")).toHaveCount(2);
+  await expect(page.locator("#validation-errors")).toContainText("context");
+  await expect(page.locator("#validation-errors")).toContainText("objective");
+  await page.locator("#validation-errors").getByRole("button", {name: /context/}).click();
+  await expect(page.locator("#json-editor")).toBeFocused();
+  await page.locator("#form-mode").click();
+  await expect(page.locator("#validation-errors li")).toHaveCount(2);
+  await page.locator("#fill-example").click();
+  await expect(page.locator("#validation-errors")).toBeEmpty();
+  await page.getByRole("button", {name: /A05/}).click();
+  await expect(page.locator("#validation-errors")).toBeEmpty();
+});
 
-  await expect(page.locator("#preset-error")).toContainText("Исправьте входные данные");
-  await expect(page.locator("#json-editor")).toHaveValue('{"context":');
-  await expect(page.locator("#validation-errors")).toContainText("JSON");
-  expect(presetPosts).toBe(0);
+test("saving a preset from untouched empty input reveals and focuses its required field", async ({page}) => {
+  page.on("dialog", (dialog) => dialog.accept());
+  await page.route("http://atom-lab.test/v1/atom-lab/presets", (route) => route.fulfill({
+    contentType: "application/json", body: JSON.stringify({items: [], next_cursor: null}),
+  }));
+  await unlockAtom(page, "A06");
+  await expect(page.locator("#validation-errors")).toBeEmpty();
+  await editPreset(page);
+  await page.locator("#preset-name").fill("Пустой вход");
+  await page.locator("#save-preset").click();
+  await expect(page.locator("#request-response")).toBeVisible();
+  await expect(page.locator("#input-editor")).toBeVisible();
+  await expect(page.locator("#validation-errors li")).toHaveCount(2);
+  await expect(page.locator("#input-editor [aria-invalid='true']").first()).toBeFocused();
+  await page.locator("#fill-example").click();
+  await expect(page.locator("#validation-errors")).toBeEmpty();
+  await editPreset(page);
+  await expect(page.locator("#preset-name")).toHaveValue("Пустой вход");
 });
 
 test("fixed fields are selectable only while their values exist in the preset input", async ({page}) => {

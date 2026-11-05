@@ -121,6 +121,37 @@ transport-failure evidence above remains historical. No backend or migration cha
 PostgreSQL checks are not repeated; the acceptance database stays untouched and no provider is
 called. Fresh review of the resulting entire PR remains required before the second-model review.
 
+## Independent review round 3
+
+Reviewer: GPT-6.1 Sol (`gpt-6.1-sol`), xhigh; reviewed the entire PR at head
+`92393395c9f55743ba3de93059c4c7d1f8299a84` and found two UI validation defects:
+
+- P2: preset validation selected the input tab while the library still hid the editor and errors.
+- P3: the empty-input quiet state hid required-field feedback after a draft had been edited.
+
+Repair: explicit input/prompt tab navigation now reveals the laboratory. Failed preset input
+validation requests feedback, opens and focuses the current editor, and explains how to return
+to the preserved preset draft. JSON validation links target the visible JSON editor. The existing
+`validationRequested` flag latches actual draft changes, so returning to `{}` cannot hide errors;
+a new untouched session stays quiet. Ordinary preset/history rendering does not switch views.
+
+Three browser regressions first failed against the reviewed code at the hidden request panel or
+missing required errors. The repaired journeys cover new/versioned presets, visible errors and
+focus, correction and successful saves preserving name/description/fixed fields/base version,
+empty input after saved baselines and edits returned to the initial baseline, and an untouched
+empty draft whose Save must explicitly reveal validation. The existing backend-field-error
+journey also verifies that empty-prompt feedback stays visible in the preset panel and the text
+is retained when returning to the editor.
+
+Validation: doctor and canonical frontend-check passed, including lint, typecheck, all 53 Atom Lab
+Node tests, all 104 Chromium journeys, generated API-contract drift and frontend builds.
+Documentation validation and generated-document drift passed; the latter uses the managed
+`.quick-check-venv` because the system Python lacks `markdown_it` and the sandbox Temp ACL blocks
+cleanup. Frontend log: `.quick-check-tmp/fix-round3-frontend.log` (ignored diagnostic).
+Backend and PostgreSQL checks are not repeated for this UI-only repair. The acceptance database
+stays untouched and no provider is called. Fresh entire-PR review of the resulting commit remains
+required before the second-model review; do not merge.
+
 ## Publication
 
 Create a codex/any-818 branch, commit only the explicit feature file set, push and create a PR
