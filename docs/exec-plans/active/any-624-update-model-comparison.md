@@ -867,3 +867,39 @@ Compatibility: old collections without clean source identity cannot resume. Reco
 with missing ledger effort remain pending until independent evidence can be recovered. This
 change does not certify container images from a host Git SHA. Native Windows CI, live acceptance
 and publication were not rerun in this implementation step.
+
+### Review round 3 implementation authorized
+
+User approved the confirmed P2 fix and tests. Implement guarded start/result capture with
+HTTP status and parse/read errors, await the start journal task before finalization, and
+isolate screenshot, trace, browser close and final-journal actions. Emit a diagnostic failure
+record even when an artifact cannot be saved. In Python, retain a missing/unreadable trace as
+a failed attempt with no fabricated hash; preserve stop-on-error and router restoration.
+Exercise the unchanged driver through Node VM test doubles and feed its actual JSON into
+Python collect tests. Cover success/JSON-error controls, both non-JSON endpoints, body-read
+and artifact/close failures, persistence and no automatic retry. Run focused checks and
+canonical quick-check; no paid calls, acceptance-file rewrites or publication.
+
+### Review round 3 implementation validated
+
+The driver captures start/result HTTP status before reading JSON and records body/parse
+errors without aborting finalization. The asynchronous start journal is awaited before the
+final journal. Screenshot, trace, browser close and final-journal failures are isolated and
+reported; a diagnostic failure cannot become a successful attempt. Python records unreadable
+or absent traces with an explicit error and null hash, persists FAIL and stops collection.
+Unknown subprocess crashes/timeouts still propagate, restore the router and leave orphan
+evidence blocking a blind retry; no result or trace is fabricated.
+
+Added 27 regression cases. The real JS source is executed using Node VM browser test doubles,
+with real temporary artifact files; driver JSON feeds the real Python collection code. Tests
+cover JSON success/error controls, HTML/plain-text/body-read failures at both endpoints,
+screenshot/trace/close/journal failures, missing/unreadable traces, and crashes/timeouts.
+The previous driver passes both controls and exits 1 in all ten injected failure scenarios.
+Focused tests: 201 passed. Canonical quick-check: 3,179 passed, 12 standard skips, 628
+deselected, exit zero. Ruff, ESLint for both JS files, config/architecture/docs/generated-doc
+checks and whitespace checks pass. No dependencies added.
+
+No real browser sessions or paid provider calls were started; historical acceptance records
+were not rewritten. Changes remain local pending publication. Actual storage/process failures
+can still leave an incomplete journal when no complete result is recoverable; resume then
+continues to require explicit reconciliation rather than resubmitting an unknown attempt.

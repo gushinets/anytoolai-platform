@@ -185,6 +185,21 @@ def write_router(project: str, content: str) -> None:
         raise RuntimeError("worker router readback mismatch")
 
 
+def trace_origin(observed: dict, trace: Path) -> dict:
+    try:
+        trace_hash = hashlib.sha256(trace.read_bytes()).hexdigest()
+    except OSError as error:
+        trace_hash = None
+        observed["ui_outcome"] = "error"
+        observed["trace_error"] = str(error)
+    return {
+        "ui_outcome": observed["ui_outcome"],
+        "ui_latency_ms": observed["ui_latency_ms"],
+        "trace": trace.name,
+        "trace_sha256": trace_hash,
+    }
+
+
 def collect(args: argparse.Namespace) -> None:
     suite = json.loads(args.suite.read_text(encoding="utf-8"))
     validate_suite(suite)
@@ -254,6 +269,7 @@ def collect(args: argparse.Namespace) -> None:
                 timeout=DRIVER_TIMEOUT_SECONDS,
             )
             observed = json.loads(completed.stdout)
+            origin = trace_origin(observed, trace)
             (args.out / f"{run_id}.browser.json").write_text(completed.stdout, encoding="utf-8")
             record = {
                 **observed,
@@ -269,12 +285,7 @@ def collect(args: argparse.Namespace) -> None:
                 "prompt_sha256": snapshot["prompt_sha256"],
                 "git_sha": revision["git_sha"],
                 "provider_calls": provider_calls(args.project, observed["session_id"]),
-                "origin": {
-                    "ui_outcome": observed["ui_outcome"],
-                    "ui_latency_ms": observed["ui_latency_ms"],
-                    "trace": trace.name,
-                    "trace_sha256": hashlib.sha256(trace.read_bytes()).hexdigest(),
-                },
+                "origin": origin,
             }
             record["status"], record["review_needed"] = evidence_status(record, args.out)
             with (args.out / "runs.jsonl").open("a", encoding="utf-8") as stream:

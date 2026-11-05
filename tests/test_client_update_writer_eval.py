@@ -973,3 +973,120 @@ def test_resume_rejects_legacy_manifest_without_revision(tmp_path, missing):
     ):
         eval_module.collect(args)
     write.assert_not_called()
+
+
+DRIVER_FAILURES = [
+    "json-error", "html-start", "plain-start", "body-start",
+    "html-result", "plain-result", "body-result", "screenshot", "trace", "close", "journal",
+]
+
+
+def driver_result(spec, failure, run_process):
+    harness = ROOT / "tests/fixtures/client_update_writer_eval/driver_harness.mjs"
+    completed = run_process(
+        ["node", "--experimental-vm-modules", str(harness), str(eval_module.DRIVER)],
+        input=json.dumps({**spec, "failure": failure}),
+        encoding="utf-8", capture_output=True, check=True, timeout=20,
+    )
+    return json.loads(completed.stdout)
+
+
+@pytest.mark.parametrize("failure", ["success", *DRIVER_FAILURES])
+def test_live_driver_finalizes_each_attempt_independently(tmp_path, failure):
+    trace = tmp_path / "attempt.zip"
+    result = driver_result({
+        "trace": str(trace), "language": "en", "tone": "warm",
+        "progress_notes": "Done", "web_url": "http://web",
+    }, failure, eval_module.subprocess.run)
+    record, calls = result["record"], result["calls"]
+    assert record["ui_outcome"] == ("result" if failure == "success" else "error")
+    assert calls.count("submit") == 1
+    assert calls.count("screenshot") == calls.count("trace") == calls.count("close") == 1
+    assert calls[-1] == "complete"
+    assert trace.exists() == (failure != "trace")
+    if failure != "journal":
+        journal = json.loads(Path(str(trace) + ".journal.json").read_text(encoding="utf-8"))
+        assert journal == {**record, "phase": "complete"}
+    else:
+        assert "journal" in record["diagnostic_errors"]
+    if failure.startswith(("html-", "plain-", "body-")):
+        kind = failure.split("-")[1]
+        assert record[kind + "_status"] == (200 if failure.startswith("body-") else 502)
+        assert kind + "_response" in record["diagnostic_errors"]
+
+
+@pytest.mark.parametrize("failure", DRIVER_FAILURES)
+def test_driver_failures_are_persisted_and_stop_collection(tmp_path, failure):
+    args, baseline, prompt = resume_collection(tmp_path)
+    args.max_attempts = 2
+    args.web_url = "http://web"
+    state = {"router": json.dumps(baseline)}
+    run_process = eval_module.subprocess.run
+
+    def browser(_command, **kwargs):
+        result = driver_result(json.loads(kwargs["input"]), failure, run_process)
+        return SimpleNamespace(stdout=json.dumps(result["record"]))
+
+    with (
+        patch.object(eval_module, "_git_state", return_value={
+            "git_sha": "revision-A", "git_dirty": False,
+        }),
+        patch.object(eval_module, "_docker", side_effect=lambda *a:
+                     prompt if a[-1].endswith(".md") else state["router"]),
+        patch.object(eval_module, "write_router", side_effect=lambda _p, content:
+                     state.update(router=content)) as write,
+        patch.object(eval_module, "provider_calls", return_value=[]),
+        patch.object(eval_module.subprocess, "run", side_effect=browser) as submit,
+        pytest.raises(RuntimeError, match="UI failed; evidence retained"),
+    ):
+        eval_module.collect(args)
+    submit.assert_called_once()
+    assert write.call_args.args == ("local", json.dumps(baseline))
+    [run] = eval_module.read_jsonl(tmp_path / "runs.jsonl")
+    assert run["status"] == "FAIL"
+    assert run["origin"]["ui_outcome"] == "error"
+    assert (run["origin"]["trace_sha256"] is None) == (failure == "trace")
+    if failure == "trace":
+        assert run["trace_error"]
+
+
+@pytest.mark.parametrize("error", [FileNotFoundError, PermissionError])
+def test_unreadable_trace_fails_even_when_ui_reports_success(tmp_path, error):
+    observed = {"ui_outcome": "result", "ui_latency_ms": 1000}
+    with patch.object(Path, "read_bytes", side_effect=error("trace unavailable")):
+        origin = eval_module.trace_origin(observed, tmp_path / "attempt.zip")
+    assert observed["ui_outcome"] == origin["ui_outcome"] == "error"
+    assert origin["trace_sha256"] is None
+    assert observed["trace_error"] == "trace unavailable"
+
+
+@pytest.mark.parametrize("failure", [
+    eval_module.subprocess.CalledProcessError(1, ["node"]),
+    eval_module.subprocess.TimeoutExpired(["node"], 180),
+])
+def test_unknown_process_outcome_restores_router_and_blocks_blind_retry(tmp_path, failure):
+    args, baseline, prompt = resume_collection(tmp_path)
+    args.max_attempts = 2
+    args.web_url = "http://web"
+
+    def crash(_command, **kwargs):
+        trace = json.loads(kwargs["input"])["trace"]
+        Path(trace + ".journal.json").write_text('{"phase":"submitting"}', encoding="utf-8")
+        raise failure
+
+    with (
+        patch.object(eval_module, "_git_state", return_value={
+            "git_sha": "revision-A", "git_dirty": False,
+        }),
+        patch.object(eval_module, "_docker", side_effect=lambda *a:
+                     prompt if a[-1].endswith(".md") else json.dumps(baseline)),
+        patch.object(eval_module, "write_router") as write,
+        patch.object(eval_module.subprocess, "run", side_effect=crash) as submit,
+    ):
+        with pytest.raises(type(failure)):
+            eval_module.collect(args)
+        with pytest.raises(RuntimeError, match="orphaned browser evidence"):
+            eval_module.collect(args)
+    submit.assert_called_once()
+    assert write.call_args.args == ("local", json.dumps(baseline))
+    assert not (tmp_path / "runs.jsonl").exists()

@@ -8,22 +8,23 @@ const UI_TIMEOUT_MS = 120_000;
 const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({ locale: spec.language });
 const page = await context.newPage();
-let startResponse;
+const record = { ui_outcome: 'error', session_id: null, output: null };
+let startCapture = Promise.resolve();
 let resultResponse;
 page.on('response', response => {
   if (/\/scenarios\/client_update_writer\.update_v1\/start$/.test(response.url())) {
-    startResponse = response;
-    response.json().then(start => {
-      record.session_id = start.scenario_session_id ?? null;
-      writeFileSync(`${spec.trace}.journal.json`, JSON.stringify({ ...record, phase: 'started', start }));
-    }).catch(error => { record.journal_error = String(error); });
+    startCapture = capture('start_response', async () => {
+      record.start_status = response.status();
+      record.start = await response.json();
+      record.session_id = record.start.scenario_session_id ?? null;
+      writeFileSync(`${spec.trace}.journal.json`, JSON.stringify({ ...record, phase: 'started' }));
+    });
   }
   if (/\/v1\/results\//.test(response.url())) resultResponse = response;
 });
-const record = { ui_outcome: 'error', session_id: null, output: null };
 let submittedAt;
-await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
 try {
+  await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
   await page.goto(`${spec.web_url}/products/client_update_writer`);
   await page.locator('#ui-language').selectOption(spec.language);
   await page.locator('#client-update-writer-progress-notes').fill(spec.progress_notes);
@@ -47,22 +48,36 @@ try {
     record.error = await page.locator('[role="alert"]').allTextContents();
   }
 } catch (error) {
+  record.ui_outcome = 'error';
   record.error = String(error);
 } finally {
   record.ui_latency_ms ??= submittedAt === undefined ? 0 : performance.now() - submittedAt;
-  if (startResponse) {
-    record.start_status = startResponse.status();
-    record.start = await startResponse.json();
-    record.session_id = record.start.scenario_session_id ?? null;
-  }
+  await startCapture;
   if (resultResponse) {
-    record.result_status = resultResponse.status();
-    record.result = await resultResponse.json();
-    record.output = record.result.output ?? null;
+    await capture('result_response', async () => {
+      record.result_status = resultResponse.status();
+      record.result = await resultResponse.json();
+      record.output = record.result.output ?? null;
+    });
   }
-  await page.screenshot({ path: `${spec.trace}.png`, fullPage: true });
-  await context.tracing.stop({ path: spec.trace });
-  await browser.close();
+  await capture('screenshot', () => page.screenshot({ path: `${spec.trace}.png`, fullPage: true }));
+  await capture('trace', () => context.tracing.stop({ path: spec.trace }));
+  await capture('browser_close', () => browser.close());
 }
-writeFileSync(`${spec.trace}.journal.json`, JSON.stringify({ ...record, phase: 'complete' }));
+if (record.diagnostic_errors || record.start_status >= 400 || record.result_status >= 400) {
+  record.ui_outcome = 'error';
+}
+await capture('journal', () => {
+  writeFileSync(`${spec.trace}.journal.json`, JSON.stringify({ ...record, phase: 'complete' }));
+});
 process.stdout.write(JSON.stringify(record));
+
+async function capture(stage, action) {
+  try {
+    await action();
+  } catch (error) {
+    record.ui_outcome = 'error';
+    record.diagnostic_errors ??= {};
+    record.diagnostic_errors[stage] = String(error);
+  }
+}
