@@ -12,7 +12,7 @@ dependencies = [
     "anytoolai-platform-core",
     "anytoolai-platform-sdk",
     "anytoolai-freelancer-suite",
-    "uvicorn>=0.30",
+    "uvicorn>=0.54.0",
     "alembic>=1.13",
     "psycopg[binary]>=3.2",
     "anytoolai-platform-actions",
