@@ -96,6 +96,21 @@ Definitions remain in repository configuration; these tables store runtime state
 | created_at | DATETIME | no |
 | updated_at | DATETIME | no |
 
+## platform.atom_lab_prompts
+
+| Column | Type | Nullable |
+|---|---|---|
+| ref | VARCHAR(128) | no |
+| tenant_id | VARCHAR(128) | no |
+| region | VARCHAR(64) | no |
+| atom_id | VARCHAR(16) | no |
+| name | VARCHAR(80) | no |
+| prompt | TEXT | no |
+| source_ref | VARCHAR(128) | no |
+| schema_refs | JSON | no |
+| source_run_id | VARCHAR(128) | yes |
+| created_at | DATETIME | no |
+
 ## platform.atom_lab_runs
 
 | Column | Type | Nullable |
@@ -119,6 +134,7 @@ Definitions remain in repository configuration; these tables store runtime state
 | action_config_schema_version | INTEGER | no |
 | prompt_ref | VARCHAR(128) | no |
 | prompt_version | INTEGER | no |
+| prompt_source_ref | VARCHAR(128) | yes |
 | base_prompt | TEXT | no |
 | prompt | TEXT | no |
 | input_schema_ref | VARCHAR(128) | no |

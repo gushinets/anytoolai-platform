@@ -251,6 +251,7 @@ class AtomLabRunAdmissionRequest:
     idempotency_key: str
     preset_id: str | None = None
     preset_version: int | None = None
+    prompt_source_ref: str | None = None
 
 
 @dataclass(frozen=True)
@@ -278,6 +279,8 @@ def compute_atom_lab_request_hash(request: AtomLabRunAdmissionRequest) -> str:
             else {"preset_id": request.preset_id, "version": request.preset_version}
         ),
     }
+    if request.prompt_source_ref is not None:
+        canonical_request["prompt_source_ref"] = request.prompt_source_ref
     encoded = json.dumps(
         canonical_request,
         sort_keys=True,
@@ -413,6 +416,7 @@ class AtomLabRunService:
                 capability_provenance=request.capability_provenance,
                 preset_id=request.preset_id,
                 preset_version=request.preset_version,
+                prompt_source_ref=request.prompt_source_ref,
             ),
         )
         stored = self._run_repository.create(

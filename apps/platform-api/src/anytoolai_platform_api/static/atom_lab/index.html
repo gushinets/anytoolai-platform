@@ -10,13 +10,13 @@
   <body>
     <main class="page-shell">
       <header class="page-header">
-        <div>
-          <p class="eyebrow">Внутренний инструмент</p>
+        <div class="header-identity">
           <h1>Atom Lab</h1>
-          <p>Проверка контрактов и промптов атомов AnytoolAI.</p>
+          <span class="internal-label">Внутренний</span>
         </div>
         <nav aria-label="Разделы Atom Lab">
-          <button id="presets-button" type="button" disabled>Библиотека пресетов</button>
+          <button id="workbench-button" type="button" aria-current="page" disabled>Лаборатория</button>
+          <button id="presets-button" type="button" disabled>Пресеты</button>
           <button id="history-button" type="button" disabled>История запусков</button>
         </nav>
       </header>
@@ -30,38 +30,56 @@
       </section>
       <p id="status" role="status" aria-live="polite"></p>
       <section id="workspace" class="workspace" hidden>
-        <aside class="sidebar" aria-label="Выбор атома">
-          <h2>Атомы</h2>
+        <aside id="atom-sidebar" class="sidebar" aria-label="Выбор атома">
+          <h2>Атомы <span id="atom-count"></span></h2>
           <nav id="atom-navigation" aria-label="Каталог из 11 атомов"></nav>
         </aside>
         <div class="content-column">
           <section id="presets-panel" class="card library-panel" aria-labelledby="presets-title" hidden>
             <div class="panel-heading">
-              <div><p class="eyebrow">Общая библиотека</p><h2 id="presets-title">Пресеты</h2></div>
-              <button id="close-presets" type="button">Закрыть</button>
+              <div><h2 id="presets-title">Пресеты</h2><p class="help-text">Общая библиотека · все атомы</p></div>
+              <div class="library-actions">
+                <button id="new-preset" type="button">Новый пресет из черновика</button>
+                <button id="close-presets" class="quiet-action" type="button">В лабораторию</button>
+              </div>
             </div>
             <div class="library-grid">
               <section aria-labelledby="preset-list-title">
                 <h3 id="preset-list-title">Сохранённые пресеты</h3>
                 <div id="preset-list" class="item-list"></div>
+                <p id="preset-list-state" class="help-text" role="status"></p>
                 <button id="load-more-presets" type="button" hidden>Показать ещё</button>
               </section>
-              <section aria-labelledby="preset-editor-title">
-                <h3 id="preset-editor-title">Версия пресета</h3>
-                <p id="preset-state" class="draft-state" role="status"></p>
-                <label for="preset-name">Название</label>
-                <input id="preset-name" maxlength="256">
-                <label for="preset-description">Описание</label>
-                <textarea id="preset-description" rows="3" maxlength="4096"></textarea>
-                <fieldset><legend>Фиксированные поля верхнего уровня</legend><div id="fixed-fields" class="checkbox-list"></div></fieldset>
-                <label for="preset-version-select">Неизменяемая версия</label>
-                <select id="preset-version-select"></select>
-                <button id="load-more-versions" type="button" hidden>Показать более ранние версии</button>
-                <div class="button-row">
-                  <button id="new-preset" type="button">Новый пресет</button>
-                  <button id="save-preset" class="primary-action" type="button">Сохранить новый</button>
-                  <button id="export-preset" type="button" disabled>Экспорт версии</button>
+              <section class="preset-card" aria-label="Выбранный пресет">
+                <p id="preset-empty" class="library-empty">Выберите пресет, чтобы посмотреть его состав и версии, или создайте новый из текущего черновика.</p>
+                <div id="preset-heading" class="panel-heading" hidden>
+                  <div><p id="preset-context" class="help-text"></p><h3 id="preset-selected-name"></h3></div>
+                  <div class="preset-version-control">
+                    <label for="preset-version-select">Версия</label>
+                    <select id="preset-version-select"></select>
+                    <button id="load-more-versions" class="quiet-action" type="button" hidden>Показать более ранние версии</button>
+                    <button id="export-preset" class="quiet-action" type="button" disabled>Экспорт версии</button>
+                  </div>
                 </div>
+                <p id="preset-state" class="draft-state" role="status"></p>
+                <p id="preset-view-description" hidden></p>
+                <div id="preset-view-actions" class="library-actions" hidden>
+                  <button id="apply-preset" class="primary-action" type="button">Открыть в лаборатории</button>
+                  <button id="edit-preset" type="button">Новая версия</button>
+                </div>
+                <section id="preset-editor-form" class="preset-form" aria-labelledby="preset-editor-title" hidden>
+                  <h3 id="preset-editor-title">Новый пресет</h3>
+                  <p id="preset-source" class="help-text"></p>
+                  <label for="preset-name">Название</label>
+                  <input id="preset-name" maxlength="256">
+                  <label for="preset-description">Описание</label>
+                  <textarea id="preset-description" rows="2" maxlength="4096"></textarea>
+                  <fieldset><legend>Закреплённые поля верхнего уровня</legend><div id="fixed-fields" class="checkbox-list"></div></fieldset>
+                  <div class="library-actions">
+                    <button id="save-preset" class="primary-action" type="button">Сохранить новый</button>
+                    <button id="cancel-preset" type="button">Отмена</button>
+                  </div>
+                </section>
                 <div id="preset-conflict" class="warning" role="alert" hidden>
                   <p>Появилась более новая версия. Локальный черновик сохранён.</p>
                   <div class="button-row">
@@ -74,7 +92,14 @@
                   <button id="adapt-preset" type="button">Адаптировать к текущему контракту</button>
                 </div>
                 <p id="preset-error" class="error" role="alert"></p>
-                <pre id="preset-readonly" hidden></pre>
+                <section id="preset-configuration" class="library-section" hidden>
+                  <h4>Конфигурация</h4>
+                  <dl id="preset-config-metadata" class="library-facts"></dl>
+                  <div id="preset-input-fields" class="preset-field-list"></div>
+                  <details><summary>Входные данные · JSON</summary><pre id="preset-input-json" tabindex="0"></pre></details>
+                  <details><summary>Текст сохранённого промпта</summary><pre id="preset-prompt" tabindex="0"></pre></details>
+                </section>
+                <details id="preset-technical" hidden><summary>Полный JSON сохранённой версии</summary><pre id="preset-readonly" tabindex="0"></pre></details>
                 <a id="preset-export-download" hidden>Скачать JSON</a>
                 <pre id="preset-export" hidden></pre>
               </section>
@@ -82,55 +107,119 @@
           </section>
           <section id="history-panel" class="card library-panel" aria-labelledby="history-title" hidden>
             <div class="panel-heading">
-              <div><p class="eyebrow">Постоянная история</p><h2 id="history-title">Запуски</h2></div>
-              <button id="close-history" type="button">Закрыть</button>
+              <div><h2 id="history-title">История запусков</h2><p id="history-context" class="help-text"></p></div>
+              <button id="close-history" class="quiet-action" type="button">В лабораторию</button>
             </div>
-            <div class="library-grid">
-              <section aria-labelledby="history-list-title">
-                <h3 id="history-list-title">Принятые запуски</h3>
-                <div id="history-list" class="item-list"></div>
-                <button id="load-more-history" type="button" hidden>Показать ещё</button>
+            <p id="history-list-state" class="help-text" role="status"></p>
+            <p id="history-error" class="error" role="alert"></p>
+            <table class="history-table">
+              <caption class="visually-hidden">Сохранённые запуски всех атомов. Выберите дату, чтобы раскрыть подробности.</caption>
+              <thead><tr><th scope="col">Создан</th><th scope="col">Атом</th><th scope="col">Статус</th><th scope="col">Модель</th></tr></thead>
+              <tbody id="history-list"></tbody>
+            </table>
+            <button id="load-more-history" type="button" hidden>Показать ещё</button>
+            <section id="history-record" class="history-record" aria-labelledby="history-detail-title" hidden>
+              <div class="panel-heading"><div><p id="history-created" class="help-text"></p><h3 id="history-detail-title"></h3></div><button id="collapse-history" class="quiet-action" type="button">Свернуть подробности</button></div>
+              <div id="history-status" class="run-status"><p id="history-status-text" class="run-state"></p><p id="history-status-help"></p></div>
+              <dl id="history-summary" class="library-facts"></dl>
+              <div class="library-actions">
+                <button id="restore-history" class="primary-action" type="button" disabled>Восстановить запрос в лаборатории</button>
+                <button id="save-history-preset" type="button" disabled>Сохранить снимок как пресет</button>
+              </div>
+              <p class="help-text">Восстановление переносит настройки в черновик. Запуск выполняется отдельно.</p>
+              <p id="history-warning" class="warning" role="status"></p>
+              <div class="tab-list" role="tablist" aria-label="Данные сохранённого запуска">
+                <button id="history-result-tab" type="button" role="tab" aria-selected="true" aria-controls="history-result-panel">Результат</button>
+                <button id="history-request-tab" type="button" role="tab" aria-selected="false" aria-controls="history-request-panel" tabindex="-1">Запрос</button>
+                <button id="history-diagnostics-tab" type="button" role="tab" aria-selected="false" aria-controls="history-diagnostics-panel" tabindex="-1">Диагностика</button>
+              </div>
+              <section id="history-result-panel" role="tabpanel" aria-labelledby="history-result-tab">
+                <div id="history-result-readable" class="readable-result" hidden></div>
+                <p id="history-result-message" class="help-text"></p>
+                <div id="history-invalid" class="invalid-response" hidden><p id="history-invalid-code"></p><pre id="history-invalid-raw" tabindex="0"></pre></div>
+                <details><summary>Полный JSON результата</summary><pre id="history-result-json" tabindex="0"></pre></details>
               </section>
-              <section aria-labelledby="history-detail-title">
-                <h3 id="history-detail-title">Снимок запуска</h3>
-                <p id="history-warning" class="warning" role="status"></p>
-                <pre id="history-detail">Выберите запуск.</pre>
-                <div class="button-row">
-                  <button id="restore-history" type="button" disabled>Восстановить настройки</button>
-                  <button id="save-history-preset" type="button" disabled>Сохранить снимок как пресет</button>
-                </div>
-                <p id="history-error" class="error" role="alert"></p>
+              <section id="history-request-panel" role="tabpanel" aria-labelledby="history-request-tab" hidden>
+                <h4>Входные данные</h4><pre id="history-input-json" tabindex="0"></pre>
+                <details><summary>Отправленный промпт</summary><pre id="history-prompt" tabindex="0"></pre></details>
+                <details><summary>Полный снимок запроса</summary><pre id="history-snapshot" tabindex="0"></pre></details>
               </section>
-            </div>
+              <section id="history-diagnostics-panel" role="tabpanel" aria-labelledby="history-diagnostics-tab" hidden>
+                <div id="history-metadata" class="library-metadata"></div>
+                <details><summary>Диагностика и вызовы провайдера · JSON</summary><pre id="history-diagnostics-json" tabindex="0"></pre></details>
+                <details><summary>Идентификаторы выполнения · JSON</summary><pre id="history-runtime-json" tabindex="0"></pre></details>
+              </section>
+              <details class="run-technical"><summary>Полный JSON запуска</summary><pre id="history-detail" tabindex="0"></pre></details>
+            </section>
           </section>
           <section id="atom-passport" class="card passport" aria-labelledby="atom-title">
-            <p id="atom-action-type" class="eyebrow"></p>
             <h2 id="atom-title"></h2>
-            <dl>
-              <div><dt>Назначение</dt><dd id="atom-description"></dd></div>
-              <div><dt>Преобразование</dt><dd id="atom-transformation"></dd></div>
-            </dl>
-            <details>
-              <summary>Фиксированные схемы входа и выхода</summary>
-              <div class="schema-grid">
-                <section aria-labelledby="input-schema-title"><h3 id="input-schema-title">Схема входа</h3><pre id="input-schema" tabindex="0"></pre></section>
-                <section aria-labelledby="output-schema-title"><h3 id="output-schema-title">Схема выхода</h3><pre id="output-schema" tabindex="0"></pre></section>
-              </div>
-            </details>
+            <p class="atom-action"><code id="atom-action-type"></code></p>
+            <p id="atom-description" class="atom-description"></p>
+            <div class="passport-flow">
+              <section class="contract-part" aria-labelledby="input-contract-title">
+                <h3 id="input-contract-title">Что передать</h3>
+                <p id="input-contract-label"></p>
+                <div id="input-contract-fields" class="contract-fields"></div>
+                <p class="contract-ref"><code id="input-schema-ref"></code></p>
+                <p id="input-schema-version" class="contract-version"></p>
+                <details>
+                  <summary>JSON Schema входа</summary>
+                  <pre id="input-schema" tabindex="0"></pre>
+                </details>
+              </section>
+              <span class="passport-arrow" aria-hidden="true">→</span>
+              <section class="contract-part" aria-labelledby="output-contract-title">
+                <h3 id="output-contract-title">Что получить</h3>
+                <p id="output-contract-label"></p>
+                <div id="output-contract-fields" class="contract-fields"></div>
+                <p class="contract-ref"><code id="output-schema-ref"></code></p>
+                <p id="output-schema-version" class="contract-version"></p>
+                <details>
+                  <summary>JSON Schema выхода</summary>
+                  <pre id="output-schema" tabindex="0"></pre>
+                </details>
+              </section>
+            </div>
           </section>
-          <section class="editor-grid">
-            <div class="card editor-card">
-              <div class="tab-list" role="tablist" aria-label="Редактор конфигурации">
-                <button id="input-tab" type="button" role="tab" aria-selected="true" aria-controls="input-panel">Вход</button>
-                <button id="prompt-tab" type="button" role="tab" aria-selected="false" aria-controls="prompt-panel">Промпт</button>
+          <section id="run-controls" class="card run-controls" aria-label="Настройки запуска">
+            <div class="run-heading">
+              <h2>Запуск</h2>
+              <button id="refresh-models" class="quiet-action" type="button">Обновить каталог моделей</button>
+            </div>
+            <div>
+              <label for="model-select">Модель</label>
+              <select id="model-select"></select>
+            </div>
+            <div>
+              <label for="reasoning-effort">Reasoning effort</label>
+              <select id="reasoning-effort"></select>
+            </div>
+            <button id="run-button" class="primary-action" type="button">Запустить атом</button>
+            <p id="reasoning-help" class="help-text"></p>
+            <p id="launch-readiness" class="launch-readiness" role="status"></p>
+            <p id="model-catalog-warning" class="warning" role="status"></p>
+          </section>
+          <section id="request-response" class="editor-grid" aria-label="Запрос и ответ">
+            <section class="card editor-card" aria-labelledby="request-title">
+              <div class="request-heading">
+                <h2 id="request-title">Запрос</h2>
+                <div class="tab-list" role="tablist" aria-label="Содержимое запроса">
+                  <button id="input-tab" type="button" role="tab" aria-selected="true" aria-controls="input-panel">Вход</button>
+                  <button id="prompt-tab" type="button" role="tab" aria-selected="false" aria-controls="prompt-panel" tabindex="-1">Промпт<span id="prompt-tab-state"></span></button>
+                </div>
               </div>
+              <div id="validation-errors" class="validation-errors" aria-live="polite"></div>
               <section id="input-panel" role="tabpanel" aria-labelledby="input-tab">
+                <div class="input-heading">
+                  <h3>Входные данные</h3>
+                  <button id="fill-example" class="quiet-action" type="button">Заполнить пример</button>
+                </div>
                 <div class="editor-toolbar">
-                  <div role="group" aria-label="Режим редактора">
+                  <div class="input-mode-switch" role="group" aria-label="Представление входных данных">
                     <button id="form-mode" type="button" aria-pressed="true">Форма</button>
                     <button id="json-mode" type="button" aria-pressed="false">JSON</button>
                   </div>
-                  <button id="fill-example" type="button">Заполнить пример</button>
                 </div>
                 <div id="input-editor"></div>
                 <div id="json-panel" hidden>
@@ -140,50 +229,66 @@
                 </div>
               </section>
               <section id="prompt-panel" role="tabpanel" aria-labelledby="prompt-tab" hidden>
-                <label for="prompt-editor">Инструкция конфигурации</label>
-                <textarea id="prompt-editor" rows="18"></textarea>
-                <button id="reset-prompt" type="button">Восстановить исходный промпт</button>
+                <div class="prompt-heading"><h3>Промпт</h3><span id="run-prompt-state" class="prompt-edited"></span></div>
+                <label for="prompt-select">Источник и версия</label>
+                <select id="prompt-select"></select>
+                <p id="prompt-origin" class="help-text"></p>
+                <p class="prompt-reference"><code id="run-prompt-ref"></code></p>
+                <p id="prompt-load-status" class="help-text" role="status"></p>
+                <button id="retry-prompts" type="button" hidden>Повторить загрузку промптов</button>
+                <label for="prompt-editor">Промпт запуска</label>
+                <textarea id="prompt-editor" rows="12" spellcheck="false"></textarea>
+                <div class="prompt-actions">
+                  <button id="reset-prompt" class="quiet-action" type="button">Восстановить исходный промпт</button>
+                  <p class="help-text">В запуск пойдёт текущий текст промпта.</p>
+                </div>
+                <p id="prompt-test-status" class="help-text" role="status"></p>
+                <details id="save-prompt-panel">
+                  <summary>Сохранить как новый промпт в Lab</summary>
+                  <form id="save-prompt-form">
+                    <label for="save-prompt-name">Название</label>
+                    <input id="save-prompt-name" maxlength="80" required>
+                    <button id="save-prompt" type="submit">Сохранить промпт</button>
+                  </form>
+                </details>
+                <p id="save-prompt-status" class="help-text" role="status"></p>
               </section>
-              <div id="validation-errors" class="validation-errors" aria-live="polite"></div>
               <p id="draft-state" class="draft-state" aria-live="polite"></p>
-            </div>
+            </section>
             <aside id="result-placeholder" class="card result-card" aria-label="Запуск и результат">
-              <h2>Запуск</h2>
-              <div class="run-controls">
-                <label for="model-select">GPT-модель</label>
-                <select id="model-select"></select>
-                <label for="reasoning-effort">Reasoning effort</label>
-                <select id="reasoning-effort"></select>
-                <p id="reasoning-help" class="help-text"></p>
-                <p id="model-catalog-warning" class="warning" role="status"></p>
-                <button id="refresh-models" type="button">Обновить каталог</button>
-                <button id="run-button" class="primary-action" type="button">Запустить атом</button>
-                <button id="retry-submit" type="button" hidden>Повторить отправку</button>
-                <button id="retry-read" type="button" hidden>Повторить чтение запуска</button>
+              <h2>Ответ</h2>
+              <div id="run-status" class="run-status" data-tone="neutral">
+                <p id="run-state" class="run-state" role="status" aria-live="polite" aria-describedby="run-status-help">Запуск ещё не создан.</p>
+                <p id="run-status-help">Заполните входные данные и запустите атом.</p>
               </div>
-              <p id="run-state" class="run-state" role="status" aria-live="polite">Запуск ещё не создан.</p>
-              <section aria-labelledby="submitted-snapshot-title">
-                <h3 id="submitted-snapshot-title">Конфигурация принятого запуска</h3>
-                <pre id="submitted-snapshot">—</pre>
-              </section>
-              <section id="result-section" aria-labelledby="result-title" hidden>
+              <p id="response-draft-warning" class="warning" role="status" hidden>Черновик изменён. Ниже ответ на предыдущую конфигурацию; параметры принятого запуска сохранены.</p>
+              <button id="retry-submit" type="button" hidden>Повторить отправку</button>
+              <button id="retry-read" type="button" hidden>Повторить чтение запуска</button>
+              <section id="result-section" class="response-section" aria-labelledby="result-title" hidden>
                 <h3 id="result-title">Результат</h3>
+                <p id="result-caption" class="help-text"></p>
                 <div id="result-readable" class="readable-result"></div>
-                <details><summary>JSON результата</summary><pre id="result-json"></pre></details>
+                <details><summary>Полный JSON результата</summary><pre id="result-json" tabindex="0"></pre></details>
               </section>
               <section id="invalid-response" class="invalid-response" aria-labelledby="invalid-response-title" hidden>
                 <h3 id="invalid-response-title">Ответ не прошёл контракт</h3>
                 <p id="invalid-response-code"></p>
                 <pre id="invalid-response-raw"></pre>
               </section>
-              <section aria-labelledby="run-metadata-title">
-                <h3 id="run-metadata-title">Метаданные</h3>
-                <div id="run-metadata">—</div>
+              <section id="run-metadata-section" class="response-section" aria-labelledby="run-metadata-title" hidden>
+                <h3 id="run-metadata-title">Параметры выполнения</h3>
+                <div id="run-metadata"></div>
               </section>
-              <details>
-                <summary>Диагностика и ID</summary>
-                <pre id="run-diagnostics">—</pre>
-              </details>
+              <div id="run-technical" class="run-technical" hidden>
+                <details>
+                  <summary>Конфигурация принятого запуска</summary>
+                  <pre id="submitted-snapshot" tabindex="0">—</pre>
+                </details>
+                <details>
+                  <summary>Диагностика и ID</summary>
+                  <pre id="run-diagnostics" tabindex="0">—</pre>
+                </details>
+              </div>
             </aside>
           </section>
         </div>

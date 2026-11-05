@@ -287,6 +287,25 @@ class AtomLabRunRequest(BaseModel):
     model_id: str = Field(min_length=1, max_length=256)
     reasoning_effort: ReasoningEffort | None
     preset_ref: AtomLabRunPresetRef | None = None
+    prompt_source_ref: str | None = Field(default=None, max_length=128, pattern=r"^[A-Za-z0-9_.-]+$")
+
+
+class AtomLabPromptOption(BaseModel):
+    ref: str
+    name: str
+    prompt: str
+    group: Literal["platform", "product", "lab"]
+    source_ref: str | None = None
+    source_run_id: str | None = None
+
+
+class AtomLabPromptCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=80)
+    prompt: str = Field(min_length=1, max_length=65536)
+    source_ref: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.-]+$")
+    source_run_id: str | None = Field(default=None, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
 
 
 class AtomLabRunRuntimeIdsResponse(BaseModel):

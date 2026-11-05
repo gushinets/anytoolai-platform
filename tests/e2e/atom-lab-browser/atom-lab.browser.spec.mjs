@@ -113,6 +113,17 @@ function historyDetail({
   };
 }
 
+async function editPreset(page) {
+  if (await page.locator("#presets-panel").isHidden()) await page.locator("#presets-button").click();
+  await expect(page.locator("#workspace")).toHaveAttribute("aria-busy", "false");
+  if (await page.locator("#preset-editor-form").isVisible()) return;
+  await page.locator(await page.locator("#edit-preset").isVisible() ? "#edit-preset" : "#new-preset").click();
+}
+
+async function showWorkbench(page) {
+  if (await page.locator("#request-response").isHidden()) await page.locator("#workbench-button").click();
+}
+
 async function openLab(page, {models = () => MODEL_CATALOG} = {}) {
   await page.route("http://atom-lab.test/**", async (route) => {
     const pathname = new URL(route.request().url()).pathname;
@@ -143,6 +154,7 @@ async function unlockAtom(page, atomId, options) {
 }
 
 async function importJson(page, payload) {
+  await showWorkbench(page);
   await page.locator("#json-mode").click();
   await page.locator("#json-editor").fill(JSON.stringify(payload));
   await page.locator("#form-mode").click();
@@ -174,6 +186,8 @@ test("protected shell, dynamic values, invalid types, numbers, focus, and narrow
   await page.locator("#access-code").fill("secret");
   await page.locator("#access-form button").click();
   await expect(page.locator("#atom-navigation button")).toHaveCount(11);
+  await expect(page.locator("#atom-count")).toHaveText("11");
+  await expect(page.locator("#status")).toBeHidden();
   await expect(page.locator("#workspace")).toBeVisible();
 
   await page.getByRole("button", {name: /A05/}).click();
@@ -210,6 +224,248 @@ test("protected shell, dynamic values, invalid types, numbers, focus, and narrow
   await expect(type).toBeFocused();
   await type.selectOption("string");
   await expect(page.getByRole("textbox", {name: "Значение «key_1»", exact: true})).toBeVisible();
+});
+
+test("compact extraction controls stay aligned and preserve false versus omitted flags", async ({page}) => {
+  const extraction = {
+    ...catalog()[0],
+    input_schema: await schema("extract_input.schema.json"),
+    example_input: {
+      source_text: "Срок — 20 ноября 2026 года. Бюджет — 120000 рублей.",
+      fields: [
+        {name: "deadline", type: "date", description: "Срок завершения проекта.", required: false},
+        {name: "budget", type: "number", description: "Бюджет проекта в рублях.", required: true},
+      ],
+      strict: false,
+    },
+  };
+  await openLab(page);
+  await page.route("http://atom-lab.test/v1/atom-lab/atoms", (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify(catalog().map((atom) => atom.atom_id === "A01" ? extraction : atom)),
+  }));
+  await page.locator("#access-code").fill("secret");
+  await page.locator("#access-form button").click();
+  await page.locator("#fill-example").click();
+  await page.locator("details.array-item").first().locator("summary").click();
+
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({width, height: 900});
+    const alignment = await page.getByLabel("type", {exact: true}).first().evaluate((select) => {
+      const control = select.getBoundingClientRect();
+      const label = select.labels[0].getBoundingClientRect();
+      return {beside: label.right <= control.left, sameRow: label.top < control.bottom && label.bottom > control.top};
+    });
+    expect(alignment).toEqual({beside: true, sameRow: true});
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+  }
+  const required = page.getByLabel("required", {exact: true}).first();
+  await required.evaluate((input) => input.labels[0].click());
+  await expect(required).toBeChecked();
+  await page.getByLabel("type", {exact: true}).first().selectOption("string");
+  await page.getByLabel("strict", {exact: true}).check();
+  await expect(page.getByLabel("strict", {exact: true})).toHaveAccessibleDescription(/required=true/);
+  await page.getByLabel("strict", {exact: true}).uncheck();
+  await page.locator("#json-mode").click();
+  const payload = JSON.parse(await page.locator("#json-editor").inputValue());
+  expect(payload.strict).toBe(false);
+  expect(payload.fields[0]).toMatchObject({required: true, type: "string"});
+  await page.locator("#form-mode").click();
+  await page.getByRole("button", {name: "Не передавать «strict»", exact: true}).click();
+  await page.locator("#json-mode").click();
+  expect(JSON.parse(await page.locator("#json-editor").inputValue())).not.toHaveProperty("strict");
+});
+
+test("data-flow passport includes optional fields, exact versions and full schemas", async ({page}) => {
+  const extraction = {
+    ...catalog()[0],
+    input_schema: await schema("extract_input.schema.json"),
+    output_schema: await schema("extract_output.schema.json"),
+    schema_refs: {input: {schema_ref: "contract.input", version: 2}, output: {schema_ref: "contract.output", version: 3}},
+  };
+  await openLab(page);
+  await page.route("http://atom-lab.test/v1/atom-lab/atoms", (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify(catalog().map((atom) => atom.atom_id === "A01" ? extraction : atom)),
+  }));
+  await page.locator("#access-code").fill("secret");
+  await page.locator("#access-form button").click();
+  await expect(page.locator("#input-contract-fields .contract-field-list-required code")).toHaveText(["source_text", "fields"]);
+  await expect(page.locator("#input-contract-fields")).toContainText("strict опционально");
+  await expect(page.locator("#output-contract-fields .contract-field-list-required code")).toHaveText(["values", "missing_fields"]);
+  await expect(page.locator("#output-contract-fields")).toContainText("confidence опционально");
+  await expect(page.locator("#input-schema-ref")).toHaveText("contract.input");
+  await expect(page.locator("#output-schema-version")).toHaveText("Версия 3");
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({width, height: 900});
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+    for (const direction of ["input", "output"]) {
+      const fieldTops = await page.locator(`#${direction}-contract-fields .contract-field-list-required code`)
+        .evaluateAll((fields) => fields.map((field) => field.getBoundingClientRect().top));
+      expect(Math.max(...fieldTops) - Math.min(...fieldTops)).toBeLessThan(1);
+    }
+  }
+  await page.getByText("JSON Schema входа", {exact: true}).click();
+  await page.getByText("JSON Schema выхода", {exact: true}).click();
+  await expect(page.locator("#input-schema")).toHaveText(JSON.stringify(extraction.input_schema, null, 2));
+  await expect(page.locator("#output-schema")).toHaveText(JSON.stringify(extraction.output_schema, null, 2));
+  await page.getByRole("button", {name: /A06/}).click();
+  await expect(page.locator("#input-schema-ref")).toHaveText(A06.schema_refs.input.schema_ref);
+  await expect(page.locator("#output-contract-fields")).toHaveText("См. полную JSON Schema.");
+});
+
+test("request and response workspace keeps one launch action and keyboard-accessible editor views", async ({page}) => {
+  await page.setViewportSize({width: 1440, height: 1000});
+  await page.route("http://atom-lab.test/v1/atom-lab/atoms/A06/prompts", route => route.fulfill({
+    contentType: "application/json", body: JSON.stringify([
+      {ref: A06.prompt_ref, name: "Платформенный", prompt: A06.prompt, group: "platform", source_ref: null, source_run_id: null},
+    ]),
+  }));
+  await unlockAtom(page, "A06");
+  await expect(page.locator("#request-title")).toHaveText("Запрос");
+  await expect(page.locator("#validation-errors")).toBeEmpty();
+  await expect(page.locator("#launch-readiness")).toContainText("Проверьте");
+  const positions = await page.evaluate(() => ({
+    launch: document.querySelector(".run-controls").getBoundingClientRect().bottom,
+    request: document.querySelector(".editor-card").getBoundingClientRect().toJSON(),
+    response: document.querySelector(".result-card").getBoundingClientRect().toJSON(),
+  }));
+  expect(positions.launch).toBeLessThan(positions.request.top);
+  expect(positions.request.right).toBeLessThan(positions.response.left);
+  expect(positions.request.top).toBe(positions.response.top);
+  await expect(page.locator("#prompt-editor")).toHaveCount(1);
+  await expect(page.getByRole("button", {name: "Запустить атом", exact: true})).toHaveCount(1);
+  await expect(page.getByRole("button", {name: "Пробный запуск", exact: true})).toHaveCount(0);
+  await expect(page.locator(".run-controls #run-prompt-ref")).toHaveCount(0);
+
+  await page.locator("#input-tab").focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator("#prompt-tab")).toBeFocused();
+  await expect(page.locator("#prompt-panel")).toBeVisible();
+  await expect(page.locator("#run-prompt-ref")).toHaveText(A06.prompt_ref);
+  await page.keyboard.press("Home");
+  await expect(page.locator("#input-tab")).toBeFocused();
+  await expect(page.locator("#input-panel")).toBeVisible();
+  await page.locator("#run-button").click();
+  await expect(page.locator("#validation-errors")).toContainText("Обязательное поле");
+  await expect(page.getByRole("button", {name: "Добавить поле «context»", exact: true})).toBeFocused();
+  await page.locator("#fill-example").click();
+  await expect(page.locator("#validation-errors")).toBeEmpty();
+  await expect(page.locator("#launch-readiness")).toHaveText("Черновик готов к запуску");
+  for (const width of [390, 320]) {
+    await page.setViewportSize({width, height: 1000});
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+    const ordering = await page.evaluate(() => ({
+      request: document.querySelector(".editor-card").getBoundingClientRect().bottom,
+      response: document.querySelector(".result-card").getBoundingClientRect().top,
+    }));
+    expect(ordering.request).toBeLessThan(ordering.response);
+  }
+});
+
+test("object array summaries preserve edits and reveal invalid or newly added controls", async ({page}) => {
+  await unlockAtom(page, "A05");
+  await page.locator("#fill-example").click();
+  const rows = page.locator("details.array-item");
+  await expect(rows.first()).not.toHaveAttribute("open");
+  await rows.first().locator("summary").click();
+  await page.getByLabel("severity", {exact: true}).selectOption("low");
+  await page.locator("#json-mode").click();
+  const payload = JSON.parse(await page.locator("#json-editor").inputValue());
+  expect(payload.issues[0].severity).toBe("low");
+  payload.issues[0].severity = "invalid";
+  await page.locator("#json-editor").fill(JSON.stringify(payload));
+  await page.locator("#form-mode").click();
+  await expect(rows.first()).toHaveAttribute("open");
+  await rows.first().locator("summary").click();
+  await page.locator("#validation-errors").getByRole("button", {name: /issues\[0\]\.severity/}).click();
+  await expect(rows.first()).toHaveAttribute("open");
+  await expect(page.getByLabel("severity", {exact: true})).toBeFocused();
+  await page.getByLabel("severity", {exact: true}).selectOption("high");
+  await expect(page.locator("#validation-errors")).toBeEmpty();
+  await rows.first().locator("summary").click();
+  await page.getByRole("button", {name: "Добавить элемент", exact: true}).click();
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(1)).toHaveAttribute("open");
+  await expect(page.getByRole("button", {name: "Добавить поле «category»", exact: true})).toBeFocused();
+  await page.getByRole("button", {name: "Удалить элемент 2", exact: true}).click();
+  await expect(rows).toHaveCount(1);
+  await expect(page.getByLabel("category", {exact: true})).toBeFocused();
+});
+
+test("the shared launch tests the selected prompt and keeps accepted results separate from the draft", async ({page}) => {
+  const product = {ref: "product.a06.v1", name: "Продуктовый", prompt: "Промпт продукта", group: "product", source_ref: null, source_run_id: null};
+  let body;
+  let savedBody;
+  let posts = 0;
+  await page.route("http://atom-lab.test/v1/atom-lab/atoms/A06/prompts", async route => {
+    if (route.request().method() === "GET") {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify([
+        {ref: A06.prompt_ref, name: "Платформенный", prompt: A06.prompt, group: "platform", source_ref: null, source_run_id: null}, product,
+      ])});
+    } else {
+      savedBody = route.request().postDataJSON();
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({
+        ref: "lab.saved.v1", group: "lab", ...savedBody,
+      })});
+    }
+  });
+  await page.route("http://atom-lab.test/v1/atom-lab/runs", async route => {
+    posts += 1;
+    body = route.request().postDataJSON();
+    await route.fulfill({status: 202, contentType: "application/json", body: JSON.stringify({
+      run_id: "run-workbench", scenario_session_id: "session-library", job_id: "job-library", status: "queued",
+    })});
+  });
+  await page.route("http://atom-lab.test/v1/atom-lab/runs/run-workbench", async route => {
+    const detail = historyDetail({runId: "run-workbench", input: body.input, prompt: body.prompt});
+    detail.snapshot.prompt.ref = product.ref;
+    await route.fulfill({contentType: "application/json", body: JSON.stringify(detail)});
+  });
+  await unlockAtom(page, "A06");
+  await page.locator("#fill-example").click();
+  await page.locator("#reasoning-effort").selectOption("high");
+  await page.locator("#prompt-tab").click();
+  await page.locator("#prompt-select").selectOption(product.ref);
+  await page.locator("#prompt-editor").fill("Отредактированный продуктовый промпт");
+  await expect(page.locator("#prompt-tab-state")).toContainText("изменён");
+  await page.locator("#run-button").click();
+  await expect(page.locator("#run-state")).toHaveText("Завершён успешно");
+  await expect(page.locator("#prompt-test-status")).toContainText("Ответ прошёл контракт");
+  await expect(page.locator("#response-draft-warning")).toBeHidden();
+  expect(body.prompt_source_ref).toBe(product.ref);
+  const snapshot = await page.locator("#submitted-snapshot").textContent();
+  const result = await page.locator("#result-json").textContent();
+  await page.locator("#input-tab").click();
+  await page.locator("#json-mode").click();
+  await page.locator("#json-editor").fill(JSON.stringify({objective: body.input.objective, context: body.input.context}));
+  await expect(page.locator("#response-draft-warning")).toBeHidden();
+  await page.locator("#json-editor").fill("{");
+  await expect(page.locator("#response-draft-warning")).toBeVisible();
+  await page.locator("#json-editor").fill(JSON.stringify({...body.input, objective: "Другая цель"}));
+  await expect(page.locator("#response-draft-warning")).toBeVisible();
+  await expect(page.locator("#submitted-snapshot")).toHaveText(snapshot);
+  await expect(page.locator("#result-json")).toHaveText(result);
+  await page.locator("#json-editor").fill(JSON.stringify(body.input));
+  await expect(page.locator("#response-draft-warning")).toBeHidden();
+  await page.locator("#model-select").selectOption("gpt-no-reasoning");
+  await expect(page.locator("#response-draft-warning")).toBeVisible();
+  await page.locator("#model-select").selectOption("gpt-supported");
+  await page.locator("#reasoning-effort").selectOption("high");
+  await expect(page.locator("#response-draft-warning")).toBeHidden();
+  await page.locator("#prompt-tab").click();
+  await page.locator("#save-prompt-panel summary").click();
+  await page.locator("#save-prompt-name").fill("Успешный промпт");
+  await page.locator("#save-prompt").click();
+  await expect(page.locator("#save-prompt-status")).toContainText("Сохранён");
+  expect(savedBody).toMatchObject({prompt: body.prompt, source_ref: product.ref, source_run_id: "run-workbench"});
+  await expect(page.locator("#run-prompt-ref")).toHaveText("lab.saved.v1");
+  await page.locator("#input-tab").click();
+  page.once("dialog", dialog => dialog.accept());
+  await page.getByRole("button", {name: /A05/}).click();
+  await expect(page.locator("#response-draft-warning")).toBeVisible();
+  await expect(page.locator("#result-json")).toHaveText(result);
+  expect(posts).toBe(1);
 });
 
 test("unrestricted strings preserve line breaks through form edits", async ({page}) => {
@@ -253,6 +509,7 @@ test("Form numbers that cannot round-trip are rejected before changing the draft
     categories: ["да", "нет"],
     criteria: [{id: "scope", description: "Границы", weight: 1}],
   });
+  await page.locator("details.array-item").first().locator("summary").click();
   await page.getByLabel("weight", {exact: true}).fill("0.1234567890123456789");
   await expect(page.locator("#validation-errors")).toContainText("точност");
 });
@@ -587,6 +844,9 @@ test("one accepted submission survives draft edits and renders safe result diagn
   await page.getByLabel("context").fill("Изменённый после запуска черновик");
 
   await expect(page.locator("#run-state")).toContainText("Завершён");
+  await expect(page.locator("#run-status")).toHaveAttribute("data-tone", "success");
+  await expect(page.locator("#run-status-help")).toContainText("проверку контракта");
+  await expect(page.locator("#run-metadata .metadata-group")).toHaveCount(2);
   await expect(page.locator("#submitted-snapshot")).toContainText("Оценка");
   await expect(page.locator("#submitted-snapshot")).not.toContainText("Изменённый после запуска");
   await expect(page.locator("#submitted-snapshot")).not.toContainText("execution-hash-1");
@@ -646,6 +906,8 @@ test("a rejected next submission never replaces the previously accepted run card
   await expect(page.locator("#result-readable")).toContainText("Результат A");
 
   await expect(page.locator("#run-state")).toContainText("lab_invalid_request");
+  await expect(page.locator("#run-status")).toHaveAttribute("data-tone", "error");
+  await expect(page.locator("#run-status-help")).toContainText("результат предыдущего принятого запуска");
   await expect(page.locator("#submitted-snapshot")).toContainText(A05.prompt);
   await expect(page.locator("#run-diagnostics")).toContainText("artifact-a");
 });
@@ -719,6 +981,7 @@ test("network submission retry reuses the idempotency key and polling reconnects
   await page.locator("#retry-submit").click();
   await expect(page.locator("#run-button")).toBeDisabled();
   await expect(page.locator("#run-state")).toContainText("Переподключение… Запуск принят; текущее состояние временно неизвестно.");
+  await expect(page.locator("#run-status")).toHaveAttribute("data-tone", "warning");
   await expect(page.locator("#run-button")).toBeDisabled();
   await expect(page.locator("#run-state")).toContainText("Завершён");
   await expect(page.locator("#run-button")).toBeDisabled();
@@ -775,6 +1038,7 @@ test("a delayed accepted run never attaches its source id to a newly selected dr
 
   await page.locator("#fill-example").click();
   await page.locator("#presets-button").click();
+  await editPreset(page);
   await page.locator("#preset-name").fill("A05 после чужого запуска");
   await page.locator("#save-preset").click();
   await expect.poll(() => presetBody).not.toBeNull();
@@ -833,6 +1097,7 @@ test("an idempotent run retry keeps its original draft ownership after navigatio
 
   await page.locator("#fill-example").click();
   await page.locator("#presets-button").click();
+  await editPreset(page);
   await page.locator("#preset-name").fill("A05 после retry чужого запуска");
   await page.locator("#save-preset").click();
   await expect.poll(() => presetBody).not.toBeNull();
@@ -908,6 +1173,8 @@ test("client validation blocks admission and the corrected draft can be submitte
   await page.locator("#run-button").click();
 
   await expect(page.locator("#run-state")).toContainText("Ошибка");
+  await expect(page.locator("#run-status")).toHaveAttribute("data-tone", "error");
+  await expect(page.locator("#run-status-help")).toContainText("provider_unavailable");
   await expect(page.locator("#run-diagnostics")).toContainText("provider_unavailable");
   expect(posts).toBe(1);
 });
@@ -932,6 +1199,7 @@ test("final invalid output is diagnostics, never a successful result", async ({p
   await page.locator("#run-button").click();
 
   await expect(page.locator("#invalid-response")).toBeVisible();
+  await expect(page.locator("#run-status")).toHaveAttribute("data-tone", "error");
   await expect(page.locator("#invalid-response")).toContainText("structured_output_validation_failed");
   await expect(page.locator("#invalid-response")).toContainText("Сырой ответ обрезан");
   await expect(page.locator("#invalid-response-raw")).toContainText("<script id=bad>");
@@ -1397,6 +1665,128 @@ test("an accepted nonterminal run blocks overlapping launch until it reaches ter
   await expect(page.locator("#run-button")).toBeEnabled();
 });
 
+test("preset browsing preserves an unrelated dirty draft until explicit application", async ({page}) => {
+  const stored = {
+    name: "Сравнение пилота", description: "Сохранённая конфигурация", atom_id: "A11",
+    base_action_config_id: A11.base_action_config_id, schema_refs: A11.schema_refs,
+    prompt: "Сохранённый промпт", prompt_ref: A11.prompt_ref,
+    model_id: "openai/gpt-supported", reasoning_effort: "high", fixed_fields: ["categories"],
+    example_input: A11.example_input, source_run_id: null,
+    preset_id: "preset-browse", version: 1, created_at: "2026-11-06T08:00:00Z",
+  };
+  await page.route("http://atom-lab.test/v1/atom-lab/presets**", async (route) => {
+    const pathname = new URL(route.request().url()).pathname;
+    const summary = {preset_id: stored.preset_id, name: stored.name, description: stored.description,
+      atom_id: stored.atom_id, created_at: stored.created_at};
+    const body = pathname.endsWith("/versions/1") ? stored : pathname.endsWith("/versions")
+      ? {items: [{...summary, version: 1}], next_cursor: null}
+      : {items: [{...summary, latest_version: 1, updated_at: stored.created_at}], next_cursor: null};
+    await route.fulfill({contentType: "application/json", body: JSON.stringify(body)});
+  });
+  let discard = false;
+  let confirmations = 0;
+  page.on("dialog", (dialog) => { confirmations += 1; return discard ? dialog.accept() : dialog.dismiss(); });
+  await unlockAtom(page, "A05");
+  await page.locator("#prompt-tab").click();
+  await page.locator("#prompt-editor").fill("Несохранённый промпт A05");
+  await page.locator("#presets-button").click();
+  await expect(page.locator("#preset-editor-form")).toBeHidden();
+  await expect(page.locator("#preset-empty")).toBeVisible();
+  await page.locator("#preset-list button").click();
+  await expect(page.locator("#preset-selected-name")).toHaveText(stored.name);
+  await expect(page.locator("#preset-editor-form")).toBeHidden();
+  await expect(page.locator("#preset-config-metadata")).toContainText("high");
+  await expect(page.locator("#preset-input-fields [data-fixed=true]")).toHaveText("categories · закреплено");
+  await expect(page.locator("#atom-sidebar")).toBeHidden();
+  await expect(page.locator("#request-response")).toBeHidden();
+  expect(JSON.parse(await page.locator("#preset-readonly").textContent())).toEqual(stored);
+  expect(confirmations).toBe(0);
+  await page.locator("#apply-preset").click();
+  await expect(page.locator("#presets-panel")).toBeVisible();
+  await expect(page.locator("#prompt-editor")).toHaveValue("Несохранённый промпт A05");
+  discard = true;
+  await page.locator("#apply-preset").click();
+  await expect(page.locator("#presets-panel")).toBeHidden();
+  await expect(page.locator("#atom-title")).toContainText("A11");
+  await expect(page.locator("#prompt-editor")).toHaveValue(stored.prompt);
+  await page.locator("#presets-button").click();
+  await expect(page.locator("#preset-editor-form")).toBeVisible();
+  await expect(page.locator("#preset-editor-title")).toHaveText("Новая версия на основе v1");
+  await page.locator("#cancel-preset").click();
+  await expect(page.locator("#preset-editor-form")).toBeHidden();
+  expect(JSON.parse(await page.locator("#preset-readonly").textContent())).toEqual(stored);
+});
+
+test("history table reveals result, request and diagnostics with complete JSON and keyboard tabs", async ({page}) => {
+  const detail = historyDetail();
+  const older = {...historyDetail({runId: "run-older-page"}), created_at: "2026-09-22T08:00:00Z"};
+  let posts = 0;
+  await page.route("http://atom-lab.test/v1/atom-lab/runs**", async (route) => {
+    if (route.request().method() === "POST") posts += 1;
+    const url = new URL(route.request().url());
+    const selected = url.searchParams.has("cursor") || url.pathname.endsWith(older.run_id) ? older : detail;
+    const body = url.pathname.endsWith("/runs") ? {items: [{
+      run_id: selected.run_id, status: selected.status, atom_id: "A06", model_id: "openai/gpt-supported",
+      preset_id: null, preset_version: null, created_at: selected.created_at,
+      started_at: selected.started_at, finished_at: selected.finished_at,
+    }], next_cursor: url.searchParams.has("cursor") ? null : "older"} : selected;
+    await route.fulfill({contentType: "application/json", body: JSON.stringify(body)});
+  });
+  await unlockAtom(page, "A05");
+  await page.locator("#history-button").click();
+  await expect(page.locator(".history-table th")).toHaveText(["Создан", "Атом", "Статус", "Модель"]);
+  await expect(page.locator("#history-list .status-badge")).toHaveText("Успешно");
+  await expect(page.locator("#history-record")).toBeHidden();
+  await page.locator(".history-open").click();
+  await expect(page.locator("#history-record")).toBeVisible();
+  await expect(page.locator("#history-result-readable")).toContainText("Готово");
+  expect(JSON.parse(await page.locator("#history-detail").textContent())).toEqual(detail);
+  await page.locator("#history-result-tab").focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator("#history-request-tab")).toBeFocused();
+  expect(JSON.parse(await page.locator("#history-snapshot").textContent())).toEqual(detail.snapshot);
+  await page.keyboard.press("End");
+  await expect(page.locator("#history-diagnostics-panel")).toBeVisible();
+  expect(JSON.parse(await page.locator("#history-diagnostics-json").textContent())).toEqual(detail.diagnostics);
+  for (const width of [390, 320]) {
+    await page.setViewportSize({width, height: 900});
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  }
+  await page.locator("#collapse-history").click();
+  await expect(page.locator(".history-open")).toBeFocused();
+  await expect(page.locator("#history-record")).toBeHidden();
+  await page.locator("#load-more-history").click();
+  await page.locator('[data-run-id="run-older-page"]').click();
+  await expect(page.locator("#history-detail")).toContainText(older.run_id);
+  await page.locator("#presets-button").click();
+  await page.locator("#history-button").click();
+  await expect(page.locator("#history-record")).toBeHidden();
+  await page.locator("#load-more-history").click();
+  await expect(page.locator("#history-record")).toBeVisible();
+  expect(JSON.parse(await page.locator("#history-detail").textContent())).toEqual(older);
+  expect(posts).toBe(0);
+});
+
+test("empty libraries offer explicit creation without opening an empty form", async ({page}) => {
+  await page.route("http://atom-lab.test/v1/atom-lab/presets", (route) => route.fulfill({
+    contentType: "application/json", body: JSON.stringify({items: [], next_cursor: null}),
+  }));
+  await page.route("http://atom-lab.test/v1/atom-lab/runs", (route) => route.fulfill({
+    contentType: "application/json", body: JSON.stringify({items: [], next_cursor: null}),
+  }));
+  await unlockAtom(page, "A05");
+  await page.locator("#presets-button").click();
+  await expect(page.locator("#preset-list-state")).toContainText("Сохранённых пресетов пока нет");
+  await expect(page.locator("#preset-editor-form")).toBeHidden();
+  await page.locator("#new-preset").click();
+  await expect(page.locator("#preset-editor-form")).toBeVisible();
+  await expect(page.locator("#preset-source")).toContainText("текущий черновик A05");
+  await page.locator("#cancel-preset").click();
+  await page.locator("#history-button").click();
+  await expect(page.locator("#history-list-state")).toContainText("Запусков пока нет");
+  await expect(page.locator("#history-record")).toBeHidden();
+});
+
 test("run, immutable preset versions, export, reload, and history restore form one protected journey", async ({page}) => {
   page.on("dialog", (dialog) => dialog.accept());
   const versions = [];
@@ -1486,20 +1876,27 @@ test("run, immutable preset versions, export, reload, and history restore form o
   });
 
   await unlockAtom(page, "A06");
+  await showWorkbench(page);
   await page.locator("#fill-example").click();
+  await showWorkbench(page);
   await page.locator("#prompt-tab").click();
+  await showWorkbench(page);
   await page.locator("#prompt-editor").fill("Промпт версии один");
   await page.locator("#reasoning-effort").selectOption("high");
+  await showWorkbench(page);
   await page.locator("#run-button").click();
   await expect(page.locator("#run-state")).toContainText("Завершён");
 
   await page.locator("#presets-button").click();
   await expect(page.locator("#preset-name")).toBeDisabled();
   await expect(page.locator("#preset-state")).toHaveText("Загрузка пресетов…");
+  await editPreset(page);
   await expect(page.locator("#preset-name")).toBeEnabled();
   await page.locator("#preset-name").fill("Рабочий пресет");
+  await editPreset(page);
   await page.locator("#preset-description").fill("Проверка версий");
   await page.locator("#fixed-fields").getByLabel("context").check();
+  await editPreset(page);
   await page.locator("#save-preset").dblclick();
   await expect(page.locator("#workspace")).toHaveAttribute("aria-busy", "true");
   expect(await page.locator("#workspace").evaluate((node) => node.inert)).toBe(true);
@@ -1509,12 +1906,15 @@ test("run, immutable preset versions, export, reload, and history restore form o
   expect(presetWrites).toHaveLength(1);
 
   await page.locator("#close-presets").click();
+  await showWorkbench(page);
   await page.locator("#prompt-editor").fill("Промпт версии два");
   await page.locator("#presets-button").click();
+  await editPreset(page);
   await page.locator("#save-preset").click();
   await expect(page.locator("#preset-state")).toContainText("Сохранена неизменяемая версия 2");
   await page.locator("#preset-version-select").selectOption("1");
-  await expect(page.locator("#prompt-editor")).toHaveValue("Промпт версии один");
+  await expect(page.locator("#preset-prompt")).toHaveText("Промпт версии один");
+  await expect(page.locator("#prompt-editor")).toHaveValue("Промпт версии два");
   await page.locator("#export-preset").click();
   await expect(page.locator("#preset-export")).toContainText('"version": 1');
   await expect(page.locator("#preset-export-download")).toHaveAttribute("download", "atom-lab-preset-library-v1.json");
@@ -1530,7 +1930,7 @@ test("run, immutable preset versions, export, reload, and history restore form o
 
   await page.locator("#close-presets").click();
   await page.locator("#history-button").click();
-  await page.locator("#history-list button").click();
+  await page.locator("#history-list .history-open").click();
   await page.locator("#restore-history").click();
   await page.locator("#presets-button").click();
   await expect(page.locator("#save-preset")).toHaveText("Сохранить новый");
@@ -1540,7 +1940,7 @@ test("run, immutable preset versions, export, reload, and history restore form o
   await page.locator("#access-code").fill("secret");
   await page.locator("#access-form button").click();
   await page.locator("#history-button").click();
-  await page.locator("#history-list button").click();
+  await page.locator("#history-list .history-open").click();
   await expect(page.locator("#history-detail")).toContainText('"validation_attempts": 2');
   await page.locator("#restore-history").click();
   await expect(page.locator("#prompt-editor")).toHaveValue("Промпт версии один");
@@ -1612,9 +2012,13 @@ test("preset conflict disables stale recovery when the latest-version read fails
   await page.locator("#presets-button").click();
   await page.locator("#preset-list button").click();
   await expect(page.locator("#preset-state")).toContainText("Открыта сохранённая версия");
+  await editPreset(page);
   await page.locator("#preset-name").fill("Мой локальный черновик");
+  await showWorkbench(page);
   await page.locator("#prompt-tab").click();
+  await showWorkbench(page);
   await page.locator("#prompt-editor").fill("Локальный промпт не потерять");
+  await editPreset(page);
   await page.locator("#save-preset").click();
 
   await expect(page.locator("#preset-conflict")).toBeVisible();
@@ -1624,7 +2028,7 @@ test("preset conflict disables stale recovery when the latest-version read fails
   await expect(page.locator("#open-latest-preset")).toBeVisible();
   await expect(page.locator("#open-latest-preset")).toBeEnabled();
   await expect(page.locator("#save-as-new-preset")).toBeVisible();
-  expect(listReads).toBe(1);
+  expect(listReads).toBe(2);
 
   await page.locator("#open-latest-preset").click();
   await expect(page.locator("#open-latest-preset")).toBeDisabled();
@@ -1632,6 +2036,7 @@ test("preset conflict disables stale recovery when the latest-version read fails
   await expect(page.locator("#preset-name")).toHaveValue("Мой локальный черновик");
   await expect(page.locator("#prompt-editor")).toHaveValue("Локальный промпт не потерять");
 
+  await showWorkbench(page);
   await page.getByRole("button", {name: /A05/}).click();
   await expect(page.locator("#atom-title")).toContainText("A05");
   await expect(page.locator("#preset-name")).toHaveValue("");
@@ -1739,7 +2144,9 @@ test("preset conflict opens the directly resolved latest version from a later li
   await page.locator("#presets-button").click();
   await page.locator("#load-more-presets").click();
   await page.getByRole("button", {name: /Конкурентный пресет/}).click();
+  await editPreset(page);
   await page.locator("#preset-name").fill("Локальный конфликтующий draft");
+  await editPreset(page);
   await page.locator("#save-preset").click();
 
   await expect(page.locator("#open-latest-preset")).toBeEnabled();
@@ -1747,12 +2154,14 @@ test("preset conflict opens the directly resolved latest version from a later li
   await page.locator("#open-latest-preset").click();
   await expect(page.locator("#preset-version-select")).toHaveValue("3");
   await expect(page.locator("#preset-name")).toHaveValue(newest.name);
-  await expect(page.locator("#prompt-editor")).toHaveValue(newest.prompt);
+  await expect(page.locator("#preset-prompt")).toHaveText(newest.prompt);
   await expect(page.getByRole("button", {name: /Самая новая серверная версия/})).toContainText("v3");
   expect(confirmations).toBe(1);
   expect(listReads).toBe(2);
 
+  await editPreset(page);
   await page.locator("#preset-name").fill(saved.name);
+  await editPreset(page);
   await page.locator("#save-preset").click();
   await expect(page.locator("#preset-state")).toContainText("Сохранена неизменяемая версия 4");
   await expect(page.getByRole("button", {name: new RegExp(saved.name)})).toContainText("v4");
@@ -1838,7 +2247,9 @@ test("preset selection commits atomically across stale responses and failed read
   await expect(presetButtons.nth(1)).toHaveAttribute("aria-current", "true");
   await page.waitForTimeout(250);
   await expect(page.locator("#preset-version-select option")).toHaveCount(1);
+  await editPreset(page);
   await page.locator("#preset-name").fill("Preset B edited");
+  await editPreset(page);
   await page.locator("#save-preset").click();
   await expect.poll(() => savePath).toBe("/v1/atom-lab/presets/preset-b/versions");
 });
@@ -1943,13 +2354,17 @@ test("reset prompt warns only when the open preset already has unsaved changes",
   await unlockAtom(page, "A06");
   await page.locator("#presets-button").click();
   await page.locator("#preset-list button").click();
+  await showWorkbench(page);
   await page.locator("#prompt-tab").click();
 
+  await showWorkbench(page);
   await page.locator("#reset-prompt").click();
   await expect(page.locator("#prompt-editor")).toHaveValue(A06.prompt);
   expect(dialogs).toBe(0);
 
+  await showWorkbench(page);
   await page.locator("#prompt-editor").fill("Ещё одно несохранённое изменение");
+  await showWorkbench(page);
   await page.locator("#reset-prompt").click();
   await expect(page.locator("#prompt-editor")).toHaveValue(A06.prompt);
   expect(dialogs).toBe(1);
@@ -2010,16 +2425,21 @@ test("opening presets replaces unavailable model placeholders and restores the c
   } : MODEL_CATALOG});
   await page.locator("#presets-button").click();
   await page.getByRole("button", {name: /Missing model/}).click();
+  await editPreset(page);
   await expect(page.locator("#model-select option", {hasText: "gpt-retired — недоступна"})).toHaveCount(1);
   await expect(page.locator("#model-catalog-warning")).toContainText("Сохранённая модель недоступна");
 
   await page.getByRole("button", {name: /Missing model/}).click();
+  await editPreset(page);
   await expect(page.locator("#model-select option", {hasText: "gpt-retired — недоступна"})).toHaveCount(1);
 
+  await showWorkbench(page);
   await page.locator("#refresh-models").click();
   await expect.poll(() => refreshed).toBe(true);
   await expect(page.locator('#model-select option[value="gpt-retired"]')).toHaveCount(1);
+  await page.locator("#presets-button").click();
   await page.getByRole("button", {name: /Current model/}).click();
+  await editPreset(page);
   await expect(page.locator("#model-select")).toHaveValue("gpt-supported");
   await expect(page.locator('#model-select option[value="gpt-retired"]')).toHaveCount(0);
   await expect(page.locator("#model-catalog-warning")).toBeEmpty();
@@ -2173,8 +2593,10 @@ test("stalled preset writes report an ambiguous outcome and block blind duplicat
   });
 
   await unlockAtom(page, "A06");
+  await showWorkbench(page);
   await page.locator("#fill-example").click();
   await page.locator("#presets-button").click();
+  await editPreset(page);
   await page.locator("#preset-name").fill("Неизвестный результат");
   await page.clock.install();
   await page.evaluate(() => {
@@ -2189,6 +2611,7 @@ test("stalled preset writes report an ambiguous outcome and block blind duplicat
     };
   });
 
+  await editPreset(page);
   await page.locator("#save-preset").click();
   await expect(page.locator("#workspace")).toHaveAttribute("aria-busy", "true");
   await page.clock.fastForward(30_000);
@@ -2208,8 +2631,10 @@ test("transport loss after a committed preset write blocks blind duplicate saves
   });
 
   await unlockAtom(page, "A06");
+  await showWorkbench(page);
   await page.locator("#fill-example").click();
   await page.locator("#presets-button").click();
+  await editPreset(page);
   await page.locator("#preset-name").fill("Потерянный ответ");
   await page.evaluate(() => {
     const originalFetch = globalThis.fetch;
@@ -2224,6 +2649,7 @@ test("transport loss after a committed preset write blocks blind duplicate saves
     };
   });
 
+  await editPreset(page);
   await page.locator("#save-preset").click();
   await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
   await expect(page.locator("#save-preset")).toBeDisabled();
@@ -2282,8 +2708,10 @@ test("ambiguous preset create stays blocked after reopening and opening another 
 
   page.on("dialog", (dialog) => dialog.accept());
   await unlockAtom(page, "A06");
+  await showWorkbench(page);
   await page.locator("#fill-example").click();
   await page.locator("#presets-button").click();
+  await editPreset(page);
   await page.locator("#preset-name").fill("Create с неизвестным результатом");
   await page.evaluate(() => {
     const originalFetch = globalThis.fetch;
@@ -2295,6 +2723,7 @@ test("ambiguous preset create stays blocked after reopening and opening another 
     };
   });
 
+  await editPreset(page);
   await page.locator("#save-preset").click();
   await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
   await page.locator("#close-presets").click();
@@ -2359,7 +2788,9 @@ test("ambiguous version write with no new server version unlocks retry and keeps
   await unlockAtom(page, "A06");
   await page.locator("#presets-button").click();
   await page.getByRole("button", {name: /Пресет для recovery/}).click();
+  await editPreset(page);
   await page.locator("#preset-description").fill("Локальный черновик");
+  await editPreset(page);
   await page.locator("#save-preset").click();
   await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
 
@@ -2419,14 +2850,19 @@ test("ambiguous version recovery opens the preset normally after its owner sessi
   await unlockAtom(page, "A06");
   await page.locator("#presets-button").click();
   await page.getByRole("button", {name: /Пресет после смены session/}).click();
+  await editPreset(page);
   await page.locator("#preset-description").fill("Неизвестно сохранённый draft");
+  await editPreset(page);
   await page.locator("#save-preset").click();
   await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
 
+  await showWorkbench(page);
   await page.getByRole("button", {name: /A05/}).click();
   await expect(page.locator("#atom-title")).toContainText("A05");
+  await page.locator("#presets-button").click();
   await page.getByRole("button", {name: /Пресет после смены session/}).click();
 
+  await editPreset(page);
   expect(dialogs).toBe(1);
   await expect(page.locator("#atom-title")).toContainText("A06");
   await expect(page.locator("#preset-version-select")).toHaveValue("1");
@@ -2495,12 +2931,14 @@ test("history preset draft does not inherit ambiguous recovery ownership", async
   await unlockAtom(page, "A06");
   await page.locator("#presets-button").click();
   await page.getByRole("button", {name: /Исходный recovery preset/}).click();
+  await editPreset(page);
   await page.locator("#preset-description").fill("Неизвестно сохранённый исходный draft");
+  await editPreset(page);
   await page.locator("#save-preset").click();
   await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
 
   await page.locator("#history-button").click();
-  await page.locator("#history-list button").click();
+  await page.locator("#history-list .history-open").click();
   await page.locator("#save-history-preset").click();
   await expect(page.locator("#preset-name")).toHaveValue(`Запуск ${detail.run_id}`);
   expect(dialogs).toBe(1);
@@ -2578,20 +3016,28 @@ test("history-derived ambiguous recovery does not preserve a replaced owner sess
   });
   await unlockAtom(page, "A05");
   await page.locator("#history-button").click();
-  await page.locator("#history-list button").click();
+  await page.locator("#history-list .history-open").click();
   await page.locator("#save-history-preset").click();
+  await editPreset(page);
   await page.locator("#preset-name").fill("History recovery preset");
+  await editPreset(page);
   await page.locator("#preset-description").fill("Сохранённая history версия");
+  await editPreset(page);
   await page.locator("#save-preset").click();
   await expect(page.locator("#preset-version-select")).toHaveValue("1");
 
+  await editPreset(page);
   await page.locator("#preset-description").fill("Неизвестно сохранённое history обновление");
+  await editPreset(page);
   await page.locator("#save-preset").click();
   await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
+  await showWorkbench(page);
   await page.getByRole("button", {name: /A11/}).click();
   await expect(page.locator("#atom-title")).toContainText("A11");
+  await page.locator("#presets-button").click();
   await page.getByRole("button", {name: /History recovery preset/}).click();
 
+  await editPreset(page);
   expect(dialogs).toBe(1);
   await expect(page.locator("#atom-title")).toContainText("A06");
   await expect(page.locator("#preset-version-select")).toHaveValue("1");
@@ -2685,7 +3131,9 @@ test("successful preset readback materializes its version outside the latest pag
   await unlockAtom(page, "A06");
   await page.locator("#presets-button").click();
   await page.getByRole("button", {name: /Пресет successful readback/}).click();
+  await editPreset(page);
   await page.locator("#preset-description").fill("Успешно сохранённая v2");
+  await editPreset(page);
   await page.locator("#save-preset").click();
 
   await expect(page.locator("#preset-version-select")).toHaveValue("2");
@@ -2697,7 +3145,9 @@ test("successful preset readback materializes its version outside the latest pag
   await expect(page.locator('#preset-version-select option[value="1"]')).toHaveCount(1);
   await expect(page.locator("#preset-version-select")).toHaveValue("2");
   await expect(page.locator('#preset-version-select option[value="2"]')).toHaveCount(1);
+  await editPreset(page);
   await page.locator("#preset-description").fill("Следующий черновик");
+  await editPreset(page);
   await page.locator("#save-preset").click();
   await expect.poll(() => versionWriteBodies).toHaveLength(2);
   expect(versionWriteBodies[1].base_version).toBe(2);
@@ -2775,7 +3225,9 @@ test("ambiguous recovery keeps its base selected when the expected-version read 
   await unlockAtom(page, "A06");
   await page.locator("#presets-button").click();
   await page.getByRole("button", {name: /Пресет recovery read failure/}).click();
+  await editPreset(page);
   await page.locator("#preset-description").fill("Локальный черновик после неизвестного Save");
+  await editPreset(page);
   await page.locator("#save-preset").click();
   await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
 
@@ -2842,7 +3294,9 @@ test("exact committed recovery refreshes the editor draft version", async ({page
   await unlockAtom(page, "A06");
   await page.locator("#presets-button").click();
   await page.getByRole("button", {name: /Пресет draft state/}).click();
+  await editPreset(page);
   await page.locator("#preset-description").fill("Сохранённая v2");
+  await editPreset(page);
   await page.locator("#save-preset").click();
   await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
 
@@ -2933,16 +3387,23 @@ test("ambiguous version write reconciles an exact committed version without disc
   await unlockAtom(page, "A06");
   await page.locator("#presets-button").click();
   await page.getByRole("button", {name: /Пресет exact recovery/}).click();
+  await editPreset(page);
   await page.locator("#preset-description").fill("Exact committed draft");
+  await editPreset(page);
   await page.locator("#save-preset").click();
   await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
 
+  await editPreset(page);
   await page.locator("#preset-name").fill("Локальное имя после ошибки");
+  await editPreset(page);
   await page.locator("#preset-description").fill("Поздний локальный черновик");
   await importJson(page, {...A06.example_input, objective: "Поздняя локальная цель"});
+  await showWorkbench(page);
   await page.locator("#prompt-tab").click();
+  await showWorkbench(page);
   await page.locator("#prompt-editor").fill("Поздний локальный промпт");
 
+  await page.locator("#presets-button").click();
   await page.getByRole("button", {name: /Пресет exact recovery/}).click();
 
   expect(dialogs).toBe(0);
@@ -2951,18 +3412,22 @@ test("ambiguous version write reconciles an exact committed version without disc
   await expect(page.locator("#preset-name")).toHaveValue("Локальное имя после ошибки");
   await expect(page.locator("#preset-description")).toHaveValue("Поздний локальный черновик");
   await expect(page.locator("#prompt-editor")).toHaveValue("Поздний локальный промпт");
+  await showWorkbench(page);
   await page.locator("#input-tab").click();
+  await showWorkbench(page);
   await page.locator("#json-mode").click();
   await expect(page.locator("#json-editor")).toHaveValue(/Поздняя локальная цель/);
   await expect(page.locator("#preset-state")).toContainText("несохранённый черновик");
   await expect(page.locator("#preset-error")).toHaveText("");
   await expect(page.locator("#save-preset")).toBeEnabled();
+  await page.locator("#presets-button").click();
   await page.locator("#load-more-versions").click();
   await expect(page.locator("#preset-version-select")).toHaveValue("2");
   await expect(page.locator('#preset-version-select option[value="2"]')).toHaveCount(1);
   await expect.poll(() => page.locator("#preset-version-select option").evaluateAll(
     (options) => options.map((option) => option.value),
   )).toEqual(Array.from({length: 30}, (_, index) => String(30 - index)));
+  await editPreset(page);
   await page.locator("#save-preset").click();
   await expect.poll(() => versionWriteBodies).toHaveLength(2);
   expect(versionWriteBodies[1].base_version).toBe(2);
@@ -3042,7 +3507,9 @@ test("ambiguous version write surfaces a concurrent conflict without discarding 
   await unlockAtom(page, "A06");
   await page.locator("#presets-button").click();
   await page.getByRole("button", {name: /Пресет conflict recovery/}).click();
+  await editPreset(page);
   await page.locator("#preset-description").fill("Локальный конфликтующий draft");
+  await editPreset(page);
   await page.locator("#save-preset").click();
   await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
 
@@ -3095,9 +3562,12 @@ test("gateway failure after a committed preset write blocks blind duplicate save
   });
 
   await unlockAtom(page, "A06");
+  await showWorkbench(page);
   await page.locator("#fill-example").click();
   await page.locator("#presets-button").click();
+  await editPreset(page);
   await page.locator("#preset-name").fill("Commit за gateway");
+  await editPreset(page);
   await page.locator("#save-preset").click();
 
   await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
@@ -3125,15 +3595,19 @@ test("structured pre-write preset failure keeps the draft retryable", async ({pa
   });
 
   await unlockAtom(page, "A06");
+  await showWorkbench(page);
   await page.locator("#fill-example").click();
   await page.locator("#presets-button").click();
+  await editPreset(page);
   await page.locator("#preset-name").fill("Retryable pre-write draft");
+  await editPreset(page);
   await page.locator("#save-preset").click();
 
   await expect(page.locator("#preset-error")).toContainText("Каталог Atom Lab недоступен");
   await expect(page.locator("#preset-name")).toHaveValue("Retryable pre-write draft");
   await expect(page.locator("#save-preset")).toBeEnabled();
   await expect(page.locator("#new-preset")).toBeEnabled();
+  await editPreset(page);
   await page.locator("#save-preset").click();
   await expect.poll(() => posts).toBe(2);
 });
@@ -3150,9 +3624,12 @@ test("malformed successful preset response blocks blind duplicate saves", async 
   });
 
   await unlockAtom(page, "A06");
+  await showWorkbench(page);
   await page.locator("#fill-example").click();
   await page.locator("#presets-button").click();
+  await editPreset(page);
   await page.locator("#preset-name").fill("Повреждённый ответ");
+  await editPreset(page);
   await page.locator("#save-preset").click();
 
   await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
@@ -3176,9 +3653,12 @@ test("invalid successful preset response blocks blind duplicate saves", async ({
   });
 
   await unlockAtom(page, "A06");
+  await showWorkbench(page);
   await page.locator("#fill-example").click();
   await page.locator("#presets-button").click();
+  await editPreset(page);
   await page.locator("#preset-name").fill("Неполный успешный ответ");
+  await editPreset(page);
   await page.locator("#save-preset").click();
 
   await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
@@ -3203,9 +3683,12 @@ test("new preset response with a non-initial version blocks blind duplicate save
   });
 
   await unlockAtom(page, "A06");
+  await showWorkbench(page);
   await page.locator("#fill-example").click();
   await page.locator("#presets-button").click();
+  await editPreset(page);
   await page.locator("#preset-name").fill("Неверная первая версия");
+  await editPreset(page);
   await page.locator("#save-preset").click();
 
   await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
@@ -3265,7 +3748,9 @@ for (const responseCase of [
     await unlockAtom(page, "A06");
     await page.locator("#presets-button").click();
     await page.locator("#preset-list button").click();
+    await editPreset(page);
     await page.locator("#preset-description").fill(`Изменение: ${responseCase.name}`);
+    await editPreset(page);
     await page.locator("#save-preset").click();
 
     await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
@@ -3295,9 +3780,12 @@ test("preset save exposes backend field errors without losing the draft", async 
   });
 
   await unlockAtom(page, "A06");
+  await showWorkbench(page);
   await page.locator("#fill-example").click();
   await page.locator("#presets-button").click();
+  await editPreset(page);
   await page.locator("#preset-name").fill("   ");
+  await editPreset(page);
   await page.locator("#save-preset").click();
 
   await expect(page.locator("#preset-error")).toContainText("name: Имя не может состоять только из пробелов.");
@@ -3352,8 +3840,11 @@ test("historical preset provenance stays read-only until explicit adaptation", a
   await expect(page.locator("#save-preset")).toBeDisabled();
   await expect(page.locator("#prompt-editor")).toHaveValue(originalPrompt);
 
+  await showWorkbench(page);
   await page.locator("#prompt-tab").click();
+  await showWorkbench(page);
   await page.locator("#prompt-editor").fill("Текущий несохранённый draft");
+  await page.locator("#presets-button").click();
   page.once("dialog", (dialog) => dialog.dismiss());
   await page.locator("#adapt-preset").click();
   await expect(page.locator("#preset-compatibility")).toBeVisible();
@@ -3407,14 +3898,19 @@ test("successful preset write keeps its identity when readback fails", async ({p
   });
 
   await unlockAtom(page, "A06");
+  await showWorkbench(page);
   await page.locator("#fill-example").click();
   await page.locator("#presets-button").click();
+  await editPreset(page);
   await page.locator("#preset-name").fill("Readback preset");
+  await editPreset(page);
   await page.locator("#preset-description").fill("Readback failure");
+  await editPreset(page);
   await page.locator("#save-preset").click();
   await expect(page.locator("#preset-state")).toContainText("повторное чтение не удалось");
   await expect(page.locator("#preset-error")).toContainText("Сохранение завершено");
   await expect(page.locator("#save-preset")).toHaveText("Сохранить новую версию");
+  await editPreset(page);
   await page.locator("#save-preset").click();
   await expect.poll(() => versionPosts).toBe(1);
   expect(createPosts).toBe(1);
@@ -3438,11 +3934,16 @@ test("preset save rejects the visible invalid editor value instead of storing th
   });
 
   await unlockAtom(page, "A06");
+  await showWorkbench(page);
   await page.locator("#fill-example").click();
   await page.locator("#presets-button").click();
+  await editPreset(page);
   await page.locator("#preset-name").fill("Невалидный черновик");
+  await showWorkbench(page);
   await page.locator("#json-mode").click();
+  await showWorkbench(page);
   await page.locator("#json-editor").fill('{"context":');
+  await editPreset(page);
   await page.locator("#save-preset").click();
 
   await expect(page.locator("#preset-error")).toContainText("Исправьте входные данные");
@@ -3457,16 +3958,22 @@ test("fixed fields are selectable only while their values exist in the preset in
   });
 
   await unlockAtom(page, "A06");
+  await showWorkbench(page);
   await page.locator("#fill-example").click();
   await page.locator("#presets-button").click();
+  await editPreset(page);
   await expect(page.locator("#fixed-fields").getByLabel("context")).toBeEnabled();
   await expect(page.locator("#fixed-fields").getByLabel("audience")).toBeDisabled();
 
+  await showWorkbench(page);
   await page.locator("#json-mode").click();
+  await showWorkbench(page);
   await page.locator("#json-editor").fill(JSON.stringify({...A06.example_input, audience: "Команда"}));
   await expect(page.locator("#fixed-fields").getByLabel("audience")).toBeEnabled();
+  await editPreset(page);
   await page.locator("#fixed-fields").getByLabel("audience").check();
   await page.locator("#close-presets").click();
+  await showWorkbench(page);
   await page.locator("#json-editor").fill(JSON.stringify(A06.example_input));
   await page.locator("#presets-button").click();
   await expect(page.locator("#fixed-fields").getByLabel("audience")).toBeDisabled();
@@ -3516,13 +4023,16 @@ test("fill example protects preset-only fixed-field changes", async ({page}) => 
   await unlockAtom(page, "A06");
   await page.locator("#presets-button").click();
   await page.locator("#preset-list button").click();
+  await editPreset(page);
   await page.locator("#fixed-fields").getByLabel("audience").check();
   await expect(page.locator("#preset-state")).toContainText("Есть несохранённый черновик");
 
+  await showWorkbench(page);
   await page.locator("#fill-example").click();
 
   expect(confirmations).toBe(1);
   await expect(page.locator("#fixed-fields").getByLabel("audience")).toBeChecked();
+  await showWorkbench(page);
   await page.locator("#json-mode").click();
   await expect(page.locator("#json-editor")).toHaveValue(/"audience": "Команда"/);
 });
@@ -3576,10 +4086,12 @@ test("accepted run immediately marks an open saved preset as a changed draft", a
   await unlockAtom(page, "A06");
   await page.locator("#presets-button").click();
   await page.locator("#preset-list button").click();
+  await editPreset(page);
   await expect(page.locator("#preset-state")).toContainText("Открыта сохранённая версия");
   await page.locator("#close-presets").click();
   await page.locator("#presets-button").click();
   await expect(page.locator("#preset-state")).toContainText("Открыта сохранённая версия");
+  await showWorkbench(page);
   await page.locator("#run-button").click();
   await expect(page.locator("#preset-state")).toContainText("Есть несохранённый черновик");
 });
@@ -3589,29 +4101,37 @@ test("new preset metadata participates in discard protection and atom changes cl
     await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [], next_cursor: null})});
   });
   await unlockAtom(page, "A06");
+  await showWorkbench(page);
   await page.locator("#fill-example").click();
   await page.locator("#presets-button").click();
+  await editPreset(page);
   await page.locator("#preset-name").fill("Несохранённый пресет");
+  await editPreset(page);
   await page.locator("#preset-description").fill("Не потерять metadata");
   await page.locator("#fixed-fields").getByLabel("context").check();
 
   page.once("dialog", (dialog) => dialog.dismiss());
+  await showWorkbench(page);
   await page.getByRole("button", {name: /A05/}).click();
   await expect(page.locator("#atom-title")).toContainText("A06");
   await expect(page.locator("#preset-name")).toHaveValue("Несохранённый пресет");
 
   page.once("dialog", (dialog) => dialog.accept());
+  await showWorkbench(page);
   await page.getByRole("button", {name: /A05/}).click();
   await expect(page.locator("#atom-title")).toContainText("A05");
   await expect(page.locator("#preset-name")).toHaveValue("");
   await expect(page.locator("#preset-version-select option")).toHaveCount(0);
   await expect(page.locator("#save-preset")).toHaveText("Сохранить новый");
-  await expect(page.locator("#preset-state")).toContainText("Нет несохранённых изменений");
+  await expect(page.locator("#preset-state")).toHaveText("");
 
+  await editPreset(page);
   await expect(page.locator("#preset-name")).toBeEnabled();
   await expect(page.locator("#fixed-fields").getByLabel("issues")).toBeVisible();
+  await editPreset(page);
   await page.locator("#preset-name").fill("Новый после смены атома");
   page.once("dialog", (dialog) => dialog.dismiss());
+  await showWorkbench(page);
   await page.getByRole("button", {name: /A06/}).click();
   await expect(page.locator("#atom-title")).toContainText("A05");
   await expect(page.locator("#preset-name")).toHaveValue("Новый после смены атома");
@@ -3639,10 +4159,11 @@ test("history list identifies presets that share the same version number", async
   await unlockAtom(page, "A06");
   await page.locator("#history-button").click();
 
-  const historyButtons = page.locator("#history-list button");
+  const historyButtons = page.locator("#history-list .history-open");
   await expect(historyButtons).toHaveCount(2);
-  await expect(historyButtons.nth(0)).toContainText("preset-a · v1");
-  await expect(historyButtons.nth(1)).toContainText("preset-b · v1");
+  const rows = page.locator("#history-list > tr[data-selected]");
+  await expect(rows.nth(0)).toContainText("preset-a · v1");
+  await expect(rows.nth(1)).toContainText("preset-b · v1");
 });
 
 test("open history model availability follows delayed catalog load and refresh", async ({page}) => {
@@ -3699,13 +4220,14 @@ test("open history model availability follows delayed catalog load and refresh",
   await page.locator("#access-form button").click();
   await expect(page.locator("#history-button")).toBeEnabled();
   await page.locator("#history-button").click();
-  await page.locator("#history-list button").click();
+  await page.locator("#history-list .history-open").click();
   await expect(page.locator("#history-warning")).toContainText("Историческая модель недоступна");
 
   releaseInitialModels(MODEL_CATALOG);
   await expect.poll(() => modelReads).toBe(1);
   await expect(page.locator("#history-warning")).toHaveText("");
 
+  await showWorkbench(page);
   await page.locator("#refresh-models").click();
   await expect.poll(() => refreshRequested).toBe(true);
   await expect.poll(() => modelReads).toBe(2);
@@ -3736,7 +4258,7 @@ test("history detail keeps the last selected snapshot across out-of-order respon
 
   await unlockAtom(page, "A06");
   await page.locator("#history-button").click();
-  const historyButtons = page.locator("#history-list button");
+  const historyButtons = page.locator("#history-list .history-open");
   await historyButtons.nth(0).click();
   await expect(page.locator("#restore-history")).toBeDisabled();
   await historyButtons.nth(1).dispatchEvent("click");
@@ -3804,8 +4326,8 @@ test("history keeps running and crash-failed snapshots readable without silent m
 
   await unlockAtom(page, "A06");
   await page.locator("#history-button").click();
-  await expect(page.locator("#history-list button")).toHaveCount(2);
-  await page.getByRole("button", {name: /A06 · failed/}).click();
+  await expect(page.locator("#history-list .history-open")).toHaveCount(2);
+  await page.locator("#history-list .history-open").nth(1).click();
   await expect(page.locator("#history-detail")).toContainText("worker_lease_lost");
   await expect(page.locator("#history-detail")).toContainText('"action_run_id": null');
   await expect(page.locator("#history-warning")).toContainText("только для чтения");
@@ -3818,11 +4340,14 @@ test("history keeps running and crash-failed snapshots readable without silent m
   await expect(page.locator("#run-button")).toBeDisabled();
   await page.locator("#model-select").selectOption("gpt-supported");
   await page.locator("#reasoning-effort").selectOption("high");
+  await showWorkbench(page);
   await page.locator("#run-button").click();
   await expect.poll(() => runPosts).toBe(1);
   expect(adaptedRunBody.preset_ref).toBeNull();
   await page.locator("#presets-button").click();
+  await editPreset(page);
   await page.locator("#preset-name").fill("Адаптированный пресет");
+  await editPreset(page);
   await page.locator("#save-preset").click();
   await expect.poll(() => adaptedPresetBody).not.toBeNull();
   expect(adaptedPresetBody.source_run_id).toBeNull();
@@ -3911,17 +4436,23 @@ test("saving from history uses the selected snapshot instead of the unrelated ed
   await unlockAtom(page, "A05");
   await page.locator("#presets-button").click();
   await page.locator("#preset-list button").click();
+  await editPreset(page);
   await page.locator("#close-presets").click();
   await page.locator("#history-button").click();
-  await page.locator("#history-list button").click();
+  await page.locator("#history-list .history-open").click();
   await page.locator("#save-history-preset").click();
   await expect(page.locator("#fixed-fields").getByLabel("objective")).toBeVisible();
   await page.locator("#close-presets").click();
+  await showWorkbench(page);
   await page.locator("#prompt-tab").click();
+  await showWorkbench(page);
   await page.locator("#prompt-editor").fill("Несохранённый A05 prompt");
   await page.locator("#presets-button").click();
+  await editPreset(page);
   await page.locator("#preset-name").fill("Из выбранной истории");
+  await editPreset(page);
   await page.locator("#preset-description").fill("Не из текущего A05 draft");
+  await editPreset(page);
   await page.locator("#save-preset").click();
   await expect.poll(() => savedBody).not.toBeNull();
   await expect(page.locator("#preset-state")).toContainText("Сохранена неизменяемая версия 1");
@@ -3942,6 +4473,7 @@ test("saving from history uses the selected snapshot instead of the unrelated ed
   await expect(page.locator("#atom-title")).toContainText("A05");
   await expect(page.locator("#prompt-editor")).toHaveValue("Несохранённый A05 prompt");
   await page.locator("#close-presets").click();
+  await showWorkbench(page);
   await page.locator("#run-button").click();
   await expect.poll(() => runBody).not.toBeNull();
   expect(runBody.atom_id).toBe("A05");

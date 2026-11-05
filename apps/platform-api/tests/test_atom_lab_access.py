@@ -115,6 +115,25 @@ def test_atom_lab_catalog_fails_closed_without_server_configuration(
     }
 
 
+def test_explicit_local_open_access_loads_catalog_without_code(app, monkeypatch) -> None:
+    monkeypatch.setenv("ANYTOOLAI_ATOM_LAB_AUTH_DISABLED", "true")
+    monkeypatch.delenv("ANYTOOLAI_ATOM_LAB_ACCESS_CODE")
+    catalog = asyncio.run(_request(app, "/v1/atom-lab/atoms"))
+    assert catalog.status_code == HTTPStatus.OK
+    assert len(catalog.json()) == 11
+    page = asyncio.run(_request(app, "/atom-lab"))
+    assert 'id="access-panel" data-auto-open="true" hidden' in page.text
+    assert page.headers["cache-control"] == "no-store"
+    invalid_run = asyncio.run(_request(app, "/v1/atom-lab/runs", method="POST", json={}))
+    assert invalid_run.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+
+
+@pytest.mark.parametrize("value", ["false", "", "TRUE"])
+def test_open_access_requires_explicit_true(app, monkeypatch, value) -> None:
+    monkeypatch.setenv("ANYTOOLAI_ATOM_LAB_AUTH_DISABLED", value)
+    assert asyncio.run(_request(app, "/v1/atom-lab/atoms")).status_code == HTTPStatus.UNAUTHORIZED
+
+
 def test_atom_lab_models_use_atom_lab_error_envelope_when_storage_is_unavailable(app) -> None:
     response = asyncio.run(
         _request(

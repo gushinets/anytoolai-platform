@@ -217,6 +217,56 @@ def _error(response: httpx.Response, status: int, code: str) -> None:
     assert "Точный промпт" not in response.text
 
 
+def test_workbench_prompts_are_protected_atom_scoped_and_run_local(app: FastAPI) -> None:
+    product_ref = "client_update_writer.reply_draft_compose_reply.v1"
+    platform_ref = "kernel_demo.compose_reply.v1"
+    path = "/v1/atom-lab/atoms/A07/prompts"
+    edited = "Точный промпт для ответа с конкретным следующим шагом"
+
+    async def exercise_library() -> str:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            assert (await client.get(path)).status_code == HTTPStatus.UNAUTHORIZED
+            client.headers["X-Atom-Lab-Access-Code"] = ACCESS_CODE
+            options = (await client.get(path)).json()
+            by_ref = {option["ref"]: option for option in options}
+            assert by_ref[platform_ref]["group"] == "platform"
+            assert by_ref[product_ref]["group"] == "product"
+            assert "client_update_writer.prepaid_request_compose_persuasive_text.v1" not in by_ref
+            draft = {"name": "Ответ", "prompt": edited, "source_ref": product_ref}
+            assert (await client.post(path, json={
+                **draft, "source_run_id": "missing",
+            })).status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+            assert (await client.post(path, json={
+                **draft, "source_ref": "kernel_demo.extract_structured_fields.v1",
+            })).status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+            response = await client.post(path, json=draft)
+            assert response.status_code == HTTPStatus.CREATED, response.text
+            saved = response.json()
+            assert saved["prompt"] == edited
+            assert saved["group"] == "lab"
+            assert saved["source_ref"] == product_ref
+            assert saved in (await client.get(path)).json()
+            assert saved not in (await client.get("/v1/atom-lab/atoms/A01/prompts")).json()
+            return saved["ref"]
+
+    saved_ref = asyncio.run(exercise_library())
+    wrong_atom = _post(app, _payload(prompt_source_ref=saved_ref))
+    _error(wrong_atom, HTTPStatus.UNPROCESSABLE_ENTITY, "prompt_source_invalid")
+    payload = _payload("A07", prompt=edited, prompt_source_ref=saved_ref)
+    response = _post(app, payload)
+    assert response.status_code == HTTPStatus.ACCEPTED, response.text
+    _error(_post(app, {**payload, "prompt_source_ref": product_ref}), HTTPStatus.CONFLICT,
+           "idempotency_conflict")
+    with transaction_boundary(_factory(app)) as session:
+        run = AtomLabRunRepository(session).get(response.json()["run_id"])
+        assert run.snapshot_payload()["prompt"] == {
+            "ref": platform_ref, "version": 1, "base": run.base_prompt,
+            "content": edited, "source_ref": saved_ref,
+        }
+
+
 @pytest.mark.parametrize("atom_id", list(INPUTS))
 def test_run_preserves_every_atom_payload_through_real_workflow_mapping(app, atom_id):
     payload = _payload(atom_id)
