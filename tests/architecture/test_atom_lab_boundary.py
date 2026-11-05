@@ -141,7 +141,7 @@ def test_atom_lab_browser_atom_ids_match_backend_enum() -> None:
         r"^const ATOM_LABELS = \{\n(.*?)^\};", browser_source, re.MULTILINE | re.DOTALL,
     )
     assert browser_match is not None
-    browser_atom_ids = re.findall(r"^  (A\d{2}):", browser_match.group(1), re.MULTILINE)
+    browser_atom_ids = re.findall(r"^  ([^\s:]+):", browser_match.group(1), re.MULTILINE)
     assert "const ATOM_IDS = new Set(Object.keys(ATOM_LABELS));" in browser_source
 
     schemas_module = ast.parse(ATOM_LAB_SCHEMAS_PATH.read_text(encoding="utf-8"))

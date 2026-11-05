@@ -7,7 +7,7 @@
 - Created: 2026-11-06
 - Last updated: 2026-11-06
 - Review date: 2026-11-06
-- Next action: integrate with current main, validate and publish the linked PR
+- Next action: review the linked PR and required GitHub CI
 - Blocker: none
 
 ## Goal
@@ -35,6 +35,17 @@ stamped or migrated as part of publishing the PR. Prove a clean upgrade on an is
 Previous feature checks: 53 Node tests, 96 Chromium journeys, lint, live Docker desktop/mobile
 inspection and zero-write saved-run verification. Run repository and migration checks on the
 integrated branch, record exact results and disclose any unresolved limitations in the PR.
+
+The branch is based on 4cd2e0aa with migration 0018 after 0017. Generated docs and API types
+are current. Canonical frontend-check passed, as did the Atom Lab DB-free API/Core suite and
+five PostgreSQL storage/migration/concurrency tests. The latter use disposable databases and
+cover saved-prompt replay plus tenant/region/atom isolation. A clean checkout passed all 242
+architecture tests after updating the atom-ID drift guard for the label-derived catalog.
+
+Windows full-check was attempted but did not complete successfully. Local ignored QA snapshots
+cause four provider-boundary failures in the working folder; those pass in the clean checkout.
+The unchanged deployment runner test also fails on the local Temp ACL before its selector
+assertion. No permissions or lock-safety rules were changed. Full required CI remains pending.
 
 ## Publication
 
