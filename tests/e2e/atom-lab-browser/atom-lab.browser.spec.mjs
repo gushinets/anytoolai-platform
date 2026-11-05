@@ -3844,14 +3844,14 @@ test("preset save exposes backend field errors without losing the draft", async 
   await expect(page.locator("#prompt-editor")).toHaveValue("   ");
 });
 
-for (const path of ["preset", "history"]) {
+for (const [path, compatible] of [["preset", false], ["history", false], ["preset", true], ["history", true]]) {
   for (const available of [false, true]) {
-    test(`${path} adaptation ${available ? "retains an available" : "detaches an obsolete"} Lab prompt origin after checking current options`, async ({page}) => {
+    test(`${path} ${compatible ? "compatible restore" : "adaptation"} ${available ? "retains an available" : "detaches an obsolete"} ${compatible ? "product" : "Lab"} prompt origin after checking current options`, async ({page}) => {
       page.on("dialog", (dialog) => dialog.accept());
-      const promptSourceRef = "atom_lab_prompt_historical";
+      const promptSourceRef = compatible ? "product.prompt.v1" : "atom_lab_prompt_historical";
       const stored = {
         name: "Исторический пресет", description: "Старый контракт", atom_id: "A06",
-        base_action_config_id: available ? "config.a06.retired" : A06.base_action_config_id,
+        base_action_config_id: !compatible && available ? "config.a06.retired" : A06.base_action_config_id,
         schema_refs: A06.schema_refs, prompt: "Исторический текст промпта", prompt_ref: A06.prompt_ref,
         prompt_source_ref: promptSourceRef, model_id: "openai/gpt-supported", reasoning_effort: "high",
         fixed_fields: ["context"], example_input: A06.example_input, source_run_id: null,
@@ -3860,7 +3860,7 @@ for (const path of ["preset", "history"]) {
       const detail = historyDetail({runId: "run-historical-origin", prompt: stored.prompt});
       detail.snapshot.action.config_id = stored.base_action_config_id;
       detail.snapshot.prompt.source_ref = promptSourceRef;
-      const currentAtom = available ? A06 : {
+      const currentAtom = compatible || available ? A06 : {
         ...A06, schema_refs: {
           input: {...A06.schema_refs.input, version: 2},
           output: {...A06.schema_refs.output, version: 2},
@@ -3889,7 +3889,8 @@ for (const path of ["preset", "history"]) {
           } else {
             await route.fulfill({json: [
               {ref: A06.prompt_ref, name: "Платформенный", prompt: A06.prompt, group: "platform", source_ref: null, source_run_id: null},
-              ...(available ? [{ref: promptSourceRef, name: "Сохранённый", prompt: stored.prompt, group: "lab", source_ref: A06.prompt_ref, source_run_id: null}] : []),
+              ...(available ? [{ref: promptSourceRef, name: "Сохранённый", prompt: stored.prompt, group: compatible ? "product" : "lab", source_ref: A06.prompt_ref, source_run_id: null}] : []),
+              ...(compatible && !available ? [{ref: "product.prompt.v2", name: "Новый продуктовый", prompt: "Новый текст v2", group: "product", source_ref: A06.prompt_ref, source_run_id: null}] : []),
             ]});
           }
           return;
@@ -3902,7 +3903,10 @@ for (const path of ["preset", "history"]) {
           return;
         }
         if (pathname === `/v1/atom-lab/presets/${stored.preset_id}/versions`) {
-          await route.fulfill({json: {items: [{...summary, version: 1}], next_cursor: null}});
+          if (request.method() === "POST") {
+            presetBody = request.postDataJSON();
+            await route.abort();
+          } else await route.fulfill({json: {items: [{...summary, version: 1}], next_cursor: null}});
           return;
         }
         if (pathname === `/v1/atom-lab/presets/${stored.preset_id}/versions/1`) {
@@ -3940,7 +3944,7 @@ for (const path of ["preset", "history"]) {
       }
       await page.locator(`#${path === "preset" ? "presets" : "history"}-button`).click();
       await page.locator(path === "preset" ? "#preset-list button" : "#history-list .history-open").click();
-      await page.locator(path === "preset" ? "#adapt-preset" : "#restore-history").click();
+      await page.locator(path === "preset" ? compatible ? "#apply-preset" : "#adapt-preset" : "#restore-history").click();
       await expect.poll(() => promptReads).toBe(available ? 2 : 1);
       await expect(page.locator("#prompt-editor")).toHaveValue(stored.prompt);
       await expect(page.locator("#run-button")).toBeDisabled();
@@ -3978,8 +3982,124 @@ for (const path of ["preset", "history"]) {
       expect(presetBody.prompt).toBe(editedPrompt);
       expect(presetBody.prompt_source_ref).toBe(available ? promptSourceRef : null);
       expect(presetBody.schema_refs).toEqual(currentAtom.schema_refs);
+      await page.locator(`#${path === "preset" ? "presets" : "history"}-button`).click();
+      await page.locator(path === "preset" ? "#preset-list button" : "#history-list .history-open").click();
+      await expect.poll(async () => {
+        const text = await page.locator(path === "preset" ? "#preset-readonly" : "#history-detail").textContent();
+        return text ? JSON.parse(text) : null;
+      }).toEqual(path === "preset" ? stored : detail);
     });
   }
+}
+
+for (const available of [false, true]) {
+  test(`direct history preset ${available ? "preserves a valid" : "detaches a retired"} product origin without changing another atom's draft`, async ({page}) => {
+    page.on("dialog", (dialog) => dialog.accept());
+    const promptSourceRef = "product.prompt.v1";
+    const detail = historyDetail({runId: "run-direct-preset", prompt: "Точный исторический текст"});
+    detail.snapshot.prompt.source_ref = promptSourceRef;
+    let promptReads = 0;
+    const promptRequests = [];
+    let releasePrompts;
+    const promptGate = new Promise((resolve) => { releasePrompts = resolve; });
+    let presetBody = null;
+    await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
+      const request = route.request();
+      const {pathname} = new URL(request.url());
+      if (pathname.endsWith("/prompts")) {
+        promptRequests.push(pathname);
+        if (pathname.includes("/A05/")) {
+          await route.fulfill({json: [
+            {ref: A05.prompt_ref, name: "Платформенный", prompt: A05.prompt, group: "platform", source_ref: null, source_run_id: null},
+            {ref: "product.a05.v1", name: "Продуктовый A05", prompt: "Текст A05", group: "product", source_ref: A05.prompt_ref, source_run_id: null},
+          ]});
+          return;
+        }
+        promptReads += 1;
+        await promptGate;
+        if (promptReads === 2) {
+          await route.fulfill({status: 503, json: {error: {code: "prompts_unavailable", message: "Источник временно недоступен"}}});
+        } else if (promptReads === 3) {
+          await route.fulfill({json: []});
+        } else await route.fulfill({json: [
+          {ref: A06.prompt_ref, name: "Платформенный", prompt: A06.prompt, group: "platform", source_ref: null, source_run_id: null},
+          ...(available ? [{ref: promptSourceRef, name: "Продуктовый", prompt: "Текущий текст", group: "product", source_ref: A06.prompt_ref, source_run_id: null}] : []),
+          ...(!available ? [{ref: "product.prompt.v2", name: "Новый продуктовый", prompt: "Новый текст v2", group: "product", source_ref: A06.prompt_ref, source_run_id: null}] : []),
+        ]});
+        return;
+      }
+      if (pathname === "/v1/atom-lab/runs") {
+        await route.fulfill({json: {items: [{
+          run_id: detail.run_id, status: detail.status, atom_id: "A06", model_id: "openai/gpt-supported",
+          preset_id: null, preset_version: null, created_at: detail.created_at,
+          started_at: detail.started_at, finished_at: detail.finished_at,
+        }], next_cursor: null}});
+        return;
+      }
+      if (pathname === `/v1/atom-lab/runs/${detail.run_id}`) {
+        await route.fulfill({json: detail});
+        return;
+      }
+      if (pathname === "/v1/atom-lab/presets") {
+        if (request.method() === "POST") {
+          presetBody = request.postDataJSON();
+          await route.abort();
+        } else await route.fulfill({json: {items: [], next_cursor: null}});
+        return;
+      }
+      await route.fallback();
+    });
+
+    await unlockAtom(page, "A05");
+    await page.locator("#fill-example").click();
+    await page.locator("#prompt-tab").click();
+    await page.locator("#prompt-select").selectOption("product.a05.v1");
+    const currentPrompt = "Несохранённый промпт другого атома";
+    await page.locator("#prompt-editor").fill(currentPrompt);
+    await page.locator("#history-button").click();
+    await page.locator("#history-list .history-open").click();
+    await page.locator("#save-history-preset").click();
+    await expect.poll(() => promptReads).toBe(1);
+    await expect(page.locator("#save-history-preset")).toBeDisabled();
+    await expect(page.locator("#history-panel")).toBeVisible();
+    expect(presetBody).toBeNull();
+    await showWorkbench(page);
+    const abandonedCheck = page.waitForResponse("**/atoms/A06/prompts");
+    releasePrompts();
+    await abandonedCheck;
+    await expect(page.locator("#presets-panel")).toBeHidden();
+    await expect(page.locator("#request-response")).toBeVisible();
+    await page.locator("#history-button").click();
+    await expect(page.locator("#save-history-preset")).toBeEnabled();
+    await page.locator("#save-history-preset").click();
+    await expect(page.locator("#history-error")).toContainText("Источник временно недоступен");
+    await expect(page.locator("#save-history-preset")).toBeEnabled();
+    await page.locator("#save-history-preset").click();
+    await expect(page.locator("#history-error")).toContainText("Список промптов вернул некорректный ответ");
+    await page.locator("#save-history-preset").click();
+    await expect(page.locator("#presets-panel")).toBeVisible();
+    await expect(page.locator("#preset-prompt")).toHaveText(detail.snapshot.prompt.content);
+    if (!available) await expect(page.locator("#preset-state")).toContainText("Исторический источник недоступен");
+    await page.locator("#preset-name").fill("Из истории другого атома");
+    await page.locator("#save-preset").click();
+    await expect.poll(() => presetBody).not.toBeNull();
+    expect(presetBody.atom_id).toBe("A06");
+    expect(presetBody.prompt).toBe(detail.snapshot.prompt.content);
+    expect(presetBody.prompt_source_ref).toBe(available ? promptSourceRef : null);
+    expect(presetBody.source_run_id).toBe(detail.run_id);
+    expect(presetBody.example_input).toEqual(detail.snapshot.input);
+    expect(promptRequests.filter((pathname) => pathname.includes("/A06/"))).toHaveLength(4);
+    await showWorkbench(page);
+    await expect(page.locator("#atom-title")).toContainText("A05");
+    await expect(page.locator("#prompt-editor")).toHaveValue(currentPrompt);
+    await expect(page.locator("#prompt-select")).toHaveValue("product.a05.v1");
+    await page.locator("#input-tab").click();
+    await page.locator("#json-mode").click();
+    await expect(page.locator("#json-editor")).toHaveValue(JSON.stringify(A05.example_input, null, 2));
+    await page.locator("#history-button").click();
+    await page.locator("#history-list .history-open").click();
+    expect(JSON.parse(await page.locator("#history-detail").textContent())).toEqual(detail);
+  });
 }
 
 test("historical preset provenance stays read-only until explicit adaptation", async ({page}) => {
@@ -4709,6 +4829,13 @@ test("saving from history uses the selected snapshot instead of the unrelated ed
     }
     if (pathname === `/v1/atom-lab/presets/${editorPreset.preset_id}/versions/1`) {
       await route.fulfill({contentType: "application/json", body: JSON.stringify(editorPreset)});
+      return;
+    }
+    if (pathname === "/v1/atom-lab/atoms/A06/prompts") {
+      await route.fulfill({json: [
+        {ref: A06.prompt_ref, name: "Платформенный", prompt: A06.prompt, group: "platform", source_ref: null, source_run_id: null},
+        {ref: detail.snapshot.prompt.source_ref, name: "Из истории", prompt: detail.snapshot.prompt.content, group: "product", source_ref: A06.prompt_ref, source_run_id: null},
+      ]});
       return;
     }
     if (pathname === "/v1/atom-lab/presets/history-preset/versions") {
