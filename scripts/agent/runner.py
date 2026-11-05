@@ -179,7 +179,10 @@ def uv_executable() -> str:
 
 
 def uv_install_command(*args: str, python: str) -> list[str]:
-    return [uv_executable(), "pip", "install", "--python", python, *args]
+    return [
+        uv_executable(), "pip", "install", "--config-file",
+        str(ROOT / "infra" / "python" / "uv-build.toml"), "--python", python, *args,
+    ]
 
 
 def build_system_requirements(project_root: Path) -> list[str]:
@@ -222,6 +225,8 @@ def quick_check_python() -> str:
 # in both files (neither script imports the other).
 QUICK_CHECK_DEPENDENCY_FINGERPRINT_INPUTS = [
     ROOT / "uv.lock",
+    ROOT / "pyproject.toml",
+    ROOT / "infra" / "python" / "uv-build.toml",
     ROOT / "packages" / "backend" / "platform-sdk" / "pyproject.toml",
     ROOT / "packages" / "backend" / "platform-core" / "pyproject.toml",
     ROOT / "packages" / "backend" / "platform-actions" / "pyproject.toml",
@@ -521,6 +526,10 @@ def full_check() -> int:
     env = baseline_env()
     try:
         build_requirements = build_system_requirements(FREELANCER_SUITE_ROOT)
+        build_config = tomllib.loads(
+            (ROOT / "infra" / "python" / "uv-build.toml").read_text(encoding="utf-8")
+        )
+        build_requirements.extend(build_config["build-constraint-dependencies"])
     except RuntimeError as exc:
         print(str(exc), file=sys.stderr)
         return 1
@@ -551,6 +560,7 @@ def full_check() -> int:
             "-m",
             "pytest",
             "packages/backend/product-platforms/freelancer-suite/tests",
+            "tests/test_quick_check.py",
         ],
         env,
     )

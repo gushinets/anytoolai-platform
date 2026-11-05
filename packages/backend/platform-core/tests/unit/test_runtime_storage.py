@@ -555,10 +555,7 @@ def test_handoff_compatibility_revision_repairs_database_stamped_at_0007() -> No
     with _provision_runtime_database(upgrade_target=None) as (engine, alembic_config):
         with engine.begin() as connection:
             alembic_config.attributes["connection"] = connection
-            command.upgrade(alembic_config, "head")
-            connection.execute(sa.text("DROP TABLE platform.atom_lab_preset_versions CASCADE"))
-            connection.execute(sa.text("DROP TABLE platform.atom_lab_presets"))
-            connection.execute(sa.text("DROP TABLE platform.atom_lab_runs"))
+            command.upgrade(alembic_config, "0007")
             connection.execute(sa.text("DROP TABLE platform.product_handoffs"))
             command.stamp(alembic_config, "0007")
 
@@ -1276,7 +1273,7 @@ def test_guest_identity_repository_create_read_touch(
     assert touched.last_seen_at is not None
 
 
-def test_quota_usage_repository_ensures_and_consumes_conditionally(
+def test_quota_usage_repository_ensures_and_reserves_conditionally(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
     with transaction_boundary(session_factory) as session:
@@ -1307,12 +1304,13 @@ def test_quota_usage_repository_ensures_and_consumes_conditionally(
             period_key="lifetime",
             limit_count=1,
         )
-        consumed = repository.consume_if_available(usage)
-        exhausted = repository.consume_if_available(usage)
+        consumed = repository.reserve_if_available(usage)
+        exhausted = repository.reserve_if_available(usage)
 
     assert repeated.id == usage.id
     assert consumed is not None
-    assert consumed.used_count == 1
+    assert consumed.used_count == 0
+    assert consumed.reserved_count == 1
     assert exhausted is None
 
 
@@ -1412,7 +1410,7 @@ def test_quota_usage_repository_concurrent_ensure_usage_creates_one_dimension_ro
     assert rows[0]["dimension_key"] == "kernel_demo"
 
 
-def test_quota_usage_repository_conditional_consume_blocks_stale_concurrent_read(
+def test_quota_usage_repository_conditional_reserve_blocks_stale_concurrent_read(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
     with transaction_boundary(session_factory) as session:
@@ -1440,10 +1438,10 @@ def test_quota_usage_repository_conditional_consume_blocks_stale_concurrent_read
         assert first_read is not None
         assert second_read is not None
 
-        first_consumed = first_repo.consume_if_available(first_read)
+        first_consumed = first_repo.reserve_if_available(first_read)
         first_session.commit()
 
-        second_consumed = second_repo.consume_if_available(second_read)
+        second_consumed = second_repo.reserve_if_available(second_read)
         second_session.commit()
     finally:
         first_session.close()
@@ -1455,7 +1453,8 @@ def test_quota_usage_repository_conditional_consume_blocks_stale_concurrent_read
     assert first_consumed is not None
     assert second_consumed is None
     assert final_usage is not None
-    assert final_usage.used_count == 1
+    assert final_usage.used_count == 0
+    assert final_usage.reserved_count == 1
 
 
 def test_quota_usage_repository_reraises_unexpected_integrity_errors(

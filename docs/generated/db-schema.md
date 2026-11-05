@@ -182,6 +182,32 @@ Definitions remain in repository configuration; these tables store runtime state
 | acquisition_source | VARCHAR(128) | yes |
 | properties | JSON | no |
 
+## platform.execution_reservations
+
+| Column | Type | Nullable |
+|---|---|---|
+| id | VARCHAR(128) | no |
+| tenant_id | VARCHAR(128) | no |
+| region | VARCHAR(64) | no |
+| owner_kind | VARCHAR(11) | no |
+| owner_id | VARCHAR(128) | no |
+| product_id | VARCHAR(128) | no |
+| scenario_id | VARCHAR(128) | no |
+| frontend_id | VARCHAR(128) | no |
+| scenario_session_id | VARCHAR(128) | no |
+| job_id | VARCHAR(128) | no |
+| guest_quota_usage_id | VARCHAR(128) | yes |
+| paid_allowance_usage_id | VARCHAR(128) | yes |
+| replay_namespace | VARCHAR(7) | yes |
+| replay_key | VARCHAR(256) | yes |
+| request_hash | VARCHAR(64) | yes |
+| handoff_id | VARCHAR(128) | yes |
+| state | VARCHAR(8) | no |
+| result_artifact_id | VARCHAR(128) | yes |
+| created_at | DATETIME | no |
+| updated_at | DATETIME | no |
+| finalized_at | DATETIME | yes |
+
 ## platform.guest_identities
 
 | Column | Type | Nullable |
@@ -209,6 +235,8 @@ Definitions remain in repository configuration; these tables store runtime state
 | period_key | VARCHAR(128) | no |
 | limit_count | INTEGER | no |
 | used_count | INTEGER | no |
+| reserved_count | INTEGER | no |
+| legacy_used_count | INTEGER | no |
 | created_at | DATETIME | no |
 | updated_at | DATETIME | no |
 | metadata | JSON | no |
@@ -226,6 +254,7 @@ Definitions remain in repository configuration; these tables store runtime state
 | workflow_id | VARCHAR(128) | no |
 | workflow_version | INTEGER | no |
 | status | VARCHAR(9) | no |
+| consumption_mode | VARCHAR(9) | no |
 | input_artifact_id | VARCHAR(128) | yes |
 | result_artifact_id | VARCHAR(128) | yes |
 | error_code | VARCHAR(128) | yes |
@@ -249,6 +278,24 @@ Definitions remain in repository configuration; these tables store runtime state
 | last_attempt_at | DATETIME | yes |
 | last_success_at | DATETIME | yes |
 | last_error | VARCHAR(512) | yes |
+| created_at | DATETIME | no |
+| updated_at | DATETIME | no |
+
+## platform.paid_allowance_usage
+
+| Column | Type | Nullable |
+|---|---|---|
+| id | VARCHAR(128) | no |
+| tenant_id | VARCHAR(128) | no |
+| region | VARCHAR(64) | no |
+| owner_id | VARCHAR(128) | no |
+| allowance_id | VARCHAR(128) | no |
+| product_id | VARCHAR(128) | no |
+| metric_key | VARCHAR(128) | no |
+| unit | VARCHAR(128) | no |
+| quantity | BIGINT | no |
+| used_count | BIGINT | no |
+| reserved_count | BIGINT | no |
 | created_at | DATETIME | no |
 | updated_at | DATETIME | no |
 

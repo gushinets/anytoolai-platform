@@ -7,6 +7,7 @@ export const es: Shape<typeof en> = {
   notFound: "Este enlace de transferencia no es válido.",
   loadFailed: "Algo salió mal al cargar esta transferencia. Inténtelo de nuevo.",
   retry: "Reintentar",
+  capacityReserved: "La capacidad está ocupada temporalmente. Inténtalo de nuevo en un momento.",
   actionFailed: "No se pudo completar la acción. Inténtelo de nuevo.",
   fields: {
     from: "De",

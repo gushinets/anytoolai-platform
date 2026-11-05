@@ -409,7 +409,7 @@ test.describe("Brief Decoder -> Acceptance Builder handoff", () => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   });
 
-  test("accepted handoff: consent preview, same-tab redirect, queued draft shown without a submit, consumed handoff, replay refused", async ({
+  test("accepted handoff: consent preview, same-tab redirect, queued draft shown without a submit, consumed handoff, owner replay reuses result", async ({
     page,
   }) => {
     test.setTimeout(240_000);
@@ -527,8 +527,37 @@ test.describe("Brief Decoder -> Acceptance Builder handoff", () => {
     await expect(page.locator("#acceptance-builder-brief-text")).toHaveValue("");
     await expect(page.getByRole("button", { name: "Copy" })).toHaveCount(0);
 
-    // 6. The token is spent: the consent page is terminal, a replayed accept is refused, and the
-    // backend's own view names the target session.
+    // 6. Consent stays terminal, but the original owner can replay Accept without another debit.
+    const readTargetExecution = () => withDb(async (db) => {
+      const jobs = await db.query<{ id: string; scenario_session_id: string }>(
+        "SELECT j.id, j.scenario_session_id FROM platform.jobs j JOIN platform.scenario_sessions s ON s.id = j.scenario_session_id WHERE s.parent_scenario_session_id = $1 ORDER BY j.id",
+        [sourceSessionId],
+      );
+      const reservations = await db.query<{
+        id: string;
+        job_id: string;
+        scenario_session_id: string;
+        state: string;
+        used_count: number;
+        reserved_count: number;
+        legacy_used_count: number;
+      }>(
+        "SELECT r.id, r.job_id, r.scenario_session_id, r.state::text AS state, q.used_count, q.reserved_count, q.legacy_used_count FROM platform.execution_reservations r JOIN platform.guest_quota_usage q ON q.id = r.guest_quota_usage_id WHERE r.owner_kind = 'guest' AND r.owner_id = $1 AND r.product_id = 'acceptance_builder' ORDER BY r.id",
+        [guestId],
+      );
+      return { jobs: jobs.rows, reservations: reservations.rows };
+    });
+    const beforeReplay = await readTargetExecution();
+    expect(beforeReplay.jobs).toHaveLength(1);
+    expect(beforeReplay.reservations).toHaveLength(1);
+    expect(beforeReplay.reservations[0]).toMatchObject({
+      job_id: beforeReplay.jobs[0]!.id,
+      scenario_session_id: targetSessionId,
+      state: "consumed",
+      used_count: 1,
+      reserved_count: 0,
+      legacy_used_count: 0,
+    });
     await page.goto(`${WEB_MIRROR_BASE_URL}/handoff/${encodeURIComponent(token)}`);
     await expect(page.getByRole("button", { name: "Accept" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Decline" })).toHaveCount(0);
@@ -537,8 +566,13 @@ test.describe("Brief Decoder -> Acceptance Builder handoff", () => {
     const replay = await page.request.post(`${WEB_MIRROR_BASE_URL}/v1/handoffs/${encodeURIComponent(token)}/accept`, {
       data: { guest_id: guestId },
     });
-    expect(replay.status()).toBe(409);
-    expect(((await replay.json()) as { error: { code: string } }).error.code).toBe("handoff_already_accepted");
+    expect(replay.status()).toBe(200);
+    expect(await replay.json()).toMatchObject({
+      status: "consumed",
+      target_scenario_session_id: targetSessionId,
+      target_job_id: beforeReplay.jobs[0]!.id,
+    });
+    expect(await readTargetExecution()).toEqual(beforeReplay);
 
     // 7. The spent token still names the queued target, so a reload after a lost Accept response can
     // reach it: an explicit "Open result" (no automatic jump), which shows the same paid result.

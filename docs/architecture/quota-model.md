@@ -1,127 +1,136 @@
 # Quota Model
 
-MVP-A uses guest quota instead of billing.
+MVP-A exposes guest quota. ANY-507 also provides typed paid metering internally; paid
+HTTP authentication, AccessSnapshot, scenario metric selection and interservice usage remain
+ANY-766 responsibilities. See the [shared contract and execution plan](../exec-plans/active/ANY-507-implementation-plan.md).
 
-## A13 status
+## Admission and replay
 
-A13 is **backend-complete**. The backend owns guest identity persistence, quota policy resolution,
-quota state, quota consumption, standardized API errors, and quota events. CE-kit's shared
-`getQuota()` and `startScenario()` HTTP clients in the MVP-A2 A15 slice (ANY-8/ANY-170/ANY-171)
-are real, propagate the opaque guest id, and handle `429 quota_exhausted`.
+Ordinary start and immediate handoff share `ExecutionReservationService.reserve_execution`.
+The caller owns the SQLAlchemy Session and outer commit. One candidate savepoint contains the
+session, created job, original bucket reservation, reserved increment and admission events.
+Acceptance requires `used_count + reserved_count < quantity`; it does not debit used quota.
+Deferred handoff creates no job or reservation.
 
-Rules:
+Guest buckets use the configured product/scenario dimension and UTC period. Paid buckets use a
+scoped allowance ID, immutable owner/product/metric/unit/quantity, and strict integer quantity in
+`0…2^53−1`. A new allowance ID creates a separate bucket even when its other terms match. A
+historical body/source-session `user_id` is never trusted paid authority. Before first binding,
+Core verifies the trusted owner/scope, requested product and session/job/bucket links, product
+membership of the metric, and registry unit. One allowance ID within tenant/region binds to one
+owner; a changed tuple conflicts without changing usage. ANY-766 selects the scenario's expected
+metric and checks grant/freshness; a registry commercial `enabled` flag alone is not paid authority.
 
-- quota enforcement is backend-owned;
-- check quota before accepting a scenario start;
-- resolve quota scope from the repo-configured quota policy dimension;
-- consume quota on accepted scenario start, in the same transaction that creates the started
-  scenario session and linked created job;
-- do not consume quota on frontend clicks or intent;
-- failed workflow execution after an accepted start does not refund quota in A13;
-- quota exhausted returns standardized state;
-- quota state is independent from provider calls, transport retries, PydanticAI validation retries,
-  LiteLLM telemetry, and provider usage/cost accounting;
-- email capture and paywall intent are recorded;
-- (ANY-150) a scenario start submitted with the same `Idempotency-Key` header, tenant, region,
-  product, scenario, and `guest_id` as an already-accepted start replays that start's snapshot and
-  does not consume quota again, even under concurrent duplicate submission.
+`ScenarioRuntimeService.find_execution_replay` is owner-scoped and returns the original session,
+job and reservation with `is_replay=True`, without reserving again. Paid starts require a key;
+replay namespace is `start` or `handoff` (stable runtime handoff ID). Request hashes exclude
+allowance ID/access revision. Legacy guest replay synthesizes no historical reservation. Paid
+replay never uses the guest `guest_id=NULL` path. Concurrent losers roll back all candidate writes
+before reading the winner.
 
-For A13, an accepted scenario start means the A12 queue-and-return start flow has passed product,
-scenario, frontend, input, and workflow validation and will commit:
+PostgreSQL admission locks use `FOR NO KEY UPDATE`, avoiding an upgrade deadlock with reservation
+FK `KEY SHARE` locks. Locks remain held through the caller's final admission check. Caller rejection
+rolls back the complete candidate; it cannot recreate acceptance through rollback recovery.
 
-```text
-scenario_sessions row with status=started and checkpoint=processing (insert-or-select on
-  Idempotency-Key, see ANY-150 below)
--> quota consumed (only when this call actually inserted the row -- a replay never reaches this step)
--> linked jobs row with status=created
-```
+## Finalization and recovery
 
-If quota is exhausted, the whole request transaction rolls back: any `scenario_sessions` row this
-specific call inserted (an ANY-150 keyed insert-or-select can insert before quota runs) disappears
-with it, and the API returns `quota_exhausted`. No scenario session or job is ever left committed for
-a rejected start.
+`quotas/finalization.py` provides `finalize_success(session, job_id, FinalExecutionResult,
+config_registry=...)` and `release_execution(session, job_id)`. Neither commits or rolls back the
+caller. Existing-row lock order is `job -> scenario -> reservation -> original bucket`.
 
-Immediate handoff acceptance and the ordinary `/start` router share the same rollback-and-recover
-shape for quota exhaustion. A rejected start must leave the quota usage dimension and the
-`quota.checked` / `quota.exhausted` audit pair durable, return safe HTTP 429, and leave no target
-session or job committed. Neither router commits its transaction on `quota_exhausted` -- both let the
-error propagate out of `transaction_boundary`, which rolls the transaction back. The quota service
-therefore registers an exhaustion-only rollback recovery callback before raising: after rollback it
-re-ensures the same usage dimension and re-emits the same checked/exhausted pair in an independent
-transaction (`storage/transactions.py`'s `register_rollback_recovery_callback`).
+The shared Result API availability boundary (`results/validation.py`) validates canonical linkage,
+workflow/schema versions, normalized output and recursively forbidden fields. The runner retains
+one deep-copied final candidate and artifact ID and registers success recovery before finalization.
+An artifact row or successful provider call alone cannot consume quota.
 
-For handoffs, the accepted claim establishes quota-rejection ownership when target quota evaluation
-discovers exhaustion under the handoff lifecycle advisory lock. That PostgreSQL session-level lock
-survives the accepting transaction rollback and is released only after recovery callbacks complete.
-The handoff quota callback is critical: the owning accept request cannot return
-`429 quota_exhausted` if recovery fails to persist the durable `failed` state and audit chain. One
-conditional update claims recovery and finalizes `failed` with safe `quota_exhausted`, then emits the
-quota pair and `handoff.failed` before commit. A repeated recovery that finds an existing audit pair
-returns without duplicating it; a lost terminal CAS without the audit pair is treated as recovery
-failure, not a valid 429. Decline and expiry can win only before this ownership point; afterward they
-wait and observe `failed`. Recovery never consumes quota, creates a target session/job, runs a
-workflow, creates a target artifact, or makes a provider call. The router's later failure call
-remains idempotent and does not duplicate the handoff event.
+New success requires a running job, active reservation and running scenario. Accessible canonical
+result publication, succeeded job, scenario completion, `reserved−1`, `used+1`, consumed reservation
+and events commit together. Failure/cancellation releases without debit; partial/debug artifacts do
+not qualify as success. A competing terminal scenario wins without publication, debit or restoration
+to running. Consumed and released decisions cannot change into each other; repeated terminal calls
+return `applied=False` and emit no new transition.
 
-The fast SQLite test suite has a known ceiling here: many concurrent ordinary `/start` losing
-requests each spawn an independent non-critical recovery transaction against the same usage row, and
-SQLite's ATTACH-schema harness can drop some of those under write contention
-(`sqlite3.OperationalError: database is locked`) without changing the primary response path. That
-best-effort tolerance applies only to non-critical ordinary `/start` recovery. Immediate handoff
-quota recovery is critical: recovery failure prevents returning `429 quota_exhausted`. SQLite does
-not provide valid handoff race behavior for advisory-lock ownership, decline/expiry serialization,
-or recovery ordering. Production-safe concurrency evidence for handoff quota rejection comes from
-`test_quota_concurrency_postgresql.py`, not the SQLite suite.
+Normal execution and rollback/unknown-commit recovery use this same finalizer. Recovery reads durable
+terminal state first; metered final results have no independent artifact-only recovery commit.
+Action/provider/debug recovery and causal event backfill remain intact. Preclaim cancellation,
+worker cancellation, disabled/poison failure and orphan terminalization share release. JobLease
+still determines liveness: elapsed time never releases a live execution or automatically requeues
+an unknown outcome. Original guest windows and paid buckets remain attached across calendar/cycle
+changes. Legacy jobs retain their earlier debit history and are never charged again.
 
-API behavior:
+`ConsumptionTransition(applied, reservation, became_exhausted)` exposes an exhaustion edge only on
+an applied consumption. ANY-766 attaches its explicit outbox write before the same outer commit,
+including recovery; this stage introduces no outbox or Portal wire.
 
-- `POST /v1/products/{product_id}/scenarios/{scenario_id}/start` returns `429` with
-  `quota_exhausted` when the backend rejects the start for exhausted quota;
-- the rejected start is not visible as a half-created session or job to the frontend;
-- missing guest identity for a quota-protected product returns frontend-safe `422`;
-- unknown guest identity for a quota-protected product returns frontend-safe `404`;
-- (ANY-150) the same request replayed with the same `Idempotency-Key` returns `200` with the
-  original start's snapshot and does not touch quota; the same key reused with a different request
-  returns `409 idempotency_key_conflict` before quota is touched -- see
-  `docs/architecture/scenario-session-model.md`.
-- `GET /v1/products/{product_id}/quota?guest_id={guest_id}` returns product-wide quota state for
-  product-dimension policies; scenario-dimension policies require `scenario_id` so the backend can
-  identify the counter.
+## Readback and guest HTTP
 
-Concurrency proof:
+`quotas/readback.py:read_consumption(session, owner, bucket)` takes an original usage-row ID and
+returns `ConsumptionReadback` from one query without writes or locks. Its typed bucket carries the
+original guest dimension or paid allowance identity. Unknown/foreign buckets return `None`
+(`unobserved`); storage errors propagate. Paid callers resolve allowance IDs through the paid
+repository. Reads never create an allowance. The result carries `owner`, the typed original
+`bucket`, `quantity`, `used`, `successful_used`, `legacy_used`, `reserved`, `remaining`, `available`
+and aware UTC `read_at`. Paid `legacy_used` is always zero.
 
-- PostgreSQL is the production source of truth for quota consume semantics;
-- PostgreSQL-backed tests are required for quota concurrency, `ON CONFLICT`, row-lock, and
-  transaction-isolation proof;
-- `apps/platform-api/tests/test_quota_concurrency_postgresql.py` is the PostgreSQL-backed
-  integration check for concurrent accepted starts, `N+1` exhaustion behavior, and (ANY-150)
-  concurrent duplicate submission under one `Idempotency-Key`.
-
-Quota policy config owns the quota dimension. Supported values:
-
-- `product`: one product-wide quota counter shared by all scenarios under the product;
-- `scenario`: one quota counter per `guest_id + product_id + scenario_id`.
-
-The persisted quota uniqueness path is:
+All readback counters derive from one row snapshot:
 
 ```text
-tenant_id + region + guest_id + product_id + quota_policy_id + quota_dimension + dimension_key + period_key
+used = legacy_used + successful_used
+remaining = max(quantity - used, 0)
+available = max(quantity - used - reserved, 0)
+exhausted = remaining == 0
 ```
 
-For product-wide policies, `dimension_key = product_id` and `scenario_id` is not persisted on the
-usage row. For scenario-specific policies, `dimension_key = scenario_id` and `scenario_id` is
-persisted on the usage row. Quota events include `quota_dimension` and `quota_dimension_key`; for
-scenario-specific policies they also include `quota_scenario_id`.
+`GET /v1/products/{product_id}/quota?guest_id=...` preserves the guest identity/policy/dimension,
+unit/period/limit/used/remaining/exhausted/resets fields. It adds `successful_used_count`,
+`legacy_used_count`, `reserved_count`, `available_count` and timezone-aware `read_at`. Historical
+used quota is preserved, never refunded or relabelled as successful results. Product policies share
+one product counter; scenario policies require `scenario_id`. Empty guest state derives from policy
+without creating a usage row. Guest HTTP uses the current configured policy `limit_count`, even
+when it differs from the stored guest limit; GET does not synchronize that stored limit. Used,
+legacy and reserved counts come from one row, and remaining/available use the configured limit.
+HTTP exposes no bucket/reservation/owner internals, prompts or billing state. The paid HTTP branch
+and interservice endpoints belong to ANY-766.
 
-`product.quota_policy_ref` resolves the quota policy from repo config.
+With Q=1 and one reservation: used=0, reserved=1, remaining=1, available=0, exhausted=false.
+`429 quota_capacity_reserved` is a temporary admission rejection; no candidate execution survives,
+no exhaustion/paywall state opens, and handoff consent remains retryable. `429 quota_exhausted`
+means final used quota reached quantity. Missing guest identity returns 422; unknown guest returns
+404. Accepted keyed replay returns the original execution's current snapshot; changed input returns
+409 `idempotency_key_conflict` without reserving.
 
-The MVP-A conversion path is:
+## Events and clients
 
-```text
-guest usage -> quota exhausted -> email capture -> waitlist/paywall intent -> early access
-```
+- `quota.checked`: quota evaluation.
+- `quota.reserved`: actual admission reservation, in the acceptance transaction.
+- `quota.consumed`: accessible successful result, in the publication/debit transaction.
+- `quota.released`: actual failure/cancellation release, in the terminal transaction.
+- `quota.capacity_reserved`: rejected admission while reserves occupy capacity.
+- `quota.exhausted`: rejected admission after used quota reached quantity.
 
-Implementing guest quota only in frontend is an architecture error.
+Transition events carry owner kind/ID, tenant/region, product/scenario/frontend, session/job, original
+bucket and applicable handoff/result dimensions. Paid events include allowance/metric/unit; guest
+events include policy/dimension/window. Replay and losing terminal decisions emit no duplicate
+reserve/consume/release. Denial audit recovery never recreates session/job/reservation or consumes.
+Capacity audit retains the observed counter snapshot across rollback. Exhaustion recovery preserves
+the checked/exhausted audit pair. Immediate handoff exhaustion also durably marks failed under its
+lifecycle lock; busy capacity leaves the handoff actionable. Handoff audit recovery is critical.
+
+CE-kit parses the expanded DTO and classifies the two 429 codes separately. Shared web refreshes
+quota after acceptance, terminal success/release and explicit new-task reads. Temporary busy retry
+reuses the prepared start/key or original handoff token and guest. A result-fetch retry only reads
+the same result. Advisory quota never replaces an active/completed result. Leaving the page does
+not cancel execution: an eventual successful result still consumes its reservation.
+
+## Verification and activation boundary
+
+PostgreSQL suites cover atomic acceptance/finalization/recovery, terminal arbitration and bucket
+history; `test_execution_readback_postgresql.py` proves readback, guest HTTP refresh, historical
+contribution, scoped unknown/error behavior and transition dimensions. Frontend parser/component
+checks cover busy versus exhausted and retry identity. Stage 5 provides the
+[quiesce/cutover/rollback procedure](../../infra/deployment/execution-metering-cutover.md) and
+[ANY-766 mechanism handoff](../handoffs/ANY-507-execution-metering.md). Actual gate results and
+activation limits remain in the plan's stage-5 checkpoint. Never mix old/new admission or workers.
 
 ## Periods and windows
 
@@ -132,7 +141,7 @@ supported. `resolve_quota_period(period, now)` computes `period_key` (`lifetime`
 UTC instant; naive datetimes are rejected.
 
 - The window is resolved once per operation: `validate_accepted_start` stores it in `QuotaValidation`,
-  and consume and rollback recovery reuse it; `check_quota` resolves once per request. Only these two
+  and reservation and rollback recovery reuse it; `check_quota` resolves once per request. Only these two
   entry points read the injectable quota clock.
 - A new window selects or creates a new `guest_quota_usage` row through the existing `period_key`
   unique dimension. Nothing is reset and no job or migration is needed.

@@ -29,9 +29,9 @@ from anytoolai_platform_core.workflows.repository import JobRepository
 from anytoolai_platform_worker.composition import build_worker
 from anytoolai_platform_worker.lease import AdvisoryJobLease, _advisory_lock_key
 from test_worker_boot import (
+    _EXTRACT_FIELDS,
     CONFIG_ROOT,
     FIXTURE_ROOT,
-    _EXTRACT_FIELDS,
     _seed_job,
     _seed_running_job,
 )
@@ -41,6 +41,9 @@ from tests.db_support import provision_database
 pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+CONSOLE_STARTUP_TIMEOUT_SECONDS = 30.0
+CONSOLE_STARTUP_POLL_SECONDS = 0.05
+CONSOLE_APPLICATION_NAME = "anytoolai_worker_sigterm_console_test"
 
 
 def _src_roots() -> list[str]:
@@ -258,8 +261,16 @@ def test_real_console_entrypoint_under_uv_run_exits_cleanly_on_sigterm(
     (PID 1), not directly to the Python process -- so nothing else here actually proves `uv`
     forwards the signal down to where `main.py`'s handler can see it. This launches the exact
     same command and confirms it exits cleanly (code 0) on SIGTERM."""
-    _engine, _session_factory, database_url = db
-    env = {**os.environ, "ANYTOOLAI_DATABASE_URL": database_url}
+    engine, _session_factory, database_url = db
+    worker_url = sa.engine.make_url(database_url).update_query_dict(
+        {"application_name": CONSOLE_APPLICATION_NAME}
+    )
+    env = {
+        **os.environ,
+        "ANYTOOLAI_DATABASE_URL": worker_url.render_as_string(hide_password=False),
+        # --no-sync must use the environment with the installed console entrypoint.
+        "UV_PROJECT_ENVIRONMENT": sys.prefix,
+    }
     process = subprocess.Popen(
         [
             "uv",
@@ -276,13 +287,26 @@ def test_real_console_entrypoint_under_uv_run_exits_cleanly_on_sigterm(
         text=True,
     )
     try:
-        # `main.py`'s `_register_sigterm_handler()` call only happens after
-        # `WorkerSettings.from_env()` and `build_worker()` -- config-registry loading and
-        # engine construction -- have both completed. A SIGTERM that arrives before that
-        # registration hits Python's default disposition (immediate termination, exit code
-        # 143) instead of the graceful handler; empirically this needs several seconds of
-        # headroom, not the ~2s a bare `python -c` boots in.
-        time.sleep(6.0)
+        # Engine construction is lazy: the tagged connection appears only when run_forever
+        # starts polling, after main registered SIGTERM. A fixed startup sleep tests import
+        # speed instead of signal forwarding on cold or I/O-throttled hosts.
+        deadline = time.monotonic() + CONSOLE_STARTUP_TIMEOUT_SECONDS
+        with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as observer:
+            while time.monotonic() < deadline:
+                if process.poll() is not None:
+                    pytest.fail("Worker exited before starting database polling.")
+                ready = observer.execute(
+                    sa.text(
+                        "SELECT EXISTS (SELECT 1 FROM pg_stat_activity "
+                        "WHERE datname = current_database() AND application_name = :name)"
+                    ),
+                    {"name": CONSOLE_APPLICATION_NAME},
+                ).scalar_one()
+                if ready:
+                    break
+                time.sleep(CONSOLE_STARTUP_POLL_SECONDS)
+            else:
+                pytest.fail("Worker did not start database polling before the startup deadline.")
         process.send_signal(signal.SIGTERM)
         returncode = process.wait(timeout=20)
     finally:

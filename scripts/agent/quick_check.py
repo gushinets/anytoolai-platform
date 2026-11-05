@@ -156,6 +156,8 @@ def bootstrap_marker() -> Path:
 # and compares it) turns that drift back into a clear ENV001 instead of a stale-venv PROOF000.
 DEPENDENCY_FINGERPRINT_INPUTS = [
     ROOT / "uv.lock",
+    ROOT / "pyproject.toml",
+    ROOT / "infra" / "python" / "uv-build.toml",
     *(project / "pyproject.toml" for project in EDITABLE_PROJECTS),
 ]
 
@@ -174,11 +176,18 @@ def uv_executable() -> str:
 
 
 def uv_install_command(*args: str, python: str) -> list[str]:
-    return [uv_executable(), "pip", "install", "--python", python, *args]
+    return [
+        uv_executable(), "pip", "install", "--config-file",
+        str(ROOT / "infra" / "python" / "uv-build.toml"), "--python", python, *args,
+    ]
 
 
 def uv_sync_command(*args: str, python: str) -> list[str]:
-    return [uv_executable(), "sync", "--python", python, "--active", *args]
+    return [
+        uv_executable(), "sync", "--config-file",
+        str(ROOT / "infra" / "python" / "uv-build.toml"),
+        "--python", python, "--active", *args,
+    ]
 
 
 def python_version(python_executable: Path) -> tuple[int, int] | None:

@@ -23,6 +23,7 @@ from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.providers.gateway import ProviderGatewayExecutionError
+from anytoolai_platform_core.quotas.finalization import SCENARIO_TERMINAL_ERROR
 from anytoolai_platform_core.scenarios.correlation import (
     build_scenario_identity_metadata,
     enrich_job_metadata_with_scenario_identity,
@@ -35,7 +36,7 @@ from anytoolai_platform_core.scenarios.repository import ScenarioSessionReposito
 from anytoolai_platform_core.scenarios.runtime_scope import is_atom_lab_session
 from anytoolai_platform_core.scenarios.service import ScenarioSessionService
 from anytoolai_platform_core.storage.transactions import transaction_boundary
-from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
+from anytoolai_platform_core.workflows.models import JobConsumptionMode, JobRecord, JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
 from anytoolai_platform_core.workflows.runner import (
     SequentialWorkflowRunner,
@@ -64,6 +65,11 @@ class JobScenarioSessionInvalidError(PlatformError):
             "job_scenario_session_invalid",
             "Job scenario session linkage is invalid.",
         )
+
+
+class JobScenarioNotRunnableError(PlatformError):
+    def __init__(self) -> None:
+        super().__init__(SCENARIO_TERMINAL_ERROR, "Scenario is no longer runnable.")
 
 
 class AtomLabSnapshotInvalidError(PlatformError):
@@ -100,7 +106,7 @@ class RunWorkflowHandler:
             claimed = self._claim(job_id)
         except asyncio.CancelledError:
             raise
-        except JobScenarioSessionInvalidError as exc:
+        except (JobScenarioSessionInvalidError, JobScenarioNotRunnableError) as exc:
             self._persist_created_job_failure(job_id, exc)
             return self._get(job_id)
         if claimed is None:
@@ -181,7 +187,7 @@ class RunWorkflowHandler:
             with transaction_boundary(self._session_factory) as session:
                 repository = JobRepository(session)
                 emitter = EventEmitter(EventLogRepository(session))
-                job = repository.get(job_id)
+                job = repository.get(job_id, for_update=True)
                 if job is None or job.status is not JobStatus.created:
                     return job
 
@@ -190,7 +196,7 @@ class RunWorkflowHandler:
                 return WorkflowJobService(repository, emitter).cancel_created(
                     job_id,
                     metadata=metadata,
-                ) or repository.get(job_id)
+                ) or repository.get(job_id, for_update=True)
         except JobScenarioSessionInvalidError as exc:
             # Same poison-job handling as handle()/_claim(): a job whose scenario
             # linkage is missing/mismatched can't be cancelled cleanly either, so it
@@ -230,7 +236,7 @@ class RunWorkflowHandler:
                 if not self._lease.acquire(job_id):
                     return None
                 lease_acquired = True
-                job = repository.get(job_id)
+                job = repository.get(job_id, for_update=True)
                 if job is None or job.status is not JobStatus.created:
                     return None
 
@@ -252,15 +258,21 @@ class RunWorkflowHandler:
                         ),
                         error_code="product_disabled",
                     )
-                    scenario_service.mark_failed(
-                        scenario,
-                        error_code="product_disabled",
-                        context=self._execution_context(job, scenario),
-                    )
+                    if job.consumption_mode is not JobConsumptionMode.reserved:
+                        scenario_service.mark_failed(
+                            scenario,
+                            error_code="product_disabled",
+                            context=self._execution_context(job, scenario),
+                        )
                     return None
 
                 # Held until handle()'s finally releases it after execution.
                 scenario = self._load_scenario(session, job)
+                if (
+                    job.consumption_mode is JobConsumptionMode.reserved
+                    and scenario.status is not ScenarioSessionStatus.started
+                ):
+                    raise JobScenarioNotRunnableError()
                 metadata = enrich_job_metadata_with_scenario_identity(
                     job.metadata,
                     scenario,
@@ -435,7 +447,7 @@ class RunWorkflowHandler:
         reconcile_succeeded_job = False
         with transaction_boundary(self._session_factory) as session:
             repository = JobRepository(session)
-            job = repository.get(job_id)
+            job = repository.get(job_id, for_update=True)
             if job is None:
                 return
             emitter = EventEmitter(EventLogRepository(session))
@@ -473,7 +485,10 @@ class RunWorkflowHandler:
                     )
                 scenario_error_code = job.error_code or error_code
 
-            if not reconcile_succeeded_job:
+            if (
+                not reconcile_succeeded_job
+                and job.consumption_mode is not JobConsumptionMode.reserved
+            ):
                 scenario = ScenarioSessionRepository(session).get(
                     job.scenario_session_id,
                     tenant_id=job.tenant_id,
@@ -481,7 +496,10 @@ class RunWorkflowHandler:
                     product_id=job.product_id,
                     frontend_id=job.frontend_id,
                 )
-                if scenario is not None and scenario.status is not ScenarioSessionStatus.failed:
+                if scenario is not None and scenario.status in {
+                    ScenarioSessionStatus.started, ScenarioSessionStatus.running,
+                    ScenarioSessionStatus.waiting_for_user,
+                }:
                     ScenarioSessionService(
                         ScenarioSessionRepository(session),
                         emitter,
@@ -510,6 +528,8 @@ class RunWorkflowHandler:
         # it back to `completed` would clobber that and emit a stale scenario.completed
         # event. Shared by both the happy path and the rollback-recovery reconciliation
         # path below so a future change to this guard only has to be made once.
+        if job.consumption_mode is JobConsumptionMode.reserved:
+            return
         if scenario.status is not ScenarioSessionStatus.running:
             return
         ScenarioSessionService(
@@ -563,7 +583,7 @@ class RunWorkflowHandler:
         error_message_safe = _safe_error_message(exc)
         with transaction_boundary(self._session_factory) as session:
             repository = JobRepository(session)
-            job = repository.get(job_id)
+            job = repository.get(job_id, for_update=True)
             if job is None or job.status is not JobStatus.created:
                 return
             emitter = EventEmitter(EventLogRepository(session))
@@ -581,13 +601,15 @@ class RunWorkflowHandler:
     def _persist_handler_cancellation(self, job_id: str) -> None:
         with transaction_boundary(self._session_factory) as session:
             repository = JobRepository(session)
-            job = repository.get(job_id)
+            job = repository.get(job_id, for_update=True)
             if job is None:
                 return
             emitter = EventEmitter(EventLogRepository(session))
             if job.status is JobStatus.running:
                 job = WorkflowJobService(repository, emitter).mark_canceled(job)
             elif job.status is not JobStatus.canceled:
+                return
+            if job.consumption_mode is JobConsumptionMode.reserved:
                 return
             scenario = ScenarioSessionRepository(session).get(
                 job.scenario_session_id,
@@ -596,7 +618,10 @@ class RunWorkflowHandler:
                 product_id=job.product_id,
                 frontend_id=job.frontend_id,
             )
-            if scenario is not None and scenario.status is not ScenarioSessionStatus.failed:
+            if scenario is not None and scenario.status in {
+                    ScenarioSessionStatus.started, ScenarioSessionStatus.running,
+                    ScenarioSessionStatus.waiting_for_user,
+                }:
                 ScenarioSessionService(
                     ScenarioSessionRepository(session),
                     emitter,

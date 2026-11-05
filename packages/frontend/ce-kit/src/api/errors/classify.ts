@@ -12,6 +12,7 @@ export const BACKEND_ERROR_CODE = {
   scenarioCheckpointNotActionable: "scenario_checkpoint_not_actionable",
   scenarioNextActionNotAllowed: "scenario_next_action_not_allowed",
   quotaExhausted: "quota_exhausted",
+  quotaCapacityReserved: "quota_capacity_reserved",
   resultArtifactNotFound: "result_artifact_not_found",
   resultArtifactUnavailable: "result_artifact_unavailable",
   handoffNotFound: "handoff_not_found",
@@ -68,6 +69,11 @@ export function isScenarioActionConflict(error: PlatformApiError): boolean {
 /** True only for the 429 that means the guest has no quota left; no session/job was created. */
 export function isQuotaExhausted(error: PlatformApiError): boolean {
   return _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.quotaExhausted);
+}
+
+/** Capacity held by in-flight executions: retry the same logical operation; no paywall. */
+export function isQuotaCapacityReserved(error: PlatformApiError): boolean {
+  return _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.quotaCapacityReserved);
 }
 
 /** True only for the 404 that means the result artifact id is unknown, or out of tenant/region scope. */

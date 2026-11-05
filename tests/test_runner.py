@@ -137,16 +137,23 @@ def test_full_check_uses_uv_for_freelancer_suite_install(monkeypatch) -> None:
         "/usr/local/bin/uv",
         "pip",
         "install",
+        "--config-file",
+        str(runner.ROOT / "infra" / "python" / "uv-build.toml"),
         "--python",
         quick_check_python,
         "setuptools>=68",
         "wheel",
+        "setuptools==82.0.1",
+        "wheel==0.46.3",
+        "packaging==26.2",
     ]
     assert "PYTHONPATH" not in commands[0][1]
     assert commands[1][0] == [
         "/usr/local/bin/uv",
         "pip",
         "install",
+        "--config-file",
+        str(runner.ROOT / "infra" / "python" / "uv-build.toml"),
         "--python",
         quick_check_python,
         "--no-build-isolation",
@@ -160,6 +167,7 @@ def test_full_check_uses_uv_for_freelancer_suite_install(monkeypatch) -> None:
         "-m",
         "pytest",
         "packages/backend/product-platforms/freelancer-suite/tests",
+        "tests/test_quick_check.py",
     ]
     assert "PYTHONPATH" not in commands[2][1]
 
@@ -530,10 +538,37 @@ def test_required_backend_workflow_runs_canonical_postgresql_check() -> None:
     assert job.get("continue-on-error") is not True
     steps_by_name = {step.get("name"): step for step in job["steps"]}
     postgresql_step = steps_by_name["Run all PostgreSQL production-semantics tests"]
-    assert postgresql_step["run"] == ("uv run python scripts/agent/runner.py postgresql-check")
+    assert postgresql_step["run"] == (
+        "uv run --no-sync python scripts/agent/runner.py postgresql-check"
+    )
     assert postgresql_step["env"]["ANYTOOLAI_POSTGRES_TEST_DATABASE_URL"] == (
         "postgresql+psycopg://anytoolai:anytoolai@127.0.0.1:5432/postgres"
     )
+
+
+def test_compose_smoke_prod_checks_ports_then_boots_before_smoke_and_always_tears_down() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    workflow = yaml.safe_load(
+        (repo_root / ".github/workflows/backend.yml").read_text(encoding="utf-8")
+    )
+    steps = workflow["jobs"]["compose-smoke-prod"]["steps"]
+    run_steps = [step for step in steps if "run" in step]
+    prefix = "uv run --no-sync python scripts/agent/runner.py "
+    assert [step["run"] for step in run_steps] == [
+        "uv sync --locked --group dev --config-file infra/python/uv-build.toml",
+        "uv run --no-sync --no-build python -m pytest tests/compose/test_postgres_ports.py",
+        prefix + "prod-fake-up",
+        prefix + "prod-smoke",
+        prefix + "prod-fake-down",
+    ]
+    boot, teardown = run_steps[2], run_steps[-1]
+    assert "if" not in boot
+    assert teardown["if"] == "always()"
+    assert boot["env"] == teardown["env"]
+    assert boot["env"]["ANYTOOLAI_ENABLED_PRODUCT_IDS"] == "kernel_demo"
+    for key in ("ANYTOOLAI_POSTGRES_USER", "ANYTOOLAI_POSTGRES_PASSWORD", "ANYTOOLAI_POSTGRES_DB"):
+        assert boot["env"][key]
+    assert "env" not in run_steps[1]
 
 
 def _compose_stack_check_action() -> dict:
@@ -556,8 +591,8 @@ def test_compose_stack_check_action_scopes_secrets_to_exactly_two_steps() -> Non
     steps = action["runs"]["steps"]
 
     secret_needing_runs = {
-        "uv run python scripts/agent/runner.py dev-up",
-        "uv run python scripts/agent/runner.py ${{ inputs.check-command }}",
+        "uv run --no-sync python scripts/agent/runner.py dev-up",
+        "uv run --no-sync python scripts/agent/runner.py ${{ inputs.check-command }}",
     }
     for step in steps:
         step_env = step.get("env", {})
@@ -580,14 +615,14 @@ def test_compose_stack_check_action_shape() -> None:
     steps_by_run = {step.get("run"): step for step in steps if step.get("run")}
 
     bootstrap_step = steps_by_run[
-        "uv run python scripts/agent/runner.py quick-check --bootstrap-only"
+        "uv run --no-sync python scripts/agent/runner.py quick-check --bootstrap-only"
     ]
     assert bootstrap_step["if"] == "inputs.bootstrap-quick-check == 'true'"
 
     dump_step = next(s for s in steps if s.get("name") == "Dump Docker Compose logs on failure")
     assert dump_step["if"] == "failure()"
 
-    teardown_step = steps_by_run["uv run python scripts/agent/runner.py dev-down"]
+    teardown_step = steps_by_run["uv run --no-sync python scripts/agent/runner.py dev-down"]
     assert teardown_step["name"] == "Tear down dev stack"
     assert teardown_step["if"] == "always()"
 
@@ -4869,3 +4904,23 @@ def test_deployment_lock_checks_windows_file_acl_after_open_and_closes_on_failur
     with pytest.raises(OSError) as closed:
         os.fstat(descriptors[0])
     assert closed.value.errno == runner.errno.EBADF
+
+
+def test_automated_python_installs_check_locks_and_use_shared_build_config():
+    runner = load_runner_module()
+    for relative in (
+        ".github/workflows/backend.yml",
+        ".github/workflows/docs.yml",
+        ".github/actions/compose-stack-check/action.yml",
+        "infra/docker/platform-api.Dockerfile",
+        "infra/docker/platform-worker.Dockerfile",
+    ):
+        for line in (runner.ROOT / relative).read_text().splitlines():
+            if "uv sync " in line:
+                assert "--locked" in line, (relative, line)
+                assert "--config-file" in line, (relative, line)
+                assert "infra/python/uv-build.toml" in line, (relative, line)
+            if "uv run " in line:
+                assert "uv run --no-sync " in line, (relative, line)
+            if "uv pip install " in line:
+                assert "--config-file infra/python/uv-build.toml" in line, (relative, line)
