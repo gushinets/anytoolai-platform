@@ -72,6 +72,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/atom-lab/atoms/{atom_id}/prompts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Atom Prompts */
+        get: operations["list_atom_prompts_v1_atom_lab_atoms__atom_id__prompts_get"];
+        put?: never;
+        /** Create Atom Prompt */
+        post: operations["create_atom_prompt_v1_atom_lab_atoms__atom_id__prompts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/atom-lab/models": {
         parameters: {
             query?: never;
@@ -713,6 +731,35 @@ export interface components {
             preset_id: string;
             /** Version */
             version: number;
+        };
+        /** AtomLabPromptCreateRequest */
+        AtomLabPromptCreateRequest: {
+            /** Name */
+            name: string;
+            /** Prompt */
+            prompt: string;
+            /** Source Ref */
+            source_ref: string;
+            /** Source Run Id */
+            source_run_id?: string | null;
+        };
+        /** AtomLabPromptOption */
+        AtomLabPromptOption: {
+            /**
+             * Group
+             * @enum {string}
+             */
+            group: "platform" | "product" | "lab";
+            /** Name */
+            name: string;
+            /** Prompt */
+            prompt: string;
+            /** Ref */
+            ref: string;
+            /** Source Ref */
+            source_ref?: string | null;
+            /** Source Run Id */
+            source_run_id?: string | null;
         };
         /** AtomLabProviderCallDiagnosticResponse */
         AtomLabProviderCallDiagnosticResponse: {
@@ -1465,6 +1512,112 @@ export interface operations {
             };
         };
     };
+    list_atom_prompts_v1_atom_lab_atoms__atom_id__prompts_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Atom-Lab-Access-Code"?: string | null;
+            };
+            path: {
+                atom_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabPromptOption"][];
+                };
+            };
+            /** @description Atom Lab access denied. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+            /** @description Atom Lab request validation failed. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+            /** @description Atom Lab is not configured. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+        };
+    };
+    create_atom_prompt_v1_atom_lab_atoms__atom_id__prompts_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Atom-Lab-Access-Code"?: string | null;
+            };
+            path: {
+                atom_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AtomLabPromptCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabPromptOption"];
+                };
+            };
+            /** @description Atom Lab access denied. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+            /** @description Atom Lab request validation failed. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+            /** @description Atom Lab is not configured. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+        };
+    };
     list_models_v1_atom_lab_models_get: {
         parameters: {
             query?: never;
@@ -2019,6 +2172,8 @@ export interface operations {
                     } | null;
                     /** Prompt */
                     prompt: string;
+                    /** Prompt Source Ref */
+                    prompt_source_ref?: string | null;
                     reasoning_effort: ("none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max") | null;
                 };
             };

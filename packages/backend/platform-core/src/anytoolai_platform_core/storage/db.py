@@ -373,6 +373,7 @@ atom_lab_runs_table = sa.Table(
     sa.Column("action_config_schema_version", sa.Integer(), nullable=False),
     sa.Column("prompt_ref", sa.String(length=128), nullable=False),
     sa.Column("prompt_version", sa.Integer(), nullable=False),
+    sa.Column("prompt_source_ref", sa.String(length=128)),
     sa.Column("base_prompt", sa.Text(), nullable=False),
     sa.Column("prompt", sa.Text(), nullable=False),
     sa.Column("input_schema_ref", sa.String(length=128), nullable=False),
@@ -889,10 +890,27 @@ event_log_table = sa.Table(
     ),
 )
 
+atom_lab_prompts_table = sa.Table(
+    "atom_lab_prompts",
+    runtime_metadata,
+    sa.Column("ref", sa.String(128), primary_key=True),
+    sa.Column("tenant_id", sa.String(128), nullable=False),
+    sa.Column("region", sa.String(64), nullable=False),
+    sa.Column("atom_id", sa.String(16), nullable=False),
+    sa.Column("name", sa.String(80), nullable=False),
+    sa.Column("prompt", sa.Text(), nullable=False),
+    sa.Column("source_ref", sa.String(128), nullable=False),
+    sa.Column("schema_refs", json_document, nullable=False),
+    sa.Column("source_run_id", sa.String(128)),
+    sa.Column("created_at", utc_datetime, nullable=False),
+    sa.Index("ix_atom_lab_prompts_scope", "tenant_id", "region", "atom_id"),
+)
+
 runtime_tables = {
     "scenario_sessions": scenario_sessions_table,
     "jobs": jobs_table,
     "atom_lab_presets": atom_lab_presets_table,
+    "atom_lab_prompts": atom_lab_prompts_table,
     "atom_lab_preset_versions": atom_lab_preset_versions_table,
     "atom_lab_runs": atom_lab_runs_table,
     "atom_lab_admission_scopes": atom_lab_admission_scopes_table,

@@ -156,13 +156,20 @@ class FakeLifecycleTarget {
 function createFakeDocument() {
   const ids = [
     "access-form", "access-code", "access-panel", "workspace", "status",
-    "atom-navigation", "atom-title", "atom-action-type", "atom-description",
-    "atom-transformation", "atom-passport", "input-schema", "output-schema",
+    "atom-navigation", "atom-count", "atom-title", "atom-action-type", "atom-description",
+    "atom-passport", "input-schema", "output-schema",
+    "input-contract-label", "output-contract-label", "input-contract-fields", "output-contract-fields",
+    "input-schema-ref", "output-schema-ref", "input-schema-version", "output-schema-version",
     "input-tab", "prompt-tab", "input-panel", "prompt-panel", "form-mode", "json-mode", "input-editor",
     "json-panel", "json-editor", "json-error", "prompt-editor", "fill-example", "reset-prompt",
+    "prompt-select", "prompt-origin", "prompt-load-status", "retry-prompts", "prompt-tab-state",
+    "prompt-test-status", "run-prompt-ref", "run-prompt-state", "save-prompt-panel",
+    "save-prompt-form", "save-prompt-name", "save-prompt", "save-prompt-status",
     "draft-state", "validation-errors", "result-placeholder", "presets-button",
     "history-button", "model-select", "reasoning-effort", "reasoning-help",
     "model-catalog-warning", "refresh-models", "run-button", "retry-submit", "retry-read", "run-state",
+    "launch-readiness", "response-draft-warning",
+    "run-status", "run-status-help", "result-caption", "run-metadata-section", "run-technical",
     "submitted-snapshot", "result-section", "result-readable", "result-json",
     "invalid-response", "invalid-response-code", "invalid-response-raw", "run-metadata",
     "run-diagnostics", "presets-panel", "close-presets", "preset-list", "load-more-presets",
@@ -173,6 +180,19 @@ function createFakeDocument() {
     "preset-compatibility", "adapt-preset", "preset-readonly",
     "history-panel", "close-history", "history-list", "load-more-history", "history-warning",
     "history-detail", "restore-history", "save-history-preset", "history-error",
+    "workbench-button", "atom-sidebar", "run-controls", "request-response",
+    "preset-empty", "preset-heading", "preset-selected-name", "preset-context",
+    "preset-view-description", "preset-view-actions", "preset-editor-form", "preset-editor-title",
+    "preset-source", "apply-preset", "edit-preset", "cancel-preset",
+    "preset-configuration", "preset-config-metadata", "preset-input-fields", "preset-input-json",
+    "preset-prompt", "preset-technical", "preset-list-state", "history-context",
+    "history-list-state", "history-record", "history-created", "history-detail-title",
+    "collapse-history", "history-status", "history-status-text", "history-status-help",
+    "history-summary", "history-result-tab", "history-request-tab", "history-diagnostics-tab",
+    "history-result-panel", "history-request-panel", "history-diagnostics-panel", "history-result-readable",
+    "history-result-message", "history-result-json", "history-invalid", "history-invalid-code",
+    "history-invalid-raw", "history-input-json", "history-prompt", "history-snapshot",
+    "history-metadata", "history-diagnostics-json", "history-runtime-json",
   ];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id.endsWith("editor") ? "textarea" : "div", id)]));
   elements.get("access-form").tagName = "FORM";
@@ -466,6 +486,23 @@ test("the interactive shell unlocks, safely renders catalog text, and keeps the 
   assert.equal(elements.get("atom-navigation").querySelector("button").textContent.includes("A01"), true);
   assert.equal(elements.get("atom-description").textContent, atom.description);
   assert.equal(elements.get("atom-passport").querySelector("img"), null);
+});
+
+test("local open access loads the editor automatically without a submitted code", async () => {
+  const {document, elements} = createFakeDocument();
+  const atom = await catalogAtom("A01");
+  elements.get("access-panel").dataset.autoOpen = "true";
+  const controller = bootstrapAtomLab({
+    document,
+    fetchImpl: async () => ({ok: true, async json() { return [atom]; }}),
+    confirmImpl: () => true,
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(controller.getSession().atom.atom_id, "A01");
+  assert.equal(elements.get("access-panel").hidden, true);
+  assert.equal(elements.get("workspace").hidden, false);
+  assert.equal(elements.get("access-code").value, "");
+  controller.destroy();
 });
 
 test("repeated refresh requests share one bounded model-catalog polling chain", async () => {
@@ -1779,10 +1816,10 @@ test("dirty atom navigation requires confirmation and preserves the current draf
   const buttons = elements.get("atom-navigation").querySelectorAll("button");
 
   await buttons[1].click();
-  assert.match(elements.get("atom-title").textContent, /A01/);
+  assert.equal(elements.get("atom-title").querySelector("span").textContent, "A01");
   allowNavigation = true;
   await buttons[1].click();
-  assert.match(elements.get("atom-title").textContent, /A02/);
+  assert.equal(elements.get("atom-title").querySelector("span").textContent, "A02");
 });
 
 test("invalid raw JSON requires confirmation before atom navigation", async () => {
@@ -1802,7 +1839,7 @@ test("invalid raw JSON requires confirmation before atom navigation", async () =
   await elements.get("atom-navigation").querySelectorAll("button")[1].click();
 
   assert.equal(confirmations, 1);
-  assert.match(elements.get("atom-title").textContent, /A01/);
+  assert.equal(elements.get("atom-title").querySelector("span").textContent, "A01");
   assert.equal(elements.get("json-editor").value, '{"source_text":');
 });
 
@@ -2129,9 +2166,11 @@ test("accepted and detail response parsers reject incomplete or unknown lifecycl
   assert.equal(parseRunDetail({...detail, snapshot: {atom_id: "A99"}}, "run"), null);
   assert.deepEqual(parseRunDetail(detail, "run"), {
     run_id: "run", status: "running", snapshot: {atom_id: "A01"}, runtime_ids: runtimeIds, result: null, diagnostics,
+    created_at: detail.created_at, started_at: detail.started_at, finished_at: detail.finished_at,
   });
   assert.deepEqual(parseRunDetail({...detail, status: "succeeded", result: {value: "ok"}}, "run"), {
     run_id: "run", status: "succeeded", snapshot: {atom_id: "A01"}, runtime_ids: runtimeIds, result: {value: "ok"}, diagnostics,
+    created_at: detail.created_at, started_at: detail.started_at, finished_at: detail.finished_at,
   });
 });
 

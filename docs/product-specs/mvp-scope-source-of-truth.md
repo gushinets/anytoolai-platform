@@ -104,9 +104,14 @@ Atom Lab is an internal kernel experimentation surface, not a public product, ad
 MVP-A release dependency. Its static shell is served by `platform-api` at `/atom-lab`; protected
 data routes live only under `/v1/atom-lab/*` and require the separate
 `X-Atom-Lab-Access-Code`. Missing server configuration fails closed.
+An operator can explicitly set `ANYTOOLAI_ATOM_LAB_AUTH_DISABLED=true` for a local deployment
+bound to loopback. That deployment opens the Lab catalog without entering a code.
 
 The catalog may expose the live `kernel_demo` action configuration, repository prompt, fixed input
 and output schemas, prepared Russian description, and validated example for each A01-A11 atom.
+The Laboratory workspace («Лаборатория») also lists prompts bound to compatible product actions.
+Users can edit the text for a Lab run and save a standalone prompt in Lab storage. Saved Lab prompts and source-run
+provenance stay inside the protected surface. Product definitions continue to live in the registry.
 This is a narrow exception to the ordinary frontend prohibition on prompt/model visibility. Public
 product clients and shared frontend packages still cannot receive prompt/provider/model overrides.
 
