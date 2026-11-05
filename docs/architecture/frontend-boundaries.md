@@ -401,8 +401,12 @@ Recommended frontend behavior for `429 quota_exhausted`:
 For `quota_capacity_reserved`, show temporary occupancy and retry the same prepared start/key
 (or handoff token/guest). Do not open an exhausted/paywall state or manufacture a new execution.
 The rejected attempt leaves no session/job/reservation; quota refresh is read-only.
-The form, ordinary Submit, mode selection and shell busy indication unlock immediately after this
-definite rejection. Retain the prepared key for an unchanged retry; edited input creates a new key.
+The form, ordinary Submit, mode selection and shell busy indication unlock after this definite
+rejection only if that prepared key has no earlier send with an unresolved outcome. Retain the key
+for an unchanged retry; edited input creates a new key. If a prior send timed out, lost its response
+or returned an unreadable acceptance, a later capacity rejection cannot prove that earlier send
+will not accept. Preserve the lock and same-key retry across automatic/manual retries until the
+execution is recovered. Uncertainty belongs to that key, not subsequent logical submissions.
 Ambiguous start/poll failures and accepted or attached executions retain their reattachment locks.
 
 Frontend-safe responses must not expose prompts, provider policies, provider/model names, retry

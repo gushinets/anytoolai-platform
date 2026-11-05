@@ -420,6 +420,9 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   // outcomes that might have; and a start known to have created a session is never sent again --
   // "Try again" resumes polling that session (see submitCurrentValues()).
   const sentStartsRef = useRef(new WeakSet<PreparedScenarioStart>());
+  // A later capacity rejection settles only that attempt. An earlier timed-out/unreadable send
+  // of the same key can still accept, so retain its lock across automatic and manual retries.
+  const uncertainStartsRef = useRef(new WeakSet<PreparedScenarioStart>());
   const startedSessionsRef = useRef(new WeakMap<PreparedScenarioStart, string>());
   // True while the run on screen is the attached session (no local submit since): "Try again"
   // re-polls it instead of validating an empty form or starting a second, quota-spending run.
@@ -447,9 +450,11 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   const handoffLocked = HANDOFF_STATUS_IS_LOCKED[handoffStatus];
   const isHandoffLocked = () => HANDOFF_STATUS_IS_LOCKED[handoffStatusRef.current];
   // Ambiguous start/poll failures keep the execution locked: remounting would lose its only
-  // reattachment handle. A definite capacity rejection retains the key for an unchanged retry,
-  // but created no execution, so editing or switching modes is safe. Other definite rejections
-  // clear pendingStart in runStart().
+  // reattachment handle. Capacity rejection permits editing/mode changes only when every earlier
+  // send of that key also had a definite rejection. Retain the key for an unchanged retry.
+  const capacityRejectedSafely = phase.kind === "retryable-error" &&
+    phase.reason === "quotaCapacityReserved" && pendingStart !== null &&
+    !uncertainStartsRef.current.has(pendingStart.prepared);
   //
   // Code review finding: `result-fetch-error` needs the same "unsafe to abandon" treatment for a
   // different reason -- that phase means the scenario session already completed and consumed its
@@ -465,7 +470,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     // An ambiguous failure keeps the run "live": a started run through its Idempotency-Key
     // (`pendingStart`), an attached handoff session through the session itself. Both may still be
     // running server-side, so abandoning this mount (a mode switch) would lose the only handle.
-    (phase.kind === "retryable-error" && phase.reason !== "quotaCapacityReserved" &&
+    (phase.kind === "retryable-error" && !capacityRejectedSafely &&
       (pendingStart !== null || attachActiveRef.current));
   // An attached (already queued and reserved) session that has not started polling yet (runtime config and
   // identity still loading): a mode switch would drop it before it could attach. A failed boot releases the
@@ -616,6 +621,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     // handle, so the same Idempotency-Key makes it safe: the backend returns the session it already
     // created instead of spending quota twice. A definite 4xx is never retried.
     if (!controller?.signal.aborted && !result.ok && isAmbiguousFailure(result.error)) {
+      uncertainStartsRef.current.add(prepared);
       firstSend = false;
       result = await prepared.execute(client, startOptions);
     }
@@ -630,8 +636,8 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     }
     if (!result.ok) {
       if (capacityReserved) {
-        // This key created no execution. Retain it for an unchanged retry, but allow editing
-        // and mode changes instead of treating the rejected request as an ambiguous active run.
+        // This attempt created no execution. Earlier uncertain sends of this key may still
+        // accept; busy retains their lock while the same-key retry remains available.
         setPhase({ kind: "retryable-error", reason: "quotaCapacityReserved" });
         return;
       }
@@ -682,6 +688,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       // Idempotency-Key) stays exactly as set by the caller, so a retry collapses onto whatever the
       // backend actually did rather than risk a second, capacity-reserving start. See `busy`'s own
       // comment for why this is also why a mode switch must stay blocked here.
+      uncertainStartsRef.current.add(prepared);
       setPhase({ kind: "retryable-error", reason: "startFailed" });
       return;
     }

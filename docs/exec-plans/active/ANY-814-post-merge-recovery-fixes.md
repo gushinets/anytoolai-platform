@@ -4,11 +4,11 @@
 
 - State: active
 - Owner: Vyacheslav
-- Next action: review required CI and findings on the linked ANY-814 PR before merge.
+- Next action: review required CI and findings on PR #257 before merge.
 - Created: 2026-11-05.
 - Last updated: 2026-11-05
 - Review date: 2026-11-05
-- Blocker: none; final CI acceptance follows PR publication.
+- Blocker: none locally; required CI must validate the updated PR head.
 - Issue: [ANY-814](https://linear.app/paveldik/issue/ANY-814).
 - Related completed issue: [ANY-507](https://linear.app/paveldik/issue/ANY-507).
 - Base: `main` at `4cd2e0aa39b67d648cd40540db0a59a2559fd4f2`, merged PR #256.
@@ -21,8 +21,10 @@ The legacy guest replay dependency predates ANY-507; the reservation path inheri
 
 1. A definite `quota_capacity_reserved` rejection keeps the prepared key available for an
    unchanged retry, but does not mark an unaccepted request as an active execution. Fields,
-   ordinary Submit, mode switching and the shell's busy indication unlock. Edited input gets a
-   new key. Ambiguous failures and accepted/attached executions retain their existing locks.
+   ordinary Submit, mode switching and the shell's busy indication unlock only when that key
+   has no earlier unresolved send. Edited input gets a new key when editing is safe. Ambiguous
+   failures and accepted/attached executions retain their existing locks, including after a
+   subsequent capacity rejection.
 2. Owner/hash-checked accepted replay returns persisted session/job/result and original bucket
    even if the current scenario/product association is absent. Current config only enriches
    next actions when available; absent config grants no actions. New starts and action execution
@@ -31,6 +33,23 @@ The legacy guest replay dependency predates ANY-507; the reservation path inheri
 
 No paid HTTP, Portal/access/outbox integration, schema migration, production activation or
 general runtime/UI refactor belongs to this issue.
+
+## REV-1 follow-up — 2026-11-05
+
+Read-only review of `171f767d` confirmed that a timed-out first start can still be accepted after
+its retry returns `quota_capacity_reserved`. A controlled PostgreSQL schedule reproduced that
+late acceptance; a UI probe observed fields, Submit and mode selection incorrectly unlocked.
+
+- [x] Remember unresolved outcomes per prepared start across automatic and manual retries.
+- [x] Unlock capacity rejections only when that key has no unresolved earlier send; retain
+  same-key recovery and the capacity-specific message otherwise.
+- [x] Cover first/repeated definite rejection, uncertain automatic/manual retries, late accepted
+  execution/result recovery and the actual shell mode guard with regression tests.
+- [x] Re-run affected frontend and documentation checks, review the final diff and prepare the
+  PR #257 update.
+
+The backend replay/finalization changes stay at their already verified implementation. Required
+CI passed for `171f767d`; it is historical evidence until the follow-up head is checked.
 
 ## Execution
 
@@ -58,6 +77,8 @@ replay controls passed and four config-removal/disassociation probes failed as e
 
 ## Results
 
+### Initial implementation (`171f767d`)
+
 Implemented capacity-specific unlock with prepared-key retention and optional configuration lookup
 only for accepted replay/session reads. New admission and next actions retain strict configuration
 requirements. Missing definitions expose no next actions; Result API validation is unchanged.
@@ -77,3 +98,26 @@ requirements. Missing definitions expose no next actions; Result API validation 
   tests deselected in this focused run (covered by the complete PostgreSQL gate).
 - `quick-check`/`full-check` have not been run locally for this change; required CI must validate
   the published head. No paid HTTP integration or credentialed provider calls were exercised.
+
+### REV-1 remediation
+
+The prepared handle now remembers whether any send had an unresolved outcome. The flag is set
+before automatic retry and on other unknown start outcomes (including unreadable acceptance).
+Capacity rejection changes the message but cannot discard that history. Existing successful-start
+tracking still resumes polling, and each new logical submission has a distinct handle.
+
+Six permanent regression cases cover repeated definite rejection; gateway timeout, network loss,
+manual 5xx retry and unreadable acceptance followed by repeated capacity rejection; same-key
+recovery through polling/result rendering; a subsequent new key remaining editable; and the actual
+Client Update Writer mode-switch/busy-warning guard. Five failed before the production fix, while
+the definite-rejection controls passed. After the fix all 11 selected capacity/uncertainty tests
+passed; the other 113 tests in those files were filtered out of that focused run.
+
+Doctor, config/architecture/docs/generated-docs validation and diff check pass. The first complete
+frontend run passed lint/typecheck/unit checks but Chromium launch failed inside the sandbox
+(`Operation not permitted`). The complete canonical `frontend-check` then passed with browser
+execution permitted: lint/typecheck, 815 unit/component tests (52 shared UI, 327 CE-kit, 436 web),
+88 Atom Lab browser tests, OpenAPI drift check and production builds. No tests were suppressed to
+obtain this result. Backend behavior and migrations are unchanged; the earlier 637 PostgreSQL
+passes are reused rather than claimed as a new local run. Required CI must validate the follow-up
+head after publication.
