@@ -1787,23 +1787,37 @@ test("empty libraries offer explicit creation without opening an empty form", as
   await expect(page.locator("#history-record")).toBeHidden();
 });
 
-test("run, immutable preset versions, export, reload, and history restore form one protected journey", async ({page}) => {
+async function presetHistoryJourney(page, promptGroup) {
   page.on("dialog", (dialog) => dialog.accept());
   const versions = [];
   const presetWrites = [];
   let presetListReads = 0;
   let runPosts = 0;
   const detail = historyDetail();
+  const promptOrigin = {
+    ref: `${promptGroup}.a06.v1`, name: "Исходный промпт", prompt: "Промпт источника",
+    group: promptGroup, source_ref: promptGroup === "lab" ? "product.a06.v1" : null,
+    source_run_id: null,
+  };
 
   await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
     const request = route.request();
     const {pathname} = new URL(request.url());
     const method = request.method();
     expect(request.headers()["x-atom-lab-access-code"]).toBe("secret");
+    if (pathname === "/v1/atom-lab/atoms/A06/prompts") {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify([
+        {ref: A06.prompt_ref, name: "Платформенный", prompt: A06.prompt, group: "platform", source_ref: null, source_run_id: null},
+        promptOrigin,
+      ])});
+      return;
+    }
     if (pathname === "/v1/atom-lab/runs" && method === "POST") {
       runPosts += 1;
+      expect(request.postDataJSON().prompt_source_ref).toBe(promptOrigin.ref);
       detail.snapshot.input = request.postDataJSON().input;
       detail.snapshot.prompt.content = request.postDataJSON().prompt;
+      detail.snapshot.prompt.source_ref = request.postDataJSON().prompt_source_ref;
       await route.fulfill({status: 202, contentType: "application/json", body: JSON.stringify({
         run_id: detail.run_id, scenario_session_id: "session-library", job_id: "job-library", status: "succeeded",
       })});
@@ -1880,6 +1894,7 @@ test("run, immutable preset versions, export, reload, and history restore form o
   await page.locator("#fill-example").click();
   await showWorkbench(page);
   await page.locator("#prompt-tab").click();
+  await page.locator("#prompt-select").selectOption(promptOrigin.ref);
   await showWorkbench(page);
   await page.locator("#prompt-editor").fill("Промпт версии один");
   await page.locator("#reasoning-effort").selectOption("high");
@@ -1904,9 +1919,12 @@ test("run, immutable preset versions, export, reload, and history restore form o
   await expect(page.locator("#workspace")).toHaveAttribute("aria-busy", "false");
   await expect(page.locator("#preset-error")).toHaveText("");
   expect(presetWrites).toHaveLength(1);
+  expect(presetWrites[0].prompt_source_ref).toBe(promptOrigin.ref);
 
   await page.locator("#close-presets").click();
   await showWorkbench(page);
+  await expect(page.locator("#prompt-select")).toHaveValue(promptOrigin.ref);
+  await expect(page.locator("#run-prompt-ref")).toHaveText(promptOrigin.ref);
   await page.locator("#prompt-editor").fill("Промпт версии два");
   await page.locator("#presets-button").click();
   await editPreset(page);
@@ -1917,6 +1935,7 @@ test("run, immutable preset versions, export, reload, and history restore form o
   await expect(page.locator("#prompt-editor")).toHaveValue("Промпт версии два");
   await page.locator("#export-preset").click();
   await expect(page.locator("#preset-export")).toContainText('"version": 1');
+  expect(JSON.parse(await page.locator("#preset-export").textContent()).configuration.prompt_source_ref).toBe(promptOrigin.ref);
   await expect(page.locator("#preset-export-download")).toHaveAttribute("download", "atom-lab-preset-library-v1.json");
   await page.locator("#preset-version-select").selectOption("2");
   await expect(page.locator("#prompt-editor")).toHaveValue("Промпт версии два");
@@ -1927,6 +1946,7 @@ test("run, immutable preset versions, export, reload, and history restore form o
   expect(versions[0].prompt).toBe("Промпт версии один");
   expect(versions[1].prompt).toBe("Промпт версии два");
   expect(presetWrites[0].source_run_id).toBe(detail.run_id);
+  expect(versions.every(version => version.prompt_source_ref === promptOrigin.ref)).toBe(true);
 
   await page.locator("#close-presets").click();
   await page.locator("#history-button").click();
@@ -1944,11 +1964,31 @@ test("run, immutable preset versions, export, reload, and history restore form o
   await expect(page.locator("#history-detail")).toContainText('"validation_attempts": 2');
   await page.locator("#restore-history").click();
   await expect(page.locator("#prompt-editor")).toHaveValue("Промпт версии один");
+  await page.locator("#prompt-tab").click();
+  await expect(page.locator("#prompt-select")).toHaveValue(promptOrigin.ref);
+  await expect(page.locator("#run-prompt-ref")).toHaveText(promptOrigin.ref);
   await expect(page.locator("#draft-state")).toContainText("несохранённые");
   await expect(page.locator("#run-state")).toContainText("Запуск ещё не создан");
   expect(runPosts).toBe(1);
   expect(detail.diagnostics.physical_calls).toBe(1);
-});
+  await page.locator("#run-button").click();
+  await expect.poll(() => runPosts).toBe(2);
+  await expect(page.locator("#run-state")).toContainText("Завершён");
+
+  await page.locator("#presets-button").click();
+  await page.locator("#preset-list button").click();
+  await page.locator("#apply-preset").click();
+  await page.locator("#prompt-tab").click();
+  await expect(page.locator("#prompt-select")).toHaveValue(promptOrigin.ref);
+  await page.locator("#run-button").click();
+  await expect.poll(() => runPosts).toBe(3);
+}
+
+for (const promptGroup of ["product", "lab"]) {
+  test(`run, immutable preset versions, export, reload, and history restore preserve ${promptGroup} origin`, async ({page}) => {
+    await presetHistoryJourney(page, promptGroup);
+  });
+}
 
 test("preset conflict disables stale recovery when the latest-version read fails", async ({page}) => {
   page.on("dialog", (dialog) => dialog.accept());
@@ -4360,6 +4400,7 @@ test("saving from history uses the selected snapshot instead of the unrelated ed
     prompt: "Промпт выбранной истории",
     reasoningEffort: null,
   });
+  detail.snapshot.prompt.source_ref = "product.history.a06.v1";
   const editorPreset = {
     name: "Текущий A05", description: "Связанный runtime draft", atom_id: "A05",
     base_action_config_id: A05.base_action_config_id, schema_refs: A05.schema_refs,
@@ -4466,6 +4507,7 @@ test("saving from history uses the selected snapshot instead of the unrelated ed
   expect(savedBody.example_input).toEqual(detail.snapshot.input);
   expect(savedBody.prompt).toBe(detail.snapshot.prompt.content);
   expect(savedBody.prompt_ref).toBe(detail.snapshot.prompt.ref);
+  expect(savedBody.prompt_source_ref).toBe(detail.snapshot.prompt.source_ref);
   expect(savedBody.model_id).toBe(detail.snapshot.provider.model_id);
   expect(savedBody.reasoning_effort).toBe(detail.snapshot.provider.reasoning_effort);
   expect(savedBody.source_run_id).toBe(detail.run_id);

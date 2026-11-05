@@ -31,14 +31,16 @@ def upgrade() -> None:
             "ix_atom_lab_prompts_scope", "atom_lab_prompts",
             ["tenant_id", "region", "atom_id"], schema="platform",
         )
-    if inspector is None or "prompt_source_ref" not in {
-        column["name"] for column in inspector.get_columns("atom_lab_runs", schema="platform")
-    }:
-        op.add_column(
-            "atom_lab_runs", sa.Column("prompt_source_ref", sa.String(128)), schema="platform",
-        )
+    for table in ("atom_lab_runs", "atom_lab_preset_versions"):
+        if inspector is None or "prompt_source_ref" not in {
+            column["name"] for column in inspector.get_columns(table, schema="platform")
+        }:
+            op.add_column(
+                table, sa.Column("prompt_source_ref", sa.String(128)), schema="platform",
+            )
 
 
 def downgrade() -> None:
+    op.drop_column("atom_lab_preset_versions", "prompt_source_ref", schema="platform")
     op.drop_column("atom_lab_runs", "prompt_source_ref", schema="platform")
     op.drop_table("atom_lab_prompts", schema="platform")

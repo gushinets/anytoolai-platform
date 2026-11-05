@@ -269,6 +269,9 @@ class AtomLabPresetVersionRequest(BaseModel):
     fixed_fields: list[str] = Field(default_factory=list)
     example_input: dict[str, Any]
     source_run_id: str | None = Field(default=None, max_length=128)
+    prompt_source_ref: str | None = Field(
+        default=None, max_length=128, pattern=r"^[A-Za-z0-9_.-]+$",
+    )
 
 
 class AtomLabRunPresetRef(BaseModel):

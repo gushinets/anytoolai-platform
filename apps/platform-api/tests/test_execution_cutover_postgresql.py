@@ -8,7 +8,7 @@ import sqlalchemy as sa
 from alembic import command
 from anytoolai_platform_core.quotas.models import ExecutionOwner, ExecutionOwnerKind
 from anytoolai_platform_core.quotas.readback import read_consumption
-from anytoolai_platform_core.storage.db import guest_quota_usage_table, runtime_metadata
+from anytoolai_platform_core.storage.db import guest_quota_usage_table
 from anytoolai_platform_core.storage.transactions import (
     engine_from_session_factory,
     transaction_boundary,
@@ -25,7 +25,7 @@ pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
 runtime = runtime_fixture
 
 
-def snapshot(connection):
+def snapshot(connection, metadata):
     return {
         table.name: [
             dict(row)
@@ -33,7 +33,7 @@ def snapshot(connection):
                 sa.select(table).order_by(*table.primary_key.columns)
             ).mappings()
         ]
-        for table in runtime_metadata.sorted_tables
+        for table in metadata.tables.values()
     }
 
 
@@ -44,6 +44,8 @@ def test_0017_preserves_results_paid_usage_and_all_reservation_states(runtime):
     with engine.begin() as connection:
         config.attributes["connection"] = connection
         command.downgrade(config, "0016")
+        historical_metadata = sa.MetaData(schema="platform")
+        historical_metadata.reflect(connection, schema="platform")
 
     grant = allowance()
     with transaction_boundary(factory) as session:
@@ -67,12 +69,13 @@ def test_0017_preserves_results_paid_usage_and_all_reservation_states(runtime):
             )
 
         with engine.begin() as connection:
-            before = snapshot(connection)
+            before = snapshot(connection, historical_metadata)
             assert before["guest_quota_usage"][0]["legacy_used_count"] == 0
             config.attributes["connection"] = connection
-            command.upgrade(config, "head")
+            command.upgrade(config, "0017")
             before["guest_quota_usage"][0]["legacy_used_count"] = 1
-            assert snapshot(connection) == before
+            assert snapshot(connection, historical_metadata) == before
+            command.upgrade(config, "head")
 
         owner = ExecutionOwner("anytoolai", "ru", ExecutionOwnerKind.guest, "guest_demo")
         with transaction_boundary(factory) as session:

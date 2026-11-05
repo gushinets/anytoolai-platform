@@ -620,6 +620,8 @@ export interface components {
             prompt: string;
             /** Prompt Ref */
             prompt_ref: string;
+            /** Prompt Source Ref */
+            prompt_source_ref?: string | null;
             reasoning_effort?: components["schemas"]["ReasoningEffort"] | null;
             schema_refs: components["schemas"]["AtomLabSchemaRefsResponse"];
             /** Source Run Id */
@@ -675,6 +677,8 @@ export interface components {
             prompt: string;
             /** Prompt Ref */
             prompt_ref: string;
+            /** Prompt Source Ref */
+            prompt_source_ref?: string | null;
             reasoning_effort?: components["schemas"]["ReasoningEffort"] | null;
             schema_refs: components["schemas"]["AtomLabSchemaRefsResponse"];
             /** Source Run Id */
@@ -708,6 +712,8 @@ export interface components {
             prompt: string;
             /** Prompt Ref */
             prompt_ref: string;
+            /** Prompt Source Ref */
+            prompt_source_ref?: string | null;
             reasoning_effort?: components["schemas"]["ReasoningEffort"] | null;
             schema_refs: components["schemas"]["AtomLabSchemaRefsResponse"];
             /** Source Run Id */

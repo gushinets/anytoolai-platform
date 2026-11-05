@@ -331,6 +331,7 @@ atom_lab_preset_versions_table = sa.Table(
     sa.Column("fixed_fields", json_document, nullable=False),
     sa.Column("example_input", json_document, nullable=False),
     sa.Column("source_run_id", sa.String(length=128)),
+    sa.Column("prompt_source_ref", sa.String(length=128)),
     sa.Column("created_at", utc_datetime, nullable=False),
     sa.ForeignKeyConstraint(
         ["preset_id"],

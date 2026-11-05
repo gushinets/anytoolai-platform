@@ -75,6 +75,7 @@ class AtomLabPresetVersionRecord:
     tenant_id: str
     region: str
     source_run_id: str | None = None
+    prompt_source_ref: str | None = None
     created_at: datetime = field(default_factory=utc_now)
 
 
