@@ -102,6 +102,55 @@ def test_ledger_accepts_platform_identifier():
         assert "scenario_session_123_abc" in docker.call_args.args[-1]
 
 
+@pytest.mark.parametrize(
+    "project",
+    ["", "--help", "--privileged", "-local", "Local", "local name", "local\n", "local;id"],
+)
+def test_write_router_rejects_invalid_project_before_any_docker_call(project):
+    with (
+        patch.object(eval_module.subprocess, "run") as run,
+        patch.object(eval_module, "_docker") as readback,
+    ):
+        with pytest.raises(ValueError, match="invalid Compose project name"):
+            eval_module.write_router(project, "model_list: []")
+        run.assert_not_called()
+        readback.assert_not_called()
+
+
+def test_write_router_separates_options_and_preserves_stdin_restart_and_readback():
+    project = "anytoolai-e986bbcb"
+    container = f"{project}-platform-worker-1"
+    content = "model_list: []\n# Привет; $(not-a-command)\n"
+    with (
+        patch.object(eval_module.subprocess, "run") as run,
+        patch.object(eval_module, "_docker", return_value=content) as readback,
+    ):
+        eval_module.write_router(project, content)
+    write, restart = run.call_args_list
+    assert write.args[0][:9] == [
+        "docker", "exec", "--user", "root", "-i", "--", container, "python", "-c"
+    ]
+    assert write.args[0][-1] == eval_module.ROUTER
+    assert content not in write.args[0]
+    assert write.kwargs == {"input": content, "text": True, "check": True, "capture_output": True}
+    assert restart.args[0] == ["docker", "restart", "--", container]
+    assert restart.kwargs == {
+        "check": True,
+        "capture_output": True,
+        "timeout": eval_module.WORKER_RESTART_TIMEOUT_SECONDS,
+    }
+    readback.assert_called_once_with(project, "platform-worker", "cat", eval_module.ROUTER)
+
+
+def test_write_router_still_rejects_readback_mismatch():
+    with (
+        patch.object(eval_module.subprocess, "run"),
+        patch.object(eval_module, "_docker", return_value="different content"),
+        pytest.raises(RuntimeError, match="worker router readback mismatch"),
+    ):
+        eval_module.write_router("local", "model_list: []")
+
+
 report_spec = importlib.util.spec_from_file_location(
     "client_update_writer_eval_report", ROOT / "scripts/agent/client_update_writer_eval_report.py"
 )

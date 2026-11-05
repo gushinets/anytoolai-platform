@@ -9,6 +9,10 @@ import json
 import re
 import zipfile
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
+
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("proposal_ai_eval", REPO_ROOT / "scripts" / "agent" / "proposal_ai_eval.py")
@@ -20,6 +24,39 @@ FIXTURE = json.loads(proposal_ai_eval.ORDERS_PATH.read_text(encoding="utf-8"))
 PROFILE = FIXTURE["freelancer_positioning"]
 EN_ORDER = {"task_text": "Need Make.com scenarios for Telegram. Budget $150.", "expect_language": "en", "expect_gap": False}
 CLEAN = "I build Make.com and n8n automations with Telegram bots.\n\nI can start this week and will confirm the plan after a short call."
+
+
+@pytest.mark.parametrize(
+    "project",
+    [
+        "", "-local", "_local", "--help", "--privileged", "Local", " local", "local ",
+        "local name", "local\n", "local\r\n", "local\tname", "local\x00name", "local/name",
+        "local\\name", "local.name", "local:name", "local;id", "$(id)", "`id`", "local|id",
+        "local&name", "локальный", "１local",
+    ],
+)
+def test_docker_rejects_invalid_project_without_subprocess(project: str) -> None:
+    with patch.object(proposal_ai_eval.subprocess, "run") as run:
+        with pytest.raises(ValueError, match="invalid Compose project name"):
+            proposal_ai_eval._docker(project, "platform-worker", "cat", "/app/router.yaml")
+        run.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "project", ["local", "a", "1", "my-project_2", "a-", "a_", "anytoolai-e986bbcb"]
+)
+def test_docker_accepts_compose_names_and_separates_options(project: str) -> None:
+    command = ("printf", "%s", "a value; $(literal)")
+    with patch.object(
+        proposal_ai_eval.subprocess, "run", return_value=SimpleNamespace(stdout="container output")
+    ) as run:
+        assert proposal_ai_eval._docker(project, "platform-worker", *command) == "container output"
+    run.assert_called_once_with(
+        ["docker", "exec", "--", f"{project}-platform-worker-1", *command],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
 
 def violations(text: str, gaps: list | None = None, order: dict = EN_ORDER, profile: str = PROFILE) -> set[str]:

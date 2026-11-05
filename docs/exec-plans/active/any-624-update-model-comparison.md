@@ -7,8 +7,8 @@
 - Created: 2026-11-03
 - Last updated: 2026-11-05
 - Review date: 2026-11-05
-- Next action: none for implementation or acceptance; owner may close the issue
-- Blocker: none; final human acceptance, evidence audit, full-check and source commit completed
+- Next action: verify SonarCloud reanalysis after the authorized commit and push
+- Blocker: remote SonarCloud reanalysis pending; local regression tests and quick-check pass
 
 ## Goal and scope
 
@@ -664,3 +664,56 @@ observations, not 61 confirmed failures. Full outputs remain available with the 
 Source commit c243cbe3 contains the verified implementation. Full-check passed before that commit;
 this follow-up changes only the acceptance record. No production/default-model change, push,
 GitHub or Linear write. Implementation and agreed final acceptance are complete for this iteration.
+
+### SonarCloud Docker argument validation — approved follow-up
+
+User explicitly authorized fixing both S8705 findings, the shared helper and adding tests.
+The two findings cover write_router's docker exec/restart calls, which accept an unchecked
+CLI project name. The shared Proposal _docker helper uses the same project-to-container pattern.
+The reported HTTP/LLM source is not a reachable application route: this is local evaluation CLI
+input, passed as an argv list without a host shell. Arbitrary command execution was not proven;
+acceptance of invalid option-like/project strings was reproduced with subprocess intercepted.
+
+Implementation plan:
+1. Add one shared Compose-project-name validator using the documented ASCII lowercase/digit,
+   dash and underscore contract with an initial letter/digit. Call it before any subprocess in
+   write_router and _docker. Add -- before container operands in exec and restart. Keep all
+   content on stdin, the fixed container Python command, timeouts and readback behavior.
+2. Add security regression tests for invalid names rejected without subprocess, valid project
+   names, option separators, stdin preservation and router readback errors. Existing collector
+   restoration and offline-review tests must continue passing. No new dependencies or abstractions.
+3. Run doctor, focused Proposal/Update eval tests, quick-check and documentation/diff checks.
+   Record Sonar reanalysis as pending until the changed revision is analyzed remotely. Do not
+   repeat paid live collection: prompts and the accepted final outputs remain byte-identical.
+
+The source changes remain on the checked-out feature/ANY-624 branch. No Sonar suppression,
+GitHub comment/review/thread resolution or production/default-model change is part of this fix.
+
+### Sonar follow-up implementation and validation
+
+Added a shared _validate_compose_project guard in the existing Proposal helper module, used
+by both _docker and Update write_router before subprocess. It rejects empty names, leading
+options/underscores, uppercase or non-ASCII characters, spaces, control characters and shell
+metacharacters; valid Compose names are unchanged. All three Docker exec/restart invocations
+now place -- before the container operand. Router content stays on stdin; fixed container Python
+code, restart timeout, readback failure and the collector's restoration behavior are preserved.
+
+Added 41 parameterized security/positive regression cases across the existing two eval test files.
+The focused Proposal/Update set passed all 126 tests. Canonical quick-check exited zero on the
+current merged source plus this patch: 3,104 passed, 12 standard skips and 628 deselected. Config,
+architecture, docs and generated-doc checks passed. The validation container used Python 3.12,
+Node 24, pinned pnpm and real sudo-to-nobody uid 65534 without modifying the host sudo policy.
+Docker's real CLI accepted the -- terminator for exec/restart and reported only missing operands;
+no container target or operation was supplied for that parser check.
+
+No Ruff findings on changed lines; 331 pre-existing findings in the large legacy eval scripts/tests
+remain outside the edited lines. Whitespace validation passed. Product prompt and accepted live
+evidence hashes remain unchanged, including all 270 accepted outputs and original observations.
+No paid runs, live-stack restart, product/default-model changes or analysis suppression. Full-check
+was not repeated for this CLI-only patch; quick-check is the current broad backend gate. At
+completion of local validation, the source changes were uncommitted and unpublished. The two remote findings
+remain unverified until the updated revision is published and SonarCloud reanalyzes it.
+
+User subsequently explicitly requested "commit and push" for this validated follow-up. Commit
+the five scoped files on feature/ANY-624 and push normally to origin; do not force-push. Remote
+SonarCloud results remain pending until the new revision is analyzed.

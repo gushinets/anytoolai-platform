@@ -26,7 +26,13 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from proposal_ai_eval import _docker, _git_state, evidence_problems, read_jsonl
+from proposal_ai_eval import (
+    _docker,
+    _git_state,
+    _validate_compose_project,
+    evidence_problems,
+    read_jsonl,
+)
 
 EvaluationStatus = Literal["PASS", "FAIL", "PENDING"]
 
@@ -105,6 +111,8 @@ def evidence_status(record: dict, directory: Path) -> tuple[EvaluationStatus, li
 
 
 def write_router(project: str, content: str) -> None:
+    _validate_compose_project(project)
+    container = f"{project}-platform-worker-1"
     subprocess.run(
         [
             "docker",
@@ -112,7 +120,8 @@ def write_router(project: str, content: str) -> None:
             "--user",
             "root",
             "-i",
-            f"{project}-platform-worker-1",
+            "--",
+            container,
             "python",
             "-c",
             "import sys; from pathlib import Path; Path(sys.argv[1]).write_text(sys.stdin.read())",
@@ -124,7 +133,7 @@ def write_router(project: str, content: str) -> None:
         capture_output=True,
     )
     subprocess.run(
-        ["docker", "restart", f"{project}-platform-worker-1"],
+        ["docker", "restart", "--", container],
         check=True,
         capture_output=True,
         timeout=WORKER_RESTART_TIMEOUT_SECONDS,
