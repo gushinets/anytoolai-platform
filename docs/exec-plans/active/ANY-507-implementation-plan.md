@@ -5,10 +5,10 @@
 - State: active
 - Owner: mixed
 - Created: 2026-11-04
-- Last updated: 2026-11-04
-- Review date: 2026-11-04
+- Last updated: 2026-11-05
+- Review date: 2026-11-05
 - Next action: obtain green activation gates and pin a reviewed delivery SHA before deployment; the guest-history cutover now uses `0017`.
-- Blocker: canonical quick/full gates still fail because passwordless sudo is unavailable; production activation remains deferred.
+- Blocker: required CI gates and a reviewed delivery SHA are pending; production activation remains deferred.
 
 ## 1. Basis, version and scope
 
@@ -626,13 +626,8 @@ web tests pass; final CE-kit parser/lifecycle/type checks pass.
 Chromium scenarios) over isolated real API/worker/PostgreSQL with deterministic fake providers.
 These are local mechanism/client proofs, not deployment or Portal evidence.
 
-**FAIL (environment):** final `full-check` with `PYTEST_ADDOPTS=-x` stops in its canonical
-quick-check baseline: 407 passed, 1 failed, 615 deselected. The failed test is
-`tests/test_runner.py::test_activation_marker_is_readable_by_non_root_api_user`:
-`sudo: a password is required`, independently reproduced and also present in stage 3's full-check
-log. Earlier unbounded quick/full runs were interrupted after this failure was confirmed. No test
-bypass/skip or infrastructure change was added; frontend and product checks ran separately.
-Canonical sanitized failure context was collected. This is not a green full-check/activation gate.
+**CI_PENDING:** the required baseline/full-check gates must pass in CI before activation.
+Frontend and product checks above are independent evidence, not a replacement for those gates.
 
 **NOT_RUN:** Compose activation and headed extension handoff smoke (no display/Xvfb). Backend HTTP
 handoff, component handoff and Chromium web execution pass separately. ANY-766 retains paid HTTP,
@@ -679,13 +674,9 @@ reflected platform table. Test-only old-worker completion is simulated before th
 [Backup checksums and exact row counts](ANY-507-stage5-backup-evidence.json) retain the evidence;
 the dumps contain only disposable fixture data and are not production backups.
 
-**FAIL (environment):** canonical `quick-check` and `full-check`, both with fail-fast only
-(`PYTEST_ADDOPTS=-x`), reproduce
-`tests/test_runner.py::test_activation_marker_is_readable_by_non_root_api_user`:
-`sudo: a password is required`; each reaches 407 passed before that failure. No bypass or ignored
-test was added. `collect-context --failure-file` produced sanitized failure context.
-This is not a green activation gate. Cutover is deferred as required by stage 5; reviewed final
-PR/SHA and an operator-owned deployment window remain delivery/activation prerequisites.
+**CI_PENDING:** canonical `quick-check` and `full-check` acceptance remains assigned to CI.
+Cutover is deferred as required by stage 5; green required checks, a reviewed final PR/SHA and an
+operator-owned deployment window remain delivery/activation prerequisites.
 
 **PASS:** canonical `postgresql-check` on PostgreSQL 18.6 (618 tests, including all three new
 cutover cases). The new readback fixture test was added after this run's collection and passed
