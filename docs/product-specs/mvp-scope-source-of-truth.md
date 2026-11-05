@@ -173,6 +173,8 @@ MVP-A runtime tables:
 - `platform.event_log`
 - `platform.guest_identities`
 - `platform.guest_quota_usage`
+- `platform.paid_allowance_usage` (internal typed metering; paid HTTP belongs to ANY-766)
+- `platform.execution_reservations`
 - `platform.email_captures`
 - `platform.paywall_intents`
 - `platform.product_handoffs`
@@ -248,9 +250,10 @@ Required kit capabilities:
 - `renderJobStatus()`
 - `renderError()`
 
-Guest quota is backend-enforced. Chrome Extensions may store the opaque guest id locally, but quota
-is checked and consumed by the backend on accepted scenario start, not on frontend click and not from
-provider usage or retry telemetry.
+Guest quota is backend-enforced. Chrome Extensions may store the opaque guest id locally, but capacity
+is checked and reserved by the backend on accepted scenario start. Accessible canonical success
+consumes it; failure/cancellation releases it. Frontend clicks, provider usage and retry telemetry
+do not consume quota. Temporary occupied capacity remains retryable without a paywall.
 
 A13 is backend-complete for guest identity/quota. In MVP-A2, A15a delivered the shared client/storage
 foundation, A15b delivered real quota/start/polling helpers, guest-id propagation, typed
@@ -289,7 +292,10 @@ MVP-A platform events:
 - `guest.created`
 - `product.opened`
 - `quota.checked`
+- `quota.reserved`
 - `quota.consumed`
+- `quota.released`
+- `quota.capacity_reserved`
 - `quota.exhausted`
 - `email_capture.submitted`
 - `paywall.shown`

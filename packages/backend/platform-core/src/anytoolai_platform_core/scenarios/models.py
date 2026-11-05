@@ -9,6 +9,7 @@ from anytoolai_platform_core.common.ids import new_id
 from anytoolai_platform_core.common.time import utc_now
 
 if TYPE_CHECKING:
+    from anytoolai_platform_core.quotas.models import ExecutionAcceptance
     from anytoolai_platform_core.workflows.models import JobRecord
 
 
@@ -78,3 +79,4 @@ class ScenarioSessionSnapshot:
 class LinkedScenarioSessionResult:
     session: ScenarioSessionRecord
     job: JobRecord | None = None
+    acceptance: ExecutionAcceptance | None = None

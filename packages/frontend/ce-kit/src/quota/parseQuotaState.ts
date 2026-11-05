@@ -37,6 +37,10 @@ function isIsoTimestamp(value: string): boolean {
   );
 }
 
+function isQuotaCount(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+}
+
 /**
  * Validates and maps the backend's `QuotaStateResponse` payload (snake_case) into the client's
  * `QuotaState` shape (camelCase). Returns null for anything that doesn't match, so callers fall
@@ -58,9 +62,14 @@ export function parseQuotaState(payload: unknown): QuotaState | null {
     period,
     limit_count: limitCount,
     used_count: usedCount,
+    successful_used_count: successfulUsedCount,
+    legacy_used_count: legacyUsedCount,
+    reserved_count: reservedCount,
+    available_count: availableCount,
     remaining_count: remainingCount,
     exhausted,
     resets_at: resetsAt,
+    read_at: readAt,
   } = payload;
 
   if (
@@ -71,10 +80,23 @@ export function parseQuotaState(payload: unknown): QuotaState | null {
     typeof dimensionKey !== "string" ||
     typeof unit !== "string" ||
     typeof period !== "string" ||
-    typeof limitCount !== "number" ||
-    typeof usedCount !== "number" ||
-    typeof remainingCount !== "number" ||
+    !isQuotaCount(limitCount) ||
+    !isQuotaCount(usedCount) ||
+    !isQuotaCount(successfulUsedCount) ||
+    !isQuotaCount(legacyUsedCount) ||
+    !isQuotaCount(reservedCount) ||
+    !isQuotaCount(remainingCount) ||
+    !isQuotaCount(availableCount) ||
     typeof exhausted !== "boolean"
+  ) {
+    return null;
+  }
+  if (
+    usedCount !== legacyUsedCount + successfulUsedCount ||
+    remainingCount !== Math.max(limitCount - usedCount, 0) ||
+    availableCount !== Math.max(limitCount - usedCount - reservedCount, 0) ||
+    exhausted !== (remainingCount === 0) ||
+    typeof readAt !== "string" || !isIsoTimestamp(readAt)
   ) {
     return null;
   }
@@ -101,9 +123,14 @@ export function parseQuotaState(payload: unknown): QuotaState | null {
     period,
     limitCount,
     usedCount,
+    successfulUsedCount,
+    legacyUsedCount,
+    reservedCount,
+    availableCount,
     remainingCount,
     exhausted,
     resetsAt: resetsAt ?? null,
+    readAt,
   };
 }
 
@@ -126,6 +153,11 @@ type _QuotaStateShapeCheck = AssertExactSchemaShape<
     scenario_id?: string | null;
     unit: components["schemas"]["QuotaUnit"];
     used_count: number;
+    successful_used_count: number;
+    legacy_used_count: number;
+    reserved_count: number;
+    available_count: number;
+    read_at: string;
   }
 >;
 const _assertQuotaStateShapeMatchesGenerated: _QuotaStateShapeCheck = true;

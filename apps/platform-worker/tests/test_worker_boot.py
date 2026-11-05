@@ -2022,8 +2022,10 @@ def test_two_workers_terminalize_disabled_job_once(
     seen = local()
     original_get = JobRepository.get
 
-    def synchronized_get(repository: JobRepository, job_id: str) -> JobRecord | None:
-        record = original_get(repository, job_id)
+    def synchronized_get(
+        repository: JobRepository, job_id: str, *, for_update: bool = False
+    ) -> JobRecord | None:
+        record = original_get(repository, job_id, for_update=for_update)
         if record is not None and record.status is JobStatus.created and not getattr(seen, "waited", False):
             seen.waited = True
             barrier.wait(timeout=10)
@@ -2366,3 +2368,34 @@ def test_sweep_orphaned_jobs_survives_reconciler_exception(
     worker._sweep_orphaned_jobs()
 
     assert "worker.reconciliation_sweep_failed" in caplog.text
+
+
+@pytest.mark.parametrize("cancel", [False, True])
+def test_legacy_terminal_recovery_preserves_independently_expired_scenario(
+    session_factory, cancel,
+):
+    job = _seed_running_job(session_factory)
+    with transaction_boundary(session_factory) as session:
+        repository = ScenarioSessionRepository(session)
+        scenario = repository.get(
+            job.scenario_session_id, tenant_id=job.tenant_id, region=job.region,
+            product_id=job.product_id, frontend_id=job.frontend_id,
+        )
+        repository.update(
+            replace(scenario, status=ScenarioSessionStatus.expired),
+            tenant_id=job.tenant_id, region=job.region,
+            product_id=job.product_id, frontend_id=job.frontend_id,
+        )
+    handler = RunWorkflowHandler(session_factory=session_factory, runner_factory=RecordingRunner)
+    if cancel:
+        handler._persist_handler_cancellation(job.id)
+    else:
+        handler._persist_handler_failure(job.id, RuntimeError("late failure"))
+    with transaction_boundary(session_factory) as session:
+        terminal = JobRepository(session).get(job.id)
+        scenario = ScenarioSessionRepository(session).get(
+            job.scenario_session_id, tenant_id=job.tenant_id, region=job.region,
+            product_id=job.product_id, frontend_id=job.frontend_id,
+        )
+    assert terminal.status is (JobStatus.canceled if cancel else JobStatus.failed)
+    assert scenario.status is ScenarioSessionStatus.expired

@@ -8,6 +8,7 @@ import {
   isHandoffNotActionable,
   isIdempotencyKeyConflict,
   isQuotaExhausted,
+  isQuotaCapacityReserved,
   isResultNotFound,
   isResultUnavailable,
   isScenarioActionConflict,
@@ -54,6 +55,17 @@ describe("isQuotaExhausted", () => {
   it("is true only for the quota_exhausted code", () => {
     expect(isQuotaExhausted(backendError("quota_exhausted"))).toBe(true);
     expect(isQuotaExhausted(backendError("guest_identity_required"))).toBe(false);
+  });
+});
+
+describe("isQuotaCapacityReserved", () => {
+  it("separates a retryable reserve from exhaustion, unknown codes and transport errors", () => {
+    const busy = backendError("quota_capacity_reserved", 429);
+    expect(isQuotaCapacityReserved(busy)).toBe(true);
+    expect(isQuotaExhausted(busy)).toBe(false);
+    expect(isQuotaCapacityReserved(backendError("quota_exhausted", 429))).toBe(false);
+    expect(isQuotaCapacityReserved(backendError("quota_unknown", 429))).toBe(false);
+    expect(isQuotaCapacityReserved({ type: "timeout" })).toBe(false);
   });
 });
 

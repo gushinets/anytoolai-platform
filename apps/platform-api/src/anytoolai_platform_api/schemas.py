@@ -115,9 +115,14 @@ class QuotaStateResponse(BaseModel):
     period: QuotaPeriod
     limit_count: int
     used_count: int
+    successful_used_count: int
+    legacy_used_count: int
+    reserved_count: int
+    available_count: int
     remaining_count: int
     exhausted: bool
     resets_at: datetime | None = None
+    read_at: datetime
 
 
 class ScenarioStartRequest(BaseModel):

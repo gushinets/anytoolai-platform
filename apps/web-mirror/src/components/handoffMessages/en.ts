@@ -5,6 +5,7 @@ export const en = {
   notFound: "This handoff link is not valid.",
   loadFailed: "Something went wrong loading this handoff. Please try again.",
   retry: "Try again",
+  capacityReserved: "Capacity is temporarily in use. Please try again shortly.",
   actionFailed: "That action could not be completed. Please try again.",
   fields: {
     from: "From",

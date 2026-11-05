@@ -8,6 +8,7 @@
 
 type ScenarioSessionRecord = {
   scenarioSessionId: string;
+  guestId: string | null;
   jobId: string;
   status: string;
   currentCheckpointId: string | null;
@@ -54,6 +55,7 @@ export function createFakePlatformServer(options: FakePlatformServerOptions = {}
   let nextGuestSeq = 1;
   let nextSessionSeq = 1;
   const guestUsedCount = new Map<string, number>();
+  const guestReservedCount = new Map<string, number>();
   const startLedger = new Map<string, StartLedgerEntry>(); // keyed by idempotencyKey
   const sessions = new Map<string, ScenarioSessionRecord>();
   const pollCounts = new Map<string, number>();
@@ -103,6 +105,11 @@ export function createFakePlatformServer(options: FakePlatformServerOptions = {}
         period: "lifetime",
         limit_count: quotaLimit,
         used_count: usedCount,
+        successful_used_count: usedCount,
+        legacy_used_count: 0,
+        reserved_count: guestReservedCount.get(guestId) ?? 0,
+        available_count: Math.max(0, quotaLimit - usedCount - (guestReservedCount.get(guestId) ?? 0)),
+        read_at: "2026-11-04T00:00:00Z",
         remaining_count: Math.max(0, quotaLimit - usedCount),
         exhausted: usedCount >= quotaLimit,
       });
@@ -145,6 +152,9 @@ export function createFakePlatformServer(options: FakePlatformServerOptions = {}
         if (usedCount >= quotaLimit) {
           return errorResponse(429, "quota_exhausted", "Guest quota exhausted.");
         }
+        if (usedCount + (guestReservedCount.get(guestId) ?? 0) >= quotaLimit) {
+          return errorResponse(429, "quota_capacity_reserved", "Quota capacity is temporarily reserved.");
+        }
       }
 
       const scenarioSessionId = `scenario_session_${nextSessionSeq}`;
@@ -152,6 +162,7 @@ export function createFakePlatformServer(options: FakePlatformServerOptions = {}
       nextSessionSeq += 1;
       const session: ScenarioSessionRecord = {
         scenarioSessionId,
+        guestId,
         jobId,
         status: "running",
         currentCheckpointId: null,
@@ -162,7 +173,7 @@ export function createFakePlatformServer(options: FakePlatformServerOptions = {}
       pollCounts.set(scenarioSessionId, 0);
       startLedger.set(idempotencyKey, { idempotencyKey, requestFingerprint, scenarioSessionId });
       if (guestId) {
-        guestUsedCount.set(guestId, (guestUsedCount.get(guestId) ?? 0) + 1);
+        guestReservedCount.set(guestId, (guestReservedCount.get(guestId) ?? 0) + 1);
       }
       return jsonResponse(200, _startPayload(session));
     }
@@ -182,6 +193,10 @@ export function createFakePlatformServer(options: FakePlatformServerOptions = {}
       pollCounts.set(scenarioSessionId, polls);
       if (session.status === "running" && polls >= pollsUntilComplete) {
         session.status = "completed";
+        if (session.guestId) {
+          guestReservedCount.set(session.guestId, (guestReservedCount.get(session.guestId) ?? 0) - 1);
+          guestUsedCount.set(session.guestId, (guestUsedCount.get(session.guestId) ?? 0) + 1);
+        }
         session.currentCheckpointId = "result_ready";
         session.allowedNextActions = ["copy_result"];
         const resultArtifactId = `artifact_${scenarioSessionId.replace(/^scenario_session_/, "")}`;
@@ -255,6 +270,14 @@ export function createFakePlatformServer(options: FakePlatformServerOptions = {}
 
   return {
     fetchImpl,
+    failSession(sessionId: string): void {
+      const session = sessions.get(sessionId);
+      if (!session || session.status !== "running") throw new Error("expected a running session");
+      session.status = "failed";
+      if (session.guestId) {
+        guestReservedCount.set(session.guestId, (guestReservedCount.get(session.guestId) ?? 0) - 1);
+      }
+    },
     getUsedCount(guestId: string): number {
       return guestUsedCount.get(guestId) ?? 0;
     },

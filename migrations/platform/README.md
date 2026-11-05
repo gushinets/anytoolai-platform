@@ -10,6 +10,8 @@ MVP-A runtime tables:
 - event_log
 - guest_identities
 - guest_quota_usage
+- paid_allowance_usage
+- execution_reservations
 - email_captures
 - paywall_intents
 - product_handoffs
@@ -19,6 +21,21 @@ Migration `0004` creates the final A17 handoff table for fresh databases. Migrat
 idempotent compatibility revision for databases that were stamped through the former placeholder
 `0004` before A17 landed; it creates `product_handoffs` only when missing and has a no-op downgrade.
 Email capture and paywall intent remain separate access-lite slices.
+
+Revision `0016` prepares execution metering storage: guest reserved/historical counters, immutable
+paid buckets, execution reservations and server-owned job consumption mode. Existing counters and
+runtime history are preserved. The migration itself does not switch admission or charging.
+Revision `0017` runs during quiesced application cutover and reconciles guest historical usage as
+total used minus consumed guest reservations. It includes old admissions after `0016` preparation
+without resetting successful usage, active reserves, paid buckets or results. Do not resume old
+admission after this reconciliation; ordinary later `upgrade head` calls are no-ops.
+PostgreSQL deferred checks reject a committed `reserved` job without its reservation.
+Downgrade refuses to discard paid/reservation history. ANY-507 stage 2 now connects reservation
+admission for new metered starts; stage 3 implements terminal consumption/release and recovery.
+Stage 5 supplies the [cutover procedure](../../infra/deployment/execution-metering-cutover.md) and
+independent verification; failed gates defer activation. See
+[runtime storage](../../docs/architecture/runtime-storage.md#execution-metering-storage-any-507-stage-1)
+and [ANY-507](../../docs/exec-plans/active/ANY-507-implementation-plan.md) for stage and cutover boundaries.
 
 Historical handoff compatibility revisions keep their schema checks and index-repair logic inline so
 the recorded Alembic history does not depend on future edits to mutable helper modules. Revision

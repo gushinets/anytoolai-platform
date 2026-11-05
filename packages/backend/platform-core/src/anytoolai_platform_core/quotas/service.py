@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 
 import sqlalchemy as sa
@@ -18,6 +18,8 @@ from anytoolai_platform_core.handoffs.repository import HandoffRepository
 from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.identity.service import GuestIdentityNotFoundError
 from anytoolai_platform_core.quotas.models import (
+    ExecutionOwner,
+    ExecutionOwnerKind,
     QuotaDimension,
     QuotaPolicy,
     QuotaState,
@@ -28,6 +30,7 @@ from anytoolai_platform_core.quotas.periods import (
     UnsupportedQuotaPeriodError,
     resolve_quota_period,
 )
+from anytoolai_platform_core.quotas.readback import consumption_from_bucket
 from anytoolai_platform_core.quotas.repository import QuotaUsageRepository
 from anytoolai_platform_core.storage.db import event_log_table
 from anytoolai_platform_core.storage.transactions import (
@@ -63,6 +66,14 @@ class QuotaExhaustedError(PlatformError):
         super().__init__("quota_exhausted", "Guest quota exhausted.")
 
 
+QUOTA_CAPACITY_RESERVED = "quota_capacity_reserved"
+
+
+class QuotaCapacityReservedError(PlatformError):
+    def __init__(self) -> None:
+        super().__init__(QUOTA_CAPACITY_RESERVED, "Quota capacity is temporarily reserved.")
+
+
 class QuotaDimensionRequiredError(PlatformError):
     def __init__(self) -> None:
         super().__init__(
@@ -80,10 +91,10 @@ class ResolvedQuotaDimension:
 
 @dataclass(frozen=True)
 class QuotaValidation:
-    """Everything consume_for_accepted_start needs, resolved ahead of any write.
+    """Everything reserve_for_accepted_start needs, resolved ahead of any write.
 
-    Returned by validate_accepted_start(); required by consume_for_accepted_start().
-    A caller cannot consume quota without first validating -- that ordering is a type
+    Returned by validate_accepted_start(); required by reserve_for_accepted_start().
+    A caller cannot reserve quota without first validating -- that ordering is a type
     signature, not a convention -- and callers that must not write anything before
     quota/guest validation passes (e.g. a keyed insert-or-select) can call
     validate_accepted_start() as a pure precondition check first.
@@ -204,8 +215,8 @@ class GuestQuotaService:
         without writing anything.
 
         Returns None when the product has no quota policy configured (quota does not
-        apply to this start at all) -- callers should skip consume_for_accepted_start
-        entirely in that case, exactly like a None return from it today. Call this
+        apply to this start at all) -- callers should skip reserve_for_accepted_start
+        entirely in that case. Call this
         before any durable write for the start (e.g. before inserting the candidate
         scenario_sessions row) so an invalid/missing/unknown guest_id or a
         misconfigured policy fails fast instead of paying for a write that then has
@@ -236,7 +247,26 @@ class GuestQuotaService:
             resolved_period=self._resolve_period(policy),
         )
 
-    def consume_for_accepted_start(
+    def ensure_execution_usage(
+        self,
+        *,
+        tenant_id: str,
+        region: str,
+        product_id: str,
+        guest_id: str,
+        validation: QuotaValidation,
+    ) -> QuotaUsageRecord:
+        return self._ensure_usage(
+            tenant_id=tenant_id,
+            region=region,
+            guest_id=guest_id,
+            product_id=product_id,
+            policy=validation.policy,
+            dimension=validation.dimension,
+            resolved_period=validation.resolved_period,
+        )
+
+    def reserve_for_accepted_start(
         self,
         *,
         tenant_id: str,
@@ -249,19 +279,19 @@ class GuestQuotaService:
         validation: QuotaValidation,
         scenario_chain_id: str | None = None,
         handoff_id: str | None = None,
-    ) -> QuotaState:
+        usage: QuotaUsageRecord | None = None,
+    ) -> QuotaUsageRecord:
         policy = validation.policy
         dimension = validation.dimension
         resolved = validation.resolved_period
-        usage = self._ensure_usage(
-            tenant_id=tenant_id,
-            region=region,
-            guest_id=guest_id,
-            product_id=product_id,
-            policy=policy,
-            dimension=dimension,
-            resolved_period=resolved,
-        )
+        if usage is None:
+            usage = self.ensure_execution_usage(
+                tenant_id=tenant_id,
+                region=region,
+                guest_id=guest_id,
+                product_id=product_id,
+                validation=validation,
+            )
         checked_state = _state_from_usage(usage, policy, resolved)
         context_kwargs = {
             "tenant_id": tenant_id,
@@ -278,9 +308,13 @@ class GuestQuotaService:
             **context_kwargs,
         )
 
-        consumed = self._quota_repository.consume_if_available(usage)
-        if consumed is None:
-            latest = self._quota_repository.get(usage.id) or usage
+        reserved = self._quota_repository.reserve_if_available(usage)
+        if reserved is None:
+            latest = self._quota_repository.get(usage.id)
+            if latest is None:
+                raise RuntimeError("quota bucket disappeared during reservation")
+            if latest.used_count < latest.limit_count:
+                raise QuotaCapacityReservedError()
             exhausted_state = _state_from_usage(latest, policy, resolved)
             self._emit_quota_event(
                 "quota.exhausted",
@@ -307,14 +341,7 @@ class GuestQuotaService:
             )
             raise QuotaExhaustedError()
 
-        consumed_state = _state_from_usage(consumed, policy, resolved)
-        self._emit_quota_event(
-            "quota.consumed",
-            state=consumed_state,
-            result_status="accepted",
-            **context_kwargs,
-        )
-        return consumed_state
+        return reserved
 
     def _register_exhaustion_recovery(
         self,
@@ -571,7 +598,10 @@ def _state_from_usage(
     policy: QuotaPolicy,
     resolved_period: ResolvedQuotaPeriod,
 ) -> QuotaState:
-    remaining_count = max(policy.limit_count - record.used_count, 0)
+    readback = consumption_from_bucket(
+        ExecutionOwner(record.tenant_id, record.region, ExecutionOwnerKind.guest, record.guest_id),
+        replace(record, limit_count=policy.limit_count),
+    )
     return QuotaState(
         guest_id=record.guest_id,
         product_id=record.product_id,
@@ -584,9 +614,14 @@ def _state_from_usage(
         period_key=record.period_key,
         limit_count=policy.limit_count,
         used_count=record.used_count,
-        remaining_count=remaining_count,
-        exhausted=remaining_count <= 0,
+        successful_used_count=readback.successful_used,
+        legacy_used_count=readback.legacy_used,
+        reserved_count=readback.reserved,
+        available_count=readback.available,
+        remaining_count=readback.remaining,
+        exhausted=readback.remaining == 0,
         resets_at=resolved_period.ends_at,
+        read_at=readback.read_at,
     )
 
 
@@ -610,9 +645,14 @@ def _state_from_empty_usage(
         period_key=resolved_period.period_key,
         limit_count=policy.limit_count,
         used_count=0,
+        successful_used_count=0,
+        legacy_used_count=0,
+        reserved_count=0,
+        available_count=policy.limit_count,
         remaining_count=policy.limit_count,
         exhausted=policy.limit_count <= 0,
         resets_at=resolved_period.ends_at,
+        read_at=utc_now(),
     )
 
 
@@ -663,6 +703,10 @@ def _emit_quota_event(
         "period_key": state.period_key,
         "limit_count": state.limit_count,
         "used_count": state.used_count,
+        "successful_used_count": state.successful_used_count,
+        "legacy_used_count": state.legacy_used_count,
+        "reserved_count": state.reserved_count,
+        "available_count": state.available_count,
         "remaining_count": state.remaining_count,
         "exhausted": state.exhausted,
     }

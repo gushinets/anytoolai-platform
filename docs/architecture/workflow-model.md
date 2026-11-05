@@ -12,6 +12,15 @@ MVP-A keeps the contract intentionally small:
 - stop on failed step;
 - explicit final workflow artifact.
 
+## Metered completion
+
+For reserved jobs the runner validates one final candidate through the shared Result API boundary,
+registers immutable success recovery, then calls the common `finalize_success`. Canonical publication,
+job/scenario success, reserve decrement, used increment and quota/workflow events share one caller
+transaction. Intermediate action/debug artifacts never consume quota. Terminal failure/cancellation
+releases the original bucket; rollback recovery uses the same decisions and cannot charge twice or
+publish after release. See [quota model](quota-model.md).
+
 ## Step schema
 
 `WorkflowStepDefinition` supports these fields:
@@ -207,8 +216,14 @@ runtime code does not rely on ad hoc callback registration order to repair durab
 
 Instead, the shared rollback executor runs explicit recovery phases:
 
-1. recover durable runtime rows for artifacts, provider calls, action runs, and the workflow job;
+1. recover durable runtime rows and terminal decisions;
 2. replay only the missing lifecycle events in causal order.
+
+For reserved jobs, final artifact publication, job/scenario success and consumption recover through
+one critical `finalize_success` transaction using the retained immutable candidate. The final result
+has no independent artifact-only recovery commit. Recovery reads durable terminal state first;
+consumed/released decisions cannot be reversed. Action/provider/debug artifact recovery remains
+separate. Legacy/unmetered jobs retain their earlier row-recovery path. See [quota model](quota-model.md).
 
 For a failed workflow, the ordered replay contract is:
 

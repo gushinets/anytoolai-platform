@@ -76,9 +76,11 @@ guest usage -> quota exhausted -> email capture -> waitlist/paywall intent -> ea
 ```
 
 Guest quota is enforced by the backend. The API creates opaque guest ids, frontends may store those
-ids locally, and quota is consumed only when the backend accepts a scenario start by committing the
-started scenario session and linked created job. Quota is not tied to frontend clicks, provider-call
-count, retries, or LLM telemetry.
+ids locally, and the backend reserves capacity atomically with the started session and linked job.
+Only accessible canonical result publication consumes once; failure/cancellation releases the reserve.
+Legacy used quota is preserved. Quota is independent of frontend clicks, provider-call count, retries
+and LLM telemetry. Guest readback separates used/reserved/remaining/available and historical usage;
+temporary `429 quota_capacity_reserved` stays retryable without opening exhausted/paywall state.
 
 A13 delivers this backend guest identity/quota behavior. A15a/A15b in MVP-A2 delivered the CE-kit
 integration: shared client storage, real `getQuota()`, idempotent `startScenario()`, bounded session
@@ -165,6 +167,8 @@ MVP-A tables:
 - `platform.event_log`
 - `platform.guest_identities`
 - `platform.guest_quota_usage`
+- `platform.paid_allowance_usage` (internal typed metering; paid HTTP belongs to ANY-766)
+- `platform.execution_reservations`
 - `platform.email_captures`
 - `platform.paywall_intents`
 - `platform.product_handoffs`

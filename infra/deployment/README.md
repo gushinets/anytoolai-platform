@@ -784,6 +784,11 @@ poll loop refreshes plus a `HEALTHCHECK` on its freshness.
 
 ## Migrations and scaling
 
+For the first reserve/consume-on-success application cutover, follow the
+[ANY-507 quiesce, backup and rollback procedure](execution-metering-cutover.md).
+It requires a fully drained queue and compatible API/worker code, including when reservation
+storage was already prepared. A schema upgrade alone does not authorize mixing old/new workers.
+
 Migrations run in their own one-shot `migrate` service (see "Compose layout" above), not inside
 `platform-api`/`platform-worker`. `platform-api`/`platform-worker` `depends_on: migrate:
 condition: service_completed_successfully` — Compose won't start either until `migrate` has

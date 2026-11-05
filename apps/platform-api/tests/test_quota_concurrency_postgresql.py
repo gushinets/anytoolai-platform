@@ -57,7 +57,7 @@ def _provision_api_app(
 
 @pytest.mark.postgresql
 @pytest.mark.slow
-def test_postgresql_parallel_scenario_starts_consume_quota_exactly_once() -> None:
+def test_postgresql_parallel_scenario_starts_reserve_capacity_exactly_once() -> None:
     """Production-semantics quota check for PostgreSQL row locks and conditional updates.
 
     Set ANYTOOLAI_POSTGRES_TEST_DATABASE_URL to a PostgreSQL maintenance database URL. The test
@@ -94,7 +94,7 @@ def test_postgresql_parallel_scenario_starts_consume_quota_exactly_once() -> Non
             == request_count - quota_limit
         )
         assert all(
-            response.json()["error"]["code"] == "quota_exhausted"
+            response.json()["error"]["code"] == "quota_capacity_reserved"
             for response in responses
             if response.status_code == HTTPStatus.TOO_MANY_REQUESTS
         )
@@ -113,24 +113,25 @@ def test_postgresql_parallel_scenario_starts_consume_quota_exactly_once() -> Non
         assert job_count == quota_limit
         assert len(usages) == 1
         usage = usages[0]
-        assert usage["used_count"] == quota_limit
+        assert usage["used_count"] == 0
+        assert usage["reserved_count"] == quota_limit
         assert usage["limit_count"] == quota_limit
         assert usage["quota_dimension"] == "product"
         assert usage["dimension_key"] == "kernel_demo"
-        assert event_types.count("quota.consumed") == quota_limit
-        assert event_types.count("quota.exhausted") == request_count - quota_limit
+        assert event_types.count("quota.consumed") == 0
+        assert event_types.count("quota.exhausted") == 0
 
 
 @pytest.mark.postgresql
 @pytest.mark.slow
-def test_postgresql_concurrent_duplicate_submit_with_idempotency_key_consumes_quota_once() -> None:
+def test_postgresql_concurrent_duplicate_submit_with_idempotency_key_reserves_once() -> None:
     """ANY-150: N concurrent /start requests sharing one Idempotency-Key (differing
-    only by X-Request-ID) must consume exactly one quota unit and create exactly one
+    only by X-Request-ID) must reserve exactly one quota unit and create exactly one
     session/job.
 
     This is the core correctness claim behind putting the atomic insert-or-select
     before quota consumption in ScenarioRuntimeService.start_session: only the request
-    that actually wins the DB-level unique-constraint race may consume quota, so no
+    that actually wins the DB-level unique-constraint race may reserve capacity, so no
     concurrent duplicate can be double-charged (or, symmetrically, none can be
     incorrectly quota_exhausted for what is really the same logical request as one
     that already succeeded). Deliberately run against PostgreSQL, not SQLite, and
@@ -196,14 +197,15 @@ def test_postgresql_concurrent_duplicate_submit_with_idempotency_key_consumes_qu
 
         assert scenario_count == 1
         assert job_count == 1
-        assert usage["used_count"] == 1
+        assert usage["used_count"] == 0
+        assert usage["reserved_count"] == 1
         assert started_count == 1
-        assert consumed_count == 1
+        assert consumed_count == 0
 
 
 @pytest.mark.postgresql
 @pytest.mark.slow
-def test_postgresql_parallel_starts_consume_scenario_dimension_quota_with_independent_counters() -> (
+def test_postgresql_parallel_starts_reserve_scenario_capacity_with_independent_counters() -> (
     None
 ):
     with _provision_api_app("anytoolai_a13_scenario_quota_test") as (session_factory, app):
@@ -261,7 +263,7 @@ def test_postgresql_parallel_starts_consume_scenario_dimension_quota_with_indepe
             for status_code in status_codes
         )
         assert all(
-            response.json()["error"]["code"] == "quota_exhausted"
+            response.json()["error"]["code"] == "quota_capacity_reserved"
             for _scenario_id, response in scenario_responses
             if response.status_code == HTTPStatus.TOO_MANY_REQUESTS
         )
@@ -304,10 +306,11 @@ def test_postgresql_parallel_starts_consume_scenario_dimension_quota_with_indepe
             assert usage["quota_dimension"] == "scenario"
             assert usage["dimension_key"] == scenario_id
             assert usage["scenario_id"] == scenario_id
-            assert usage["used_count"] == scenario_quota_limit
+            assert usage["used_count"] == 0
+            assert usage["reserved_count"] == scenario_quota_limit
             assert usage["limit_count"] == scenario_quota_limit
-        assert event_types.count("quota.consumed") == expected_ok
-        assert event_types.count("quota.exhausted") == expected_rejected
+        assert event_types.count("quota.consumed") == 0
+        assert event_types.count("quota.exhausted") == 0
 
 
 @pytest.mark.postgresql
@@ -330,7 +333,8 @@ def test_postgresql_parallel_handoff_accept_creates_one_target() -> None:
                 )
 
         responses = asyncio.run(accept_twice())
-        assert sorted(response.status_code for response in responses) == [200, 409]
+        assert [response.status_code for response in responses] == [200, 200]
+        assert responses[0].json() == responses[1].json()
         with transaction_boundary(session_factory) as session:
             handoff = (
                 session.execute(

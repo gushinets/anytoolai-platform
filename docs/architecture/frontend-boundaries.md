@@ -115,8 +115,8 @@ A15 ownership and delivery slices:
   helpers over the A17 `/v1/handoffs/{token}`, `.../accept`, and `.../decline` endpoints, with typed
   `handoff_expired` / `handoff_already_accepted` / `handoff_declined` / `handoff_failed` /
   `handoff_not_actionable` / `handoff_acceptance_failed` handling via `isHandoffExpired()` /
-  `isHandoffNotActionable()` / `isHandoffAcceptanceFailed()` (reusing `isQuotaExhausted()` for the
-  429 case), plus the `web-mirror` `/handoff/{handoff_token}` consent page (`HandoffConsent`) that
+  `isHandoffNotActionable()` / `isHandoffAcceptanceFailed()` (using `isQuotaExhausted()` for final used exhaustion and
+  `isQuotaCapacityReserved()` for temporary capacity; both are HTTP 429), plus the `web-mirror` `/handoff/{handoff_token}` consent page (`HandoffConsent`) that
   renders the backend safe preview and all terminal states -- web-mirror's first real wiring to
   CE-kit. Component/browser tests cover this over Vitest + Testing Library; a real running
   dev-server route is ANY-224's job.
@@ -147,14 +147,15 @@ The shared runtime, not a product, owns the web side of a handoff:
   `createHandoff` for the shown result and opens `/handoff/{token}` in the same tab. The button is
   hidden unless the target is in `NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS` (unset = all).
 - `HandoffConsent` sends the user to `/products/{targetProductId}?session={id}` right after a
-  successful Accept; the ids are redacted once the token's TTL passes.
+  successful Accept; later preview GETs redact the ids after TTL, while an owner-checked accept
+  replay can still return the existing target linkage.
 - `/products/{id}?session=` reaches the product as `attachSessionId`; `ProductRunPage` polls that
-  already-queued session and renders its result with no start request and no quota charge; "Try
-  again" re-polls that session, and an unknown session id (404) ends in the run-failed state. The
+  already-queued session and renders its result without a new start or reservation; its backend
+  success consumes the existing reservation. "Try again" re-polls that session, and an unknown session id (404) ends in the run-failed state. The
   route reads `?session=` from its `searchParams` prop (not `useSearchParams`, whose Suspense
   boundary would turn the unknown-product 404 into a 200), removes it from the address bar so a
   bookmark or shared link does not carry it, and keeps it in the tab's `sessionStorage` so a reload
-  still shows the result the accept already charged for. `useAttachSession` is the one owner of that
+  still shows the result the accept already queued. `useAttachSession` is the one owner of that
   state (`AttachProps`: `attachSessionId`, `onAttachBegin`, `onAttachEnd`, threaded route -> shell ->
   product -> `ProductRunPage`; no analytics event is involved). The page reports two facts: it started
   polling the session, and the person moved on from it ("New task" on the attached result, own work
@@ -187,7 +188,7 @@ The shared runtime, not a product, owns the web side of a handoff:
 - The redirect after Accept (and the "Open result" action, and what is remembered) needs an `accepted` or
   `consumed` preview that names a non-empty target session the host can open; any other status with a
   session id (for example `failed`) stays on the consent page's terminal status. One remembered session
-  per product per tab, and the newest accepted one wins by the handoff's own order (its `expiresAt`, which grows with creation time, compared as a time to the microsecond, since the backend clock has microseconds, and not as a string: `...:00.5Z` is later than `...:00Z`), not by which response arrives last: an older Accept that settles late cannot replace the newer session the person is already on. A session the person opens themselves (the Accept they just clicked, or "Open result" on a spent token) is chosen outright: it is what the tab restores from then on, even when an older one, while the newest accepted session stays remembered as its fallback (and its order as the guard against late Accepts): when the opened one ends, that newer paid-for session is what the next visit restores, and a newer Accept that settles late meanwhile only becomes that fallback, never the restored one. An Accept whose answer was lost or unreadable (transport failure, timeout, a non-preview 2xx) is resolved by one authoritative preview read, on the page (open the queued session, or let the person retry) and after leaving it (remember the queued session only).
+  per product per tab, and the newest accepted one wins by the handoff's own order (its `expiresAt`, which grows with creation time, compared as a time to the microsecond, since the backend clock has microseconds, and not as a string: `...:00.5Z` is later than `...:00Z`), not by which response arrives last: an older Accept that settles late cannot replace the newer session the person is already on. A session the person opens themselves (the Accept they just clicked, or "Open result" on a spent token) is chosen outright: it is what the tab restores from then on, even when an older one, while the newest accepted session stays remembered as its fallback (and its order as the guard against late Accepts): when the opened one ends, that newer accepted session is what the next visit restores, and a newer Accept that settles late meanwhile only becomes that fallback, never the restored one. An Accept whose answer was lost or unreadable (transport failure, timeout, a non-preview 2xx) is resolved by one authoritative preview read, on the page (open the queued session, or let the person retry) and after leaving it (remember the queued session only).
 - A product with a `handoff` must define `<messageScope>.continueToTarget` in its messages. A
   multi-mode product (each mode its own `ProductDefinition`) supplies only its mode list to the shared
   `products/shared/MultiModeProduct.tsx`, which owns the selector, the clean remount per mode, the
@@ -200,7 +201,7 @@ The shared runtime, not a product, owns the web side of a handoff:
 - The source-side handoff button creates the handoff (state "creating", form and mode switch locked),
   then starts the same-tab navigation ("navigating"). Both show a visible "Opening the next step…" status
   and lock the page until it unloads; a bfcache return resets it. There is deliberately no timer: how
-  long a navigation takes is a guess, and unlocking on a guess lets a new paid run start under a
+  long a navigation takes is a guess, and unlocking on a guess lets a new run start under a
   navigation that is still going to leave for the previous result. A cancelled navigation (Esc, Stop)
   fires no event, so the "navigating" status carries an explicit "Stay on this page" action. It calls
   `window.stop()` before unlocking: otherwise a merely slow navigation could still commit after the
@@ -208,7 +209,7 @@ The shared runtime, not a product, owns the web side of a handoff:
   in-flight request of the document, and the one that must survive is a copy activation POST (it
   outlives the "Copied" feedback), so the action is disabled while one is in flight.
 - An Accept whose response arrives after the person left the consent page still happened server-side and
-  charged the quota: the target session id is kept for that product's next visit
+  reserved capacity: the target session id is kept for that product's next visit
   (`rememberAttachSession`), and nothing navigates. An error such as "already accepted" that
   arrives after the person left proves the Accept went through, so one read of the authoritative preview
   names the session it queued and that is kept too; nothing else continues. Left before any answer
@@ -387,7 +388,8 @@ Safe API behavior:
 - `404` for unknown scenario, unknown session, or unknown guest identity;
 - `409` for stale checkpoints, non-actionable checkpoints, or disallowed next actions;
 - `422` for invalid frontend selection, non-object scenario input, or missing guest identity;
-- `429` with `quota_exhausted` when the backend rejects a scenario start because quota is exhausted.
+- `429` with `quota_exhausted` when used quota reached the configured limit;
+- `429` with `quota_capacity_reserved` when remaining quota is temporarily occupied by reservations.
 
 Recommended frontend behavior for `429 quota_exhausted`:
 
@@ -395,6 +397,10 @@ Recommended frontend behavior for `429 quota_exhausted`:
 - disable the run action or show a clear quota-exhausted state after the response;
 - do not show a progress row, job, or partial session for the rejected attempt because the backend
   creates none.
+
+For `quota_capacity_reserved`, show temporary occupancy and retry the same prepared start/key
+(or handoff token/guest). Do not open an exhausted/paywall state or manufacture a new execution.
+The rejected attempt leaves no session/job/reservation; quota refresh is read-only.
 
 Frontend-safe responses must not expose prompts, provider policies, provider/model names, retry
 budgets, PydanticAI run ids, LiteLLM response ids, or raw unsafe exception text.
@@ -498,10 +504,11 @@ distinguish "exists in my own tenant/region" from "unknown," i.e. it is not a st
 no-existence-oracle guarantee across all callers who can reach an id in-scope — it only guarantees
 that a caller cannot learn anything about artifacts outside their own tenant/region.
 
-The canonical-artifact guard (job/workflow/schema consistency + schema re-validation) is shared with
-the handoff payload builder (see `handoff-model.md`) through
-`anytoolai_platform_core.artifacts.canonical.resolve_canonical_workflow_result`, so both consumers
-reject the same non-canonical states identically.
+The canonical-artifact layer (job/workflow/schema consistency and schema re-validation) is shared
+with the handoff payload builder through `artifacts.canonical.resolve_canonical_workflow_result`.
+Result API and metered publication additionally share `results.validation`'s recursive forbidden-key
+check. Consumption therefore requires the full Result API availability boundary, not just the
+canonical artifact predicate or an artifact row. See [quota model](quota-model.md).
 
 ## A17 public handoff contract
 
@@ -513,11 +520,25 @@ navigation need, and never derive or inspect its contents.
 The unexpired preview response contains only display-safe product/scenario identity, status,
 expiry, bounded config-mapped preview data, and nullable target session/job ids. It never contains
 hidden target context, source artifact/session/job identifiers, token hashes, artifact metadata,
-prompts, providers/models, or debug data. After token TTL, preview content and linked target
-identifiers are redacted even when the durable handoff remains in a terminal accepted, consumed,
-declined, or failed state. The backend remains authoritative for expiry and terminal status.
+prompts, providers/models, or debug data. After token TTL, preview GET returns `status=expired`,
+empty preview content and null target identifiers while preserving durable terminal state.
+An accept replay by the original owner is checked before TTL denial and returns its existing safe
+target linkage, including after expiry; it creates no execution or new reserve. New acceptance and
+decline still enforce TTL. The backend owns both rules; clients must not infer them from local time.
 
 Accept creates and links the target session. An immediate definition may return a target job; a
 deferred definition returns a retrievable `waiting_for_user/handoff_ready` target session with
 `job_id: null`. Frontends must not start or fabricate a target workflow merely because the user
 accepted; start policy belongs to the config contract and backend.
+
+## Reservation-aware quota clients (ANY-507 stage 4)
+
+CE-kit preserves guest quota fields and maps `successful_used_count`, `legacy_used_count`,
+`reserved_count`, `available_count`, `read_at` to `successfulUsedCount`, `legacyUsedCount`,
+`reservedCount`, `availableCount`, `readAt`. `remainingCount` includes reserved capacity;
+`availableCount` excludes it, and `exhausted` depends on remaining, not available. The parser rejects
+missing/invalid counters, inconsistent arithmetic and invalid aware timestamps. Shared web refreshes
+after acceptance and terminal success/release. `quota_capacity_reserved`
+is retryable with the same prepared key or handoff token/guest, without exhausted/paywall UI.
+`quota_exhausted` remains final used exhaustion. Advisory reads and result-fetch retries create no
+logical execution; an active/completed result is never replaced by a quota refresh.
