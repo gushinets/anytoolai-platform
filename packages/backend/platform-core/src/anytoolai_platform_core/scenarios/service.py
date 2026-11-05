@@ -344,7 +344,7 @@ class ScenarioRuntimeService:
             job = self._job_repository.get(reservation.job_id)
             if stored is None or job is None:
                 raise RuntimeError("reservation lost its execution linkage")
-            scenario = self._require_product_scenario(stored.product_id, stored.scenario_id)
+            scenario = self._find_product_scenario(stored.product_id, stored.scenario_id)
             return self._acceptance_snapshot(
                 stored, scenario, job, reservation=reservation, is_replay=True
             )
@@ -387,8 +387,8 @@ class ScenarioRuntimeService:
         job = self._job_repository.get_latest_for_scenario_session(stored.id)
         if job is not None and job.consumption_mode is JobConsumptionMode.reserved:
             raise RuntimeError("reserved job has no matching replay reservation")
-        # Replay resolves current config for next actions without pinning its original version.
-        scenario = self._require_product_scenario(stored.product_id, stored.scenario_id)
+        # Config enriches a durable replay; removing it cannot hide an accepted execution.
+        scenario = self._find_product_scenario(stored.product_id, stored.scenario_id)
         return self._acceptance_snapshot(stored, scenario, job, is_replay=True)
 
     @staticmethod
@@ -447,7 +447,7 @@ class ScenarioRuntimeService:
     def _acceptance_snapshot(
         self,
         session: ScenarioSessionRecord,
-        scenario: ScenarioDefinition,
+        scenario: ScenarioDefinition | None,
         job: JobRecord | None,
         *,
         reservation: ExecutionReservation | None = None,
@@ -666,11 +666,9 @@ class ScenarioRuntimeService:
         if session is None:
             raise ScenarioSessionNotFoundError()
         job = self._job_repository.get_latest_for_scenario_session(session.id)
-        scenario = self._require_product_scenario(
-            session.product_id,
-            session.scenario_id,
-            scenario_version=session.scenario_version,
-        )
+        scenario = self._find_product_scenario(session.product_id, session.scenario_id)
+        if scenario is not None and scenario.version != session.scenario_version:
+            raise ScenarioNotFoundError()
         return self._snapshot_from_records(
             session=session,
             scenario=scenario,
@@ -743,7 +741,7 @@ class ScenarioRuntimeService:
         self,
         *,
         session: ScenarioSessionRecord,
-        scenario: ScenarioDefinition,
+        scenario: ScenarioDefinition | None,
         job: JobRecord | None,
     ) -> ScenarioSessionSnapshot:
         checkpoint_state = resolve_checkpoint_state(
@@ -760,6 +758,15 @@ class ScenarioRuntimeService:
             current_checkpoint_id=checkpoint_state.checkpoint_id,
         )
 
+    def _find_product_scenario(
+        self, product_id: str, scenario_id: str
+    ) -> ScenarioDefinition | None:
+        product = self._config_registry.get_product(product_id)
+        scenario = self._config_registry.get_scenario(scenario_id)
+        if product is None or scenario is None or scenario_id not in product.scenarios:
+            return None
+        return scenario
+
     def _require_product_scenario(
         self,
         product_id: str,
@@ -767,11 +774,8 @@ class ScenarioRuntimeService:
         *,
         scenario_version: int | None = None,
     ) -> ScenarioDefinition:
-        product = self._config_registry.get_product(product_id)
-        scenario = self._config_registry.get_scenario(scenario_id)
-        if product is None or scenario is None:
-            raise ScenarioNotFoundError()
-        if scenario_id not in product.scenarios:
+        scenario = self._find_product_scenario(product_id, scenario_id)
+        if scenario is None:
             raise ScenarioNotFoundError()
         if scenario_version is not None and scenario.version != scenario_version:
             raise ScenarioNotFoundError()

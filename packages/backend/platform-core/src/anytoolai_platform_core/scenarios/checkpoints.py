@@ -24,12 +24,13 @@ class ScenarioCheckpointState:
 
 def resolve_checkpoint_state(
     *,
-    scenario: ScenarioDefinition,
+    scenario: ScenarioDefinition | None,
     session: ScenarioSessionRecord,
     job: JobRecord | None,
 ) -> ScenarioCheckpointState:
     checkpoint_id = _resolved_checkpoint_id(session=session, job=job)
-    if checkpoint_id == RESULT_READY_CHECKPOINT_ID:
+    # Persisted executions remain readable after config removal, without granting retired actions.
+    if checkpoint_id == RESULT_READY_CHECKPOINT_ID and scenario is not None:
         return ScenarioCheckpointState(
             checkpoint_id=checkpoint_id,
             actionable=True,

@@ -138,6 +138,15 @@ Changed request hashes produce `409 idempotency_key_conflict`; accepted replay r
 including after terminal failure or a paid cycle change. Authentication remains ANY-766's boundary;
 new-start access/snapshot refresh must not hide a previously accepted execution from its valid owner.
 
+Accepted replay and the subsequent `GET /v1/scenario-sessions/{id}` read survive removal of the
+scenario, its product association, or the product definition. Status, checkpoint and execution/result
+IDs come from persisted session/job records; missing config grants no next actions. The existing
+stored-scenario version guard remains in force when a current definition exists.
+Current configuration remains mandatory for new admission and next-action execution. These reads
+do not create reservations or bypass canonical workflow/schema validation in the Result API.
+The same config-independent recovery applies to historical guest replay without synthesizing a
+reservation. See [ANY-814](../exec-plans/active/ANY-814-post-merge-recovery-fixes.md).
+
 Replay lookup precedes validation required only for new admission, after request-shape/internal-only
 visibility checks. New admission uses one candidate savepoint for session/job/bucket/reservation,
 reserved increment and events. A competing guest-session or owner-reservation unique violation

@@ -110,7 +110,7 @@ class TestErrorBoundary extends Component<{ children: ReactNode }, { failed: boo
 }
 
 describe("ProductRunPage", () => {
-  it("retries occupied capacity with the same key and refreshes consumption on success", async () => {
+  it.each(["Try again", "Run"])("retries occupied capacity using %s with the same key and an unlocked form", async (button) => {
     const { client, calls } = makeClientCapturingRequests({
       ...happyPathRoutes(),
       [ROUTES.START]: [errorResponse(429, "quota_capacity_reserved"), startResponse()],
@@ -121,20 +121,43 @@ describe("ProductRunPage", () => {
         quotaResponse(TEST_PRODUCT_IDS, { limit_count: 1, used_count: 1, remaining_count: 0, exhausted: true }),
       ],
     });
-    renderPage({ client });
+    const onLockedChange = vi.fn();
+    renderPage({ client, onLockedChange });
     await waitForForm();
     fillValidForm();
     submit();
     await screen.findByText("Capacity is temporarily in use. Please try again shortly.");
     expect(screen.queryByText("You've used all your Test Product runs for now.")).toBeNull();
     await screen.findByText(/Available now: 0. In progress: 1./);
-    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect((screen.getByLabelText("Text") as HTMLTextAreaElement).disabled).toBe(false);
+    expect((screen.getByRole("button", { name: "Run" }) as HTMLButtonElement).disabled).toBe(false);
+    expect(onLockedChange.mock.calls.at(-1)).toEqual([false]);
+    fireEvent.click(screen.getByRole("button", { name: button }));
     await waitForResult();
     const starts = calls.filter((call) => call.key === ROUTES.START);
     expect(starts).toHaveLength(2);
     expect(idempotencyKeyOf(starts[0]!)).toBe(idempotencyKeyOf(starts[1]!));
     await screen.findByText("0 of 1 runs remaining.");
     expect(screen.getByText(RESULT_TEXT)).toBeTruthy();
+  });
+
+  it("uses edited input and a new key after a definite capacity rejection", async () => {
+    const { client, calls } = makeClientCapturingRequests({
+      ...happyPathRoutes(),
+      [ROUTES.START]: [errorResponse(429, "quota_capacity_reserved"), startResponse()],
+    });
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+    await screen.findByText("Capacity is temporarily in use. Please try again shortly.");
+    fireEvent.change(screen.getByLabelText("Text"), { target: { value: "A different request." } });
+    submit();
+    await waitForResult();
+    const starts = calls.filter((call) => call.key === ROUTES.START);
+    expect(starts).toHaveLength(2);
+    expect(idempotencyKeyOf(starts[0]!)).not.toBe(idempotencyKeyOf(starts[1]!));
+    expect(JSON.parse(starts[1]!.init.body as string)).toMatchObject({ input: { text: "A different request." } });
   });
 
   it("refreshes capacity after terminal failure without starting another execution", async () => {

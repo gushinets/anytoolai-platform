@@ -446,23 +446,10 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   const [copyActivationsInFlight, setCopyActivationsInFlight] = useState(0);
   const handoffLocked = HANDOFF_STATUS_IS_LOCKED[handoffStatus];
   const isHandoffLocked = () => HANDOFF_STATUS_IS_LOCKED[handoffStatusRef.current];
-  // Code review finding: `retryable-error` alone isn't a safe-to-remount signal -- both an
-  // ambiguous poll failure (timeout/connection loss in `runPoll`, backend may still be running the
-  // accepted session) *and* an ambiguous `/start` failure itself (network/timeout/5xx -- the
-  // backend may have already accepted the start, created the session, and consumed quota before
-  // the response was lost) land here, and both deliberately keep `pendingStart` alive so a retry
-  // can reattach via the same Idempotency-Key instead of starting (and charging) a new run. A
-  // mode switch remounting this component would destroy that same `pendingStart`, so `pendingStart
-  // !== null` -- not a per-phase flag guessing which specific ambiguous case this is -- is the
-  // actual thing worth gating on: it's already true in exactly (and only) the cases where
-  // abandoning this instance would lose real, uncommitted reattachment state. Two `retryable-error`
-  // transitions are genuinely safe and explicitly clear `pendingStart` themselves before landing
-  // here: the deterministic guest-identity-not-found self-heal, and (code review finding) any other
-  // deterministic `/start` rejection -- see `runStart`'s own comment for why a definite 4xx there
-  // means no session/job was ever created, unlike a network failure/timeout/5xx. Also covers the
-  // form's own Submit button and fields (below), not just the mode-switch guard -- editing values
-  // or resubmitting during any of these ambiguous windows would equally abandon the original
-  // Idempotency-Key reattachment path.
+  // Ambiguous start/poll failures keep the execution locked: remounting would lose its only
+  // reattachment handle. A definite capacity rejection retains the key for an unchanged retry,
+  // but created no execution, so editing or switching modes is safe. Other definite rejections
+  // clear pendingStart in runStart().
   //
   // Code review finding: `result-fetch-error` needs the same "unsafe to abandon" treatment for a
   // different reason -- that phase means the scenario session already completed and consumed its
@@ -478,7 +465,8 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     // An ambiguous failure keeps the run "live": a started run through its Idempotency-Key
     // (`pendingStart`), an attached handoff session through the session itself. Both may still be
     // running server-side, so abandoning this mount (a mode switch) would lose the only handle.
-    (phase.kind === "retryable-error" && (pendingStart !== null || attachActiveRef.current));
+    (phase.kind === "retryable-error" && phase.reason !== "quotaCapacityReserved" &&
+      (pendingStart !== null || attachActiveRef.current));
   // An attached (already queued and reserved) session that has not started polling yet (runtime config and
   // identity still loading): a mode switch would drop it before it could attach. A failed boot releases the
   // lock: nothing is running, and a mode switch before the attach began does not forget the persisted
@@ -642,6 +630,8 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     }
     if (!result.ok) {
       if (capacityReserved) {
+        // This key created no execution. Retain it for an unchanged retry, but allow editing
+        // and mode changes instead of treating the rejected request as an ambiguous active run.
         setPhase({ kind: "retryable-error", reason: "quotaCapacityReserved" });
         return;
       }

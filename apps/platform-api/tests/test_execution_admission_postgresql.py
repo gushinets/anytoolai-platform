@@ -5,6 +5,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 from uuid import uuid4
 
 import pytest
@@ -118,6 +119,21 @@ def start(session, registry, grant=None, key="request", **changes):
 def rows(factory, table):
     with transaction_boundary(factory) as session:
         return list(session.execute(sa.select(table)).mappings())
+
+
+def without_scenario_config(registry, removal: Literal["scenario", "association", "product"]):
+    products = dict(registry.products)
+    if removal == "product":
+        del products["kernel_demo"]
+        return replace(registry, products=products)
+    product = products["kernel_demo"]
+    products["kernel_demo"] = replace(
+        product, scenarios=tuple(item for item in product.scenarios if item != SCENARIO)
+    )
+    scenarios = dict(registry.scenarios)
+    if removal == "scenario":
+        del scenarios[SCENARIO]
+    return replace(registry, products=products, scenarios=scenarios)
 
 
 def assert_empty_admission(factory):
@@ -411,7 +427,8 @@ def test_empty_guest_identity_retains_safe_validation_without_admission_rows(run
     assert_empty_admission(factory)
 
 
-def test_legacy_guest_replay_does_not_synthesize_a_reservation(runtime):
+@pytest.mark.parametrize("removal", [None, "scenario", "association", "product"])
+def test_legacy_guest_replay_does_not_synthesize_a_reservation(runtime, removal):
     factory, _, registry = runtime
     request_hash = compute_idempotency_request_hash(
         tenant_id="anytoolai",
@@ -449,8 +466,13 @@ def test_legacy_guest_replay_does_not_synthesize_a_reservation(runtime):
             )
         )
     with transaction_boundary(factory) as session:
-        replay = start(session, registry)
+        replay_registry = (
+            registry if removal is None else without_scenario_config(registry, removal)
+        )
+        replay = start(session, replay_registry)
     assert replay.is_replay and replay.job_id == job.id
+    assert replay.scenario_session_id == stored.id
+    assert replay.allowed_next_actions == ()
     assert replay.reservation is None
     assert rows(factory, execution_reservations_table) == []
     assert rows(factory, guest_quota_usage_table) == []

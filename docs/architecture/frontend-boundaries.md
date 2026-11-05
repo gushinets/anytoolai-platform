@@ -401,6 +401,9 @@ Recommended frontend behavior for `429 quota_exhausted`:
 For `quota_capacity_reserved`, show temporary occupancy and retry the same prepared start/key
 (or handoff token/guest). Do not open an exhausted/paywall state or manufacture a new execution.
 The rejected attempt leaves no session/job/reservation; quota refresh is read-only.
+The form, ordinary Submit, mode selection and shell busy indication unlock immediately after this
+definite rejection. Retain the prepared key for an unchanged retry; edited input creates a new key.
+Ambiguous start/poll failures and accepted or attached executions retain their reattachment locks.
 
 Frontend-safe responses must not expose prompts, provider policies, provider/model names, retry
 budgets, PydanticAI run ids, LiteLLM response ids, or raw unsafe exception text.
