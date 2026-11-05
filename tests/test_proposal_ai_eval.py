@@ -56,6 +56,7 @@ def test_docker_accepts_compose_names_and_separates_options(project: str) -> Non
         check=True,
         capture_output=True,
         text=True,
+        encoding="utf-8",
     )
 
 

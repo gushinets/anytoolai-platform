@@ -129,6 +129,7 @@ def write_router(project: str, content: str) -> None:
         ],
         input=content,
         text=True,
+        encoding="utf-8",
         check=True,
         capture_output=True,
     )
@@ -143,7 +144,7 @@ def write_router(project: str, content: str) -> None:
 
 
 def collect(args: argparse.Namespace) -> None:
-    suite = json.loads(args.suite.read_text())
+    suite = json.loads(args.suite.read_text(encoding="utf-8"))
     if args.model not in suite["models"] or args.reasoning not in suite["reasoning"]:
         raise ValueError("configuration outside frozen matrix")
     repeats = suite["repeats"] if args.repeats is None else args.repeats
@@ -172,14 +173,16 @@ def collect(args: argparse.Namespace) -> None:
     }
     manifest_path = args.out / "manifest.json"
     if manifest_path.exists():
-        saved = json.loads(manifest_path.read_text())
+        saved = json.loads(manifest_path.read_text(encoding="utf-8"))
         for field in (
             "suite_sha256", "model", "reasoning_effort", "prompt_sha256", "original_router"
         ):
             if saved[field] != snapshot[field]:
                 raise ValueError(f"resume manifest mismatch: {field}")
     else:
-        manifest_path.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n")
+        manifest_path.write_text(
+            json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
     try:
         write_router(args.project, selected)
         attempts = (
@@ -200,12 +203,13 @@ def collect(args: argparse.Namespace) -> None:
                 ["node", str(DRIVER)],
                 input=json.dumps(spec),
                 text=True,
+                encoding="utf-8",
                 capture_output=True,
                 check=True,
                 timeout=DRIVER_TIMEOUT_SECONDS,
             )
             observed = json.loads(completed.stdout)
-            (args.out / f"{run_id}.browser.json").write_text(completed.stdout)
+            (args.out / f"{run_id}.browser.json").write_text(completed.stdout, encoding="utf-8")
             record = {
                 **observed,
                 "id": run_id,
@@ -227,7 +231,7 @@ def collect(args: argparse.Namespace) -> None:
                 },
             }
             record["status"], record["review_needed"] = evidence_status(record, args.out)
-            with (args.out / "runs.jsonl").open("a") as stream:
+            with (args.out / "runs.jsonl").open("a", encoding="utf-8") as stream:
                 stream.write(json.dumps(record, ensure_ascii=False) + "\n")
             print(
                 f"{run_id}: {record['status']}, {observed['ui_latency_ms'] / 1000:.1f}s",
@@ -242,7 +246,7 @@ def collect(args: argparse.Namespace) -> None:
     finally:
         write_router(args.project, original)
         (args.out / "router-restored.txt").write_text(
-            "Original worker router restored and read back.\n"
+            "Original worker router restored and read back.\n", encoding="utf-8"
         )
 
 

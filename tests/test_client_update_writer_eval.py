@@ -20,6 +20,19 @@ eval_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(eval_module)
 
 
+@pytest.fixture(autouse=True)
+def windows_default_text_encoding(monkeypatch):
+    # Exercise Windows' legacy default on every host; UTF-8 files must be explicit.
+    original_open = Path.open
+
+    def legacy_open(path, mode="r", buffering=-1, encoding=None, errors=None, newline=None):
+        if "b" not in mode and encoding in (None, "locale"):
+            encoding = "cp1252"
+        return original_open(path, mode, buffering, encoding, errors, newline)
+
+    monkeypatch.setattr(Path, "open", legacy_open)
+
+
 def record():
     return {
         "origin": {"ui_outcome": "result", "ui_latency_ms": 1000},
@@ -68,7 +81,7 @@ def test_missing_trace_is_not_accepted(tmp_path):
 
 
 def test_frozen_matrix_preserves_originals():
-    suite = json.loads(eval_module.FIXTURE.read_text())
+    suite = json.loads(eval_module.FIXTURE.read_text(encoding="utf-8"))
     expected_cases = 12
     expected_attempts = 360
     assert len(suite["cases"]) == expected_cases
@@ -133,7 +146,9 @@ def test_write_router_separates_options_and_preserves_stdin_restart_and_readback
     ]
     assert write.args[0][-1] == eval_module.ROUTER
     assert content not in write.args[0]
-    assert write.kwargs == {"input": content, "text": True, "check": True, "capture_output": True}
+    assert write.kwargs == {
+        "input": content, "text": True, "encoding": "utf-8", "check": True, "capture_output": True
+    }
     assert restart.args[0] == ["docker", "restart", "--", container]
     assert restart.kwargs == {
         "check": True,
@@ -273,7 +288,7 @@ def test_termination_triggers_normal_unwinding():
 @pytest.mark.parametrize("repeats", [5, None])
 def test_orphaned_journal_blocks_retry_and_restores_router(tmp_path, repeats):
     baseline = "model_list:\n  - litellm_params:\n      model: openai/gpt-6-luna\n"
-    (tmp_path / "U01-ru-1.zip.journal.json").write_text('{"phase":"started"}')
+    (tmp_path / "U01-ru-1.zip.journal.json").write_text('{"phase":"started"}', encoding="utf-8")
     args = SimpleNamespace(
         suite=eval_module.FIXTURE,
         model="openai/gpt-6-luna",
@@ -346,13 +361,13 @@ def review_directory(tmp_path, *, questions=None):
         "suite_sha256": eval_module.digest(suite),
         **{key: run[key] for key in ("model", "reasoning_effort", "prompt_sha256")},
     }
-    (series / "manifest.json").write_text(json.dumps(manifest))
-    (series / "runs.jsonl").write_text(json.dumps(run) + "\n")
+    (series / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    (series / "runs.jsonl").write_text(json.dumps(run) + "\n", encoding="utf-8")
     return directory, run
 
 
 def saved_verdict(directory):
-    return json.loads((directory / "verdicts.jsonl").read_text().splitlines()[-1])
+    return json.loads((directory / "verdicts.jsonl").read_text(encoding="utf-8").splitlines()[-1])
 
 
 def test_interactive_review_requires_explicit_decisions_and_records_identity(tmp_path, capsys):
@@ -364,7 +379,9 @@ def test_interactive_review_requires_explicit_decisions_and_records_identity(tmp
         "suggestion": "agent suggests yes",
         "reason": "Agent explanation",
     }
-    (tmp_path / "agent-observations.json").write_text(json.dumps({"observations": [observation]}))
+    (tmp_path / "agent-observations.json").write_text(
+        json.dumps({"observations": [observation]}), encoding="utf-8"
+    )
     with patch(
         "builtins.input", side_effect=["", "invalid", "n", "Readiness is misstated", "Still", "y"]
     ):
@@ -400,7 +417,8 @@ def test_review_resumes_partial_decisions_and_does_not_auto_accept(tmp_path):
         review_module.review(directory, "Putilin")
     assert report_module.human_status(run, saved_verdict(directory)) == ("PASS", False)
     expected_saves = 3
-    assert len((directory / "verdicts.jsonl").read_text().splitlines()) == expected_saves
+    saved = (directory / "verdicts.jsonl").read_text(encoding="utf-8").splitlines()
+    assert len(saved) == expected_saves
 
 
 @pytest.mark.parametrize("stale", [True, False])
@@ -426,8 +444,10 @@ def test_review_discards_stale_or_differently_attributed_partial_decisions(tmp_p
     }
     if stale:
         old["input_sha256"] = "old-input"
-    (directory / "verdicts.jsonl").write_text(json.dumps(old) + "\n")
-    (tmp_path / "agent-observations.json").write_text(json.dumps({"observations": [observation]}))
+    (directory / "verdicts.jsonl").write_text(json.dumps(old) + "\n", encoding="utf-8")
+    (tmp_path / "agent-observations.json").write_text(
+        json.dumps({"observations": [observation]}), encoding="utf-8"
+    )
     with patch("builtins.input", side_effect=["n", "New assessment", "", "n"]):
         review_module.review(directory, "Putilin")
     assert saved_verdict(directory)["answers"][0]["reason"] == "New assessment"
@@ -455,7 +475,7 @@ def test_review_rejects_invalid_identity_and_series_without_writes(tmp_path, rev
 def test_review_validates_hashes_before_accepting_any_decision(tmp_path):
     directory, run = review_directory(tmp_path)
     run["output"]["text"] = "Modified after collection"
-    (directory / "sol-medium/runs.jsonl").write_text(json.dumps(run) + "\n")
+    (directory / "sol-medium/runs.jsonl").write_text(json.dumps(run) + "\n", encoding="utf-8")
     with pytest.raises(ValueError, match="output digest"):
         review_module.review(directory, "Putilin")
     assert not (directory / "verdicts.jsonl").exists()
@@ -521,11 +541,11 @@ def write_report_experiment(directory, manifests):
         assert report_module.human_status(run, verdict) == ("PASS", False)
         path = directory / series
         path.mkdir()
-        (path / "manifest.json").write_text(json.dumps(manifest))
-        (path / "runs.jsonl").write_text(json.dumps(run) + "\n")
+        (path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+        (path / "runs.jsonl").write_text(json.dumps(run) + "\n", encoding="utf-8")
         verdicts.append(verdict)
     (directory / "verdicts.jsonl").write_text(
-        "".join(json.dumps(verdict) + "\n" for verdict in verdicts)
+        "".join(json.dumps(verdict) + "\n" for verdict in verdicts), encoding="utf-8"
     )
 
 
@@ -538,6 +558,26 @@ def valid_report_runtime():
         return_value=("PENDING", ["human semantic review required"]),
     ):
         yield
+
+
+@pytest.mark.usefixtures("valid_report_runtime")
+def test_report_preserves_utf8_with_legacy_default_encoding(tmp_path):
+    text = "Проверка готовности: mañana."
+    probe = tmp_path / "utf8.txt"
+    probe.write_bytes(text.encode("utf-8"))
+    with pytest.raises(UnicodeDecodeError):
+        probe.read_text()
+    manifests = experiment_manifests()
+    for manifest in manifests.values():
+        manifest["suite"]["cases"][0]["progress_notes"] = text
+    write_report_experiment(tmp_path, manifests)
+    # Real collector manifests contain literal Unicode rather than JSON ASCII escapes.
+    for path in tmp_path.glob("*/manifest.json"):
+        document = json.loads(path.read_text(encoding="utf-8"))
+        path.write_bytes(json.dumps(document, ensure_ascii=False).encode("utf-8"))
+
+    assert report_module.summarize(tmp_path)["status"] == "PASS"
+    assert text in (tmp_path / "report.html").read_text(encoding="utf-8")
 
 
 @pytest.mark.usefixtures("valid_report_runtime")
@@ -577,11 +617,11 @@ def test_report_rejects_inconsistent_experiments_without_overwriting_reports(tmp
     write_report_experiment(tmp_path, manifests)
     reports = [tmp_path / name for name in ("summary.json", "report.html", "review-template.jsonl")]
     for path in reports:
-        path.write_text("previous report")
+        path.write_text("previous report", encoding="utf-8")
     verdicts = (tmp_path / "verdicts.jsonl").read_bytes()
     with pytest.raises(ValueError):
         report_module.summarize(tmp_path)
-    assert all(path.read_text() == "previous report" for path in reports)
+    assert all(path.read_text(encoding="utf-8") == "previous report" for path in reports)
     assert (tmp_path / "verdicts.jsonl").read_bytes() == verdicts
 
 
@@ -606,13 +646,13 @@ def test_report_rejects_a_suite_with_a_forged_matching_digest(tmp_path):
     write_report_experiment(tmp_path, manifests)
     manifest = manifests["medium"]
     manifest["suite"]["cases"][0]["progress_notes"] = "Changed after hashing."
-    (tmp_path / "medium/manifest.json").write_text(json.dumps(manifest))
+    (tmp_path / "medium/manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     with pytest.raises(ValueError, match="suite manifest digest mismatch"):
         report_module.summarize(tmp_path)
 
 
 def resume_collection(tmp_path):
-    suite = json.loads(eval_module.FIXTURE.read_text())
+    suite = json.loads(eval_module.FIXTURE.read_text(encoding="utf-8"))
     baseline = {
         "model_list": [
             {
@@ -632,7 +672,7 @@ def resume_collection(tmp_path):
         "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
         "original_router": baseline,
     }
-    (tmp_path / "manifest.json").write_text(json.dumps(manifest))
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     args = SimpleNamespace(
         suite=eval_module.FIXTURE,
         model=manifest["model"],
@@ -644,6 +684,49 @@ def resume_collection(tmp_path):
         max_attempts=0,
     )
     return args, baseline, prompt
+
+
+def test_collector_preserves_utf8_and_resumes_with_legacy_encoding(tmp_path):
+    args, baseline, prompt = resume_collection(tmp_path)
+    state = {"router": json.dumps(baseline)}
+    (tmp_path / "manifest.json").unlink()
+    args.max_attempts = 1
+    args.web_url = "http://localhost:3200"
+    observed = {
+        "output": {"text": "Проверка готовности: mañana."},
+        "session_id": "scenario_session_test",
+        "ui_outcome": "result",
+        "ui_latency_ms": 1000,
+    }
+
+    def browser(_command, **kwargs):
+        assert kwargs["encoding"] == "utf-8"
+        spec = json.loads(kwargs["input"])
+        Path(spec["trace"]).write_bytes(b"trace")
+        return SimpleNamespace(stdout=json.dumps(observed, ensure_ascii=False))
+
+    with (
+        patch.object(
+            eval_module, "_docker",
+            side_effect=lambda *a: prompt if a[-1].endswith(".md") else state["router"],
+        ),
+        patch.object(eval_module, "_git_state", return_value={}),
+        patch.object(
+            eval_module, "write_router",
+            side_effect=lambda _project, content: state.update(router=content),
+        ),
+        patch.object(eval_module, "provider_calls", return_value=[]),
+        patch.object(eval_module, "evidence_status", return_value=("PENDING", [])),
+        patch.object(eval_module.subprocess, "run", side_effect=browser) as submit,
+    ):
+        eval_module.collect(args)
+        args.max_attempts = 0
+        eval_module.collect(args)
+        submit.assert_called_once()
+    [run] = eval_module.read_jsonl(tmp_path / "runs.jsonl")
+    assert run["output"] == observed["output"]
+    raw = json.loads((tmp_path / f"{run['id']}.browser.json").read_text(encoding="utf-8"))
+    assert raw == observed
 
 
 @pytest.mark.parametrize(
@@ -706,8 +789,10 @@ def test_resume_accepts_equivalent_baseline_and_restores_actual_entry_text(tmp_p
 def test_resume_still_restores_entry_baseline_after_orphaned_attempt(tmp_path):
     args, baseline, prompt = resume_collection(tmp_path)
     args.max_attempts = 1
-    first_case = json.loads(args.suite.read_text())["cases"][0]["id"]
-    (tmp_path / f"{first_case}-1.zip.journal.json").write_text('{"phase":"started"}')
+    first_case = json.loads(args.suite.read_text(encoding="utf-8"))["cases"][0]["id"]
+    (tmp_path / f"{first_case}-1.zip.journal.json").write_text(
+        '{"phase":"started"}', encoding="utf-8"
+    )
     original = "# Current baseline\n" + json.dumps(baseline)
     with (
         patch.object(
@@ -744,7 +829,7 @@ def test_corrupt_partial_review_is_rejected_without_overwriting(tmp_path):
     verdict = saved_verdict(directory)
     verdict["answers"] = []
     path = directory / "verdicts.jsonl"
-    path.write_text(json.dumps(verdict) + "\n")
+    path.write_text(json.dumps(verdict) + "\n", encoding="utf-8")
     original = path.read_bytes()
     with pytest.raises(ValueError, match="Повреждены"):
         review_module.review(directory, "Putilin")

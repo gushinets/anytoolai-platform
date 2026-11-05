@@ -187,7 +187,7 @@ def measured_metrics(runs: list[dict], diagnostics: list[dict], groups: dict) ->
 
 def summarize(directory: Path) -> dict:
     manifests = {
-        path.parent.name: json.loads(path.read_text())
+        path.parent.name: json.loads(path.read_text(encoding="utf-8"))
         for path in sorted(directory.glob("*/manifest.json"))
     }
     suite, observed = validate_experiment(manifests)
@@ -257,15 +257,18 @@ def summarize(directory: Path) -> dict:
             state = "FAIL"
         summary[series] = {"status": state, "groups": groups, **metrics}
     result = overall_summary(summary, suite, observed)
-    (directory / "summary.json").write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
+    (directory / "summary.json").write_text(
+        json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
     (directory / "review-template.jsonl").write_text(
-        "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in template)
+        "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in template), encoding="utf-8"
     )
     (directory / "report.html").write_text(
         '<!doctype html><meta charset="utf-8"><title>ANY-624 review</title>'
         "<style>body{max-width:70rem;margin:2rem auto;font-family:system-ui}"
         "pre{white-space:pre-wrap}</style>"
-        "<h1>ANY-624 — human review pending</h1>" + "".join(sections)
+        "<h1>ANY-624 — human review pending</h1>" + "".join(sections),
+        encoding="utf-8",
     )
     return result
 

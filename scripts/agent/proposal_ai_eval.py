@@ -547,7 +547,7 @@ def _docker(project: str, service: str, *command: str) -> str:
     project = _parse_compose_project(project)
     return subprocess.run(
         ["docker", "exec", "--", f"{project}-{service}-1", *command],
-        check=True, capture_output=True, text=True
+        check=True, capture_output=True, text=True, encoding="utf-8"
     ).stdout
 
 

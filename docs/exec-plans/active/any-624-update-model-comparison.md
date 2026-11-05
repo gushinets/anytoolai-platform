@@ -810,3 +810,29 @@ Recomputed separate copies of the accepted main and variant reports with the new
 remain hash-identical; no provider calls or product prompt/model changes. Commit and normal push
 of these four scoped files are explicitly authorized. Remote results will be checked for the
 published SHA; inline comments/reviews/threads are not modified without separate permission.
+
+### Windows CI portability follow-up
+
+The Windows baseline on e3ad39c2 failed 11 Update evaluator tests because implicit
+text I/O used cp1252 for UTF-8 suites and review records. A separate selector unit test
+failed before validation when real Windows deployment-lock ACL inspection timed out.
+Linux baseline/full-check on that revision passed; these Windows failures are not acceptance
+failures or reasons to alter the preserved human verdicts.
+
+Implementation plan: make UTF-8 explicit for Update collector/report files and subprocess
+text, including the shared Docker reader used by Proposal; align test fixture I/O. Exercise
+legacy cp1252 file defaults in all Update evaluator tests, with Unicode collection/resume
+and report regressions. Call the existing locked validation body in the selector unit test;
+leave production lock behavior and its dedicated integration tests unchanged. Run focused
+tests and canonical quick-check before preparing the patch for publication. No live provider
+calls, prompt changes, dependency additions or GitHub comments are needed.
+
+Validation completed: 148 focused tests pass, including the selector test and all Update
+evaluator tests with simulated cp1252 file defaults. Two new regressions exercise Unicode
+collection/resume and report output; the previous collector and report reproduce decoding
+failures with the same legacy default. Canonical quick-check passes: 3,125 passed, 12 standard
+skips, 628 deselected. Config, architecture, docs and generated-doc checks pass. Ruff passes
+the Update collector/report/test files; the shared Proposal reader and existing test modules
+have no additional Ruff diagnostics against the previous revision. Whitespace checks pass.
+Production deployment-lock code, accepted evidence and prompts are unchanged; no provider
+calls occurred. Native Windows CI and remote checks still need a new run after publication.
