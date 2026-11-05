@@ -89,6 +89,38 @@ Local diagnostics: `.quick-check-tmp/fix-round1-postgresql.log` and
 The next reviewers must inspect the same resulting commit: fresh GPT-6.1 Sol xhigh, then GPT-6 Sol
 xhigh (the user-approved replacement for unavailable GPT-5.6). Leave PR 259 open and do not merge.
 
+## Independent review round 2
+
+Reviewer: GPT-6.1 Sol (`gpt-6.1-sol`), xhigh; reviewed the entire PR at head
+`93b75056205a2cc46a9d415e33784eae71588c52` and found one P2: historical preset/history
+adaptation retained a saved Lab prompt origin whose schema contract was no longer current,
+so strict backend validation rejected subsequent runs and preset saves.
+
+Repair: reconcile origins only during explicit adaptation against the existing
+current prompt-options endpoint. Preserve available origins and historical prompt text; detach
+only unavailable origins with a visible explanation. Block new run/preset writes until that
+check succeeds, and retain the existing retry path on loading failures. Compatible restore,
+save, apply and export keep their provenance. Backend validation and immutable records stay strict.
+
+Four focused Chromium regressions passed: preset/history adaptation with unavailable and available
+Lab origins. They verify schema v1-to-v2 drift, delayed options, 503 and malformed-list recovery,
+blocked write handlers while unresolved, preservation of edits, both resulting run/preset payloads,
+and an already-open prompt tab with an abandoned draft's request still pending. The platform prompt
+must be present in a valid options response before absence can detach an origin.
+
+Validation: doctor and canonical frontend-check passed, including lint, typecheck, all 53 Atom Lab
+Node tests, all 101 Chromium journeys, generated API-contract drift and frontend builds. The six
+focused new/existing origin journeys also passed together; ordinary prompt loads retain the
+existing saved-version status because only adaptation reconciliation updates draft state.
+Documentation validation and generated-document drift passed. Final frontend log:
+`.quick-check-tmp/fix-round2-frontend-final.log` (ignored diagnostic, not PR content).
+
+All required CI checks passed on the prior head `93b75056`: full-check, Windows baseline,
+PostgreSQL quota/concurrency, atoms-proof and production Compose smoke. The round 1 broad local
+transport-failure evidence above remains historical. No backend or migration changes are needed in round 2, so
+PostgreSQL checks are not repeated; the acceptance database stays untouched and no provider is
+called. Fresh review of the resulting entire PR remains required before the second-model review.
+
 ## Publication
 
 Create a codex/any-818 branch, commit only the explicit feature file set, push and create a PR
