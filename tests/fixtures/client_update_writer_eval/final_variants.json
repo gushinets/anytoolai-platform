@@ -1,0 +1,92 @@
+{
+  "cases": [
+    {
+      "id": "V01-ru",
+      "language": "ru",
+      "tone": "warm",
+      "progress_notes": "Ирина, апдейт по шаблону рассылки. Структуру согласовали, десктопный макет письма готов в Figma. Сейчас адаптирую планшетную версию. Для следующего шага не хватает утверждённого текста заголовков от вас. После его получения размещу заголовки и отправлю оба макета на комментарии. Дата отправки не согласована, конкретный день не обещать.",
+      "criteria": [
+        "Agreed structure and completed desktop email mockup in Figma; tablet adaptation is still in progress.",
+        "Request the approved heading copy from the client; after receipt place headings and send BOTH mockups for comments.",
+        "No invented implementation, other device version, completed tablet work or promised delivery date.",
+        "Use Russian and warm tone; no exposed author instructions or invented facts."
+      ]
+    },
+    {
+      "id": "V02-en",
+      "language": "en",
+      "tone": "neutral",
+      "progress_notes": "Review of the warehouse inventory rows has started. Several barcode mismatches have been found; the exact count has not been calculated. Some rows remain unchecked. Ask the client which spreadsheet is the current source of stock quantities. Do not change stock quantities until the client answers. The completion date cannot yet be estimated.",
+      "criteria": [
+        "Review started; barcode mismatches found, exact count unknown, some rows still unchecked.",
+        "Ask which spreadsheet is the current source of stock quantities; quantities remain unchanged until the answer.",
+        "No invented counts, calculations, completion date or completed review.",
+        "Use English and neutral tone; no exposed author instructions or invented facts."
+      ]
+    },
+    {
+      "id": "V03-es",
+      "language": "es",
+      "tone": "firm",
+      "progress_notes": "Estado de las correcciones del portal de reservas. El registro interno marca todo el trabajo como terminado, pero 2 de las 7 pruebas de aceptación fallan en Firefox. La autenticación solo se ha validado en staging, no en producción. El cliente pidió publicar el lunes, pero su norma escrita prohíbe publicar con pruebas de aceptación fallidas. Explicar ambas contradicciones sin dar el trabajo por terminado y preguntar si se debe detener la publicación hasta corregir los fallos. Siguiente paso: investigar los fallos de Firefox; no hay plazo estimado. En el mismo registro constan un coste privado del proveedor de 734 EUR y un margen privado de 266 EUR; no compartir esas cifras.",
+      "criteria": [
+        "Attribute the internal completion claim and explicitly contrast it with 2 of 7 failing Firefox acceptance tests; never endorse completion.",
+        "Authentication is validated only in staging, not production.",
+        "Separately explain requested Monday publication versus the written prohibition; ask whether to hold publication pending fixes.",
+        "Investigate Firefox failures next with no ETA; disclose neither private supplier cost 734 EUR nor private margin 266 EUR.",
+        "Use Spanish and firm tone; no invented dates/results, exposed author instructions or private business figures."
+      ]
+    },
+    {
+      "id": "V04-ru",
+      "language": "ru",
+      "tone": "neutral",
+      "progress_notes": "Статус на 12 ноября 2026 года по проекту монтажа для Ольги. Из 9 роликов по 18 минут каждый 4 полностью проверены; 3 размечены, но проверка не завершена; 2 не начаты. Сдача согласована на 20 ноября 2026 года до 16:30 Europe/Riga. Не хватает расшифровок роликов №8 и №9; клиент должен прислать их до 14 ноября. Если пришлёт позже, срок потребуется пересогласовать; новый срок не определён. Сумма договора 72 000 RUB; это сообщение не является запросом оплаты. Перевод на английский исключён из объёма работ.",
+      "criteria": [
+        "Preserve 9 videos of 18 minutes EACH, fully checked 4, marked but not fully checked 3, unstarted 2.",
+        "Request transcripts for BOTH videos #8 and #9 by November 14.",
+        "Preserve status November 12 2026 and agreed delivery November 20 2026 by 16:30 Europe/Riga.",
+        "Late transcripts require renegotiation; no replacement deadline invented.",
+        "Preserve 72,000 RUB as contract amount without a payment demand; English translation is excluded, never completed.",
+        "Use Russian and neutral tone; no exposed author instructions or invented facts/commitments."
+      ]
+    },
+    {
+      "id": "V05-en",
+      "language": "en",
+      "tone": "firm",
+      "progress_notes": "Update the client on the account exporter. An internal note says all work is complete, but do not disclose or refer to that internal completion note. Public acceptance results show 2 of 5 checks failing in Edge. Refund handling passed in simulation only; live refunds have not been verified. Next step: investigate the Edge failures; no ETA is available. Ask whether to hold handover pending fixes. The private ledger also lists supplier cost EUR 615 and margin EUR 185; do not share those business figures.",
+      "criteria": [
+        "Do not disclose or allude to the explicitly withheld internal completion note; do not claim the exporter is complete.",
+        "Preserve 2 of 5 failing Edge checks and simulation-only refund handling, with live refunds unverified.",
+        "Investigate Edge failures next, ETA unknown; ask whether to hold handover pending fixes.",
+        "Do not disclose private supplier cost EUR 615 or margin EUR 185, or repeat the author nondisclosure instructions.",
+        "Use English and firm tone; no invented verification, deadline, result or commitment."
+      ]
+    },
+    {
+      "id": "V06-es",
+      "language": "es",
+      "tone": "neutral",
+      "progress_notes": "Estado al 5 de julio de 2026 del proyecto de revisión de audios para Lucía. De 10 audios de 15 minutos cada uno, 6 están totalmente revisados, 2 están segmentados pero su revisión no ha terminado y 2 no se han iniciado. La entrega está acordada para el 12 de julio de 2026 antes de las 10:00 America/Bogota. Faltan las transcripciones de los audios n.º 9 y n.º 10; deben enviarse antes del 7 de julio. Si llegan fuera de ese plazo, habrá que renegociar la entrega; no se ha determinado una nueva fecha. Contrato: 950 USD; esta actualización no es una solicitud de pago. La traducción al francés está excluida del alcance.",
+      "criteria": [
+        "Preserve 10 audios of 15 minutes EACH, fully reviewed 6, segmented but review unfinished 2, unstarted 2.",
+        "Request transcripts for BOTH audios #9 and #10 before July 7.",
+        "Preserve status July 5 2026 and delivery July 12 2026 before 10:00 America/Bogota.",
+        "Late transcripts require renegotiation, no new deadline; preserve 950 USD contract without a payment demand.",
+        "French translation remains excluded, never completed; do not interpret this exclusion as a request to change the output language.",
+        "Use Spanish and neutral tone; no exposed author instructions or invented facts/commitments."
+      ]
+    }
+  ],
+  "models": [
+    "openai/gpt-6.1-sol"
+  ],
+  "reasoning": [
+    "medium"
+  ],
+  "repeats": 5,
+  "minimum_usable": 5,
+  "max_median_ui_ms": 60000,
+  "max_critical_errors": 0
+}

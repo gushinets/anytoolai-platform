@@ -107,6 +107,7 @@ report_spec = importlib.util.spec_from_file_location(
 )
 report_module = importlib.util.module_from_spec(report_spec)
 report_spec.loader.exec_module(report_module)
+review_module = importlib.import_module("client_update_writer_review")
 
 
 def reviewed_run():
@@ -257,3 +258,179 @@ def test_configuration_outside_frozen_matrix_is_rejected_before_collecting():
         eval_module.collect(
             SimpleNamespace(suite=eval_module.FIXTURE, model="openai/unknown", reasoning="medium")
         )
+
+
+def review_directory(tmp_path, *, questions=None):
+    directory = tmp_path / "screening"
+    series = directory / "sol-medium"
+    series.mkdir(parents=True)
+    run, _ = reviewed_run()
+    run.update(
+        {
+            "id": "U04-en-1",
+            "case": "U04-en",
+            "attempt": 1,
+            "model": "openai/gpt-6.1-sol",
+            "reasoning_effort": "medium",
+            "prompt_sha256": "frozen-prompt",
+        }
+    )
+    run["input"].update({"id": "U04-en", "progress_notes": "Internal complete; tests fail."})
+    if questions is not None:
+        run["input"]["criteria"] = questions
+    run["input_sha256"] = eval_module.digest(run["input"])
+    suite = {"cases": [run["input"]]}
+    manifest = {
+        "suite": suite,
+        "suite_sha256": eval_module.digest(suite),
+        **{key: run[key] for key in ("model", "reasoning_effort", "prompt_sha256")},
+    }
+    (series / "manifest.json").write_text(json.dumps(manifest))
+    (series / "runs.jsonl").write_text(json.dumps(run) + "\n")
+    return directory, run
+
+
+def saved_verdict(directory):
+    return json.loads((directory / "verdicts.jsonl").read_text().splitlines()[-1])
+
+
+def test_interactive_review_requires_explicit_decisions_and_records_identity(tmp_path, capsys):
+    directory, run = review_directory(tmp_path)
+    observation = {
+        "series": "screening/sol-medium",
+        "run_id": run["id"],
+        **review_module.verdict_hashes(run),
+        "suggestion": "agent suggests yes",
+        "reason": "Agent explanation",
+    }
+    (tmp_path / "agent-observations.json").write_text(json.dumps({"observations": [observation]}))
+    with patch(
+        "builtins.input", side_effect=["", "invalid", "n", "Readiness is misstated", "Still", "y"]
+    ):
+        review_module.review(directory, " Putilin ", "sol-medium")
+    verdict = saved_verdict(directory)
+    assert verdict["reviewer"] == "Putilin"
+    assert verdict["reviewed_at"]
+    assert verdict["answers"][0]["decision"] == "no"
+    assert verdict["answers"][0]["reason"] == "Readiness is misstated"
+    assert verdict["critical_error"] is True
+    assert report_module.human_status(run, verdict) == ("FAIL", True)
+    display = capsys.readouterr().out
+    assert "Internal complete; tests fail." in display
+    assert "Still in progress." in display
+    assert "agent suggests yes" in display
+    # A confirmed verdict is not requested again, even for another reviewer.
+    with patch("builtins.input", side_effect=AssertionError("already reviewed")):
+        review_module.review(directory, "Another reviewer")
+
+
+def test_review_resumes_partial_decisions_and_does_not_auto_accept(tmp_path):
+    directory, run = review_directory(tmp_path, questions=["Ready?", "Dates?"])
+    with (
+        patch("builtins.input", side_effect=["y", "q"]),
+        pytest.raises(review_module.ReviewStopped),
+    ):
+        review_module.review(directory, "Putilin")
+    verdict = saved_verdict(directory)
+    assert verdict["answers"][0]["decision"] == "yes"
+    assert verdict["answers"][1]["decision"] is None
+    assert report_module.human_status(run, verdict)[0] == "PENDING"
+    with patch("builtins.input", side_effect=["y", "n"]):
+        review_module.review(directory, "Putilin")
+    assert report_module.human_status(run, saved_verdict(directory)) == ("PASS", False)
+    expected_saves = 3
+    assert len((directory / "verdicts.jsonl").read_text().splitlines()) == expected_saves
+
+
+@pytest.mark.parametrize("stale", [True, False])
+def test_review_discards_stale_or_differently_attributed_partial_decisions(tmp_path, capsys, stale):
+    directory, run = review_directory(tmp_path)
+    old = {
+        "series": "sol-medium",
+        "id": run["id"],
+        **review_module.verdict_hashes(run),
+        "reviewer": "Putilin" if stale else "Other",
+        "critical_error": None,
+        "answers": [
+            {"question": "Preserves readiness.", "decision": "yes", "reason": "Old", "quote": ""}
+        ],
+    }
+    observation = {
+        "series": "screening/sol-medium",
+        "run_id": run["id"],
+        **review_module.verdict_hashes(run),
+        "output_sha256": "old-output",
+        "suggestion": "STALE SUGGESTION",
+        "reason": "Do not display",
+    }
+    if stale:
+        old["input_sha256"] = "old-input"
+    (directory / "verdicts.jsonl").write_text(json.dumps(old) + "\n")
+    (tmp_path / "agent-observations.json").write_text(json.dumps({"observations": [observation]}))
+    with patch("builtins.input", side_effect=["n", "New assessment", "", "n"]):
+        review_module.review(directory, "Putilin")
+    assert saved_verdict(directory)["answers"][0]["reason"] == "New assessment"
+    assert "STALE SUGGESTION" not in capsys.readouterr().out
+
+
+def test_unknown_or_skipped_review_is_pending_and_eof_preserves_progress(tmp_path):
+    directory, run = review_directory(tmp_path)
+    with patch("builtins.input", side_effect=["u", "Cannot tell", "", "s"]):
+        review_module.review(directory, "Putilin")
+    assert report_module.human_status(run, saved_verdict(directory))[0] == "PENDING"
+    with patch("builtins.input", side_effect=EOFError):
+        review_module.main(["--directory", str(directory), "--reviewer", "Putilin"])
+    assert saved_verdict(directory)["answers"][0]["decision"] == "unknown"
+
+
+@pytest.mark.parametrize("reviewer,series", [("agent", None), (" ", None), ("Putilin", "missing")])
+def test_review_rejects_invalid_identity_and_series_without_writes(tmp_path, reviewer, series):
+    directory, _ = review_directory(tmp_path)
+    with pytest.raises(ValueError):
+        review_module.review(directory, reviewer, series)
+    assert not (directory / "verdicts.jsonl").exists()
+
+
+def test_review_validates_hashes_before_accepting_any_decision(tmp_path):
+    directory, run = review_directory(tmp_path)
+    run["output"]["text"] = "Modified after collection"
+    (directory / "sol-medium/runs.jsonl").write_text(json.dumps(run) + "\n")
+    with pytest.raises(ValueError, match="output digest"):
+        review_module.review(directory, "Putilin")
+    assert not (directory / "verdicts.jsonl").exists()
+
+
+def test_collector_dispatches_offline_review_without_docker():
+    with (
+        patch.object(review_module, "main") as offline,
+        patch.object(eval_module, "collect") as collect,
+    ):
+        eval_module.main(["review", "--reviewer", "Putilin", "--directory", "results"])
+    offline.assert_called_once_with(["--reviewer", "Putilin", "--directory", "results"])
+    collect.assert_not_called()
+
+
+def test_review_reasks_critical_error_after_resolving_unknown(tmp_path):
+    directory, run = review_directory(tmp_path)
+    with patch("builtins.input", side_effect=["u", "Need another look", "", "n"]):
+        review_module.review(directory, "Putilin")
+    with patch("builtins.input", side_effect=["n", "Found an omission", "", "y"]):
+        review_module.review(directory, "Putilin")
+    assert report_module.human_status(run, saved_verdict(directory)) == ("FAIL", True)
+
+
+def test_corrupt_partial_review_is_rejected_without_overwriting(tmp_path):
+    directory, _ = review_directory(tmp_path)
+    with (
+        patch("builtins.input", side_effect=["y", "q"]),
+        pytest.raises(review_module.ReviewStopped),
+    ):
+        review_module.review(directory, "Putilin")
+    verdict = saved_verdict(directory)
+    verdict["answers"] = []
+    path = directory / "verdicts.jsonl"
+    path.write_text(json.dumps(verdict) + "\n")
+    original = path.read_bytes()
+    with pytest.raises(ValueError, match="Повреждены"):
+        review_module.review(directory, "Putilin")
+    assert path.read_bytes() == original

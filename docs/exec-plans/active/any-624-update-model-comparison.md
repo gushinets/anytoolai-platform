@@ -3,12 +3,12 @@
 ## Status
 
 - State: active
-- Owner: human
+- Owner: mixed
 - Created: 2026-11-03
-- Last updated: 2026-11-04
-- Review date: 2026-11-04
-- Next action: human screening confirmation and finalist selection; no automatic rollout
-- Blocker: formal semantic verdicts and finalists await human confirmation
+- Last updated: 2026-11-05
+- Review date: 2026-11-05
+- Next action: collect the authorized 265 new corrected-prompt final attempts; run full-check and commit
+- Blocker: none for live collection; full-check architecture docstring issue identified and corrected
 
 ## Goal and scope
 
@@ -168,3 +168,268 @@ Implementation plan:
   full-check/broad baseline limitations remain as documented.
 
 - Post-live verification: 102 prompt/identity/eval/entry-point tests passed again in 3.43s; documentation validation and diff whitespace checks pass. The earlier 15 product pipeline tests also passed; no source changed during live collection.
+
+### Interactive human review — implementation plan
+
+User requested the same terminal review workflow as ProposalAI, with a named reviewer.
+1. Add an offline review subcommand to the existing Update collector, preserving collection CLI.
+2. Read validated manifests/runs and hash-bound agent observations; show one full input/output
+   and criterion at a time, with explicit yes/no/unknown, skip and quit choices.
+3. Append partial human verdicts after each decision; resume matching decisions, reject stale
+   suggestions, and record reviewer/time. Never automatically promote an agent suggestion.
+4. Ask about critical errors explicitly, preserve the existing report contract, and test resume,
+   disagreement, stale hashes, interruption and compatibility with report aggregation.
+No model calls, dependency, frontend changes, automatic verdicts or external writes.
+
+### Interactive review delivered
+
+- Added the collector's offline `review --directory <results-directory> --series sol-medium
+  --reviewer Putilin` mode. The series filter is optional. Collection CLI stays compatible.
+- Displays one original input/full output, model/reasoning and current hash-bound agent
+  observation, then explicit per-criterion yes/no/unknown/skip/quit. Yes records human
+  confirmation; no/unknown require a reason and allow a quote. No automatic agent confirmation.
+- Every completed decision appends to the existing verdict stream with reviewer/time and
+  input/output/criteria hashes. Partial decisions resume; stale suggestions are withheld,
+  a new reviewer never inherits another reviewer's partial answers, corrupt partial state fails
+  explicitly, and changed criteria decisions invalidate the old critical-error assessment.
+- Existing confirmed PASS/FAIL rows are skipped. Unknown/skipped decisions remain PENDING.
+  Run one terminal review process per result directory, as with the ProposalAI workflow.
+- 98 targeted eval/ProposalAI/entry-point tests pass; Ruff, documentation validation and diff
+  checks pass. Tested real saved sol medium queue with quit before any decision: no human
+  verdict created and no provider inference. Full-check was not rerun. No commit or external write.
+
+### User-confirmed batch acceptance and technical retest
+
+User explicitly confirmed viewing all responses and requested marking the rest passed,
+with failed testing repeated. Record existing visible responses as Putilin's explicit chat
+acceptance, retaining earlier agent findings and all verdict history. Do not turn the
+credential failure into an answer. Freeze a separate one-case repeat of its exact input,
+model/reasoning and corrected prompt; collect new UI/ledger proof and restore the router.
+The new unseen response is not covered by the user's approval of existing responses.
+Refresh reports and reconcile additional calls; preserve original failure and earlier audit.
+
+### Batch acceptance and technical retest outcome
+
+- Recorded Putilin's explicit chat confirmation: 292 additional screening verdicts and 27
+  controls, preserving 67 already-confirmed screening verdicts. All 359 existing screening
+  outputs and 27 controls are human-accepted. Reports regenerated as PASS under that confirmation;
+  earlier agent deviations remain unchanged. This is acceptance, not proof those omissions vanished.
+- Backed up verdicts and retained exact confirmation messages, scope, timestamp and provenance.
+  The original missing-output authentication attempt was not marked accepted.
+- Repeated its exact U04-en input once, separately, on luna/medium and the same prompt. Result
+  delivered in 12.36s; one provider call succeeded. Agent reading retains both contradictions,
+  3/8 Safari failures, sandbox-only payment capture, investigation/no ETA and hold confirmation.
+  This new unseen result remains PENDING human review, not a fabricated Putilin decision.
+- Original FAIL and its two failed gateway rows retained. New UI evidence/model/ledger checked;
+  router restored/read back. All 389 physical attempts accounted for: 387 succeeded, two failed
+  on the historical key error. Incremental ledger estimate 0.0004283, not an invoice claim.
+- Doctor, documentation and diff checks pass; no source changes during this operation.
+  Interactive-review changes remain uncommitted. No finalist series, full-check, production
+  rollout, GitHub/Linear writes or default-model change.
+
+### Technical retest human confirmation
+
+Putilin explicitly confirmed the new retest response in chat with no errors observed.
+Recorded a hash-bound human PASS, regenerated the separate report and updated acceptance audits.
+Original screening, privacy controls and technical retest are now user-accepted. The original
+key failure remains historical evidence, not silently replaced. No new provider calls, source
+fixes, finalist series, model default change, full-check or external write.
+
+### Finalist phase — sol medium selected by user
+
+User selected sol/medium as the only finalist and authorized continuation. Freeze one corrected
+prompt revision, copy the same-model/same-input accepted five attempts into the twenty-attempt
+main groups with original hashes/evidence/human verdicts, and collect exactly 180 new main
+attempts plus 30 variant attempts. No old-prompt or other-model data is reused.
+
+Implementation plan:
+1. Freeze six new inputs before calls: two RU (email desktop/tablet dependency; 9 videos ×18 min,
+   4/3/2, Riga deadline, contract/exclusion), two EN (unknown inventory/barcodes/current source;
+   explicit status withholding with public failures/private costs), two ES (internal readiness
+   versus Firefox acceptance plus publication rule/private costs; 10 audios ×15 min, 6/2/2,
+   Bogota deadline, 950 USD and French exclusion). Preserve original main inputs verbatim.
+2. Check doctor, worker prompt/router and runtime; freeze pre-run ledger and SDK pricing metadata.
+3. Collect variants first, then main attempts 6–20 in checkpoint batches with full web/ledger proof.
+   No prompt tuning mid-series or silent retries. Main threshold 19/20, variants 5/5, zero critical
+   errors and median UI <=60s. New outputs are not covered by prior human acceptance.
+4. Read full outputs, reconcile old seeds/new calls/costs/evidence and restore the router.
+5. Generate both reports and present new outputs for human review. Attempt full-check separately;
+   no production rollout/default model change, extra model comparison or external publication.
+
+### Final variant gate outcome
+
+- Completed all 30 new variant attempts on sol/medium; no transport/UI failures. Full-output
+  agent reading finds 950 USD contract amount absent in V06 Spanish attempts 1, 2 and 3,
+  though the input explicitly provides the amount as contract context, not a payment request.
+  Attempts 4 and 5 preserve it. This violates the agreed 5/5 variant criterion; new human
+  verdicts remain PENDING and were not inferred from prior approval of different outputs.
+- No critical problem observed in the other 25 new outputs, including contradictory status
+  alongside private costs and explicit status withholding. Derived generic next steps remain
+  a human-review caveat. Original prompt/default model unchanged; no tuning during the series.
+- Stopped before the 180 additional main attempts and asked the user whether to fix this
+  omission or explicitly continue the unchanged series despite the variant gate failure.
+  Sixty accepted seed outputs remain separate, hash-matched and linked to original evidence.
+- All 30 new physical calls reconcile with new sessions and UI evidence; zero unaccounted calls,
+  no unknown ledger cost. Router restored/read back. Median variant UI 5.28s; incremental
+  ledger estimate 0.0759181. Pre-run installed SDK pricing metadata frozen; invoice/cache
+  charges are not independently reconciled. No new provider calls after the observed failure.
+- Full reports, immutable inputs/criteria and agent observations retained for user assessment.
+  Doctor/config/docs/diff checks pass; full-check not run. No new source behavior changes,
+  external writes, commits or rollout. New variant fixture and previous review-tool changes
+  remain uncommitted. A future prompt change cannot reuse these seeds as proof of its behavior.
+
+### V06-es amount omission — analysis and proposed implementation plan (2026-11-05)
+
+User requested investigation and a proposed correction, not implementation or new paid evals.
+Confirmed facts: the browser trace submits the complete 950 USD sentence to the start endpoint;
+there is no max_length constraint in that request. UI text matches canonical output. The five
+outputs are complete (619–689 main-text characters, 204–219 output tokens), all calls succeeded
+with the same 2,031 input-token count/model/reasoning/prompt. Amount absent in attempts 1–3,
+present in 4–5. Thus transport/input loss or renderer truncation does not explain the omission.
+
+Contract gap: the Update prompt separates fidelity of INCLUDED facts from completeness, but
+completeness enumerates results, blockers, requests and next steps without explicitly requiring
+client-facing commercial terms. The workflow intent likewise emphasizes progress/next steps.
+The privacy rule protects own costs/margins/private figures but does not positively distinguish
+client contract terms. A no-payment-request statement means no demand to pay, not suppressing
+the stated contract amount. These are observable ambiguities; the model's exact latent reason
+cannot be established from these five outputs without a controlled revised-prompt comparison.
+The generic compose-reply validator checks length/format/placeholders, not semantic fact coverage.
+
+Scope checked: all four products and Update's sibling modes. This exact prompt/completeness
+boundary is used only by Update; ProposalAI has explicit Terms rules and Reply Draft explicitly
+preserves client-facing intent facts. No confirmed matching defect in other products; their
+behavior was not live-tested in this investigation. No shared platform/schema/DSL change proposed.
+
+Proposed plan, pending user's implementation instruction:
+1. Amend Update's completeness rule to cover supplied client-facing commercial terms: contract
+   or quoted amount/currency, with the input's actual agreement/payment status and conditions.
+2. Clarify that no-payment-request text does not suppress the amount; preserve contract context
+   without inventing an invoice, debt, due date or payment request. Distinguish these terms from
+   the freelancer's own private costs/margins, retaining explicit author nondisclosure priority.
+   No literal 950/USD/Spanish-specific branch or numeric-extraction runtime validator.
+3. Add a small prompt-contract test, then freeze live RU/EN/ES regressions: exact V06 and its
+   translations, contract plus private costs/margins, explicit amount withholding, and quoted
+   versus agreed/paid status. Existing U04/unknowns and non-payment intent must remain intact.
+4. Compare unchanged baseline and new prompt on sol medium before a full restart; no accepted
+   old-prompt seeds or verdicts can establish acceptance of a new prompt. Preserve old evidence.
+   If the clarification does not reliably pass, stop prompt looping and reassess model/contract.
+
+No source/config/test behavior changed. No new provider calls or full-check in this analysis.
+
+### V06 correction implementation — 2026-11-05
+
+User explicitly authorized the proposed Update prompt rule and V06 checks.
+1. Add client-facing commercial terms to the completeness contract, preserving stated status,
+   non-payment intent, private business protection and explicit author withholding priority.
+2. Add a prompt-contract regression and frozen V06 RU/EN/ES cases, mixed contract/private-cost
+   controls and explicit amount-withholding controls; preserve original failed Spanish input.
+3. Run focused Python tests and config/docs checks. Verify prompt effects on sol/medium using
+   a fresh 45-attempt targeted live suite (nine inputs, five repeats) if runtime/key available.
+   No old human verdicts or old-prompt seeds are reused; no full finalist restart in this step.
+4. Reconcile new UI/ledger evidence and restore router. Report semantic observations separately
+   from human approval. No default model change, new dependencies or platform validators.
+
+### V06 correction verification outcome
+
+- Added one general completeness rule to Update: supplied client-facing contract/quoted amounts,
+  currencies and stated status/conditions remain context even without a payment request. No
+  invented invoice/debt/due date/payment demand; private own costs/margins and explicit author
+  withholding retain precedence. No case-specific USD/950/language branch or platform validator.
+- Added two prompt-contract checks, an immutable original-V06 fixture check and nine input-schema
+  checks. The live suite contains base V06, mixed client/private figures and explicit amount
+  withholding in RU/EN/ES, five repeats each. Original Spanish input and criteria remain exact.
+- 126 focused Python tests passed; new-file Ruff, doctor, configuration, architecture, docs and
+  diff checks pass. Fake/output-schema tests are not claimed as model semantic proof.
+- Fresh sol/medium live validation completed all 45 attempts on prompt SHA-256
+  ddda3dcaa9c00993b5ac914cb5721e2275bb6cd464c3bccdb2a3e743810424c1.
+  On full-output agent reading, original V06 Spanish preserves 950 USD in 5/5 versus 2/5 on the
+  previous prompt. All 30 base/mixed outputs retain it without payment demands; all 15 explicit
+  withholding outputs omit it, and own supplier costs/margins remain undisclosed. V06 quantities,
+  dates, transcript request and French exclusion remain. Derived generic next steps and one
+  awkward English cutoff phrasing are retained as human-review caveats, not polished indefinitely.
+- All 45 physical calls and unique UI sessions reconcile; traces/screenshots/journals and visible
+  versus canonical text/model checked. Router restored/read back. Median UI 6.26s; ledger estimate
+  0.1487641. Pre-run SDK cost metadata captured; no invoice/cache billing reconciliation claimed.
+- New outputs remain PENDING human confirmation. Old accepted verdicts/seeds were not copied
+  into the new revision. Full final series/full-check/rollout not performed. No default model
+  change, dependency additions, commits or external writes. Prior uncommitted changes retained.
+
+### V06 targeted human acceptance
+
+Putilin explicitly confirmed viewing all 45 fresh targeted outputs with no errors and asked
+to mark them passed. Recorded hash-bound human PASS decisions with reviewer/time and exact chat
+provenance; regenerated the targeted report as PASS (45/45, zero critical errors). Prior history
+and old-prompt evidence remain unchanged. No provider calls. Complete final acceptance of the
+new prompt, full-check and committing the pending changes remain outside this confirmation.
+
+### Corrected-prompt full final acceptance — user authorized start
+
+User authorized the remaining work: 240 new main attempts (12 inputs ×20) and 25 new variant
+attempts. Five already human-accepted V06 Spanish outputs on the identical corrected prompt,
+input and criteria are imported with original evidence/verdicts; no old-prompt seed is used.
+
+Implementation plan:
+1. Freeze the original main inputs and six variant inputs, thresholds and corrected prompt hash.
+2. Run full-check before the web server to avoid frontend build/dev artifact collisions; fix
+   task-owned failures without weakening architecture checks. Preflight ledger/runtime/pricing.
+3. Collect remaining variants first, then the 240 main attempts in checkpoint batches. Preserve
+   failures, outputs, journals/traces and ledger; no silent retries or prompt tuning mid-series.
+4. Read full outputs, reconcile new calls and imported seeds, restore router and generate reports.
+   New human verdicts remain empty. Present findings and record any acceptance limitation.
+5. Commit the authorized source/test/tool changes locally with the ANY-624 title convention;
+   no GitHub writes or production/default-model change.
+
+Initial full-check passed config/architecture-script/docs/generated-doc checks but its architecture
+pytest found a literal provider/model example in the collector docstring. Replaced that example
+with a generic placeholder; no allowlist exemption or runtime behavior change. Dedicated guard
+rerun and the full check will verify the correction. This also removes a local ignored evidence
+path from that touched example. No unrelated reference cleanup.
+
+### Final-phase verification and runtime checkpoint
+
+- Full-check reached backend pytest with 3040 passed, 12 skipped and 486 deselected; its sole
+  remaining failure is the host sudo-to-nobody activation-marker test requiring interactive
+  authentication. No skip/allowlist was introduced. Sanitized failure context collected.
+- Separate full product suite exposed stale literal expectations for the pre-U04 blanket privacy
+  rule. Updated the affected assertions to retain private-business protection and explicit
+  withholding while permitting operational status evidence; all 240 product tests now pass.
+  Prompt bytes unchanged. Separate frontend lint/types/tests/API-drift passed; first production
+  build failed /404 prerender, clean generated-output rebuild passed. Next's auto-added Node
+  type dependency/package-lock changes were captured and reverted; no frontend source/dependency
+  change remains in the patch.
+- Collected all 25 new variants alongside five same-prompt accepted V06 seeds. Agent reading flags
+  V02 English attempt 3: stock quantities staying unchanged until the client's answer is not
+  explicit. Other new variants preserve material criteria. No human rating was fabricated.
+- Main collection started. U04 English attempts 1–3 delivered results retaining both contradictions;
+  attempt 4 failed technically with provider 401 invalidated key. Both gateway failures and UI
+  evidence retained; router restored. Environment already contains a different configured key,
+  so canonical live refresh is underway before resuming the remaining 236 planned attempts.
+  No output/attempt replacement, prompt tuning or automatic UI retry.
+
+### Final-phase credential blocker and reconciled checkpoint
+
+- Canonical live refresh was attempted twice, including activation and collection inside one
+  execution context. Worker credential equality with the resolved configured environment and
+  unchanged prompt were verified without recording secret values. The provider still rejected
+  the credential: earlier logs reported invalidation; the latest reports 401 AuthenticationError,
+  incorrect API key. Collection stopped; a working credential is required to continue.
+- All 25 new variants completed; five accepted same-prompt V06 seeds remain accepted. Main has
+  six original attempts: three delivered U04 English answers and three retained technical failures
+  (attempts 4–6). There are 234 unattempted main slots. No failed attempt was replaced or removed.
+  With three technical failures, this original U04 English group cannot reach 19/20; any recovery
+  series must remain separate and its acceptance treatment explicit.
+- Reconciled all 31 new sessions with 34 physical provider-call rows: 28 successful calls and
+  six failed gateway calls, zero unexplained rows. Ledger estimate is 0.0693913, not invoice cost.
+  All trace hashes and successful visible/canonical outputs verified; router restored/read back.
+  Reports are main FAIL (technical threshold), variants PENDING. All 28 new delivered outputs
+  were read by the agent but remain pending human review; no earlier human approval was reused.
+- V02 English attempt 3 omits the instruction that stock quantities remain unchanged until the
+  client's answer. Its full output and hash-bound agent observation are retained for review;
+  it was not accepted automatically or patched during the frozen series.
+- Full acceptance remains incomplete. Full-check also remains red on the host sudo-to-nobody
+  requirement described above; product tests pass and frontend stages pass with the clean build
+  retry. No default-model switch, production rollout, push or external write was performed.
+- Final focused eval/commercial regression rerun: 44 passed. Collector/reviewer/new-test Ruff,
+  documentation validation and diff whitespace checks passed. The existing product test file
+  still has nine baseline long-line lint findings; verified their exact text is unchanged.

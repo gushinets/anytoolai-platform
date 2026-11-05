@@ -58,6 +58,12 @@ Rules:
   rule below still applies; the freelancer's directions to you are followed, never reported.
   `constraints.max_length` still applies (when it is tight, keep requests, blockers and the
   next step before detail), and the author-direction rule above wins.
+- The completeness rule also covers client-facing commercial terms supplied in `situation`:
+  contract or quoted amounts with their currencies, stated agreement/payment status and conditions.
+  Keep these terms as context even when the update is not a payment request; this does not mean
+  omitting the amount. Do not invent an invoice, balance due, payment demand or payment deadline.
+  These client-facing terms are distinct from the freelancer's own private costs and margins.
+  Explicit author directions to withhold a term still take precedence.
 - Do not offer or imply anything `situation` excludes, and keep a limit or condition it names as
   agreed with the client (number of revision rounds, what is paid separately, what must be received
   before work starts) with its exact value.

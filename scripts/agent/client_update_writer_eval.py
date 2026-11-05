@@ -3,7 +3,10 @@
 Run with managed Python, a local dev-live stack and served web-mirror:
   .quick-check-venv/bin/python scripts/agent/client_update_writer_eval.py \
     --project anytoolai-xxxxxxxx --web-url http://localhost:3200 \
-    --model openai/gpt-6-luna --reasoning medium --out .agent/any-624/luna-medium
+    --model <provider/model> --reasoning medium --out <results-directory>
+
+Offline human review: use the review subcommand with --directory, --reviewer and optional
+--series. It resumes saved verdicts without submitting new scenarios.
 
 The worker router is overridden only inside its container, read back, and restored
 in finally. Run one collector at a time on this isolated stack. Never use a production stack.
@@ -17,6 +20,7 @@ import json
 import re
 import signal
 import subprocess
+import sys
 from itertools import islice
 from pathlib import Path
 from typing import Literal
@@ -236,7 +240,14 @@ def interrupt_collection(_signum, _frame) -> None:
     raise KeyboardInterrupt("collector terminated; restoring worker router")
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv and argv[0] == "review":
+        # Review imports this collector through the report module.
+        from client_update_writer_review import main as review_main  # noqa: PLC0415
+
+        review_main(argv[1:])
+        return
     signal.signal(signal.SIGTERM, interrupt_collection)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--resume", action="store_true")
@@ -257,7 +268,7 @@ def main() -> None:
         "--repeats", type=int, default=None, help="Defaults to the frozen suite repeats."
     )
     parser.add_argument("--out", required=True, type=Path)
-    collect(parser.parse_args())
+    collect(parser.parse_args(argv))
 
 
 if __name__ == "__main__":
