@@ -3834,6 +3834,144 @@ test("preset save exposes backend field errors without losing the draft", async 
   await expect(page.locator("#save-preset")).toBeEnabled();
 });
 
+for (const path of ["preset", "history"]) {
+  for (const available of [false, true]) {
+    test(`${path} adaptation ${available ? "retains an available" : "detaches an obsolete"} Lab prompt origin after checking current options`, async ({page}) => {
+      page.on("dialog", (dialog) => dialog.accept());
+      const promptSourceRef = "atom_lab_prompt_historical";
+      const stored = {
+        name: "Исторический пресет", description: "Старый контракт", atom_id: "A06",
+        base_action_config_id: available ? "config.a06.retired" : A06.base_action_config_id,
+        schema_refs: A06.schema_refs, prompt: "Исторический текст промпта", prompt_ref: A06.prompt_ref,
+        prompt_source_ref: promptSourceRef, model_id: "openai/gpt-supported", reasoning_effort: "high",
+        fixed_fields: ["context"], example_input: A06.example_input, source_run_id: null,
+        preset_id: "preset-historical-origin", version: 1, created_at: "2026-09-23T09:30:00Z",
+      };
+      const detail = historyDetail({runId: "run-historical-origin", prompt: stored.prompt});
+      detail.snapshot.action.config_id = stored.base_action_config_id;
+      detail.snapshot.prompt.source_ref = promptSourceRef;
+      const currentAtom = available ? A06 : {
+        ...A06, schema_refs: {
+          input: {...A06.schema_refs.input, version: 2},
+          output: {...A06.schema_refs.output, version: 2},
+        },
+      };
+      const summary = {
+        preset_id: stored.preset_id, latest_version: 1, name: stored.name,
+        description: stored.description, atom_id: stored.atom_id,
+        created_at: stored.created_at, updated_at: stored.created_at,
+      };
+      let promptReads = 0;
+      let releasePrompts;
+      const promptGate = new Promise((resolve) => { releasePrompts = resolve; });
+      let runBody = null;
+      let presetBody = null;
+      await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
+        const request = route.request();
+        const {pathname} = new URL(request.url());
+        if (pathname === "/v1/atom-lab/atoms/A06/prompts") {
+          promptReads += 1;
+          await promptGate;
+          if (!available && promptReads === 1) {
+            await route.fulfill(path === "preset"
+              ? {status: 503, json: {error: {code: "prompts_unavailable", message: "Не удалось проверить источник"}}}
+              : {json: []});
+          } else {
+            await route.fulfill({json: [
+              {ref: A06.prompt_ref, name: "Платформенный", prompt: A06.prompt, group: "platform", source_ref: null, source_run_id: null},
+              ...(available ? [{ref: promptSourceRef, name: "Сохранённый", prompt: stored.prompt, group: "lab", source_ref: A06.prompt_ref, source_run_id: null}] : []),
+            ]});
+          }
+          return;
+        }
+        if (pathname === "/v1/atom-lab/presets") {
+          if (request.method() === "POST") {
+            presetBody = request.postDataJSON();
+            await route.abort();
+          } else await route.fulfill({json: {items: [summary], next_cursor: null}});
+          return;
+        }
+        if (pathname === `/v1/atom-lab/presets/${stored.preset_id}/versions`) {
+          await route.fulfill({json: {items: [{...summary, version: 1}], next_cursor: null}});
+          return;
+        }
+        if (pathname === `/v1/atom-lab/presets/${stored.preset_id}/versions/1`) {
+          await route.fulfill({json: stored});
+          return;
+        }
+        if (pathname === "/v1/atom-lab/runs") {
+          if (request.method() === "POST") {
+            runBody = request.postDataJSON();
+            await route.abort();
+          } else await route.fulfill({json: {items: [{
+            run_id: detail.run_id, status: detail.status, atom_id: "A06", model_id: stored.model_id,
+            preset_id: null, preset_version: null, created_at: detail.created_at,
+            started_at: detail.started_at, finished_at: detail.finished_at,
+          }], next_cursor: null}});
+          return;
+        }
+        if (pathname === `/v1/atom-lab/runs/${detail.run_id}`) {
+          await route.fulfill({json: detail});
+          return;
+        }
+        await route.fallback();
+      });
+
+      await openLab(page);
+      await page.route("http://atom-lab.test/v1/atom-lab/atoms", (route) => route.fulfill({
+        json: catalog().map((atom) => atom.atom_id === "A06" ? currentAtom : atom),
+      }));
+      await page.locator("#access-code").fill("secret");
+      await page.locator("#access-form button").click();
+      await page.getByRole("button", {name: /A06/}).click();
+      if (available) {
+        await page.locator("#prompt-tab").click();
+        await expect.poll(() => promptReads).toBe(1);
+      }
+      await page.locator(`#${path === "preset" ? "presets" : "history"}-button`).click();
+      await page.locator(path === "preset" ? "#preset-list button" : "#history-list .history-open").click();
+      await page.locator(path === "preset" ? "#adapt-preset" : "#restore-history").click();
+      await expect.poll(() => promptReads).toBe(available ? 2 : 1);
+      await expect(page.locator("#prompt-editor")).toHaveValue(stored.prompt);
+      await expect(page.locator("#run-button")).toBeDisabled();
+      await editPreset(page);
+      await expect(page.locator("#save-preset")).toBeDisabled();
+      await expect(page.locator("#preset-state")).toContainText("Повторить загрузку можно во вкладке «Промпт»");
+      await page.locator("#run-button").dispatchEvent("click");
+      await page.locator("#save-preset").dispatchEvent("click");
+      expect(runBody).toBeNull();
+      expect(presetBody).toBeNull();
+      await showWorkbench(page);
+      await page.locator("#prompt-tab").click();
+      const editedPrompt = `${stored.prompt}. Правка во время загрузки`;
+      await page.locator("#prompt-editor").fill(editedPrompt);
+      releasePrompts();
+      if (!available) {
+        await expect(page.locator("#retry-prompts")).toBeVisible();
+        await expect(page.locator("#run-button")).toBeDisabled();
+        await editPreset(page);
+        await expect(page.locator("#save-preset")).toBeDisabled();
+        await showWorkbench(page);
+        await page.locator("#retry-prompts").click();
+        await expect(page.locator("#prompt-origin")).toContainText("Исторический источник недоступен");
+      } else await expect(page.locator("#prompt-select")).toHaveValue(promptSourceRef);
+      await expect(page.locator("#prompt-editor")).toHaveValue(editedPrompt);
+      await expect(page.locator("#run-button")).toBeEnabled();
+      await page.locator("#run-button").click();
+      await expect.poll(() => runBody).not.toBeNull();
+      expect(runBody.prompt).toBe(editedPrompt);
+      expect(runBody.prompt_source_ref ?? null).toBe(available ? promptSourceRef : null);
+      await editPreset(page);
+      await page.locator("#preset-name").fill("Адаптированный пресет");
+      await page.locator("#save-preset").click();
+      await expect.poll(() => presetBody).not.toBeNull();
+      expect(presetBody.prompt).toBe(editedPrompt);
+      expect(presetBody.prompt_source_ref).toBe(available ? promptSourceRef : null);
+      expect(presetBody.schema_refs).toEqual(currentAtom.schema_refs);
+    });
+  }
+}
+
 test("historical preset provenance stays read-only until explicit adaptation", async ({page}) => {
   const stored = {
     name: "Исторический пресет", description: "Старый контракт", atom_id: "A06",
