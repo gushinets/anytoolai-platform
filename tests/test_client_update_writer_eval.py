@@ -984,7 +984,7 @@ DRIVER_FAILURES = [
 def driver_result(spec, failure, run_process):
     harness = ROOT / "tests/fixtures/client_update_writer_eval/driver_harness.mjs"
     completed = run_process(
-        ["node", "--experimental-vm-modules", str(harness), str(eval_module.DRIVER)],
+        ["node", str(harness)],
         input=json.dumps({**spec, "failure": failure}),
         encoding="utf-8", capture_output=True, check=True, timeout=20,
     )

@@ -903,3 +903,27 @@ No real browser sessions or paid provider calls were started; historical accepta
 were not rewritten. Changes remain local pending publication. Actual storage/process failures
 can still leave an incomplete journal when no complete result is recoverable; resume then
 continues to require explicit reconciliation rather than resubmitting an unknown attempt.
+
+### Sonar follow-up implementation authorized
+
+User authorized fixing all four findings, committing and pushing. Replace dynamic source
+loading/VM execution with a statically imported collector function shared by CLI and tests.
+Inject browser and journal writer only, keep page interaction and finalization behavior, use
+HTTPS mock URLs, remove the obsolete source-path argument and VM flag. Preserve the existing
+27 regressions; run focused tests, Ruff/ESLint and quick-check, then publish and verify Sonar
+against the exact new SHA. No suppression or external comment/thread writes are needed.
+
+### Static collector imports validated
+
+The CLI and test harness now statically import the same collectLive function. Browser and
+journal writer are explicit dependencies; normal runtime uses Playwright and the default
+filesystem writer. Page interaction and failure finalization retain their previous behavior.
+Removed arbitrary source-path input, node:vm execution and the experimental VM flag. Mock API
+URLs use HTTPS. No Sonar suppressions, exclusions or issue-status changes were introduced.
+
+All 201 focused tests pass, preserving the existing failure-evidence regression matrix.
+Canonical quick-check: 3,179 passed, 12 standard skips, 628 deselected, exit zero. Ruff,
+ESLint on the CLI/shared collector/harness, config/architecture/docs/generated-doc checks
+and whitespace checks pass. No paid calls or real browser sessions were required. Commit
+and normal push are explicitly authorized; remote Sonar must be checked against the newly
+published SHA before declaring these findings resolved.

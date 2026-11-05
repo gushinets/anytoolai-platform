@@ -1,18 +1,16 @@
 /** Execute the real collector with deterministic browser/network and artifact failures. */
 import { readFileSync, writeFileSync } from 'node:fs';
-import vm from 'node:vm';
+import { collectLive } from '../../e2e/client-update-writer-smoke/collect-live-run.mjs';
 
 const spec = JSON.parse(readFileSync(0, 'utf8'));
-const source = readFileSync(process.argv[2], 'utf8');
 const calls = [];
 let listener;
-let stdout = '';
 const failure = spec.failure;
 function response(kind) {
   return {
     url: () => kind === 'start'
-      ? 'http://api/scenarios/client_update_writer.update_v1/start'
-      : 'http://api/v1/results/result1',
+      ? 'https://api/scenarios/client_update_writer.update_v1/start'
+      : 'https://api/v1/results/result1',
     status: () => failure === `html-${kind}` || failure === `plain-${kind}` || failure === 'json-error' ? 502 : 200,
     json: async () => {
       if (kind === 'start') await new Promise(resolve => setTimeout(resolve, 5));
@@ -47,9 +45,8 @@ const page = {
     allTextContents: async () => ['API error'],
   }),
 };
-const context = vm.createContext({ process: { stdout: { write: value => { stdout += value; } } } });
-const modules = {
-  '@playwright/test': { chromium: { launch: async () => ({
+const chromium = {
+  launch: async () => ({
     newContext: async () => ({
       newPage: async () => page,
       tracing: {
@@ -65,21 +62,15 @@ const modules = {
       calls.push('close');
       if (failure === 'close') throw new Error('Close failed');
     },
-  }) } },
-  'node:fs': {
-    readFileSync: () => JSON.stringify(spec),
-    writeFileSync: (path, content) => {
-      const { phase } = JSON.parse(content);
-      calls.push(phase);
-      if (phase === 'complete' && failure === 'journal') throw new Error('Journal unavailable');
-      writeFileSync(path, content);
-    },
-  },
-  'node:perf_hooks': { performance: { now: () => 100 } },
+  }),
 };
-const module = new vm.SourceTextModule(source, { context });
-await module.link(name => new vm.SyntheticModule(Object.keys(modules[name]), function () {
-  for (const [key, value] of Object.entries(modules[name])) this.setExport(key, value);
-}, { context }));
-await module.evaluate();
-process.stdout.write(JSON.stringify({ record: JSON.parse(stdout), calls }));
+const record = await collectLive(spec, {
+  chromium,
+  writeJournal: (path, content) => {
+    const { phase } = JSON.parse(content);
+    calls.push(phase);
+    if (phase === 'complete' && failure === 'journal') throw new Error('Journal unavailable');
+    writeFileSync(path, content);
+  },
+});
+process.stdout.write(JSON.stringify({ record, calls }));
