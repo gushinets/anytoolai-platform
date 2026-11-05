@@ -7,8 +7,8 @@
 - Created: 2026-11-03
 - Last updated: 2026-11-05
 - Review date: 2026-11-05
-- Next action: verify SonarCloud reanalysis after the authorized commit and push
-- Blocker: remote SonarCloud reanalysis pending; local regression tests and quick-check pass
+- Next action: owner review of the PR; SonarCloud follow-up is verified
+- Blocker: none for this follow-up; SonarCloud and local regression checks pass
 
 ## Goal and scope
 
@@ -743,3 +743,18 @@ existing negative/positive matrix pass: 128 focused tests; no new Ruff findings 
 Canonical quick-check is running while the small patch is published for exact-SHA SonarCloud
 verification, continuing the user's explicit fix, commit and push request. Remote resolution
 and the current broad-test result are not yet asserted.
+
+### Verified SonarCloud resolution
+
+Fresh SonarCloud analysis at 2026-11-05 13:17:55 UTC covers source commit 0cd69e61 exactly:
+quality gate OK, zero open issues/vulnerabilities, security rating 1 (A). GitHub's SonarCloud
+Code Analysis check also completed SUCCESS for that SHA. All three S8705 findings were resolved
+by reanalysis; no manual issue acceptance, suppression or security-engine configuration change.
+
+The final focused set passed 128 tests. Canonical quick-check completed with exit zero:
+3,106 passed, 12 standard skips, 628 deselected; config/architecture/docs/generated-docs passed.
+It used the same isolated environment with real uid 65534 switching, without test skips or host
+sudo changes. Original accepted live inputs, outputs, manifests and agent observations remain
+byte-identical; no paid provider requests or prompt/model changes. The source fix is pushed;
+this final verification record is documentation-only. Remaining PR CI is independent of the
+confirmed SonarCloud result; no merge or production deployment was performed.
