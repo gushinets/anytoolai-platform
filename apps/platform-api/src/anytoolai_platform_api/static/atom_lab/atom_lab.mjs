@@ -915,6 +915,7 @@ function focusEditorControl(document, control) {
 
 function renderValidation(document, container, session, admissionErrors = []) {
   clearValidationPresentation(document, container, session);
+  session.validationRequested ||= session.dirty;
   if (!session.validationRequested && Object.keys(session.payload).length === 0
     && !session.jsonError && session.inputErrors.size === 0 && admissionErrors.length === 0) return;
   const errors = [...validateDraft(session), ...admissionErrors];
@@ -927,7 +928,8 @@ function renderValidation(document, container, session, admissionErrors = []) {
     const errorId = controlIdForKey(error.key ?? error.path, "error");
     item.id = errorId;
     const control = typeof document.getElementById === "function"
-      ? document.getElementById(error.controlId ?? controlIdForKey(error.key ?? error.path))
+      ? document.getElementById(error.controlId ?? (session.mode === "json"
+        ? "json-editor" : controlIdForKey(error.key ?? error.path)))
         ?? document.getElementById(controlIdForKey(error.key ?? error.path, "type"))
         ?? document.getElementById(controlIdForKey(error.key ?? error.path, "add"))
         ?? document.getElementById(controlIdForKey(error.key ?? error.path, "add-item"))
@@ -2620,14 +2622,18 @@ export function bootstrapAtomLab({
     if (!presetEditorActive || presetLibraryLoading || presetOpenInFlight || presetReadOnly || presetSaveInFlight
       || presetSaveOutcomeUnknown || (!presetSourceOverride && session.promptSourceNeedsValidation)) return;
     if (!presetSourceOverride && validateDraft(session).length > 0) {
-      renderValidation(document, nodes["validation-errors"], session, admissionErrors);
+      session.validationRequested = true;
       showInputTab(true);
+      renderValidation(document, nodes["validation-errors"], session, admissionErrors);
       setPresetError("Исправьте входные данные перед сохранением пресета.");
+      nodes.status.textContent = "Исправьте входные данные перед сохранением пресета. Затем вернитесь в «Пресеты»: настройки остались в черновике.";
+      nodes["validation-errors"].querySelector("button")?.click();
       return;
     }
     presetSaveInFlight = true;
     updatePresetEditorDisabled();
     setPresetError();
+    nodes.status.textContent = "";
     const payload = currentPresetPayload();
     const updating = Boolean(selectedPresetVersion) && !forceNew;
     const expectedPresetId = updating ? selectedPresetVersion.preset_id : null;
@@ -3491,6 +3497,7 @@ export function bootstrapAtomLab({
   };
 
   const showInputTab = (showInput) => {
+    showLibrary();
     nodes["input-panel"].hidden = !showInput;
     nodes["prompt-panel"].hidden = showInput;
     nodes["input-tab"].setAttribute("aria-selected", String(showInput));
