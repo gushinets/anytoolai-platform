@@ -195,6 +195,7 @@ def reviewed_run():
     run = {
         "input": {"criteria": ["Preserves readiness."]},
         "output": {"text": "Still in progress."},
+        "git_sha": "a" * 40,
     }
     run.update(
         {
@@ -309,7 +310,7 @@ def test_orphaned_journal_blocks_retry_and_restores_router(tmp_path, repeats):
         ),
         patch.object(
             eval_module, "_git_state",
-            return_value={"git_sha": "revision-A", "git_dirty": False},
+            return_value={"git_sha": "a" * 40, "git_dirty": False},
         ),
         patch.object(eval_module, "write_router") as write,
         patch.object(eval_module.subprocess, "run") as browser,
@@ -364,7 +365,8 @@ def review_directory(tmp_path, *, questions=None):
     manifest = {
         "suite": suite,
         "suite_sha256": eval_module.digest(suite),
-        **{key: run[key] for key in ("model", "reasoning_effort", "prompt_sha256")},
+        **{key: run[key] for key in ("model", "reasoning_effort", "prompt_sha256", "git_sha")},
+        "git_dirty": False,
     }
     (series / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     (series / "runs.jsonl").write_text(json.dumps(run) + "\n", encoding="utf-8")
@@ -517,6 +519,8 @@ def experiment_manifests():
             "model": "openai/gpt-6.1-sol",
             "reasoning_effort": effort,
             "prompt_sha256": "fixed-prompt",
+            "git_sha": "a" * 40,
+            "git_dirty": False,
         }
         for effort in suite["reasoning"]
     }
@@ -528,7 +532,8 @@ def write_report_experiment(directory, manifests):
         manifest["suite_sha256"] = eval_module.digest(manifest["suite"])
         run, verdict = reviewed_run()
         run.update(
-            {field: manifest[field] for field in ("model", "reasoning_effort", "prompt_sha256")}
+            {field: manifest[field]
+             for field in ("model", "reasoning_effort", "prompt_sha256", "git_sha")}
         )
         run["input"] = manifest["suite"]["cases"][0]
         run.update(
@@ -676,7 +681,7 @@ def resume_collection(tmp_path):
         "reasoning_effort": "medium",
         "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
         "original_router": baseline,
-        "git_sha": "revision-A",
+        "git_sha": "a" * 40,
         "git_dirty": False,
     }
     (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
@@ -719,7 +724,7 @@ def test_collector_preserves_utf8_and_resumes_with_legacy_encoding(tmp_path):
         ),
         patch.object(
             eval_module, "_git_state",
-            return_value={"git_sha": "revision-A", "git_dirty": False},
+            return_value={"git_sha": "a" * 40, "git_dirty": False},
         ),
         patch.object(
             eval_module, "write_router",
@@ -757,7 +762,7 @@ def test_resume_rejects_live_router_drift_before_writes_or_submissions(
         ),
         patch.object(
             eval_module, "_git_state",
-            return_value={"git_sha": "revision-A", "git_dirty": False},
+            return_value={"git_sha": "a" * 40, "git_dirty": False},
         ),
         patch.object(eval_module, "write_router") as write,
         patch.object(eval_module.subprocess, "run") as browser,
@@ -786,7 +791,7 @@ def test_resume_accepts_equivalent_baseline_and_restores_actual_entry_text(tmp_p
         ),
         patch.object(
             eval_module, "_git_state",
-            return_value={"git_sha": "revision-A", "git_dirty": False},
+            return_value={"git_sha": "a" * 40, "git_dirty": False},
         ),
         patch.object(eval_module, "write_router") as write,
         patch.object(eval_module.subprocess, "run") as browser,
@@ -818,7 +823,7 @@ def test_resume_still_restores_entry_baseline_after_orphaned_attempt(tmp_path):
         ),
         patch.object(
             eval_module, "_git_state",
-            return_value={"git_sha": "revision-A", "git_dirty": False},
+            return_value={"git_sha": "a" * 40, "git_dirty": False},
         ),
         patch.object(eval_module, "write_router") as write,
         patch.object(eval_module.subprocess, "run") as browser,
@@ -901,8 +906,8 @@ def test_human_pass_cannot_override_effort_evidence(tmp_path, recorded, expected
 
 
 @pytest.mark.parametrize("revision", [
-    {"git_sha": "revision-B", "git_dirty": False},
-    {"git_sha": "revision-A", "git_dirty": True},
+    {"git_sha": "b" * 40, "git_dirty": False},
+    {"git_sha": "a" * 40, "git_dirty": True},
     {"git_sha": None, "git_dirty": False},
 ])
 def test_resume_rejects_unverifiable_or_changed_revision_before_mutation(tmp_path, revision):
@@ -964,7 +969,7 @@ def test_resume_rejects_legacy_manifest_without_revision(tmp_path, missing):
     path.write_text(json.dumps(manifest), encoding="utf-8")
     with (
         patch.object(eval_module, "_git_state", return_value={
-            "git_sha": "revision-A", "git_dirty": False,
+            "git_sha": "a" * 40, "git_dirty": False,
         }),
         patch.object(eval_module, "_docker", side_effect=lambda *a:
                      prompt if a[-1].endswith(".md") else json.dumps(baseline)),
@@ -1029,7 +1034,7 @@ def test_driver_failures_are_persisted_and_stop_collection(tmp_path, failure):
 
     with (
         patch.object(eval_module, "_git_state", return_value={
-            "git_sha": "revision-A", "git_dirty": False,
+            "git_sha": "a" * 40, "git_dirty": False,
         }),
         patch.object(eval_module, "_docker", side_effect=lambda *a:
                      prompt if a[-1].endswith(".md") else state["router"]),
@@ -1076,7 +1081,7 @@ def test_unknown_process_outcome_restores_router_and_blocks_blind_retry(tmp_path
 
     with (
         patch.object(eval_module, "_git_state", return_value={
-            "git_sha": "revision-A", "git_dirty": False,
+            "git_sha": "a" * 40, "git_dirty": False,
         }),
         patch.object(eval_module, "_docker", side_effect=lambda *a:
                      prompt if a[-1].endswith(".md") else json.dumps(baseline)),
@@ -1090,3 +1095,141 @@ def test_unknown_process_outcome_restores_router_and_blocks_blind_retry(tmp_path
     submit.assert_called_once()
     assert write.call_args.args == ("local", json.dumps(baseline))
     assert not (tmp_path / "runs.jsonl").exists()
+
+
+def change_revision(path, field, value):
+    record = json.loads(path.read_text(encoding="utf-8"))
+    if value is ...:
+        record.pop(field, None)
+    else:
+        record[field] = value
+    path.write_text(json.dumps(record) + "\n", encoding="utf-8")
+
+
+@pytest.mark.parametrize("boundary", ["report", "review"])
+@pytest.mark.parametrize("conflict", ["series", "run", "unknown_manifest", "dirty_manifest"])
+def test_revision_conflicts_rejected_before_any_output_or_review_write(
+    tmp_path, boundary, conflict
+):
+    write_report_experiment(tmp_path, experiment_manifests())
+    manifest = tmp_path / "high/manifest.json"
+    run = tmp_path / "high/runs.jsonl"
+    change_revision(run, "git_sha", "b" * 40)
+    if conflict == "series":
+        change_revision(manifest, "git_sha", "b" * 40)
+    elif conflict == "unknown_manifest":
+        change_revision(manifest, "git_sha", ...)
+    elif conflict == "dirty_manifest":
+        change_revision(manifest, "git_dirty", True)
+    for name in ["report.html", "summary.json", "review-template.jsonl"]:
+        (tmp_path / name).write_text("previous output", encoding="utf-8")
+    before = {path: path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()}
+    with (
+        patch("builtins.input") as ask,
+        pytest.raises(ValueError, match="source revision mismatch"),
+    ):
+        if boundary == "report":
+            report_module.summarize(tmp_path)
+        else:
+            review_module.review(tmp_path, "Putilin")
+    ask.assert_not_called()
+    assert {path: path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()} == before
+
+
+UNVERIFIED_REVISIONS = [
+    ("manifest", "git_sha", ...), ("manifest", "git_sha", None),
+    ("manifest", "git_sha", ""), ("manifest", "git_sha", "a" * 39),
+    ("manifest", "git_sha", "g" * 40), ("manifest", "git_sha", "a" * 40 + "\n"),
+    ("manifest", "git_sha", 123), ("manifest", "git_sha", []),
+    ("manifest", "git_dirty", ...), ("manifest", "git_dirty", None),
+    ("manifest", "git_dirty", True), ("manifest", "git_dirty", 0),
+    ("manifest", "git_dirty", "false"),
+    ("runs", "git_sha", ...), ("runs", "git_sha", "not-a-sha"),
+    ("runs", "git_sha", {}), ("runs", "git_dirty", True), ("runs", "git_dirty", 0),
+]
+
+
+@pytest.mark.usefixtures("valid_report_runtime")
+@pytest.mark.parametrize("target,field,value", UNVERIFIED_REVISIONS)
+def test_unverified_revision_keeps_human_pass_but_blocks_technical_pass(
+    tmp_path, target, field, value
+):
+    write_report_experiment(tmp_path, experiment_manifests())
+    path = tmp_path / "high" / ("manifest.json" if target == "manifest" else "runs.jsonl")
+    change_revision(path, field, value)
+    verdicts = (tmp_path / "verdicts.jsonl").read_bytes()
+    result = report_module.summarize(tmp_path)
+    assert result["status"] == result["series"]["high"]["status"] == "PENDING"
+    assert result["series"]["medium"]["status"] == "PASS"
+    assert result["series"]["high"]["groups"]["case"]["usable"] == 0
+    assert result["series"]["high"]["revision_issues"]["case-1"]
+    assert "source revision" in (tmp_path / "report.html").read_text(encoding="utf-8")
+    assert (tmp_path / "verdicts.jsonl").read_bytes() == verdicts
+    [run] = eval_module.read_jsonl(tmp_path / "high/runs.jsonl")
+    verdict = next(row for row in eval_module.read_jsonl(tmp_path / "verdicts.jsonl")
+                   if row["series"] == "high")
+    assert report_module.human_status(run, verdict) == ("PASS", False)
+
+
+@pytest.mark.parametrize("field,value", [(f, v) for target, f, v in UNVERIFIED_REVISIONS
+                                         if target == "manifest"])
+def test_collector_and_resume_use_the_same_clean_revision_contract(tmp_path, field, value):
+    args, _, _ = resume_collection(tmp_path)
+    manifest_path = tmp_path / "manifest.json"
+    valid = json.loads(manifest_path.read_text(encoding="utf-8"))
+    change_revision(manifest_path, field, value)
+    invalid = json.loads(manifest_path.read_text(encoding="utf-8"))
+    with (
+        patch.object(eval_module, "_git_state", return_value=invalid),
+        pytest.raises(ValueError, match="clean Git revision"),
+    ):
+        eval_module.collection_revision()
+    with pytest.raises(ValueError, match="git_sha/git_dirty"):
+        eval_module.validate_resume_manifest(invalid, valid)
+
+
+@pytest.mark.usefixtures("valid_report_runtime")
+def test_legacy_semantic_review_remains_possible_without_certifying_revision(tmp_path, capsys):
+    manifest = experiment_manifests()["high"]
+    manifest["suite"]["reasoning"] = ["high"]
+    write_report_experiment(tmp_path, {"high": manifest})
+    change_revision(tmp_path / "high/manifest.json", "git_sha", ...)
+    change_revision(tmp_path / "high/runs.jsonl", "git_sha", ...)
+    (tmp_path / "verdicts.jsonl").unlink()
+    before = {path: path.read_bytes() for path in (tmp_path / "high").iterdir()}
+    with patch("builtins.input", side_effect=["y", "n"]):
+        review_module.review(tmp_path, "Putilin")
+    assert "ревизия не подтверждена" in capsys.readouterr().out
+    [run] = eval_module.read_jsonl(tmp_path / "high/runs.jsonl")
+    assert report_module.human_status(run, saved_verdict(tmp_path)) == ("PASS", False)
+    assert report_module.summarize(tmp_path)["status"] == "PENDING"
+    assert {path: path.read_bytes() for path in (tmp_path / "high").iterdir()} == before
+
+
+@pytest.mark.parametrize("length", [40, 64])
+def test_valid_revision_contract_accepts_full_git_object_ids(length):
+    revision = {"git_sha": "a" * length, "git_dirty": False}
+    with patch.object(eval_module, "_git_state", return_value=revision):
+        assert eval_module.collection_revision() == revision
+    assert eval_module.revision_problems(revision, {"git_sha": revision["git_sha"]}) == []
+
+
+@pytest.mark.usefixtures("valid_report_runtime")
+def test_unverified_revision_does_not_hide_a_human_failure(tmp_path):
+    write_report_experiment(tmp_path, experiment_manifests())
+    change_revision(tmp_path / "high/manifest.json", "git_dirty", True)
+    path = tmp_path / "verdicts.jsonl"
+    verdicts = eval_module.read_jsonl(path)
+    for verdict in verdicts:
+        if verdict["series"] == "high":
+            verdict["critical_error"] = True
+    path.write_text("".join(json.dumps(row) + "\n" for row in verdicts), encoding="utf-8")
+    assert report_module.summarize(tmp_path)["status"] == "FAIL"
+
+
+@pytest.mark.parametrize("dirty", [False, True])
+def test_revision_contract_rejects_conflict_even_if_clean_state_is_unverified(dirty):
+    with pytest.raises(ValueError, match="source revision mismatch"):
+        eval_module.revision_problems(
+            {"git_sha": "a" * 40, "git_dirty": dirty}, {"git_sha": "b" * 40}
+        )

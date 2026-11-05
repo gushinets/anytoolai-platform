@@ -927,3 +927,33 @@ ESLint on the CLI/shared collector/harness, config/architecture/docs/generated-d
 and whitespace checks pass. No paid calls or real browser sessions were required. Commit
 and normal push are explicitly authorized; remote Sonar must be checked against the newly
 published SHA before declaring these findings resolved.
+
+### Review round 4 implementation authorized
+
+User approved the unified revision contract and tests. Share parsing of full Git object IDs
+and explicit clean-state checks across collector, report manifests and runs. Reject known
+conflicting revisions before any report/verdict writes. Keep missing/malformed/dirty identity
+explicitly unverified (technical PENDING), while retaining independent human assessments.
+Show reasons in JSON/HTML and warn during semantic review of unverifiable legacy evidence.
+Test each boundary and write preservation, then run focused tests and canonical quick-check.
+No container attestation, new provider calls or historical verdict migration is planned.
+
+### Review round 4 implementation validated
+
+Collector/resume, report and manual review now share the full Git SHA and explicit clean-state
+contract. Known conflicting revisions across manifests and runs are rejected before report or
+verdict writes, including conflicts hidden behind a missing manifest SHA. Missing, malformed
+or dirty provenance remains technically PENDING with per-run reasons in JSON/HTML; manual
+review warns that a human text assessment cannot establish technical provenance. Human
+verdicts remain independent, and critical FAIL retains precedence.
+
+Added 45 regression cases covering both report/review entry points, collection/resume,
+missing/malformed SHA and clean flags, SHA-1/SHA-256 positive controls, file preservation,
+legacy semantic review and critical-failure precedence. All 246 focused tests pass.
+Canonical quick-check: 3,224 passed, 12 standard skips, 628 deselected, exit zero. Ruff,
+documentation validation and whitespace checks pass. No dependencies or acceptance records were changed.
+
+No paid provider calls or real browser sessions were started. This contract identifies the
+source checkout; it does not attest the code running in containers. Historical evidence with
+unverified provenance remains PENDING when recomputed, without rewriting human decisions.
+Changes are local; commit and publication are outside this request.

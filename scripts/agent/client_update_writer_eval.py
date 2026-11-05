@@ -23,6 +23,7 @@ import re
 import signal
 import subprocess
 import sys
+from collections.abc import Iterable
 from itertools import islice
 from pathlib import Path
 from typing import Literal
@@ -80,11 +81,52 @@ def validate_suite(suite: dict) -> None:
         raise ValueError("suite requires integer 1 <= minimum_usable <= repeats")
 
 
+def source_revision(record: dict) -> str | None:
+    sha = record.get("git_sha")
+    if isinstance(sha, str) and re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", sha):
+        return sha
+    return None
+
+
+def clean_source_revision(record: dict) -> str | None:
+    return source_revision(record) if record.get("git_dirty") is False else None
+
+
+def validate_source_revisions(records: Iterable[dict]) -> None:
+    revisions = {source_revision(record) for record in records} - {None}
+    if len(revisions) > 1:
+        raise ValueError("source revision mismatch")
+
+
+def revision_problems(manifest: dict, run: dict) -> list[str]:
+    validate_source_revisions((manifest, run))
+    problems = []
+    if clean_source_revision(manifest) is None:
+        problems.append("manifest source revision is missing, malformed or not proven clean")
+    if source_revision(run) is None:
+        problems.append("run source revision is missing or malformed")
+    # Runs inherit clean state from their matching manifest unless they explicitly contradict it.
+    if run.get("git_dirty", False) is not False:
+        problems.append("run source revision is not proven clean")
+    return problems
+
+
 def collection_revision() -> dict:
     revision = _git_state()
-    if not revision.get("git_sha") or revision.get("git_dirty") is not False:
+    if clean_source_revision(revision) is None:
         raise ValueError("collection requires an identifiable clean Git revision")
     return revision
+
+
+def validate_resume_manifest(saved: dict, snapshot: dict) -> None:
+    if clean_source_revision(saved) is None:
+        raise ValueError("resume manifest mismatch: unverified git_sha/git_dirty")
+    for field in (
+        "suite_sha256", "model", "reasoning_effort", "prompt_sha256", "original_router",
+        "git_sha", "git_dirty",
+    ):
+        if saved.get(field) != snapshot[field]:
+            raise ValueError(f"resume manifest mismatch: {field}")
 
 
 def provider_calls(project: str, session_id: str | None) -> list[dict]:
@@ -233,12 +275,7 @@ def collect(args: argparse.Namespace) -> None:
     manifest_path = args.out / "manifest.json"
     if manifest_path.exists():
         saved = json.loads(manifest_path.read_text(encoding="utf-8"))
-        for field in (
-            "suite_sha256", "model", "reasoning_effort", "prompt_sha256", "original_router",
-            "git_sha", "git_dirty",
-        ):
-            if saved.get(field) != snapshot[field]:
-                raise ValueError(f"resume manifest mismatch: {field}")
+        validate_resume_manifest(saved, snapshot)
     else:
         manifest_path.write_text(
             json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"

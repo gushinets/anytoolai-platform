@@ -16,7 +16,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
-from client_update_writer_eval import digest
+from client_update_writer_eval import digest, revision_problems, validate_source_revisions
 from client_update_writer_eval_report import human_status, validate_runs
 from proposal_ai_eval import read_jsonl
 
@@ -61,12 +61,22 @@ def review(directory: Path, reviewer: str, series: str | None = None) -> None:
     if series is not None and series not in {p.parent.name for p in manifests}:
         raise ValueError(f"Неизвестная серия: {series}")
     # Validate the full selected queue before writing any human decisions.
+    selected = {
+        path: json.loads(path.read_text(encoding="utf-8")) for path in manifests
+        if series is None or path.parent.name == series
+    }
+    validate_source_revisions(selected.values())
     queue = []
-    for path in manifests:
-        if series is None or path.parent.name == series:
-            runs = read_jsonl(path.parent / "runs.jsonl")
-            validate_runs(json.loads(path.read_text(encoding="utf-8")), runs)
-            queue.extend((path.parent.name, run) for run in runs)
+    for path, manifest in selected.items():
+        runs = read_jsonl(path.parent / "runs.jsonl")
+        validate_runs(manifest, runs)
+        if any(revision_problems(manifest, run) for run in runs):
+            print(
+                f"{path.parent.name}: ревизия не подтверждена; "
+                "оценка текста не даёт технический PASS."
+            )
+        queue.extend((path.parent.name, run) for run in runs)
+    validate_source_revisions([*selected.values(), *(run for _, run in queue)])
     verdict_path = directory / "verdicts.jsonl"
     verdicts = {(r["series"], r["id"]): r for r in read_jsonl(verdict_path)}
     observation_path = directory.parent / "agent-observations.json"

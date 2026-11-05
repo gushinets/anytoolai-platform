@@ -18,7 +18,14 @@ import math
 import statistics
 from pathlib import Path
 
-from client_update_writer_eval import EvaluationStatus, digest, evidence_status, validate_suite
+from client_update_writer_eval import (
+    EvaluationStatus,
+    digest,
+    evidence_status,
+    revision_problems,
+    validate_source_revisions,
+    validate_suite,
+)
 from proposal_ai_eval import read_jsonl
 
 
@@ -60,6 +67,7 @@ def validate_runs(manifest: dict, runs: list[dict]) -> None:
     cases = {case["id"]: case for case in manifest["suite"]["cases"]}
     if manifest["suite_sha256"] != digest(manifest["suite"]):
         raise ValueError("suite manifest digest mismatch")
+    validate_source_revisions([manifest, *runs])
     seen = set()
     for run in runs:
         key = run["case"], run["attempt"]
@@ -76,24 +84,28 @@ def validate_runs(manifest: dict, runs: list[dict]) -> None:
                 raise ValueError(f"configuration mismatch: {field}")
 
 
-def render_run(series: str, run: dict, status: str, case: dict) -> str:
+def render_run(series: str, run: dict, status: str, case: dict, revision_issues: list[str]) -> str:
     output = json.dumps(run.get("output"), ensure_ascii=False, indent=2)
     questions = "".join("<li>" + html.escape(q) + "</li>" for q in case["criteria"])
     evidence = html.escape(
         json.dumps(
             {
-                key: run.get(key)
-                for key in (
-                    "session_id",
-                    "model",
-                    "reasoning_effort",
-                    "prompt_sha256",
-                    "origin",
-                    "provider_calls",
-                    "review_needed",
-                    "recovery_note",
-                    "diagnostic_reason",
-                )
+                "revision_issues": revision_issues,
+                **{
+                    key: run.get(key)
+                    for key in (
+                        "session_id",
+                        "model",
+                        "reasoning_effort",
+                        "prompt_sha256",
+                        "git_sha",
+                        "origin",
+                        "provider_calls",
+                        "review_needed",
+                        "recovery_note",
+                        "diagnostic_reason",
+                    )
+                },
             },
             ensure_ascii=False,
             indent=2,
@@ -115,6 +127,7 @@ def validate_experiment(manifests: dict[str, dict]) -> tuple[dict, set[tuple[str
     suite = reference["suite"]
     validate_suite(suite)
     suite_hash = digest(suite)
+    validate_source_revisions(manifests.values())
     planned = {(model, effort) for model in suite["models"] for effort in suite["reasoning"]}
     if not planned or len(planned) != len(suite["models"]) * len(suite["reasoning"]):
         raise ValueError("empty or duplicate experiment configuration matrix")
@@ -192,16 +205,27 @@ def summarize(directory: Path) -> dict:
         for path in sorted(directory.glob("*/manifest.json"))
     }
     suite, observed = validate_experiment(manifests)
+    series_runs = {
+        series: read_jsonl(directory / series / "runs.jsonl") for series in manifests
+    }
+    validate_source_revisions([
+        *manifests.values(), *(run for runs in series_runs.values() for run in runs)
+    ])
     verdicts = {(row["series"], row["id"]): row for row in read_jsonl(directory / "verdicts.jsonl")}
     summary = {}
     template = []
     sections = []
     for series, manifest in manifests.items():
         series_directory = directory / series
-        runs = read_jsonl(series_directory / "runs.jsonl")
+        runs = series_runs[series]
         diagnostics = read_jsonl(series_directory / "diagnostics.jsonl")
-        sections.extend(render_run(series, run, "DIAGNOSTIC", run["input"]) for run in diagnostics)
+        sections.extend(
+            render_run(series, run, "DIAGNOSTIC", run["input"], []) for run in diagnostics
+        )
         validate_runs(manifest, runs)
+        revision_issues = {
+            run["id"]: issues for run in runs if (issues := revision_problems(manifest, run))
+        }
         if len({row["id"] for row in runs}) != len(runs):
             raise ValueError(f"duplicate attempts in {series}")
         groups = {}
@@ -214,6 +238,7 @@ def summarize(directory: Path) -> dict:
             critical = 0
             for run in group:
                 measured, problems = evidence_status(run, series_directory)
+                problems = problems + revision_issues.get(run["id"], [])
                 human, is_critical = human_status(run, verdicts.get((series, run["id"])))
                 status = "FAIL" if "FAIL" in (measured, human) else "PENDING"
                 verified = problems == ["human semantic review required"]
@@ -236,7 +261,9 @@ def summarize(directory: Path) -> dict:
                         ],
                     }
                 )
-                sections.append(render_run(series, run, status, case))
+                sections.append(
+                    render_run(series, run, status, case, revision_issues.get(run["id"], []))
+                )
             passed = statuses.count("PASS")
             pending = statuses.count("PENDING") + expected - len(group)
             state = "PENDING" if pending else "PASS"
@@ -256,7 +283,9 @@ def summarize(directory: Path) -> dict:
             median is not None and median > manifest["suite"]["max_median_ui_ms"]
         ):
             state = "FAIL"
-        summary[series] = {"status": state, "groups": groups, **metrics}
+        summary[series] = {
+            "status": state, "groups": groups, "revision_issues": revision_issues, **metrics
+        }
     result = overall_summary(summary, suite, observed)
     (directory / "summary.json").write_text(
         json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
