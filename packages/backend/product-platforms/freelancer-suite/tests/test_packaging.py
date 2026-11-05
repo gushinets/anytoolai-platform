@@ -48,7 +48,11 @@ def test_non_python_product_config_files_are_included_in_the_built_wheel(
 
     out_dir = tmp_path / "dist"
     subprocess.run(
-        [_uv_executable(), "build", "--wheel", "-o", str(out_dir), str(package_copy)],
+        [
+            _uv_executable(), "build", "--config-file",
+            str(PACKAGE_ROOT.parents[3] / "infra" / "python" / "uv-build.toml"),
+            "--wheel", "-o", str(out_dir), str(package_copy),
+        ],
         check=True,
         capture_output=True,
         text=True,

@@ -115,11 +115,19 @@ def test_quota_state_payload_exposes_resets_at_and_hides_period_key() -> None:
         period_key="day:2026-09-30",
         limit_count=3,
         used_count=0,
+        successful_used_count=0,
+        legacy_used_count=0,
+        reserved_count=1,
+        available_count=2,
         remaining_count=3,
         exhausted=False,
         resets_at=datetime(2026, 10, 1, tzinfo=UTC),
+        read_at=datetime(2026, 9, 30, tzinfo=UTC),
     )
     body = QuotaStateResponse(**_quota_state_payload(state)).model_dump(mode="json")
     assert body["resets_at"] == "2026-10-01T00:00:00Z"
     assert body["period"] == "calendar_day"
     assert "period_key" not in body
+    assert body["reserved_count"] == 1
+    assert body["available_count"] == 2
+    assert body["read_at"] == "2026-09-30T00:00:00Z"

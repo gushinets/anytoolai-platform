@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any, Iterator
@@ -17,6 +18,7 @@ from anytoolai_platform_core.storage.transactions import (
     build_session_factory,
     transaction_boundary,
 )
+
 from tests.db_support import provision_database
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -108,7 +110,9 @@ def test_quota_check_endpoint_returns_current_state(
     )
 
     assert response.status_code == HTTPStatus.OK
-    assert response.json() == {
+    payload = response.json()
+    assert datetime.fromisoformat(payload.pop("read_at")).tzinfo is not None
+    assert payload == {
         "guest_id": guest_id,
         "product_id": "kernel_demo",
         "quota_policy_id": "kernel_demo.guest_quota_v1",
@@ -119,6 +123,10 @@ def test_quota_check_endpoint_returns_current_state(
         "period": "lifetime",
         "limit_count": 3,
         "used_count": 0,
+        "successful_used_count": 0,
+        "legacy_used_count": 0,
+        "reserved_count": 0,
+        "available_count": 3,
         "remaining_count": 3,
         "exhausted": False,
         "resets_at": None,

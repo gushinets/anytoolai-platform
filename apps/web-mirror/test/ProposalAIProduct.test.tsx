@@ -285,8 +285,11 @@ describe("ProposalAI product definition", () => {
       [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
       [ROUTES.QUOTA]: [
         quotaResponse(IDS),
+        quotaResponse(IDS, { used_count: 0, reserved_count: 1 }),
         quotaResponse(IDS, { used_count: 1, remaining_count: 2 }),
+        quotaResponse(IDS, { used_count: 1, remaining_count: 2, reserved_count: 1 }),
         quotaResponse(IDS, { used_count: 2, remaining_count: 1 }),
+        quotaResponse(IDS, { used_count: 2, remaining_count: 1, reserved_count: 1 }),
         quotaResponse(IDS, { used_count: 3, remaining_count: 0, exhausted: true }),
         quotaResponse(IDS, { used_count: 3, remaining_count: 0, exhausted: true }),
       ],
@@ -315,7 +318,7 @@ describe("ProposalAI product definition", () => {
     fireEvent.click(screen.getByRole("button", { name: "Regenerate proposal" }));
     await screen.findByText("You've used all your ProposalAI runs for now.");
     expect(screen.getByText("0 of 3 proposals remaining.")).toBeTruthy();
-    await waitFor(() => expect(routed.calls.filter((call) => call.key === ROUTES.QUOTA)).toHaveLength(5));
+    await waitFor(() => expect(routed.calls.filter((call) => call.key === ROUTES.QUOTA)).toHaveLength(8));
   });
 
   it("ignores an older quota response that arrives after the accepted run's refresh", async () => {

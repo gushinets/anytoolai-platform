@@ -47,6 +47,10 @@ export function runtimeConfigResponse(ids: ProductIds, overrides: Record<string,
 }
 
 export function quotaResponse(ids: ProductIds, overrides: Record<string, unknown> = {}): Response {
+  const used = typeof overrides.used_count === "number" ? overrides.used_count : 0;
+  const reserved = typeof overrides.reserved_count === "number" ? overrides.reserved_count : 0;
+  const limit = typeof overrides.limit_count === "number" ? overrides.limit_count : 3;
+  const legacy = typeof overrides.legacy_used_count === "number" ? overrides.legacy_used_count : 0;
   return jsonResponse(200, {
     guest_id: "guest_1",
     product_id: ids.productId,
@@ -57,7 +61,12 @@ export function quotaResponse(ids: ProductIds, overrides: Record<string, unknown
     unit: "scenario_run",
     period: "lifetime",
     limit_count: 3,
-    used_count: 0,
+    used_count: used,
+    successful_used_count: used - legacy,
+    legacy_used_count: legacy,
+    reserved_count: reserved,
+    available_count: Math.max(limit - used - reserved, 0),
+    read_at: "2026-11-04T00:00:00Z",
     remaining_count: 3,
     exhausted: false,
     ...overrides,

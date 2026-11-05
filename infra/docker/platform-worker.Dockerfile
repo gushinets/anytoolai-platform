@@ -6,7 +6,7 @@ FROM python:3.12-slim
 COPY --from=ghcr.io/astral-sh/uv:0.13.4 /uv /usr/local/bin/uv
 WORKDIR /app
 COPY . .
-RUN uv sync --project apps/platform-worker --frozen --no-dev
+RUN uv sync --project apps/platform-worker --locked --config-file /app/infra/python/uv-build.toml --no-dev
 RUN groupadd --system platform-worker && \
     useradd --system --gid platform-worker --home-dir /app --no-create-home platform-worker && \
     chown -R platform-worker:platform-worker /app

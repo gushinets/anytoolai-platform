@@ -27,9 +27,10 @@ class ArtifactService:
         self._session = repository.session
         self._event_emitter = event_emitter
 
-    def create(self, record: ArtifactRecord) -> ArtifactRecord:
+    def create(self, record: ArtifactRecord, *, recover: bool = True) -> ArtifactRecord:
         stored = self._repository.create(record)
-        self._register_recovery(stored)
+        if recover:
+            self._register_recovery(stored)
         self._event_emitter.emit(
             "artifact.created",
             artifact_execution_context_from_record(stored),

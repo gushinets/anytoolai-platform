@@ -17,7 +17,12 @@ export type QuotaState = {
   period: QuotaPeriod;
   limitCount: number;
   usedCount: number;
+  successfulUsedCount: number;
+  legacyUsedCount: number;
+  reservedCount: number;
+  availableCount: number;
   remainingCount: number;
   exhausted: boolean;
   resetsAt: string | null;
+  readAt: string;
 };

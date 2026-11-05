@@ -121,6 +121,7 @@ class HandoffCreated:
 @dataclass(frozen=True)
 class HandoffAccepted:
     preview: HandoffPreview
+    is_replay: bool = False
 
 
 @dataclass(frozen=True)

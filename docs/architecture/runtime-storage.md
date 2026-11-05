@@ -11,6 +11,8 @@ It covers the design that was implemented for:
 - `platform.artifacts`
 - `platform.guest_identities`
 - `platform.guest_quota_usage`
+- `platform.paid_allowance_usage`
+- `platform.execution_reservations`
 - `platform.product_handoffs`
 - `platform.atom_lab_runs`
 - `platform.model_catalog_state`
@@ -36,6 +38,8 @@ The runtime storage slice lives in these files:
 - `migrations/platform/versions/0010_handoffs_index_compat.py`
 - `migrations/platform/versions/0012_atom_lab_runs.py`
 - `migrations/platform/versions/0013_model_catalog_state.py`
+- `migrations/platform/versions/0016_execution_reservations.py`
+- `migrations/platform/versions/0017_guest_legacy_usage.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/storage/db.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/storage/transactions.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/scenarios/repository.py`
@@ -46,6 +50,7 @@ The runtime storage slice lives in these files:
 - `packages/backend/platform-core/src/anytoolai_platform_core/artifacts/repository.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/identity/repository.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/quotas/repository.py`
+- `packages/backend/platform-core/src/anytoolai_platform_core/quotas/execution_repository.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/handoffs/repository.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/atom_lab/repository.py`
 - `packages/backend/platform-core/tests/unit/test_runtime_storage.py`
@@ -87,6 +92,62 @@ For the Provider Gateway ADR-0007 realignment:
   restores the legacy target-session index for the historical revision boundary
 - `0012_atom_lab_runs.py` adds the immutable Atom Lab admission snapshot linked one-to-one to its
   scenario session and job; action/artifact links remain nullable until execution creates them
+- `0016_execution_reservations.py` prepares success-only metering storage without activating the
+  admission/finalization mechanism; its stage boundary is described below
+
+### Execution metering storage (ANY-507 stage 1)
+
+Stage 2 connects this schema to ordinary-start/immediate-handoff admission using one caller-owned
+savepoint for session, job, reservation and counter writes. Admission changes `reserved_count`,
+not historical usage. Revision `0017` reconciles the historical guest contribution at quiesced
+application cutover as total used minus consumed guest reservations, retaining all successful
+usage, active reserves and result history. Old admission must stay stopped after reconciliation. The
+[quota model](quota-model.md) records the reserve/replay, terminal recovery and client/readback
+contracts implemented through stage 4. Stage 5 still owns cutover/activation verification.
+
+Revision `0016` appends to `0015`. It preserves every existing identity, scope, usage count and runtime
+row. Guest usage gains `reserved_count=0` and `legacy_used_count=used_count`. Successful guest usage
+will be the difference `used_count - legacy_used_count`; migration never labels historical attempts
+as successful and never refunds or reassigns a window. Historical usage may exceed a later policy
+limit, so the new guest constraints do not require `used_count <= limit_count`.
+
+`paid_allowance_usage` stores one bucket per `tenant_id + region + allowance_id`, independent of
+guest policies/windows. Its owner/product/metric/unit/quantity tuple is immutable: repository
+insert-or-select rejects conflicting bindings, and a PostgreSQL trigger rejects direct SQL
+rebinding. Quantity and used/reserved counters are `BIGINT`; quantity is limited to `0..2^53-1`,
+counters are nonnegative, and their sum cannot exceed quantity. The typed `PaidAllowance` excludes
+boolean/fractional quantities and requires a canonical Portal UUID owner. Metric and unit strings
+come from the registry; checking their product membership belongs to stage-2 admission, not storage.
+A read returns no row for an unobserved allowance and creates no bucket.
+
+`execution_reservations` stores the original owner, session/job, product/scenario/frontend,
+guest-or-paid bucket, optional replay namespace/key/hash and final result linkage. Foreign keys
+protect all bucket/runtime/handoff/result references. Checks require exactly one bucket matching the
+owner kind, complete replay identity (mandatory for paid), and a final artifact only for `consumed`.
+`handoff` replay uses the stable runtime handoff ID. Unique constraints cover session, job, and
+`tenant + region + owner kind/id + product + scenario + namespace + replay key`; allowance ID is
+excluded so replay can retain its original bucket across cycles. Repository creation validates
+owner/scope/product/scenario/frontend links and exposes no generic identity-changing update.
+
+Jobs have the server-owned `JobConsumptionMode`: `legacy | unmetered | reserved`. Historical jobs
+remain `legacy`; new metered jobs are `reserved` and other starts are `unmetered`. Migration preserves
+both guest `used_count` and its historical `legacy_used_count` contribution. Job repository updates
+cannot change the mode.
+PostgreSQL deferred constraint triggers require exactly one reservation for a `reserved` job and no
+reservation for other modes, at transaction completion. This permits job-then-reservation insertion
+while rejecting a committed reserved job with a missing reservation. SQLite metadata construction
+does not provide this PostgreSQL trigger guarantee.
+
+`PaidAllowanceUsageRepository` and `ExecutionReservationRepository` live in
+`quotas/execution_repository.py`, accept the caller's `Session`, and never commit or roll back it.
+They supply storage binding, creation and lookup. ANY-507 stages 2–4 connect reserve/replay,
+transactional publication/release/recovery and readback through Core quota services. Portal authority,
+AccessSnapshot and paid HTTP remain ANY-766 responsibilities.
+
+Downgrade to `0015` is refused once paid buckets or reservations exist; restoring an old runtime after
+activation requires the coordinated backup/quiesce procedure from the
+[execution plan](../exec-plans/active/ANY-507-implementation-plan.md). Upgrade was designed to leave
+old tables intact, and repeated `upgrade head` does not backfill legacy usage a second time.
 
 ### Atom Lab run snapshots
 
@@ -331,8 +392,8 @@ Escaped rollback recovery also lives in `storage.transactions.py`. Recovery call
 explicit rollback phases instead of depending on accidental FIFO callback order. The current
 contract separates:
 
-1. quota-exhaustion recovery, which re-ensures the rejected target quota dimension and its
-   checked/exhausted audit events without consuming quota;
+1. quota-rejection recovery: exhaustion re-ensures the usage dimension and checked/exhausted audit;
+   temporary capacity rejection records its observed snapshot without recreating execution;
 2. row recovery for runtime tables such as `platform.artifacts`, `platform.provider_calls`,
    `platform.action_runs`, and `platform.jobs`;
 3. event recovery that backfills only missing `platform.event_log` rows in causal order.
@@ -345,8 +406,10 @@ partial durable state.
 Rollback recovery callbacks can be marked critical when the caller must not return its normal
 domain error unless recovery succeeds. Handoff quota exhaustion uses this path: a returned
 `429 quota_exhausted` proves the `failed` handoff and quota audit pair are already durable.
-Non-critical workflow/action/provider/artifact recovery keeps the older best-effort behavior where
-callback failures are attached as notes to the original exception.
+Reserved success recovery is also critical: its final artifact and debit cannot recover
+independently. Non-critical workflow/action/provider/debug-artifact callbacks keep their earlier
+behavior, attaching failures as notes to the original exception. Handoff capacity-rejection audit
+is critical too, but leaves the token retryable and never marks it failed or creates a target.
 
 ## Common Runtime Dimensions
 
@@ -599,7 +662,9 @@ Key columns:
 - `scenario_id` nullable
 - `period_key`
 - `limit_count`
-- `used_count`
+- `used_count` (legacy plus successful consumption)
+- `legacy_used_count` (preserved historical debit)
+- `reserved_count` (active executions)
 - timestamps and metadata
 
 The unique runtime dimension is:
@@ -612,13 +677,15 @@ For product-wide policies, `quota_dimension = product`, `dimension_key = product
 `scenario_id` is null. For scenario-specific policies, `quota_dimension = scenario`,
 `dimension_key = scenario_id`, and `scenario_id` stores the scoped scenario.
 
-Quota consumption uses a conditional database update:
+Capacity reservation uses a locked conditional update:
 
 ```text
-WHERE used_count < limit_count
+WHERE used_count + reserved_count < limit_count
 ```
 
-That conditional update is the MVP-A concurrency guard for repeated or concurrent accepted starts.
+Success moves one original reserve to used atomically with result publication; terminal failure
+releases it without debit. Readback derives all counters from one row snapshot. This conditional
+update is the concurrency guard for repeated or concurrent accepted starts.
 It is independent from provider-call rows, transport retries, validation retries, and provider
 usage/cost telemetry.
 
@@ -783,8 +850,8 @@ uv run python -m pytest apps/platform-api/tests/test_quota_concurrency_postgresq
 
 The test creates and drops a disposable database, applies Alembic migrations, then runs concurrent
 scenario starts through the API transaction path. It verifies that PostgreSQL row locking and the
-conditional quota update allow exactly the first `N` accepted starts, return `429 quota_exhausted`
-for later starts, and keep session/job/quota/event counts consistent.
+conditional quota update allow the first `N` reservations, return
+`429 quota_capacity_reserved` while reserves occupy capacity and `429 quota_exhausted` after consumption, and keep session/job/quota/event counts consistent.
 
 Worker claim concurrency has its own PostgreSQL production-semantics smoke in:
 

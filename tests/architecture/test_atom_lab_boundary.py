@@ -172,7 +172,10 @@ def test_canonical_frontend_workflows_install_atom_lab_chromium_before_checks() 
     )
     workflows = (
         (FRONTEND_WORKFLOW_PATH, "frontend", "python scripts/agent/runner.py frontend-check"),
-        (BACKEND_WORKFLOW_PATH, "full-check", "uv run python scripts/agent/runner.py full-check"),
+        (
+            BACKEND_WORKFLOW_PATH, "full-check",
+            "uv run --no-sync python scripts/agent/runner.py full-check",
+        ),
     )
 
     for workflow_path, job_name, expected_check in workflows:

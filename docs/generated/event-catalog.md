@@ -14,7 +14,10 @@ Generated-doc mirror of the MVP-A platform event taxonomy from `configs/kernel/p
 ### quota
 
 - `quota.checked`
+- `quota.reserved`
 - `quota.consumed`
+- `quota.released`
+- `quota.capacity_reserved`
 - `quota.exhausted`
 
 ### scenario

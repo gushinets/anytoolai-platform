@@ -7,10 +7,11 @@ export const fr: Shape<typeof en> = {
   nav: {
     label: "Outils",
     allTools: "Tous les outils",
-    runInProgress: "Une génération est en cours. Si vous quittez maintenant, vous ne verrez pas le résultat et le quota ne sera pas restitué.",
+    runInProgress: "Une exécution est en cours. Si vous partez, elle continuera ; un résultat réussi utilise une exécution.",
   },
   loading: "Chargement de {product}…",
   unavailable: "{product} est indisponible pour le moment. Veuillez recharger la page.",
+  quotaReserved: "Disponibles maintenant : {available}. En cours : {reserved}.",
   quotaExhausted: "Vous avez utilisé toutes vos exécutions de {product} pour le moment.",
   resultFetchFailed: "Votre résultat est prêt, mais nous n’avons pas pu le charger. Veuillez réessayer.",
   starting: "Démarrage…",
@@ -28,6 +29,7 @@ export const fr: Shape<typeof en> = {
     handoffFailed: "Impossible d’ouvrir l’étape suivante. Veuillez réessayer.",
   },
   errors: {
+    quotaCapacityReserved: "La capacité est temporairement occupée. Réessayez dans un instant.",
     startFailed: "Impossible de démarrer {product}. Veuillez réessayer.",
     timeout: "Cela prend plus de temps que prévu. Veuillez réessayer.",
     connectionLost: "Connexion perdue pendant l’attente de votre résultat. Veuillez réessayer.",
