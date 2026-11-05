@@ -936,3 +936,19 @@ def test_review_asks_again_for_the_general_answer_that_a_critical_detail_contrad
     last = proposal_ai_eval.read_jsonl(tmp_path / "verdicts.jsonl")[-1]
     assert last["criterion_id"] == "no-critical-error" and last["decision"]["answer"] == "no"
     assert last["decision"]["violation_type"] == "unagreed_term_accepted"
+
+
+@pytest.mark.parametrize("failed_command", ["rev-parse", "status"])
+def test_git_state_propagates_failures_instead_of_claiming_clean(failed_command):
+    def git(command, **kwargs):
+        assert kwargs["check"] is True
+        assert kwargs["cwd"] == Path(proposal_ai_eval.__file__).resolve().parents[2]
+        if command[1] == failed_command:
+            raise proposal_ai_eval.subprocess.CalledProcessError(128, command)
+        return SimpleNamespace(stdout="revision-A\n")
+
+    with (
+        patch.object(proposal_ai_eval.subprocess, "run", side_effect=git),
+        pytest.raises(proposal_ai_eval.subprocess.CalledProcessError),
+    ):
+        proposal_ai_eval._git_state()

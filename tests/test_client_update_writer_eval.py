@@ -39,7 +39,9 @@ def record():
         "model": "openai/gpt-6-luna",
         "output": {"text": "Done.", "call_to_action": "Send photos."},
         "visible_text": "Done.\n\nSend photos.",
-        "provider_calls": [{"model": "gpt-6-luna", "status": "succeeded"}],
+        "reasoning_effort": "medium",
+        "provider_calls": [{"model": "gpt-6-luna", "status": "succeeded",
+                            "metadata": {"reasoning_effort": "medium"}}],
     }
 
 
@@ -305,7 +307,10 @@ def test_orphaned_journal_blocks_retry_and_restores_router(tmp_path, repeats):
             "_docker",
             side_effect=lambda *a: "prompt" if a[-1].endswith(".md") else baseline,
         ),
-        patch.object(eval_module, "_git_state", return_value={}),
+        patch.object(
+            eval_module, "_git_state",
+            return_value={"git_sha": "revision-A", "git_dirty": False},
+        ),
         patch.object(eval_module, "write_router") as write,
         patch.object(eval_module.subprocess, "run") as browser,
     ):
@@ -671,6 +676,8 @@ def resume_collection(tmp_path):
         "reasoning_effort": "medium",
         "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
         "original_router": baseline,
+        "git_sha": "revision-A",
+        "git_dirty": False,
     }
     (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     args = SimpleNamespace(
@@ -710,7 +717,10 @@ def test_collector_preserves_utf8_and_resumes_with_legacy_encoding(tmp_path):
             eval_module, "_docker",
             side_effect=lambda *a: prompt if a[-1].endswith(".md") else state["router"],
         ),
-        patch.object(eval_module, "_git_state", return_value={}),
+        patch.object(
+            eval_module, "_git_state",
+            return_value={"git_sha": "revision-A", "git_dirty": False},
+        ),
         patch.object(
             eval_module, "write_router",
             side_effect=lambda _project, content: state.update(router=content),
@@ -745,7 +755,10 @@ def test_resume_rejects_live_router_drift_before_writes_or_submissions(
             "_docker",
             side_effect=lambda *a: prompt if a[-1].endswith(".md") else json.dumps(current),
         ),
-        patch.object(eval_module, "_git_state", return_value={}),
+        patch.object(
+            eval_module, "_git_state",
+            return_value={"git_sha": "revision-A", "git_dirty": False},
+        ),
         patch.object(eval_module, "write_router") as write,
         patch.object(eval_module.subprocess, "run") as browser,
     ):
@@ -771,7 +784,10 @@ def test_resume_accepts_equivalent_baseline_and_restores_actual_entry_text(tmp_p
             "_docker",
             side_effect=lambda *a: prompt if a[-1].endswith(".md") else original,
         ),
-        patch.object(eval_module, "_git_state", return_value={}),
+        patch.object(
+            eval_module, "_git_state",
+            return_value={"git_sha": "revision-A", "git_dirty": False},
+        ),
         patch.object(eval_module, "write_router") as write,
         patch.object(eval_module.subprocess, "run") as browser,
     ):
@@ -800,7 +816,10 @@ def test_resume_still_restores_entry_baseline_after_orphaned_attempt(tmp_path):
             "_docker",
             side_effect=lambda *a: prompt if a[-1].endswith(".md") else original,
         ),
-        patch.object(eval_module, "_git_state", return_value={}),
+        patch.object(
+            eval_module, "_git_state",
+            return_value={"git_sha": "revision-A", "git_dirty": False},
+        ),
         patch.object(eval_module, "write_router") as write,
         patch.object(eval_module.subprocess, "run") as browser,
         pytest.raises(RuntimeError, match="orphaned browser evidence"),
@@ -834,3 +853,123 @@ def test_corrupt_partial_review_is_rejected_without_overwriting(tmp_path):
     with pytest.raises(ValueError, match="Повреждены"):
         review_module.review(directory, "Putilin")
     assert path.read_bytes() == original
+
+
+@pytest.mark.parametrize(
+    "recorded,expected", [("medium", "FAIL"), (None, "PENDING"), ("high", "PENDING")]
+)
+def test_effort_is_verified_on_every_physical_attempt(tmp_path, recorded, expected):
+    run = record()
+    run["reasoning_effort"] = "high"
+    call = run["provider_calls"][0]
+    call["metadata"] = {"reasoning_effort": "high"}
+    run["provider_calls"].append({**call, "metadata": {"reasoning_effort": recorded}})
+    with patch.object(eval_module, "evidence_problems", return_value=[]):
+        status, problems = eval_module.evidence_status(run, tmp_path)
+    assert status == expected
+    assert (problems == ["human semantic review required"]) == (recorded == "high")
+
+
+def test_provider_query_preserves_effort_metadata():
+    call = {"metadata": {"reasoning_effort": "high"}}
+    with patch.object(eval_module, "_docker", return_value=json.dumps([call])) as docker:
+        assert eval_module.provider_calls("local", "scenario_session_test") == [call]
+    assert "metadata" in docker.call_args.args[-1]
+
+
+@pytest.mark.parametrize(
+    "recorded,expected", [("medium", "FAIL"), (None, "PENDING"), ("high", "PASS")]
+)
+def test_human_pass_cannot_override_effort_evidence(tmp_path, recorded, expected):
+    manifest = experiment_manifests()["high"]
+    manifest["suite"]["reasoning"] = ["high"]
+    write_report_experiment(tmp_path, {"high": manifest})
+    path = tmp_path / "high/runs.jsonl"
+    run = json.loads(path.read_text(encoding="utf-8"))
+    run["origin"]["ui_outcome"] = "result"
+    run["visible_text"] = run["output"]["text"]
+    run["provider_calls"] = [{
+        "model": run["model"], "status": "succeeded", "metadata": {"reasoning_effort": recorded},
+        "input_tokens": 1, "output_tokens": 1, "estimated_cost": 0,
+    }]
+    path.write_text(json.dumps(run) + "\n", encoding="utf-8")
+    with (
+        patch.object(eval_module, "evidence_problems", return_value=[]),
+        patch.object(report_module, "evidence_status", side_effect=eval_module.evidence_status),
+    ):
+        assert report_module.summarize(tmp_path)["status"] == expected
+
+
+@pytest.mark.parametrize("revision", [
+    {"git_sha": "revision-B", "git_dirty": False},
+    {"git_sha": "revision-A", "git_dirty": True},
+    {"git_sha": None, "git_dirty": False},
+])
+def test_resume_rejects_unverifiable_or_changed_revision_before_mutation(tmp_path, revision):
+    args, baseline, prompt = resume_collection(tmp_path)
+    before = (tmp_path / "manifest.json").read_bytes()
+    with (
+        patch.object(eval_module, "_git_state", return_value=revision),
+        patch.object(
+            eval_module, "_docker",
+            side_effect=lambda *a: prompt if a[-1].endswith(".md") else json.dumps(baseline),
+        ),
+        patch.object(eval_module, "write_router") as write,
+        patch.object(eval_module.subprocess, "run") as submit,
+        pytest.raises(ValueError, match="revision|git_sha"),
+    ):
+        eval_module.collect(args)
+    write.assert_not_called()
+    submit.assert_not_called()
+    assert (tmp_path / "manifest.json").read_bytes() == before
+
+
+@pytest.mark.parametrize("change", [
+    {"cases": []}, {"cases": [{"id": "case", "criteria": []}]},
+    {"cases": [{"id": "", "criteria": ["Ready?"]}]},
+    {"cases": [{"id": "case", "criteria": [" "]}]},
+    {"cases": [{"id": "same", "criteria": ["Ready?"]}] * 2},
+    {"repeats": 0}, {"repeats": 0, "minimum_usable": 0},
+    {"repeats": -1}, {"repeats": True}, {"repeats": 1.5},
+    {"minimum_usable": 0}, {"minimum_usable": 2}, {"minimum_usable": True},
+])
+def test_invalid_suite_is_rejected_before_collection_or_report_writes(tmp_path, change):
+    manifest = experiment_manifests()["medium"]
+    manifest["suite"].update(change)
+    manifest["suite_sha256"] = eval_module.digest(manifest["suite"])
+    suite_path = tmp_path / "suite.json"
+    suite_path.write_text(json.dumps(manifest["suite"]), encoding="utf-8")
+    with (
+        patch.object(eval_module, "_docker") as docker,
+        pytest.raises(ValueError, match="suite"),
+    ):
+        eval_module.collect(SimpleNamespace(suite=suite_path))
+    docker.assert_not_called()
+    series = tmp_path / "medium"
+    series.mkdir()
+    (series / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    report = tmp_path / "report.html"
+    report.write_text("previous report", encoding="utf-8")
+    with pytest.raises(ValueError, match="suite"):
+        report_module.summarize(tmp_path)
+    assert report.read_text(encoding="utf-8") == "previous report"
+
+
+@pytest.mark.parametrize("missing", ["git_sha", "git_dirty"])
+def test_resume_rejects_legacy_manifest_without_revision(tmp_path, missing):
+    args, baseline, prompt = resume_collection(tmp_path)
+    path = tmp_path / "manifest.json"
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    del manifest[missing]
+    path.write_text(json.dumps(manifest), encoding="utf-8")
+    with (
+        patch.object(eval_module, "_git_state", return_value={
+            "git_sha": "revision-A", "git_dirty": False,
+        }),
+        patch.object(eval_module, "_docker", side_effect=lambda *a:
+                     prompt if a[-1].endswith(".md") else json.dumps(baseline)),
+        patch.object(eval_module, "write_router") as write,
+        pytest.raises(ValueError, match=missing),
+    ):
+        eval_module.collect(args)
+    write.assert_not_called()

@@ -18,7 +18,7 @@ import math
 import statistics
 from pathlib import Path
 
-from client_update_writer_eval import EvaluationStatus, digest, evidence_status
+from client_update_writer_eval import EvaluationStatus, digest, evidence_status, validate_suite
 from proposal_ai_eval import read_jsonl
 
 
@@ -113,6 +113,7 @@ def validate_experiment(manifests: dict[str, dict]) -> tuple[dict, set[tuple[str
         raise ValueError("no experiment manifests found")
     reference = next(iter(manifests.values()))
     suite = reference["suite"]
+    validate_suite(suite)
     suite_hash = digest(suite)
     planned = {(model, effort) for model in suite["models"] for effort in suite["reasoning"]}
     if not planned or len(planned) != len(suite["models"]) * len(suite["reasoning"]):

@@ -578,8 +578,13 @@ def read_provider_calls(project: str, session_id: str) -> list[dict]:
 
 
 def _git_state() -> dict:
-    sha = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
-    dirty = bool(subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True).stdout.strip())
+    root = Path(__file__).resolve().parents[2]
+    sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=root, check=True, capture_output=True, encoding="utf-8"
+    ).stdout.strip()
+    dirty = bool(subprocess.run(
+        ["git", "status", "--porcelain"], cwd=root, check=True, capture_output=True, encoding="utf-8"
+    ).stdout.strip())
     return {"git_sha": sha or None, "git_dirty": dirty}
 
 

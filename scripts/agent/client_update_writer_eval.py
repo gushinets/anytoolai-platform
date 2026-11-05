@@ -10,6 +10,8 @@ Offline human review: use the review subcommand with --directory, --reviewer and
 
 The worker router is overridden only inside its container, read back, and restored
 in finally. Run one collector at a time on this isolated stack. Never use a production stack.
+Commit source changes before collecting; resume requires the same clean Git revision.
+This identifies the checkout, not the container build; keep the stack on that revision.
 """
 
 from __future__ import annotations
@@ -54,6 +56,37 @@ def digest(value: object) -> str:
     ).hexdigest()
 
 
+def validate_suite(suite: dict) -> None:
+    if not isinstance(suite, dict):
+        raise ValueError("suite must be an object")
+    cases = suite.get("cases")
+    if not isinstance(cases, list) or not cases:
+        raise ValueError("suite must contain cases")
+    seen = set()
+    for case in cases:
+        if not isinstance(case, dict):
+            raise ValueError("suite case must be an object")
+        case_id = case.get("id")
+        if not isinstance(case_id, str) or not case_id.strip() or case_id in seen:
+            raise ValueError("suite case ids must be nonempty and unique")
+        seen.add(case_id)
+        criteria = case.get("criteria")
+        if not isinstance(criteria, list) or not criteria or any(
+            not isinstance(question, str) or not question.strip() for question in criteria
+        ):
+            raise ValueError("suite cases must have nonempty criteria")
+    repeats, minimum = suite.get("repeats"), suite.get("minimum_usable")
+    if type(repeats) is not int or type(minimum) is not int or not 1 <= minimum <= repeats:
+        raise ValueError("suite requires integer 1 <= minimum_usable <= repeats")
+
+
+def collection_revision() -> dict:
+    revision = _git_state()
+    if not revision.get("git_sha") or revision.get("git_dirty") is not False:
+        raise ValueError("collection requires an identifiable clean Git revision")
+    return revision
+
+
 def provider_calls(project: str, session_id: str | None) -> list[dict]:
     if session_id is None:
         return []
@@ -62,7 +95,8 @@ def provider_calls(project: str, session_id: str | None) -> list[dict]:
     sql = (
         "select coalesce(json_agg(row_to_json(c)), '[]') from "
         "(select step_id, model, gateway_model, "
-        "semantic_attempt_index, status, latency_ms, input_tokens, output_tokens, estimated_cost "
+        "semantic_attempt_index, status, latency_ms, input_tokens, output_tokens, estimated_cost, "
+        "metadata "
         f"from platform.provider_calls where scenario_session_id = '{session_id}' "
         "order by created_at) c"
     )
@@ -87,6 +121,14 @@ def evidence_status(record: dict, directory: Path) -> tuple[EvaluationStatus, li
     calls = record["provider_calls"]
     if not calls:
         problems.append("provider ledger missing")
+    effort = record.get("reasoning_effort")
+    for call in calls:
+        metadata = call.get("metadata")
+        recorded = metadata.get("reasoning_effort") if isinstance(metadata, dict) else None
+        if not effort or not recorded:
+            problems.append("provider reasoning effort evidence missing")
+        elif recorded != effort:
+            return "FAIL", ["provider reasoning effort mismatch"]
     if any(
         call["model"].removeprefix("openai/") != record["model"].removeprefix("openai/")
         for call in calls
@@ -145,11 +187,13 @@ def write_router(project: str, content: str) -> None:
 
 def collect(args: argparse.Namespace) -> None:
     suite = json.loads(args.suite.read_text(encoding="utf-8"))
+    validate_suite(suite)
     if args.model not in suite["models"] or args.reasoning not in suite["reasoning"]:
         raise ValueError("configuration outside frozen matrix")
     repeats = suite["repeats"] if args.repeats is None else args.repeats
     if not 1 <= repeats <= suite["repeats"]:
         raise ValueError("repeats must be between 1 and frozen screening repeats")
+    revision = collection_revision()
     args.out.mkdir(parents=True, exist_ok=args.resume)
     completed_ids = {row["id"] for row in read_jsonl(args.out / "runs.jsonl")}
     original = _docker(args.project, "platform-worker", "cat", ROUTER)
@@ -164,7 +208,7 @@ def collect(args: argparse.Namespace) -> None:
     snapshot = {
         "suite": suite,
         "suite_sha256": digest(suite),
-        **_git_state(),
+        **revision,
         "model": args.model,
         "reasoning_effort": args.reasoning,
         "router": router,
@@ -175,9 +219,10 @@ def collect(args: argparse.Namespace) -> None:
     if manifest_path.exists():
         saved = json.loads(manifest_path.read_text(encoding="utf-8"))
         for field in (
-            "suite_sha256", "model", "reasoning_effort", "prompt_sha256", "original_router"
+            "suite_sha256", "model", "reasoning_effort", "prompt_sha256", "original_router",
+            "git_sha", "git_dirty",
         ):
-            if saved[field] != snapshot[field]:
+            if saved.get(field) != snapshot[field]:
                 raise ValueError(f"resume manifest mismatch: {field}")
     else:
         manifest_path.write_text(
@@ -222,6 +267,7 @@ def collect(args: argparse.Namespace) -> None:
                 "model": args.model,
                 "reasoning_effort": args.reasoning,
                 "prompt_sha256": snapshot["prompt_sha256"],
+                "git_sha": revision["git_sha"],
                 "provider_calls": provider_calls(args.project, observed["session_id"]),
                 "origin": {
                     "ui_outcome": observed["ui_outcome"],

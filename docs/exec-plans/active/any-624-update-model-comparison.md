@@ -836,3 +836,34 @@ the Update collector/report/test files; the shared Proposal reader and existing 
 have no additional Ruff diagnostics against the previous revision. Whitespace checks pass.
 Production deployment-lock code, accepted evidence and prompts are unchanged; no provider
 calls occurred. Native Windows CI and remote checks still need a new run after publication.
+
+### Review round 2 implementation
+
+Authorized: fix the three confirmed findings with regressions. Plan: share suite validation
+between collection/report preflight (nonempty unique cases/criteria, positive integer repeats
+and usable threshold); preserve ledger reasoning_effort and fail mismatches while missing
+evidence stays pending; require a clean, identifiable Git revision and reject resume across
+commits before router mutation. Record the collection revision on runs. This minimal source
+identity is not attestation of container image contents. Add focused regressions and run
+quick-check. Historical evidence/verdicts remain untouched; no paid calls or publication.
+
+### Review round 2 fixes validated
+
+Implemented all three confirmed findings. Ledger metadata is preserved; every physical call
+must match the requested effort, mismatch fails and missing evidence stays pending even with
+human PASS. Collection requires an identifiable clean Git checkout, records its revision on
+each run, and rejects changed or missing revision identity on resume before router mutation.
+Git command failures now propagate and commands resolve the repository independently of cwd.
+Shared suite validation rejects empty/duplicate cases, empty criteria, invalid repeat counts
+and usable thresholds before collection or report writes.
+
+Added 27 regression cases. Focused evaluation tests: 174 passed. Canonical quick-check in
+the prepared isolated container: 3,152 passed, 12 standard skips, 628 deselected, exit zero.
+Config, architecture, docs and generated-artifact checks pass. Ruff passes the Update files;
+shared Proposal files add no lint diagnostics to their existing baseline. Whitespace checks
+pass. No new dependencies, provider calls or changes to historical responses/verdicts.
+
+Compatibility: old collections without clean source identity cannot resume. Recomputed reports
+with missing ledger effort remain pending until independent evidence can be recovered. This
+change does not certify container images from a host Git SHA. Native Windows CI, live acceptance
+and publication were not rerun in this implementation step.
