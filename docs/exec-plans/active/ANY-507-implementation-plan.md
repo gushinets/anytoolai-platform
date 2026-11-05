@@ -698,3 +698,26 @@ Headed extension handoff smoke is not run (no display/Xvfb); backend handoff con
 metering execute in the successful PostgreSQL gate. ANY-766 paid HTTP/access/outbox and peer
 acceptance remain unstarted. Stage-5 verification and handoff preparation stop here; activation
 remains deferred rather than treating failed/incomplete checks as green.
+
+## 11. PR #256 CI follow-up — 2026-11-05
+
+The first PR run on `f3bbf929` passed all required backend gates, frontend and the sibling
+product smokes. `acceptance-builder-smoke` alone failed: its historical accepted-handoff test
+still expected `409 handoff_already_accepted` for the original guest, while ANY-507 intentionally
+returns the original target linkage with HTTP 200 for an owner-scoped replay.
+
+Update that browser scenario to require the original target session/job and compare real database
+jobs, reservations and quota counters before/after replay: one consumed reservation, used=1,
+reserved=0, unchanged IDs and counters. Keep terminal consent and explicit Open result recovery.
+Production behavior is unchanged. Final CI outcomes are recorded on PR #256.
+
+**PASS:** canonical `acceptance-builder-smoke`, all 11 Playwright cases (59.4 seconds), including
+the accepted-owner replay and unchanged stored execution/counters. The isolated run used real
+PostgreSQL 18, native API/worker processes from the managed Python environment and the built
+web-mirror, with deterministic fake providers. It is not a Docker-image acceptance claim: cold
+`dev-up` image builds were canceled during dependency downloads before this native run. The
+temporary PostgreSQL container and native API/worker were stopped after the smoke.
+
+**PASS:** doctor, Acceptance Builder smoke typecheck/lint, documentation validation and diff check.
+CI must rerun on the follow-up commit; historical first-run green gates are not claimed for a
+future SHA.
