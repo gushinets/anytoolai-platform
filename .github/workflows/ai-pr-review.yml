@@ -22,7 +22,7 @@ jobs:
       check_run_id: ${{ steps.gate.outputs.check_run_id }}
     steps:
       - id: gate
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         with:
           script: |
             core.setOutput('run', 'false');
@@ -169,7 +169,7 @@ jobs:
       needs.comment-gate.outputs.run == 'true'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         env:
           CHECK_RUN_ID: ${{ needs.comment-gate.outputs.check_run_id }}
           REVIEW_RESULT: ${{ needs.ai-pr-review.result }}
