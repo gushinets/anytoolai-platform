@@ -2236,6 +2236,11 @@ async function prepareRejectedSourceWrite(page, kind, {historyAtom = "A05"} = {}
         await route.fulfill({json: {...product, ref: "lab.saved-source", group: "lab", ...payload}});
       } else {
         const {base_version: baseVersion, ...configuration} = payload;
+        if (payload.source_run_id !== null) expect(payload).toMatchObject({
+          source_run_id: detail.run_id, atom_id: originalVersion.atom_id,
+          base_action_config_id: originalVersion.base_action_config_id,
+          schema_refs: originalVersion.schema_refs, prompt_ref: originalVersion.prompt_ref,
+        });
         stored = {...configuration, preset_id: stored.preset_id, version: (baseVersion ?? 0) + 1, created_at: stored.created_at};
         await route.fulfill({status: 201, json: {preset_id: stored.preset_id, version: stored.version, created_at: stored.created_at}});
       }
@@ -2379,7 +2384,7 @@ for (const kind of ["prompt", "preset", "version", "history"]) {
       if (kind !== "prompt") {
         expect(recovered.prompt_ref).toBe("prompt.a06.v2");
         expect(recovered.example_input).toEqual(retainedInput);
-        expect(recovered.source_run_id).toBe(kind === "preset" ? null : detail.run_id);
+        expect(recovered.source_run_id).toBeNull();
         await expect(page.locator("#preset-state")).toContainText("Сохранена неизменяемая версия");
       } else await expect(error).toContainText("Сохранён промпт");
       if (kind === "history") {
@@ -2712,7 +2717,7 @@ test("base recovery keeps both a history snapshot and dirty A06 editor usable", 
   await expect(page.locator("#preset-prompt")).toHaveText(detail.snapshot.prompt.content);
   await save.click();
   await expect.poll(() => state.writes.length).toBe(3);
-  expect(state.writes[2].payload).toMatchObject({prompt_ref: "prompt.a06.v2", prompt: detail.snapshot.prompt.content, source_run_id: detail.run_id});
+  expect(state.writes[2].payload).toMatchObject({prompt_ref: "prompt.a06.v2", prompt: detail.snapshot.prompt.content, source_run_id: null});
   await expect(page.locator("#preset-state")).toContainText("Сохранена неизменяемая версия");
 });
 
@@ -2735,6 +2740,192 @@ test("a new authoritative base invalidates the old exact successful trial", asyn
   expect(state.writes[0].payload.source_run_id).toBe(detail.run_id);
   expect(state.writes[1].payload.source_run_id).toBeNull();
 });
+
+for (const historyAtom of ["A05", "A06"]) {
+  test(`changed history preset base clears its source run without borrowing the ${historyAtom} editor run`, async ({page}) => {
+    const {state, save, detail, originalDetail} = await prepareRejectedSourceWrite(page, "history", {historyAtom});
+    let runBody;
+    await page.route("**/v1/atom-lab/runs", async route => {
+      if (route.request().method() !== "POST") return route.fallback();
+      runBody = route.request().postDataJSON();
+      await route.fulfill({status: 202, json: {
+        run_id: "run-foreign-editor", scenario_session_id: "session-library", job_id: "job-library", status: "queued",
+      }});
+    });
+    const foreign = historyDetail({runId: "run-foreign-editor", prompt: "Ручной текст владельца", reasoningEffort: null});
+    foreign.snapshot.atom_id = historyAtom;
+    await page.route("**/v1/atom-lab/runs/run-foreign-editor", route => route.fulfill({json: foreign}));
+    await showWorkbench(page);
+    await page.locator("#run-button").click();
+    await expect(page.locator("#run-state")).toHaveText("Завершён успешно");
+    expect(runBody.atom_id).toBe(historyAtom);
+    await page.locator("#presets-button").click();
+    state.authoritativeAtom = {...A06, prompt_ref: "prompt.a06.v2"};
+    await save.click();
+    await expect(page.locator("#preset-config-metadata")).toContainText("prompt.a06.v2");
+    await expect(save).toBeEnabled();
+    await save.click();
+    await expect.poll(() => state.writes.length).toBe(2);
+    expect(state.writes[1].payload).toMatchObject({prompt_ref: "prompt.a06.v2", source_run_id: null});
+    await expect(page.locator("#preset-state")).toContainText("Сохранена неизменяемая версия");
+    expect(detail).toEqual(originalDetail);
+  });
+}
+
+for (const presetAtom of ["A05", "A06"]) {
+  test(`base refresh rechecks the immutable ${presetAtom} preset card against its own atom`, async ({page}) => {
+    const {state, originalVersion, product} = await prepareRejectedSourceWrite(page, "version");
+    await page.locator("#cancel-preset").click();
+    const viewed = presetAtom === "A06" ? originalVersion : {...originalVersion,
+      atom_id: "A05", base_action_config_id: A05.base_action_config_id, schema_refs: A05.schema_refs,
+      prompt_ref: A05.prompt_ref, prompt_source_ref: null, example_input: A05.example_input,
+    };
+    if (presetAtom === "A05") {
+      await page.route(`**/v1/atom-lab/presets/${originalVersion.preset_id}/versions/1`, route => route.fulfill({json: viewed}));
+      await page.locator("#preset-list button").click();
+    }
+    await showWorkbench(page);
+    await page.locator("#prompt-tab").click();
+    state.authoritativeAtom = {...A06, prompt_ref: "prompt.a06.v2"};
+    state.optionsOverride = [
+      {...product, group: "platform", ref: state.authoritativeAtom.prompt_ref}, product,
+    ];
+    state.rejectionCode = "prompt_invalid";
+    state.rejectionField = "source_ref";
+    await page.locator("#save-prompt-panel summary").click();
+    await page.locator("#save-prompt-name").fill("Обновить основу");
+    await page.locator("#save-prompt").click();
+    await expect.poll(() => state.atomReads).toBe(1);
+    await showWorkbench(page);
+    await page.locator("#presets-button").click();
+    if (presetAtom === "A05") {
+      await expect(page.locator("#apply-preset")).toBeEnabled();
+      await expect(page.locator("#adapt-preset")).toBeHidden();
+      expect(JSON.parse(await page.locator("#preset-readonly").textContent())).toEqual(viewed);
+      return;
+    }
+    await expect(page.locator("#apply-preset")).toBeDisabled();
+    await expect(page.locator("#edit-preset")).toBeDisabled();
+    await expect(page.locator("#adapt-preset")).toBeVisible();
+    expect(JSON.parse(await page.locator("#preset-readonly").textContent())).toEqual(originalVersion);
+    await page.locator("#apply-preset").dispatchEvent("click");
+    await page.locator("#edit-preset").dispatchEvent("click");
+    await expect(page.locator("#presets-panel")).toBeVisible();
+    await expect(page.locator("#preset-editor-form")).toBeHidden();
+    await page.locator("#adapt-preset").click();
+    await expect(page.locator("#preset-editor-form")).toBeVisible();
+    await expect(page.locator("#preset-config-metadata")).toContainText(product.ref);
+    await expect(page.locator("#preset-prompt")).toHaveText(originalVersion.prompt);
+    await page.locator("#save-preset").click();
+    await expect.poll(() => state.writes.length).toBe(2);
+    expect(state.writes[1].payload).toMatchObject({prompt_ref: "prompt.a06.v2", source_run_id: null, prompt_source_ref: product.ref});
+    await expect(page.locator("#preset-state")).toContainText("Сохранена неизменяемая версия");
+  });
+}
+
+for (const first of ["atom", "preset"]) {
+  test(`preset read and base refresh keep the immutable version guarded when ${first} returns first`, async ({page}) => {
+    const {state, originalVersion, product} = await prepareRejectedSourceWrite(page, "version");
+    await page.locator("#cancel-preset").click();
+    await showWorkbench(page);
+    await page.locator("#prompt-tab").click();
+    state.authoritativeAtom = {...A06, prompt_ref: "prompt.a06.v2"};
+    state.optionsOverride = [{...product, ref: state.authoritativeAtom.prompt_ref, group: "platform"}, product];
+    state.rejectionCode = "prompt_invalid";
+    state.rejectionField = "source_ref";
+    let releaseAtom;
+    state.atomGate = new Promise(resolve => { releaseAtom = resolve; });
+    await page.locator("#save-prompt-panel summary").click();
+    await page.locator("#save-prompt-name").fill("Проверить основу");
+    await page.locator("#save-prompt").click();
+    await expect.poll(() => state.atomReads).toBe(1);
+    await page.locator("#presets-button").click();
+    let releasePreset;
+    const presetGate = new Promise(resolve => { releasePreset = resolve; });
+    let readingPreset = false;
+    const versionUrl = `**/v1/atom-lab/presets/${originalVersion.preset_id}/versions/1`;
+    await page.route(versionUrl, async route => {
+      readingPreset = true;
+      await presetGate;
+      await route.fulfill({json: originalVersion});
+    });
+    await page.locator("#preset-list button").click();
+    await expect.poll(() => readingPreset).toBe(true);
+    await page.locator("#apply-preset").dispatchEvent("click");
+    await page.locator("#edit-preset").dispatchEvent("click");
+    const atomRead = page.waitForResponse("**/v1/atom-lab/atoms/A06");
+    const presetRead = page.waitForResponse(versionUrl);
+    if (first === "atom") {
+      releaseAtom();
+      await (await atomRead).finished();
+      releasePreset();
+    } else {
+      releasePreset();
+      await (await presetRead).finished();
+      releaseAtom();
+    }
+    await atomRead;
+    await presetRead;
+    await expect(page.locator("#workspace")).toHaveAttribute("aria-busy", "false");
+    await expect(page.locator("#apply-preset")).toBeDisabled();
+    await expect(page.locator("#adapt-preset")).toBeVisible();
+    expect(JSON.parse(await page.locator("#preset-readonly").textContent())).toEqual(originalVersion);
+    expect(state.writes).toHaveLength(1);
+  });
+}
+
+for (const proof of ["restored", "completed"]) {
+  test(`unchanged authoritative Retry keeps preset binding and the ${proof} exact trial`, async ({page}) => {
+    const {state, detail, product, originalVersion} = await prepareRejectedSourceWrite(page, "prompt");
+    detail.snapshot.preset = {id: originalVersion.preset_id, version: originalVersion.version};
+    await page.locator("#history-button").click();
+    await page.locator("#history-list .history-open").click();
+    await page.locator("#restore-history").click();
+    let runBody;
+    await page.route("**/v1/atom-lab/runs", async route => {
+      if (route.request().method() !== "POST") return route.fallback();
+      runBody = route.request().postDataJSON();
+      await route.fulfill({status: 202, json: {
+        run_id: "run-unchanged-base", scenario_session_id: "session-library", job_id: "job-library", status: "queued",
+      }});
+    });
+    const completed = structuredClone({...detail, run_id: "run-unchanged-base"});
+    await page.route("**/v1/atom-lab/runs/run-unchanged-base", route => route.fulfill({json: completed}));
+    if (proof === "completed") {
+      await page.locator("#run-button").click();
+      await expect(page.locator("#run-state")).toHaveText("Завершён успешно");
+      // Replace the restored owner so this assertion can only use completed proof.
+      detail.run_id = "run-other-proof";
+      detail.snapshot.prompt.content = "Другой восстановленный текст";
+      await page.locator("#history-button").click();
+      await page.locator("#history-list .history-open").click();
+      await page.locator("#restore-history").click();
+      await page.locator("#prompt-tab").click();
+      await page.locator("#prompt-editor").fill(completed.snapshot.prompt.content);
+    }
+    await page.locator("#prompt-tab").click();
+    await expect(page.locator("#prompt-test-status")).toContainText("Пробный запуск завершён");
+    state.authoritativeAtom = {...A06, prompt_ref: "prompt.a06.temporary"};
+    state.atomStatus = 503;
+    if (!(await page.locator("#save-prompt").isVisible())) await page.locator("#save-prompt-panel summary").click();
+    await page.locator("#save-prompt-name").fill("Неизменная основа");
+    await page.locator("#save-prompt").click();
+    await expect(page.locator("#prompt-load-status")).toContainText("Атом временно недоступен");
+    state.authoritativeAtom = structuredClone(A06);
+    state.optionsOverride = [{...product, ref: A06.prompt_ref, group: "platform", prompt: A06.prompt}, product];
+    state.atomStatus = 200;
+    await page.locator("#retry-prompts").click();
+    await expect.poll(() => state.atomReads).toBe(2);
+    await expect(page.locator("#prompt-load-status")).toHaveText("");
+    await expect(page.locator("#prompt-select")).toHaveValue(product.ref);
+    await expect(page.locator("#prompt-test-status")).toContainText("Пробный запуск завершён");
+    await page.locator("#save-prompt").click();
+    await expect.poll(() => state.writes.length).toBe(2);
+    expect(state.writes[1].payload.source_run_id).toBe(proof === "completed" ? completed.run_id : detail.run_id);
+    await page.locator("#run-button").click();
+    await expect.poll(() => runBody?.preset_ref).toEqual({preset_id: originalVersion.preset_id, version: 1});
+  });
+}
 
 for (const change of ["new-preset", "editor", "catalog", "hidden-panel"]) {
   test(`history base recovery fences a later ${change} during its atom read`, async ({page}) => {
