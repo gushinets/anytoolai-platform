@@ -916,49 +916,6 @@
         "title": "AtomLabPresetVersionSummaryResponse",
         "type": "object"
       },
-      "AtomLabPromptCreateRequest": {
-        "additionalProperties": false,
-        "properties": {
-          "name": {
-            "maxLength": 80,
-            "minLength": 1,
-            "title": "Name",
-            "type": "string"
-          },
-          "prompt": {
-            "minLength": 1,
-            "title": "Prompt",
-            "type": "string"
-          },
-          "source_ref": {
-            "maxLength": 128,
-            "minLength": 1,
-            "pattern": "^[A-Za-z0-9_.-]+$",
-            "title": "Source Ref",
-            "type": "string"
-          },
-          "source_run_id": {
-            "anyOf": [
-              {
-                "maxLength": 128,
-                "pattern": "^[A-Za-z0-9_-]+$",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source Run Id"
-          }
-        },
-        "required": [
-          "name",
-          "prompt",
-          "source_ref"
-        ],
-        "title": "AtomLabPromptCreateRequest",
-        "type": "object"
-      },
       "AtomLabPromptOption": {
         "properties": {
           "group": {
@@ -3051,7 +3008,47 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AtomLabPromptCreateRequest"
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "maxLength": 80,
+                    "minLength": 1,
+                    "title": "Name",
+                    "type": "string"
+                  },
+                  "prompt": {
+                    "minLength": 1,
+                    "title": "Prompt",
+                    "type": "string"
+                  },
+                  "source_ref": {
+                    "maxLength": 128,
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z0-9_.-]+$",
+                    "title": "Source Ref",
+                    "type": "string"
+                  },
+                  "source_run_id": {
+                    "anyOf": [
+                      {
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z0-9_-]+$",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Source Run Id"
+                  }
+                },
+                "required": [
+                  "name",
+                  "prompt",
+                  "source_ref"
+                ],
+                "title": "AtomLabPromptCreateRequest",
+                "type": "object"
               }
             }
           },
@@ -3080,6 +3077,16 @@
           },
           "404": {
             "$ref": "#/components/responses/AtomLabAtomNotFound"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabErrorResponse"
+                }
+              }
+            },
+            "description": "Atom Lab payload is too large."
           },
           "422": {
             "content": {

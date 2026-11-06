@@ -255,6 +255,71 @@ def test_saved_prompt_uses_run_admission_utf8_limit(app, monkeypatch, limit, pro
         ]
 
 
+@pytest.mark.parametrize("content_length", [None, "actual", "1"])
+@pytest.mark.parametrize("over_limit", [False, True])
+@pytest.mark.parametrize("access_mode", ["code", "local-origin", "local-cli"])
+def test_saved_prompt_bounds_stream_before_parsing(
+    app, monkeypatch, content_length, over_limit, access_mode,
+):
+    raw = json.dumps({
+        "name": "Stream boundary", "prompt": "я" * 8,
+        "source_ref": "kernel_demo.compose_reply.v1",
+    }, ensure_ascii=False).encode("utf-8")
+    monkeypatch.setenv("ANYTOOLAI_ATOM_LAB_RUN_BODY_MAX_BYTES", str(len(raw) - int(over_limit)))
+    monkeypatch.setenv("ANYTOOLAI_ATOM_LAB_RUN_PROMPT_MAX_BYTES", "16")
+    consumed = []
+
+    async def request():
+        async def body():
+            for chunk in (raw[:-1], raw[-1:], b"unread trailing data" if over_limit else b""):
+                consumed.append(len(chunk))
+                yield chunk
+
+        headers = {"Content-Type": "application/json"}
+        if access_mode == "code":
+            headers["X-Atom-Lab-Access-Code"] = ACCESS_CODE
+        else:
+            monkeypatch.setenv("ANYTOOLAI_ATOM_LAB_AUTH_DISABLED", "true")
+            if access_mode == "local-origin":
+                headers["Origin"] = "http://127.0.0.1:8000"
+        if content_length is not None:
+            headers["Content-Length"] = (
+                str(len(raw)) if content_length == "actual" else content_length
+            )
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1:8000",
+        ) as client:
+            return await client.post(
+                "/v1/atom-lab/atoms/A07/prompts", headers=headers, content=body(),
+            )
+
+    response = asyncio.run(request())
+    if over_limit:
+        _error(response, HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "payload_too_large")
+        assert consumed == [len(raw) - 1, 1]
+    else:
+        assert response.status_code == HTTPStatus.CREATED, response.text
+        assert response.json()["prompt"] == "я" * 8
+
+
+@pytest.mark.parametrize("raw", [b"{", b"{}", b'{"name": "x", "prompt": 42, "source_ref": "x"}'])
+def test_saved_prompt_bounded_parser_keeps_validation_envelope(app, raw):
+    async def request():
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test",
+            headers={"Content-Type": "application/json", "X-Atom-Lab-Access-Code": ACCESS_CODE},
+        ) as client:
+            return await client.post("/v1/atom-lab/atoms/A07/prompts", content=raw)
+
+    response = asyncio.run(request())
+    _error(response, HTTPStatus.UNPROCESSABLE_ENTITY, "request_validation_failed")
+    assert response.json()["error"]["field_errors"]
+    if b"42" in raw:
+        assert response.json()["error"]["field_errors"] == [
+            {"path": "prompt", "message": "Недопустимое значение."},
+        ]
+
+
 @pytest.mark.parametrize("method", ["get", "post"])
 def test_prompt_routes_document_and_return_atom_not_found(app, method):
     path = "/v1/atom-lab/atoms/{atom_id}/prompts"

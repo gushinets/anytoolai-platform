@@ -541,6 +541,124 @@ test(`the shared launch keeps its successful prompt trial after ${presetReadback
 });
 }
 
+for (const state of ["new", "version", "failed", "prompt", "source", "input", "model", "reasoning", "other-atom"]) {
+  test(`a trial completing after preset readback respects the ${state} draft`, async ({page}) => {
+    const product = {ref: "product.a06.v1", name: "Продуктовый", prompt: "Текст продукта", group: "product", source_ref: null, source_run_id: null};
+    const versions = [];
+    let body;
+    let savedBody;
+    let posts = 0;
+    let completeRun;
+    const completion = new Promise(resolve => { completeRun = resolve; });
+    await page.route("http://atom-lab.test/v1/atom-lab/atoms/A06/prompts", async route => {
+      if (route.request().method() === "GET") await route.fulfill({json: [
+        {ref: A06.prompt_ref, name: "Платформенный", prompt: A06.prompt, group: "platform", source_ref: null, source_run_id: null}, product,
+      ]});
+      else {
+        savedBody = route.request().postDataJSON();
+        await route.fulfill({json: {ref: "lab.delayed.v1", group: "lab", ...savedBody}});
+      }
+    });
+    await page.route("http://atom-lab.test/v1/atom-lab/runs", async route => {
+      posts += 1;
+      body = route.request().postDataJSON();
+      await route.fulfill({status: 202, json: {
+        run_id: "run-delayed-trial", scenario_session_id: "session-library", job_id: "job-library", status: "queued",
+      }});
+    });
+    await page.route("http://atom-lab.test/v1/atom-lab/runs/run-delayed-trial", async route => {
+      await completion;
+      const detail = historyDetail({runId: "run-delayed-trial", input: body.input, prompt: body.prompt});
+      detail.snapshot.prompt.source_ref = body.prompt_source_ref;
+      if (state === "failed") {
+        detail.status = "failed";
+        detail.result = null;
+        detail.diagnostics.error_code = "output_validation_failed";
+      }
+      await route.fulfill({json: detail});
+    });
+    await page.route("http://atom-lab.test/v1/atom-lab/presets**", async route => {
+      const {pathname} = new URL(route.request().url());
+      if (route.request().method() === "POST") {
+        const version = versions.length + 1;
+        versions.push({...route.request().postDataJSON(), preset_id: "delayed-trial-preset", version, created_at: "2026-11-07T08:00:00Z"});
+        await route.fulfill({status: 201, json: {preset_id: "delayed-trial-preset", version, created_at: versions.at(-1).created_at}});
+        return;
+      }
+      const version = versions.at(-1);
+      const summary = version ? {
+        preset_id: version.preset_id, name: version.name, description: version.description,
+        atom_id: version.atom_id, created_at: version.created_at,
+      } : null;
+      if (pathname === "/v1/atom-lab/presets") await route.fulfill({json: {
+        items: summary ? [{...summary, latest_version: version.version, updated_at: version.created_at}] : [], next_cursor: null,
+      }});
+      else if (pathname.endsWith("/versions")) await route.fulfill({json: {
+        items: versions.map(item => ({...summary, version: item.version})), next_cursor: null,
+      }});
+      else await route.fulfill({json: version});
+    });
+
+    await unlockAtom(page, "A06");
+    await page.locator("#fill-example").click();
+    await page.locator("#reasoning-effort").selectOption("high");
+    await page.locator("#prompt-tab").click();
+    await page.locator("#prompt-select").selectOption(product.ref);
+    await page.locator("#prompt-editor").fill("Промпт отложенного запуска");
+    if (state === "version") {
+      await editPreset(page);
+      await page.locator("#preset-name").fill("Проверка отложенного запуска");
+      await page.locator("#save-preset").click();
+      await expect(page.locator("#preset-state")).toContainText("Сохранена неизменяемая версия 1");
+      await showWorkbench(page);
+    }
+    await page.locator("#run-button").click();
+    await expect(page.locator("#run-state")).toHaveText("Ожидает запуска");
+    await editPreset(page);
+    await page.locator("#preset-name").fill("Проверка отложенного запуска");
+    await page.locator("#save-preset").click();
+    await expect(page.locator("#preset-state")).toContainText(`Сохранена неизменяемая версия ${state === "version" ? 2 : 1}`);
+    await showWorkbench(page);
+    await page.locator("#prompt-tab").click();
+    await expect(page.locator("#prompt-select")).toHaveValue(product.ref);
+    if (state === "prompt") await page.locator("#prompt-editor").fill("Другой текст");
+    if (state === "source") {
+      await page.locator("#prompt-select").selectOption(A06.prompt_ref);
+      await page.locator("#prompt-editor").fill(body.prompt);
+    }
+    if (state === "input") {
+      await page.locator("#input-tab").click();
+      await page.locator("#json-mode").click();
+      await page.locator("#json-editor").fill(JSON.stringify({...body.input, objective: "Другая цель"}));
+      await page.locator("#prompt-tab").click();
+    }
+    if (state === "model") await page.locator("#model-select").selectOption("gpt-no-reasoning");
+    if (state === "reasoning") await page.locator("#reasoning-effort").selectOption("low");
+    if (state === "other-atom") {
+      page.once("dialog", dialog => dialog.accept());
+      await page.getByRole("button", {name: /A05/}).click();
+    }
+    completeRun();
+    await expect(page.locator("#run-state")).toHaveText(state === "failed" ? "Ошибка" : "Завершён успешно");
+    if (state === "other-atom") {
+      await expect(page.locator("#atom-title")).toContainText("A05");
+      await expect(page.locator("#prompt-editor")).toHaveValue(A05.prompt);
+      expect(posts).toBe(1);
+      return;
+    }
+    const proven = state === "new" || state === "version";
+    await expect(page.locator("#prompt-test-status")).toContainText(proven ? "Ответ прошёл контракт" : "нет успешного пробного запуска");
+    if (proven) await expect(page.locator("#response-draft-warning")).toBeHidden();
+    else if (state !== "failed") await expect(page.locator("#response-draft-warning")).toBeVisible();
+    await page.locator("#save-prompt-panel summary").click();
+    await page.locator("#save-prompt-name").fill("Отложенный промпт");
+    await page.locator("#save-prompt").click();
+    await expect(page.locator("#save-prompt-status")).toContainText("Сохранён");
+    expect(savedBody.source_run_id).toBe(proven ? "run-delayed-trial" : null);
+    expect(posts).toBe(1);
+  });
+}
+
 for (const library of ["history", "presets"]) {
   test(`a delayed prompt rejection keeps the ${library} section open until explicit error navigation`, async ({page}) => {
     let rejectRun;

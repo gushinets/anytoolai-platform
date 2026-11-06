@@ -180,6 +180,79 @@ def test_code_protected_remote_access_keeps_working(app) -> None:
     assert response.status_code == HTTPStatus.OK
 
 
+@pytest.mark.parametrize("content_length", [None, "1048576"])
+@pytest.mark.parametrize("malformed", [False, True])
+@pytest.mark.parametrize("access_mode", [
+    "missing-code", "wrong-code", "untrusted-host", "untrusted-origin",
+])
+def test_saved_prompt_denies_access_without_consuming_body(
+    app, monkeypatch, content_length, malformed, access_mode,
+) -> None:
+    consumed = []
+    headers = {"Content-Type": "application/json"}
+    base_url = "http://127.0.0.1:8000"
+    if content_length is not None:
+        headers["Content-Length"] = content_length
+    if access_mode == "wrong-code":
+        headers["X-Atom-Lab-Access-Code"] = "wrong"
+    if access_mode.startswith("untrusted-"):
+        monkeypatch.setenv("ANYTOOLAI_ATOM_LAB_AUTH_DISABLED", "true")
+        if access_mode == "untrusted-host":
+            base_url = "http://rebound.example:8000"
+        else:
+            headers["Origin"] = "https://untrusted.example"
+
+    async def request():
+        async def body():
+            for chunk in (b"{" if malformed else b'{"prompt":"', b"a" * 1048576, b'"}'):
+                consumed.append(len(chunk))
+                yield chunk
+
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url=base_url,
+        ) as client:
+            return await client.post(
+                "/v1/atom-lab/atoms/A07/prompts", headers=headers, content=body(),
+            )
+
+    response = asyncio.run(request())
+    assert response.status_code == HTTPStatus.UNAUTHORIZED
+    assert response.json()["error"]["code"] == "atom_lab_access_denied"
+    assert consumed == []
+
+
+def test_saved_prompt_bounded_body_preserves_openapi_contract(app) -> None:
+    operation = app.openapi()["paths"]["/v1/atom-lab/atoms/{atom_id}/prompts"]["post"]
+    assert operation["requestBody"] == {
+        "required": True,
+        "content": {"application/json": {"schema": {
+            "title": "AtomLabPromptCreateRequest", "type": "object", "additionalProperties": False,
+            "required": ["name", "prompt", "source_ref"],
+            "properties": {
+                "name": {"title": "Name", "type": "string", "minLength": 1, "maxLength": 80},
+                "prompt": {"title": "Prompt", "type": "string", "minLength": 1},
+                "source_ref": {
+                    "title": "Source Ref", "type": "string", "minLength": 1, "maxLength": 128,
+                    "pattern": "^[A-Za-z0-9_.-]+$",
+                },
+                "source_run_id": {
+                    "title": "Source Run Id",
+                    "anyOf": [
+                        {"type": "string", "maxLength": 128, "pattern": "^[A-Za-z0-9_-]+$"},
+                        {"type": "null"},
+                    ],
+                },
+            },
+        }}},
+    }
+    assert operation["responses"]["413"] == {
+        "description": "Atom Lab payload is too large.",
+        "content": {"application/json": {"schema": {
+            "$ref": "#/components/schemas/AtomLabErrorResponse",
+        }}},
+    }
+
+
 @pytest.mark.parametrize("value", ["false", "", "TRUE"])
 def test_open_access_requires_explicit_true(app, monkeypatch, value) -> None:
     monkeypatch.setenv("ANYTOOLAI_ATOM_LAB_AUTH_DISABLED", value)
