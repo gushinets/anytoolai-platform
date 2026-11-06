@@ -7,7 +7,7 @@
 - Created: 2026-11-06
 - Last updated: 2026-11-06
 - Review date: 2026-11-06
-- Next action: owner reviews the complete current-HEAD matrix and any recorded failures; language work remains in ANY-771
+- Next action: owner reviews acceptance with the low-priority A01-ES-3 caveat tracked in ANY-823; language work remains in ANY-771
 - Blocker: no confirmed critical defect in this sample; owner acceptance with the A01-ES-3 caveat pending
 
 ## Latest result — full matrix at current HEAD
@@ -50,6 +50,12 @@ regression. Amount, percentage, balance, invoice and urgency requirements pass. 
 FAIL and 44/45 score are retained; no raw result or assessment history is replaced with PASS.
 Recommend owner acceptance with this caveat and correction before sending when work has not
 started. It occurred in one of three Spanish A01 attempts; repeatability was not studied separately.
+
+**Remediation ownership:** A01-ES-3 will be addressed in [ANY-823](https://linear.app/paveldik/issue/ANY-823/prepaid-request-ne-usilivat-status-nachala-rabot-i-predoplaty),
+priority **Low**, currently Backlog. Its description includes the exact input/output and verification
+criteria. This planned fix does not block acceptance of this iteration of ANY-604 and is not yet
+implemented. The original response, conservative FAIL and 44/45 remain unchanged. The link is
+also present in the ANY-604 description, result comment and related issues.
 
 Language defects remain assigned to [ANY-771](https://linear.app/paveldik/issue/ANY-771).
 A deferred defect still counts as FAIL. Earlier failures, wording caveats and corrected assessments

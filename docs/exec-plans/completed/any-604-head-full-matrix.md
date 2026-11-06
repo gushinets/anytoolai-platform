@@ -7,7 +7,7 @@
 - Created: 2026-11-06
 - Last updated: 2026-11-06
 - Review date: 2026-11-06
-- Next action: owner reviews the A01-ES-3 status finding and complete evidence
+- Next action: owner reviews acceptance with the low-priority A01-ES-3 follow-up in ANY-823
 - Blocker: no confirmed critical defect; owner acceptance with a low-severity caveat pending
 
 ## Goal and scope
@@ -65,3 +65,10 @@ A01-ES-3 is low severity and is not recommended as a blocker for this iteration.
 All financial amounts, percentage, balance, invoice and urgency checks pass. Recommend owner
 acceptance with a wording caveat, correcting it before sending when necessary. The conservative
 FAIL and 44/45 remain unchanged; no new generation or source fix was performed.
+
+## Remediation ownership
+
+A01-ES-3 is deferred to [ANY-823](https://linear.app/paveldik/issue/ANY-823/prepaid-request-ne-usilivat-status-nachala-rabot-i-predoplaty), priority Low, Backlog.
+The ANY-604 description and result comment both link to it. The fix is planned, not implemented,
+and does not block this iteration. Raw responses, the conservative FAIL and 44/45 are unchanged.
+Language remediation remains separately assigned to ANY-771.

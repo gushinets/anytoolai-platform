@@ -5607,7 +5607,8 @@
         "case_id": "A01-ES-3",
         "reason": "Amount, percentage/total relation, balance, invoice, language and no-urgency checks pass. However, the response says design is already underway (ya está en marcha) and the prepayment should have been paid before starting (debía abonarse). The input describes starting the design with prepayment before starting; it does not explicitly establish that work has already begun without payment or that prepayment is late. This turns a prepayment request into an unsupported retrospective obligation. This is a payment-status regression finding, not a wrong-language failure.",
         "failure_type": "unsupported_started_work_and_retrospective_payment_obligation",
-        "remediation_issue": "ANY-604"
+        "remediation_issue": "ANY-823",
+        "previous_remediation_issue": "ANY-604"
       }
     ],
     "language_remediation_issue": "ANY-771",
@@ -5625,6 +5626,15 @@
       "recommendation": "Accept this iteration with a documented caveat at the owner's discretion; correct the wording before sending if work has not started.",
       "verdict_policy": "Keep the conservative FAIL and 44/45 unchanged; do not rewrite raw outputs or claim 45/45.",
       "repeatability": "Observed in one of three Spanish A01 attempts; no separate repeatability study."
+    },
+    "resolution_ownership": {
+      "case_id": "A01-ES-3",
+      "issue": "ANY-823",
+      "url": "https://linear.app/paveldik/issue/ANY-823/prepaid-request-ne-usilivat-status-nachala-rabot-i-predoplaty",
+      "priority": "Low",
+      "status": "planned; Backlog",
+      "blocks_current_iteration": false,
+      "note": "Planned remediation does not change the conservative FAIL or 44/45. Source evidence remains unchanged."
     }
   },
   "review_2_matrix": {
@@ -10964,8 +10974,9 @@
             "support": "debía abonarse antes de empezar"
           },
           "failure_type": "unsupported_started_work_and_retrospective_payment_obligation",
-          "remediation_issue": "ANY-604",
-          "scope_note": "The narrow amount/percentage/no-urgency checks pass. FAIL concerns preservation of work/payment status in the full semantic regression review; the original ticket A01 is in Russian."
+          "remediation_issue": "ANY-823",
+          "scope_note": "The narrow amount/percentage/no-urgency checks pass. FAIL concerns preservation of work/payment status in the full semantic regression review; the original ticket A01 is in Russian.",
+          "previous_remediation_issue": "ANY-604"
         },
         "submitted_input_verified": true,
         "result_action_session_verified": true,
@@ -12847,7 +12858,8 @@
         "case_id": "A01-ES-3",
         "reason": "Amount, percentage/total relation, balance, invoice, language and no-urgency checks pass. However, the response says design is already underway (ya está en marcha) and the prepayment should have been paid before starting (debía abonarse). The input describes starting the design with prepayment before starting; it does not explicitly establish that work has already begun without payment or that prepayment is late. This turns a prepayment request into an unsupported retrospective obligation. This is a payment-status regression finding, not a wrong-language failure.",
         "failure_type": "unsupported_started_work_and_retrospective_payment_obligation",
-        "remediation_issue": "ANY-604"
+        "remediation_issue": "ANY-823",
+        "previous_remediation_issue": "ANY-604"
       }
     ],
     "severity_assessment": {
@@ -12857,6 +12869,15 @@
       "recommendation": "Accept this iteration with a documented caveat at the owner's discretion; correct the wording before sending if work has not started.",
       "verdict_policy": "Keep the conservative FAIL and 44/45 unchanged; do not rewrite raw outputs or claim 45/45.",
       "repeatability": "Observed in one of three Spanish A01 attempts; no separate repeatability study."
+    },
+    "resolution_ownership": {
+      "case_id": "A01-ES-3",
+      "issue": "ANY-823",
+      "url": "https://linear.app/paveldik/issue/ANY-823/prepaid-request-ne-usilivat-status-nachala-rabot-i-predoplaty",
+      "priority": "Low",
+      "status": "planned; Backlog",
+      "blocks_current_iteration": false,
+      "note": "Planned remediation does not change the conservative FAIL or 44/45. Source evidence remains unchanged."
     }
   }
 }
