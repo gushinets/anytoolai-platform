@@ -263,6 +263,38 @@ The final Sonar metric remains pending a new scan. No generated code, runtime, r
 or exclusions changed. Backend, PostgreSQL and provider checks were not repeated; the acceptance
 DB remains untouched. Fresh reviews and CI on the resulting commit remain required; do not merge.
 
+## Fresh GPT-6 Sol review: reopening an edited preset
+
+The SonarCloud analysis of `8d3a6c038d4acf76b1752ee3002a93b1f5b1b43e` passed with
+zero open issues and 2.91% duplicated new lines (limit 3%). All 21 previously verified
+False positive classifications remain; rules, thresholds, exclusions and generated files are unchanged.
+The parent verified GitHub's final check summary on that head: all checks passed, with 21 successful
+checks and the neutral CodeRabbit rate-limit result. All five required gates, including full-check
+and Windows baseline, passed. The resulting repair commit still needs its own CI and fresh review pair.
+
+A fresh GPT-6 Sol review found one P2: after opening saved v1, editing its laboratory draft
+and cancelling the preset editor, reopening v1 compares only the retained preset reference.
+It can therefore label modified run settings as the saved immutable version without restoring it.
+
+Repair: explicit Open in Laboratory compares actual settings through the existing draft-snapshot
+matcher and confirms before restoring a changed draft, including model/reasoning/origin changes
+that the ordinary dirty flag does not track. New version keeps the already-applied draft so users
+can save laboratory edits; ordinary navigation back to an active preset editor also preserves them.
+
+Both new Chromium regressions first failed against the reviewed source because reopening skipped
+the discard confirmation. The repaired tests cover prompt/input edits and settings-only changes,
+Cancel with an unchanged immutable snapshot, decline preserving all draft settings, accept restoring
+exact v1 settings and a mocked run sending the full persisted payload plus its preset reference.
+The two new cases and both existing product/Lab-origin immutable-version journeys passed together
+(4/4). Canonical `python scripts/agent/runner.py frontend-check` passed on the final source,
+including lint, typecheck, all 53 Atom Lab Node tests, all 112 Chromium journeys, API-contract drift
+and frontend builds. Doctor, documentation validation, generated-document drift and `git diff --check`
+passed. Final frontend log: `.quick-check-tmp/sonar259/preset-reopen-frontend-final.log`; reproduction
+and focused logs: `preset-reopen-red.log` and `preset-reopen-focused.log` in the same ignored folder.
+
+No provider, backend, database, migration, Docker or remote changes are part of this repair.
+Fresh entire-PR reviews and CI on the resulting commit remain required; do not merge.
+
 ## Publication
 
 Create a codex/any-818 branch, commit only the explicit feature file set, push and create a PR

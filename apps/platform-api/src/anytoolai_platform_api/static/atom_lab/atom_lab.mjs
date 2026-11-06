@@ -2597,10 +2597,12 @@ export function bootstrapAtomLab({
   const editSelectedPreset = ({openWorkbench = false} = {}) => {
     if (!selectedPresetVersion || presetReadOnly || presetOpenInFlight || presetSaveInFlight || presetSaveOutcomeUnknown) return;
     const version = selectedPresetVersion;
-    const alreadyApplied = session.presetRef?.preset_id === version.preset_id
+    const samePresetVersion = session.presetRef?.preset_id === version.preset_id
       && session.presetRef.version === version.version;
+    const alreadyApplied = samePresetVersion
+      && (!openWorkbench || matchesDraftSnapshot({...version, input: version.example_input}));
     if (!alreadyApplied) {
-      if (hasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return;
+      if ((hasUnsavedDraft() || samePresetVersion) && !confirmImpl(DIRTY_WARNING)) return;
       if (!applyConfigurationToEditor(version, {
         presetRef: {preset_id: version.preset_id, version: version.version},
         sourceRunId: version.source_run_id,
