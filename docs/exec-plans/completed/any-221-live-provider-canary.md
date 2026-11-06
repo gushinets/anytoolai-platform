@@ -16,6 +16,10 @@
   meant two different things across `runner.py` and `live_canary.py` -- both fixed, and now
   confirmed against a real credentialed run (see the 2026-08-25 rows below).
 
+The implementation log below is historical. ANY-814 supersedes its pre-replay token check:
+the token now gates new admission, while owner/hash-matched accepted replay is a persisted read.
+The current contract lives in [scenario sessions](../../architecture/scenario-session-model.md).
+
 ## Goal
 
 Prove all 11 generic atom prompts/contracts, and (since 2026-08-21) all 3 composite kernel_demo

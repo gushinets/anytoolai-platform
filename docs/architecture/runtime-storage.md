@@ -146,7 +146,7 @@ AccessSnapshot and paid HTTP remain ANY-766 responsibilities.
 
 Downgrade to `0015` is refused once paid buckets or reservations exist; restoring an old runtime after
 activation requires the coordinated backup/quiesce procedure from the
-[execution plan](../exec-plans/active/ANY-507-implementation-plan.md). Upgrade was designed to leave
+[execution plan](../exec-plans/completed/ANY-507-implementation-plan.md). Upgrade was designed to leave
 old tables intact, and repeated `upgrade head` does not backfill legacy usage a second time.
 
 ### Atom Lab run snapshots

@@ -5,6 +5,8 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from http import HTTPStatus
+from typing import Literal
 from uuid import uuid4
 
 import pytest
@@ -36,7 +38,10 @@ from anytoolai_platform_core.quotas.models import (
 from anytoolai_platform_core.scenarios.models import ScenarioSessionRecord
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
 from anytoolai_platform_core.scenarios.service import (
+    IdempotencyKeyConflictError,
+    ScenarioNotFoundError,
     ScenarioRuntimeService,
+    ScenarioSessionService,
     compute_idempotency_request_hash,
 )
 from anytoolai_platform_core.storage.db import (
@@ -46,13 +51,15 @@ from anytoolai_platform_core.storage.db import (
     jobs_table,
     paid_allowance_usage_table,
     product_handoffs_table,
+    provider_calls_table,
     scenario_sessions_table,
 )
 from anytoolai_platform_core.storage.transactions import build_session_factory, transaction_boundary
-from anytoolai_platform_core.workflows.models import JobConsumptionMode, JobRecord
+from anytoolai_platform_core.workflows.models import JobConsumptionMode, JobRecord, JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
 from test_handoffs_api import _create, _request, _seed_source
 from test_scenario_runtime_api import _create_test_app, _start_payload
+from test_scenario_runtime_api import _request as scenario_request
 
 from tests.db_support import provision_database
 
@@ -118,6 +125,23 @@ def start(session, registry, grant=None, key="request", **changes):
 def rows(factory, table):
     with transaction_boundary(factory) as session:
         return list(session.execute(sa.select(table)).mappings())
+
+
+def without_scenario_config(
+    registry, removal: Literal["scenario", "association", "product"], *, scenario_id=SCENARIO
+):
+    products = dict(registry.products)
+    if removal == "product":
+        del products["kernel_demo"]
+        return replace(registry, products=products)
+    product = products["kernel_demo"]
+    products["kernel_demo"] = replace(
+        product, scenarios=tuple(item for item in product.scenarios if item != scenario_id)
+    )
+    scenarios = dict(registry.scenarios)
+    if removal == "scenario":
+        del scenarios[scenario_id]
+    return replace(registry, products=products, scenarios=scenarios)
 
 
 def assert_empty_admission(factory):
@@ -411,7 +435,8 @@ def test_empty_guest_identity_retains_safe_validation_without_admission_rows(run
     assert_empty_admission(factory)
 
 
-def test_legacy_guest_replay_does_not_synthesize_a_reservation(runtime):
+@pytest.mark.parametrize("removal", [None, "scenario", "association", "product"])
+def test_legacy_guest_replay_does_not_synthesize_a_reservation(runtime, removal):
     factory, _, registry = runtime
     request_hash = compute_idempotency_request_hash(
         tenant_id="anytoolai",
@@ -446,14 +471,124 @@ def test_legacy_guest_replay_does_not_synthesize_a_reservation(runtime):
                 scenario_session_id=stored.id,
                 workflow_id="kernel_demo.single_action_extract_v1",
                 workflow_version=1,
+                status=JobStatus.succeeded,
             )
         )
     with transaction_boundary(factory) as session:
-        replay = start(session, registry)
+        replay_registry = (
+            registry if removal is None else without_scenario_config(registry, removal)
+        )
+        replay = start(session, replay_registry)
     assert replay.is_replay and replay.job_id == job.id
+    assert replay.scenario_session_id == stored.id
+    assert replay.allowed_next_actions == (
+        tuple(registry.get_scenario(SCENARIO).allowed_next_actions) if removal is None else ()
+    )
     assert replay.reservation is None
     assert rows(factory, execution_reservations_table) == []
     assert rows(factory, guest_quota_usage_table) == []
+
+
+@pytest.mark.parametrize("metered", [True, False])
+@pytest.mark.parametrize("removal", [None, "scenario", "association", "product"])
+def test_canary_replay_reads_accepted_execution_without_new_admission(
+    runtime, monkeypatch, metered, removal
+):
+    factory, app, registry = runtime
+    scenario_id = "kernel_demo.single_action_live_smoke_v1"
+    if not metered:
+        product = registry.get_product("kernel_demo")
+        registry = replace(
+            registry,
+            products={**registry.products, "kernel_demo": replace(product, quota_policy_ref=None)},
+        )
+    monkeypatch.setenv("ANYTOOLAI_LIVE_CANARY_TOKEN", "original-token")
+    with transaction_boundary(factory) as session:
+        first = start(
+            session, registry, scenario_id=scenario_id, live_canary_token="original-token"
+        )
+    tables = (
+        scenario_sessions_table, jobs_table, execution_reservations_table,
+        guest_quota_usage_table, provider_calls_table, event_log_table,
+    )
+    before = {table.name: rows(factory, table) for table in tables}
+    monkeypatch.setenv("ANYTOOLAI_LIVE_CANARY_TOKEN", "rotated-token")
+    drifted = (
+        registry if removal is None
+        else without_scenario_config(registry, removal, scenario_id=scenario_id)
+    )
+    app.state.runtime = replace(app.state.runtime, config_registry=drifted)
+    path = f"/v1/products/kernel_demo/scenarios/{scenario_id}/start"
+    replay = asyncio.run(scenario_request(
+        app, "POST", path, json=_start_payload(), idempotency_key="request"
+    ))
+    assert replay.status_code == HTTPStatus.OK
+    assert replay.json()["scenario_session_id"] == first.scenario_session_id
+    assert replay.json()["job_id"] == first.job_id
+    with transaction_boundary(factory) as session:
+        # Token rotation cannot turn an accepted read into a fresh permission check.
+        repeated = start(
+            session, drifted, scenario_id=scenario_id, live_canary_token="original-token"
+        )
+        assert repeated.is_replay and repeated.reservation == first.reservation
+        with pytest.raises(IdempotencyKeyConflictError):
+            start(session, drifted, scenario_id=scenario_id, input_payload={"changed": True})
+        for changes in ({"key": "new-request"}, {"guest_id": "another-guest"}):
+            with pytest.raises(ScenarioNotFoundError):
+                start(session, drifted, scenario_id=scenario_id, **changes)
+    assert len(before["scenario_sessions"]) == len(before["jobs"]) == 1
+    assert len(before["execution_reservations"]) == int(metered)
+    assert before["provider_calls"] == []
+    for table in tables:
+        assert rows(factory, table) == before[table.name]
+
+
+@pytest.mark.parametrize("removal", ["scenario", "association", "product"])
+def test_rejected_retry_does_not_settle_an_earlier_start(runtime, monkeypatch, removal):
+    factory, app, registry = runtime
+    admitted = threading.Event()
+    resume = threading.Event()
+    original = ScenarioSessionService.start
+
+    def pause_before_write(self, record):
+        admitted.set()
+        assert resume.wait(timeout=15)
+        return original(self, record)
+
+    monkeypatch.setattr(ScenarioSessionService, "start", pause_before_write)
+
+    def submit():
+        with transaction_boundary(factory) as session:
+            return start(session, registry)
+
+    path = f"/v1/products/kernel_demo/scenarios/{SCENARIO}/start"
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        pending = pool.submit(submit)
+        try:
+            assert admitted.wait(timeout=15)
+            app.state.runtime = replace(
+                app.state.runtime, config_registry=without_scenario_config(registry, removal)
+            )
+            rejected = asyncio.run(scenario_request(
+                app, "POST", path, json=_start_payload(), idempotency_key="request"
+            ))
+            assert rejected.status_code == HTTPStatus.NOT_FOUND
+            assert rejected.json()["error"]["code"] == "scenario_not_found"
+        finally:
+            resume.set()
+        accepted = pending.result(timeout=15)
+
+    replay = asyncio.run(scenario_request(
+        app, "POST", path, json=_start_payload(), idempotency_key="request"
+    ))
+    assert replay.status_code == HTTPStatus.OK
+    assert replay.json()["scenario_session_id"] == accepted.scenario_session_id
+    assert replay.json()["job_id"] == accepted.job_id
+    for table in (scenario_sessions_table, jobs_table, execution_reservations_table):
+        assert len(rows(factory, table)) == 1
+    usage = rows(factory, guest_quota_usage_table)[0]
+    assert (usage["used_count"], usage["reserved_count"]) == (0, 1)
+    assert rows(factory, provider_calls_table) == []
 
 
 def test_unmetered_null_guest_replay_preserves_its_existing_contract(runtime):

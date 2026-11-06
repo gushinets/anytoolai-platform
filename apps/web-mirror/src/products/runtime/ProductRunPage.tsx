@@ -12,6 +12,7 @@ import {
   getRuntimeConfig,
   isAmbiguousFailure,
   isGuestIdentityNotFound,
+  isIdempotencyKeyConflict,
   isQuotaExhausted,
   isQuotaCapacityReserved,
   isResultNotFound,
@@ -411,15 +412,13 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   // Holds the one Idempotency-Key-bound handle for the current logical submission (ANY-150): a
   // "Try again" after a retryable failure reuses `.execute()` on this same handle so the backend
   // can collapse a duplicate submit into the original session instead of spending quota twice.
-  // Editing any field after a failure makes the next submit build a genuinely new handle instead.
+  // Editing after a definite rejection makes the next submit build a new handle instead.
   // Declared before `busy` below, which reads it.
   const [pendingStart, setPendingStart] = useState<{ prepared: PreparedScenarioStart; input: V } | null>(null);
-  // What this page knows about each prepared start (its Idempotency-Key), across every runStart():
-  // whether it was ever sent, and the session it created once a start succeeded. A key is released
-  // only on proof that nothing was created (see the 4xx branch in runStart()), never by listing the
-  // outcomes that might have; and a start known to have created a session is never sent again --
-  // "Try again" resumes polling that session (see submitCurrentValues()).
-  const sentStartsRef = useRef(new WeakSet<PreparedScenarioStart>());
+  // A later rejection settles only that attempt. Earlier unresolved sends of the same key may
+  // still accept, so keep their lock and recovery handle across automatic and manual retries.
+  const uncertainStartsRef = useRef(new WeakSet<PreparedScenarioStart>());
+  // Once accepted, retry polls this session instead of sending another start.
   const startedSessionsRef = useRef(new WeakMap<PreparedScenarioStart, string>());
   // True while the run on screen is the attached session (no local submit since): "Try again"
   // re-polls it instead of validating an empty form or starting a second, quota-spending run.
@@ -446,23 +445,12 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   const [copyActivationsInFlight, setCopyActivationsInFlight] = useState(0);
   const handoffLocked = HANDOFF_STATUS_IS_LOCKED[handoffStatus];
   const isHandoffLocked = () => HANDOFF_STATUS_IS_LOCKED[handoffStatusRef.current];
-  // Code review finding: `retryable-error` alone isn't a safe-to-remount signal -- both an
-  // ambiguous poll failure (timeout/connection loss in `runPoll`, backend may still be running the
-  // accepted session) *and* an ambiguous `/start` failure itself (network/timeout/5xx -- the
-  // backend may have already accepted the start, created the session, and consumed quota before
-  // the response was lost) land here, and both deliberately keep `pendingStart` alive so a retry
-  // can reattach via the same Idempotency-Key instead of starting (and charging) a new run. A
-  // mode switch remounting this component would destroy that same `pendingStart`, so `pendingStart
-  // !== null` -- not a per-phase flag guessing which specific ambiguous case this is -- is the
-  // actual thing worth gating on: it's already true in exactly (and only) the cases where
-  // abandoning this instance would lose real, uncommitted reattachment state. Two `retryable-error`
-  // transitions are genuinely safe and explicitly clear `pendingStart` themselves before landing
-  // here: the deterministic guest-identity-not-found self-heal, and (code review finding) any other
-  // deterministic `/start` rejection -- see `runStart`'s own comment for why a definite 4xx there
-  // means no session/job was ever created, unlike a network failure/timeout/5xx. Also covers the
-  // form's own Submit button and fields (below), not just the mode-switch guard -- editing values
-  // or resubmitting during any of these ambiguous windows would equally abandon the original
-  // Idempotency-Key reattachment path.
+  // Ambiguous start/poll failures keep the execution locked: remounting would lose its only
+  // reattachment handle. Capacity rejection permits editing/mode changes only when every earlier
+  // send of that key also had a definite rejection. Retain the key for an unchanged retry.
+  const capacityRejectedSafely = phase.kind === "retryable-error" &&
+    phase.reason === "quotaCapacityReserved" && pendingStart !== null &&
+    !uncertainStartsRef.current.has(pendingStart.prepared);
   //
   // Code review finding: `result-fetch-error` needs the same "unsafe to abandon" treatment for a
   // different reason -- that phase means the scenario session already completed and consumed its
@@ -478,7 +466,8 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     // An ambiguous failure keeps the run "live": a started run through its Idempotency-Key
     // (`pendingStart`), an attached handoff session through the session itself. Both may still be
     // running server-side, so abandoning this mount (a mode switch) would lose the only handle.
-    (phase.kind === "retryable-error" && (pendingStart !== null || attachActiveRef.current));
+    (phase.kind === "retryable-error" && !capacityRejectedSafely &&
+      (pendingStart !== null || attachActiveRef.current));
   // An attached (already queued and reserved) session that has not started polling yet (runtime config and
   // identity still loading): a mode switch would drop it before it could attach. A failed boot releases the
   // lock: nothing is running, and a mode switch before the attach began does not forget the persisted
@@ -619,16 +608,12 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     // regardless of which controller (if any) controllerRef points to by the time each resolves.
     const controller = controllerRef.current;
     const startOptions = { signal: controller?.signal, timeoutMs: START_TIMEOUT_MS };
-    // Only the answer to a key's very first send can prove the key created nothing: every later
-    // send follows one whose outcome may have created the session.
-    let firstSend = !sentStartsRef.current.has(prepared);
-    sentStartsRef.current.add(prepared);
     let result = await prepared.execute(client, startOptions);
     // One automatic retry of an ambiguous failure (network, timeout, 5xx). It reuses the prepared
     // handle, so the same Idempotency-Key makes it safe: the backend returns the session it already
-    // created instead of spending quota twice. A definite 4xx is never retried.
+    // created instead of spending quota twice. A definite 4xx is not retried automatically.
     if (!controller?.signal.aborted && !result.ok && isAmbiguousFailure(result.error)) {
-      firstSend = false;
+      uncertainStartsRef.current.add(prepared);
       result = await prepared.execute(client, startOptions);
     }
     if (controller?.signal.aborted) {
@@ -642,7 +627,16 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     }
     if (!result.ok) {
       if (capacityReserved) {
+        // This attempt created no execution. Earlier uncertain sends of this key may still
+        // accept; busy retains their lock while the same-key retry remains available.
         setPhase({ kind: "retryable-error", reason: "quotaCapacityReserved" });
+        return;
+      }
+      // Even an enveloped 4xx may reject before an earlier send commits. Do not abandon its
+      // key, enter a paywall, or replace its guest identity while that outcome is unresolved.
+      // A key/hash conflict proves this immutable request cannot own the accepted execution.
+      if (uncertainStartsRef.current.has(prepared) && !isIdempotencyKeyConflict(result.error)) {
+        setPhase({ kind: "retryable-error", reason: "startFailed" });
         return;
       }
       if (quotaRejected) {
@@ -663,25 +657,12 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         return;
       }
       if (
-        (result.error.type === "backend_error" ||
-          (result.error.type === "invalid_response" && firstSend)) &&
+        (result.error.type === "backend_error" || result.error.type === "invalid_response") &&
         result.error.status >= 400 &&
         result.error.status < 500
       ) {
-        // A 4xx without the platform envelope (a proxy's HTML or empty 422) is just as definite, but
-        // only as the answer to the key's first send: for any later send it is the edge rejecting
-        // that request (an HTML 429/403), which says nothing about what an earlier send of the same
-        // key created -- so it falls through to the ambiguous branch below and keeps the key. An
-        // enveloped 4xx is the backend itself, which would have replayed a session the same key had
-        // already created, so it stays definite.
-        // Code review finding: a definite 4xx here (`scenario_not_found`, `idempotency_key_conflict`,
-        // `scenario_input_invalid`/`scenario_frontend_invalid`, `guest_identity_required`, ...;
-        // `quota_exhausted`/`guest_identity_not_found` were already peeled off above) means the
-        // backend validated and rejected the request *before* creating a session/job -- unlike a
-        // network failure/timeout/5xx, there's nothing ambiguous left to reattach to. Clearing
-        // `pendingStart` lets the next submit mint a fresh Idempotency-Key (needed either way for
-        // `idempotency_key_conflict`, since replaying the same key would just repeat the same 409
-        // forever) and, via `busy`, immediately unblocks the form/mode switch.
+        // No earlier send is unresolved, or the key belongs to a different request. Editing
+        // and a fresh key are safe, including after a sequence of definite capacity rejections.
         setPendingStart(null);
         setPhase({ kind: "retryable-error", reason: "startFailed" });
         return;
@@ -692,6 +673,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       // Idempotency-Key) stays exactly as set by the caller, so a retry collapses onto whatever the
       // backend actually did rather than risk a second, capacity-reserving start. See `busy`'s own
       // comment for why this is also why a mode switch must stay blocked here.
+      uncertainStartsRef.current.add(prepared);
       setPhase({ kind: "retryable-error", reason: "startFailed" });
       return;
     }
