@@ -7,10 +7,65 @@
 - Created: 2026-11-06
 - Last updated: 2026-11-06
 - Review date: 2026-11-06
-- Next action: owner reviews the A04 editorial-sequence correction and new targeted evidence; language work remains in ANY-771
-- Blocker: no full-matrix verification on the latest prompt; see targeted A04 result below
+- Next action: owner reviews the complete current-HEAD matrix and any recorded failures; language work remains in ANY-771
+- Blocker: no confirmed critical defect in this sample; owner acceptance with the A01-ES-3 caveat pending
 
-## Latest result — omit future payment-request narration
+## Latest result — full matrix at current HEAD
+
+**FAIL: 44/45 at commit `87e1bb64266aa03abe226074045045e57d697b49`.** The coverage gap is closed: 36 new browser
+submissions for A01/U1/U2/U3, plus the nine latest A04 submissions on identical prompt/workflow/router
+hashes. This is a complete 45-attempt matrix, **not 45 new requests**. Product source, prompt,
+model and workflow were unchanged during this verification. Older successful U1/U2/U3 results
+were not substituted for fresh verification of the current prompt.
+
+| Case | RU | EN | ES |
+| --- | --- | --- | --- |
+| A01 | 3/3 | 3/3 | 2/3 |
+| A04 | 3/3 | 3/3 | 3/3 |
+| U1 | 3/3 | 3/3 | 3/3 |
+| U2 | 3/3 | 3/3 | 3/3 |
+| U3 | 3/3 | 3/3 | 3/3 |
+
+New series: 35/36 PASS, 36 physical provider calls, estimated USD 0.01185387.
+Combined matrix: 47 physical calls. All calls/costs, including internal retries, are
+retained. Every attempt has one successful A06, text-only output and exact backend/UI/clipboard
+equality. Actual POST inputs and result/action/session correspondence are verified for all 36.
+These structural checks do not determine semantic PASS; full outputs were read separately.
+
+The original ticket language subset (A01 RU; A04/U1/U2/U3 EN, three each) is **15/15 PASS**.
+The broader multilingual semantic matrix remains **44/45**: the additional A01-ES-3 finding
+concerns unsupported work/payment status, while its narrow amount/percentage/no-urgency checks pass.
+This distinction does not remove the finding from the full matrix. No wrong-language response
+was observed in this new sample; the historical ANY-771 defect is not thereby proven fixed.
+
+### Findings on this prompt
+
+- **A01-ES-3 — FAIL:** Amount, percentage/total relation, balance, invoice, language and no-urgency checks pass. However, the response says design is already underway (ya está en marcha) and the prepayment should have been paid before starting (debía abonarse). The input describes starting the design with prepayment before starting; it does not explicitly establish that work has already begun without payment or that prepayment is late. This turns a prepayment request into an unsupported retrospective obligation. This is a payment-status regression finding, not a wrong-language failure.
+
+**Severity assessment after review: low, not a blocker for this iteration.** The input's
+“empezamos” is ambiguous about whether design is starting now. The response strengthens it into
+already-underway work and an obligation that should have been paid earlier, which may give the
+client an unintended impression. This is a wording/semantic risk, not a confirmed critical
+regression. Amount, percentage, balance, invoice and urgency requirements pass. The conservative
+FAIL and 44/45 score are retained; no raw result or assessment history is replaced with PASS.
+Recommend owner acceptance with this caveat and correction before sending when work has not
+started. It occurred in one of three Spanish A01 attempts; repeatability was not studied separately.
+
+Language defects remain assigned to [ANY-771](https://linear.app/paveldik/issue/ANY-771).
+A deferred defect still counts as FAIL. Earlier failures, wording caveats and corrected assessments
+remain unchanged in their historical series. No repair or replacement generation was performed
+in this verification pass. Finite samples do not guarantee future generation; acceptance remains
+with the owner.
+
+### Internal calls in the new series
+
+- No internal retry appears in the new 36-run ledger.
+
+Exact causes of any internal semantic retries are not established by the captured evidence.
+The preceding A04 contributes 11 physical calls for nine results. Full new inputs, outputs,
+quoted assessments and ledger data are included below and in the adjacent evidence JSON.
+
+## Preceding targeted result — omit future payment-request narration
 
 **PASS: 9/9 (targeted A04 including no payment-request preview).** Nine fresh browser submissions on the new prompt, RU/EN/ES three each.
 The prompt now treats directions about when to ask for payment as message selection, not as
@@ -2566,4 +2621,567 @@ Hay dos puntos del anticipo que siguen sin resolverse. El campo del importe indi
 También está pendiente la fecha: el campo indica el 7 de octubre de 2026, mientras que solicitaste pagar después de la entrega final, prevista para el 20 de octubre de 2026. ¿Cuál de estas fechas o condiciones de pago corresponde?
 
 Por favor, responde confirmando ambos puntos.
+```
+
+
+## Full evidence — current-HEAD matrix completion
+
+36 fresh attempts; no earlier attempt overwritten or resubmitted. Inputs match the frozen earlier cases.
+
+Runtime SHA-256 values:
+
+- `packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/client_update_writer/prompts/prepaid_request_compose_persuasive_text.v1.md`: `c4b59bd3410cd1b9775e26f77a1c0f4d4eb05ee1e68d1c5d38a65e1607202d4f`
+- `packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/client_update_writer/workflows.yaml`: `35e6334ccb4387c481d83dbed7cf6e4024ae8d9b25a0b1e75f489b4c96de6bbc`
+- `configs/kernel/litellm_router.yaml`: `60d55333ac52d3a3490a6b2783acf375b2e8305d9b2a17e77855b0735d6c0c25`
+
+### HEAD completion A01
+
+```json
+{
+  "id": "A01",
+  "language": "ru",
+  "tone": "warm",
+  "notes": "Елена, начинаем дизайн презентации на 12 слайдов. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+  "amount": "15 000 RUB",
+  "due_date": ""
+}
+```
+
+#### HEAD completion A01-1 — PASS
+
+Session: `scenario_session_01793985235440489215_0000000002_4958febbcc36444f84aa89e3d3cdb6cf`. Artifact: `artifact_01793985241527213644_0000000011_279503c16dd5469c89ee0ea5166c57b5`.
+Trace SHA-256: `04ee9465a0d71fc910ff4572d37fad7d8a9a5801f2aeacc4be14652a5bdada01`.
+
+Assessment: Explicit request for 15,000 RUB as 50% of the agreed 30,000 RUB total; balance after final PDF/PPTX and future separate invoice retained. No invented urgency or calendar deadline; language matches notes.
+
+```text
+Елена, для начала дизайна презентации на 12 слайдов прошу внести предоплату 15 000 RUB — это 50% от согласованной общей стоимости 30 000 RUB. Оставшаяся сумма будет оплачена после передачи финальных PDF и PPTX. Реквизиты будут указаны в отдельном счёте. Пожалуйста, сообщите, когда отправите предоплату. Спасибо!
+```
+
+#### HEAD completion A01-2 — PASS
+
+Session: `scenario_session_01793985245544207323_0000000008_50f5431cc38f488b882b405083286eb1`. Artifact: `artifact_01793985249750664586_0000000027_f1c0417452784b3085d36b532eb8cba6`.
+Trace SHA-256: `e07f4043e22743f3de15e48e20a0b1c8333ce5c0aa7115b997a54ce8e1adead5`.
+
+Assessment: Explicit request for 15,000 RUB as 50% of the agreed 30,000 RUB total; balance after final PDF/PPTX and future separate invoice retained. No invented urgency or calendar deadline; language matches notes.
+
+```text
+Елена, пожалуйста, внесите предоплату за дизайн презентации на 12 слайдов: 15 000 RUB — это 50% от согласованной общей стоимости 30 000 RUB. Предоплата вносится перед началом работы, а остаток оплачивается после передачи финальных PDF и PPTX. Реквизиты будут указаны в отдельном счёте. Пожалуйста, сообщите, когда отправите оплату.
+```
+
+#### HEAD completion A01-3 — PASS
+
+Session: `scenario_session_01793985257952211600_0000000014_6ca434fff7b74ffca4912b4a0fb01912`. Artifact: `artifact_01793985263030021964_0000000043_e77c2e3ce57d457789623ad2bf866c00`.
+Trace SHA-256: `36dd7416fa5af7adca0878edad911f1fb45429c75ba3965965744e2cd3635949`.
+
+Assessment: Explicit request for 15,000 RUB as 50% of the agreed 30,000 RUB total; balance after final PDF/PPTX and future separate invoice retained. No invented urgency or calendar deadline; language matches notes.
+
+```text
+Елена, начинаем дизайн презентации на 12 слайдов. Пожалуйста, внесите предоплату 15 000 RUB — это 50% от согласованной общей стоимости 30 000 RUB. Остаток оплачивается после передачи финальных PDF и PPTX. Реквизиты будут указаны в отдельном счёте. Пожалуйста, сообщите, когда отправите оплату.
+```
+
+### HEAD completion A01-EN
+
+```json
+{
+  "id": "A01-EN",
+  "language": "en",
+  "tone": "warm",
+  "notes": "Elena, we are starting the design of a 12-slide presentation. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+  "amount": "15 000 RUB",
+  "due_date": ""
+}
+```
+
+#### HEAD completion A01-EN-1 — PASS
+
+Session: `scenario_session_01793985270169754776_0000000020_73cea9ba05e3447899919ce34ff03f5a`. Artifact: `artifact_01793985275243534567_0000000059_6cdda124afa84acd85e24150aab5c48e`.
+Trace SHA-256: `75679918e0e0b48c5d313d2f043adc21828dddff060827ae14d1d135e33a83d2`.
+
+Assessment: Explicit request for 15,000 RUB as 50% of the agreed 30,000 RUB total; balance after final PDF/PPTX and future separate invoice retained. No invented urgency or calendar deadline; language matches notes.
+
+```text
+Hi Elena, for the design of the 12-slide presentation, the agreed total is RUB 30,000, with a 50% prepayment (RUB 15,000) before starting. Please arrange the prepayment; payment details will be provided in a separate invoice. The remaining balance is due after delivery of the final PDF and PPTX. Please let me know once the payment has been sent.
+```
+
+#### HEAD completion A01-EN-2 — PASS
+
+Session: `scenario_session_01793985280235596234_0000000026_55cea554864449f592cbe8f12c2786ce`. Artifact: `artifact_01793985283993659607_0000000075_0ac8de8257e54750a5ee03bdf1867b16`.
+Trace SHA-256: `f7049218dc921364432efc4ff238858198038afa2c4d4ae3fcd620bcc369ced4`.
+
+Assessment: Explicit request for 15,000 RUB as 50% of the agreed 30,000 RUB total; balance after final PDF/PPTX and future separate invoice retained. No invented urgency or calendar deadline; language matches notes.
+
+```text
+Hi Elena, please pay the prepayment of 15 000 RUB for the design of the 12-slide presentation before work begins. This is 50% of the agreed total price of 30,000 RUB. The remaining balance will be due after delivery of the final PDF and PPTX. Payment details will be provided in a separate invoice. Please let me know once you’ve sent the payment.
+```
+
+#### HEAD completion A01-EN-3 — PASS
+
+Session: `scenario_session_01793985288211954969_0000000032_306dc41babb74eb485cd0fb330c36a5c`. Artifact: `artifact_01793985293621785050_0000000091_03b663e390b54be39b90fdc8a82e772f`.
+Trace SHA-256: `082f0fabe1444c09886f84982d230dd54f27c6ef36e658ec28518f4e54e71672`.
+
+Assessment: Explicit request for 15,000 RUB as 50% of the agreed 30,000 RUB total; balance after final PDF/PPTX and future separate invoice retained. No invented urgency or calendar deadline; language matches notes.
+
+```text
+Hi Elena, the agreed total for the 12-slide presentation is RUB 30,000, with a 50% prepayment of RUB 15,000 before design starts. Please arrange the prepayment; payment details will be in a separate invoice. The remaining balance is due after delivery of the final PDF and PPTX. Please let me know once the payment has been sent. Thank you!
+```
+
+### HEAD completion A01-ES
+
+```json
+{
+  "id": "A01-ES",
+  "language": "es",
+  "tone": "warm",
+  "notes": "Elena, empezamos el diseño de una presentación de 12 diapositivas. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+  "amount": "15 000 RUB",
+  "due_date": ""
+}
+```
+
+#### HEAD completion A01-ES-1 — PASS
+
+Session: `scenario_session_01793985300203187510_0000000038_5cd58b8abc2142e0a2c38e873093e0e3`. Artifact: `artifact_01793985308150408629_0000000107_a5c90579d5354fc086487967239f1619`.
+Trace SHA-256: `719158a2ab71882f4e36577287ba27f723b0f7e5429cd9092a2a8faeae5d376a`.
+
+Assessment: Explicit request for 15,000 RUB as 50% of the agreed 30,000 RUB total; balance after final PDF/PPTX and future separate invoice retained. No invented urgency or calendar deadline; language matches notes.
+
+```text
+Hola, Elena. Para el diseño de la presentación de 12 diapositivas, ¿podrías abonar amablemente el anticipo acordado de 15 000 RUB, que corresponde al 50 % del precio total acordado de 30 000 RUB y estaba previsto antes de empezar? El saldo se abonará después de entregar el PDF y el PPTX finales. Los datos de pago estarán en una factura aparte. Avísame, por favor, cuando hayas realizado el pago.
+```
+
+#### HEAD completion A01-ES-2 — PASS
+
+Session: `scenario_session_01793985314868942678_0000000044_78926a0213834819bc9f6ad996fa0d87`. Artifact: `artifact_01793985322797231876_0000000123_1e0c2a46bd6e46b2a5f044b009635618`.
+Trace SHA-256: `d62743cc1adcedcc87b9f9562e84ee0daf27677b32f47c5aa7f75129f1ea0628`.
+
+Assessment: Explicit request for 15,000 RUB as 50% of the agreed 30,000 RUB total; balance after final PDF/PPTX and future separate invoice retained. No invented urgency or calendar deadline; language matches notes.
+
+```text
+Hola, Elena. ¿Podrías realizar el anticipo acordado antes de empezar? Corresponde al 50% del precio total acordado de 30 000 RUB, es decir, 15 000 RUB. Los datos de pago estarán en una factura aparte. El saldo se abonará después de entregar los archivos finales en PDF y PPTX. Avísame, por favor, cuando hayas enviado el pago.
+```
+
+#### HEAD completion A01-ES-3 — FAIL
+
+Session: `scenario_session_01793985327370815251_0000000050_05ccec90657a4559bd55b34682803e36`. Artifact: `artifact_01793985336120092781_0000000139_baf158187fa94a35a15b2bb0dda5cfdb`.
+Trace SHA-256: `c9f5d4ace8d53ed51674a243925a71a283a9544d1f0334ecfcc03b532c791c11`.
+
+Assessment: Amount, percentage/total relation, balance, invoice, language and no-urgency checks pass. However, the response says design is already underway (ya está en marcha) and the prepayment should have been paid before starting (debía abonarse). The input describes starting the design with prepayment before starting; it does not explicitly establish that work has already begun without payment or that prepayment is late. This turns a prepayment request into an unsupported retrospective obligation. This is a payment-status regression finding, not a wrong-language failure.
+
+```text
+El diseño de la presentación de 12 diapositivas ya está en marcha. El precio total acordado es de 30 000 RUB; el anticipo del 50% de ese total (15 000 RUB) debía abonarse antes de empezar, y el saldo se abonará después de entregar los archivos finales en PDF y PPTX. ¿Podrías realizar el pago del anticipo, por favor? Los datos de pago estarán en una factura aparte. Avísame cuando hayas enviado el pago. ¡Muchas gracias!
+```
+
+### HEAD completion U1-RU
+
+```json
+{
+  "id": "U1-RU",
+  "language": "ru",
+  "tone": "firm",
+  "notes": "Клиент Sam. Согласована предоплата USD 800 за редизайн сайта. Платёж срочный, нужен как можно скорее.",
+  "amount": "USD 800",
+  "due_date": ""
+}
+```
+
+#### HEAD completion U1-RU-1 — PASS
+
+Session: `scenario_session_01793985343327753098_0000000056_3189de646e7e47e39b1416df656373cf`. Artifact: `artifact_01793985346574150148_0000000155_0ee5a27adcb94a4d9e84580d4254ec29`.
+Trace SHA-256: `b6dc356c7ede3aa745ca13cc032c739319da572ce0acba2a988bd86ed1fc1a46`.
+
+Assessment: Explicit USD 800 deposit request preserves urgency from notes, with no invented calendar deadline or payment terms. Correct input language and sent-payment follow-up; full text reviewed.
+
+```text
+Sam, прошу оплатить согласованную предоплату USD 800 за редизайн сайта как можно скорее. Дайте знать, когда отправите платёж.
+```
+
+#### HEAD completion U1-RU-2 — PASS
+
+Session: `scenario_session_01793985353125679584_0000000062_57cd5be79de040b799a579ed055e632f`. Artifact: `artifact_01793985356087555151_0000000171_f9bc4112629c4389bc037f38f778ba88`.
+Trace SHA-256: `6043bba3d8ebc0dcc189305829318b3c96d6090f7b4c53c258b8a95addcaf96c`.
+
+Assessment: Explicit USD 800 deposit request preserves urgency from notes, with no invented calendar deadline or payment terms. Correct input language and sent-payment follow-up; full text reviewed.
+
+```text
+Sam, прошу внести предоплату в размере USD 800 за редизайн сайта как можно скорее. Пожалуйста, сообщите, когда отправите платёж.
+```
+
+#### HEAD completion U1-RU-3 — PASS
+
+Session: `scenario_session_01793985361781786505_0000000068_d770a821309945a69496ea579995813d`. Artifact: `artifact_01793985364313402319_0000000187_16f44b78bc114394b28d5a226ef604b9`.
+Trace SHA-256: `f295955784fe4bdde1a7d6f55f4f73ed0073efa3825ddfcf1a796b229d690449`.
+
+Assessment: Explicit USD 800 deposit request preserves urgency from notes, with no invented calendar deadline or payment terms. Correct input language and sent-payment follow-up; full text reviewed.
+
+```text
+Sam, прошу оплатить предоплату в размере USD 800 за редизайн сайта как можно скорее. Пожалуйста, сообщите, когда отправите платёж.
+```
+
+### HEAD completion U1-EN
+
+```json
+{
+  "id": "U1-EN",
+  "language": "en",
+  "tone": "firm",
+  "notes": "Client Sam. Agreed deposit USD 800 for the site redesign. The payment is urgent, needed ASAP.",
+  "amount": "USD 800",
+  "due_date": ""
+}
+```
+
+#### HEAD completion U1-EN-1 — PASS
+
+Session: `scenario_session_01793985371199285928_0000000074_275b9d602de445789846560a10aa7dc5`. Artifact: `artifact_01793985373969312382_0000000203_b3394766583f4ff09287fee66044a25f`.
+Trace SHA-256: `3ba73e03b6936b42a6a9f2292aca7bca2e0cd33e23f6d1525df821ab4acca3d2`.
+
+Assessment: Explicit USD 800 deposit request preserves urgency from notes, with no invented calendar deadline or payment terms. Correct input language and sent-payment follow-up; full text reviewed.
+
+```text
+Please pay the USD 800 deposit for the site redesign as soon as possible, as this payment is urgent. Please let me know once you’ve sent it.
+```
+
+#### HEAD completion U1-EN-2 — PASS
+
+Session: `scenario_session_01793985381697871476_0000000080_52a1edc5fda849b78e721a4aa329db18`. Artifact: `artifact_01793985384104367939_0000000219_387f1715fac341928fd6b0dd7c14df41`.
+Trace SHA-256: `1d63e299601d65cc19128f75b3ccc1c74f3e10184df23edf514b83f2fccd4da1`.
+
+Assessment: Explicit USD 800 deposit request preserves urgency from notes, with no invented calendar deadline or payment terms. Correct input language and sent-payment follow-up; full text reviewed.
+
+```text
+Sam, please pay the USD 800 deposit for the site redesign as soon as possible. Please let me know once the payment has been sent.
+```
+
+#### HEAD completion U1-EN-3 — PASS
+
+Session: `scenario_session_01793985392195472513_0000000086_3355106cddf24796954ea83fd83874ef`. Artifact: `artifact_01793985395846444287_0000000235_780308d7960147858a7b6aebd7e784b0`.
+Trace SHA-256: `2fbb4ac3bbfd42001d7eef8fc07557f004ac0bd4802afd959eea93d4197e0cae`.
+
+Assessment: Explicit USD 800 deposit request preserves urgency from notes, with no invented calendar deadline or payment terms. Correct input language and sent-payment follow-up; full text reviewed.
+
+```text
+Sam, please pay the agreed USD 800 deposit for the site redesign as soon as possible; the payment is urgent. Please let me know once you’ve sent it.
+```
+
+### HEAD completion U1-ES
+
+```json
+{
+  "id": "U1-ES",
+  "language": "es",
+  "tone": "firm",
+  "notes": "Cliente Sam. Se acordó un anticipo de USD 800 por el rediseño del sitio web. El pago es urgente, se necesita lo antes posible.",
+  "amount": "USD 800",
+  "due_date": ""
+}
+```
+
+#### HEAD completion U1-ES-1 — PASS
+
+Session: `scenario_session_01793985402085468801_0000000092_fc1a6364bb8f430881e5264e1706ba33`. Artifact: `artifact_01793985406781540199_0000000251_40f5c099ca0949c8a40aa761bef858ed`.
+Trace SHA-256: `d6fc42f302464791762051923518af6d85e8479c9063a9e22fdfa3dc5eee85ac`.
+
+Assessment: Explicit USD 800 deposit request preserves urgency from notes, with no invented calendar deadline or payment terms. Correct input language and sent-payment follow-up; full text reviewed.
+
+```text
+Sam, por favor realiza lo antes posible el pago urgente del anticipo de USD 800 por el rediseño del sitio web. Avísame cuando hayas enviado el pago.
+```
+
+#### HEAD completion U1-ES-2 — PASS
+
+Session: `scenario_session_01793985412066257253_0000000098_ae6f3ac9ce9247eca6fcdd323887ab92`. Artifact: `artifact_01793985415264812739_0000000267_73fc7c0efe074530ac0042a0553d6975`.
+Trace SHA-256: `cdafad1827f6db505d251a55f519d613bf30e47947adbed35c94f129e1afc2a9`.
+
+Assessment: Explicit USD 800 deposit request preserves urgency from notes, with no invented calendar deadline or payment terms. Correct input language and sent-payment follow-up; full text reviewed.
+
+```text
+Sam, por favor, realiza lo antes posible el pago urgente del anticipo acordado de USD 800 por el rediseño del sitio web. Avísame cuando hayas enviado el pago.
+```
+
+#### HEAD completion U1-ES-3 — PASS
+
+Session: `scenario_session_01793985422602601065_0000000104_0be3111d8e6c4a449fa519bc10911a96`. Artifact: `artifact_01793985426151024114_0000000283_e3285c3078cd4f76b7285ab6dd78c721`.
+Trace SHA-256: `ac445d4d1798ea1940a990f27a7f80ef5176a44c586765402f6265d7a3ed0a96`.
+
+Assessment: Explicit USD 800 deposit request preserves urgency from notes, with no invented calendar deadline or payment terms. Correct input language and sent-payment follow-up; full text reviewed.
+
+```text
+Sam, por favor realiza lo antes posible el pago urgente del anticipo acordado de USD 800 por el rediseño del sitio web. Avísame cuando hayas enviado el pago.
+```
+
+### HEAD completion U2-RU
+
+```json
+{
+  "id": "U2-RU",
+  "language": "ru",
+  "tone": "firm",
+  "notes": "Клиент Sam. Согласована предоплата USD 800 за редизайн сайта.",
+  "amount": "USD 800",
+  "due_date": "пятница — как можно скорее"
+}
+```
+
+#### HEAD completion U2-RU-1 — PASS
+
+Session: `scenario_session_01793985433332278652_0000000110_c9d3d81adcf14d62b775fd264978de3d`. Artifact: `artifact_01793985437213288825_0000000299_0bf919c5a7c04bf0be1637f32ed3f1bf`.
+Trace SHA-256: `81732da213582d776fd66db147d458317985ba7d35c6fa803f74cb0f438509e1`.
+
+Assessment: Explicit USD 800 deposit request in Russian keeps ASAP urgency and a no-later-than-Friday deadline that permits earlier payment. No invented terms; full text reviewed.
+
+```text
+Пожалуйста, оплатите предоплату USD 800 за редизайн сайта как можно скорее, но не позднее пятницы. Сообщите, пожалуйста, когда отправите оплату.
+```
+
+#### HEAD completion U2-RU-2 — PASS
+
+Session: `scenario_session_01793985443692242623_0000000116_296437886ee845568efab65d878b8f66`. Artifact: `artifact_01793985447066743794_0000000315_36dae99540bb46b6818efc4743102f5e`.
+Trace SHA-256: `cd101004b8a4cbef6b806ea23f7673cbe2fc5186acb3d618ba9ebf44abd4a232`.
+
+Assessment: Explicit USD 800 deposit request in Russian keeps ASAP urgency and a no-later-than-Friday deadline that permits earlier payment. No invented terms; full text reviewed.
+
+```text
+Пожалуйста, оплатите согласованную предоплату в размере USD 800 за редизайн сайта как можно скорее, но не позднее пятницы. Сообщите, пожалуйста, когда отправите оплату.
+```
+
+#### HEAD completion U2-RU-3 — PASS
+
+Session: `scenario_session_01793985452887972173_0000000122_a123a85cf9ef46309c54d8eddcb31828`. Artifact: `artifact_01793985455740716001_0000000331_d8f1858d3b9e4dcca40f355a1bc32fac`.
+Trace SHA-256: `b7fa3247c31b8cff412577040cab3e904f6a6d908f83ebc39c91e1d534833bf8`.
+
+Assessment: Explicit USD 800 deposit request in Russian keeps ASAP urgency and a no-later-than-Friday deadline that permits earlier payment. No invented terms; full text reviewed.
+
+```text
+Sam, прошу внести согласованную предоплату USD 800 за редизайн сайта как можно скорее, но не позднее пятницы. Пожалуйста, сообщите, когда отправите платеж.
+```
+
+### HEAD completion U2-EN
+
+```json
+{
+  "id": "U2-EN",
+  "language": "en",
+  "tone": "firm",
+  "notes": "Client Sam. Agreed deposit USD 800 for the site redesign.",
+  "amount": "USD 800",
+  "due_date": "Friday — ASAP"
+}
+```
+
+#### HEAD completion U2-EN-1 — PASS
+
+Session: `scenario_session_01793985461937674025_0000000128_4c7fc9c113344069b9c6d65f21d9cbaf`. Artifact: `artifact_01793985465188785393_0000000347_f00aa6d09ba74d41ab508e2fcca2dbe4`.
+Trace SHA-256: `8a6da19fe1608dfc680e8d7cce504ced608b551bae912877ea96d70acd6a34f7`.
+
+Assessment: Explicit USD 800 deposit request retains ASAP urgency and a no-later-than-Friday deadline allowing earlier payment. Correct notes language, no invented terms; full text reviewed.
+
+```text
+Hi Sam, please pay the agreed USD 800 deposit for the site redesign as soon as possible, no later than Friday. Please let me know once you’ve sent it.
+```
+
+#### HEAD completion U2-EN-2 — PASS
+
+Session: `scenario_session_01793985472221525500_0000000134_ce17102d77fa4d4ca2b045abf956edf4`. Artifact: `artifact_01793985474626505036_0000000363_3173d655b2874669a0addd236d6b37fc`.
+Trace SHA-256: `d0fe94e90cd9ed9215fa74f7f69c86221557fa7da4ae468f5a9d01b0f1235980`.
+
+Assessment: Explicit USD 800 deposit request retains ASAP urgency and a no-later-than-Friday deadline allowing earlier payment. Correct notes language, no invented terms; full text reviewed.
+
+```text
+Sam, please pay the agreed USD 800 deposit for the site redesign as soon as possible, and no later than Friday. Please let me know once you’ve sent it.
+```
+
+#### HEAD completion U2-EN-3 — PASS
+
+Session: `scenario_session_01793985482727742114_0000000140_dd79cd47da91458c8a147b89a0dac235`. Artifact: `artifact_01793985485890859315_0000000379_d7e8c2ad35c0426f9e4af8252148a018`.
+Trace SHA-256: `9915411296225b60ca8adbb71f5835834b536c7e59b4795071a124f2ef4b105e`.
+
+Assessment: Explicit USD 800 deposit request retains ASAP urgency and a no-later-than-Friday deadline allowing earlier payment. Correct notes language, no invented terms; full text reviewed.
+
+```text
+Please pay the agreed USD 800 deposit for the site redesign as soon as possible, and no later than Friday. Please let me know once the payment has been sent.
+```
+
+### HEAD completion U2-ES
+
+```json
+{
+  "id": "U2-ES",
+  "language": "es",
+  "tone": "firm",
+  "notes": "Cliente Sam. Se acordó un anticipo de USD 800 por el rediseño del sitio web.",
+  "amount": "USD 800",
+  "due_date": "viernes — lo antes posible"
+}
+```
+
+#### HEAD completion U2-ES-1 — PASS
+
+Session: `scenario_session_01793985490716201577_0000000146_e45177feafa84375bfab525f6ea0691d`. Artifact: `artifact_01793985493595407601_0000000395_6e6d47e63fc04c00a5013fd8946c998e`.
+Trace SHA-256: `c1392ce8baa2bd13941f8272cf603b0e24a5b1cd9b456aa831eff9e70f1e5543`.
+
+Assessment: Explicit USD 800 deposit request retains ASAP urgency and a no-later-than-Friday deadline allowing earlier payment. Correct notes language, no invented terms; full text reviewed.
+
+```text
+Sam, por favor realiza el pago del anticipo de USD 800 por el rediseño del sitio web lo antes posible y, en todo caso, a más tardar el viernes. Avísame cuando hayas enviado el pago.
+```
+
+#### HEAD completion U2-ES-2 — PASS
+
+Session: `scenario_session_01793985498641658527_0000000152_cc1b78acf2f646b09c67a4aa1a66ada3`. Artifact: `artifact_01793985502500133583_0000000411_2e61be8e9dab48bdb821f2cfa4782d2a`.
+Trace SHA-256: `4ba08d6fe079bfe03f3684ffea12c43e04b44b90c5645e2883c54f6020ced258`.
+
+Assessment: Explicit USD 800 deposit request retains ASAP urgency and a no-later-than-Friday deadline allowing earlier payment. Correct notes language, no invented terms; full text reviewed.
+
+```text
+Sam, por favor, realiza el pago del anticipo acordado de USD 800 por el rediseño del sitio web lo antes posible y, en todo caso, a más tardar el viernes. Avísame cuando hayas enviado el pago.
+```
+
+#### HEAD completion U2-ES-3 — PASS
+
+Session: `scenario_session_01793985506597622016_0000000158_0f57777851f94f3c9a1c720f70de88b8`. Artifact: `artifact_01793985510302058833_0000000427_46a60581296141a1af2d21de761a7858`.
+Trace SHA-256: `6f898883157be6a9c104d3d8c782542c79f0b4a0b109e47cd9e699a68ae2cc86`.
+
+Assessment: Explicit USD 800 deposit request retains ASAP urgency and a no-later-than-Friday deadline allowing earlier payment. Correct notes language, no invented terms; full text reviewed.
+
+```text
+Sam, por favor, realiza lo antes posible el pago del anticipo acordado de USD 800 por el rediseño del sitio web, a más tardar el viernes. Avísame cuando hayas enviado el pago.
+```
+
+### HEAD completion U3-RU
+
+```json
+{
+  "id": "U3-RU",
+  "language": "ru",
+  "tone": "firm",
+  "notes": "Клиент Sam. Согласована предоплата USD 800 за редизайн сайта. Платёж несрочный, можно не спешить.",
+  "amount": "USD 800",
+  "due_date": "пятница — как можно скорее"
+}
+```
+
+#### HEAD completion U3-RU-1 — PASS
+
+Session: `scenario_session_01793985516349110397_0000000164_90b56280e9f9413cb2ba08ee8600e914`. Artifact: `artifact_01793985520238345845_0000000443_c47f8b3ce8414107a76e42448e2a00bf`.
+Trace SHA-256: `aadb5908a182e2fa4d668bf2ccc0be78026114738e46da8c9e6fdb886b5cf39d`.
+
+Assessment: Explicit USD 800 payment request retains Friday as a due-by deadline and allows earlier payment. No urgency despite ASAP in the date field: no-rush notes correctly win. Correct input language; full output reviewed with no additional wording caveat.
+
+```text
+Sam, прошу оплатить предоплату в размере USD 800 за редизайн сайта не позднее пятницы. Пожалуйста, сообщите, когда отправите платёж.
+```
+
+#### HEAD completion U3-RU-2 — PASS
+
+Session: `scenario_session_01793985526855529447_0000000170_d07ddad97baf447981beb0eb9bbc6519`. Artifact: `artifact_01793985531259309754_0000000459_49906939cfcd41d5abd648ff96124b79`.
+Trace SHA-256: `d5cc3630efa55fe991663e37b9fe6b6196bca08fa36ef498a84fc51decd8f40b`.
+
+Assessment: Explicit USD 800 payment request retains Friday as a due-by deadline and allows earlier payment. No urgency despite ASAP in the date field: no-rush notes correctly win. Correct input language; full output reviewed with no additional wording caveat.
+
+```text
+Пожалуйста, внесите предоплату USD 800 за редизайн сайта не позднее пятницы. Дайте знать, когда платёж будет отправлен.
+```
+
+#### HEAD completion U3-RU-3 — PASS
+
+Session: `scenario_session_01793985536845980879_0000000176_6f529635b3344e2991dc07d07a3c84c3`. Artifact: `artifact_01793985540249427783_0000000475_517f7001b072489fa93a3d68582decdb`.
+Trace SHA-256: `032620c026f869baa359606f8c14f9ccad1fe533ec3a6aaf6df59eeb147f4f14`.
+
+Assessment: Explicit USD 800 payment request retains Friday as a due-by deadline and allows earlier payment. No urgency despite ASAP in the date field: no-rush notes correctly win. Correct input language; full output reviewed with no additional wording caveat.
+
+```text
+Sam, прошу оплатить согласованную предоплату в размере USD 800 за редизайн сайта не позднее пятницы. Пожалуйста, сообщите, когда отправите платёж.
+```
+
+### HEAD completion U3-EN
+
+```json
+{
+  "id": "U3-EN",
+  "language": "en",
+  "tone": "firm",
+  "notes": "Client Sam. Agreed deposit USD 800 for the site redesign. Not urgent, no rush.",
+  "amount": "USD 800",
+  "due_date": "Friday — ASAP"
+}
+```
+
+#### HEAD completion U3-EN-1 — PASS
+
+Session: `scenario_session_01793985544748619956_0000000182_c6946433e0db421798cdde152a70aa73`. Artifact: `artifact_01793985547520924024_0000000491_3c4b779c20064666877aaccf4547c3f3`.
+Trace SHA-256: `a7992e7e7ad032f169a6c7119db53f7495ff2645b5bb8bbda031e7714e5cb41d`.
+
+Assessment: Explicit USD 800 payment request retains Friday as a due-by deadline and allows earlier payment. No urgency despite ASAP in the date field: no-rush notes correctly win. Correct input language; full output reviewed with no additional wording caveat.
+
+```text
+Please pay the agreed USD 800 deposit for the site redesign by Friday. Please let me know once the payment has been sent.
+```
+
+#### HEAD completion U3-EN-2 — PASS
+
+Session: `scenario_session_01793985554609416370_0000000188_fd746a9edb5a4e6fa2e83ba869e59857`. Artifact: `artifact_01793985558231944954_0000000507_7d45b1ca79654147b09e1df4cc6b068f`.
+Trace SHA-256: `60fffa8168974001214a3ae7928ea4853351975129867156d635b7110de2e9e2`.
+
+Assessment: Explicit USD 800 payment request retains Friday as a due-by deadline and allows earlier payment. No urgency despite ASAP in the date field: no-rush notes correctly win. Correct input language; full output reviewed with no additional wording caveat.
+
+```text
+Hi Sam, please pay the agreed USD 800 deposit for the site redesign by Friday. Please let me know once you’ve sent it.
+```
+
+#### HEAD completion U3-EN-3 — PASS
+
+Session: `scenario_session_01793985565315282545_0000000194_1a59d163a76a4586b46017c6374b839f`. Artifact: `artifact_01793985568963902719_0000000523_07d2bf5a580e4bac847f868b50b37c23`.
+Trace SHA-256: `780998c10e89d04d7237b3b63e7999ebcf0c92e7be26a466d93cfa0947afef8a`.
+
+Assessment: Explicit USD 800 payment request retains Friday as a due-by deadline and allows earlier payment. No urgency despite ASAP in the date field: no-rush notes correctly win. Correct input language; full output reviewed with no additional wording caveat.
+
+```text
+Please pay the USD 800 deposit for the site redesign by Friday. Let me know once the payment has been sent.
+```
+
+### HEAD completion U3-ES
+
+```json
+{
+  "id": "U3-ES",
+  "language": "es",
+  "tone": "firm",
+  "notes": "Cliente Sam. Se acordó un anticipo de USD 800 por el rediseño del sitio web. No es urgente, no hay prisa.",
+  "amount": "USD 800",
+  "due_date": "viernes — lo antes posible"
+}
+```
+
+#### HEAD completion U3-ES-1 — PASS
+
+Session: `scenario_session_01793985573140376578_0000000200_d7e2c72b86454694815b30f549fba5ff`. Artifact: `artifact_01793985576717199068_0000000539_51e697db7eab492d8ab17401910bc73a`.
+Trace SHA-256: `7823c11eeb051816f48e9578a288d3b1c1a733a886f35adc67bf630f4bc561be`.
+
+Assessment: Explicit USD 800 payment request retains Friday as a due-by deadline and allows earlier payment. No urgency despite ASAP in the date field: no-rush notes correctly win. Correct input language; full output reviewed with no additional wording caveat.
+
+```text
+Hola Sam, por favor, realiza el pago del anticipo de USD 800 por el rediseño del sitio web a más tardar el viernes. Avísame cuando hayas enviado el pago.
+```
+
+#### HEAD completion U3-ES-2 — PASS
+
+Session: `scenario_session_01793985580441682195_0000000206_34987af4bf5040a7953e03a352367fbf`. Artifact: `artifact_01793985584433383513_0000000555_325325841dcd40e5bc513890a2cc8b03`.
+Trace SHA-256: `9ae80e35e89eaa14022bb661e41ac16784f567647476413de14159e1d01f6f1c`.
+
+Assessment: Explicit USD 800 payment request retains Friday as a due-by deadline and allows earlier payment. No urgency despite ASAP in the date field: no-rush notes correctly win. Correct input language; full output reviewed with no additional wording caveat.
+
+```text
+Sam, por favor, realiza el pago del anticipo de USD 800 por el rediseño del sitio web a más tardar el viernes. Avísame cuando hayas enviado el pago.
+```
+
+#### HEAD completion U3-ES-3 — PASS
+
+Session: `scenario_session_01793985589159518939_0000000212_dabfb0d79e7e497fbaa37fe12cbef2e1`. Artifact: `artifact_01793985591985021440_0000000571_254b3ac1d4964427ad94084c400fae41`.
+Trace SHA-256: `e96ffa43585f8bf5046dd0958af637afad399eb86f3cb49b0fa54d8f94f8f70a`.
+
+Assessment: Explicit USD 800 payment request retains Friday as a due-by deadline and allows earlier payment. No urgency despite ASAP in the date field: no-rush notes correctly win. Correct input language; full output reviewed with no additional wording caveat.
+
+```text
+Por favor, realiza el pago del anticipo de USD 800 por el rediseño del sitio web a más tardar el viernes. Avísame cuando hayas enviado el pago.
 ```
