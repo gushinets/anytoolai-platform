@@ -504,3 +504,68 @@ untracked reports remain untouched. Six owned files changed, plus the parallel
 owner's CSS. Full backend/production PostgreSQL, required CI and fresh independent
 review remain with the parent. No schema/generated contract, dependency, Sonar
 setting, working DB, migration, deployment, provider call, commit or push changed.
+
+## Final P2: fresh history summaries and independent successful trials
+
+Doctor passed before edits on 2026-11-07. Reproduce and repair review
+`5806319558`, discussions `4497080777` and `4497080785`:
+
+1. A run may finish between its list and detail reads. Reconcile the accepted
+   detail's status/times into its row; compare a known terminal detail only with
+   a genuinely fresh selected summary, preserving it when appending other rows.
+   Keep nonterminal refresh, failure/action guards and request generations.
+2. Keep explicitly restored successful draft evidence independent of the latest
+   successful asynchronous submission. Match either exact configuration at use
+   and save time, retaining catalog identity, adaptation and failed-run guards.
+
+Reach: shared Atom Lab JavaScript, focused Chromium regressions and this plan.
+Prove both failures before production edits, then run related history/trial
+journeys, Node checks, canonical frontend-check, docs/drift and diff checks.
+No new polling/cache framework, backend/CSS changes, working DB, migration,
+provider call, dependency, staging, commit or push is needed.
+
+The six new core cases first produced four expected failures: a Running row
+beside a successful detail, an unrelated-page append that unnecessarily reread
+the selected run and hid it after 503, and loss of one trial in each completion /
+restore ordering. Fresh selected status and timestamp changes already refetched.
+The accepted detail now reconciles only its existing row's status and times;
+terminal-detail comparison reads only the freshly returned page. Nonterminal
+invalidation and existing list/detail generations and action locks remain intact.
+
+Successful evidence now has exactly two bounded owners: the explicitly restored
+successful draft and the latest successful asynchronous submission. The existing
+exact configuration match chooses the restored proof first, then the completed
+submission. Failures preserve both; explicit incompatible adaptation clears both.
+A further failing catalog-cancellation case proved that a new unlock may retain
+the old dirty editor. Exact trial matching now also requires current catalog
+membership, so neither old record can qualify through that retained editor.
+
+Focused Chromium passed all 40 history/trial cases, including both completion
+orders, B -> A -> B prompt-save provenance, later failure, editor replacement,
+retired model values, incompatible/adapted/failed history, accepted and cancelled
+catalog switches, status/time advance, unrelated pagination, delayed/out-of-order
+reads, malformed/detail/list failures, retry and selection changes. The unchanged
+run snapshot, result and draft warning remain attributed to the actual submission;
+restoring or saving a prompt never starts an execution. Atom Lab lint and all 53
+Node tests passed. Architecture validation passed.
+
+Verification (2026-11-07):
+
+- Canonical `python scripts/agent/runner.py frontend-check` passed using the
+  managed interpreter: lint, typecheck, all 189 Chromium journeys, 53 Atom Lab
+  Node tests, six demo Node tests, 824 Vitest tests, generated API-type drift and
+  production builds. Log: `.quick-check-tmp/p2-history-trials-frontend.log`.
+- `validate-architecture`, `validate-docs`, `generate-docs --check` and
+  `git diff --check` passed. Staging is empty; HEAD remains `6e7dc986`.
+
+The identical frontend command passed with escalation after the sandbox denied
+the local pnpm-store symlink. Documentation generation used the existing managed
+Python environment, workspace Temp directory and bundled LiteLLM cost map after
+the system interpreter lacked `markdown_it`. Chromium used its installed cache.
+Three owned files changed; unrelated untracked reports remain untouched. No
+backend/CSS, schema/generated contract, dependency, Sonar setting, working DB,
+migration, provider call, deployment, commit or push changed. Existing exact
+viewport assertions remain intact. Full backend/production PostgreSQL checks were
+not repeated for these JavaScript fixes; PR update, CI and independent review
+remain with the parent. Ambiguous-save retry/idempotency and unbounded library
+pagination remain the previously documented separate follow-ups.

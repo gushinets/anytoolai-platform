@@ -940,6 +940,108 @@ for (const state of ["new", "version", "failed", "prompt", "version-prompt", "so
   });
 }
 
+for (const completionOrder of ["before", "after"]) {
+  test(`restored trial and async success remain independently usable when completion is ${completionOrder} restore`, async ({page}) => {
+    const restored = historyDetail({runId: "run-adopted-trial", prompt: "Проверенный промпт из истории"});
+    let submitted;
+    let posts = 0;
+    let detailReads = 0;
+    const savedBodies = [];
+    let releaseRun;
+    const completion = new Promise(resolve => { releaseRun = resolve; });
+    await page.route("http://atom-lab.test/v1/atom-lab/**", async route => {
+      const {pathname} = new URL(route.request().url());
+      if (pathname === "/v1/atom-lab/runs" && route.request().method() === "POST") {
+        posts += 1;
+        if (posts === 1) submitted = route.request().postDataJSON();
+        await route.fulfill({status: 202, json: {run_id: posts === 1 ? "run-async-trial" : "run-later-failure", status: "queued",
+          scenario_session_id: "session-library", job_id: "job-library"}});
+      } else if (pathname === "/v1/atom-lab/runs/run-later-failure") {
+        await route.fulfill({json: {...restored, run_id: "run-later-failure", status: "failed", result: null,
+          diagnostics: {...restored.diagnostics, error_code: "output_validation_failed"}}});
+      } else if (pathname === "/v1/atom-lab/runs/run-async-trial") {
+        detailReads += 1;
+        await completion;
+        await route.fulfill({json: historyDetail({runId: "run-async-trial", input: submitted.input, prompt: submitted.prompt})});
+      } else if (pathname === "/v1/atom-lab/runs") await route.fulfill({json: {items: [{
+        run_id: restored.run_id, status: restored.status, atom_id: "A06", model_id: restored.snapshot.provider.model_id,
+        preset_id: null, preset_version: null, created_at: restored.created_at,
+        started_at: restored.started_at, finished_at: restored.finished_at,
+      }], next_cursor: null}});
+      else if (pathname.endsWith(restored.run_id)) await route.fulfill({json: restored});
+      else if (pathname === "/v1/atom-lab/atoms/A06/prompts") {
+        if (route.request().method() === "POST") {
+          savedBodies.push(route.request().postDataJSON());
+          await route.fulfill({status: 422, json: {error: {code: "prompt_invalid", message: "Test rejection", field_errors: []}}});
+        } else await route.fulfill({json: [{ref: A06.prompt_ref, name: "Платформенный", prompt: A06.prompt,
+          group: "platform", source_ref: null, source_run_id: null}]});
+      } else await route.fallback();
+    });
+    await unlockAtom(page, "A06");
+    await page.locator("#fill-example").click();
+    await page.locator("#reasoning-effort").selectOption("high");
+    await page.locator("#prompt-tab").click();
+    await page.locator("#prompt-editor").fill("Промпт асинхронного запуска");
+    await page.locator("#run-button").click();
+    await expect.poll(() => detailReads).toBe(1);
+    if (completionOrder === "before") {
+      releaseRun();
+      await expect(page.locator("#run-state")).toHaveText("Завершён успешно");
+    }
+    await page.locator("#history-button").click();
+    await page.locator("#history-list .history-open").click();
+    page.once("dialog", dialog => dialog.accept());
+    await page.locator("#restore-history").click();
+    await page.locator("#prompt-tab").click();
+    await expect(page.locator("#prompt-test-status")).toContainText("Ответ прошёл контракт");
+    if (completionOrder === "after") {
+      releaseRun();
+      await expect(page.locator("#run-state")).toHaveText("Завершён успешно");
+    }
+    const submittedSnapshot = await page.locator("#submitted-snapshot").textContent();
+    const result = await page.locator("#result-json").textContent();
+    for (const [prompt, runId] of [
+      [restored.snapshot.prompt.content, restored.run_id],
+      [submitted.prompt, "run-async-trial"],
+      [restored.snapshot.prompt.content, restored.run_id],
+    ]) {
+      await page.locator("#prompt-editor").fill(prompt);
+      await expect(page.locator("#prompt-test-status")).toContainText("Ответ прошёл контракт");
+      if (runId === restored.run_id) await expect(page.locator("#response-draft-warning")).toBeVisible();
+      else await expect(page.locator("#response-draft-warning")).toBeHidden();
+      if (await page.locator("#save-prompt-panel").getAttribute("open") === null) await page.locator("#save-prompt-panel summary").click();
+      await page.locator("#save-prompt-name").fill("Подтверждённый текст");
+      const count = savedBodies.length + 1;
+      await page.locator("#save-prompt").click();
+      await expect.poll(() => savedBodies.length).toBe(count);
+      await expect(page.locator("#save-prompt-status")).toContainText("Test rejection");
+      expect(savedBodies.at(-1)).toMatchObject({prompt, source_run_id: runId});
+      await expect(page.locator("#submitted-snapshot")).toHaveText(submittedSnapshot);
+      await expect(page.locator("#result-json")).toHaveText(result);
+    }
+    await page.locator("#run-button").click();
+    await expect(page.locator("#run-state")).toHaveText("Ошибка");
+    await expect(page.locator("#prompt-test-status")).toContainText("Ответ прошёл контракт");
+    await page.locator("#save-prompt-name").fill("Успех до ошибки");
+    await page.locator("#save-prompt").click();
+    await expect.poll(() => savedBodies.length).toBe(4);
+    await expect(page.locator("#save-prompt-status")).toContainText("Test rejection");
+    expect(savedBodies.at(-1).source_run_id).toBe(restored.run_id);
+    page.once("dialog", dialog => dialog.accept());
+    await page.getByRole("button", {name: /A05/}).click();
+    await page.getByRole("button", {name: /A06/}).click();
+    await page.locator("#input-tab").click();
+    await page.locator("#fill-example").click();
+    await page.locator("#prompt-tab").click();
+    for (const prompt of [submitted.prompt, restored.snapshot.prompt.content]) {
+      await page.locator("#prompt-editor").fill(prompt);
+      await expect(page.locator("#prompt-test-status")).toContainText("Ответ прошёл контракт");
+    }
+    expect(posts).toBe(2);
+    expect(detailReads).toBe(1);
+  });
+}
+
 for (const library of ["history", "presets"]) {
   test(`a delayed prompt rejection keeps the ${library} section open until explicit error navigation`, async ({page}) => {
     let rejectRun;
@@ -973,7 +1075,7 @@ for (const library of ["history", "presets"]) {
   });
 }
 
-for (const historicalState of ["succeeded", "retired-model", "failed", "incompatible", "adapted-schema", "adapted-action", "adapted-prompt", "new-catalog"]) {
+for (const historicalState of ["succeeded", "retired-model", "failed", "incompatible", "adapted-schema", "adapted-action", "adapted-prompt", "new-catalog", "new-catalog-cancelled"]) {
   test(`restored ${historicalState} history keeps only a matching successful prompt trial`, async ({page}) => {
     const detail = historyDetail({runId: "run-trial-restore"});
     detail.snapshot.prompt.source_ref = "product.a06.v1";
@@ -990,7 +1092,10 @@ for (const historicalState of ["succeeded", "retired-model", "failed", "incompat
       if (pathname === "/v1/atom-lab/atoms/A06/prompts") {
         if (route.request().method() === "POST") {
           savedBody = route.request().postDataJSON();
-          await route.fulfill({json: {ref: "lab.restored", group: "lab", ...savedBody}});
+          if (historicalState === "new-catalog-cancelled") await route.fulfill({status: 422, json: {
+            error: {code: "prompt_invalid", message: "Test rejection", field_errors: []},
+          }});
+          else await route.fulfill({json: {ref: "lab.restored", group: "lab", ...savedBody}});
         } else await route.fulfill({json: [
           {ref: A06.prompt_ref, name: "Платформенный", prompt: A06.prompt, group: "platform", source_ref: null, source_run_id: null},
           {ref: detail.snapshot.prompt.source_ref, name: "Продуктовый", prompt: "Текущий продуктовый текст", group: "product", source_ref: null, source_run_id: null},
@@ -1023,18 +1128,23 @@ for (const historicalState of ["succeeded", "retired-model", "failed", "incompat
       await page.locator("#restore-history").click();
       await page.locator("#prompt-tab").click();
     }
-    if (historicalState === "new-catalog") {
+    if (historicalState.startsWith("new-catalog")) {
       await expect(page.locator("#prompt-test-status")).toContainText("Ответ прошёл контракт");
-      page.once("dialog", dialog => dialog.accept());
+      page.once("dialog", dialog => historicalState === "new-catalog" ? dialog.accept() : dialog.dismiss());
       await page.locator("#access-form").dispatchEvent("submit");
-      await expect(page.locator("#atom-title")).toContainText("A01");
-      await page.getByRole("button", {name: /A06/}).click();
-      await page.locator("#input-tab").click();
-      await importJson(page, detail.snapshot.input);
-      await page.locator("#reasoning-effort").selectOption("high");
-      await page.locator("#prompt-tab").click();
-      await page.locator("#prompt-select").selectOption(detail.snapshot.prompt.source_ref);
-      await page.locator("#prompt-editor").fill(detail.snapshot.prompt.content);
+      if (historicalState === "new-catalog") {
+        await expect(page.locator("#atom-title")).toContainText("A01");
+        await page.getByRole("button", {name: /A06/}).click();
+        await page.locator("#input-tab").click();
+        await importJson(page, detail.snapshot.input);
+        await page.locator("#reasoning-effort").selectOption("high");
+        await page.locator("#prompt-tab").click();
+        await page.locator("#prompt-select").selectOption(detail.snapshot.prompt.source_ref);
+        await page.locator("#prompt-editor").fill(detail.snapshot.prompt.content);
+      } else {
+        await expect(page.locator("#workspace")).toHaveAttribute("aria-busy", "false");
+        await expect(page.locator("#atom-title")).toContainText("A06");
+      }
     }
     if (historicalState === "retired-model") {
       await expect(page.locator("#model-select")).toHaveValue("gpt-retired");
@@ -1077,7 +1187,7 @@ for (const historicalState of ["succeeded", "retired-model", "failed", "incompat
     await page.locator("#save-prompt-panel summary").click();
     await page.locator("#save-prompt-name").fill("Из истории");
     await page.locator("#save-prompt").click();
-    await expect(page.locator("#save-prompt-status")).toContainText("Сохранён");
+    await expect(page.locator("#save-prompt-status")).toContainText(historicalState === "new-catalog-cancelled" ? "Test rejection" : "Сохранён");
     expect(savedBody.source_run_id).toBe(["succeeded", "retired-model"].includes(historicalState) ? detail.run_id : null);
     expect(savedBody.source_ref).toBe(detail.snapshot.prompt.source_ref);
     expect(runWrites).toBe(0);
@@ -5501,6 +5611,78 @@ test("open history model availability follows delayed catalog load and refresh",
   await expect.poll(() => modelReads).toBe(2);
   await expect(page.locator("#history-warning")).toContainText("Историческая модель недоступна");
 });
+
+for (const followup of ["row", "unrelated-page", "fresh-status", "fresh-times"]) {
+  test(`history detail newer than its list stays coherent through ${followup}`, async ({page}) => {
+    const complete = historyDetail({runId: "run-newer-history-detail"});
+    const pending = {...complete, status: "running", result: null, finished_at: null};
+    const other = historyDetail({runId: "run-unrelated-page"});
+    const changed = {...complete, finished_at: "2026-09-23T08:00:03Z"};
+    if (followup === "fresh-status") {
+      changed.status = "failed";
+      changed.result = null;
+      changed.finished_at = complete.finished_at;
+    }
+    let listReads = 0;
+    let detailReads = 0;
+    let promptBody;
+    let runPosts = 0;
+    const summary = detail => ({run_id: detail.run_id, status: detail.status, atom_id: "A06",
+      model_id: detail.snapshot.provider.model_id, preset_id: null, preset_version: null,
+      created_at: detail.created_at, started_at: detail.started_at, finished_at: detail.finished_at});
+    await page.route("http://atom-lab.test/v1/atom-lab/**", async route => {
+      const url = new URL(route.request().url());
+      if (url.pathname === "/v1/atom-lab/runs" && route.request().method() === "GET") {
+        listReads += 1;
+        await route.fulfill({json: {items: [listReads === 1 ? pending : url.searchParams.has("cursor") ? other : changed].map(summary),
+          next_cursor: listReads === 1 ? "older-page" : null}});
+      } else if (url.pathname.endsWith(complete.run_id)) {
+        detailReads += 1;
+        if (detailReads > 1 && followup === "unrelated-page") await route.fulfill({status: 503, json: {}});
+        else await route.fulfill({json: detailReads === 1 ? complete : changed});
+      } else if (url.pathname === "/v1/atom-lab/runs") {
+        runPosts += 1;
+        await route.abort();
+      } else if (url.pathname === "/v1/atom-lab/atoms/A06/prompts") {
+        if (route.request().method() === "POST") {
+          promptBody = route.request().postDataJSON();
+          await route.fulfill({status: 422, json: {error: {code: "prompt_invalid", message: "Test rejection", field_errors: []}}});
+        } else await route.fulfill({json: [{ref: A06.prompt_ref, name: "Платформенный", prompt: A06.prompt,
+          group: "platform", source_ref: null, source_run_id: null}]});
+      } else await route.fallback();
+    });
+    await unlockAtom(page, "A06");
+    await page.locator("#history-button").click();
+    await page.locator(`[data-run-id="${complete.run_id}"]`).click();
+    await expect(page.locator("#history-status-text")).toHaveText("Завершён успешно");
+    if (followup === "unrelated-page") {
+      await page.locator("#load-more-history").click();
+      await expect(page.locator("#history-list .history-open")).toHaveCount(2);
+    } else if (followup.startsWith("fresh-")) {
+      await showWorkbench(page);
+      await page.locator("#history-button").click();
+      await expect.poll(() => detailReads).toBe(2);
+    }
+    await expect(page.locator("#restore-history")).toBeEnabled();
+    await expect(page.locator("#save-history-preset")).toBeEnabled();
+    await expect(page.locator("#history-record")).toBeVisible();
+    await expect(page.locator("#history-error")).toHaveText("");
+    const expected = followup.startsWith("fresh-") ? changed : complete;
+    const selectedRow = page.locator("#history-list tr[data-selected='true']");
+    await expect(selectedRow.locator(".status-badge")).toHaveText(expected.status === "succeeded" ? "Успешно" : "Ошибка");
+    expect(JSON.parse(await page.locator("#history-detail").textContent())).toEqual(expected);
+    expect(detailReads).toBe(followup.startsWith("fresh-") ? 2 : 1);
+    await page.locator("#restore-history").click();
+    await page.locator("#prompt-tab").click();
+    await expect(page.locator("#prompt-editor")).toHaveValue(expected.snapshot.prompt.content);
+    await page.locator("#save-prompt-panel summary").click();
+    await page.locator("#save-prompt-name").fill("Свежий снимок");
+    await page.locator("#save-prompt").click();
+    await expect.poll(() => promptBody).toBeTruthy();
+    expect(promptBody.source_run_id).toBe(expected.status === "succeeded" ? complete.run_id : null);
+    expect(runPosts).toBe(0);
+  });
+}
 
 for (const initialStatus of ["queued", "running"]) {
   for (const finalStatus of ["succeeded", "failed"]) {
