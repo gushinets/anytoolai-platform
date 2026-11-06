@@ -7,8 +7,9 @@
 - Created: 2026-11-05
 - Last updated: 2026-11-06
 - Review date: 2026-11-06
-- Next action: obtain required CI and review on the final PR head before merge.
-- Blocker: a complete baseline run requires passwordless sudo for an unchanged user-switch test.
+- Next action: merge PR #257 once GitHub's final-head requirements are satisfied.
+- Blocker: none in the implementation; local validation limitations are recorded below.
+- Required CI and review: completed for implementation head `85abcb92`.
 - Issue: [ANY-814](https://linear.app/paveldik/issue/ANY-814).
 - Related issue: [ANY-507](https://linear.app/paveldik/issue/ANY-507), merged in PR #256.
 - Delivery PR: [#257](https://github.com/gushinets/anytoolai-platform/pull/257).
@@ -57,6 +58,7 @@ Relevant contracts: [scenario sessions](../../architecture/scenario-session-mode
 - [x] Consolidate current docs and mark the superseded canary ordering as historical.
 - [x] Run applicable checks, inspect the final diff and record the baseline environment limitation.
 - [x] Review the combined PR and local follow-up; no new confirmed defects found.
+- [x] Obtain all required CI passes and reviewer approval for `85abcb92`.
 
 ## Validation
 
@@ -66,11 +68,24 @@ and the actual client request timer. PostgreSQL checks cover original IDs, one e
 counters/events, token rotation, removed scenario/association/product and rejection of new or
 foreign starts. Completed legacy replay checks configured actions versus none after removal.
 
-Verification below applies to the follow-up over `d255f0d9`. Regression tests reproduced
+Verification is pinned to implementation head `85abcb92`. Regression tests reproduced
 the unsafe unlock, false lock and config-dependent canary behavior before the production changes.
-No new CI or production acceptance is claimed.
+Production acceptance is not claimed.
 
-Local follow-up results:
+## Completed CI and review
+
+The [implementation CI run](https://github.com/gushinets/anytoolai-platform/actions/runs/42170441896)
+passed all five required jobs: `full-check`, `postgresql-quota-concurrency`, `atoms-proof`,
+`baseline (windows-latest)` and `compose-smoke-prod`.
+The PostgreSQL 18.6 gate passed all 648 cases without skips. The baseline passed on Linux
+(3,031 passed, 12 skipped) and Windows (3,016 passed, 27 skipped); skipped tests are not counted
+as executed. Full-check also passed frontend checks and the 247-case product backend suite.
+[Reviewer approval](https://github.com/gushinets/anytoolai-platform/pull/257#pullrequestreview-5796647162)
+confirmed no merge-blocking defects. Both original CodeRabbit threads were re-evaluated and
+resolved by CodeRabbit. Subsequent documentation-only status updates do not change this verified
+implementation; GitHub must still validate any later PR head.
+
+## Local validation history and limitations
 
 - Doctor: passed using the managed Python 3.12 environment.
 - `frontend-check`: passed lint, typecheck, all 824 unit/component tests, all 88 Atom Lab browser
@@ -89,9 +104,9 @@ Local follow-up results:
 - `quick-check`: interrupted after about 85% of its 3,043 selected tests. The confirmed failure is
   the unchanged `test_activation_marker_is_readable_by_non_root_api_user`: `sudo -n -u nobody`
   requires a password in this environment. The remaining baseline was not completed; no checks
-  were suppressed and no fresh full-check or CI pass is claimed. Sanitized failure context was
-  captured locally with `collect-context`.
+  were suppressed. This local attempt is not claimed as a pass; the successful CI results are
+  recorded above. Sanitized failure context was captured locally with `collect-context`.
 
 No credentialed provider calls, real paid HTTP/Portal integration or production operations were
-performed. Temporary PostgreSQL clusters were stopped and removed. Required CI must pass on the
-published final head; earlier-head CI and these local results do not substitute for it.
+performed. Temporary PostgreSQL clusters were stopped and removed. The local sudo and temporary
+database-profile issues are validation limitations, not unresolved implementation or merge blockers.
