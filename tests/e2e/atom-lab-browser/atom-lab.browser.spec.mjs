@@ -541,12 +541,12 @@ test(`the shared launch keeps its successful prompt trial after ${presetReadback
 });
 }
 
-for (const state of ["new", "version", "failed", "prompt", "source", "input", "model", "reasoning", "other-atom"]) {
+for (const state of ["new", "version", "failed", "prompt", "version-prompt", "source", "input", "model", "reasoning", "other-atom", "subsequent-failed"]) {
   test(`a trial completing after preset readback respects the ${state} draft`, async ({page}) => {
     const product = {ref: "product.a06.v1", name: "Продуктовый", prompt: "Текст продукта", group: "product", source_ref: null, source_run_id: null};
     const versions = [];
     let body;
-    let savedBody;
+    const savedBodies = [];
     let posts = 0;
     let completeRun;
     const completion = new Promise(resolve => { completeRun = resolve; });
@@ -555,15 +555,17 @@ for (const state of ["new", "version", "failed", "prompt", "source", "input", "m
         {ref: A06.prompt_ref, name: "Платформенный", prompt: A06.prompt, group: "platform", source_ref: null, source_run_id: null}, product,
       ]});
       else {
-        savedBody = route.request().postDataJSON();
-        await route.fulfill({json: {ref: "lab.delayed.v1", group: "lab", ...savedBody}});
+        const savedBody = route.request().postDataJSON();
+        savedBodies.push(savedBody);
+        await route.fulfill({json: {ref: `lab.delayed.v${savedBodies.length}`, group: "lab", ...savedBody}});
       }
     });
     await page.route("http://atom-lab.test/v1/atom-lab/runs", async route => {
       posts += 1;
       body = route.request().postDataJSON();
       await route.fulfill({status: 202, json: {
-        run_id: "run-delayed-trial", scenario_session_id: "session-library", job_id: "job-library", status: "queued",
+        run_id: posts === 1 ? "run-delayed-trial" : "run-subsequent-failed",
+        scenario_session_id: "session-library", job_id: "job-library", status: "queued",
       }});
     });
     await page.route("http://atom-lab.test/v1/atom-lab/runs/run-delayed-trial", async route => {
@@ -575,6 +577,13 @@ for (const state of ["new", "version", "failed", "prompt", "source", "input", "m
         detail.result = null;
         detail.diagnostics.error_code = "output_validation_failed";
       }
+      await route.fulfill({json: detail});
+    });
+    await page.route("http://atom-lab.test/v1/atom-lab/runs/run-subsequent-failed", async route => {
+      const detail = historyDetail({runId: "run-subsequent-failed", input: body.input, prompt: body.prompt});
+      detail.status = "failed";
+      detail.result = null;
+      detail.diagnostics.error_code = "output_validation_failed";
       await route.fulfill({json: detail});
     });
     await page.route("http://atom-lab.test/v1/atom-lab/presets**", async route => {
@@ -605,7 +614,8 @@ for (const state of ["new", "version", "failed", "prompt", "source", "input", "m
     await page.locator("#prompt-tab").click();
     await page.locator("#prompt-select").selectOption(product.ref);
     await page.locator("#prompt-editor").fill("Промпт отложенного запуска");
-    if (state === "version") {
+    const newVersion = state.startsWith("version");
+    if (newVersion) {
       await editPreset(page);
       await page.locator("#preset-name").fill("Проверка отложенного запуска");
       await page.locator("#save-preset").click();
@@ -617,11 +627,11 @@ for (const state of ["new", "version", "failed", "prompt", "source", "input", "m
     await editPreset(page);
     await page.locator("#preset-name").fill("Проверка отложенного запуска");
     await page.locator("#save-preset").click();
-    await expect(page.locator("#preset-state")).toContainText(`Сохранена неизменяемая версия ${state === "version" ? 2 : 1}`);
+    await expect(page.locator("#preset-state")).toContainText(`Сохранена неизменяемая версия ${newVersion ? 2 : 1}`);
     await showWorkbench(page);
     await page.locator("#prompt-tab").click();
     await expect(page.locator("#prompt-select")).toHaveValue(product.ref);
-    if (state === "prompt") await page.locator("#prompt-editor").fill("Другой текст");
+    if (["prompt", "version-prompt", "subsequent-failed"].includes(state)) await page.locator("#prompt-editor").fill("Другой текст");
     if (state === "source") {
       await page.locator("#prompt-select").selectOption(A06.prompt_ref);
       await page.locator("#prompt-editor").fill(body.prompt);
@@ -647,15 +657,44 @@ for (const state of ["new", "version", "failed", "prompt", "source", "input", "m
       return;
     }
     const proven = state === "new" || state === "version";
-    await expect(page.locator("#prompt-test-status")).toContainText(proven ? "Ответ прошёл контракт" : "нет успешного пробного запуска");
+    if (proven) await expect(page.locator("#prompt-test-status")).toContainText("Ответ прошёл контракт");
+    else await expect(page.locator("#prompt-test-status")).not.toContainText("Ответ прошёл контракт");
     if (proven) await expect(page.locator("#response-draft-warning")).toBeHidden();
     else if (state !== "failed") await expect(page.locator("#response-draft-warning")).toBeVisible();
+    const submittedSnapshot = await page.locator("#submitted-snapshot").textContent();
+    const result = await page.locator("#result-json").textContent();
+    if (state === "subsequent-failed") {
+      await page.locator("#run-button").click();
+      await expect(page.locator("#run-state")).toHaveText("Ошибка");
+    }
     await page.locator("#save-prompt-panel summary").click();
     await page.locator("#save-prompt-name").fill("Отложенный промпт");
     await page.locator("#save-prompt").click();
     await expect(page.locator("#save-prompt-status")).toContainText("Сохранён");
-    expect(savedBody.source_run_id).toBe(proven ? "run-delayed-trial" : null);
-    expect(posts).toBe(1);
+    expect(savedBodies[0].source_run_id).toBe(proven ? "run-delayed-trial" : null);
+    if (!proven) {
+      await page.locator("#prompt-select").selectOption(product.ref);
+      await page.locator("#prompt-editor").fill(versions.at(-1).prompt);
+      await page.locator("#input-tab").click();
+      await page.locator("#json-mode").click();
+      await page.locator("#json-editor").fill(JSON.stringify(versions.at(-1).example_input));
+      await page.locator("#model-select").selectOption("gpt-supported");
+      await page.locator("#reasoning-effort").selectOption("high");
+      await page.locator("#prompt-tab").click();
+      await expect(page.locator("#prompt-test-status")).toContainText(state === "failed"
+        ? "нет успешного пробного запуска" : "Ответ прошёл контракт");
+      if (state !== "subsequent-failed") {
+        await expect(page.locator("#response-draft-warning")).toBeHidden();
+        await expect(page.locator("#submitted-snapshot")).toHaveText(submittedSnapshot);
+        await expect(page.locator("#result-json")).toHaveText(result);
+      }
+      await page.locator("#save-prompt-panel summary").click();
+      await page.locator("#save-prompt-name").fill("Возврат к проверенному тексту");
+      await page.locator("#save-prompt").click();
+      await expect(page.locator("#save-prompt-status")).toContainText("Сохранён");
+      expect(savedBodies[1].source_run_id).toBe(state === "failed" ? null : "run-delayed-trial");
+    }
+    expect(posts).toBe(state === "subsequent-failed" ? 2 : 1);
   });
 }
 
@@ -692,7 +731,7 @@ for (const library of ["history", "presets"]) {
   });
 }
 
-for (const historicalState of ["succeeded", "retired-model", "failed", "incompatible"]) {
+for (const historicalState of ["succeeded", "retired-model", "failed", "incompatible", "adapted-schema", "adapted-action", "adapted-prompt", "new-catalog"]) {
   test(`restored ${historicalState} history keeps only a matching successful prompt trial`, async ({page}) => {
     const detail = historyDetail({runId: "run-trial-restore"});
     detail.snapshot.prompt.source_ref = "product.a06.v1";
@@ -730,6 +769,31 @@ for (const historicalState of ["succeeded", "retired-model", "failed", "incompat
     await page.locator("#restore-history").click();
     await page.locator("#prompt-tab").click();
     await expect(page.locator("#prompt-select")).toHaveValue(detail.snapshot.prompt.source_ref);
+    if (historicalState.startsWith("adapted-")) {
+      await expect(page.locator("#prompt-test-status")).toContainText("Ответ прошёл контракт");
+      if (historicalState === "adapted-schema") detail.snapshot.schemas.input.version = 99;
+      if (historicalState === "adapted-action") detail.snapshot.action.config_id = "retired.action";
+      if (historicalState === "adapted-prompt") detail.snapshot.prompt.ref = "retired.prompt";
+      await page.locator("#history-button").click();
+      await page.locator("#history-list .history-open").click();
+      await expect(page.locator("#restore-history")).toHaveText("Адаптировать к текущему контракту");
+      page.once("dialog", dialog => dialog.accept());
+      await page.locator("#restore-history").click();
+      await page.locator("#prompt-tab").click();
+    }
+    if (historicalState === "new-catalog") {
+      await expect(page.locator("#prompt-test-status")).toContainText("Ответ прошёл контракт");
+      page.once("dialog", dialog => dialog.accept());
+      await page.locator("#access-form").dispatchEvent("submit");
+      await expect(page.locator("#atom-title")).toContainText("A01");
+      await page.getByRole("button", {name: /A06/}).click();
+      await page.locator("#input-tab").click();
+      await importJson(page, detail.snapshot.input);
+      await page.locator("#reasoning-effort").selectOption("high");
+      await page.locator("#prompt-tab").click();
+      await page.locator("#prompt-select").selectOption(detail.snapshot.prompt.source_ref);
+      await page.locator("#prompt-editor").fill(detail.snapshot.prompt.content);
+    }
     if (historicalState === "retired-model") {
       await expect(page.locator("#model-select")).toHaveValue("gpt-retired");
       await expect(page.locator("#run-button")).toBeDisabled();
@@ -4862,6 +4926,86 @@ test("accepted run immediately marks an open saved preset as a changed draft", a
   await page.locator("#run-button").click();
   await expect(page.locator("#preset-state")).toContainText("Есть несохранённый черновик");
 });
+
+for (const draftState of ["clean", "dirty"]) {
+  test(`cancelling a new preset preserves the ${draftState} editor binding until a committed save`, async ({page}) => {
+    page.on("dialog", dialog => dialog.accept());
+    const stored = {
+      name: "Исходный пресет", description: "Версия 1", atom_id: "A06",
+      base_action_config_id: A06.base_action_config_id, schema_refs: A06.schema_refs,
+      prompt: A06.prompt, prompt_ref: A06.prompt_ref, prompt_source_ref: null,
+      model_id: "openai/gpt-supported", reasoning_effort: "high", fixed_fields: ["context"],
+      example_input: A06.example_input, source_run_id: "run-source-preset",
+      preset_id: "preset-cancel-origin", version: 1, created_at: "2026-11-07T08:00:00Z",
+    };
+    const writes = [];
+    const runBodies = [];
+    let created = null;
+    await page.route("http://atom-lab.test/v1/atom-lab/presets**", async route => {
+      const {pathname} = new URL(route.request().url());
+      if (route.request().method() === "POST") {
+        writes.push(route.request().postDataJSON());
+        created = {...writes.at(-1), preset_id: "preset-new-committed", version: 1, created_at: stored.created_at};
+        await route.fulfill({status: 201, json: {preset_id: created.preset_id, version: 1, created_at: created.created_at}});
+        return;
+      }
+      const version = pathname.includes("preset-new-committed") ? created : stored;
+      const summary = item => ({
+        preset_id: item.preset_id, name: item.name, description: item.description,
+        atom_id: item.atom_id, created_at: item.created_at,
+      });
+      if (pathname === "/v1/atom-lab/presets") await route.fulfill({json: {
+        items: [stored, ...(created ? [created] : [])].map(item => ({...summary(item), latest_version: 1, updated_at: item.created_at})),
+        next_cursor: null,
+      }});
+      else if (pathname.endsWith("/versions")) await route.fulfill({json: {items: [{...summary(version), version: 1}], next_cursor: null}});
+      else await route.fulfill({json: version});
+    });
+    await page.route("http://atom-lab.test/v1/atom-lab/runs", async route => {
+      runBodies.push(route.request().postDataJSON());
+      await route.fulfill({status: 422, json: {error: {code: "test_rejected", message: "Запуск не принят", field_errors: []}, request_id: "test-cancel"}});
+    });
+    await unlockAtom(page, "A06");
+    await page.locator("#presets-button").click();
+    await page.locator("#preset-list button").click();
+    await page.locator("#apply-preset").click();
+    const input = draftState === "dirty" ? {...stored.example_input, objective: "Изменённая цель"} : stored.example_input;
+    if (draftState === "dirty") await importJson(page, input);
+    const draftMessage = await page.locator("#draft-state").textContent();
+    await page.locator("#presets-button").click();
+    await page.locator("#new-preset").click();
+    await page.locator("#cancel-preset").click();
+    await showWorkbench(page);
+    await expect(page.locator("#draft-state")).toHaveText(draftMessage);
+    await page.locator("#run-button").click();
+    await expect(page.locator("#run-state")).toContainText("test_rejected");
+    const expectedBody = {
+      atom_id: stored.atom_id, input, prompt: stored.prompt,
+      model_id: stored.model_id, reasoning_effort: stored.reasoning_effort,
+      preset_ref: {preset_id: stored.preset_id, version: stored.version},
+    };
+    expect(runBodies).toEqual([expectedBody]);
+    expect(writes).toEqual([]);
+
+    await page.locator("#presets-button").click();
+    await page.locator("#preset-list button").click();
+    await editPreset(page);
+    await expect(page.locator("#fixed-fields").getByLabel("context")).toBeChecked();
+    await expect(page.locator("#preset-config-metadata")).toContainText(stored.source_run_id);
+    if (draftState === "dirty") await expect(page.locator("#preset-input-json")).toContainText(input.objective);
+    await page.locator("#new-preset").click();
+    await page.locator("#preset-name").fill("Новый сохранённый пресет");
+    await page.locator("#fixed-fields").getByLabel("context").check();
+    await page.locator("#save-preset").click();
+    await expect(page.locator("#preset-state")).toContainText("Сохранена неизменяемая версия 1");
+    expect(writes).toHaveLength(1);
+    expect(writes[0]).toMatchObject({example_input: input, source_run_id: stored.source_run_id, fixed_fields: ["context"]});
+    await showWorkbench(page);
+    await page.locator("#run-button").click();
+    await expect(page.locator("#run-state")).toContainText("test_rejected");
+    expect(runBodies).toEqual([expectedBody, {...expectedBody, preset_ref: {preset_id: created.preset_id, version: 1}}]);
+  });
+}
 
 test("new preset metadata participates in discard protection and atom changes clear its association", async ({page}) => {
   await page.route("http://atom-lab.test/v1/atom-lab/presets", async (route) => {

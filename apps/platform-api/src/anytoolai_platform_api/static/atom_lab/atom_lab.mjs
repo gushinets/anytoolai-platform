@@ -202,7 +202,6 @@ export function createDraftSession(atom) {
     promptSourceNeedsValidation: false,
     promptSourceDetached: false,
     promptOptions: null,
-    promptTrial: null,
     validationRequested: false,
     arrayExpansion: new Map(),
     arraySummaries: [],
@@ -1546,6 +1545,7 @@ export function bootstrapAtomLab({
   let modelOptions = [];
   let activeSubmission = null;
   let displayedSubmission = null;
+  let promptTrial = null;
   let submitInFlight = false;
   let modelCatalogPollTimer = null;
   let modelCatalogPollStartedAt = null;
@@ -2162,7 +2162,7 @@ export function bootstrapAtomLab({
   const applyConfigurationToEditor = (configuration, {presetRef = null, sourceRunId = null, restored = false} = {}) => {
     const atom = catalog.find((item) => item.atom_id === configuration.atom_id);
     if (!atom) return false;
-    const promptTrial = session?.promptTrial;
+    if (!presetContractMatchesAtom(configuration, atom)) promptTrial = null;
     selectAtom(atom, {force: true, preservePreset: true});
     session.payload = cloneJson(configuration.example_input ?? configuration.input);
     session.baselinePayload = restored ? {} : cloneJson(session.payload);
@@ -2176,7 +2176,6 @@ export function bootstrapAtomLab({
     nodes["prompt-editor"].value = session.prompt;
     renderPromptOptions();
     applyModelSelection(configuration.model_id, configuration.reasoning_effort);
-    session.promptTrial = promptTrial && matchesDraftSnapshot(promptTrial.snapshot) ? promptTrial : null;
     renderEditor();
     if (session.promptSourceNeedsValidation) void loadPromptOptions();
     return true;
@@ -2570,13 +2569,12 @@ export function bootstrapAtomLab({
     }
   };
 
-  const startNewPreset = ({fromHistory = null, activate = true, clearSessionPreset = true} = {}) => {
+  const startNewPreset = ({fromHistory = null, activate = true} = {}) => {
     setPresetReadOnly(false);
     presetEditorActive = activate;
     selectedPresetSummary = null;
     selectedPresetVersion = null;
     presetSourceOverride = fromHistory;
-    if (clearSessionPreset) session.presetRef = null;
     nodes["preset-name"].value = fromHistory ? `Запуск ${fromHistory.sourceRunId}` : "";
     nodes["preset-description"].value = "";
     nodes["preset-version-select"].replaceChildren();
@@ -3011,10 +3009,7 @@ export function bootstrapAtomLab({
         `${submission.snapshot.atom_id} · ${diagnostics.response_model_id ?? diagnostics.requested_model_id}`;
       renderReadableResult(document, nodes["result-readable"], detail.result);
       nodes["result-json"].textContent = JSON.stringify(detail.result, null, 2);
-      submission.ownerSession.promptTrial = {runId: submission.runId, snapshot: submission.snapshot};
-      if (session && matchesDraftSnapshot(submission.snapshot)) {
-        session.promptTrial = submission.ownerSession.promptTrial;
-      }
+      promptTrial = {runId: submission.runId, snapshot: submission.snapshot, atom: submission.ownerSession.atom};
     }
     const debugArtifact = (diagnostics.debug_artifacts ?? [])[0];
     const invalid = detail.status === "failed" && Boolean(debugArtifact);
@@ -3390,8 +3385,8 @@ export function bootstrapAtomLab({
       && sameJsonSemantically(snapshot.input, getDraftPayload(session));
   };
 
-  const matchingPromptTrial = (draft) => draft.promptTrial && matchesDraftSnapshot(draft.promptTrial.snapshot)
-    ? draft.promptTrial.runId : null;
+  const matchingPromptTrial = () => promptTrial?.atom === session.atom && matchesDraftSnapshot(promptTrial.snapshot)
+    ? promptTrial.runId : null;
 
   const renderPromptStatus = () => {
     nodes["reset-prompt"].disabled = Boolean(session.promptSourceNeedsValidation);
@@ -3406,11 +3401,11 @@ export function bootstrapAtomLab({
       : selected?.source_ref
         ? `${PROMPT_GROUPS[selected.group]} · Основа: ${selected.source_ref}`
         : PROMPT_GROUPS[selected?.group ?? "platform"];
-    const status = matchingPromptTrial(session)
+    const status = matchingPromptTrial()
       ? "Пробный запуск завершён. Ответ прошёл контракт."
       : selected?.source_run_id && !edited
         ? "У сохранённого текста есть пробный запуск в истории."
-        : session.promptTrial
+        : promptTrial?.atom === session.atom
           ? "Текст или настройки изменились после пробного запуска."
           : "Для текущего текста нет успешного пробного запуска.";
     if (nodes["prompt-test-status"].textContent !== status) nodes["prompt-test-status"].textContent = status;
@@ -3614,7 +3609,7 @@ export function bootstrapAtomLab({
     }
     const payload = {
       name, prompt: draft.prompt, source_ref: promptRefFor(draft),
-      source_run_id: matchingPromptTrial(draft),
+      source_run_id: matchingPromptTrial(),
     };
     draft.savingPrompt = true;
     nodes["save-prompt"].disabled = true;
@@ -3766,7 +3761,7 @@ export function bootstrapAtomLab({
     if (presetSaveInFlight || presetSaveOutcomeUnknown) return;
     if (presetHasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return;
     if (selectedPresetVersion) commitPresetVersion(selectedPresetVersion);
-    else startNewPreset({activate: false, clearSessionPreset: false});
+    else startNewPreset({activate: false});
     renderPresetList();
   });
   nodes["preset-name"].addEventListener("input", renderPresetState);
@@ -3902,10 +3897,9 @@ export function bootstrapAtomLab({
       return;
     }
     if (compatible && selectedHistoryDetail.status === "succeeded") {
-      session.promptTrial = {runId: selectedHistoryDetail.run_id, snapshot: cloneJson(configuration)};
+      promptTrial = {runId: selectedHistoryDetail.run_id, snapshot: cloneJson(configuration), atom: session.atom};
     }
     startNewPreset({activate: false});
-    session.presetRef = restoredPresetRef;
     showLibrary();
     nodes.status.textContent = compatible
       ? "Снимок восстановлен как черновик. Для запуска нажмите «Запустить атом»."
@@ -3958,7 +3952,7 @@ export function bootstrapAtomLab({
         }
       }
     }
-    startNewPreset({fromHistory: source, clearSessionPreset: false});
+    startNewPreset({fromHistory: source});
     showLibrary("presets");
     nodes.status.textContent = "Подготовлен пресет из выбранного снимка истории.";
   });
