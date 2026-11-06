@@ -1311,7 +1311,17 @@ export interface components {
          */
         WebClientEventType: "web.product_viewed" | "web.form_started" | "web.form_submitted" | "web.result_viewed" | "web.retry_clicked" | "web.mode_selected" | "web.gap_selected" | "web.feedback_submitted";
     };
-    responses: never;
+    responses: {
+        /** @description Atom not found. */
+        AtomLabAtomNotFound: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["AtomLabErrorResponse"];
+            };
+        };
+    };
     parameters: never;
     requestBodies: never;
     headers: never;
@@ -1489,15 +1499,7 @@ export interface operations {
                     "application/json": components["schemas"]["AtomLabErrorResponse"];
                 };
             };
-            /** @description Atom not found. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AtomLabErrorResponse"];
-                };
-            };
+            404: components["responses"]["AtomLabAtomNotFound"];
             /** @description Atom Lab request validation failed. */
             422: {
                 headers: {
@@ -1549,15 +1551,7 @@ export interface operations {
                     "application/json": components["schemas"]["AtomLabErrorResponse"];
                 };
             };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AtomLabErrorResponse"];
-                };
-            };
+            404: components["responses"]["AtomLabAtomNotFound"];
             /** @description Atom Lab request validation failed. */
             422: {
                 headers: {
@@ -1613,15 +1607,7 @@ export interface operations {
                     "application/json": components["schemas"]["AtomLabErrorResponse"];
                 };
             };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AtomLabErrorResponse"];
-                };
-            };
+            404: components["responses"]["AtomLabAtomNotFound"];
             /** @description Atom Lab request validation failed. */
             422: {
                 headers: {

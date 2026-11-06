@@ -323,12 +323,19 @@ def test_atom_lab_request_validation_uses_the_lab_error_envelope(app) -> None:
     assert "must-not-be-echoed" not in response.text
 
 
-def test_atom_lab_shell_is_public_but_contains_no_protected_catalog_data(app) -> None:
+@pytest.mark.parametrize("auth_disabled", [False, True])
+def test_atom_lab_shell_is_public_but_contains_no_protected_catalog_data(
+    app, monkeypatch, auth_disabled,
+) -> None:
+    if auth_disabled:
+        monkeypatch.setenv("ANYTOOLAI_ATOM_LAB_AUTH_DISABLED", "true")
     page = asyncio.run(_request(app, "/atom-lab"))
     styles = asyncio.run(_request(app, "/atom-lab/atom_lab.css"))
     script = asyncio.run(_request(app, "/atom-lab/atom_lab.mjs"))
 
     assert page.status_code == HTTPStatus.OK
+    assert page.headers["Content-Security-Policy"] == "frame-ancestors 'none'"
+    assert page.headers["Cache-Control"] == "no-store"
     assert styles.status_code == HTTPStatus.OK
     assert script.status_code == HTTPStatus.OK
     assert '<input id="access-code" type="password"' in page.text

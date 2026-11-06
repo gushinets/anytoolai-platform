@@ -2162,6 +2162,7 @@ export function bootstrapAtomLab({
   const applyConfigurationToEditor = (configuration, {presetRef = null, sourceRunId = null, restored = false} = {}) => {
     const atom = catalog.find((item) => item.atom_id === configuration.atom_id);
     if (!atom) return false;
+    const promptTrial = session?.promptTrial;
     selectAtom(atom, {force: true, preservePreset: true});
     session.payload = cloneJson(configuration.example_input ?? configuration.input);
     session.baselinePayload = restored ? {} : cloneJson(session.payload);
@@ -2175,6 +2176,7 @@ export function bootstrapAtomLab({
     nodes["prompt-editor"].value = session.prompt;
     renderPromptOptions();
     applyModelSelection(configuration.model_id, configuration.reasoning_effort);
+    session.promptTrial = promptTrial && matchesDraftSnapshot(promptTrial.snapshot) ? promptTrial : null;
     renderEditor();
     if (session.promptSourceNeedsValidation) void loadPromptOptions();
     return true;
@@ -3375,12 +3377,12 @@ export function bootstrapAtomLab({
   };
 
   const matchesDraftSnapshot = (snapshot) => {
-    const model = selectedModelOption()?.modelId;
+    const model = nodes["model-select"].value;
     if (!model || session.jsonError || session.inputErrors.size > 0) return false;
     return snapshot.atom_id === session.atom.atom_id
       && snapshot.prompt === session.prompt
       && (snapshot.prompt_source_ref ?? session.atom.prompt_ref) === promptRefFor(session)
-      && snapshot.model_id === (model.startsWith("openai/") ? model : `openai/${model}`)
+      && snapshot.model_id === addressedModelId(model)
       && snapshot.reasoning_effort === (nodes["reasoning-effort"].value || null)
       && sameJsonSemantically(snapshot.input, getDraftPayload(session));
   };

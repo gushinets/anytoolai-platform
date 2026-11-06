@@ -138,7 +138,7 @@ async function submitNewPresetFromExample(page, name) {
   await page.locator("#save-preset").click();
 }
 
-async function openLab(page, {models = () => MODEL_CATALOG} = {}) {
+async function openLab(page, {models = () => MODEL_CATALOG, accessRequired = true} = {}) {
   await page.route("http://atom-lab.test/**", async (route) => {
     const pathname = new URL(route.request().url()).pathname;
     if (pathname === "/v1/atom-lab/atoms") {
@@ -155,7 +155,12 @@ async function openLab(page, {models = () => MODEL_CATALOG} = {}) {
     }
     const file = pathname === "/atom-lab/" ? "index.html" : pathname.split("/").at(-1);
     const contentType = file.endsWith(".css") ? "text/css" : file.endsWith(".mjs") ? "text/javascript" : "text/html";
-    await route.fulfill({contentType, body: await readFile(new URL(file, STATIC_ROOT))});
+    let body = await readFile(new URL(file, STATIC_ROOT), "utf8");
+    if (file === "index.html" && !accessRequired) {
+      body = body.replace('id="access-panel"', 'id="access-panel" data-auto-open="true" hidden');
+    }
+    await route.fulfill({contentType, body, headers: file === "index.html"
+      ? {"Content-Security-Policy": "frame-ancestors 'none'"} : {}});
   });
   await page.goto("http://atom-lab.test/atom-lab/");
 }
@@ -191,6 +196,26 @@ test("preset and history libraries stay inert before access is unlocked", async 
   await expect(page.locator("#history-panel")).toBeHidden();
   expect(protectedReads).toBe(0);
 });
+
+for (const origin of ["http://untrusted.test", "http://atom-lab.test"]) {
+  test(`the no-code shell rejects framing by ${origin}`, async ({page}) => {
+    await openLab(page, {accessRequired: false});
+    await expect(page.locator("#atom-navigation button")).toHaveCount(11);
+    let protectedRequests = 0;
+    page.on("request", request => {
+      if (new URL(request.url()).pathname.startsWith("/v1/atom-lab/")) protectedRequests += 1;
+    });
+    await page.route(`${origin}/frame`, route => route.fulfill({
+      contentType: "text/html",
+      body: '<iframe style="opacity:0.01;width:1200px;height:900px" src="http://atom-lab.test/atom-lab/"></iframe>',
+    }));
+    const refused = page.waitForEvent("console", message => message.text().includes("frame-ancestors"));
+    await page.goto(`${origin}/frame`);
+    await refused;
+    await expect(page.frameLocator("iframe").locator("#workspace")).toHaveCount(0);
+    expect(protectedRequests).toBe(0);
+  });
+}
 
 test("protected shell, dynamic values, invalid types, numbers, focus, and narrow layout work in Chromium", async ({page}) => {
   await page.setViewportSize({width: 375, height: 900});
@@ -407,10 +432,12 @@ test("object array summaries preserve edits and reveal invalid or newly added co
   await expect(page.getByLabel("category", {exact: true})).toBeFocused();
 });
 
-test("the shared launch tests the selected prompt and keeps accepted results separate from the draft", async ({page}) => {
+for (const presetReadback of ["success", "unavailable"]) {
+test(`the shared launch keeps its successful prompt trial after ${presetReadback} preset readback`, async ({page}) => {
   const product = {ref: "product.a06.v1", name: "Продуктовый", prompt: "Промпт продукта", group: "product", source_ref: null, source_run_id: null};
   let body;
   let savedBody;
+  let presetBody;
   let posts = 0;
   await page.route("http://atom-lab.test/v1/atom-lab/atoms/A06/prompts", async route => {
     if (route.request().method() === "GET") {
@@ -435,6 +462,24 @@ test("the shared launch tests the selected prompt and keeps accepted results sep
     const detail = historyDetail({runId: "run-workbench", input: body.input, prompt: body.prompt});
     detail.snapshot.prompt.ref = product.ref;
     await route.fulfill({contentType: "application/json", body: JSON.stringify(detail)});
+  });
+  await page.route("http://atom-lab.test/v1/atom-lab/presets**", async route => {
+    const {pathname} = new URL(route.request().url());
+    if (route.request().method() === "POST") {
+      presetBody = route.request().postDataJSON();
+      await route.fulfill({json: {preset_id: "trial-preset", version: 1, created_at: "2026-11-06T08:00:00Z"}});
+      return;
+    }
+    const version = {...presetBody, preset_id: "trial-preset", version: 1, created_at: "2026-11-06T08:00:00Z"};
+    const summary = presetBody ? {
+      preset_id: version.preset_id, name: version.name, description: version.description,
+      atom_id: version.atom_id, created_at: version.created_at,
+    } : null;
+    if (pathname === "/v1/atom-lab/presets") {
+      await route.fulfill({json: {items: summary ? [{...summary, latest_version: 1, updated_at: version.created_at}] : [], next_cursor: null}});
+    } else if (presetReadback === "unavailable") await route.fulfill({status: 503, json: {}});
+    else if (pathname.endsWith("/versions")) await route.fulfill({json: {items: [{...summary, version: 1}], next_cursor: null}});
+    else await route.fulfill({json: version});
   });
   await unlockAtom(page, "A06");
   await page.locator("#fill-example").click();
@@ -467,7 +512,20 @@ test("the shared launch tests the selected prompt and keeps accepted results sep
   await page.locator("#model-select").selectOption("gpt-supported");
   await page.locator("#reasoning-effort").selectOption("high");
   await expect(page.locator("#response-draft-warning")).toBeHidden();
+  await page.locator("#presets-button").click();
+  await editPreset(page);
+  await page.locator("#preset-name").fill("Проверенный пресет");
+  await page.locator("#save-preset").click();
+  await expect(page.locator("#preset-state")).toContainText(presetReadback === "success"
+    ? "Сохранена неизменяемая версия 1" : "Версия 1 сохранена");
+  expect(presetBody.source_run_id).toBe("run-workbench");
+  await showWorkbench(page);
   await page.locator("#prompt-tab").click();
+  await expect(page.locator("#prompt-test-status")).toContainText("Ответ прошёл контракт");
+  await page.locator("#reasoning-effort").selectOption("low");
+  await expect(page.locator("#prompt-test-status")).toContainText("изменились");
+  await page.locator("#reasoning-effort").selectOption("high");
+  await expect(page.locator("#prompt-test-status")).toContainText("Ответ прошёл контракт");
   await page.locator("#save-prompt-panel summary").click();
   await page.locator("#save-prompt-name").fill("Успешный промпт");
   await page.locator("#save-prompt").click();
@@ -481,6 +539,7 @@ test("the shared launch tests the selected prompt and keeps accepted results sep
   await expect(page.locator("#result-json")).toHaveText(result);
   expect(posts).toBe(1);
 });
+}
 
 for (const library of ["history", "presets"]) {
   test(`a delayed prompt rejection keeps the ${library} section open until explicit error navigation`, async ({page}) => {
@@ -515,10 +574,11 @@ for (const library of ["history", "presets"]) {
   });
 }
 
-for (const historicalState of ["succeeded", "failed", "incompatible"]) {
+for (const historicalState of ["succeeded", "retired-model", "failed", "incompatible"]) {
   test(`restored ${historicalState} history keeps only a matching successful prompt trial`, async ({page}) => {
     const detail = historyDetail({runId: "run-trial-restore"});
     detail.snapshot.prompt.source_ref = "product.a06.v1";
+    if (historicalState === "retired-model") detail.snapshot.provider.model_id = "openai/gpt-retired";
     if (historicalState === "failed") {
       detail.status = "failed";
       detail.result = null;
@@ -539,7 +599,7 @@ for (const historicalState of ["succeeded", "failed", "incompatible"]) {
       } else if (pathname === "/v1/atom-lab/runs") {
         if (route.request().method() === "POST") runWrites += 1;
         await route.fulfill({json: {items: [{
-          run_id: detail.run_id, status: detail.status, atom_id: "A06", model_id: "openai/gpt-supported",
+          run_id: detail.run_id, status: detail.status, atom_id: "A06", model_id: detail.snapshot.provider.model_id,
           preset_id: null, preset_version: null, created_at: detail.created_at,
           started_at: detail.started_at, finished_at: detail.finished_at,
         }], next_cursor: null}});
@@ -552,6 +612,15 @@ for (const historicalState of ["succeeded", "failed", "incompatible"]) {
     await page.locator("#restore-history").click();
     await page.locator("#prompt-tab").click();
     await expect(page.locator("#prompt-select")).toHaveValue(detail.snapshot.prompt.source_ref);
+    if (historicalState === "retired-model") {
+      await expect(page.locator("#model-select")).toHaveValue("gpt-retired");
+      await expect(page.locator("#run-button")).toBeDisabled();
+      await expect(page.locator("#prompt-test-status")).toContainText("Ответ прошёл контракт");
+      await page.locator("#prompt-editor").fill("Правка текста");
+      await expect(page.locator("#prompt-test-status")).toContainText("изменились");
+      await page.locator("#prompt-editor").fill(detail.snapshot.prompt.content);
+      await expect(page.locator("#prompt-test-status")).toContainText("Ответ прошёл контракт");
+    }
     if (historicalState === "succeeded") {
       await expect(page.locator("#prompt-test-status")).toContainText("Ответ прошёл контракт");
       await page.locator("#prompt-editor").fill("Правка текста");
@@ -580,12 +649,12 @@ for (const historicalState of ["succeeded", "failed", "incompatible"]) {
       await page.locator("#prompt-select").selectOption(detail.snapshot.prompt.source_ref);
       await page.locator("#prompt-editor").fill(detail.snapshot.prompt.content);
       await expect(page.locator("#prompt-test-status")).toContainText("Ответ прошёл контракт");
-    } else await expect(page.locator("#prompt-test-status")).not.toContainText("Ответ прошёл контракт");
+    } else if (historicalState !== "retired-model") await expect(page.locator("#prompt-test-status")).not.toContainText("Ответ прошёл контракт");
     await page.locator("#save-prompt-panel summary").click();
     await page.locator("#save-prompt-name").fill("Из истории");
     await page.locator("#save-prompt").click();
     await expect(page.locator("#save-prompt-status")).toContainText("Сохранён");
-    expect(savedBody.source_run_id).toBe(historicalState === "succeeded" ? detail.run_id : null);
+    expect(savedBody.source_run_id).toBe(["succeeded", "retired-model"].includes(historicalState) ? detail.run_id : null);
     expect(savedBody.source_ref).toBe(detail.snapshot.prompt.source_ref);
     expect(runWrites).toBe(0);
   });
@@ -1847,7 +1916,7 @@ for (const settingsOnly of [false, true, null]) {
       base_action_config_id: A06.base_action_config_id, schema_refs: A06.schema_refs,
       prompt: A06.prompt, prompt_ref: A06.prompt_ref, prompt_source_ref: "product.a06.v1",
       model_id: "openai/gpt-supported", reasoning_effort: "high", fixed_fields: ["context"],
-      example_input: A06.example_input, source_run_id: null,
+      example_input: A06.example_input, source_run_id: settingsOnly === false ? "run-unknown" : null,
       preset_id: "preset-reopen", version: 1, created_at: "2026-11-06T08:00:00Z",
     };
     let runBody;
@@ -1888,6 +1957,7 @@ for (const settingsOnly of [false, true, null]) {
     await page.locator("#apply-preset").click();
     await page.locator("#prompt-tab").click();
     await expect(page.locator("#prompt-select")).toHaveValue(stored.prompt_source_ref);
+    await expect(page.locator("#prompt-test-status")).not.toContainText("Ответ прошёл контракт");
     if (settingsOnly !== null) await expect(page.locator("#preset-config-metadata")).toContainText(stored.prompt_source_ref);
     const editedInput = settingsOnly !== false ? stored.example_input : {...stored.example_input, objective: "Новая цель"};
     const editedPrompt = settingsOnly !== false ? stored.prompt : "Несохранённый промпт";

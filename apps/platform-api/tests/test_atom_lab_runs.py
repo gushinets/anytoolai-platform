@@ -219,10 +219,18 @@ def _error(response: httpx.Response, status: int, code: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "prompt,accepted", [("a" * 16, True), ("a" * 17, False), ("я" * 8, True), ("я" * 8 + "!", False)]
+    "limit,prompt,accepted", [
+        (16, "a" * 16, True), (16, "a" * 17, False),
+        (16, "я" * 8, True), (16, "я" * 8 + "!", False),
+        (70000, "a" * 65537, True), (70000, "a" * 70000, True),
+        (70000, "a" * 70001, False), (70000, "я" * 35000, True),
+        (70000, "я" * 35000 + "!", False),
+    ],
+    ids=["ascii-limit", "ascii-over", "utf8-limit", "utf8-over", "raised-ascii-above-64k",
+         "raised-ascii-limit", "raised-ascii-over", "raised-utf8-limit", "raised-utf8-over"],
 )
-def test_saved_prompt_uses_run_admission_utf8_limit(app, monkeypatch, prompt, accepted):
-    monkeypatch.setenv("ANYTOOLAI_ATOM_LAB_RUN_PROMPT_MAX_BYTES", "16")
+def test_saved_prompt_uses_run_admission_utf8_limit(app, monkeypatch, limit, prompt, accepted):
+    monkeypatch.setenv("ANYTOOLAI_ATOM_LAB_RUN_PROMPT_MAX_BYTES", str(limit))
 
     async def save():
         async with httpx.AsyncClient(
