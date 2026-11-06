@@ -1545,7 +1545,8 @@ export function bootstrapAtomLab({
   let modelOptions = [];
   let activeSubmission = null;
   let displayedSubmission = null;
-  let promptTrial = null;
+  let completedPromptTrial = null;
+  let restoredPromptTrial = null;
   let submitInFlight = false;
   let modelCatalogPollTimer = null;
   let modelCatalogPollStartedAt = null;
@@ -2163,7 +2164,10 @@ export function bootstrapAtomLab({
   const applyConfigurationToEditor = (configuration, {presetRef = null, sourceRunId = null, restored = false} = {}) => {
     const atom = catalog.find((item) => item.atom_id === configuration.atom_id);
     if (!atom) return false;
-    if (!presetContractMatchesAtom(configuration, atom)) promptTrial = null;
+    if (!presetContractMatchesAtom(configuration, atom)) {
+      completedPromptTrial = null;
+      restoredPromptTrial = null;
+    }
     selectAtom(atom, {force: true, preservePreset: true});
     session.payload = cloneJson(configuration.example_input ?? configuration.input);
     session.baselinePayload = restored ? {} : cloneJson(session.payload);
@@ -2887,12 +2891,12 @@ export function bootstrapAtomLab({
       if (generation !== historyListLoadGeneration) return false;
       historyItems = append ? [...historyItems, ...parsed.items] : parsed.items;
       historyCursor = parsed.next_cursor;
-      const selected = historyItems.find(run => run.run_id === selectedHistoryRunId);
-      if (selected && (!selectedHistoryDetail
-        || selected.status !== selectedHistoryDetail.status
+      const selected = parsed.items.find(run => run.run_id === selectedHistoryRunId);
+      if (historyItems.some(run => run.run_id === selectedHistoryRunId) && (!selectedHistoryDetail
+        || selected && (selected.status !== selectedHistoryDetail.status
         || selected.started_at !== selectedHistoryDetail.started_at
-        || selected.finished_at !== selectedHistoryDetail.finished_at)) {
-        await openHistoryRun(selected.run_id);
+        || selected.finished_at !== selectedHistoryDetail.finished_at))) {
+        await openHistoryRun(selectedHistoryRunId);
       }
       if (generation !== historyListLoadGeneration) return false;
       renderHistoryList();
@@ -2947,6 +2951,8 @@ export function bootstrapAtomLab({
       if (!parsed) throw new Error("Снимок запуска вернул некорректный ответ.");
       if (generation !== historyOpenGeneration) return;
       selectedHistoryDetail = cloneJson(parsed);
+      historyItems = historyItems.map(run => run.run_id === runId
+        ? {...run, status: parsed.status, started_at: parsed.started_at, finished_at: parsed.finished_at} : run);
       renderHistoryDetail(parsed);
       const compatible = currentContractMatchesHistory(parsed);
       selectedHistoryCompatible = compatible;
@@ -3030,7 +3036,7 @@ export function bootstrapAtomLab({
         `${submission.snapshot.atom_id} · ${diagnostics.response_model_id ?? diagnostics.requested_model_id}`;
       renderReadableResult(document, nodes["result-readable"], detail.result);
       nodes["result-json"].textContent = JSON.stringify(detail.result, null, 2);
-      promptTrial = {runId: submission.runId, snapshot: submission.snapshot, atom: submission.ownerSession.atom};
+      completedPromptTrial = {runId: submission.runId, snapshot: submission.snapshot, atom: submission.ownerSession.atom};
     }
     const debugArtifact = (diagnostics.debug_artifacts ?? [])[0];
     const invalid = detail.status === "failed" && Boolean(debugArtifact);
@@ -3406,8 +3412,12 @@ export function bootstrapAtomLab({
       && sameJsonSemantically(snapshot.input, getDraftPayload(session));
   };
 
-  const matchingPromptTrial = () => promptTrial?.atom === session.atom && matchesDraftSnapshot(promptTrial.snapshot)
-    ? promptTrial.runId : null;
+  const matchingPromptTrial = () => {
+    if (!catalog.includes(session.atom)) return null;
+    const trial = [restoredPromptTrial, completedPromptTrial].find(candidate => candidate?.atom === session.atom
+      && matchesDraftSnapshot(candidate.snapshot));
+    return trial?.runId ?? null;
+  };
 
   const renderPromptStatus = () => {
     nodes["reset-prompt"].disabled = Boolean(session.promptSourceNeedsValidation);
@@ -3428,7 +3438,7 @@ export function bootstrapAtomLab({
       ? "Пробный запуск завершён. Ответ прошёл контракт."
       : selected?.source_run_id && !edited
         ? "У сохранённого текста есть пробный запуск в истории."
-        : promptTrial?.atom === session.atom
+        : completedPromptTrial?.atom === session.atom || restoredPromptTrial?.atom === session.atom
           ? "Текст или настройки изменились после пробного запуска."
           : "Для текущего текста нет успешного пробного запуска.";
     if (nodes["prompt-test-status"].textContent !== status) nodes["prompt-test-status"].textContent = status;
@@ -3931,7 +3941,7 @@ export function bootstrapAtomLab({
       return;
     }
     if (compatible && selectedHistoryDetail.status === "succeeded") {
-      promptTrial = {runId: selectedHistoryDetail.run_id, snapshot: cloneJson(configuration), atom: session.atom};
+      restoredPromptTrial = {runId: selectedHistoryDetail.run_id, snapshot: cloneJson(configuration), atom: session.atom};
     }
     startNewPreset({activate: false});
     showLibrary();
