@@ -569,3 +569,70 @@ viewport assertions remain intact. Full backend/production PostgreSQL checks wer
 not repeated for these JavaScript fixes; PR update, CI and independent review
 remain with the parent. Ambiguous-save retry/idempotency and unbounded library
 pagination remain the previously documented separate follow-ups.
+
+## Source refresh and library presentation
+
+Doctor passed before edits on 2026-11-07. Address review `5806688876`,
+discussions `4497362859`, `4497362869` and `4497362876`:
+
+1. Revalidate a still-selected source after confirmed `prompt_source_invalid` run
+   rejection. Preserve manual prompt/input edits, detach missing references, expose
+   read-error Retry, and fence changed sources, replacement editors and catalogs.
+2. Wrap full user-supplied preset names/descriptions in the shared item list.
+   API limits remain 256 name characters and 4096 description characters.
+3. Reflect only a visible selected history detail in expansion ARIA and detail
+   rows; preserve selection and allow the same date button to retry a failed read.
+
+Reach: shared Atom Lab JavaScript/CSS, focused Chromium regressions and this plan.
+First reproduce the three failures, then run focused/connected browser journeys,
+canonical frontend-check, docs/generation and diff checks. Visually inspect narrow
+screenshots. Use existing mocked fixtures only; no backend/API changes, live DB,
+provider calls, migration, dependency, staging, commit, push or GitHub publication.
+
+All three reported defects were reproduced before production edits: two source
+recovery cases remained at one GET, allowed unbroken preset text stretched the
+desktop document to 41235px, and detail 503 left `aria-expanded=true`. Logs:
+`.quick-check-tmp/p3-regressions-before.log` and `p3-fencing-before.log`.
+
+Confirmed source rejection now targets the existing source selector and refreshes
+through the shared loader only for the same editor, selected reference and loaded
+catalog atom. Pending/failed revalidation blocks launch, reset and saves; Retry
+forces a new GET despite populated options. Fresh options detach retired refs
+without replacing manual prompt/input text, retire the field error, and admit a
+new submission with a new key. No successful trial is inferred. Delayed rejection
+after source/editor/catalog change and delayed refresh after source/editor change
+preserve the current draft. A further regression caught explicit platform selection
+during refresh: reconciliation now compares its effective reference, rather than
+mistaking the platform's null override for a missing source.
+
+The shared list button wraps full names and descriptions without truncation or API
+limit changes. Desktop 1440px and mobile 360px keep the exact document width with
+256/4096-character values. History expansion requires the selected visible detail;
+failed detail reads retain selection and explain retry through the date button.
+The same render now handles nonterminal detail invalidation during list refresh:
+an added assertion reproduced stale ARIA/empty expansion on list 503 too. Log:
+`.quick-check-tmp/p3-history-list-before.log`.
+
+Focused final Chromium verification passed 16 cases (nine new and seven connected
+history refresh cases); the broader prompt/history/trial/admission set passed 96.
+Logs: `.quick-check-tmp/p3-final-focused.log` and `p3-connected-chromium.log`.
+Atom Lab lint and all 53 Node tests passed. Narrow screenshots were visually
+inspected for long preset text, collapsed history failure and successful retry;
+artifacts live under `.quick-check-tmp/p3-final-focused/`.
+
+Final canonical `frontend-check` passed (2026-11-07): lint, typecheck, 198 Chromium
+journeys, 53 Atom Lab Node tests, six demo Node tests, 824 Vitest tests, generated
+API-type drift and production builds. Log: `.quick-check-tmp/p3-frontend-check-final.log`.
+The full command was repeated after the last history invalidation change.
+`validate-docs`, `generate-docs --check` and `git diff --check` passed; documentation
+logs are `.quick-check-tmp/p3-validate-docs.log` and `p3-generate-docs-check.log`.
+
+The pnpm-store symlink and generator Temp ACL required the established escalation;
+the same commands then passed. Chromium used the installed cache; no dependency or
+generated contract changed. Four owned files remain uncommitted, staging is empty
+and HEAD is `3bc8025ce14c2aed23d1ccc1a28c8b2e23741d9b`. Unrelated untracked
+reports remain untouched. Backend/production PostgreSQL checks were not repeated
+for these UI fixes. Parent owns commit/push, fresh independent review and required
+CI. Working DB, migrations, deployment, provider calls and GitHub writes were not
+used. Ambiguous-save retry/idempotency and unbounded library pagination remain
+the previously documented separate follow-ups.

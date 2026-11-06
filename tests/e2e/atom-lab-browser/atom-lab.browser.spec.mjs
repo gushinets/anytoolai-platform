@@ -2083,6 +2083,196 @@ test("admission rejection keeps the draft, hides transport retry, and a new laun
   expect(keys[0]).not.toBe(keys[1]);
 });
 
+for (const refreshFails of [false, true]) {
+  test(`a rejected prompt source refreshes without losing edits${refreshFails ? " after a failed read and Retry" : ""}`, async ({page}) => {
+    page.on("dialog", dialog => dialog.accept());
+    const platform = {ref: A06.prompt_ref, name: "Платформенный", prompt: A06.prompt, group: "platform", source_ref: null, source_run_id: null};
+    const product = {ref: "product.a06.v1", name: "Продуктовый v1", prompt: "Текст продукта v1", group: "product", source_ref: null, source_run_id: null};
+    const replacement = {...product, ref: "product.a06.v2", name: "Продуктовый v2", prompt: "Текст продукта v2"};
+    let reads = 0;
+    let releaseRefresh;
+    const refreshGate = new Promise(resolve => { releaseRefresh = resolve; });
+    const submissions = [];
+    const keys = [];
+    await page.route("http://atom-lab.test/v1/atom-lab/atoms/A06/prompts", async route => {
+      reads += 1;
+      const read = reads;
+      if (read === 2) await refreshGate;
+      if (read === 2 && refreshFails) {
+        await route.fulfill({status: 503, json: {error: {code: "prompts_unavailable", message: "Библиотека временно недоступна."}}});
+      } else await route.fulfill({json: [platform, read === 1 ? product : replacement]});
+    });
+    await page.route("http://atom-lab.test/v1/atom-lab/runs", async route => {
+      submissions.push(route.request().postDataJSON());
+      keys.push(route.request().headers()["idempotency-key"]);
+      await route.fulfill({status: 422, json: {error: {
+        code: submissions.length === 1 ? "prompt_source_invalid" : "input_invalid",
+        message: "Запуск не принят.",
+        field_errors: [{path: submissions.length === 1 ? "prompt_source_ref" : "input", message: "Источник больше недоступен."}],
+      }, request_id: "source-rejected"}});
+    });
+    await unlockAtom(page, "A06");
+    await page.locator("#fill-example").click();
+    await page.locator("#prompt-tab").click();
+    await page.locator("#prompt-select").selectOption(product.ref);
+    await page.locator("#prompt-editor").fill("Ручной текст до отказа");
+    await page.locator("#input-tab").click();
+    await page.locator("#run-button").click();
+    await expect(page.locator("#run-state")).toContainText("prompt_source_invalid");
+    await expect.poll(() => reads).toBe(2);
+    await expect(page.locator("#prompt-panel")).toBeVisible();
+    await expect(page.locator("#prompt-select")).toHaveAttribute("aria-invalid", "true");
+    await expect(page.locator("#validation-errors")).toContainText("prompt_source_ref: Источник больше недоступен.");
+    await expect(page.locator("#run-button")).toBeDisabled();
+    await expect(page.locator("#reset-prompt")).toBeDisabled();
+    await expect(page.locator("#save-prompt")).toBeDisabled();
+    await expect(page.locator("#retry-submit")).toBeHidden();
+    const editedPrompt = "Ручной текст после отказа — сохранить полностью";
+    await page.locator("#prompt-editor").fill(editedPrompt);
+    await page.locator("#input-tab").click();
+    const input = {...A06.example_input, objective: "Правка во время обновления источников"};
+    await importJson(page, input);
+    await page.getByRole("button", {name: "prompt_source_ref: Источник больше недоступен.", exact: true}).click();
+    await expect(page.locator("#prompt-select")).toBeFocused();
+    releaseRefresh();
+    if (refreshFails) {
+      await expect(page.locator("#prompt-load-status")).toContainText("Библиотека временно недоступна");
+      await expect(page.locator("#retry-prompts")).toBeVisible();
+      await expect(page.locator("#prompt-select")).toHaveValue(product.ref);
+      await expect(page.locator("#prompt-editor")).toHaveValue(editedPrompt);
+      await expect(page.locator("#run-button")).toBeDisabled();
+      await page.locator("#run-button").dispatchEvent("click");
+      expect(submissions).toHaveLength(1);
+      await page.locator("#retry-prompts").click();
+    }
+    await expect(page.locator("#prompt-select")).toHaveValue(A06.prompt_ref);
+    await expect(page.locator("#prompt-select option")).toHaveText([platform.name, replacement.name]);
+    await expect(page.locator("#prompt-origin")).toContainText("источник недоступен");
+    await expect(page.locator("#prompt-editor")).toHaveValue(editedPrompt);
+    await expect(page.locator("#validation-errors")).not.toContainText("prompt_source_ref");
+    await expect(page.locator("#prompt-select")).not.toHaveAttribute("aria-invalid", "true");
+    await expect(page.locator("#retry-prompts")).toBeHidden();
+    await expect(page.locator("#run-button")).toBeEnabled();
+    await expect(page.locator("#prompt-test-status")).toContainText("нет успешного пробного запуска");
+    await page.locator("#run-button").click();
+    await expect.poll(() => submissions.length).toBe(2);
+    expect(submissions[0].prompt_source_ref).toBe(product.ref);
+    expect(submissions[1].prompt_source_ref).toBeUndefined();
+    expect(submissions[1].prompt).toBe(editedPrompt);
+    expect(submissions[1].input).toEqual(input);
+    expect(keys[1]).not.toBe(keys[0]);
+    expect(reads).toBe(refreshFails ? 3 : 2);
+    await page.locator("#prompt-select").selectOption(replacement.ref);
+    await expect(page.locator("#prompt-editor")).toHaveValue(replacement.prompt);
+  });
+}
+
+for (const change of ["source", "replacement-editor", "catalog"]) {
+  test(`a delayed rejected prompt source leaves a changed ${change} untouched`, async ({page}) => {
+    let cancelSwitch = false;
+    page.on("dialog", dialog => cancelSwitch ? dialog.dismiss() : dialog.accept());
+    const product = {ref: "product.a06.v1", name: "Продуктовый v1", prompt: "Текст продукта v1", group: "product", source_ref: null, source_run_id: null};
+    const other = {...product, ref: "product.a06.v2", name: "Продуктовый v2", prompt: "Текст продукта v2"};
+    let reads = 0;
+    let releaseRejection;
+    const rejection = new Promise(resolve => { releaseRejection = resolve; });
+    await page.route("http://atom-lab.test/v1/atom-lab/atoms/A06/prompts", async route => {
+      reads += 1;
+      await route.fulfill({json: [
+        {ref: A06.prompt_ref, name: "Платформенный", prompt: A06.prompt, group: "platform", source_ref: null, source_run_id: null}, product, other,
+      ]});
+    });
+    await page.route("http://atom-lab.test/v1/atom-lab/runs", async route => {
+      await rejection;
+      await route.fulfill({status: 422, json: {error: {
+        code: "prompt_source_invalid", message: "Источник больше недоступен.",
+        field_errors: [{path: "prompt_source_ref", message: "Устаревший источник."}],
+      }, request_id: "late-source-rejection"}});
+    });
+    await unlockAtom(page, "A06");
+    await page.locator("#fill-example").click();
+    await page.locator("#prompt-tab").click();
+    await page.locator("#prompt-select").selectOption(product.ref);
+    const posted = page.waitForRequest(request => request.method() === "POST" && request.url().endsWith("/runs"));
+    await page.locator("#run-button").click();
+    await posted;
+    if (change === "source") await page.locator("#prompt-select").selectOption(other.ref);
+    if (change === "replacement-editor") {
+      await page.getByRole("button", {name: /A05/}).click();
+      await page.getByRole("button", {name: /A06/}).click();
+      await page.locator("#input-tab").click();
+      await page.locator("#fill-example").click();
+      await page.locator("#prompt-tab").click();
+      await page.locator("#prompt-select").selectOption(product.ref);
+    }
+    const currentText = "Правки текущего редактора";
+    await page.locator("#prompt-editor").fill(currentText);
+    if (change === "catalog") {
+      cancelSwitch = true;
+      const reloaded = page.waitForResponse("**/v1/atom-lab/models");
+      await page.locator("#access-form").dispatchEvent("submit");
+      await reloaded;
+    }
+    const readsBeforeRejection = reads;
+    const rejected = page.waitForResponse(response => response.request().method() === "POST" && response.url().endsWith("/runs"));
+    releaseRejection();
+    await (await rejected).finished();
+    await expect(page.locator("#run-state")).toContainText("prompt_source_invalid");
+    await expect(page.locator("#run-button")).toBeEnabled();
+    await expect(page.locator("#prompt-editor")).toHaveValue(currentText);
+    await expect(page.locator("#prompt-select")).toHaveValue(change === "source" ? other.ref : product.ref);
+    await expect(page.locator("#validation-errors")).not.toContainText("Устаревший источник");
+    await expect(page.locator("#retry-prompts")).toBeHidden();
+    expect(reads).toBe(readsBeforeRejection);
+    await expect(page.locator("#prompt-test-status")).not.toContainText("Ответ прошёл контракт");
+  });
+}
+
+for (const change of ["source", "editor"]) {
+  test(`a rejected source refresh preserves a later ${change} selection`, async ({page}) => {
+    page.on("dialog", dialog => dialog.accept());
+    const platform = {ref: A06.prompt_ref, name: "Платформенный", prompt: A06.prompt, group: "platform", source_ref: null, source_run_id: null};
+    const product = {ref: "product.a06.v1", name: "Продуктовый v1", prompt: "Текст продукта v1", group: "product", source_ref: null, source_run_id: null};
+    const replacement = {...product, ref: "product.a06.v2", name: "Продуктовый v2", prompt: "Текст продукта v2"};
+    let reads = 0;
+    let releaseRefresh;
+    const refresh = new Promise(resolve => { releaseRefresh = resolve; });
+    await page.route("http://atom-lab.test/v1/atom-lab/atoms/A06/prompts", async route => {
+      const read = ++reads;
+      if (read === 2) await refresh;
+      await route.fulfill({json: [platform, read === 1 ? product : replacement]});
+    });
+    await page.route("http://atom-lab.test/v1/atom-lab/runs", route => route.fulfill({status: 422, json: {error: {
+      code: "prompt_source_invalid", message: "Источник больше недоступен.",
+      field_errors: [{path: "prompt_source_ref", message: "Устаревший источник."}],
+    }, request_id: "source-refresh"}}));
+    await unlockAtom(page, "A06");
+    await page.locator("#fill-example").click();
+    await page.locator("#prompt-tab").click();
+    await page.locator("#prompt-select").selectOption(product.ref);
+    await page.locator("#run-button").click();
+    await expect.poll(() => reads).toBe(2);
+    if (change === "editor") {
+      await page.getByRole("button", {name: /A05/}).click();
+      await page.getByRole("button", {name: /A06/}).click();
+    }
+    const selectedRef = change === "source" ? platform.ref : replacement.ref;
+    await page.locator("#prompt-select").selectOption(selectedRef);
+    const text = "Правки после начала обновления";
+    await page.locator("#prompt-editor").fill(text);
+    const refreshed = page.waitForResponse("**/atoms/A06/prompts");
+    releaseRefresh();
+    await (await refreshed).finished();
+    await expect(page.locator("#run-button")).toBeEnabled();
+    await expect(page.locator("#prompt-editor")).toHaveValue(text);
+    await expect(page.locator("#prompt-select")).toHaveValue(selectedRef);
+    await expect(page.locator("#prompt-origin")).not.toContainText("недоступен");
+    await expect(page.locator("#validation-errors")).not.toContainText("Устаревший источник");
+    await expect(page.locator("#retry-prompts")).toBeHidden();
+    expect(reads).toBe(change === "source" ? 2 : 3);
+  });
+}
+
 test("prompt admission errors stay visible and identify the prompt editor", async ({page}) => {
   await page.route("http://atom-lab.test/v1/atom-lab/runs", async (route) => {
     await route.fulfill({status: 422, contentType: "application/json", body: JSON.stringify({
@@ -2672,6 +2862,71 @@ for (const settingsOnly of [false, true, null]) {
     });
   });
 }
+
+test("full length preset names and descriptions wrap on desktop and mobile", async ({page}, testInfo) => {
+  const longName = "Я".repeat(256);
+  const longDescription = "О".repeat(4096);
+  const items = [
+    {preset_id: "long-name", name: longName, description: "Полное длинное имя без пробелов"},
+    {preset_id: "long-description", name: "Полное описание без пробелов", description: longDescription},
+  ].map(item => ({...item, atom_id: "A06", latest_version: 1, created_at: "2026-09-23T08:00:00Z", updated_at: "2026-09-23T08:00:00Z"}));
+  await page.route("http://atom-lab.test/v1/atom-lab/presets", route => route.fulfill({json: {items, next_cursor: null}}));
+  await unlockAtom(page, "A06");
+  await page.locator("#presets-button").click();
+  await expect(page.locator("#preset-list button")).toHaveCount(2);
+  for (const width of [1440, 360]) {
+    await page.setViewportSize({width, height: 900});
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+    await expect(page.locator('[data-preset-id="long-name"]')).toContainText(longName);
+    await expect(page.locator('[data-preset-id="long-description"] small').last()).toHaveText(longDescription);
+    expect(await page.locator("#preset-list button").evaluateAll(buttons => buttons.every(button => button.scrollWidth <= button.clientWidth))).toBe(true);
+  }
+  await page.screenshot({path: testInfo.outputPath("long-presets-360.png")});
+});
+
+test("a failed history detail stays collapsed and retries from its date button", async ({page}, testInfo) => {
+  await page.setViewportSize({width: 360, height: 900});
+  const detail = historyDetail();
+  let reads = 0;
+  await page.route("http://atom-lab.test/v1/atom-lab/runs**", async route => {
+    if (new URL(route.request().url()).pathname.endsWith("/runs")) {
+      await route.fulfill({json: {items: [{
+        run_id: detail.run_id, status: detail.status, atom_id: "A06", model_id: "openai/gpt-supported",
+        preset_id: null, preset_version: null, created_at: detail.created_at,
+        started_at: detail.started_at, finished_at: detail.finished_at,
+      }], next_cursor: null}});
+    } else {
+      reads += 1;
+      await route.fulfill(reads === 1
+        ? {status: 503, json: {error: {code: "history_unavailable", message: "Подробности временно недоступны."}}}
+        : {json: detail});
+    }
+  });
+  await unlockAtom(page, "A06");
+  await page.locator("#history-button").click();
+  const date = page.locator(`[data-run-id="${detail.run_id}"]`);
+  await date.click();
+  await expect(page.locator("#history-error")).toContainText("Подробности временно недоступны");
+  await expect(date).toHaveAttribute("aria-current", "true");
+  await expect(date).toHaveAttribute("aria-expanded", "false");
+  await expect(date).toBeEnabled();
+  await expect(page.locator("#history-record")).toBeHidden();
+  await expect(page.locator("#history-list > tr")).toHaveCount(1);
+  await expect(page.locator("#history-list .history-expanded")).toHaveCount(0);
+  await expect(page.locator("#history-error")).toContainText("кнопкой даты");
+  await page.screenshot({path: testInfo.outputPath("history-read-failed-360.png")});
+  await date.click();
+  await expect(page.locator("#history-record")).toBeVisible();
+  await expect(date).toHaveAttribute("aria-expanded", "true");
+  await expect(page.locator("#history-list > tr")).toHaveCount(2);
+  await expect(page.locator("#history-list .history-expanded")).toHaveCount(1);
+  await expect(page.locator("#history-error")).toHaveText("");
+  await expect(page.locator("#history-result-readable")).toContainText("Готово");
+  await expect(page.locator("#restore-history")).toBeEnabled();
+  expect(reads).toBe(2);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(360);
+  await page.screenshot({path: testInfo.outputPath("history-read-retried-360.png")});
+});
 
 test("history table reveals result, request and diagnostics with complete JSON and keyboard tabs", async ({page}) => {
   const detail = historyDetail();
@@ -5794,6 +6049,8 @@ for (const outcome of ["list-failure", "failure", "malformed", "superseded-succe
     if (outcome === "list-failure") {
       await expect(page.locator("#history-error")).toContainText("Список недоступен");
       await expect(page.locator("#history-record")).toBeHidden();
+      await expect(page.locator(`[data-run-id="${complete.run_id}"]`)).toHaveAttribute("aria-expanded", "false");
+      await expect(page.locator("#history-list .history-expanded")).toHaveCount(0);
       await expect(page.locator("#restore-history")).toBeDisabled();
       await expect(page.locator("#save-history-preset")).toBeDisabled();
       return;
