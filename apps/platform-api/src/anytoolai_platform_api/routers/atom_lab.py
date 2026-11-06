@@ -137,10 +137,11 @@ _RUN_ID_PATTERN = re.compile(r"[A-Za-z0-9_-]+")
 
 
 def require_atom_lab_run_access(
+    request: Request,
     access_code: Annotated[str | None, Header(alias="X-Atom-Lab-Access-Code")] = None,
 ) -> None:
     try:
-        require_atom_lab_access(access_code)
+        require_atom_lab_access(request, access_code)
     except AtomLabApiError as exc:
         code = "access_denied" if exc.status_code == HTTPStatus.UNAUTHORIZED else "lab_unavailable"
         raise AtomLabApiError(status_code=exc.status_code, code=code, message=exc.message) from exc
@@ -647,7 +648,7 @@ def _prompt_source_exists(
 @protected_router.get(
     "/atoms/{atom_id}/prompts",
     response_model=list[AtomLabPromptOption],
-    responses=_ERROR_RESPONSES,
+    responses={**_ERROR_RESPONSES, 404: {"model": AtomLabErrorResponse}},
 )
 def list_atom_prompts(
     atom: Annotated[AtomLabAtomResponse, Depends(get_atom)],
@@ -669,14 +670,14 @@ def list_atom_prompts(
     "/atoms/{atom_id}/prompts",
     status_code=HTTPStatus.CREATED,
     response_model=AtomLabPromptOption,
-    responses=_ERROR_RESPONSES,
+    responses={**_ERROR_RESPONSES, 404: {"model": AtomLabErrorResponse}},
 )
 def create_atom_prompt(
     payload: AtomLabPromptCreateRequest,
     atom: Annotated[AtomLabAtomResponse, Depends(get_atom)],
     registry: Annotated[ConfigRegistry, Depends(get_config_registry)],
     session_factory: Annotated[Any, Depends(get_atom_lab_session_factory)],
-    settings: Annotated[Settings, Depends(get_settings)],
+    settings: Annotated[Settings, Depends(get_atom_lab_run_settings)],
 ) -> AtomLabPromptOption:
     def invalid_prompt(message: str, path: str) -> AtomLabApiError:
         return AtomLabApiError(

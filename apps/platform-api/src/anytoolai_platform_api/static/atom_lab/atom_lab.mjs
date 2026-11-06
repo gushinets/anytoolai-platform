@@ -2087,7 +2087,7 @@ export function bootstrapAtomLab({
       ["Атом", `${configuration.atom_id} · ${ATOM_LABELS[configuration.atom_id].name}`],
       ["Модель", configuration.model_id],
       ["Reasoning", configuration.reasoning_effort ?? "Не запрошен"],
-      ["Промпт", configuration.prompt_ref],
+      ["Промпт", configuration.prompt_source_ref ?? configuration.prompt_ref],
       ["Конфигурация действия", configuration.base_action_config_id],
       ["Схема входа", `${configuration.schema_refs.input.schema_ref} · v${configuration.schema_refs.input.version}`],
       ["Схема выхода", `${configuration.schema_refs.output.schema_ref} · v${configuration.schema_refs.output.version}`],
@@ -2600,7 +2600,8 @@ export function bootstrapAtomLab({
     const samePresetVersion = session.presetRef?.preset_id === version.preset_id
       && session.presetRef.version === version.version;
     const alreadyApplied = samePresetVersion
-      && (!openWorkbench || matchesDraftSnapshot({...version, input: version.example_input}));
+      && (!openWorkbench || (session.sourceRunId === version.source_run_id
+        && matchesDraftSnapshot({...version, input: version.example_input})));
     if (!alreadyApplied) {
       if ((hasUnsavedDraft() || samePresetVersion) && !confirmImpl(DIRTY_WARNING)) return;
       if (!applyConfigurationToEditor(version, {
@@ -3232,7 +3233,8 @@ export function bootstrapAtomLab({
                   : undefined,
           }));
         renderValidation(document, nodes["validation-errors"], session, admissionErrors);
-        if (admissionErrors.some(({path}) => path === "prompt")) showInputTab(false);
+        if (session === submission.ownerSession && !nodes["request-response"].hidden
+          && admissionErrors.some(({path}) => path === "prompt")) showInputTab(false);
         setRunState(
           `${code}: ${error?.message ?? safeApiMessage(payload, "Запуск не принят.")} Черновик сохранён.`,
           "error", "Исправьте параметры перед следующей отправкой.",
@@ -3387,6 +3389,7 @@ export function bootstrapAtomLab({
     ? draft.promptTrial.runId : null;
 
   const renderPromptStatus = () => {
+    nodes["reset-prompt"].disabled = Boolean(session.promptSourceNeedsValidation);
     const ref = promptRefFor(session);
     const selected = session.promptOptions?.find((option) => option.ref === ref);
     const edited = session.prompt !== session.basePrompt;
@@ -3714,7 +3717,7 @@ export function bootstrapAtomLab({
     renderEditor();
   });
   nodes["reset-prompt"].addEventListener("click", () => {
-    if (session.prompt === session.basePrompt) return;
+    if (session.promptSourceNeedsValidation || session.prompt === session.basePrompt) return;
     if (hasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return;
     resetPrompt(session);
     nodes["prompt-editor"].value = session.prompt;
@@ -3892,6 +3895,9 @@ export function bootstrapAtomLab({
     })) {
       nodes["history-error"].textContent = "Исторический снимок нельзя восстановить автоматически.";
       return;
+    }
+    if (compatible && selectedHistoryDetail.status === "succeeded") {
+      session.promptTrial = {runId: selectedHistoryDetail.run_id, snapshot: cloneJson(configuration)};
     }
     startNewPreset({activate: false});
     session.presetRef = restoredPresetRef;

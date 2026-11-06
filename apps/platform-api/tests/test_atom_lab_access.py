@@ -43,13 +43,17 @@ async def _request(
     access_code: str | None = None,
     request_id: str = "req_atom_lab",
     raise_app_exceptions: bool = True,
+    base_url: str = "http://testserver",
+    origin: str | None = None,
 ) -> httpx.Response:
     headers = {"X-Request-ID": request_id}
+    if origin is not None:
+        headers["Origin"] = origin
     if access_code is not None:
         headers["X-Atom-Lab-Access-Code"] = access_code
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app, raise_app_exceptions=raise_app_exceptions),
-        base_url="http://testserver",
+        base_url=base_url,
     ) as client:
         return await client.request(method, path, headers=headers, json=json)
 
@@ -115,17 +119,65 @@ def test_atom_lab_catalog_fails_closed_without_server_configuration(
     }
 
 
-def test_explicit_local_open_access_loads_catalog_without_code(app, monkeypatch) -> None:
+@pytest.mark.parametrize(
+    "base_url", ["http://127.0.0.1:8000", "http://localhost:8000", "http://[::1]:8000"]
+)
+def test_explicit_local_open_access_loads_catalog_without_code(app, monkeypatch, base_url) -> None:
     monkeypatch.setenv("ANYTOOLAI_ATOM_LAB_AUTH_DISABLED", "true")
     monkeypatch.delenv("ANYTOOLAI_ATOM_LAB_ACCESS_CODE")
-    catalog = asyncio.run(_request(app, "/v1/atom-lab/atoms"))
+    catalog = asyncio.run(_request(app, "/v1/atom-lab/atoms", base_url=base_url, origin=base_url))
     assert catalog.status_code == HTTPStatus.OK
     assert len(catalog.json()) == 11
+    cli_catalog = asyncio.run(_request(app, "/v1/atom-lab/atoms", base_url=base_url))
+    assert cli_catalog.status_code == HTTPStatus.OK
     page = asyncio.run(_request(app, "/atom-lab"))
     assert 'id="access-panel" data-auto-open="true" hidden' in page.text
     assert page.headers["cache-control"] == "no-store"
-    invalid_run = asyncio.run(_request(app, "/v1/atom-lab/runs", method="POST", json={}))
+    invalid_run = asyncio.run(_request(
+        app, "/v1/atom-lab/runs", method="POST", json={}, base_url=base_url, origin=base_url,
+    ))
     assert invalid_run.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+
+
+@pytest.mark.parametrize("base_url,origin", [
+    ("http://127.0.0.1:8000", "chrome-extension://" + "a" * 32),
+    ("http://127.0.0.1:8000", "https://untrusted.example"),
+    ("http://127.0.0.1:8000", "http://127.0.0.1:9000"),
+    ("http://127.0.0.1:8000", "http://localhost:8000"),
+    ("http://127.0.0.1:8000", "null"),
+    ("http://rebound.example:8000", None),
+    ("http://rebound.example:8000", "http://rebound.example:8000"),
+    ("http://localhost.untrusted.example", None),
+])
+@pytest.mark.parametrize("method,path", [
+    ("GET", "/v1/atom-lab/atoms"),
+    ("GET", "/v1/atom-lab/atoms/A07/prompts"),
+    ("GET", "/v1/atom-lab/runs"),
+    ("POST", "/v1/atom-lab/runs"),
+    ("POST", "/v1/atom-lab/presets"),
+    ("POST", "/v1/atom-lab/atoms/A07/prompts"),
+])
+def test_local_open_access_rejects_untrusted_host_or_origin(
+    app, monkeypatch, base_url, origin, method, path,
+) -> None:
+    monkeypatch.setenv("ANYTOOLAI_ATOM_LAB_AUTH_DISABLED", "true")
+    response = asyncio.run(_request(
+        app, path, method=method, json={} if method == "POST" else None,
+        base_url=base_url, origin=origin,
+    ))
+    assert response.status_code == HTTPStatus.UNAUTHORIZED
+    assert response.json()["error"]["code"] == (
+        "access_denied" if path == "/v1/atom-lab/runs" else "atom_lab_access_denied"
+    )
+    assert "prompt_ref" not in response.text
+
+
+def test_code_protected_remote_access_keeps_working(app) -> None:
+    response = asyncio.run(_request(
+        app, "/v1/atom-lab/atoms", access_code=ACCESS_CODE,
+        base_url="https://lab.example", origin="https://lab.example",
+    ))
+    assert response.status_code == HTTPStatus.OK
 
 
 @pytest.mark.parametrize("value", ["false", "", "TRUE"])

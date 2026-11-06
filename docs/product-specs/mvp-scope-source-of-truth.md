@@ -106,6 +106,9 @@ data routes live only under `/v1/atom-lab/*` and require the separate
 `X-Atom-Lab-Access-Code`. Missing server configuration fails closed.
 An operator can explicitly set `ANYTOOLAI_ATOM_LAB_AUTH_DISABLED=true` for a local deployment
 bound to loopback. That deployment opens the Lab catalog without entering a code.
+No-code requests require a `localhost`, `127.0.0.1`, or `[::1]` Host; any supplied browser
+Origin must match the request scheme, host, and port. This applies to catalog, history,
+and writes. Remote ingress must retain access-code protection.
 
 The catalog may expose the live `kernel_demo` action configuration, repository prompt, fixed input
 and output schemas, prepared Russian description, and validated example for each A01-A11 atom.

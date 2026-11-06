@@ -482,6 +482,115 @@ test("the shared launch tests the selected prompt and keeps accepted results sep
   expect(posts).toBe(1);
 });
 
+for (const library of ["history", "presets"]) {
+  test(`a delayed prompt rejection keeps the ${library} section open until explicit error navigation`, async ({page}) => {
+    let rejectRun;
+    const gate = new Promise(resolve => { rejectRun = resolve; });
+    await page.route("http://atom-lab.test/v1/atom-lab/runs", async route => {
+      if (route.request().method() === "GET") {
+        await route.fulfill({json: {items: [], next_cursor: null}});
+        return;
+      }
+      await gate;
+      await route.fulfill({status: 413, json: {error: {
+        code: "payload_too_large", message: "Слишком большой промпт",
+        field_errors: [{path: "prompt", message: "Сократите промпт"}],
+      }}});
+    });
+    await page.route("http://atom-lab.test/v1/atom-lab/presets", route => route.fulfill({json: {items: [], next_cursor: null}}));
+    await unlockAtom(page, "A06");
+    await page.locator("#fill-example").click();
+    const submitted = page.waitForRequest(request => request.method() === "POST" && request.url().endsWith("/runs"));
+    await page.locator("#run-button").click();
+    await submitted;
+    await page.locator(`#${library}-button`).click();
+    rejectRun();
+    await expect(page.locator("#run-state")).toContainText("payload_too_large");
+    await expect(page.locator(`#${library}-panel`)).toBeVisible();
+    await expect(page.locator("#request-response")).toBeHidden();
+    await showWorkbench(page);
+    await page.locator("#validation-errors button").click();
+    await expect(page.locator("#prompt-panel")).toBeVisible();
+    await expect(page.locator("#prompt-editor")).toBeFocused();
+  });
+}
+
+for (const historicalState of ["succeeded", "failed", "incompatible"]) {
+  test(`restored ${historicalState} history keeps only a matching successful prompt trial`, async ({page}) => {
+    const detail = historyDetail({runId: "run-trial-restore"});
+    detail.snapshot.prompt.source_ref = "product.a06.v1";
+    if (historicalState === "failed") {
+      detail.status = "failed";
+      detail.result = null;
+    }
+    if (historicalState === "incompatible") detail.snapshot.schemas.input.version = 99;
+    let savedBody;
+    let runWrites = 0;
+    await page.route("http://atom-lab.test/v1/atom-lab/**", async route => {
+      const {pathname} = new URL(route.request().url());
+      if (pathname === "/v1/atom-lab/atoms/A06/prompts") {
+        if (route.request().method() === "POST") {
+          savedBody = route.request().postDataJSON();
+          await route.fulfill({json: {ref: "lab.restored", group: "lab", ...savedBody}});
+        } else await route.fulfill({json: [
+          {ref: A06.prompt_ref, name: "Платформенный", prompt: A06.prompt, group: "platform", source_ref: null, source_run_id: null},
+          {ref: detail.snapshot.prompt.source_ref, name: "Продуктовый", prompt: "Текущий продуктовый текст", group: "product", source_ref: null, source_run_id: null},
+        ]});
+      } else if (pathname === "/v1/atom-lab/runs") {
+        if (route.request().method() === "POST") runWrites += 1;
+        await route.fulfill({json: {items: [{
+          run_id: detail.run_id, status: detail.status, atom_id: "A06", model_id: "openai/gpt-supported",
+          preset_id: null, preset_version: null, created_at: detail.created_at,
+          started_at: detail.started_at, finished_at: detail.finished_at,
+        }], next_cursor: null}});
+      } else if (pathname === `/v1/atom-lab/runs/${detail.run_id}`) await route.fulfill({json: detail});
+      else await route.fallback();
+    });
+    await unlockAtom(page, "A06");
+    await page.locator("#history-button").click();
+    await page.locator("#history-list .history-open").click();
+    await page.locator("#restore-history").click();
+    await page.locator("#prompt-tab").click();
+    await expect(page.locator("#prompt-select")).toHaveValue(detail.snapshot.prompt.source_ref);
+    if (historicalState === "succeeded") {
+      await expect(page.locator("#prompt-test-status")).toContainText("Ответ прошёл контракт");
+      await page.locator("#prompt-editor").fill("Правка текста");
+      await expect(page.locator("#prompt-test-status")).toContainText("изменились");
+      await page.locator("#prompt-editor").fill(detail.snapshot.prompt.content);
+      await page.locator("#model-select").selectOption("gpt-no-reasoning");
+      await expect(page.locator("#prompt-test-status")).toContainText("изменились");
+      await page.locator("#model-select").selectOption("gpt-supported");
+      await page.locator("#reasoning-effort").selectOption("low");
+      await expect(page.locator("#prompt-test-status")).toContainText("изменились");
+      await page.locator("#reasoning-effort").selectOption("high");
+      await page.locator("#input-tab").click();
+      await page.locator("#json-mode").click();
+      await page.locator("#json-editor").fill(JSON.stringify({...detail.snapshot.input, objective: "Другая цель"}));
+      await page.locator("#prompt-tab").click();
+      await expect(page.locator("#prompt-test-status")).toContainText("изменились");
+      await page.locator("#input-tab").click();
+      await page.locator("#json-editor").fill(JSON.stringify(detail.snapshot.input));
+      await page.locator("#prompt-tab").click();
+      await expect(page.locator("#prompt-test-status")).toContainText("Ответ прошёл контракт");
+      page.once("dialog", dialog => dialog.accept());
+      await page.locator("#prompt-select").selectOption(A06.prompt_ref);
+      await page.locator("#prompt-editor").fill(detail.snapshot.prompt.content);
+      await expect(page.locator("#prompt-test-status")).toContainText("изменились");
+      page.once("dialog", dialog => dialog.accept());
+      await page.locator("#prompt-select").selectOption(detail.snapshot.prompt.source_ref);
+      await page.locator("#prompt-editor").fill(detail.snapshot.prompt.content);
+      await expect(page.locator("#prompt-test-status")).toContainText("Ответ прошёл контракт");
+    } else await expect(page.locator("#prompt-test-status")).not.toContainText("Ответ прошёл контракт");
+    await page.locator("#save-prompt-panel summary").click();
+    await page.locator("#save-prompt-name").fill("Из истории");
+    await page.locator("#save-prompt").click();
+    await expect(page.locator("#save-prompt-status")).toContainText("Сохранён");
+    expect(savedBody.source_run_id).toBe(historicalState === "succeeded" ? detail.run_id : null);
+    expect(savedBody.source_ref).toBe(detail.snapshot.prompt.source_ref);
+    expect(runWrites).toBe(0);
+  });
+}
+
 test("unrestricted strings preserve line breaks through form edits", async ({page}) => {
   await unlockAtom(page, "A06");
   await importJson(page, {context: {notes: "first\nsecond"}, objective: "pilot"});
@@ -1731,8 +1840,8 @@ test("preset browsing preserves an unrelated dirty draft until explicit applicat
   expect(JSON.parse(await page.locator("#preset-readonly").textContent())).toEqual(stored);
 });
 
-for (const settingsOnly of [false, true]) {
-  test(`reopening v1 after cancelling ${settingsOnly ? "model, reasoning and origin" : "input and prompt"} edits protects and restores the saved settings`, async ({page}) => {
+for (const settingsOnly of [false, true, null]) {
+  test(`reopening v1 after cancelling ${settingsOnly === null ? "run provenance" : settingsOnly ? "model, reasoning and origin" : "input and prompt"} edits protects and restores the saved settings`, async ({page}) => {
     const stored = {
       name: "Повторное открытие", description: "Неизменяемая версия", atom_id: "A06",
       base_action_config_id: A06.base_action_config_id, schema_refs: A06.schema_refs,
@@ -1779,9 +1888,13 @@ for (const settingsOnly of [false, true]) {
     await page.locator("#apply-preset").click();
     await page.locator("#prompt-tab").click();
     await expect(page.locator("#prompt-select")).toHaveValue(stored.prompt_source_ref);
-    const editedInput = settingsOnly ? stored.example_input : {...stored.example_input, objective: "Новая цель"};
-    const editedPrompt = settingsOnly ? stored.prompt : "Несохранённый промпт";
-    if (settingsOnly) {
+    if (settingsOnly !== null) await expect(page.locator("#preset-config-metadata")).toContainText(stored.prompt_source_ref);
+    const editedInput = settingsOnly !== false ? stored.example_input : {...stored.example_input, objective: "Новая цель"};
+    const editedPrompt = settingsOnly !== false ? stored.prompt : "Несохранённый промпт";
+    if (settingsOnly === null) {
+      await page.locator("#run-button").click();
+      await expect(page.locator("#run-state")).toHaveText("Завершён успешно");
+    } else if (settingsOnly) {
       await page.locator("#prompt-select").selectOption(A06.prompt_ref);
       await page.locator("#model-select").selectOption("gpt-no-reasoning");
     } else {
@@ -1809,9 +1922,9 @@ for (const settingsOnly of [false, true]) {
     await expect(page.locator("#presets-panel")).toBeVisible();
     await expect(page.locator("#prompt-editor")).toHaveValue(editedPrompt);
     expect(JSON.parse(await page.locator("#json-editor").inputValue())).toEqual(editedInput);
-    await expect(page.locator("#model-select")).toHaveValue(settingsOnly ? "gpt-no-reasoning" : "gpt-supported");
-    await expect(page.locator("#reasoning-effort")).toHaveValue(settingsOnly ? "" : "high");
-    await expect(page.locator("#prompt-select")).toHaveValue(settingsOnly ? A06.prompt_ref : stored.prompt_source_ref);
+    await expect(page.locator("#model-select")).toHaveValue(settingsOnly === true ? "gpt-no-reasoning" : "gpt-supported");
+    await expect(page.locator("#reasoning-effort")).toHaveValue(settingsOnly === true ? "" : "high");
+    await expect(page.locator("#prompt-select")).toHaveValue(settingsOnly === true ? A06.prompt_ref : stored.prompt_source_ref);
     discard = true;
     await page.locator("#apply-preset").click();
     expect(confirmations).toBe(3);
@@ -1823,6 +1936,11 @@ for (const settingsOnly of [false, true]) {
     await page.locator("#input-tab").click();
     await page.locator("#json-mode").click();
     expect(JSON.parse(await page.locator("#json-editor").inputValue())).toEqual(stored.example_input);
+    if (settingsOnly === null) {
+      await page.locator("#presets-button").click();
+      await expect(page.locator("#preset-state")).not.toContainText("Есть несохранённый черновик");
+      await showWorkbench(page);
+    }
     await page.locator("#run-button").click();
     await expect(page.locator("#run-state")).toHaveText("Завершён успешно");
     expect(runBody).toEqual({
@@ -4004,9 +4122,13 @@ for (const [path, compatible] of [["preset", false], ["history", false], ["prese
       await page.locator("#prompt-tab").click();
       const editedPrompt = `${stored.prompt}. Правка во время загрузки`;
       await page.locator("#prompt-editor").fill(editedPrompt);
+      await expect(page.locator("#reset-prompt")).toBeDisabled();
+      await page.locator("#reset-prompt").dispatchEvent("click");
+      await expect(page.locator("#prompt-editor")).toHaveValue(editedPrompt);
       releasePrompts();
       if (!available) {
         await expect(page.locator("#retry-prompts")).toBeVisible();
+        await expect(page.locator("#reset-prompt")).toBeDisabled();
         await expect(page.locator("#run-button")).toBeDisabled();
         await editPreset(page);
         await expect(page.locator("#save-preset")).toBeDisabled();
@@ -4015,6 +4137,11 @@ for (const [path, compatible] of [["preset", false], ["history", false], ["prese
         await expect(page.locator("#prompt-origin")).toContainText("Исторический источник недоступен");
       } else await expect(page.locator("#prompt-select")).toHaveValue(promptSourceRef);
       await expect(page.locator("#prompt-editor")).toHaveValue(editedPrompt);
+      await expect(page.locator("#reset-prompt")).toBeEnabled();
+      await page.locator("#reset-prompt").click();
+      await expect(page.locator("#prompt-editor")).toHaveValue(available ? stored.prompt : currentAtom.prompt);
+      await expect(page.locator("#prompt-select")).toHaveValue(available ? promptSourceRef : currentAtom.prompt_ref);
+      await page.locator("#prompt-editor").fill(editedPrompt);
       await expect(page.locator("#run-button")).toBeEnabled();
       await page.locator("#run-button").click();
       await expect.poll(() => runBody).not.toBeNull();

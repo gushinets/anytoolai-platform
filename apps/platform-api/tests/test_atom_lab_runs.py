@@ -218,6 +218,56 @@ def _error(response: httpx.Response, status: int, code: str) -> None:
     assert "Точный промпт" not in response.text
 
 
+@pytest.mark.parametrize(
+    "prompt,accepted", [("a" * 16, True), ("a" * 17, False), ("я" * 8, True), ("я" * 8 + "!", False)]
+)
+def test_saved_prompt_uses_run_admission_utf8_limit(app, monkeypatch, prompt, accepted):
+    monkeypatch.setenv("ANYTOOLAI_ATOM_LAB_RUN_PROMPT_MAX_BYTES", "16")
+
+    async def save():
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test",
+            headers={"X-Atom-Lab-Access-Code": ACCESS_CODE},
+        ) as client:
+            response = await client.post("/v1/atom-lab/atoms/A07/prompts", json={
+                "name": "UTF-8 boundary", "prompt": prompt,
+                "source_ref": "kernel_demo.compose_reply.v1",
+            })
+            options = (await client.get("/v1/atom-lab/atoms/A07/prompts")).json()
+            assert any(option["name"] == "UTF-8 boundary" for option in options) == accepted
+            return response
+
+    response = asyncio.run(save())
+    if accepted:
+        assert response.status_code == HTTPStatus.CREATED, response.text
+    else:
+        _error(response, HTTPStatus.UNPROCESSABLE_ENTITY, "prompt_invalid")
+        assert response.json()["error"]["field_errors"] == [
+            {"path": "prompt", "message": "Недопустимое значение."},
+        ]
+
+
+@pytest.mark.parametrize("method", ["get", "post"])
+def test_prompt_routes_document_and_return_atom_not_found(app, method):
+    path = "/v1/atom-lab/atoms/{atom_id}/prompts"
+    assert app.openapi()["paths"][path][method]["responses"]["404"]["content"][
+        "application/json"
+    ]["schema"] == {"$ref": "#/components/schemas/AtomLabErrorResponse"}
+
+    async def request():
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test",
+            headers={"X-Atom-Lab-Access-Code": ACCESS_CODE},
+        ) as client:
+            return await client.request(
+                method.upper(), path.replace("{atom_id}", "missing"),
+                json={"name": "Test", "prompt": "Test", "source_ref": "missing"}
+                if method == "post" else None,
+            )
+
+    _error(asyncio.run(request()), HTTPStatus.NOT_FOUND, "atom_not_found")
+
+
 def test_workbench_prompts_are_protected_atom_scoped_and_run_local(app: FastAPI) -> None:
     product_ref = "client_update_writer.reply_draft_compose_reply.v1"
     platform_ref = "kernel_demo.compose_reply.v1"
