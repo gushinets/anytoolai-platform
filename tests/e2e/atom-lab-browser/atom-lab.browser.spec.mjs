@@ -2721,6 +2721,286 @@ test("base recovery keeps both a history snapshot and dirty A06 editor usable", 
   await expect(page.locator("#preset-state")).toContainText("Сохранена неизменяемая версия");
 });
 
+for (const discoveryOwner of ["history", "editor"]) {
+  for (const recovery of ["unchanged", "new-base"]) {
+    test(`shared contract failure from ${discoveryOwner} locks both owners until ${recovery} authoritative Retry`, async ({page}) => {
+      const {state, save, product, detail, originalDetail, name} = await prepareRejectedSourceWrite(page, "history", {historyAtom: "A06"});
+      let runs = 0;
+      await page.route("**/v1/atom-lab/runs", async route => {
+        if (route.request().method() !== "POST") return route.fallback();
+        runs += 1;
+        await route.fulfill({status: 422, json: {error: {code: "input_invalid", message: "Unexpected run"}}});
+      });
+      await expect(page.locator("#preset-source")).toContainText(`сохранённый запуск ${detail.run_id}`);
+      const fresh = {...A06, prompt_ref: "prompt.a06.v2"};
+      state.authoritativeAtom = {...fresh, schema_refs: {...A06.schema_refs, input: {...A06.schema_refs.input, version: 2}}};
+      state.optionsOverride = [{...product, ref: fresh.prompt_ref, group: "platform"}, product];
+      state.rejectionField = "prompt_ref";
+      if (discoveryOwner === "history") await save.click();
+      else {
+        state.rejectionCode = "prompt_invalid";
+        state.rejectionField = "source_ref";
+        await showWorkbench(page);
+        await page.locator("#save-prompt-panel summary").click();
+        await page.locator("#save-prompt-name").fill("Имя промпта второго владельца");
+        await page.locator("#save-prompt").click();
+      }
+      await expect.poll(() => state.atomReads).toBe(1);
+      await showWorkbench(page);
+      await expect(page.locator("#prompt-load-status")).toContainText("Контракт атома изменился");
+      await expect(page.locator("#retry-prompts")).toBeVisible();
+      await expect(page.locator("#prompt-select")).toBeDisabled();
+      await expect(page.locator("#run-button")).toBeDisabled();
+      if (await page.locator("#save-prompt").isHidden()) await page.locator("#save-prompt-panel summary").click();
+      await expect(page.locator("#save-prompt")).toBeDisabled();
+      await page.locator("#run-button").dispatchEvent("click");
+      await page.locator("#save-prompt").dispatchEvent("click");
+      await page.locator("#prompt-select").evaluate((picker, ref) => {
+        picker.value = ref;
+        picker.dispatchEvent(new Event("change", {bubbles: true}));
+      }, A06.prompt_ref);
+      await expect(page.locator("#prompt-select")).toHaveValue(product.ref);
+      await expect(page.locator("#prompt-editor")).toHaveValue("Ручной текст владельца");
+      await page.locator("#presets-button").click();
+      await expect(page.locator("#preset-error")).toContainText("Контракт атома изменился");
+      const historyRetry = page.getByRole("button", {name: "Повторить загрузку источника", exact: true});
+      await expect(historyRetry).toBeVisible();
+      await expect(save).toBeDisabled();
+      await save.dispatchEvent("click");
+      await expect(name).toHaveValue("  Имя владельца  ");
+      await expect(page.locator("#preset-prompt")).toHaveText(detail.snapshot.prompt.content);
+      expect(JSON.parse(await page.locator("#preset-input-json").textContent())).toEqual(detail.snapshot.input);
+      expect(state.writes).toHaveLength(1);
+      expect(runs).toBe(0);
+
+      // Even an old cached options list must recheck the locked authoritative contract.
+      state.optionsOverride = [{...product, ref: A06.prompt_ref, group: "platform", prompt: A06.prompt}, product];
+      await historyRetry.click();
+      await expect.poll(() => state.atomReads).toBe(2);
+      await expect(page.locator("#preset-error")).toContainText("Контракт атома изменился");
+      await expect(save).toBeDisabled();
+      await showWorkbench(page);
+      await expect(page.locator("#run-button")).toBeDisabled();
+      state.authoritativeAtom = recovery === "unchanged" ? structuredClone(A06) : fresh;
+      state.optionsOverride = [{...product, ref: state.authoritativeAtom.prompt_ref, group: "platform", prompt: state.authoritativeAtom.prompt}, product];
+      await page.locator("#retry-prompts").click();
+      await expect.poll(() => state.atomReads).toBe(3);
+      await expect(page.locator("#run-button")).toBeEnabled();
+      await expect(page.locator("#prompt-select")).toBeEnabled();
+      await expect(page.locator("#prompt-select")).toHaveValue(product.ref);
+      await expect(page.locator("#prompt-load-status")).toBeEmpty();
+      await expect(page.locator("#retry-prompts")).toBeHidden();
+      await page.locator("#presets-button").click();
+      await expect(page.locator("#preset-error")).toBeEmpty();
+      await expect(save).toBeEnabled();
+      await expect(name).toHaveValue("  Имя владельца  ");
+      if (recovery === "unchanged") await expect(page.locator("#preset-source")).toContainText(`сохранённый запуск ${detail.run_id}`);
+      else {
+        await expect(page.locator("#preset-source")).toHaveText("Источник: настройки из истории. Привязка к сохранённому запуску снята после смены основы промпта. Настройки и вход не связаны с текущим черновиком.");
+        await expect(page.locator("#preset-source")).not.toContainText("null");
+        await expect(page.locator("#preset-source")).not.toContainText(detail.run_id);
+      }
+      await save.click();
+      await expect(page.locator("#preset-state")).toContainText("Сохранена неизменяемая версия");
+      expect(state.writes[1].payload).toMatchObject({
+        prompt_ref: recovery === "unchanged" ? A06.prompt_ref : fresh.prompt_ref,
+        prompt_source_ref: product.ref, source_run_id: recovery === "unchanged" ? detail.run_id : null,
+        prompt: detail.snapshot.prompt.content, example_input: detail.snapshot.input,
+      });
+      expect(detail).toEqual(originalDetail);
+    });
+  }
+}
+
+for (const staleCompatible of [false, true]) {
+  test(`shared contract checks ignore an older ${staleCompatible ? "compatible" : "incompatible"} response from the other owner`, async ({page}) => {
+    const {state, save, product} = await prepareRejectedSourceWrite(page, "history", {historyAtom: "A06"});
+    const incompatible = {...A06, prompt_ref: "prompt.a06.v2", base_action_config_id: "config.a06.v2"};
+    state.optionsOverride = [{...product, ref: "prompt.a06.v2", group: "platform"}, product];
+    state.rejectionField = "prompt_ref";
+    let release;
+    const gate = new Promise(resolve => { release = resolve; });
+    const replies = [incompatible, staleCompatible ? A06 : incompatible, staleCompatible ? incompatible : A06, A06];
+    let reads = 0;
+    await page.route("**/v1/atom-lab/atoms/A06", async route => {
+      const index = reads++;
+      if (index === 1) await gate;
+      await route.fulfill({json: replies[index]});
+    });
+    await save.click();
+    await expect(page.locator("#preset-error")).toContainText("Контракт атома изменился");
+    state.optionsOverride = [{...product, ref: A06.prompt_ref, group: "platform", prompt: A06.prompt}, product];
+    await showWorkbench(page);
+    await page.locator("#retry-prompts").click();
+    await expect.poll(() => reads).toBe(2);
+    await page.locator("#presets-button").click();
+    await page.getByRole("button", {name: "Повторить загрузку источника", exact: true}).click();
+    await expect.poll(() => reads).toBe(3);
+    await expect(save)[staleCompatible ? "toBeDisabled" : "toBeEnabled"]();
+    const completed = page.waitForResponse("**/v1/atom-lab/atoms/A06");
+    release();
+    await (await completed).finished();
+    await showWorkbench(page);
+    await expect(page.locator("#run-button"))[staleCompatible ? "toBeDisabled" : "toBeEnabled"]();
+    await expect(page.locator("#prompt-editor")).toHaveValue("Ручной текст владельца");
+    if (staleCompatible) {
+      await expect(page.locator("#prompt-load-status")).toContainText("Контракт атома изменился");
+      await page.locator("#retry-prompts").click();
+      await expect.poll(() => reads).toBe(4);
+    }
+    await expect(page.locator("#run-button")).toBeEnabled();
+    await expect(page.locator("#prompt-load-status")).toBeEmpty();
+    await page.locator("#presets-button").click();
+    await expect(page.locator("#preset-error")).toBeEmpty();
+    await expect(save).toBeEnabled();
+    expect(state.writes).toHaveLength(1);
+  });
+}
+
+test("shared contract ignores an invalidated peer options read before it can supersede a current authority check", async ({page}) => {
+  const {state, save, product} = await prepareRejectedSourceWrite(page, "history", {historyAtom: "A06"});
+  const fresh = {...A06, prompt_ref: "prompt.a06.v2"};
+  state.authoritativeAtom = {...fresh, base_action_config_id: "config.a06.v2"};
+  const options = [{...product, ref: fresh.prompt_ref, group: "platform"}, product];
+  state.optionsOverride = options;
+  state.rejectionField = "prompt_ref";
+  let releaseOptions;
+  let waiting = false;
+  const optionsGate = new Promise(resolve => { releaseOptions = resolve; });
+  await page.route("**/v1/atom-lab/atoms/A06/prompts", async route => {
+    if (waiting) return route.fallback();
+    waiting = true;
+    await optionsGate;
+    await route.fulfill({json: options});
+  });
+  await showWorkbench(page);
+  await page.locator("#retry-prompts").dispatchEvent("click");
+  await expect.poll(() => waiting).toBe(true);
+  await page.locator("#presets-button").click();
+  await save.click();
+  await expect(page.locator("#preset-error")).toContainText("Контракт атома изменился");
+  state.authoritativeAtom = fresh;
+  let releaseAtom;
+  state.atomGate = new Promise(resolve => { releaseAtom = resolve; });
+  await page.getByRole("button", {name: "Повторить загрузку источника", exact: true}).click();
+  await expect.poll(() => state.atomReads).toBe(2);
+  const oldOptions = page.waitForResponse("**/v1/atom-lab/atoms/A06/prompts");
+  releaseOptions();
+  await (await oldOptions).finished();
+  await expect(save).toBeDisabled();
+  expect(state.atomReads).toBe(2);
+  releaseAtom();
+  await expect(save).toBeEnabled();
+  await expect(page.locator("#preset-error")).toBeEmpty();
+  await showWorkbench(page);
+  await expect(page.locator("#run-button")).toBeEnabled();
+  await expect(page.locator("#prompt-load-status")).toBeEmpty();
+  expect(state.writes).toHaveLength(1);
+});
+
+test("shared contract direct history Retry clears both owners only after compatible authority", async ({page}) => {
+  const {state, save, product, detail, originalDetail} = await prepareRejectedSourceWrite(page, "history", {historyAtom: "A06"});
+  const fresh = {...A06, prompt_ref: "prompt.a06.v2"};
+  state.authoritativeAtom = {...fresh, base_action_config_id: "config.a06.v2"};
+  state.optionsOverride = [{...product, ref: fresh.prompt_ref, group: "platform"}, product];
+  await save.click();
+  await expect(page.locator("#preset-error")).toContainText("Контракт атома изменился");
+  state.authoritativeAtom = structuredClone(A06);
+  state.optionsOverride = [{...product, ref: A06.prompt_ref, group: "platform", prompt: A06.prompt}, product];
+  await page.locator("#history-button").click();
+  await page.locator("#history-list .history-open").click();
+  await page.locator("#save-history-preset").click();
+  await expect.poll(() => state.atomReads).toBe(2);
+  await expect(save).toBeEnabled();
+  await expect(page.locator("#preset-source")).toContainText(`сохранённый запуск ${detail.run_id}`);
+  await expect(page.locator("#preset-error")).toBeEmpty();
+  await showWorkbench(page);
+  await expect(page.locator("#run-button")).toBeEnabled();
+  await expect(page.locator("#prompt-select")).toBeEnabled();
+  await expect(page.locator("#prompt-load-status")).toBeEmpty();
+  expect(detail).toEqual(originalDetail);
+  expect(state.writes).toHaveLength(1);
+});
+
+test("shared contract failure leaves another atom usable and survives recreating its old editor", async ({page}) => {
+  const {state, save, product} = await prepareRejectedSourceWrite(page, "history");
+  const fresh = {...A06, prompt_ref: "prompt.a06.v2"};
+  state.authoritativeAtom = {...fresh, base_action_config_id: "config.a06.v2"};
+  state.optionsOverride = [{...product, ref: fresh.prompt_ref, group: "platform"}, product];
+  state.rejectionField = "prompt_ref";
+  await save.click();
+  await expect(page.locator("#preset-error")).toContainText("Контракт атома изменился");
+  await showWorkbench(page);
+  await expect(page.locator("#atom-title")).toContainText("A05");
+  await expect(page.locator("#prompt-select")).toBeEnabled();
+  await expect(page.locator("#run-button")).toBeEnabled();
+  await expect(page.locator("#prompt-load-status")).toBeEmpty();
+  await page.locator("#input-tab").click();
+  await page.getByRole("button", {name: /A06/}).click();
+  await page.locator("#fill-example").click();
+  await expect(page.locator("#run-button")).toBeDisabled();
+  await page.locator("#run-button").dispatchEvent("click");
+  expect(state.writes).toHaveLength(1);
+  await page.locator("#prompt-tab").click();
+  await expect(page.locator("#prompt-load-status")).toContainText("Контракт атома изменился");
+  await expect(page.locator("#retry-prompts")).toBeVisible();
+  await expect(page.locator("#prompt-select")).toBeDisabled();
+  await page.getByRole("button", {name: /A05/}).click();
+  await expect(page.locator("#prompt-select")).toBeEnabled();
+});
+
+for (const ownerAtom of ["A05", "A06"]) {
+  for (const stale of ["none", "editor", "catalog"]) {
+    test(`shared contract direct history failure protects ${ownerAtom} with ${stale} owner replacement`, async ({page}) => {
+      const {state, product, detail, originalDetail} = await prepareRejectedSourceWrite(page, "prompt");
+      if (ownerAtom === "A05") {
+        await page.getByRole("button", {name: /A05/}).click();
+        await page.locator("#input-tab").click();
+        await page.locator("#fill-example").click();
+        await page.locator("#prompt-tab").click();
+        await page.locator("#prompt-select").selectOption("product.a05.v1");
+        await page.locator("#prompt-editor").fill("Другой атом");
+      }
+      state.authoritativeAtom = {...A06, prompt_ref: "prompt.a06.v2", base_action_config_id: "config.a06.v2"};
+      state.optionsOverride = [{...product, ref: "prompt.a06.v2", group: "platform"}, product];
+      let release;
+      state.atomGate = new Promise(resolve => { release = resolve; });
+      await page.locator("#history-button").click();
+      await page.locator("#history-list .history-open").click();
+      await page.locator("#save-history-preset").click();
+      await expect.poll(() => state.atomReads).toBe(1);
+      if (stale !== "none") {
+        await showWorkbench(page);
+        await page.locator("#input-tab").click();
+        if (stale === "editor") await page.getByRole("button", {name: new RegExp(ownerAtom)}).click();
+        else {
+          const reloaded = page.waitForResponse("**/v1/atom-lab/models");
+          await page.locator("#access-form").dispatchEvent("submit");
+          await reloaded;
+          await page.getByRole("button", {name: new RegExp(ownerAtom)}).click();
+        }
+        await page.locator("#fill-example").click();
+      }
+      const completed = page.waitForResponse("**/v1/atom-lab/atoms/A06");
+      release();
+      await (await completed).finished();
+      if (stale === "none") {
+        await expect(page.locator("#history-error")).toContainText("Контракт атома изменился");
+        expect(JSON.parse(await page.locator("#history-detail").textContent())).toEqual(originalDetail);
+        await expect(page.locator("#history-prompt")).toHaveText(detail.snapshot.prompt.content);
+      }
+      await showWorkbench(page);
+      await expect(page.locator("#run-button"))[ownerAtom === "A06" && stale === "none" ? "toBeDisabled" : "toBeEnabled"]();
+      if (ownerAtom === "A06" && stale === "none") {
+        await expect(page.locator("#prompt-load-status")).toContainText("Контракт атома изменился");
+        await expect(page.locator("#retry-prompts")).toBeVisible();
+        await expect(page.locator("#prompt-editor")).toHaveValue("Ручной текст владельца");
+      }
+      expect(state.writes).toHaveLength(0);
+    });
+  }
+}
+
 test("a new authoritative base invalidates the old exact successful trial", async ({page}) => {
   const {state, detail} = await prepareRejectedSourceWrite(page, "prompt");
   await page.locator("#history-button").click();
@@ -2744,6 +3024,7 @@ test("a new authoritative base invalidates the old exact successful trial", asyn
 for (const historyAtom of ["A05", "A06"]) {
   test(`changed history preset base clears its source run without borrowing the ${historyAtom} editor run`, async ({page}) => {
     const {state, save, detail, originalDetail} = await prepareRejectedSourceWrite(page, "history", {historyAtom});
+    await expect(page.locator("#preset-source")).toContainText(`сохранённый запуск ${detail.run_id}`);
     let runBody;
     await page.route("**/v1/atom-lab/runs", async route => {
       if (route.request().method() !== "POST") return route.fallback();
@@ -2763,6 +3044,7 @@ for (const historyAtom of ["A05", "A06"]) {
     state.authoritativeAtom = {...A06, prompt_ref: "prompt.a06.v2"};
     await save.click();
     await expect(page.locator("#preset-config-metadata")).toContainText("prompt.a06.v2");
+    await expect(page.locator("#preset-source")).toHaveText("Источник: настройки из истории. Привязка к сохранённому запуску снята после смены основы промпта. Настройки и вход не связаны с текущим черновиком.");
     await expect(save).toBeEnabled();
     await save.click();
     await expect.poll(() => state.writes.length).toBe(2);

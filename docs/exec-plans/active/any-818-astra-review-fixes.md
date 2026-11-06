@@ -917,3 +917,71 @@ ambiguous-save and unbounded-library follow-ups remain outside this repair.
 
 `validate-docs`, `generate-docs --check` and `git diff --check` passed. Logs:
 `.quick-check-tmp/p7-validate-docs.log` and `p7-generate-docs-check.log`.
+
+## Shared authoritative contract failures and history origin wording
+
+Doctor passed before edits on 2026-11-07 at `81abf301`. Address review
+`5808301758`, discussions `4498630961` and `4498630976`. A current authoritative
+contract failure must protect every live owner of that catalog atom, including a
+recreated editor and the direct history pre-read path. Preserve source, request,
+editor and catalog fences, raw prompt/input/name, unrelated atoms, and Retry in
+both owners. Only compatible authoritative recovery can clear those locks. A
+history preset whose old source-run binding was cleared must explain its history
+origin without displaying a null or another editor's run ID.
+
+Reach: the existing shared Atom Lab JavaScript, focused browser/Node regressions
+where needed, and this plan. Reproduce peer-owner controls and direct history
+reads before production edits; then check both recovery owners, stale errors and
+compatible replies, recreated editors, unrelated A05, exact save payload and
+history immutability. Run connected focused checks, one final canonical
+frontend-check, docs/generation and diff checks. No backend, dependencies,
+working DB, migrations, provider calls, CI/Sonar changes, staging or publication.
+Parent owns fresh independent review, commit/push and CI; never merge.
+
+Before production edits, Chromium reproduced missing same-atom peer locks from
+both discovery owners, bypass by recreating the old editor, the direct history
+pre-read leaving A06 runnable, and the literal `сохранённый запуск null` label.
+Logs: `.quick-check-tmp/p8-shared-before.log` and
+`.quick-check-tmp/p8-order-origin-before.log`. Three initial A05 control fixtures
+needed to open the Input tab before filling the example; the corrected controls
+passed without changing their expectations.
+
+Known failures now belong to the canonical catalog atom through a WeakMap. Its
+latest authoritative-check token fences cross-owner success and failure replies;
+an invalidated options read cannot acquire that token. Current failures lock both
+live owners, preserve their raw state and present each owner's error and Retry.
+Recreated editors inherit the known lock. A compatible authoritative Retry clears
+the relevant owners together, preserving canonical identity on an unchanged
+contract and using the existing reconciliation on a changed base. Direct history
+reads use the same truth and fences while retaining their explicit reopen rule.
+History-origin copy distinguishes an actual saved run ID from a binding removed
+after a base change; exact request provenance remains null in the latter case.
+
+Final focused Chromium passed 95 connected journeys, including 15 new cases.
+They cover both discovery owners, unchanged/new-base cross-owner recovery,
+cached incompatible Retry, both cross-owner response orders, invalidated peer
+options, direct history Retry, stale editor/catalog failures, recreated editors,
+unrelated A05, synthetic controls, raw state, exact write payloads and immutable
+history. Existing source-selection, successful proof, preset-card and save
+acknowledgement assertions remain intact. All 56 Atom Lab Node tests and lint
+passed. Logs: `.quick-check-tmp/p8-focused-final.log`, `p8-node-final.log` and
+`p8-lint-final.log`.
+
+The final canonical managed `python scripts/agent/runner.py frontend-check`
+exited zero on 2026-11-07: lint, typecheck, all 300 Chromium journeys, 56 Atom Lab
+Node tests, six demo Node tests, 824 Vitest tests, generated API-type drift and
+production builds. Log: `.quick-check-tmp/p8-frontend-check-final.log`. The
+sandbox first rejected the existing pnpm-store symlink; the identical command
+passed with approved escalation, installed Chromium cache, workspace Temp and
+bundled LiteLLM cost map. No dependency, assertion, retry or check was weakened.
+`validate-docs`, `generate-docs --check` and `git diff --check` passed; logs:
+`.quick-check-tmp/p8-validate-docs.log` and `p8-generate-docs-check.log`.
+
+Only the three owned source/browser-test/plan files changed. HEAD remains
+`81abf301e28403ecbdf586a0f6715a64d70d4595`, staging is empty and unrelated untracked
+reports remain untouched. No backend/CSS, schema/generated contract, dependency,
+CI/Sonar, working DB, migration, provider, deployment, commit, push or GitHub
+write changed. Broad backend/PostgreSQL checks were not repeated for this UI
+repair. A genuinely changed contract still requires explicit reopen or existing
+adaptation. Parent owns fresh independent review, commit/push and required CI;
+never merge. Ambiguous-save and unbounded-library follow-ups remain separate.

@@ -1594,6 +1594,7 @@ export function bootstrapAtomLab({
   let historyOpenInFlight = false;
   let restoredHistoryDraft = false;
   let presetSourceOverride = null;
+  const promptContractChecks = new WeakMap();
   let paused = false;
   let destroyed = false;
 
@@ -2088,7 +2089,9 @@ export function bootstrapAtomLab({
     if (!configuration) return;
     nodes["preset-editor-title"].textContent = selected ? `Новая версия на основе v${selected.version}` : "Новый пресет";
     nodes["preset-source"].textContent = presetSourceOverride
-      ? `Источник: сохранённый запуск ${presetSourceOverride.sourceRunId}. Настройки и вход не связаны с текущим черновиком.`
+      ? `${presetSourceOverride.sourceRunId
+        ? `Источник: сохранённый запуск ${presetSourceOverride.sourceRunId}.`
+        : "Источник: настройки из истории. Привязка к сохранённому запуску снята после смены основы промпта."} Настройки и вход не связаны с текущим черновиком.`
       : `Источник: текущий черновик ${session.atom.atom_id}. Вход, промпт и настройки можно изменить в лаборатории.`;
     const rows = [
       ["Атом", `${configuration.atom_id} · ${ATOM_LABELS[configuration.atom_id].name}`],
@@ -2187,7 +2190,7 @@ export function bootstrapAtomLab({
     session.presetRef = presetRef;
     session.sourceRunId = sourceRunId;
     session.promptSourceRef = configuration.prompt_source_ref ?? null;
-    session.promptSourceNeedsValidation = session.promptSourceRef !== null;
+    session.promptSourceNeedsValidation = session.promptContractNeedsValidation || session.promptSourceRef !== null;
     restoredHistoryDraft = restored;
     nodes["prompt-editor"].value = session.prompt;
     renderPromptOptions();
@@ -2225,11 +2228,14 @@ export function bootstrapAtomLab({
     : "Результат создания неизвестен: сервер мог создать пресет. Не повторяйте Save; перезагрузите страницу и проверьте библиотеку.";
 
   const setPresetError = (message = "") => {
+    const source = presetSourceOverride;
+    if (!message && presetEditorActive && source?.promptSourceNeedsValidation) {
+      message = source.promptSourceLoadError ?? "";
+    }
     const outcomeMessage = presetSaveOutcomeUnknown ? presetSaveOutcomeUnknownMessage() : "";
     nodes["preset-error"].textContent = outcomeMessage && message
       ? `${outcomeMessage} ${message}`
       : outcomeMessage || message;
-    const source = presetSourceOverride;
     if (presetEditorActive && source?.promptSourceNeedsValidation && source.promptSourceLoadError) {
       nodes["preset-error"].append(button(document, "Повторить загрузку источника", () => {
         void loadPromptOptions({refresh: true, draft: source});
@@ -3416,15 +3422,19 @@ export function bootstrapAtomLab({
     && isNullableString(option.source_ref)
     && isNullableString(option.source_run_id);
 
-  const fetchPromptOptions = async (draft) => {
+  const fetchPromptOptions = async (draft, isCurrent) => {
     const options = await protectedJson(promptUrl(draft));
+    if (!isCurrent()) return {options, atom: draft.atom};
     const hasPlatform = (atom) => options.some((option) => option.group === "platform" && option.ref === atom.prompt_ref);
     if (!Array.isArray(options) || !options.every(validPromptOption)
       || !options.some((option) => option.group === "platform")) {
       throw new Error("Список промптов вернул некорректный ответ.");
     }
     let atom = draft.atom;
-    if (!hasPlatform(atom) || draft.promptContractNeedsValidation) {
+    let promptContractCheck;
+    if (!hasPlatform(atom) || draft.promptContractNeedsValidation || promptContractChecks.get(atom)?.error) {
+      promptContractCheck = {error: promptContractChecks.get(atom)?.error ?? null};
+      promptContractChecks.set(atom, promptContractCheck);
       try {
         atom = await protectedJson(`/v1/atom-lab/atoms/${draft.atom.atom_id}`);
         if (!isRecord(atom) || atom.atom_id !== draft.atom.atom_id
@@ -3446,10 +3456,11 @@ export function bootstrapAtomLab({
       } catch (error) {
         error.promptSourceNeedsValidation = true;
         error.promptContractNeedsValidation = true;
+        error.promptContractCheck = promptContractCheck;
         throw error;
       }
     }
-    return {options, atom};
+    return {options, atom, promptContractCheck};
   };
 
   const reconcilePromptSource = (draft, options) => {
@@ -3461,6 +3472,48 @@ export function bootstrapAtomLab({
 
   const isCurrentPromptOwner = (draft) => !destroyed && catalog.includes(draft.atom)
     && (draft === session || (presetEditorActive && draft === presetSourceOverride));
+
+  const isCurrentPromptContractCheck = (draft, check) => !check || promptContractChecks.get(draft.atom) === check;
+
+  const rememberPromptContractFailure = (atom, message) => {
+    promptContractChecks.get(atom).error = message;
+    for (const owner of [session, presetSourceOverride]) {
+      if (owner?.atom !== atom) continue;
+      owner.promptSourceNeedsValidation = true;
+      owner.promptContractNeedsValidation = true;
+      owner.promptSourceLoadError = message;
+      owner.loadingPrompts = false;
+      if (owner === session) {
+        renderPromptStatus();
+        nodes["prompt-load-status"].textContent = message;
+        nodes["retry-prompts"].hidden = false;
+      } else if (presetEditorActive) setPresetError(message);
+    }
+    updateRunButton();
+    updatePresetEditorDisabled();
+    if (presetEditorActive) renderPresetState();
+  };
+
+  const recoverPromptContract = (atom, options) => {
+    const check = promptContractChecks.get(atom);
+    if (!check?.error) return;
+    check.error = null;
+    for (const owner of [session, presetSourceOverride]) {
+      if (owner?.atom !== atom || !owner.promptContractNeedsValidation) continue;
+      owner.promptOptions = options;
+      reconcilePromptSource(owner, options);
+      owner.promptSourceLoadError = null;
+      owner.loadingPrompts = false;
+      if (owner === session) {
+        renderPromptOptions();
+        nodes["prompt-load-status"].textContent = "";
+        nodes["retry-prompts"].hidden = true;
+      } else if (presetEditorActive) setPresetError();
+    }
+    updateRunButton();
+    updatePresetEditorDisabled();
+    if (presetEditorActive) renderPresetState();
+  };
 
   const refreshRejectedPromptSource = (draft, ref, baseRef = draft.atom.prompt_ref) => {
     if (!isCurrentPromptOwner(draft) || draft.atom.prompt_ref !== baseRef || promptRefFor(draft) !== ref) return;
@@ -3550,9 +3603,10 @@ export function bootstrapAtomLab({
       nodes["prompt-load-status"].textContent = "Загрузка промптов…";
     }
     try {
-      const {options, atom} = await fetchPromptOptions(draft);
-      if (!isCurrent()) return;
+      const {options, atom, promptContractCheck} = await fetchPromptOptions(draft, isCurrent);
+      if (!isCurrent() || !isCurrentPromptContractCheck(draft, promptContractCheck)) return;
       const reconcileSource = draft.promptSourceNeedsValidation || atom !== draft.atom;
+      if (promptContractCheck) recoverPromptContract(draft.atom, options);
       if (atom !== draft.atom) {
         const previous = draft.atom;
         const contractChanged = !presetContractMatchesAtom(previous, atom);
@@ -3596,7 +3650,8 @@ export function bootstrapAtomLab({
         if (presetEditorActive) renderPresetState();
       }
     } catch (error) {
-      if (!isCurrent()) return;
+      if (!isCurrent() || !isCurrentPromptContractCheck(draft, error.promptContractCheck)) return;
+      if (error.promptContractNeedsValidation) rememberPromptContractFailure(draft.atom, error.message);
       draft.promptSourceLoadError = error.message;
       if (error.promptSourceNeedsValidation) {
         draft.promptSourceNeedsValidation = true;
@@ -3658,6 +3713,8 @@ export function bootstrapAtomLab({
     nodes["save-prompt-status"].textContent = "";
     nodes["prompt-load-status"].textContent = "";
     nodes["retry-prompts"].hidden = true;
+    const contractError = promptContractChecks.get(atom)?.error;
+    if (contractError) rememberPromptContractFailure(atom, contractError);
     renderPromptOptions();
     if (nodes["prompt-tab"].getAttribute?.("aria-selected") === "true") void loadPromptOptions();
     renderNavigation();
@@ -4105,13 +4162,17 @@ export function bootstrapAtomLab({
       updateHistoryControls();
       nodes["history-error"].textContent = "Проверка источника промпта…";
       try {
-        const {options, atom} = await fetchPromptOptions(source);
-        if (!isCurrent()) return;
+        const {options, atom, promptContractCheck} = await fetchPromptOptions(source, isCurrent);
+        if (!isCurrent() || !isCurrentPromptContractCheck(source, promptContractCheck)) return;
         if (atom !== source.atom) throw new Error("Основа промпта изменилась. Заново откройте каталог и явно адаптируйте исторический снимок.");
+        if (promptContractCheck) recoverPromptContract(source.atom, options);
         reconcilePromptSource(source, options);
         nodes["history-error"].textContent = "";
       } catch (error) {
-        if (isCurrent()) nodes["history-error"].textContent = `${error.message} Повторите сохранение пресета из истории.`;
+        if (isCurrent() && isCurrentPromptContractCheck(source, error.promptContractCheck)) {
+          if (error.promptContractNeedsValidation) rememberPromptContractFailure(source.atom, error.message);
+          nodes["history-error"].textContent = `${error.message} Повторите сохранение пресета из истории.`;
+        }
         return;
       } finally {
         if (generation === historyOpenGeneration) {
