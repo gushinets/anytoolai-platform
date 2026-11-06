@@ -120,6 +120,7 @@ _ERROR_RESPONSES = {
     422: {"model": AtomLabErrorResponse, "description": "Atom Lab request validation failed."},
     503: {"model": AtomLabErrorResponse, "description": "Atom Lab is not configured."},
 }
+_ATOM_NOT_FOUND_RESPONSE = {"model": AtomLabErrorResponse, "description": "Atom not found."}
 _PRESET_PAGE_DEFAULT = 20
 _PRESET_PAGE_MAX = 100
 _PRESET_CURSOR_PARTS = 2
@@ -568,7 +569,9 @@ def get_atom_lab_page() -> HTMLResponse:
         content = content.replace(
             'id="access-panel"', 'id="access-panel" data-auto-open="true" hidden',
         )
-    return HTMLResponse(content, headers={"Cache-Control": "no-store"})
+    return HTMLResponse(content, headers={
+        "Cache-Control": "no-store", "Content-Security-Policy": "frame-ancestors 'none'",
+    })
 
 
 @router.get("/atom-lab/atom_lab.css", include_in_schema=False)
@@ -602,7 +605,7 @@ def list_atoms(
     response_model=AtomLabAtomResponse,
     responses={
         **_ERROR_RESPONSES,
-        404: {"model": AtomLabErrorResponse, "description": "Atom not found."},
+        404: _ATOM_NOT_FOUND_RESPONSE,
     },
 )
 def get_atom(
@@ -648,7 +651,7 @@ def _prompt_source_exists(
 @protected_router.get(
     "/atoms/{atom_id}/prompts",
     response_model=list[AtomLabPromptOption],
-    responses={**_ERROR_RESPONSES, 404: {"model": AtomLabErrorResponse}},
+    responses={**_ERROR_RESPONSES, 404: _ATOM_NOT_FOUND_RESPONSE},
 )
 def list_atom_prompts(
     atom: Annotated[AtomLabAtomResponse, Depends(get_atom)],
@@ -670,7 +673,7 @@ def list_atom_prompts(
     "/atoms/{atom_id}/prompts",
     status_code=HTTPStatus.CREATED,
     response_model=AtomLabPromptOption,
-    responses={**_ERROR_RESPONSES, 404: {"model": AtomLabErrorResponse}},
+    responses={**_ERROR_RESPONSES, 404: _ATOM_NOT_FOUND_RESPONSE},
 )
 def create_atom_prompt(
     payload: AtomLabPromptCreateRequest,

@@ -1,5 +1,17 @@
 {
   "components": {
+    "responses": {
+      "AtomLabAtomNotFound": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AtomLabErrorResponse"
+            }
+          }
+        },
+        "description": "Atom not found."
+      }
+    },
     "schemas": {
       "AtomLabAtomId": {
         "enum": [
@@ -914,7 +926,6 @@
             "type": "string"
           },
           "prompt": {
-            "maxLength": 65536,
             "minLength": 1,
             "title": "Prompt",
             "type": "string"
@@ -2892,14 +2903,7 @@
             "description": "Atom Lab access denied."
           },
           "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AtomLabErrorResponse"
-                }
-              }
-            },
-            "description": "Atom not found."
+            "$ref": "#/components/responses/AtomLabAtomNotFound"
           },
           "422": {
             "content": {
@@ -2985,14 +2989,7 @@
             "description": "Atom Lab access denied."
           },
           "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AtomLabErrorResponse"
-                }
-              }
-            },
-            "description": "Not Found"
+            "$ref": "#/components/responses/AtomLabAtomNotFound"
           },
           "422": {
             "content": {
@@ -3082,14 +3079,7 @@
             "description": "Atom Lab access denied."
           },
           "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AtomLabErrorResponse"
-                }
-              }
-            },
-            "description": "Not Found"
+            "$ref": "#/components/responses/AtomLabAtomNotFound"
           },
           "422": {
             "content": {

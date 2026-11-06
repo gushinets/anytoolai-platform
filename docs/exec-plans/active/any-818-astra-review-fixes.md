@@ -7,12 +7,23 @@
 - Created: 2026-11-06
 - Last updated: 2026-11-06
 - Review date: 2026-11-06
-- Next action: commit and push, then independent review and CI on the resulting commit.
+- Next action: parent review, commit and push, then fresh independent Astra review and CI.
 - Blocker: none.
 
 Scope: address [PR #259](https://github.com/gushinets/anytoolai-platform/pull/259)
 Astra review findings 1–8 without changing product runtime,
 working acceptance data, or the unrelated experiment files.
+
+Follow-up scope: prevent framing of the Atom Lab HTML shell, remove the independent
+saved-prompt character ceiling in favor of configured UTF-8 bytes, preserve known
+successful trial evidence through unchanged preset saves and retired-model history
+restores, clarify the local-only no-code launch contract, and share the identical
+atom-not-found OpenAPI response across its three operations. Existing trust checks,
+new-run model admission, production ingress and the 404 error envelope remain intact.
+
+Follow-up validation: focused API and Chromium regressions, canonical OpenAPI/client
+generation, docs generation checks, and frontend-check. Use only isolated test fixtures
+and mocked browser transport; no working DB, migrations, deployment or paid calls.
 
 ## Plan
 
@@ -78,3 +89,43 @@ documentation generation uses the existing managed environment. No dependency wa
 The pnpm update notice request timed out during install; the frozen install and every subsequent
 frontend-check step still completed successfully. Test imports used the bundled LiteLLM cost map
 (`LITELLM_LOCAL_MODEL_COST_MAP=True`) without any provider call.
+
+## Follow-up review repairs
+
+The independent follow-up found five related defects; all are repaired:
+
+1. The HTML response now sends `Content-Security-Policy: frame-ancestors 'none'`
+   alongside its existing no-store policy in both access modes. API regressions
+   verify the real headers; Chromium's mocked HTTP contract blocks same-origin and
+   cross-origin framing while top-level no-code loading still works.
+2. Saved-prompt requests rely on the existing configured UTF-8 byte validator rather
+   than a separate 65,536-character ceiling. Boundary tests cover a lower limit,
+   65,537-byte ASCII, a raised 70,000-byte limit, and one-byte-over UTF-8/ASCII rejection.
+3. Reapplying a configuration preserves only an already known successful trial whose
+   snapshot exactly matches the resulting draft. Tests cover successful and failed
+   preset readback, later setting changes, and an unknown preset source-run ID.
+4. Snapshot comparison reads the retained model selector value even when that model
+   has left the catalog. Compatible successful history keeps its trial; admission
+   still requires an available model. Failed/adapted history remains unproven.
+5. The deployment runbook now limits no-code access to a separately launched API or
+   custom local stand and explains that standard Compose and `atom-lab-*` keep code protection.
+
+The canonical exporter shares `components.responses.AtomLabAtomNotFound` across atom
+detail and both prompt operations. A regression resolves the three references and
+compares the complete schema with live FastAPI, preserving every other response and
+the exact error envelope; Markdown retains both prompt 404 entries. Regeneration
+removed 14 lines from the generated TypeScript without exclusions, suppressions or
+hand-editing generated files. Sonar's final quality-gate decision remains for CI.
+
+Follow-up verification passed: 397 connected API/docs/Atom Lab architecture tests;
+canonical `frontend-check` (including all 122 Chromium journeys, lint, typecheck,
+Node/Vitest tests, generated type drift and production builds); `validate-docs`;
+`generate-docs --check`; and `git diff --check`. A Ruff comparison against HEAD for
+all six changed Python files found no new diagnostics and two fewer existing ones.
+The focused follow-up regressions failed before fixes at the expected CSP, raised
+ASCII-byte limit, preset readback and retired-model boundaries.
+
+The first frontend-check attempt hit the sandbox's pnpm-store symlink permission;
+the same canonical command passed with escalation. SQLite tests used the existing
+managed interpreter and `runner.baseline_env()` outside the sandbox, with the bundled
+LiteLLM cost map. No working DB, provider, deployment, migration, commit or push was used.

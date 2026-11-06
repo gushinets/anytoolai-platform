@@ -306,7 +306,7 @@ class AtomLabPromptCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(min_length=1, max_length=80)
-    prompt: str = Field(min_length=1, max_length=65536)
+    prompt: str = Field(min_length=1)
     source_ref: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.-]+$")
     source_run_id: str | None = Field(default=None, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
 

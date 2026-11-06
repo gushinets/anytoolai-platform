@@ -153,10 +153,13 @@ SSO layer, or public frontend. The API image already packages `/atom-lab` HTML/C
 PostgreSQL and the API bind to loopback only. External access must pass through an operator-owned
 HTTPS reverse proxy restricted to the approved internal network.
 
-For a local loopback deployment only, `ANYTOOLAI_ATOM_LAB_AUTH_DISABLED=true` opens the
-Lab without a code. Protected routes require Host `localhost`, `127.0.0.1`, or `[::1]`
-and reject any Origin that differs from the request's scheme, host, or port. Origin-free
-local CLI requests remain supported. Keep access-code protection enabled behind remote ingress.
+For a separately launched local API process or custom local stand only,
+`ANYTOOLAI_ATOM_LAB_AUTH_DISABLED=true` opens the Lab without a code. The standard Compose
+environment does not forward this flag, and `atom-lab-*` commands always require and verify
+access-code protection; adding the flag to `.env.atom-lab` does not disable it. No-code routes
+require Host `localhost`, `127.0.0.1`, or `[::1]` and reject any Origin that differs from the
+request's scheme, host, or port. Origin-free local CLI requests remain supported. The HTML
+shell rejects framing in both modes. Keep access-code protection enabled behind remote ingress.
 
 Run `python3 scripts/agent/runner.py quick-check` once, create the gitignored secret file with
 owner-only permissions, and set unique PostgreSQL credentials, a high-entropy Lab access code, a different
