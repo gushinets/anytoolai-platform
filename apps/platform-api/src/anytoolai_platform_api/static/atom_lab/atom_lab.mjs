@@ -2134,8 +2134,10 @@ export function bootstrapAtomLab({
       : "Новый пресет";
     const unchanged = selectedPresetVersion ? "Открыта сохранённая версия." : "Нет несохранённых изменений.";
     nodes["preset-state"].textContent = `${source}. ${changed ? "Есть несохранённый черновик." : unchanged}${
-      !presetSourceOverride && session.promptSourceNeedsValidation
-        ? " Проверка источника ещё не завершена. Повторить загрузку можно во вкладке «Промпт»."
+      (presetSourceOverride ?? session).promptSourceNeedsValidation
+        ? presetSourceOverride
+          ? " Проверка источника ещё не завершена."
+          : " Проверка источника ещё не завершена. Повторить загрузку можно во вкладке «Промпт»."
         : (presetSourceOverride ?? session).promptSourceDetached
           ? " Исторический источник недоступен. Текст промпта сохранён." : ""
     }`;
@@ -2220,6 +2222,12 @@ export function bootstrapAtomLab({
     nodes["preset-error"].textContent = outcomeMessage && message
       ? `${outcomeMessage} ${message}`
       : outcomeMessage || message;
+    const source = presetSourceOverride;
+    if (presetEditorActive && source?.promptSourceNeedsValidation && source.promptSourceLoadError) {
+      nodes["preset-error"].append(button(document, "Повторить загрузку источника", () => {
+        void loadPromptOptions({refresh: true, draft: source});
+      }));
+    }
   };
 
   const loadPresets = async ({append = false, merge = false} = {}) => {
@@ -2287,7 +2295,7 @@ export function bootstrapAtomLab({
       nodes[id].disabled = operationLocked || presetReadOnly || selectedPresetVersion === null || presetSaveOutcomeUnknown !== null;
     }
     nodes["cancel-preset"].disabled = versionControlsLocked;
-    const promptSourcePending = !presetSourceOverride && session?.promptSourceNeedsValidation;
+    const promptSourcePending = (presetSourceOverride ?? session)?.promptSourceNeedsValidation;
     nodes["save-preset"].disabled = editorLocked || presetSaveOutcomeUnknown || promptSourcePending;
     nodes["save-as-new-preset"].disabled = versionControlsLocked || presetSaveOutcomeUnknown || promptSourcePending;
     nodes["open-latest-preset"].disabled = versionControlsLocked || conflictLatestPreset === null;
@@ -2630,7 +2638,7 @@ export function bootstrapAtomLab({
 
   const savePreset = async ({forceNew = false} = {}) => {
     if (!presetEditorActive || presetLibraryLoading || presetOpenInFlight || presetReadOnly || presetSaveInFlight
-      || presetSaveOutcomeUnknown || (!presetSourceOverride && session.promptSourceNeedsValidation)) return;
+      || presetSaveOutcomeUnknown || (presetSourceOverride ?? session).promptSourceNeedsValidation) return;
     if (!presetSourceOverride && validateDraft(session).length > 0) {
       session.validationRequested = true;
       showInputTab(true);
@@ -2645,6 +2653,7 @@ export function bootstrapAtomLab({
     setPresetError();
     nodes.status.textContent = "";
     const payload = currentPresetPayload();
+    const sourceOwner = presetSourceOverride ?? session;
     const updating = Boolean(selectedPresetVersion) && !forceNew;
     const expectedPresetId = updating ? selectedPresetVersion.preset_id : null;
     const expectedVersion = updating ? selectedPresetVersion.version + 1 : 1;
@@ -2767,6 +2776,10 @@ export function bootstrapAtomLab({
         : "";
       const details = fieldErrors ? ` Поля: ${fieldErrors}.` : "";
       setPresetError(`${error instanceof Error ? error.message : "Не удалось сохранить пресет."}${details} Значения черновика сохранены.`);
+      if (error?.code === "preset_contract_invalid"
+        && error.fieldErrors?.some(({path}) => path === "prompt_source_ref")) {
+        refreshRejectedPromptSource(sourceOwner, payload.prompt_source_ref ?? sourceOwner.atom.prompt_ref);
+      }
       renderPresetState();
     } finally {
       presetSaveInFlight = false;
@@ -3273,10 +3286,7 @@ export function bootstrapAtomLab({
         );
         activeSubmission = null;
         if (code === "prompt_source_invalid" && admissionErrors.some(({path}) => path === "prompt_source_ref")) {
-          session.promptSourceNeedsValidation = true;
-          updatePresetEditorDisabled();
-          if (presetEditorActive) renderPresetState();
-          void loadPromptOptions({refresh: true});
+          refreshRejectedPromptSource(session, submission.body.prompt_source_ref);
         }
         return;
       }
@@ -3412,6 +3422,19 @@ export function bootstrapAtomLab({
     draft.promptSourceNeedsValidation = false;
   };
 
+  const isCurrentPromptOwner = (draft) => !destroyed && catalog.includes(draft.atom)
+    && (draft === session || (presetEditorActive && draft === presetSourceOverride));
+
+  const refreshRejectedPromptSource = (draft, ref) => {
+    if (!isCurrentPromptOwner(draft) || promptRefFor(draft) !== ref) return;
+    draft.promptSourceNeedsValidation = true;
+    if (draft === session) renderPromptStatus();
+    updateRunButton();
+    updatePresetEditorDisabled();
+    if (presetEditorActive) renderPresetState();
+    void loadPromptOptions({refresh: true, draft});
+  };
+
   const matchesDraftSnapshot = (snapshot) => {
     const model = nodes["model-select"].value;
     if (!model || session.jsonError || session.inputErrors.size > 0) return false;
@@ -3478,24 +3501,28 @@ export function bootstrapAtomLab({
     renderPromptStatus();
   };
 
-  const loadPromptOptions = async ({refresh = false} = {}) => {
-    const draft = session;
-    if (!draft || (!refresh && (draft.promptOptions || draft.loadingPrompts))) return;
+  const loadPromptOptions = async ({refresh = false, draft = session} = {}) => {
+    if (!draft || !isCurrentPromptOwner(draft) || (!refresh && (draft.promptOptions || draft.loadingPrompts))) return;
     const request = {};
+    const isCurrent = () => isCurrentPromptOwner(draft) && draft.loadingPrompts === request;
     draft.loadingPrompts = request;
-    nodes["retry-prompts"].hidden = true;
-    nodes["prompt-load-status"].textContent = "Загрузка промптов…";
+    draft.promptSourceLoadError = null;
+    if (draft === session) {
+      nodes["retry-prompts"].hidden = true;
+      nodes["prompt-load-status"].textContent = "Загрузка промптов…";
+    }
     try {
       const options = await fetchPromptOptions(draft);
-      if (draft.loadingPrompts !== request) return;
+      if (!isCurrent()) return;
       draft.promptOptions = options;
       const reconcileSource = draft.promptSourceNeedsValidation;
       if (reconcileSource) reconcilePromptSource(draft, options);
       draft.basePrompt = options.find((option) => option.ref === promptRefFor(draft))?.prompt
         ?? draft.basePrompt;
-      if (session !== draft) return;
-      renderPromptOptions();
-      nodes["prompt-load-status"].textContent = "";
+      if (draft === session) {
+        renderPromptOptions();
+        nodes["prompt-load-status"].textContent = "";
+      } else setPresetError();
       if (reconcileSource) {
         refreshAdmissionValidation();
         updateRunButton();
@@ -3503,15 +3530,22 @@ export function bootstrapAtomLab({
         if (presetEditorActive) renderPresetState();
       }
     } catch (error) {
-      if (session !== draft || draft.loadingPrompts !== request) return;
-      nodes["prompt-load-status"].textContent = error.message;
-      nodes["retry-prompts"].hidden = false;
+      if (!isCurrent()) return;
+      draft.promptSourceLoadError = error.message;
+      if (draft === session) {
+        nodes["prompt-load-status"].textContent = error.message;
+        nodes["retry-prompts"].hidden = false;
+      } else setPresetError(error.message);
     } finally {
       if (draft.loadingPrompts === request) draft.loadingPrompts = false;
     }
   };
 
   const applyPromptOption = (option) => {
+    session.loadingPrompts = false;
+    session.promptSourceNeedsValidation = false;
+    nodes["prompt-load-status"].textContent = "";
+    nodes["retry-prompts"].hidden = true;
     session.promptSourceRef = option.ref === session.atom.prompt_ref ? null : option.ref;
     session.promptSourceDetached = false;
     session.basePrompt = option.prompt;
@@ -3686,7 +3720,9 @@ export function bootstrapAtomLab({
     } catch (error) {
       if (session === draft) {
         nodes["save-prompt-status"].textContent = error.message;
-        if (error.outcomeUnknown) {
+        if (error?.code === "prompt_invalid" && error.fieldErrors?.some(({path}) => path === "source_ref")) {
+          refreshRejectedPromptSource(draft, payload.source_ref);
+        } else if (error.outcomeUnknown) {
           draft.promptOptions = null;
           void loadPromptOptions();
         }
