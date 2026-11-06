@@ -218,6 +218,29 @@ The next PR scan must recompute the Sonar metric; no threshold, exclusion or sup
 No backend, PostgreSQL or provider checks were repeated for this test-only cleanup, and the old
 acceptance DB remains untouched. Fresh reviews and CI on the resulting commit remain required.
 
+### Second duplication cleanup
+
+The scan on `0195579734ef930ae6006abe0c3f078ac66ab6cf` retained all 21 False positive
+classifications and A ratings. Duplication fell from 3.7% to 3.2%, with 96 generated and 12 Chromium
+test duplicated new lines remaining; the gate is still red. A fresh GPT-6.1 Sol full-PR review of
+that head returned no findings.
+
+The three invalid-201 preset-response cases now share a small table of their exact raw response
+bodies, existing preset names and test-title prefixes, removing 35 source lines overall. All three
+scenarios and their assertions remain. Source outside those three cases is unchanged, including
+the separate gateway and structured pre-write failures. Before/after browser collection confirms
+the same 110 test names in the same order.
+
+Validation: the three cases and two neighboring failure journeys passed together (5/5). Canonical
+frontend-check passed with lint, typecheck, all 53 Atom Lab Node tests, all 110 Chromium journeys,
+generated API-contract drift and frontend builds. Doctor, documentation validation,
+`generate-docs --check` and `git diff --check` passed. Frontend log:
+`.quick-check-tmp/sonar259/test-response-table-frontend.log` (ignored diagnostic).
+The resulting Sonar metric remains pending a new PR analysis; do not infer a green gate from
+local tests. No generated code, rules, thresholds or exclusions changed. Backend, PostgreSQL and
+provider checks were not repeated; the acceptance DB remains untouched. Restart the final fresh
+review pair and check CI on the resulting commit without merging.
+
 ## Publication
 
 Create a codex/any-818 branch, commit only the explicit feature file set, push and create a PR
