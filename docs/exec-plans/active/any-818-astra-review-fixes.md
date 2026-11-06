@@ -243,3 +243,61 @@ dependency, Sonar rule/threshold/exclusion, working DB or paid provider changed.
 All changes remain uncommitted for parent review, PR update and independent CI/review.
 Full backend, production PostgreSQL and deployment gates were not repeated for this
 JavaScript-only behavior fix.
+
+## Confirmed prompt-save catalog synchronization
+
+Doctor passed before edits on 2026-11-07. Repair the confirmed successful-write
+finding from [PR discussion](https://github.com/gushinets/anytoolai-platform/pull/259#discussion_r4495906101).
+An A06 prompt save may complete after A06 -> A05 -> A06 navigation, leaving the
+replacement editor's already loaded library unaware of the confirmed saved record.
+
+Reach: shared prompt-save success handling and prompt-option request fencing,
+focused Chromium regressions, and this plan. Materialize confirmed saved options
+only for the identical loaded catalog atom; fence any pre-write GET so it cannot
+replace that library. Preserve active text/source and replacement-editor state,
+including same-session edits during POST. Keep unchanged-owner direct-save UX.
+
+Validation: first reproduce both GET/POST orderings, then verify edits/source,
+another atom, new unlock/catalog, normal saving, and existing malformed/failed-write
+behavior with mocked transport. Run canonical frontend-check and docs/diff checks.
+No backend/API change, working DB, provider call, dependency, commit or push is needed.
+Ambiguous-write retry and the unbounded library remain separate follow-ups.
+
+The new regressions first reproduced both list/save orderings and loss of the
+replacement editor's saved option (four failures); two additional cases reproduced
+the edited owner's form being closed and cleared. The ordinary unchanged owner,
+another atom and a newly loaded catalog already passed. A further failing regression
+proved that cancelling the unlock's atom switch retains the old editor while the
+catalog has changed, so the success guard checks actual current catalog membership.
+
+Confirmed saves now materialize one deduplicated option into the current library
+only for that same catalog atom. A pending pre-write GET is superseded through the
+existing loader; request identity fences its success, failure and cleanup. The
+replacement editor keeps its current source/text. An edited owner also keeps its
+open form/name/focus; an unchanged owner keeps automatic saved-prompt selection,
+form close and focus. Failed, malformed and indeterminate writes retain their
+previous safe reconciliation path, without inventing a confirmed option.
+
+Two more regressions reproduced an inert Retry after materialization: a forced
+post-save refresh failed with 503, or the replacement GET had already failed before
+201. The shared Retry handler now explicitly refreshes despite a populated list.
+Both cases retain the confirmed option through the error, issue a new GET on Retry,
+and return to a usable loaded library after 200.
+
+Verification (2026-11-07):
+
+- Focused Chromium: 15 passed, covering both GET/POST orderings, edited current
+  text/source in both owner and replacement editors, another atom, new catalog
+  with accepted/cancelled atom switch, unchanged-owner UX, three failed write
+  outcomes and both failed-read/retry orderings.
+- Canonical `python scripts/agent/runner.py frontend-check`: passed lint,
+  typecheck, 154 Chromium journeys, 53 Atom Lab Node tests, six demo Node tests,
+  824 Vitest tests, API-type drift and all production builds.
+- `validate-docs`, `generate-docs --check`, and `git diff --check`: passed.
+
+The sandbox denied the pnpm-store symlink and generator Temp writes; the identical
+commands passed with escalation. Chromium used the existing browser cache and the
+successful docs check used the bundled LiteLLM cost map. No generated API artifact,
+backend/API code, dependency, Sonar setting, working DB, migration or provider call
+changed. Full backend/production PostgreSQL/deployment checks were not repeated for
+this JavaScript-only fix. Changes remain uncommitted for parent review and PR/CI.

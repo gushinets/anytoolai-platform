@@ -432,6 +432,153 @@ test("object array summaries preserve edits and reveal invalid or newly added co
   await expect(page.getByLabel("category", {exact: true})).toBeFocused();
 });
 
+for (const state of ["replacement-get-before", "replacement-get-after", "replacement-refresh-failed", "replacement-read-failed", "replacement-text", "replacement-source", "owner-text", "owner-source", "other-atom", "new-catalog", "new-catalog-cancelled", "owner-unchanged"]) {
+  test(`a confirmed prompt save synchronizes the library for ${state}`, async ({page}) => {
+    const product = {ref: "product.a06.v1", name: "Продуктовый", prompt: "Текст продукта", group: "product", source_ref: null, source_run_id: null};
+    let reads = 0;
+    let saved;
+    let payload;
+    let completeSave;
+    let completeRead;
+    const saveGate = new Promise(resolve => { completeSave = resolve; });
+    const readGate = new Promise(resolve => { completeRead = resolve; });
+    await page.route("http://atom-lab.test/v1/atom-lab/atoms/*/prompts", async route => {
+      const atom = catalog().find(item => route.request().url().includes(`/atoms/${item.atom_id}/`));
+      if (route.request().method() === "POST") {
+        payload = route.request().postDataJSON();
+        await saveGate;
+        saved = {ref: "lab.confirmed", group: "lab", ...payload};
+        await route.fulfill({status: 201, json: saved});
+        return;
+      }
+      const options = [{ref: atom.prompt_ref, name: "Платформенный", prompt: atom.prompt, group: "platform", source_ref: null, source_run_id: null}];
+      if (atom.atom_id === "A06") {
+        reads += 1;
+        options.push(product);
+        if (saved) options.push(saved);
+        if ((reads === 2 && state === "replacement-read-failed")
+          || (reads === 3 && state === "replacement-refresh-failed")) {
+          await route.fulfill({status: 503, json: {error: {code: "prompts_unavailable", message: "Библиотека временно недоступна."}}});
+          return;
+        }
+        if (reads === 2 && ["replacement-get-after", "replacement-refresh-failed"].includes(state)) await readGate;
+      }
+      await route.fulfill({json: options});
+    });
+    await unlockAtom(page, "A06");
+    await page.locator("#prompt-tab").click();
+    await expect(page.locator("#save-prompt")).toBeEnabled();
+    await page.locator("#prompt-editor").fill("Сохраняемый текст");
+    await page.locator("#save-prompt-panel summary").click();
+    await page.locator("#save-prompt-name").fill("Подтверждённый промпт");
+    const posted = page.waitForRequest(request => request.method() === "POST" && request.url().endsWith("/A06/prompts"));
+    await page.locator("#save-prompt").click();
+    await posted;
+    if (state.startsWith("replacement") || state === "other-atom") {
+      page.once("dialog", dialog => dialog.accept());
+      await page.getByRole("button", {name: /A05/}).click();
+      if (state !== "other-atom") {
+        const read = page.waitForRequest(request => request.method() === "GET" && request.url().endsWith("/A06/prompts"));
+        await page.getByRole("button", {name: /A06/}).click();
+        await read;
+      }
+    }
+    if (state.startsWith("new-catalog")) {
+      page.once("dialog", dialog => state === "new-catalog-cancelled" ? dialog.dismiss() : dialog.accept());
+      await page.locator("#access-form").dispatchEvent("submit");
+      await expect(page.locator("#atom-title")).toContainText(state === "new-catalog-cancelled" ? "A06" : "A01");
+      if (state !== "new-catalog-cancelled") await page.getByRole("button", {name: /A06/}).click();
+    }
+    if (state === "replacement-read-failed") await expect(page.locator("#retry-prompts")).toBeVisible();
+    else if (!["replacement-get-after", "replacement-refresh-failed"].includes(state)) await expect(page.locator("#prompt-load-status")).toBeEmpty();
+    if (state.endsWith("source")) {
+      if (state.startsWith("owner")) page.once("dialog", dialog => dialog.accept());
+      await page.locator("#prompt-select").selectOption(product.ref);
+      await page.locator("#prompt-editor").fill(payload.prompt);
+    }
+    if (state.endsWith("text")) await page.locator("#prompt-editor").fill("Новая правка во время сохранения");
+    const currentText = await page.locator("#prompt-editor").inputValue();
+    const currentRef = await page.locator("#run-prompt-ref").textContent();
+    const accepted = page.waitForResponse(response => response.request().method() === "POST" && response.url().endsWith("/A06/prompts"));
+    completeSave();
+    await (await accepted).finished();
+    if (["replacement-refresh-failed", "replacement-read-failed"].includes(state)) {
+      await expect(page.locator("#retry-prompts")).toBeVisible();
+      await expect(page.locator('#prompt-select option[value="lab.confirmed"]')).toHaveCount(1);
+      const previousReads = reads;
+      await page.locator("#retry-prompts").click();
+      await expect.poll(() => reads).toBe(previousReads + 1);
+      await expect(page.locator("#prompt-load-status")).toBeEmpty();
+      await expect(page.locator("#retry-prompts")).toBeHidden();
+      await expect(page.locator("#save-prompt")).toBeEnabled();
+    }
+    if (["replacement-get-after", "replacement-refresh-failed"].includes(state)) {
+      await expect(page.locator('#prompt-select option[value="lab.confirmed"]')).toHaveCount(1);
+      const staleRead = page.waitForResponse(response => response.request().method() === "GET" && response.url().endsWith("/A06/prompts"));
+      completeRead();
+      await (await staleRead).finished();
+    }
+    if (state === "owner-unchanged") {
+      await expect(page.locator("#save-prompt-status")).toContainText("Сохранён");
+      await expect(page.locator("#run-prompt-ref")).toHaveText("lab.confirmed");
+      await expect(page.locator("#prompt-select")).toBeFocused();
+      await expect(page.locator("#save-prompt-name")).toBeEmpty();
+      await expect(page.locator("#save-prompt-panel")).not.toHaveAttribute("open");
+    } else {
+      await expect(page.locator("#prompt-editor")).toHaveValue(currentText);
+      await expect(page.locator("#run-prompt-ref")).toHaveText(currentRef);
+      if (state.startsWith("owner")) {
+        await expect(page.locator("#save-prompt")).toBeEnabled();
+        await expect(page.locator("#save-prompt-panel")).toHaveAttribute("open");
+        await expect(page.locator("#save-prompt-name")).toHaveValue(payload.name);
+      }
+    }
+    await page.locator("#input-tab").click();
+    await page.locator("#prompt-tab").click();
+    await expect(page.locator("#prompt-load-status")).toBeEmpty();
+    const differentScope = state === "other-atom" || state.startsWith("new-catalog");
+    await expect(page.locator('#prompt-select option[value="lab.confirmed"]')).toHaveCount(differentScope ? 0 : 1);
+    if (differentScope) return;
+    await expect(page.locator("#prompt-editor")).toHaveValue(currentText);
+    if (state !== "owner-unchanged") {
+      if (state.endsWith("text") || state.endsWith("source")) page.once("dialog", dialog => dialog.accept());
+      await page.locator("#prompt-select").selectOption("lab.confirmed");
+    }
+    await expect(page.locator("#prompt-editor")).toHaveValue(payload.prompt);
+    await expect(page.locator("#prompt-select")).toHaveValue("lab.confirmed");
+  });
+}
+
+for (const outcome of ["rejected", "malformed", "indeterminate"]) {
+  test(`a ${outcome} prompt write preserves the current draft without a confirmed option`, async ({page}) => {
+    await page.route("http://atom-lab.test/v1/atom-lab/atoms/A06/prompts", async route => {
+      if (route.request().method() === "GET") await route.fulfill({json: [{
+        ref: A06.prompt_ref, name: "Платформенный", prompt: A06.prompt, group: "platform", source_ref: null, source_run_id: null,
+      }]});
+      else if (outcome === "rejected") await route.fulfill({status: 422, json: {error: {
+        code: "prompt_invalid", message: "Промпт не прошёл проверку.",
+      }}});
+      else if (outcome === "malformed") await route.fulfill({status: 201, json: {}});
+      else await route.abort("failed");
+    });
+    await unlockAtom(page, "A06");
+    await page.locator("#prompt-tab").click();
+    await expect(page.locator("#save-prompt")).toBeEnabled();
+    await page.locator("#prompt-editor").fill("Несохранённый текст");
+    await page.locator("#save-prompt-panel summary").click();
+    await page.locator("#save-prompt-name").fill("Не подтверждён");
+    await page.locator("#save-prompt").click();
+    await expect(page.locator("#save-prompt-status")).toContainText(outcome === "rejected"
+      ? "Промпт не прошёл проверку" : "подтверждение не получено");
+    await expect(page.locator("#save-prompt")).toBeEnabled();
+    await expect(page.locator("#prompt-editor")).toHaveValue("Несохранённый текст");
+    await expect(page.locator("#prompt-select")).toHaveValue(A06.prompt_ref);
+    await expect(page.locator("#prompt-select option")).toHaveCount(1);
+    await expect(page.locator("#save-prompt-panel")).toHaveAttribute("open");
+    await expect(page.locator("#save-prompt-name")).toHaveValue("Не подтверждён");
+  });
+}
+
 for (const presetReadback of ["success", "unavailable"]) {
 test(`the shared launch keeps its successful prompt trial after ${presetReadback} preset readback`, async ({page}) => {
   const product = {ref: "product.a06.v1", name: "Продуктовый", prompt: "Промпт продукта", group: "product", source_ref: null, source_run_id: null};
