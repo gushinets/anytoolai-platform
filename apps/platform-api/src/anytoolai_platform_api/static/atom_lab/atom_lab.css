@@ -195,7 +195,7 @@ pre { background: #111827; border-radius: 0.55rem; color: #e5e7eb; max-height: 2
 .run-status[data-tone="pending"] { background: #eef2ff; border-color: #a9b6e8; color: #2638a2; }
 .run-status .run-state { align-items: baseline; display: flex; gap: 0.55rem; margin: 0; overflow-wrap: anywhere; }
 .run-status .run-state::before { background: currentColor; border-radius: 50%; content: ""; flex: 0 0 0.5rem; height: 0.5rem; }
-#run-status-help { font-size: 0.88rem; margin: 0.35rem 0 0; }
+#run-status-help { font-size: 0.88rem; margin: 0.35rem 0 0; overflow-wrap: anywhere; }
 #run-status-help:empty { display: none; }
 .response-section { margin-top: 1.2rem; }
 .response-section > h3 { font-size: 1rem; margin: 0 0 0.6rem; }
