@@ -297,6 +297,13 @@ def _number(value: object) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value >= 0
 
 
+def delivery_latency(run: dict) -> float | None:
+    """A delivery time exists only for an observed result, regardless of its semantic quality."""
+    origin = run.get("origin") or {}
+    value = origin.get("ui_latency_ms")
+    return value if origin.get("ui_outcome") == "result" and _number(value) else None
+
+
 def config_mismatches(run: dict, group: dict) -> list[str]:
     """A run made with another channel, model, reasoning or prompt is not an observation of this group."""
     return [
@@ -315,13 +322,28 @@ def evidence_problems(run: dict, group: dict, base: Path | None = None) -> list[
     origin = run.get("origin") or {}
     if origin.get("ui_outcome") not in ("result", "error") or not _number(origin.get("ui_latency_ms")):
         problems.append("no web form observation (UI outcome and UI time)")
+    diagnostics = run.get("diagnostic_errors") or {}
+    # Only these auxiliary failures leave the required trace/API proof intact.
+    problems.extend(
+        f"browser evidence capture failed: {stage}"
+        for stage in diagnostics
+        if stage not in ("screenshot", "browser_close", "journal", "start_journal")
+    )
+    if run.get("trace_error"):
+        problems.append("browser artifact could not be read during collection")
     artifact = (base / origin["trace"]) if base and isinstance(origin.get("trace"), str) else None
-    if artifact is None or not artifact.is_file() or not artifact.resolve().is_relative_to(base.resolve()):
-        problems.append("browser artifact missing")
-    elif hashlib.sha256(artifact.read_bytes()).hexdigest() != origin.get("trace_sha256"):
-        problems.append("browser artifact does not match its sha256")
-    elif not _is_trace_of(artifact, run.get("session_id"), before_session=_failed_before_session(run)):
-        problems.append("browser artifact is not a Playwright trace of this session")
+    try:
+        if (artifact is None or not artifact.is_file()
+                or not artifact.resolve().is_relative_to(base.resolve())):
+            problems.append("browser artifact missing")
+        elif hashlib.sha256(artifact.read_bytes()).hexdigest() != origin.get("trace_sha256"):
+            problems.append("browser artifact does not match its sha256")
+        elif not _is_trace_of(
+            artifact, run.get("session_id"), before_session=_failed_before_session(run)
+        ):
+            problems.append("browser artifact is not a Playwright trace of this session")
+    except OSError:
+        problems.append("browser artifact unreadable")
     return problems
 
 
@@ -507,12 +529,14 @@ def accept(suite: dict, orders: dict[str, dict], runs: list[dict], verdicts: dic
     limit = suite["max_median_latency_ms"]
     for series in sorted({key[0] for key in groups}):
         planned = sum(group["attempts"] for key, group in groups.items() if key[0] == series)
-        # only UI times of verified web form runs; a missing run or an API time never stands in for one
-        latencies = [(run.get("origin") or {}).get("ui_latency_ms") for run, j in judged if run["series"] == series and j["verified"]]
-        latencies = [value for value in latencies if _number(value)]
-        median = statistics.median(latencies) if len(latencies) == planned else None
+        verified = [run for run, j in judged if run["series"] == series and j["verified"]]
+        latencies = [value for run in verified if (value := delivery_latency(run)) is not None]
+        median = statistics.median(latencies) if len(verified) == planned and latencies else None
         if median is None:
-            pending.append(f"{series}: UI time verified for {len(latencies)} of {planned} planned runs")
+            pending.append(
+                f"{series}: UI time verified for {len(verified)} of {planned} planned runs; "
+                f"{len(latencies)} delivered results"
+            )
         elif median > limit:
             fails.append(f"{series}: median latency {median / 1000:.1f} s above {limit / 1000:.0f} s")
         lines.append(f"| {series} | {'-' if median is None else f'{median / 1000:.1f}'} | {limit / 1000:.0f} |")

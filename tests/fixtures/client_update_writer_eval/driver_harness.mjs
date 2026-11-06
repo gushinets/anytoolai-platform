@@ -6,6 +6,7 @@ const spec = JSON.parse(readFileSync(0, 'utf8'));
 const calls = [];
 let listener;
 const failure = spec.failure;
+const apiFailure = /^(json-error|(html|plain|body)-(start|result))$/.test(failure);
 function response(kind) {
   return {
     url: () => kind === 'start'
@@ -15,6 +16,7 @@ function response(kind) {
     json: async () => {
       if (kind === 'start') await new Promise(resolve => setTimeout(resolve, 5));
       if (failure === `body-${kind}`) throw new Error('Response body unavailable');
+      if (failure === 'capture-result' && kind === 'result') throw new Error('Body capture failed');
       if (failure === `html-${kind}`) return JSON.parse('<html>Bad gateway</html>');
       if (failure === `plain-${kind}`) return JSON.parse('Bad gateway');
       if (failure === 'json-error') return { error: 'gateway error' };
@@ -24,8 +26,10 @@ function response(kind) {
 }
 const page = {
   on: (_event, callback) => { listener = callback; },
-  goto: async () => {},
-  waitForFunction: async () => {},
+  goto: async () => { if (failure === 'pre-submit') throw new Error('Page unavailable'); },
+  waitForFunction: async () => {
+    if (failure === 'submit-timeout') throw Object.assign(new Error('UI timeout'), { name: 'TimeoutError' });
+  },
   screenshot: async ({ path }) => {
     calls.push('screenshot');
     if (failure === 'screenshot') throw new Error('Screenshot unavailable');
@@ -40,8 +44,11 @@ const page = {
       listener(response('start'));
       if (!failure.endsWith('-start') && failure !== 'json-error') listener(response('result'));
     },
-    count: async () => failure.includes('-') ? 0 : 1,
-    last: () => ({ innerText: async () => 'Done' }),
+    count: async () => apiFailure ? 0 : 1,
+    last: () => ({ innerText: async () => {
+      if (failure === 'capture-visible') throw new Error('Browser disconnected while reading text');
+      return 'Done';
+    } }),
     allTextContents: async () => ['API error'],
   }),
 };
@@ -50,7 +57,7 @@ const chromium = {
     newContext: async () => ({
       newPage: async () => page,
       tracing: {
-        start: async () => {},
+        start: async () => { if (failure === 'trace-start') throw new Error('Trace start failed'); },
         stop: async ({ path }) => {
           calls.push('trace');
           if (failure === 'trace') throw new Error('Trace unavailable');
@@ -70,6 +77,8 @@ const record = await collectLive(spec, {
     const { phase } = JSON.parse(content);
     calls.push(phase);
     if (phase === 'complete' && failure === 'journal') throw new Error('Journal unavailable');
+    if (phase === 'started' && failure === 'start-journal') throw new Error('Journal unavailable');
+    if (phase === 'submitting' && failure === 'submit-journal') throw new Error('Journal unavailable');
     writeFileSync(path, content);
   },
 });

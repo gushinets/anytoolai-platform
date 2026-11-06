@@ -20,13 +20,16 @@ from pathlib import Path
 
 from client_update_writer_eval import (
     EvaluationStatus,
+    configuration_problems,
     digest,
     evidence_status,
     revision_problems,
+    validate_manifest_identity,
+    validate_runs,
     validate_source_revisions,
     validate_suite,
 )
-from proposal_ai_eval import read_jsonl
+from proposal_ai_eval import delivery_latency, read_jsonl
 
 
 def human_status(run: dict, verdict: dict | None) -> tuple[EvaluationStatus, bool]:
@@ -63,34 +66,13 @@ def human_status(run: dict, verdict: dict | None) -> tuple[EvaluationStatus, boo
     return ("PENDING" if undecided else "PASS"), False
 
 
-def validate_runs(manifest: dict, runs: list[dict]) -> None:
-    cases = {case["id"]: case for case in manifest["suite"]["cases"]}
-    if manifest["suite_sha256"] != digest(manifest["suite"]):
-        raise ValueError("suite manifest digest mismatch")
-    validate_source_revisions([manifest, *runs])
-    seen = set()
-    for run in runs:
-        key = run["case"], run["attempt"]
-        if key in seen or run["case"] not in cases:
-            raise ValueError("duplicate or unplanned attempt")
-        seen.add(key)
-        if run["input"] != cases[run["case"]]:
-            raise ValueError("input differs from planned case")
-        for field in ("input", "output"):
-            if run[field + "_sha256"] != digest(run[field]):
-                raise ValueError(f"{field} digest mismatch")
-        for field in ("model", "reasoning_effort", "prompt_sha256"):
-            if run[field] != manifest[field]:
-                raise ValueError(f"configuration mismatch: {field}")
-
-
-def render_run(series: str, run: dict, status: str, case: dict, revision_issues: list[str]) -> str:
+def render_run(series: str, run: dict, status: str, case: dict, evidence_issues: list[str]) -> str:
     output = json.dumps(run.get("output"), ensure_ascii=False, indent=2)
     questions = "".join("<li>" + html.escape(q) + "</li>" for q in case["criteria"])
     evidence = html.escape(
         json.dumps(
             {
-                "revision_issues": revision_issues,
+                "evidence_issues": evidence_issues,
                 **{
                     key: run.get(key)
                     for key in (
@@ -104,6 +86,9 @@ def render_run(series: str, run: dict, status: str, case: dict, revision_issues:
                         "review_needed",
                         "recovery_note",
                         "diagnostic_reason",
+                        "diagnostic_errors",
+                        "trace_error",
+                        "error",
                     )
                 },
             },
@@ -126,8 +111,7 @@ def validate_experiment(manifests: dict[str, dict]) -> tuple[dict, set[tuple[str
     reference = next(iter(manifests.values()))
     suite = reference["suite"]
     validate_suite(suite)
-    suite_hash = digest(suite)
-    validate_source_revisions(manifests.values())
+    validate_manifest_identity(manifests.values())
     planned = {(model, effort) for model in suite["models"] for effort in suite["reasoning"]}
     if not planned or len(planned) != len(suite["models"]) * len(suite["reasoning"]):
         raise ValueError("empty or duplicate experiment configuration matrix")
@@ -135,10 +119,6 @@ def validate_experiment(manifests: dict[str, dict]) -> tuple[dict, set[tuple[str
     for manifest in manifests.values():
         if manifest["suite_sha256"] != digest(manifest["suite"]):
             raise ValueError("suite manifest digest mismatch")
-        if manifest["suite_sha256"] != suite_hash:
-            raise ValueError("experiment suite mismatch")
-        if manifest["prompt_sha256"] != reference["prompt_sha256"]:
-            raise ValueError("experiment prompt mismatch")
         pair = (manifest["model"], manifest["reasoning_effort"])
         if pair not in planned:
             raise ValueError("configuration outside experiment plan")
@@ -165,11 +145,13 @@ def overall_summary(summary: dict, suite: dict, observed: set[tuple[str, str]]) 
     return {"status": overall, "series": summary, "missing_configurations": missing}
 
 
-def measured_metrics(runs: list[dict], diagnostics: list[dict], groups: dict) -> dict:
+def measured_metrics(
+    runs: list[dict], diagnostics: list[dict], groups: dict, verified_runs: list[dict]
+) -> dict:
     times = [
-        run["origin"]["ui_latency_ms"]
-        for run in runs
-        if isinstance(run["origin"].get("ui_latency_ms"), (int, float))
+        value
+        for run in verified_runs
+        if (value := delivery_latency(run)) is not None
     ]
     calls = [call for run in runs + diagnostics for call in run["provider_calls"]]
     costs = [
@@ -199,6 +181,14 @@ def measured_metrics(runs: list[dict], diagnostics: list[dict], groups: dict) ->
     }
 
 
+def accepted_status(
+    technical: EvaluationStatus, human: EvaluationStatus, problems: list[str]
+) -> EvaluationStatus:
+    if "FAIL" in (technical, human):
+        return "FAIL"
+    return "PASS" if technical == human == "PASS" and not problems else "PENDING"
+
+
 def summarize(directory: Path) -> dict:
     manifests = {
         path.parent.name: json.loads(path.read_text(encoding="utf-8"))
@@ -226,24 +216,19 @@ def summarize(directory: Path) -> dict:
         revision_issues = {
             run["id"]: issues for run in runs if (issues := revision_problems(manifest, run))
         }
-        if len({row["id"] for row in runs}) != len(runs):
-            raise ValueError(f"duplicate attempts in {series}")
+        configuration_issues = configuration_problems(manifest)
+        assessments = {run["id"]: evidence_status(run, series_directory) for run in runs}
         groups = {}
         for case in manifest["suite"]["cases"]:
             group = [run for run in runs if run["case"] == case["id"]]
             expected = manifest["suite"]["repeats"]
-            if any(run["attempt"] not in range(1, expected + 1) for run in group):
-                raise ValueError(f"unplanned attempt in {series}/{case['id']}")
             statuses = []
             critical = 0
             for run in group:
-                measured, problems = evidence_status(run, series_directory)
-                problems = problems + revision_issues.get(run["id"], [])
+                measured, problems = assessments[run["id"]]
+                problems = problems + revision_issues.get(run["id"], []) + configuration_issues
                 human, is_critical = human_status(run, verdicts.get((series, run["id"])))
-                status = "FAIL" if "FAIL" in (measured, human) else "PENDING"
-                verified = problems == ["human semantic review required"]
-                if verified and human == "PASS":
-                    status = "PASS"
+                status = accepted_status(measured, human, problems)
                 statuses.append(status)
                 critical += is_critical
                 template.append(
@@ -262,7 +247,7 @@ def summarize(directory: Path) -> dict:
                     }
                 )
                 sections.append(
-                    render_run(series, run, status, case, revision_issues.get(run["id"], []))
+                    render_run(series, run, status, case, problems)
                 )
             passed = statuses.count("PASS")
             pending = statuses.count("PENDING") + expected - len(group)
@@ -276,15 +261,32 @@ def summarize(directory: Path) -> dict:
                 "pending": pending,
                 "critical_errors": critical,
             }
-        metrics = measured_metrics(runs, diagnostics, groups)
+        verified_runs = [run for run in runs if assessments[run["id"]][0] == "PASS"
+                         and not revision_issues.get(run["id"]) and not configuration_issues]
+        metrics = measured_metrics(runs, diagnostics, groups, verified_runs)
         median = metrics["median_ui_ms"]
-        state = "PENDING" if any(g["status"] == "PENDING" for g in groups.values()) else "PASS"
+        complete = (
+            len(runs) == manifest["suite"]["repeats"] * len(manifest["suite"]["cases"])
+            and not revision_issues and not configuration_issues
+            and all(assessments[run["id"]][0] == "PASS"
+                    or (run.get("origin") or {}).get("ui_outcome") == "error" for run in runs)
+        )
+        state = "PENDING" if not complete or median is None or any(
+            g["status"] == "PENDING" for g in groups.values()
+        ) else "PASS"
         if any(g["status"] == "FAIL" for g in groups.values()) or (
-            median is not None and median > manifest["suite"]["max_median_ui_ms"]
+            complete and median is not None and median > manifest["suite"]["max_median_ui_ms"]
         ):
             state = "FAIL"
         summary[series] = {
-            "status": state, "groups": groups, "revision_issues": revision_issues, **metrics
+            "status": state, "groups": groups, "revision_issues": revision_issues,
+            "observations_complete": bool(complete),
+            "configuration_issues": configuration_issues,
+            "evidence_issues": {key: issues for key, (_, issues) in assessments.items() if issues},
+            "collection_diagnostics": {
+                run["id"]: run["diagnostic_errors"] for run in runs if run.get("diagnostic_errors")
+            },
+            **metrics
         }
     result = overall_summary(summary, suite, observed)
     (directory / "summary.json").write_text(

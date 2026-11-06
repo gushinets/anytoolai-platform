@@ -5,10 +5,10 @@
 - State: active
 - Owner: mixed
 - Created: 2026-11-03
-- Last updated: 2026-11-05
-- Review date: 2026-11-05
-- Next action: owner review of the validated P1/P2 fixes and PR checks
-- Blocker: none in local validation; post-push PR checks still need verification
+- Last updated: 2026-11-06
+- Review date: 2026-11-06
+- Next action: owner review of the validated round 5 acceptance contract
+- Blocker: none in local validation; round 5 changes remain local
 
 ## Goal and scope
 
@@ -957,3 +957,83 @@ No paid provider calls or real browser sessions were started. This contract iden
 source checkout; it does not attest the code running in containers. Historical evidence with
 unverified provenance remains PENDING when recomputed, without rewriting human decisions.
 Changes are local; commit and publication are outside this request.
+
+### Review round 5: acceptance contract implementation authorized
+
+The user requested a root-model fix after repeated boundary gaps. Treat experiment identity,
+observed UI delivery, technical proof, human judgment and collection control as separate axes.
+Use one identity preflight for collector/resume, report and review: common suite/prompt/source/
+baseline, with the selected router derived only by model/effort substitution. Missing identity
+cannot establish technical PASS. Keep semantic judgments independent. Technical assessment
+returns explicit PASS/FAIL/PENDING; aggregation must not infer proof from message text.
+Delivery metrics use verified successful observations; completeness and all-attempt costs are
+separate. Apply the shared trace/latency contract to Proposal AI as well, preserving its planned
+attempt completeness rule. Keep runtime failures and critical semantic failures authoritative.
+
+Implement this in existing evaluator helpers, without a new framework, dependency or runtime
+configuration format. Preserve raw records and historical human verdicts. Cover identity and
+observation/proof/human combinations at collector/review/report entry points with real temporary
+files, synthetic trace archives and the statically imported browser harness. Validate focused
+suites, lint, docs and canonical quick-check. No paid calls, prompt/model rollout or publication.
+
+### Acceptance contract after review round 5
+
+One experiment has fixed suite, prompt, clean source revision and baseline router; only the
+planned model/effort coordinates vary. The selected router must equal the baseline with exactly
+those substitutions. Known conflicts reject preflight before report/verdict or worker writes.
+Unknown router/prompt/revision evidence cannot establish acceptance. Resume also validates the
+saved runs through the same input/output/configuration/attempt checks as report and review.
+
+| Axis | Meaning | Effect |
+| --- | --- | --- |
+| UI observation | result, error, or unknown | A storage/cleanup error cannot overwrite it. Setup without submission remains unknown. |
+| Technical proof | PASS, FAIL, PENDING | PASS requires trace, session, canonical/visible text and provider model/effort evidence. It is not semantic acceptance. |
+| Human decision | PASS, FAIL, PENDING | Hash-bound assessment of the text; it cannot certify technical evidence or identity. |
+| Collection readiness | continue or stop with retained attempt | Real UI failure, unknown outcome or collection diagnostics stop new spending without changing the saved observation. |
+| Delivery metrics | verified result times only | Finite nonnegative numeric latency; booleans, failures and unknown observations are excluded. All costs remain counted. |
+
+The report accepts an attempt only when technical and human assessments are explicitly PASS
+and its identity has no unresolved issues. Known technical/human failures retain precedence.
+Group thresholds remain the approved usable-count and critical-error rules. Latency is gated
+only when the planned observation set is complete and its identity is verified; partial slow
+samples remain provisional. Missing/invalid limits are rejected, not silently bypassed.
+
+Trace/API capture diagnostics (including unknown future stages) mean unverified evidence.
+Screenshot, browser-close and journal failures are auxiliary warnings when required proof is
+otherwise complete; they are retained in JSON/HTML and still stop collection for reconciliation.
+No attempt is automatically resubmitted. Technical success still leaves the collector's saved
+status PENDING until a human evaluates the text. Historical raw records/verdicts are never migrated.
+
+Proposal AI shares the delivery-time predicate and trace-read handling. Its completeness rule
+still counts verified observations, including genuine failed deliveries, while its latency
+population contains successful deliveries only. Acceptance Builder and Brief Decoder have no
+matching evaluator path in the inspected code. No product prompt or default model changes.
+
+Boundary: this validates recorded source/configuration identity and evidence consistency. It
+does not attest container images or prove that synthetic test traces came from a live browser.
+
+### Review round 5 validation completed
+
+Implemented the acceptance contract above across collector/resume, manual review, report and
+shared Proposal AI evidence/latency utilities. Confirmed all three reported P2s and the analogous
+Proposal AI latency defect with deterministic regressions. Removed message-text-based proof
+inference and duplicated report-only run guards. No new dependencies, runtime model changes or
+historical-data migration.
+
+Added 103 regression cases; all 349 focused tests pass. Coverage includes all entry points for
+baseline/selected-router identity, imported-run resume rejection, a 36-case UI/proof/human matrix,
+complete versus partial latency populations, invalid values and limits, unknown prompt identity,
+real failure versus cleanup/capture diagnostics, future unknown capture stages, and all-attempt
+cost preservation. Existing collector coverage explicitly asserts that technical PASS still saves
+PENDING without a human assessment. The actual JS collector runs through deterministic browser
+doubles; real temporary files and synthetic trace ZIPs exercise the real evidence/report logic.
+
+Final canonical quick-check: 3,327 passed, 12 standard skips, 628 deselected, exit zero. Source
+and test checksums were unchanged throughout this final run. Config, architecture, docs and
+generated-doc checks pass. Ruff passes on the changed Update files and on changed Proposal AI
+lines; existing unrelated whole-file Proposal AI lint debt was not reformatted. ESLint and
+whitespace checks pass. A preceding quick-check also passed before the last two boundary cases.
+
+No live browser/provider calls, GitHub writes, commit or push. Raw acceptance records and human
+verdicts remain untouched. Legacy evidence missing required identity/proof stays unverified on
+recomputation; the recorded source identity does not attest a running container image.

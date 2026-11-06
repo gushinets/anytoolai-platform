@@ -952,3 +952,35 @@ def test_git_state_propagates_failures_instead_of_claiming_clean(failed_command)
         pytest.raises(proposal_ai_eval.subprocess.CalledProcessError),
     ):
         proposal_ai_eval._git_state()
+
+
+def test_failed_delivery_does_not_reduce_proposal_latency(tmp_path, capsys):
+    runs = attempts(5)
+    for run, latency in zip(runs, [50000, 55000, 80000, 90000, 0], strict=True):
+        run["origin"]["ui_latency_ms"] = latency
+    failed = runs[-1]
+    failed.update(session_id=None, output=None, runtime_status="ui_error", error="start failed")
+    failed["origin"]["ui_outcome"] = "error"
+    trace = _zip({"trace.trace": "{}", "trace.network": "GET /products/proposal_ai"})
+    failed["origin"]["trace_sha256"] = hashlib.sha256(trace).hexdigest()
+    code, out = run_accept(
+        tmp_path, runs, confirmed(runs[:4]), capsys, program=GRID, traces={"r4": trace}
+    )
+    assert code == 1 and "median latency 67.5 s above 60 s" in out
+    assert "4/5 | PASS" in out
+
+
+def test_unreadable_proposal_trace_is_missing_proof(tmp_path, capsys):
+    runs = attempts(3)
+    suite = write_suite(tmp_path, runs, confirmed(runs))
+    original = Path.read_bytes
+
+    def read_bytes(path):
+        if path.suffix == ".zip":
+            raise PermissionError("trace unreadable")
+        return original(path)
+
+    with patch.object(Path, "read_bytes", read_bytes):
+        assert proposal_ai_eval.main(["accept", "--suite", str(suite)]) == 1
+    out = capsys.readouterr().out
+    assert out.startswith("# Suite t: PENDING") and "browser artifact unreadable" in out

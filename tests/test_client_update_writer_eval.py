@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import json
 import sys
+import zipfile
 from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
@@ -51,11 +52,11 @@ def test_ui_error_fails_even_after_backend_success(tmp_path):
     assert eval_module.evidence_status(run, tmp_path)[0] == "FAIL"
 
 
-def test_success_stays_pending_for_human(tmp_path):
+def test_complete_technical_proof_is_separate_from_human_review(tmp_path):
     with patch.object(eval_module, "evidence_problems", return_value=[]):
         assert eval_module.evidence_status(record(), tmp_path) == (
-            "PENDING",
-            ["human semantic review required"],
+            "PASS",
+            [],
         )
 
 
@@ -244,6 +245,7 @@ def test_report_validates_saved_output_against_hash():
     run.update(
         {
             "case": "U01-en",
+            "id": "U01-en-1",
             "attempt": 1,
             "model": "openai/gpt-6-luna",
             "reasoning_effort": "medium",
@@ -253,7 +255,7 @@ def test_report_validates_saved_output_against_hash():
     case = {"id": "U01-en", **run["input"]}
     run["input"] = case
     run["input_sha256"] = eval_module.digest(case)
-    suite = {"cases": [case]}
+    suite = {"cases": [case], "repeats": 1}
     manifest = {
         "suite": suite,
         "suite_sha256": eval_module.digest(suite),
@@ -323,15 +325,15 @@ def test_orphaned_journal_blocks_retry_and_restores_router(tmp_path, repeats):
 
 def test_diagnostic_costs_count_but_unknown_cost_prevents_cost_per_usable():
     call = {"input_tokens": 10, "output_tokens": 2, "estimated_cost": 0.01}
-    run = {"origin": {"ui_latency_ms": 1000}, "provider_calls": [call]}
+    run = {"origin": {"ui_outcome": "result", "ui_latency_ms": 1000}, "provider_calls": [call]}
     diagnostic = {"provider_calls": [{**call, "estimated_cost": "NaN"}]}
     groups = {"U01-en": {"usable": 1}}
-    metrics = report_module.measured_metrics([run], [diagnostic], groups)
+    metrics = report_module.measured_metrics([run], [diagnostic], groups, [run])
     assert metrics["calls_without_cost"] == 1
     assert metrics["cost_per_usable"] is None
     assert metrics["ledger_estimated_cost"] == call["estimated_cost"]
     diagnostic["provider_calls"][0]["estimated_cost"] = 0.02
-    metrics = report_module.measured_metrics([run], [diagnostic], groups)
+    metrics = report_module.measured_metrics([run], [diagnostic], groups, [run])
     assert metrics["cost_per_usable"] == pytest.approx(0.03)
 
 
@@ -354,14 +356,14 @@ def review_directory(tmp_path, *, questions=None):
             "attempt": 1,
             "model": "openai/gpt-6.1-sol",
             "reasoning_effort": "medium",
-            "prompt_sha256": "frozen-prompt",
+            "prompt_sha256": "e" * 64,
         }
     )
     run["input"].update({"id": "U04-en", "progress_notes": "Internal complete; tests fail."})
     if questions is not None:
         run["input"]["criteria"] = questions
     run["input_sha256"] = eval_module.digest(run["input"])
-    suite = {"cases": [run["input"]]}
+    suite = {"cases": [run["input"]], "repeats": 1}
     manifest = {
         "suite": suite,
         "suite_sha256": eval_module.digest(suite),
@@ -513,17 +515,26 @@ def experiment_manifests():
         "minimum_usable": 1,
         "max_median_ui_ms": 60000,
     }
-    return {
+    manifests = {
         effort: {
             "suite": deepcopy(suite),
             "model": "openai/gpt-6.1-sol",
             "reasoning_effort": effort,
-            "prompt_sha256": "fixed-prompt",
+            "prompt_sha256": "f" * 64,
             "git_sha": "a" * 40,
             "git_dirty": False,
         }
         for effort in suite["reasoning"]
     }
+
+    for manifest in manifests.values():
+        manifest["original_router"] = {"model_list": [{"litellm_params": {
+            "model": "openai/gpt-6-luna", "timeout": 60,
+        }}]}
+        manifest["router"] = eval_module.selected_router(
+            manifest["original_router"], manifest["model"], manifest["reasoning_effort"]
+        )
+    return manifests
 
 
 def write_report_experiment(directory, manifests):
@@ -541,7 +552,7 @@ def write_report_experiment(directory, manifests):
                 "id": "case-1",
                 "case": "case",
                 "attempt": 1,
-                "origin": {"ui_latency_ms": 1000},
+                "origin": {"ui_outcome": "result", "ui_latency_ms": 1000},
                 "provider_calls": [],
             }
         )
@@ -565,7 +576,7 @@ def valid_report_runtime():
     with patch.object(
         report_module,
         "evidence_status",
-        return_value=("PENDING", ["human semantic review required"]),
+        return_value=("PASS", []),
     ):
         yield
 
@@ -684,6 +695,10 @@ def resume_collection(tmp_path):
         "git_sha": "a" * 40,
         "git_dirty": False,
     }
+    manifest["suite"] = suite
+    manifest["router"] = eval_module.selected_router(
+        baseline, manifest["model"], manifest["reasoning_effort"]
+    )
     (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     args = SimpleNamespace(
         suite=eval_module.FIXTURE,
@@ -731,7 +746,7 @@ def test_collector_preserves_utf8_and_resumes_with_legacy_encoding(tmp_path):
             side_effect=lambda _project, content: state.update(router=content),
         ),
         patch.object(eval_module, "provider_calls", return_value=[]),
-        patch.object(eval_module, "evidence_status", return_value=("PENDING", [])),
+        patch.object(eval_module, "evidence_status", return_value=("PASS", [])),
         patch.object(eval_module.subprocess, "run", side_effect=browser) as submit,
     ):
         eval_module.collect(args)
@@ -740,6 +755,8 @@ def test_collector_preserves_utf8_and_resumes_with_legacy_encoding(tmp_path):
         submit.assert_called_once()
     [run] = eval_module.read_jsonl(tmp_path / "runs.jsonl")
     assert run["output"] == observed["output"]
+    assert run["status"] == "PENDING"
+    assert run["review_needed"] == ["human semantic review required"]
     raw = json.loads((tmp_path / f"{run['id']}.browser.json").read_text(encoding="utf-8"))
     assert raw == observed
 
@@ -861,7 +878,7 @@ def test_corrupt_partial_review_is_rejected_without_overwriting(tmp_path):
 
 
 @pytest.mark.parametrize(
-    "recorded,expected", [("medium", "FAIL"), (None, "PENDING"), ("high", "PENDING")]
+    "recorded,expected", [("medium", "FAIL"), (None, "PENDING"), ("high", "PASS")]
 )
 def test_effort_is_verified_on_every_physical_attempt(tmp_path, recorded, expected):
     run = record()
@@ -872,7 +889,7 @@ def test_effort_is_verified_on_every_physical_attempt(tmp_path, recorded, expect
     with patch.object(eval_module, "evidence_problems", return_value=[]):
         status, problems = eval_module.evidence_status(run, tmp_path)
     assert status == expected
-    assert (problems == ["human semantic review required"]) == (recorded == "high")
+    assert (problems == []) == (recorded == "high")
 
 
 def test_provider_query_preserves_effort_metadata():
@@ -980,10 +997,11 @@ def test_resume_rejects_legacy_manifest_without_revision(tmp_path, missing):
     write.assert_not_called()
 
 
-DRIVER_FAILURES = [
+API_FAILURES = [
     "json-error", "html-start", "plain-start", "body-start",
-    "html-result", "plain-result", "body-result", "screenshot", "trace", "close", "journal",
+    "html-result", "plain-result", "body-result",
 ]
+DRIVER_FAILURES = [*API_FAILURES, "screenshot", "trace", "close", "journal"]
 
 
 def driver_result(spec, failure, run_process):
@@ -1004,7 +1022,7 @@ def test_live_driver_finalizes_each_attempt_independently(tmp_path, failure):
         "progress_notes": "Done", "web_url": "http://web",
     }, failure, eval_module.subprocess.run)
     record, calls = result["record"], result["calls"]
-    assert record["ui_outcome"] == ("result" if failure == "success" else "error")
+    assert record["ui_outcome"] == ("error" if failure in API_FAILURES else "result")
     assert calls.count("submit") == 1
     assert calls.count("screenshot") == calls.count("trace") == calls.count("close") == 1
     assert calls[-1] == "complete"
@@ -1042,25 +1060,28 @@ def test_driver_failures_are_persisted_and_stop_collection(tmp_path, failure):
                      state.update(router=content)) as write,
         patch.object(eval_module, "provider_calls", return_value=[]),
         patch.object(eval_module.subprocess, "run", side_effect=browser) as submit,
-        pytest.raises(RuntimeError, match="UI failed; evidence retained"),
+        pytest.raises(RuntimeError, match=(
+            "UI failed; evidence retained" if failure in API_FAILURES
+            else "Evidence collection failed"
+        )),
     ):
         eval_module.collect(args)
     submit.assert_called_once()
     assert write.call_args.args == ("local", json.dumps(baseline))
     [run] = eval_module.read_jsonl(tmp_path / "runs.jsonl")
-    assert run["status"] == "FAIL"
-    assert run["origin"]["ui_outcome"] == "error"
+    assert run["status"] == ("FAIL" if failure in API_FAILURES else "PENDING")
+    assert run["origin"]["ui_outcome"] == ("error" if failure in API_FAILURES else "result")
     assert (run["origin"]["trace_sha256"] is None) == (failure == "trace")
     if failure == "trace":
         assert run["trace_error"]
 
 
 @pytest.mark.parametrize("error", [FileNotFoundError, PermissionError])
-def test_unreadable_trace_fails_even_when_ui_reports_success(tmp_path, error):
+def test_unreadable_trace_preserves_the_observed_ui_success(tmp_path, error):
     observed = {"ui_outcome": "result", "ui_latency_ms": 1000}
     with patch.object(Path, "read_bytes", side_effect=error("trace unavailable")):
         origin = eval_module.trace_origin(observed, tmp_path / "attempt.zip")
-    assert observed["ui_outcome"] == origin["ui_outcome"] == "error"
+    assert observed["ui_outcome"] == origin["ui_outcome"] == "result"
     assert origin["trace_sha256"] is None
     assert observed["trace_error"] == "trace unavailable"
 
@@ -1233,3 +1254,305 @@ def test_revision_contract_rejects_conflict_even_if_clean_state_is_unverified(di
         eval_module.revision_problems(
             {"git_sha": "a" * 40, "git_dirty": dirty}, {"git_sha": "b" * 40}
         )
+
+
+def proved_report_experiment(directory, *, repeats=1, minimum=1):
+    """Synthetic archives/ledger, with the real evidence and report validators."""
+    manifests = {"medium": experiment_manifests()["medium"]}
+    manifest = manifests["medium"]
+    manifest["suite"].update(reasoning=["medium"], repeats=repeats, minimum_usable=minimum)
+    write_report_experiment(directory, manifests)
+    path = directory / "medium"
+    prototype = eval_module.read_jsonl(path / "runs.jsonl")[0]
+    decision = eval_module.read_jsonl(directory / "verdicts.jsonl")[0]
+    runs, decisions = [], []
+    for attempt in range(1, repeats + 1):
+        run = deepcopy(prototype)
+        run.update(id=f"case-{attempt}", attempt=attempt, session_id=f"scenario_session_{attempt}")
+        run["visible_text"] = run["output"]["text"]
+        trace = path / f"case-{attempt}.zip"
+        with zipfile.ZipFile(trace, "w") as archive:
+            archive.writestr("trace.trace", "{}")
+            archive.writestr("trace.network", run["session_id"])
+        run["origin"].update(
+            trace=trace.name, trace_sha256=hashlib.sha256(trace.read_bytes()).hexdigest()
+        )
+        run["provider_calls"] = [{
+            "model": run["model"], "status": "succeeded", "estimated_cost": 0.01,
+            "metadata": {"reasoning_effort": run["reasoning_effort"]},
+            "input_tokens": 10, "output_tokens": 5,
+        }]
+        runs.append(run)
+        decisions.append({**decision, "id": run["id"]})
+    write_rows(path / "runs.jsonl", runs)
+    write_rows(directory / "verdicts.jsonl", decisions)
+    return path, runs
+
+
+def write_rows(path, rows):
+    path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+
+
+@pytest.mark.parametrize("boundary", ["report", "review", "resume"])
+@pytest.mark.parametrize("field", [
+    "timeout", "temperature", "num_retries", "api_base", "router_settings",
+])
+def test_baseline_contract_at_every_entry_point(tmp_path, boundary, field):
+    manifests = experiment_manifests()
+    high = manifests["high"]
+    if field == "router_settings":
+        high["original_router"][field] = {"retry_after": 42}
+    else:
+        high["original_router"]["model_list"][0]["litellm_params"][field] = 42
+    high["router"] = eval_module.selected_router(
+        high["original_router"], high["model"], high["reasoning_effort"]
+    )
+    write_report_experiment(tmp_path, manifests)
+    before = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    with pytest.raises(ValueError, match="router"), patch("builtins.input") as ask:
+        if boundary == "report":
+            report_module.summarize(tmp_path)
+        elif boundary == "review":
+            review_module.review(tmp_path, "Putilin")
+        else:
+            snapshot = {**manifests["medium"], "original_router": high["original_router"]}
+            eval_module.validate_resume_manifest(manifests["medium"], snapshot)
+    ask.assert_not_called()
+    assert {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()} == before
+
+
+@pytest.mark.parametrize("field,value", [
+    ("original_router", None), ("original_router", {}),
+    ("original_router", {"model_list": []}),
+    ("original_router", {"model_list": [{"litellm_params": {"model": ""}}]}),
+    ("router", None), ("router", "not a mapping"),
+])
+def test_unknown_router_never_becomes_proved_by_a_human(tmp_path, field, value):
+    path, _ = proved_report_experiment(tmp_path)
+    change_revision(path / "manifest.json", field, value)
+    verdicts = (tmp_path / "verdicts.jsonl").read_bytes()
+    result = report_module.summarize(tmp_path)
+    assert result["status"] == "PENDING"
+    assert result["series"]["medium"]["configuration_issues"]
+    assert (tmp_path / "verdicts.jsonl").read_bytes() == verdicts
+
+
+@pytest.mark.parametrize("boundary", ["report", "review", "resume"])
+def test_selected_router_must_be_exactly_the_declared_override(tmp_path, boundary):
+    path, _ = proved_report_experiment(tmp_path)
+    manifest_path = path / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    saved = deepcopy(manifest)
+    manifest["router"]["model_list"][0]["litellm_params"]["timeout"] = 99
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="selected router differs"):
+        if boundary == "report":
+            report_module.summarize(tmp_path)
+        elif boundary == "review":
+            review_module.review(tmp_path, "Putilin")
+        else:
+            eval_module.validate_resume_manifest(manifest, saved)
+
+
+@pytest.mark.parametrize("ui", ["result", "error", "unknown"])
+@pytest.mark.parametrize("proof", ["valid", "missing", "corrupt", "unreadable"])
+@pytest.mark.parametrize("human", ["PASS", "FAIL", "PENDING"])
+def test_acceptance_axes_through_real_report(tmp_path, ui, proof, human):
+    path, runs = proved_report_experiment(tmp_path)
+    run = runs[0]
+    run["origin"]["ui_outcome"] = ui
+    trace = path / run["origin"]["trace"]
+    if proof == "missing":
+        trace.unlink()
+    elif proof == "corrupt":
+        trace.write_bytes(b"not a trace")
+        run["origin"]["trace_sha256"] = hashlib.sha256(trace.read_bytes()).hexdigest()
+    write_rows(path / "runs.jsonl", runs)
+    verdict_path = tmp_path / "verdicts.jsonl"
+    decisions = eval_module.read_jsonl(verdict_path)
+    if human == "FAIL":
+        decisions[0]["critical_error"] = True
+    elif human == "PENDING":
+        decisions = []
+    write_rows(verdict_path, decisions)
+    previous = verdict_path.read_bytes()
+    original_read = Path.read_bytes
+
+    def read_bytes(file):
+        if proof == "unreadable" and file == trace:
+            raise PermissionError("unreadable trace")
+        return original_read(file)
+
+    with patch.object(Path, "read_bytes", read_bytes):
+        result = report_module.summarize(tmp_path)
+    expected = "FAIL" if human == "FAIL" or ui == "error" else "PENDING"
+    if ui == "result" and proof == "valid" and human == "PASS":
+        expected = "PASS"
+    assert result["status"] == expected
+    assert verdict_path.read_bytes() == previous
+    series = result["series"]["medium"]
+    assert series["measured_ui_attempts"] == int(ui == "result" and proof == "valid")
+    assert series["ledger_estimated_cost"] == run["provider_calls"][0]["estimated_cost"]
+
+
+@pytest.mark.parametrize("latencies,expected,median", [
+    ([50000, 55000, 80000, 90000], "FAIL", 67500),
+    ([1000, 2000, 3000, 4000], "PASS", 2500),
+])
+def test_failed_attempts_never_reduce_delivery_latency(tmp_path, latencies, expected, median):
+    path, runs = proved_report_experiment(tmp_path, repeats=5, minimum=4)
+    for run, latency in zip(runs, [*latencies, 0], strict=True):
+        run["origin"]["ui_latency_ms"] = latency
+    runs[-1]["origin"]["ui_outcome"] = "error"
+    write_rows(path / "runs.jsonl", runs)
+    result = report_module.summarize(tmp_path)
+    assert result["status"] == expected
+    series = result["series"]["medium"]
+    assert series["median_ui_ms"] == median
+    assert series["measured_ui_attempts"] == len(latencies)
+    assert series["groups"]["case"]["usable"] == len(latencies)
+    assert series["provider_calls"] == len(runs)
+    costs = [r["provider_calls"][0]["estimated_cost"] for r in runs]
+    assert series["ledger_estimated_cost"] == sum(costs)
+
+
+@pytest.mark.parametrize("latency", [None, True, -1, float("nan"), float("inf"), "1000"])
+def test_unverified_delivery_time_cannot_pass_the_gate(tmp_path, latency):
+    path, runs = proved_report_experiment(tmp_path)
+    runs[0]["origin"]["ui_latency_ms"] = latency
+    write_rows(path / "runs.jsonl", runs)
+    result = report_module.summarize(tmp_path)
+    assert result["status"] == "PENDING"
+    assert result["series"]["medium"]["median_ui_ms"] is None
+
+
+def test_technical_status_does_not_depend_on_diagnostic_wording():
+    assert report_module.accepted_status("PENDING", "PASS", []) == "PENDING"
+    assert report_module.accepted_status("PASS", "PASS", []) == "PASS"
+    assert report_module.accepted_status("PASS", "PASS", ["unproven identity"]) == "PENDING"
+    assert report_module.accepted_status("FAIL", "PASS", []) == "FAIL"
+
+
+@pytest.mark.parametrize("failure,outcome,submitted", [
+    ("capture-result", "result", True), ("trace-start", "result", True),
+    ("start-journal", "result", True), ("submit-journal", "unknown", False),
+    ("pre-submit", "unknown", False), ("submit-timeout", "error", True),
+    ("capture-visible", "unknown", True),
+])
+def test_driver_records_only_what_was_observed(tmp_path, failure, outcome, submitted):
+    result = driver_result({
+        "trace": str(tmp_path / "attempt.zip"), "language": "en", "tone": "warm",
+        "progress_notes": "Done", "web_url": "https://web",
+    }, failure, eval_module.subprocess.run)
+    assert result["record"]["ui_outcome"] == outcome
+    assert result["calls"].count("submit") == int(submitted)
+    assert result["calls"].count("close") == 1
+    with pytest.raises(RuntimeError):
+        eval_module.require_collection_ready(result["record"])
+
+
+@pytest.mark.parametrize("stage,expected", [
+    ("start_response", "PENDING"), ("result_response", "PENDING"),
+    ("trace_start", "PENDING"), ("trace", "PENDING"),
+    ("unknown_capture_stage", "PENDING"),
+    ("screenshot", "PASS"), ("browser_close", "PASS"),
+    ("journal", "PASS"), ("start_journal", "PASS"),
+])
+def test_capture_proof_and_cleanup_diagnostics_have_separate_meanings(tmp_path, stage, expected):
+    path, runs = proved_report_experiment(tmp_path)
+    runs[0]["diagnostic_errors"] = {stage: "failure"}
+    write_rows(path / "runs.jsonl", runs)
+    result = report_module.summarize(tmp_path)
+    assert result["status"] == expected
+    assert result["series"]["medium"]["collection_diagnostics"] == {"case-1": {stage: "failure"}}
+    assert stage in (tmp_path / "report.html").read_text(encoding="utf-8")
+
+
+def test_router_key_order_is_not_experiment_drift(tmp_path):
+    path, _ = proved_report_experiment(tmp_path)
+    manifest = json.loads((path / "manifest.json").read_text(encoding="utf-8"))
+    reordered = json.loads(json.dumps(manifest, sort_keys=True))
+    eval_module.validate_resume_manifest(manifest, reordered)
+    assert report_module.summarize(tmp_path)["status"] == "PASS"
+
+
+@pytest.mark.parametrize("change", ["source", "input", "duplicate", "attempt"])
+def test_resume_validates_imported_runs_before_mutating_worker(tmp_path, change):
+    path, runs = proved_report_experiment(tmp_path)
+    manifest = json.loads((path / "manifest.json").read_text(encoding="utf-8"))
+    args, baseline, prompt = resume_collection(tmp_path)
+    args.out = path
+    args.suite = tmp_path / "suite.json"
+    args.suite.write_text(json.dumps(manifest["suite"]), encoding="utf-8")
+    manifest.update(
+        original_router=baseline, prompt_sha256=hashlib.sha256(prompt.encode()).hexdigest()
+    )
+    manifest["router"] = eval_module.selected_router(baseline, args.model, args.reasoning)
+    runs[0]["prompt_sha256"] = manifest["prompt_sha256"]
+    if change == "source":
+        runs[0]["git_sha"] = "b" * 40
+    elif change == "input":
+        runs[0]["input"] = {**runs[0]["input"], "progress_notes": "tampered"}
+    elif change == "duplicate":
+        runs.append(deepcopy(runs[0]))
+    else:
+        runs[0]["attempt"] = 99
+    (path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    write_rows(path / "runs.jsonl", runs)
+    with (
+        patch.object(eval_module, "_git_state", return_value={
+            "git_sha": "a" * 40, "git_dirty": False,
+        }),
+        patch.object(eval_module, "_docker", side_effect=lambda *a:
+                     prompt if a[-1].endswith(".md") else json.dumps(baseline)),
+        patch.object(eval_module, "write_router") as write,
+        pytest.raises(ValueError),
+    ):
+        eval_module.collect(args)
+    write.assert_not_called()
+
+
+def test_incomplete_slow_observations_are_not_a_final_latency_failure(tmp_path):
+    path, runs = proved_report_experiment(tmp_path, repeats=5, minimum=4)
+    runs[0]["origin"]["ui_latency_ms"] = 90000
+    write_rows(path / "runs.jsonl", runs[:1])
+    result = report_module.summarize(tmp_path)
+    assert result["status"] == "PENDING"
+    assert not result["series"]["medium"]["observations_complete"]
+
+
+def test_unknown_identity_on_a_failed_attempt_cannot_complete_an_experiment(tmp_path):
+    path, runs = proved_report_experiment(tmp_path, repeats=5, minimum=4)
+    runs[-1]["origin"]["ui_outcome"] = "error"
+    del runs[-1]["git_sha"]
+    write_rows(path / "runs.jsonl", runs)
+    result = report_module.summarize(tmp_path)
+    assert result["status"] == "PENDING"
+    assert not result["series"]["medium"]["observations_complete"]
+
+
+@pytest.mark.parametrize("limit", [None, True, -1, float("nan"), float("inf"), "60000"])
+def test_invalid_latency_limit_is_rejected_before_collect_or_report(tmp_path, limit):
+    manifests = experiment_manifests()
+    for manifest in manifests.values():
+        manifest["suite"]["max_median_ui_ms"] = limit
+    write_report_experiment(tmp_path, manifests)
+    with pytest.raises(ValueError, match="max_median_ui_ms"):
+        report_module.summarize(tmp_path)
+    suite = tmp_path / "suite.json"
+    suite.write_text(json.dumps(manifests["medium"]["suite"]), encoding="utf-8")
+    with (
+        patch.object(eval_module, "_docker") as docker,
+        pytest.raises(ValueError, match="max_median_ui_ms"),
+    ):
+        eval_module.collect(SimpleNamespace(suite=suite))
+    docker.assert_not_called()
+
+
+@pytest.mark.parametrize("prompt_hash", [None, "", "bad-hash"])
+def test_unknown_prompt_revision_is_not_certified_by_matching_unknown_values(tmp_path, prompt_hash):
+    path, runs = proved_report_experiment(tmp_path)
+    change_revision(path / "manifest.json", "prompt_sha256", prompt_hash)
+    runs[0]["prompt_sha256"] = prompt_hash
+    write_rows(path / "runs.jsonl", runs)
+    assert report_module.summarize(tmp_path)["status"] == "PENDING"

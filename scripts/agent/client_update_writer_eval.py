@@ -19,11 +19,13 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import re
 import signal
 import subprocess
 import sys
 from collections.abc import Iterable
+from copy import deepcopy
 from itertools import islice
 from pathlib import Path
 from typing import Literal
@@ -79,6 +81,9 @@ def validate_suite(suite: dict) -> None:
     repeats, minimum = suite.get("repeats"), suite.get("minimum_usable")
     if type(repeats) is not int or type(minimum) is not int or not 1 <= minimum <= repeats:
         raise ValueError("suite requires integer 1 <= minimum_usable <= repeats")
+    limit = suite.get("max_median_ui_ms")
+    if type(limit) not in (int, float) or not math.isfinite(limit) or limit < 0:
+        raise ValueError("suite requires a finite nonnegative max_median_ui_ms")
 
 
 def source_revision(record: dict) -> str | None:
@@ -111,6 +116,95 @@ def revision_problems(manifest: dict, run: dict) -> list[str]:
     return problems
 
 
+def baseline_router(manifest: dict) -> dict | None:
+    router = manifest.get("original_router")
+    if not isinstance(router, dict):
+        return None
+    models = router.get("model_list")
+    if not isinstance(models, list) or not models:
+        return None
+    for model in models:
+        params = model.get("litellm_params") if isinstance(model, dict) else None
+        if not isinstance(params, dict) or not isinstance(params.get("model"), str):
+            return None
+        if not params["model"].strip():
+            return None
+    return router
+
+
+def selected_router(baseline: dict, model: str, effort: str) -> dict:
+    if baseline_router({"original_router": baseline}) is None:
+        raise ValueError("baseline router missing or malformed")
+    router = deepcopy(baseline)
+    router["model_list"][0]["litellm_params"].update(model=model, reasoning_effort=effort)
+    return router
+
+
+def router_problems(manifest: dict) -> list[str]:
+    baseline = baseline_router(manifest)
+    if baseline is None:
+        return ["baseline router missing or malformed"]
+    actual = manifest.get("router")
+    if not isinstance(actual, dict):
+        return ["selected router missing or malformed"]
+    expected = selected_router(baseline, manifest["model"], manifest["reasoning_effort"])
+    if digest(actual) != digest(expected):
+        raise ValueError("selected router differs from baseline model/effort override")
+    return []
+
+
+def configuration_problems(manifest: dict) -> list[str]:
+    problems = router_problems(manifest)
+    prompt_hash = manifest.get("prompt_sha256")
+    if not isinstance(prompt_hash, str) or not re.fullmatch(r"[0-9a-f]{64}", prompt_hash):
+        problems.append("prompt revision missing or malformed")
+    return problems
+
+
+def validate_manifest_identity(manifests: Iterable[dict]) -> None:
+    """All known fixed coordinates must agree; absent proof is assessed separately."""
+    manifests = list(manifests)
+    validate_source_revisions(manifests)
+    for manifest in manifests:
+        if "suite" in manifest and manifest.get("suite_sha256") != digest(manifest["suite"]):
+            raise ValueError("suite manifest digest mismatch")
+    for field in ("suite_sha256", "prompt_sha256"):
+        values = {digest(m[field]) for m in manifests if m.get(field) is not None}
+        if len(values) > 1:
+            raise ValueError(f"experiment {field.removesuffix('_sha256')} mismatch")
+    baselines = {digest(router) for m in manifests if (router := baseline_router(m)) is not None}
+    if len(baselines) > 1:
+        raise ValueError("experiment baseline router mismatch")
+    for manifest in manifests:
+        router_problems(manifest)
+
+
+def validate_runs(manifest: dict, runs: list[dict]) -> None:
+    cases = {case["id"]: case for case in manifest["suite"]["cases"]}
+    if manifest["suite_sha256"] != digest(manifest["suite"]):
+        raise ValueError("suite manifest digest mismatch")
+    validate_source_revisions([manifest, *runs])
+    seen = set()
+    identifiers = set()
+    for run in runs:
+        key = run["case"], run["attempt"]
+        if key in seen or run["case"] not in cases or run["id"] in identifiers:
+            raise ValueError("duplicate or unplanned attempt")
+        if (type(run["attempt"]) is not int
+                or not 1 <= run["attempt"] <= manifest["suite"]["repeats"]):
+            raise ValueError("unplanned attempt")
+        seen.add(key)
+        identifiers.add(run["id"])
+        if run["input"] != cases[run["case"]]:
+            raise ValueError("input differs from planned case")
+        for field in ("input", "output"):
+            if run[field + "_sha256"] != digest(run[field]):
+                raise ValueError(f"{field} digest mismatch")
+        for field in ("model", "reasoning_effort", "prompt_sha256"):
+            if run[field] != manifest[field]:
+                raise ValueError(f"configuration mismatch: {field}")
+
+
 def collection_revision() -> dict:
     revision = _git_state()
     if clean_source_revision(revision) is None:
@@ -127,6 +221,9 @@ def validate_resume_manifest(saved: dict, snapshot: dict) -> None:
     ):
         if saved.get(field) != snapshot[field]:
             raise ValueError(f"resume manifest mismatch: {field}")
+    validate_manifest_identity((saved, snapshot))
+    if configuration_problems(saved):
+        raise ValueError("resume manifest mismatch: unverified router or prompt")
 
 
 def provider_calls(project: str, session_id: str | None) -> list[dict]:
@@ -156,8 +253,8 @@ def provider_calls(project: str, session_id: str | None) -> list[dict]:
 
 
 def evidence_status(record: dict, directory: Path) -> tuple[EvaluationStatus, list[str]]:
-    """Runtime failures fail; missing proof stays pending, even with a fluent output."""
-    if record["origin"]["ui_outcome"] == "error":
+    """Technical proof only; PASS never substitutes for a human semantic decision."""
+    if (record.get("origin") or {}).get("ui_outcome") == "error":
         return "FAIL", ["UI did not deliver a result"]
     problems = evidence_problems(record, {"channel": "web_form"}, directory)
     calls = record["provider_calls"]
@@ -191,7 +288,7 @@ def evidence_status(record: dict, directory: Path) -> tuple[EvaluationStatus, li
             visible += "\n\n" + output["call_to_action"]
         if visible != record.get("visible_text"):
             problems.append("visible text differs from canonical text and call_to_action")
-    return "PENDING", problems or ["human semantic review required"]
+    return ("PENDING", problems) if problems else ("PASS", [])
 
 
 def write_router(project: str, content: str) -> None:
@@ -232,7 +329,6 @@ def trace_origin(observed: dict, trace: Path) -> dict:
         trace_hash = hashlib.sha256(trace.read_bytes()).hexdigest()
     except OSError as error:
         trace_hash = None
-        observed["ui_outcome"] = "error"
         observed["trace_error"] = str(error)
     return {
         "ui_outcome": observed["ui_outcome"],
@@ -240,6 +336,20 @@ def trace_origin(observed: dict, trace: Path) -> dict:
         "trace": trace.name,
         "trace_sha256": trace_hash,
     }
+
+
+def require_collection_ready(observed: dict) -> None:
+    """Stopping further paid work does not reclassify the saved observation."""
+    if observed["ui_outcome"] == "error":
+        raise RuntimeError(
+            "UI failed; evidence retained. Diagnose before spending on more attempts."
+        )
+    if observed["ui_outcome"] != "result":
+        raise RuntimeError("UI outcome unknown; attempt retained. Reconcile before continuing.")
+    if observed.get("diagnostic_errors") or observed.get("trace_error"):
+        raise RuntimeError(
+            "Evidence collection failed; attempt retained. Reconcile before continuing."
+        )
 
 
 def collect(args: argparse.Namespace) -> None:
@@ -252,12 +362,11 @@ def collect(args: argparse.Namespace) -> None:
         raise ValueError("repeats must be between 1 and frozen screening repeats")
     revision = collection_revision()
     args.out.mkdir(parents=True, exist_ok=args.resume)
-    completed_ids = {row["id"] for row in read_jsonl(args.out / "runs.jsonl")}
+    completed = read_jsonl(args.out / "runs.jsonl")
+    completed_ids = {row["id"] for row in completed}
     original = _docker(args.project, "platform-worker", "cat", ROUTER)
-    router = yaml.safe_load(original)
-    params = router["model_list"][0]["litellm_params"]
-    params["model"] = args.model
-    params["reasoning_effort"] = args.reasoning
+    baseline = yaml.safe_load(original)
+    router = selected_router(baseline, args.model, args.reasoning)
     selected = yaml.safe_dump(router)
     prompt = _docker(
         args.project, "platform-worker", "cat", f"/app/{PRODUCT}/prompts/update_compose_reply.v1.md"
@@ -269,13 +378,14 @@ def collect(args: argparse.Namespace) -> None:
         "model": args.model,
         "reasoning_effort": args.reasoning,
         "router": router,
-        "original_router": yaml.safe_load(original),
+        "original_router": baseline,
         "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
     }
     manifest_path = args.out / "manifest.json"
     if manifest_path.exists():
         saved = json.loads(manifest_path.read_text(encoding="utf-8"))
         validate_resume_manifest(saved, snapshot)
+        validate_runs(snapshot, completed)
     else:
         manifest_path.write_text(
             json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
@@ -324,7 +434,9 @@ def collect(args: argparse.Namespace) -> None:
                 "provider_calls": provider_calls(args.project, observed["session_id"]),
                 "origin": origin,
             }
-            record["status"], record["review_needed"] = evidence_status(record, args.out)
+            technical, problems = evidence_status(record, args.out)
+            record["status"] = "FAIL" if technical == "FAIL" else "PENDING"
+            record["review_needed"] = problems or ["human semantic review required"]
             with (args.out / "runs.jsonl").open("a", encoding="utf-8") as stream:
                 stream.write(json.dumps(record, ensure_ascii=False) + "\n")
             print(
@@ -333,10 +445,7 @@ def collect(args: argparse.Namespace) -> None:
             )
             if _docker(args.project, "platform-worker", "cat", ROUTER) != selected:
                 raise RuntimeError("worker configuration changed during collection")
-            if observed["ui_outcome"] == "error":
-                raise RuntimeError(
-                    "UI failed; evidence retained. Diagnose before spending on more attempts."
-                )
+            require_collection_ready(observed)
     finally:
         write_router(args.project, original)
         (args.out / "router-restored.txt").write_text(

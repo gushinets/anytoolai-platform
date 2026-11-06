@@ -16,8 +16,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
-from client_update_writer_eval import digest, revision_problems, validate_source_revisions
-from client_update_writer_eval_report import human_status, validate_runs
+from client_update_writer_eval import (
+    configuration_problems,
+    digest,
+    revision_problems,
+    validate_manifest_identity,
+    validate_runs,
+    validate_source_revisions,
+)
+from client_update_writer_eval_report import human_status
 from proposal_ai_eval import read_jsonl
 
 Choice = Literal["y", "n", "u", "s"]
@@ -65,14 +72,16 @@ def review(directory: Path, reviewer: str, series: str | None = None) -> None:
         path: json.loads(path.read_text(encoding="utf-8")) for path in manifests
         if series is None or path.parent.name == series
     }
-    validate_source_revisions(selected.values())
+    validate_manifest_identity(selected.values())
     queue = []
     for path, manifest in selected.items():
         runs = read_jsonl(path.parent / "runs.jsonl")
         validate_runs(manifest, runs)
-        if any(revision_problems(manifest, run) for run in runs):
+        if configuration_problems(manifest) or any(
+            revision_problems(manifest, run) for run in runs
+        ):
             print(
-                f"{path.parent.name}: ревизия не подтверждена; "
+                f"{path.parent.name}: конфигурация или ревизия не подтверждена; "
                 "оценка текста не даёт технический PASS."
             )
         queue.extend((path.parent.name, run) for run in runs)
@@ -94,7 +103,7 @@ def review(directory: Path, reviewer: str, series: str | None = None) -> None:
 
     for position, (name, run) in enumerate(queue, 1):
         if not run.get("output"):
-            print(f"{name}/{run['id']}: нет ответа модели; технический FAIL остаётся.")
+            print(f"{name}/{run['id']}: нет ответа модели для оценки текста.")
             continue
         previous = verdicts.get((name, run["id"]))
         if previous and human_status(run, previous)[0] != "PENDING":
