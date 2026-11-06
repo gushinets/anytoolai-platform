@@ -7,7 +7,7 @@
 - Created: 2026-11-06
 - Last updated: 2026-11-06
 - Review date: 2026-11-06
-- Next action: review the linked PR and required GitHub CI
+- Next action: complete fresh independent reviews and check CI on the resulting head; do not merge
 - Blocker: none
 
 ## Goal
@@ -185,6 +185,38 @@ including full-check, Windows baseline, PostgreSQL, atoms-proof and production C
 No backend or PostgreSQL checks are repeated for this UI-only repair. The acceptance database
 stays untouched and no provider is called. Fresh entire-PR review of the resulting commit remains
 required before the second-model review; do not merge.
+
+## SonarCloud follow-up
+
+All required GitHub checks and the other code CI checks passed on `17233e7ee6440ccbfa71c96d971e4368315f3c6f`.
+SonarCloud alone failed with 21 issues and 3.7% duplicated new lines. A fresh independent
+GPT-6.1 Sol xhigh review confirmed the 21 issues are false positives: trusted catalog regular
+expressions, the valid library-mode switch, headings hidden until populated and keyboard-focusable
+scrolling regions. Issue classification is separate from this test cleanup; runtime behavior and
+Sonar's advisory status remain unchanged.
+
+Using only the in-app browser requested by the user, the existing Mikhail Gushinets (`gushinets`)
+Sonar account signed in through its existing GitHub session. All 21 independently verified findings
+were bulk-classified as False positive; the UI confirmed all 21 statuses and "All issues 0".
+This follows Sonar's [issue-editing workflow](https://docs.sonarsource.com/sonarqube-cloud/managing-your-projects/issues/editing);
+the keyboard-focusable overflow regions also match the W3C
+[scrollable-element keyboard-access rule](https://www.w3.org/WAI/standards-guidelines/act/rules/0ssw9k/).
+No rules, quality thresholds, exclusions or permissions changed, and no public comments or optional
+sharing with Sonar were submitted. The gate still fails on duplication, pending a new analysis.
+
+The duplication report contains 123 duplicated new lines: 96 in generated CE-kit API contracts
+and 27 in Chromium tests; production code has none. Generated contracts remain intact. One small
+`openNewPresetFromExample` helper replaces 12 identical four-step setups, removing 29 source lines
+overall. Expanding its calls reproduces the previous test file exactly, preserving every scenario's
+transport, write behavior and assertions.
+
+Validation: all 12 affected Chromium journeys passed, then canonical frontend-check passed with
+lint, typecheck, all 53 Atom Lab Node tests, all 110 Chromium journeys, generated API-contract drift
+and frontend builds. Doctor, documentation validation, generated-document drift and `git diff --check`
+passed. Frontend log: `.quick-check-tmp/sonar259/test-cleanup-frontend.log` (ignored diagnostic).
+The next PR scan must recompute the Sonar metric; no threshold, exclusion or suppression changed.
+No backend, PostgreSQL or provider checks were repeated for this test-only cleanup, and the old
+acceptance DB remains untouched. Fresh reviews and CI on the resulting commit remain required.
 
 ## Publication
 

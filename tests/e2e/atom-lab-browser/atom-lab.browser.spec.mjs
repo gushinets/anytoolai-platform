@@ -124,6 +124,13 @@ async function showWorkbench(page) {
   if (await page.locator("#request-response").isHidden()) await page.locator("#workbench-button").click();
 }
 
+async function openNewPresetFromExample(page) {
+  await showWorkbench(page);
+  await page.locator("#fill-example").click();
+  await page.locator("#presets-button").click();
+  await editPreset(page);
+}
+
 async function openLab(page, {models = () => MODEL_CATALOG} = {}) {
   await page.route("http://atom-lab.test/**", async (route) => {
     const pathname = new URL(route.request().url()).pathname;
@@ -2633,10 +2640,7 @@ test("stalled preset writes report an ambiguous outcome and block blind duplicat
   });
 
   await unlockAtom(page, "A06");
-  await showWorkbench(page);
-  await page.locator("#fill-example").click();
-  await page.locator("#presets-button").click();
-  await editPreset(page);
+  await openNewPresetFromExample(page);
   await page.locator("#preset-name").fill("Неизвестный результат");
   await page.clock.install();
   await page.evaluate(() => {
@@ -2671,10 +2675,7 @@ test("transport loss after a committed preset write blocks blind duplicate saves
   });
 
   await unlockAtom(page, "A06");
-  await showWorkbench(page);
-  await page.locator("#fill-example").click();
-  await page.locator("#presets-button").click();
-  await editPreset(page);
+  await openNewPresetFromExample(page);
   await page.locator("#preset-name").fill("Потерянный ответ");
   await page.evaluate(() => {
     const originalFetch = globalThis.fetch;
@@ -2748,10 +2749,7 @@ test("ambiguous preset create stays blocked after reopening and opening another 
 
   page.on("dialog", (dialog) => dialog.accept());
   await unlockAtom(page, "A06");
-  await showWorkbench(page);
-  await page.locator("#fill-example").click();
-  await page.locator("#presets-button").click();
-  await editPreset(page);
+  await openNewPresetFromExample(page);
   await page.locator("#preset-name").fill("Create с неизвестным результатом");
   await page.evaluate(() => {
     const originalFetch = globalThis.fetch;
@@ -3602,10 +3600,7 @@ test("gateway failure after a committed preset write blocks blind duplicate save
   });
 
   await unlockAtom(page, "A06");
-  await showWorkbench(page);
-  await page.locator("#fill-example").click();
-  await page.locator("#presets-button").click();
-  await editPreset(page);
+  await openNewPresetFromExample(page);
   await page.locator("#preset-name").fill("Commit за gateway");
   await editPreset(page);
   await page.locator("#save-preset").click();
@@ -3635,10 +3630,7 @@ test("structured pre-write preset failure keeps the draft retryable", async ({pa
   });
 
   await unlockAtom(page, "A06");
-  await showWorkbench(page);
-  await page.locator("#fill-example").click();
-  await page.locator("#presets-button").click();
-  await editPreset(page);
+  await openNewPresetFromExample(page);
   await page.locator("#preset-name").fill("Retryable pre-write draft");
   await editPreset(page);
   await page.locator("#save-preset").click();
@@ -3664,10 +3656,7 @@ test("malformed successful preset response blocks blind duplicate saves", async 
   });
 
   await unlockAtom(page, "A06");
-  await showWorkbench(page);
-  await page.locator("#fill-example").click();
-  await page.locator("#presets-button").click();
-  await editPreset(page);
+  await openNewPresetFromExample(page);
   await page.locator("#preset-name").fill("Повреждённый ответ");
   await editPreset(page);
   await page.locator("#save-preset").click();
@@ -3693,10 +3682,7 @@ test("invalid successful preset response blocks blind duplicate saves", async ({
   });
 
   await unlockAtom(page, "A06");
-  await showWorkbench(page);
-  await page.locator("#fill-example").click();
-  await page.locator("#presets-button").click();
-  await editPreset(page);
+  await openNewPresetFromExample(page);
   await page.locator("#preset-name").fill("Неполный успешный ответ");
   await editPreset(page);
   await page.locator("#save-preset").click();
@@ -3723,10 +3709,7 @@ test("new preset response with a non-initial version blocks blind duplicate save
   });
 
   await unlockAtom(page, "A06");
-  await showWorkbench(page);
-  await page.locator("#fill-example").click();
-  await page.locator("#presets-button").click();
-  await editPreset(page);
+  await openNewPresetFromExample(page);
   await page.locator("#preset-name").fill("Неверная первая версия");
   await editPreset(page);
   await page.locator("#save-preset").click();
@@ -3821,10 +3804,7 @@ test("preset save exposes backend field errors without losing the draft", async 
   });
 
   await unlockAtom(page, "A06");
-  await showWorkbench(page);
-  await page.locator("#fill-example").click();
-  await page.locator("#presets-button").click();
-  await editPreset(page);
+  await openNewPresetFromExample(page);
   await page.locator("#preset-name").fill("   ");
   await showWorkbench(page);
   await page.locator("#prompt-tab").click();
@@ -4206,10 +4186,7 @@ test("successful preset write keeps its identity when readback fails", async ({p
   });
 
   await unlockAtom(page, "A06");
-  await showWorkbench(page);
-  await page.locator("#fill-example").click();
-  await page.locator("#presets-button").click();
-  await editPreset(page);
+  await openNewPresetFromExample(page);
   await page.locator("#preset-name").fill("Readback preset");
   await editPreset(page);
   await page.locator("#preset-description").fill("Readback failure");
@@ -4371,10 +4348,7 @@ test("fixed fields are selectable only while their values exist in the preset in
   });
 
   await unlockAtom(page, "A06");
-  await showWorkbench(page);
-  await page.locator("#fill-example").click();
-  await page.locator("#presets-button").click();
-  await editPreset(page);
+  await openNewPresetFromExample(page);
   await expect(page.locator("#fixed-fields").getByLabel("context")).toBeEnabled();
   await expect(page.locator("#fixed-fields").getByLabel("audience")).toBeDisabled();
 
@@ -4514,10 +4488,7 @@ test("new preset metadata participates in discard protection and atom changes cl
     await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [], next_cursor: null})});
   });
   await unlockAtom(page, "A06");
-  await showWorkbench(page);
-  await page.locator("#fill-example").click();
-  await page.locator("#presets-button").click();
-  await editPreset(page);
+  await openNewPresetFromExample(page);
   await page.locator("#preset-name").fill("Несохранённый пресет");
   await editPreset(page);
   await page.locator("#preset-description").fill("Не потерять metadata");
