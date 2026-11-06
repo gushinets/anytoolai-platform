@@ -3390,6 +3390,8 @@ export function bootstrapAtomLab({
 
   const renderPromptStatus = () => {
     nodes["reset-prompt"].disabled = Boolean(session.promptSourceNeedsValidation);
+    nodes["save-prompt"].disabled = !session.promptOptions || Boolean(session.savingPrompt)
+      || Boolean(session.promptSourceNeedsValidation);
     const ref = promptRefFor(session);
     const selected = session.promptOptions?.find((option) => option.ref === ref);
     const edited = session.prompt !== session.basePrompt;
@@ -3451,7 +3453,6 @@ export function bootstrapAtomLab({
         ?? draft.basePrompt;
       if (session !== draft) return;
       renderPromptOptions();
-      nodes["save-prompt"].disabled = Boolean(draft.savingPrompt);
       nodes["prompt-load-status"].textContent = "";
       if (reconcileSource) {
         updateRunButton();
@@ -3504,7 +3505,6 @@ export function bootstrapAtomLab({
     nodes["save-prompt-panel"].open = false;
     nodes["save-prompt-name"].value = "";
     nodes["save-prompt-status"].textContent = "";
-    nodes["save-prompt"].disabled = true;
     nodes["prompt-load-status"].textContent = "";
     nodes["retry-prompts"].hidden = true;
     renderPromptOptions();
@@ -3603,8 +3603,9 @@ export function bootstrapAtomLab({
   nodes["save-prompt-form"].addEventListener("submit", async (event) => {
     event.preventDefault();
     const draft = session;
-    if (!draft?.promptOptions || draft.savingPrompt) return;
-    const name = nodes["save-prompt-name"].value.trim();
+    if (!draft?.promptOptions || draft.savingPrompt || draft.promptSourceNeedsValidation) return;
+    const formName = nodes["save-prompt-name"].value;
+    const name = formName.trim();
     if (!name || !draft.prompt.trim()) {
       nodes["save-prompt-status"].textContent = "Укажите название и текст промпта.";
       return;
@@ -3627,7 +3628,8 @@ export function bootstrapAtomLab({
         renderPromptOptions();
         return;
       }
-      const unchanged = draft.prompt === payload.prompt && promptRefFor(draft) === payload.source_ref;
+      const unchanged = draft.prompt === payload.prompt && promptRefFor(draft) === payload.source_ref
+        && nodes["save-prompt-name"].value === formName;
       if (unchanged) {
         applyPromptOption(saved);
       }
@@ -3648,7 +3650,7 @@ export function bootstrapAtomLab({
       }
     } finally {
       draft.savingPrompt = false;
-      if (session === draft) nodes["save-prompt"].disabled = !draft.promptOptions;
+      if (session === draft) renderPromptStatus();
     }
   });
   nodes["model-select"].addEventListener("change", () => {

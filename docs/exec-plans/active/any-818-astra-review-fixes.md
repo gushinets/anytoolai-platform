@@ -301,3 +301,66 @@ successful docs check used the bundled LiteLLM cost map. No generated API artifa
 backend/API code, dependency, Sonar setting, working DB, migration or provider call
 changed. Full backend/production PostgreSQL/deployment checks were not repeated for
 this JavaScript-only fix. Changes remain uncommitted for parent review and PR/CI.
+
+## Confirmed final review: prompt storage and save-form ownership
+
+Doctor passed before edits on 2026-11-07. Reproduce and repair the three confirmed
+findings from PR #259's latest independent review:
+
+1. Contain prompt-creation database failures around the complete transaction,
+   return the existing safe 503 envelope, and log only the exception type. Preserve
+   input validation, rollback and uncertain-commit behavior without retrying writes.
+2. Render Save availability whenever prompt options materialize, including a
+   replacement editor whose Prompt tab has never loaded. Preserve unresolved-source
+   and in-flight-save guards, list request fencing and the existing forced Retry.
+3. Include the actual editable name in successful-save ownership checks so a delayed
+   201 preserves a newer name, source, text, open form and focus.
+
+Reach: the prompt-creation router boundary, shared editor rendering/completion,
+focused API/Chromium regressions, and this plan. No wire/schema changes are planned.
+Prove the regressions before production edits, then run relevant API/architecture,
+canonical frontend, docs generation/drift and diff checks. Use isolated SQLite and
+mocked browser transport; no working DB, migrations, provider calls, commit or push.
+
+All three regressions were reproduced before production edits. The isolated API
+tests escaped DBAPI errors before the insert, during insertion, at commit and after
+commit; real Uvicorn with access logging disabled exposed the refused SQLite INSERT's
+prompt parameter. Chromium reproduced permanent Save disablement and automatic
+source switching after both a changed name and a whitespace-only name edit.
+
+Prompt creation now catches expected database failures around the complete existing
+transaction. It logs only the fixed event/code and exception type, returning the
+existing 503 envelope without chaining the database exception. NUL input remains
+an explicit 422. A simulated failure after commit keeps its one persisted row and
+never retries the write; the client continues to classify this 503 as an uncertain
+outcome and preserves the draft for its existing read reconciliation.
+
+Shared prompt-status rendering owns Save availability from known options, current
+save state and unresolved source validation. Confirmed option materialization uses
+that same path even before the replacement editor's first Prompt-tab visit. Exact
+raw form-name comparison keeps an edited owner's name, prompt/source, open form and
+focus; unchanged-owner automatic selection and closing remain intact. Browser
+regressions include current/replacement editors, both GET/POST and two-POST response
+orders, unresolved historical sources, failed reads with forced Retry, scope fences,
+and rejected/malformed/uncertain writes. No API schema or generated artifact changed.
+
+Verification (2026-11-07):
+
+- Connected run/catalog/history/preset/access API, real Uvicorn access logging,
+  docs generation/validation and Atom Lab architecture: 457 passed in 235.39 seconds.
+- Canonical `python scripts/agent/runner.py frontend-check`: passed lint, typecheck,
+  161 Chromium journeys, 53 Atom Lab Node tests, six demo Node tests, 824 Vitest
+  tests, generated API-type drift and production builds. The additional 503 case
+  was added after discovery started; the final focused Chromium suite passed all
+  23 cases, including that case, and final Atom Lab lint also passed.
+- `validate-docs`, `generate-docs --check` and `git diff --check`: passed.
+- Ruff against HEAD: no new diagnostics; the router has four existing diagnostics
+  versus six before, and the API test file has none.
+
+The sandbox stalled isolated SQLite setup and denied pnpm-store symlink creation;
+the identical checks passed with escalation. Tests used the managed interpreter,
+`runner.baseline_env()`, bundled LiteLLM cost map and installed Chromium cache.
+Only five intended files changed; staging is empty and unrelated untracked reports
+are preserved. Full backend/production PostgreSQL, required CI and the next fresh
+independent review remain with the parent. No dependencies, Sonar rules/thresholds,
+API schemas, generated files, working DB, migration, deployment or provider call changed.

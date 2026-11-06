@@ -726,34 +726,52 @@ def create_atom_prompt(
         or len(payload.prompt.encode("utf-8")) > settings.atom_lab_run_prompt_max_bytes
     ):
         raise invalid_prompt("Проверьте текст и размер промпта.", "prompt")
-    with transaction_boundary(session_factory) as session:
-        repository = AtomLabPromptRepository(session)
-        if not _prompt_source_exists(payload.source_ref, atom, registry, repository, settings):
-            raise invalid_prompt("Исходный промпт недоступен для этого атома.", "source_ref")
-        if payload.source_run_id is not None:
-            runs = AtomLabRunRepository(session).history_in_scope(
-                tenant_id=settings.default_tenant_id, region=settings.default_region,
-                run_id=payload.source_run_id, limit=1,
+    try:
+        with transaction_boundary(session_factory) as session:
+            repository = AtomLabPromptRepository(session)
+            if not _prompt_source_exists(payload.source_ref, atom, registry, repository, settings):
+                raise invalid_prompt("Исходный промпт недоступен для этого атома.", "source_ref")
+            if payload.source_run_id is not None:
+                runs = AtomLabRunRepository(session).history_in_scope(
+                    tenant_id=settings.default_tenant_id, region=settings.default_region,
+                    run_id=payload.source_run_id, limit=1,
+                )
+                if (
+                    not runs
+                    or AtomLabRunHistoryService.status(runs[0]) is not AtomLabRunStatus.succeeded
+                    or runs[0].run.atom_id != atom.atom_id
+                    or runs[0].run.input_schema_ref != atom.schema_refs.input.schema_ref
+                    or runs[0].run.input_schema_version != atom.schema_refs.input.version
+                    or runs[0].run.output_schema_ref != atom.schema_refs.output.schema_ref
+                    or runs[0].run.output_schema_version != atom.schema_refs.output.version
+                    or runs[0].run.prompt != payload.prompt
+                    or (runs[0].run.prompt_source_ref or runs[0].run.prompt_ref)
+                    != payload.source_ref
+                ):
+                    raise invalid_prompt(
+                        "Пробный запуск должен соответствовать промпту.", "source_run_id"
+                    )
+            record = AtomLabSavedPrompt(
+                ref=new_id("atom_lab_prompt"), tenant_id=settings.default_tenant_id,
+                region=settings.default_region, atom_id=atom.atom_id, name=payload.name.strip(),
+                prompt=payload.prompt, source_ref=payload.source_ref,
+                source_run_id=payload.source_run_id,
+                schema_refs=atom.schema_refs.model_dump(), created_at=utc_now(),
             )
-            if (
-                not runs
-                or AtomLabRunHistoryService.status(runs[0]) is not AtomLabRunStatus.succeeded
-                or runs[0].run.atom_id != atom.atom_id
-                or runs[0].run.input_schema_ref != atom.schema_refs.input.schema_ref
-                or runs[0].run.input_schema_version != atom.schema_refs.input.version
-                or runs[0].run.output_schema_ref != atom.schema_refs.output.schema_ref
-                or runs[0].run.output_schema_version != atom.schema_refs.output.version
-                or runs[0].run.prompt != payload.prompt
-                or (runs[0].run.prompt_source_ref or runs[0].run.prompt_ref) != payload.source_ref
-            ):
-                raise invalid_prompt("Пробный запуск должен соответствовать промпту.", "source_run_id")
-        record = AtomLabSavedPrompt(
-            ref=new_id("atom_lab_prompt"), tenant_id=settings.default_tenant_id,
-            region=settings.default_region, atom_id=atom.atom_id, name=payload.name.strip(),
-            prompt=payload.prompt, source_ref=payload.source_ref, source_run_id=payload.source_run_id,
-            schema_refs=atom.schema_refs.model_dump(), created_at=utc_now(),
+            repository.create(record)
+    except (DBAPIError, DisconnectionError, DatabaseTimeoutError) as exc:
+        logger.warning(
+            "atom_lab.prompt_database_error",
+            extra={
+                "event": "atom_lab.prompt_database_error",
+                "error_code": "lab_unavailable",
+                "exception_type": type(exc).__name__,
+            },
         )
-        repository.create(record)
+        raise AtomLabApiError(
+            status_code=HTTPStatus.SERVICE_UNAVAILABLE, code="lab_unavailable",
+            message="Промпт Atom Lab не может быть сохранён.",
+        ) from None
     return _saved_prompt_option(record)
 
 

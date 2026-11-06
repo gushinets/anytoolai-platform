@@ -2,17 +2,22 @@ from __future__ import annotations
 
 import asyncio
 import json
+import socket
+import sqlite3
+import threading
 from collections.abc import Iterator
 from dataclasses import replace
 from datetime import timedelta
 from http import HTTPStatus
 from pathlib import Path
+from time import monotonic, sleep
 from typing import Any
 
 import httpx
 import psycopg
 import pytest
 import sqlalchemy as sa
+import uvicorn
 from anytoolai_platform_api.atom_lab.catalog import get_atom_catalog_entry
 from anytoolai_platform_api.dependencies import (
     get_atom_lab_run_settings,
@@ -34,6 +39,7 @@ from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
 from anytoolai_platform_core.storage.db import (
     atom_lab_admission_scopes_table,
+    atom_lab_prompts_table,
     atom_lab_runs_table,
     guest_identities_table,
     jobs_table,
@@ -318,6 +324,119 @@ def test_saved_prompt_bounded_parser_keeps_validation_envelope(app, raw):
         assert response.json()["error"]["field_errors"] == [
             {"path": "prompt", "message": "Недопустимое значение."},
         ]
+
+
+@pytest.mark.parametrize("stage", ["begin", "insert", "commit", "after_commit"])
+def test_saved_prompt_database_failure_is_contained(app, caplog, stage):
+    factory = _factory(app)
+    target = factory if stage == "after_commit" else factory.kw["bind"]
+    event_name = "before_cursor_execute" if stage == "insert" else stage
+    secret = "saved-prompt-private-marker"
+    attempts = []
+
+    def fail(*args, **kwargs):
+        if stage == "insert" and not args[2].startswith("INSERT INTO platform.atom_lab_prompts"):
+            return
+        attempts.append(stage)
+        raise sa.exc.ProgrammingError("INSERT private", {"prompt": secret}, Exception(secret))
+
+    async def save():
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test",
+            headers={"X-Atom-Lab-Access-Code": ACCESS_CODE, "X-Request-ID": "prompt-db-error"},
+        ) as client:
+            return await client.post("/v1/atom-lab/atoms/A07/prompts", json={
+                "name": "Private", "prompt": secret, "source_ref": "kernel_demo.compose_reply.v1",
+            })
+
+    sa.event.listen(target, event_name, fail)
+    try:
+        response = asyncio.run(save())
+    finally:
+        sa.event.remove(target, event_name, fail)
+    _error(response, HTTPStatus.SERVICE_UNAVAILABLE, "lab_unavailable")
+    assert response.json()["request_id"] == "prompt-db-error"
+    assert secret not in response.text + caplog.text
+    records = [
+        record for record in caplog.records if record.message == "atom_lab.prompt_database_error"
+    ]
+    assert len(records) == 1
+    assert records[0].exception_type == "ProgrammingError"
+    assert records[0].exc_info is None
+    assert attempts == [stage]
+    with transaction_boundary(factory) as session:
+        count = session.scalar(sa.select(sa.func.count()).select_from(atom_lab_prompts_table))
+    assert count == int(stage == "after_commit")
+
+
+def test_refused_prompt_insert_never_reaches_uvicorn_error_log(app, capfd, caplog):
+    engine = _factory(app).kw["bind"]
+    secret = "saved-prompt-uvicorn-private-marker"
+
+    def refuse_insert(connection, cursor, statement, parameters, context, executemany):
+        def authorize(action, table, *args):
+            if action == sqlite3.SQLITE_INSERT and table == "atom_lab_prompts":
+                return sqlite3.SQLITE_DENY
+            return sqlite3.SQLITE_OK
+
+        connection.connection.driver_connection.set_authorizer(authorize)
+
+    server_socket = socket.socket()
+    server_socket.bind(("127.0.0.1", 0))
+    server = uvicorn.Server(uvicorn.Config(
+        app, host="127.0.0.1", port=server_socket.getsockname()[1], access_log=False,
+    ))
+    thread = threading.Thread(target=server.run, kwargs={"sockets": [server_socket]}, daemon=True)
+    sa.event.listen(engine, "before_cursor_execute", refuse_insert)
+    thread.start()
+    try:
+        deadline = monotonic() + 5
+        while not server.started and monotonic() < deadline:
+            sleep(0.01)
+        assert server.started
+        response = httpx.post(
+            f"http://127.0.0.1:{server_socket.getsockname()[1]}/v1/atom-lab/atoms/A07/prompts",
+            headers={"X-Atom-Lab-Access-Code": ACCESS_CODE},
+            json={
+                "name": "Private", "prompt": secret, "source_ref": "kernel_demo.compose_reply.v1",
+            },
+            timeout=5,
+        )
+    finally:
+        server.should_exit = True
+        thread.join(timeout=5)
+        server_socket.close()
+        sa.event.remove(engine, "before_cursor_execute", refuse_insert)
+    assert not thread.is_alive()
+    captured = capfd.readouterr()
+    emitted = captured.out + captured.err + caplog.text
+    assert secret not in emitted
+    assert "[parameters:" not in emitted
+    assert "INSERT INTO" not in emitted
+    assert "Exception in ASGI application" not in emitted
+    _error(response, HTTPStatus.SERVICE_UNAVAILABLE, "lab_unavailable")
+    with transaction_boundary(_factory(app)) as session:
+        assert session.scalar(sa.select(sa.func.count()).select_from(atom_lab_prompts_table)) == 0
+
+
+@pytest.mark.parametrize("path", ["prompt", "name"])
+def test_saved_prompt_nul_remains_a_validation_error(app, path):
+    async def save():
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test",
+            headers={"X-Atom-Lab-Access-Code": ACCESS_CODE},
+        ) as client:
+            return await client.post("/v1/atom-lab/atoms/A07/prompts", json={
+                "name": "Private", "prompt": "Private",
+                "source_ref": "kernel_demo.compose_reply.v1",
+                path: "private\x00value",
+            })
+
+    response = asyncio.run(save())
+    _error(response, HTTPStatus.UNPROCESSABLE_ENTITY, "prompt_invalid")
+    assert response.json()["error"]["field_errors"] == [
+        {"path": path, "message": "Недопустимое значение."},
+    ]
 
 
 @pytest.mark.parametrize("method", ["get", "post"])
