@@ -140,16 +140,22 @@ new-start access/snapshot refresh must not hide a previously accepted execution 
 
 Accepted replay and the subsequent `GET /v1/scenario-sessions/{id}` read survive removal of the
 scenario, its product association, or the product definition. Status, checkpoint and execution/result
-IDs come from persisted session/job records; missing config grants no next actions. The existing
-stored-scenario version guard remains in force when a current definition exists.
+IDs come from persisted session/job records; missing config grants no next actions. Both replay
+paths use the current definition for `allowed_next_actions` without pinning the original version;
+replay across a version bump does not create another execution or move its quota bucket. Session
+polling retains its stored-version guard when the current product/scenario association resolves.
 Current configuration remains mandatory for new admission and next-action execution. These reads
-do not create reservations or bypass canonical workflow/schema validation in the Result API.
-The same config-independent recovery applies to historical guest replay without synthesizing a
-reservation. See [ANY-814](../exec-plans/active/ANY-814-post-merge-recovery-fixes.md).
+do not bypass canonical workflow/schema validation in the Result API.
 
-Replay lookup precedes validation required only for new admission, after request-shape/internal-only
-visibility checks. New admission uses one candidate savepoint for session/job/bucket/reservation,
-reserved increment and events. A competing guest-session or owner-reservation unique violation
+The live-canary token authorizes new internal-only admission, not reading an accepted execution.
+After request-shape and owner/scope/hash checks, a matching replay returns the original snapshot
+even without a token or after token rotation/config removal. A new key or different owner cannot
+reuse that acceptance; new internal-only starts still require a valid server-configured token.
+This rule also covers historical guest replay without adding visibility metadata or a reservation.
+Public session/result reads retain their existing runtime-scope isolation from Atom Lab.
+
+Replay lookup precedes new-admission checks. New admission uses one candidate savepoint for
+session/job/bucket/reservation, reserved increment and events. A competing guest-session or owner-reservation unique violation
 rolls back the complete losing candidate before resolving the winner; nothing partially accepted
 survives. This path calls `ScenarioSessionService.start`, not the earlier `start_or_get_existing`
 helper. The caller still owns final commit/rollback and any final access check.
@@ -160,12 +166,6 @@ Historical guest and unmetered starts retain `scenario_sessions.idempotency_key`
 no synthetic reservation. This nullable guest constraint alone does not deduplicate `guest_id=NULL`
 requests; paid execution always uses its explicit owner-scoped reservation and never this NULL path.
 The HTTP request/response DTOs gain no paid authority fields from this internal mechanism.
-
-Both replay paths resolve the persisted product/scenario against current config without pinning the
-old scenario version. A version bump therefore remains replayable; removal of the definition may
-still return not found. `allowed_next_actions` follows the current definition, including when two
-API processes have different config snapshots during an update. This does not create another
-execution or move its original quota bucket.
 
 ## A17 linked handoff sessions
 

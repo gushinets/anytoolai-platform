@@ -35,7 +35,7 @@ admission for new metered starts; stage 3 implements terminal consumption/releas
 Stage 5 supplies the [cutover procedure](../../infra/deployment/execution-metering-cutover.md) and
 independent verification; failed gates defer activation. See
 [runtime storage](../../docs/architecture/runtime-storage.md#execution-metering-storage-any-507-stage-1)
-and [ANY-507](../../docs/exec-plans/active/ANY-507-implementation-plan.md) for stage and cutover boundaries.
+and [ANY-507](../../docs/exec-plans/completed/ANY-507-implementation-plan.md) for stage and cutover boundaries.
 
 Historical handoff compatibility revisions keep their schema checks and index-repair logic inline so
 the recorded Alembic history does not depend on future edits to mutable helper modules. Revision

@@ -391,7 +391,17 @@ Safe API behavior:
 - `429` with `quota_exhausted` when used quota reached the configured limit;
 - `429` with `quota_capacity_reserved` when remaining quota is temporarily occupied by reservations.
 
-Recommended frontend behavior for `429 quota_exhausted`:
+A start error describes one HTTP attempt. If an earlier send of that prepared key timed out, lost
+its response or returned an unreadable acceptance, a later rejection cannot prove the earlier send
+will not commit. Preserve the key, field/Submit/mode locks and same-key recovery across automatic
+and manual retries, including enveloped 4xx, quota exhaustion and unknown-guest responses. Do not
+enter a paywall or replace guest identity while that execution is unresolved. Once a session is
+known, retry polls it instead of sending another start.
+An explicit `idempotency_key_conflict` proves that the immutable request does not own that key's
+execution; discard that handle and allow a fresh key rather than keeping an unrecoverable lock.
+
+When the key has no unresolved sends, definite 4xx rejections unlock the form and allow a fresh key.
+Repeated definite rejections alone do not create uncertainty. For `429 quota_exhausted` in that case:
 
 - keep quota state advisory in the frontend and treat the backend response as authoritative;
 - disable the run action or show a clear quota-exhausted state after the response;
@@ -401,13 +411,10 @@ Recommended frontend behavior for `429 quota_exhausted`:
 For `quota_capacity_reserved`, show temporary occupancy and retry the same prepared start/key
 (or handoff token/guest). Do not open an exhausted/paywall state or manufacture a new execution.
 The rejected attempt leaves no session/job/reservation; quota refresh is read-only.
-The form, ordinary Submit, mode selection and shell busy indication unlock after this definite
-rejection only if that prepared key has no earlier send with an unresolved outcome. Retain the key
-for an unchanged retry; edited input creates a new key. If a prior send timed out, lost its response
-or returned an unreadable acceptance, a later capacity rejection cannot prove that earlier send
-will not accept. Preserve the lock and same-key retry across automatic/manual retries until the
-execution is recovered. Uncertainty belongs to that key, not subsequent logical submissions.
-Ambiguous start/poll failures and accepted or attached executions retain their reattachment locks.
+With no unresolved sends, fields, ordinary Submit, mode selection and shell busy indication unlock.
+Retain the key for an unchanged retry; safe edits create a new key. Uncertainty belongs to that key,
+not subsequent logical submissions. Ambiguous polling and accepted or attached executions retain
+their reattachment locks.
 
 Frontend-safe responses must not expose prompts, provider policies, provider/model names, retry
 budgets, PydanticAI run ids, LiteLLM response ids, or raw unsafe exception text.

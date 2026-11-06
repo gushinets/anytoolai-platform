@@ -241,21 +241,16 @@ def test_start_session_accepts_internal_only_scenario_with_the_correct_live_cana
     assert snapshot.status is ScenarioSessionStatus.started
 
 
-def test_start_session_rejects_internal_only_scenario_idempotency_replay_without_a_live_canary_token(
+def test_start_session_replays_accepted_canary_without_new_admission_permission(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
     config_registry,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """`code-review` finding: the idempotency-key replay lookup used to run
-    before the internal_only/live_canary_token check, so a second start_session() call reusing
-    the same idempotency_key from a legitimately-token-authorized first call, but omitting the
-    token this time, would return the replayed snapshot instead of being rejected -- the token
-    check must fire before idempotency replay is even considered, not just on a genuinely new
-    request."""
+    """Replay reads the accepted execution; only new admission needs the canary token."""
     monkeypatch.setenv("ANYTOOLAI_LIVE_CANARY_TOKEN", "the-real-token")
     with transaction_boundary(session_factory) as session:
         service = _runtime_service(session, config_registry=config_registry)
-        service.start_session(
+        first = service.start_session(
             tenant_id="anytoolai",
             region="default",
             product_id="kernel_demo",
@@ -267,17 +262,20 @@ def test_start_session_rejects_internal_only_scenario_idempotency_replay_without
             live_canary_token="the-real-token",
         )
 
-        with pytest.raises(ScenarioNotFoundError):
-            service.start_session(
-                tenant_id="anytoolai",
-                region="default",
-                product_id="kernel_demo",
-                scenario_id="kernel_demo.single_action_live_smoke_v1",
-                frontend_id="kernel_demo_ce",
-                input_payload=_LIVE_SCENARIO_INPUT,
-                guest_id="guest_demo",
-                idempotency_key="idem-internal-only-replay",
-            )
+        monkeypatch.delenv("ANYTOOLAI_LIVE_CANARY_TOKEN")
+        replay = service.start_session(
+            tenant_id="anytoolai",
+            region="default",
+            product_id="kernel_demo",
+            scenario_id="kernel_demo.single_action_live_smoke_v1",
+            frontend_id="kernel_demo_ce",
+            input_payload=_LIVE_SCENARIO_INPUT,
+            guest_id="guest_demo",
+            idempotency_key="idem-internal-only-replay",
+        )
+        assert replay.is_replay
+        assert replay.scenario_session_id == first.scenario_session_id
+        assert replay.job_id == first.job_id
 
 
 def test_create_linked_session_always_rejects_internal_only_scenario(

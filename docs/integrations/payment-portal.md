@@ -92,7 +92,7 @@ ANY-507 stage 2 (2026-11-04) adds Core-only reservation admission and owner-scop
 ordinary start and immediate handoff. Typed `ExecutionOwner`/`PaidAllowance` arguments are supplied
 explicitly by trusted internal callers; historical body/source-session `user_id` is not Portal
 authority. No paid HTTP authentication, AccessSnapshot, usage endpoint or wire change is delivered
-by this checkpoint. See the [shared contract and stage boundaries](../exec-plans/active/ANY-507-implementation-plan.md).
+by this checkpoint. See the [shared contract and stage boundaries](../exec-plans/completed/ANY-507-implementation-plan.md).
 Stage 3 adds one transactional success finalizer/release path for both typed paid and guest buckets,
 shared by ordinary execution and rollback recovery. It returns an applied/replayed
 `ConsumptionTransition` with the original reservation and an exhaustion edge for ANY-766's

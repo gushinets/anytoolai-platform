@@ -1,11 +1,12 @@
 # ANY-507 mechanism handoff to ANY-766
 
-Implementation baseline: stage 1 `805110b7`, stage 2 `98c92121`, stage 3 `02639ec7`, stage 4
-`6b83e7b2`. Stage-5 tests/procedure are the accompanying working-tree change; no reviewed PR/SHA
-or production activation is claimed. Pin the reviewed final SHA before ANY-766 consumes this
-handoff. The [execution plan](../exec-plans/active/ANY-507-implementation-plan.md#10-stage-5-checkpoint--2026-11-04)
-records actual gates and limitations. [ANY-766](https://linear.app/paveldik/issue/ANY-766)
-owns the consuming integration.
+Delivery baseline: merged [PR #256](https://github.com/gushinets/anytoolai-platform/pull/256),
+`4cd2e0aa39b67d648cd40540db0a59a2559fd4f2` (the same tree as `7c93c0db`), includes stage-5 tests and
+the cutover procedure. Production activation is not claimed. The
+[execution plan](../exec-plans/completed/ANY-507-implementation-plan.md#10-stage-5-checkpoint--2026-11-04)
+records historical verification and limits; [ANY-814](../exec-plans/active/ANY-814-post-merge-recovery-fixes.md)
+tracks subsequent replay/client recovery changes. [ANY-766](https://linear.app/paveldik/issue/ANY-766)
+owns the consuming integration and must pin the actual version it uses.
 
 ## Implemented Core contract
 

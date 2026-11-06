@@ -523,13 +523,16 @@ describe("All tools link", () => {
     expect(calls.filter((call) => call.key === routes.START)).toHaveLength(1);
   });
 
-  it("keeps modes and the busy warning locked after an uncertain start then capacity rejection", async () => {
+  it.each([
+    { status: 429, code: "quota_capacity_reserved" },
+    { status: 404, code: "scenario_not_found" },
+  ])("keeps modes and the busy warning locked after an uncertain start then $code", async ({ status, code }) => {
     const routes = routesFor(CUW_IDS);
     const { calls } = renderShell(registered(CUW_IDS.productId), {
       ...bootRoutes(CUW_IDS),
       [routes.START]: [
         new Response("<html>Gateway timeout</html>", { status: 504 }),
-        errorResponse(429, "quota_capacity_reserved"),
+        errorResponse(status, code),
       ],
     });
     fireEvent.change(await screen.findByLabelText("Progress notes"), {
@@ -537,7 +540,7 @@ describe("All tools link", () => {
     });
     fireEvent.click(screen.getByRole("radio", { name: "neutral" }));
     fireEvent.click(screen.getByRole("button", { name: "Write update" }));
-    await screen.findByText("Capacity is temporarily in use. Please try again shortly.");
+    await screen.findByRole("button", { name: "Try again" });
     expect(screen.getByRole("tooltip").textContent).toBe(host.runInProgress);
     for (const name of ["Update", "Reply Draft", "Prepaid Request"]) {
       expect((screen.getByRole("radio", { name }) as HTMLInputElement).disabled).toBe(true);

@@ -2,21 +2,21 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: mixed
 - Created: 2026-11-04
-- Last updated: 2026-11-05
-- Review date: 2026-11-05
-- Next action: obtain green activation gates and pin a reviewed delivery SHA before deployment; the guest-history cutover now uses `0017`.
-- Blocker: required CI gates and a reviewed delivery SHA are pending; production activation remains deferred.
+- Last updated: 2026-11-06
+- Review date: 2026-11-06
+- Next action: ANY-766 consumes the delivered mechanism; ANY-814 owns replay/client follow-up.
+- Blocker: none for mechanism delivery. Production activation remains deferred.
 
 ## 1. Basis, version and scope
 
-This repository-local English execution plan preserves the reviewed PLAN-1–3 corrections.
-Stages 1–4 are implemented in `805110b7`, `98c92121`, `02639ec7` and `6b83e7b2`.
-The current user instruction authorizes stage 5 only, including independent cutover rehearsal and
-handoff preparation. Section 6 preserves the historical stage-0 observations; later checkpoints
-record the implementation evidence. ANY-766 retains paid HTTP/access and interservice integration.
+The mechanism and stage-5 verification were delivered in merged [PR #256](https://github.com/gushinets/anytoolai-platform/pull/256)
+at `4cd2e0aa39b67d648cd40540db0a59a2559fd4f2` (the same tree as delivery `7c93c0db`).
+The stage baselines and validation checkpoints below are historical evidence, not current blockers.
+[ANY-814](../active/ANY-814-post-merge-recovery-fixes.md) owns subsequent replay/client recovery changes.
+ANY-766 retains paid HTTP/access and interservice integration; production activation is not claimed.
 
 Sources: [ANY-507](https://linear.app/paveldik/issue/ANY-507),
 [parent ANY-504](https://linear.app/paveldik/issue/ANY-504), Mikhail's 2026-11-03 M2 decision,
@@ -24,9 +24,10 @@ and the supplied PLAN-5 implementation plan for [ANY-766](https://linear.app/pav
 Section 2 freezes the shared internal Kernel contract; section 6 records the inspected baseline,
 transaction owners, concrete attachment points and stage-0 evidence.
 
-**Kernel baseline:** `feature/ANY-507` at
+**Historical pre-implementation baseline:** `feature/ANY-507` at
 [`2b4920999e7839b12e90b6b05cd6dc0667e5e7b4`](https://github.com/gushinets/anytoolai-platform/commit/2b4920999e7839b12e90b6b05cd6dc0667e5e7b4).
-The checked-in migration graph has one head, `0015`. ANY-711/#225 is included at
+At that baseline the migration graph had one head, `0015`. Delivery advances it to `0017`.
+ANY-711/#225 is included at
 `331e086ca9e0c72eb757aacc476bad5bacb5bae5`, supplying the capability registry, metric vocabulary
 and trusted deployment scope. These are source observations, not deployed-database evidence.
 
