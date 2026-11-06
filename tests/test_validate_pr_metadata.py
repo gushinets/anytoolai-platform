@@ -103,3 +103,37 @@ def test_ignores_follow_up_ticket_links_outside_linear_section(validator) -> Non
     body = pr_body() + "\n## Follow-up debt\n\nhttps://linear.app/paveldik/issue/ANY-339/other\n"
 
     validator.validate_pr_metadata("ANY-338 - Something", body)
+
+
+@pytest.mark.parametrize("ending", ["\n", "\r\n", "\r", ""])
+@pytest.mark.parametrize("marker", ["```", "~~~~", "`" * 8000])
+def test_fence_line_endings(validator, ending, marker):
+    # Keep rendered metadata outside the fence, including an unterminated final fence.
+    body = pr_body() + marker + ending
+    validator.validate_pr_metadata("ANY-338 - Something", body)
+    assert validator._without_fenced_code_blocks(marker + ending) == (
+        "\n" if ending.endswith("\n") else ""
+    )
+
+
+@pytest.mark.parametrize("ending", ["\n", "\r\n"])
+@pytest.mark.parametrize("marker", ["```", "~~~~"])
+def test_fenced_duplicate_sections_are_ignored(validator, ending, marker):
+    body = pr_body() + marker + "markdown\n" + pr_body() + marker + "\n"
+    validator.validate_pr_metadata("ANY-338 - Something", body.replace("\n", ending))
+
+
+@pytest.mark.parametrize(
+    "source,expected",
+    [
+        ("   ```info\nhidden\n   ````\nvisible", "\n\n\nvisible"),
+        ("    ```\nvisible", "    ```\nvisible"),
+        ("```bad`info\nvisible", "```bad`info\nvisible"),
+        ("````\nhidden\n```\nstill hidden", "\n\n\n"),
+        ("~~~\nhidden\n```\nstill hidden", "\n\n\n"),
+        ("```\nhidden\n```not closing\nstill hidden", "\n\n\n"),
+        ("```\rhidden\r```\rvisible", "visible"),
+    ],
+)
+def test_fence_contract(validator, source, expected):
+    assert validator._without_fenced_code_blocks(source) == expected
