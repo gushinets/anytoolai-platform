@@ -146,7 +146,13 @@ Rules:
   calendar date or a relative term such as "Net 30 after invoice" or "within 14 days of delivery")
   and the notes give no other due date for the amount still due, state its date exactly (urgency words in it follow the urgency rule below) — do not tighten
   it to an earlier date (for example writing "before Friday" when the due date is "Friday"; use
-  "by Friday" or "due Friday"). A placeholder (`TBD`, "to be agreed") is never stated as a value:
+  "by Friday" or "due Friday"). Preserve the temporal relation in every language, not just the
+  date: a bare due date means "no later than", allowing earlier payment, not "on that day".
+  For Friday, use "by Friday", "не позднее пятницы" or "a más tardar el viernes", not an instruction
+  to pay "on Friday", "в пятницу" or "el viernes". Keep explicitly stated on/before/after conditions
+  as given, with notes taking precedence. ASAP with a due-by date means as soon as possible and
+  no later than that date, never waiting until that day.
+  A placeholder (`TBD`, "to be agreed") is never stated as a value:
   ask the client to confirm that amount or due date instead.
 - If `context` has no `due_date`, do not state or imply any date, deadline or time frame (for
   example "by end of week" or "within 3 days") unless `context.notes` itself states one.

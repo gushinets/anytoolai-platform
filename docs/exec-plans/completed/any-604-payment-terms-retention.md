@@ -46,7 +46,9 @@ A01-3 and A01-EN-2 missing the explicit payment request, and classified the Span
 ambiguity as FAIL rather than an acceptable caveat. Full semantic acceptance is therefore
 14/15 for the original cases and 18/21 overall for this historical first-fix series.
 Original texts remain unchanged; prior verdicts are retained in the evidence audit history.
-The subsequent review fixes and multilingual verification now pass 45/45 on the revised prompt;
+The subsequent multilingual series was initially marked 45/45. Review round 2 corrected four
+U2 deadline-meaning failures, making that historical series 41/45. The deadline fix is verified
+separately on U2; other cases have not been rerun on its prompt revision;
 see [the current acceptance report](any-604-prepaid-request-live-acceptance.md).
 
 ## Historical first-fix result

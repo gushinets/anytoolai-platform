@@ -7,7 +7,7 @@
 - Created: 2026-11-06
 - Last updated: 2026-11-06
 - Review date: 2026-11-06
-- Next action: owner reviews the two fixes and completed 45-run multilingual matrix
+- Next action: see the acceptance report for corrected review-2 verdicts and deadline verification
 - Blocker: none
 
 ## Goal
@@ -69,13 +69,17 @@ no tests or assertions were bypassed. All 69 product tests passed separately.
 
 ## Additional multilingual verification
 
-A04 and U1–U3 were each repeated three times in RU/EN/ES: 36/36 PASS. A04 only asks to
+A04 and U1–U3 were each repeated three times in RU/EN/ES: initially 36/36 PASS, corrected
+to 32/36 after review round 2 found four U2 deadline-meaning failures. A04 only asks to
 confirm conflicting amounts and dates; U1/U2 preserve the specified urgency, while U3 honors
 the no-rush notes. All applicable messages explicitly request USD 800. All outputs stay in the
 requested language and match both the displayed result and actual clipboard contents.
 
 The worker prompt, workflow and router hashes match the preceding nine A01 runs. Together
-the two series cover all five cases in all three languages, three times each: 45/45 PASS.
+the two series cover all five cases in all three languages, three times each: initially 45/45,
+corrected to 41/45. U2-RU-2 and U2-ES-1/2/3 say to pay on Friday instead of no later than Friday.
+Their raw outputs and earlier assessments are preserved. The later deadline prompt revision is
+verified separately; these historical runs are not proof of a full pass on that revision.
 The new series contains 37 physical provider calls: A04-RU-3 has two semantic attempts inside
 one successful A06 action. Both calls and costs are retained; the exact retry reason is unknown.
 Full inputs, outputs, ledger data and historical failures remain in the adjacent acceptance report

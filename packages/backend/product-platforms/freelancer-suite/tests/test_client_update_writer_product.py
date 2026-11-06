@@ -538,6 +538,19 @@ def test_prepaid_request_prompt_forbids_invented_dates_without_a_due_date() -> N
     assert "If `context` has no `due_date`, do not state or imply any date" in prompt
 
 
+def test_prepaid_request_prompt_preserves_deadline_relation_across_languages() -> None:
+    prompt = _normalized_prepaid_prompt()
+
+    assert (
+        'a bare due date means "no later than", allowing earlier payment, not "on that day"'
+        in prompt
+    )
+    assert '"by Friday", "не позднее пятницы" or "a más tardar el viernes"' in prompt
+    assert "Keep explicitly stated on/before/after conditions as given" in prompt
+    assert "with notes taking precedence" in prompt
+    assert "no later than that date, never waiting until that day" in prompt
+
+
 def test_prepaid_request_prompt_preserves_the_payment_arrangement() -> None:
     # Protects the prompt contract; model retention is checked by the ANY-604 live series.
     prompt = _normalized_prepaid_prompt()

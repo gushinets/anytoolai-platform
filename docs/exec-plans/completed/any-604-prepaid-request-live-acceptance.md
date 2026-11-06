@@ -7,26 +7,35 @@
 - Created: 2026-11-06
 - Last updated: 2026-11-06
 - Review date: 2026-11-06
-- Next action: owner reviews the local changes and completed 45-run multilingual matrix
-- Blocker: no live matrix failure; the previously recorded local sudo test limitation remains
+- Next action: owner reviews the deadline fix and targeted U2 results; full current-revision matrix not rerun
+- Blocker: no U2 failure on the new revision; full-matrix coverage and the prior sudo test limitation remain
 
-## Latest complete multilingual matrix
+## Latest result — review round 2
 
-**PASS: 45/45 on the review-round-1 prompt.** This combines nine preceding A01 RU/EN/ES
-runs with 36 new A04/U1/U2/U3 RU/EN/ES runs. Worker prompt, workflow and router hashes
-are identical across both series. This is two consecutive recorded series, not 45 new requests
-in the latest batch. All 45 outputs passed semantic review and actual UI/clipboard equality.
+**U2 RU/EN/ES: 9/9 PASS on the deadline-meaning prompt revision.** The same inputs were
+run three times per language. Each request preserves USD 800, a Friday due-by deadline that
+allows earlier payment, and ASAP urgency. Full outputs and supporting quotes are appended below.
+This is a targeted U2 check. A01/A04/U1/U3 have not been rerun on this prompt revision;
+results from different prompt hashes are not combined into a new 45/45 claim.
+
+## Previous multilingual matrix — corrected after review round 2
+
+**FAIL: 41/45 on the review-round-1 prompt. The former 45/45 PASS is withdrawn.**
+U2-RU-2 and U2-ES-1/2/3 instruct payment on Friday instead of no later than Friday.
+Their four former PASS assessments missed the temporal relation. Raw outputs, UI/clipboard
+proof, traces and ledger data are unchanged; previous assessments remain in JSON audit data.
 
 | Case | RU | EN | ES |
 | --- | --- | --- | --- |
 | A01 | 3/3 | 3/3 | 3/3 |
 | A04 | 3/3 | 3/3 | 3/3 |
 | U1 | 3/3 | 3/3 | 3/3 |
-| U2 | 3/3 | 3/3 | 3/3 |
+| U2 | 2/3 | 3/3 | 0/3 |
 | U3 | 3/3 | 3/3 | 3/3 |
 
-Earlier failed outputs and corrected assessments remain historical evidence. The complete
-current-revision matrix supersedes the earlier A01-only coverage limitation, not the raw history.
+These 45 attempts combine nine A01 and 36 A04/U1/U2/U3 attempts on identical prior
+prompt/workflow/router hashes. All 45 retain successful UI/clipboard delivery. The issue is
+the generated wording and its incorrect semantic assessment, not missing transport evidence.
 
 ## Preceding review-round-1 A01 result
 
@@ -854,6 +863,8 @@ Para el diseño de la presentación de 12 diapositivas, el anticipo corresponde 
 
 ## Additional A04/U1–U3 multilingual live series — 2026-11-06
 
+**Corrected acceptance: 32/36; the earlier 36/36 assessment missed four U2 deadline errors.**
+
 The user requested A04 and U1–U3 in Russian, English and Spanish. Twelve inputs were frozen
 before collection, three browser attempts each. English inputs are verbatim from the ticket.
 RU/ES equivalents preserve amounts, tone, both October dates, Friday and the urgency/no-rush
@@ -863,7 +874,7 @@ relationship; notes and due-date text are translated together. No source, prompt
 | --- | --- | --- | --- | --- |
 | A04 | 3/3 | 3/3 | 3/3 | Confirmation only; both amounts and dates; no payment demand or payment-sent closing |
 | U1 | 3/3 | 3/3 | 3/3 | USD 800 direct request, notes urgency retained, no invented date |
-| U2 | 3/3 | 3/3 | 3/3 | USD 800 direct request, Friday and deadline urgency retained |
+| U2 | 2/3 | 3/3 | 0/3 | Four outputs change due-by to on-Friday; former PASS corrected |
 | U3 | 3/3 | 3/3 | 3/3 | USD 800 direct request, Friday retained, no urgency |
 
 All 36 new responses stayed in the requested language. All were delivered and copied correctly,
@@ -879,7 +890,8 @@ New-series provider-ledger estimate: USD 0.012419000; median UI delivery: 4.47s.
 
 Self-checks verify 36 planned attempts, exact frozen inputs, unique new sessions, unchanged
 historical evidence, equal runtime hashes, provider/action counts, trace hashes and UI/clipboard
-equality. Combined-matrix checks require exactly three successful attempts per case/language.
+equality. The original combined-matrix assertions trusted recorded PASS verdicts and missed the temporal
+relation. Review round 2 corrects these verdicts: delivery success is not semantic success.
 Semantic and language decisions come from reading full outputs; they are not inferred from
 a keyword classifier. No failed user attempt was replaced; the one internal semantic retry
 is retained explicitly in the ledger evidence.
@@ -1137,11 +1149,11 @@ Direct USD 800 payment request retains Friday and urgency from the due-date text
 Sam, оплатите, пожалуйста, предоплату в размере USD 800 за редизайн сайта к пятнице — как можно скорее. Сообщите, пожалуйста, когда отправите оплату.
 ```
 
-##### U2-RU-2 — PASS
+##### U2-RU-2 — FAIL (corrected in review round 2)
 
 Session: `scenario_session_01793965864485097808_0000000116_754d5f354dac4fd6895d2230ac3b445a`.
 
-Direct USD 800 payment request retains Friday and urgency from the due-date text.
+Previous PASS withdrawn: payment on Friday changes a due-by deadline and may delay an ASAP payment. The original output is retained below.
 
 ```text
 Прошу оплатить предоплату в размере USD 800 за редизайн сайта в пятницу — как можно скорее. Пожалуйста, сообщите, когда отправите оплату.
@@ -1203,31 +1215,31 @@ Billing notes:
 
 Cliente Sam. Se acordó un anticipo de USD 800 por el rediseño del sitio web.
 
-##### U2-ES-1 — PASS
+##### U2-ES-1 — FAIL (corrected in review round 2)
 
 Session: `scenario_session_01793965913854582638_0000000146_b608a262d18b48fc8b04277654bb6f56`.
 
-Direct USD 800 payment request retains Friday and urgency from the due-date text.
+Previous PASS withdrawn: payment on Friday changes a due-by deadline and may delay an ASAP payment. The original output is retained below.
 
 ```text
 Sam, por favor, realiza el pago del anticipo acordado de USD 800 por el rediseño del sitio web el viernes — lo antes posible. Avísame cuando hayas enviado el pago.
 ```
 
-##### U2-ES-2 — PASS
+##### U2-ES-2 — FAIL (corrected in review round 2)
 
 Session: `scenario_session_01793965923863596195_0000000152_e950d8d2c2bc4cb4b8ba71d847d55dfd`.
 
-Direct USD 800 payment request retains Friday and urgency from the due-date text.
+Previous PASS withdrawn: payment on Friday changes a due-by deadline and may delay an ASAP payment. The original output is retained below.
 
 ```text
 Por favor, paga el anticipo de USD 800 por el rediseño del sitio web el viernes, lo antes posible. Avísame cuando hayas enviado el pago.
 ```
 
-##### U2-ES-3 — PASS
+##### U2-ES-3 — FAIL (corrected in review round 2)
 
 Session: `scenario_session_01793965935777477258_0000000158_5b7ab0967e1246e096ae488258cbe9a4`.
 
-Direct USD 800 payment request retains Friday and urgency from the due-date text.
+Previous PASS withdrawn: payment on Friday changes a due-by deadline and may delay an ASAP payment. The original output is retained below.
 
 ```text
 Sam, por favor realiza el pago del anticipo acordado de USD 800 por el rediseño del sitio web el viernes, lo antes posible. Avísame cuando hayas enviado el pago.
@@ -1345,4 +1357,146 @@ Direct USD 800 payment request retains Friday with no urgency; no-rush notes ove
 
 ```text
 Sam, por favor, realiza el pago de USD 800 como anticipo por el rediseño del sitio web, con vencimiento el viernes. Avísame cuando lo hayas enviado.
+```
+
+## Review round 2 — new U2 deadline verification
+
+The prompt now preserves temporal relations in every language: a bare due date means no later
+than that date, allowing earlier payment; explicit on/before/after conditions retain their meaning
+and notes remain authoritative. ASAP plus a due-by date must not instruct waiting until that day.
+One prompt-contract regression pins the rule. No model, schema, workflow or UI changes.
+
+U2 RU/EN/ES: three new browser attempts each, **9/9 PASS**. Inputs are byte-for-byte identical
+to the previous U2 translations. The worker prompt hash differs from the prior series; workflow
+and router hashes match. All nine sessions have one successful A06 and text-only output matching
+both the displayed text and actual clipboard. All 9 physical provider calls are retained.
+Ledger model: gpt-6-luna; configured reasoning medium, effective effort unproven (ledger null).
+Estimated ledger cost: USD 0.002618480; median UI delivery: 4.48s.
+
+### Checks and limits
+
+All 70 product tests passed. Doctor passed in managed Python 3.12; invoking it with the system
+Python 3.14 first failed for missing pytest/pydantic. Config, architecture and generated-doc checks
+passed; no new Ruff findings (nine existing line-length findings). The live bootstrap initially
+rejected a source fingerprint changed during build; no scenarios were submitted, and a clean
+restart verified the final source. Full quick-check was not rerun for this bounded prompt change;
+the prior run's sudo environment failure remains the latest baseline result, not a current pass.
+Documentation, whitespace and evidence consistency checks passed. Owned live services were
+stopped; database volumes and raw traces remain. Finite samples do not guarantee future outputs.
+Other scenarios were not rerun on this revision.
+
+### Full new inputs and outputs
+
+#### Review 2 U2-RU
+
+Tone: firm; amount: USD 800; due date: пятница — как можно скорее.
+
+Billing notes:
+
+Клиент Sam. Согласована предоплата USD 800 за редизайн сайта.
+
+##### Review 2 U2-RU-1 — PASS
+
+Session: `scenario_session_01793969804597667057_0000000002_a1d4fc3ef80647c3b157f5e7423b6e24`.
+
+Deadline evidence: не позднее пятницы. Urgency evidence: как можно скорее.
+
+```text
+Sam, пожалуйста, оплатите предоплату USD 800 за редизайн сайта как можно скорее, но не позднее пятницы. Сообщите, пожалуйста, когда отправите оплату.
+```
+
+##### Review 2 U2-RU-2 — PASS
+
+Session: `scenario_session_01793969815026538185_0000000008_cc61409e81e74fd18f557bb8992d1e35`.
+
+Deadline evidence: не позднее пятницы. Urgency evidence: как можно скорее.
+
+```text
+Пожалуйста, внесите согласованную предоплату в размере USD 800 за редизайн сайта как можно скорее, но не позднее пятницы. Сообщите, пожалуйста, когда отправите оплату.
+```
+
+##### Review 2 U2-RU-3 — PASS
+
+Session: `scenario_session_01793969823687733497_0000000014_21bb6dfe78c94def8ea7177f3e895ff0`.
+
+Deadline evidence: не позднее пятницы. Urgency evidence: как можно скорее.
+
+```text
+Sam, пожалуйста, внесите согласованную предоплату USD 800 за редизайн сайта как можно скорее, но не позднее пятницы. Сообщите, пожалуйста, когда отправите оплату.
+```
+
+#### Review 2 U2-EN
+
+Tone: firm; amount: USD 800; due date: Friday — ASAP.
+
+Billing notes:
+
+Client Sam. Agreed deposit USD 800 for the site redesign.
+
+##### Review 2 U2-EN-1 — PASS
+
+Session: `scenario_session_01793969836238336143_0000000020_5167875089144d978b00a46618540394`.
+
+Deadline evidence: no later than Friday. Urgency evidence: as soon as possible.
+
+```text
+Hi Sam, please pay the agreed USD 800 deposit for the site redesign as soon as possible, and no later than Friday. Please let me know once you’ve sent it.
+```
+
+##### Review 2 U2-EN-2 — PASS
+
+Session: `scenario_session_01793969848780017099_0000000026_ab9bb2e9ee624e0f87b88004209b9c5e`.
+
+Deadline evidence: no later than Friday. Urgency evidence: as soon as possible.
+
+```text
+Please pay the USD 800 deposit for the site redesign as soon as possible, and no later than Friday. Let me know once you’ve sent it.
+```
+
+##### Review 2 U2-EN-3 — PASS
+
+Session: `scenario_session_01793969856862354775_0000000032_e878239d30674fc3ad2136df4b224a6d`.
+
+Deadline evidence: no later than Friday. Urgency evidence: as soon as possible.
+
+```text
+Please pay the USD 800 deposit for the site redesign as soon as possible, and no later than Friday. Please let me know once you’ve sent the payment.
+```
+
+#### Review 2 U2-ES
+
+Tone: firm; amount: USD 800; due date: viernes — lo antes posible.
+
+Billing notes:
+
+Cliente Sam. Se acordó un anticipo de USD 800 por el rediseño del sitio web.
+
+##### Review 2 U2-ES-1 — PASS
+
+Session: `scenario_session_01793969865505511188_0000000038_fee3a16541e643838e4b48c94a0b2d4c`.
+
+Deadline evidence: a más tardar el viernes. Urgency evidence: lo antes posible.
+
+```text
+Por favor, realiza el pago del anticipo de USD 800 por el rediseño del sitio web lo antes posible y, en cualquier caso, a más tardar el viernes. Avísame cuando hayas enviado el pago.
+```
+
+##### Review 2 U2-ES-2 — PASS
+
+Session: `scenario_session_01793969875782326413_0000000044_1f5242a047d8409cab6362efa4075bb5`.
+
+Deadline evidence: a más tardar el viernes. Urgency evidence: lo antes posible.
+
+```text
+Sam, por favor realiza el pago de USD 800 correspondiente al anticipo acordado por el rediseño del sitio web lo antes posible y, en cualquier caso, a más tardar el viernes. Avísame cuando hayas enviado el pago.
+```
+
+##### Review 2 U2-ES-3 — PASS
+
+Session: `scenario_session_01793969886832944650_0000000050_4245bf2484b246c987c803bf8bffd925`.
+
+Deadline evidence: a más tardar, el viernes. Urgency evidence: lo antes posible.
+
+```text
+Sam, por favor, realiza el pago del anticipo de USD 800 por el rediseño del sitio web lo antes posible y, a más tardar, el viernes. Avísame cuando lo hayas enviado.
 ```
