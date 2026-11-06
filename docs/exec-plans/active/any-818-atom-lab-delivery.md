@@ -241,6 +241,28 @@ local tests. No generated code, rules, thresholds or exclusions changed. Backend
 provider checks were not repeated; the acceptance DB remains untouched. Restart the final fresh
 review pair and check CI on the resulting commit without merging.
 
+### Third duplication cleanup
+
+The user-requested in-app browser verification on
+`0fb157fa91be9fd126e2840a3dab637e80425468` showed exactly 3.03% duplication and 102 duplicated
+new lines: 96 generated and six in Chromium tests. The progression is 3.7% to 3.2% to 3.03%; the
+gate is still red. A fresh full-PR review of that head returned no findings.
+
+`submitNewPresetFromExample(page, name)` now shares only the four repeated submit steps: open the
+example preset, fill its name, call the existing editor check and click Save. Three source consumers
+cover the gateway, structured pre-write and three invalid-201 scenarios. Unlock, transport mocks,
+assertions and retry polling remain in their tests; recovery fixtures are unchanged. Expanding the
+helper reproduces the previous test file exactly, including every `editPreset` check. Before/after
+collection confirms all 110 browser test names and their order are unchanged.
+
+Validation: all five affected Chromium journeys passed, then canonical frontend-check passed with
+lint, typecheck, all 53 Atom Lab Node tests, all 110 Chromium journeys, generated API-contract drift
+and frontend builds. Doctor, documentation validation, `generate-docs --check` and `git diff --check`
+passed. Frontend log: `.quick-check-tmp/sonar259/test-submit-helper-frontend.log` (ignored diagnostic).
+The final Sonar metric remains pending a new scan. No generated code, runtime, rules, thresholds
+or exclusions changed. Backend, PostgreSQL and provider checks were not repeated; the acceptance
+DB remains untouched. Fresh reviews and CI on the resulting commit remain required; do not merge.
+
 ## Publication
 
 Create a codex/any-818 branch, commit only the explicit feature file set, push and create a PR
