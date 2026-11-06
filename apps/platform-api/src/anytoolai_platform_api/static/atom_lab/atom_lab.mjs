@@ -2952,9 +2952,10 @@ export function bootstrapAtomLab({
   const setRunState = (message, tone = "neutral", help = "") => {
     nodes["run-state"].textContent = message;
     nodes["run-status"].dataset.tone = tone;
-    const previousResult = tone !== "success" && !nodes["result-section"].hidden
-      ? "Ниже показан результат предыдущего принятого запуска." : "";
-    nodes["run-status-help"].textContent = [help, previousResult].filter(Boolean).join(" ");
+    const responseSource = displayedSubmission
+      ? `Ниже показаны данные ${displayedSubmission === activeSubmission ? "" : "предыдущего "}принятого запуска ${displayedSubmission.runId}.`
+      : "";
+    nodes["run-status-help"].textContent = [help, responseSource].filter(Boolean).join(" ");
   };
 
   const setAcceptedRunState = (status, errorCode = null) => {

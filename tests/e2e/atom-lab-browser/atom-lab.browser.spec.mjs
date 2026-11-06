@@ -1523,10 +1523,128 @@ test("a rejected next submission never replaces the previously accepted run card
 
   await expect(page.locator("#run-state")).toContainText("lab_invalid_request");
   await expect(page.locator("#run-status")).toHaveAttribute("data-tone", "error");
-  await expect(page.locator("#run-status-help")).toContainText("результат предыдущего принятого запуска");
+  await expect(page.locator("#run-status-help")).toContainText("данные предыдущего принятого запуска run-a");
   await expect(page.locator("#submitted-snapshot")).toContainText(A05.prompt);
   await expect(page.locator("#run-diagnostics")).toContainText("artifact-a");
 });
+
+for (const outcome of ["success", "invalid", "diagnostics"]) {
+  for (const rejection of ["quota", "validation", "network"]) {
+    test(`retained ${outcome} data identifies its accepted run after an identical ${rejection} submission`, async ({page}) => {
+      const sourceRunId = "atom_lab_run_01730885400000000000_0000000001_0123456789abcdef0123456789abcdef";
+      const bodies = [];
+      let rejectSubmission;
+      const rejected = new Promise(resolve => { rejectSubmission = resolve; });
+      let finishNextRun;
+      const nextRun = new Promise(resolve => { finishNextRun = resolve; });
+      await page.route("http://atom-lab.test/v1/atom-lab/runs", async route => {
+        bodies.push(route.request().postDataJSON());
+        if (bodies.length === 2) {
+          await rejected;
+          if (rejection === "network") await route.abort("connectionfailed");
+          else await route.fulfill({status: rejection === "quota" ? 429 : 422, json: {
+            error: {code: rejection === "quota" ? "quota_exhausted" : "lab_invalid_request", message: "Run B rejected.", field_errors: []},
+            request_id: "request-b",
+          }});
+          return;
+        }
+        const suffix = bodies.length === 1 ? "source" : "next";
+        await route.fulfill({status: 202, json: {
+          run_id: suffix === "source" ? sourceRunId : "run-next", scenario_session_id: `session-${suffix}`, job_id: `job-${suffix}`, status: "queued",
+        }});
+      });
+      await page.route(`http://atom-lab.test/v1/atom-lab/runs/${sourceRunId}`, async route => {
+        const detail = historyDetail({runId: sourceRunId, prompt: A06.prompt, reasoningEffort: null});
+        detail.runtime_ids = {scenario_session_id: "session-source", job_id: "job-source", action_run_id: "action-source", artifact_id: outcome === "success" ? "artifact-source" : null};
+        detail.diagnostics.physical_calls = 3;
+        if (outcome !== "success") {
+          detail.status = "failed";
+          detail.result = null;
+          detail.diagnostics.error_code = outcome === "invalid" ? "structured_output_validation_failed" : "provider_unavailable";
+          detail.diagnostics.debug_artifacts = outcome === "invalid" ? [{
+            artifact_id: "debug-source", error_code: detail.diagnostics.error_code,
+            raw_output_text: "<invalid>Ответ запуска A</invalid>", truncated: true, redacted: true,
+          }] : [];
+        }
+        await route.fulfill({json: detail});
+      });
+      await page.route("http://atom-lab.test/v1/atom-lab/runs/run-next", async route => {
+        await nextRun;
+        const detail = historyDetail({runId: "run-next", prompt: A06.prompt, reasoningEffort: null});
+        detail.runtime_ids = {scenario_session_id: "session-next", job_id: "job-next", action_run_id: "action-next", artifact_id: "artifact-next"};
+        detail.result = {summary: "Новый результат C"};
+        await route.fulfill({json: detail});
+      });
+      await unlockAtom(page, "A06");
+      await page.locator("#fill-example").click();
+      await page.locator("#run-button").click();
+      await expect(page.locator("#run-button")).toBeEnabled();
+      await expect(page.locator("#run-state")).toContainText(outcome === "success" ? "Завершён успешно" : "Ошибка");
+      await expect(page.locator("#run-status-help")).toContainText(`данные принятого запуска ${sourceRunId}`);
+      await expect(page.locator("#run-status-help")).not.toContainText("предыдущего");
+      await expect(page.locator("#result-section"))[outcome === "success" ? "toBeVisible" : "toBeHidden"]();
+      await expect(page.locator("#invalid-response"))[outcome === "invalid" ? "toBeVisible" : "toBeHidden"]();
+      if (outcome === "invalid") await expect(page.locator("#invalid-response")).toContainText("Сырой ответ обрезан");
+      await expect(page.locator("#run-metadata-section")).toBeVisible();
+      await expect(page.locator("#run-metadata dl > div").filter({hasText: "Вызовов провайдера"})).toHaveText("Вызовов провайдера3");
+      const retained = new Map();
+      for (const id of ["submitted-snapshot", "run-diagnostics", "run-metadata", "result-json", "invalid-response-raw"]) {
+        retained.set(id, await page.locator(`#${id}`).textContent());
+      }
+      await expect(page.locator("#submitted-snapshot")).toBeHidden();
+      await expect(page.locator("#response-draft-warning")).toBeHidden();
+
+      await page.locator("#run-button").click();
+      await expect(page.locator("#run-state")).toHaveText("Отправка запуска…");
+      await expect(page.locator("#run-status-help")).toContainText(`данные предыдущего принятого запуска ${sourceRunId}`);
+      rejectSubmission();
+      if (rejection === "network") await expect(page.locator("#retry-submit")).toBeVisible();
+      else await expect(page.locator("#run-state")).toContainText(rejection === "quota" ? "quota_exhausted" : "lab_invalid_request");
+      expect(bodies).toHaveLength(2);
+      expect(bodies[1]).toEqual(bodies[0]);
+      for (const [id, text] of retained) await expect(page.locator(`#${id}`)).toHaveText(text);
+      await expect(page.locator("#run-metadata-section")).toBeVisible();
+      await expect(page.locator("#result-section"))[outcome === "success" ? "toBeVisible" : "toBeHidden"]();
+      await expect(page.locator("#invalid-response"))[outcome === "invalid" ? "toBeVisible" : "toBeHidden"]();
+      await expect(page.locator("#run-status-help")).toBeVisible();
+      await expect(page.locator("#run-status-help")).toContainText(`данные предыдущего принятого запуска ${sourceRunId}`);
+      await expect(page.locator("#response-draft-warning")).toBeHidden();
+      if (outcome === "invalid" && rejection === "quota") {
+        for (const width of [1280, 320]) {
+          await page.setViewportSize({width, height: 1000});
+          expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+          expect(await page.locator("#run-status-help").evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
+        }
+        await page.locator(".result-card").screenshot({path: test.info().outputPath("invalid-quota-320.png")});
+      }
+      await page.locator("#prompt-tab").click();
+      await expect(page.locator("#run-prompt-ref")).toHaveText(A06.prompt_ref);
+      await page.locator("#prompt-editor").fill("Изменённый после отклонения черновик");
+      await expect(page.locator("#response-draft-warning")).toBeVisible();
+      await page.locator("#prompt-editor").fill(A06.prompt);
+      await expect(page.locator("#response-draft-warning")).toBeHidden();
+      await expect(page.locator("#run-status-help")).toContainText(`данные предыдущего принятого запуска ${sourceRunId}`);
+
+      await page.locator(rejection === "network" ? "#retry-submit" : "#run-button").click();
+      await expect(page.locator("#run-state")).toHaveText("Ожидает запуска");
+      await expect(page.locator("#run-status-help")).toContainText("данные принятого запуска run-next");
+      await expect(page.locator("#run-status-help")).not.toContainText("предыдущего");
+      await expect(page.locator("#run-diagnostics")).toContainText("session-next");
+      await expect(page.locator("#run-diagnostics")).not.toContainText(sourceRunId);
+      await expect(page.locator("#result-section")).toBeHidden();
+      await expect(page.locator("#invalid-response")).toBeHidden();
+      finishNextRun();
+      await expect(page.locator("#run-state")).toHaveText("Завершён успешно");
+      await expect(page.locator("#result-readable")).toContainText("Новый результат C");
+      await expect(page.locator("#run-diagnostics")).toContainText("artifact-next");
+      await expect(page.locator("#run-status-help")).toContainText("данные принятого запуска run-next");
+      await expect(page.locator("#run-status-help")).not.toContainText("предыдущего");
+      await expect(page.locator("#response-draft-warning")).toBeHidden();
+      expect(bodies).toHaveLength(3);
+      expect(bodies[2]).toEqual(bodies[0]);
+    });
+  }
+}
 
 test("accepted runtime IDs are visible before the protected detail read returns", async ({page}) => {
   let releaseDetail;

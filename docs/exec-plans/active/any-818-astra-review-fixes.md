@@ -364,3 +364,54 @@ Only five intended files changed; staging is empty and unrelated untracked repor
 are preserved. Full backend/production PostgreSQL, required CI and the next fresh
 independent review remain with the parent. No dependencies, Sonar rules/thresholds,
 API schemas, generated files, working DB, migration, deployment or provider call changed.
+
+## Final P3: attribution of retained accepted-run data
+
+Doctor passed before edits on 2026-11-07. Reproduce PR #259 discussion
+`discussion_r4496503470`: an invalid accepted run A retains raw output and provider-call
+metadata after an identical request B is rejected for quota, without a visible source
+marker because the successful-result section is hidden.
+
+Reach: the shared run-status attribution in `atom_lab.mjs`, Chromium regressions and
+this plan. Use the existing displayed/active submission identities so all retained
+accepted-run data has a visible run ID, including invalid output and metadata-only
+failures. Keep accepted configuration, source, full JSON, IDs and diagnostics intact;
+preserve the separate semantic draft warning. A new accepted run replaces the source.
+
+First prove the regression with mocked Chromium transport, then make the smallest
+shared fix and cover successful, invalid and diagnostic-only runs across quota,
+validation and network outcomes. Run focused Chromium, canonical `frontend-check`,
+documentation generation/validation and diff checks. No backend changes, working DB,
+migration, provider calls, dependencies, Sonar changes, staging, commit or push.
+
+The exact Chromium regression failed before production edits: invalid A's raw text,
+metadata and IDs were retained after identical B's quota rejection, while the visible
+help contained only the rejection guidance. Shared status help now always names the
+displayed accepted run and marks it as previous when its submission differs from the
+active submission. It no longer depends on success tone or result-section visibility.
+The separate draft warning still follows semantic configuration changes.
+
+A real-format long run ID also reproduced horizontal overflow (1454px at a 1280px
+viewport). The existing help rule now wraps long tokens. Chromium verifies the narrow
+desktop response column and a 320px viewport without page or help overflow. An ignored
+320px screenshot is saved at `.quick-check-tmp/atom-lab-invalid-quota-320.png`.
+
+Verification (2026-11-07):
+
+- Final focused Chromium: 14 passed, including nine success/invalid/metadata-only ×
+  quota/validation/network cases. They check identical requests, visible source text,
+  raw/result/metadata visibility and retention, unchanged full JSON/config/IDs/source,
+  draft edits/reverts and a newly accepted run's replacement identity.
+- Canonical `python scripts/agent/runner.py frontend-check`: passed lint, typecheck,
+  171 Chromium journeys, 53 Atom Lab Node tests, six demo Node tests, 824 Vitest tests,
+  generated API-type drift and production builds. The final focused run also covers
+  the explicit panel-visibility assertions added after full-suite discovery.
+- `validate-docs`, `generate-docs --check`, and `git diff --check`: passed.
+
+The identical frontend command passed with escalation after the sandbox denied the
+pnpm-store symlink. Documentation generation passed with its temporary directory
+inside the ignored workspace directory and the bundled LiteLLM cost map. Four intended
+files changed, staging is empty and unrelated untracked reports remain untouched.
+No backend/API, schema, generated artifact, dependency, Sonar setting, working DB,
+migration, provider call, deployment, commit or push changed. Full backend/PostgreSQL,
+required CI and a fresh independent review remain with the parent.
