@@ -1688,6 +1688,8 @@ export function bootstrapAtomLab({
       return sameJson(getDraftPayload(session), submission.body.input);
     }
     if (path === "prompt") return session.prompt === submission.body.prompt;
+    if (path === "prompt_source_ref") return session === submission.ownerSession
+      && catalog.includes(session.atom) && promptRefFor(session) === submission.body.prompt_source_ref;
     return false;
   };
 
@@ -2773,12 +2775,13 @@ export function bootstrapAtomLab({
   };
 
   const renderHistoryList = () => {
-    nodes["history-record"].hidden = selectedHistoryDetail === null
+    nodes["history-record"].hidden = selectedHistoryDetail?.run_id !== selectedHistoryRunId
       || !historyItems.some(run => run.run_id === selectedHistoryRunId);
     nodes["history-panel"].append(nodes["history-record"]);
     nodes["history-list"].replaceChildren();
     for (const run of historyItems) {
       const selected = run.run_id === selectedHistoryRunId;
+      const expanded = selected && !nodes["history-record"].hidden;
       const row = document.createElement("tr");
       row.dataset.selected = String(selected);
       const date = document.createElement("td");
@@ -2786,7 +2789,7 @@ export function bootstrapAtomLab({
       const item = button(document, formatLabDate(run.created_at), () => openHistoryRun(run.run_id));
       item.className = "history-open";
       item.dataset.runId = run.run_id;
-      item.setAttribute("aria-expanded", String(selected));
+      item.setAttribute("aria-expanded", String(expanded));
       item.setAttribute("aria-controls", "history-record");
       item.setAttribute("aria-current", String(selected));
       date.append(item);
@@ -2810,7 +2813,7 @@ export function bootstrapAtomLab({
       }
       row.append(date, atom, status, model);
       nodes["history-list"].append(row);
-      if (selected) {
+      if (expanded) {
         const details = document.createElement("tr");
         const cell = document.createElement("td");
         cell.colSpan = 4;
@@ -2879,7 +2882,7 @@ export function bootstrapAtomLab({
     if (selectedHistoryDetail?.status === "queued" || selectedHistoryDetail?.status === "running") {
       selectedHistoryDetail = null;
       selectedHistoryCompatible = false;
-      nodes["history-record"].hidden = true;
+      renderHistoryList();
     }
     nodes["history-list-state"].textContent = "Загрузка истории…";
     updateHistoryControls();
@@ -2961,7 +2964,7 @@ export function bootstrapAtomLab({
       nodes["restore-history"].textContent = compatible ? "Восстановить запрос в лаборатории" : "Адаптировать к текущему контракту";
     } catch (error) {
       if (generation !== historyOpenGeneration) return;
-      nodes["history-error"].textContent = error instanceof Error ? error.message : "Не удалось открыть запуск.";
+      nodes["history-error"].textContent = `${error instanceof Error ? error.message : "Не удалось открыть запуск."} Повторите чтение кнопкой даты запуска.`;
     } finally {
       if (generation === historyOpenGeneration) {
         historyOpenInFlight = false;
@@ -3257,16 +3260,24 @@ export function bootstrapAtomLab({
                 ? "reasoning-effort"
                 : path === "prompt"
                   ? "prompt-editor"
-                  : undefined,
+                  : path === "prompt_source_ref"
+                    ? "prompt-select"
+                    : undefined,
           }));
         renderValidation(document, nodes["validation-errors"], session, admissionErrors);
         if (session === submission.ownerSession && !nodes["request-response"].hidden
-          && admissionErrors.some(({path}) => path === "prompt")) showInputTab(false);
+          && admissionErrors.some(({path}) => path === "prompt" || path === "prompt_source_ref")) showInputTab(false);
         setRunState(
           `${code}: ${error?.message ?? safeApiMessage(payload, "Запуск не принят.")} Черновик сохранён.`,
           "error", "Исправьте параметры перед следующей отправкой.",
         );
         activeSubmission = null;
+        if (code === "prompt_source_invalid" && admissionErrors.some(({path}) => path === "prompt_source_ref")) {
+          session.promptSourceNeedsValidation = true;
+          updatePresetEditorDisabled();
+          if (presetEditorActive) renderPresetState();
+          void loadPromptOptions({refresh: true});
+        }
         return;
       }
       const accepted = parseAcceptedRun(payload);
@@ -3396,7 +3407,7 @@ export function bootstrapAtomLab({
   };
 
   const reconcilePromptSource = (draft, options) => {
-    draft.promptSourceDetached = !options.some((option) => option.ref === draft.promptSourceRef);
+    draft.promptSourceDetached = !options.some((option) => option.ref === promptRefFor(draft));
     if (draft.promptSourceDetached) draft.promptSourceRef = null;
     draft.promptSourceNeedsValidation = false;
   };
@@ -3486,6 +3497,7 @@ export function bootstrapAtomLab({
       renderPromptOptions();
       nodes["prompt-load-status"].textContent = "";
       if (reconcileSource) {
+        refreshAdmissionValidation();
         updateRunButton();
         updatePresetEditorDisabled();
         if (presetEditorActive) renderPresetState();

@@ -102,7 +102,7 @@ button:hover:where(:not(.primary-action)) { background: #eef2ff; border-color: #
 .library-grid { align-items: start; display: grid; gap: 1rem; grid-template-columns: minmax(15rem, 2fr) minmax(20rem, 3fr); }
 .library-grid > section { display: grid; gap: 0.65rem; min-width: 0; }
 .item-list { display: grid; gap: 0.45rem; }
-.item-list button { display: grid; gap: 0.2rem; text-align: left; width: 100%; }
+.item-list button { display: grid; gap: 0.2rem; overflow-wrap: anywhere; text-align: left; width: 100%; }
 .item-list button[aria-current="true"] { background: #e7eaff; border-color: #5968d9; }
 .item-list small { color: #5f6b85; }
 .item-list button[aria-current="true"] small { color: #4d5b76; }
