@@ -4,7 +4,7 @@ Delivery baseline: merged [PR #256](https://github.com/gushinets/anytoolai-platf
 `4cd2e0aa39b67d648cd40540db0a59a2559fd4f2` (the same tree as `7c93c0db`), includes stage-5 tests and
 the cutover procedure. Production activation is not claimed. The
 [execution plan](../exec-plans/completed/ANY-507-implementation-plan.md#10-stage-5-checkpoint--2026-11-04)
-records historical verification and limits; [ANY-814](../exec-plans/active/ANY-814-post-merge-recovery-fixes.md)
+records historical verification and limits; [ANY-814](../exec-plans/completed/ANY-814-post-merge-recovery-fixes.md)
 tracks subsequent replay/client recovery changes. [ANY-766](https://linear.app/paveldik/issue/ANY-766)
 owns the consuming integration and must pin the actual version it uses.
 

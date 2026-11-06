@@ -2,12 +2,12 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: Vyacheslav
 - Created: 2026-11-05
 - Last updated: 2026-11-06
 - Review date: 2026-11-06
-- Next action: merge PR #257 once GitHub's final-head requirements are satisfied.
+- Next action: none for implementation; PR #257 follows GitHub's merge requirements.
 - Blocker: none in the implementation; local validation limitations are recorded below.
 - Required CI and review: completed for implementation head `85abcb92`.
 - Issue: [ANY-814](https://linear.app/paveldik/issue/ANY-814).

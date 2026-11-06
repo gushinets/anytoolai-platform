@@ -15,7 +15,7 @@
 The mechanism and stage-5 verification were delivered in merged [PR #256](https://github.com/gushinets/anytoolai-platform/pull/256)
 at `4cd2e0aa39b67d648cd40540db0a59a2559fd4f2` (the same tree as delivery `7c93c0db`).
 The stage baselines and validation checkpoints below are historical evidence, not current blockers.
-[ANY-814](../active/ANY-814-post-merge-recovery-fixes.md) owns subsequent replay/client recovery changes.
+[ANY-814](ANY-814-post-merge-recovery-fixes.md) owns subsequent replay/client recovery changes.
 ANY-766 retains paid HTTP/access and interservice integration; production activation is not claimed.
 
 Sources: [ANY-507](https://linear.app/paveldik/issue/ANY-507),
