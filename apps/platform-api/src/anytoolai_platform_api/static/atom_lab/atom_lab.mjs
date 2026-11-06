@@ -3012,6 +3012,9 @@ export function bootstrapAtomLab({
       renderReadableResult(document, nodes["result-readable"], detail.result);
       nodes["result-json"].textContent = JSON.stringify(detail.result, null, 2);
       submission.ownerSession.promptTrial = {runId: submission.runId, snapshot: submission.snapshot};
+      if (session && matchesDraftSnapshot(submission.snapshot)) {
+        session.promptTrial = submission.ownerSession.promptTrial;
+      }
     }
     const debugArtifact = (diagnostics.debug_artifacts ?? [])[0];
     const invalid = detail.status === "failed" && Boolean(debugArtifact);

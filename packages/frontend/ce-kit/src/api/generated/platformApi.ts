@@ -738,17 +738,6 @@ export interface components {
             /** Version */
             version: number;
         };
-        /** AtomLabPromptCreateRequest */
-        AtomLabPromptCreateRequest: {
-            /** Name */
-            name: string;
-            /** Prompt */
-            prompt: string;
-            /** Source Ref */
-            source_ref: string;
-            /** Source Run Id */
-            source_run_id?: string | null;
-        };
         /** AtomLabPromptOption */
         AtomLabPromptOption: {
             /**
@@ -1585,7 +1574,16 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AtomLabPromptCreateRequest"];
+                "application/json": {
+                    /** Name */
+                    name: string;
+                    /** Prompt */
+                    prompt: string;
+                    /** Source Ref */
+                    source_ref: string;
+                    /** Source Run Id */
+                    source_run_id?: string | null;
+                };
             };
         };
         responses: {
@@ -1608,6 +1606,15 @@ export interface operations {
                 };
             };
             404: components["responses"]["AtomLabAtomNotFound"];
+            /** @description Atom Lab payload is too large. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
             /** @description Atom Lab request validation failed. */
             422: {
                 headers: {

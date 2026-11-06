@@ -5,7 +5,7 @@
 - State: active
 - Owner: agent
 - Created: 2026-11-06
-- Last updated: 2026-11-06
+- Last updated: 2026-11-07
 - Review date: 2026-11-06
 - Next action: parent review, commit and push, then fresh independent Astra review and CI.
 - Blocker: none.
@@ -129,3 +129,60 @@ The first frontend-check attempt hit the sandbox's pnpm-store symlink permission
 the same canonical command passed with escalation. SQLite tests used the existing
 managed interpreter and `runner.baseline_env()` outside the sandbox, with the bundled
 LiteLLM cost map. No working DB, provider, deployment, migration, commit or push was used.
+
+## Final review follow-up: prompt admission and delayed trial completion
+
+Doctor passed before edits on 2026-11-07. Reproduce and repair two remaining findings:
+
+1. Authenticate saved-prompt creation before consuming any request bytes, then bound
+   the request stream with the existing configured run body budget before JSON parsing.
+   Preserve configured UTF-8 prompt limits, access modes, error envelopes and OpenAPI.
+2. Carry an actual successful trial to the active editor after an equivalent preset
+   readback replaces its session. Require an exact immutable snapshot match; changed
+   drafts and unrelated late operations must retain their current state.
+
+Reach: Atom Lab router admission helpers and prompt operation, API stream regressions,
+editor configuration/completion handling, preset creation/version Chromium regressions,
+and generated contracts only if the API schema changes. No new dependencies or settings.
+
+Validation: prove focused regressions fail first, then run connected API/docs/architecture
+checks, canonical frontend-check, generation drift and diff checks. Use isolated SQLite
+fixtures and mocked browser transport only; no acceptance DB, provider calls, commit or push.
+
+Both findings are repaired and verified. The unauthorized 1 MiB stream regression
+first consumed all chunks before returning 401; it now reads zero bytes in protected
+and untrusted no-code access modes. Prompt creation and run admission share the same
+bounded stream reader. Prompt JSON validation retains the `request_validation_failed`
+envelope, and the configured UTF-8 prompt validator still owns prompt byte limits.
+Authorized tests cover chunked, actual and falsely short Content-Length, exact/over
+body boundaries, code access, local same-origin access and origin-free local CLI access.
+
+Delayed successful completion now copies actual trial evidence to the active session
+only when its immutable request snapshot matches exactly. Chromium covers completion
+before and after preset readback, both new presets and new versions, failed output
+validation, changed text/source/input/model/reasoning and navigation to another atom.
+All cases use one mocked run submission; no provider rerun or unknown source-run
+inference is involved.
+
+The wire request fields and constraints are unchanged. FastAPI now represents the
+manually bounded prompt request schema inline, as it already does for run admission;
+the only semantic OpenAPI addition is the documented 413 error envelope. A regression
+checks the complete request schema and 413 response. Canonical OpenAPI, Markdown and
+CE-kit types were regenerated without hand edits or exporter special cases.
+
+Final verification (2026-11-07):
+
+- Connected API/catalog/history/presets/access, docs generation and Atom Lab architecture:
+  434 passed in 216.16 seconds; the subsequently added exact OpenAPI contract check also passed.
+- Canonical `frontend-check`: passed lint, typecheck, 131 Chromium journeys, all
+  Node/Vitest suites, API-type drift and production builds.
+- `validate-docs`, `generate-docs --check`, and `git diff --check`: passed.
+- Ruff comparison for the three changed Python files: seven existing diagnostics,
+  no new diagnostics versus HEAD.
+
+The sandbox again stalled isolated API setup and denied documentation Temp writes;
+the same checks passed with escalation. The managed Python environment used
+`runner.baseline_env()` and the bundled LiteLLM model cost map; Chromium used the
+installed browser cache. Production PostgreSQL, full backend CI, clean independent
+review, commit and push remain with the parent. No acceptance data, dependency,
+Sonar rule/threshold/exclusion, deployment, migration or paid provider was changed.

@@ -98,6 +98,7 @@ from anytoolai_platform_core.providers.models import (
 )
 from anytoolai_platform_core.storage.transactions import transaction_boundary
 from fastapi import APIRouter, Depends, Header, Query, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, HTMLResponse
 from jsonschema import ValidationError as JsonSchemaValidationError
 from jsonschema import validate as validate_json_schema
@@ -181,11 +182,7 @@ async def _read_run_payload(
     key = request.headers.get("Idempotency-Key")
     if key is None or not key.strip() or len(key) > _IDEMPOTENCY_KEY_MAX_LENGTH:
         raise _run_error(HTTPStatus.UNPROCESSABLE_ENTITY, "input_invalid", "Idempotency-Key")
-    raw = bytearray()
-    async for chunk in request.stream():
-        if len(raw) + len(chunk) > settings.atom_lab_run_body_max_bytes:
-            raise _run_error(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "payload_too_large")
-        raw.extend(chunk)
+    raw = await _read_atom_lab_body(request, settings)
     try:
         payload = AtomLabRunRequest.model_validate_json(raw)
         _run_input_bytes(payload)
@@ -208,6 +205,28 @@ async def _read_run_payload(
     if not payload.prompt.strip():
         raise _run_error(HTTPStatus.UNPROCESSABLE_ENTITY, "input_invalid", "prompt")
     return payload
+
+
+async def _read_atom_lab_body(request: Request, settings: Settings) -> bytearray:
+    raw = bytearray()
+    async for chunk in request.stream():
+        if len(raw) + len(chunk) > settings.atom_lab_run_body_max_bytes:
+            raise _run_error(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "payload_too_large")
+        raw.extend(chunk)
+    return raw
+
+
+async def _read_prompt_payload(
+    request: Request,
+    settings: Annotated[Settings, Depends(get_atom_lab_run_settings)],
+) -> AtomLabPromptCreateRequest:
+    raw = await _read_atom_lab_body(request, settings)
+    try:
+        return AtomLabPromptCreateRequest.model_validate_json(raw)
+    except ValidationError as exc:
+        raise RequestValidationError([
+            {**error, "loc": ("body", *error["loc"])} for error in exc.errors()
+        ]) from exc
 
 
 def _contains_nul(value: Any) -> bool:
@@ -673,10 +692,21 @@ def list_atom_prompts(
     "/atoms/{atom_id}/prompts",
     status_code=HTTPStatus.CREATED,
     response_model=AtomLabPromptOption,
-    responses={**_ERROR_RESPONSES, 404: _ATOM_NOT_FOUND_RESPONSE},
+    responses={
+        **_ERROR_RESPONSES, 404: _ATOM_NOT_FOUND_RESPONSE,
+        413: {"model": AtomLabErrorResponse, "description": "Atom Lab payload is too large."},
+    },
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {"application/json": {
+                "schema": AtomLabPromptCreateRequest.model_json_schema(),
+            }},
+        }
+    },
 )
 def create_atom_prompt(
-    payload: AtomLabPromptCreateRequest,
+    payload: Annotated[AtomLabPromptCreateRequest, Depends(_read_prompt_payload)],
     atom: Annotated[AtomLabAtomResponse, Depends(get_atom)],
     registry: Annotated[ConfigRegistry, Depends(get_config_registry)],
     session_factory: Annotated[Any, Depends(get_atom_lab_session_factory)],
