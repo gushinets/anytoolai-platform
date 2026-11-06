@@ -10,9 +10,7 @@ LINEAR_SECTION_PATTERN = re.compile(
     r"^## Linear issue[ \t]*\r?\n(?P<content>.*?)(?=^## |\Z)",
     re.MULTILINE | re.DOTALL,
 )
-FENCE_PATTERN = re.compile(
-    r"^ {0,3}(?P<marker>`{3,}|~{3,})(?P<rest>[^\r\n]*)(?:\r?\n)?$"
-)
+FENCE_PATTERN = re.compile(r"^ {0,3}(?P<marker>`{3,}+|~{3,}+)(?P<rest>[^\r\n]*)$")
 LINEAR_URL_PATTERN = re.compile(
     r"https://linear\.app/paveldik/issue/(ANY-[1-9][0-9]*)(?=/|[\s<]|$)"
     r"(?:/[^\s<]*)?"
@@ -28,7 +26,7 @@ def _without_fenced_code_blocks(markdown: str) -> str:
     fence_character = ""
     fence_length = 0
     for line in markdown.splitlines(keepends=True):
-        fence_match = FENCE_PATTERN.fullmatch(line)
+        fence_match = FENCE_PATTERN.fullmatch(line.removesuffix("\n").removesuffix("\r"))
         if fence_character:
             if fence_match is not None:
                 marker = fence_match.group("marker")
