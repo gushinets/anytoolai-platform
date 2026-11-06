@@ -2,12 +2,12 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: mixed
 - Created: 2026-11-03
 - Last updated: 2026-11-06
 - Review date: 2026-11-06
-- Next action: owner review of completed product acceptance; further tooling hardening is deferred
+- Next action: none for this iteration; archived at the owner's request on 2026-11-06.
 - Blocker: no new product defect established by round 6; evidence limitations remain documented
 
 ## Goal and scope
@@ -1073,3 +1073,9 @@ whitespace checks pass. A preceding quick-check also passed before the last two 
 No live browser/provider calls, GitHub writes, commit or push. Raw acceptance records and human
 verdicts remain untouched. Legacy evidence missing required identity/proof stays unverified on
 recomputation; the recorded source identity does not attest a running container image.
+
+## Archive decision — 2026-11-06
+
+The owner requested moving this plan to completed. Existing acceptance caveats, deferred
+tooling limitations and validation results remain recorded above. This archive operation
+does not change Linear statuses or certify a default-model rollout.
