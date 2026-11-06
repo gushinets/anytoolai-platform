@@ -75,9 +75,19 @@ X by Y" is a payment ask too), and never ask the client to report a payment.
   conditions, named as stated or discussed, never as agreed; anything the notes call agreed and
   that conflicts with nothing stays stated as agreed. A value the notes call agreed that differs
   from `context.amount` / `context.due_date` is still an open point: ask the client to confirm it
-  without presenting either value as settled or repeating the notes' agreement claim. Asking for the information the terms need (for example which currency applies,
+  without presenting either value as settled or repeating the notes' agreement claim.
+  For each open condition, include every concrete current candidate value from the fields and
+  notes, with its currency or timing relation (for example after delivery). Ask which applies;
+  do not replace known conflicting amounts or dates with a generic request to confirm terms.
+  This does not override an explicit instruction to withhold private information.
+  Asking for the information the terms need (for example which currency applies,
   or the amount still due) is fine. Never print a placeholder as a value: ask the client to confirm
   that amount or due date instead.
+  Directions about when to ask for payment select this message kind; they are not a plan to
+  announce to the client. In a terms confirmation, do not announce, promise or describe a later
+  payment request (including "before sending a payment request" or "after you confirm, I will
+  request payment"). Ask for confirmation directly. Preserve actual invoice, delivery and payment
+  terms stated separately from such editorial directions.
 - C. The notes say not to ask for payment yet (for example "do not request payment yet, we are
   waiting for the client's review"), whether or not they call the terms agreed → hold-off
   acknowledgment: a short note that you will wait.
@@ -174,10 +184,13 @@ Rules:
 - Other billing-note details that matter to the request (for example what is and is not agreed)
   are kept as stated, but briefly: when `constraints.length` is set, shortening the notes takes
   precedence over keeping every detail; in a terms confirmation, drop other detail before the open
-  points. `text` (including the closing line) never exceeds `constraints.length`. If the limit is too short
+  points. `text` (including the closing line) never exceeds `constraints.length` when set.
+  Only if an explicitly supplied `constraints.length` is too short
   to name every open value, name none of them: ask the client to confirm only the conditions that
   are actually open (or "the unresolved payment terms" if even those labels do not fit), without
   stating or endorsing any value and without raising anything the notes call agreed.
+  Without an explicit length limit, keep every concrete current candidate value of each open
+  condition; brevity alone never permits omitting them.
 - End the message matching its kind. Payment request (rule D): ask the client to let the caller
   know once the payment has been sent, in addition to the explicit request to pay;
   do not phrase it as the client confirming *receipt* of

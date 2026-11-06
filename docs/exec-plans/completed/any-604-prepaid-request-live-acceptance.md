@@ -7,10 +7,117 @@
 - Created: 2026-11-06
 - Last updated: 2026-11-06
 - Review date: 2026-11-06
-- Next action: owner reviews notes priority and U2/U3 results; full current-revision matrix not rerun
-- Blocker: no U2/U3 failure in the latest series; A01/A04/U1 not rerun on this prompt revision
+- Next action: owner reviews the A04 editorial-sequence correction and new targeted evidence; language work remains in ANY-771
+- Blocker: no full-matrix verification on the latest prompt; see targeted A04 result below
 
-## Latest result — review round 3
+## Latest result — omit future payment-request narration
+
+**PASS: 9/9 (targeted A04 including no payment-request preview).** Nine fresh browser submissions on the new prompt, RU/EN/ES three each.
+The prompt now treats directions about when to ask for payment as message selection, not as
+client-facing future actions. Confirmation asks directly about the disputed terms; actual invoice,
+delivery and payment terms still belong in the message. The preceding candidate-value rule remains.
+
+| Language | A04 result |
+| --- | --- |
+| RU | 3/3 |
+| EN | 3/3 |
+| ES | 3/3 |
+
+This is a local change on base commit `0f52903b083e8e019fb02d763b76ce111dbf17da`; the base SHA alone does not identify
+the tested prompt. The worker prompt matches the checkout and has a new hash; workflow/router/model
+are unchanged. Every attempt has one successful A06, a text-only result and exact backend/UI/clipboard
+equality. Actual POST inputs match the frozen cases with no language/length constraint, and
+result/action/session IDs correlate. There are 11 physical calls, estimated USD 0.00477517, all retained.
+A04-ES-1 and A04-ES-2 each have two physical calls (semantic attempts 1 and 2).
+The exact internal retry causes are not established by the captured evidence; both calls and costs
+are retained. No browser attempt was resubmitted or replaced.
+
+All nine final outputs retain both USD 1,000 / USD 1,200 and 7 / 20 October 2026 with the
+original after-delivery relation, ask only for confirmation, and omit later payment-request
+narration. No additional wording caveat was found in this sample. Complete outputs and semantic
+assessments appear below, including the no-preview check.
+
+Prior A04 responses with editorial phrases and all earlier FAILs are unchanged. A01/U1/U2/U3
+were **not rerun on this hash**; no current full-matrix PASS is claimed. The English-to-Spanish
+issue remains assigned to [ANY-771](https://linear.app/paveldik/issue/ANY-771), and the historical
+U3-RU-3 typo remains recorded. Finite samples do not establish a universal generation guarantee.
+
+## Preceding result — A04 confirmation-values fix
+
+**PASS: 9/9 (targeted A04 only).** Nine new browser submissions on the changed prompt, three each in RU/EN/ES.
+This is a local prompt change on base commit `0f52903b083e8e019fb02d763b76ce111dbf17da`, not the prompt committed at that SHA.
+Worker prompt/workflow/router were verified against the checkout before submissions. Workflow,
+router and model are unchanged; the prompt hash differs from the historical complete matrix.
+
+The confirmation rule now requires every known current candidate with currency and timing relation.
+Omission for brevity is allowed only when an explicitly supplied length limit cannot fit the values;
+privacy instructions and the ban on asking for payment retain precedence.
+
+There are 9 physical provider calls, estimated total USD 0.00412640; all are retained in JSON.
+All nine attempts retain one successful A06, text-only output and exact backend/UI/clipboard equality.
+Both USD 1,000 / USD 1,200 and 7 / 20 October 2026 must appear as disputed alternatives;
+after-delivery meaning, confirmation-only behavior and language are assessed from complete outputs below.
+
+| Case | RU | EN | ES |
+| --- | --- | --- | --- |
+| A04 — disputed values and confirmation only | 3/3 | 3/3 | 3/3 |
+
+Minor instruction-following caveat: A04-RU-3, A04-ES-1 and A04-ES-3 unnecessarily repeat
+“before sending a payment request” from the editorial notes. This conflicts with the prompt's
+non-reporting preference but is not a payment demand and does not alter the disputed terms.
+Their targeted A04 criteria pass; this is not a claim of flawless prompt compliance. Keep this
+as wording polish for the next product-feedback iteration, without changing raw outputs.
+Actual POST bodies match every frozen input; no language/length constraint was submitted.
+Result, action and session IDs were correlated for all nine attempts.
+
+A01/U1/U2/U3 were **not rerun on this prompt hash**. The earlier 41/45 matrix and its four FAILs
+remain historical evidence, not a current full-matrix result. A01 English-to-Spanish remediation
+remains assigned to [ANY-771](https://linear.app/paveldik/issue/ANY-771); no language fix is claimed.
+The historical U3-RU-3 spelling caveat remains unchanged. Finite samples are not a universal guarantee.
+
+## Historical complete matrix — notes-priority prompt
+
+**FAIL: 41/45 on the notes-priority prompt from commit `0f52903b083e8e019fb02d763b76ce111dbf17da`.**
+This combines 27 fresh A01/A04/U1 attempts with 18 preceding review-3 U2/U3 attempts.
+All five cases cover RU/EN/ES, three attempts each. Worker prompt, workflow and router hashes
+match across the two series and the checkout. These are 27 new attempts, not 45 new submissions.
+
+| Case | RU | EN | ES |
+| --- | --- | --- | --- |
+| A01 | 3/3 | 1/3 | 3/3 |
+| A04 | 2/3 | 2/3 | 3/3 |
+| U1 | 3/3 | 3/3 | 3/3 |
+| U2 | 3/3 | 3/3 | 3/3 |
+| U3 | 3/3 | 3/3 | 3/3 |
+
+The coverage gap for A01/A04/U1 is now closed on the same prompt. All 45 results retain actual
+UI/clipboard equality and text-only A06 outputs. There are 47 physical provider calls
+across the combined matrix; all are retained in evidence, including any internal retries.
+
+**Four new failures prevent full acceptance.** A01-EN-2 and A01-EN-3 produce Spanish text for
+English notes. A04-RU-1 and A04-EN-2 omit both conflicting amounts and both dates from the
+confirmation request. These are current-prompt failures, separate from the older 41/45 series.
+Captured POST bodies match the intended inputs, and result/action session IDs match. These
+requests send no language or length constraint; the prompt requires notes-language fallback. No lost
+browser delivery or result mix-up was found. No corrective prompt edit or replacement run was made.
+
+### Resolution ownership
+
+- **Language failures A01-EN-2 and A01-EN-3 will be addressed in
+  [ANY-771](https://linear.app/paveldik/issue/ANY-771).** Its description and acceptance checks
+  now explicitly include Client Update Writer → Prepaid Request. This records planned remediation,
+  not a completed fix: the observed FAIL verdicts and 41/45 result remain unchanged.
+- **A04 omissions:** A04-RU-1 / A04-EN-2 are retained as historical failures. The subsequent
+  confirmation-values fix and fresh nine-attempt rerun are recorded above; the old outputs
+  and verdicts were not replaced. Language remediation remains separate in ANY-771.
+- The U3-RU-3 typo is a minor wording caveat with a separate corrected copy below.
+
+The known U3-RU-3 spelling error ("согласанную" → "согласованную") remains a minor quality
+caveat. The original response is unchanged; the corrected version below is an editorial copy,
+not a replacement model output. Finite samples do not guarantee future generation; ticket
+acceptance remains the owner's decision. Older failed series and verdict history are preserved.
+
+## Preceding targeted result — review round 3
 
 **U2/U3 RU/EN/ES: 18/18 PASS on the notes-priority prompt revision.** Each of the six
 unchanged inputs was run three times through the live form. U2 retains urgency; U3 removes
@@ -26,9 +133,9 @@ The correction is editorial, not a new model result or proof of universally poli
 | U2 — keep urgency | 3/3 | 3/3 | 3/3 |
 | U3 — notes remove urgency | 3/3 | 3/3 | 3/3 |
 
-This is a separate prompt revision. A01/A04/U1 have not been rerun on it; there is no new
-full-matrix claim. Review round 3 addressed an instruction ambiguity and a coverage gap;
-it did not establish that U3 had actually failed on the preceding prompt.
+At that stage, A01/A04/U1 had not been rerun. The subsequent 27-attempt series below
+now completes them on identical runtime hashes. Review round 3 addressed an instruction
+ambiguity and coverage gap; it did not establish an observed U3 failure on the preceding prompt.
 
 ## Previous targeted result — review round 2
 
@@ -1784,4 +1891,679 @@ Deadline evidence: a más tardar el viernes. Urgency assessment: Full output con
 
 ```text
 Sam, por favor, realiza el pago del anticipo de USD 800 por el rediseño del sitio web a más tardar el viernes. Avísame cuando hayas enviado el pago.
+```
+
+## Complete current-prompt acceptance — remaining A01/A04/U1
+
+The user clarified the remaining scope as A01/A04/U1. Nine unchanged inputs were each run
+three times via the real Prepaid form: **23/27 semantic PASS**. No product, prompt,
+model, workflow, schema, test or dependency changes were made during this QA batch.
+
+Every new attempt has one successful logical A06, text-only output and actual UI/clipboard
+equality. The new batch records 29 physical gpt-6-luna calls. A01-1 and A01-2 each have two
+semantic attempts within one A06; the exact retry reason was not recovered. Both calls and costs
+are retained, and provider transport success is not proof of first-pass validation.
+Estimated provider-ledger cost:
+USD 0.011073715; median UI delivery: 6.47s.
+Configured reasoning is medium; effective effort remains unproven because the ledger field is null.
+
+### Verification and limits
+
+Self-checks reconcile unchanged inputs, 27 unique fresh sessions, full outputs, trace hashes,
+action/provider counts, UI/clipboard equality and a 45-session matrix with three attempts for
+each case/language. Semantic review reads every full output and records supporting quotes;
+these structural assertions are not a semantic classifier. All prior evidence remains unchanged.
+Managed Python 3.12 doctor passed. No code tests were rerun for this QA-only batch; previous
+code-check results remain historical. The user's known minor U3 spelling caveat remains visible.
+Documentation, whitespace and evidence consistency checks passed. Captured POST inputs and
+result/action session linkage were verified for all 27 new attempts. Owned services were stopped;
+database volumes and diagnostic traces are retained. These findings require owner review before
+acceptance; no product correction or autonomous ticket closure was performed.
+
+### Full new inputs and outputs
+
+#### Completion A01
+
+Tone: warm; amount: 15 000 RUB; due date: (empty).
+
+Billing notes:
+
+Елена, начинаем дизайн презентации на 12 слайдов. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.
+
+##### Completion A01-1 — PASS
+
+Session: `scenario_session_01793981257406691352_0000000002_c8c2afb1e8004b68bce974ece070adbf`.
+
+Assessment: Direct payment request preserves 15,000 RUB as 50% of the agreed 30,000 RUB total, balance after final PDF/PPTX and a future separate invoice, without invented urgency; language matches notes.
+
+```text
+Елена, начинаем дизайн презентации на 12 слайдов. Согласованная общая стоимость — 30 000 RUB. Предоплата составляет 50% от этой суммы — 15 000 RUB. Пожалуйста, оплатите предоплату; реквизиты будут в отдельном счёте. Остаток оплачивается после передачи финальных PDF и PPTX. Дайте знать, когда отправите оплату. Спасибо!
+```
+
+##### Completion A01-2 — PASS
+
+Session: `scenario_session_01793981273766207989_0000000008_a69490a246674763998656f727b73b81`.
+
+Assessment: Direct payment request preserves 15,000 RUB as 50% of the agreed 30,000 RUB total, balance after final PDF/PPTX and a future separate invoice, without invented urgency; language matches notes.
+
+```text
+Елена, прошу внести предоплату 15 000 RUB — 50% от согласованной общей цены 30 000 RUB — перед началом дизайна презентации на 12 слайдов. Оставшаяся часть оплачивается после передачи финальных PDF и PPTX. Реквизиты будут в отдельном счёте. Пожалуйста, сообщите, когда отправите предоплату.
+```
+
+##### Completion A01-3 — PASS
+
+Session: `scenario_session_01793981288261542888_0000000014_aab66d79fbcc463f8ff2db207cc1a995`.
+
+Assessment: Direct payment request preserves 15,000 RUB as 50% of the agreed 30,000 RUB total, balance after final PDF/PPTX and a future separate invoice, without invented urgency; language matches notes.
+
+```text
+Елена, по дизайну презентации на 12 слайдов: согласованная общая стоимость — 30 000 RUB. Предоплата перед стартом — 50% от этой суммы, то есть 15 000 RUB; остаток оплачивается после передачи финальных PDF и PPTX. Пожалуйста, внесите предоплату. Реквизиты будут в отдельном счёте. Дайте знать, когда отправите оплату.
+```
+
+#### Completion A01-EN
+
+Tone: warm; amount: 15 000 RUB; due date: (empty).
+
+Billing notes:
+
+Elena, we are starting the design of a 12-slide presentation. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.
+
+##### Completion A01-EN-1 — PASS
+
+Session: `scenario_session_01793981299763345250_0000000020_4133c65a8dc446228435b6d20123cde7`.
+
+Assessment: Direct payment request preserves 15,000 RUB as 50% of the agreed 30,000 RUB total, balance after final PDF/PPTX and a future separate invoice, without invented urgency; language matches notes.
+
+```text
+Hi Elena, for the 12-slide presentation, the agreed total is 30,000 RUB. The 50% prepayment is 15,000 RUB, payable before work begins. The remaining balance is due after delivery of the final PDF and PPTX. Please pay the prepayment; payment details will be provided in a separate invoice. Please let me know once you’ve sent it.
+```
+
+##### Completion A01-EN-2 — FAIL
+
+Session: `scenario_session_01793981314115168511_0000000026_cfb8548f92a044e199969a3dc8a44be3`.
+
+Assessment: FAIL: English notes produced a Spanish response. Payment request, 15,000 RUB = 50% of 30,000 RUB, balance/future invoice terms and lack of invented urgency are otherwise preserved.
+
+```text
+Elena, para el diseño de la presentación de 12 diapositivas, el anticipo es el 50 % del precio total acordado de 30 000 RUB, es decir, 15 000 RUB, antes de comenzar. El saldo se abonará después de entregar el PDF y el PPTX finales. Los datos de pago estarán en una factura aparte. ¿Podrías realizar el pago del anticipo y avisarme cuando lo hayas enviado? ¡Muchas gracias!
+```
+
+##### Completion A01-EN-3 — FAIL
+
+Session: `scenario_session_01793981325166777884_0000000032_ca7b257e58104cccbd372435238f7f82`.
+
+Assessment: FAIL: English notes produced a Spanish response. Payment request, 15,000 RUB = 50% of 30,000 RUB, balance/future invoice terms and lack of invented urgency are otherwise preserved.
+
+```text
+Hola, Elena. El precio total acordado para el diseño de la presentación de 12 diapositivas es de 30 000 RUB. Para empezar, por favor, realiza el anticipo del 50 % del total (15 000 RUB). El saldo se abonará después de entregar el PDF y el PPTX finales. Los datos de pago estarán en una factura aparte. Avísame cuando hayas enviado el anticipo. ¡Gracias!
+```
+
+#### Completion A01-ES
+
+Tone: warm; amount: 15 000 RUB; due date: (empty).
+
+Billing notes:
+
+Elena, empezamos el diseño de una presentación de 12 diapositivas. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.
+
+##### Completion A01-ES-1 — PASS
+
+Session: `scenario_session_01793981335517030036_0000000038_dd55c64c046a45d39df8a20051ee1911`.
+
+Assessment: Direct payment request preserves 15,000 RUB as 50% of the agreed 30,000 RUB total, balance after final PDF/PPTX and a future separate invoice, without invented urgency; language matches notes.
+
+```text
+Ya empezamos el diseño de la presentación de 12 diapositivas. El anticipo, previsto antes de empezar, es de 15 000 RUB: el 50% del precio total acordado de 30 000 RUB. ¿Podrías realizarlo, por favor? El saldo se abonará después de entregar los archivos finales en PDF y PPTX. Los datos de pago estarán en una factura aparte. Avísame, por favor, cuando hayas enviado el pago.
+```
+
+##### Completion A01-ES-2 — PASS
+
+Session: `scenario_session_01793981356633893990_0000000044_cbccf9343b624c06aaabd45c5b934734`.
+
+Assessment: Direct payment request preserves 15,000 RUB as 50% of the agreed 30,000 RUB total, balance after final PDF/PPTX and a future separate invoice, without invented urgency; language matches notes.
+
+```text
+Hola, Elena. El anticipo para el diseño de la presentación de 12 diapositivas es del 50% del precio total acordado de 30 000 RUB, es decir, 15 000 RUB. ¿Podrías realizar el pago del anticipo, por favor? Los datos de pago estarán en una factura aparte. El saldo se abonará después de entregar los archivos finales en PDF y PPTX. Avísame cuando hayas enviado el pago. ¡Muchas gracias!
+```
+
+##### Completion A01-ES-3 — PASS
+
+Session: `scenario_session_01793981367854393393_0000000050_b9595342c65a4a0aa829227e4b241cac`.
+
+Assessment: Direct payment request preserves 15,000 RUB as 50% of the agreed 30,000 RUB total, balance after final PDF/PPTX and a future separate invoice, without invented urgency; language matches notes.
+
+```text
+Elena, ¿podrías abonar el anticipo de 15 000 RUB, que corresponde al 50% del precio total acordado de 30 000 RUB por el diseño de la presentación de 12 diapositivas? El saldo se abonará después de entregar el PDF y el PPTX finales. Los datos de pago estarán en una factura aparte. Avísame, por favor, cuando hayas enviado el pago.
+```
+
+#### Completion A04-RU
+
+Tone: firm; amount: USD 1,200; due date: 7 октября 2026.
+
+Billing notes:
+
+Клиент Pat. В нашем черновике указаны общая стоимость USD 2,000 и предоплата 50% (USD 1,000), но в поле суммы стоит USD 1,200. Клиент не согласился с изменением. Не создавайте впечатление, что повышенная сумма согласована. Укажите на расхождение и попросите подтвердить условия предоплаты, прежде чем отправлять требование оплаты. В поле срока указано 7 октября 2026, но Pat попросил оплатить после окончательной передачи результата 20 октября 2026; этот вопрос не решён. Штрафы не согласовывались.
+
+##### Completion A04-RU-1 — FAIL
+
+Session: `scenario_session_01793981376010662431_0000000056_4bf6dba047b34bb999636c72abfc1660`.
+
+Assessment: FAIL: confirmation requested without naming USD 1,000 / 1,200 or 7 / 20 October 2026. No payment demand or sent-payment follow-up, but explicit amount/date comparison AC is unmet.
+
+```text
+Pat, по сумме предоплаты есть расхождение, а срок оплаты не согласован. Подтвердите, пожалуйста, сумму предоплаты и срок её оплаты. После вашего подтверждения направлю запрос на оплату.
+```
+
+##### Completion A04-RU-2 — PASS
+
+Session: `scenario_session_01793981390726523841_0000000062_b6d19bda2fab46a7b65d2042645647f5`.
+
+Assessment: Only confirmation is requested, with USD 1,000 / 1,200 and 7 / 20 October 2026 as unresolved alternatives; no payment demand, agreed-value claim or sent-payment follow-up; language matches notes.
+
+```text
+Есть расхождение по сумме предоплаты: в черновике указаны USD 1,000, а в поле суммы — USD 1,200. Также не согласован срок оплаты: указано 7 октября 2026 года, а Pat попросил оплату после окончательной передачи результата 20 октября 2026 года. Пожалуйста, подтвердите сумму предоплаты и срок оплаты.
+```
+
+##### Completion A04-RU-3 — PASS
+
+Session: `scenario_session_01793981405913130696_0000000068_cb5fb2cf4ec54bfe848b5591d15af3e1`.
+
+Assessment: Only confirmation is requested, with USD 1,000 / 1,200 and 7 / 20 October 2026 as unresolved alternatives; no payment demand, agreed-value claim or sent-payment follow-up; language matches notes.
+
+```text
+Пожалуйста, подтвердите условия предоплаты. В черновике указаны общая стоимость USD 2,000 и предоплата 50% (USD 1,000), тогда как в поле суммы указано USD 1,200. Также в поле срока указано 7 октября 2026, а Pat просил оплату после окончательной передачи результата 20 октября 2026. Подтвердите, пожалуйста, сумму предоплаты и срок оплаты.
+```
+
+#### Completion A04-EN
+
+Tone: firm; amount: USD 1,200; due date: 7 October 2026.
+
+Billing notes:
+
+Client Pat. Our draft says total fee USD 2,000 and a 50% deposit (USD 1,000), but the amount field says USD 1,200. The client has not accepted the change. Do not imply the higher amount is agreed. Highlight the mismatch and request confirmation of deposit terms before sending any payment demand. Due date field is 7 October 2026, but Pat requested payment after final delivery on 20 October 2026; this is unresolved. No penalties were agreed.
+
+##### Completion A04-EN-1 — PASS
+
+Session: `scenario_session_01793981418275133600_0000000074_9fb5ab63691549e4803120aad3c004dc`.
+
+Assessment: Only confirmation is requested, with USD 1,000 / 1,200 and 7 / 20 October 2026 as unresolved alternatives; no payment demand, agreed-value claim or sent-payment follow-up; language matches notes.
+
+```text
+Please confirm the deposit terms. The draft lists a total fee of USD 2,000 and a 50% deposit of USD 1,000, while the amount entered is USD 1,200; the change has not been accepted. Please also confirm the due date: the field says 7 October 2026, while you requested payment after final delivery on 20 October 2026. Please reply with the confirmed terms.
+```
+
+##### Completion A04-EN-2 — FAIL
+
+Session: `scenario_session_01793981431118505307_0000000080_0799b05ce1044591ac5ecc7b3e8d2d9c`.
+
+Assessment: FAIL: confirmation requested without naming USD 1,000 / 1,200 or 7 / 20 October 2026. No payment demand or sent-payment follow-up, but explicit amount/date comparison AC is unmet.
+
+```text
+The deposit amount and payment timing remain unresolved. Please confirm the deposit terms, including when payment is due, and reply with your confirmation.
+```
+
+##### Completion A04-EN-3 — PASS
+
+Session: `scenario_session_01793981443051048890_0000000086_25896cf982ca4630957ac9182a71b097`.
+
+Assessment: Only confirmation is requested, with USD 1,000 / 1,200 and 7 / 20 October 2026 as unresolved alternatives; no payment demand, agreed-value claim or sent-payment follow-up; language matches notes.
+
+```text
+Please confirm the deposit amount and due date: is the deposit USD 1,000 or USD 1,200, and is payment due by 7 October 2026 or after final delivery on 20 October 2026? Please reply with your confirmation.
+```
+
+#### Completion A04-ES
+
+Tone: firm; amount: USD 1,200; due date: 7 de octubre de 2026.
+
+Billing notes:
+
+Cliente Pat. Nuestro borrador indica un precio total de USD 2,000 y un anticipo del 50% (USD 1,000), pero el campo del importe indica USD 1,200. El cliente no ha aceptado el cambio. No des a entender que el importe mayor está acordado. Señala la discrepancia y pide confirmar las condiciones del anticipo antes de enviar cualquier solicitud de pago. El campo de fecha de vencimiento indica el 7 de octubre de 2026, pero Pat pidió pagar después de la entrega final del 20 de octubre de 2026; esto sigue sin resolverse. No se acordaron penalizaciones.
+
+##### Completion A04-ES-1 — PASS
+
+Session: `scenario_session_01793981453627908020_0000000092_6a36187f68ae4ee491ca659ecb2f062f`.
+
+Assessment: Only confirmation is requested, with USD 1,000 / 1,200 and 7 / 20 October 2026 as unresolved alternatives; no payment demand, agreed-value claim or sent-payment follow-up; language matches notes.
+
+```text
+Para confirmar las condiciones del anticipo, hay una discrepancia: el borrador propone USD 1,000 (el 50% del precio total propuesto de USD 2,000), mientras que el campo del importe indica USD 1,200; el cambio no ha sido aceptado. Además, el 7 de octubre de 2026 no coincide con tu solicitud de pagar después de la entrega final del 20 de octubre de 2026. Confirma, por favor, el importe del anticipo y cuándo vence.
+```
+
+##### Completion A04-ES-2 — PASS
+
+Session: `scenario_session_01793981466253202102_0000000098_1041c6d3cee146b3a8803d100c46cdb7`.
+
+Assessment: Only confirmation is requested, with USD 1,000 / 1,200 and 7 / 20 October 2026 as unresolved alternatives; no payment demand, agreed-value claim or sent-payment follow-up; language matches notes.
+
+```text
+Hay una discrepancia entre el anticipo de USD 1,000 indicado en el borrador y los USD 1,200 registrados. También está pendiente confirmar el vencimiento: la fecha registrada es el 7 de octubre de 2026, mientras que Pat pidió pagar después de la entrega final del 20 de octubre de 2026. Por favor, confirme el importe y el vencimiento del anticipo.
+```
+
+##### Completion A04-ES-3 — PASS
+
+Session: `scenario_session_01793981485219817065_0000000104_ee89a2bc96e143868c69695efdff1c75`.
+
+Assessment: Only confirmation is requested, with USD 1,000 / 1,200 and 7 / 20 October 2026 as unresolved alternatives; no payment demand, agreed-value claim or sent-payment follow-up; language matches notes.
+
+```text
+Hay dos condiciones del anticipo pendientes de confirmar. El borrador indica un precio total de USD 2,000 y un anticipo del 50% (USD 1,000), mientras que el campo del importe indica USD 1,200; el cambio aún no ha sido aceptado. Además, la fecha indicada es el 7 de octubre de 2026, pero Pat pidió pagar después de la entrega final del 20 de octubre de 2026. Por favor, confirma el importe y la fecha de vencimiento del anticipo.
+```
+
+#### Completion U1-RU
+
+Tone: firm; amount: USD 800; due date: (empty).
+
+Billing notes:
+
+Клиент Sam. Согласована предоплата USD 800 за редизайн сайта. Платёж срочный, нужен как можно скорее.
+
+##### Completion U1-RU-1 — PASS
+
+Session: `scenario_session_01793981496012215069_0000000110_0661bd6482f94e7caf3b351b149c4a5e`.
+
+Assessment: Direct USD 800 payment request retains the urgency from notes without inventing a date; language matches notes.
+
+```text
+Sam, прошу как можно скорее внести согласованную предоплату USD 800 за редизайн сайта. Пожалуйста, сообщите, когда отправите оплату.
+```
+
+##### Completion U1-RU-2 — PASS
+
+Session: `scenario_session_01793981508285386279_0000000116_6fe937314c9846f58565f5831c6d4ab9`.
+
+Assessment: Direct USD 800 payment request retains the urgency from notes without inventing a date; language matches notes.
+
+```text
+Sam, прошу как можно скорее оплатить предоплату в размере USD 800 за редизайн сайта. Пожалуйста, сообщите, когда отправите платёж.
+```
+
+##### Completion U1-RU-3 — PASS
+
+Session: `scenario_session_01793981523025748194_0000000122_fc73ff96ad4e40ccaf25c99cc89b53cb`.
+
+Assessment: Direct USD 800 payment request retains the urgency from notes without inventing a date; language matches notes.
+
+```text
+Sam, прошу оплатить предоплату в размере USD 800 за редизайн сайта как можно скорее. Пожалуйста, сообщите, когда отправите платёж.
+```
+
+#### Completion U1-EN
+
+Tone: firm; amount: USD 800; due date: (empty).
+
+Billing notes:
+
+Client Sam. Agreed deposit USD 800 for the site redesign. The payment is urgent, needed ASAP.
+
+##### Completion U1-EN-1 — PASS
+
+Session: `scenario_session_01793981533119028507_0000000128_6a1e125029194ff49b6d175aa5cc3893`.
+
+Assessment: Direct USD 800 payment request retains the urgency from notes without inventing a date; language matches notes.
+
+```text
+Sam, please pay the agreed USD 800 deposit for the site redesign as soon as possible; the payment is urgent. Please let me know once you’ve sent it.
+```
+
+##### Completion U1-EN-2 — PASS
+
+Session: `scenario_session_01793981541434295473_0000000134_40bf8687580348879686464cbb443dfe`.
+
+Assessment: Direct USD 800 payment request retains the urgency from notes without inventing a date; language matches notes.
+
+```text
+Sam, please pay the agreed USD 800 deposit for the site redesign as soon as possible. Please let me know once you’ve sent the payment.
+```
+
+##### Completion U1-EN-3 — PASS
+
+Session: `scenario_session_01793981550502644366_0000000140_c83ddc8be28d43d896dc055c53ccc4db`.
+
+Assessment: Direct USD 800 payment request retains the urgency from notes without inventing a date; language matches notes.
+
+```text
+Please pay the agreed USD 800 deposit for the site redesign ASAP, as the payment is urgent. Let me know once you’ve sent it.
+```
+
+#### Completion U1-ES
+
+Tone: firm; amount: USD 800; due date: (empty).
+
+Billing notes:
+
+Cliente Sam. Se acordó un anticipo de USD 800 por el rediseño del sitio web. El pago es urgente, se necesita lo antes posible.
+
+##### Completion U1-ES-1 — PASS
+
+Session: `scenario_session_01793981560941855333_0000000146_c485291b027746ee9a8933d72c1c60d1`.
+
+Assessment: Direct USD 800 payment request retains the urgency from notes without inventing a date; language matches notes.
+
+```text
+Sam, por favor realiza lo antes posible el pago del anticipo de USD 800 por el rediseño del sitio web, ya que es urgente. Avísame cuando hayas enviado el pago.
+```
+
+##### Completion U1-ES-2 — PASS
+
+Session: `scenario_session_01793981571782256493_0000000152_cfcf229714154008b8998b53e76a6277`.
+
+Assessment: Direct USD 800 payment request retains the urgency from notes without inventing a date; language matches notes.
+
+```text
+Sam, por el anticipo acordado para el rediseño del sitio web, te solicito que pagues USD 800 lo antes posible. Por favor, avísame cuando hayas enviado el pago.
+```
+
+##### Completion U1-ES-3 — PASS
+
+Session: `scenario_session_01793981581883912793_0000000158_e4ff7850793741869c26bfd649ba3093`.
+
+Assessment: Direct USD 800 payment request retains the urgency from notes without inventing a date; language matches notes.
+
+```text
+Sam, el anticipo de USD 800 por el rediseño del sitio web es urgente y se necesita lo antes posible. Por favor, realiza el pago y avísame cuando lo hayas enviado.
+```
+
+
+## Full evidence — confirmation-values A04 rerun
+
+No earlier attempt was overwritten or resubmitted. Inputs are identical to the preceding A04 series.
+
+Runtime SHA-256 values:
+
+- `packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/client_update_writer/prompts/prepaid_request_compose_persuasive_text.v1.md`: `c341a0d92edec240bf4a73c7b7ff6bd34df0146ea7e4805e56ff33e986622ff3`
+- `packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/client_update_writer/workflows.yaml`: `35e6334ccb4387c481d83dbed7cf6e4024ae8d9b25a0b1e75f489b4c96de6bbc`
+- `configs/kernel/litellm_router.yaml`: `60d55333ac52d3a3490a6b2783acf375b2e8305d9b2a17e77855b0735d6c0c25`
+
+### Confirmation-values A04-RU
+
+```json
+{
+  "id": "A04-RU",
+  "language": "ru",
+  "tone": "firm",
+  "notes": "Клиент Pat. В нашем черновике указаны общая стоимость USD 2,000 и предоплата 50% (USD 1,000), но в поле суммы стоит USD 1,200. Клиент не согласился с изменением. Не создавайте впечатление, что повышенная сумма согласована. Укажите на расхождение и попросите подтвердить условия предоплаты, прежде чем отправлять требование оплаты. В поле срока указано 7 октября 2026, но Pat попросил оплатить после окончательной передачи результата 20 октября 2026; этот вопрос не решён. Штрафы не согласовывались.",
+  "amount": "USD 1,200",
+  "due_date": "7 октября 2026"
+}
+```
+
+#### Confirmation-values A04-RU-1 — PASS
+
+Session: `scenario_session_01793982823064761639_0000000002_58db6f335154416fb720b45e89de71a1`. Artifact: `artifact_01793982831507336054_0000000011_833c25200f5244848ec1171ebe942783`.
+Trace SHA-256: `5692a66b1230359cf90d6cfd1be4a09dc9bcbd7cd32850892f6a65dee73a65ab`.
+
+Assessment: Both USD 1,000 and USD 1,200 and both 7 / 20 October 2026 are retained as unresolved alternatives; the latter remains after final delivery. Confirmation only, no payment demand or sent-payment follow-up, no invented penalties or agreement; language matches notes.
+
+```text
+Pat, условия предоплаты требуют подтверждения. В черновике указаны общая стоимость USD 2,000 и предоплата 50% от неё — USD 1,000, тогда как в поле суммы указано USD 1,200. По сроку указано 7 октября 2026 года, а вы просили оплату после окончательной передачи результата 20 октября 2026 года. Пожалуйста, подтвердите, какая сумма предоплаты и какой срок применяются.
+```
+
+#### Confirmation-values A04-RU-2 — PASS
+
+Session: `scenario_session_01793982838411182481_0000000008_2386cde31c014a59805cc3019151d905`. Artifact: `artifact_01793982844871351611_0000000027_cd6cbe2c0e73431bb8d366c33edf4db6`.
+Trace SHA-256: `d8eb5ed5b16fb2822b2f491d8dbbd73e1012f8a85bce0dd48c9116e5e8f94bd4`.
+
+Assessment: Both USD 1,000 and USD 1,200 and both 7 / 20 October 2026 are retained as unresolved alternatives; the latter remains after final delivery. Confirmation only, no payment demand or sent-payment follow-up, no invented penalties or agreement; language matches notes.
+
+```text
+Pat, пожалуйста, подтвердите условия предоплаты. В поле суммы указано USD 1,200, а в черновике — предоплата 50% от общей стоимости USD 2,000, то есть USD 1,000. Какая сумма предоплаты применяется? Также подтвердите срок: 7 октября 2026 года или после окончательной передачи результата 20 октября 2026 года. Пожалуйста, ответьте, какие условия верны.
+```
+
+#### Confirmation-values A04-RU-3 — PASS
+
+Session: `scenario_session_01793982850884281140_0000000014_f6d7a7999c864f2ba3a84a2bba9b955a`. Artifact: `artifact_01793982857856546959_0000000043_a74d1e38ebbc471d963d3633c23e717d`.
+Trace SHA-256: `6ae34430d87934ccfc1a1af91830e7cf18f15e21d05cc1c6b358d9449831547f`.
+
+Assessment: Both USD 1,000 and USD 1,200 and both 7 / 20 October 2026 are retained as unresolved alternatives; the latter remains after final delivery. Confirmation only, no payment demand or sent-payment follow-up, no invented penalties or agreement; language matches notes. Minor instruction-following caveat: unnecessarily repeats the editorial sequence before sending a payment request. It does not ask for payment, invent a payment obligation or change disputed terms. Retained for iterative wording polish; not a full prompt-compliance PASS.
+
+```text
+Pat, нужно подтвердить условия предоплаты до отправки требования об оплате. В черновике указаны общая стоимость USD 2,000 и предоплата 50% от этой суммы — USD 1,000; в поле суммы указано USD 1,200. Какую сумму предоплаты подтвердите? В поле срока указано 7 октября 2026 года, а вы просили оплату после окончательной передачи результата 20 октября 2026 года. Какой срок применим? Пожалуйста, ответьте и подтвердите условия.
+```
+
+### Confirmation-values A04-EN
+
+```json
+{
+  "id": "A04-EN",
+  "language": "en",
+  "tone": "firm",
+  "notes": "Client Pat. Our draft says total fee USD 2,000 and a 50% deposit (USD 1,000), but the amount field says USD 1,200. The client has not accepted the change. Do not imply the higher amount is agreed. Highlight the mismatch and request confirmation of deposit terms before sending any payment demand. Due date field is 7 October 2026, but Pat requested payment after final delivery on 20 October 2026; this is unresolved. No penalties were agreed.",
+  "amount": "USD 1,200",
+  "due_date": "7 October 2026"
+}
+```
+
+#### Confirmation-values A04-EN-1 — PASS
+
+Session: `scenario_session_01793982863355622075_0000000020_6be7778020b248f9b97b406b4aa36d55`. Artifact: `artifact_01793982868636475077_0000000059_457d40fba15644b4bdc6bff6c3f3ce63`.
+Trace SHA-256: `a0df47dcde168b0aea1cf28ba58f88730648ed62bff3c29a8af2a1810212093d`.
+
+Assessment: Both USD 1,000 and USD 1,200 and both 7 / 20 October 2026 are retained as unresolved alternatives; the latter remains after final delivery. Confirmation only, no payment demand or sent-payment follow-up, no invented penalties or agreement; language matches notes.
+
+```text
+Please confirm the deposit terms: should the deposit be USD 1,200, or 50% of the USD 2,000 total (USD 1,000)? Please also confirm whether the due date is 7 October 2026 or after final delivery on 20 October 2026. Please reply with which terms apply.
+```
+
+#### Confirmation-values A04-EN-2 — PASS
+
+Session: `scenario_session_01793982875943451880_0000000026_a866d004460b41998b77c826e481da2e`. Artifact: `artifact_01793982881412154191_0000000075_418757e52e0f44539f93367415a136d7`.
+Trace SHA-256: `5a646921bcf9277c32f4ed5b7b19264823ac51426cbf3f921a1a40ce4b161461`.
+
+Assessment: Both USD 1,000 and USD 1,200 and both 7 / 20 October 2026 are retained as unresolved alternatives; the latter remains after final delivery. Confirmation only, no payment demand or sent-payment follow-up, no invented penalties or agreement; language matches notes.
+
+```text
+Please confirm the deposit terms: the amount field lists USD 1,200, while the draft states a 50% deposit on a USD 2,000 total (USD 1,000). Please also confirm the due date: 7 October 2026, or after final delivery on 20 October 2026. Please reply confirming which terms apply.
+```
+
+#### Confirmation-values A04-EN-3 — PASS
+
+Session: `scenario_session_01793982887673514657_0000000032_ce20b8b539454cc29632af28f69c4717`. Artifact: `artifact_01793982894824241156_0000000091_512477e2eb314a2da4e43724c9b348a9`.
+Trace SHA-256: `042a42d3051d4af836dce2f05c709d72097c11227c5eb8eedad83b3ad5df7040`.
+
+Assessment: Both USD 1,000 and USD 1,200 and both 7 / 20 October 2026 are retained as unresolved alternatives; the latter remains after final delivery. Confirmation only, no payment demand or sent-payment follow-up, no invented penalties or agreement; language matches notes.
+
+```text
+Pat, please confirm which deposit terms apply: USD 1,200 as listed for this payment, or the draft terms of a 50% deposit against a USD 2,000 total fee (USD 1,000). Please also confirm the due date: 7 October 2026, or after final delivery on 20 October 2026. Please reply with your confirmation.
+```
+
+### Confirmation-values A04-ES
+
+```json
+{
+  "id": "A04-ES",
+  "language": "es",
+  "tone": "firm",
+  "notes": "Cliente Pat. Nuestro borrador indica un precio total de USD 2,000 y un anticipo del 50% (USD 1,000), pero el campo del importe indica USD 1,200. El cliente no ha aceptado el cambio. No des a entender que el importe mayor está acordado. Señala la discrepancia y pide confirmar las condiciones del anticipo antes de enviar cualquier solicitud de pago. El campo de fecha de vencimiento indica el 7 de octubre de 2026, pero Pat pidió pagar después de la entrega final del 20 de octubre de 2026; esto sigue sin resolverse. No se acordaron penalizaciones.",
+  "amount": "USD 1,200",
+  "due_date": "7 de octubre de 2026"
+}
+```
+
+#### Confirmation-values A04-ES-1 — PASS
+
+Session: `scenario_session_01793982899732959053_0000000038_3f5d9785e9dd4c2db4811a96e9ac7bdd`. Artifact: `artifact_01793982906102853194_0000000107_1755fddeb2644e21b13124cd544db5ff`.
+Trace SHA-256: `b929e4cbc136400d1982bc74aa1d24bf2ed036a27982bacd261ec2326ff2d35a`.
+
+Assessment: Both USD 1,000 and USD 1,200 and both 7 / 20 October 2026 are retained as unresolved alternatives; the latter remains after final delivery. Confirmation only, no payment demand or sent-payment follow-up, no invented penalties or agreement; language matches notes. Minor instruction-following caveat: unnecessarily repeats the editorial sequence before sending a payment request. It does not ask for payment, invent a payment obligation or change disputed terms. Retained for iterative wording polish; not a full prompt-compliance PASS.
+
+```text
+Pat, antes de enviar una solicitud de pago, necesitamos confirmar las condiciones del anticipo. El campo del importe indica USD 1,200; el borrador indica un precio total de USD 2,000 y un anticipo del 50% de ese total (USD 1,000), y el cambio no ha sido aceptado. La fecha indicada es el 7 de octubre de 2026, mientras que pediste pagar después de la entrega final del 20 de octubre de 2026; este punto sigue sin resolverse. Confirma, por favor, qué importe y qué fecha o condición de vencimiento corresponden al anticipo.
+```
+
+#### Confirmation-values A04-ES-2 — PASS
+
+Session: `scenario_session_01793982913757973454_0000000044_9cecdd4d26994ac7b3a6e5c5ea391ae5`. Artifact: `artifact_01793982919079603242_0000000123_bd2e36f62850424298ebdedd8972877c`.
+Trace SHA-256: `bb31f06e7b7f4406f21b470de25145d32db9c0b9e99b1fad45e609693e2d7050`.
+
+Assessment: Both USD 1,000 and USD 1,200 and both 7 / 20 October 2026 are retained as unresolved alternatives; the latter remains after final delivery. Confirmation only, no payment demand or sent-payment follow-up, no invented penalties or agreement; language matches notes.
+
+```text
+Hay dos puntos del anticipo que siguen sin resolverse. El importe figura como USD 1,200, mientras que el borrador indica un anticipo del 50% del precio total de USD 2,000, es decir, USD 1,000; el cambio no ha sido aceptado. La fecha indicada es el 7 de octubre de 2026, mientras que Pat pidió pagar después de la entrega final del 20 de octubre de 2026. Confirma qué importe y qué fecha o condición de pago corresponden. Por favor, responde con la confirmación.
+```
+
+#### Confirmation-values A04-ES-3 — PASS
+
+Session: `scenario_session_01793982925653871128_0000000050_c7bbb5c4e4db4aab90a66cb17c820a93`. Artifact: `artifact_01793982930558448005_0000000139_33f4a504186340a2b52c8b150797af59`.
+Trace SHA-256: `9de17e06935bbf7d10fd79af88f6bfeb9eca4d2d13fcce2ce291182236d3512b`.
+
+Assessment: Both USD 1,000 and USD 1,200 and both 7 / 20 October 2026 are retained as unresolved alternatives; the latter remains after final delivery. Confirmation only, no payment demand or sent-payment follow-up, no invented penalties or agreement; language matches notes. Minor instruction-following caveat: unnecessarily repeats the editorial sequence before sending a payment request. It does not ask for payment, invent a payment obligation or change disputed terms. Retained for iterative wording polish; not a full prompt-compliance PASS.
+
+```text
+Pat, antes de enviar una solicitud de pago, confirma las condiciones del anticipo: el borrador indica un total de USD 2,000 y un anticipo del 50% de ese total (USD 1,000), mientras que el importe registrado es USD 1,200. ¿Qué importe corresponde? También está pendiente la fecha: el campo indica el 7 de octubre de 2026, mientras que pediste pagar después de la entrega final del 20 de octubre de 2026. ¿Qué plazo corresponde? Por favor, responde con la confirmación.
+```
+
+
+## Full evidence — A04 without payment-request previews
+
+Every attempt is retained; inputs are identical to both preceding A04 series.
+
+Runtime SHA-256 values:
+
+- `packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/client_update_writer/prompts/prepaid_request_compose_persuasive_text.v1.md`: `c4b59bd3410cd1b9775e26f77a1c0f4d4eb05ee1e68d1c5d38a65e1607202d4f`
+- `packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/client_update_writer/workflows.yaml`: `35e6334ccb4387c481d83dbed7cf6e4024ae8d9b25a0b1e75f489b4c96de6bbc`
+- `configs/kernel/litellm_router.yaml`: `60d55333ac52d3a3490a6b2783acf375b2e8305d9b2a17e77855b0735d6c0c25`
+
+### No-preview A04-RU
+
+```json
+{
+  "id": "A04-RU",
+  "language": "ru",
+  "tone": "firm",
+  "notes": "Клиент Pat. В нашем черновике указаны общая стоимость USD 2,000 и предоплата 50% (USD 1,000), но в поле суммы стоит USD 1,200. Клиент не согласился с изменением. Не создавайте впечатление, что повышенная сумма согласована. Укажите на расхождение и попросите подтвердить условия предоплаты, прежде чем отправлять требование оплаты. В поле срока указано 7 октября 2026, но Pat попросил оплатить после окончательной передачи результата 20 октября 2026; этот вопрос не решён. Штрафы не согласовывались.",
+  "amount": "USD 1,200",
+  "due_date": "7 октября 2026"
+}
+```
+
+#### No-preview A04-RU-1 — PASS
+
+Session: `scenario_session_01793983642478676186_0000000002_3041ae2f5a8941968ed9ae39281a4f14`. Artifact: `artifact_01793983649627272477_0000000011_85b4eec15b864edfabbf659e913a7ea1`.
+Trace SHA-256: `7d249d843a8c3b0ccfb75b2f6f225af7bbd697bc2f5cae5fc7c43592155f376b`.
+
+Assessment: Both USD 1,000 and USD 1,200 and both 7 / 20 October 2026 remain unresolved alternatives; the later option remains after final delivery. Direct confirmation only, with no announcement or promise of a later payment request, no payment demand or sent-payment follow-up, and no invented agreement or penalties. Language matches notes. Full output reviewed; no additional wording caveat found in this attempt.
+
+```text
+Pat, подтвердите условия предоплаты: в поле суммы указано USD 1,200, тогда как в черновике указана предоплата USD 1,000 — 50% от общей стоимости USD 2,000. Также в поле срока указано 7 октября 2026, а вы просили оплатить после окончательной передачи результата 20 октября 2026. Уточните, пожалуйста, какая сумма и какой срок применяются. Жду вашего подтверждения.
+```
+
+#### No-preview A04-RU-2 — PASS
+
+Session: `scenario_session_01793983657500182193_0000000008_0c60a012cced40ebaeaf32201b4d5fab`. Artifact: `artifact_01793983663504742921_0000000027_db573c40e5144f66888b784ad80af8f7`.
+Trace SHA-256: `f4acf1981598853b700d65514550e060145c65b198e4dd42a33e5db949fc518a`.
+
+Assessment: Both USD 1,000 and USD 1,200 and both 7 / 20 October 2026 remain unresolved alternatives; the later option remains after final delivery. Direct confirmation only, with no announcement or promise of a later payment request, no payment demand or sent-payment follow-up, and no invented agreement or penalties. Language matches notes. Full output reviewed; no additional wording caveat found in this attempt.
+
+```text
+Pat, прошу подтвердить условия предоплаты. В черновике указаны общая стоимость USD 2,000 и предоплата 50% от неё (USD 1,000), тогда как в поле суммы указано USD 1,200. Какую сумму предоплаты следует использовать?
+
+Также в поле срока указано 7 октября 2026 года, а вы просили оплату после окончательной передачи результата 20 октября 2026 года. Подтвердите, пожалуйста, какой срок применим. Прошу ответить с подтверждением обоих условий.
+```
+
+#### No-preview A04-RU-3 — PASS
+
+Session: `scenario_session_01793983670129210820_0000000014_f58223284bbd42c881b72ffec10de80f`. Artifact: `artifact_01793983675748035267_0000000043_33d3e32a86094c77a2fd4a696a98eb93`.
+Trace SHA-256: `a6a6ac241fed8e89930189dac40e62f212b58bfed29ced884aacce4c6fe0560d`.
+
+Assessment: Both USD 1,000 and USD 1,200 and both 7 / 20 October 2026 remain unresolved alternatives; the later option remains after final delivery. Direct confirmation only, with no announcement or promise of a later payment request, no payment demand or sent-payment follow-up, and no invented agreement or penalties. Language matches notes. Full output reviewed; no additional wording caveat found in this attempt.
+
+```text
+Pat, подтвердите, пожалуйста, условия предоплаты: в черновике указаны общая стоимость USD 2,000 и предоплата 50% от этой суммы — USD 1,000, тогда как в поле суммы указано USD 1,200. Также уточните срок: 7 октября 2026 года или после окончательной передачи результата 20 октября 2026 года. Жду вашего ответа, чтобы зафиксировать условия.
+```
+
+### No-preview A04-EN
+
+```json
+{
+  "id": "A04-EN",
+  "language": "en",
+  "tone": "firm",
+  "notes": "Client Pat. Our draft says total fee USD 2,000 and a 50% deposit (USD 1,000), but the amount field says USD 1,200. The client has not accepted the change. Do not imply the higher amount is agreed. Highlight the mismatch and request confirmation of deposit terms before sending any payment demand. Due date field is 7 October 2026, but Pat requested payment after final delivery on 20 October 2026; this is unresolved. No penalties were agreed.",
+  "amount": "USD 1,200",
+  "due_date": "7 October 2026"
+}
+```
+
+#### No-preview A04-EN-1 — PASS
+
+Session: `scenario_session_01793983680366105855_0000000020_dc86c639583a47c1b53087e772e1414b`. Artifact: `artifact_01793983684127782812_0000000059_3e547e05b2374ce08fbd17754361b327`.
+Trace SHA-256: `25485ac9931796f4d5c50671f2333336568a1b292ab6bdcb60757ef933e2897b`.
+
+Assessment: Both USD 1,000 and USD 1,200 and both 7 / 20 October 2026 remain unresolved alternatives; the later option remains after final delivery. Direct confirmation only, with no announcement or promise of a later payment request, no payment demand or sent-payment follow-up, and no invented agreement or penalties. Language matches notes. Full output reviewed; no additional wording caveat found in this attempt.
+
+```text
+Pat, please confirm the deposit terms. The draft states a 50% deposit of USD 1,000 against a total fee of USD 2,000; the amount field lists USD 1,200, and the change has not been accepted. The due date listed is 7 October 2026, while you requested payment after final delivery on 20 October 2026. Which deposit amount and payment timing apply? Please reply with your confirmation.
+```
+
+#### No-preview A04-EN-2 — PASS
+
+Session: `scenario_session_01793983688702500074_0000000026_46023b6605bd44c9a0c2262634c77b8f`. Artifact: `artifact_01793983694249696266_0000000075_8b98af627b8b4ce995cd9c845cd50476`.
+Trace SHA-256: `e2a299ea6770a61f24d27c1186a3df379d95423bdacb93dedb362b8225bc68ff`.
+
+Assessment: Both USD 1,000 and USD 1,200 and both 7 / 20 October 2026 remain unresolved alternatives; the later option remains after final delivery. Direct confirmation only, with no announcement or promise of a later payment request, no payment demand or sent-payment follow-up, and no invented agreement or penalties. Language matches notes. Full output reviewed; no additional wording caveat found in this attempt.
+
+```text
+Pat, please confirm the unresolved deposit terms: is the deposit USD 1,200 or USD 1,000 (50% of the draft USD 2,000 total)? Please also confirm whether the due date is 7 October 2026 or after final delivery on 20 October 2026. Please reply with your confirmation.
+```
+
+#### No-preview A04-EN-3 — PASS
+
+Session: `scenario_session_01793983701169863579_0000000032_5a3120d34903497ca82cc0d7fcd2e7e4`. Artifact: `artifact_01793983708497477997_0000000091_72b1f6fe16194d82b9675945daf04a4f`.
+Trace SHA-256: `a6ad37f4345c1c9e33a4199c0491ff8a80c2071878a3446c0d28c7a42aedb234`.
+
+Assessment: Both USD 1,000 and USD 1,200 and both 7 / 20 October 2026 remain unresolved alternatives; the later option remains after final delivery. Direct confirmation only, with no announcement or promise of a later payment request, no payment demand or sent-payment follow-up, and no invented agreement or penalties. Language matches notes. Full output reviewed; no additional wording caveat found in this attempt.
+
+```text
+Please confirm which deposit applies: USD 1,200, or the draft 50% deposit of USD 1,000 based on a USD 2,000 total. Also, should the due date be 7 October 2026, or the requested timing of after final delivery on 20 October 2026? Please reply with your confirmation.
+```
+
+### No-preview A04-ES
+
+```json
+{
+  "id": "A04-ES",
+  "language": "es",
+  "tone": "firm",
+  "notes": "Cliente Pat. Nuestro borrador indica un precio total de USD 2,000 y un anticipo del 50% (USD 1,000), pero el campo del importe indica USD 1,200. El cliente no ha aceptado el cambio. No des a entender que el importe mayor está acordado. Señala la discrepancia y pide confirmar las condiciones del anticipo antes de enviar cualquier solicitud de pago. El campo de fecha de vencimiento indica el 7 de octubre de 2026, pero Pat pidió pagar después de la entrega final del 20 de octubre de 2026; esto sigue sin resolverse. No se acordaron penalizaciones.",
+  "amount": "USD 1,200",
+  "due_date": "7 de octubre de 2026"
+}
+```
+
+#### No-preview A04-ES-1 — PASS
+
+Session: `scenario_session_01793983716476494307_0000000038_e9c2f7939625487ab43890bc256e7bfd`. Artifact: `artifact_01793983727579893523_0000000110_e181ae7ec06d488b80e91f01999923ab`.
+Trace SHA-256: `e3c12dc2b605ff964d7214e80c9776a810db66f786eaa83873caa93ca961dfc0`.
+
+Assessment: Both USD 1,000 and USD 1,200 and both 7 / 20 October 2026 remain unresolved alternatives; the later option remains after final delivery. Direct confirmation only, with no announcement or promise of a later payment request, no payment demand or sent-payment follow-up, and no invented agreement or penalties. Language matches notes. Full output reviewed; no additional wording caveat found in this attempt.
+
+```text
+¿Podrías confirmar las condiciones del anticipo? El borrador indica un anticipo del 50% del total de USD 2,000 (USD 1,000), mientras que el campo del importe indica USD 1,200. También está pendiente confirmar el vencimiento: el campo indica el 7 de octubre de 2026, mientras que solicitaste pagar después de la entrega final del 20 de octubre de 2026. Por favor, responde indicando qué condiciones aplican.
+```
+
+#### No-preview A04-ES-2 — PASS
+
+Session: `scenario_session_01793983733130195638_0000000044_159d9679d1c6484b87f95907b25a4eb9`. Artifact: `artifact_01793983745319373727_0000000129_d0f4ad5e05d94de092b737e0bf5fa170`.
+Trace SHA-256: `c8ed096c465f0e2d05fd9c42b8926bbed5c1891d21043ae56cbb65020a67bbfa`.
+
+Assessment: Both USD 1,000 and USD 1,200 and both 7 / 20 October 2026 remain unresolved alternatives; the later option remains after final delivery. Direct confirmation only, with no announcement or promise of a later payment request, no payment demand or sent-payment follow-up, and no invented agreement or penalties. Language matches notes. Full output reviewed; no additional wording caveat found in this attempt.
+
+```text
+Hay dos puntos pendientes de confirmar sobre el anticipo: el campo del importe indica USD 1,200, mientras que el borrador indica un anticipo de USD 1,000 (50% del precio total de USD 2,000); y la fecha indicada es el 7 de octubre de 2026, mientras que solicitaste pagar después de la entrega final del 20 de octubre de 2026. Confirma, por favor, qué importe y qué fecha o condición de pago aplican.
+```
+
+#### No-preview A04-ES-3 — PASS
+
+Session: `scenario_session_01793983753101464980_0000000050_03208ec12a3d4c1a9f64380fa1b19b69`. Artifact: `artifact_01793983761184376363_0000000145_822a591ac3ef46268fea9f8f90860d41`.
+Trace SHA-256: `7713e1cf9bd8784a3b4fdb21fbb4248ff3ac4ea588ef09356aeb260250f6d573`.
+
+Assessment: Both USD 1,000 and USD 1,200 and both 7 / 20 October 2026 remain unresolved alternatives; the later option remains after final delivery. Direct confirmation only, with no announcement or promise of a later payment request, no payment demand or sent-payment follow-up, and no invented agreement or penalties. Language matches notes. Full output reviewed; no additional wording caveat found in this attempt.
+
+```text
+Hay dos puntos del anticipo que siguen sin resolverse. El campo del importe indica USD 1,200, mientras que el borrador contempla un anticipo del 50% del total de USD 2,000, es decir, USD 1,000. ¿Qué importe y condiciones del anticipo debemos tomar como válidos?
+
+También está pendiente la fecha: el campo indica el 7 de octubre de 2026, mientras que solicitaste pagar después de la entrega final, prevista para el 20 de octubre de 2026. ¿Cuál de estas fechas o condiciones de pago corresponde?
+
+Por favor, responde confirmando ambos puntos.
 ```

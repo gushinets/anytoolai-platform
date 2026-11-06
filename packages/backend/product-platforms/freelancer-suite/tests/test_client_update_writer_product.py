@@ -767,6 +767,36 @@ def test_prepaid_request_max_length_floor_fits_longest_amount_and_due_date() -> 
 # new case maps onto a bullet instead of a new branch that needs its own priority clause. Model
 # behavior is only provable live (ANY-604): the fake provider returns one fixed response, so the
 # rule text is what is pinned here.
+def test_prepaid_request_prompt_preserves_conflicting_values_without_length_limit() -> None:
+    prompt = _normalized_prepaid_prompt()
+    confirmation = prompt.split("B. Any condition is open", 1)[1].split(
+        "C. The notes say not to ask for payment yet", 1
+    )[0]
+    assert (
+        "include every concrete current candidate value from the fields and notes" in confirmation
+    )
+    assert "with its currency or timing relation" in confirmation
+    assert (
+        "do not replace known conflicting amounts or dates with a generic request" in confirmation
+    )
+    assert (
+        "does not override an explicit instruction to withhold private information" in confirmation
+    )
+    assert "Only if an explicitly supplied `constraints.length` is too short" in prompt
+    assert "brevity alone never permits omitting them" in prompt
+
+
+def test_prepaid_request_confirmation_omits_editorial_payment_request_sequence() -> None:
+    confirmation = _normalized_prepaid_prompt().split("B. Any condition is open", 1)[1].split(
+        "C. The notes say not to ask for payment yet", 1
+    )[0]
+    assert "Directions about when to ask for payment select this message kind" in confirmation
+    assert "do not announce, promise or describe a later payment request" in confirmation
+    assert "Ask for confirmation directly" in confirmation
+    assert "Preserve actual invoice, delivery and payment terms" in confirmation
+    assert "stated separately from such editorial directions" in confirmation
+
+
 def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     prompt = " ".join(
         _load_prompt_template(
