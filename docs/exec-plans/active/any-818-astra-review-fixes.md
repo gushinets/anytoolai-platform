@@ -834,3 +834,86 @@ Broad backend/PostgreSQL checks were not repeated for this UI fix. A genuinely
 changed contract remains blocked with raw state retained until an explicit reopen
 or existing adaptation; direct immutable history never silently changes its base.
 Parent owns final independent review, commit/push and required CI; never merge.
+
+## Authoritative refresh: provenance, immutable preset cards and unchanged Retry
+
+Doctor passed before edits on 2026-11-07 at `ffae9ead`. Address review
+`5808032846`, discussions `4498410936`, `4498410943` and `4498410956`.
+First reproduce stale preset source-run provenance, cached preset-card
+compatibility and loss of a valid preset binding after unchanged authoritative
+Retry. Check the real backend snapshot matching fields and distinguish an absent
+history owner from its deliberately cleared source-run ID.
+
+Reach: the existing shared Atom Lab prompt/base reconciliation, exact Chromium
+payload and behavior regressions, and this plan. Preserve immutable history and
+preset versions, catalog/owner/request fences, explicit adaptation, contract locks
+and both bounded successful trial records. A confirmed unchanged base/contract
+must preserve canonical atom identity and valid bindings; genuine changes must
+invalidate incompatible provenance and execution references. No backend, schema,
+dependency, working DB, migration, provider, CI/Sonar, staging or publication
+changes are needed. Run meaningful regressions before production edits, connected
+focused checks, one final canonical frontend-check, docs/generation and diff
+checks. Parent owns fresh independent review, commit/push and CI; never merge.
+
+Initial Chromium regressions reproduced the stale source-run IDs in both preset
+write handlers, the cached card's hidden Adapt action and loss of restored and
+completed exact successful proofs on unchanged Retry. Logs:
+`.quick-check-tmp/p7-regressions-before.log`, `p7-controls-before.log` and
+`p7-node-before.log`. The first two foreign-run fixtures needed their requested
+reasoning corrected before they reached the provenance assertion; the second
+run then failed on the actual stale ID. Assertions were not weakened.
+
+The backend repository compares source-run tenant/region, atom, action config,
+input/output schema refs and versions, and base prompt ref. It does not compare
+prompt source, text, input or model. Accordingly, the shared successful refresh
+clears source-run and preset bindings only when that contract changes, while
+retired product-source recovery on an unchanged base keeps valid lineage.
+Deliberate null history provenance no longer falls back to another editor's run.
+Authoritative reads confirming the same base text and validated contract retain
+the canonical old atom, bindings and both exact proofs, even with reordered
+schema keys; old atoms are never mutated. Immutable preset cards recheck against
+their own current atom on render/apply, and actual catalog replacement exposes
+the existing explicit Adapt action. Editable recovered configurations stay
+editable; immutable versions and history stay unchanged.
+
+Connected checks caught an acknowledgement regression when all successful source
+reads rerendered a readonly card. The new card refresh is restricted to actual
+atom replacement, preserving the original exact Save acknowledgement assertions.
+Auditing every source-run writer also reproduced late run acceptance reattaching
+an old-base ID after a refresh: unchanged control passed, changed-base control
+failed (`.quick-check-tmp/p7-late-acceptance-before.log`). The existing acceptance
+owner check now also requires the submission's frozen atom contract to match.
+
+Final focused verification passed 66 Chromium journeys and all 56 Atom Lab Node
+tests, plus Atom Lab lint. Logs: `.quick-check-tmp/p7-focused-final.log`,
+`p7-node-final.log` and `p7-lint-final.log`. Eight new Chromium cases cover distinct
+history owners with foreign current runs, same/other atom immutable cards,
+synthetic apply/edit, explicit adaptation with exact saved payload, both atom/card
+read orders, and independently restored/completed proof on unchanged Retry. Two
+new Node cases cover canonical identity with reordered schema keys and both
+late-acceptance controls. Existing create/version payload assertions now require
+null old-base provenance, and the shared mock enforces the real backend contract
+for every non-null source run. Retired-source same-base controls still preserve
+their valid original IDs. Connected Save acknowledgement, source/editor/catalog
+fences, contract locks, direct immutable history, adaptation and old-trial
+invalidation checks passed without weakening any matcher, timeout or skip.
+
+The one final canonical managed `python scripts/agent/runner.py frontend-check`
+passed on 2026-11-07 after the last source/test edits: lint, typecheck, all 285
+Chromium journeys, 56 Atom Lab Node tests, six demo Node tests, 824 Vitest tests,
+generated API-type drift and production builds. Log:
+`.quick-check-tmp/p7-frontend-check-final.log`. The sandbox first rejected the
+existing pnpm-store symlink; the identical command passed with approved escalation,
+the installed Chromium cache, workspace Temp and bundled LiteLLM cost map.
+
+Four owned JavaScript/tests/plan files are uncommitted. HEAD remains
+`ffae9ead2786dd7319625dfc124c06d54ebfdd8b`, staging is empty and unrelated untracked
+reports remain untouched. No backend/CSS, schema/generated contract, dependency,
+CI/Sonar setting, working DB, migration, provider, deployment, commit, push or
+GitHub write changed. Broad backend/PostgreSQL checks were not repeated for this
+UI fix; the review already supplied isolated real-handler evidence. Parent owns
+fresh independent review, commit/push and required CI; never merge. The existing
+ambiguous-save and unbounded-library follow-ups remain outside this repair.
+
+`validate-docs`, `generate-docs --check` and `git diff --check` passed. Logs:
+`.quick-check-tmp/p7-validate-docs.log` and `p7-generate-docs-check.log`.

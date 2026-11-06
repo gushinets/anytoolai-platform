@@ -2045,7 +2045,7 @@ export function bootstrapAtomLab({
         : (nodes["reasoning-effort"].value || null),
       fixed_fields: selectedFixedFields(),
       example_input: cloneJson(source?.input ?? getDraftPayload(session)),
-      source_run_id: source?.sourceRunId ?? session.sourceRunId,
+      source_run_id: source ? source.sourceRunId : session.sourceRunId,
       prompt_source_ref: source ? source.promptSourceRef : session.promptSourceRef,
     };
   };
@@ -2117,6 +2117,10 @@ export function bootstrapAtomLab({
 
   const renderPresetState = () => {
     if (!session) return;
+    if (selectedPresetVersion && !presetEditorActive) {
+      const atom = catalog.find((item) => item.atom_id === selectedPresetVersion.atom_id);
+      setPresetReadOnly(!presetContractMatchesAtom(selectedPresetVersion, atom), selectedPresetVersion);
+    }
     renderPresetDetails();
     nodes["save-preset"].textContent = selectedPresetVersion ? "Сохранить новую версию" : "Сохранить новый";
     if (!selectedPresetVersion && !presetEditorActive) {
@@ -2613,8 +2617,10 @@ export function bootstrapAtomLab({
   };
 
   const editSelectedPreset = ({openWorkbench = false} = {}) => {
+    renderPresetState();
     if (!selectedPresetVersion || presetReadOnly || presetOpenInFlight || presetSaveInFlight || presetSaveOutcomeUnknown) return;
     const version = selectedPresetVersion;
+    if (!presetContractMatchesAtom(version, catalog.find((item) => item.atom_id === version.atom_id))) return;
     const samePresetVersion = session.presetRef?.preset_id === version.preset_id
       && session.presetRef.version === version.version;
     const alreadyApplied = samePresetVersion
@@ -3305,7 +3311,7 @@ export function bootstrapAtomLab({
       admissionErrors = [];
       renderValidation(document, nodes["validation-errors"], session, admissionErrors);
       submission.runId = accepted.run_id;
-      if (session === submission.ownerSession) {
+      if (session === submission.ownerSession && presetContractMatchesAtom(submission.atom, session.atom)) {
         submission.ownerSession.sourceRunId = accepted.run_id;
         renderPresetState();
       }
@@ -3436,6 +3442,7 @@ export function bootstrapAtomLab({
           throw new Error("Контракт атома изменился. Черновик сохранён; откройте актуальный атом или явно адаптируйте сохранённый снимок.");
         }
         if (!hasPlatform(atom)) throw new Error("Список промптов вернул некорректный ответ.");
+        if (atom.prompt_ref === draft.atom.prompt_ref && atom.prompt === draft.atom.prompt) atom = draft.atom;
       } catch (error) {
         error.promptSourceNeedsValidation = true;
         error.promptContractNeedsValidation = true;
@@ -3548,17 +3555,19 @@ export function bootstrapAtomLab({
       const reconcileSource = draft.promptSourceNeedsValidation || atom !== draft.atom;
       if (atom !== draft.atom) {
         const previous = draft.atom;
+        const contractChanged = !presetContractMatchesAtom(previous, atom);
         catalog = catalog.map((item) => item === previous ? atom : item);
         for (const owner of [session, presetSourceOverride]) {
           if (owner?.atom !== previous) continue;
           owner.promptSourceRef = promptRefFor(owner);
           owner.atom = atom;
+          if (contractChanged) owner.sourceRunId = null;
           if (Object.hasOwn(owner, "prompt_ref")) owner.prompt_ref = atom.prompt_ref;
           owner.promptOptions = options;
           reconcilePromptSource(owner, options);
           if (owner !== draft) owner.loadingPrompts = false;
           if (owner === session) {
-            owner.presetRef = null;
+            if (contractChanged) owner.presetRef = null;
             owner.basePrompt = options.find((option) => option.ref === promptRefFor(owner))?.prompt ?? owner.basePrompt;
             nodes["prompt-load-status"].textContent = "";
             nodes["retry-prompts"].hidden = true;
@@ -3570,6 +3579,7 @@ export function bootstrapAtomLab({
         nodes["restore-history"].textContent = selectedHistoryCompatible ? "Восстановить запрос в лаборатории" : "Адаптировать к текущему контракту";
         renderSelectedHistoryWarning();
         updateHistoryControls();
+        if (selectedPresetVersion && !presetEditorActive) renderPresetState();
       }
       draft.promptOptions = options;
       if (draft.promptSourceNeedsValidation) reconcilePromptSource(draft, options);

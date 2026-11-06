@@ -335,6 +335,73 @@ test("all eleven non-smoke Form-mode drafts emit the shared acceptance POST payl
   }
 });
 
+for (const changedBase of [false, true]) {
+  test(`authoritative atom refresh ${changedBase ? "invalidates" : "preserves"} owner bindings before late run acceptance`, async () => {
+    const atom = await catalogAtom("A06");
+    const refreshed = {...structuredClone(atom), prompt_ref: changedBase ? "prompt.a06.v2" : atom.prompt_ref};
+    const {document, elements} = createFakeDocument();
+    const options = [{ref: refreshed.prompt_ref, name: "Платформа", prompt: atom.prompt,
+      group: "platform", source_ref: null, source_run_id: null}];
+    let releaseAcceptance;
+    const acceptance = new Promise(resolve => { releaseAcceptance = resolve; });
+    let runSent;
+    const sending = new Promise(resolve => { runSent = resolve; });
+    let atomReads = 0;
+    const controller = bootstrapAtomLab({
+      document,
+      scheduleImpl: () => 0,
+      cancelScheduleImpl: () => {},
+      fetchImpl: async url => {
+        let payload;
+        if (url.endsWith("/atoms")) payload = [atom];
+        else if (url.endsWith("/models")) payload = {
+          items: [{model_id: "gpt-supported", compatibility: "compatible", reason: "confirmed_openai_text_gpt",
+            reasoning_supported: false, allowed_reasoning_efforts: null, provenance: {}}],
+          snapshot_id: "models-1", last_success_at: "2026-11-07T00:00:00Z", stale: false, refresh_status: "current", error: null,
+        };
+        else if (url.endsWith("/prompts")) payload = options;
+        else if (url.endsWith("/atoms/A06")) {
+          atomReads += 1;
+          payload = structuredClone(refreshed);
+          payload.input_schema = Object.fromEntries(Object.entries(payload.input_schema).reverse());
+        } else if (url.endsWith("/runs")) {
+          runSent();
+          await acceptance;
+          payload = {run_id: "run-late", scenario_session_id: "session-late", job_id: "job-late", status: "queued"};
+        } else throw new Error(`Unexpected request ${url}`);
+        return {ok: true, status: 200, async json() { return payload; }};
+      },
+    });
+    elements.get("access-code").value = "secret";
+    await elements.get("access-form").dispatch("submit");
+    await elements.get("fill-example").click();
+    elements.get("model-select").value = "gpt-supported";
+    const owner = controller.getSession();
+    const canonical = owner.atom;
+    const presetRef = {preset_id: "preset-unchanged", version: 1};
+    owner.presetRef = presetRef;
+    owner.sourceRunId = "run-unchanged";
+    const submitted = elements.get("run-button").click();
+    await sending;
+    owner.promptSourceNeedsValidation = true;
+    owner.promptContractNeedsValidation = true;
+    await elements.get("retry-prompts").click();
+    assert.equal(atomReads, 1);
+    if (changedBase) assert.notEqual(owner.atom, canonical);
+    else assert.equal(owner.atom, canonical);
+    assert.equal(canonical.prompt_ref, atom.prompt_ref);
+    assert.equal(owner.presetRef, changedBase ? null : presetRef);
+    assert.equal(owner.sourceRunId, changedBase ? null : "run-unchanged");
+    assert.equal(owner.promptSourceNeedsValidation, false);
+    assert.equal(owner.promptContractNeedsValidation, false);
+    assert.deepEqual(owner.promptOptions, options);
+    releaseAcceptance();
+    await submitted;
+    assert.equal(owner.sourceRunId, changedBase ? null : "run-late");
+    controller.destroy();
+  });
+}
+
 test("omission remains distinct from null, empty string, false, and zero", async () => {
   const atom = await catalogAtom("A04", {
     input_schema: {
