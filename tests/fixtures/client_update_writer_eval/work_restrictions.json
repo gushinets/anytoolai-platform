@@ -1,0 +1,197 @@
+{
+  "cases": [
+    {
+      "id": "V02-en",
+      "language": "en",
+      "tone": "neutral",
+      "progress_notes": "Review of the warehouse inventory rows has started. Several barcode mismatches have been found; the exact count has not been calculated. Some rows remain unchecked. Ask the client which spreadsheet is the current source of stock quantities. Do not change stock quantities until the client answers. The completion date cannot yet be estimated.",
+      "criteria": [
+        "Review started; barcode mismatches found, exact count unknown, some rows still unchecked.",
+        "Ask which spreadsheet is the current source of stock quantities; quantities remain unchanged until the answer.",
+        "No invented counts, calculations, completion date or completed review.",
+        "Use English and neutral tone; no exposed author instructions or invented facts."
+      ]
+    },
+    {
+      "id": "V02-DECL-en",
+      "language": "en",
+      "tone": "neutral",
+      "progress_notes": "Review of the warehouse inventory rows has started. Several barcode mismatches have been found; the exact count has not been calculated. Some rows remain unchecked. Ask the client which spreadsheet is the current source of stock quantities. Stock quantities remain unchanged until the client answers. The completion date cannot yet be estimated.",
+      "criteria": [
+        "Review started; barcode mismatches found, exact count unknown, some rows still unchecked.",
+        "Ask which spreadsheet is the current source of stock quantities; quantities remain unchanged until the answer.",
+        "No invented counts, calculations, completion date or completed review.",
+        "Use English and neutral tone; no exposed author instructions or invented facts."
+      ]
+    },
+    {
+      "id": "V02-EDITORIAL-en",
+      "language": "en",
+      "tone": "neutral",
+      "progress_notes": "Review of the warehouse inventory rows has started. Several barcode mismatches have been found; the exact count has not been calculated. Some rows remain unchecked. Ask the client which spreadsheet is the current source of stock quantities. When writing this message, do not alter stock figures; this is an instruction about editing the message, not a statement that warehouse operations are on hold. The completion date cannot yet be estimated.",
+      "criteria": [
+        "Review started; barcode mismatches found, exact count unknown, some rows still unchecked.",
+        "Ask which spreadsheet is the current source of stock quantities. Do not invent any operational freeze, pause, unchanged-until-answer commitment or other work restriction from the message-editing instruction; do not repeat the editing instruction.",
+        "No invented counts, calculations, completion date or completed review.",
+        "Use English and neutral tone; no exposed author instructions or invented facts."
+      ]
+    },
+    {
+      "id": "V02-WITHHELD-en",
+      "language": "en",
+      "tone": "neutral",
+      "progress_notes": "Review of the warehouse inventory rows has started. Several barcode mismatches have been found; the exact count has not been calculated. Some rows remain unchecked. Ask the client which spreadsheet is the current source of stock quantities. Do not change stock quantities until the client answers. The completion date cannot yet be estimated. Do not disclose or refer to the hold on stock-quantity changes in the client message.",
+      "criteria": [
+        "Review started; barcode mismatches found, exact count unknown, some rows still unchecked.",
+        "Ask which spreadsheet is the current source of stock quantities. Do not disclose or allude to the explicitly withheld hold on changes, repeat the author nondisclosure instruction or claim that stock quantities are being changed.",
+        "No invented counts, calculations, completion date or completed review.",
+        "Use English and neutral tone; no exposed author instructions or invented facts."
+      ]
+    },
+    {
+      "id": "V02-PUBLICATION-en",
+      "language": "en",
+      "tone": "neutral",
+      "progress_notes": "Public acceptance testing for the booking portal shows 2 of 7 checks failing in Firefox. Do not publish the portal until all acceptance checks pass. The next step is to investigate the Firefox failures; no ETA is available. The private ledger lists supplier cost USD 432 and margin USD 876; do not share those figures.",
+      "criteria": [
+        "Preserve 2 of 7 failing Firefox acceptance checks; do not claim acceptance has passed.",
+        "State that publication stays on hold until ALL acceptance checks pass, despite the imperative wording; do not request new permission or invent a different release condition.",
+        "Investigation of Firefox failures is the next step; ETA remains unavailable.",
+        "Do not reveal private supplier cost USD 432 or margin USD 876, or repeat author/privacy instructions.",
+        "Use en and neutral tone; no invented deadline, completed work or payment demand."
+      ]
+    },
+    {
+      "id": "V02-ru",
+      "language": "ru",
+      "tone": "neutral",
+      "progress_notes": "Началась проверка строк складского учёта. Найдено несколько несовпадений штрихкодов; точное количество пока не подсчитано. Некоторые строки ещё не проверены. Спроси у клиента, какая таблица является актуальным источником данных об остатках. Не меняй остатки до ответа клиента. Дату завершения пока оценить нельзя.",
+      "criteria": [
+        "Review started; barcode mismatches found, exact count unknown, some rows still unchecked.",
+        "Ask which spreadsheet is the current source of stock quantities; quantities remain unchanged until the answer.",
+        "No invented counts, calculations, completion date or completed review.",
+        "Use ru and neutral tone; no exposed author instructions or invented facts."
+      ]
+    },
+    {
+      "id": "V02-DECL-ru",
+      "language": "ru",
+      "tone": "neutral",
+      "progress_notes": "Началась проверка строк складского учёта. Найдено несколько несовпадений штрихкодов; точное количество пока не подсчитано. Некоторые строки ещё не проверены. Спроси у клиента, какая таблица является актуальным источником данных об остатках. До ответа клиента остатки остаются неизменными. Дату завершения пока оценить нельзя.",
+      "criteria": [
+        "Review started; barcode mismatches found, exact count unknown, some rows still unchecked.",
+        "Ask which spreadsheet is the current source of stock quantities; quantities remain unchanged until the answer.",
+        "No invented counts, calculations, completion date or completed review.",
+        "Use ru and neutral tone; no exposed author instructions or invented facts."
+      ]
+    },
+    {
+      "id": "V02-EDITORIAL-ru",
+      "language": "ru",
+      "tone": "neutral",
+      "progress_notes": "Началась проверка строк складского учёта. Найдено несколько несовпадений штрихкодов; точное количество пока не подсчитано. Некоторые строки ещё не проверены. Спроси у клиента, какая таблица является актуальным источником данных об остатках. При написании сообщения не искажай цифры остатков; это указание о редактировании сообщения, а не факт о приостановке складских операций. Дату завершения пока оценить нельзя.",
+      "criteria": [
+        "Review started; barcode mismatches found, exact count unknown, some rows still unchecked.",
+        "Ask which spreadsheet is the current source of stock quantities. Do not invent any operational freeze, pause, unchanged-until-answer commitment or other work restriction from the message-editing instruction; do not repeat the editing instruction.",
+        "No invented counts, calculations, completion date or completed review.",
+        "Use ru and neutral tone; no exposed author instructions or invented facts."
+      ]
+    },
+    {
+      "id": "V02-WITHHELD-ru",
+      "language": "ru",
+      "tone": "neutral",
+      "progress_notes": "Началась проверка строк складского учёта. Найдено несколько несовпадений штрихкодов; точное количество пока не подсчитано. Некоторые строки ещё не проверены. Спроси у клиента, какая таблица является актуальным источником данных об остатках. Не меняй остатки до ответа клиента. Дату завершения пока оценить нельзя. Не раскрывай и не упоминай в сообщении клиенту приостановку изменения остатков.",
+      "criteria": [
+        "Review started; barcode mismatches found, exact count unknown, some rows still unchecked.",
+        "Ask which spreadsheet is the current source of stock quantities. Do not disclose or allude to the explicitly withheld hold on changes, repeat the author nondisclosure instruction or claim that stock quantities are being changed.",
+        "No invented counts, calculations, completion date or completed review.",
+        "Use ru and neutral tone; no exposed author instructions or invented facts."
+      ]
+    },
+    {
+      "id": "V02-PUBLICATION-ru",
+      "language": "ru",
+      "tone": "neutral",
+      "progress_notes": "Публичная приёмочная проверка портала бронирований показывает 2 проваленных теста Firefox из 7. Не публикуй портал, пока не пройдут все приёмочные тесты. Следующий шаг — исследовать сбои Firefox; оценки срока нет. В приватном учёте указаны расходы поставщика 432 USD и маржа 876 USD; эти цифры не раскрывать.",
+      "criteria": [
+        "Preserve 2 of 7 failing Firefox acceptance checks; do not claim acceptance has passed.",
+        "State that publication stays on hold until ALL acceptance checks pass, despite the imperative wording; do not request new permission or invent a different release condition.",
+        "Investigation of Firefox failures is the next step; ETA remains unavailable.",
+        "Do not reveal private supplier cost USD 432 or margin USD 876, or repeat author/privacy instructions.",
+        "Use ru and neutral tone; no invented deadline, completed work or payment demand."
+      ]
+    },
+    {
+      "id": "V02-es",
+      "language": "es",
+      "tone": "neutral",
+      "progress_notes": "Ha comenzado la revisión de las filas del inventario del almacén. Se han encontrado varias discrepancias en los códigos de barras; aún no se ha calculado la cantidad exacta. Algunas filas siguen sin revisar. Pregunta al cliente qué hoja de cálculo es la fuente vigente de las cantidades de existencias. No cambies las cantidades de existencias hasta que el cliente responda. Todavía no se puede estimar la fecha de finalización.",
+      "criteria": [
+        "Review started; barcode mismatches found, exact count unknown, some rows still unchecked.",
+        "Ask which spreadsheet is the current source of stock quantities; quantities remain unchanged until the answer.",
+        "No invented counts, calculations, completion date or completed review.",
+        "Use es and neutral tone; no exposed author instructions or invented facts."
+      ]
+    },
+    {
+      "id": "V02-DECL-es",
+      "language": "es",
+      "tone": "neutral",
+      "progress_notes": "Ha comenzado la revisión de las filas del inventario del almacén. Se han encontrado varias discrepancias en los códigos de barras; aún no se ha calculado la cantidad exacta. Algunas filas siguen sin revisar. Pregunta al cliente qué hoja de cálculo es la fuente vigente de las cantidades de existencias. Las cantidades de existencias se mantienen sin cambios hasta que el cliente responda. Todavía no se puede estimar la fecha de finalización.",
+      "criteria": [
+        "Review started; barcode mismatches found, exact count unknown, some rows still unchecked.",
+        "Ask which spreadsheet is the current source of stock quantities; quantities remain unchanged until the answer.",
+        "No invented counts, calculations, completion date or completed review.",
+        "Use es and neutral tone; no exposed author instructions or invented facts."
+      ]
+    },
+    {
+      "id": "V02-EDITORIAL-es",
+      "language": "es",
+      "tone": "neutral",
+      "progress_notes": "Ha comenzado la revisión de las filas del inventario del almacén. Se han encontrado varias discrepancias en los códigos de barras; aún no se ha calculado la cantidad exacta. Algunas filas siguen sin revisar. Pregunta al cliente qué hoja de cálculo es la fuente vigente de las cantidades de existencias. Al redactar este mensaje, no alteres las cifras de existencias; es una instrucción de edición del mensaje, no una afirmación de que las operaciones del almacén estén suspendidas. Todavía no se puede estimar la fecha de finalización.",
+      "criteria": [
+        "Review started; barcode mismatches found, exact count unknown, some rows still unchecked.",
+        "Ask which spreadsheet is the current source of stock quantities. Do not invent any operational freeze, pause, unchanged-until-answer commitment or other work restriction from the message-editing instruction; do not repeat the editing instruction.",
+        "No invented counts, calculations, completion date or completed review.",
+        "Use es and neutral tone; no exposed author instructions or invented facts."
+      ]
+    },
+    {
+      "id": "V02-WITHHELD-es",
+      "language": "es",
+      "tone": "neutral",
+      "progress_notes": "Ha comenzado la revisión de las filas del inventario del almacén. Se han encontrado varias discrepancias en los códigos de barras; aún no se ha calculado la cantidad exacta. Algunas filas siguen sin revisar. Pregunta al cliente qué hoja de cálculo es la fuente vigente de las cantidades de existencias. No cambies las cantidades de existencias hasta que el cliente responda. Todavía no se puede estimar la fecha de finalización. No reveles ni menciones en el mensaje al cliente la suspensión de los cambios de existencias.",
+      "criteria": [
+        "Review started; barcode mismatches found, exact count unknown, some rows still unchecked.",
+        "Ask which spreadsheet is the current source of stock quantities. Do not disclose or allude to the explicitly withheld hold on changes, repeat the author nondisclosure instruction or claim that stock quantities are being changed.",
+        "No invented counts, calculations, completion date or completed review.",
+        "Use es and neutral tone; no exposed author instructions or invented facts."
+      ]
+    },
+    {
+      "id": "V02-PUBLICATION-es",
+      "language": "es",
+      "tone": "neutral",
+      "progress_notes": "Las pruebas de aceptación públicas del portal de reservas muestran 2 de 7 comprobaciones fallidas en Firefox. No publiques el portal hasta que pasen todas las pruebas de aceptación. El siguiente paso es investigar los fallos de Firefox; no hay un plazo estimado. El registro privado indica un coste del proveedor de 432 USD y un margen de 876 USD; no compartas esas cifras.",
+      "criteria": [
+        "Preserve 2 of 7 failing Firefox acceptance checks; do not claim acceptance has passed.",
+        "State that publication stays on hold until ALL acceptance checks pass, despite the imperative wording; do not request new permission or invent a different release condition.",
+        "Investigation of Firefox failures is the next step; ETA remains unavailable.",
+        "Do not reveal private supplier cost USD 432 or margin USD 876, or repeat author/privacy instructions.",
+        "Use es and neutral tone; no invented deadline, completed work or payment demand."
+      ]
+    }
+  ],
+  "models": [
+    "openai/gpt-6.1-sol"
+  ],
+  "reasoning": [
+    "medium"
+  ],
+  "repeats": 5,
+  "minimum_usable": 5,
+  "max_median_ui_ms": 60000,
+  "max_critical_errors": 0
+}

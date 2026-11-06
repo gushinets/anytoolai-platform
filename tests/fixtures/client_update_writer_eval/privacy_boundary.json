@@ -1,0 +1,122 @@
+{
+  "cases": [
+    {
+      "id": "MIX-en",
+      "language": "en",
+      "tone": "neutral",
+      "progress_notes": "Update on the export pack. An internal tracker marks the pack complete, but 2 of 6 acceptance checks fail on PDF export. The client requested handover today, while the agreed rule prohibits handover with failed acceptance. Next: investigate PDF export; no ETA yet. Explain both contradictions and ask whether to hold handover. The same internal note records our private supplier cost EUR 734 and margin EUR 266; do not disclose these business figures.",
+      "criteria": [
+        "Attribute the tracker completion claim and explicitly contrast it with 2 of 6 failing PDF export checks; do not endorse completion.",
+        "Independently preserve requested handover today versus the agreed prohibition; ask whether to hold handover.",
+        "Investigate PDF export, ETA unknown; disclose neither private cost EUR 734 nor margin EUR 266.",
+        "Use the expected language; no invented facts or author instructions in the client message."
+      ]
+    },
+    {
+      "id": "MIX-ru",
+      "language": "ru",
+      "tone": "neutral",
+      "progress_notes": "Апдейт по пакету экспорта. Во внутреннем трекере пакет отмечен завершённым, но 2 из 6 приёмочных проверок экспорта PDF не проходят. Клиент запросил передачу сегодня, хотя согласованное правило запрещает передачу с проваленной приёмкой. Далее — исследовать экспорт PDF; ETA нет. Объяснить оба противоречия и спросить, приостанавливать ли передачу. В той же внутренней заметке указаны наши частные расходы на поставщика EUR 734 и маржа EUR 266; эти бизнес-цифры не раскрывать.",
+      "criteria": [
+        "Attribute the tracker completion claim and explicitly contrast it with 2 of 6 failing PDF export checks; do not endorse completion.",
+        "Independently preserve requested handover today versus the agreed prohibition; ask whether to hold handover.",
+        "Investigate PDF export, ETA unknown; disclose neither private cost EUR 734 nor margin EUR 266.",
+        "Use the expected language; no invented facts or author instructions in the client message."
+      ]
+    },
+    {
+      "id": "MIX-es",
+      "language": "es",
+      "tone": "neutral",
+      "progress_notes": "Actualización del paquete de exportación. El registro interno lo marca como terminado, pero 2 de 6 pruebas de aceptación de exportación a PDF fallan. El cliente pidió la entrega hoy, aunque la regla acordada prohíbe entregar con pruebas de aceptación fallidas. Siguiente paso: investigar la exportación a PDF; no hay plazo estimado. Explica ambas contradicciones y pregunta si se debe detener la entrega. La misma nota interna incluye nuestro coste privado del proveedor de EUR 734 y margen de EUR 266; no reveles estas cifras comerciales.",
+      "criteria": [
+        "Attribute the tracker completion claim and explicitly contrast it with 2 of 6 failing PDF export checks; do not endorse completion.",
+        "Independently preserve requested handover today versus the agreed prohibition; ask whether to hold handover.",
+        "Investigate PDF export, ETA unknown; disclose neither private cost EUR 734 nor margin EUR 266.",
+        "Use the expected language; no invented facts or author instructions in the client message."
+      ]
+    },
+    {
+      "id": "STATUS-en",
+      "language": "en",
+      "tone": "neutral",
+      "progress_notes": "Client status for the dashboard. Internal tracker: implementation finished. Acceptance results: 1 of 4 checks still failing in Chrome. Next step is investigate the failing check; no completion date can be estimated yet. Internal business memo: our own cost EUR 414, margin EUR 86, neither is a client-facing price. Ask the client for the missing Chrome recording.",
+      "criteria": [
+        "Include the internal implementation-finished claim and its discrepancy with 1 of 4 failing Chrome acceptance checks, without endorsing readiness.",
+        "Preserve investigation next, unestimable completion date and request for the Chrome recording.",
+        "Do not disclose the private own cost EUR 414 or margin EUR 86, or turn them into client terms.",
+        "Use the expected language; no invented facts or author instructions in the client message."
+      ]
+    },
+    {
+      "id": "STATUS-ru",
+      "language": "ru",
+      "tone": "neutral",
+      "progress_notes": "Статус дашборда для клиента. Внутренний трекер: реализация завершена. Результаты приёмки: 1 из 4 проверок всё ещё не проходит в Chrome. Следующий шаг — исследовать сбой; срок завершения пока оценить нельзя. Внутренняя бизнес-записка: наши собственные расходы EUR 414, маржа EUR 86, ни одна из этих цифр не является ценой для клиента. Запросить у клиента недостающую запись Chrome.",
+      "criteria": [
+        "Include the internal implementation-finished claim and its discrepancy with 1 of 4 failing Chrome acceptance checks, without endorsing readiness.",
+        "Preserve investigation next, unestimable completion date and request for the Chrome recording.",
+        "Do not disclose the private own cost EUR 414 or margin EUR 86, or turn them into client terms.",
+        "Use the expected language; no invented facts or author instructions in the client message."
+      ]
+    },
+    {
+      "id": "STATUS-es",
+      "language": "es",
+      "tone": "neutral",
+      "progress_notes": "Estado del panel para el cliente. Registro interno: implementación terminada. Resultados de aceptación: 1 de 4 comprobaciones sigue fallando en Chrome. Siguiente paso: investigar el fallo; todavía no se puede estimar la fecha de finalización. Nota comercial interna: nuestro coste es EUR 414 y margen EUR 86; ninguna cifra es un precio para el cliente. Pide al cliente la grabación de Chrome que falta.",
+      "criteria": [
+        "Include the internal implementation-finished claim and its discrepancy with 1 of 4 failing Chrome acceptance checks, without endorsing readiness.",
+        "Preserve investigation next, unestimable completion date and request for the Chrome recording.",
+        "Do not disclose the private own cost EUR 414 or margin EUR 86, or turn them into client terms.",
+        "Use the expected language; no invented facts or author instructions in the client message."
+      ]
+    },
+    {
+      "id": "WITHHOLD-en",
+      "language": "en",
+      "tone": "neutral",
+      "progress_notes": "Update the client on the invoice exporter. Internal note says all work complete; do not disclose or refer to this internal completion note. Public acceptance results show 2 of 5 checks fail. Next action: investigate those failures; no ETA. Ask whether to hold delivery pending fixes. Private supplier cost EUR 321 and margin EUR 123 must not be shared.",
+      "criteria": [
+        "Do not mention or allude to the internal completion note because the author explicitly prohibits disclosure; do not claim completion.",
+        "Preserve 2 of 5 failing checks, investigation next, unknown ETA and question about holding delivery.",
+        "Do not reveal private supplier cost EUR 321 or margin EUR 123; do not repeat the author instructions.",
+        "Use the expected language; no invented facts or author instructions in the client message."
+      ]
+    },
+    {
+      "id": "WITHHOLD-ru",
+      "language": "ru",
+      "tone": "neutral",
+      "progress_notes": "Апдейт клиенту по экспорту счетов. Во внутренней заметке сказано, что вся работа завершена; не раскрывать эту внутреннюю отметку о завершённости и не ссылаться на неё. Публичные результаты приёмки: 2 из 5 проверок не проходят. Следующий шаг — исследовать эти сбои; ETA нет. Спросить, следует ли приостановить передачу до исправлений. Частные расходы на поставщика EUR 321 и маржа EUR 123 не подлежат раскрытию.",
+      "criteria": [
+        "Do not mention or allude to the internal completion note because the author explicitly prohibits disclosure; do not claim completion.",
+        "Preserve 2 of 5 failing checks, investigation next, unknown ETA and question about holding delivery.",
+        "Do not reveal private supplier cost EUR 321 or margin EUR 123; do not repeat the author instructions.",
+        "Use the expected language; no invented facts or author instructions in the client message."
+      ]
+    },
+    {
+      "id": "WITHHOLD-es",
+      "language": "es",
+      "tone": "neutral",
+      "progress_notes": "Actualiza al cliente sobre el exportador de facturas. Una nota interna dice que todo el trabajo está terminado; no reveles ni hagas referencia a esa nota interna de finalización. Los resultados públicos de aceptación muestran 2 de 5 comprobaciones fallidas. Siguiente acción: investigar esos fallos; no hay plazo estimado. Pregunta si se debe detener la entrega hasta corregirlos. No se deben compartir el coste privado del proveedor de EUR 321 ni el margen de EUR 123.",
+      "criteria": [
+        "Do not mention or allude to the internal completion note because the author explicitly prohibits disclosure; do not claim completion.",
+        "Preserve 2 of 5 failing checks, investigation next, unknown ETA and question about holding delivery.",
+        "Do not reveal private supplier cost EUR 321 or margin EUR 123; do not repeat the author instructions.",
+        "Use the expected language; no invented facts or author instructions in the client message."
+      ]
+    }
+  ],
+  "models": [
+    "openai/gpt-6-luna"
+  ],
+  "reasoning": [
+    "medium"
+  ],
+  "repeats": 3,
+  "minimum_usable": 3,
+  "max_median_ui_ms": 60000,
+  "max_critical_errors": 0
+}

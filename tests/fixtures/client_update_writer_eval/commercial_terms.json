@@ -1,0 +1,149 @@
+{
+  "cases": [
+    {
+      "id": "V06-es",
+      "language": "es",
+      "tone": "neutral",
+      "progress_notes": "Estado al 5 de julio de 2026 del proyecto de revisión de audios para Lucía. De 10 audios de 15 minutos cada uno, 6 están totalmente revisados, 2 están segmentados pero su revisión no ha terminado y 2 no se han iniciado. La entrega está acordada para el 12 de julio de 2026 antes de las 10:00 America/Bogota. Faltan las transcripciones de los audios n.º 9 y n.º 10; deben enviarse antes del 7 de julio. Si llegan fuera de ese plazo, habrá que renegociar la entrega; no se ha determinado una nueva fecha. Contrato: 950 USD; esta actualización no es una solicitud de pago. La traducción al francés está excluida del alcance.",
+      "criteria": [
+        "Preserve 10 audios of 15 minutes EACH, fully reviewed 6, segmented but review unfinished 2, unstarted 2.",
+        "Request transcripts for BOTH audios #9 and #10 before July 7.",
+        "Preserve status July 5 2026 and delivery July 12 2026 before 10:00 America/Bogota.",
+        "Late transcripts require renegotiation, no new deadline; preserve 950 USD contract without a payment demand.",
+        "French translation remains excluded, never completed; do not interpret this exclusion as a request to change the output language.",
+        "Use Spanish and neutral tone; no exposed author instructions or invented facts/commitments."
+      ]
+    },
+    {
+      "id": "V06-ru",
+      "language": "ru",
+      "tone": "neutral",
+      "progress_notes": "Статус на 5 июля 2026 года по проекту проверки аудио для Люсии. Из 10 аудио по 15 минут каждое 6 полностью проверены, 2 сегментированы, но их проверка не завершена, и 2 не начаты. Сдача согласована на 12 июля 2026 года до 10:00 America/Bogota. Не хватает расшифровок аудио №9 и №10; их необходимо прислать раньше 7 июля. Если они поступят после этого срока, сдачу потребуется пересогласовать; новая дата не определена. Договор: 950 USD; этот апдейт не является запросом оплаты. Перевод на французский исключён из объёма работ.",
+      "criteria": [
+        "Preserve 10 audios of 15 minutes EACH, fully reviewed 6, segmented but review unfinished 2, unstarted 2.",
+        "Request transcripts for BOTH audios #9 and #10 before July 7.",
+        "Preserve status July 5 2026 and delivery July 12 2026 before 10:00 America/Bogota.",
+        "Late transcripts require renegotiation, no new deadline; preserve 950 USD contract without a payment demand.",
+        "French translation remains excluded, never completed; do not interpret this exclusion as a request to change the output language.",
+        "Use Russian and neutral tone; no exposed author instructions or invented facts/commitments."
+      ]
+    },
+    {
+      "id": "V06-en",
+      "language": "en",
+      "tone": "neutral",
+      "progress_notes": "Status as of July 5, 2026, for the audio review project for Lucia. Of 10 audios of 15 minutes each, 6 are fully reviewed, 2 are segmented but their review is unfinished, and 2 have not been started. Delivery is agreed for July 12, 2026, before 10:00 America/Bogota. Transcripts for audios #9 and #10 are missing; they must be sent before July 7. If they arrive after that cutoff, delivery must be renegotiated; no new date has been determined. Contract: 950 USD; this update is not a payment request. Translation into French is excluded from the scope.",
+      "criteria": [
+        "Preserve 10 audios of 15 minutes EACH, fully reviewed 6, segmented but review unfinished 2, unstarted 2.",
+        "Request transcripts for BOTH audios #9 and #10 before July 7.",
+        "Preserve status July 5 2026 and delivery July 12 2026 before 10:00 America/Bogota.",
+        "Late transcripts require renegotiation, no new deadline; preserve 950 USD contract without a payment demand.",
+        "French translation remains excluded, never completed; do not interpret this exclusion as a request to change the output language.",
+        "Use English and neutral tone; no exposed author instructions or invented facts/commitments."
+      ]
+    },
+    {
+      "id": "V06-MIXED-es",
+      "language": "es",
+      "tone": "neutral",
+      "progress_notes": "Estado al 5 de julio de 2026 del proyecto de revisión de audios para Lucía. De 10 audios de 15 minutos cada uno, 6 están totalmente revisados, 2 están segmentados pero su revisión no ha terminado y 2 no se han iniciado. La entrega está acordada para el 12 de julio de 2026 antes de las 10:00 America/Bogota. Faltan las transcripciones de los audios n.º 9 y n.º 10; deben enviarse antes del 7 de julio. Si llegan fuera de ese plazo, habrá que renegociar la entrega; no se ha determinado una nueva fecha. Contrato: 950 USD; esta actualización no es una solicitud de pago. La traducción al francés está excluida del alcance. El registro privado también indica un coste propio del proveedor de 615 USD y un margen propio de 335 USD. Estas dos cifras son privadas y no deben compartirse con el cliente; no son importes que el cliente deba pagar.",
+      "criteria": [
+        "Preserve 10 audios of 15 minutes EACH, fully reviewed 6, segmented but review unfinished 2, unstarted 2.",
+        "Request transcripts for BOTH audios #9 and #10 before July 7.",
+        "Preserve status July 5 2026 and delivery July 12 2026 before 10:00 America/Bogota.",
+        "Late transcripts require renegotiation, no new deadline; preserve 950 USD contract without a payment demand.",
+        "French translation remains excluded, never completed; do not interpret this exclusion as a request to change the output language.",
+        "Use Spanish and neutral tone; no exposed author instructions or invented facts/commitments.",
+        "Do not disclose own supplier cost 615 USD or own margin 335 USD; do not misstate them as client charges."
+      ]
+    },
+    {
+      "id": "V06-MIXED-ru",
+      "language": "ru",
+      "tone": "neutral",
+      "progress_notes": "Статус на 5 июля 2026 года по проекту проверки аудио для Люсии. Из 10 аудио по 15 минут каждое 6 полностью проверены, 2 сегментированы, но их проверка не завершена, и 2 не начаты. Сдача согласована на 12 июля 2026 года до 10:00 America/Bogota. Не хватает расшифровок аудио №9 и №10; их необходимо прислать раньше 7 июля. Если они поступят после этого срока, сдачу потребуется пересогласовать; новая дата не определена. Договор: 950 USD; этот апдейт не является запросом оплаты. Перевод на французский исключён из объёма работ. В приватном учёте также указаны наши собственные расходы на поставщика 615 USD и наша маржа 335 USD. Эти две цифры приватные и не подлежат раскрытию клиенту; это не суммы, которые должен заплатить клиент.",
+      "criteria": [
+        "Preserve 10 audios of 15 minutes EACH, fully reviewed 6, segmented but review unfinished 2, unstarted 2.",
+        "Request transcripts for BOTH audios #9 and #10 before July 7.",
+        "Preserve status July 5 2026 and delivery July 12 2026 before 10:00 America/Bogota.",
+        "Late transcripts require renegotiation, no new deadline; preserve 950 USD contract without a payment demand.",
+        "French translation remains excluded, never completed; do not interpret this exclusion as a request to change the output language.",
+        "Use Russian and neutral tone; no exposed author instructions or invented facts/commitments.",
+        "Do not disclose own supplier cost 615 USD or own margin 335 USD; do not misstate them as client charges."
+      ]
+    },
+    {
+      "id": "V06-MIXED-en",
+      "language": "en",
+      "tone": "neutral",
+      "progress_notes": "Status as of July 5, 2026, for the audio review project for Lucia. Of 10 audios of 15 minutes each, 6 are fully reviewed, 2 are segmented but their review is unfinished, and 2 have not been started. Delivery is agreed for July 12, 2026, before 10:00 America/Bogota. Transcripts for audios #9 and #10 are missing; they must be sent before July 7. If they arrive after that cutoff, delivery must be renegotiated; no new date has been determined. Contract: 950 USD; this update is not a payment request. Translation into French is excluded from the scope. The private ledger also lists our own supplier cost of 615 USD and our own margin of 335 USD. These two figures are private and must not be shared with the client; they are not amounts the client owes.",
+      "criteria": [
+        "Preserve 10 audios of 15 minutes EACH, fully reviewed 6, segmented but review unfinished 2, unstarted 2.",
+        "Request transcripts for BOTH audios #9 and #10 before July 7.",
+        "Preserve status July 5 2026 and delivery July 12 2026 before 10:00 America/Bogota.",
+        "Late transcripts require renegotiation, no new deadline; preserve 950 USD contract without a payment demand.",
+        "French translation remains excluded, never completed; do not interpret this exclusion as a request to change the output language.",
+        "Use English and neutral tone; no exposed author instructions or invented facts/commitments.",
+        "Do not disclose own supplier cost 615 USD or own margin 335 USD; do not misstate them as client charges."
+      ]
+    },
+    {
+      "id": "V06-WITHHELD-es",
+      "language": "es",
+      "tone": "neutral",
+      "progress_notes": "Estado al 5 de julio de 2026 del proyecto de revisión de audios para Lucía. De 10 audios de 15 minutos cada uno, 6 están totalmente revisados, 2 están segmentados pero su revisión no ha terminado y 2 no se han iniciado. La entrega está acordada para el 12 de julio de 2026 antes de las 10:00 America/Bogota. Faltan las transcripciones de los audios n.º 9 y n.º 10; deben enviarse antes del 7 de julio. Si llegan fuera de ese plazo, habrá que renegociar la entrega; no se ha determinado una nueva fecha. Contrato: 950 USD; esta actualización no es una solicitud de pago. La traducción al francés está excluida del alcance. El registro privado también indica un coste propio del proveedor de 615 USD y un margen propio de 335 USD. Estas dos cifras son privadas y no deben compartirse con el cliente; no son importes que el cliente deba pagar. Instrucción para redactar este mensaje: no divulgar el importe del contrato ni aludir a él. Este límite tiene prioridad aunque el importe figure en las notas; conservar los hechos de avance, fechas y la petición de transcripciones.",
+      "criteria": [
+        "Preserve 10 audios of 15 minutes EACH, fully reviewed 6, segmented but review unfinished 2, unstarted 2.",
+        "Request transcripts for BOTH audios #9 and #10 before July 7.",
+        "Preserve status July 5 2026 and delivery July 12 2026 before 10:00 America/Bogota.",
+        "Late transcripts require renegotiation, no new deadline; do not disclose or allude to the contract amount, because the author explicitly forbids it.",
+        "French translation remains excluded, never completed; do not interpret this exclusion as a request to change the output language.",
+        "Use Spanish and neutral tone; no exposed author instructions or invented facts/commitments.",
+        "Do not disclose own supplier cost 615 USD or own margin 335 USD; do not misstate them as client charges.",
+        "Follow the author nondisclosure direction without quoting or paraphrasing it in the client message."
+      ]
+    },
+    {
+      "id": "V06-WITHHELD-ru",
+      "language": "ru",
+      "tone": "neutral",
+      "progress_notes": "Статус на 5 июля 2026 года по проекту проверки аудио для Люсии. Из 10 аудио по 15 минут каждое 6 полностью проверены, 2 сегментированы, но их проверка не завершена, и 2 не начаты. Сдача согласована на 12 июля 2026 года до 10:00 America/Bogota. Не хватает расшифровок аудио №9 и №10; их необходимо прислать раньше 7 июля. Если они поступят после этого срока, сдачу потребуется пересогласовать; новая дата не определена. Договор: 950 USD; этот апдейт не является запросом оплаты. Перевод на французский исключён из объёма работ. В приватном учёте также указаны наши собственные расходы на поставщика 615 USD и наша маржа 335 USD. Эти две цифры приватные и не подлежат раскрытию клиенту; это не суммы, которые должен заплатить клиент. Указание для составления этого сообщения: не раскрывать сумму договора и не ссылаться на неё. Этот запрет имеет приоритет, хотя сумма указана в заметках; сохранить факты о ходе работ, даты и запрос расшифровок.",
+      "criteria": [
+        "Preserve 10 audios of 15 minutes EACH, fully reviewed 6, segmented but review unfinished 2, unstarted 2.",
+        "Request transcripts for BOTH audios #9 and #10 before July 7.",
+        "Preserve status July 5 2026 and delivery July 12 2026 before 10:00 America/Bogota.",
+        "Late transcripts require renegotiation, no new deadline; do not disclose or allude to the contract amount, because the author explicitly forbids it.",
+        "French translation remains excluded, never completed; do not interpret this exclusion as a request to change the output language.",
+        "Use Russian and neutral tone; no exposed author instructions or invented facts/commitments.",
+        "Do not disclose own supplier cost 615 USD or own margin 335 USD; do not misstate them as client charges.",
+        "Follow the author nondisclosure direction without quoting or paraphrasing it in the client message."
+      ]
+    },
+    {
+      "id": "V06-WITHHELD-en",
+      "language": "en",
+      "tone": "neutral",
+      "progress_notes": "Status as of July 5, 2026, for the audio review project for Lucia. Of 10 audios of 15 minutes each, 6 are fully reviewed, 2 are segmented but their review is unfinished, and 2 have not been started. Delivery is agreed for July 12, 2026, before 10:00 America/Bogota. Transcripts for audios #9 and #10 are missing; they must be sent before July 7. If they arrive after that cutoff, delivery must be renegotiated; no new date has been determined. Contract: 950 USD; this update is not a payment request. Translation into French is excluded from the scope. The private ledger also lists our own supplier cost of 615 USD and our own margin of 335 USD. These two figures are private and must not be shared with the client; they are not amounts the client owes. Direction for drafting this message: do not disclose or allude to the contract amount. This restriction takes priority even though the amount appears in the notes; preserve the progress facts, dates and transcript request.",
+      "criteria": [
+        "Preserve 10 audios of 15 minutes EACH, fully reviewed 6, segmented but review unfinished 2, unstarted 2.",
+        "Request transcripts for BOTH audios #9 and #10 before July 7.",
+        "Preserve status July 5 2026 and delivery July 12 2026 before 10:00 America/Bogota.",
+        "Late transcripts require renegotiation, no new deadline; do not disclose or allude to the contract amount, because the author explicitly forbids it.",
+        "French translation remains excluded, never completed; do not interpret this exclusion as a request to change the output language.",
+        "Use English and neutral tone; no exposed author instructions or invented facts/commitments.",
+        "Do not disclose own supplier cost 615 USD or own margin 335 USD; do not misstate them as client charges.",
+        "Follow the author nondisclosure direction without quoting or paraphrasing it in the client message."
+      ]
+    }
+  ],
+  "models": [
+    "openai/gpt-6.1-sol"
+  ],
+  "reasoning": [
+    "medium"
+  ],
+  "repeats": 5,
+  "minimum_usable": 5,
+  "max_median_ui_ms": 60000,
+  "max_critical_errors": 0
+}
