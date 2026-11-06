@@ -1731,6 +1731,108 @@ test("preset browsing preserves an unrelated dirty draft until explicit applicat
   expect(JSON.parse(await page.locator("#preset-readonly").textContent())).toEqual(stored);
 });
 
+for (const settingsOnly of [false, true]) {
+  test(`reopening v1 after cancelling ${settingsOnly ? "model, reasoning and origin" : "input and prompt"} edits protects and restores the saved settings`, async ({page}) => {
+    const stored = {
+      name: "Повторное открытие", description: "Неизменяемая версия", atom_id: "A06",
+      base_action_config_id: A06.base_action_config_id, schema_refs: A06.schema_refs,
+      prompt: A06.prompt, prompt_ref: A06.prompt_ref, prompt_source_ref: "product.a06.v1",
+      model_id: "openai/gpt-supported", reasoning_effort: "high", fixed_fields: ["context"],
+      example_input: A06.example_input, source_run_id: null,
+      preset_id: "preset-reopen", version: 1, created_at: "2026-11-06T08:00:00Z",
+    };
+    let runBody;
+    await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
+      const request = route.request();
+      const {pathname} = new URL(request.url());
+      if (pathname === "/v1/atom-lab/atoms/A06/prompts") {
+        await route.fulfill({json: [
+          {ref: A06.prompt_ref, name: "Платформенный", prompt: A06.prompt, group: "platform", source_ref: null, source_run_id: null},
+          {ref: stored.prompt_source_ref, name: "Продуктовый", prompt: stored.prompt, group: "product", source_ref: null, source_run_id: null},
+        ]});
+      } else if (pathname.startsWith("/v1/atom-lab/presets")) {
+        expect(request.method()).toBe("GET");
+        const summary = {preset_id: stored.preset_id, name: stored.name, description: stored.description,
+          atom_id: stored.atom_id, created_at: stored.created_at};
+        await route.fulfill({json: pathname.endsWith("/versions/1") ? stored : {
+          items: [pathname.endsWith("/versions") ? {...summary, version: 1}
+            : {...summary, latest_version: 1, updated_at: stored.created_at}], next_cursor: null,
+        }});
+      } else if (pathname === "/v1/atom-lab/runs") {
+        runBody = request.postDataJSON();
+        await route.fulfill({status: 202, json: {
+          run_id: "run-reopen", scenario_session_id: "session-library", job_id: "job-library", status: "queued",
+        }});
+      } else if (pathname === "/v1/atom-lab/runs/run-reopen") {
+        const detail = historyDetail({runId: "run-reopen", prompt: stored.prompt});
+        detail.snapshot.prompt.source_ref = stored.prompt_source_ref;
+        detail.snapshot.preset = {id: stored.preset_id, version: 1};
+        await route.fulfill({json: detail});
+      } else await route.fallback();
+    });
+    let discard = false;
+    let confirmations = 0;
+    page.on("dialog", dialog => { confirmations += 1; return discard ? dialog.accept() : dialog.dismiss(); });
+    await unlockAtom(page, "A06");
+    await page.locator("#presets-button").click();
+    await page.locator("#preset-list button").click();
+    await page.locator("#apply-preset").click();
+    await page.locator("#prompt-tab").click();
+    await expect(page.locator("#prompt-select")).toHaveValue(stored.prompt_source_ref);
+    const editedInput = settingsOnly ? stored.example_input : {...stored.example_input, objective: "Новая цель"};
+    const editedPrompt = settingsOnly ? stored.prompt : "Несохранённый промпт";
+    if (settingsOnly) {
+      await page.locator("#prompt-select").selectOption(A06.prompt_ref);
+      await page.locator("#model-select").selectOption("gpt-no-reasoning");
+    } else {
+      await page.locator("#input-tab").click();
+      await importJson(page, editedInput);
+      await page.locator("#prompt-tab").click();
+      await page.locator("#prompt-editor").fill(editedPrompt);
+    }
+    await page.locator("#input-tab").click();
+    await page.locator("#json-mode").click();
+    await page.locator("#presets-button").click();
+    await expect(page.locator("#preset-editor-form")).toBeVisible();
+    await expect(page.locator("#preset-state")).toContainText("Есть несохранённый черновик");
+    expect(JSON.parse(await page.locator("#preset-input-json").textContent())).toEqual(editedInput);
+    await expect(page.locator("#preset-prompt")).toHaveText(editedPrompt);
+    expect(confirmations).toBe(0);
+    discard = true;
+    await page.locator("#cancel-preset").click();
+    await expect(page.locator("#preset-editor-form")).toBeHidden();
+    expect(confirmations).toBe(1);
+    expect(JSON.parse(await page.locator("#preset-readonly").textContent())).toEqual(stored);
+    discard = false;
+    await page.locator("#apply-preset").click();
+    expect(confirmations).toBe(2);
+    await expect(page.locator("#presets-panel")).toBeVisible();
+    await expect(page.locator("#prompt-editor")).toHaveValue(editedPrompt);
+    expect(JSON.parse(await page.locator("#json-editor").inputValue())).toEqual(editedInput);
+    await expect(page.locator("#model-select")).toHaveValue(settingsOnly ? "gpt-no-reasoning" : "gpt-supported");
+    await expect(page.locator("#reasoning-effort")).toHaveValue(settingsOnly ? "" : "high");
+    await expect(page.locator("#prompt-select")).toHaveValue(settingsOnly ? A06.prompt_ref : stored.prompt_source_ref);
+    discard = true;
+    await page.locator("#apply-preset").click();
+    expect(confirmations).toBe(3);
+    await expect(page.locator("#presets-panel")).toBeHidden();
+    await expect(page.locator("#prompt-editor")).toHaveValue(stored.prompt);
+    await expect(page.locator("#prompt-select")).toHaveValue(stored.prompt_source_ref);
+    await expect(page.locator("#model-select")).toHaveValue("gpt-supported");
+    await expect(page.locator("#reasoning-effort")).toHaveValue(stored.reasoning_effort);
+    await page.locator("#input-tab").click();
+    await page.locator("#json-mode").click();
+    expect(JSON.parse(await page.locator("#json-editor").inputValue())).toEqual(stored.example_input);
+    await page.locator("#run-button").click();
+    await expect(page.locator("#run-state")).toHaveText("Завершён успешно");
+    expect(runBody).toEqual({
+      atom_id: stored.atom_id, input: stored.example_input, prompt: stored.prompt,
+      prompt_source_ref: stored.prompt_source_ref, model_id: stored.model_id,
+      reasoning_effort: stored.reasoning_effort, preset_ref: {preset_id: stored.preset_id, version: 1},
+    });
+  });
+}
+
 test("history table reveals result, request and diagnostics with complete JSON and keyboard tabs", async ({page}) => {
   const detail = historyDetail();
   const older = {...historyDetail({runId: "run-older-page"}), created_at: "2026-09-22T08:00:00Z"};
