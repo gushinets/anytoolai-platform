@@ -242,7 +242,7 @@ pre { background: #111827; border-radius: 0.55rem; color: #e5e7eb; max-height: 2
 .readable-result dd { line-height: 1.65; margin: 0 0 0.7rem; white-space: pre-wrap; }
 .readable-result dd:last-child { margin-bottom: 0; }
 .result-structured-value { font: 0.85rem ui-monospace, Consolas, monospace; }
-.invalid-response { background: #fff1f1; border-left: 4px solid #a52626; padding: 0.75rem; }
+.invalid-response { background: #fff1f1; border-left: 4px solid #a52626; overflow-wrap: anywhere; padding: 0.75rem; }
 #run-metadata { display: grid; gap: 0.65rem; }
 .metadata-group { background: #f7f8fc; border: 1px solid #e2e6ef; border-radius: 0.55rem; padding: 0.8rem; }
 .metadata-group h4 { font-size: 0.9rem; margin: 0 0 0.65rem; }

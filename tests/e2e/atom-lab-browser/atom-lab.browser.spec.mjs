@@ -5502,6 +5502,153 @@ test("open history model availability follows delayed catalog load and refresh",
   await expect(page.locator("#history-warning")).toContainText("Историческая модель недоступна");
 });
 
+for (const initialStatus of ["queued", "running"]) {
+  for (const finalStatus of ["succeeded", "failed"]) {
+    test(`history refresh replaces ${initialStatus} detail with actual ${finalStatus} data and trial provenance`, async ({page}) => {
+      const complete = historyDetail({runId: "run-refreshed-history", prompt: A06.prompt});
+      complete.snapshot.prompt.source_ref = A06.prompt_ref;
+      complete.status = finalStatus;
+      if (finalStatus === "failed") {
+        complete.result = null;
+        complete.diagnostics.error_code = "worker_lease_lost";
+      }
+      const pending = {...complete, status: initialStatus, result: null, finished_at: null,
+        started_at: initialStatus === "queued" ? null : complete.started_at,
+        diagnostics: {...complete.diagnostics, error_code: null, response_model_id: null, physical_calls: 0}};
+      let current = pending;
+      let detailReads = 0;
+      let promptBody = null;
+      let runPosts = 0;
+      await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
+        const {pathname} = new URL(route.request().url());
+        if (pathname === "/v1/atom-lab/runs" && route.request().method() === "GET") {
+          await route.fulfill({json: {items: [{run_id: current.run_id, status: current.status, atom_id: "A06",
+            model_id: current.snapshot.provider.model_id, preset_id: null, preset_version: null,
+            created_at: current.created_at, started_at: current.started_at, finished_at: current.finished_at}], next_cursor: null}});
+        } else if (pathname === `/v1/atom-lab/runs/${complete.run_id}`) {
+          detailReads += 1;
+          await route.fulfill({json: current});
+        } else if (pathname === "/v1/atom-lab/runs") {
+          runPosts += 1;
+          await route.abort();
+        } else if (pathname === "/v1/atom-lab/atoms/A06/prompts" && route.request().method() === "POST") {
+          promptBody = route.request().postDataJSON();
+          await route.fulfill({status: 422, json: {error: {code: "prompt_invalid", message: "Test rejection", field_errors: []}, request_id: "save-history"}});
+        } else if (pathname === "/v1/atom-lab/atoms/A06/prompts") {
+          await route.fulfill({json: [{ref: A06.prompt_ref, name: "Платформенный", prompt: A06.prompt,
+            group: "platform", source_ref: null, source_run_id: null}]});
+        } else await route.fallback();
+      });
+      await unlockAtom(page, "A06");
+      await page.locator("#history-button").click();
+      await page.locator("#history-list .history-open").click();
+      await expect(page.locator("#history-status-text")).toHaveText(initialStatus === "queued" ? "Ожидает запуска" : "Выполняется");
+      await showWorkbench(page);
+      await page.locator("#prompt-tab").click();
+      await page.locator("#prompt-editor").fill("Несохранённый текущий черновик");
+      current = complete;
+      await page.locator("#history-button").click();
+      await expect(page.locator("#history-status-text")).toHaveText(finalStatus === "succeeded" ? "Завершён успешно" : "Ошибка");
+      expect(JSON.parse(await page.locator("#history-detail").textContent())).toEqual(complete);
+      await showWorkbench(page);
+      await expect(page.locator("#prompt-editor")).toHaveValue("Несохранённый текущий черновик");
+      await page.locator("#history-button").click();
+      expect(detailReads).toBe(2);
+      page.once("dialog", dialog => dialog.accept());
+      await page.locator("#restore-history").click();
+      await page.locator("#prompt-tab").click();
+      await expect(page.locator("#prompt-editor")).toHaveValue(complete.snapshot.prompt.content);
+      if (finalStatus === "succeeded") await expect(page.locator("#prompt-test-status")).toContainText("Ответ прошёл контракт");
+      else await expect(page.locator("#prompt-test-status")).not.toContainText("Ответ прошёл контракт");
+      await page.locator("#save-prompt-panel summary").click();
+      await page.locator("#save-prompt-name").fill("Из обновлённой истории");
+      await page.locator("#save-prompt").click();
+      await expect.poll(() => promptBody).not.toBeNull();
+      expect(promptBody.source_run_id).toBe(finalStatus === "succeeded" ? complete.run_id : null);
+      expect(runPosts).toBe(0);
+    });
+  }
+}
+
+for (const outcome of ["list-failure", "failure", "malformed", "superseded-success", "superseded-failure", "pagination", "append"]) {
+  test(`history refresh fences stale actions and delayed reads after ${outcome}`, async ({page}) => {
+    const complete = historyDetail({runId: "run-refresh-owner"});
+    const other = historyDetail({runId: "run-refresh-other", prompt: "Последний выбранный запрос"});
+    const pending = {...complete, status: "running", result: null, finished_at: null};
+    let refreshed = false;
+    let reads = 0;
+    let releaseRead;
+    const delayedRead = new Promise(resolve => { releaseRead = resolve; });
+    const summary = detail => ({run_id: detail.run_id, status: detail.status, atom_id: "A06",
+      model_id: detail.snapshot.provider.model_id, preset_id: null, preset_version: null,
+      created_at: detail.created_at, started_at: detail.started_at, finished_at: detail.finished_at});
+    await page.route("http://atom-lab.test/v1/atom-lab/runs**", async route => {
+      const url = new URL(route.request().url());
+      if (url.pathname.endsWith("/runs")) {
+        if (outcome === "list-failure" && refreshed) {
+          await route.fulfill({status: 503, json: {error: {code: "history_unavailable", message: "Список недоступен", field_errors: []}, request_id: "list-failed"}});
+          return;
+        }
+        const paginated = outcome === "pagination" && refreshed && !url.searchParams.has("cursor");
+        const appending = outcome === "append" && url.searchParams.has("cursor");
+        await route.fulfill({json: {items: (paginated || appending ? [other] : [refreshed ? complete : pending, other]).map(summary),
+          next_cursor: paginated || (outcome === "append" && !appending) ? "selected-page" : null}});
+      } else if (url.pathname.endsWith(other.run_id)) await route.fulfill({json: other});
+      else {
+        reads += 1;
+        if (reads === 2) await delayedRead;
+        if (reads === 2 && outcome.includes("failure")) {
+          await route.fulfill({status: 503, json: {error: {code: "history_unavailable", message: "Свежее чтение недоступно", field_errors: []}, request_id: "history-failed"}});
+        } else await route.fulfill({json: reads === 1 ? pending : reads === 2 && outcome === "malformed" ? {} : complete});
+      }
+    });
+    await unlockAtom(page, "A06");
+    await page.locator("#history-button").click();
+    await page.locator(`[data-run-id="${complete.run_id}"]`).click();
+    await expect(page.locator("#history-status-text")).toHaveText("Выполняется");
+    if (outcome !== "append") await showWorkbench(page);
+    refreshed = true;
+    await page.locator(outcome === "append" ? "#load-more-history" : "#history-button").click();
+    if (outcome === "list-failure") {
+      await expect(page.locator("#history-error")).toContainText("Список недоступен");
+      await expect(page.locator("#history-record")).toBeHidden();
+      await expect(page.locator("#restore-history")).toBeDisabled();
+      await expect(page.locator("#save-history-preset")).toBeDisabled();
+      return;
+    }
+    if (outcome === "pagination") {
+      await expect(page.locator("#restore-history")).toBeDisabled();
+      await page.locator("#load-more-history").click();
+    }
+    await expect.poll(() => reads).toBe(2);
+    await expect(page.locator("#history-record")).toBeHidden();
+    await expect(page.locator("#restore-history")).toBeDisabled();
+    await expect(page.locator("#save-history-preset")).toBeDisabled();
+    await page.locator("#restore-history").dispatchEvent("click");
+    await page.locator("#save-history-preset").dispatchEvent("click");
+    await expect(page.locator("#history-panel")).toBeVisible();
+    if (outcome.startsWith("superseded")) {
+      await page.locator(`[data-run-id="${other.run_id}"]`).dispatchEvent("click");
+      await expect(page.locator("#history-detail")).toContainText(other.snapshot.prompt.content);
+    }
+    const reply = page.waitForResponse(response => response.url().endsWith(complete.run_id));
+    releaseRead();
+    await (await reply).finished();
+    if (outcome === "failure" || outcome === "malformed") {
+      await expect(page.locator("#history-error")).toContainText(outcome === "failure" ? "Свежее чтение недоступно" : "некорректный ответ");
+      await expect(page.locator("#restore-history")).toBeDisabled();
+      await expect(page.locator("#save-history-preset")).toBeDisabled();
+      await page.locator(`[data-run-id="${complete.run_id}"]`).click();
+    }
+    await expect(page.locator("#restore-history")).toBeEnabled();
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
+    expect(JSON.parse(await page.locator("#history-detail").textContent())).toEqual(outcome.startsWith("superseded") ? other : complete);
+    await expect(page.locator("#history-error")).toHaveText("");
+    await page.locator("#restore-history").click();
+    await expect(page.locator("#prompt-editor")).toHaveValue(outcome.startsWith("superseded") ? other.snapshot.prompt.content : complete.snapshot.prompt.content);
+  });
+}
+
 test("history detail keeps the last selected snapshot across out-of-order responses", async ({page}) => {
   const slow = historyDetail({runId: "run-history-slow", prompt: "Медленный snapshot"});
   const fast = historyDetail({runId: "run-history-fast", prompt: "Последний выбранный snapshot"});

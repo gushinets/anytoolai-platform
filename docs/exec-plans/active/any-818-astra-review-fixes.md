@@ -415,3 +415,92 @@ files changed, staging is empty and unrelated untracked reports remain untouched
 No backend/API, schema, generated artifact, dependency, Sonar setting, working DB,
 migration, provider call, deployment, commit or push changed. Full backend/PostgreSQL,
 required CI and a fresh independent review remain with the parent.
+
+## Final P2: interactive HTML framing and refreshed history details
+
+Doctor passed before edits on 2026-11-07. Repair the two confirmed findings from
+review `5805900263`, discussions `4496748281` and `4496748298`:
+
+1. Protect interactive API HTML entry points, including Swagger, ReDoc and its
+   OAuth redirect, against framing. Use the existing response middleware; preserve
+   other CSP directives, response headers, top-level docs and all Lab authorization.
+   Inspect the demo shell and documented browser journeys before choosing scope.
+2. Reconcile the selected history detail with refreshed summaries. Changed status
+   must invalidate the cached result before restore/save can use it, fetch actual
+   detail, and fence delayed reads and failures. Preserve drafts, selection and
+   successful-trial provenance; immutable terminal details may remain cached.
+
+Reach: API response boundary and header tests, shared history loading/actions,
+focused Chromium regressions, and this plan. Prove focused regressions before the
+production fixes, then run connected API, canonical frontend and docs checks.
+Use isolated SQLite/in-memory Uvicorn and mocked transport only; no working DB,
+migration, provider call, new dependency, Sonar change, staging, commit or push.
+
+The parallel CSS owner exclusively adds `overflow-wrap: anywhere` to the existing
+`.invalid-response` rule. Its exact CI reproduction uses
+`mcr.microsoft.com/playwright:v1.62.1-noble` plus Ubuntu `fonts-dejavu-core`: the
+320px document was 332px, with an unbroken invalid-response identifier measuring
+283px inside a 226px container. Keep the existing exact overflow assertion intact.
+
+The new regressions first reproduced the missing HTML headers (nine failures;
+the existing two Lab-shell cases already passed) and all four queued/running to
+succeeded/failed stale cards. An additional failing regression showed that an
+unsuccessful summary refresh also left the running snapshot actionable.
+
+The existing API response middleware now appends an independent
+`frame-ancestors 'none'` CSP policy to HTML responses. The Lab route retains its
+no-store policy and gets framing protection from that shared boundary. Swagger,
+ReDoc, OAuth redirect and demo headers are covered in both access modes. A test
+retains a route's existing script/ancestor CSP, X-Frame-Options and cache headers;
+non-HTML API responses are unchanged. No documented API iframe journey exists;
+product result/consent navigation is owned by the separate web host. No Portal
+identity, scope or producer/consumer contract changed.
+
+History now retains selection separately from the cached detail, invalidates
+nonterminal snapshots before refreshing the list, and fetches selected details
+when summaries differ or a fresh nonterminal read is needed. Existing generation
+fences reject delayed reads. Restore/save remain disabled while list/detail reads
+are pending and after failed or malformed detail reads; invalidated data is hidden.
+Reopening, older-page loading, selecting another run, failed reads and retry all
+preserve the current draft. Stable terminal snapshots may reuse their detail.
+Successful fresh history restores the exact trial and saves its source run without
+issuing an execution POST; failed history does not invent successful evidence.
+
+Real browser proof: `.quick-check-tmp/framing-probe.py` starts actual Uvicorn with
+SQLite RAM (a fixture-only `clock_timestamp` shim), then
+`.quick-check-tmp/framing-probe.mjs` drives installed Chromium against the real
+FastAPI HTML/OpenAPI and official default Swagger UI 5 CDN assets. There is no
+mock Swagger UI or mocked refresh endpoint. In both no-code and code-protected
+modes, direct foreign-Origin POST returns 401 and same-origin/foreign-origin
+iframes are blocked, leaving zero catalog-state rows. Top-level Swagger's
+Try it out / Execute returns 202 and creates exactly one pending row. Code mode
+also proves missing-code 401 before entering the header. Both servers and browser
+are closed after each run; no worker or provider is launched. Logs:
+`.quick-check-tmp/framing-probe-local.log` and `framing-probe-code.log`.
+
+Verification (2026-11-07): 11 new API header cases passed; focused Chromium
+20 passed, then all 11 final refresh cases passed including the added older-page
+append case. Connected API/demo/docs/Atom Lab architecture passed 471 cases
+(`.quick-check-tmp/p2-api-docs-architecture.log`). `validate-docs` and
+`generate-docs --check` passed. Ruff comparison against HEAD found no new
+diagnostics in any changed Python file (main 0/0, router 4/4, access tests 1/1).
+
+The parallel CSS owner separately proved 3/3 exact Linux viewport cases and all
+171 original Chromium cases on frozen `1ae5819` plus only the CSS fix. That
+isolated snapshot does not include these new API/JavaScript/tests. Evidence:
+`.quick-check-tmp/atomlab-viewport-linux/fixed-target.log`, `full-linux.log` and
+`reproduction.md`. The final canonical
+`python scripts/agent/runner.py frontend-check` passed lint, typecheck, all 182
+Chromium journeys, 53 Atom Lab Node tests, six demo Node tests, 824 Vitest tests,
+generated API-type drift and production builds. Log:
+`.quick-check-tmp/p2-frontend-check-final.log`. No test tolerance, skip or retry
+was added.
+
+Isolated API tests used the managed interpreter and `runner.baseline_env()`;
+Chromium used the installed browser cache and the bundled LiteLLM cost map. The
+sandbox again stalled async setup; the isolated checks passed with escalation.
+Documentation, final diff and staging checks passed; staging is empty and unrelated
+untracked reports remain untouched. Six owned files changed, plus the parallel
+owner's CSS. Full backend/production PostgreSQL, required CI and fresh independent
+review remain with the parent. No schema/generated contract, dependency, Sonar
+setting, working DB, migration, deployment, provider call, commit or push changed.

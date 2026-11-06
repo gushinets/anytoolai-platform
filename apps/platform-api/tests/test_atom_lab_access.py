@@ -21,6 +21,7 @@ from anytoolai_platform_core.storage.db import event_log_table, scenario_session
 from anytoolai_platform_core.storage.transactions import SessionFactory, transaction_boundary
 from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, ConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -178,6 +179,37 @@ def test_code_protected_remote_access_keeps_working(app) -> None:
         base_url="https://lab.example", origin="https://lab.example",
     ))
     assert response.status_code == HTTPStatus.OK
+
+
+@pytest.mark.parametrize("path", ["/docs", "/redoc", "/docs/oauth2-redirect", "/demo", "/atom-lab"])
+@pytest.mark.parametrize("auth_disabled", [False, True])
+def test_api_html_cannot_be_framed(app, monkeypatch, path, auth_disabled) -> None:
+    monkeypatch.setenv("ANYTOOLAI_ATOM_LAB_AUTH_DISABLED", str(auth_disabled).lower())
+    response = asyncio.run(_request(app, path))
+
+    assert response.status_code == HTTPStatus.OK
+    assert response.headers["content-type"].startswith("text/html")
+    assert "frame-ancestors 'none'" in response.headers.get_list("content-security-policy")
+    assert response.headers["X-Request-ID"] == "req_atom_lab"
+
+
+def test_html_framing_policy_preserves_existing_headers_and_non_html(app) -> None:
+    @app.get("/html-policy-probe", include_in_schema=False)
+    def html_probe() -> HTMLResponse:
+        return HTMLResponse("<p>probe</p>", headers={
+            "Content-Security-Policy": "script-src 'self'; frame-ancestors 'self'",
+            "X-Frame-Options": "SAMEORIGIN",
+            "Cache-Control": "private",
+        })
+
+    response = asyncio.run(_request(app, "/html-policy-probe"))
+    assert response.headers.get_list("content-security-policy") == [
+        "script-src 'self'; frame-ancestors 'self'", "frame-ancestors 'none'",
+    ]
+    assert response.headers["X-Frame-Options"] == "SAMEORIGIN"
+    assert response.headers["Cache-Control"] == "private"
+    api_response = asyncio.run(_request(app, "/health"))
+    assert "content-security-policy" not in api_response.headers
 
 
 @pytest.mark.parametrize("content_length", [None, "1048576"])
