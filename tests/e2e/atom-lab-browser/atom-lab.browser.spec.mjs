@@ -3644,81 +3644,46 @@ test("structured pre-write preset failure keeps the draft retryable", async ({pa
   await expect.poll(() => posts).toBe(2);
 });
 
-test("malformed successful preset response blocks blind duplicate saves", async ({page}) => {
-  let posts = 0;
-  await page.route("http://atom-lab.test/v1/atom-lab/presets", async (route) => {
-    if (route.request().method() === "POST") {
-      posts += 1;
-      await route.fulfill({status: 201, contentType: "application/json", body: "{"});
-      return;
-    }
-    await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [], next_cursor: null})});
+for (const responseCase of [
+  {
+    name: "malformed successful preset response", presetName: "Повреждённый ответ", body: "{",
+  },
+  {
+    name: "invalid successful preset response", presetName: "Неполный успешный ответ",
+    body: JSON.stringify({preset_id: "preset-committed-with-invalid-envelope", version: 1}),
+  },
+  {
+    name: "new preset response with a non-initial version", presetName: "Неверная первая версия",
+    body: JSON.stringify({
+      preset_id: "preset-wrong-create-version",
+      version: 2,
+      created_at: "2026-09-24T12:00:00Z",
+    }),
+  },
+]) {
+  test(`${responseCase.name} blocks blind duplicate saves`, async ({page}) => {
+    let posts = 0;
+    await page.route("http://atom-lab.test/v1/atom-lab/presets", async (route) => {
+      if (route.request().method() === "POST") {
+        posts += 1;
+        await route.fulfill({status: 201, contentType: "application/json", body: responseCase.body});
+        return;
+      }
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [], next_cursor: null})});
+    });
+
+    await unlockAtom(page, "A06");
+    await openNewPresetFromExample(page);
+    await page.locator("#preset-name").fill(responseCase.presetName);
+    await editPreset(page);
+    await page.locator("#save-preset").click();
+
+    await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
+    await expect(page.locator("#save-preset")).toBeDisabled();
+    await expect(page.locator("#save-as-new-preset")).toBeDisabled();
+    expect(posts).toBe(1);
   });
-
-  await unlockAtom(page, "A06");
-  await openNewPresetFromExample(page);
-  await page.locator("#preset-name").fill("Повреждённый ответ");
-  await editPreset(page);
-  await page.locator("#save-preset").click();
-
-  await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
-  await expect(page.locator("#save-preset")).toBeDisabled();
-  await expect(page.locator("#save-as-new-preset")).toBeDisabled();
-  expect(posts).toBe(1);
-});
-
-test("invalid successful preset response blocks blind duplicate saves", async ({page}) => {
-  let posts = 0;
-  await page.route("http://atom-lab.test/v1/atom-lab/presets", async (route) => {
-    if (route.request().method() === "POST") {
-      posts += 1;
-      await route.fulfill({status: 201, contentType: "application/json", body: JSON.stringify({
-        preset_id: "preset-committed-with-invalid-envelope",
-        version: 1,
-      })});
-      return;
-    }
-    await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [], next_cursor: null})});
-  });
-
-  await unlockAtom(page, "A06");
-  await openNewPresetFromExample(page);
-  await page.locator("#preset-name").fill("Неполный успешный ответ");
-  await editPreset(page);
-  await page.locator("#save-preset").click();
-
-  await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
-  await expect(page.locator("#save-preset")).toBeDisabled();
-  await expect(page.locator("#save-as-new-preset")).toBeDisabled();
-  expect(posts).toBe(1);
-});
-
-test("new preset response with a non-initial version blocks blind duplicate saves", async ({page}) => {
-  let posts = 0;
-  await page.route("http://atom-lab.test/v1/atom-lab/presets", async (route) => {
-    if (route.request().method() === "POST") {
-      posts += 1;
-      await route.fulfill({status: 201, contentType: "application/json", body: JSON.stringify({
-        preset_id: "preset-wrong-create-version",
-        version: 2,
-        created_at: "2026-09-24T12:00:00Z",
-      })});
-      return;
-    }
-    await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [], next_cursor: null})});
-  });
-
-  await unlockAtom(page, "A06");
-  await openNewPresetFromExample(page);
-  await page.locator("#preset-name").fill("Неверная первая версия");
-  await editPreset(page);
-  await page.locator("#save-preset").click();
-
-  await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
-  await expect(page.locator("#save-preset")).toBeDisabled();
-  await expect(page.locator("#save-as-new-preset")).toBeDisabled();
-  expect(posts).toBe(1);
-});
+}
 
 for (const responseCase of [
   {name: "another identity", presetId: "preset-other", version: 2},
