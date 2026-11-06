@@ -2022,8 +2022,8 @@
       "additional_language_review": "5 PASS, 1 REVIEW (Spanish wording ambiguity)"
     }
   },
-  "acceptance_scope": "Historical original pre-fix series; see review_2 and current_revision_matrix for the latest targeted results and coverage limits.",
-  "latest_original_ticket_acceptance": "Current revision: U2 RU/EN/ES 9/9 PASS, full matrix not rerun. Previous revision: 41/45 after correcting four deadline-meaning failures.",
+  "acceptance_scope": "Historical original pre-fix series; see review_3 and current_revision_matrix for the latest targeted results and coverage limits.",
+  "latest_original_ticket_acceptance": "Current revision: U2/U3 RU/EN/ES 18/18 PASS; full matrix not rerun. Earlier targeted U2: 9/9 on review-2 prompt; prior full matrix: 41/45 after four deadline corrections.",
   "review_1": {
     "acceptance": "PASS 9/9 for requested A01 RU/EN/ES recheck",
     "environment": {
@@ -5506,6 +5506,47 @@
     ]
   },
   "current_revision_matrix": {
+    "acceptance": "PARTIAL: U2/U3 18/18 PASS; A01/A04/U1 not rerun on the notes-priority prompt revision.",
+    "matrix": [
+      {
+        "case": "U2",
+        "language": "ru",
+        "attempts": 3,
+        "passed": 3
+      },
+      {
+        "case": "U2",
+        "language": "en",
+        "attempts": 3,
+        "passed": 3
+      },
+      {
+        "case": "U2",
+        "language": "es",
+        "attempts": 3,
+        "passed": 3
+      },
+      {
+        "case": "U3",
+        "language": "ru",
+        "attempts": 3,
+        "passed": 3
+      },
+      {
+        "case": "U3",
+        "language": "en",
+        "attempts": 3,
+        "passed": 3
+      },
+      {
+        "case": "U3",
+        "language": "es",
+        "attempts": 3,
+        "passed": 3
+      }
+    ]
+  },
+  "review_2_matrix": {
     "acceptance": "PARTIAL: U2 9/9 PASS; A01/A04/U1/U3 not rerun on the deadline prompt revision.",
     "matrix": [
       {
@@ -5525,6 +5566,1140 @@
         "language": "es",
         "attempts": 3,
         "passed": 3
+      }
+    ]
+  },
+  "review_3": {
+    "acceptance": "PASS 18/18 U2/U3",
+    "scope": "U2 and U3 RU/EN/ES, three fresh browser attempts per unchanged input on the notes-priority prompt revision. No observed prior U3 failure is claimed.",
+    "environment": {
+      "source_sha": "44c2feb261ecece564adaafe999b8d52601e8c7f",
+      "runtime_files_match_checkout": true,
+      "sha256": {
+        "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/client_update_writer/prompts/prepaid_request_compose_persuasive_text.v1.md": "3919fc15b9c208028512f8d011e425c4fadfc28d9f75e3469009071aebe94b36",
+        "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/client_update_writer/workflows.yaml": "35e6334ccb4387c481d83dbed7cf6e4024ae8d9b25a0b1e75f489b4c96de6bbc",
+        "configs/kernel/litellm_router.yaml": "60d55333ac52d3a3490a6b2783acf375b2e8305d9b2a17e77855b0735d6c0c25"
+      },
+      "router": "model_list:\n  - model_name: anytoolai.default_text\n    litellm_params:\n      model: openai/gpt-6-luna\n      api_key: env/OPENAI_API_KEY\n      reasoning_effort: medium\n      # Kept although LiteLLM 1.105.1 lists gpt-6-luna: a model its static registry does not list\n      # yet would have this parameter rejected as unsupported although the API accepts it.\n      allowed_openai_params: [reasoning_effort]\n\nrouter_settings:\n  routing_strategy: simple-shuffle\n  enable_pre_call_checks: true\n",
+      "started_at": "2026-11-06T14:01:48.324783+00:00",
+      "source_note": "Working tree includes authorized Prepaid prompt and contract-test edits; runtime prompt/workflow/router verified byte-for-byte against checkout."
+    },
+    "physical_provider_calls": 18,
+    "runs": [
+      {
+        "id": "U2-RU-1",
+        "input": {
+          "id": "U2-RU",
+          "language": "ru",
+          "tone": "firm",
+          "notes": "Клиент Sam. Согласована предоплата USD 800 за редизайн сайта.",
+          "amount": "USD 800",
+          "due_date": "пятница — как можно скорее"
+        },
+        "session_id": "scenario_session_01793973715277251294_0000000002_abf8411d02f4470c8fd7c74fb81099db",
+        "submitted_at": "2026-11-06T14:01:55.185Z",
+        "output": {
+          "text": "Sam, пожалуйста, внесите предоплату USD 800 за редизайн сайта как можно скорее, но не позднее пятницы. Сообщите, пожалуйста, когда отправите оплату."
+        },
+        "visible_text": "Sam, пожалуйста, внесите предоплату USD 800 за редизайн сайта как можно скорее, но не позднее пятницы. Сообщите, пожалуйста, когда отправите оплату.",
+        "clipboard_text": "Sam, пожалуйста, внесите предоплату USD 800 за редизайн сайта как можно скорее, но не позднее пятницы. Сообщите, пожалуйста, когда отправите оплату.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 6350.280822,
+        "trace_sha256": "0e29f66782b6842c73677f1fe2f3b57994fcd960d650ad1ffebaa5c4337dd98a",
+        "artifact_id": "artifact_01793973720293865525_0000000011_49550b6f10774b39bb900b49f6ea97cc",
+        "action": {
+          "id": "action_run_01793973715413303706_0000000002_891a30e4fe5d4488b2c611cc1b0d7155",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "semantic_attempt_index": 1,
+            "status": "succeeded",
+            "latency_ms": 4655,
+            "input_tokens": 4177,
+            "output_tokens": 200,
+            "estimated_cost": 0.0006220499999999999,
+            "reasoning_effort": null,
+            "attempts": {
+              "pydantic_run_id": "01a1b12a-825f-772d-966a-8e144f1daa7e",
+              "physical_call_index": 1,
+              "semantic_attempt_index": 1,
+              "transport_attempt_index": 1
+            }
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_checks": {
+          "verdict": "PASS",
+          "deadline_quote": "не позднее пятницы",
+          "payment_quote": "пожалуйста, внесите предоплату USD 800",
+          "urgency_quote": "как можно скорее",
+          "urgency_present": true,
+          "urgency_review": "Explicit ASAP urgency from due_date is retained without strengthening it; payment is requested no later than Friday and earlier payment is allowed.",
+          "language_matches_input": true,
+          "amount_preserved": true,
+          "no_invented_date_or_stronger_urgency": true
+        },
+        "assessment_note": "Full output reviewed for temporal relation and urgency precedence. Structural/quote checks verify provenance, not model semantics."
+      },
+      {
+        "id": "U2-RU-2",
+        "input": {
+          "id": "U2-RU",
+          "language": "ru",
+          "tone": "firm",
+          "notes": "Клиент Sam. Согласована предоплата USD 800 за редизайн сайта.",
+          "amount": "USD 800",
+          "due_date": "пятница — как можно скорее"
+        },
+        "session_id": "scenario_session_01793973725500433274_0000000008_eae01a02b8b645c19462bca1ee52144e",
+        "submitted_at": "2026-11-06T14:02:05.420Z",
+        "output": {
+          "text": "Предоплата USD 800 за редизайн сайта согласована. Пожалуйста, оплатите её как можно скорее, но не позднее пятницы, и сообщите, когда отправите платёж."
+        },
+        "visible_text": "Предоплата USD 800 за редизайн сайта согласована. Пожалуйста, оплатите её как можно скорее, но не позднее пятницы, и сообщите, когда отправите платёж.",
+        "clipboard_text": "Предоплата USD 800 за редизайн сайта согласована. Пожалуйста, оплатите её как можно скорее, но не позднее пятницы, и сообщите, когда отправите платёж.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 6361.640309999999,
+        "trace_sha256": "bdfb55af0de8b0d439bfcc0691aa32a587c8f63e7009e9da132302bbd82cbe88",
+        "artifact_id": "artifact_01793973730072086737_0000000027_a098d4ea1edf440f85829c474d7dcd93",
+        "action": {
+          "id": "action_run_01793973726371249999_0000000018_07fe1f7cedae4d839a289357a53aabad",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "semantic_attempt_index": 1,
+            "status": "succeeded",
+            "latency_ms": 3662,
+            "input_tokens": 4177,
+            "output_tokens": 238,
+            "estimated_cost": 0.00016104,
+            "reasoning_effort": null,
+            "attempts": {
+              "pydantic_run_id": "01a1b12a-acaa-77b2-bae7-7e36174812eb",
+              "physical_call_index": 1,
+              "semantic_attempt_index": 1,
+              "transport_attempt_index": 1
+            }
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_checks": {
+          "verdict": "PASS",
+          "deadline_quote": "не позднее пятницы",
+          "payment_quote": "Пожалуйста, оплатите её",
+          "urgency_quote": "как можно скорее",
+          "urgency_present": true,
+          "urgency_review": "Explicit ASAP urgency from due_date is retained without strengthening it; payment is requested no later than Friday and earlier payment is allowed.",
+          "language_matches_input": true,
+          "amount_preserved": true,
+          "no_invented_date_or_stronger_urgency": true
+        },
+        "assessment_note": "Full output reviewed for temporal relation and urgency precedence. Structural/quote checks verify provenance, not model semantics."
+      },
+      {
+        "id": "U2-RU-3",
+        "input": {
+          "id": "U2-RU",
+          "language": "ru",
+          "tone": "firm",
+          "notes": "Клиент Sam. Согласована предоплата USD 800 за редизайн сайта.",
+          "amount": "USD 800",
+          "due_date": "пятница — как можно скорее"
+        },
+        "session_id": "scenario_session_01793973736797460727_0000000014_31ad1c6187434d93b2a31b2a2f4e100e",
+        "submitted_at": "2026-11-06T14:02:16.720Z",
+        "output": {
+          "text": "Sam, пожалуйста, оплатите предоплату в размере USD 800 за редизайн сайта как можно скорее, не позднее пятницы. Сообщите, пожалуйста, когда отправите платеж."
+        },
+        "visible_text": "Sam, пожалуйста, оплатите предоплату в размере USD 800 за редизайн сайта как можно скорее, не позднее пятницы. Сообщите, пожалуйста, когда отправите платеж.",
+        "clipboard_text": "Sam, пожалуйста, оплатите предоплату в размере USD 800 за редизайн сайта как можно скорее, не позднее пятницы. Сообщите, пожалуйста, когда отправите платеж.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 4377.855073,
+        "trace_sha256": "d6efa0982162fe24581fc9f5d6e08e3cb8f69caa5834a16507c3f877d77e9925",
+        "artifact_id": "artifact_01793973740732477890_0000000043_2e0b3420c6d84c969beeb3ef4592a457",
+        "action": {
+          "id": "action_run_01793973737136910223_0000000034_9c61e95304dd400ba4d58a668d804019",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "semantic_attempt_index": 1,
+            "status": "succeeded",
+            "latency_ms": 3555,
+            "input_tokens": 4177,
+            "output_tokens": 201,
+            "estimated_cost": 0.00014254,
+            "reasoning_effort": null,
+            "attempts": {
+              "pydantic_run_id": "01a1b12a-d6b8-71c3-9fb7-1442d6a1a33d",
+              "physical_call_index": 1,
+              "semantic_attempt_index": 1,
+              "transport_attempt_index": 1
+            }
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_checks": {
+          "verdict": "PASS",
+          "deadline_quote": "не позднее пятницы",
+          "payment_quote": "пожалуйста, оплатите предоплату в размере USD 800",
+          "urgency_quote": "как можно скорее",
+          "urgency_present": true,
+          "urgency_review": "Explicit ASAP urgency from due_date is retained without strengthening it; payment is requested no later than Friday and earlier payment is allowed.",
+          "language_matches_input": true,
+          "amount_preserved": true,
+          "no_invented_date_or_stronger_urgency": true
+        },
+        "assessment_note": "Full output reviewed for temporal relation and urgency precedence. Structural/quote checks verify provenance, not model semantics."
+      },
+      {
+        "id": "U2-EN-1",
+        "input": {
+          "id": "U2-EN",
+          "language": "en",
+          "tone": "firm",
+          "notes": "Client Sam. Agreed deposit USD 800 for the site redesign.",
+          "amount": "USD 800",
+          "due_date": "Friday — ASAP"
+        },
+        "session_id": "scenario_session_01793973746530384935_0000000020_93d30fac8b9840f39edae10851519010",
+        "submitted_at": "2026-11-06T14:02:26.371Z",
+        "output": {
+          "text": "Sam, please pay the agreed USD 800 deposit for the site redesign as soon as possible, and no later than Friday. Please let me know once you’ve sent it."
+        },
+        "visible_text": "Sam, please pay the agreed USD 800 deposit for the site redesign as soon as possible, and no later than Friday. Please let me know once you’ve sent it.",
+        "clipboard_text": "Sam, please pay the agreed USD 800 deposit for the site redesign as soon as possible, and no later than Friday. Please let me know once you’ve sent it.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 6625.423646,
+        "trace_sha256": "572bcc438028356a1995c0e8b8fc20e027a74fd92b96af371d9e775fed2bdd5e",
+        "artifact_id": "artifact_01793973750975663961_0000000059_965c472d050e4711a151eb9d922195d3",
+        "action": {
+          "id": "action_run_01793973746806246004_0000000050_18e5150965714d6da2e8381d9c5ce24f",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "semantic_attempt_index": 1,
+            "status": "succeeded",
+            "latency_ms": 4129,
+            "input_tokens": 4167,
+            "output_tokens": 169,
+            "estimated_cost": 0.0006053,
+            "reasoning_effort": null,
+            "attempts": {
+              "pydantic_run_id": "01a1b12a-fc7e-7489-823a-9aec2fed165d",
+              "physical_call_index": 1,
+              "semantic_attempt_index": 1,
+              "transport_attempt_index": 1
+            }
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_checks": {
+          "verdict": "PASS",
+          "deadline_quote": "no later than Friday",
+          "payment_quote": "please pay the agreed USD 800 deposit",
+          "urgency_quote": "as soon as possible",
+          "urgency_present": true,
+          "urgency_review": "Explicit ASAP urgency from due_date is retained without strengthening it; payment is requested no later than Friday and earlier payment is allowed.",
+          "language_matches_input": true,
+          "amount_preserved": true,
+          "no_invented_date_or_stronger_urgency": true
+        },
+        "assessment_note": "Full output reviewed for temporal relation and urgency precedence. Structural/quote checks verify provenance, not model semantics."
+      },
+      {
+        "id": "U2-EN-2",
+        "input": {
+          "id": "U2-EN",
+          "language": "en",
+          "tone": "firm",
+          "notes": "Client Sam. Agreed deposit USD 800 for the site redesign.",
+          "amount": "USD 800",
+          "due_date": "Friday — ASAP"
+        },
+        "session_id": "scenario_session_01793973759136710016_0000000026_a70a18739d8d44a9a77e7496afc9d1ad",
+        "submitted_at": "2026-11-06T14:02:39.039Z",
+        "output": {
+          "text": "Sam, please pay the agreed USD 800 deposit for the site redesign as soon as possible, and no later than Friday. Please let me know once you’ve sent the payment."
+        },
+        "visible_text": "Sam, please pay the agreed USD 800 deposit for the site redesign as soon as possible, and no later than Friday. Please let me know once you’ve sent the payment.",
+        "clipboard_text": "Sam, please pay the agreed USD 800 deposit for the site redesign as soon as possible, and no later than Friday. Please let me know once you’ve sent the payment.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 4293.760909999999,
+        "trace_sha256": "0ea53510108936534d9e14c023732262f241599158360de53ea5b3652757db3d",
+        "artifact_id": "artifact_01793973763118569091_0000000075_211769e1c4464c31bb25e40a646daf16",
+        "action": {
+          "id": "action_run_01793973760057580473_0000000066_74a9fc1551604410969f072efb680d2f",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "semantic_attempt_index": 1,
+            "status": "succeeded",
+            "latency_ms": 3022,
+            "input_tokens": 4167,
+            "output_tokens": 177,
+            "estimated_cost": 0.00013044,
+            "reasoning_effort": null,
+            "attempts": {
+              "pydantic_run_id": "01a1b12b-3040-7317-ba43-5bfd89e34160",
+              "physical_call_index": 1,
+              "semantic_attempt_index": 1,
+              "transport_attempt_index": 1
+            }
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_checks": {
+          "verdict": "PASS",
+          "deadline_quote": "no later than Friday",
+          "payment_quote": "please pay the agreed USD 800 deposit",
+          "urgency_quote": "as soon as possible",
+          "urgency_present": true,
+          "urgency_review": "Explicit ASAP urgency from due_date is retained without strengthening it; payment is requested no later than Friday and earlier payment is allowed.",
+          "language_matches_input": true,
+          "amount_preserved": true,
+          "no_invented_date_or_stronger_urgency": true
+        },
+        "assessment_note": "Full output reviewed for temporal relation and urgency precedence. Structural/quote checks verify provenance, not model semantics."
+      },
+      {
+        "id": "U2-EN-3",
+        "input": {
+          "id": "U2-EN",
+          "language": "en",
+          "tone": "firm",
+          "notes": "Client Sam. Agreed deposit USD 800 for the site redesign.",
+          "amount": "USD 800",
+          "due_date": "Friday — ASAP"
+        },
+        "session_id": "scenario_session_01793973767476708150_0000000032_6503db803d864cad9c680576e83e5054",
+        "submitted_at": "2026-11-06T14:02:47.389Z",
+        "output": {
+          "text": "Please pay the agreed USD 800 deposit for the site redesign as soon as possible, and no later than Friday. Please let me know once you’ve sent it."
+        },
+        "visible_text": "Please pay the agreed USD 800 deposit for the site redesign as soon as possible, and no later than Friday. Please let me know once you’ve sent it.",
+        "clipboard_text": "Please pay the agreed USD 800 deposit for the site redesign as soon as possible, and no later than Friday. Please let me know once you’ve sent it.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 4385.864638,
+        "trace_sha256": "4d242d4f4d95fabeccb1e96c6d1e9a5c8e42a36a031ea9b45e92a193c26a443f",
+        "artifact_id": "artifact_01793973770712810929_0000000091_0215a6f51bb3411f921f36aad80d9709",
+        "action": {
+          "id": "action_run_01793973768182114024_0000000082_639c561324f745159e6d61f11feb300b",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "semantic_attempt_index": 1,
+            "status": "succeeded",
+            "latency_ms": 2487,
+            "input_tokens": 4167,
+            "output_tokens": 162,
+            "estimated_cost": 0.00012294,
+            "reasoning_effort": null,
+            "attempts": {
+              "pydantic_run_id": "01a1b12b-5000-7397-95bb-3bbae10f2dc5",
+              "physical_call_index": 1,
+              "semantic_attempt_index": 1,
+              "transport_attempt_index": 1
+            }
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_checks": {
+          "verdict": "PASS",
+          "deadline_quote": "no later than Friday",
+          "payment_quote": "Please pay the agreed USD 800 deposit",
+          "urgency_quote": "as soon as possible",
+          "urgency_present": true,
+          "urgency_review": "Explicit ASAP urgency from due_date is retained without strengthening it; payment is requested no later than Friday and earlier payment is allowed.",
+          "language_matches_input": true,
+          "amount_preserved": true,
+          "no_invented_date_or_stronger_urgency": true
+        },
+        "assessment_note": "Full output reviewed for temporal relation and urgency precedence. Structural/quote checks verify provenance, not model semantics."
+      },
+      {
+        "id": "U2-ES-1",
+        "input": {
+          "id": "U2-ES",
+          "language": "es",
+          "tone": "firm",
+          "notes": "Cliente Sam. Se acordó un anticipo de USD 800 por el rediseño del sitio web.",
+          "amount": "USD 800",
+          "due_date": "viernes — lo antes posible"
+        },
+        "session_id": "scenario_session_01793973778810593014_0000000038_fce01dd32e3946b38bcf60b665d160ef",
+        "submitted_at": "2026-11-06T14:02:58.605Z",
+        "output": {
+          "text": "Sam, por favor, realiza el pago del anticipo acordado de USD 800 por el rediseño del sitio web lo antes posible y, a más tardar, el viernes. Avísame cuando hayas enviado el pago."
+        },
+        "visible_text": "Sam, por favor, realiza el pago del anticipo acordado de USD 800 por el rediseño del sitio web lo antes posible y, a más tardar, el viernes. Avísame cuando hayas enviado el pago.",
+        "clipboard_text": "Sam, por favor, realiza el pago del anticipo acordado de USD 800 por el rediseño del sitio web lo antes posible y, a más tardar, el viernes. Avísame cuando hayas enviado el pago.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 6547.305621,
+        "trace_sha256": "03c50f9ee1a7c45f4d1f479dde4d13c4fd1b046d20cfd07a8d2b632fbe357939",
+        "artifact_id": "artifact_01793973783887191806_0000000107_029ec0ec587e4c41b54339e13813759f",
+        "action": {
+          "id": "action_run_01793973779794661956_0000000098_ade0a1ad15f24c45814e02e5ea941020",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "semantic_attempt_index": 1,
+            "status": "succeeded",
+            "latency_ms": 4053,
+            "input_tokens": 4177,
+            "output_tokens": 181,
+            "estimated_cost": 0.0006125499999999999,
+            "reasoning_effort": null,
+            "attempts": {
+              "pydantic_run_id": "01a1b12b-7d5b-77a1-a7c7-2cc0ddd4e72f",
+              "physical_call_index": 1,
+              "semantic_attempt_index": 1,
+              "transport_attempt_index": 1
+            }
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_checks": {
+          "verdict": "PASS",
+          "deadline_quote": "a más tardar, el viernes",
+          "payment_quote": "por favor, realiza el pago del anticipo acordado de USD 800",
+          "urgency_quote": "lo antes posible",
+          "urgency_present": true,
+          "urgency_review": "Explicit ASAP urgency from due_date is retained without strengthening it; payment is requested no later than Friday and earlier payment is allowed.",
+          "language_matches_input": true,
+          "amount_preserved": true,
+          "no_invented_date_or_stronger_urgency": true
+        },
+        "assessment_note": "Full output reviewed for temporal relation and urgency precedence. Structural/quote checks verify provenance, not model semantics."
+      },
+      {
+        "id": "U2-ES-2",
+        "input": {
+          "id": "U2-ES",
+          "language": "es",
+          "tone": "firm",
+          "notes": "Cliente Sam. Se acordó un anticipo de USD 800 por el rediseño del sitio web.",
+          "amount": "USD 800",
+          "due_date": "viernes — lo antes posible"
+        },
+        "session_id": "scenario_session_01793973791283991382_0000000044_97151877c4cc41a6be33cb9c4b82c434",
+        "submitted_at": "2026-11-06T14:03:11.152Z",
+        "output": {
+          "text": "Sam, por favor, realiza el pago del anticipo de USD 800 por el rediseño del sitio web lo antes posible y, a más tardar, el viernes. Avísame cuando lo hayas enviado."
+        },
+        "visible_text": "Sam, por favor, realiza el pago del anticipo de USD 800 por el rediseño del sitio web lo antes posible y, a más tardar, el viernes. Avísame cuando lo hayas enviado.",
+        "clipboard_text": "Sam, por favor, realiza el pago del anticipo de USD 800 por el rediseño del sitio web lo antes posible y, a más tardar, el viernes. Avísame cuando lo hayas enviado.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 4449.457434,
+        "trace_sha256": "addb7c7da35aec7817475e4dbddf7b1f2104f099212cbc93bf8d4e1b7702ad94",
+        "artifact_id": "artifact_01793973794454761245_0000000123_3e2a818d0e514309997bcd87c6278075",
+        "action": {
+          "id": "action_run_01793973791976352943_0000000114_e3bd848ff3274ca7a3431441f6b7a36b",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "semantic_attempt_index": 1,
+            "status": "succeeded",
+            "latency_ms": 2436,
+            "input_tokens": 4177,
+            "output_tokens": 191,
+            "estimated_cost": 0.00013754000000000001,
+            "reasoning_effort": null,
+            "attempts": {
+              "pydantic_run_id": "01a1b12b-acf0-712e-8d5e-18e8ef89a6b9",
+              "physical_call_index": 1,
+              "semantic_attempt_index": 1,
+              "transport_attempt_index": 1
+            }
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_checks": {
+          "verdict": "PASS",
+          "deadline_quote": "a más tardar, el viernes",
+          "payment_quote": "por favor, realiza el pago del anticipo de USD 800",
+          "urgency_quote": "lo antes posible",
+          "urgency_present": true,
+          "urgency_review": "Explicit ASAP urgency from due_date is retained without strengthening it; payment is requested no later than Friday and earlier payment is allowed.",
+          "language_matches_input": true,
+          "amount_preserved": true,
+          "no_invented_date_or_stronger_urgency": true
+        },
+        "assessment_note": "Full output reviewed for temporal relation and urgency precedence. Structural/quote checks verify provenance, not model semantics."
+      },
+      {
+        "id": "U2-ES-3",
+        "input": {
+          "id": "U2-ES",
+          "language": "es",
+          "tone": "firm",
+          "notes": "Cliente Sam. Se acordó un anticipo de USD 800 por el rediseño del sitio web.",
+          "amount": "USD 800",
+          "due_date": "viernes — lo antes posible"
+        },
+        "session_id": "scenario_session_01793973802346871925_0000000050_9853cd1e4b0b4e7385e4dcdcac61f909",
+        "submitted_at": "2026-11-06T14:03:22.185Z",
+        "output": {
+          "text": "Sam, por favor, realiza lo antes posible el pago del anticipo acordado de USD 800 por el rediseño del sitio web y, en todo caso, a más tardar el viernes. Avísame cuando lo hayas enviado."
+        },
+        "visible_text": "Sam, por favor, realiza lo antes posible el pago del anticipo acordado de USD 800 por el rediseño del sitio web y, en todo caso, a más tardar el viernes. Avísame cuando lo hayas enviado.",
+        "clipboard_text": "Sam, por favor, realiza lo antes posible el pago del anticipo acordado de USD 800 por el rediseño del sitio web y, en todo caso, a más tardar el viernes. Avísame cuando lo hayas enviado.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 4367.289885000001,
+        "trace_sha256": "1f46735eaf3d5361c18f466b76a3fb81c85daa71eda168e9e02eb6618115688a",
+        "artifact_id": "artifact_01793973806177510787_0000000139_81ddb31ca2e446d4be2e09fd2a267c9c",
+        "action": {
+          "id": "action_run_01793973802556539602_0000000130_90e8b220a7394a3b976080f6bd5854a0",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "semantic_attempt_index": 1,
+            "status": "succeeded",
+            "latency_ms": 3577,
+            "input_tokens": 4177,
+            "output_tokens": 245,
+            "estimated_cost": 0.00016454,
+            "reasoning_effort": null,
+            "attempts": {
+              "pydantic_run_id": "01a1b12b-d645-72b2-9bd8-02be10ca21dd",
+              "physical_call_index": 1,
+              "semantic_attempt_index": 1,
+              "transport_attempt_index": 1
+            }
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_checks": {
+          "verdict": "PASS",
+          "deadline_quote": "a más tardar el viernes",
+          "payment_quote": "por favor, realiza lo antes posible el pago del anticipo acordado de USD 800",
+          "urgency_quote": "lo antes posible",
+          "urgency_present": true,
+          "urgency_review": "Explicit ASAP urgency from due_date is retained without strengthening it; payment is requested no later than Friday and earlier payment is allowed.",
+          "language_matches_input": true,
+          "amount_preserved": true,
+          "no_invented_date_or_stronger_urgency": true
+        },
+        "assessment_note": "Full output reviewed for temporal relation and urgency precedence. Structural/quote checks verify provenance, not model semantics."
+      },
+      {
+        "id": "U3-RU-1",
+        "input": {
+          "id": "U3-RU",
+          "language": "ru",
+          "tone": "firm",
+          "notes": "Клиент Sam. Согласована предоплата USD 800 за редизайн сайта. Платёж несрочный, можно не спешить.",
+          "amount": "USD 800",
+          "due_date": "пятница — как можно скорее"
+        },
+        "session_id": "scenario_session_01793973810639778111_0000000056_b4d4e667a4cd4c358d0dd98cfa123e35",
+        "submitted_at": "2026-11-06T14:03:30.569Z",
+        "output": {
+          "text": "Прошу внести согласованную предоплату в размере USD 800 за редизайн сайта не позднее пятницы. Пожалуйста, сообщите, когда отправите платёж."
+        },
+        "visible_text": "Прошу внести согласованную предоплату в размере USD 800 за редизайн сайта не позднее пятницы. Пожалуйста, сообщите, когда отправите платёж.",
+        "clipboard_text": "Прошу внести согласованную предоплату в размере USD 800 за редизайн сайта не позднее пятницы. Пожалуйста, сообщите, когда отправите платёж.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 6251.939439,
+        "trace_sha256": "5084dd30c8ab7a9a078ea2a422bda894e1d822a0acdedc1d2f95e042cb881c1d",
+        "artifact_id": "artifact_01793973814755349211_0000000155_dbe73947670d441a89969f0926cd0952",
+        "action": {
+          "id": "action_run_01793973811248365588_0000000146_8196c53e939c4db5b842e391ba17224d",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "semantic_attempt_index": 1,
+            "status": "succeeded",
+            "latency_ms": 3456,
+            "input_tokens": 4190,
+            "output_tokens": 235,
+            "estimated_cost": 0.0006411749999999999,
+            "reasoning_effort": null,
+            "attempts": {
+              "pydantic_run_id": "01a1b12b-f838-75ce-add7-eff5fbb9b5d3",
+              "physical_call_index": 1,
+              "semantic_attempt_index": 1,
+              "transport_attempt_index": 1
+            }
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_checks": {
+          "verdict": "PASS",
+          "deadline_quote": "не позднее пятницы",
+          "payment_quote": "Прошу внести согласованную предоплату в размере USD 800",
+          "urgency_present": false,
+          "urgency_review": "Full output contains a neutral payment request with a Friday due-by deadline; no ASAP, pressure or invented urgency. No-rush notes override urgency in due_date.",
+          "language_matches_input": true,
+          "amount_preserved": true,
+          "no_invented_date_or_stronger_urgency": true
+        },
+        "assessment_note": "Full output reviewed for temporal relation and urgency precedence. Structural/quote checks verify provenance, not model semantics."
+      },
+      {
+        "id": "U3-RU-2",
+        "input": {
+          "id": "U3-RU",
+          "language": "ru",
+          "tone": "firm",
+          "notes": "Клиент Sam. Согласована предоплата USD 800 за редизайн сайта. Платёж несрочный, можно не спешить.",
+          "amount": "USD 800",
+          "due_date": "пятница — как можно скорее"
+        },
+        "session_id": "scenario_session_01793973822557812686_0000000062_603572ab07384154a45dd31efc0f4b79",
+        "submitted_at": "2026-11-06T14:03:42.419Z",
+        "output": {
+          "text": "Sam, прошу внести согласованную предоплату USD 800 за редизайн сайта не позднее пятницы. Пожалуйста, сообщите, когда отправите платёж."
+        },
+        "visible_text": "Sam, прошу внести согласованную предоплату USD 800 за редизайн сайта не позднее пятницы. Пожалуйста, сообщите, когда отправите платёж.",
+        "clipboard_text": "Sam, прошу внести согласованную предоплату USD 800 за редизайн сайта не позднее пятницы. Пожалуйста, сообщите, когда отправите платёж.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 4396.7781430000005,
+        "trace_sha256": "cea6ad9c0ad2315e5be64dc9e33b101bd9e3ece6b0f302b0b7d034c13dc63ed8",
+        "artifact_id": "artifact_01793973826503303622_0000000171_349366f238e1451dbfc389f99c0a84e6",
+        "action": {
+          "id": "action_run_01793973822852157775_0000000162_78dc06f454de4809a07fa7675bf55c26",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "semantic_attempt_index": 1,
+            "status": "succeeded",
+            "latency_ms": 3610,
+            "input_tokens": 4190,
+            "output_tokens": 205,
+            "estimated_cost": 0.00014467,
+            "reasoning_effort": null,
+            "attempts": {
+              "pydantic_run_id": "01a1b12c-258f-7412-beb8-1b3054fde996",
+              "physical_call_index": 1,
+              "semantic_attempt_index": 1,
+              "transport_attempt_index": 1
+            }
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_checks": {
+          "verdict": "PASS",
+          "deadline_quote": "не позднее пятницы",
+          "payment_quote": "прошу внести согласованную предоплату USD 800",
+          "urgency_present": false,
+          "urgency_review": "Full output contains a neutral payment request with a Friday due-by deadline; no ASAP, pressure or invented urgency. No-rush notes override urgency in due_date.",
+          "language_matches_input": true,
+          "amount_preserved": true,
+          "no_invented_date_or_stronger_urgency": true
+        },
+        "assessment_note": "Full output reviewed for temporal relation and urgency precedence. Structural/quote checks verify provenance, not model semantics."
+      },
+      {
+        "id": "U3-RU-3",
+        "input": {
+          "id": "U3-RU",
+          "language": "ru",
+          "tone": "firm",
+          "notes": "Клиент Sam. Согласована предоплата USD 800 за редизайн сайта. Платёж несрочный, можно не спешить.",
+          "amount": "USD 800",
+          "due_date": "пятница — как можно скорее"
+        },
+        "session_id": "scenario_session_01793973833290964482_0000000068_fdc2df33c179477fa6db4d5722338f4a",
+        "submitted_at": "2026-11-06T14:03:53.176Z",
+        "output": {
+          "text": "Sam, прошу оплатить согласанную предоплату USD 800 за редизайн сайта не позднее пятницы. Пожалуйста, сообщите, когда отправите платёж."
+        },
+        "visible_text": "Sam, прошу оплатить согласанную предоплату USD 800 за редизайн сайта не позднее пятницы. Пожалуйста, сообщите, когда отправите платёж.",
+        "clipboard_text": "Sam, прошу оплатить согласанную предоплату USD 800 за редизайн сайта не позднее пятницы. Пожалуйста, сообщите, когда отправите платёж.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 4395.0992400000005,
+        "trace_sha256": "f0a12a5bee22e8bd93fd68c50be1a4014c510924f5ad9f0e2035d725b85ad960",
+        "artifact_id": "artifact_01793973837211108179_0000000187_cecb04b7141e4e72aa4927b7b711a9a5",
+        "action": {
+          "id": "action_run_01793973833567524051_0000000178_77d51d711e164f1f9d217fb4860fc195",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "semantic_attempt_index": 1,
+            "status": "succeeded",
+            "latency_ms": 3606,
+            "input_tokens": 4190,
+            "output_tokens": 190,
+            "estimated_cost": 0.00013717,
+            "reasoning_effort": null,
+            "attempts": {
+              "pydantic_run_id": "01a1b12c-4f67-7220-ac3e-a718a4e1a394",
+              "physical_call_index": 1,
+              "semantic_attempt_index": 1,
+              "transport_attempt_index": 1
+            }
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_checks": {
+          "verdict": "PASS",
+          "deadline_quote": "не позднее пятницы",
+          "payment_quote": "прошу оплатить согласанную предоплату USD 800",
+          "urgency_present": false,
+          "urgency_review": "Full output contains a neutral payment request with a Friday due-by deadline; no ASAP, pressure or invented urgency. No-rush notes override urgency in due_date.",
+          "language_matches_input": true,
+          "amount_preserved": true,
+          "no_invented_date_or_stronger_urgency": true,
+          "quality_note": "Minor spelling error: согласанную instead of согласованную; correct before sending. Semantic payment/deadline/urgency criteria pass."
+        },
+        "assessment_note": "Full output reviewed for temporal relation and urgency precedence. Structural/quote checks verify provenance, not model semantics."
+      },
+      {
+        "id": "U3-EN-1",
+        "input": {
+          "id": "U3-EN",
+          "language": "en",
+          "tone": "firm",
+          "notes": "Client Sam. Agreed deposit USD 800 for the site redesign. Not urgent, no rush.",
+          "amount": "USD 800",
+          "due_date": "Friday — ASAP"
+        },
+        "session_id": "scenario_session_01793973843905357778_0000000074_dc456e16c416432ea450416ad21e86f6",
+        "submitted_at": "2026-11-06T14:04:03.800Z",
+        "output": {
+          "text": "Hi Sam, please pay the agreed USD 800 deposit for the site redesign by Friday. Let me know once you’ve sent the payment."
+        },
+        "visible_text": "Hi Sam, please pay the agreed USD 800 deposit for the site redesign by Friday. Let me know once you’ve sent the payment.",
+        "clipboard_text": "Hi Sam, please pay the agreed USD 800 deposit for the site redesign by Friday. Let me know once you’ve sent the payment.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 4415.513421999999,
+        "trace_sha256": "d3f0c33670f4487154b06c59155e34b5fd348ddb279504a4b6eadba492687fc0",
+        "artifact_id": "artifact_01793973846796877517_0000000203_16759a756263466fa5c27f06aab3c4e1",
+        "action": {
+          "id": "action_run_01793973844283407014_0000000194_46cd5f3228be4a23878062fc6e0cc5e5",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "semantic_attempt_index": 1,
+            "status": "succeeded",
+            "latency_ms": 2472,
+            "input_tokens": 4173,
+            "output_tokens": 166,
+            "estimated_cost": 0.0006045499999999999,
+            "reasoning_effort": null,
+            "attempts": {
+              "pydantic_run_id": "01a1b12c-7946-7101-b196-b1a6c1f82120",
+              "physical_call_index": 1,
+              "semantic_attempt_index": 1,
+              "transport_attempt_index": 1
+            }
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_checks": {
+          "verdict": "PASS",
+          "deadline_quote": "by Friday",
+          "payment_quote": "please pay the agreed USD 800 deposit",
+          "urgency_present": false,
+          "urgency_review": "Full output contains a neutral payment request with a Friday due-by deadline; no ASAP, pressure or invented urgency. No-rush notes override urgency in due_date.",
+          "language_matches_input": true,
+          "amount_preserved": true,
+          "no_invented_date_or_stronger_urgency": true
+        },
+        "assessment_note": "Full output reviewed for temporal relation and urgency precedence. Structural/quote checks verify provenance, not model semantics."
+      },
+      {
+        "id": "U3-EN-2",
+        "input": {
+          "id": "U3-EN",
+          "language": "en",
+          "tone": "firm",
+          "notes": "Client Sam. Agreed deposit USD 800 for the site redesign. Not urgent, no rush.",
+          "amount": "USD 800",
+          "due_date": "Friday — ASAP"
+        },
+        "session_id": "scenario_session_01793973852216510856_0000000080_812bab3ebc394a3ab5badbc1f3d72aa4",
+        "submitted_at": "2026-11-06T14:04:12.157Z",
+        "output": {
+          "text": "Please pay the agreed USD 800 deposit for the site redesign by Friday. Let me know once the payment has been sent."
+        },
+        "visible_text": "Please pay the agreed USD 800 deposit for the site redesign by Friday. Let me know once the payment has been sent.",
+        "clipboard_text": "Please pay the agreed USD 800 deposit for the site redesign by Friday. Let me know once the payment has been sent.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 6263.727091,
+        "trace_sha256": "8f666658f3829044cf4d0c0f0a81cfd32314adc62b5e12240bb5ecb77285523d",
+        "artifact_id": "artifact_01793973857239647243_0000000219_028ab036fd6146e782c5856845db712e",
+        "action": {
+          "id": "action_run_01793973852857205686_0000000210_62ad173e859b48988c53acc5f16e8588",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "semantic_attempt_index": 1,
+            "status": "succeeded",
+            "latency_ms": 4340,
+            "input_tokens": 4173,
+            "output_tokens": 134,
+            "estimated_cost": 0.000109,
+            "reasoning_effort": null,
+            "attempts": {
+              "pydantic_run_id": "01a1b12c-9ac0-71eb-a509-9628ee309af8",
+              "physical_call_index": 1,
+              "semantic_attempt_index": 1,
+              "transport_attempt_index": 1
+            }
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_checks": {
+          "verdict": "PASS",
+          "deadline_quote": "by Friday",
+          "payment_quote": "Please pay the agreed USD 800 deposit",
+          "urgency_present": false,
+          "urgency_review": "Full output contains a neutral payment request with a Friday due-by deadline; no ASAP, pressure or invented urgency. No-rush notes override urgency in due_date.",
+          "language_matches_input": true,
+          "amount_preserved": true,
+          "no_invented_date_or_stronger_urgency": true
+        },
+        "assessment_note": "Full output reviewed for temporal relation and urgency precedence. Structural/quote checks verify provenance, not model semantics."
+      },
+      {
+        "id": "U3-EN-3",
+        "input": {
+          "id": "U3-EN",
+          "language": "en",
+          "tone": "firm",
+          "notes": "Client Sam. Agreed deposit USD 800 for the site redesign. Not urgent, no rush.",
+          "amount": "USD 800",
+          "due_date": "Friday — ASAP"
+        },
+        "session_id": "scenario_session_01793973862440602315_0000000086_1970715e61d642668f4ad4d39acd8aaa",
+        "submitted_at": "2026-11-06T14:04:22.365Z",
+        "output": {
+          "text": "Please pay the agreed USD 800 deposit for the site redesign by Friday. Please let me know once you’ve sent the payment."
+        },
+        "visible_text": "Please pay the agreed USD 800 deposit for the site redesign by Friday. Please let me know once you’ve sent the payment.",
+        "clipboard_text": "Please pay the agreed USD 800 deposit for the site redesign by Friday. Please let me know once you’ve sent the payment.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 4287.144840000001,
+        "trace_sha256": "bb7c3683ca62cabdfe650953b31d01aa3f8257a4f131beee913c06c56bf7076f",
+        "artifact_id": "artifact_01793973866351264450_0000000235_d2896384b85c4cfb942cf37db157a2ac",
+        "action": {
+          "id": "action_run_01793973863319927654_0000000226_583bfc0f195f47cb9d6fe29ce77e30e1",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "semantic_attempt_index": 1,
+            "status": "succeeded",
+            "latency_ms": 2993,
+            "input_tokens": 4173,
+            "output_tokens": 218,
+            "estimated_cost": 0.00015099999999999998,
+            "reasoning_effort": null,
+            "attempts": {
+              "pydantic_run_id": "01a1b12c-c3a0-75cc-b582-e32dd1ca4ff7",
+              "physical_call_index": 1,
+              "semantic_attempt_index": 1,
+              "transport_attempt_index": 1
+            }
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_checks": {
+          "verdict": "PASS",
+          "deadline_quote": "by Friday",
+          "payment_quote": "Please pay the agreed USD 800 deposit",
+          "urgency_present": false,
+          "urgency_review": "Full output contains a neutral payment request with a Friday due-by deadline; no ASAP, pressure or invented urgency. No-rush notes override urgency in due_date.",
+          "language_matches_input": true,
+          "amount_preserved": true,
+          "no_invented_date_or_stronger_urgency": true
+        },
+        "assessment_note": "Full output reviewed for temporal relation and urgency precedence. Structural/quote checks verify provenance, not model semantics."
+      },
+      {
+        "id": "U3-ES-1",
+        "input": {
+          "id": "U3-ES",
+          "language": "es",
+          "tone": "firm",
+          "notes": "Cliente Sam. Se acordó un anticipo de USD 800 por el rediseño del sitio web. No es urgente, no hay prisa.",
+          "amount": "USD 800",
+          "due_date": "viernes — lo antes posible"
+        },
+        "session_id": "scenario_session_01793973872396761829_0000000092_b6f2b0a93fad43638795589045a81c5a",
+        "submitted_at": "2026-11-06T14:04:32.269Z",
+        "output": {
+          "text": "El anticipo de USD 800 por el rediseño del sitio web vence a más tardar el viernes. Por favor, realiza el pago y avísame cuando lo hayas enviado."
+        },
+        "visible_text": "El anticipo de USD 800 por el rediseño del sitio web vence a más tardar el viernes. Por favor, realiza el pago y avísame cuando lo hayas enviado.",
+        "clipboard_text": "El anticipo de USD 800 por el rediseño del sitio web vence a más tardar el viernes. Por favor, realiza el pago y avísame cuando lo hayas enviado.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 4392.690452999999,
+        "trace_sha256": "afc820c2751a6f7e5a2b12e37c43e0741b99dc76d407fc9a6616185a7d8d3db6",
+        "artifact_id": "artifact_01793973876054756634_0000000251_3bbc36b7779c42c9ab7e166d17b409b8",
+        "action": {
+          "id": "action_run_01793973873426888431_0000000242_f0787131c618499c8dc96dd94a9a7686",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "semantic_attempt_index": 1,
+            "status": "succeeded",
+            "latency_ms": 2584,
+            "input_tokens": 4186,
+            "output_tokens": 226,
+            "estimated_cost": 0.000636175,
+            "reasoning_effort": null,
+            "attempts": {
+              "pydantic_run_id": "01a1b12c-eb1a-721c-95a2-db34f1c2da54",
+              "physical_call_index": 1,
+              "semantic_attempt_index": 1,
+              "transport_attempt_index": 1
+            }
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_checks": {
+          "verdict": "PASS",
+          "deadline_quote": "a más tardar el viernes",
+          "payment_quote": "Por favor, realiza el pago",
+          "urgency_present": false,
+          "urgency_review": "Full output contains a neutral payment request with a Friday due-by deadline; no ASAP, pressure or invented urgency. No-rush notes override urgency in due_date.",
+          "language_matches_input": true,
+          "amount_preserved": true,
+          "no_invented_date_or_stronger_urgency": true
+        },
+        "assessment_note": "Full output reviewed for temporal relation and urgency precedence. Structural/quote checks verify provenance, not model semantics."
+      },
+      {
+        "id": "U3-ES-2",
+        "input": {
+          "id": "U3-ES",
+          "language": "es",
+          "tone": "firm",
+          "notes": "Cliente Sam. Se acordó un anticipo de USD 800 por el rediseño del sitio web. No es urgente, no hay prisa.",
+          "amount": "USD 800",
+          "due_date": "viernes — lo antes posible"
+        },
+        "session_id": "scenario_session_01793973883367920413_0000000098_529e4fa9ac6f4074a425ef17a3c5c9d0",
+        "submitted_at": "2026-11-06T14:04:43.188Z",
+        "output": {
+          "text": "Por favor, realiza el pago de USD 800 por el anticipo acordado para el rediseño del sitio web, a más tardar el viernes. Avísame cuando lo hayas enviado."
+        },
+        "visible_text": "Por favor, realiza el pago de USD 800 por el anticipo acordado para el rediseño del sitio web, a más tardar el viernes. Avísame cuando lo hayas enviado.",
+        "clipboard_text": "Por favor, realiza el pago de USD 800 por el anticipo acordado para el rediseño del sitio web, a más tardar el viernes. Avísame cuando lo hayas enviado.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 4446.037989,
+        "trace_sha256": "903a2e6a01bbd57afffc202fbedfafb73f4f330ff4c19f639f485aa38eb4cb41",
+        "artifact_id": "artifact_01793973886708517004_0000000267_7eb5c0d595094cafa0932efc322c3242",
+        "action": {
+          "id": "action_run_01793973884135229283_0000000258_c8c717642f0c4f2aa6f3a47883ac899c",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "semantic_attempt_index": 1,
+            "status": "succeeded",
+            "latency_ms": 2532,
+            "input_tokens": 4186,
+            "output_tokens": 185,
+            "estimated_cost": 0.00013463,
+            "reasoning_effort": null,
+            "attempts": {
+              "pydantic_run_id": "01a1b12d-14f2-72e7-9496-5c7228bea54c",
+              "physical_call_index": 1,
+              "semantic_attempt_index": 1,
+              "transport_attempt_index": 1
+            }
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_checks": {
+          "verdict": "PASS",
+          "deadline_quote": "a más tardar el viernes",
+          "payment_quote": "Por favor, realiza el pago de USD 800",
+          "urgency_present": false,
+          "urgency_review": "Full output contains a neutral payment request with a Friday due-by deadline; no ASAP, pressure or invented urgency. No-rush notes override urgency in due_date.",
+          "language_matches_input": true,
+          "amount_preserved": true,
+          "no_invented_date_or_stronger_urgency": true
+        },
+        "assessment_note": "Full output reviewed for temporal relation and urgency precedence. Structural/quote checks verify provenance, not model semantics."
+      },
+      {
+        "id": "U3-ES-3",
+        "input": {
+          "id": "U3-ES",
+          "language": "es",
+          "tone": "firm",
+          "notes": "Cliente Sam. Se acordó un anticipo de USD 800 por el rediseño del sitio web. No es urgente, no hay prisa.",
+          "amount": "USD 800",
+          "due_date": "viernes — lo antes posible"
+        },
+        "session_id": "scenario_session_01793973893568818030_0000000104_a9172dae6b3c486ab23eeee33bed4caa",
+        "submitted_at": "2026-11-06T14:04:53.458Z",
+        "output": {
+          "text": "Sam, por favor, realiza el pago del anticipo de USD 800 por el rediseño del sitio web a más tardar el viernes. Avísame cuando hayas enviado el pago."
+        },
+        "visible_text": "Sam, por favor, realiza el pago del anticipo de USD 800 por el rediseño del sitio web a más tardar el viernes. Avísame cuando hayas enviado el pago.",
+        "clipboard_text": "Sam, por favor, realiza el pago del anticipo de USD 800 por el rediseño del sitio web a más tardar el viernes. Avísame cuando hayas enviado el pago.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 4323.263201000001,
+        "trace_sha256": "92bcd7ba4bcde11d1cc7b3a1a96e6a51a6680106ecc6187beae404bfd5b5dea9",
+        "artifact_id": "artifact_01793973897320115874_0000000283_2d86fb3ef4fe4a409c05bbd819a394fa",
+        "action": {
+          "id": "action_run_01793973893774153625_0000000274_ef2a22c5bb6544969da1116fed0c92d7",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "semantic_attempt_index": 1,
+            "status": "succeeded",
+            "latency_ms": 3506,
+            "input_tokens": 4186,
+            "output_tokens": 220,
+            "estimated_cost": 0.00015213,
+            "reasoning_effort": null,
+            "attempts": {
+              "pydantic_run_id": "01a1b12d-3a97-77fa-829e-1a55467420ef",
+              "physical_call_index": 1,
+              "semantic_attempt_index": 1,
+              "transport_attempt_index": 1
+            }
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_checks": {
+          "verdict": "PASS",
+          "deadline_quote": "a más tardar el viernes",
+          "payment_quote": "por favor, realiza el pago del anticipo de USD 800",
+          "urgency_present": false,
+          "urgency_review": "Full output contains a neutral payment request with a Friday due-by deadline; no ASAP, pressure or invented urgency. No-rush notes override urgency in due_date.",
+          "language_matches_input": true,
+          "amount_preserved": true,
+          "no_invented_date_or_stronger_urgency": true
+        },
+        "assessment_note": "Full output reviewed for temporal relation and urgency precedence. Structural/quote checks verify provenance, not model semantics."
+      }
+    ],
+    "quality_caveats": [
+      {
+        "id": "U3-RU-3",
+        "severity": "minor",
+        "finding": "Spelling error: согласанную instead of согласованную. Deadline, amount and urgency AC still pass; correct the typo before sending."
       }
     ]
   }

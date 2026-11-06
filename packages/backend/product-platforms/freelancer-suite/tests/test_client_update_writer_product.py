@@ -549,6 +549,13 @@ def test_prepaid_request_prompt_preserves_deadline_relation_across_languages() -
     assert "Keep explicitly stated on/before/after conditions as given" in prompt
     assert "with notes taking precedence" in prompt
     assert "no later than that date, never waiting until that day" in prompt
+    deadline_rule = prompt.split("- In a payment request, when", 1)[1].split(
+        "- If `context` has no `due_date`", 1
+    )[0]
+    assert (
+        "Unless the notes say the payment is not urgent or not to be rushed, "
+        "ASAP with a due-by date means" in deadline_rule
+    )
 
 
 def test_prepaid_request_prompt_preserves_the_payment_arrangement() -> None:

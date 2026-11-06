@@ -7,10 +7,30 @@
 - Created: 2026-11-06
 - Last updated: 2026-11-06
 - Review date: 2026-11-06
-- Next action: owner reviews the deadline fix and targeted U2 results; full current-revision matrix not rerun
-- Blocker: no U2 failure on the new revision; full-matrix coverage and the prior sudo test limitation remain
+- Next action: owner reviews notes priority and U2/U3 results; full current-revision matrix not rerun
+- Blocker: no U2/U3 failure in the latest series; A01/A04/U1 not rerun on this prompt revision
 
-## Latest result — review round 2
+## Latest result — review round 3
+
+**U2/U3 RU/EN/ES: 18/18 PASS on the notes-priority prompt revision.** Each of the six
+unchanged inputs was run three times through the live form. U2 retains urgency; U3 removes
+urgency because no-rush notes override ASAP in due_date. All responses explicitly request
+USD 800 and retain a Friday due-by deadline that allows earlier payment. UI and actual clipboard
+match every backend text. Full inputs, outputs and quoted semantic evidence are appended below.
+U3-RU-3 has a minor spelling error, "согласанную" instead of "согласованную". Its semantic AC
+pass; a manually corrected version for sending is included beside the original output below.
+The correction is editorial, not a new model result or proof of universally polished wording.
+
+| Case | RU | EN | ES |
+| --- | --- | --- | --- |
+| U2 — keep urgency | 3/3 | 3/3 | 3/3 |
+| U3 — notes remove urgency | 3/3 | 3/3 | 3/3 |
+
+This is a separate prompt revision. A01/A04/U1 have not been rerun on it; there is no new
+full-matrix claim. Review round 3 addressed an instruction ambiguity and a coverage gap;
+it did not establish that U3 had actually failed on the preceding prompt.
+
+## Previous targeted result — review round 2
 
 **U2 RU/EN/ES: 9/9 PASS on the deadline-meaning prompt revision.** The same inputs were
 run three times per language. Each request preserves USD 800, a Friday due-by deadline that
@@ -1499,4 +1519,269 @@ Deadline evidence: a más tardar, el viernes. Urgency evidence: lo antes posible
 
 ```text
 Sam, por favor, realiza el pago del anticipo de USD 800 por el rediseño del sitio web lo antes posible y, a más tardar, el viernes. Avísame cuando lo hayas enviado.
+```
+
+## Review round 3 — U2/U3 notes-priority verification
+
+The ASAP/deadline explanation now explicitly excludes notes saying the payment is not urgent
+or not to be rushed. The existing urgency rule remains authoritative; the existing deadline
+contract test now pins this qualification within the deadline paragraph. No model, workflow,
+schema, UI, runtime or dependency changes. Earlier outputs and assessments are unchanged.
+
+The same six U2/U3 RU/EN/ES inputs were run three times each: **18/18 PASS**. All 18
+physical provider calls are retained. Each user attempt has one successful A06 and a text-only
+result matching both UI and actual clipboard. The deployed prompt matches the checkout and
+differs from review round 2; workflow/router hashes are unchanged. Model: gpt-6-luna; configured
+reasoning medium, effective effort not independently proven because ledger effort remains null.
+Estimated ledger cost: USD 0.005409440; median UI delivery: 4.41s.
+
+### Checks and limits
+
+All 70 product tests pass, including the strengthened deadline/notes contract. The preceding
+prompt lacks that qualification, as verified by a regression control. Managed Python 3.12 doctor,
+config, architecture and generated-doc checks pass; Ruff introduces no findings. Full quick-check
+and frontend checks were not rerun for this prompt-only change. The earlier local sudo failure
+remains historical; GitHub CI on the preceding 44c2feb2 commit was green (21 successful checks,
+one skipped CodeRabbit), which does not validate these new uncommitted changes.
+No observed U3 failure was invented or reclassified. Other scenarios are not claimed tested on
+this revision, and a finite successful sample does not guarantee all future model outputs.
+One minor quality caveat is retained: U3-RU-3 spells "согласованную" as "согласанную".
+This does not change the amount, deadline or urgency; the original output remains unchanged.
+Documentation, whitespace and evidence consistency checks passed. Owned live services were
+stopped with database volumes and raw traces retained. No external publication in this round.
+
+### Full new inputs and outputs
+
+#### Review 3 U2-RU
+
+Tone: firm; amount: USD 800; due date: пятница — как можно скорее.
+
+Billing notes:
+
+Клиент Sam. Согласована предоплата USD 800 за редизайн сайта.
+
+##### Review 3 U2-RU-1 — PASS
+
+Session: `scenario_session_01793973715277251294_0000000002_abf8411d02f4470c8fd7c74fb81099db`.
+
+Deadline evidence: не позднее пятницы. Urgency assessment: Explicit ASAP urgency from due_date is retained without strengthening it; payment is requested no later than Friday and earlier payment is allowed.
+
+```text
+Sam, пожалуйста, внесите предоплату USD 800 за редизайн сайта как можно скорее, но не позднее пятницы. Сообщите, пожалуйста, когда отправите оплату.
+```
+
+##### Review 3 U2-RU-2 — PASS
+
+Session: `scenario_session_01793973725500433274_0000000008_eae01a02b8b645c19462bca1ee52144e`.
+
+Deadline evidence: не позднее пятницы. Urgency assessment: Explicit ASAP urgency from due_date is retained without strengthening it; payment is requested no later than Friday and earlier payment is allowed.
+
+```text
+Предоплата USD 800 за редизайн сайта согласована. Пожалуйста, оплатите её как можно скорее, но не позднее пятницы, и сообщите, когда отправите платёж.
+```
+
+##### Review 3 U2-RU-3 — PASS
+
+Session: `scenario_session_01793973736797460727_0000000014_31ad1c6187434d93b2a31b2a2f4e100e`.
+
+Deadline evidence: не позднее пятницы. Urgency assessment: Explicit ASAP urgency from due_date is retained without strengthening it; payment is requested no later than Friday and earlier payment is allowed.
+
+```text
+Sam, пожалуйста, оплатите предоплату в размере USD 800 за редизайн сайта как можно скорее, не позднее пятницы. Сообщите, пожалуйста, когда отправите платеж.
+```
+
+#### Review 3 U2-EN
+
+Tone: firm; amount: USD 800; due date: Friday — ASAP.
+
+Billing notes:
+
+Client Sam. Agreed deposit USD 800 for the site redesign.
+
+##### Review 3 U2-EN-1 — PASS
+
+Session: `scenario_session_01793973746530384935_0000000020_93d30fac8b9840f39edae10851519010`.
+
+Deadline evidence: no later than Friday. Urgency assessment: Explicit ASAP urgency from due_date is retained without strengthening it; payment is requested no later than Friday and earlier payment is allowed.
+
+```text
+Sam, please pay the agreed USD 800 deposit for the site redesign as soon as possible, and no later than Friday. Please let me know once you’ve sent it.
+```
+
+##### Review 3 U2-EN-2 — PASS
+
+Session: `scenario_session_01793973759136710016_0000000026_a70a18739d8d44a9a77e7496afc9d1ad`.
+
+Deadline evidence: no later than Friday. Urgency assessment: Explicit ASAP urgency from due_date is retained without strengthening it; payment is requested no later than Friday and earlier payment is allowed.
+
+```text
+Sam, please pay the agreed USD 800 deposit for the site redesign as soon as possible, and no later than Friday. Please let me know once you’ve sent the payment.
+```
+
+##### Review 3 U2-EN-3 — PASS
+
+Session: `scenario_session_01793973767476708150_0000000032_6503db803d864cad9c680576e83e5054`.
+
+Deadline evidence: no later than Friday. Urgency assessment: Explicit ASAP urgency from due_date is retained without strengthening it; payment is requested no later than Friday and earlier payment is allowed.
+
+```text
+Please pay the agreed USD 800 deposit for the site redesign as soon as possible, and no later than Friday. Please let me know once you’ve sent it.
+```
+
+#### Review 3 U2-ES
+
+Tone: firm; amount: USD 800; due date: viernes — lo antes posible.
+
+Billing notes:
+
+Cliente Sam. Se acordó un anticipo de USD 800 por el rediseño del sitio web.
+
+##### Review 3 U2-ES-1 — PASS
+
+Session: `scenario_session_01793973778810593014_0000000038_fce01dd32e3946b38bcf60b665d160ef`.
+
+Deadline evidence: a más tardar, el viernes. Urgency assessment: Explicit ASAP urgency from due_date is retained without strengthening it; payment is requested no later than Friday and earlier payment is allowed.
+
+```text
+Sam, por favor, realiza el pago del anticipo acordado de USD 800 por el rediseño del sitio web lo antes posible y, a más tardar, el viernes. Avísame cuando hayas enviado el pago.
+```
+
+##### Review 3 U2-ES-2 — PASS
+
+Session: `scenario_session_01793973791283991382_0000000044_97151877c4cc41a6be33cb9c4b82c434`.
+
+Deadline evidence: a más tardar, el viernes. Urgency assessment: Explicit ASAP urgency from due_date is retained without strengthening it; payment is requested no later than Friday and earlier payment is allowed.
+
+```text
+Sam, por favor, realiza el pago del anticipo de USD 800 por el rediseño del sitio web lo antes posible y, a más tardar, el viernes. Avísame cuando lo hayas enviado.
+```
+
+##### Review 3 U2-ES-3 — PASS
+
+Session: `scenario_session_01793973802346871925_0000000050_9853cd1e4b0b4e7385e4dcdcac61f909`.
+
+Deadline evidence: a más tardar el viernes. Urgency assessment: Explicit ASAP urgency from due_date is retained without strengthening it; payment is requested no later than Friday and earlier payment is allowed.
+
+```text
+Sam, por favor, realiza lo antes posible el pago del anticipo acordado de USD 800 por el rediseño del sitio web y, en todo caso, a más tardar el viernes. Avísame cuando lo hayas enviado.
+```
+
+#### Review 3 U3-RU
+
+Tone: firm; amount: USD 800; due date: пятница — как можно скорее.
+
+Billing notes:
+
+Клиент Sam. Согласована предоплата USD 800 за редизайн сайта. Платёж несрочный, можно не спешить.
+
+##### Review 3 U3-RU-1 — PASS
+
+Session: `scenario_session_01793973810639778111_0000000056_b4d4e667a4cd4c358d0dd98cfa123e35`.
+
+Deadline evidence: не позднее пятницы. Urgency assessment: Full output contains a neutral payment request with a Friday due-by deadline; no ASAP, pressure or invented urgency. No-rush notes override urgency in due_date.
+
+```text
+Прошу внести согласованную предоплату в размере USD 800 за редизайн сайта не позднее пятницы. Пожалуйста, сообщите, когда отправите платёж.
+```
+
+##### Review 3 U3-RU-2 — PASS
+
+Session: `scenario_session_01793973822557812686_0000000062_603572ab07384154a45dd31efc0f4b79`.
+
+Deadline evidence: не позднее пятницы. Urgency assessment: Full output contains a neutral payment request with a Friday due-by deadline; no ASAP, pressure or invented urgency. No-rush notes override urgency in due_date.
+
+```text
+Sam, прошу внести согласованную предоплату USD 800 за редизайн сайта не позднее пятницы. Пожалуйста, сообщите, когда отправите платёж.
+```
+
+##### Review 3 U3-RU-3 — PASS
+
+Session: `scenario_session_01793973833290964482_0000000068_fdc2df33c179477fa6db4d5722338f4a`.
+
+Deadline evidence: не позднее пятницы. Urgency assessment: Full output contains a neutral payment request with a Friday due-by deadline; no ASAP, pressure or invented urgency. No-rush notes override urgency in due_date.
+
+```text
+Sam, прошу оплатить согласанную предоплату USD 800 за редизайн сайта не позднее пятницы. Пожалуйста, сообщите, когда отправите платёж.
+```
+
+Manually corrected version for sending (only spelling changed; the live output above and JSON evidence are unchanged):
+
+```text
+Sam, прошу оплатить согласованную предоплату USD 800 за редизайн сайта не позднее пятницы. Пожалуйста, сообщите, когда отправите платёж.
+```
+
+#### Review 3 U3-EN
+
+Tone: firm; amount: USD 800; due date: Friday — ASAP.
+
+Billing notes:
+
+Client Sam. Agreed deposit USD 800 for the site redesign. Not urgent, no rush.
+
+##### Review 3 U3-EN-1 — PASS
+
+Session: `scenario_session_01793973843905357778_0000000074_dc456e16c416432ea450416ad21e86f6`.
+
+Deadline evidence: by Friday. Urgency assessment: Full output contains a neutral payment request with a Friday due-by deadline; no ASAP, pressure or invented urgency. No-rush notes override urgency in due_date.
+
+```text
+Hi Sam, please pay the agreed USD 800 deposit for the site redesign by Friday. Let me know once you’ve sent the payment.
+```
+
+##### Review 3 U3-EN-2 — PASS
+
+Session: `scenario_session_01793973852216510856_0000000080_812bab3ebc394a3ab5badbc1f3d72aa4`.
+
+Deadline evidence: by Friday. Urgency assessment: Full output contains a neutral payment request with a Friday due-by deadline; no ASAP, pressure or invented urgency. No-rush notes override urgency in due_date.
+
+```text
+Please pay the agreed USD 800 deposit for the site redesign by Friday. Let me know once the payment has been sent.
+```
+
+##### Review 3 U3-EN-3 — PASS
+
+Session: `scenario_session_01793973862440602315_0000000086_1970715e61d642668f4ad4d39acd8aaa`.
+
+Deadline evidence: by Friday. Urgency assessment: Full output contains a neutral payment request with a Friday due-by deadline; no ASAP, pressure or invented urgency. No-rush notes override urgency in due_date.
+
+```text
+Please pay the agreed USD 800 deposit for the site redesign by Friday. Please let me know once you’ve sent the payment.
+```
+
+#### Review 3 U3-ES
+
+Tone: firm; amount: USD 800; due date: viernes — lo antes posible.
+
+Billing notes:
+
+Cliente Sam. Se acordó un anticipo de USD 800 por el rediseño del sitio web. No es urgente, no hay prisa.
+
+##### Review 3 U3-ES-1 — PASS
+
+Session: `scenario_session_01793973872396761829_0000000092_b6f2b0a93fad43638795589045a81c5a`.
+
+Deadline evidence: a más tardar el viernes. Urgency assessment: Full output contains a neutral payment request with a Friday due-by deadline; no ASAP, pressure or invented urgency. No-rush notes override urgency in due_date.
+
+```text
+El anticipo de USD 800 por el rediseño del sitio web vence a más tardar el viernes. Por favor, realiza el pago y avísame cuando lo hayas enviado.
+```
+
+##### Review 3 U3-ES-2 — PASS
+
+Session: `scenario_session_01793973883367920413_0000000098_529e4fa9ac6f4074a425ef17a3c5c9d0`.
+
+Deadline evidence: a más tardar el viernes. Urgency assessment: Full output contains a neutral payment request with a Friday due-by deadline; no ASAP, pressure or invented urgency. No-rush notes override urgency in due_date.
+
+```text
+Por favor, realiza el pago de USD 800 por el anticipo acordado para el rediseño del sitio web, a más tardar el viernes. Avísame cuando lo hayas enviado.
+```
+
+##### Review 3 U3-ES-3 — PASS
+
+Session: `scenario_session_01793973893568818030_0000000104_a9172dae6b3c486ab23eeee33bed4caa`.
+
+Deadline evidence: a más tardar el viernes. Urgency assessment: Full output contains a neutral payment request with a Friday due-by deadline; no ASAP, pressure or invented urgency. No-rush notes override urgency in due_date.
+
+```text
+Sam, por favor, realiza el pago del anticipo de USD 800 por el rediseño del sitio web a más tardar el viernes. Avísame cuando hayas enviado el pago.
 ```
