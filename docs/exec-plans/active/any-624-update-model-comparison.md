@@ -7,8 +7,8 @@
 - Created: 2026-11-03
 - Last updated: 2026-11-06
 - Review date: 2026-11-06
-- Next action: owner review of the validated round 5 acceptance contract
-- Blocker: none in local validation; round 5 changes remain local
+- Next action: owner review of completed product acceptance; further tooling hardening is deferred
+- Blocker: no new product defect established by round 6; evidence limitations remain documented
 
 ## Goal and scope
 
@@ -31,6 +31,42 @@ Screening: at least 4/5 usable per case/language/configuration, no critical erro
 median submit-to-visible-result at most 60 seconds. Finalists: 19/20 main, 5/5 variants.
 Missing evidence or human semantic confirmation stays PENDING. UI failures stay failures
 when the backend succeeds later. Unknown provider cost is never zero.
+
+## Supporting tooling: scope frozen
+
+Owner decision, 2026-11-06: retain the collector, offline reviewer and report generator as
+experimental supporting tools. Further development of these tools is outside ANY-624.
+Their output is not an independent product acceptance decision. Existing CI checks remain
+required; this decision does not disable tests or resolve PR review threads.
+
+The deliverable is the live evaluation of U01/U03/U04/U05 and the subsequently authorized
+model comparison. Putilin accepted the 270 finalist outputs; the full report and acceptance
+decision are attached to [ANY-624](https://linear.app/paveldik/issue/ANY-624).
+Round 6 findings concern the supporting tools and do not establish a defect in those accepted
+outputs. They do not, by themselves, reopen the completed human assessment or require another
+paid matrix. Evidence of an actual incorrect result or invalidated acceptance must still be
+investigated. Earlier technical-provenance gaps remain unresolved; human acceptance does not
+retroactively prove the missing source/effort evidence.
+
+Known limitations are deferred, not fixed or suppressed:
+
+| Tool limitation | Actual consequence |
+| --- | --- |
+| Imported run ID can disagree with case/attempt | Resume can repeat a slot when its expected trace/journal is also absent. Canonical collected records do not have this mismatch. |
+| Scoped review checks the selected series | A sibling conflict does not block text review; the combined report still rejects the invalid experiment. |
+| Missing latency is formatted as a number | Collection can raise TypeError after retaining PENDING and restoring the router. |
+| Browser initialization precedes guarded cleanup | Setup failure can leave no attempt record or an unclosed browser; no product request has been submitted at that stage. |
+| Partial negative human decisions can show PENDING | An explicit failure is not reliably summarized until the remaining criteria are answered. |
+| Model/effort matrix validation is incomplete before collection | Malformed custom suites can spend calls before the report rejects them. |
+| CLI/HTML omit language and tone from the displayed input | Reviewers need the full submitted input to assess those criteria. |
+
+A read-only audit of the accepted 240 main and 30 variant records found canonical IDs, no
+duplicate case/attempt pairs, successful UI outcomes, finite latencies and complete human
+PASS decisions; each final directory contains one series. No raw records or verdicts were
+rewritten. This audit checks stored evidence and decisions, not a new semantic evaluation.
+
+Any future reuse or hardening of the utilities needs a separately scoped task. Do not treat
+their current PASS/PENDING/FAIL summary alone as certification of a new experiment.
 
 ## Relevant docs
 

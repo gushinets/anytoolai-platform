@@ -1,5 +1,9 @@
 """Render full ANY-624 outputs and summarize measured evidence without inventing semantic verdicts.
 
+Experimental diagnostic report, not an independent product acceptance decision.
+Known limitations and the frozen scope are documented in
+docs/exec-plans/active/any-624-update-model-comparison.md (Supporting tooling: scope frozen).
+
   LITELLM_LOCAL_MODEL_COST_MAP=True .quick-check-venv/bin/python \
     scripts/agent/client_update_writer_eval_report.py .agent/any-624
 

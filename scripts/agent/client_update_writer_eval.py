@@ -1,5 +1,9 @@
 """Collect ANY-624 live web evidence; no automatic semantic PASS decisions.
 
+Experimental supporting tool; further hardening is outside ANY-624's accepted live review.
+Known limitations and acceptance authority are documented in
+docs/exec-plans/active/any-624-update-model-comparison.md (Supporting tooling: scope frozen).
+
 Run with managed Python, a local dev-live stack and served web-mirror:
   .quick-check-venv/bin/python scripts/agent/client_update_writer_eval.py \
     --project anytoolai-xxxxxxxx --web-url http://localhost:3200 \
