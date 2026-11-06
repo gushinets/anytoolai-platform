@@ -131,6 +131,13 @@ async function openNewPresetFromExample(page) {
   await editPreset(page);
 }
 
+async function submitNewPresetFromExample(page, name) {
+  await openNewPresetFromExample(page);
+  await page.locator("#preset-name").fill(name);
+  await editPreset(page);
+  await page.locator("#save-preset").click();
+}
+
 async function openLab(page, {models = () => MODEL_CATALOG} = {}) {
   await page.route("http://atom-lab.test/**", async (route) => {
     const pathname = new URL(route.request().url()).pathname;
@@ -3600,10 +3607,7 @@ test("gateway failure after a committed preset write blocks blind duplicate save
   });
 
   await unlockAtom(page, "A06");
-  await openNewPresetFromExample(page);
-  await page.locator("#preset-name").fill("Commit за gateway");
-  await editPreset(page);
-  await page.locator("#save-preset").click();
+  await submitNewPresetFromExample(page, "Commit за gateway");
 
   await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
   await expect(page.locator("#save-preset")).toBeDisabled();
@@ -3630,10 +3634,7 @@ test("structured pre-write preset failure keeps the draft retryable", async ({pa
   });
 
   await unlockAtom(page, "A06");
-  await openNewPresetFromExample(page);
-  await page.locator("#preset-name").fill("Retryable pre-write draft");
-  await editPreset(page);
-  await page.locator("#save-preset").click();
+  await submitNewPresetFromExample(page, "Retryable pre-write draft");
 
   await expect(page.locator("#preset-error")).toContainText("Каталог Atom Lab недоступен");
   await expect(page.locator("#preset-name")).toHaveValue("Retryable pre-write draft");
@@ -3673,10 +3674,7 @@ for (const responseCase of [
     });
 
     await unlockAtom(page, "A06");
-    await openNewPresetFromExample(page);
-    await page.locator("#preset-name").fill(responseCase.presetName);
-    await editPreset(page);
-    await page.locator("#save-preset").click();
+    await submitNewPresetFromExample(page, responseCase.presetName);
 
     await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
     await expect(page.locator("#save-preset")).toBeDisabled();
