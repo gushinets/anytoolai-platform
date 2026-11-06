@@ -7,7 +7,7 @@
 - Created: 2026-11-06
 - Last updated: 2026-11-06
 - Review date: 2026-11-06
-- Next action: owner reviews original 15/15 live pass and Spanish wording caveat
+- Next action: owner reviews the subsequent review fixes and completed multilingual acceptance
 - Blocker: none
 
 ## Goal
@@ -39,7 +39,17 @@ Prompt-text tests protect the instruction contract only. Live review must verify
 and guard against regressions in A04 and urgency. The prior quick-check environment failure
 (passwordless sudo for nobody) must be reported if it remains; never bypass the test.
 
-## Result
+## Review correction
+
+The first-fix aggregate below described numeric/urgency retention only. Review round 1 found
+A01-3 and A01-EN-2 missing the explicit payment request, and classified the Spanish percentage
+ambiguity as FAIL rather than an acceptable caveat. Full semantic acceptance is therefore
+14/15 for the original cases and 18/21 overall for this historical first-fix series.
+Original texts remain unchanged; prior verdicts are retained in the evidence audit history.
+The subsequent review fixes and multilingual verification now pass 45/45 on the revised prompt;
+see [the current acceptance report](any-604-prepaid-request-live-acceptance.md).
+
+## Historical first-fix result
 
 One prompt paragraph now distinguishes the complete agreed payment arrangement from the amount
 requested now. The partial-receipt rule says never request both figures as still owed, rather

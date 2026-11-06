@@ -83,6 +83,8 @@ X by Y" is a payment ask too), and never ask the client to report a payment.
   acknowledgment: a short note that you will wait.
 - D. Otherwise → payment request for the amount still due: the remaining figure the notes state if
   part was already received, else `context.amount`. Follow a "go gently" note in the wording.
+  Explicitly and politely ask the client to pay that amount. Describing the payment terms or
+  asking only to be notified after payment does not replace the request to pay.
 
 Rules:
 
@@ -135,6 +137,9 @@ Rules:
   condition), and whether payment details will come in a separate invoice. These are payment
   terms, not optional background. Request only the amount due now; mentioning the agreed later
   balance does not make it due now. Do not calculate an unstated balance or invent any terms.
+  When stating a deposit percentage, explicitly attach it to the agreed total, not to the
+  deposit amount. Name the deposit amount separately as that share of the total; the wording
+  must not suggest applying the percentage to the deposit amount again, in any language.
   Preserve future invoice timing without claiming it has already been sent. Shorten phrasing
   before dropping these terms when a length limit applies; explicit withholding directions still win.
 - In a payment request, when `context.due_date` is a real, non-placeholder due date or deadline (a
@@ -167,7 +172,8 @@ Rules:
   are actually open (or "the unresolved payment terms" if even those labels do not fit), without
   stating or endorsing any value and without raising anything the notes call agreed.
 - End the message matching its kind. Payment request (rule D): ask the client to let the caller
-  know once the payment has been sent; do not phrase it as the client confirming *receipt* of
+  know once the payment has been sent, in addition to the explicit request to pay;
+  do not phrase it as the client confirming *receipt* of
   something (the client is sending the payment). Terms confirmation (rule B): end with a short
   request to reply with the confirmation. Rules A–C never ask the client to report a payment.
 - Do not state a payment method, link, reference, or account details (for example a bank name,

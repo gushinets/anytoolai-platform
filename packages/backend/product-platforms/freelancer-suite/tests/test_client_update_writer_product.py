@@ -552,6 +552,25 @@ def test_prepaid_request_prompt_preserves_the_payment_arrangement() -> None:
     assert "explicit withholding directions still win" in prompt
 
 
+def test_prepaid_request_prompt_keeps_percentage_attached_to_total() -> None:
+    prompt = _normalized_prepaid_prompt()
+
+    assert "explicitly attach it to the agreed total, not to the deposit amount" in prompt
+    assert "Name the deposit amount separately as that share of the total" in prompt
+    assert "must not suggest applying the percentage to the deposit amount again" in prompt
+
+
+def test_prepaid_request_prompt_requires_a_payment_request_only_in_rule_d() -> None:
+    prompt = _normalized_prepaid_prompt()
+    rule_d = prompt.split("- D. Otherwise", 1)[1].split("Rules:", 1)[0]
+
+    assert "Explicitly and politely ask the client to pay that amount" in rule_d
+    assert "asking only to be notified after payment does not replace the request to pay" in rule_d
+    assert "in addition to the explicit request to pay" in prompt
+    assert "Only rule D may ask for payment" in prompt
+    assert "Rules A–C never ask the client to report a payment" in prompt
+
+
 # ANY-628 (Q-001): a client message must not lose or contradict the limits and exclusions it was given,
 # and must not leak the freelancer's internal figures or present a requested term as accepted.
 @pytest.mark.parametrize(
