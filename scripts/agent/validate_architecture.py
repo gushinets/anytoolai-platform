@@ -88,23 +88,15 @@ FREELANCER_SUITE_ALLOWED_IMPORTERS = (
     ROOT / "scripts" / "agent" / "validate_configs.py",
 )
 
-JS_MODULE_IMPORT_RE = re.compile(
-    r"""
-    (?:
-        (?:import|export)\s+
-        (?:(?:type\s+)?[^'"]*?\s+from\s+)?
-        ["']([^"']+)["']
-    )
-    |
-    (?:require\(\s*["']([^"']+)["']\s*\))
-    |
-    (?:import\(\s*["']([^"']+)["']\s*\))
-    """,
-    re.VERBOSE,
-)
-GOOGLE_GENAI_NAMED_IMPORT_RE = re.compile(
-    r"""import\s+(?:type\s+)?\{[^}]*\bgenai\b[^}]*\}\s+from\s+["']google["']"""
-)
+# Scan each quote-free span once; failed import candidates must not rescan the file tail.
+JS_STATIC_IMPORT_START_RE = re.compile(r"(?:import|export)\s")
+JS_SIDE_EFFECT_IMPORT_RE = re.compile(r"(?:import|export)\s+$")
+JS_FROM_SUFFIX_RE = re.compile(r"\sfrom\s+$")
+JS_CALL_IMPORT_SUFFIX_RE = re.compile(r"(?:require|import)\(\s*$")
+JS_CALL_IMPORT_END_RE = re.compile(r"\s*\)")
+GOOGLE_GENAI_IMPORT_START_RE = re.compile(r"import\s+(?:type\s+)?\{")
+GOOGLE_GENAI_NAME_RE = re.compile(r"\bgenai\b")
+GOOGLE_GENAI_FROM_RE = re.compile(r"\s+from\s+[\"']google[\"']")
 
 
 def iter_text_files(root: Path) -> Iterator[Path]:
@@ -154,13 +146,38 @@ def imported_js_ts_modules(path: Path) -> set[str]:
     """Return JavaScript/TypeScript module specifiers from imports/requires."""
     text = path.read_text(encoding="utf-8", errors="ignore")
     imports: set[str] = set()
-    for match in JS_MODULE_IMPORT_RE.finditer(text):
-        module = next((value for value in match.groups() if value), None)
-        if module:
+    spans = re.split(r"[\"']", text)
+    index = 0
+    while index + 2 < len(spans):
+        prefix, module, suffix = spans[index : index + 3]
+        start = JS_STATIC_IMPORT_START_RE.search(prefix)
+        from_suffix = JS_FROM_SUFFIX_RE.search(prefix) if start else None
+        static_import = start is not None and (
+            JS_SIDE_EFFECT_IMPORT_RE.search(prefix) is not None
+            or (from_suffix is not None and from_suffix.start() >= start.end())
+        )
+        call_import = (
+            JS_CALL_IMPORT_SUFFIX_RE.search(prefix) is not None
+            and JS_CALL_IMPORT_END_RE.match(suffix) is not None
+        )
+        if module and (static_import or call_import):
             imports.add(module)
+            index += 2  # The closing quote cannot also open another matched specifier.
+        else:
+            index += 1
 
-    if GOOGLE_GENAI_NAMED_IMPORT_RE.search(text):
-        imports.add("google.genai")
+    # The existing google named-import rule allows quotes inside the brace contents.
+    offset = 0
+    for brace_span in text.split("}")[:-1]:
+        start = GOOGLE_GENAI_IMPORT_START_RE.search(brace_span)
+        offset += len(brace_span) + 1
+        if (
+            start is not None
+            and GOOGLE_GENAI_NAME_RE.search(brace_span, start.end()) is not None
+            and GOOGLE_GENAI_FROM_RE.match(text, offset) is not None
+        ):
+            imports.add("google.genai")
+            break
 
     return imports
 
