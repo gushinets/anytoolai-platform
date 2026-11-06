@@ -186,3 +186,60 @@ the same checks passed with escalation. The managed Python environment used
 installed browser cache. Production PostgreSQL, full backend CI, clean independent
 review, commit and push remain with the parent. No acceptance data, dependency,
 Sonar rule/threshold/exclusion, deployment, migration or paid provider was changed.
+
+## Remaining review follow-up: reversible drafts and preset cancellation
+
+Doctor passed before edits on 2026-11-07. Reproduce the remaining delayed-trial
+finding and the new-preset cancellation finding before changing production code.
+
+1. Keep the existing single successful-trial record independent of editor-session
+   replacement, recording only confirmed run/history success. Preserve exact snapshot checks
+   across preset creation/version readback, edits and reverts, history/new drafts,
+   failed runs and subsequent operations; never infer success from a source-run ID.
+   Require the same loaded catalog atom and clear evidence on explicit adaptation
+   across incompatible action, prompt or schema contracts.
+2. Keep an editor's real preset binding while preparing a new preset. Cancellation
+   must leave its input, prompt, source-run provenance and dirty state intact;
+   only a committed new preset may replace its binding.
+
+Reach: the shared Atom Lab editor lifecycle, focused browser/Node regressions,
+and this plan. Validate with mocked browser transport, canonical frontend-check,
+connected API/docs/architecture checks and generation/diff checks. No live DB,
+provider calls, dependencies, commit, push, migrations or deployment.
+
+Both regressions failed before production edits: returning from Y to X after
+delayed completion lost the successful trial for both creation and version
+readback; clean and dirty editor launches after cancellation sent `preset_ref: null`.
+
+The existing single successful-trial record now outlives editor-session recreation.
+Only a validated successful accepted run or compatible successful history restore
+sets it. Status and prompt saves still require exact text, source, atom, input,
+model and reasoning matches. Catalog object identity prevents reuse after a fresh
+unlock/catalog load; explicit adaptation clears evidence for incompatible schema,
+action configuration or prompt contracts. Failed runs do not erase actual success.
+No history cache, source-run inference or output/run reassignment was added.
+
+Preparing a new preset now changes only preset metadata. The working editor keeps
+its binding until a committed save reapplies the new immutable version. Clean/dirty
+cancellation tests compare the complete run payload, assert zero preset writes,
+verify the original fixed fields/provenance, and verify normal new-preset rebinding.
+
+Verification (2026-11-07):
+
+- Thirteen focused delayed-completion/cancellation Chromium journeys passed;
+  compatible/failed/retired/adapted history and new-catalog guards also passed.
+- Canonical `python scripts/agent/runner.py frontend-check` passed lint, typecheck,
+  all Node/Vitest suites, 139 Chromium journeys, API-type drift and production builds.
+- Connected catalog/history/presets/access API, docs generation/validation and Atom
+  Lab boundary tests passed: 289 tests, with existing managed dependencies and
+  `runner.baseline_env()` (the exact collection count was checked without rerunning tests).
+- `validate-docs`, `generate-docs --check`, and `git diff --check` passed.
+
+The first canonical frontend run hit the sandbox pnpm-store symlink permission;
+the identical escalated command passed. Isolated SQLite tests and documentation
+Temp checks used the previously established escalation. Chromium used the existing
+browser cache; LiteLLM used the bundled cost map. No API/generated artifact,
+dependency, Sonar rule/threshold/exclusion, working DB or paid provider changed.
+All changes remain uncommitted for parent review, PR update and independent CI/review.
+Full backend, production PostgreSQL and deployment gates were not repeated for this
+JavaScript-only behavior fix.
