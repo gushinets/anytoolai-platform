@@ -175,6 +175,10 @@ def _install_request_context(app: FastAPI) -> None:
             else:
                 response = await call_next(request)
             response.headers[REQUEST_ID_HEADER] = request_id
+            media_type = response.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+            if media_type == "text/html":
+                # Separate policies preserve route CSP directives while refusing every ancestor.
+                response.headers.append("Content-Security-Policy", "frame-ancestors 'none'")
             if request.url.path.startswith("/internal/"):
                 response.headers["Cache-Control"] = "no-store"
             apply_atom_lab_cache_policy(request, response)

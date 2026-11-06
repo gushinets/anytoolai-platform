@@ -589,7 +589,7 @@ def get_atom_lab_page() -> HTMLResponse:
             'id="access-panel"', 'id="access-panel" data-auto-open="true" hidden',
         )
     return HTMLResponse(content, headers={
-        "Cache-Control": "no-store", "Content-Security-Policy": "frame-ancestors 'none'",
+        "Cache-Control": "no-store",
     })
 
 

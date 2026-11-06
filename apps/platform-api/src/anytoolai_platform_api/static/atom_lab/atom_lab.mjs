@@ -1584,6 +1584,7 @@ export function bootstrapAtomLab({
   let historyListLoadGeneration = 0;
   let historyListLoadInFlight = false;
   let selectedHistoryDetail = null;
+  let selectedHistoryRunId = null;
   let selectedHistoryCompatible = false;
   let historyOpenGeneration = 0;
   let historyOpenInFlight = false;
@@ -2768,11 +2769,12 @@ export function bootstrapAtomLab({
   };
 
   const renderHistoryList = () => {
-    nodes["history-record"].hidden = !historyItems.some(run => run.run_id === selectedHistoryDetail?.run_id);
+    nodes["history-record"].hidden = selectedHistoryDetail === null
+      || !historyItems.some(run => run.run_id === selectedHistoryRunId);
     nodes["history-panel"].append(nodes["history-record"]);
     nodes["history-list"].replaceChildren();
     for (const run of historyItems) {
-      const selected = run.run_id === selectedHistoryDetail?.run_id;
+      const selected = run.run_id === selectedHistoryRunId;
       const row = document.createElement("tr");
       row.dataset.selected = String(selected);
       const date = document.createElement("td");
@@ -2868,6 +2870,13 @@ export function bootstrapAtomLab({
     const generation = ++historyListLoadGeneration;
     const cursor = append ? historyCursor : null;
     historyListLoadInFlight = true;
+    historyOpenGeneration += 1;
+    historyOpenInFlight = false;
+    if (selectedHistoryDetail?.status === "queued" || selectedHistoryDetail?.status === "running") {
+      selectedHistoryDetail = null;
+      selectedHistoryCompatible = false;
+      nodes["history-record"].hidden = true;
+    }
     nodes["history-list-state"].textContent = "Загрузка истории…";
     updateHistoryControls();
     nodes["history-error"].textContent = "";
@@ -2878,6 +2887,14 @@ export function bootstrapAtomLab({
       if (generation !== historyListLoadGeneration) return false;
       historyItems = append ? [...historyItems, ...parsed.items] : parsed.items;
       historyCursor = parsed.next_cursor;
+      const selected = historyItems.find(run => run.run_id === selectedHistoryRunId);
+      if (selected && (!selectedHistoryDetail
+        || selected.status !== selectedHistoryDetail.status
+        || selected.started_at !== selectedHistoryDetail.started_at
+        || selected.finished_at !== selectedHistoryDetail.finished_at)) {
+        await openHistoryRun(selected.run_id);
+      }
+      if (generation !== historyListLoadGeneration) return false;
       renderHistoryList();
       return true;
     } catch (error) {
@@ -2910,17 +2927,20 @@ export function bootstrapAtomLab({
       if (buttonNode.dataset.runId) buttonNode.disabled = listLocked;
     }
     nodes["load-more-history"].disabled = listLocked;
-    nodes["restore-history"].disabled = historyOpenInFlight || selectedHistoryDetail === null;
-    nodes["save-history-preset"].disabled = historyOpenInFlight
-      || selectedHistoryDetail === null
+    nodes["restore-history"].disabled = listLocked || selectedHistoryDetail === null
+      || !historyItems.some(run => run.run_id === selectedHistoryRunId);
+    nodes["save-history-preset"].disabled = nodes["restore-history"].disabled
       || !selectedHistoryCompatible;
   };
 
   const openHistoryRun = async (runId) => {
     const keepRowFocus = document.activeElement?.dataset?.runId === runId;
     const generation = ++historyOpenGeneration;
+    selectedHistoryRunId = runId;
+    selectedHistoryDetail = null;
+    selectedHistoryCompatible = false;
     historyOpenInFlight = true;
-    updateHistoryControls();
+    renderHistoryList();
     nodes["history-error"].textContent = "";
     try {
       const parsed = parseRunDetail(await protectedJson(`/v1/atom-lab/runs/${encodeURIComponent(runId)}`), runId);
@@ -3889,7 +3909,7 @@ export function bootstrapAtomLab({
     }
   });
   nodes["restore-history"].addEventListener("click", () => {
-    if (!selectedHistoryDetail || historyOpenInFlight) return;
+    if (!selectedHistoryDetail || nodes["restore-history"].disabled) return;
     if (hasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return;
     const configuration = historyConfiguration(selectedHistoryDetail);
     if (!isRecord(configuration.input) || !isNonEmptyString(configuration.prompt) || !isNonEmptyString(configuration.model_id)) {
@@ -3920,7 +3940,7 @@ export function bootstrapAtomLab({
       : "Снимок явно адаптирован к текущему контракту без ссылки на устаревший пресет.";
   });
   nodes["save-history-preset"].addEventListener("click", async () => {
-    if (!selectedHistoryDetail || !selectedHistoryCompatible || historyOpenInFlight) return;
+    if (!selectedHistoryDetail || nodes["save-history-preset"].disabled) return;
     if (hasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return;
     const configuration = historyConfiguration(selectedHistoryDetail);
     const atom = catalog.find((item) => item.atom_id === configuration.atom_id);
@@ -3974,7 +3994,8 @@ export function bootstrapAtomLab({
   nodes["collapse-history"].addEventListener("click", () => {
     historyOpenGeneration += 1;
     historyOpenInFlight = false;
-    const previousId = selectedHistoryDetail?.run_id;
+    const previousId = selectedHistoryRunId;
+    selectedHistoryRunId = null;
     selectedHistoryDetail = null;
     renderHistoryList();
     for (const item of nodes["history-list"].querySelectorAll("button")) {
