@@ -636,3 +636,58 @@ for these UI fixes. Parent owns commit/push, fresh independent review and requir
 CI. Working DB, migrations, deployment, provider calls and GitHub writes were not
 used. Ambiguous-save retry/idempotency and unbounded library pagination remain
 the previously documented separate follow-ups.
+
+## Source recovery after prompt and preset writes
+
+Doctor passed before edits on 2026-11-07 at `32aba398`. Address review
+`5807008049`, discussion `4497608097`: confirmed field-specific source rejection
+on prompt creation, preset creation and preset version creation must refresh and
+reconcile the save owner's source. Preserve manual prompt/input/name edits and
+immutable history/configuration; detach a retired source only after a successful
+validated read. Fence changed sources, replacement editors, closed/replaced preset
+editors and catalog replacement. A history A06 preset must recover independently
+of an open A05 draft, with failed-read Retry targeting that same owner.
+
+Reach: shared Atom Lab JavaScript, focused Chromium regressions and this plan.
+First reproduce, then use the existing prompt loader/reconciliation helpers for
+all three writes; preserve existing run rejection recovery and bounded trial
+evidence. Verify focused source/write/history controls, canonical frontend-check,
+documentation/generation and diff checks. No backend/CSS/contracts, dependencies,
+working DB, migrations, provider calls, staging, commit or push is needed.
+
+All four initial Chromium regressions failed before production edits: prompt,
+preset, version and direct A06 history preset (with an unrelated A05 draft)
+remained at one prompt GET after the field-specific 422. Reproduction log:
+`.quick-check-tmp/p4-write-recovery-before.log`.
+
+The existing prompt loader now accepts its owner, fences the current editor or
+preset snapshot and catalog membership, and reconciles only validated successful
+reads. A shared rejection helper covers the three writes and the existing run
+path. Explicit source selection invalidates an earlier read and clears its pending
+state. Snapshot failures offer Retry in the preset panel, including after closing
+and reopening it; they never load options into the unrelated workbench. Save
+guards include the snapshot's pending validation. Prompt/input/name edits and
+source-run provenance remain intact; immutable history is unchanged.
+
+Focused Chromium passed all 49 cases (32 new, 17 connected), covering all write
+owners, successful retired-ref refresh, 503/Retry, real recovered save payloads and
+acknowledgements, pending-write/read source/editor/catalog changes, form closure,
+replacement preset metadata and mismatched rejection code/field. Existing run
+source recovery, compatible restores, adaptations and direct history save checks
+also passed. Log: `.quick-check-tmp/p4-focused.log`.
+
+Final canonical `frontend-check` passed on 2026-11-07: lint, typecheck, all 230
+Chromium journeys, 53 Atom Lab Node tests, six demo Node tests, 824 Vitest tests,
+generated API-type drift and production builds. Log:
+`.quick-check-tmp/p4-frontend-check-final.log`. The sandbox first rejected the
+pnpm-store symlink; the identical command passed with approved escalation, using
+the installed Chromium cache and managed Python environment. No check was
+weakened. `validate-docs`, `generate-docs --check` and `git diff --check` passed;
+documentation logs are `.quick-check-tmp/p4-validate-docs.log` and
+`.quick-check-tmp/p4-generate-docs-check.log`.
+
+Only the three owned files changed. HEAD remains `32aba398145d0494bbf74c5909005bc4037a19e8`,
+staging is empty and unrelated untracked reports are untouched. Backend/CSS,
+contracts, dependencies, working DB, migrations, provider calls, deployment,
+commits, pushes and GitHub writes were not used. Broad backend/PostgreSQL checks
+were not repeated for this UI-only fix; parent owns review, commit/push and CI.

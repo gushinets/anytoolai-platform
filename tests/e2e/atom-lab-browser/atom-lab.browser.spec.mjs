@@ -2083,6 +2083,303 @@ test("admission rejection keeps the draft, hides transport retry, and a new laun
   expect(keys[0]).not.toBe(keys[1]);
 });
 
+async function prepareRejectedSourceWrite(page, kind) {
+  page.on("dialog", dialog => dialog.accept());
+  const platform = {ref: A06.prompt_ref, name: "Платформенный", prompt: A06.prompt, group: "platform", source_ref: null, source_run_id: null};
+  const product = {ref: "product.a06.v1", name: "Продуктовый v1", prompt: "Текст продукта v1", group: "product", source_ref: null, source_run_id: null};
+  const replacement = {...product, ref: "product.a06.v2", name: "Продуктовый v2", prompt: "Текст продукта v2"};
+  const detail = historyDetail({runId: "run-write-source", prompt: "Исторический ручной текст"});
+  detail.snapshot.prompt.source_ref = product.ref;
+  const originalDetail = structuredClone(detail);
+  let stored = {
+    preset_id: "preset-write-source", version: 1, created_at: detail.created_at,
+    name: "Исходный пресет", description: "Описание", atom_id: "A06",
+    base_action_config_id: A06.base_action_config_id, schema_refs: A06.schema_refs,
+    prompt: "Ручной текст пресета", prompt_ref: A06.prompt_ref, prompt_source_ref: product.ref,
+    example_input: A06.example_input, fixed_fields: [], model_id: "openai/gpt-supported",
+    reasoning_effort: "high", source_run_id: detail.run_id,
+  };
+  const originalVersion = structuredClone(stored);
+  const summary = () => ({...stored, latest_version: stored.version, updated_at: stored.created_at});
+  const state = {
+    reads: 0, writes: [], refreshStatus: 200, rejectionCode: kind === "prompt" ? "prompt_invalid" : "preset_contract_invalid",
+    rejectionField: kind === "prompt" ? "source_ref" : "prompt_source_ref",
+    writeGate: Promise.resolve(), refreshGate: Promise.resolve(),
+  };
+  await page.route("http://atom-lab.test/v1/atom-lab/**", async route => {
+    const request = route.request();
+    const {pathname} = new URL(request.url());
+    if (request.method() === "POST") {
+      const payload = request.postDataJSON();
+      state.writes.push({pathname, payload});
+      await state.writeGate;
+      if (state.writes.length === 1) {
+        await route.fulfill({status: 422, json: {error: {
+          code: state.rejectionCode, message: "Источник сохранения отклонён.",
+          field_errors: [{path: state.rejectionField, message: "Источник больше недоступен."}],
+        }, request_id: "write-source-rejection"}});
+      } else if (kind === "prompt") {
+        await route.fulfill({json: {...product, ref: "lab.saved-source", group: "lab", ...payload}});
+      } else {
+        const {base_version: baseVersion, ...configuration} = payload;
+        stored = {...configuration, preset_id: stored.preset_id, version: (baseVersion ?? 0) + 1, created_at: stored.created_at};
+        await route.fulfill({status: 201, json: {preset_id: stored.preset_id, version: stored.version, created_at: stored.created_at}});
+      }
+      return;
+    }
+    if (pathname === "/v1/atom-lab/atoms/A06/prompts") {
+      const read = ++state.reads;
+      if (read > 1) await state.refreshGate;
+      if (read > 1 && state.refreshStatus !== 200) {
+        await route.fulfill({status: state.refreshStatus, json: {error: {code: "prompts_unavailable", message: "Источники временно недоступны."}}});
+      } else await route.fulfill({json: [platform, read === 1 ? product : replacement]});
+      return;
+    }
+    if (pathname.endsWith("/prompts")) {
+      const atom = catalog().find(item => pathname.includes(`/${item.atom_id}/`));
+      await route.fulfill({json: [{...platform, ref: atom.prompt_ref, prompt: atom.prompt}, {...product, ref: "product.a05.v1"}]});
+      return;
+    }
+    if (pathname === "/v1/atom-lab/presets") {
+      await route.fulfill({json: {items: kind === "version" || state.writes.length > 1 ? [summary()] : [], next_cursor: null}});
+      return;
+    }
+    if (pathname === `/v1/atom-lab/presets/${stored.preset_id}/versions`) {
+      await route.fulfill({json: {items: [{...summary(), version: stored.version}], next_cursor: null}});
+      return;
+    }
+    if (pathname === `/v1/atom-lab/presets/${stored.preset_id}/versions/${stored.version}`) {
+      await route.fulfill({json: stored});
+      return;
+    }
+    if (pathname === "/v1/atom-lab/runs") {
+      await route.fulfill({json: {items: [{
+        run_id: detail.run_id, status: detail.status, atom_id: "A06", model_id: stored.model_id,
+        preset_id: null, preset_version: null, created_at: detail.created_at,
+        started_at: detail.started_at, finished_at: detail.finished_at,
+      }], next_cursor: null}});
+      return;
+    }
+    if (pathname === `/v1/atom-lab/runs/${detail.run_id}`) {
+      await route.fulfill({json: detail});
+      return;
+    }
+    await route.fallback();
+  });
+  await unlockAtom(page, kind === "history" ? "A05" : "A06");
+  await page.locator("#fill-example").click();
+  if (kind === "version") {
+    await page.locator("#presets-button").click();
+    await page.locator("#preset-list button").click();
+    await page.locator("#edit-preset").click();
+    await expect.poll(() => state.reads).toBe(1);
+  } else {
+    await page.locator("#prompt-tab").click();
+    await page.locator("#prompt-select").selectOption(kind === "history" ? "product.a05.v1" : product.ref);
+    await page.locator("#prompt-editor").fill("Ручной текст владельца");
+    if (kind === "history") {
+      await page.locator("#history-button").click();
+      await page.locator("#history-list .history-open").click();
+      await page.locator("#save-history-preset").click();
+    } else if (kind === "preset") await editPreset(page);
+  }
+  const name = page.locator(kind === "prompt" ? "#save-prompt-name" : "#preset-name");
+  if (kind === "prompt") await page.locator("#save-prompt-panel summary").click();
+  await name.fill("  Имя владельца  ");
+  const save = page.locator(kind === "prompt" ? "#save-prompt" : "#save-preset");
+  const error = page.locator(kind === "prompt" ? "#save-prompt-status" : "#preset-error");
+  return {state, product, replacement, detail, originalDetail, originalVersion, save, name, error};
+}
+
+for (const kind of ["prompt", "preset", "version", "history"]) {
+  for (const refreshFails of [false, true]) {
+    test(`${kind} source write rejection refreshes its owner${refreshFails ? " after 503 and Retry" : ""}`, async ({page}) => {
+      const fixture = await prepareRejectedSourceWrite(page, kind);
+      const {state, product, replacement, detail, originalDetail, save, name, error} = fixture;
+      let releaseRefresh;
+      state.refreshGate = new Promise(resolve => { releaseRefresh = resolve; });
+      state.refreshStatus = refreshFails ? 503 : 200;
+      await save.click();
+      await expect(error).toContainText("Источник сохранения отклонён");
+      await expect.poll(() => state.reads).toBe(2);
+      await expect(save).toBeDisabled();
+      await name.fill("Изменённое имя во время проверки");
+      if (kind !== "history") {
+        await showWorkbench(page);
+        await page.locator("#prompt-tab").click();
+        await page.locator("#prompt-editor").fill("Ручной текст после отказа");
+        await page.locator("#input-tab").click();
+        await importJson(page, {...A06.example_input, objective: "Ручной вход после отказа"});
+        await page.locator("#prompt-tab").click();
+        await expect(page.locator("#prompt-select")).toHaveValue(product.ref);
+      }
+      releaseRefresh();
+      const retry = kind === "history"
+        ? page.getByRole("button", {name: "Повторить загрузку источника", exact: true})
+        : page.locator("#retry-prompts");
+      if (refreshFails) {
+        await expect(kind === "history" ? error : page.locator("#prompt-load-status")).toContainText("Источники временно недоступны");
+        await expect(retry).toBeVisible();
+        await expect(save).toBeDisabled();
+        if (kind === "history") await expect(page.locator("#preset-config-metadata")).toContainText(product.ref);
+        else await expect(page.locator("#prompt-select")).toHaveValue(product.ref);
+        await save.dispatchEvent("click");
+        expect(state.writes).toHaveLength(1);
+        state.refreshStatus = 200;
+        if (kind === "history") {
+          await showWorkbench(page);
+          await expect(page.locator("#prompt-select")).toHaveValue("product.a05.v1");
+          await page.locator("#presets-button").click();
+        }
+        await retry.click();
+      }
+      if (kind === "history") {
+        await expect(page.locator("#preset-state")).toContainText("Исторический источник недоступен");
+        await expect(page.locator("#preset-prompt")).toHaveText(detail.snapshot.prompt.content);
+        await expect(page.locator("#preset-config-metadata")).not.toContainText(product.ref);
+      } else {
+        await expect(page.locator("#prompt-select")).toHaveValue(A06.prompt_ref);
+        await expect(page.locator("#prompt-select option")).toContainText(["Платформенный", replacement.name]);
+        await expect(page.locator("#prompt-editor")).toHaveValue("Ручной текст после отказа");
+        if (kind !== "prompt") await editPreset(page);
+      }
+      await expect(name).toHaveValue("Изменённое имя во время проверки");
+      await expect(save).toBeEnabled();
+      expect(state.reads).toBe(refreshFails ? 3 : 2);
+      await save.click();
+      await expect.poll(() => state.writes.length).toBe(2);
+      const recovered = state.writes[1].payload;
+      expect(state.writes[0].payload[kind === "prompt" ? "source_ref" : "prompt_source_ref"]).toBe(product.ref);
+      expect(recovered[kind === "prompt" ? "source_ref" : "prompt_source_ref"]).toBe(kind === "prompt" ? A06.prompt_ref : null);
+      expect(recovered.name).toBe("Изменённое имя во время проверки");
+      expect(recovered.prompt).toBe(kind === "history" ? detail.snapshot.prompt.content : "Ручной текст после отказа");
+      if (kind !== "prompt") {
+        expect(recovered.example_input).toEqual(kind === "history" ? detail.snapshot.input : {...A06.example_input, objective: "Ручной вход после отказа"});
+        expect(recovered.source_run_id).toBe(kind === "preset" ? null : detail.run_id);
+        await expect(page.locator("#preset-state")).toContainText("Сохранена неизменяемая версия");
+      } else await expect(error).toContainText("Сохранён промпт");
+      if (kind === "history") {
+        await showWorkbench(page);
+        await expect(page.locator("#atom-title")).toContainText("A05");
+        await expect(page.locator("#prompt-editor")).toHaveValue("Ручной текст владельца");
+        await expect(page.locator("#prompt-select")).toHaveValue("product.a05.v1");
+        await page.locator("#history-button").click();
+        await page.locator("#history-list .history-open").click();
+        expect(JSON.parse(await page.locator("#history-detail").textContent())).toEqual(originalDetail);
+      }
+    });
+  }
+}
+
+for (const phase of ["write", "refresh"]) {
+  for (const change of ["source", "editor", "catalog", "text-and-name", "closed-panel"]) {
+    test(`prompt source write recovery fences a later ${change} during ${phase}`, async ({page}) => {
+      const {state, save, name, product} = await prepareRejectedSourceWrite(page, "prompt");
+      let release;
+      const gate = new Promise(resolve => { release = resolve; });
+      if (phase === "write") state.writeGate = gate;
+      else state.refreshGate = gate;
+      await save.click();
+      await expect.poll(() => phase === "write" ? state.writes.length : state.reads).toBe(phase === "write" ? 1 : 2);
+      if (change === "source") await page.locator("#prompt-select").selectOption(A06.prompt_ref);
+      if (change === "editor") {
+        await page.getByRole("button", {name: /A05/}).click();
+        await page.locator("#prompt-select").selectOption("product.a05.v1");
+      }
+      await page.locator("#prompt-editor").fill("Правки после отправки");
+      if (change === "text-and-name") await name.fill("Позднее ручное имя");
+      if (change === "closed-panel") await page.locator("#save-prompt-panel summary").click();
+      if (change === "catalog") {
+        page.removeAllListeners("dialog");
+        page.on("dialog", dialog => dialog.dismiss());
+        const reloaded = page.waitForResponse("**/v1/atom-lab/models");
+        await page.locator("#access-form").dispatchEvent("submit");
+        await reloaded;
+      }
+      const completed = page.waitForResponse(response => phase === "write"
+        ? response.request().method() === "POST"
+        : response.url().endsWith("/atoms/A06/prompts"));
+      release();
+      await (await completed).finished();
+      const shouldRecover = change === "text-and-name" || change === "closed-panel";
+      if (shouldRecover) await expect(page.locator("#prompt-select")).toHaveValue(A06.prompt_ref);
+      else await expect(page.locator("#prompt-select")).toHaveValue(change === "source" ? A06.prompt_ref : change === "editor" ? "product.a05.v1" : product.ref);
+      await expect(page.locator("#prompt-editor")).toHaveValue("Правки после отправки");
+      await expect(page.locator("#retry-prompts")).toBeHidden();
+      if (change === "source" || change === "editor") await expect(page.locator("#prompt-load-status")).toBeEmpty();
+      if (change === "text-and-name") await expect(name).toHaveValue("Позднее ручное имя");
+      if (change === "closed-panel") await expect(page.locator("#save-prompt-panel")).not.toHaveAttribute("open", "");
+      expect(state.reads).toBe(phase === "refresh" || shouldRecover ? 2 : 1);
+      expect(state.writes).toHaveLength(1);
+    });
+  }
+}
+
+for (const phase of ["write", "refresh"]) {
+  for (const change of phase === "write" ? ["closed-panel", "catalog"] : ["closed-panel", "new-preset", "editor", "catalog"]) {
+    test(`history source write recovery preserves a later ${change} during ${phase}`, async ({page}) => {
+      const {state, save, product} = await prepareRejectedSourceWrite(page, "history");
+      let release;
+      const gate = new Promise(resolve => { release = resolve; });
+      if (phase === "write") state.writeGate = gate;
+      else state.refreshGate = gate;
+      await save.click();
+      await expect.poll(() => phase === "write" ? state.writes.length : state.reads).toBe(phase === "write" ? 1 : 2);
+      await showWorkbench(page);
+      if (change === "new-preset") {
+        await page.locator("#presets-button").click();
+        await page.locator("#new-preset").click();
+        await page.locator("#preset-name").fill("Другой владелец");
+      }
+      if (change === "editor") await page.getByRole("button", {name: /A06/}).click();
+      if (change === "catalog") {
+        const reloaded = page.waitForResponse("**/v1/atom-lab/models");
+        await page.locator("#access-form").dispatchEvent("submit");
+        await reloaded;
+      }
+      const completed = page.waitForResponse(response => phase === "write"
+        ? response.request().method() === "POST"
+        : response.url().endsWith("/atoms/A06/prompts"));
+      release();
+      await (await completed).finished();
+      if (change === "new-preset") {
+        await expect(page.locator("#preset-name")).toHaveValue("Другой владелец");
+        await expect(page.locator("#preset-prompt")).toHaveText("Ручной текст владельца");
+        await expect(page.locator("#preset-config-metadata")).toContainText("product.a05.v1");
+        await expect(page.locator("#preset-state")).not.toContainText("источник недоступен");
+      } else {
+        await expect(page.locator("#presets-panel")).toBeHidden();
+        if (change !== "catalog") await expect(page.locator("#atom-title")).toContainText(change === "editor" ? "A06" : "A05");
+        if (change === "closed-panel") {
+          await expect(page.locator("#prompt-editor")).toHaveValue("Ручной текст владельца");
+          await expect(page.locator("#prompt-select")).toHaveValue("product.a05.v1");
+        }
+      }
+      await expect(page.locator("#prompt-load-status")).toBeEmpty();
+      await expect(page.locator("#retry-prompts")).toBeHidden();
+      expect(state.writes).toHaveLength(1);
+      expect(state.writes[0].payload.prompt_source_ref).toBe(product.ref);
+    });
+  }
+}
+
+for (const kind of ["prompt", "preset", "version", "history"]) {
+  for (const mismatch of ["code", "field"]) {
+    test(`${kind} source write recovery ignores a different rejection ${mismatch}`, async ({page}) => {
+      const {state, save, error} = await prepareRejectedSourceWrite(page, kind);
+      if (mismatch === "code") state.rejectionCode = "input_invalid";
+      else state.rejectionField = "prompt";
+      await save.click();
+      await expect(error).toContainText("Источник сохранения отклонён");
+      await expect(save).toBeEnabled();
+      expect(state.reads).toBe(1);
+      expect(state.writes).toHaveLength(1);
+      await expect(page.locator("#retry-prompts")).toBeHidden();
+      await expect(page.getByRole("button", {name: "Повторить загрузку источника", exact: true})).toHaveCount(0);
+    });
+  }
+}
+
 for (const refreshFails of [false, true]) {
   test(`a rejected prompt source refreshes without losing edits${refreshFails ? " after a failed read and Retry" : ""}`, async ({page}) => {
     page.on("dialog", dialog => dialog.accept());
