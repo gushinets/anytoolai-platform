@@ -3434,14 +3434,16 @@ export function bootstrapAtomLab({
     renderPromptStatus();
   };
 
-  const loadPromptOptions = async () => {
+  const loadPromptOptions = async ({refresh = false} = {}) => {
     const draft = session;
-    if (!draft || draft.promptOptions || draft.loadingPrompts) return;
-    draft.loadingPrompts = true;
+    if (!draft || (!refresh && (draft.promptOptions || draft.loadingPrompts))) return;
+    const request = {};
+    draft.loadingPrompts = request;
     nodes["retry-prompts"].hidden = true;
     nodes["prompt-load-status"].textContent = "Загрузка промптов…";
     try {
       const options = await fetchPromptOptions(draft);
+      if (draft.loadingPrompts !== request) return;
       draft.promptOptions = options;
       const reconcileSource = draft.promptSourceNeedsValidation;
       if (reconcileSource) reconcilePromptSource(draft, options);
@@ -3457,11 +3459,11 @@ export function bootstrapAtomLab({
         if (presetEditorActive) renderPresetState();
       }
     } catch (error) {
-      if (session !== draft) return;
+      if (session !== draft || draft.loadingPrompts !== request) return;
       nodes["prompt-load-status"].textContent = error.message;
       nodes["retry-prompts"].hidden = false;
     } finally {
-      draft.loadingPrompts = false;
+      if (draft.loadingPrompts === request) draft.loadingPrompts = false;
     }
   };
 
@@ -3587,7 +3589,7 @@ export function bootstrapAtomLab({
     session.prompt = nodes["prompt-editor"].value;
     updateDraftState();
   });
-  nodes["retry-prompts"].addEventListener("click", loadPromptOptions);
+  nodes["retry-prompts"].addEventListener("click", () => loadPromptOptions({refresh: true}));
   nodes["prompt-select"].addEventListener("change", () => {
     const ref = nodes["prompt-select"].value;
     const option = session.promptOptions?.find((item) => item.ref === ref);
@@ -3617,16 +3619,25 @@ export function bootstrapAtomLab({
     try {
       const saved = await protectedJson(promptUrl(draft), {method: "POST", body: JSON.stringify(payload)});
       if (!validPromptOption(saved) || saved.group !== "lab") throw unknownWriteOutcome();
-      if (session !== draft) return;
-      draft.promptOptions.push(saved);
-      if (draft.prompt === payload.prompt && promptRefFor(draft) === payload.source_ref) {
+      if (destroyed || session?.atom !== draft.atom || !catalog.includes(draft.atom)) return;
+      session.promptOptions = [...(session.promptOptions ?? draft.promptOptions).filter(option => option.ref !== saved.ref), saved];
+      // A pre-write GET must not replace a confirmed saved option with its older list.
+      if (session.loadingPrompts) void loadPromptOptions({refresh: true});
+      if (session !== draft) {
+        renderPromptOptions();
+        return;
+      }
+      const unchanged = draft.prompt === payload.prompt && promptRefFor(draft) === payload.source_ref;
+      if (unchanged) {
         applyPromptOption(saved);
       }
       renderPromptOptions();
-      nodes["save-prompt-panel"].open = false;
-      nodes["save-prompt-name"].value = "";
       nodes["save-prompt-status"].textContent = `Сохранён промпт «${saved.name}».`;
-      nodes["prompt-select"].focus();
+      if (unchanged) {
+        nodes["save-prompt-panel"].open = false;
+        nodes["save-prompt-name"].value = "";
+        nodes["prompt-select"].focus();
+      }
     } catch (error) {
       if (session === draft) {
         nodes["save-prompt-status"].textContent = error.message;
