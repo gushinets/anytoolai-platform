@@ -538,6 +538,20 @@ def test_prepaid_request_prompt_forbids_invented_dates_without_a_due_date() -> N
     assert "If `context` has no `due_date`, do not state or imply any date" in prompt
 
 
+def test_prepaid_request_prompt_preserves_the_payment_arrangement() -> None:
+    # Protects the prompt contract; model retention is checked by the ANY-604 live series.
+    prompt = _normalized_prepaid_prompt()
+
+    assert "preserve the complete explicitly stated payment arrangement" in prompt
+    assert "the deposit percentage and agreed total" in prompt
+    assert "when the remaining balance is payable (including its delivery condition)" in prompt
+    assert "whether payment details will come in a separate invoice" in prompt
+    assert "mentioning the agreed later balance does not make it due now" in prompt
+    assert "Do not calculate an unstated balance or invent any terms" in prompt
+    assert "without claiming it has already been sent" in prompt
+    assert "explicit withholding directions still win" in prompt
+
+
 # ANY-628 (Q-001): a client message must not lose or contradict the limits and exclusions it was given,
 # and must not leak the freelancer's internal figures or present a requested term as accepted.
 @pytest.mark.parametrize(
@@ -810,7 +824,8 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     assert "final with an agreed amount still owed is an ordinary unpaid payment" in prompt
     assert "rejected, superseded or replaced is history, not a conflict" in prompt
     assert (
-        "the stated remaining figure after a partial receipt, else `context.amount`, never both"
+        "the stated remaining figure after a partial receipt, else `context.amount`, "
+        "never request both as still owed"
         in prompt
     )
     assert "that conflicts with nothing stays stated as agreed" in prompt

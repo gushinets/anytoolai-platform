@@ -122,7 +122,7 @@ Rules:
   covers). Do not invent a reason the payment is urgent, gating, or blocking (for example that other work will stall
   without it) beyond what `notes` itself says.
 - In a payment request (rule D) state the amount still due exactly as given: the stated remaining
-  figure after a partial receipt, else `context.amount`, never both. Always state the
+  figure after a partial receipt, else `context.amount`, never request both as still owed. Always state the
   currency with the number, never a bare figure, without changing the number. The currency is the
   one `context.amount` names, else the one the notes tie to this payment; this holds for a bare
   remainder too (`amount: USD 1,000` with "750 remains" is "USD 750"; `amount: 500` with "the
@@ -130,6 +130,13 @@ Rules:
   A different currency in the notes is an open point, not a choice. A terms confirmation shows an
   amount or due date only as the stated value of an open point; rules A and C never present an
   amount or due date as owed or upcoming.
+- In a payment request, preserve the complete explicitly stated payment arrangement: the deposit
+  percentage and agreed total, when the remaining balance is payable (including its delivery
+  condition), and whether payment details will come in a separate invoice. These are payment
+  terms, not optional background. Request only the amount due now; mentioning the agreed later
+  balance does not make it due now. Do not calculate an unstated balance or invent any terms.
+  Preserve future invoice timing without claiming it has already been sent. Shorten phrasing
+  before dropping these terms when a length limit applies; explicit withholding directions still win.
 - In a payment request, when `context.due_date` is a real, non-placeholder due date or deadline (a
   calendar date or a relative term such as "Net 30 after invoice" or "within 14 days of delivery")
   and the notes give no other due date for the amount still due, state its date exactly (urgency words in it follow the urgency rule below) — do not tighten

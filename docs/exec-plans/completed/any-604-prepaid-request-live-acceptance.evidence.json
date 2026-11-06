@@ -1,0 +1,2002 @@
+{
+  "issue": "ANY-604",
+  "date": "2026-11-06",
+  "acceptance": "FAIL",
+  "reviewer": "Codex agent semantic review; owner acceptance pending",
+  "environment": {
+    "source_sha": "e4fb6fa4e457595058b45a24287f7277ec4b5630",
+    "runtime_files_match_checkout": true,
+    "sha256": {
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/client_update_writer/prompts/prepaid_request_compose_persuasive_text.v1.md": "b79d8a66b4137d098b82259c69624ecc3e4549f7c36ceaeca8b704330fc682d1",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/client_update_writer/workflows.yaml": "35e6334ccb4387c481d83dbed7cf6e4024ae8d9b25a0b1e75f489b4c96de6bbc",
+      "configs/kernel/litellm_router.yaml": "60d55333ac52d3a3490a6b2783acf375b2e8305d9b2a17e77855b0735d6c0c25"
+    },
+    "router": "model_list:\n  - model_name: anytoolai.default_text\n    litellm_params:\n      model: openai/gpt-6-luna\n      api_key: env/OPENAI_API_KEY\n      reasoning_effort: medium\n      # Kept although LiteLLM 1.105.1 lists gpt-6-luna: a model its static registry does not list\n      # yet would have this parameter rejected as unsupported although the API accepts it.\n      allowed_openai_params: [reasoning_effort]\n\nrouter_settings:\n  routing_strategy: simple-shuffle\n  enable_pre_call_checks: true\n",
+    "started_at": "2026-11-06T09:43:54.827153+00:00",
+    "source_note": "Runtime source unchanged; only acceptance documentation and ignored QA scripts added."
+  },
+  "runs": [
+    {
+      "id": "A04-1",
+      "input": {
+        "id": "A04",
+        "language": "en",
+        "tone": "firm",
+        "notes": "Client Pat. Our draft says total fee USD 2,000 and a 50% deposit (USD 1,000), but the amount field says USD 1,200. The client has not accepted the change. Do not imply the higher amount is agreed. Highlight the mismatch and request confirmation of deposit terms before sending any payment demand. Due date field is 7 October 2026, but Pat requested payment after final delivery on 20 October 2026; this is unresolved. No penalties were agreed.",
+        "amount": "USD 1,200",
+        "due_date": "7 October 2026"
+      },
+      "session_id": "scenario_session_01793958245058802073_0000000002_d6bb0d958887497686e80ca51a86f296",
+      "submitted_at": "2026-11-06T09:44:04.921Z",
+      "artifact_id": "artifact_01793958253331360986_0000000011_021562152bf5471e843310713917a366",
+      "output": {
+        "text": "Please confirm the deposit amount and due date before I send a payment request. The draft lists a 50% deposit of USD 1,000 based on a USD 2,000 total, while the amount field lists USD 1,200; the change has not been accepted. The due date is also unresolved: the field says 7 October 2026, while you requested payment after final delivery on 20 October 2026. Please reply with the deposit terms and due date you confirm."
+      },
+      "output_source": "browser result API",
+      "visible_text": "Please confirm the deposit amount and due date before I send a payment request. The draft lists a 50% deposit of USD 1,000 based on a USD 2,000 total, while the amount field lists USD 1,200; the change has not been accepted. The due date is also unresolved: the field says 7 October 2026, while you requested payment after final delivery on 20 October 2026. Please reply with the deposit terms and due date you confirm.",
+      "clipboard_text": "Please confirm the deposit amount and due date before I send a payment request. The draft lists a 50% deposit of USD 1,000 based on a USD 2,000 total, while the amount field lists USD 1,200; the change has not been accepted. The due date is also unresolved: the field says 7 October 2026, while you requested payment after final delivery on 20 October 2026. Please reply with the deposit terms and due date you confirm.",
+      "ui_outcome": "result",
+      "ui_latency_ms": 10569.477479,
+      "error": null,
+      "trace_sha256": "207e375fb90257799e1e86b5796937f6571fb2fe62f53c9ad746c9955465ed05",
+      "screenshot_sha256": "f07a861b4605c0a2a288af33c7f5b2444bc697072fb057d7a6e11cbc6ec5b2a2",
+      "action": {
+        "id": "action_run_01793958245553338854_0000000002_671e4cde843d45c6a8c376f16f408f0a",
+        "step_id": "compose_persuasive_text",
+        "action_type": "text.compose_persuasive_text",
+        "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+        "status": "succeeded"
+      },
+      "provider_calls": [
+        {
+          "step_id": "compose_persuasive_text",
+          "model": "gpt-6-luna",
+          "gateway_model": "anytoolai.default_text",
+          "status": "succeeded",
+          "latency_ms": 7483,
+          "input_tokens": 3886,
+          "output_tokens": 451,
+          "estimated_cost": 0.000711175,
+          "reasoning_effort": null
+        }
+      ],
+      "semantic_verdict": "PASS",
+      "semantic_reason": "Both amounts and both dates remain unresolved and are presented for confirmation; no payment demand or payment-sent closing.",
+      "browser_verdict": "PASS",
+      "acceptance": "PASS"
+    },
+    {
+      "id": "A04-2",
+      "input": {
+        "id": "A04",
+        "language": "en",
+        "tone": "firm",
+        "notes": "Client Pat. Our draft says total fee USD 2,000 and a 50% deposit (USD 1,000), but the amount field says USD 1,200. The client has not accepted the change. Do not imply the higher amount is agreed. Highlight the mismatch and request confirmation of deposit terms before sending any payment demand. Due date field is 7 October 2026, but Pat requested payment after final delivery on 20 October 2026; this is unresolved. No penalties were agreed.",
+        "amount": "USD 1,200",
+        "due_date": "7 October 2026"
+      },
+      "session_id": "scenario_session_01793958261609408950_0000000008_16f316d969984b0692c5a4fa5b7cf7c9",
+      "submitted_at": "2026-11-06T09:44:21.520Z",
+      "artifact_id": "artifact_01793958267540937298_0000000027_7bb96660f60649038fcc492a59ecb37e",
+      "output": {
+        "text": "Please confirm the deposit amount and due date. The amount listed is USD 1,200, while the draft describes a 50% deposit (USD 1,000) on a USD 2,000 total; the change has not been accepted. The listed due date is 7 October 2026, while your requested timing is after final delivery on 20 October 2026. Please reply with the confirmed terms."
+      },
+      "output_source": "browser result API",
+      "visible_text": "Please confirm the deposit amount and due date. The amount listed is USD 1,200, while the draft describes a 50% deposit (USD 1,000) on a USD 2,000 total; the change has not been accepted. The listed due date is 7 October 2026, while your requested timing is after final delivery on 20 October 2026. Please reply with the confirmed terms.",
+      "clipboard_text": "Please confirm the deposit amount and due date. The amount listed is USD 1,200, while the draft describes a 50% deposit (USD 1,000) on a USD 2,000 total; the change has not been accepted. The listed due date is 7 October 2026, while your requested timing is after final delivery on 20 October 2026. Please reply with the confirmed terms.",
+      "ui_outcome": "result",
+      "ui_latency_ms": 6432.301310999999,
+      "error": null,
+      "trace_sha256": "4640754fd9798e0b8b7a03b583917141c32a0a0c0af84d025850e03d82de236f",
+      "screenshot_sha256": "5acb2f2414470946140f1b4eea2d9a638330b62183bb1b03a842a4a2f05b6c92",
+      "action": {
+        "id": "action_run_01793958262430248234_0000000018_f000852bb6724110bc825965e19162c7",
+        "step_id": "compose_persuasive_text",
+        "action_type": "text.compose_persuasive_text",
+        "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+        "status": "succeeded"
+      },
+      "provider_calls": [
+        {
+          "step_id": "compose_persuasive_text",
+          "model": "gpt-6-luna",
+          "gateway_model": "anytoolai.default_text",
+          "status": "succeeded",
+          "latency_ms": 5063,
+          "input_tokens": 3886,
+          "output_tokens": 458,
+          "estimated_cost": 0.00026813,
+          "reasoning_effort": null
+        }
+      ],
+      "semantic_verdict": "PASS",
+      "semantic_reason": "Both amounts and both dates remain unresolved and are presented for confirmation; no payment demand or payment-sent closing.",
+      "browser_verdict": "PASS",
+      "acceptance": "PASS"
+    },
+    {
+      "id": "A04-3",
+      "input": {
+        "id": "A04",
+        "language": "en",
+        "tone": "firm",
+        "notes": "Client Pat. Our draft says total fee USD 2,000 and a 50% deposit (USD 1,000), but the amount field says USD 1,200. The client has not accepted the change. Do not imply the higher amount is agreed. Highlight the mismatch and request confirmation of deposit terms before sending any payment demand. Due date field is 7 October 2026, but Pat requested payment after final delivery on 20 October 2026; this is unresolved. No penalties were agreed.",
+        "amount": "USD 1,200",
+        "due_date": "7 October 2026"
+      },
+      "session_id": "scenario_session_01793958272623390968_0000000014_6d850c40d0d0451191c12bb713fa2b89",
+      "submitted_at": "2026-11-06T09:44:32.542Z",
+      "artifact_id": "artifact_01793958278224171342_0000000043_d733291742164562ac374e3339992d04",
+      "output": {
+        "text": "Please confirm the deposit amount and payment timing. The draft lists a 50% deposit of USD 1,000, while the amount listed for billing is USD 1,200. The due date is listed as 7 October 2026, while your request was for payment after final delivery on 20 October 2026. Please confirm the deposit terms before I send a payment request."
+      },
+      "output_source": "browser result API",
+      "visible_text": "Please confirm the deposit amount and payment timing. The draft lists a 50% deposit of USD 1,000, while the amount listed for billing is USD 1,200. The due date is listed as 7 October 2026, while your request was for payment after final delivery on 20 October 2026. Please confirm the deposit terms before I send a payment request.",
+      "clipboard_text": "Please confirm the deposit amount and payment timing. The draft lists a 50% deposit of USD 1,000, while the amount listed for billing is USD 1,200. The due date is listed as 7 October 2026, while your request was for payment after final delivery on 20 October 2026. Please confirm the deposit terms before I send a payment request.",
+      "ui_outcome": "result",
+      "ui_latency_ms": 6493.056869999999,
+      "error": null,
+      "trace_sha256": "34490d9757c4aeffbdec6db9b07c216920197eca0f84f0528d63a63ce7025335",
+      "screenshot_sha256": "7d80547530b7ea9fd0d0b2cfdd206c8310c4a52d756f39b408d0a33ae76aa353",
+      "action": {
+        "id": "action_run_01793958273612087192_0000000034_820a81c5b90e440d838bce8ad6ec05e1",
+        "step_id": "compose_persuasive_text",
+        "action_type": "text.compose_persuasive_text",
+        "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+        "status": "succeeded"
+      },
+      "provider_calls": [
+        {
+          "step_id": "compose_persuasive_text",
+          "model": "gpt-6-luna",
+          "gateway_model": "anytoolai.default_text",
+          "status": "succeeded",
+          "latency_ms": 4556,
+          "input_tokens": 3886,
+          "output_tokens": 361,
+          "estimated_cost": 0.00021963,
+          "reasoning_effort": null
+        }
+      ],
+      "semantic_verdict": "PASS",
+      "semantic_reason": "Both amounts and both dates remain unresolved and are presented for confirmation; no payment demand or payment-sent closing.",
+      "browser_verdict": "PASS",
+      "acceptance": "PASS"
+    },
+    {
+      "id": "A01-1",
+      "input": {
+        "id": "A01",
+        "language": "ru",
+        "tone": "warm",
+        "notes": "Елена, начинаем дизайн презентации на 12 слайдов. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "session_id": "scenario_session_01793958287537156544_0000000020_daca8ef6883749c5a03f27b8e37f116b",
+      "submitted_at": "2026-11-06T09:44:47.366Z",
+      "artifact_id": "artifact_01793958293267143147_0000000059_3f776bcaabc142dbabfddef156c676f2",
+      "output": {
+        "text": "Елена, для начала дизайна презентации на 12 слайдов прошу внести предоплату 15 000 RUB — 50% от согласованной общей стоимости 30 000 RUB. Остаток оплачивается после передачи финальных PDF и PPTX. Реквизиты будут указаны в отдельном счёте. Пожалуйста, сообщите, когда отправите предоплату."
+      },
+      "output_source": "browser result API",
+      "visible_text": "Елена, для начала дизайна презентации на 12 слайдов прошу внести предоплату 15 000 RUB — 50% от согласованной общей стоимости 30 000 RUB. Остаток оплачивается после передачи финальных PDF и PPTX. Реквизиты будут указаны в отдельном счёте. Пожалуйста, сообщите, когда отправите предоплату.",
+      "clipboard_text": "Елена, для начала дизайна презентации на 12 слайдов прошу внести предоплату 15 000 RUB — 50% от согласованной общей стоимости 30 000 RUB. Остаток оплачивается после передачи финальных PDF и PPTX. Реквизиты будут указаны в отдельном счёте. Пожалуйста, сообщите, когда отправите предоплату.",
+      "ui_outcome": "result",
+      "ui_latency_ms": 6512.973283,
+      "error": null,
+      "trace_sha256": "8a8a03302f2cc8cacbf885b4f63c43fc215fee1e01cedfe5262d1dcd21879226",
+      "screenshot_sha256": "bd3bbe34f3b8770518da7699727ab80edad528d06ad2e0dcc6f98c0669ad7415",
+      "action": {
+        "id": "action_run_01793958288323903873_0000000050_caf222b7cbe94565b8031696f0fcb340",
+        "step_id": "compose_persuasive_text",
+        "action_type": "text.compose_persuasive_text",
+        "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+        "status": "succeeded"
+      },
+      "provider_calls": [
+        {
+          "step_id": "compose_persuasive_text",
+          "model": "gpt-6-luna",
+          "gateway_model": "anytoolai.default_text",
+          "status": "succeeded",
+          "latency_ms": 4905,
+          "input_tokens": 3851,
+          "output_tokens": 336,
+          "estimated_cost": 0.0006493,
+          "reasoning_effort": null
+        }
+      ],
+      "semantic_verdict": "PASS",
+      "semantic_reason": "15,000 RUB and 50% retained; no invented urgency. Name, balance after final PDF/PPTX and separate future invoice also retained.",
+      "browser_verdict": "PASS",
+      "acceptance": "PASS"
+    },
+    {
+      "id": "A01-2",
+      "input": {
+        "id": "A01",
+        "language": "ru",
+        "tone": "warm",
+        "notes": "Елена, начинаем дизайн презентации на 12 слайдов. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "session_id": "scenario_session_01793958302221874553_0000000026_5afdd90147e64604975f1ef3dd7a735f",
+      "submitted_at": "2026-11-06T09:45:02.049Z",
+      "artifact_id": "artifact_01793958306026619554_0000000075_4799b6edfdaf494ca83b45e0fe44e6a2",
+      "output": {
+        "text": "Елена, для начала дизайна презентации на 12 слайдов прошу внести предоплату 15 000 RUB. Пожалуйста, сообщите, когда отправите оплату."
+      },
+      "output_source": "browser result API",
+      "visible_text": "Елена, для начала дизайна презентации на 12 слайдов прошу внести предоплату 15 000 RUB. Пожалуйста, сообщите, когда отправите оплату.",
+      "clipboard_text": "Елена, для начала дизайна презентации на 12 слайдов прошу внести предоплату 15 000 RUB. Пожалуйста, сообщите, когда отправите оплату.",
+      "ui_outcome": "result",
+      "ui_latency_ms": 4713.050437000001,
+      "error": null,
+      "trace_sha256": "07983620272748af903417b2958e344a8b76e9bf602bc942a466fc8c4112c13d",
+      "screenshot_sha256": "cf84251b0264395eddd43ddd7e37648110f27110e588073f48b80a94c32024a0",
+      "action": {
+        "id": "action_run_01793958302353287010_0000000066_27385e552bb744dd8427e40deb432ebf",
+        "step_id": "compose_persuasive_text",
+        "action_type": "text.compose_persuasive_text",
+        "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+        "status": "succeeded"
+      },
+      "provider_calls": [
+        {
+          "step_id": "compose_persuasive_text",
+          "model": "gpt-6-luna",
+          "gateway_model": "anytoolai.default_text",
+          "status": "succeeded",
+          "latency_ms": 3621,
+          "input_tokens": 3851,
+          "output_tokens": 276,
+          "estimated_cost": 0.00017678,
+          "reasoning_effort": null
+        }
+      ],
+      "semantic_verdict": "FAIL",
+      "semantic_reason": "15,000 RUB retained but required 50% omitted; no invented urgency.",
+      "browser_verdict": "PASS",
+      "acceptance": "FAIL"
+    },
+    {
+      "id": "A01-3",
+      "input": {
+        "id": "A01",
+        "language": "ru",
+        "tone": "warm",
+        "notes": "Елена, начинаем дизайн презентации на 12 слайдов. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "session_id": "scenario_session_01793958314384935989_0000000032_d5302b6e462a4a8ba4f08886f1c56aba",
+      "submitted_at": "2026-11-06T09:45:14.289Z",
+      "artifact_id": "artifact_01793958318975897074_0000000091_cc480a3d335e40fbb38be0e30af56051",
+      "output": {
+        "text": "Елена, для начала дизайна презентации на 12 слайдов прошу внести предоплату 15 000 RUB. Реквизиты будут в отдельном счёте. Пожалуйста, сообщите, когда предоплата будет отправлена."
+      },
+      "output_source": "browser result API",
+      "visible_text": "Елена, для начала дизайна презентации на 12 слайдов прошу внести предоплату 15 000 RUB. Реквизиты будут в отдельном счёте. Пожалуйста, сообщите, когда предоплата будет отправлена.",
+      "clipboard_text": "Елена, для начала дизайна презентации на 12 слайдов прошу внести предоплату 15 000 RUB. Реквизиты будут в отдельном счёте. Пожалуйста, сообщите, когда предоплата будет отправлена.",
+      "ui_outcome": "result",
+      "ui_latency_ms": 6484.187368,
+      "error": null,
+      "trace_sha256": "9d77fcf2beeb4970a8b34d5d572e4ec28b97739f16e778bffe6c7d94b71cf7cb",
+      "screenshot_sha256": "897f3058d901938a4227fe9cdea22bd72767bc2b62f88c235544dc0f3c0c5fcd",
+      "action": {
+        "id": "action_run_01793958315129650624_0000000082_9fb81d963e474765aa9fa896b79cdcde",
+        "step_id": "compose_persuasive_text",
+        "action_type": "text.compose_persuasive_text",
+        "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+        "status": "succeeded"
+      },
+      "provider_calls": [
+        {
+          "step_id": "compose_persuasive_text",
+          "model": "gpt-6-luna",
+          "gateway_model": "anytoolai.default_text",
+          "status": "succeeded",
+          "latency_ms": 3785,
+          "input_tokens": 3851,
+          "output_tokens": 297,
+          "estimated_cost": 0.00018727999999999998,
+          "reasoning_effort": null
+        }
+      ],
+      "semantic_verdict": "FAIL",
+      "semantic_reason": "15,000 RUB retained but required 50% omitted; no invented urgency.",
+      "browser_verdict": "PASS",
+      "acceptance": "FAIL"
+    },
+    {
+      "id": "U1-1",
+      "input": {
+        "id": "U1",
+        "language": "en",
+        "tone": "firm",
+        "notes": "Client Sam. Agreed deposit USD 800 for the site redesign. The payment is urgent, needed ASAP.",
+        "amount": "USD 800",
+        "due_date": ""
+      },
+      "session_id": "scenario_session_01793958327034540824_0000000038_7445828ad362465494a630618e642c28",
+      "submitted_at": "2026-11-06T09:45:26.884Z",
+      "artifact_id": "artifact_01793958330200957442_0000000107_1384a8a1af744ae6bd5132af036f91e2",
+      "output": {
+        "text": "Please send the agreed USD 800 deposit for the site redesign ASAP. This payment is urgent. Let me know once it has been sent."
+      },
+      "output_source": "browser result API",
+      "visible_text": "Please send the agreed USD 800 deposit for the site redesign ASAP. This payment is urgent. Let me know once it has been sent.",
+      "clipboard_text": "Please send the agreed USD 800 deposit for the site redesign ASAP. This payment is urgent. Let me know once it has been sent.",
+      "ui_outcome": "result",
+      "ui_latency_ms": 4611.298656,
+      "error": null,
+      "trace_sha256": "538509569c45b0fe40120ef4468555c2865a518a25d0a0a957d8829f3d7f75ff",
+      "screenshot_sha256": "510eb22bcc6e1786eaa6d7d4ba8a9dfe71f63dff530d7b84d55507ffbf757524",
+      "action": {
+        "id": "action_run_01793958327072090016_0000000098_f60d3c41cbf945518e874f236eac4c5f",
+        "step_id": "compose_persuasive_text",
+        "action_type": "text.compose_persuasive_text",
+        "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+        "status": "succeeded"
+      },
+      "provider_calls": [
+        {
+          "step_id": "compose_persuasive_text",
+          "model": "gpt-6-luna",
+          "gateway_model": "anytoolai.default_text",
+          "status": "succeeded",
+          "latency_ms": 3052,
+          "input_tokens": 3791,
+          "output_tokens": 131,
+          "estimated_cost": 0.0005392999999999999,
+          "reasoning_effort": null
+        }
+      ],
+      "semantic_verdict": "PASS",
+      "semantic_reason": "USD 800 and ASAP retained from notes, with no invented date.",
+      "browser_verdict": "PASS",
+      "acceptance": "PASS"
+    },
+    {
+      "id": "U1-2",
+      "input": {
+        "id": "U1",
+        "language": "en",
+        "tone": "firm",
+        "notes": "Client Sam. Agreed deposit USD 800 for the site redesign. The payment is urgent, needed ASAP.",
+        "amount": "USD 800",
+        "due_date": ""
+      },
+      "session_id": "scenario_session_01793958338274582030_0000000044_df8ca0da3ddc4a279023fac69e475254",
+      "submitted_at": "2026-11-06T09:45:38.078Z",
+      "artifact_id": "artifact_01793958342458551787_0000000123_c78e33a5a5ec4d54ad25d28e170de26e",
+      "output": {
+        "text": "Hi Sam, please send the agreed USD 800 deposit for the site redesign. The payment is needed ASAP. Let me know once it has been sent."
+      },
+      "output_source": "browser result API",
+      "visible_text": "Hi Sam, please send the agreed USD 800 deposit for the site redesign. The payment is needed ASAP. Let me know once it has been sent.",
+      "clipboard_text": "Hi Sam, please send the agreed USD 800 deposit for the site redesign. The payment is needed ASAP. Let me know once it has been sent.",
+      "ui_outcome": "result",
+      "ui_latency_ms": 4737.583433,
+      "error": null,
+      "trace_sha256": "c96500205fec8213d905daa6d64cedf931fb2617bb28c190cacc2de63f6c4cd6",
+      "screenshot_sha256": "f21397f46638f1a4a3bbefb39e53f8f895a202fa636d8a8d10c7a64c46bf398c",
+      "action": {
+        "id": "action_run_01793958339308949970_0000000114_2f99f180baa64ee3adf2c8b1bf01f934",
+        "step_id": "compose_persuasive_text",
+        "action_type": "text.compose_persuasive_text",
+        "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+        "status": "succeeded"
+      },
+      "provider_calls": [
+        {
+          "step_id": "compose_persuasive_text",
+          "model": "gpt-6-luna",
+          "gateway_model": "anytoolai.default_text",
+          "status": "succeeded",
+          "latency_ms": 3087,
+          "input_tokens": 3791,
+          "output_tokens": 197,
+          "estimated_cost": 0.00013668000000000003,
+          "reasoning_effort": null
+        }
+      ],
+      "semantic_verdict": "PASS",
+      "semantic_reason": "USD 800 and ASAP retained from notes, with no invented date.",
+      "browser_verdict": "PASS",
+      "acceptance": "PASS"
+    },
+    {
+      "id": "U1-3",
+      "input": {
+        "id": "U1",
+        "language": "en",
+        "tone": "firm",
+        "notes": "Client Sam. Agreed deposit USD 800 for the site redesign. The payment is urgent, needed ASAP.",
+        "amount": "USD 800",
+        "due_date": ""
+      },
+      "session_id": "scenario_session_01793958350775362285_0000000050_092251aefa2a48128591f9d02543dcca",
+      "submitted_at": "2026-11-06T09:45:50.557Z",
+      "artifact_id": "artifact_01793958354134694528_0000000139_50c993684598495e9e0a69cfd2497d0a",
+      "output": {
+        "text": "Sam, the USD 800 deposit for the site redesign is needed ASAP. Please send it and let me know once it’s been sent."
+      },
+      "output_source": "browser result API",
+      "visible_text": "Sam, the USD 800 deposit for the site redesign is needed ASAP. Please send it and let me know once it’s been sent.",
+      "clipboard_text": "Sam, the USD 800 deposit for the site redesign is needed ASAP. Please send it and let me know once it’s been sent.",
+      "ui_outcome": "result",
+      "ui_latency_ms": 4613.9689960000005,
+      "error": null,
+      "trace_sha256": "88e5f91e401c6e3135e5a5a352405cfc732a2aac9c4ef5d8ba98eb8833a438b2",
+      "screenshot_sha256": "b237d3b4caae0379ed380d9b1a84edb69fda567d5d91a07243d35b9a7a4fc782",
+      "action": {
+        "id": "action_run_01793958351611219109_0000000130_d3e6ecf324ab4aa3b95dd739e769fc3b",
+        "step_id": "compose_persuasive_text",
+        "action_type": "text.compose_persuasive_text",
+        "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+        "status": "succeeded"
+      },
+      "provider_calls": [
+        {
+          "step_id": "compose_persuasive_text",
+          "model": "gpt-6-luna",
+          "gateway_model": "anytoolai.default_text",
+          "status": "succeeded",
+          "latency_ms": 2470,
+          "input_tokens": 3791,
+          "output_tokens": 170,
+          "estimated_cost": 0.00012318,
+          "reasoning_effort": null
+        }
+      ],
+      "semantic_verdict": "PASS",
+      "semantic_reason": "USD 800 and ASAP retained from notes, with no invented date.",
+      "browser_verdict": "PASS",
+      "acceptance": "PASS"
+    },
+    {
+      "id": "U2-1",
+      "input": {
+        "id": "U2",
+        "language": "en",
+        "tone": "firm",
+        "notes": "Client Sam. Agreed deposit USD 800 for the site redesign.",
+        "amount": "USD 800",
+        "due_date": "Friday — ASAP"
+      },
+      "session_id": "scenario_session_01793958362188920962_0000000056_e800b6b91f7a418e941c55cff6d767ca",
+      "submitted_at": "2026-11-06T09:46:02.028Z",
+      "artifact_id": "artifact_01793958365863718469_0000000155_9b42179637a24827b52cae0462ca9a6d",
+      "output": {
+        "text": "Hi Sam, please send the agreed USD 800 deposit for the site redesign by Friday, as soon as possible. Let me know once it has been sent."
+      },
+      "output_source": "browser result API",
+      "visible_text": "Hi Sam, please send the agreed USD 800 deposit for the site redesign by Friday, as soon as possible. Let me know once it has been sent.",
+      "clipboard_text": "Hi Sam, please send the agreed USD 800 deposit for the site redesign by Friday, as soon as possible. Let me know once it has been sent.",
+      "ui_outcome": "result",
+      "ui_latency_ms": 4599.840712000001,
+      "error": null,
+      "trace_sha256": "825cd4388310d3ed4c01cf672f4da547b35cf388c72af394e089a645a7ab8734",
+      "screenshot_sha256": "2ff0b97b3330c53711435f2cadbce0cddfafb5e360bf2a65f41a83ec51a98127",
+      "action": {
+        "id": "action_run_01793958362246155773_0000000146_ae154ff4c300409db060a192440bcd9e",
+        "step_id": "compose_persuasive_text",
+        "action_type": "text.compose_persuasive_text",
+        "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+        "status": "succeeded"
+      },
+      "provider_calls": [
+        {
+          "step_id": "compose_persuasive_text",
+          "model": "gpt-6-luna",
+          "gateway_model": "anytoolai.default_text",
+          "status": "succeeded",
+          "latency_ms": 3532,
+          "input_tokens": 3792,
+          "output_tokens": 233,
+          "estimated_cost": 0.000590425,
+          "reasoning_effort": null
+        }
+      ],
+      "semantic_verdict": "PASS",
+      "semantic_reason": "USD 800, Friday and explicit urgency retained.",
+      "browser_verdict": "PASS",
+      "acceptance": "PASS"
+    },
+    {
+      "id": "U2-2",
+      "input": {
+        "id": "U2",
+        "language": "en",
+        "tone": "firm",
+        "notes": "Client Sam. Agreed deposit USD 800 for the site redesign.",
+        "amount": "USD 800",
+        "due_date": "Friday — ASAP"
+      },
+      "session_id": "scenario_session_01793958371260247769_0000000062_25e74bdb8fde4a5c9fb6655da305c428",
+      "submitted_at": "2026-11-06T09:46:11.139Z",
+      "artifact_id": "artifact_01793958374420008962_0000000171_2c5e7986912b40eb8a6920eff354efaf",
+      "output": {
+        "text": "Please send the agreed USD 800 deposit for the site redesign by Friday — ASAP. Let me know once it has been sent."
+      },
+      "output_source": "browser result API",
+      "visible_text": "Please send the agreed USD 800 deposit for the site redesign by Friday — ASAP. Let me know once it has been sent.",
+      "clipboard_text": "Please send the agreed USD 800 deposit for the site redesign by Friday — ASAP. Let me know once it has been sent.",
+      "ui_outcome": "result",
+      "ui_latency_ms": 4428.40353,
+      "error": null,
+      "trace_sha256": "cbd634bf594cffd26638fe53e6a1f38a46489d7d459c8358290c8c230cbd83e3",
+      "screenshot_sha256": "225a70233c2edb94d889e87a00f4c5b38cc2bde827f392fe901dadec4bc4435c",
+      "action": {
+        "id": "action_run_01793958371962984210_0000000162_11662c3058fa486d9080610db83a97c9",
+        "step_id": "compose_persuasive_text",
+        "action_type": "text.compose_persuasive_text",
+        "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+        "status": "succeeded"
+      },
+      "provider_calls": [
+        {
+          "step_id": "compose_persuasive_text",
+          "model": "gpt-6-luna",
+          "gateway_model": "anytoolai.default_text",
+          "status": "succeeded",
+          "latency_ms": 2410,
+          "input_tokens": 3792,
+          "output_tokens": 173,
+          "estimated_cost": 0.00012469,
+          "reasoning_effort": null
+        }
+      ],
+      "semantic_verdict": "PASS",
+      "semantic_reason": "USD 800, Friday and explicit urgency retained.",
+      "browser_verdict": "PASS",
+      "acceptance": "PASS"
+    },
+    {
+      "id": "U2-3",
+      "input": {
+        "id": "U2",
+        "language": "en",
+        "tone": "firm",
+        "notes": "Client Sam. Agreed deposit USD 800 for the site redesign.",
+        "amount": "USD 800",
+        "due_date": "Friday — ASAP"
+      },
+      "session_id": "scenario_session_01793958380574554480_0000000068_1579776e84e84b9bb8eeaa7643844341",
+      "submitted_at": "2026-11-06T09:46:20.461Z",
+      "artifact_id": "artifact_01793958384854305847_0000000187_cf75f8b228f547948c9a9811be6f1270",
+      "output": {
+        "text": "The agreed deposit of USD 800 for the site redesign is due Friday — ASAP. Please send it and let me know once it has been sent."
+      },
+      "output_source": "backend recovery after UI error",
+      "visible_text": null,
+      "clipboard_text": null,
+      "ui_outcome": "error",
+      "ui_latency_ms": 6414.877017000001,
+      "error": [
+        "Lost connection while waiting for your result. Please try again.",
+        ""
+      ],
+      "trace_sha256": "3d9465cf6bc1841addebec17e638162cd7fb298f113f184baadcb57dbaca4cf3",
+      "screenshot_sha256": "9d4a8c982cc0ed9d7ca4be3715e7b65fb3ad4791b9380f1642902b31107d93d6",
+      "action": {
+        "id": "action_run_01793958381517318812_0000000178_27cac65a4fc04a04ae48cbb58f11013d",
+        "step_id": "compose_persuasive_text",
+        "action_type": "text.compose_persuasive_text",
+        "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+        "status": "succeeded"
+      },
+      "provider_calls": [
+        {
+          "step_id": "compose_persuasive_text",
+          "model": "gpt-6-luna",
+          "gateway_model": "anytoolai.default_text",
+          "status": "succeeded",
+          "latency_ms": 3277,
+          "input_tokens": 3792,
+          "output_tokens": 228,
+          "estimated_cost": 0.00015219,
+          "reasoning_effort": null
+        }
+      ],
+      "semantic_verdict": "PASS",
+      "semantic_reason": "USD 800, Friday and explicit urgency retained.",
+      "browser_verdict": "FAIL",
+      "acceptance": "FAIL"
+    },
+    {
+      "id": "U3-1",
+      "input": {
+        "id": "U3",
+        "language": "en",
+        "tone": "firm",
+        "notes": "Client Sam. Agreed deposit USD 800 for the site redesign. Not urgent, no rush.",
+        "amount": "USD 800",
+        "due_date": "Friday — ASAP"
+      },
+      "session_id": "scenario_session_01793958505584461569_0000000073_fe1d3b1e4cc1483ba6a5249a71504a11",
+      "submitted_at": "2026-11-06T09:48:25.515Z",
+      "artifact_id": "artifact_01793958507998679038_0000000203_a5a6ce2391ce4b2bbb8c9454f919eb0c",
+      "output": {
+        "text": "Hi Sam, please send the agreed USD 800 deposit for the site redesign by Friday. Please let me know once it has been sent."
+      },
+      "output_source": "browser result API",
+      "visible_text": "Hi Sam, please send the agreed USD 800 deposit for the site redesign by Friday. Please let me know once it has been sent.",
+      "clipboard_text": "Hi Sam, please send the agreed USD 800 deposit for the site redesign by Friday. Please let me know once it has been sent.",
+      "ui_outcome": "result",
+      "ui_latency_ms": 4299.247997,
+      "error": null,
+      "trace_sha256": "d28be86c063b458156f5b4ab6fbfd4d869de6e0be5c9999990a42d49ff95e663",
+      "screenshot_sha256": "7eb4044ace1fe53e653db5098619a1c8ca70621c706c6492bce50980c45a5955",
+      "action": {
+        "id": "action_run_01793958505625193787_0000000194_ba9d97dce9c94186bcc894d91fc0b648",
+        "step_id": "compose_persuasive_text",
+        "action_type": "text.compose_persuasive_text",
+        "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+        "status": "succeeded"
+      },
+      "provider_calls": [
+        {
+          "step_id": "compose_persuasive_text",
+          "model": "gpt-6-luna",
+          "gateway_model": "anytoolai.default_text",
+          "status": "succeeded",
+          "latency_ms": 2323,
+          "input_tokens": 3798,
+          "output_tokens": 119,
+          "estimated_cost": 0.000534175,
+          "reasoning_effort": null
+        }
+      ],
+      "semantic_verdict": "PASS",
+      "semantic_reason": "USD 800 and Friday retained; no urgency despite ASAP in due_date.",
+      "browser_verdict": "PASS",
+      "acceptance": "PASS"
+    },
+    {
+      "id": "U3-2",
+      "input": {
+        "id": "U3",
+        "language": "en",
+        "tone": "firm",
+        "notes": "Client Sam. Agreed deposit USD 800 for the site redesign. Not urgent, no rush.",
+        "amount": "USD 800",
+        "due_date": "Friday — ASAP"
+      },
+      "session_id": "scenario_session_01793958514086681659_0000000079_922763538eb0410db55e160d7b764d98",
+      "submitted_at": "2026-11-06T09:48:33.992Z",
+      "artifact_id": "artifact_01793958517226724874_0000000219_5538060d442d4520af06b4eb76462348",
+      "output": {
+        "text": "Please arrange the agreed USD 800 deposit for the site redesign by Friday. Let me know once the payment has been sent."
+      },
+      "output_source": "browser result API",
+      "visible_text": "Please arrange the agreed USD 800 deposit for the site redesign by Friday. Let me know once the payment has been sent.",
+      "clipboard_text": "Please arrange the agreed USD 800 deposit for the site redesign by Friday. Let me know once the payment has been sent.",
+      "ui_outcome": "result",
+      "ui_latency_ms": 4349.912988,
+      "error": null,
+      "trace_sha256": "6602e4b4ed7b7c5f8a486abc2bc9aff95bcb87dfbcca18b1a882ce26fcf97dc3",
+      "screenshot_sha256": "522f55a24be66522cec4086df598123c0702c75d3078b4968f978a8b009164a9",
+      "action": {
+        "id": "action_run_01793958515068912579_0000000210_f20d73ed909b4f009d84e7d868dcd43a",
+        "step_id": "compose_persuasive_text",
+        "action_type": "text.compose_persuasive_text",
+        "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+        "status": "succeeded"
+      },
+      "provider_calls": [
+        {
+          "step_id": "compose_persuasive_text",
+          "model": "gpt-6-luna",
+          "gateway_model": "anytoolai.default_text",
+          "status": "succeeded",
+          "latency_ms": 2121,
+          "input_tokens": 3798,
+          "output_tokens": 125,
+          "estimated_cost": 0.00010075000000000001,
+          "reasoning_effort": null
+        }
+      ],
+      "semantic_verdict": "PASS",
+      "semantic_reason": "USD 800 and Friday retained; no urgency despite ASAP in due_date.",
+      "browser_verdict": "PASS",
+      "acceptance": "PASS"
+    },
+    {
+      "id": "U3-3",
+      "input": {
+        "id": "U3",
+        "language": "en",
+        "tone": "firm",
+        "notes": "Client Sam. Agreed deposit USD 800 for the site redesign. Not urgent, no rush.",
+        "amount": "USD 800",
+        "due_date": "Friday — ASAP"
+      },
+      "session_id": "scenario_session_01793958524939896929_0000000085_51dd165fa5ae4a9ea9e6e52ed372fe30",
+      "submitted_at": "2026-11-06T09:48:44.809Z",
+      "artifact_id": "artifact_01793958527527958152_0000000235_6c80d1c898024e1a9d7a10ee5e9e42c8",
+      "output": {
+        "text": "Please send the USD 800 deposit for the site redesign by Friday. Let me know once it has been sent."
+      },
+      "output_source": "browser result API",
+      "visible_text": "Please send the USD 800 deposit for the site redesign by Friday. Let me know once it has been sent.",
+      "clipboard_text": "Please send the USD 800 deposit for the site redesign by Friday. Let me know once it has been sent.",
+      "ui_outcome": "result",
+      "ui_latency_ms": 4433.040497,
+      "error": null,
+      "trace_sha256": "6cfd3276e9ce603d1e7958c561a5ce8570446c0ead6c0fd077d01a007b26603d",
+      "screenshot_sha256": "178e74518ddacec88ae79584beead34f29974022d3bd84024c5b2c2a81e97869",
+      "action": {
+        "id": "action_run_01793958525299626993_0000000226_6bc781c9a6284b11b051d1d0901a7edd",
+        "step_id": "compose_persuasive_text",
+        "action_type": "text.compose_persuasive_text",
+        "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+        "status": "succeeded"
+      },
+      "provider_calls": [
+        {
+          "step_id": "compose_persuasive_text",
+          "model": "gpt-6-luna",
+          "gateway_model": "anytoolai.default_text",
+          "status": "succeeded",
+          "latency_ms": 2181,
+          "input_tokens": 3798,
+          "output_tokens": 123,
+          "estimated_cost": 9.975000000000001e-05,
+          "reasoning_effort": null
+        }
+      ],
+      "semantic_verdict": "PASS",
+      "semantic_reason": "USD 800 and Friday retained; no urgency despite ASAP in due_date.",
+      "browser_verdict": "PASS",
+      "acceptance": "PASS"
+    }
+  ],
+  "excluded_prior_series": {
+    "reason": "User replaced credential and explicitly requested restart",
+    "session_id": "scenario_session_01793957920808593276_0000000004_5e012cf960454c959ac0de5966c93362",
+    "ui_outcome": "error",
+    "output": null,
+    "provider_error_types": [
+      "AuthenticationError",
+      "RouterRateLimitError"
+    ],
+    "trace_sha256": "5af67d7b2edcaa1b419b41c0c6844f32a6e89f922a35e6a996e4ddf902f75ae6"
+  },
+  "scope": "Five original ticket inputs, three attempts each; no expanded model comparison",
+  "rechecks": [
+    {
+      "series": "recheck-1",
+      "requested_scope": "A01 and U2, three fresh browser attempts each",
+      "environment": {
+        "source_sha": "e4fb6fa4e457595058b45a24287f7277ec4b5630",
+        "runtime_files_match_checkout": true,
+        "sha256": {
+          "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/client_update_writer/prompts/prepaid_request_compose_persuasive_text.v1.md": "b79d8a66b4137d098b82259c69624ecc3e4549f7c36ceaeca8b704330fc682d1",
+          "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/client_update_writer/workflows.yaml": "35e6334ccb4387c481d83dbed7cf6e4024ae8d9b25a0b1e75f489b4c96de6bbc",
+          "configs/kernel/litellm_router.yaml": "60d55333ac52d3a3490a6b2783acf375b2e8305d9b2a17e77855b0735d6c0c25"
+        },
+        "router": "model_list:\n  - model_name: anytoolai.default_text\n    litellm_params:\n      model: openai/gpt-6-luna\n      api_key: env/OPENAI_API_KEY\n      reasoning_effort: medium\n      # Kept although LiteLLM 1.105.1 lists gpt-6-luna: a model its static registry does not list\n      # yet would have this parameter rejected as unsupported although the API accepts it.\n      allowed_openai_params: [reasoning_effort]\n\nrouter_settings:\n  routing_strategy: simple-shuffle\n  enable_pre_call_checks: true\n",
+        "started_at": "2026-11-06T10:02:39.131955+00:00",
+        "source_note": "Runtime source unchanged; only acceptance documentation and ignored QA scripts added."
+      },
+      "acceptance": "PASS for this targeted series only",
+      "reviewer": "Codex agent semantic review",
+      "runs": [
+        {
+          "id": "A01-1",
+          "input": {
+            "id": "A01",
+            "language": "ru",
+            "tone": "warm",
+            "notes": "Елена, начинаем дизайн презентации на 12 слайдов. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+            "amount": "15 000 RUB",
+            "due_date": ""
+          },
+          "session_id": "scenario_session_01793959368394983552_0000000002_0c772ea114654bbe88e5b2d915381249",
+          "submitted_at": "2026-11-06T10:02:48.293Z",
+          "output": {
+            "text": "Елена, для начала дизайна презентации на 12 слайдов прошу внести предоплату 15 000 RUB — 50% от согласованной общей стоимости. Реквизиты будут в отдельном счёте. Пожалуйста, сообщите, когда отправите оплату."
+          },
+          "visible_text": "Елена, для начала дизайна презентации на 12 слайдов прошу внести предоплату 15 000 RUB — 50% от согласованной общей стоимости. Реквизиты будут в отдельном счёте. Пожалуйста, сообщите, когда отправите оплату.",
+          "clipboard_text": "Елена, для начала дизайна презентации на 12 слайдов прошу внести предоплату 15 000 RUB — 50% от согласованной общей стоимости. Реквизиты будут в отдельном счёте. Пожалуйста, сообщите, когда отправите оплату.",
+          "ui_outcome": "result",
+          "ui_latency_ms": 6444.390968,
+          "trace_sha256": "3ec16091be3191db67f60f260b96f440642814a2d6e244e54ea331f534482c84",
+          "artifact_id": "artifact_01793959374256850261_0000000011_cf04a30bd64945628027c007fe3a86a7",
+          "action": {
+            "id": "action_run_01793959368550732005_0000000002_a8d9cdc59cb94fab9a3b83af4d6121b4",
+            "step_id": "compose_persuasive_text",
+            "action_type": "text.compose_persuasive_text",
+            "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+            "status": "succeeded"
+          },
+          "provider_calls": [
+            {
+              "step_id": "compose_persuasive_text",
+              "model": "gpt-6-luna",
+              "status": "succeeded",
+              "latency_ms": 5473,
+              "input_tokens": 3851,
+              "output_tokens": 357,
+              "estimated_cost": 0.00021728,
+              "reasoning_effort": null
+            }
+          ],
+          "semantic_verdict": "PASS",
+          "browser_verdict": "PASS",
+          "semantic_reason": "15,000 RUB and 50% retained without invented urgency; balance after final PDF/PPTX omitted (outside explicit percentage AC)."
+        },
+        {
+          "id": "A01-2",
+          "input": {
+            "id": "A01",
+            "language": "ru",
+            "tone": "warm",
+            "notes": "Елена, начинаем дизайн презентации на 12 слайдов. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+            "amount": "15 000 RUB",
+            "due_date": ""
+          },
+          "session_id": "scenario_session_01793959381937681372_0000000008_1d41e967769f46adb5cf106a7f274065",
+          "submitted_at": "2026-11-06T10:03:01.781Z",
+          "output": {
+            "text": "Елена, для начала дизайна презентации на 12 слайдов прошу внести предоплату 15 000 RUB — 50% от согласованной общей стоимости 30 000 RUB. Реквизиты будут в отдельном счёте. Пожалуйста, сообщите, когда отправите оплату."
+          },
+          "visible_text": "Елена, для начала дизайна презентации на 12 слайдов прошу внести предоплату 15 000 RUB — 50% от согласованной общей стоимости 30 000 RUB. Реквизиты будут в отдельном счёте. Пожалуйста, сообщите, когда отправите оплату.",
+          "clipboard_text": "Елена, для начала дизайна презентации на 12 слайдов прошу внести предоплату 15 000 RUB — 50% от согласованной общей стоимости 30 000 RUB. Реквизиты будут в отдельном счёте. Пожалуйста, сообщите, когда отправите оплату.",
+          "ui_outcome": "result",
+          "ui_latency_ms": 6453.158034,
+          "trace_sha256": "da351c9ad011a27b2304b49d9fc69795465a1e8a2f46997668539ba6d0875b27",
+          "artifact_id": "artifact_01793959386299677223_0000000027_ecc9ab9713b048528e7b3c5043683339",
+          "action": {
+            "id": "action_run_01793959382350749966_0000000018_b08c87d846a84a7595d237cb38cd11bc",
+            "step_id": "compose_persuasive_text",
+            "action_type": "text.compose_persuasive_text",
+            "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+            "status": "succeeded"
+          },
+          "provider_calls": [
+            {
+              "step_id": "compose_persuasive_text",
+              "model": "gpt-6-luna",
+              "status": "succeeded",
+              "latency_ms": 3908,
+              "input_tokens": 3851,
+              "output_tokens": 323,
+              "estimated_cost": 0.00020028,
+              "reasoning_effort": null
+            }
+          ],
+          "semantic_verdict": "PASS",
+          "browser_verdict": "PASS",
+          "semantic_reason": "15,000 RUB and 50% retained without invented urgency; balance after final PDF/PPTX omitted (outside explicit percentage AC)."
+        },
+        {
+          "id": "A01-3",
+          "input": {
+            "id": "A01",
+            "language": "ru",
+            "tone": "warm",
+            "notes": "Елена, начинаем дизайн презентации на 12 слайдов. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+            "amount": "15 000 RUB",
+            "due_date": ""
+          },
+          "session_id": "scenario_session_01793959392293951826_0000000014_290efdf4a21a4b87938ea2e52ffbfe19",
+          "submitted_at": "2026-11-06T10:03:12.227Z",
+          "output": {
+            "text": "Елена, для начала дизайна презентации на 12 слайдов прошу внести предоплату 15 000 RUB — 50% от согласованной стоимости. Реквизиты будут в отдельном счёте. Пожалуйста, сообщите, когда отправите оплату."
+          },
+          "visible_text": "Елена, для начала дизайна презентации на 12 слайдов прошу внести предоплату 15 000 RUB — 50% от согласованной стоимости. Реквизиты будут в отдельном счёте. Пожалуйста, сообщите, когда отправите оплату.",
+          "clipboard_text": "Елена, для начала дизайна презентации на 12 слайдов прошу внести предоплату 15 000 RUB — 50% от согласованной стоимости. Реквизиты будут в отдельном счёте. Пожалуйста, сообщите, когда отправите оплату.",
+          "ui_outcome": "result",
+          "ui_latency_ms": 4213.892396000001,
+          "trace_sha256": "b07eeafe27d5a3b7886054a1a5f7234d4fc645ad4353574a56b82d36788ad9b5",
+          "artifact_id": "artifact_01793959396281801345_0000000043_7ad17c9c730440fd9b87f995930d0243",
+          "action": {
+            "id": "action_run_01793959392368249193_0000000034_50c70e8956c84730bcf767eb78ee7b07",
+            "step_id": "compose_persuasive_text",
+            "action_type": "text.compose_persuasive_text",
+            "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+            "status": "succeeded"
+          },
+          "provider_calls": [
+            {
+              "step_id": "compose_persuasive_text",
+              "model": "gpt-6-luna",
+              "status": "succeeded",
+              "latency_ms": 3866,
+              "input_tokens": 3851,
+              "output_tokens": 313,
+              "estimated_cost": 0.00019528,
+              "reasoning_effort": null
+            }
+          ],
+          "semantic_verdict": "PASS",
+          "browser_verdict": "PASS",
+          "semantic_reason": "15,000 RUB and 50% retained without invented urgency; balance after final PDF/PPTX omitted (outside explicit percentage AC)."
+        },
+        {
+          "id": "U2-1",
+          "input": {
+            "id": "U2",
+            "language": "en",
+            "tone": "firm",
+            "notes": "Client Sam. Agreed deposit USD 800 for the site redesign.",
+            "amount": "USD 800",
+            "due_date": "Friday — ASAP"
+          },
+          "session_id": "scenario_session_01793959400740277771_0000000020_ec5c998820a34eaa89d62c5bb18c5459",
+          "submitted_at": "2026-11-06T10:03:20.604Z",
+          "output": {
+            "text": "Sam, the agreed USD 800 deposit for the site redesign is due Friday and is needed ASAP. Please send it and let me know once it has been sent."
+          },
+          "visible_text": "Sam, the agreed USD 800 deposit for the site redesign is due Friday and is needed ASAP. Please send it and let me know once it has been sent.",
+          "clipboard_text": "Sam, the agreed USD 800 deposit for the site redesign is due Friday and is needed ASAP. Please send it and let me know once it has been sent.",
+          "ui_outcome": "result",
+          "ui_latency_ms": 4427.965346999999,
+          "trace_sha256": "17ce58e25a3abc6c36b884e030f3761063d78453849ec51d5d792a4b76038d35",
+          "artifact_id": "artifact_01793959404392759683_0000000059_90844ffd8c3f4c0ca749160cd7c96152",
+          "action": {
+            "id": "action_run_01793959401360155719_0000000050_11167d9f8bff4005a760e13e7909d611",
+            "step_id": "compose_persuasive_text",
+            "action_type": "text.compose_persuasive_text",
+            "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+            "status": "succeeded"
+          },
+          "provider_calls": [
+            {
+              "step_id": "compose_persuasive_text",
+              "model": "gpt-6-luna",
+              "status": "succeeded",
+              "latency_ms": 2973,
+              "input_tokens": 3792,
+              "output_tokens": 207,
+              "estimated_cost": 0.00014168999999999998,
+              "reasoning_effort": null
+            }
+          ],
+          "semantic_verdict": "PASS",
+          "browser_verdict": "PASS",
+          "semantic_reason": "USD 800, Friday and ASAP retained; visible and copied text match canonical output."
+        },
+        {
+          "id": "U2-2",
+          "input": {
+            "id": "U2",
+            "language": "en",
+            "tone": "firm",
+            "notes": "Client Sam. Agreed deposit USD 800 for the site redesign.",
+            "amount": "USD 800",
+            "due_date": "Friday — ASAP"
+          },
+          "session_id": "scenario_session_01793959412034301726_0000000026_92f7010ca55b4f73b8fba90e198b4f87",
+          "submitted_at": "2026-11-06T10:03:31.886Z",
+          "output": {
+            "text": "Please send the agreed USD 800 deposit for the site redesign by Friday, ASAP. Let me know once it has been sent."
+          },
+          "visible_text": "Please send the agreed USD 800 deposit for the site redesign by Friday, ASAP. Let me know once it has been sent.",
+          "clipboard_text": "Please send the agreed USD 800 deposit for the site redesign by Friday, ASAP. Let me know once it has been sent.",
+          "ui_outcome": "result",
+          "ui_latency_ms": 4515.933914,
+          "trace_sha256": "31227a6c3a72946e486de6cf61d3a90e4cb0f3cbe43907def3763f500f0ee3ee",
+          "artifact_id": "artifact_01793959414933651577_0000000075_54bb9473c8a74fed97a54a16b50f0552",
+          "action": {
+            "id": "action_run_01793959412475965873_0000000066_981a84a1f2ce444a801f6eb7c12db72b",
+            "step_id": "compose_persuasive_text",
+            "action_type": "text.compose_persuasive_text",
+            "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+            "status": "succeeded"
+          },
+          "provider_calls": [
+            {
+              "step_id": "compose_persuasive_text",
+              "model": "gpt-6-luna",
+              "status": "succeeded",
+              "latency_ms": 2404,
+              "input_tokens": 3792,
+              "output_tokens": 160,
+              "estimated_cost": 0.00011818999999999999,
+              "reasoning_effort": null
+            }
+          ],
+          "semantic_verdict": "PASS",
+          "browser_verdict": "PASS",
+          "semantic_reason": "USD 800, Friday and ASAP retained; visible and copied text match canonical output."
+        },
+        {
+          "id": "U2-3",
+          "input": {
+            "id": "U2",
+            "language": "en",
+            "tone": "firm",
+            "notes": "Client Sam. Agreed deposit USD 800 for the site redesign.",
+            "amount": "USD 800",
+            "due_date": "Friday — ASAP"
+          },
+          "session_id": "scenario_session_01793959422744945228_0000000032_5caf697b5d5b4cc394da8c2f9a97e971",
+          "submitted_at": "2026-11-06T10:03:42.598Z",
+          "output": {
+            "text": "Sam, please send the agreed USD 800 deposit for the site redesign by Friday — ASAP. Let me know once it’s been sent."
+          },
+          "visible_text": "Sam, please send the agreed USD 800 deposit for the site redesign by Friday — ASAP. Let me know once it’s been sent.",
+          "clipboard_text": "Sam, please send the agreed USD 800 deposit for the site redesign by Friday — ASAP. Let me know once it’s been sent.",
+          "ui_outcome": "result",
+          "ui_latency_ms": 4493.593088,
+          "trace_sha256": "a07cf984b63f77ab5c249dba680e49c016ac9b5c81de13633eb74faa2955aa2b",
+          "artifact_id": "artifact_01793959425872469109_0000000091_32175149e54c402697d5626e25019972",
+          "action": {
+            "id": "action_run_01793959423019402126_0000000082_ba60d9f725234e3abf175fffa5b4d295",
+            "step_id": "compose_persuasive_text",
+            "action_type": "text.compose_persuasive_text",
+            "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+            "status": "succeeded"
+          },
+          "provider_calls": [
+            {
+              "step_id": "compose_persuasive_text",
+              "model": "gpt-6-luna",
+              "status": "succeeded",
+              "latency_ms": 2814,
+              "input_tokens": 3792,
+              "output_tokens": 180,
+              "estimated_cost": 0.00012818999999999998,
+              "reasoning_effort": null
+            }
+          ],
+          "semantic_verdict": "PASS",
+          "browser_verdict": "PASS",
+          "semantic_reason": "USD 800, Friday and ASAP retained; visible and copied text match canonical output."
+        }
+      ]
+    }
+  ],
+  "post_fix": {
+    "original_acceptance": "PASS 15/15",
+    "additional_language_review": "5 PASS, 1 REVIEW (Spanish wording ambiguity)",
+    "environment": {
+      "source_sha": "e4fb6fa4e457595058b45a24287f7277ec4b5630",
+      "runtime_files_match_checkout": true,
+      "sha256": {
+        "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/client_update_writer/prompts/prepaid_request_compose_persuasive_text.v1.md": "0dc7381ee2b0abe0190c58616630f8c3b95a40714acdb2512f56282fc5887a72",
+        "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/client_update_writer/workflows.yaml": "35e6334ccb4387c481d83dbed7cf6e4024ae8d9b25a0b1e75f489b4c96de6bbc",
+        "configs/kernel/litellm_router.yaml": "60d55333ac52d3a3490a6b2783acf375b2e8305d9b2a17e77855b0735d6c0c25"
+      },
+      "router": "model_list:\n  - model_name: anytoolai.default_text\n    litellm_params:\n      model: openai/gpt-6-luna\n      api_key: env/OPENAI_API_KEY\n      reasoning_effort: medium\n      # Kept although LiteLLM 1.105.1 lists gpt-6-luna: a model its static registry does not list\n      # yet would have this parameter rejected as unsupported although the API accepts it.\n      allowed_openai_params: [reasoning_effort]\n\nrouter_settings:\n  routing_strategy: simple-shuffle\n  enable_pre_call_checks: true\n",
+      "started_at": "2026-11-06T10:35:21.839268+00:00",
+      "source_note": "Working tree includes authorized Prepaid prompt and contract-test edits; runtime prompt/workflow/router verified byte-for-byte against checkout."
+    },
+    "runs": [
+      {
+        "id": "A04-1",
+        "input": {
+          "id": "A04",
+          "language": "en",
+          "tone": "firm",
+          "notes": "Client Pat. Our draft says total fee USD 2,000 and a 50% deposit (USD 1,000), but the amount field says USD 1,200. The client has not accepted the change. Do not imply the higher amount is agreed. Highlight the mismatch and request confirmation of deposit terms before sending any payment demand. Due date field is 7 October 2026, but Pat requested payment after final delivery on 20 October 2026; this is unresolved. No penalties were agreed.",
+          "amount": "USD 1,200",
+          "due_date": "7 October 2026"
+        },
+        "session_id": "scenario_session_01793961097893853434_0000000002_c3e4e63bb7ca4d0887cd65abaf9cc429",
+        "submitted_at": "2026-11-06T10:31:37.831Z",
+        "output": {
+          "text": "Before I send a payment request, please confirm the deposit terms: the amount is listed as USD 1,200, while the draft specifies a USD 1,000 deposit (50% of a USD 2,000 total), and the change has not been accepted. Please also confirm whether the due date is 7 October 2026 or after final delivery on 20 October 2026. Please reply with your confirmation."
+        },
+        "visible_text": "Before I send a payment request, please confirm the deposit terms: the amount is listed as USD 1,200, while the draft specifies a USD 1,000 deposit (50% of a USD 2,000 total), and the change has not been accepted. Please also confirm whether the due date is 7 October 2026 or after final delivery on 20 October 2026. Please reply with your confirmation.",
+        "clipboard_text": "Before I send a payment request, please confirm the deposit terms: the amount is listed as USD 1,200, while the draft specifies a USD 1,000 deposit (50% of a USD 2,000 total), and the change has not been accepted. Please also confirm whether the due date is 7 October 2026 or after final delivery on 20 October 2026. Please reply with your confirmation.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 10540.00511,
+        "trace_sha256": "7f0a68d9d30a81740a3b76ef1337d7a8d98fe5d8eb433dd81bff5c35cadb087c",
+        "artifact_id": "artifact_01793961106400403802_0000000011_e1e39511de294960bdc6e501e320e5b6",
+        "action": {
+          "id": "action_run_01793961098895294681_0000000002_fda7344529d44186988e571d311a6def",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "status": "succeeded",
+            "latency_ms": 7239,
+            "input_tokens": 4017,
+            "output_tokens": 490,
+            "estimated_cost": 0.00074705,
+            "reasoning_effort": null
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_reason": "Both amounts and dates are presented for confirmation, without a payment demand or payment-sent closing."
+      },
+      {
+        "id": "A04-2",
+        "input": {
+          "id": "A04",
+          "language": "en",
+          "tone": "firm",
+          "notes": "Client Pat. Our draft says total fee USD 2,000 and a 50% deposit (USD 1,000), but the amount field says USD 1,200. The client has not accepted the change. Do not imply the higher amount is agreed. Highlight the mismatch and request confirmation of deposit terms before sending any payment demand. Due date field is 7 October 2026, but Pat requested payment after final delivery on 20 October 2026; this is unresolved. No penalties were agreed.",
+          "amount": "USD 1,200",
+          "due_date": "7 October 2026"
+        },
+        "session_id": "scenario_session_01793961116357593194_0000000008_3d8fccc359fe45e2a96f35c886335e9b",
+        "submitted_at": "2026-11-06T10:31:56.253Z",
+        "output": {
+          "text": "The deposit terms are unresolved: the draft lists a 50% deposit of USD 1,000 against a total fee of USD 2,000, while the amount field lists USD 1,200. The due date is also unresolved: the date field says 7 October 2026, while you requested payment after final delivery on 20 October 2026. Please confirm the deposit terms and payment timing."
+        },
+        "visible_text": "The deposit terms are unresolved: the draft lists a 50% deposit of USD 1,000 against a total fee of USD 2,000, while the amount field lists USD 1,200. The due date is also unresolved: the date field says 7 October 2026, while you requested payment after final delivery on 20 October 2026. Please confirm the deposit terms and payment timing.",
+        "clipboard_text": "The deposit terms are unresolved: the draft lists a 50% deposit of USD 1,000 against a total fee of USD 2,000, while the amount field lists USD 1,200. The due date is also unresolved: the date field says 7 October 2026, while you requested payment after final delivery on 20 October 2026. Please confirm the deposit terms and payment timing.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 6572.589274000001,
+        "trace_sha256": "0993e55858802a14184f924f5237cf972c5484d02433aef0acb4ebf4810cb9e3",
+        "artifact_id": "artifact_01793961121746399895_0000000027_4a3872b771ac4036987b0a8cef7ebb8c",
+        "action": {
+          "id": "action_run_01793961116515060066_0000000018_191ef71ba1fe44eda597793152ee4d9d",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "status": "succeeded",
+            "latency_ms": 5183,
+            "input_tokens": 4017,
+            "output_tokens": 427,
+            "estimated_cost": 0.00025393999999999997,
+            "reasoning_effort": null
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_reason": "Both amounts and dates are presented for confirmation, without a payment demand or payment-sent closing."
+      },
+      {
+        "id": "A04-3",
+        "input": {
+          "id": "A04",
+          "language": "en",
+          "tone": "firm",
+          "notes": "Client Pat. Our draft says total fee USD 2,000 and a 50% deposit (USD 1,000), but the amount field says USD 1,200. The client has not accepted the change. Do not imply the higher amount is agreed. Highlight the mismatch and request confirmation of deposit terms before sending any payment demand. Due date field is 7 October 2026, but Pat requested payment after final delivery on 20 October 2026; this is unresolved. No penalties were agreed.",
+          "amount": "USD 1,200",
+          "due_date": "7 October 2026"
+        },
+        "session_id": "scenario_session_01793961129902176125_0000000014_a5e46d70e879429a929bffaabdcc0039",
+        "submitted_at": "2026-11-06T10:32:09.724Z",
+        "output": {
+          "text": "Before I send a payment request, please confirm the deposit terms: the draft lists a 50% deposit of USD 1,000 on a USD 2,000 total, while the billing amount is USD 1,200, and the change has not been accepted. Please also confirm when the deposit is due: 7 October 2026 or after final delivery on 20 October 2026. Please reply with your confirmation."
+        },
+        "visible_text": "Before I send a payment request, please confirm the deposit terms: the draft lists a 50% deposit of USD 1,000 on a USD 2,000 total, while the billing amount is USD 1,200, and the change has not been accepted. Please also confirm when the deposit is due: 7 October 2026 or after final delivery on 20 October 2026. Please reply with your confirmation.",
+        "clipboard_text": "Before I send a payment request, please confirm the deposit terms: the draft lists a 50% deposit of USD 1,000 on a USD 2,000 total, while the billing amount is USD 1,200, and the change has not been accepted. Please also confirm when the deposit is due: 7 October 2026 or after final delivery on 20 October 2026. Please reply with your confirmation.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 6617.014359,
+        "trace_sha256": "e1c239e043ddcfc348da9b3bd20a3ee07ae41692b62537d3c5cd0f1f1ffbbce5",
+        "artifact_id": "artifact_01793961135520446008_0000000043_1325b2f00eae462b8d761cb0b9f41553",
+        "action": {
+          "id": "action_run_01793961130822055667_0000000034_94d2a351d0c1489eb90aea2484385628",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "status": "succeeded",
+            "latency_ms": 4648,
+            "input_tokens": 4017,
+            "output_tokens": 417,
+            "estimated_cost": 0.00024894,
+            "reasoning_effort": null
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_reason": "Both amounts and dates are presented for confirmation, without a payment demand or payment-sent closing."
+      },
+      {
+        "id": "A01-1",
+        "input": {
+          "id": "A01",
+          "language": "ru",
+          "tone": "warm",
+          "notes": "Елена, начинаем дизайн презентации на 12 слайдов. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+          "amount": "15 000 RUB",
+          "due_date": ""
+        },
+        "session_id": "scenario_session_01793961143386644437_0000000020_adef3897faad47868fecb61f5646f959",
+        "submitted_at": "2026-11-06T10:32:23.274Z",
+        "output": {
+          "text": "Елена, для начала дизайна презентации на 12 слайдов прошу внести предоплату 15 000 RUB — это 50% от согласованной общей стоимости 30 000 RUB. Оставшаяся часть оплачивается после передачи финальных PDF и PPTX. Реквизиты будут в отдельном счёте. Пожалуйста, сообщите, когда отправите предоплату."
+        },
+        "visible_text": "Елена, для начала дизайна презентации на 12 слайдов прошу внести предоплату 15 000 RUB — это 50% от согласованной общей стоимости 30 000 RUB. Оставшаяся часть оплачивается после передачи финальных PDF и PPTX. Реквизиты будут в отдельном счёте. Пожалуйста, сообщите, когда отправите предоплату.",
+        "clipboard_text": "Елена, для начала дизайна презентации на 12 слайдов прошу внести предоплату 15 000 RUB — это 50% от согласованной общей стоимости 30 000 RUB. Оставшаяся часть оплачивается после передачи финальных PDF и PPTX. Реквизиты будут в отдельном счёте. Пожалуйста, сообщите, когда отправите предоплату.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 8522.505258000001,
+        "trace_sha256": "cb3c8e354410faf0fb13222e94241b955bd09214a64182524b77cb4e2bc94e98",
+        "artifact_id": "artifact_01793961149995246376_0000000059_840bdbd25aa841d68287f14e79f34262",
+        "action": {
+          "id": "action_run_01793961143603256123_0000000050_dd3da1f62f9b4dd289a00ec4c363ab70",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "status": "succeeded",
+            "latency_ms": 6339,
+            "input_tokens": 3982,
+            "output_tokens": 442,
+            "estimated_cost": 0.000718675,
+            "reasoning_effort": null
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_reason": "15,000 RUB, 50%, agreed 30,000 RUB total, balance after final PDF/PPTX and future separate invoice all retained; no invented urgency."
+      },
+      {
+        "id": "A01-2",
+        "input": {
+          "id": "A01",
+          "language": "ru",
+          "tone": "warm",
+          "notes": "Елена, начинаем дизайн презентации на 12 слайдов. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+          "amount": "15 000 RUB",
+          "due_date": ""
+        },
+        "session_id": "scenario_session_01793961157703798001_0000000026_a3781bd458d34cb7ba0d450290d2c978",
+        "submitted_at": "2026-11-06T10:32:37.562Z",
+        "output": {
+          "text": "Елена, пожалуйста, внесите предоплату 15 000 RUB за дизайн презентации на 12 слайдов — это 50% от согласованной общей стоимости 30 000 RUB. Предоплата вносится перед началом работы; реквизиты будут в отдельном счёте. Остаток оплачивается после передачи финальных PDF и PPTX. Пожалуйста, сообщите, когда отправите предоплату."
+        },
+        "visible_text": "Елена, пожалуйста, внесите предоплату 15 000 RUB за дизайн презентации на 12 слайдов — это 50% от согласованной общей стоимости 30 000 RUB. Предоплата вносится перед началом работы; реквизиты будут в отдельном счёте. Остаток оплачивается после передачи финальных PDF и PPTX. Пожалуйста, сообщите, когда отправите предоплату.",
+        "clipboard_text": "Елена, пожалуйста, внесите предоплату 15 000 RUB за дизайн презентации на 12 слайдов — это 50% от согласованной общей стоимости 30 000 RUB. Предоплата вносится перед началом работы; реквизиты будут в отдельном счёте. Остаток оплачивается после передачи финальных PDF и PPTX. Пожалуйста, сообщите, когда отправите предоплату.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 6538.897116,
+        "trace_sha256": "613b2d534b114460abb2e09f517d4718f17ecd498bd64b1408663ef4df923d53",
+        "artifact_id": "artifact_01793961162448583734_0000000075_f0199faaf7694d16b439993e77f77f72",
+        "action": {
+          "id": "action_run_01793961158080497499_0000000066_25be126d98f94a99b8c28f1f0b53d81a",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "status": "succeeded",
+            "latency_ms": 4313,
+            "input_tokens": 3982,
+            "output_tokens": 391,
+            "estimated_cost": 0.00023559,
+            "reasoning_effort": null
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_reason": "15,000 RUB, 50%, agreed 30,000 RUB total, balance after final PDF/PPTX and future separate invoice all retained; no invented urgency."
+      },
+      {
+        "id": "A01-3",
+        "input": {
+          "id": "A01",
+          "language": "ru",
+          "tone": "warm",
+          "notes": "Елена, начинаем дизайн презентации на 12 слайдов. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+          "amount": "15 000 RUB",
+          "due_date": ""
+        },
+        "session_id": "scenario_session_01793961171213013095_0000000032_215b750b0f9a4ccdb346765b8dc956f2",
+        "submitted_at": "2026-11-06T10:32:51.033Z",
+        "output": {
+          "text": "Елена, для начала дизайна презентации на 12 слайдов предусмотрена предоплата 50% от согласованной общей стоимости 30 000 RUB — 15 000 RUB. Остаток оплачивается после передачи финальных PDF и PPTX. Реквизиты будут в отдельном счёте. Пожалуйста, сообщите, когда отправите предоплату."
+        },
+        "visible_text": "Елена, для начала дизайна презентации на 12 слайдов предусмотрена предоплата 50% от согласованной общей стоимости 30 000 RUB — 15 000 RUB. Остаток оплачивается после передачи финальных PDF и PPTX. Реквизиты будут в отдельном счёте. Пожалуйста, сообщите, когда отправите предоплату.",
+        "clipboard_text": "Елена, для начала дизайна презентации на 12 слайдов предусмотрена предоплата 50% от согласованной общей стоимости 30 000 RUB — 15 000 RUB. Остаток оплачивается после передачи финальных PDF и PPTX. Реквизиты будут в отдельном счёте. Пожалуйста, сообщите, когда отправите предоплату.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 6669.569178000001,
+        "trace_sha256": "c988cacce53a5d1e0feba1eb2b531d145c731219f613434d7857a90ff14c079c",
+        "artifact_id": "artifact_01793961176147776392_0000000091_63ad8950937a4e7b934104aaf153254e",
+        "action": {
+          "id": "action_run_01793961171533073895_0000000082_78a6c90ba2f646d6bc67730489cfa3d7",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "status": "succeeded",
+            "latency_ms": 4568,
+            "input_tokens": 3982,
+            "output_tokens": 401,
+            "estimated_cost": 0.00024059,
+            "reasoning_effort": null
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_reason": "15,000 RUB, 50%, agreed 30,000 RUB total, balance after final PDF/PPTX and future separate invoice all retained; no invented urgency."
+      },
+      {
+        "id": "U1-1",
+        "input": {
+          "id": "U1",
+          "language": "en",
+          "tone": "firm",
+          "notes": "Client Sam. Agreed deposit USD 800 for the site redesign. The payment is urgent, needed ASAP.",
+          "amount": "USD 800",
+          "due_date": ""
+        },
+        "session_id": "scenario_session_01793961184864511730_0000000038_76e08a42e7084eb79ae4cb28e2bc2791",
+        "submitted_at": "2026-11-06T10:33:04.693Z",
+        "output": {
+          "text": "Sam, please send the USD 800 deposit for the site redesign ASAP, as the payment is urgent. Let me know once it has been sent."
+        },
+        "visible_text": "Sam, please send the USD 800 deposit for the site redesign ASAP, as the payment is urgent. Let me know once it has been sent.",
+        "clipboard_text": "Sam, please send the USD 800 deposit for the site redesign ASAP, as the payment is urgent. Let me know once it has been sent.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 4617.046697999999,
+        "trace_sha256": "e9d65df8e75d26034bd8ba7090d7be03e587ebca56f8eb92ac79afe0ffca6197",
+        "artifact_id": "artifact_01793961187587217972_0000000107_e0c94fdcfeed433f8fd1ca0ebdecf0fc",
+        "action": {
+          "id": "action_run_01793961185237505860_0000000098_678d00e50f76423080ff0c9d411fc2bf",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "status": "succeeded",
+            "latency_ms": 2303,
+            "input_tokens": 3922,
+            "output_tokens": 131,
+            "estimated_cost": 0.0005556749999999999,
+            "reasoning_effort": null
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_reason": "USD 800 and notes urgency preserved without an invented date."
+      },
+      {
+        "id": "U1-2",
+        "input": {
+          "id": "U1",
+          "language": "en",
+          "tone": "firm",
+          "notes": "Client Sam. Agreed deposit USD 800 for the site redesign. The payment is urgent, needed ASAP.",
+          "amount": "USD 800",
+          "due_date": ""
+        },
+        "session_id": "scenario_session_01793961195339579774_0000000044_d0f973d4b306451bb53dc1a8b791e829",
+        "submitted_at": "2026-11-06T10:33:15.253Z",
+        "output": {
+          "text": "Sam, the agreed USD 800 deposit for the site redesign is urgent and needed ASAP. Please send it and let me know once it has been sent."
+        },
+        "visible_text": "Sam, the agreed USD 800 deposit for the site redesign is urgent and needed ASAP. Please send it and let me know once it has been sent.",
+        "clipboard_text": "Sam, the agreed USD 800 deposit for the site redesign is urgent and needed ASAP. Please send it and let me know once it has been sent.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 4324.677348,
+        "trace_sha256": "d0765fdc7d87644752e87852bd297f7fa4c386b22547a80f1ed1bb3a8cb25745",
+        "artifact_id": "artifact_01793961198669135207_0000000123_2cc86481f10d4ba88f2e3e19c7f4614b",
+        "action": {
+          "id": "action_run_01793961195679905497_0000000114_4def0517e94a4efe9ad60549449a622f",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "status": "succeeded",
+            "latency_ms": 2937,
+            "input_tokens": 3922,
+            "output_tokens": 184,
+            "estimated_cost": 0.00013149,
+            "reasoning_effort": null
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_reason": "USD 800 and notes urgency preserved without an invented date."
+      },
+      {
+        "id": "U1-3",
+        "input": {
+          "id": "U1",
+          "language": "en",
+          "tone": "firm",
+          "notes": "Client Sam. Agreed deposit USD 800 for the site redesign. The payment is urgent, needed ASAP.",
+          "amount": "USD 800",
+          "due_date": ""
+        },
+        "session_id": "scenario_session_01793961204845926921_0000000050_949e0039127a4a8f9d633e7c62719e39",
+        "submitted_at": "2026-11-06T10:33:24.700Z",
+        "output": {
+          "text": "Sam, please send the USD 800 deposit for the site redesign. This payment is urgent and needed ASAP. Please let me know once it has been sent."
+        },
+        "visible_text": "Sam, please send the USD 800 deposit for the site redesign. This payment is urgent and needed ASAP. Please let me know once it has been sent.",
+        "clipboard_text": "Sam, please send the USD 800 deposit for the site redesign. This payment is urgent and needed ASAP. Please let me know once it has been sent.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 4449.951544,
+        "trace_sha256": "f86daf53138b8427c9904f5462d95e077b2c2b6eec04ed55a96c491e9055fdd1",
+        "artifact_id": "artifact_01793961208695031813_0000000139_df34b9af89a24f91a4d7409e11fadab5",
+        "action": {
+          "id": "action_run_01793961205751835507_0000000130_d5d7b550e7f94eb79c86ab5deafcbfa2",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "status": "succeeded",
+            "latency_ms": 2906,
+            "input_tokens": 3922,
+            "output_tokens": 194,
+            "estimated_cost": 0.00013649000000000002,
+            "reasoning_effort": null
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_reason": "USD 800 and notes urgency preserved without an invented date."
+      },
+      {
+        "id": "U2-1",
+        "input": {
+          "id": "U2",
+          "language": "en",
+          "tone": "firm",
+          "notes": "Client Sam. Agreed deposit USD 800 for the site redesign.",
+          "amount": "USD 800",
+          "due_date": "Friday — ASAP"
+        },
+        "session_id": "scenario_session_01793961234223829053_0000000056_7ae58239e97744abae2461c9af71c051",
+        "submitted_at": "2026-11-06T10:33:53.992Z",
+        "output": {
+          "text": "Sam, the agreed USD 800 deposit for the site redesign is due Friday and is needed ASAP. Please send it and let me know once it has been sent."
+        },
+        "visible_text": "Sam, the agreed USD 800 deposit for the site redesign is due Friday and is needed ASAP. Please send it and let me know once it has been sent.",
+        "clipboard_text": "Sam, the agreed USD 800 deposit for the site redesign is due Friday and is needed ASAP. Please send it and let me know once it has been sent.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 4475.459329,
+        "trace_sha256": "42bd7408f3bc2edbe8012163075a9143be62fe24330fbc52e62f85c1d4e6daef",
+        "artifact_id": "artifact_01793961238221418451_0000000155_0d1fb922442145d0a4009c0f6e1da7a5",
+        "action": {
+          "id": "action_run_01793961234886292744_0000000146_dd7c7ab34656489d99b36b823e979737",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "status": "succeeded",
+            "latency_ms": 3276,
+            "input_tokens": 3923,
+            "output_tokens": 201,
+            "estimated_cost": 0.0005907999999999999,
+            "reasoning_effort": null
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_reason": "USD 800, Friday and ASAP retained."
+      },
+      {
+        "id": "U2-2",
+        "input": {
+          "id": "U2",
+          "language": "en",
+          "tone": "firm",
+          "notes": "Client Sam. Agreed deposit USD 800 for the site redesign.",
+          "amount": "USD 800",
+          "due_date": "Friday — ASAP"
+        },
+        "session_id": "scenario_session_01793961243069343645_0000000062_07ced60e89e2484884e785a8365fee48",
+        "submitted_at": "2026-11-06T10:34:03.002Z",
+        "output": {
+          "text": "Sam, please send the agreed USD 800 deposit for the site redesign. It is due Friday — ASAP. Please let me know once you’ve sent the payment."
+        },
+        "visible_text": "Sam, please send the agreed USD 800 deposit for the site redesign. It is due Friday — ASAP. Please let me know once you’ve sent the payment.",
+        "clipboard_text": "Sam, please send the agreed USD 800 deposit for the site redesign. It is due Friday — ASAP. Please let me know once you’ve sent the payment.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 4354.582778,
+        "trace_sha256": "88349d146cd56a5d5b3e471a0570c3eb09f1ab78a37905ac633576bc89c67d1b",
+        "artifact_id": "artifact_01793961246315090297_0000000171_0c3347f72e7140c8a5f3575e4666401d",
+        "action": {
+          "id": "action_run_01793961243302360637_0000000162_29e37427b7b343b4850142b85eb67b6c",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "status": "succeeded",
+            "latency_ms": 2970,
+            "input_tokens": 3923,
+            "output_tokens": 208,
+            "estimated_cost": 0.0001435,
+            "reasoning_effort": null
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_reason": "USD 800, Friday and ASAP retained."
+      },
+      {
+        "id": "U2-3",
+        "input": {
+          "id": "U2",
+          "language": "en",
+          "tone": "firm",
+          "notes": "Client Sam. Agreed deposit USD 800 for the site redesign.",
+          "amount": "USD 800",
+          "due_date": "Friday — ASAP"
+        },
+        "session_id": "scenario_session_01793961254285195929_0000000068_81327f73f2b743008fe3ed3d91fb24b4",
+        "submitted_at": "2026-11-06T10:34:14.139Z",
+        "output": {
+          "text": "Please send the agreed USD 800 deposit for the site redesign by Friday; it is needed ASAP. Please let me know once it has been sent."
+        },
+        "visible_text": "Please send the agreed USD 800 deposit for the site redesign by Friday; it is needed ASAP. Please let me know once it has been sent.",
+        "clipboard_text": "Please send the agreed USD 800 deposit for the site redesign by Friday; it is needed ASAP. Please let me know once it has been sent.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 4478.880884000001,
+        "trace_sha256": "b245d5045ae9f83ca014295ee8369ebe3d4247126cbcd072ae8c4aa38717f636",
+        "artifact_id": "artifact_01793961257840413161_0000000187_29e980d445ff4160a55ea08d4cd57f1b",
+        "action": {
+          "id": "action_run_01793961254393287156_0000000178_b36926648a824d7c9af684aa9969c27c",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "status": "succeeded",
+            "latency_ms": 3402,
+            "input_tokens": 3923,
+            "output_tokens": 234,
+            "estimated_cost": 0.00015649999999999998,
+            "reasoning_effort": null
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_reason": "USD 800, Friday and ASAP retained."
+      },
+      {
+        "id": "U3-1",
+        "input": {
+          "id": "U3",
+          "language": "en",
+          "tone": "firm",
+          "notes": "Client Sam. Agreed deposit USD 800 for the site redesign. Not urgent, no rush.",
+          "amount": "USD 800",
+          "due_date": "Friday — ASAP"
+        },
+        "session_id": "scenario_session_01793961265612641753_0000000074_26a5c223cfe147498aee65a7ace1477d",
+        "submitted_at": "2026-11-06T10:34:25.438Z",
+        "output": {
+          "text": "Please send the agreed USD 800 deposit for the site redesign by Friday. Please let me know once it has been sent."
+        },
+        "visible_text": "Please send the agreed USD 800 deposit for the site redesign by Friday. Please let me know once it has been sent.",
+        "clipboard_text": "Please send the agreed USD 800 deposit for the site redesign by Friday. Please let me know once it has been sent.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 4481.2225530000005,
+        "trace_sha256": "02a553e72738529f0a11f9b76c3aaa1eba9b0d1f96f245abe8ec26af00a246e9",
+        "artifact_id": "artifact_01793961268334038144_0000000203_c109d5d9670a4ee2907e21b8a75d922c",
+        "action": {
+          "id": "action_run_01793961265923378802_0000000194_96ebdbf733334f29b60959ee50701cea",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "status": "succeeded",
+            "latency_ms": 2375,
+            "input_tokens": 3929,
+            "output_tokens": 123,
+            "estimated_cost": 0.00055255,
+            "reasoning_effort": null
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_reason": "USD 800 and Friday retained; notes override ASAP and no urgency appears."
+      },
+      {
+        "id": "U3-2",
+        "input": {
+          "id": "U3",
+          "language": "en",
+          "tone": "firm",
+          "notes": "Client Sam. Agreed deposit USD 800 for the site redesign. Not urgent, no rush.",
+          "amount": "USD 800",
+          "due_date": "Friday — ASAP"
+        },
+        "session_id": "scenario_session_01793961277569998260_0000000080_c0fd26e77812436bb2b48b8cbc2f58bc",
+        "submitted_at": "2026-11-06T10:34:37.464Z",
+        "output": {
+          "text": "Please send the agreed USD 800 deposit for the site redesign by Friday. Let me know once it has been sent."
+        },
+        "visible_text": "Please send the agreed USD 800 deposit for the site redesign by Friday. Let me know once it has been sent.",
+        "clipboard_text": "Please send the agreed USD 800 deposit for the site redesign by Friday. Let me know once it has been sent.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 6400.474611000001,
+        "trace_sha256": "691f240c5b4b581d55c25d282ddd5a4a6298ea7a448f184bbeb52f0a10dbd2d7",
+        "artifact_id": "artifact_01793961281683940055_0000000219_066a9aec9f4a4e3dbc4be0d3cac63e02",
+        "action": {
+          "id": "action_run_01793961278418687378_0000000210_879e0056451f4571897bccd7662ba370",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "status": "succeeded",
+            "latency_ms": 3217,
+            "input_tokens": 3929,
+            "output_tokens": 135,
+            "estimated_cost": 0.00010706,
+            "reasoning_effort": null
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_reason": "USD 800 and Friday retained; notes override ASAP and no urgency appears."
+      },
+      {
+        "id": "U3-3",
+        "input": {
+          "id": "U3",
+          "language": "en",
+          "tone": "firm",
+          "notes": "Client Sam. Agreed deposit USD 800 for the site redesign. Not urgent, no rush.",
+          "amount": "USD 800",
+          "due_date": "Friday — ASAP"
+        },
+        "session_id": "scenario_session_01793961288999251706_0000000086_95c510017c6a44fea00eefec857b7f99",
+        "submitted_at": "2026-11-06T10:34:48.861Z",
+        "output": {
+          "text": "Sam, please send the agreed USD 800 deposit for the site redesign by Friday. Let me know once the payment has been sent."
+        },
+        "visible_text": "Sam, please send the agreed USD 800 deposit for the site redesign by Friday. Let me know once the payment has been sent.",
+        "clipboard_text": "Sam, please send the agreed USD 800 deposit for the site redesign by Friday. Let me know once the payment has been sent.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 4381.267784000001,
+        "trace_sha256": "4f109b1a1642c2af5e963082e033cdd7b3a20a56c23de7f09da6bce6d3bc81e6",
+        "artifact_id": "artifact_01793961293021186773_0000000235_d02055d0c9f449b3be5028db99a49bb1",
+        "action": {
+          "id": "action_run_01793961289807002944_0000000226_ebd2626883fc4646bcbace37d40abc69",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "status": "succeeded",
+            "latency_ms": 3167,
+            "input_tokens": 3929,
+            "output_tokens": 184,
+            "estimated_cost": 0.00013156,
+            "reasoning_effort": null
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_reason": "USD 800 and Friday retained; notes override ASAP and no urgency appears."
+      },
+      {
+        "id": "A01-EN-1",
+        "input": {
+          "id": "A01-EN",
+          "language": "en",
+          "tone": "warm",
+          "notes": "Elena, we are starting the design of a 12-slide presentation. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+          "amount": "15 000 RUB",
+          "due_date": ""
+        },
+        "session_id": "scenario_session_01793961325205346679_0000000092_494ec9ca335048239f4de3b73fd61001",
+        "submitted_at": "2026-11-06T10:35:25.131Z",
+        "output": {
+          "text": "Hi Elena, for the 12-slide presentation design, the agreed total is RUB 30,000, with a 50% prepayment of RUB 15,000 before work starts. The remaining balance is due after delivery of the final PDF and PPTX. Payment details will be provided in a separate invoice. Could you please arrange the prepayment and let me know once it’s been sent? Thank you!"
+        },
+        "visible_text": "Hi Elena, for the 12-slide presentation design, the agreed total is RUB 30,000, with a 50% prepayment of RUB 15,000 before work starts. The remaining balance is due after delivery of the final PDF and PPTX. Payment details will be provided in a separate invoice. Could you please arrange the prepayment and let me know once it’s been sent? Thank you!",
+        "clipboard_text": "Hi Elena, for the 12-slide presentation design, the agreed total is RUB 30,000, with a 50% prepayment of RUB 15,000 before work starts. The remaining balance is due after delivery of the final PDF and PPTX. Payment details will be provided in a separate invoice. Could you please arrange the prepayment and let me know once it’s been sent? Thank you!",
+        "ui_outcome": "result",
+        "ui_latency_ms": 6309.632151000001,
+        "trace_sha256": "37ee24955274a96e4fe8a5cc2e59b78d6bb0bb2e04bf0f92ea72708e42f9aab6",
+        "artifact_id": "artifact_01793961330603114085_0000000251_c70c0858c9e543589d1828c646474f2a",
+        "action": {
+          "id": "action_run_01793961326256086521_0000000242_a3cc2578996f4b3989ad1c1bd1176282",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "status": "succeeded",
+            "latency_ms": 4309,
+            "input_tokens": 3975,
+            "output_tokens": 362,
+            "estimated_cost": 0.0006777999999999999,
+            "reasoning_effort": null
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_reason": "15,000 RUB, 50%, agreed 30,000 RUB total, balance after final PDF/PPTX and future separate invoice all retained; no invented urgency."
+      },
+      {
+        "id": "A01-EN-2",
+        "input": {
+          "id": "A01-EN",
+          "language": "en",
+          "tone": "warm",
+          "notes": "Elena, we are starting the design of a 12-slide presentation. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+          "amount": "15 000 RUB",
+          "due_date": ""
+        },
+        "session_id": "scenario_session_01793961336236274718_0000000098_3a5f91df83f84d0f808b0abc8ed5e9c7",
+        "submitted_at": "2026-11-06T10:35:36.098Z",
+        "output": {
+          "text": "Hi Elena, we’re starting the design of your 12-slide presentation. The agreed total is 30,000 RUB, with a 50% prepayment of 15,000 RUB before work starts and the balance due after delivery of the final PDF and PPTX. Payment details will be in a separate invoice. Please let me know once you’ve sent the prepayment. Thank you!"
+        },
+        "visible_text": "Hi Elena, we’re starting the design of your 12-slide presentation. The agreed total is 30,000 RUB, with a 50% prepayment of 15,000 RUB before work starts and the balance due after delivery of the final PDF and PPTX. Payment details will be in a separate invoice. Please let me know once you’ve sent the prepayment. Thank you!",
+        "clipboard_text": "Hi Elena, we’re starting the design of your 12-slide presentation. The agreed total is 30,000 RUB, with a 50% prepayment of 15,000 RUB before work starts and the balance due after delivery of the final PDF and PPTX. Payment details will be in a separate invoice. Please let me know once you’ve sent the prepayment. Thank you!",
+        "ui_outcome": "result",
+        "ui_latency_ms": 4491.070139,
+        "trace_sha256": "aadb3425f226f48868957f8eb61fec231503733cdf2a44bfe37213f9c375faa9",
+        "artifact_id": "artifact_01793961339468713060_0000000267_2dfe88c3a2f247a795846ff3a8dd24a0",
+        "action": {
+          "id": "action_run_01793961336676157490_0000000258_5492a91732aa4bfba087694a0870567d",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "status": "succeeded",
+            "latency_ms": 2748,
+            "input_tokens": 3975,
+            "output_tokens": 194,
+            "estimated_cost": 0.00013702,
+            "reasoning_effort": null
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_reason": "15,000 RUB, 50%, agreed 30,000 RUB total, balance after final PDF/PPTX and future separate invoice all retained; no invented urgency."
+      },
+      {
+        "id": "A01-EN-3",
+        "input": {
+          "id": "A01-EN",
+          "language": "en",
+          "tone": "warm",
+          "notes": "Elena, we are starting the design of a 12-slide presentation. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+          "amount": "15 000 RUB",
+          "due_date": ""
+        },
+        "session_id": "scenario_session_01793961348184976842_0000000104_8e11c3cee9934b91a5d52d3460af3267",
+        "submitted_at": "2026-11-06T10:35:48.019Z",
+        "output": {
+          "text": "Hi Elena, for the 12-slide presentation design, the agreed total is 30,000 RUB, with a 50% prepayment of 15 000 RUB before work starts. The balance is due after delivery of the final PDF and PPTX. Please arrange the prepayment; payment details will be provided in a separate invoice. Please let me know once the payment has been sent."
+        },
+        "visible_text": "Hi Elena, for the 12-slide presentation design, the agreed total is 30,000 RUB, with a 50% prepayment of 15 000 RUB before work starts. The balance is due after delivery of the final PDF and PPTX. Please arrange the prepayment; payment details will be provided in a separate invoice. Please let me know once the payment has been sent.",
+        "clipboard_text": "Hi Elena, for the 12-slide presentation design, the agreed total is 30,000 RUB, with a 50% prepayment of 15 000 RUB before work starts. The balance is due after delivery of the final PDF and PPTX. Please arrange the prepayment; payment details will be provided in a separate invoice. Please let me know once the payment has been sent.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 4567.630711999999,
+        "trace_sha256": "dc5fc4e897b172ca67a4555668a568811a535f5556d9cde976939afdb2044a92",
+        "artifact_id": "artifact_01793961352218079552_0000000283_999199abe7624f8ab151a7c203e01cce",
+        "action": {
+          "id": "action_run_01793961348545636969_0000000274_4d7f8471c0cf48e0a6c9035ae866f338",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "status": "succeeded",
+            "latency_ms": 3636,
+            "input_tokens": 3975,
+            "output_tokens": 311,
+            "estimated_cost": 0.00019551999999999997,
+            "reasoning_effort": null
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_reason": "15,000 RUB, 50%, agreed 30,000 RUB total, balance after final PDF/PPTX and future separate invoice all retained; no invented urgency."
+      },
+      {
+        "id": "A01-ES-1",
+        "input": {
+          "id": "A01-ES",
+          "language": "es",
+          "tone": "warm",
+          "notes": "Elena, empezamos el diseño de una presentación de 12 diapositivas. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+          "amount": "15 000 RUB",
+          "due_date": ""
+        },
+        "session_id": "scenario_session_01793961359834971393_0000000110_0f1702e0f3074406a7aa7084e1948615",
+        "submitted_at": "2026-11-06T10:35:59.655Z",
+        "output": {
+          "text": "Hola, Elena. Para el diseño de la presentación de 12 diapositivas, el precio total acordado es de 30 000 RUB. Te agradecería que realizaras el anticipo del 50% (15 000 RUB) antes de empezar. El saldo se abonará después de entregar los archivos PDF y PPTX finales. Los datos de pago estarán en una factura aparte. Avísame, por favor, cuando hayas enviado el anticipo."
+        },
+        "visible_text": "Hola, Elena. Para el diseño de la presentación de 12 diapositivas, el precio total acordado es de 30 000 RUB. Te agradecería que realizaras el anticipo del 50% (15 000 RUB) antes de empezar. El saldo se abonará después de entregar los archivos PDF y PPTX finales. Los datos de pago estarán en una factura aparte. Avísame, por favor, cuando hayas enviado el anticipo.",
+        "clipboard_text": "Hola, Elena. Para el diseño de la presentación de 12 diapositivas, el precio total acordado es de 30 000 RUB. Te agradecería que realizaras el anticipo del 50% (15 000 RUB) antes de empezar. El saldo se abonará después de entregar los archivos PDF y PPTX finales. Los datos de pago estarán en una factura aparte. Avísame, por favor, cuando hayas enviado el anticipo.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 8521.731095,
+        "trace_sha256": "9c532541d2593b6dca3d7be20ad297ac083fd5caf8455bac973d92de694a3056",
+        "artifact_id": "artifact_01793961366756892523_0000000299_ba809b5827d747d69526bf197263ca4c",
+        "action": {
+          "id": "action_run_01793961360293916583_0000000290_42c85c9b57cb4d3a81dd6cfec0b36390",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "status": "succeeded",
+            "latency_ms": 6421,
+            "input_tokens": 3985,
+            "output_tokens": 584,
+            "estimated_cost": 0.0007900499999999998,
+            "reasoning_effort": null
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_reason": "15,000 RUB, 50%, agreed 30,000 RUB total, balance after final PDF/PPTX and future separate invoice all retained; no invented urgency."
+      },
+      {
+        "id": "A01-ES-2",
+        "input": {
+          "id": "A01-ES",
+          "language": "es",
+          "tone": "warm",
+          "notes": "Elena, empezamos el diseño de una presentación de 12 diapositivas. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+          "amount": "15 000 RUB",
+          "due_date": ""
+        },
+        "session_id": "scenario_session_01793961372786545963_0000000116_a9bd2288cf8f420bb83b9e1a3248072c",
+        "submitted_at": "2026-11-06T10:36:12.685Z",
+        "output": {
+          "text": "Para el diseño de la presentación de 12 diapositivas, ¿podrías realizar el anticipo del 50% de 15 000 RUB sobre el precio total acordado de 30 000 RUB? El saldo se abonará después de entregar los archivos finales en PDF y PPTX. Los datos de pago estarán en una factura aparte. Por favor, avísame cuando hayas enviado el pago. ¡Muchas gracias!"
+        },
+        "visible_text": "Para el diseño de la presentación de 12 diapositivas, ¿podrías realizar el anticipo del 50% de 15 000 RUB sobre el precio total acordado de 30 000 RUB? El saldo se abonará después de entregar los archivos finales en PDF y PPTX. Los datos de pago estarán en una factura aparte. Por favor, avísame cuando hayas enviado el pago. ¡Muchas gracias!",
+        "clipboard_text": "Para el diseño de la presentación de 12 diapositivas, ¿podrías realizar el anticipo del 50% de 15 000 RUB sobre el precio total acordado de 30 000 RUB? El saldo se abonará después de entregar los archivos finales en PDF y PPTX. Los datos de pago estarán en una factura aparte. Por favor, avísame cuando hayas enviado el pago. ¡Muchas gracias!",
+        "ui_outcome": "result",
+        "ui_latency_ms": 6407.027595,
+        "trace_sha256": "166505897b5e3aa936cb1a02a8b5b5c2a694b76134a523d3957b623953032381",
+        "artifact_id": "artifact_01793961378170113227_0000000315_358d1c81becb49d784adc0eea0f02d65",
+        "action": {
+          "id": "action_run_01793961372834416061_0000000306_28e4309fb6804c0d82f44bbf05016fdb",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "status": "succeeded",
+            "latency_ms": 5269,
+            "input_tokens": 3985,
+            "output_tokens": 460,
+            "estimated_cost": 0.00027012,
+            "reasoning_effort": null
+          }
+        ],
+        "semantic_verdict": "REVIEW",
+        "browser_verdict": "PASS",
+        "semantic_reason": "Terms retained, but “anticipo del 50% de 15 000 RUB” ambiguously attaches the percentage to the deposit amount. Manual wording correction required before sending; not an unconditional semantic PASS."
+      },
+      {
+        "id": "A01-ES-3",
+        "input": {
+          "id": "A01-ES",
+          "language": "es",
+          "tone": "warm",
+          "notes": "Elena, empezamos el diseño de una presentación de 12 diapositivas. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+          "amount": "15 000 RUB",
+          "due_date": ""
+        },
+        "session_id": "scenario_session_01793961386374587600_0000000122_98d8ac871f7f48f689925dcb83463b2e",
+        "submitted_at": "2026-11-06T10:36:26.127Z",
+        "output": {
+          "text": "Hola, Elena. Para el diseño de la presentación de 12 diapositivas, el precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar. ¿Podrías realizar el anticipo de 15 000 RUB? Los datos de pago estarán en una factura aparte. El saldo se abonará después de entregar los archivos finales en PDF y PPTX. Avísame, por favor, cuando hayas realizado el pago."
+        },
+        "visible_text": "Hola, Elena. Para el diseño de la presentación de 12 diapositivas, el precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar. ¿Podrías realizar el anticipo de 15 000 RUB? Los datos de pago estarán en una factura aparte. El saldo se abonará después de entregar los archivos finales en PDF y PPTX. Avísame, por favor, cuando hayas realizado el pago.",
+        "clipboard_text": "Hola, Elena. Para el diseño de la presentación de 12 diapositivas, el precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar. ¿Podrías realizar el anticipo de 15 000 RUB? Los datos de pago estarán en una factura aparte. El saldo se abonará después de entregar los archivos finales en PDF y PPTX. Avísame, por favor, cuando hayas realizado el pago.",
+        "ui_outcome": "result",
+        "ui_latency_ms": 6574.694065000001,
+        "trace_sha256": "da349788f0205f81928806bd7cd1970b6b0bbd924476779f5e92dd5b9b56c5ab",
+        "artifact_id": "artifact_01793961391524218764_0000000331_69e8f173696a4455a443b48dbec66df8",
+        "action": {
+          "id": "action_run_01793961387264022601_0000000322_193cadfeda9c4c9aa62de254b3e85f98",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded"
+        },
+        "provider_calls": [
+          {
+            "step_id": "compose_persuasive_text",
+            "model": "gpt-6-luna",
+            "status": "succeeded",
+            "latency_ms": 3921,
+            "input_tokens": 3985,
+            "output_tokens": 321,
+            "estimated_cost": 0.00020062,
+            "reasoning_effort": null
+          }
+        ],
+        "semantic_verdict": "PASS",
+        "browser_verdict": "PASS",
+        "semantic_reason": "15,000 RUB, 50%, agreed 30,000 RUB total, balance after final PDF/PPTX and future separate invoice all retained; no invented urgency."
+      }
+    ],
+    "scope": "original five cases x3 plus A01 EN/ES x3",
+    "reviewer": "Codex agent semantic review; user acceptance pending"
+  },
+  "acceptance_scope": "Historical original pre-fix series; see post_fix for current results",
+  "latest_original_ticket_acceptance": "PASS 15/15 after authorized prompt fix"
+}
