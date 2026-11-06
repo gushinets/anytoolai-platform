@@ -2138,11 +2138,37 @@ test("a run submission freezes the current draft and uses the exact backend fiel
     atom_id: "A01",
     input: EXAMPLES.A01,
     prompt: "Базовый промпт A01",
+    prompt_source_ref: session.atom.prompt_ref,
     model_id: "openai/gpt-supported",
     reasoning_effort: "high",
     preset_ref: null,
   });
   assert.equal(submission.snapshot.input.source_text, "Срок — 30 сентября");
+});
+
+test("run submissions freeze the effective source and atom while detached drafts stay independent", async () => {
+  const atom = await catalogAtom("A06");
+  for (const [source, detached, expected] of [
+    [null, false, atom.prompt_ref],
+    ["product.a06.v1", false, "product.a06.v1"],
+    [null, true, undefined],
+  ]) {
+    const session = createDraftSession(atom);
+    session.promptSourceRef = source;
+    session.promptSourceDetached = detached;
+    session.prompt = "Ручная версия";
+    const submission = createRunSubmission(session, {
+      modelId: "gpt-supported", reasoningEffort: null, idempotencyKey: "frozen-source",
+    });
+    const replay = JSON.stringify(submission.body);
+    session.atom = {...atom, prompt_ref: "prompt.a06.v2"};
+    session.promptSourceRef = "product.a06.v2";
+    session.prompt = "Следующая версия";
+    assert.equal(submission.body.prompt_source_ref, expected);
+    assert.equal(submission.snapshot.prompt_source_ref, expected);
+    assert.equal(submission.atom, atom);
+    assert.equal(JSON.stringify(submission.body), replay);
+  }
 });
 
 test("accepted and detail response parsers reject incomplete or unknown lifecycle envelopes", () => {

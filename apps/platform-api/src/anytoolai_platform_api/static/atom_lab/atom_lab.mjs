@@ -200,6 +200,7 @@ export function createDraftSession(atom) {
     sourceRunId: null,
     promptSourceRef: null,
     promptSourceNeedsValidation: false,
+    promptContractNeedsValidation: false,
     promptSourceDetached: false,
     promptOptions: null,
     validationRequested: false,
@@ -559,16 +560,18 @@ export function parsePresetExport(value, presetId, version) {
 export function createRunSubmission(session, {modelId, reasoningEffort, idempotencyKey}) {
   const input = getDraftPayload(session);
   const addressedModelId = modelId.startsWith("openai/") ? modelId : `openai/${modelId}`;
+  const promptSourceRef = session.promptSourceRef ?? (session.promptSourceDetached ? null : session.atom.prompt_ref);
   const snapshot = {
     atom_id: session.atom.atom_id,
     input,
     prompt: session.prompt,
-    ...(session.promptSourceRef ? {prompt_source_ref: session.promptSourceRef} : {}),
+    ...(promptSourceRef ? {prompt_source_ref: promptSourceRef} : {}),
     model_id: addressedModelId,
     reasoning_effort: reasoningEffort,
   };
   return {
     idempotencyKey,
+    atom: session.atom,
     snapshot: cloneJson(snapshot),
     body: {...cloneJson(snapshot), preset_ref: cloneJson(session.presetRef)},
   };
@@ -3052,7 +3055,7 @@ export function bootstrapAtomLab({
         `${submission.snapshot.atom_id} · ${diagnostics.response_model_id ?? diagnostics.requested_model_id}`;
       renderReadableResult(document, nodes["result-readable"], detail.result);
       nodes["result-json"].textContent = JSON.stringify(detail.result, null, 2);
-      completedPromptTrial = {runId: submission.runId, snapshot: submission.snapshot, atom: submission.ownerSession.atom};
+      completedPromptTrial = {runId: submission.runId, snapshot: submission.snapshot, atom: submission.atom};
     }
     const debugArtifact = (diagnostics.debug_artifacts ?? [])[0];
     const invalid = detail.status === "failed" && Boolean(debugArtifact);
@@ -3415,7 +3418,7 @@ export function bootstrapAtomLab({
       throw new Error("Список промптов вернул некорректный ответ.");
     }
     let atom = draft.atom;
-    if (!hasPlatform(atom)) {
+    if (!hasPlatform(atom) || draft.promptContractNeedsValidation) {
       try {
         atom = await protectedJson(`/v1/atom-lab/atoms/${draft.atom.atom_id}`);
         if (!isRecord(atom) || atom.atom_id !== draft.atom.atom_id
@@ -3432,12 +3435,13 @@ export function bootstrapAtomLab({
           || !sameJsonSemantically(atom.output_schema, draft.atom.output_schema)) {
           throw new Error("Контракт атома изменился. Черновик сохранён; откройте актуальный атом или явно адаптируйте сохранённый снимок.");
         }
+        if (!hasPlatform(atom)) throw new Error("Список промптов вернул некорректный ответ.");
       } catch (error) {
         error.promptSourceNeedsValidation = true;
+        error.promptContractNeedsValidation = true;
         throw error;
       }
     }
-    if (!hasPlatform(atom)) throw new Error("Список промптов вернул некорректный ответ.");
     return {options, atom};
   };
 
@@ -3445,6 +3449,7 @@ export function bootstrapAtomLab({
     draft.promptSourceDetached = !options.some((option) => option.ref === promptRefFor(draft));
     if (draft.promptSourceDetached) draft.promptSourceRef = null;
     draft.promptSourceNeedsValidation = false;
+    draft.promptContractNeedsValidation = false;
   };
 
   const isCurrentPromptOwner = (draft) => !destroyed && catalog.includes(draft.atom)
@@ -3479,6 +3484,7 @@ export function bootstrapAtomLab({
   };
 
   const renderPromptStatus = () => {
+    nodes["prompt-select"].disabled = Boolean(session.promptContractNeedsValidation);
     nodes["reset-prompt"].disabled = Boolean(session.promptSourceNeedsValidation);
     nodes["save-prompt"].disabled = !session.promptOptions || Boolean(session.savingPrompt)
       || Boolean(session.promptSourceNeedsValidation);
@@ -3584,6 +3590,7 @@ export function bootstrapAtomLab({
       draft.promptSourceLoadError = error.message;
       if (error.promptSourceNeedsValidation) {
         draft.promptSourceNeedsValidation = true;
+        draft.promptContractNeedsValidation ||= Boolean(error.promptContractNeedsValidation);
         updateRunButton();
         updatePresetEditorDisabled();
         if (presetEditorActive) renderPresetState();
@@ -3598,6 +3605,7 @@ export function bootstrapAtomLab({
   };
 
   const applyPromptOption = (option) => {
+    if (session.promptContractNeedsValidation) return;
     session.loadingPrompts = false;
     session.promptSourceNeedsValidation = false;
     nodes["prompt-load-status"].textContent = "";
@@ -3726,7 +3734,8 @@ export function bootstrapAtomLab({
   nodes["prompt-select"].addEventListener("change", () => {
     const ref = nodes["prompt-select"].value;
     const option = session.promptOptions?.find((item) => item.ref === ref);
-    if (!option || (session.prompt !== session.baselinePrompt && !confirmImpl(DIRTY_WARNING))) {
+    if (session.promptContractNeedsValidation || !option
+      || (session.prompt !== session.baselinePrompt && !confirmImpl(DIRTY_WARNING))) {
       nodes["prompt-select"].value = promptRefFor(session);
       return;
     }
