@@ -1549,6 +1549,15 @@ export interface operations {
                     "application/json": components["schemas"]["AtomLabErrorResponse"];
                 };
             };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
             /** @description Atom Lab request validation failed. */
             422: {
                 headers: {
@@ -1597,6 +1606,15 @@ export interface operations {
             };
             /** @description Atom Lab access denied. */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
