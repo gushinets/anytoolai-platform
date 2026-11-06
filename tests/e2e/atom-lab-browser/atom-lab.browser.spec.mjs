@@ -2083,7 +2083,7 @@ test("admission rejection keeps the draft, hides transport retry, and a new laun
   expect(keys[0]).not.toBe(keys[1]);
 });
 
-async function prepareRejectedSourceWrite(page, kind) {
+async function prepareRejectedSourceWrite(page, kind, {historyAtom = "A05"} = {}) {
   page.on("dialog", dialog => dialog.accept());
   const platform = {ref: A06.prompt_ref, name: "Платформенный", prompt: A06.prompt, group: "platform", source_ref: null, source_run_id: null};
   const product = {ref: "product.a06.v1", name: "Продуктовый v1", prompt: "Текст продукта v1", group: "product", source_ref: null, source_run_id: null};
@@ -2105,6 +2105,7 @@ async function prepareRejectedSourceWrite(page, kind) {
     reads: 0, writes: [], refreshStatus: 200, rejectionCode: kind === "prompt" ? "prompt_invalid" : "preset_contract_invalid",
     rejectionField: kind === "prompt" ? "source_ref" : "prompt_source_ref",
     writeGate: Promise.resolve(), refreshGate: Promise.resolve(),
+    authoritativeAtom: A06, atomReads: 0, atomStatus: 200, atomGate: Promise.resolve(), malformedOptions: false, optionsOverride: null,
   };
   await page.route("http://atom-lab.test/v1/atom-lab/**", async route => {
     const request = route.request();
@@ -2118,7 +2119,7 @@ async function prepareRejectedSourceWrite(page, kind) {
           code: state.rejectionCode, message: "Источник сохранения отклонён.",
           field_errors: [{path: state.rejectionField, message: "Источник больше недоступен."}],
         }, request_id: "write-source-rejection"}});
-      } else if (kind === "prompt") {
+      } else if (pathname.endsWith("/prompts")) {
         await route.fulfill({json: {...product, ref: "lab.saved-source", group: "lab", ...payload}});
       } else {
         const {base_version: baseVersion, ...configuration} = payload;
@@ -2132,7 +2133,17 @@ async function prepareRejectedSourceWrite(page, kind) {
       if (read > 1) await state.refreshGate;
       if (read > 1 && state.refreshStatus !== 200) {
         await route.fulfill({status: state.refreshStatus, json: {error: {code: "prompts_unavailable", message: "Источники временно недоступны."}}});
-      } else await route.fulfill({json: [platform, read === 1 ? product : replacement]});
+      } else await route.fulfill({json: state.optionsOverride ?? [
+        ...(state.malformedOptions ? [] : [{...platform, ref: read === 1 ? A06.prompt_ref : state.authoritativeAtom.prompt_ref}]),
+        state.writes.length === 0 ? product : replacement,
+      ]});
+      return;
+    }
+    if (pathname === "/v1/atom-lab/atoms/A06") {
+      state.atomReads += 1;
+      await state.atomGate;
+      await route.fulfill({status: state.atomStatus, json: state.atomStatus === 200
+        ? state.authoritativeAtom : {error: {code: "atom_lab_catalog_unavailable", message: "Атом временно недоступен."}}});
       return;
     }
     if (pathname.endsWith("/prompts")) {
@@ -2166,7 +2177,7 @@ async function prepareRejectedSourceWrite(page, kind) {
     }
     await route.fallback();
   });
-  await unlockAtom(page, kind === "history" ? "A05" : "A06");
+  await unlockAtom(page, kind === "history" ? historyAtom : "A06");
   await page.locator("#fill-example").click();
   if (kind === "version") {
     await page.locator("#presets-button").click();
@@ -2175,7 +2186,7 @@ async function prepareRejectedSourceWrite(page, kind) {
     await expect.poll(() => state.reads).toBe(1);
   } else {
     await page.locator("#prompt-tab").click();
-    await page.locator("#prompt-select").selectOption(kind === "history" ? "product.a05.v1" : product.ref);
+    await page.locator("#prompt-select").selectOption(kind === "history" && historyAtom === "A05" ? "product.a05.v1" : product.ref);
     await page.locator("#prompt-editor").fill("Ручной текст владельца");
     if (kind === "history") {
       await page.locator("#history-button").click();
@@ -2189,6 +2200,344 @@ async function prepareRejectedSourceWrite(page, kind) {
   const save = page.locator(kind === "prompt" ? "#save-prompt" : "#save-preset");
   const error = page.locator(kind === "prompt" ? "#save-prompt-status" : "#preset-error");
   return {state, product, replacement, detail, originalDetail, originalVersion, save, name, error};
+}
+
+for (const kind of ["prompt", "preset", "version", "history"]) {
+  for (const refreshFails of [false, true]) {
+    test(`${kind} source recovery accepts an authoritative new base${refreshFails ? " after atom 503 and Retry" : ""}`, async ({page}) => {
+      const {state, save, name, error, detail, originalDetail} = await prepareRejectedSourceWrite(page, kind);
+      if (kind === "prompt" || kind === "preset") {
+        await showWorkbench(page);
+        await page.locator("#prompt-tab").click();
+        await page.locator("#prompt-select").selectOption(A06.prompt_ref);
+        await page.locator("#prompt-editor").fill("Ручной текст для новой основы");
+        if (kind === "preset") await editPreset(page);
+      }
+      state.authoritativeAtom = {...A06, prompt_ref: "prompt.a06.v2", prompt: "Новая платформа"};
+      state.atomStatus = refreshFails ? 503 : 200;
+      let releaseAtom;
+      state.atomGate = new Promise(resolve => { releaseAtom = resolve; });
+      await save.click();
+      await expect(error).toContainText("Источник сохранения отклонён");
+      await expect.poll(() => state.atomReads).toBe(1);
+      await name.fill("Имя во время проверки");
+      const retainedPrompt = kind === "history" ? detail.snapshot.prompt.content : "Ручной текст во время проверки";
+      const retainedInput = kind === "history" ? detail.snapshot.input : {...A06.example_input, objective: "Правка во время проверки"};
+      if (kind !== "history") {
+        await showWorkbench(page);
+        await page.locator("#prompt-tab").click();
+        await page.locator("#prompt-editor").fill(retainedPrompt);
+        await page.locator("#input-tab").click();
+        await importJson(page, retainedInput);
+        await page.locator("#prompt-tab").click();
+      }
+      releaseAtom();
+      if (refreshFails) {
+        const loadError = kind === "history" ? error : page.locator("#prompt-load-status");
+        if (kind !== "history") { await showWorkbench(page); await page.locator("#prompt-tab").click(); }
+        await expect(loadError).toContainText("Атом временно недоступен");
+        await expect(save).toBeDisabled();
+        if (kind === "preset" || kind === "version") await editPreset(page);
+        await name.fill("Имя после отказа");
+        state.atomStatus = 200;
+        if (kind === "preset" || kind === "version") { await showWorkbench(page); await page.locator("#prompt-tab").click(); }
+        await (kind === "history" ? page.getByRole("button", {name: "Повторить загрузку источника", exact: true}) : page.locator("#retry-prompts")).click();
+      }
+      if (kind !== "history") {
+        await showWorkbench(page);
+        await page.locator("#prompt-tab").click();
+        await expect(page.locator("#prompt-select")).toHaveValue("prompt.a06.v2");
+        await expect(page.locator("#prompt-select option[value='prompt.a06']")).toHaveCount(0);
+        await expect(page.locator("#prompt-editor")).toHaveValue(retainedPrompt);
+        await expect(page.locator("#model-select")).toHaveValue("gpt-supported");
+        await expect(page.locator("#reasoning-effort")).toHaveValue(kind === "version" ? "high" : "");
+        if (kind !== "prompt") await editPreset(page);
+      } else {
+        await expect(page.locator("#preset-config-metadata")).toContainText("prompt.a06.v2");
+        await expect(page.locator("#preset-prompt")).toHaveText(detail.snapshot.prompt.content);
+      }
+      await expect(name).toHaveValue(refreshFails ? "Имя после отказа" : "Имя во время проверки");
+      await expect(save).toBeEnabled();
+      await save.click();
+      await expect.poll(() => state.writes.length).toBe(2);
+      const recovered = state.writes[1].payload;
+      expect(recovered.prompt).toBe(retainedPrompt);
+      expect(recovered[kind === "prompt" ? "source_ref" : "prompt_source_ref"]).toBe(kind === "prompt" ? "prompt.a06.v2" : null);
+      if (kind !== "prompt") {
+        expect(recovered.prompt_ref).toBe("prompt.a06.v2");
+        expect(recovered.example_input).toEqual(retainedInput);
+        expect(recovered.source_run_id).toBe(kind === "preset" ? null : detail.run_id);
+        await expect(page.locator("#preset-state")).toContainText("Сохранена неизменяемая версия");
+      } else await expect(error).toContainText("Сохранён промпт");
+      if (kind === "history") {
+        await showWorkbench(page);
+        await expect(page.locator("#atom-title")).toContainText("A05");
+        await expect(page.locator("#prompt-editor")).toHaveValue("Ручной текст владельца");
+        await expect(page.locator("#prompt-select")).toHaveValue("product.a05.v1");
+        await page.locator("#history-button").click();
+        await page.locator("#history-list .history-open").click();
+        expect(JSON.parse(await page.locator("#history-detail").textContent())).toEqual(originalDetail);
+      }
+      expect(state.atomReads).toBe(refreshFails ? 2 : 1);
+    });
+  }
+}
+
+test("source recovery rejects a list without its authoritative platform base", async ({page}) => {
+  const {state, save, name} = await prepareRejectedSourceWrite(page, "prompt");
+  state.malformedOptions = true;
+  await save.click();
+  await expect(page.locator("#prompt-load-status")).toContainText("Список промптов вернул некорректный ответ");
+  await expect(save).toBeDisabled();
+  await expect(page.locator("#prompt-editor")).toHaveValue("Ручной текст владельца");
+  await expect(name).toHaveValue("  Имя владельца  ");
+  expect(state.writes).toHaveLength(1);
+});
+
+for (const kind of ["preset", "version"]) {
+  test(`${kind} base-only rejection preserves a still-valid product source`, async ({page}) => {
+    const {state, product, save, name} = await prepareRejectedSourceWrite(page, kind);
+    state.rejectionField = "prompt_ref";
+    state.authoritativeAtom = {...A06, prompt_ref: "prompt.a06.v2"};
+    state.optionsOverride = [{...product, ref: "prompt.a06.v2", group: "platform"}, product];
+    await save.click();
+    await expect.poll(() => state.atomReads).toBe(1);
+    await expect(save).toBeEnabled();
+    await expect(name).toHaveValue("  Имя владельца  ");
+    await expect(page.locator("#preset-config-metadata")).toContainText(product.ref);
+    await save.click();
+    await expect(page.locator("#preset-state")).toContainText("Сохранена неизменяемая версия");
+    expect(state.writes[1].payload).toMatchObject({
+      prompt_ref: "prompt.a06.v2", prompt_source_ref: product.ref,
+      prompt: kind === "version" ? "Ручной текст пресета" : "Ручной текст владельца",
+      example_input: A06.example_input,
+    });
+  });
+}
+
+for (const failure of ["none", "atom-503", "contract"]) {
+  test(`first prompt load recovers base drift with ${failure}`, async ({page}) => {
+    let atomReads = 0;
+    let atomStatus = failure === "atom-503" ? 503 : 200;
+    let savedBody;
+    let releaseAtom;
+    const atomGate = new Promise(resolve => { releaseAtom = resolve; });
+    const fresh = structuredClone({...A06, prompt_ref: "prompt.a06.v2"});
+    if (failure === "contract") fresh.schema_refs.input.version += 1;
+    const platform = {ref: fresh.prompt_ref, name: "Свежая платформа", prompt: fresh.prompt, group: "platform", source_ref: null, source_run_id: null};
+    await page.route("http://atom-lab.test/v1/atom-lab/atoms/A06**", async route => {
+      if (route.request().method() === "POST") {
+        savedBody = route.request().postDataJSON();
+        await route.fulfill({json: {...platform, ...savedBody, group: "lab", ref: "lab.first-load"}});
+      } else if (new URL(route.request().url()).pathname.endsWith("/prompts")) {
+        await route.fulfill({json: [platform]});
+      } else {
+        atomReads += 1;
+        await atomGate;
+        await route.fulfill({status: atomStatus, json: atomStatus === 200 ? fresh : {error: {code: "atom_lab_catalog_unavailable", message: "Атом временно недоступен."}}});
+      }
+    });
+    await unlockAtom(page, "A06");
+    await importJson(page, A06.example_input);
+    await page.locator("#prompt-tab").click();
+    await expect.poll(() => atomReads).toBe(1);
+    await page.locator("#prompt-editor").fill("Черновик до первого списка");
+    await page.locator("#save-prompt-panel summary").click();
+    await page.locator("#save-prompt-name").fill("Имя до первого списка");
+    releaseAtom();
+    if (failure !== "none") {
+      await expect(page.locator("#prompt-load-status")).toContainText(failure === "contract" ? "Контракт атома изменился" : "Атом временно недоступен");
+      await expect(page.locator("#save-prompt")).toBeDisabled();
+      await expect(page.locator("#run-button")).toBeDisabled();
+      if (failure === "atom-503") {
+        atomStatus = 200;
+        await page.locator("#retry-prompts").click();
+      }
+    }
+    await expect(page.locator("#prompt-editor")).toHaveValue("Черновик до первого списка");
+    await expect(page.locator("#save-prompt-name")).toHaveValue("Имя до первого списка");
+    if (failure !== "contract") {
+      await expect(page.locator("#prompt-select")).toHaveValue(fresh.prompt_ref);
+      await page.locator("#save-prompt").click();
+      await expect(page.locator("#save-prompt-status")).toContainText("Сохранён промпт");
+      expect(savedBody).toMatchObject({prompt: "Черновик до первого списка", source_ref: fresh.prompt_ref, source_run_id: null});
+    }
+    await page.locator("#input-tab").click();
+    await page.locator("#json-mode").click();
+    expect(JSON.parse(await page.locator("#json-editor").inputValue())).toEqual(A06.example_input);
+  });
+}
+
+test("a direct history source read blocks a newly incompatible base without rewriting the snapshot", async ({page}) => {
+  const {state, detail, originalDetail, product} = await prepareRejectedSourceWrite(page, "prompt");
+  state.authoritativeAtom = {...A06, prompt_ref: "prompt.a06.v2"};
+  state.optionsOverride = [{...product, ref: "prompt.a06.v2", group: "platform"}, product];
+  await page.locator("#history-button").click();
+  await page.locator("#history-list .history-open").click();
+  await page.locator("#save-history-preset").click();
+  await expect.poll(() => state.atomReads).toBe(1);
+  await expect(page.locator("#history-error")).toContainText("Основа промпта изменилась");
+  await expect(page.locator("#presets-panel")).toBeHidden();
+  expect(JSON.parse(await page.locator("#history-detail").textContent())).toEqual(originalDetail);
+  await expect(page.locator("#history-prompt")).toHaveText(detail.snapshot.prompt.content);
+  await showWorkbench(page);
+  await expect(page.locator("#prompt-editor")).toHaveValue("Ручной текст владельца");
+  expect(state.writes).toHaveLength(0);
+});
+
+for (const change of ["input-ref", "input-content", "output", "config", "action", "malformed-atom", "wrong-atom", "claimed-platform"]) {
+  test(`base source recovery preserves the draft after ${change}`, async ({page}) => {
+    const {state, save, name} = await prepareRejectedSourceWrite(page, "prompt");
+    const atom = structuredClone({...A06, prompt_ref: "prompt.a06.v2"});
+    if (change === "input-ref") atom.schema_refs.input.version += 1;
+    if (change === "input-content") atom.input_schema.properties.context = {type: "string"};
+    if (change === "output") atom.schema_refs.output.version += 1;
+    if (change === "config") atom.base_action_config_id = "config.a06.v2";
+    if (change === "action") atom.action_type = "kernel.other_action";
+    if (change === "malformed-atom") atom.schema_refs = null;
+    if (change === "wrong-atom") atom.atom_id = "A05";
+    state.authoritativeAtom = atom;
+    if (change === "claimed-platform") state.optionsOverride = [{
+      ref: "pretend.platform", name: "Подмена", prompt: A06.prompt, group: "platform", source_ref: null, source_run_id: null,
+    }];
+    await save.click();
+    await expect(page.locator("#prompt-load-status")).toContainText(change.includes("atom")
+      ? "Атом вернул некорректный ответ" : change === "claimed-platform"
+        ? "Список промптов вернул некорректный ответ" : "Контракт атома изменился");
+    await expect(save).toBeDisabled();
+    await save.dispatchEvent("click");
+    await expect(page.locator("#prompt-editor")).toHaveValue("Ручной текст владельца");
+    await expect(name).toHaveValue("  Имя владельца  ");
+    await page.locator("#input-tab").click();
+    await page.locator("#json-mode").click();
+    expect(JSON.parse(await page.locator("#json-editor").inputValue())).toEqual(A06.example_input);
+    await expect(page.locator("#input-schema-version")).toHaveText("Версия 1");
+    expect(state.writes).toHaveLength(1);
+  });
+}
+
+for (const phase of ["write", "atom"]) {
+  for (const change of ["source", "editor", "catalog"]) {
+    test(`base source recovery fences ${change} during ${phase}`, async ({page}) => {
+      const {state, save} = await prepareRejectedSourceWrite(page, "prompt");
+      state.authoritativeAtom = {...A06, prompt_ref: "prompt.a06.v2"};
+      let release;
+      const gate = new Promise(resolve => { release = resolve; });
+      if (phase === "write") state.writeGate = gate;
+      else state.atomGate = gate;
+      await save.click();
+      await expect.poll(() => phase === "write" ? state.writes.length : state.atomReads).toBe(1);
+      if (change === "source") await page.locator("#prompt-select").selectOption(A06.prompt_ref);
+      if (change === "editor") {
+        await page.getByRole("button", {name: /A05/}).click();
+        await page.locator("#prompt-select").selectOption("product.a05.v1");
+      }
+      await page.locator("#prompt-editor").fill("Поздний ручной текст");
+      if (change === "catalog") {
+        page.removeAllListeners("dialog");
+        page.on("dialog", dialog => dialog.dismiss());
+        const reloaded = page.waitForResponse("**/v1/atom-lab/models");
+        await page.locator("#access-form").dispatchEvent("submit");
+        await reloaded;
+      }
+      const completed = page.waitForResponse(response => phase === "write"
+        ? response.request().method() === "POST" : response.url().endsWith("/atoms/A06"));
+      release();
+      await (await completed).finished();
+      await expect(page.locator("#prompt-editor")).toHaveValue("Поздний ручной текст");
+      await expect(page.locator("#prompt-select option[value='prompt.a06.v2']")).toHaveCount(0);
+      await expect(page.locator("#prompt-select")).toHaveValue(change === "source" ? A06.prompt_ref : change === "editor" ? "product.a05.v1" : "product.a06.v1");
+      expect(state.atomReads).toBe(phase === "write" ? 0 : 1);
+      expect(state.writes).toHaveLength(1);
+    });
+  }
+}
+
+test("base recovery keeps both a history snapshot and dirty A06 editor usable", async ({page}) => {
+  const {state, save, detail} = await prepareRejectedSourceWrite(page, "history", {historyAtom: "A06"});
+  state.authoritativeAtom = {...A06, prompt_ref: "prompt.a06.v2"};
+  await save.click();
+  await expect(save).toBeEnabled();
+  await expect(page.locator("#preset-config-metadata")).toContainText("prompt.a06.v2");
+  await expect(page.locator("#preset-prompt")).toHaveText(detail.snapshot.prompt.content);
+  await showWorkbench(page);
+  await expect(page.locator("#prompt-editor")).toHaveValue("Ручной текст владельца");
+  await expect(page.locator("#prompt-select")).toHaveValue("prompt.a06.v2");
+  await page.locator("#save-prompt-panel summary").click();
+  await page.locator("#save-prompt-name").fill("Другой живой владелец");
+  await page.locator("#save-prompt").click();
+  await expect(page.locator("#save-prompt-status")).toContainText("Сохранён промпт");
+  expect(state.writes[1].pathname).toBe("/v1/atom-lab/atoms/A06/prompts");
+  expect(state.writes[1].payload).toMatchObject({prompt: "Ручной текст владельца", source_ref: "prompt.a06.v2", source_run_id: null});
+  await editPreset(page);
+  await expect(page.locator("#preset-prompt")).toHaveText(detail.snapshot.prompt.content);
+  await save.click();
+  await expect.poll(() => state.writes.length).toBe(3);
+  expect(state.writes[2].payload).toMatchObject({prompt_ref: "prompt.a06.v2", prompt: detail.snapshot.prompt.content, source_run_id: detail.run_id});
+  await expect(page.locator("#preset-state")).toContainText("Сохранена неизменяемая версия");
+});
+
+test("a new authoritative base invalidates the old exact successful trial", async ({page}) => {
+  const {state, detail} = await prepareRejectedSourceWrite(page, "prompt");
+  await page.locator("#history-button").click();
+  await page.locator("#history-list .history-open").click();
+  await page.locator("#restore-history").click();
+  await page.locator("#prompt-tab").click();
+  await expect(page.locator("#prompt-test-status")).toContainText("Пробный запуск завершён");
+  await page.locator("#save-prompt-panel summary").click();
+  await page.locator("#save-prompt-name").fill("Текст с прежним испытанием");
+  state.authoritativeAtom = {...A06, prompt_ref: "prompt.a06.v2"};
+  await page.locator("#save-prompt").click();
+  await expect(page.locator("#prompt-select")).toHaveValue("prompt.a06.v2");
+  await expect(page.locator("#prompt-editor")).toHaveValue(detail.snapshot.prompt.content);
+  await expect(page.locator("#prompt-test-status")).not.toContainText("Пробный запуск завершён");
+  await page.locator("#save-prompt").click();
+  await expect(page.locator("#save-prompt-status")).toContainText("Сохранён промпт");
+  expect(state.writes[0].payload.source_run_id).toBe(detail.run_id);
+  expect(state.writes[1].payload.source_run_id).toBeNull();
+});
+
+for (const change of ["new-preset", "editor", "catalog", "hidden-panel"]) {
+  test(`history base recovery fences a later ${change} during its atom read`, async ({page}) => {
+    const {state, save, detail} = await prepareRejectedSourceWrite(page, "history");
+    state.authoritativeAtom = {...A06, prompt_ref: "prompt.a06.v2"};
+    let releaseAtom;
+    state.atomGate = new Promise(resolve => { releaseAtom = resolve; });
+    await save.click();
+    await expect.poll(() => state.atomReads).toBe(1);
+    if (change === "new-preset") {
+      await page.locator("#new-preset").click();
+      await page.locator("#preset-name").fill("Новый владелец");
+    } else {
+      await showWorkbench(page);
+      if (change === "editor") await page.getByRole("button", {name: /A11/}).click();
+      if (change === "catalog") {
+        const reloaded = page.waitForResponse("**/v1/atom-lab/models");
+        await page.locator("#access-form").dispatchEvent("submit");
+        await reloaded;
+      }
+    }
+    const completed = page.waitForResponse("**/v1/atom-lab/atoms/A06");
+    releaseAtom();
+    await (await completed).finished();
+    if (change === "new-preset") {
+      await expect(page.locator("#preset-name")).toHaveValue("Новый владелец");
+      await expect(page.locator("#preset-config-metadata")).toContainText("product.a05.v1");
+      await expect(page.locator("#preset-prompt")).toHaveText("Ручной текст владельца");
+    } else if (change === "hidden-panel") {
+      await expect(page.locator("#prompt-editor")).toHaveValue("Ручной текст владельца");
+      await expect(page.locator("#prompt-select")).toHaveValue("product.a05.v1");
+      await page.locator("#presets-button").click();
+      await expect(page.locator("#preset-config-metadata")).toContainText("prompt.a06.v2");
+      await expect(page.locator("#preset-prompt")).toHaveText(detail.snapshot.prompt.content);
+      await expect(save).toBeEnabled();
+    } else {
+      await expect(page.locator("#presets-panel")).toBeHidden();
+      await page.locator("#prompt-tab").click();
+      await expect(page.locator("#prompt-select option[value='prompt.a06.v2']")).toHaveCount(0);
+    }
+    expect(state.writes).toHaveLength(1);
+  });
 }
 
 for (const kind of ["prompt", "preset", "version", "history"]) {

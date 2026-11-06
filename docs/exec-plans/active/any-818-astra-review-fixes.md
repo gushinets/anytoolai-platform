@@ -691,3 +691,79 @@ staging is empty and unrelated untracked reports are untouched. Backend/CSS,
 contracts, dependencies, working DB, migrations, provider calls, deployment,
 commits, pushes and GitHub writes were not used. Broad backend/PostgreSQL checks
 were not repeated for this UI-only fix; parent owns review, commit/push and CI.
+
+## Recovery after an authoritative base prompt changes
+
+Doctor passed before edits on 2026-11-07 at `4f1d7768`. Address review
+`5807371763`, discussion `4497887149`: prompt-source recovery must validate a
+new platform reference against the current authoritative atom, preserving manual
+prompt/input/name and all request-owner fences. A malformed options list still
+fails closed. Changed action/schema contracts require explicit adaptation and
+must never silently reinterpret the existing input or manufacture trial evidence.
+
+Reach: the shared prompt loader/reconciliation, connected Chromium regressions
+and this plan. Reproduce the version-change failure and malformed-list control
+before production edits; cover current/preset/history owners, Retry and stale
+responses, then run focused suites, canonical frontend-check, docs/generation and
+diff checks. No backend/API, dependency, working DB, migration, provider, staging,
+commit, push or GitHub change is needed. Parent owns publication and fresh review.
+
+The initial Chromium regression failed before production edits because recovery
+made zero authoritative atom reads; the missing-platform negative control passed
+(`.quick-check-tmp/p5-before.log`). The shared loader now reads the existing atom
+endpoint whenever a valid options list lacks its loaded platform base. It
+validates the atom shape, authoritative platform reference, action/config identity,
+schema refs/versions and semantic schema content before replacing any state.
+
+An unchanged contract permits an atomic new atom identity for the catalog and both
+live owners of that atom. Manual text, input, metadata, model/effort and historical
+source-run attribution remain; missing sources detach and stale preset execution
+references clear. Old atom identities remain immutable, so old successful trials
+cannot qualify for a new base. Cached history compatibility is recomputed through
+the existing adaptation rules. Changed contracts, malformed atom/options and failed
+reads preserve raw drafts and remain blocked with an explicit error and Retry.
+Request generations still fence source/editor/catalog and snapshot replacement.
+
+The API validates preset `prompt_ref` independently of `prompt_source_ref`; a
+still-valid product source therefore exposes the same drift through a base-only
+field error. Both create/version regressions reproduced zero refresh reads before
+the final fix (`.quick-check-tmp/p5-base-only-before.log`). The same handler now
+recognizes that field and fences recovery against both posted base and source,
+retaining a valid product origin while updating the compatible platform base.
+
+The first Prompt-tab GET and its Retry use the same base comparison, without
+requiring an earlier 422 or restore. Four further entry regressions first failed
+(`.quick-check-tmp/p5-first-load-before.log`), then passed: first load, atom 503 /
+Retry, changed contract on first load and direct history pre-save. Failed fresh
+atom reads keep run/save blocked while retaining the raw draft. Direct history
+pre-save checks catalog ownership and refuses a newly incompatible base until the
+catalog is reopened and the existing explicit adaptation is chosen; it never
+rewrites the selected immutable snapshot or the unrelated current editor.
+
+Verification (2026-11-07): final focused Chromium passed all 82 cases, including
+35 new regressions and 47 connected source/write/history/adaptation controls.
+Evidence: `.quick-check-tmp/p5-focused-final.log`. Actual recovered POST payloads
+and acknowledgements cover prompt creation, preset creation/versioning, direct
+history snapshots with unrelated A05 and simultaneous dirty A06 owners, retained
+product sources, manual edits during reads, source/editor/catalog fencing, read
+503/Retry, invalid atom/options, changed contracts and old successful trial identity.
+
+The final canonical managed `python scripts/agent/runner.py frontend-check` exited
+zero after the last source/test edits: lint, typecheck, all 265 Chromium journeys,
+53 Atom Lab Node tests, six demo Node tests, 824 Vitest tests, generated API-type
+drift and production builds passed. Log:
+`.quick-check-tmp/p5-frontend-check-final.log`. The sandbox rejected the existing
+pnpm-store symlink; the identical command used the established approved escalation,
+installed Chromium cache and bundled LiteLLM cost map. No assertion, skip, retry,
+dependency or configuration was weakened. `validate-docs`, `generate-docs --check`
+and `git diff --check` passed; documentation logs are
+`.quick-check-tmp/p5-validate-docs.log` and `p5-generate-docs-check.log`.
+
+Only the three owned JavaScript/tests/plan files changed; HEAD remains
+`4f1d7768b769fac44cbcca09317e80d134a04e49`, staging is empty and unrelated untracked
+reports remain untouched. No backend/CSS, schema/generated contract, dependency,
+working DB, migration, provider, deployment, commit, push or GitHub write changed.
+Broad backend/PostgreSQL checks were not repeated for this UI fix. A genuinely
+changed contract remains blocked with raw state retained until an explicit reopen
+or existing adaptation; direct immutable history never silently changes its base.
+Parent owns final independent review, commit/push and required CI; never merge.
