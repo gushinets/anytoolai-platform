@@ -43,6 +43,7 @@ PYTEST_TARGETS = [
     "tests/test_atoms_proof.py",
     "tests/test_live_canary.py",
     "tests/test_proposal_ai_eval.py",
+    "tests/test_client_update_writer_eval.py",
     "packages/backend/platform-sdk/tests",
     "packages/backend/platform-core/tests",
     "packages/backend/platform-actions/tests",

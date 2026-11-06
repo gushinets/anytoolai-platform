@@ -1159,7 +1159,8 @@ def test_prod_up_rejects_unknown_vps_135_selector_before_compose(monkeypatch, ca
         runner, "_prod_stack_running", lambda: pytest.fail("invalid selector reached Compose")
     )
 
-    assert runner.prod_up() == 2
+    # Test selector validation independently of OS lock acquisition, covered separately.
+    assert runner._prod_up_locked() == 2
     assert "ANYTOOLAI_VPS_135_NETWORKS" in capsys.readouterr().err
 
 

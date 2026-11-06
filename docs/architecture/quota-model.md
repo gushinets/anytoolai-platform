@@ -2,7 +2,7 @@
 
 MVP-A exposes guest quota. ANY-507 also provides typed paid metering internally; paid
 HTTP authentication, AccessSnapshot, scenario metric selection and interservice usage remain
-ANY-766 responsibilities. See the [shared contract and execution plan](../exec-plans/active/ANY-507-implementation-plan.md).
+ANY-766 responsibilities. See the [shared contract and execution plan](../exec-plans/completed/ANY-507-implementation-plan.md).
 
 ## Admission and replay
 

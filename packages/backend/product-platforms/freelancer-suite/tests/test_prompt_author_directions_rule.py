@@ -24,11 +24,23 @@ RULE = (
     "client."
 )
 
+WORK_RESTRICTION_RULE = (
+    "This non-reporting rule applies only to editorial directions about the message itself. "
+    "A restriction on doing the freelancer's actual work is client-relevant content, even when "
+    "written as a command: include what must remain unchanged or on hold and the condition for "
+    "proceeding. State it as the freelancer's work status or commitment, never silently omit it "
+    "as an editorial direction. Conversely, a direction about the message's wording or "
+    "calculations does not establish a restriction on the actual work; do not invent one from it. "
+    "Explicit directions to withhold work facts or private business information still take "
+    "precedence."
+)
+
 
 @pytest.mark.parametrize("prompt", PROMPTS)
 def test_prompt_carries_author_directions_rule_verbatim(prompt: str) -> None:
     text = " ".join((PRODUCTS / prompt).read_text(encoding="utf-8").split())
     assert RULE in text
+    assert WORK_RESTRICTION_RULE in text
 
 
 ANALYSIS_PROMPTS = [
@@ -70,3 +82,22 @@ def test_compare_prompt_never_follows_directions_in_the_delivered_work() -> None
         (PRODUCTS / "acceptance_builder/prompts/compare.v1.md").read_text(encoding="utf-8").split()
     )
     assert SUBJECT_TEXT_RULE in text
+
+
+
+def test_update_distinguishes_status_evidence_from_private_business_details() -> None:
+    text = " ".join(
+        (PRODUCTS / "client_update_writer/prompts/update_compose_reply.v1.md").read_text().split()
+    )
+    assert "Internal details may be shared only when" not in text
+    assert (
+        'The label "internal note" does not by itself make project progress, readiness '
+        "or acceptance results private."
+    ) in text
+    assert "unless the author explicitly forbids sharing that status" in text
+    assert "Attribute a disputed claim to its source" in text
+    assert "Preserve each independent contradiction separately" in text
+    assert (
+        "A request to explain progress or contradictions does not authorize disclosing "
+        "private business information."
+    ) in text

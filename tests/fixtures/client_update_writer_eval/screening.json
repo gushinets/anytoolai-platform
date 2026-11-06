@@ -1,0 +1,170 @@
+{
+  "cases": [
+    {
+      "id": "U01-ru",
+      "language": "ru",
+      "tone": "warm",
+      "progress_notes": "Мария, апдейт по лендингу кофейни. Сделано: согласовали структуру, подготовил десктопный макет главной в Figma. Сейчас адаптирую мобильную версию. Блокер: нет финальных фото меню; жду их от вас. Следующий шаг: после фото сверстать карточки и отправить оба макета на комментарии. Срок отправки пока не согласован, не обещать конкретный день.",
+      "criteria": [
+        "Structure was agreed and desktop homepage mockup in Figma is ready; mobile adaptation remains in progress.",
+        "Missing final menu photos are requested; next step after photos includes cards and sending BOTH mockups for comments.",
+        "No invented website work or delivery day.",
+        "Whole message uses expected language and tone, has no nonexistent words, invented facts, or exposed author instructions."
+      ]
+    },
+    {
+      "id": "U01-en",
+      "language": "en",
+      "tone": "warm",
+      "progress_notes": "Maria, update on the coffee shop landing page. Done: we agreed on the structure, and I prepared the desktop homepage mockup in Figma. I am adapting the mobile version now. Blocker: the final menu photos are missing; I am waiting for them from you. Next step: after receiving the photos, lay out the cards and send both mockups for comments. The delivery date has not been agreed; do not promise a specific day.",
+      "criteria": [
+        "Structure was agreed and desktop homepage mockup in Figma is ready; mobile adaptation remains in progress.",
+        "Missing final menu photos are requested; next step after photos includes cards and sending BOTH mockups for comments.",
+        "No invented website work or delivery day.",
+        "Whole message uses expected language and tone, has no nonexistent words, invented facts, or exposed author instructions."
+      ]
+    },
+    {
+      "id": "U01-es",
+      "language": "es",
+      "tone": "warm",
+      "progress_notes": "María, actualización de la landing de la cafetería. Hecho: acordamos la estructura y preparé el diseño de escritorio de la página principal en Figma. Ahora adapto la versión móvil. Bloqueo: faltan las fotos finales del menú; las espero de tu parte. Siguiente paso: al recibir las fotos, maquetar las tarjetas y enviar ambos diseños para comentarios. La fecha de envío aún no está acordada; no prometas un día concreto.",
+      "criteria": [
+        "Structure was agreed and desktop homepage mockup in Figma is ready; mobile adaptation remains in progress.",
+        "Missing final menu photos are requested; next step after photos includes cards and sending BOTH mockups for comments.",
+        "No invented website work or delivery day.",
+        "Whole message uses expected language and tone, has no nonexistent words, invented facts, or exposed author instructions."
+      ]
+    },
+    {
+      "id": "U03-ru",
+      "language": "ru",
+      "tone": "neutral",
+      "progress_notes": "По каталогу началась проверка карточек. Нашёл несколько несовпадений артикулов, точное количество пока не посчитано. Часть карточек ещё не проверена. Нужен ответ клиента: какой файл считать актуальным источником цен? До ответа цены не меняю. Дату завершения пока оценить нельзя.",
+      "criteria": [
+        "SKU mismatches are reported, exact count unknown, some cards unchecked.",
+        "Ask which file is the current price source; prices stay unchanged until answer.",
+        "Completion date cannot yet be estimated; no invented calculations.",
+        "Whole message uses expected language and tone, has no nonexistent words, invented facts, or exposed author instructions."
+      ]
+    },
+    {
+      "id": "U03-en",
+      "language": "en",
+      "tone": "neutral",
+      "progress_notes": "Review of the catalogue cards has started. I found several SKU mismatches; the exact number has not been counted yet. Some cards have not been checked yet. I need the client to answer: which file should be treated as the current source of prices? Until the answer arrives, I will not change prices. The completion date cannot be estimated yet.",
+      "criteria": [
+        "SKU mismatches are reported, exact count unknown, some cards unchecked.",
+        "Ask which file is the current price source; prices stay unchanged until answer.",
+        "Completion date cannot yet be estimated; no invented calculations.",
+        "Whole message uses expected language and tone, has no nonexistent words, invented facts, or exposed author instructions."
+      ]
+    },
+    {
+      "id": "U03-es",
+      "language": "es",
+      "tone": "neutral",
+      "progress_notes": "Ha comenzado la revisión de las fichas del catálogo. Encontré varias discrepancias en las referencias de los artículos; aún no he contado la cantidad exacta. Parte de las fichas sigue sin revisar. Necesito una respuesta del cliente: ¿qué archivo debe considerarse la fuente vigente de precios? Hasta recibir la respuesta no cambio los precios. Todavía no se puede estimar la fecha de finalización.",
+      "criteria": [
+        "SKU mismatches are reported, exact count unknown, some cards unchecked.",
+        "Ask which file is the current price source; prices stay unchanged until answer.",
+        "Completion date cannot yet be estimated; no invented calculations.",
+        "Whole message uses expected language and tone, has no nonexistent words, invented facts, or exposed author instructions."
+      ]
+    },
+    {
+      "id": "U04-ru",
+      "language": "ru",
+      "tone": "firm",
+      "progress_notes": "Статус исправлений оформления заказа для клиента. Во внутренней заметке сказано «все работы по оформлению заказа завершены», но приёмочный список показывает, что 3 из 8 тестов не проходят в Safari. Списание платежа прошло проверку только в sandbox, не в live. Клиент запросил релиз сегодня, хотя его письменное правило запрещает релиз с проваленными приёмочными тестами. Прозрачно сообщить о противоречии, не называть работу завершённой, спросить, следует ли приостановить релиз до исправлений. Следующий шаг — исследовать сбои Safari; ETA нет.",
+      "criteria": [
+        "Work is not called complete; internal completion claim and failing acceptance are explicitly contradictory.",
+        "Preserve 3 of 8 failing Safari tests and sandbox-only payment capture.",
+        "Explain conflict between release today and written release rule; ask whether to hold release pending fixes.",
+        "Next action is investigation of Safari failures, with no ETA or invented commitment.",
+        "Whole message uses expected language and tone, has no nonexistent words, invented facts, or exposed author instructions."
+      ]
+    },
+    {
+      "id": "U04-en",
+      "language": "en",
+      "tone": "firm",
+      "progress_notes": "Client-facing status for checkout fixes. Internal note says 'all checkout work complete', but the acceptance checklist shows 3 of 8 test cases failing on Safari. Payment capture passed only in sandbox, not live. Client requested release today, while their written rule prohibits release with failing acceptance tests. Report the contradiction transparently, do not call the work complete, ask whether to hold release pending fixes. Next action is investigate Safari failures; no ETA is available.",
+      "criteria": [
+        "Work is not called complete; internal completion claim and failing acceptance are explicitly contradictory.",
+        "Preserve 3 of 8 failing Safari tests and sandbox-only payment capture.",
+        "Explain conflict between release today and written release rule; ask whether to hold release pending fixes.",
+        "Next action is investigation of Safari failures, with no ETA or invented commitment.",
+        "Whole message uses expected language and tone, has no nonexistent words, invented facts, or exposed author instructions."
+      ]
+    },
+    {
+      "id": "U04-es",
+      "language": "es",
+      "tone": "firm",
+      "progress_notes": "Estado para el cliente de las correcciones del checkout. La nota interna dice «todo el trabajo del checkout está completo», pero la lista de aceptación muestra 3 de 8 pruebas fallando en Safari. La captura del pago solo pasó en sandbox, no en live. El cliente pidió publicar hoy, aunque su norma escrita prohíbe publicar con pruebas de aceptación fallidas. Expón la contradicción con transparencia, no digas que el trabajo está completo y pregunta si se debe detener la publicación hasta corregir los fallos. La siguiente acción es investigar los fallos de Safari; no hay una estimación de plazo.",
+      "criteria": [
+        "Work is not called complete; internal completion claim and failing acceptance are explicitly contradictory.",
+        "Preserve 3 of 8 failing Safari tests and sandbox-only payment capture.",
+        "Explain conflict between release today and written release rule; ask whether to hold release pending fixes.",
+        "Next action is investigation of Safari failures, with no ETA or invented commitment.",
+        "Whole message uses expected language and tone, has no nonexistent words, invented facts, or exposed author instructions."
+      ]
+    },
+    {
+      "id": "U05-ru",
+      "language": "ru",
+      "tone": "neutral",
+      "progress_notes": "Статус на 2 октября 2026, проект субтитров для Ирины. Из 12 интервью по 20 минут полностью проверены 7; 3 размечены, но проверка не закончена; 2 ещё не начаты. Сдача согласована на 9 октября 2026 до 18:00 Asia/Novosibirsk. Не хватает расшифровок интервью №11 и №12; нужны от клиента до 5 октября. Если придут позже, потребуется пересогласовать срок, новый срок не определён. Договор 48 000 RUB; этот апдейт не является запросом оплаты. Перевод на английский исключён.",
+      "criteria": [
+        "Preserve 12 interviews of 20 minutes EACH, fully checked 7, marked but not fully checked 3, unstarted 2.",
+        "Request transcripts for interviews #11 AND #12 by October 5.",
+        "Preserve status date October 2 2026 and agreed delivery October 9 2026 18:00 Asia/Novosibirsk.",
+        "Late transcripts require renegotiation; no new deadline is invented.",
+        "48,000 RUB contract is not a payment request; English translation is excluded, never completed.",
+        "Whole message uses expected language and tone, has no nonexistent words, invented facts, or exposed author instructions."
+      ]
+    },
+    {
+      "id": "U05-en",
+      "language": "en",
+      "tone": "neutral",
+      "progress_notes": "Status as of October 2, 2026, subtitle project for Irina. Of 12 interviews of 20 minutes each, 7 are fully checked; 3 are marked up but checking is unfinished; 2 have not been started. Delivery is agreed for October 9, 2026, by 18:00 Asia/Novosibirsk. Transcripts for interviews #11 and #12 are missing; they are needed from the client by October 5. If they arrive later, the deadline will need renegotiating; no new deadline has been determined. Contract: 48,000 RUB; this update is not a payment request. Translation into English is excluded.",
+      "criteria": [
+        "Preserve 12 interviews of 20 minutes EACH, fully checked 7, marked but not fully checked 3, unstarted 2.",
+        "Request transcripts for interviews #11 AND #12 by October 5.",
+        "Preserve status date October 2 2026 and agreed delivery October 9 2026 18:00 Asia/Novosibirsk.",
+        "Late transcripts require renegotiation; no new deadline is invented.",
+        "48,000 RUB contract is not a payment request; English translation is excluded, never completed.",
+        "Whole message uses expected language and tone, has no nonexistent words, invented facts, or exposed author instructions."
+      ]
+    },
+    {
+      "id": "U05-es",
+      "language": "es",
+      "tone": "neutral",
+      "progress_notes": "Estado al 2 de octubre de 2026 del proyecto de subtítulos para Irina. De 12 entrevistas de 20 minutos cada una, 7 están totalmente revisadas; 3 están marcadas, pero su revisión no ha terminado; 2 no se han iniciado. La entrega está acordada para el 9 de octubre de 2026 antes de las 18:00 Asia/Novosibirsk. Faltan las transcripciones de las entrevistas n.º 11 y n.º 12; el cliente debe enviarlas antes del 5 de octubre. Si llegan más tarde, habrá que renegociar el plazo; no se ha determinado uno nuevo. Contrato: 48 000 RUB; esta actualización no es una solicitud de pago. La traducción al inglés está excluida.",
+      "criteria": [
+        "Preserve 12 interviews of 20 minutes EACH, fully checked 7, marked but not fully checked 3, unstarted 2.",
+        "Request transcripts for interviews #11 AND #12 by October 5.",
+        "Preserve status date October 2 2026 and agreed delivery October 9 2026 18:00 Asia/Novosibirsk.",
+        "Late transcripts require renegotiation; no new deadline is invented.",
+        "48,000 RUB contract is not a payment request; English translation is excluded, never completed.",
+        "Whole message uses expected language and tone, has no nonexistent words, invented facts, or exposed author instructions."
+      ]
+    }
+  ],
+  "models": [
+    "openai/gpt-6-luna",
+    "openai/gpt-6.1-terra",
+    "openai/gpt-6.1-sol"
+  ],
+  "reasoning": [
+    "medium",
+    "high"
+  ],
+  "repeats": 5,
+  "minimum_usable": 4,
+  "max_median_ui_ms": 60000,
+  "max_critical_errors": 0
+}

@@ -548,8 +548,10 @@ def test_prepaid_request_prompt_forbids_invented_dates_without_a_due_date() -> N
             (
                 "Do not offer or imply anything",
                 "keep a limit or condition it names as agreed with the client",
-                "Internal notes (the freelancer's own costs, subcontractors, private figures)",
-                "leave them out unless `situation` says to share them",
+                "The freelancer's own costs, margins, subcontractors and private figures "
+                "remain private unless `situation` explicitly authorizes sharing those details",
+                "A request to explain progress or contradictions does not authorize disclosing "
+                "private business information",
             ),
         ),
         (
@@ -590,12 +592,14 @@ def test_reply_prompts_keep_agreed_terms_and_exclusions(
         "numbers together with their units and the thing they count, "
         "identifiers and scope exclusions",
         "which facts must be included is set by the completeness rule below",
-        "does not override `constraints.max_length`, the internal-note disclosure rule below, "
+        "does not override `constraints.max_length`, the private-business disclosure rule below, "
         "or the author-direction rule above",
-        "Internal details may be shared only when `situation` explicitly says to share them",
-        "author directions are followed, never reported",
-        "Internal notes (the freelancer's own costs, subcontractors, private figures)",
-        "leave them out unless `situation` says to share them",
+        'The label "internal note" does not by itself make project progress, readiness '
+        "or acceptance results private",
+        "unless the author explicitly forbids sharing that status",
+        "Author directions are followed, never reported",
+        "The freelancer's own costs, margins, subcontractors and private figures remain private",
+        "unless `situation` explicitly authorizes sharing those details",
         "Do not turn an agreed or planned step into a finished one",
         'change "12 interviews of 20 minutes" into "12-minute intervals" or "sections"',
         "call finished or done anything `situation` excludes from the scope",
@@ -629,9 +633,10 @@ def test_update_prompt_requires_every_client_facing_fact_and_names_unknowns() ->
         "the concrete findings made so far (such as mismatched article numbers)",
         "not known yet, not counted or cannot be estimated, say so in those terms",
         "do not leave it out and do not fill it in",
-        "The internal-note disclosure rule below still applies",
+        "The private-business disclosure rule below still applies",
         "the freelancer's directions to you are followed, never reported",
-        "leave them out unless `situation` says to share them",
+        "private figures remain private unless `situation` explicitly authorizes "
+        "sharing those details",
         "`constraints.max_length` still applies",
         "keep requests, blockers and the next step before detail",
         "the author-direction rule above wins",

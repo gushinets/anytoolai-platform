@@ -9,6 +9,10 @@ import json
 import re
 import zipfile
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
+
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("proposal_ai_eval", REPO_ROOT / "scripts" / "agent" / "proposal_ai_eval.py")
@@ -20,6 +24,51 @@ FIXTURE = json.loads(proposal_ai_eval.ORDERS_PATH.read_text(encoding="utf-8"))
 PROFILE = FIXTURE["freelancer_positioning"]
 EN_ORDER = {"task_text": "Need Make.com scenarios for Telegram. Budget $150.", "expect_language": "en", "expect_gap": False}
 CLEAN = "I build Make.com and n8n automations with Telegram bots.\n\nI can start this week and will confirm the plan after a short call."
+
+
+@pytest.mark.parametrize(
+    "project",
+    [
+        "", "-local", "_local", "--help", "--privileged", "Local", " local", "local ",
+        "local name", "local\n", "local\r\n", "local\tname", "local\x00name", "local/name",
+        "local\\name", "local.name", "local:name", "local;id", "$(id)", "`id`", "local|id",
+        "local&name", "локальный", "１local",
+    ],
+)
+def test_docker_rejects_invalid_project_without_subprocess(project: str) -> None:
+    with patch.object(proposal_ai_eval.subprocess, "run") as run:
+        with pytest.raises(ValueError, match="invalid Compose project name"):
+            proposal_ai_eval._docker(project, "platform-worker", "cat", "/app/router.yaml")
+        run.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "project", ["local", "a", "1", "my-project_2", "a-", "a_", "anytoolai-e986bbcb"]
+)
+def test_docker_accepts_compose_names_and_separates_options(project: str) -> None:
+    command = ("printf", "%s", "a value; $(literal)")
+    with patch.object(
+        proposal_ai_eval.subprocess, "run", return_value=SimpleNamespace(stdout="container output")
+    ) as run:
+        assert proposal_ai_eval._docker(project, "platform-worker", *command) == "container output"
+    run.assert_called_once_with(
+        ["docker", "exec", "--", f"{project}-platform-worker-1", *command],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+
+
+def test_docker_uses_the_parsed_project_operand() -> None:
+    with (
+        patch.object(proposal_ai_eval, "_parse_compose_project", return_value="parsed-project")
+        as parse,
+        patch.object(proposal_ai_eval.subprocess, "run") as run,
+    ):
+        proposal_ai_eval._docker("original-project", "postgres", "true")
+    parse.assert_called_once_with("original-project")
+    assert run.call_args.args[0] == ["docker", "exec", "--", "parsed-project-postgres-1", "true"]
 
 
 def violations(text: str, gaps: list | None = None, order: dict = EN_ORDER, profile: str = PROFILE) -> set[str]:
@@ -887,3 +936,51 @@ def test_review_asks_again_for_the_general_answer_that_a_critical_detail_contrad
     last = proposal_ai_eval.read_jsonl(tmp_path / "verdicts.jsonl")[-1]
     assert last["criterion_id"] == "no-critical-error" and last["decision"]["answer"] == "no"
     assert last["decision"]["violation_type"] == "unagreed_term_accepted"
+
+
+@pytest.mark.parametrize("failed_command", ["rev-parse", "status"])
+def test_git_state_propagates_failures_instead_of_claiming_clean(failed_command):
+    def git(command, **kwargs):
+        assert kwargs["check"] is True
+        assert kwargs["cwd"] == Path(proposal_ai_eval.__file__).resolve().parents[2]
+        if command[1] == failed_command:
+            raise proposal_ai_eval.subprocess.CalledProcessError(128, command)
+        return SimpleNamespace(stdout="revision-A\n")
+
+    with (
+        patch.object(proposal_ai_eval.subprocess, "run", side_effect=git),
+        pytest.raises(proposal_ai_eval.subprocess.CalledProcessError),
+    ):
+        proposal_ai_eval._git_state()
+
+
+def test_failed_delivery_does_not_reduce_proposal_latency(tmp_path, capsys):
+    runs = attempts(5)
+    for run, latency in zip(runs, [50000, 55000, 80000, 90000, 0], strict=True):
+        run["origin"]["ui_latency_ms"] = latency
+    failed = runs[-1]
+    failed.update(session_id=None, output=None, runtime_status="ui_error", error="start failed")
+    failed["origin"]["ui_outcome"] = "error"
+    trace = _zip({"trace.trace": "{}", "trace.network": "GET /products/proposal_ai"})
+    failed["origin"]["trace_sha256"] = hashlib.sha256(trace).hexdigest()
+    code, out = run_accept(
+        tmp_path, runs, confirmed(runs[:4]), capsys, program=GRID, traces={"r4": trace}
+    )
+    assert code == 1 and "median latency 67.5 s above 60 s" in out
+    assert "4/5 | PASS" in out
+
+
+def test_unreadable_proposal_trace_is_missing_proof(tmp_path, capsys):
+    runs = attempts(3)
+    suite = write_suite(tmp_path, runs, confirmed(runs))
+    original = Path.read_bytes
+
+    def read_bytes(path):
+        if path.suffix == ".zip":
+            raise PermissionError("trace unreadable")
+        return original(path)
+
+    with patch.object(Path, "read_bytes", read_bytes):
+        assert proposal_ai_eval.main(["accept", "--suite", str(suite)]) == 1
+    out = capsys.readouterr().out
+    assert out.startswith("# Suite t: PENDING") and "browser artifact unreadable" in out

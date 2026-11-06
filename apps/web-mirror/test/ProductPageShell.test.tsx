@@ -501,6 +501,56 @@ describe("All tools link", () => {
   const en = PROPOSAL_AI_MESSAGES.en;
   const host = HOST_MESSAGES.en.nav;
 
+  it("unlocks modes and removes the busy warning after a definite capacity rejection", async () => {
+    const routes = routesFor(CUW_IDS);
+    const { calls } = renderShell(registered(CUW_IDS.productId), {
+      ...bootRoutes(CUW_IDS),
+      [routes.START]: [errorResponse(429, "quota_capacity_reserved")],
+    });
+    fireEvent.change(await screen.findByLabelText("Progress notes"), {
+      target: { value: "Finished the first milestone." },
+    });
+    fireEvent.click(screen.getByRole("radio", { name: "neutral" }));
+    fireEvent.click(screen.getByRole("button", { name: "Write update" }));
+    await screen.findByText("Capacity is temporarily in use. Please try again shortly.");
+    expect(screen.queryByText(host.runInProgress)).toBeNull();
+    for (const name of ["Update", "Reply Draft", "Prepaid Request"]) {
+      expect((screen.getByRole("radio", { name }) as HTMLInputElement).disabled).toBe(false);
+    }
+    fireEvent.click(screen.getByRole("radio", { name: "Reply Draft" }));
+    await screen.findByLabelText("Client message");
+    expect((screen.getByRole("radio", { name: "Reply Draft" }) as HTMLInputElement).checked).toBe(true);
+    expect(calls.filter((call) => call.key === routes.START)).toHaveLength(1);
+  });
+
+  it.each([
+    { status: 429, code: "quota_capacity_reserved" },
+    { status: 404, code: "scenario_not_found" },
+  ])("keeps modes and the busy warning locked after an uncertain start then $code", async ({ status, code }) => {
+    const routes = routesFor(CUW_IDS);
+    const { calls } = renderShell(registered(CUW_IDS.productId), {
+      ...bootRoutes(CUW_IDS),
+      [routes.START]: [
+        new Response("<html>Gateway timeout</html>", { status: 504 }),
+        errorResponse(status, code),
+      ],
+    });
+    fireEvent.change(await screen.findByLabelText("Progress notes"), {
+      target: { value: "Finished the first milestone." },
+    });
+    fireEvent.click(screen.getByRole("radio", { name: "neutral" }));
+    fireEvent.click(screen.getByRole("button", { name: "Write update" }));
+    await screen.findByRole("button", { name: "Try again" });
+    expect(screen.getByRole("tooltip").textContent).toBe(host.runInProgress);
+    for (const name of ["Update", "Reply Draft", "Prepaid Request"]) {
+      expect((screen.getByRole("radio", { name }) as HTMLInputElement).disabled).toBe(true);
+    }
+    fireEvent.click(screen.getByRole("radio", { name: "Reply Draft" }));
+    expect(screen.getByLabelText("Progress notes")).toBeTruthy();
+    expect(screen.queryByLabelText("Client message")).toBeNull();
+    expect(calls.filter((call) => call.key === routes.START)).toHaveLength(2);
+  });
+
   function renderProposal() {
     const routes = routesFor(PROPOSAL_IDS);
     const { client, resolveDeferred } = makeClientWithDeferredRoute(bootRoutes(PROPOSAL_IDS), routes.START);
