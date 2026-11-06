@@ -432,7 +432,7 @@ test("object array summaries preserve edits and reveal invalid or newly added co
   await expect(page.getByLabel("category", {exact: true})).toBeFocused();
 });
 
-for (const state of ["replacement-get-before", "replacement-get-after", "replacement-refresh-failed", "replacement-read-failed", "replacement-text", "replacement-source", "owner-text", "owner-source", "other-atom", "new-catalog", "new-catalog-cancelled", "owner-unchanged"]) {
+for (const state of ["replacement-get-before", "replacement-get-after", "replacement-refresh-failed", "replacement-read-failed", "replacement-unloaded", "replacement-source-pending", "replacement-name", "replacement-text", "replacement-source", "owner-name", "owner-name-whitespace", "owner-text", "owner-source", "other-atom", "new-catalog", "new-catalog-cancelled", "owner-unchanged"]) {
   test(`a confirmed prompt save synchronizes the library for ${state}`, async ({page}) => {
     const product = {ref: "product.a06.v1", name: "Продуктовый", prompt: "Текст продукта", group: "product", source_ref: null, source_run_id: null};
     let reads = 0;
@@ -440,11 +440,13 @@ for (const state of ["replacement-get-before", "replacement-get-after", "replace
     let payload;
     let completeSave;
     let completeRead;
+    let writes = 0;
     const saveGate = new Promise(resolve => { completeSave = resolve; });
     const readGate = new Promise(resolve => { completeRead = resolve; });
     await page.route("http://atom-lab.test/v1/atom-lab/atoms/*/prompts", async route => {
       const atom = catalog().find(item => route.request().url().includes(`/atoms/${item.atom_id}/`));
       if (route.request().method() === "POST") {
+        writes += 1;
         payload = route.request().postDataJSON();
         await saveGate;
         saved = {ref: "lab.confirmed", group: "lab", ...payload};
@@ -462,9 +464,21 @@ for (const state of ["replacement-get-before", "replacement-get-after", "replace
           return;
         }
         if (reads === 2 && ["replacement-get-after", "replacement-refresh-failed"].includes(state)) await readGate;
+        if (reads >= 2 && state === "replacement-source-pending") await readGate;
       }
       await route.fulfill({json: options});
     });
+    if (state === "replacement-source-pending") {
+      const detail = historyDetail();
+      detail.snapshot.prompt.source_ref = product.ref;
+      await page.route("http://atom-lab.test/v1/atom-lab/runs**", route => route.fulfill({json:
+        new URL(route.request().url()).pathname === "/v1/atom-lab/runs" ? {items: [{
+          run_id: detail.run_id, atom_id: "A06", status: "succeeded", created_at: detail.created_at,
+          model_id: "openai/gpt-supported", preset_id: null, preset_version: null,
+          started_at: detail.started_at, finished_at: detail.finished_at,
+        }], next_cursor: null} : detail,
+      }));
+    }
     await unlockAtom(page, "A06");
     await page.locator("#prompt-tab").click();
     await expect(page.locator("#save-prompt")).toBeEnabled();
@@ -474,13 +488,23 @@ for (const state of ["replacement-get-before", "replacement-get-after", "replace
     const posted = page.waitForRequest(request => request.method() === "POST" && request.url().endsWith("/A06/prompts"));
     await page.locator("#save-prompt").click();
     await posted;
-    if (state.startsWith("replacement") || state === "other-atom") {
+    if (state === "replacement-source-pending") {
+      await page.locator("#history-button").click();
+      await page.locator("#history-list .history-open").click();
+      page.once("dialog", dialog => dialog.accept());
+      await page.locator("#restore-history").click();
+      await showWorkbench(page);
+      await page.locator("#prompt-tab").click();
+      await expect.poll(() => reads).toBe(2);
+    } else if (state.startsWith("replacement") || state === "other-atom") {
+      if (state === "replacement-unloaded") await page.locator("#input-tab").click();
       page.once("dialog", dialog => dialog.accept());
       await page.getByRole("button", {name: /A05/}).click();
       if (state !== "other-atom") {
-        const read = page.waitForRequest(request => request.method() === "GET" && request.url().endsWith("/A06/prompts"));
+        const read = state === "replacement-unloaded" ? null
+          : page.waitForRequest(request => request.method() === "GET" && request.url().endsWith("/A06/prompts"));
         await page.getByRole("button", {name: /A06/}).click();
-        await read;
+        if (read) await read;
       }
     }
     if (state.startsWith("new-catalog")) {
@@ -490,18 +514,34 @@ for (const state of ["replacement-get-before", "replacement-get-after", "replace
       if (state !== "new-catalog-cancelled") await page.getByRole("button", {name: /A06/}).click();
     }
     if (state === "replacement-read-failed") await expect(page.locator("#retry-prompts")).toBeVisible();
-    else if (!["replacement-get-after", "replacement-refresh-failed"].includes(state)) await expect(page.locator("#prompt-load-status")).toBeEmpty();
+    else if (!["replacement-get-after", "replacement-refresh-failed", "replacement-source-pending"].includes(state)) await expect(page.locator("#prompt-load-status")).toBeEmpty();
     if (state.endsWith("source")) {
       if (state.startsWith("owner")) page.once("dialog", dialog => dialog.accept());
       await page.locator("#prompt-select").selectOption(product.ref);
       await page.locator("#prompt-editor").fill(payload.prompt);
     }
     if (state.endsWith("text")) await page.locator("#prompt-editor").fill("Новая правка во время сохранения");
+    const editedName = state === "owner-name-whitespace" ? ` ${payload.name} ` : "Новое название";
+    if (state.includes("name")) {
+      if (state.startsWith("replacement")) await page.locator("#save-prompt-panel summary").click();
+      await page.locator("#save-prompt-name").fill(editedName);
+    }
     const currentText = await page.locator("#prompt-editor").inputValue();
     const currentRef = await page.locator("#run-prompt-ref").textContent();
     const accepted = page.waitForResponse(response => response.request().method() === "POST" && response.url().endsWith("/A06/prompts"));
     completeSave();
     await (await accepted).finished();
+    if (state === "replacement-source-pending") {
+      await expect.poll(() => reads).toBe(3);
+      await expect(page.locator('#prompt-select option[value="lab.confirmed"]')).toHaveCount(1);
+      await page.locator("#save-prompt-panel summary").click();
+      await page.locator("#save-prompt-name").fill("Ожидает источник");
+      await expect(page.locator("#save-prompt")).toBeDisabled();
+      await page.locator("#save-prompt-form").dispatchEvent("submit");
+      expect(writes).toBe(1);
+      completeRead();
+      await expect(page.locator("#prompt-load-status")).toBeEmpty();
+    }
     if (["replacement-refresh-failed", "replacement-read-failed"].includes(state)) {
       await expect(page.locator("#retry-prompts")).toBeVisible();
       await expect(page.locator('#prompt-select option[value="lab.confirmed"]')).toHaveCount(1);
@@ -530,18 +570,22 @@ for (const state of ["replacement-get-before", "replacement-get-after", "replace
       if (state.startsWith("owner")) {
         await expect(page.locator("#save-prompt")).toBeEnabled();
         await expect(page.locator("#save-prompt-panel")).toHaveAttribute("open");
-        await expect(page.locator("#save-prompt-name")).toHaveValue(payload.name);
+        await expect(page.locator("#save-prompt-name")).toHaveValue(state.includes("name") ? editedName : payload.name);
       }
+      if (state.includes("name")) await expect(page.locator("#save-prompt-name")).toBeFocused();
     }
     await page.locator("#input-tab").click();
     await page.locator("#prompt-tab").click();
     await expect(page.locator("#prompt-load-status")).toBeEmpty();
+    if (state === "replacement-unloaded") expect(reads).toBe(1);
     const differentScope = state === "other-atom" || state.startsWith("new-catalog");
     await expect(page.locator('#prompt-select option[value="lab.confirmed"]')).toHaveCount(differentScope ? 0 : 1);
     if (differentScope) return;
+    await page.locator("#save-prompt-panel").evaluate(panel => { panel.open = true; });
+    await expect(page.locator("#save-prompt")).toBeEnabled();
     await expect(page.locator("#prompt-editor")).toHaveValue(currentText);
     if (state !== "owner-unchanged") {
-      if (state.endsWith("text") || state.endsWith("source")) page.once("dialog", dialog => dialog.accept());
+      if (state.endsWith("text") || state.endsWith("source") || state.startsWith("owner-name") || state === "replacement-source-pending") page.once("dialog", dialog => dialog.accept());
       await page.locator("#prompt-select").selectOption("lab.confirmed");
     }
     await expect(page.locator("#prompt-editor")).toHaveValue(payload.prompt);
@@ -549,7 +593,55 @@ for (const state of ["replacement-get-before", "replacement-get-after", "replace
   });
 }
 
-for (const outcome of ["rejected", "malformed", "indeterminate"]) {
+for (const firstCompletion of ["previous", "current"]) {
+  test(`prompt saves preserve the current editable form when ${firstCompletion} completes first`, async ({page}) => {
+    const releases = [];
+    const writes = [];
+    await page.route("http://atom-lab.test/v1/atom-lab/atoms/*/prompts", async route => {
+      const atom = route.request().url().includes("/A06/") ? A06 : A05;
+      if (route.request().method() === "GET") {
+        await route.fulfill({json: [{
+          ref: atom.prompt_ref, name: "Платформенный", prompt: atom.prompt,
+          group: "platform", source_ref: null, source_run_id: null,
+        }]});
+        return;
+      }
+      const payload = route.request().postDataJSON();
+      const index = writes.push(payload) - 1;
+      await new Promise(resolve => { releases[index] = resolve; });
+      await route.fulfill({status: 201, json: {ref: `lab.saved.${index}`, group: "lab", ...payload}});
+    });
+    await unlockAtom(page, "A06");
+    for (const name of ["Предыдущее название", "Текущее название"]) {
+      await page.locator("#prompt-tab").click();
+      await page.locator("#save-prompt-panel summary").click();
+      await page.locator("#save-prompt-name").fill(name);
+      await page.locator("#save-prompt").click();
+      await expect.poll(() => writes.length).toBe(name === "Предыдущее название" ? 1 : 2);
+      if (writes.length === 1) {
+        await page.locator("#input-tab").click();
+        await page.getByRole("button", {name: /A05/}).click();
+        await page.getByRole("button", {name: /A06/}).click();
+      }
+    }
+    await page.locator("#save-prompt-name").fill("Новое текущее название");
+    const order = firstCompletion === "previous" ? [0, 1] : [1, 0];
+    for (const index of order) {
+      releases[index]();
+      await expect(page.locator(`#prompt-select option[value="lab.saved.${index}"]`)).toHaveCount(1);
+      await expect(page.locator("#save-prompt-name")).toHaveValue("Новое текущее название");
+      await expect(page.locator("#save-prompt-name")).toBeFocused();
+      if (index === 0 && firstCompletion === "previous") await expect(page.locator("#save-prompt")).toBeDisabled();
+    }
+    await expect(page.locator("#save-prompt")).toBeEnabled();
+    await expect(page.locator("#save-prompt-panel")).toHaveAttribute("open");
+    await expect(page.locator("#prompt-select")).toHaveValue(A06.prompt_ref);
+    await expect(page.locator("#prompt-editor")).toHaveValue(A06.prompt);
+    expect(writes.map(payload => payload.name)).toEqual(["Предыдущее название", "Текущее название"]);
+  });
+}
+
+for (const outcome of ["rejected", "unavailable", "malformed", "indeterminate"]) {
   test(`a ${outcome} prompt write preserves the current draft without a confirmed option`, async ({page}) => {
     await page.route("http://atom-lab.test/v1/atom-lab/atoms/A06/prompts", async route => {
       if (route.request().method() === "GET") await route.fulfill({json: [{
@@ -557,6 +649,9 @@ for (const outcome of ["rejected", "malformed", "indeterminate"]) {
       }]});
       else if (outcome === "rejected") await route.fulfill({status: 422, json: {error: {
         code: "prompt_invalid", message: "Промпт не прошёл проверку.",
+      }}});
+      else if (outcome === "unavailable") await route.fulfill({status: 503, json: {error: {
+        code: "lab_unavailable", message: "Промпт Atom Lab не может быть сохранён.",
       }}});
       else if (outcome === "malformed") await route.fulfill({status: 201, json: {}});
       else await route.abort("failed");
