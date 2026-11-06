@@ -10,6 +10,73 @@
 - Next action: parent review, commit and push, then fresh independent Astra review and CI.
 - Blocker: none.
 
+Fresh review follow-up (2026-11-07, HEAD `35dc87daefa8e6668aae6654a2a326bcb5144b66`):
+repair three new P2 findings after the previous 29 roots passed independent review.
+Before source edits, reproduce missing default-platform source in the actual run
+submission, late successful completion after the same owner receives a new atom
+identity, and cached-source selection bypassing a failed authoritative contract
+refresh. Freeze the effective source and submitted atom identity, and keep contract
+validation pending separately from recoverable source selection. Cover platform
+and preserved product sources, stable retries, incompatible schema/action/config,
+failed reads, stale events and successful Retry. Preserve detached-source semantics,
+raw drafts and all existing materialization/history/proof behavior.
+
+Owned scope is `atom_lab.mjs`, its Node/browser tests and this plan. Doctor passed
+with the managed Python before edits. Run focused connected regressions, then one
+final canonical frontend-check and docs/generation/diff checks. No backend, DB,
+migration, provider, dependency, CI, staging, commit, push or GitHub writes. Parent
+owns fresh independent review and publication; never merge.
+
+The three follow-up roots reproduced before production edits: two Node failures
+for the actual submission payload/identity (`.quick-check-tmp/p6-node-before.log`),
+11 Chromium failures with one unchanged-base positive control passing
+(`p6-browser-before.log`), and a separate cached-selector event that replaced the
+source after an incompatible schema (`p6-selection-before.log`).
+
+The submission now captures its effective source, preserving intentional detached
+drafts, and its original atom identity. Completed proof uses that identity while
+the live owner session retains its existing lifecycle. Contract-validation failures
+keep a separate lock: cached selection and synthetic events cannot clear it, and
+Retry rechecks authoritative atom compatibility even if a stale list contains the
+old platform base. Fully compatible reads clear both guards. Ordinary missing-source
+selection remains available. Existing owner/catalog/request-generation fences and
+explicit reopen/adaptation behavior are retained; no atom object mutates in place.
+
+All 54 Node tests and the final 107 connected Chromium cases passed
+(`.quick-check-tmp/p6-node-after.log`, `p6-focused-final.log`). Twelve new browser
+cases and eight strengthened existing contract negatives cover the submitted
+platform/product sources, stable retry, late completion, stale compatible and
+incompatible Retry responses, cached lists, read 503, invalid options, synthetic
+selection/run/save events, and ordinary retired-source selection. The unchanged
+materialization/history/proof and source/editor/catalog fences also passed.
+
+The first canonical frontend run reached all 277 browser cases and exposed three
+older exact-payload expectations missing the newly explicit platform source;
+274 passed. The two shared expectations now require `prompt_source_ref` without
+relaxing equality; all three affected journeys passed
+(`.quick-check-tmp/p6-payload-expectations-fixed.log`). The original run is retained
+as `p6-frontend-check-payload-expectations.log`; the final canonical check reruns
+after these fixture-only updates. Production source remains unchanged.
+
+The final managed `frontend-check` exited zero after the last source/test edits:
+lint, typecheck, all 277 Chromium journeys, 54 Atom Lab Node tests, six demo Node
+tests, 824 Vitest tests, generated API-type drift and production builds passed.
+Evidence: `.quick-check-tmp/p6-frontend-check-final.log`. The established identical
+command escalation was needed for the existing external pnpm-store symlink; the
+installed Chromium cache and bundled LiteLLM cost map were used. No assertions,
+skips, retries, dependencies, thresholds or configuration were weakened.
+
+`validate-docs`, `generate-docs --check` and `git diff --check` passed. Evidence:
+`.quick-check-tmp/p6-validate-docs.log` and `p6-generate-docs-check.log`. The generated
+docs check used the unchanged approved escalation after Windows sandbox Temp
+cleanup denied access; the initial error is in `p6-generate-docs-temp-acl.log`.
+Only the four owned files
+changed; staging remains empty, HEAD stays `35dc87daefa8e6668aae6654a2a326bcb5144b66`
+and unrelated reports remain untouched. Backend/PostgreSQL/provider checks were
+not repeated for this UI-only repair; no working DB, migrations or paid/live calls
+were used. Parent owns review, commit/push and CI. The two previously deferred
+save-idempotency and library-pagination follow-ups stay separate; never merge.
+
 Scope: address [PR #259](https://github.com/gushinets/anytoolai-platform/pull/259)
 Astra review findings 1–8 without changing product runtime,
 working acceptance data, or the unrelated experiment files.

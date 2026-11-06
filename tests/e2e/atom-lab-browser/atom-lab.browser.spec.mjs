@@ -1588,6 +1588,7 @@ test("one accepted submission survives draft edits and renders safe result diagn
     atom_id: "A05",
     input: A05.example_input,
     prompt: A05.prompt,
+    prompt_source_ref: A05.prompt_ref,
     model_id: "openai/gpt-supported",
     reasoning_effort: "high",
     preset_ref: null,
@@ -2083,6 +2084,118 @@ test("admission rejection keeps the draft, hides transport retry, and a new laun
   expect(keys[0]).not.toBe(keys[1]);
 });
 
+for (const replay of [false, true]) {
+  test(`default platform run source stays frozen across publication${replay ? " and idempotent retry" : ""}`, async ({page}) => {
+    page.on("dialog", dialog => dialog.accept());
+    const fresh = {...A06, prompt_ref: "prompt.a06.v2", prompt: "Опубликованная платформа v2"};
+    let published = false;
+    const submissions = [];
+    await page.route("http://atom-lab.test/v1/atom-lab/atoms/A06**", async route => {
+      const atom = published ? fresh : A06;
+      await route.fulfill({json: new URL(route.request().url()).pathname.endsWith("/prompts") ? [{
+        ref: atom.prompt_ref, name: "Платформа", prompt: atom.prompt, group: "platform", source_ref: null, source_run_id: null,
+      }] : atom});
+    });
+    await page.route("http://atom-lab.test/v1/atom-lab/runs", async route => {
+      const payload = route.request().postDataJSON();
+      submissions.push({payload, key: route.request().headers()["idempotency-key"]});
+      if (replay && submissions.length === 1) {
+        await route.abort("connectionfailed");
+      } else if (payload.prompt_source_ref === A06.prompt_ref) {
+        await route.fulfill({status: 422, json: {error: {
+          code: "prompt_source_invalid", message: "Старая основа недоступна.",
+          field_errors: [{path: "prompt_source_ref", message: "Старая основа недоступна."}],
+        }, request_id: "published-platform"}});
+      } else {
+        await route.fulfill({status: 422, json: {error: {
+          code: "input_invalid", message: "Контроль следующего запуска.", field_errors: [],
+        }, request_id: "next-platform"}});
+      }
+    });
+    await unlockAtom(page, "A06");
+    await page.locator("#fill-example").click();
+    await page.locator("#prompt-tab").click();
+    await expect(page.locator("#save-prompt")).toBeEnabled();
+    await page.locator("#prompt-editor").fill("Правка опубликованного v1");
+    published = true;
+    await page.locator("#run-button").click();
+    if (replay) {
+      await expect(page.locator("#retry-submit")).toBeVisible();
+      await page.locator("#prompt-editor").fill("Новая правка во время повтора");
+      await page.locator("#retry-submit").click();
+      expect(submissions[1]).toEqual(submissions[0]);
+    }
+    await expect(page.locator("#run-state")).toContainText("prompt_source_invalid");
+    await expect(page.locator("#prompt-select")).toHaveValue(fresh.prompt_ref);
+    await expect(page.locator("#prompt-editor")).toHaveValue(replay ? "Новая правка во время повтора" : "Правка опубликованного v1");
+    await expect(page.locator("#run-button")).toBeEnabled();
+    await page.locator("#run-button").click();
+    await expect(page.locator("#run-state")).toContainText("Контроль следующего запуска");
+    expect(submissions[0].payload.prompt_source_ref).toBe(A06.prompt_ref);
+    expect(submissions.at(-1).payload.prompt_source_ref).toBeUndefined();
+    expect(submissions.at(-1).key).not.toBe(submissions[0].key);
+  });
+}
+
+for (const source of ["platform", "product"]) {
+  for (const changedBase of [false, true]) {
+    test(`late trial completion keeps submitted ${source} atom identity with ${changedBase ? "a new" : "the same"} base`, async ({page}) => {
+      let published = false;
+      let submitted;
+      let saved;
+      let completeRun;
+      const completion = new Promise(resolve => { completeRun = resolve; });
+      const fresh = {...A06, prompt_ref: "prompt.a06.v2"};
+      const product = {ref: "product.a06.v1", name: "Продукт", prompt: "Текст продукта", group: "product", source_ref: null, source_run_id: null};
+      const atom = () => published && changedBase ? fresh : A06;
+      await page.route("http://atom-lab.test/v1/atom-lab/atoms/A06**", async route => {
+        if (route.request().method() === "POST") {
+          saved = route.request().postDataJSON();
+          await route.fulfill({json: {...product, ...saved, ref: "lab.late-trial", group: "lab"}});
+        } else await route.fulfill({json: new URL(route.request().url()).pathname.endsWith("/prompts") ? [{
+          ref: atom().prompt_ref, name: "Платформа", prompt: atom().prompt, group: "platform", source_ref: null, source_run_id: null,
+        }, product] : atom()});
+      });
+      await page.route("http://atom-lab.test/v1/atom-lab/runs", async route => {
+        submitted = route.request().postDataJSON();
+        await route.fulfill({status: 202, json: {run_id: "run-old-base", scenario_session_id: "session-library", job_id: "job-library", status: "queued"}});
+      });
+      await page.route("http://atom-lab.test/v1/atom-lab/runs/run-old-base", async route => {
+        await completion;
+        const detail = historyDetail({runId: "run-old-base", input: submitted.input, prompt: submitted.prompt});
+        detail.snapshot.prompt.source_ref = submitted.prompt_source_ref;
+        await route.fulfill({json: detail});
+      });
+      await unlockAtom(page, "A06");
+      await page.locator("#fill-example").click();
+      await page.locator("#reasoning-effort").selectOption("high");
+      if (source === "product") {
+        await page.locator("#prompt-tab").click();
+        await page.locator("#prompt-select").selectOption(product.ref);
+        await page.locator("#prompt-editor").fill("Проверяемый текст продукта");
+      }
+      await page.locator("#run-button").click();
+      await expect(page.locator("#run-state")).toHaveText("Ожидает запуска");
+      published = true;
+      if (source === "product") await page.locator("#retry-prompts").dispatchEvent("click");
+      else await page.locator("#prompt-tab").click();
+      await expect(page.locator("#prompt-load-status")).toBeEmpty();
+      await expect(page.locator("#prompt-select")).toHaveValue(source === "product" ? product.ref : atom().prompt_ref);
+      completeRun();
+      await expect(page.locator("#run-state")).toHaveText("Завершён успешно");
+      if (changedBase) await expect(page.locator("#prompt-test-status")).not.toContainText("Ответ прошёл контракт");
+      else await expect(page.locator("#prompt-test-status")).toContainText("Ответ прошёл контракт");
+      await page.locator("#save-prompt-panel summary").click();
+      await page.locator("#save-prompt-name").fill("Проверка позднего ответа");
+      await page.locator("#save-prompt").click();
+      await expect(page.locator("#save-prompt-status")).toContainText("Сохранён промпт");
+      expect(saved.source_ref).toBe(source === "product" ? product.ref : atom().prompt_ref);
+      expect(saved.source_run_id).toBe(changedBase ? null : "run-old-base");
+      expect(submitted.prompt_source_ref).toBe(source === "product" ? product.ref : A06.prompt_ref);
+    });
+  }
+}
+
 async function prepareRejectedSourceWrite(page, kind, {historyAtom = "A05"} = {}) {
   page.on("dialog", dialog => dialog.accept());
   const platform = {ref: A06.prompt_ref, name: "Платформенный", prompt: A06.prompt, group: "platform", source_ref: null, source_run_id: null};
@@ -2405,6 +2518,15 @@ for (const change of ["input-ref", "input-content", "output", "config", "action"
       ? "Атом вернул некорректный ответ" : change === "claimed-platform"
         ? "Список промптов вернул некорректный ответ" : "Контракт атома изменился");
     await expect(save).toBeDisabled();
+    await page.locator("#prompt-select").evaluate((picker, ref) => {
+      picker.value = ref;
+      picker.dispatchEvent(new Event("change", {bubbles: true}));
+    }, A06.prompt_ref);
+    await expect(page.locator("#prompt-select")).toHaveValue("product.a06.v1");
+    await expect(page.locator("#prompt-select")).toBeDisabled();
+    await expect(page.locator("#retry-prompts")).toBeVisible();
+    await expect(page.locator("#run-button")).toBeDisabled();
+    await page.locator("#run-button").dispatchEvent("click");
     await save.dispatchEvent("click");
     await expect(page.locator("#prompt-editor")).toHaveValue("Ручной текст владельца");
     await expect(name).toHaveValue("  Имя владельца  ");
@@ -2415,6 +2537,123 @@ for (const change of ["input-ref", "input-content", "output", "config", "action"
     expect(state.writes).toHaveLength(1);
   });
 }
+
+for (const change of ["schema", "action", "config"]) {
+  test(`contract lock survives cached selection and stale lists after ${change}, then compatible Retry recovers`, async ({page}) => {
+    const {state, product, save, name} = await prepareRejectedSourceWrite(page, "prompt");
+    const fresh = structuredClone({...A06, prompt_ref: "prompt.a06.v2"});
+    const incompatible = structuredClone(fresh);
+    if (change === "schema") incompatible.schema_refs.input.version += 1;
+    if (change === "action") incompatible.action_type = "kernel.changed_action";
+    if (change === "config") incompatible.base_action_config_id = "config.a06.v2";
+    state.authoritativeAtom = incompatible;
+    await save.click();
+    await expect(page.locator("#prompt-load-status")).toContainText("Контракт атома изменился");
+    await expect(page.locator("#prompt-select")).toBeDisabled();
+    const cached = [{...product, ref: A06.prompt_ref, group: "platform", prompt: A06.prompt}, product];
+    state.optionsOverride = cached;
+    await page.locator("#retry-prompts").click();
+    await expect.poll(() => state.atomReads).toBe(2);
+    await expect(page.locator("#prompt-load-status")).toContainText("Контракт атома изменился");
+    state.atomStatus = 503;
+    await page.locator("#retry-prompts").click();
+    await expect.poll(() => state.atomReads).toBe(3);
+    await expect(page.locator("#prompt-load-status")).toContainText("Атом временно недоступен");
+    state.optionsOverride = [{}];
+    await page.locator("#retry-prompts").click();
+    await expect(page.locator("#prompt-load-status")).toContainText("Список промптов вернул некорректный ответ");
+    await expect(page.locator("#run-button")).toBeDisabled();
+    await expect(save).toBeDisabled();
+    await expect(page.locator("#prompt-editor")).toHaveValue("Ручной текст владельца");
+    await expect(name).toHaveValue("  Имя владельца  ");
+    expect(state.writes).toHaveLength(1);
+
+    state.atomStatus = 200;
+    state.authoritativeAtom = fresh;
+    state.optionsOverride = [{...product, ref: fresh.prompt_ref, group: "platform", prompt: fresh.prompt}, product];
+    let release;
+    state.atomGate = new Promise(resolve => { release = resolve; });
+    await page.locator("#retry-prompts").click();
+    await expect.poll(() => state.atomReads).toBe(4);
+    await page.locator("#prompt-select").evaluate((picker, ref) => {
+      picker.value = ref;
+      picker.dispatchEvent(new Event("change", {bubbles: true}));
+    }, A06.prompt_ref);
+    await expect(page.locator("#prompt-select")).toHaveValue(product.ref);
+    await expect(save).toBeDisabled();
+    release();
+    await expect(page.locator("#prompt-select")).toBeEnabled();
+    await expect(page.locator("#prompt-select")).toHaveValue(product.ref);
+    await expect(page.locator("#run-button")).toBeEnabled();
+    await expect(page.locator("#prompt-load-status")).toBeEmpty();
+    await expect(page.locator("#retry-prompts")).toBeHidden();
+    await expect(save).toBeEnabled();
+    await save.click();
+    await expect(page.locator("#save-prompt-status")).toContainText("Сохранён промпт");
+    expect(state.writes[1].payload).toMatchObject({prompt: "Ручной текст владельца", source_ref: product.ref, source_run_id: null});
+  });
+}
+
+for (const staleCompatible of [false, true]) {
+  test(`contract lock ignores a stale ${staleCompatible ? "compatible" : "incompatible"} authoritative Retry response`, async ({page}) => {
+    const {state, save, product} = await prepareRejectedSourceWrite(page, "prompt");
+    const fresh = {...A06, prompt_ref: "prompt.a06.v2"};
+    const incompatible = {...fresh, base_action_config_id: "config.a06.v2"};
+    state.authoritativeAtom = fresh;
+    state.optionsOverride = [{...product, ref: fresh.prompt_ref, group: "platform"}, product];
+    let releaseStale;
+    const staleGate = new Promise(resolve => { releaseStale = resolve; });
+    const replies = [incompatible, staleCompatible ? fresh : incompatible, staleCompatible ? incompatible : fresh, fresh];
+    let reads = 0;
+    await page.route("http://atom-lab.test/v1/atom-lab/atoms/A06", async route => {
+      const index = reads++;
+      if (index === 1) await staleGate;
+      await route.fulfill({json: replies[index]});
+    });
+    await save.click();
+    await expect(page.locator("#prompt-load-status")).toContainText("Контракт атома изменился");
+    await page.locator("#retry-prompts").click();
+    await expect.poll(() => reads).toBe(2);
+    await page.locator("#retry-prompts").dispatchEvent("click");
+    await expect.poll(() => reads).toBe(3);
+    if (staleCompatible) await expect(page.locator("#prompt-load-status")).toContainText("Контракт атома изменился");
+    else await expect(save).toBeEnabled();
+    const staleResponse = page.waitForResponse("**/v1/atom-lab/atoms/A06");
+    releaseStale();
+    await (await staleResponse).finished();
+    await page.locator("#prompt-editor").fill("Правка после старого ответа");
+    if (staleCompatible) {
+      await expect(page.locator("#prompt-select")).toBeDisabled();
+      await expect(page.locator("#run-button")).toBeDisabled();
+      await expect(page.locator("#retry-prompts")).toBeVisible();
+      await page.locator("#retry-prompts").click();
+    }
+    await expect(page.locator("#prompt-select")).toBeEnabled();
+    await expect(page.locator("#run-button")).toBeEnabled();
+    await expect(page.locator("#prompt-load-status")).toBeEmpty();
+    await save.click();
+    await expect(page.locator("#save-prompt-status")).toContainText("Сохранён промпт");
+    expect(state.writes[1].payload).toMatchObject({prompt: "Правка после старого ответа", source_ref: product.ref, source_run_id: null});
+  });
+}
+
+test("ordinary retired source selection still recovers after a source-list read fails", async ({page}) => {
+  const {state, save} = await prepareRejectedSourceWrite(page, "prompt");
+  state.refreshStatus = 503;
+  await save.click();
+  await expect(page.locator("#prompt-load-status")).toContainText("Источники временно недоступны");
+  await expect(page.locator("#prompt-select")).toBeEnabled();
+  await expect(page.locator("#run-button")).toBeDisabled();
+  await page.locator("#prompt-select").selectOption(A06.prompt_ref);
+  await expect(page.locator("#run-button")).toBeEnabled();
+  await expect(page.locator("#prompt-load-status")).toBeEmpty();
+  await expect(page.locator("#retry-prompts")).toBeHidden();
+  await page.locator("#prompt-editor").fill("Явно выбранная платформа");
+  await save.click();
+  await expect(page.locator("#save-prompt-status")).toContainText("Сохранён промпт");
+  expect(state.writes[1].payload).toMatchObject({prompt: "Явно выбранная платформа", source_ref: A06.prompt_ref});
+  expect(state.atomReads).toBe(0);
+});
 
 for (const phase of ["write", "atom"]) {
   for (const change of ["source", "editor", "catalog"]) {
@@ -6352,6 +6591,7 @@ for (const draftState of ["clean", "dirty"]) {
     await expect(page.locator("#run-state")).toContainText("test_rejected");
     const expectedBody = {
       atom_id: stored.atom_id, input, prompt: stored.prompt,
+      prompt_source_ref: stored.prompt_ref,
       model_id: stored.model_id, reasoning_effort: stored.reasoning_effort,
       preset_ref: {preset_id: stored.preset_id, version: stored.version},
     };
