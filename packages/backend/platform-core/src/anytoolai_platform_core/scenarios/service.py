@@ -124,12 +124,7 @@ LIVE_CANARY_TOKEN_ENV_VAR = "ANYTOOLAI_LIVE_CANARY_TOKEN"
 
 
 def _live_canary_token_is_valid(provided: str | None) -> bool:
-    """Gate for ScenarioDefinition.internal_only (ANY-221's 14 kernel_demo "_live_" canary
-    scenarios, real billed OpenAI calls) -- see start_session()'s own check. Fails closed: if the
-    server itself hasn't been configured with a real ANYTOOLAI_LIVE_CANARY_TOKEN, nothing can ever
-    match it, so an unconfigured deployment can never accidentally serve an internal_only scenario
-    to any caller. secrets.compare_digest avoids a timing side-channel on the comparison, the same
-    reasoning any secret-token check gets."""
+    """Authorize new internal-only admission; an unset server token fails closed."""
     configured = os.environ.get(LIVE_CANARY_TOKEN_ENV_VAR, "")
     if not configured or not provided:
         return False
@@ -206,24 +201,8 @@ class ScenarioRuntimeService:
             )
         )
 
-        # code-review (2026-08-24) finding: an idempotency-key replay below returns a
-        # snapshot before the internal_only/live_canary_token check further down ever runs, so a
-        # caller who ever learns (or brute-forces, within the same guest_id scope) a valid
-        # idempotency_key for an internal_only scenario could replay it without the token.
-        # live_canary.py itself never sends Idempotency-Key today, so this can't fire in
-        # practice yet, but checking it here (before touching idempotency at all) closes the gap
-        # regardless of how any future caller behaves. A bare config peek, not
-        # _require_product_scenario() (which raises on an unknown/removed scenario_id) -- an
-        # idempotency replay of a session whose scenario has since been removed from config must
-        # keep the config-drift tolerance the comment below describes, not fail here instead.
-        early_scenario = self._config_registry.get_scenario(scenario_id)
-        if (
-            early_scenario is not None
-            and early_scenario.internal_only
-            and not _live_canary_token_is_valid(live_canary_token)
-        ):
-            raise ScenarioNotFoundError()
-
+        # Owner/hash-matched replay reads an accepted execution, like session polling. It does
+        # not require current new-admission permission, including the live-canary token.
         if replay_identity is not None:
             replay = (
                 self.find_execution_replay(
@@ -245,13 +224,8 @@ class ScenarioRuntimeService:
                 return replay
 
         scenario = self._require_product_scenario(product_id, scenario_id)
-        # ANY-221: internal_only scenarios (the 14 kernel_demo "_live_" canary scenarios) exist
-        # only for scripts/agent/live_canary.py's own cost-capped, credentialed-gated CLI, not the
-        # normal public start-session API any frontend/Chrome-extension client also reaches through
-        # this same method -- without this, that public path bypasses live_canary.py's $0.50 cost
-        # cap and OPENAI_API_KEY fail-fast entirely (both exist only in that CLI). Raises the same
-        # ScenarioNotFoundError an unknown scenario_id would -- a caller without the right token
-        # can't distinguish "doesn't exist" from "exists but is internal-only".
+        # New internal-only admission may incur provider spend. Reject it without a valid token
+        # using the same safe response as an unknown scenario, before any durable writes.
         if scenario.internal_only and not _live_canary_token_is_valid(live_canary_token):
             raise ScenarioNotFoundError()
         self._require_enabled_frontend(product_id, frontend_id)
@@ -344,7 +318,7 @@ class ScenarioRuntimeService:
             job = self._job_repository.get(reservation.job_id)
             if stored is None or job is None:
                 raise RuntimeError("reservation lost its execution linkage")
-            scenario = self._require_product_scenario(stored.product_id, stored.scenario_id)
+            scenario = self._find_product_scenario(stored.product_id, stored.scenario_id)
             return self._acceptance_snapshot(
                 stored, scenario, job, reservation=reservation, is_replay=True
             )
@@ -387,8 +361,8 @@ class ScenarioRuntimeService:
         job = self._job_repository.get_latest_for_scenario_session(stored.id)
         if job is not None and job.consumption_mode is JobConsumptionMode.reserved:
             raise RuntimeError("reserved job has no matching replay reservation")
-        # Replay resolves current config for next actions without pinning its original version.
-        scenario = self._require_product_scenario(stored.product_id, stored.scenario_id)
+        # Config enriches a durable replay; removing it cannot hide an accepted execution.
+        scenario = self._find_product_scenario(stored.product_id, stored.scenario_id)
         return self._acceptance_snapshot(stored, scenario, job, is_replay=True)
 
     @staticmethod
@@ -447,7 +421,7 @@ class ScenarioRuntimeService:
     def _acceptance_snapshot(
         self,
         session: ScenarioSessionRecord,
-        scenario: ScenarioDefinition,
+        scenario: ScenarioDefinition | None,
         job: JobRecord | None,
         *,
         reservation: ExecutionReservation | None = None,
@@ -666,11 +640,9 @@ class ScenarioRuntimeService:
         if session is None:
             raise ScenarioSessionNotFoundError()
         job = self._job_repository.get_latest_for_scenario_session(session.id)
-        scenario = self._require_product_scenario(
-            session.product_id,
-            session.scenario_id,
-            scenario_version=session.scenario_version,
-        )
+        scenario = self._find_product_scenario(session.product_id, session.scenario_id)
+        if scenario is not None and scenario.version != session.scenario_version:
+            raise ScenarioNotFoundError()
         return self._snapshot_from_records(
             session=session,
             scenario=scenario,
@@ -743,7 +715,7 @@ class ScenarioRuntimeService:
         self,
         *,
         session: ScenarioSessionRecord,
-        scenario: ScenarioDefinition,
+        scenario: ScenarioDefinition | None,
         job: JobRecord | None,
     ) -> ScenarioSessionSnapshot:
         checkpoint_state = resolve_checkpoint_state(
@@ -760,6 +732,15 @@ class ScenarioRuntimeService:
             current_checkpoint_id=checkpoint_state.checkpoint_id,
         )
 
+    def _find_product_scenario(
+        self, product_id: str, scenario_id: str
+    ) -> ScenarioDefinition | None:
+        product = self._config_registry.get_product(product_id)
+        scenario = self._config_registry.get_scenario(scenario_id)
+        if product is None or scenario is None or scenario_id not in product.scenarios:
+            return None
+        return scenario
+
     def _require_product_scenario(
         self,
         product_id: str,
@@ -767,11 +748,8 @@ class ScenarioRuntimeService:
         *,
         scenario_version: int | None = None,
     ) -> ScenarioDefinition:
-        product = self._config_registry.get_product(product_id)
-        scenario = self._config_registry.get_scenario(scenario_id)
-        if product is None or scenario is None:
-            raise ScenarioNotFoundError()
-        if scenario_id not in product.scenarios:
+        scenario = self._find_product_scenario(product_id, scenario_id)
+        if scenario is None:
             raise ScenarioNotFoundError()
         if scenario_version is not None and scenario.version != scenario_version:
             raise ScenarioNotFoundError()

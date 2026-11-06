@@ -10,6 +10,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from http import HTTPStatus
 
 import anytoolai_platform_core.quotas.service as quota_module
 import anytoolai_platform_core.workflows.runner as runner_module
@@ -35,7 +36,11 @@ from anytoolai_platform_core.quotas.service import QuotaExhaustedError
 from anytoolai_platform_core.results.service import ResultService
 from anytoolai_platform_core.scenarios.models import ScenarioSessionStatus
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
-from anytoolai_platform_core.scenarios.service import ScenarioSessionService
+from anytoolai_platform_core.scenarios.service import (
+    IdempotencyKeyConflictError,
+    ScenarioNotFoundError,
+    ScenarioSessionService,
+)
 from anytoolai_platform_core.storage.db import (
     action_runs_table,
     artifacts_table,
@@ -61,9 +66,9 @@ from anytoolai_platform_core.workflows.runner import (
 )
 from anytoolai_platform_worker.composition import build_worker
 from anytoolai_platform_worker.lease import AdvisoryJobLease
-from test_execution_admission_postgresql import allowance, rows, start
+from test_execution_admission_postgresql import allowance, rows, start, without_scenario_config
 from test_execution_admission_postgresql import runtime as runtime_fixture
-from test_handoffs_api import _create, _seed_source
+from test_handoffs_api import _create, _request, _seed_source
 from test_scenario_runtime_api import FIXTURE_ROOT
 
 pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
@@ -147,6 +152,70 @@ def assert_meter(runtime, acceptance, state, used, reserved):
     assert reservation["state"] is state
     assert (bucket["used_count"], bucket["reserved_count"]) == (used, reserved)
     return reservation
+
+
+@pytest.mark.parametrize("paid", [True, False])
+@pytest.mark.parametrize("completed", [True, False])
+@pytest.mark.parametrize("removal", ["scenario", "association", "product"])
+def test_replay_and_poll_survive_config_removal_without_new_consumption(
+    runtime, paid, completed, removal
+):
+    factory, app, registry = runtime
+    grant = allowance() if paid else None
+    with transaction_boundary(factory) as session:
+        first = start(session, registry, grant)
+    if completed:
+        worker = worker_for(runtime)
+        try:
+            assert asyncio.run(worker.process_job(first.job_id)).status is JobStatus.succeeded
+        finally:
+            worker.dispose()
+    with transaction_boundary(factory) as session:
+        original = start(session, registry, grant)
+    event_count = len(rows(factory, event_log_table))
+    drifted = without_scenario_config(registry, removal)
+    with transaction_boundary(factory) as session:
+        replay = start(session, drifted, grant)
+        with pytest.raises(IdempotencyKeyConflictError):
+            start(session, drifted, grant, input_payload={"source_text": "changed input"})
+        with pytest.raises(ScenarioNotFoundError):
+            start(session, drifted, grant, key="new-request")
+        if paid:
+            with pytest.raises(ScenarioNotFoundError):
+                start(session, drifted, allowance())
+    assert replay.is_replay
+    assert replay.scenario_session_id == original.scenario_session_id
+    assert replay.job_id == original.job_id
+    assert replay.result_artifact_id == original.result_artifact_id
+    assert replay.status is original.status
+    assert replay.current_checkpoint_id == original.current_checkpoint_id
+    assert replay.reservation == original.reservation
+    assert replay.allowed_next_actions == ()
+
+    # The client polls immediately after replay, even if the returned execution is already done.
+    app.state.runtime = replace(app.state.runtime, config_registry=drifted)
+    path = f"/v1/scenario-sessions/{first.scenario_session_id}"
+    polled = asyncio.run(_request(app, "GET", path))
+    assert polled.status_code == HTTPStatus.OK
+    assert polled.json()["job_id"] == first.job_id
+    assert polled.json()["result_artifact_id"] == original.result_artifact_id
+    assert polled.json()["status"] == original.status.value
+    assert polled.json()["allowed_next_actions"] == []
+    if completed:
+        result = asyncio.run(_request(app, "GET", f"/v1/results/{original.result_artifact_id}"))
+        assert result.status_code == HTTPStatus.OK
+        action = asyncio.run(_request(
+            app, "POST", f"{path}/next-actions/copy_result",
+            json={"checkpoint_id": original.current_checkpoint_id},
+        ))
+        assert action.status_code == HTTPStatus.NOT_FOUND
+    assert_meter(
+        runtime, first, ReservationState.consumed if completed else ReservationState.reserved,
+        int(completed), int(not completed),
+    )
+    for table in (scenario_sessions_table, jobs_table, execution_reservations_table):
+        assert len(rows(factory, table)) == 1
+    assert len(rows(factory, event_log_table)) == event_count
 
 
 @pytest.mark.parametrize("paid", [True, False])

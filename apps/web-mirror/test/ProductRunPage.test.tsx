@@ -110,7 +110,7 @@ class TestErrorBoundary extends Component<{ children: ReactNode }, { failed: boo
 }
 
 describe("ProductRunPage", () => {
-  it("retries occupied capacity with the same key and refreshes consumption on success", async () => {
+  it.each(["Try again", "Run"])("retries occupied capacity using %s with the same key and an unlocked form", async (button) => {
     const { client, calls } = makeClientCapturingRequests({
       ...happyPathRoutes(),
       [ROUTES.START]: [errorResponse(429, "quota_capacity_reserved"), startResponse()],
@@ -121,20 +121,227 @@ describe("ProductRunPage", () => {
         quotaResponse(TEST_PRODUCT_IDS, { limit_count: 1, used_count: 1, remaining_count: 0, exhausted: true }),
       ],
     });
-    renderPage({ client });
+    const onLockedChange = vi.fn();
+    renderPage({ client, onLockedChange });
     await waitForForm();
     fillValidForm();
     submit();
     await screen.findByText("Capacity is temporarily in use. Please try again shortly.");
     expect(screen.queryByText("You've used all your Test Product runs for now.")).toBeNull();
     await screen.findByText(/Available now: 0. In progress: 1./);
-    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect((screen.getByLabelText("Text") as HTMLTextAreaElement).disabled).toBe(false);
+    expect((screen.getByRole("button", { name: "Run" }) as HTMLButtonElement).disabled).toBe(false);
+    expect(onLockedChange.mock.calls.at(-1)).toEqual([false]);
+    fireEvent.click(screen.getByRole("button", { name: button }));
     await waitForResult();
     const starts = calls.filter((call) => call.key === ROUTES.START);
     expect(starts).toHaveLength(2);
     expect(idempotencyKeyOf(starts[0]!)).toBe(idempotencyKeyOf(starts[1]!));
     await screen.findByText("0 of 1 runs remaining.");
     expect(screen.getByText(RESULT_TEXT)).toBeTruthy();
+  });
+
+  it("uses edited input and a new key after a definite capacity rejection", async () => {
+    const { client, calls } = makeClientCapturingRequests({
+      ...happyPathRoutes(),
+      [ROUTES.START]: [errorResponse(429, "quota_capacity_reserved"), startResponse()],
+    });
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+    await screen.findByText("Capacity is temporarily in use. Please try again shortly.");
+    fireEvent.change(screen.getByLabelText("Text"), { target: { value: "A different request." } });
+    submit();
+    await waitForResult();
+    const starts = calls.filter((call) => call.key === ROUTES.START);
+    expect(starts).toHaveLength(2);
+    expect(idempotencyKeyOf(starts[0]!)).not.toBe(idempotencyKeyOf(starts[1]!));
+    expect(JSON.parse(starts[1]!.init.body as string)).toMatchObject({ input: { text: "A different request." } });
+  });
+
+  it("keeps repeated definite capacity rejections unlocked without replacing the prepared key", async () => {
+    const { client, calls } = makeClientCapturingRequests({
+      ...happyPathRoutes(),
+      [ROUTES.START]: [errorResponse(429, "quota_capacity_reserved"), errorResponse(429, "quota_capacity_reserved"), startResponse()],
+    });
+    const onLockedChange = vi.fn();
+    renderPage({ client, onLockedChange });
+    await waitForForm();
+    fillValidForm();
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      submit();
+      await screen.findByText("Capacity is temporarily in use. Please try again shortly.");
+      expect((screen.getByLabelText("Text") as HTMLTextAreaElement).disabled).toBe(false);
+      expect((screen.getByRole("button", { name: "Run" }) as HTMLButtonElement).disabled).toBe(false);
+      expect(onLockedChange.mock.calls.at(-1)).toEqual([false]);
+    }
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitForResult();
+    const starts = calls.filter((call) => call.key === ROUTES.START);
+    expect(starts).toHaveLength(3);
+    expect(new Set(starts.map(idempotencyKeyOf)).size).toBe(1);
+  });
+
+  it.each([
+    { name: "client timeout", responses: [], manualRetry: false, clientTimeout: true },
+    { name: "gateway timeout", responses: [() => new Response("<html>504</html>", { status: 504 })], manualRetry: false, clientTimeout: false },
+    { name: "network failure", responses: [() => { throw new TypeError("Connection lost"); }], manualRetry: false, clientTimeout: false },
+    { name: "manual retry after 5xx", responses: [() => errorResponse(503, "internal_error"), () => errorResponse(503, "internal_error")], manualRetry: true, clientTimeout: false },
+    { name: "unreadable acceptance", responses: [() => new Response("<html>ok</html>", { status: 200 })], manualRetry: true, clientTimeout: false },
+  ])("retains the lock and recovers the same execution after $name then capacity rejection", async ({ responses, manualRetry, clientTimeout }) => {
+    let timedOutSendStarted = false;
+    const { client, calls } = makeClientCapturingRequests({
+      ...happyPathRoutes(),
+      [ROUTES.START]: [
+        ...responses,
+        errorResponse(429, "quota_capacity_reserved"),
+        errorResponse(429, "quota_capacity_reserved"),
+        startResponse(),
+        errorResponse(429, "quota_capacity_reserved"),
+      ],
+    }, (key, init) => {
+      if (clientTimeout && key === ROUTES.START && !timedOutSendStarted) {
+        timedOutSendStarted = true;
+        return new Promise<Response>((_resolve, reject) => {
+          init.signal!.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+        });
+      }
+      return undefined;
+    });
+    const onLockedChange = vi.fn();
+    renderPage({ client, onLockedChange });
+    await waitForForm();
+    fillValidForm();
+    if (clientTimeout) {
+      vi.useFakeTimers();
+      try {
+        submit();
+        await act(async () => { await advance(20_100); });
+      } finally {
+        vi.useRealTimers();
+      }
+    } else {
+      submit();
+    }
+    if (manualRetry) {
+      fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
+    }
+    for (let rejection = 0; rejection < 2; rejection += 1) {
+      await screen.findByText("Capacity is temporarily in use. Please try again shortly.");
+      expect((screen.getByLabelText("Text") as HTMLTextAreaElement).disabled).toBe(true);
+      expect((screen.getByRole("button", { name: "Run" }) as HTMLButtonElement).disabled).toBe(true);
+      expect(onLockedChange.mock.calls.at(-1)).toEqual([true]);
+      expect(screen.queryByText("You've used all your Test Product runs for now.")).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    }
+    await waitForResult();
+    const starts = calls.filter((call) => call.key === ROUTES.START);
+    expect(starts).toHaveLength(responses.length + Number(clientTimeout) + 3);
+    expect(new Set(starts.map(idempotencyKeyOf)).size).toBe(1);
+    expect(calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(1);
+    expect(calls.filter((call) => call.key === ROUTES.RESULT)).toHaveLength(1);
+    expect(onLockedChange.mock.calls.at(-1)).toEqual([false]);
+
+    // The uncertainty belongs to the recovered key, never to the next logical submission.
+    fireEvent.click(screen.getByRole("button", { name: "New task" }));
+    fillValidForm();
+    submit();
+    await screen.findByText("Capacity is temporarily in use. Please try again shortly.");
+    expect((screen.getByLabelText("Text") as HTMLTextAreaElement).disabled).toBe(false);
+    expect((screen.getByRole("button", { name: "Run" }) as HTMLButtonElement).disabled).toBe(false);
+    expect(onLockedChange.mock.calls.at(-1)).toEqual([false]);
+    const laterStart = calls.filter((call) => call.key === ROUTES.START).at(-1)!;
+    expect(idempotencyKeyOf(laterStart)).not.toBe(idempotencyKeyOf(starts[0]!));
+  });
+
+  it.each([
+    { status: 404, code: "scenario_not_found" },
+    { status: 422, code: "scenario_frontend_invalid" },
+    { status: 429, code: "quota_exhausted" },
+    { status: 404, code: "guest_identity_not_found" },
+  ])("recovers the original key after an uncertain start then $code", async ({ status, code }) => {
+    const { client, calls } = makeClientCapturingRequests({
+      ...happyPathRoutes(),
+      [ROUTES.START]: [
+        new Response("Gateway timeout", { status: 504 }),
+        errorResponse(status, code),
+        errorResponse(status, code),
+        startResponse(),
+      ],
+    });
+    const onLockedChange = vi.fn();
+    renderPage({ client, onLockedChange });
+    await waitForForm();
+    fillValidForm();
+    submit();
+    for (let rejection = 0; rejection < 2; rejection += 1) {
+      const retry = await screen.findByRole("button", { name: "Try again" });
+      expect((screen.getByLabelText("Text") as HTMLTextAreaElement).disabled).toBe(true);
+      expect((screen.getByRole("button", { name: "Run" }) as HTMLButtonElement).disabled).toBe(true);
+      expect(onLockedChange.mock.calls.at(-1)).toEqual([true]);
+      expect(screen.queryByText("You've used all your Test Product runs for now.")).toBeNull();
+      fireEvent.click(retry);
+    }
+    await waitForResult();
+    const starts = calls.filter((call) => call.key === ROUTES.START);
+    expect(starts).toHaveLength(4);
+    expect(new Set(starts.map(idempotencyKeyOf)).size).toBe(1);
+    expect(calls.filter((call) => call.key === ROUTES.GUEST_IDENTITY)).toHaveLength(1);
+    expect(onLockedChange.mock.calls.at(-1)).toEqual([false]);
+  });
+
+  it("releases an uncertain key when the backend proves it belongs to a different request", async () => {
+    const { client, calls } = makeClientCapturingRequests({
+      ...happyPathRoutes(),
+      [ROUTES.START]: [
+        errorResponse(503, "internal_error"),
+        errorResponse(503, "internal_error"),
+        errorResponse(409, "idempotency_key_conflict"),
+        startResponse(),
+      ],
+    });
+    const onLockedChange = vi.fn();
+    renderPage({ client, onLockedChange });
+    await waitForForm();
+    fillValidForm();
+    submit();
+    fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
+    await waitFor(() => expect((screen.getByLabelText("Text") as HTMLTextAreaElement).disabled).toBe(false));
+    expect(onLockedChange.mock.calls.at(-1)).toEqual([false]);
+    submit();
+    await waitForResult();
+    const starts = calls.filter((call) => call.key === ROUTES.START);
+    expect(starts).toHaveLength(4);
+    expect(new Set(starts.slice(0, 3).map(idempotencyKeyOf)).size).toBe(1);
+    expect(idempotencyKeyOf(starts[3]!)).not.toBe(idempotencyKeyOf(starts[0]!));
+  });
+
+  it.each(["HTML 403", "backend 422"])("unlocks after definite capacity rejection then %s without inventing uncertainty", async (rejection) => {
+    const { client, calls } = makeClientCapturingRequests({
+      ...happyPathRoutes(),
+      [ROUTES.START]: [
+        errorResponse(429, "quota_capacity_reserved"),
+        rejection === "HTML 403" ? new Response("Forbidden", { status: 403 }) : errorResponse(422, "scenario_input_invalid"),
+        startResponse(),
+      ],
+    });
+    const onLockedChange = vi.fn();
+    renderPage({ client, onLockedChange });
+    await waitForForm();
+    fillValidForm();
+    submit();
+    await screen.findByText("Capacity is temporarily in use. Please try again shortly.");
+    submit();
+    const retry = await screen.findByRole("button", { name: "Try again" });
+    expect((screen.getByLabelText("Text") as HTMLTextAreaElement).disabled).toBe(false);
+    expect(onLockedChange.mock.calls.at(-1)).toEqual([false]);
+    fireEvent.click(retry);
+    await waitForResult();
+    const starts = calls.filter((call) => call.key === ROUTES.START);
+    expect(starts).toHaveLength(3);
+    expect(idempotencyKeyOf(starts[1]!)).toBe(idempotencyKeyOf(starts[0]!));
+    expect(idempotencyKeyOf(starts[2]!)).not.toBe(idempotencyKeyOf(starts[0]!));
   });
 
   it("refreshes capacity after terminal failure without starting another execution", async () => {

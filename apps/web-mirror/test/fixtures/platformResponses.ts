@@ -139,13 +139,13 @@ export type CapturedCall = { key: string; url: string; init: RequestInit };
 function fetchImplFor(
   routes: RouteQueues,
   calls: CapturedCall[],
-  onCall?: (key: string) => Response | Promise<Response> | undefined,
+  onCall?: (key: string, init: RequestInit) => Response | Promise<Response> | undefined,
 ) {
   const queues = new Map(Object.entries(routes).map(([key, responses]) => [key, [...responses]]));
   return vi.fn(async (url: string, init: RequestInit) => {
     const key = `${init.method ?? "GET"} ${new URL(url).pathname}`;
     calls.push({ key, url, init });
-    const overridden = onCall?.(key);
+    const overridden = onCall?.(key, init);
     if (overridden !== undefined) {
       return overridden;
     }
@@ -227,9 +227,12 @@ export function makeClientWithDeferredCalls(routes: RouteQueues, deferred: Recor
 
 /** Like makeClient(), but each call is recorded with its full URL -- for asserting on
  * query-string parameters (e.g. that a request includes `scenario_id`). */
-export function makeClientCapturingRequests(routes: RouteQueues) {
+export function makeClientCapturingRequests(
+  routes: RouteQueues,
+  onCall?: (key: string, init: RequestInit) => Response | Promise<Response> | undefined,
+) {
   const calls: CapturedCall[] = [];
-  const fetchImpl = fetchImplFor(routes, calls);
+  const fetchImpl = fetchImplFor(routes, calls, onCall);
   const client = new PlatformApiClient({
     baseUrl: "https://api.example.com",
     fetchImpl: fetchImpl as unknown as typeof fetch,
