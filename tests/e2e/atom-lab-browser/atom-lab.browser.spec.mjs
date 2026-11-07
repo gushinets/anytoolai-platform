@@ -2388,6 +2388,185 @@ for (const change of ["base", "schema", "config"]) {
   });
 }
 
+for (const rejection of ["contract", "source"]) {
+  for (const change of ["platform", "manual"]) {
+    test(`pending ${rejection} rejection respects a later ${change} source choice`, async ({page}) => {
+      const {state, product} = await prepareRejectedSourceWrite(page, "prompt");
+      state.authoritativeAtom = {...A06, schema_refs: {...A06.schema_refs,
+        input: {...A06.schema_refs.input, version: 2}}};
+      state.optionsOverride = [{...product, ref: A06.prompt_ref, group: "platform", prompt: A06.prompt}, product];
+      let releasePost;
+      const gate = new Promise(resolve => { releasePost = resolve; });
+      const submissions = [];
+      await page.route("**/v1/atom-lab/runs", async route => {
+        if (route.request().method() !== "POST") return route.fallback();
+        submissions.push(route.request().postDataJSON());
+        await gate;
+        await route.fulfill({status: rejection === "contract" ? 409 : 422, json: {error: {
+          code: rejection === "contract" ? "contract_unavailable" : "prompt_source_invalid",
+          message: "Отказ от отправленного запроса.", field_errors: [{
+            path: rejection === "contract" ? "expected_contract" : "prompt_source_ref",
+            message: "Отправленное значение устарело.",
+          }],
+        }, request_id: "changed-source"}});
+      });
+      await page.locator("#reasoning-effort").selectOption("high");
+      await page.locator("#run-button").click();
+      await expect.poll(() => submissions.length).toBe(1);
+      await page.locator("#prompt-select").selectOption(A06.prompt_ref);
+      const text = change === "manual" ? "Новый ручной текст после отправки" : A06.prompt;
+      if (change === "manual") await page.locator("#prompt-editor").fill(text);
+      releasePost();
+      await expect(page.locator("#run-state")).toContainText(rejection === "contract" ? "contract_unavailable" : "prompt_source_invalid");
+      if (rejection === "contract") {
+        await expect.poll(() => state.atomReads).toBe(1);
+        await expect(page.locator("#prompt-load-status")).toContainText("Контракт атома изменился");
+        await expect(page.locator("#run-button")).toBeDisabled();
+        await expect(page.locator("#save-prompt")).toBeDisabled();
+        await page.locator("#run-button").dispatchEvent("click");
+        await page.locator("#save-prompt").dispatchEvent("click");
+        expect(submissions).toHaveLength(1);
+        expect(state.writes).toHaveLength(0);
+      } else {
+        await expect(page.locator("#run-button")).toBeEnabled();
+        await expect(page.locator("#save-prompt")).toBeEnabled();
+        expect(state.atomReads).toBe(0);
+        expect(state.reads).toBe(1);
+      }
+      await expect(page.locator("#prompt-select")).toHaveValue(A06.prompt_ref);
+      await expect(page.locator("#prompt-editor")).toHaveValue(text);
+      await expect(page.locator("#model-select")).toHaveValue("gpt-supported");
+      await expect(page.locator("#reasoning-effort")).toHaveValue("high");
+      await expect(page.locator("#save-prompt-name")).toHaveValue("  Имя владельца  ");
+      expect(submissions[0]).toMatchObject({prompt_source_ref: product.ref,
+        prompt: "Ручной текст владельца", input: A06.example_input,
+        expected_contract: expectedAtomContract(A06)});
+    });
+  }
+}
+
+for (const change of ["replacement-editor", "catalog", "new-base"]) {
+  test(`pending contract rejection leaves a later ${change} authority usable`, async ({page}) => {
+    const {state, product, save} = await prepareRejectedSourceWrite(page, "prompt");
+    let releasePost;
+    const gate = new Promise(resolve => { releasePost = resolve; });
+    let posted = false;
+    await page.route("**/v1/atom-lab/runs", async route => {
+      if (route.request().method() !== "POST") return route.fallback();
+      posted = true;
+      await gate;
+      await route.fulfill({status: 409, json: {error: {code: "contract_unavailable",
+        message: "Старый контракт отклонён.", field_errors: [{path: "expected_contract", message: "Старый контракт."}]},
+      request_id: "replaced-contract"}});
+    });
+    await page.locator("#run-button").click();
+    await expect.poll(() => posted).toBe(true);
+    if (change === "new-base") {
+      state.authoritativeAtom = {...A06, prompt_ref: "prompt.a06.v2", prompt: "Актуальная платформа"};
+      state.optionsOverride = [{...product, ref: state.authoritativeAtom.prompt_ref, group: "platform",
+        prompt: state.authoritativeAtom.prompt}, product];
+      await save.click();
+      await expect.poll(() => state.atomReads).toBe(1);
+      await expect(save).toBeEnabled();
+      await expect(page.locator("#prompt-select option[value='prompt.a06.v2']")).toHaveCount(1);
+    } else {
+      if (change === "catalog") {
+        const reloaded = page.waitForResponse("**/v1/atom-lab/models");
+        await page.locator("#access-form").dispatchEvent("submit");
+        await reloaded;
+      } else await page.getByRole("button", {name: /A05/}).click();
+      await page.getByRole("button", {name: /A06/}).click();
+      await page.locator("#input-tab").click();
+      await page.locator("#fill-example").click();
+      await page.locator("#prompt-tab").click();
+      await page.locator("#prompt-editor").fill("Новый редактор");
+    }
+    await editPreset(page);
+    await page.locator("#preset-name").fill("Открытая библиотека");
+    const reads = state.atomReads;
+    releasePost();
+    await expect(page.locator("#run-state")).toContainText("contract_unavailable");
+    await expect(page.locator("#presets-panel")).toBeVisible();
+    await expect(page.locator("#preset-name")).toHaveValue("Открытая библиотека");
+    await expect(page.locator("#save-preset")).toBeEnabled();
+    await showWorkbench(page);
+    await expect(page.locator("#run-button")).toBeEnabled();
+    await expect(page.locator("#retry-prompts")).toBeHidden();
+    await expect(page.locator("#prompt-editor")).toHaveValue(change === "new-base" ? "Ручной текст владельца" : "Новый редактор");
+    expect(state.atomReads).toBe(reads);
+  });
+}
+
+for (const source of ["removed", "stable", "detached"]) {
+  test(`peer contract Retry updates the ${source} source reset baseline through Run and Save`, async ({page}) => {
+    const {state, save, product, detail} = await prepareRejectedSourceWrite(page, "history", {historyAtom: "A06"});
+    if (source === "detached") {
+      detail.snapshot.prompt.source_ref = "retired.product.source";
+      await page.locator("#history-button").click();
+      await page.locator("#history-list .history-open").click();
+      await page.locator("#restore-history").click();
+      await showWorkbench(page);
+      await page.locator("#prompt-tab").click();
+      await expect(page.locator("#prompt-origin")).toContainText("Исторический источник недоступен");
+      await page.locator("#prompt-editor").fill("Ручной текст владельца");
+      await page.locator("#history-button").click();
+      await page.locator("#save-history-preset").click();
+    }
+    state.authoritativeAtom = {...A06, prompt_ref: "prompt.a06.v2", base_action_config_id: "config.a06.v2"};
+    state.optionsOverride = [{...product, ref: "prompt.a06.v2", group: "platform"}, product];
+    await save.click();
+    await expect(page.locator("#preset-error")).toContainText("Контракт атома изменился");
+    await showWorkbench(page);
+    await expect(page.locator("#run-button")).toBeDisabled();
+    state.authoritativeAtom = structuredClone(A06);
+    state.optionsOverride = [{...product, ref: A06.prompt_ref, group: "platform", prompt: A06.prompt},
+      ...(source === "removed" ? [] : [product])];
+    await page.locator("#presets-button").click();
+    await page.getByRole("button", {name: "Повторить загрузку источника", exact: true}).click();
+    await expect(save).toBeEnabled();
+    await showWorkbench(page);
+    await page.locator("#prompt-tab").click();
+    await expect(page.locator("#run-button")).toBeEnabled();
+    await expect(page.locator("#prompt-editor")).toHaveValue("Ручной текст владельца");
+    await expect(page.locator("#prompt-select")).toHaveValue(source === "stable" ? product.ref : A06.prompt_ref);
+    if (source !== "stable") await expect(page.locator("#prompt-origin")).toContainText("Исторический источник недоступен");
+    await page.locator("#reset-prompt").click();
+    const resetText = source === "stable" ? product.prompt : A06.prompt;
+    await expect(page.locator("#prompt-editor")).toHaveValue(resetText);
+    let submitted;
+    const runId = `run-peer-reset-${source}`;
+    await page.route("**/v1/atom-lab/runs", async route => {
+      if (route.request().method() !== "POST") return route.fallback();
+      submitted = route.request().postDataJSON();
+      await route.fulfill({status: 202, json: {run_id: runId, scenario_session_id: "session-library", job_id: "job-library", status: "queued"}});
+    });
+    await page.route(`**/v1/atom-lab/runs/${runId}`, async route => {
+      const completed = historyDetail({runId, input: submitted.input, prompt: submitted.prompt,
+        reasoningEffort: submitted.reasoning_effort});
+      completed.snapshot.prompt.source_ref = submitted.prompt_source_ref ?? null;
+      await route.fulfill({json: completed});
+    });
+    await page.locator("#run-button").click();
+    await expect(page.locator("#prompt-test-status")).toContainText("Ответ прошёл контракт");
+    expect(submitted.prompt).toBe(resetText);
+    expect(submitted.input).toEqual(A06.example_input);
+    expect(submitted.prompt_source_ref).toBe(source === "stable" ? product.ref : undefined);
+    const saved = [];
+    await page.route("**/v1/atom-lab/atoms/A06/prompts", async route => {
+      if (route.request().method() !== "POST") return route.fallback();
+      const body = route.request().postDataJSON();
+      saved.push(body);
+      await route.fulfill({status: 201, json: {...product, ...body, group: "lab", ref: "lab.peer-reset"}});
+    });
+    await page.locator("#save-prompt-panel summary").click();
+    await page.locator("#save-prompt-name").fill("Проверенный сброс");
+    await page.locator("#save-prompt").click();
+    await expect(page.locator("#save-prompt-status")).toContainText("Сохранён промпт");
+    expect(saved).toEqual([{name: "Проверенный сброс", prompt: resetText,
+      source_ref: source === "stable" ? product.ref : A06.prompt_ref, source_run_id: runId}]);
+  });
+}
+
 for (const otherOwner of [false, true]) {
   test(`known shared contract failure blocks legacy history without a source${otherOwner ? " beside another atom" : ""}`, async ({page}) => {
     const {state, save, detail, product} = await prepareRejectedSourceWrite(page, "prompt");

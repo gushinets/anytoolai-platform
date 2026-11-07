@@ -333,6 +333,84 @@ def test_expected_run_contract_has_a_closed_typed_shape(app, change):
     assert _counts(app) == (0, 0, 0, 0, 0)
 
 
+@pytest.mark.parametrize("direction", ["input", "output"])
+@pytest.mark.parametrize("version", [True, "1", 1.0, None, [], {}])
+def test_expected_contract_schema_versions_reject_coercion_before_admission(
+    app, direction, version,
+):
+    contract = _expected_contract(get_atom_catalog_entry(app.state.runtime.config_registry, "A01"))
+    contract["schema_refs"][direction]["version"] = version
+    response = _post(app, _payload(expected_contract=contract))
+    _error(response, HTTPStatus.UNPROCESSABLE_ENTITY, "input_invalid")
+    assert response.json()["error"]["field_errors"] == []
+    assert _counts(app) == (0, 0, 0, 0, 0)
+
+
+@pytest.mark.parametrize("assertion", ["integer", "null", "omitted"])
+def test_expected_contract_accepts_integer_versions_and_legacy_omission_with_exact_replay(
+    app, assertion,
+):
+    payload = _payload()
+    if assertion == "integer":
+        payload["expected_contract"] = _expected_contract(
+            get_atom_catalog_entry(app.state.runtime.config_registry, "A01"),
+        )
+    elif assertion == "null":
+        payload["expected_contract"] = None
+    first = _post(app, payload)
+    assert first.status_code == HTTPStatus.ACCEPTED, first.text
+    assert _post(app, payload).json() == first.json()
+    assert _counts(app) == (1, 1, 1, 1, 1)
+    with transaction_boundary(_factory(app)) as session:
+        assert session.scalar(sa.select(atom_lab_admission_scopes_table.c.accepted_count)) == 1
+
+
+@pytest.mark.parametrize("origin", ["detached", "legacy-platform", "product"])
+@pytest.mark.parametrize("matching_source", [True, False])
+def test_successful_detached_or_known_origin_run_can_only_prove_its_save_source(
+    app, origin, matching_source,
+):
+    atom = get_atom_catalog_entry(app.state.runtime.config_registry, "A07")
+    product_ref = "client_update_writer.reply_draft_compose_reply.v1"
+    source_ref = product_ref if origin == "product" else atom.prompt_ref
+    prompt = atom.prompt if origin == "legacy-platform" else "Точный ручной промпт"
+    accepted = _post(app, _payload(
+        "A07", prompt=prompt, prompt_source_ref=product_ref if origin == "product" else None,
+    ))
+    assert accepted.status_code == HTTPStatus.ACCEPTED, accepted.text
+    with transaction_boundary(_factory(app)) as session:
+        session.execute(sa.update(jobs_table).where(jobs_table.c.id == accepted.json()["job_id"])
+                        .values(status="succeeded"))
+        frozen = AtomLabRunRepository(session).get(accepted.json()["run_id"]).snapshot_payload()
+    assert frozen["prompt"].get("source_ref") == (product_ref if origin == "product" else None)
+
+    async def save():
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test",
+        ) as client:
+            return await client.post("/v1/atom-lab/atoms/A07/prompts", headers={
+                "X-Atom-Lab-Access-Code": ACCESS_CODE,
+            }, json={"name": "Проверенный текст", "prompt": prompt,
+                     "source_ref": source_ref if matching_source else (
+                         atom.prompt_ref if origin == "product" else product_ref
+                     ), "source_run_id": accepted.json()["run_id"]})
+
+    saved = asyncio.run(save())
+    if matching_source:
+        assert saved.status_code == HTTPStatus.CREATED, saved.text
+        assert saved.json()["source_run_id"] == accepted.json()["run_id"]
+        assert saved.json()["source_ref"] == source_ref
+    else:
+        _error(saved, HTTPStatus.UNPROCESSABLE_ENTITY, "prompt_invalid")
+        assert saved.json()["error"]["field_errors"][0]["path"] == "source_run_id"
+    with transaction_boundary(_factory(app)) as session:
+        run = AtomLabRunRepository(session).get(accepted.json()["run_id"])
+        assert run.snapshot_payload() == frozen
+        assert session.scalar(sa.select(sa.func.count()).select_from(atom_lab_prompts_table)) == (
+            1 if matching_source else 0
+        )
+
+
 @pytest.mark.parametrize("change", ["reordered", "boolean-number", "float-integer"])
 def test_expected_run_contract_compares_schema_json_types_and_ignores_object_order(app, change):
     before = (

@@ -183,7 +183,7 @@ class AtomLabVersionedSchemaRefResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     schema_ref: str
-    version: int
+    version: int = Field(strict=True)
 
 
 class AtomLabSchemaRefsResponse(BaseModel):

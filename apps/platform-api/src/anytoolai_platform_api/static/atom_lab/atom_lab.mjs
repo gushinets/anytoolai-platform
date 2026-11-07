@@ -3531,6 +3531,7 @@ export function bootstrapAtomLab({
       if (owner?.atom !== atom || !owner.promptContractNeedsValidation) continue;
       owner.promptOptions = options;
       reconcilePromptSource(owner, options);
+      owner.basePrompt = options.find((option) => option.ref === promptRefFor(owner))?.prompt ?? owner.basePrompt;
       owner.promptSourceLoadError = null;
       owner.loadingPrompts = false;
       if (owner === session) {
@@ -3545,7 +3546,8 @@ export function bootstrapAtomLab({
   };
 
   const refreshRejectedPromptSource = (draft, ref, baseRef = draft.atom.prompt_ref, forceContract = false) => {
-    if (!isCurrentPromptOwner(draft) || draft.atom.prompt_ref !== baseRef || promptRefFor(draft) !== ref) return;
+    if (!isCurrentPromptOwner(draft) || draft.atom.prompt_ref !== baseRef
+      || (!forceContract && promptRefFor(draft) !== ref)) return;
     if (forceContract) {
       const message = "Контракт запуска отклонён. Проверяем актуальный атом; черновик сохранён.";
       promptContractChecks.set(draft.atom, {error: message});

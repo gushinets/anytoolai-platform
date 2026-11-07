@@ -1123,3 +1123,82 @@ write changed. Broad backend/PostgreSQL checks were not repeated for this UI
 repair. A genuinely changed contract still requires explicit reopen or existing
 adaptation. Parent owns fresh independent review, commit/push and required CI;
 never merge. Ambiguous-save and unbounded-library follow-ups remain separate.
+
+## Rejected contract, peer reset and strict schema versions
+
+Doctor passed on 2026-11-07 at `35d9ee9d`. Address review `5808977447`,
+discussions `4499175758`, `4499175761` and `4499175764`. A rejection of the
+submitted atom contract must trigger authoritative recovery even after a source
+change in the same editor. Source-specific rejections retain their source fence;
+replaced owners/catalog definitions must remain untouched. Recovery must update
+every affected owner's reset baseline from the reconciled options while keeping
+manual text and intentionally detached provenance. Both nested assertion versions
+must reject JSON booleans, strings, floats and null before admission writes.
+
+Reach: existing Atom Lab JavaScript, API schema, focused API/browser regressions
+and this plan. Inspect the related detached-run-to-save proof path and fix it
+within the existing router only if its positive control demonstrates failure.
+Reproduce failures before production edits, run connected positive/negative
+controls, then the isolated connected backend suite and one final canonical
+frontend-check, docs/generation, architecture, diff and Ruff checks. Preserve all
+existing contract/proof/stale-response guards. No dependency, working DB,
+migration, paid provider call, CI/Sonar change, staging or publication. Parent owns
+fresh independent review, commit/push and required CI; never merge.
+
+Before production edits, ten new Chromium cases reproduced both changed-source
+contract rejections being discarded (zero authoritative atom reads), and peer
+Retry restoring a deleted product's text on Reset; the other seven controls
+passed. Corrected API fixtures retain the existing safe empty field-error list
+and legacy omitted source key. The actual JSON parser then reproduced six
+incorrect admissions for input/output versions `true`, `"1"` and `1.0`, while
+fifteen negative/positive controls passed. Logs:
+`.quick-check-tmp/p11-browser-before.log` and
+`.quick-check-tmp/p11-api-before-corrected.log`.
+
+The existing rejected-source helper now exempts only a forced contract check from
+the source-selection fence; its owner, catalog and submitted-atom guards remain.
+Shared recovery updates every affected owner's reset baseline from its reconciled
+options without changing manual text or detached provenance. The shared typed
+schema reference uses `Field(strict=True)` for versions; no parallel DTO or
+generated-contract change is needed. The related detached Run-to-Save controls
+pass with the existing required save `source_ref` and platform fallback; known
+source mismatches still reject. No router change is needed.
+
+Final focused verification passed all 21 API regressions and all 267 connected
+Chromium journeys, including ten new cases. They cover source-specific rejection,
+new editor/catalog/actual-base fences and an open library, peer Reset-to-Run-to-Save
+for removed/stable/intentionally detached sources, integer/null/omitted assertions,
+exact replay and admission counts, and detached/legacy/product proof origins with
+matching and mismatching save sources. Connected backend checks passed 561 tests;
+two existing PostgreSQL race tests explicitly skipped because no test PostgreSQL
+URL was supplied. These skips are not evidence for PostgreSQL behavior, which
+remains the parent CI gate. Logs:
+`.quick-check-tmp/p11-api-regressions-final.log`,
+`.quick-check-tmp/p11-browser-connected-final.log` and
+`.quick-check-tmp/p11-backend-connected-final.log`.
+
+The one final canonical managed `python scripts/agent/runner.py frontend-check`
+returned zero on 2026-11-07: lint, typecheck, all 339 Chromium journeys, 56 Atom Lab
+Node tests, six demo Node tests, 824 Vitest tests, generated API-type drift and
+production builds. Log: `.quick-check-tmp/p11-frontend-check-final.log`. The initial
+sandbox attempt hit the existing pnpm-store symlink EPERM; the identical approved
+rerun passed. Its outer log-tail printer subsequently failed on Windows cp1252
+encoding, after printing the runner's zero exit code; the complete UTF-8 log and
+successful build footer remain intact. No gate was rerun or weakened for this
+display-only failure.
+
+Documentation validation, generated-document drift and full architecture
+validation passed. Atom Lab ESLint passed; Ruff found zero diagnostics on changed
+lines and one existing untouched E501 in `schemas.py`. Logs:
+`.quick-check-tmp/p11-validate-docs-final.log`,
+`.quick-check-tmp/p11-generate-docs-final.log`,
+`.quick-check-tmp/p11-validate-architecture-final.log`,
+`.quick-check-tmp/p11-lint-final.log` and `.quick-check-tmp/p11-ruff-final.log`.
+
+Only the five owned schema/JavaScript/API-test/browser-test/plan files changed.
+HEAD remains `35d9ee9d15a8eb7585ae65294fae268f8a39fa9e`; staging is empty and
+unrelated untracked reports remain untouched. No router/core/hash/replay,
+generated contract, dependency, working DB, migration, provider, CI/Sonar,
+deployment, commit, push or GitHub write changed. Parent owns fresh independent
+review, commit/push and required CI; never merge. Existing ambiguous-save and
+unbounded-library follow-ups remain separate.
