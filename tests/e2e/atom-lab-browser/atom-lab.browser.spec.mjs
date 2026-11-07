@@ -2160,6 +2160,7 @@ for (const source of ["platform", "product"]) {
     test(`late trial completion keeps submitted ${source} atom identity with ${changedBase ? "a new" : "the same"} base`, async ({page}) => {
       let published = false;
       let submitted;
+      const submissions = [];
       let saved;
       let completeRun;
       const completion = new Promise(resolve => { completeRun = resolve; });
@@ -2176,11 +2177,15 @@ for (const source of ["platform", "product"]) {
       });
       await page.route("http://atom-lab.test/v1/atom-lab/runs", async route => {
         submitted = route.request().postDataJSON();
-        await route.fulfill({status: 202, json: {run_id: "run-old-base", scenario_session_id: "session-library", job_id: "job-library", status: "queued"}});
+        submissions.push(submitted);
+        const runId = submissions.length === 1 ? "run-old-base" : "run-current-base";
+        await route.fulfill({status: 202, json: {run_id: runId, scenario_session_id: "session-library", job_id: "job-library", status: "queued"}});
       });
-      await page.route("http://atom-lab.test/v1/atom-lab/runs/run-old-base", async route => {
+      await page.route("http://atom-lab.test/v1/atom-lab/runs/run-*-base", async route => {
         await completion;
-        const detail = historyDetail({runId: "run-old-base", input: submitted.input, prompt: submitted.prompt});
+        const runId = new URL(route.request().url()).pathname.split("/").at(-1);
+        const detail = historyDetail({runId, input: submitted.input, prompt: submitted.prompt});
+        detail.snapshot.prompt.ref = submitted.expected_contract.prompt_ref;
         detail.snapshot.prompt.source_ref = submitted.prompt_source_ref;
         await route.fulfill({json: detail});
       });
@@ -2199,8 +2204,21 @@ for (const source of ["platform", "product"]) {
       else await page.locator("#prompt-tab").click();
       await expect(page.locator("#prompt-load-status")).toBeEmpty();
       await expect(page.locator("#prompt-select")).toHaveValue(source === "product" ? product.ref : atom().prompt_ref);
+      if (source === "product") {
+        await expect(page.locator("#prompt-editor")).toHaveValue(submitted.prompt);
+        await expect(page.locator("#model-select")).toHaveValue("gpt-supported");
+        await expect(page.locator("#reasoning-effort")).toHaveValue("high");
+      }
       completeRun();
       await expect(page.locator("#run-state")).toHaveText("Завершён успешно");
+      await expect(page.locator("#response-draft-warning"))[changedBase ? "toBeVisible" : "toBeHidden"]();
+      expect(JSON.parse(await page.locator("#submitted-snapshot").textContent())).toEqual({
+        atom_id: submitted.atom_id, input: submitted.input, prompt: submitted.prompt,
+        prompt_source_ref: submitted.prompt_source_ref, model_id: submitted.model_id,
+        reasoning_effort: submitted.reasoning_effort,
+      });
+      await expect(page.locator("#result-json")).toHaveText(JSON.stringify({summary: "Готово"}, null, 2));
+      await expect(page.locator("#run-diagnostics")).toContainText("run-old-base");
       if (changedBase) await expect(page.locator("#prompt-test-status")).not.toContainText("Ответ прошёл контракт");
       else await expect(page.locator("#prompt-test-status")).toContainText("Ответ прошёл контракт");
       await page.locator("#save-prompt-panel summary").click();
@@ -2210,6 +2228,12 @@ for (const source of ["platform", "product"]) {
       expect(saved.source_ref).toBe(source === "product" ? product.ref : atom().prompt_ref);
       expect(saved.source_run_id).toBe(changedBase ? null : "run-old-base");
       expect(submitted.prompt_source_ref).toBe(source === "product" ? product.ref : A06.prompt_ref);
+      await page.locator("#run-button").click();
+      await expect(page.locator("#run-state")).toHaveText("Завершён успешно");
+      await expect(page.locator("#run-diagnostics")).toContainText("run-current-base");
+      await expect(page.locator("#response-draft-warning")).toBeHidden();
+      expect(submissions[1].expected_contract).toEqual(expectedAtomContract(atom()));
+      expect(submissions[1].input).toEqual(submissions[0].input);
     });
   }
 }

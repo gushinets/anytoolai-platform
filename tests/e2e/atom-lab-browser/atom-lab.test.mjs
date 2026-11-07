@@ -402,6 +402,62 @@ for (const changedBase of [false, true]) {
   });
 }
 
+test("response warning compares every frozen contract field semantically without changing the accepted snapshot", async () => {
+  const atom = await catalogAtom("A06", {output_schema: {type: "object", minProperties: 1, default: false}});
+  const {document, elements} = createFakeDocument();
+  const controller = bootstrapAtomLab({
+    document,
+    scheduleImpl: () => 0,
+    cancelScheduleImpl: () => {},
+    fetchImpl: async url => {
+      let payload;
+      if (url.endsWith("/atoms")) payload = [atom];
+      else if (url.endsWith("/models")) payload = {
+        items: [{model_id: "gpt-supported", compatibility: "compatible", reason: "confirmed_openai_text_gpt",
+          reasoning_supported: false, allowed_reasoning_efforts: null, provenance: {}}],
+        snapshot_id: "models-1", last_success_at: "2026-11-07T00:00:00Z", stale: false, refresh_status: "current", error: null,
+      };
+      else if (url.endsWith("/runs")) payload = {
+        run_id: "run-contract", scenario_session_id: "session-contract", job_id: "job-contract", status: "queued",
+      };
+      else throw new Error(`Unexpected request ${url}`);
+      return {ok: true, status: 200, async json() { return payload; }};
+    },
+  });
+  elements.get("access-code").value = "secret";
+  await elements.get("access-form").dispatch("submit");
+  await elements.get("fill-example").click();
+  const owner = controller.getSession();
+  owner.promptSourceRef = "product.a06.v1";
+  await elements.get("run-button").click();
+  const frozen = JSON.stringify(controller.getActiveSubmission().body);
+  const warning = elements.get("response-draft-warning");
+  assert.equal(warning.hidden, true);
+
+  owner.atom = {...structuredClone(atom), description: "Новые метаданные",
+    input_schema: Object.fromEntries(Object.entries(atom.input_schema).reverse()),
+    output_schema: {default: false, minProperties: 1.0, type: "object"}};
+  await elements.get("reasoning-effort").dispatch("change");
+  assert.equal(warning.hidden, true);
+  const visibility = [];
+  for (const [field, changed] of Object.entries({
+    action_type: "kernel.changed", base_action_config_id: "config.changed", prompt_ref: "prompt.changed",
+    schema_refs: {...atom.schema_refs, output: {...atom.schema_refs.output, version: 2}},
+    input_schema: {...atom.input_schema, description: "Изменённый контракт"},
+    output_schema: {...atom.output_schema, default: 0},
+  })) {
+    owner.atom = {...atom, [field]: changed};
+    await elements.get("reasoning-effort").dispatch("change");
+    visibility.push([field, warning.hidden]);
+  }
+  assert.deepEqual(visibility, Object.keys(controller.getActiveSubmission().body.expected_contract).map(field => [field, false]));
+  owner.atom = atom;
+  await elements.get("reasoning-effort").dispatch("change");
+  assert.equal(warning.hidden, true);
+  assert.equal(JSON.stringify(controller.getActiveSubmission().body), frozen);
+  controller.destroy();
+});
+
 test("omission remains distinct from null, empty string, false, and zero", async () => {
   const atom = await catalogAtom("A04", {
     input_schema: {

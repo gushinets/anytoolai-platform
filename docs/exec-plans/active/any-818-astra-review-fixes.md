@@ -2,6 +2,69 @@
 
 ## Status
 
+Fresh review follow-up (2026-11-07, HEAD `5477d3a4456f114a136775183d9b1a6aa35e0841`):
+repair discussion `4499320117` from review `5809145971`. Doctor passed before
+edits. Reproduce the response warning remaining hidden after an authoritative
+base change with the same product source, prompt, input, model and effort; keep
+the unchanged-base positive control. The warning must compare the accepted
+submission's frozen contract with the current atom semantically, alongside the
+existing draft comparison, without changing successful trial/history matching.
+
+Reach: existing Atom Lab JavaScript warning, focused browser/Node regressions as
+needed, and this plan. Preserve accepted-response attribution, result/raw JSON/
+diagnostics, immutable snapshots, source and request fences. Verify a matching
+new response clears the warning and identical rejected submissions retain their
+accepted data. Run focused connected checks, one final canonical frontend-check,
+docs/generation, architecture and diff checks. No backend/API, dependency, working
+DB, migration, provider, CI/Sonar or Git/GitHub writes. Parent owns fresh review,
+commit/push and CI; never merge.
+
+Before production edits, Chromium reproduced exactly the product-source/new-base
+warning failure while the three platform/unchanged-base controls passed
+(`.quick-check-tmp/p12-browser-before.log`). A focused Node regression reproduced
+all six contract fields being ignored (`p12-node-before.log`). The existing warning
+now additionally compares every field of the accepted submission's frozen
+`body.expected_contract` with the current atom through the existing semantic JSON
+comparator. No draft, trial, history, API or response-rendering behavior changed.
+All non-null displayed submissions originate in `createRunSubmission`, including
+retries and failed accepted runs; restored legacy history never assigns this
+response owner. Its six-field frozen contract is therefore always present.
+
+The four existing late-completion browser cases now check warning visibility,
+retained submitted/result/diagnostic JSON and clearing after a matching new
+accepted response. The new Node case checks all six contract fields, immutable
+submitted data, metadata-only replacement, key reordering, numeric 1/1.0,
+boolean/number distinction and restoring an equivalent current contract.
+All 14 targeted Chromium cases and 57 Node tests passed, including retained
+successful/invalid/diagnostic responses after identical quota/validation/network
+rejections (`p12-browser-after.log`, `p12-node-after.log`). The first parallel lint
+attempt raced Playwright's cleanup of `test-results` and failed with ENOENT;
+the unchanged sequential lint command passed (`p12-lint-final.log`).
+
+Final connected verification passed 129 Chromium journeys covering response
+attribution, trial proof, source rejection/recovery, compatible/adapted history
+and full frozen schemas (`p12-browser-connected-final.log`). The one final
+canonical managed `runner.py frontend-check` returned zero after all source/test
+edits: lint, typecheck, all 339 Chromium cases, 57 Atom Lab Node tests, six demo
+Node tests, 824 Vitest tests, generated API-type drift and production builds
+passed (`p12-frontend-check-final.log`). The initial sandbox invocation hit the
+established pnpm-store symlink EPERM (`p12-frontend-check-sandbox.log`); the
+identical approved rerun passed with the installed Chromium cache and bundled
+LiteLLM cost map. No dependency, check, assertion, skip or retry was weakened.
+
+Only the four owned JavaScript/browser-test/Node-test/plan files changed. HEAD
+remains `5477d3a4456f114a136775183d9b1a6aa35e0841`, staging is empty and unrelated
+untracked reports remain untouched. Final documentation, generated-document
+drift and architecture validation passed; evidence uses `p12-validate-docs-final.log`,
+`p12-generate-docs-final.log` and `p12-validate-architecture-final.log`; diff
+whitespace also passed. The generator's first sandbox Temp directory denied file
+writes; the same check passed using workspace Temp, with the initial error retained
+in `p12-generate-docs-sandbox.log`. No backend/API, generated contract, dependency,
+working DB, PostgreSQL, migration, provider, deployment, CI/Sonar or Git/GitHub
+write was used. Broad backend/PostgreSQL checks were omitted for this JavaScript
+warning repair. Parent owns fresh independent review, commit/push and required
+CI; never merge. Existing ambiguous-save and unbounded-library debt stays separate.
+
 Fresh review follow-up (2026-11-07, HEAD `2cb984fd218e67210c64f6699b749db3908bb7ba`):
 repair discussion `4499016952`. Doctor passed before edits. Reproduce successful
 stored runs and history restore accepting changed input/output schema contents

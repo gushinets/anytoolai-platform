@@ -1667,7 +1667,10 @@ export function bootstrapAtomLab({
     if (session) {
       renderPromptStatus();
       nodes["response-draft-warning"].hidden = !displayedSubmission
-        || matchesDraftSnapshot(displayedSubmission.snapshot);
+        || (matchesDraftSnapshot(displayedSubmission.snapshot)
+          && Object.entries(displayedSubmission.body.expected_contract).every(
+            ([field, value]) => sameJsonSemantically(value, session.atom[field]),
+          ));
     }
   };
 
