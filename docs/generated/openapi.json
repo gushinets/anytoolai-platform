@@ -4013,6 +4013,105 @@
                     "title": "AtomLabAtomId",
                     "type": "string"
                   },
+                  "expected_contract": {
+                    "anyOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "action_type": {
+                            "maxLength": 128,
+                            "minLength": 1,
+                            "title": "Action Type",
+                            "type": "string"
+                          },
+                          "base_action_config_id": {
+                            "maxLength": 128,
+                            "minLength": 1,
+                            "title": "Base Action Config Id",
+                            "type": "string"
+                          },
+                          "input_schema": {
+                            "additionalProperties": true,
+                            "title": "Input Schema",
+                            "type": "object"
+                          },
+                          "output_schema": {
+                            "additionalProperties": true,
+                            "title": "Output Schema",
+                            "type": "object"
+                          },
+                          "prompt_ref": {
+                            "maxLength": 128,
+                            "minLength": 1,
+                            "title": "Prompt Ref",
+                            "type": "string"
+                          },
+                          "schema_refs": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "input": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "schema_ref": {
+                                    "title": "Schema Ref",
+                                    "type": "string"
+                                  },
+                                  "version": {
+                                    "title": "Version",
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "schema_ref",
+                                  "version"
+                                ],
+                                "title": "AtomLabVersionedSchemaRefResponse",
+                                "type": "object"
+                              },
+                              "output": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "schema_ref": {
+                                    "title": "Schema Ref",
+                                    "type": "string"
+                                  },
+                                  "version": {
+                                    "title": "Version",
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "schema_ref",
+                                  "version"
+                                ],
+                                "title": "AtomLabVersionedSchemaRefResponse",
+                                "type": "object"
+                              }
+                            },
+                            "required": [
+                              "input",
+                              "output"
+                            ],
+                            "title": "AtomLabSchemaRefsResponse",
+                            "type": "object"
+                          }
+                        },
+                        "required": [
+                          "action_type",
+                          "base_action_config_id",
+                          "prompt_ref",
+                          "schema_refs",
+                          "input_schema",
+                          "output_schema"
+                        ],
+                        "title": "AtomLabRunExpectedContract",
+                        "type": "object"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "input": {
                     "additionalProperties": true,
                     "title": "Input",

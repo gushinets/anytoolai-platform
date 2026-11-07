@@ -2175,6 +2175,39 @@ export interface operations {
                      * @enum {string}
                      */
                     atom_id: "A01" | "A02" | "A03" | "A04" | "A05" | "A06" | "A07" | "A08" | "A09" | "A10" | "A11";
+                    expected_contract?: {
+                        /** Action Type */
+                        action_type: string;
+                        /** Base Action Config Id */
+                        base_action_config_id: string;
+                        /** Input Schema */
+                        input_schema: {
+                            [key: string]: unknown;
+                        };
+                        /** Output Schema */
+                        output_schema: {
+                            [key: string]: unknown;
+                        };
+                        /** Prompt Ref */
+                        prompt_ref: string;
+                        /** AtomLabSchemaRefsResponse */
+                        schema_refs: {
+                            /** AtomLabVersionedSchemaRefResponse */
+                            input: {
+                                /** Schema Ref */
+                                schema_ref: string;
+                                /** Version */
+                                version: number;
+                            };
+                            /** AtomLabVersionedSchemaRefResponse */
+                            output: {
+                                /** Schema Ref */
+                                schema_ref: string;
+                                /** Version */
+                                version: number;
+                            };
+                        };
+                    } | null;
                     /** Input */
                     input: {
                         [key: string]: unknown;
