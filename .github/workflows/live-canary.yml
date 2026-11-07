@@ -19,7 +19,7 @@ jobs:
     steps:
       # A local action reference (./.github/actions/...) can only be resolved after the repo is
       # checked out, so checkout must stay a job-level step here, not inside the composite action.
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
       # OPENAI_API_KEY/ANYTOOLAI_LIVE_CANARY_TOKEN are scoped to exactly the dev-up and
