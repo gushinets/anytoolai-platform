@@ -156,13 +156,20 @@ class FakeLifecycleTarget {
 function createFakeDocument() {
   const ids = [
     "access-form", "access-code", "access-panel", "workspace", "status",
-    "atom-navigation", "atom-title", "atom-action-type", "atom-description",
-    "atom-transformation", "atom-passport", "input-schema", "output-schema",
+    "atom-navigation", "atom-count", "atom-title", "atom-action-type", "atom-description",
+    "atom-passport", "input-schema", "output-schema",
+    "input-contract-label", "output-contract-label", "input-contract-fields", "output-contract-fields",
+    "input-schema-ref", "output-schema-ref", "input-schema-version", "output-schema-version",
     "input-tab", "prompt-tab", "input-panel", "prompt-panel", "form-mode", "json-mode", "input-editor",
     "json-panel", "json-editor", "json-error", "prompt-editor", "fill-example", "reset-prompt",
+    "prompt-select", "prompt-origin", "prompt-load-status", "retry-prompts", "prompt-tab-state",
+    "prompt-test-status", "run-prompt-ref", "run-prompt-state", "save-prompt-panel",
+    "save-prompt-form", "save-prompt-name", "save-prompt", "save-prompt-status",
     "draft-state", "validation-errors", "result-placeholder", "presets-button",
     "history-button", "model-select", "reasoning-effort", "reasoning-help",
     "model-catalog-warning", "refresh-models", "run-button", "retry-submit", "retry-read", "run-state",
+    "launch-readiness", "response-draft-warning",
+    "run-status", "run-status-help", "result-caption", "run-metadata-section", "run-technical",
     "submitted-snapshot", "result-section", "result-readable", "result-json",
     "invalid-response", "invalid-response-code", "invalid-response-raw", "run-metadata",
     "run-diagnostics", "presets-panel", "close-presets", "preset-list", "load-more-presets",
@@ -173,6 +180,19 @@ function createFakeDocument() {
     "preset-compatibility", "adapt-preset", "preset-readonly",
     "history-panel", "close-history", "history-list", "load-more-history", "history-warning",
     "history-detail", "restore-history", "save-history-preset", "history-error",
+    "workbench-button", "atom-sidebar", "run-controls", "request-response",
+    "preset-empty", "preset-heading", "preset-selected-name", "preset-context",
+    "preset-view-description", "preset-view-actions", "preset-editor-form", "preset-editor-title",
+    "preset-source", "apply-preset", "edit-preset", "cancel-preset",
+    "preset-configuration", "preset-config-metadata", "preset-input-fields", "preset-input-json",
+    "preset-prompt", "preset-technical", "preset-list-state", "history-context",
+    "history-list-state", "history-record", "history-created", "history-detail-title",
+    "collapse-history", "history-status", "history-status-text", "history-status-help",
+    "history-summary", "history-result-tab", "history-request-tab", "history-diagnostics-tab",
+    "history-result-panel", "history-request-panel", "history-diagnostics-panel", "history-result-readable",
+    "history-result-message", "history-result-json", "history-invalid", "history-invalid-code",
+    "history-invalid-raw", "history-input-json", "history-prompt", "history-snapshot",
+    "history-metadata", "history-diagnostics-json", "history-runtime-json",
   ];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id.endsWith("editor") ? "textarea" : "div", id)]));
   elements.get("access-form").tagName = "FORM";
@@ -313,6 +333,129 @@ test("all eleven non-smoke Form-mode drafts emit the shared acceptance POST payl
     assert.deepEqual(posts[0].input, acceptanceCase.input, acceptanceCase.atom_id);
     assert.equal(posts[0].atom_id, acceptanceCase.atom_id);
   }
+});
+
+for (const changedBase of [false, true]) {
+  test(`authoritative atom refresh ${changedBase ? "invalidates" : "preserves"} owner bindings before late run acceptance`, async () => {
+    const atom = await catalogAtom("A06");
+    const refreshed = {...structuredClone(atom), prompt_ref: changedBase ? "prompt.a06.v2" : atom.prompt_ref};
+    const {document, elements} = createFakeDocument();
+    const options = [{ref: refreshed.prompt_ref, name: "Платформа", prompt: atom.prompt,
+      group: "platform", source_ref: null, source_run_id: null}];
+    let releaseAcceptance;
+    const acceptance = new Promise(resolve => { releaseAcceptance = resolve; });
+    let runSent;
+    const sending = new Promise(resolve => { runSent = resolve; });
+    let atomReads = 0;
+    const controller = bootstrapAtomLab({
+      document,
+      scheduleImpl: () => 0,
+      cancelScheduleImpl: () => {},
+      fetchImpl: async url => {
+        let payload;
+        if (url.endsWith("/atoms")) payload = [atom];
+        else if (url.endsWith("/models")) payload = {
+          items: [{model_id: "gpt-supported", compatibility: "compatible", reason: "confirmed_openai_text_gpt",
+            reasoning_supported: false, allowed_reasoning_efforts: null, provenance: {}}],
+          snapshot_id: "models-1", last_success_at: "2026-11-07T00:00:00Z", stale: false, refresh_status: "current", error: null,
+        };
+        else if (url.endsWith("/prompts")) payload = options;
+        else if (url.endsWith("/atoms/A06")) {
+          atomReads += 1;
+          payload = structuredClone(refreshed);
+          payload.input_schema = Object.fromEntries(Object.entries(payload.input_schema).reverse());
+        } else if (url.endsWith("/runs")) {
+          runSent();
+          await acceptance;
+          payload = {run_id: "run-late", scenario_session_id: "session-late", job_id: "job-late", status: "queued"};
+        } else throw new Error(`Unexpected request ${url}`);
+        return {ok: true, status: 200, async json() { return payload; }};
+      },
+    });
+    elements.get("access-code").value = "secret";
+    await elements.get("access-form").dispatch("submit");
+    await elements.get("fill-example").click();
+    elements.get("model-select").value = "gpt-supported";
+    const owner = controller.getSession();
+    const canonical = owner.atom;
+    const presetRef = {preset_id: "preset-unchanged", version: 1};
+    owner.presetRef = presetRef;
+    owner.sourceRunId = "run-unchanged";
+    const submitted = elements.get("run-button").click();
+    await sending;
+    owner.promptSourceNeedsValidation = true;
+    owner.promptContractNeedsValidation = true;
+    await elements.get("retry-prompts").click();
+    assert.equal(atomReads, 1);
+    if (changedBase) assert.notEqual(owner.atom, canonical);
+    else assert.equal(owner.atom, canonical);
+    assert.equal(canonical.prompt_ref, atom.prompt_ref);
+    assert.equal(owner.presetRef, changedBase ? null : presetRef);
+    assert.equal(owner.sourceRunId, changedBase ? null : "run-unchanged");
+    assert.equal(owner.promptSourceNeedsValidation, false);
+    assert.equal(owner.promptContractNeedsValidation, false);
+    assert.deepEqual(owner.promptOptions, options);
+    releaseAcceptance();
+    await submitted;
+    assert.equal(owner.sourceRunId, changedBase ? null : "run-late");
+    controller.destroy();
+  });
+}
+
+test("response warning compares every frozen contract field semantically without changing the accepted snapshot", async () => {
+  const atom = await catalogAtom("A06", {output_schema: {type: "object", minProperties: 1, default: false}});
+  const {document, elements} = createFakeDocument();
+  const controller = bootstrapAtomLab({
+    document,
+    scheduleImpl: () => 0,
+    cancelScheduleImpl: () => {},
+    fetchImpl: async url => {
+      let payload;
+      if (url.endsWith("/atoms")) payload = [atom];
+      else if (url.endsWith("/models")) payload = {
+        items: [{model_id: "gpt-supported", compatibility: "compatible", reason: "confirmed_openai_text_gpt",
+          reasoning_supported: false, allowed_reasoning_efforts: null, provenance: {}}],
+        snapshot_id: "models-1", last_success_at: "2026-11-07T00:00:00Z", stale: false, refresh_status: "current", error: null,
+      };
+      else if (url.endsWith("/runs")) payload = {
+        run_id: "run-contract", scenario_session_id: "session-contract", job_id: "job-contract", status: "queued",
+      };
+      else throw new Error(`Unexpected request ${url}`);
+      return {ok: true, status: 200, async json() { return payload; }};
+    },
+  });
+  elements.get("access-code").value = "secret";
+  await elements.get("access-form").dispatch("submit");
+  await elements.get("fill-example").click();
+  const owner = controller.getSession();
+  owner.promptSourceRef = "product.a06.v1";
+  await elements.get("run-button").click();
+  const frozen = JSON.stringify(controller.getActiveSubmission().body);
+  const warning = elements.get("response-draft-warning");
+  assert.equal(warning.hidden, true);
+
+  owner.atom = {...structuredClone(atom), description: "Новые метаданные",
+    input_schema: Object.fromEntries(Object.entries(atom.input_schema).reverse()),
+    output_schema: {default: false, minProperties: 1.0, type: "object"}};
+  await elements.get("reasoning-effort").dispatch("change");
+  assert.equal(warning.hidden, true);
+  const visibility = [];
+  for (const [field, changed] of Object.entries({
+    action_type: "kernel.changed", base_action_config_id: "config.changed", prompt_ref: "prompt.changed",
+    schema_refs: {...atom.schema_refs, output: {...atom.schema_refs.output, version: 2}},
+    input_schema: {...atom.input_schema, description: "Изменённый контракт"},
+    output_schema: {...atom.output_schema, default: 0},
+  })) {
+    owner.atom = {...atom, [field]: changed};
+    await elements.get("reasoning-effort").dispatch("change");
+    visibility.push([field, warning.hidden]);
+  }
+  assert.deepEqual(visibility, Object.keys(controller.getActiveSubmission().body.expected_contract).map(field => [field, false]));
+  owner.atom = atom;
+  await elements.get("reasoning-effort").dispatch("change");
+  assert.equal(warning.hidden, true);
+  assert.equal(JSON.stringify(controller.getActiveSubmission().body), frozen);
+  controller.destroy();
 });
 
 test("omission remains distinct from null, empty string, false, and zero", async () => {
@@ -466,6 +609,23 @@ test("the interactive shell unlocks, safely renders catalog text, and keeps the 
   assert.equal(elements.get("atom-navigation").querySelector("button").textContent.includes("A01"), true);
   assert.equal(elements.get("atom-description").textContent, atom.description);
   assert.equal(elements.get("atom-passport").querySelector("img"), null);
+});
+
+test("local open access loads the editor automatically without a submitted code", async () => {
+  const {document, elements} = createFakeDocument();
+  const atom = await catalogAtom("A01");
+  elements.get("access-panel").dataset.autoOpen = "true";
+  const controller = bootstrapAtomLab({
+    document,
+    fetchImpl: async () => ({ok: true, async json() { return [atom]; }}),
+    confirmImpl: () => true,
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(controller.getSession().atom.atom_id, "A01");
+  assert.equal(elements.get("access-panel").hidden, true);
+  assert.equal(elements.get("workspace").hidden, false);
+  assert.equal(elements.get("access-code").value, "");
+  controller.destroy();
 });
 
 test("repeated refresh requests share one bounded model-catalog polling chain", async () => {
@@ -1462,7 +1622,14 @@ test("a persisted pagehide pauses polling and pageshow resumes the same accepted
       }
       reads += 1;
       return {ok: true, status: 200, async json() { return {
-        run_id: "run-bfcache", status: "succeeded", snapshot: {atom_id: "A01"},
+        run_id: "run-bfcache", status: "succeeded", snapshot: {
+          atom_id: "A01", action: {type: atom.action_type, config_id: atom.base_action_config_id},
+          prompt: {ref: atom.prompt_ref},
+          schemas: {
+            input: {ref: atom.schema_refs.input.schema_ref, version: atom.schema_refs.input.version, content: atom.input_schema},
+            output: {ref: atom.schema_refs.output.schema_ref, version: atom.schema_refs.output.version, content: atom.output_schema},
+          },
+        },
         runtime_ids: {scenario_session_id: "session-bfcache", job_id: "job-bfcache", action_run_id: "action-bfcache", artifact_id: "artifact-bfcache"},
         result: {value: "restored"},
         diagnostics: {error_code: null, duration_ms: 1, requested_model_id: "openai/gpt-supported", requested_reasoning_effort: null, response_model_id: null, validation_attempts: 1, transport_attempts: 1, physical_calls: 1, succeeded_first_attempt: true, provider_calls: [], provider_calls_truncated: false, debug_artifacts: [], debug_artifacts_truncated: false},
@@ -1779,10 +1946,10 @@ test("dirty atom navigation requires confirmation and preserves the current draf
   const buttons = elements.get("atom-navigation").querySelectorAll("button");
 
   await buttons[1].click();
-  assert.match(elements.get("atom-title").textContent, /A01/);
+  assert.equal(elements.get("atom-title").querySelector("span").textContent, "A01");
   allowNavigation = true;
   await buttons[1].click();
-  assert.match(elements.get("atom-title").textContent, /A02/);
+  assert.equal(elements.get("atom-title").querySelector("span").textContent, "A02");
 });
 
 test("invalid raw JSON requires confirmation before atom navigation", async () => {
@@ -1802,7 +1969,7 @@ test("invalid raw JSON requires confirmation before atom navigation", async () =
   await elements.get("atom-navigation").querySelectorAll("button")[1].click();
 
   assert.equal(confirmations, 1);
-  assert.match(elements.get("atom-title").textContent, /A01/);
+  assert.equal(elements.get("atom-title").querySelector("span").textContent, "A01");
   assert.equal(elements.get("json-editor").value, '{"source_text":');
 });
 
@@ -2101,11 +2268,47 @@ test("a run submission freezes the current draft and uses the exact backend fiel
     atom_id: "A01",
     input: EXAMPLES.A01,
     prompt: "Базовый промпт A01",
+    prompt_source_ref: session.atom.prompt_ref,
     model_id: "openai/gpt-supported",
     reasoning_effort: "high",
     preset_ref: null,
+    expected_contract: {
+      action_type: session.atom.action_type,
+      base_action_config_id: session.atom.base_action_config_id,
+      prompt_ref: session.atom.prompt_ref,
+      schema_refs: session.atom.schema_refs,
+      input_schema: session.atom.input_schema,
+      output_schema: session.atom.output_schema,
+    },
   });
   assert.equal(submission.snapshot.input.source_text, "Срок — 30 сентября");
+});
+
+test("run submissions freeze the effective source and atom while detached drafts stay independent", async () => {
+  const atom = await catalogAtom("A06");
+  for (const [source, detached, expected] of [
+    [null, false, atom.prompt_ref],
+    ["product.a06.v1", false, "product.a06.v1"],
+    [null, true, undefined],
+  ]) {
+    const session = createDraftSession(atom);
+    session.promptSourceRef = source;
+    session.promptSourceDetached = detached;
+    session.prompt = "Ручная версия";
+    const submission = createRunSubmission(session, {
+      modelId: "gpt-supported", reasoningEffort: null, idempotencyKey: "frozen-source",
+    });
+    const replay = JSON.stringify(submission.body);
+    session.atom = {...atom, prompt_ref: "prompt.a06.v2"};
+    session.promptSourceRef = "product.a06.v2";
+    session.prompt = "Следующая версия";
+    assert.equal(submission.body.prompt_source_ref, expected);
+    assert.equal(submission.body.expected_contract.prompt_ref, atom.prompt_ref);
+    assert.deepEqual(submission.body.expected_contract.schema_refs, atom.schema_refs);
+    assert.equal(submission.snapshot.prompt_source_ref, expected);
+    assert.equal(submission.atom, atom);
+    assert.equal(JSON.stringify(submission.body), replay);
+  }
 });
 
 test("accepted and detail response parsers reject incomplete or unknown lifecycle envelopes", () => {
@@ -2129,9 +2332,11 @@ test("accepted and detail response parsers reject incomplete or unknown lifecycl
   assert.equal(parseRunDetail({...detail, snapshot: {atom_id: "A99"}}, "run"), null);
   assert.deepEqual(parseRunDetail(detail, "run"), {
     run_id: "run", status: "running", snapshot: {atom_id: "A01"}, runtime_ids: runtimeIds, result: null, diagnostics,
+    created_at: detail.created_at, started_at: detail.started_at, finished_at: detail.finished_at,
   });
   assert.deepEqual(parseRunDetail({...detail, status: "succeeded", result: {value: "ok"}}, "run"), {
     run_id: "run", status: "succeeded", snapshot: {atom_id: "A01"}, runtime_ids: runtimeIds, result: {value: "ok"}, diagnostics,
+    created_at: detail.created_at, started_at: detail.started_at, finished_at: detail.finished_at,
   });
 });
 
@@ -2160,6 +2365,9 @@ test("preset and history parsers fail closed around immutable and paginated cont
   };
   const detail = {...configuration, preset_id: "preset-1", version: 1, created_at: "2026-09-23T00:00:00Z"};
   assert.deepEqual(parsePresetVersion(detail, "preset-1", 1), detail);
+  assert.ok(parsePresetVersion({...detail, prompt_source_ref: null}));
+  assert.ok(parsePresetVersion({...detail, prompt_source_ref: "product.prompt.v1"}));
+  assert.equal(parsePresetVersion({...detail, prompt_source_ref: {ref: "product.prompt.v1"}}), null);
   assert.equal(parsePresetVersion({...detail, atom_id: "A99"}, "preset-1", 1), null);
   assert.equal(parsePresetVersion({...detail, fixed_fields: ["fields", "fields"]}), null);
   assert.ok(parsePresetList({items: [{

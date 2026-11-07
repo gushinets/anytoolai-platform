@@ -235,6 +235,7 @@ def test_create_read_list_version_and_export_preserves_immutable_payload(app: Fa
         "created_at": created_payload["created_at"],
         **_version_payload(),
         "source_run_id": None,
+        "prompt_source_ref": None,
     }
 
     identities = asyncio.run(_request(app, "GET", "/v1/atom-lab/presets"))
@@ -278,7 +279,9 @@ def test_create_read_list_version_and_export_preserves_immutable_payload(app: Fa
         "format_version": 1,
         "preset_id": preset_id,
         "version": 1,
-        "configuration": {**_version_payload(), "source_run_id": None},
+        "configuration": {
+            **_version_payload(), "source_run_id": None, "prompt_source_ref": None,
+        },
     }
     assert "credential" not in exported.text.lower()
     assert "base_url" not in exported.text.lower()

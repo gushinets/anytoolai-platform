@@ -14,6 +14,20 @@ from anytoolai_platform_core.workflows.models import JobRecord
 ATOM_LAB_MODEL_PREFIX = "openai/"
 
 
+@dataclass(frozen=True)
+class AtomLabSavedPrompt:
+    ref: str
+    tenant_id: str
+    region: str
+    atom_id: str
+    name: str
+    prompt: str
+    source_ref: str
+    schema_refs: dict[str, Any]
+    source_run_id: str | None
+    created_at: datetime
+
+
 class AtomLabRunStatus(StrEnum):
     queued = "queued"
     running = "running"
@@ -61,6 +75,7 @@ class AtomLabPresetVersionRecord:
     tenant_id: str
     region: str
     source_run_id: str | None = None
+    prompt_source_ref: str | None = None
     created_at: datetime = field(default_factory=utc_now)
 
 
@@ -122,6 +137,7 @@ class AtomLabRunRecord:
     preset_version: int | None = None
     action_run_id: str | None = None
     artifact_id: str | None = None
+    prompt_source_ref: str | None = None
     created_at: datetime = field(default_factory=utc_now)
 
     def snapshot_payload(self) -> dict[str, Any]:
@@ -144,6 +160,7 @@ class AtomLabRunRecord:
             },
             "prompt": {
                 "ref": self.prompt_ref,
+                **({"source_ref": self.prompt_source_ref} if self.prompt_source_ref else {}),
                 "version": self.prompt_version,
                 "base": self.base_prompt,
                 "content": self.prompt,

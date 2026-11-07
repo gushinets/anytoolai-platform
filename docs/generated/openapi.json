@@ -1,5 +1,17 @@
 {
   "components": {
+    "responses": {
+      "AtomLabAtomNotFound": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AtomLabErrorResponse"
+            }
+          }
+        },
+        "description": "Atom not found."
+      }
+    },
     "schemas": {
       "AtomLabAtomId": {
         "enum": [
@@ -509,6 +521,19 @@
             "title": "Prompt Ref",
             "type": "string"
           },
+          "prompt_source_ref": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9_.-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Source Ref"
+          },
           "reasoning_effort": {
             "anyOf": [
               {
@@ -677,6 +702,19 @@
             "title": "Prompt Ref",
             "type": "string"
           },
+          "prompt_source_ref": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9_.-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Source Ref"
+          },
           "reasoning_effort": {
             "anyOf": [
               {
@@ -779,6 +817,19 @@
             "title": "Prompt Ref",
             "type": "string"
           },
+          "prompt_source_ref": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9_.-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Source Ref"
+          },
           "reasoning_effort": {
             "anyOf": [
               {
@@ -863,6 +914,61 @@
           "created_at"
         ],
         "title": "AtomLabPresetVersionSummaryResponse",
+        "type": "object"
+      },
+      "AtomLabPromptOption": {
+        "properties": {
+          "group": {
+            "enum": [
+              "platform",
+              "product",
+              "lab"
+            ],
+            "title": "Group",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "prompt": {
+            "title": "Prompt",
+            "type": "string"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          },
+          "source_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Ref"
+          },
+          "source_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Run Id"
+          }
+        },
+        "required": [
+          "ref",
+          "name",
+          "prompt",
+          "group"
+        ],
+        "title": "AtomLabPromptOption",
         "type": "object"
       },
       "AtomLabProviderCallDiagnosticResponse": {
@@ -2754,14 +2860,7 @@
             "description": "Atom Lab access denied."
           },
           "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AtomLabErrorResponse"
-                }
-              }
-            },
-            "description": "Atom not found."
+            "$ref": "#/components/responses/AtomLabAtomNotFound"
           },
           "422": {
             "content": {
@@ -2785,6 +2884,232 @@
           }
         },
         "summary": "Get Atom",
+        "tags": [
+          "atom-lab",
+          "atom-lab"
+        ]
+      }
+    },
+    "/v1/atom-lab/atoms/{atom_id}/prompts": {
+      "get": {
+        "operationId": "list_atom_prompts_v1_atom_lab_atoms__atom_id__prompts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "atom_id",
+            "required": true,
+            "schema": {
+              "title": "Atom Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Atom-Lab-Access-Code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Atom-Lab-Access-Code"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AtomLabPromptOption"
+                  },
+                  "title": "Response List Atom Prompts V1 Atom Lab Atoms  Atom Id  Prompts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabErrorResponse"
+                }
+              }
+            },
+            "description": "Atom Lab access denied."
+          },
+          "404": {
+            "$ref": "#/components/responses/AtomLabAtomNotFound"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabErrorResponse"
+                }
+              }
+            },
+            "description": "Atom Lab request validation failed."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabErrorResponse"
+                }
+              }
+            },
+            "description": "Atom Lab is not configured."
+          }
+        },
+        "summary": "List Atom Prompts",
+        "tags": [
+          "atom-lab",
+          "atom-lab"
+        ]
+      },
+      "post": {
+        "operationId": "create_atom_prompt_v1_atom_lab_atoms__atom_id__prompts_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "atom_id",
+            "required": true,
+            "schema": {
+              "title": "Atom Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Atom-Lab-Access-Code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Atom-Lab-Access-Code"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "maxLength": 80,
+                    "minLength": 1,
+                    "title": "Name",
+                    "type": "string"
+                  },
+                  "prompt": {
+                    "minLength": 1,
+                    "title": "Prompt",
+                    "type": "string"
+                  },
+                  "source_ref": {
+                    "maxLength": 128,
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z0-9_.-]+$",
+                    "title": "Source Ref",
+                    "type": "string"
+                  },
+                  "source_run_id": {
+                    "anyOf": [
+                      {
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z0-9_-]+$",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Source Run Id"
+                  }
+                },
+                "required": [
+                  "name",
+                  "prompt",
+                  "source_ref"
+                ],
+                "title": "AtomLabPromptCreateRequest",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabPromptOption"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabErrorResponse"
+                }
+              }
+            },
+            "description": "Atom Lab access denied."
+          },
+          "404": {
+            "$ref": "#/components/responses/AtomLabAtomNotFound"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabErrorResponse"
+                }
+              }
+            },
+            "description": "Atom Lab payload is too large."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabErrorResponse"
+                }
+              }
+            },
+            "description": "Atom Lab request validation failed."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabErrorResponse"
+                }
+              }
+            },
+            "description": "Atom Lab is not configured."
+          }
+        },
+        "summary": "Create Atom Prompt",
         "tags": [
           "atom-lab",
           "atom-lab"
@@ -3688,6 +4013,105 @@
                     "title": "AtomLabAtomId",
                     "type": "string"
                   },
+                  "expected_contract": {
+                    "anyOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "action_type": {
+                            "maxLength": 128,
+                            "minLength": 1,
+                            "title": "Action Type",
+                            "type": "string"
+                          },
+                          "base_action_config_id": {
+                            "maxLength": 128,
+                            "minLength": 1,
+                            "title": "Base Action Config Id",
+                            "type": "string"
+                          },
+                          "input_schema": {
+                            "additionalProperties": true,
+                            "title": "Input Schema",
+                            "type": "object"
+                          },
+                          "output_schema": {
+                            "additionalProperties": true,
+                            "title": "Output Schema",
+                            "type": "object"
+                          },
+                          "prompt_ref": {
+                            "maxLength": 128,
+                            "minLength": 1,
+                            "title": "Prompt Ref",
+                            "type": "string"
+                          },
+                          "schema_refs": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "input": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "schema_ref": {
+                                    "title": "Schema Ref",
+                                    "type": "string"
+                                  },
+                                  "version": {
+                                    "title": "Version",
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "schema_ref",
+                                  "version"
+                                ],
+                                "title": "AtomLabVersionedSchemaRefResponse",
+                                "type": "object"
+                              },
+                              "output": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "schema_ref": {
+                                    "title": "Schema Ref",
+                                    "type": "string"
+                                  },
+                                  "version": {
+                                    "title": "Version",
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "schema_ref",
+                                  "version"
+                                ],
+                                "title": "AtomLabVersionedSchemaRefResponse",
+                                "type": "object"
+                              }
+                            },
+                            "required": [
+                              "input",
+                              "output"
+                            ],
+                            "title": "AtomLabSchemaRefsResponse",
+                            "type": "object"
+                          }
+                        },
+                        "required": [
+                          "action_type",
+                          "base_action_config_id",
+                          "prompt_ref",
+                          "schema_refs",
+                          "input_schema",
+                          "output_schema"
+                        ],
+                        "title": "AtomLabRunExpectedContract",
+                        "type": "object"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "input": {
                     "additionalProperties": true,
                     "title": "Input",
@@ -3734,6 +4158,19 @@
                     "minLength": 1,
                     "title": "Prompt",
                     "type": "string"
+                  },
+                  "prompt_source_ref": {
+                    "anyOf": [
+                      {
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z0-9_.-]+$",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Prompt Source Ref"
                   },
                   "reasoning_effort": {
                     "anyOf": [

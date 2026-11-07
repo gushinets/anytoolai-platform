@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
@@ -133,6 +135,28 @@ def test_request_hash_is_canonical_for_nested_json_key_order() -> None:
     assert compute_atom_lab_request_hash(first) == compute_atom_lab_request_hash(reordered)
     assert compute_atom_lab_request_hash(first) != compute_atom_lab_request_hash(
         replace(reordered, reasoning_effort=ReasoningEffort.low)
+    )
+
+
+def test_optional_contract_pin_preserves_legacy_hash_and_changes_request_identity() -> None:
+    request = _request()
+    legacy = {
+        "atom_id": request.atom_id, "input": request.input_payload, "prompt": request.prompt,
+        "model_id": request.model_id, "reasoning_effort": request.reasoning_effort.value,
+        "preset_ref": None,
+    }
+    digest = hashlib.sha256(json.dumps(
+        legacy, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+    ).encode("utf-8")).hexdigest()
+    assert compute_atom_lab_request_hash(request) == digest
+    assert compute_atom_lab_request_hash(replace(request, expected_contract=None)) == digest
+    pinned = replace(request, expected_contract={"prompt_ref": "v1", "schema_refs": {"in": 1}})
+    assert compute_atom_lab_request_hash(pinned) != digest
+    assert compute_atom_lab_request_hash(pinned) == compute_atom_lab_request_hash(
+        replace(request, expected_contract={"schema_refs": {"in": 1}, "prompt_ref": "v1"})
+    )
+    assert compute_atom_lab_request_hash(pinned) != compute_atom_lab_request_hash(
+        replace(pinned, expected_contract={"prompt_ref": "v2", "schema_refs": {"in": 1}})
     )
 
 

@@ -194,6 +194,50 @@ def _runtime(app, run, *, success=True, calls=((1, 1),), confirmed_model=None):
     return action, artifact
 
 
+@pytest.mark.parametrize(
+    "mismatch",
+    [
+        {},
+        {"input_schema_ref": "historical.input"},
+        {"input_schema_version": 2},
+        {"output_schema_ref": "historical.output"},
+        {"output_schema_version": 2},
+        {"tenant_id": "other-tenant"},
+        {"region": "other-region"},
+    ],
+)
+def test_saved_prompt_trial_requires_current_schema_and_scope(app, mismatch):
+    run = _start(app)
+    _runtime(app, run)
+    if mismatch:
+        with transaction_boundary(_factory(app)) as session:
+            session.execute(
+                sa.update(atom_lab_runs_table).where(atom_lab_runs_table.c.id == run.id)
+                .values(**mismatch)
+            )
+
+    async def save():
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test",
+            headers={"X-Atom-Lab-Access-Code": ACCESS_CODE},
+        ) as client:
+            return await client.post("/v1/atom-lab/atoms/A01/prompts", json={
+                "name": "Validated trial", "prompt": run.prompt,
+                "source_ref": run.prompt_ref, "source_run_id": run.id,
+            })
+
+    response = asyncio.run(save())
+    if mismatch:
+        assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY, response.text
+        assert response.json()["error"]["code"] == "prompt_invalid"
+        assert response.json()["error"]["field_errors"] == [
+            {"path": "source_run_id", "message": "Недопустимое значение."}
+        ]
+    else:
+        assert response.status_code == HTTPStatus.CREATED, response.text
+        assert response.json()["source_run_id"] == run.id
+
+
 def test_expired_session_keeps_terminal_precedence_and_hides_stored_result(app):
     """Catches a late successful job reviving an independently expired scenario."""
     run = _start(app)

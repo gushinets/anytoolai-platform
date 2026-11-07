@@ -137,9 +137,12 @@ def test_atom_lab_shell_contains_no_embedded_registry_values() -> None:
 
 def test_atom_lab_browser_atom_ids_match_backend_enum() -> None:
     browser_source = ATOM_LAB_MODULE_PATH.read_text(encoding="utf-8")
-    browser_match = re.search(r"const ATOM_IDS = new Set\((\[[^\n]+\])\);", browser_source)
+    browser_match = re.search(
+        r"^const ATOM_LABELS = \{\n(.*?)^\};", browser_source, re.MULTILINE | re.DOTALL,
+    )
     assert browser_match is not None
-    browser_atom_ids = json.loads(browser_match.group(1))
+    browser_atom_ids = re.findall(r"^  ([^\s:]+):", browser_match.group(1), re.MULTILINE)
+    assert "const ATOM_IDS = new Set(Object.keys(ATOM_LABELS));" in browser_source
 
     schemas_module = ast.parse(ATOM_LAB_SCHEMAS_PATH.read_text(encoding="utf-8"))
     enum_class = next(

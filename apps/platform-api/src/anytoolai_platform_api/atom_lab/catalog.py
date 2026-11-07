@@ -6,6 +6,7 @@ from typing import Any
 from anytoolai_platform_api.schemas import (
     AtomLabAtomId,
     AtomLabAtomResponse,
+    AtomLabPromptOption,
     AtomLabSchemaRefsResponse,
     AtomLabVersionedSchemaRefResponse,
 )
@@ -97,6 +98,33 @@ def build_atom_catalog(registry: ConfigRegistry) -> tuple[AtomLabAtomResponse, .
 
 def get_atom_catalog_entry(registry: ConfigRegistry, atom_id: str) -> AtomLabAtomResponse | None:
     return next((entry for entry in build_atom_catalog(registry) if entry.atom_id == atom_id), None)
+
+
+def registry_prompt_options(
+    registry: ConfigRegistry, atom: AtomLabAtomResponse,
+) -> dict[str, AtomLabPromptOption]:
+    options = {
+        atom.prompt_ref: AtomLabPromptOption(
+            ref=atom.prompt_ref, name=atom.prompt_ref, prompt=atom.prompt, group="platform",
+        ),
+    }
+    for config in sorted(registry.action_configurations.values(), key=lambda item: item.prompt_ref):
+        if config.action_type != atom.action_type or config.prompt_ref in options:
+            continue
+        product = registry.get_product(config.action_config_id.partition(".")[0])
+        prompt = registry.get_prompt(config.prompt_ref)
+        if (
+            product is None or product.product_id == "kernel_demo" or prompt is None
+            or prompt.output_schema_ref != atom.schema_refs.output.schema_ref
+        ):
+            continue
+        options[prompt.prompt_ref] = AtomLabPromptOption(
+            ref=prompt.prompt_ref,
+            name=f"{product.display_name} · {prompt.prompt_ref.partition('.')[2]}",
+            prompt=prompt.content,
+            group="product",
+        )
+    return options
 
 
 def _mutable_json(value: Any) -> Any:

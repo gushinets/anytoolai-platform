@@ -16,11 +16,15 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     ValidatorRefNotFoundError,
     build_input_validator,
 )
-from anytoolai_platform_api.atom_lab.access import require_atom_lab_access
+from anytoolai_platform_api.atom_lab.access import (
+    atom_lab_access_code_required,
+    require_atom_lab_access,
+)
 from anytoolai_platform_api.atom_lab.catalog import (
     AtomLabCatalogConfigError,
     build_atom_catalog,
     get_atom_catalog_entry,
+    registry_prompt_options,
 )
 from anytoolai_platform_api.bootstrap import RuntimeBootstrapResult
 from anytoolai_platform_api.dependencies import (
@@ -47,8 +51,11 @@ from anytoolai_platform_api.schemas import (
     AtomLabPresetVersionRequest,
     AtomLabPresetVersionResponse,
     AtomLabPresetVersionSummaryResponse,
+    AtomLabPromptCreateRequest,
+    AtomLabPromptOption,
     AtomLabRunAcceptedResponse,
     AtomLabRunDetailResponse,
+    AtomLabRunExpectedContract,
     AtomLabRunListResponse,
     AtomLabRunRequest,
 )
@@ -58,10 +65,13 @@ from anytoolai_platform_core.atom_lab.models import (
     ATOM_LAB_MODEL_PREFIX,
     AtomLabPresetIdentityRecord,
     AtomLabPresetVersionRecord,
+    AtomLabRunStatus,
+    AtomLabSavedPrompt,
     is_addressable_atom_lab_model,
 )
 from anytoolai_platform_core.atom_lab.repository import (
     AtomLabPresetRepository,
+    AtomLabPromptRepository,
     AtomLabRunRepository,
     PresetAtomMismatchError,
     PresetSourceRunError,
@@ -75,6 +85,7 @@ from anytoolai_platform_core.atom_lab.service import (
     AtomLabRunHistoryService,
     AtomLabRunService,
 )
+from anytoolai_platform_core.common.ids import new_id
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.providers.catalog_repository import (
@@ -88,7 +99,8 @@ from anytoolai_platform_core.providers.models import (
 )
 from anytoolai_platform_core.storage.transactions import transaction_boundary
 from fastapi import APIRouter, Depends, Header, Query, Request
-from fastapi.responses import FileResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse, HTMLResponse
 from jsonschema import ValidationError as JsonSchemaValidationError
 from jsonschema import validate as validate_json_schema
 from pydantic import ValidationError
@@ -110,6 +122,7 @@ _ERROR_RESPONSES = {
     422: {"model": AtomLabErrorResponse, "description": "Atom Lab request validation failed."},
     503: {"model": AtomLabErrorResponse, "description": "Atom Lab is not configured."},
 }
+_ATOM_NOT_FOUND_RESPONSE = {"model": AtomLabErrorResponse, "description": "Atom not found."}
 _PRESET_PAGE_DEFAULT = 20
 _PRESET_PAGE_MAX = 100
 _PRESET_CURSOR_PARTS = 2
@@ -127,10 +140,11 @@ _RUN_ID_PATTERN = re.compile(r"[A-Za-z0-9_-]+")
 
 
 def require_atom_lab_run_access(
+    request: Request,
     access_code: Annotated[str | None, Header(alias="X-Atom-Lab-Access-Code")] = None,
 ) -> None:
     try:
-        require_atom_lab_access(access_code)
+        require_atom_lab_access(request, access_code)
     except AtomLabApiError as exc:
         code = "access_denied" if exc.status_code == HTTPStatus.UNAUTHORIZED else "lab_unavailable"
         raise AtomLabApiError(status_code=exc.status_code, code=code, message=exc.message) from exc
@@ -169,11 +183,7 @@ async def _read_run_payload(
     key = request.headers.get("Idempotency-Key")
     if key is None or not key.strip() or len(key) > _IDEMPOTENCY_KEY_MAX_LENGTH:
         raise _run_error(HTTPStatus.UNPROCESSABLE_ENTITY, "input_invalid", "Idempotency-Key")
-    raw = bytearray()
-    async for chunk in request.stream():
-        if len(raw) + len(chunk) > settings.atom_lab_run_body_max_bytes:
-            raise _run_error(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "payload_too_large")
-        raw.extend(chunk)
+    raw = await _read_atom_lab_body(request, settings)
     try:
         payload = AtomLabRunRequest.model_validate_json(raw)
         _run_input_bytes(payload)
@@ -198,6 +208,28 @@ async def _read_run_payload(
     return payload
 
 
+async def _read_atom_lab_body(request: Request, settings: Settings) -> bytearray:
+    raw = bytearray()
+    async for chunk in request.stream():
+        if len(raw) + len(chunk) > settings.atom_lab_run_body_max_bytes:
+            raise _run_error(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "payload_too_large")
+        raw.extend(chunk)
+    return raw
+
+
+async def _read_prompt_payload(
+    request: Request,
+    settings: Annotated[Settings, Depends(get_atom_lab_run_settings)],
+) -> AtomLabPromptCreateRequest:
+    raw = await _read_atom_lab_body(request, settings)
+    try:
+        return AtomLabPromptCreateRequest.model_validate_json(raw)
+    except ValidationError as exc:
+        raise RequestValidationError([
+            {**error, "loc": ("body", *error["loc"])} for error in exc.errors()
+        ]) from exc
+
+
 def _contains_nul(value: Any) -> bool:
     if isinstance(value, str):
         return "\x00" in value
@@ -206,6 +238,20 @@ def _contains_nul(value: Any) -> bool:
     if isinstance(value, list):
         return any(_contains_nul(item) for item in value)
     return False
+
+
+def _same_json_content(left: Any, right: Any) -> bool:
+    if isinstance(left, dict):
+        return (
+            isinstance(right, dict) and left.keys() == right.keys()
+            and all(_same_json_content(value, right[key]) for key, value in left.items())
+        )
+    if isinstance(left, list):
+        return (
+            isinstance(right, list) and len(left) == len(right)
+            and all(_same_json_content(a, b) for a, b in zip(left, right, strict=True))
+        )
+    return isinstance(left, bool) == isinstance(right, bool) and left == right
 
 
 def _run_input_bytes(payload: AtomLabRunRequest) -> bytes:
@@ -299,13 +345,23 @@ def start_run(
                 idempotency_key=idempotency_key,
                 preset_id=payload.preset_ref.preset_id if payload.preset_ref else None,
                 preset_version=payload.preset_ref.version if payload.preset_ref else None,
+                prompt_source_ref=payload.prompt_source_ref,
+                expected_contract=(
+                    payload.expected_contract.model_dump() if payload.expected_contract else None
+                ),
             )
 
             def validate() -> None:
                 _validate_run_sizes(payload, settings)
                 if not os.getenv("ANYTOOLAI_LIVE_CANARY_TOKEN", "").strip():
                     raise _run_error(HTTPStatus.SERVICE_UNAVAILABLE, "lab_unavailable")
-                _validate_run_contract(payload, registry)
+                atom = _validate_run_contract(payload, registry)
+                if payload.prompt_source_ref is not None and not _prompt_source_exists(
+                    payload.prompt_source_ref, atom, registry, AtomLabPromptRepository(session), settings,
+                ):
+                    raise _run_error(
+                        HTTPStatus.UNPROCESSABLE_ENTITY, "prompt_source_invalid", "prompt_source_ref"
+                    )
                 if state is None or state.snapshot_id is None:
                     raise _run_error(HTTPStatus.SERVICE_UNAVAILABLE, "catalog_unavailable")
                 if (
@@ -483,13 +539,20 @@ def _decode_run_cursor(cursor: str) -> tuple[datetime, str]:
         ) from exc
 
 
-def _validate_run_contract(payload: AtomLabRunRequest, registry: ConfigRegistry) -> None:
+def _validate_run_contract(
+    payload: AtomLabRunRequest, registry: ConfigRegistry,
+) -> AtomLabAtomResponse:
     try:
         atom = get_atom_catalog_entry(registry, payload.atom_id.value)
     except AtomLabCatalogConfigError as exc:
         raise _run_error(HTTPStatus.CONFLICT, "contract_unavailable") from exc
     if atom is None:
         raise _run_error(HTTPStatus.NOT_FOUND, "atom_not_found")
+    if payload.expected_contract is not None and not _same_json_content(
+        payload.expected_contract.model_dump(),
+        AtomLabRunExpectedContract.model_validate(atom, from_attributes=True).model_dump(),
+    ):
+        raise _run_error(HTTPStatus.CONFLICT, "contract_unavailable", "expected_contract")
     try:
         validate_json_schema(instance=payload.input, schema=atom.input_schema)
         _validate_semantic_input(registry, atom.action_type, payload.input)
@@ -497,6 +560,7 @@ def _validate_run_contract(payload: AtomLabRunRequest, registry: ConfigRegistry)
         raise _run_error(HTTPStatus.UNPROCESSABLE_ENTITY, "input_invalid", "input") from exc
     except AtomLabApiError as exc:
         raise _run_error(HTTPStatus.CONFLICT, "contract_unavailable") from exc
+    return atom
 
 
 def _validate_run_preset(
@@ -541,8 +605,15 @@ def _validate_run_preset(
 
 
 @router.get("/atom-lab", include_in_schema=False)
-def get_atom_lab_page() -> FileResponse:
-    return FileResponse(_ASSET_ROOT / "index.html", media_type="text/html; charset=utf-8")
+def get_atom_lab_page() -> HTMLResponse:
+    content = (_ASSET_ROOT / "index.html").read_text(encoding="utf-8")
+    if not atom_lab_access_code_required():
+        content = content.replace(
+            'id="access-panel"', 'id="access-panel" data-auto-open="true" hidden',
+        )
+    return HTMLResponse(content, headers={
+        "Cache-Control": "no-store",
+    })
 
 
 @router.get("/atom-lab/atom_lab.css", include_in_schema=False)
@@ -576,7 +647,7 @@ def list_atoms(
     response_model=AtomLabAtomResponse,
     responses={
         **_ERROR_RESPONSES,
-        404: {"model": AtomLabErrorResponse, "description": "Atom not found."},
+        404: _ATOM_NOT_FOUND_RESPONSE,
     },
 )
 def get_atom(
@@ -594,6 +665,143 @@ def get_atom(
             message="Атом не найден.",
         )
     return atom
+
+
+def _saved_prompt_option(record: AtomLabSavedPrompt) -> AtomLabPromptOption:
+    return AtomLabPromptOption(
+        ref=record.ref, name=record.name, prompt=record.prompt, group="lab",
+        source_ref=record.source_ref, source_run_id=record.source_run_id,
+    )
+
+
+def _prompt_source_exists(
+    ref: str,
+    atom: AtomLabAtomResponse,
+    registry: ConfigRegistry,
+    repository: AtomLabPromptRepository,
+    settings: Settings,
+) -> bool:
+    if ref in registry_prompt_options(registry, atom):
+        return True
+    rows = repository.list_for_atom(
+        tenant_id=settings.default_tenant_id, region=settings.default_region, atom_id=atom.atom_id,
+        ref=ref,
+    )
+    return bool(rows and rows[0].schema_refs == atom.schema_refs.model_dump())
+
+
+@protected_router.get(
+    "/atoms/{atom_id}/prompts",
+    response_model=list[AtomLabPromptOption],
+    responses={**_ERROR_RESPONSES, 404: _ATOM_NOT_FOUND_RESPONSE},
+)
+def list_atom_prompts(
+    atom: Annotated[AtomLabAtomResponse, Depends(get_atom)],
+    registry: Annotated[ConfigRegistry, Depends(get_config_registry)],
+    session_factory: Annotated[Any, Depends(get_atom_lab_session_factory)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> list[AtomLabPromptOption]:
+    with transaction_boundary(session_factory) as session:
+        saved = AtomLabPromptRepository(session).list_for_atom(
+            tenant_id=settings.default_tenant_id, region=settings.default_region, atom_id=atom.atom_id,
+        )
+    return [
+        *registry_prompt_options(registry, atom).values(),
+        *(_saved_prompt_option(row) for row in saved if row.schema_refs == atom.schema_refs.model_dump()),
+    ]
+
+
+@protected_router.post(
+    "/atoms/{atom_id}/prompts",
+    status_code=HTTPStatus.CREATED,
+    response_model=AtomLabPromptOption,
+    responses={
+        **_ERROR_RESPONSES, 404: _ATOM_NOT_FOUND_RESPONSE,
+        413: {"model": AtomLabErrorResponse, "description": "Atom Lab payload is too large."},
+    },
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {"application/json": {
+                "schema": AtomLabPromptCreateRequest.model_json_schema(),
+            }},
+        }
+    },
+)
+def create_atom_prompt(
+    payload: Annotated[AtomLabPromptCreateRequest, Depends(_read_prompt_payload)],
+    atom: Annotated[AtomLabAtomResponse, Depends(get_atom)],
+    registry: Annotated[ConfigRegistry, Depends(get_config_registry)],
+    session_factory: Annotated[Any, Depends(get_atom_lab_session_factory)],
+    settings: Annotated[Settings, Depends(get_atom_lab_run_settings)],
+) -> AtomLabPromptOption:
+    def invalid_prompt(message: str, path: str) -> AtomLabApiError:
+        return AtomLabApiError(
+            status_code=HTTPStatus.UNPROCESSABLE_ENTITY, code="prompt_invalid",
+            message=message, field_errors=[_field_error(path)],
+        )
+
+    if not payload.name.strip() or "\x00" in payload.name:
+        raise invalid_prompt("Укажите название промпта.", "name")
+    if (
+        not payload.prompt.strip()
+        or "\x00" in payload.prompt
+        or len(payload.prompt.encode("utf-8")) > settings.atom_lab_run_prompt_max_bytes
+    ):
+        raise invalid_prompt("Проверьте текст и размер промпта.", "prompt")
+    try:
+        with transaction_boundary(session_factory) as session:
+            repository = AtomLabPromptRepository(session)
+            if not _prompt_source_exists(payload.source_ref, atom, registry, repository, settings):
+                raise invalid_prompt("Исходный промпт недоступен для этого атома.", "source_ref")
+            if payload.source_run_id is not None:
+                runs = AtomLabRunRepository(session).history_in_scope(
+                    tenant_id=settings.default_tenant_id, region=settings.default_region,
+                    run_id=payload.source_run_id, limit=1,
+                )
+                if (
+                    not runs
+                    or AtomLabRunHistoryService.status(runs[0]) is not AtomLabRunStatus.succeeded
+                    or runs[0].run.atom_id != atom.atom_id
+                    or runs[0].run.action_type != atom.action_type
+                    or runs[0].run.action_config_id != atom.base_action_config_id
+                    or runs[0].run.prompt_ref != atom.prompt_ref
+                    or runs[0].run.input_schema_ref != atom.schema_refs.input.schema_ref
+                    or runs[0].run.input_schema_version != atom.schema_refs.input.version
+                    or runs[0].run.output_schema_ref != atom.schema_refs.output.schema_ref
+                    or runs[0].run.output_schema_version != atom.schema_refs.output.version
+                    or not _same_json_content(runs[0].run.input_schema, atom.input_schema)
+                    or not _same_json_content(runs[0].run.output_schema, atom.output_schema)
+                    or runs[0].run.prompt != payload.prompt
+                    or (runs[0].run.prompt_source_ref or runs[0].run.prompt_ref)
+                    != payload.source_ref
+                ):
+                    raise invalid_prompt(
+                        "Пробный запуск должен соответствовать промпту и текущему контракту атома.",
+                        "source_run_id",
+                    )
+            record = AtomLabSavedPrompt(
+                ref=new_id("atom_lab_prompt"), tenant_id=settings.default_tenant_id,
+                region=settings.default_region, atom_id=atom.atom_id, name=payload.name.strip(),
+                prompt=payload.prompt, source_ref=payload.source_ref,
+                source_run_id=payload.source_run_id,
+                schema_refs=atom.schema_refs.model_dump(), created_at=utc_now(),
+            )
+            repository.create(record)
+    except (DBAPIError, DisconnectionError, DatabaseTimeoutError) as exc:
+        logger.warning(
+            "atom_lab.prompt_database_error",
+            extra={
+                "event": "atom_lab.prompt_database_error",
+                "error_code": "lab_unavailable",
+                "exception_type": type(exc).__name__,
+            },
+        )
+        raise AtomLabApiError(
+            status_code=HTTPStatus.SERVICE_UNAVAILABLE, code="lab_unavailable",
+            message="Промпт Atom Lab не может быть сохранён.",
+        ) from None
+    return _saved_prompt_option(record)
 
 
 @protected_router.get(
@@ -649,7 +857,6 @@ def create_preset(
     session_factory: Annotated[Any, Depends(get_atom_lab_session_factory)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> AtomLabPresetCreatedResponse:
-    _validate_preset_payload(payload, registry, settings)
     now = utc_now()
     identity = AtomLabPresetIdentityRecord(
         tenant_id=settings.default_tenant_id,
@@ -668,6 +875,7 @@ def create_preset(
     )
     try:
         with transaction_boundary(session_factory) as session:
+            _validate_preset_payload(payload, registry, settings, AtomLabPromptRepository(session))
             stored = AtomLabPresetRepository(session).create(identity, version)
     except PresetSourceRunError as exc:
         raise _preset_source_invalid() from exc
@@ -727,7 +935,6 @@ def create_preset_version(
     session_factory: Annotated[Any, Depends(get_atom_lab_session_factory)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> AtomLabPresetCreatedResponse:
-    _validate_preset_payload(payload, registry, settings)
     version = _preset_version_record(
         preset_id,
         payload.base_version + 1,
@@ -738,6 +945,7 @@ def create_preset_version(
     )
     try:
         with transaction_boundary(session_factory) as session:
+            _validate_preset_payload(payload, registry, settings, AtomLabPromptRepository(session))
             stored = AtomLabPresetRepository(session).add_version(
                 version,
                 base_version=payload.base_version,
@@ -900,6 +1108,7 @@ def _validate_preset_payload(
     payload: AtomLabPresetVersionRequest,
     registry: ConfigRegistry,
     settings: Settings,
+    prompt_repository: AtomLabPromptRepository,
 ) -> None:
     try:
         atom = get_atom_catalog_entry(registry, payload.atom_id.value)
@@ -914,6 +1123,10 @@ def _validate_preset_payload(
         field_errors.append(_field_error("base_action_config_id"))
     if payload.prompt_ref != atom.prompt_ref:
         field_errors.append(_field_error("prompt_ref"))
+    if payload.prompt_source_ref is not None and not _prompt_source_exists(
+        payload.prompt_source_ref, atom, registry, prompt_repository, settings,
+    ):
+        field_errors.append(_field_error("prompt_source_ref"))
     if payload.schema_refs.model_dump(mode="json") != expected_refs:
         field_errors.append(_field_error("schema_refs"))
     if not is_addressable_atom_lab_model(payload.model_id):
@@ -1044,6 +1257,7 @@ def _preset_version_record(
         tenant_id=tenant_id,
         region=region,
         source_run_id=payload.source_run_id,
+        prompt_source_ref=payload.prompt_source_ref,
         created_at=created_at,
     )
 
@@ -1094,6 +1308,7 @@ def _preset_version_response(
         fixed_fields=list(stored.fixed_fields),
         example_input=stored.example_input,
         source_run_id=stored.source_run_id,
+        prompt_source_ref=stored.prompt_source_ref,
     )
 
 
