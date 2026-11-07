@@ -281,6 +281,17 @@ class AtomLabRunPresetRef(BaseModel):
     version: int = Field(strict=True, ge=1, le=2_147_483_647)
 
 
+class AtomLabRunExpectedContract(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    action_type: str = Field(min_length=1, max_length=128)
+    base_action_config_id: str = Field(min_length=1, max_length=128)
+    prompt_ref: str = Field(min_length=1, max_length=128)
+    schema_refs: AtomLabSchemaRefsResponse
+    input_schema: dict[str, Any]
+    output_schema: dict[str, Any]
+
+
 class AtomLabRunRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -291,6 +302,7 @@ class AtomLabRunRequest(BaseModel):
     reasoning_effort: ReasoningEffort | None
     preset_ref: AtomLabRunPresetRef | None = None
     prompt_source_ref: str | None = Field(default=None, max_length=128, pattern=r"^[A-Za-z0-9_.-]+$")
+    expected_contract: AtomLabRunExpectedContract | None = None
 
 
 class AtomLabPromptOption(BaseModel):

@@ -59,6 +59,23 @@ function catalog() {
   });
 }
 
+function expectedAtomContract(atom) {
+  const {action_type, base_action_config_id, prompt_ref, schema_refs, input_schema, output_schema} = atom;
+  return {action_type, base_action_config_id, prompt_ref, schema_refs, input_schema, output_schema};
+}
+
+function snapshotAtomContract(atom) {
+  return {
+    atom_id: atom.atom_id,
+    action: {type: atom.action_type, config_id: atom.base_action_config_id},
+    prompt: {ref: atom.prompt_ref},
+    schemas: {
+      input: {ref: atom.schema_refs.input.schema_ref, version: atom.schema_refs.input.version, content: atom.input_schema},
+      output: {ref: atom.schema_refs.output.schema_ref, version: atom.schema_refs.output.version, content: atom.output_schema},
+    },
+  };
+}
+
 const MODEL_CATALOG = {
   items: [
     {model_id: "gpt-supported", compatibility: "compatible", reason: "confirmed_openai_text_gpt", reasoning_supported: true, allowed_reasoning_efforts: ["low", "high"], provenance: {}},
@@ -702,7 +719,7 @@ test(`the shared launch keeps its successful prompt trial after ${presetReadback
   });
   await page.route("http://atom-lab.test/v1/atom-lab/runs/run-workbench", async route => {
     const detail = historyDetail({runId: "run-workbench", input: body.input, prompt: body.prompt});
-    detail.snapshot.prompt.ref = product.ref;
+    detail.snapshot.prompt.source_ref = product.ref;
     await route.fulfill({contentType: "application/json", body: JSON.stringify(detail)});
   });
   await page.route("http://atom-lab.test/v1/atom-lab/presets**", async route => {
@@ -1546,9 +1563,9 @@ test("one accepted submission survives draft edits and renders safe result diagn
         atom_id: "A05",
         scenario: {id: "scenario-kernel-demo", version: 1},
         workflow: {id: "workflow-kernel-demo", version: 1, step_id: "main", definition: {}},
-        action: {type: "score_match", definition_version: 1, definition: {}, config_id: "config-a05", config_schema_version: 1, config_definition: {}},
+        action: {type: A05.action_type, definition_version: 1, definition: {}, config_id: A05.base_action_config_id, config_schema_version: 1, config_definition: {}},
         prompt: {ref: "prompt.a05", version: 1, base: "Базовый промпт A05", content: "Базовый промпт A05"},
-        schemas: {input: {ref: "input.a05", version: 1, content: {}}, output: {ref: "output.a05", version: 1, content: {}}},
+        schemas: snapshotAtomContract(A05).schemas,
         input: A05.example_input,
         provider: {policy_ref: "policy.default", policy: {}, model_id: "openai/gpt-supported", reasoning_effort: "high", capability_snapshot_id: "snapshot-1", capability_provenance: {}},
         preset: {id: null, version: null},
@@ -1592,6 +1609,7 @@ test("one accepted submission survives draft edits and renders safe result diagn
     model_id: "openai/gpt-supported",
     reasoning_effort: "high",
     preset_ref: null,
+    expected_contract: expectedAtomContract(A05),
   }]);
 });
 
@@ -1609,7 +1627,7 @@ test("a rejected next submission never replaces the previously accepted run card
   await page.route("http://atom-lab.test/v1/atom-lab/runs/run-a", async (route) => {
     await route.fulfill({contentType: "application/json", body: JSON.stringify({
       run_id: "run-a", status: "succeeded",
-      snapshot: {atom_id: "A05", input: A05.example_input, prompt: "Принятый промпт A", model_id: "openai/gpt-supported", reasoning_effort: null},
+      snapshot: {...snapshotAtomContract(A05), input: A05.example_input, model_id: "openai/gpt-supported", reasoning_effort: null},
       runtime_ids: {scenario_session_id: "session-a", job_id: "job-a", action_run_id: "action-a", artifact_id: "artifact-a"},
       result: {questions: ["Результат A"]},
       diagnostics: {error_code: null, duration_ms: 800, requested_model_id: "openai/gpt-supported", requested_reasoning_effort: null, response_model_id: "gpt-confirmed", validation_attempts: 1, transport_attempts: 1, physical_calls: 1, succeeded_first_attempt: true, provider_calls: [], provider_calls_truncated: false, debug_artifacts: [], debug_artifacts_truncated: false},
@@ -1803,7 +1821,7 @@ test("network submission retry reuses the idempotency key and polling reconnects
     await new Promise((resolve) => setTimeout(resolve, 350));
     await route.fulfill({contentType: "application/json", body: JSON.stringify({
       run_id: "run-recovery", status: "succeeded",
-      snapshot: {atom_id: "A05", input: A05.example_input, prompt: A05.prompt, model_id: "openai/gpt-supported", reasoning_effort: null},
+      snapshot: {...snapshotAtomContract(A05), input: A05.example_input, model_id: "openai/gpt-supported", reasoning_effort: null},
       runtime_ids: {scenario_session_id: "session-recovery", job_id: "job-recovery", action_run_id: "action-recovery", artifact_id: "artifact-recovery"},
       result: {questions: ["Когда срок?"]},
       diagnostics: {error_code: null, duration_ms: 900, requested_model_id: "openai/gpt-supported", requested_reasoning_effort: null, response_model_id: null, validation_attempts: 1, transport_attempts: 1, physical_calls: 1, succeeded_first_attempt: true, provider_calls: [], provider_calls_truncated: false, debug_artifacts: [], debug_artifacts_truncated: false},
@@ -1972,7 +1990,7 @@ test("retryable HTTP submission responses preserve the frozen replay", async ({p
   await page.route("http://atom-lab.test/v1/atom-lab/runs/run-http-recovery", async (route) => {
     await route.fulfill({contentType: "application/json", body: JSON.stringify({
       run_id: "run-http-recovery", status: "succeeded",
-      snapshot: {atom_id: "A05"},
+      snapshot: snapshotAtomContract(A05),
       runtime_ids: {scenario_session_id: "session-http-recovery", job_id: "job-http-recovery", action_run_id: "action-http-recovery", artifact_id: "artifact-http-recovery"},
       result: {questions: ["Recovered"]},
       diagnostics: {error_code: null, duration_ms: 500, requested_model_id: "openai/gpt-supported", requested_reasoning_effort: null, response_model_id: null, validation_attempts: 1, transport_attempts: 1, physical_calls: 1, succeeded_first_attempt: true, provider_calls: [], provider_calls_truncated: false, debug_artifacts: [], debug_artifacts_truncated: false},
@@ -2318,6 +2336,181 @@ async function prepareRejectedSourceWrite(page, kind, {historyAtom = "A05"} = {}
   const save = page.locator(kind === "prompt" ? "#save-prompt" : "#save-preset");
   const error = page.locator(kind === "prompt" ? "#save-prompt-status" : "#preset-error");
   return {state, product, replacement, detail, originalDetail, originalVersion, save, name, error};
+}
+
+for (const change of ["base", "schema", "config"]) {
+  test(`pinned run admission recovers a still-valid product source after ${change} drift`, async ({page}) => {
+    const {state, product} = await prepareRejectedSourceWrite(page, "prompt");
+    const fresh = structuredClone(A06);
+    if (change === "base") fresh.prompt_ref = "prompt.a06.v2";
+    if (change === "schema") fresh.schema_refs.input.version = 2;
+    if (change === "config") fresh.base_action_config_id = "config.a06.v2";
+    state.authoritativeAtom = fresh;
+    state.optionsOverride = [{...product, ref: fresh.prompt_ref, group: "platform"}, product];
+    const submissions = [];
+    await page.route("**/v1/atom-lab/runs", async route => {
+      if (route.request().method() !== "POST") return route.fallback();
+      submissions.push({body: route.request().postDataJSON(), key: route.request().headers()["idempotency-key"]});
+      await route.fulfill({status: 409, json: {error: {
+        code: "contract_unavailable", message: "Контракт изменился.",
+        field_errors: [{path: "expected_contract", message: "Проверьте контракт."}],
+      }, request_id: "contract-pin"}});
+    });
+    await page.locator("#reasoning-effort").selectOption("high");
+    await page.locator("#run-button").click();
+    await expect(page.locator("#run-state")).toContainText("contract_unavailable");
+    await expect.poll(() => state.atomReads).toBe(1);
+    await expect(page.locator("#prompt-editor")).toHaveValue("Ручной текст владельца");
+    await expect(page.locator("#save-prompt-name")).toHaveValue("  Имя владельца  ");
+    await expect(page.locator("#model-select")).toHaveValue("gpt-supported");
+    await expect(page.locator("#reasoning-effort")).toHaveValue("high");
+    expect(submissions[0].body.expected_contract).toEqual({
+      action_type: A06.action_type, base_action_config_id: A06.base_action_config_id,
+      prompt_ref: A06.prompt_ref, schema_refs: A06.schema_refs,
+      input_schema: A06.input_schema, output_schema: A06.output_schema,
+    });
+    expect(submissions[0].body.prompt_source_ref).toBe(product.ref);
+    await expect(page.locator("#retry-submit")).toBeHidden();
+    await expect(page.locator("#prompt-test-status")).not.toContainText("Ответ прошёл контракт");
+    if (change !== "base") {
+      await expect(page.locator("#prompt-load-status")).toContainText("Контракт атома изменился");
+      await expect(page.locator("#run-button")).toBeDisabled();
+      state.authoritativeAtom = A06;
+      await page.locator("#retry-prompts").click();
+      await expect.poll(() => state.atomReads).toBe(2);
+    }
+    await expect(page.locator("#run-button")).toBeEnabled();
+    await page.locator("#run-button").click();
+    await expect.poll(() => submissions.length).toBe(2);
+    expect(submissions[1].key).not.toBe(submissions[0].key);
+    expect(submissions[1].body.expected_contract.prompt_ref).toBe(change === "base" ? fresh.prompt_ref : A06.prompt_ref);
+    expect(submissions[1].body.input).toEqual(A06.example_input);
+  });
+}
+
+for (const otherOwner of [false, true]) {
+  test(`known shared contract failure blocks legacy history without a source${otherOwner ? " beside another atom" : ""}`, async ({page}) => {
+    const {state, save, detail, product} = await prepareRejectedSourceWrite(page, "prompt");
+    delete detail.snapshot.prompt.source_ref;
+    const original = structuredClone(detail);
+    state.authoritativeAtom = {...A06, prompt_ref: "prompt.a06.v2", base_action_config_id: "config.a06.v2"};
+    state.optionsOverride = [{...product, ref: "prompt.a06.v2", group: "platform"}, product];
+    await save.click();
+    await expect(page.locator("#prompt-load-status")).toContainText("Контракт атома изменился");
+    if (otherOwner) {
+      await page.getByRole("button", {name: /A05/}).click();
+      await page.locator("#prompt-editor").fill("Другой ручной черновик");
+    }
+    await page.locator("#history-button").click();
+    await page.locator("#history-list .history-open").click();
+    await page.locator("#save-history-preset").click();
+    await expect.poll(() => state.atomReads).toBe(2);
+    await expect(page.locator("#history-error")).toContainText("Контракт атома изменился");
+    await expect(page.locator("#presets-panel")).toBeHidden();
+    expect(JSON.parse(await page.locator("#history-detail").textContent())).toEqual(original);
+    expect(state.writes).toHaveLength(1);
+    state.authoritativeAtom = A06;
+    state.optionsOverride = [{...product, ref: A06.prompt_ref, group: "platform"}, product];
+    await page.locator("#save-history-preset").click();
+    await expect.poll(() => state.atomReads).toBe(3);
+    await expect(page.locator("#save-preset")).toBeEnabled();
+    await expect(page.locator("#preset-prompt")).toHaveText(detail.snapshot.prompt.content);
+    await showWorkbench(page);
+    await expect(page.locator("#prompt-editor")).toHaveValue(otherOwner ? "Другой ручной черновик" : "Ручной текст владельца");
+    if (otherOwner) await expect(page.locator("#atom-title")).toContainText("A05");
+  });
+}
+
+test("a forced contract recheck preserves an intentionally detached history source", async ({page}) => {
+  const {state, detail} = await prepareRejectedSourceWrite(page, "prompt");
+  detail.snapshot.prompt.source_ref = "retired.product.source";
+  await page.locator("#history-button").click();
+  await page.locator("#history-list .history-open").click();
+  await page.locator("#restore-history").click();
+  await showWorkbench(page);
+  await page.locator("#prompt-tab").click();
+  await expect(page.locator("#prompt-origin")).toContainText("Исторический источник недоступен");
+  const submissions = [];
+  await page.route("**/v1/atom-lab/runs", async route => {
+    if (route.request().method() !== "POST") return route.fallback();
+    submissions.push(route.request().postDataJSON());
+    await route.fulfill({status: 409, json: {error: {
+      code: "contract_unavailable", message: "Повторите проверку контракта.",
+      field_errors: [{path: "expected_contract", message: "Проверьте контракт."}],
+    }, request_id: "detached-pin"}});
+  });
+  await page.locator("#run-button").click();
+  await expect.poll(() => state.atomReads).toBe(1);
+  await expect(page.locator("#run-button")).toBeEnabled();
+  await page.locator("#run-button").click();
+  await expect.poll(() => submissions.length).toBe(2);
+  expect(submissions.map(body => body.prompt_source_ref)).toEqual([undefined, undefined]);
+  expect(submissions[1].prompt).toBe(detail.snapshot.prompt.content);
+});
+
+for (const change of ["base", "schema-version", "schema-content", "config", "action"]) {
+test(`a successful run snapshot with changed ${change} cannot confirm the displayed contract`, async ({page}) => {
+  const {state, product} = await prepareRejectedSourceWrite(page, "prompt");
+  let submitted;
+  await page.route("**/v1/atom-lab/runs", async route => {
+    if (route.request().method() !== "POST") return route.fallback();
+    submitted = route.request().postDataJSON();
+    await route.fulfill({status: 202, json: {run_id: "run-mismatched-base", scenario_session_id: "session-library", job_id: "job-library", status: "queued"}});
+  });
+  await page.route("**/v1/atom-lab/runs/run-mismatched-base", async route => {
+    const detail = historyDetail({runId: "run-mismatched-base", input: submitted.input, prompt: submitted.prompt});
+    detail.snapshot.prompt.source_ref = product.ref;
+    if (change === "base") detail.snapshot.prompt.ref = "prompt.a06.v2";
+    if (change === "schema-version") detail.snapshot.schemas.input.version = 2;
+    if (change === "schema-content") detail.snapshot.schemas.input.content = {type: "object"};
+    if (change === "config") detail.snapshot.action.config_id = "config.a06.v2";
+    if (change === "action") detail.snapshot.action.type = "other.action";
+    await route.fulfill({json: detail});
+  });
+  await page.locator("#reasoning-effort").selectOption("high");
+  await page.locator("#run-button").click();
+  await expect(page.locator("#result-section")).toBeVisible();
+  await expect(page.locator("#prompt-test-status")).not.toContainText("Ответ прошёл контракт");
+  await page.locator("#save-prompt").click();
+  await expect.poll(() => state.writes.length).toBe(1);
+  expect(state.writes[0].payload.source_run_id).toBeNull();
+});
+}
+
+for (const changedOwner of [false, true]) {
+  test(`definite prompt proof rejection allows an explicit untested save${changedOwner ? " without touching a new owner" : ""}`, async ({page}) => {
+    const {state, detail, product} = await prepareRejectedSourceWrite(page, "prompt");
+    detail.snapshot.prompt.content = "Ручной текст владельца";
+    await page.locator("#history-button").click();
+    await page.locator("#history-list .history-open").click();
+    await page.locator("#restore-history").click();
+    await showWorkbench(page);
+    await page.locator("#prompt-tab").click();
+    await expect(page.locator("#prompt-test-status")).toContainText("Ответ прошёл контракт");
+    await page.locator("#save-prompt-panel summary").click();
+    await page.locator("#save-prompt-name").fill("Текст после проверки");
+    state.rejectionField = "source_run_id";
+    let release;
+    state.writeGate = new Promise(resolve => { release = resolve; });
+    await page.locator("#save-prompt").click();
+    await expect.poll(() => state.writes.length).toBe(1);
+    if (changedOwner) {
+      await page.getByRole("button", {name: /A05/}).click();
+      await page.locator("#prompt-editor").fill("Сохранённый другой редактор");
+    }
+    release();
+    if (changedOwner) {
+      await expect(page.locator("#prompt-editor")).toHaveValue("Сохранённый другой редактор");
+      await expect(page.locator("#save-prompt-status")).not.toContainText("Источник сохранения отклонён");
+    } else {
+      await expect(page.locator("#save-prompt-status")).toContainText("без подтверждения");
+      await expect(page.locator("#prompt-test-status")).not.toContainText("Ответ прошёл контракт");
+      await page.locator("#save-prompt").click();
+      await expect.poll(() => state.writes.length).toBe(2);
+      expect(state.writes[1].payload).toMatchObject({source_run_id: null, source_ref: product.ref, prompt: detail.snapshot.prompt.content});
+    }
+    expect(state.writes[0].payload.source_run_id).toBe(detail.run_id);
+  });
 }
 
 for (const kind of ["prompt", "preset", "version", "history"]) {
@@ -3034,7 +3227,7 @@ for (const historyAtom of ["A05", "A06"]) {
       }});
     });
     const foreign = historyDetail({runId: "run-foreign-editor", prompt: "Ручной текст владельца", reasoningEffort: null});
-    foreign.snapshot.atom_id = historyAtom;
+    Object.assign(foreign.snapshot, snapshotAtomContract(historyAtom === "A05" ? A05 : A06));
     await page.route("**/v1/atom-lab/runs/run-foreign-editor", route => route.fulfill({json: foreign}));
     await showWorkbench(page);
     await page.locator("#run-button").click();
@@ -4217,6 +4410,7 @@ for (const settingsOnly of [false, true, null]) {
       atom_id: stored.atom_id, input: stored.example_input, prompt: stored.prompt,
       prompt_source_ref: stored.prompt_source_ref, model_id: stored.model_id,
       reasoning_effort: stored.reasoning_effort, preset_ref: {preset_id: stored.preset_id, version: 1},
+      expected_contract: expectedAtomContract(A06),
     });
   });
 }
@@ -7067,6 +7261,7 @@ for (const draftState of ["clean", "dirty"]) {
       prompt_source_ref: stored.prompt_ref,
       model_id: stored.model_id, reasoning_effort: stored.reasoning_effort,
       preset_ref: {preset_id: stored.preset_id, version: stored.version},
+      expected_contract: expectedAtomContract(A06),
     };
     expect(runBodies).toEqual([expectedBody]);
     expect(writes).toEqual([]);

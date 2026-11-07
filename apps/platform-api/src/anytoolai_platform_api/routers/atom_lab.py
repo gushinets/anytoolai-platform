@@ -55,6 +55,7 @@ from anytoolai_platform_api.schemas import (
     AtomLabPromptOption,
     AtomLabRunAcceptedResponse,
     AtomLabRunDetailResponse,
+    AtomLabRunExpectedContract,
     AtomLabRunListResponse,
     AtomLabRunRequest,
 )
@@ -331,6 +332,9 @@ def start_run(
                 preset_id=payload.preset_ref.preset_id if payload.preset_ref else None,
                 preset_version=payload.preset_ref.version if payload.preset_ref else None,
                 prompt_source_ref=payload.prompt_source_ref,
+                expected_contract=(
+                    payload.expected_contract.model_dump() if payload.expected_contract else None
+                ),
             )
 
             def validate() -> None:
@@ -530,6 +534,10 @@ def _validate_run_contract(
         raise _run_error(HTTPStatus.CONFLICT, "contract_unavailable") from exc
     if atom is None:
         raise _run_error(HTTPStatus.NOT_FOUND, "atom_not_found")
+    if payload.expected_contract is not None and payload.expected_contract != (
+        AtomLabRunExpectedContract.model_validate(atom, from_attributes=True)
+    ):
+        raise _run_error(HTTPStatus.CONFLICT, "contract_unavailable", "expected_contract")
     try:
         validate_json_schema(instance=payload.input, schema=atom.input_schema)
         _validate_semantic_input(registry, atom.action_type, payload.input)
@@ -740,6 +748,8 @@ def create_atom_prompt(
                     not runs
                     or AtomLabRunHistoryService.status(runs[0]) is not AtomLabRunStatus.succeeded
                     or runs[0].run.atom_id != atom.atom_id
+                    or runs[0].run.action_config_id != atom.base_action_config_id
+                    or runs[0].run.prompt_ref != atom.prompt_ref
                     or runs[0].run.input_schema_ref != atom.schema_refs.input.schema_ref
                     or runs[0].run.input_schema_version != atom.schema_refs.input.version
                     or runs[0].run.output_schema_ref != atom.schema_refs.output.schema_ref

@@ -1566,7 +1566,14 @@ test("a persisted pagehide pauses polling and pageshow resumes the same accepted
       }
       reads += 1;
       return {ok: true, status: 200, async json() { return {
-        run_id: "run-bfcache", status: "succeeded", snapshot: {atom_id: "A01"},
+        run_id: "run-bfcache", status: "succeeded", snapshot: {
+          atom_id: "A01", action: {type: atom.action_type, config_id: atom.base_action_config_id},
+          prompt: {ref: atom.prompt_ref},
+          schemas: {
+            input: {ref: atom.schema_refs.input.schema_ref, version: atom.schema_refs.input.version, content: atom.input_schema},
+            output: {ref: atom.schema_refs.output.schema_ref, version: atom.schema_refs.output.version, content: atom.output_schema},
+          },
+        },
         runtime_ids: {scenario_session_id: "session-bfcache", job_id: "job-bfcache", action_run_id: "action-bfcache", artifact_id: "artifact-bfcache"},
         result: {value: "restored"},
         diagnostics: {error_code: null, duration_ms: 1, requested_model_id: "openai/gpt-supported", requested_reasoning_effort: null, response_model_id: null, validation_attempts: 1, transport_attempts: 1, physical_calls: 1, succeeded_first_attempt: true, provider_calls: [], provider_calls_truncated: false, debug_artifacts: [], debug_artifacts_truncated: false},
@@ -2209,6 +2216,14 @@ test("a run submission freezes the current draft and uses the exact backend fiel
     model_id: "openai/gpt-supported",
     reasoning_effort: "high",
     preset_ref: null,
+    expected_contract: {
+      action_type: session.atom.action_type,
+      base_action_config_id: session.atom.base_action_config_id,
+      prompt_ref: session.atom.prompt_ref,
+      schema_refs: session.atom.schema_refs,
+      input_schema: session.atom.input_schema,
+      output_schema: session.atom.output_schema,
+    },
   });
   assert.equal(submission.snapshot.input.source_text, "Срок — 30 сентября");
 });
@@ -2232,6 +2247,8 @@ test("run submissions freeze the effective source and atom while detached drafts
     session.promptSourceRef = "product.a06.v2";
     session.prompt = "Следующая версия";
     assert.equal(submission.body.prompt_source_ref, expected);
+    assert.equal(submission.body.expected_contract.prompt_ref, atom.prompt_ref);
+    assert.deepEqual(submission.body.expected_contract.schema_refs, atom.schema_refs);
     assert.equal(submission.snapshot.prompt_source_ref, expected);
     assert.equal(submission.atom, atom);
     assert.equal(JSON.stringify(submission.body), replay);

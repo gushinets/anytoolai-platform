@@ -2,6 +2,78 @@
 
 ## Status
 
+Fresh review follow-up (2026-11-07, HEAD `2e25217f66c27ccede7dc5d1b63027015f353dec`):
+repair review comments 4498804412, 4498804420 and 4498804424. Doctor passed before
+edits. First reproduce real API admission of a stale displayed atom contract with
+a still-valid product/Lab source, saved-prompt proof surviving base/config drift,
+and legacy history without a source bypassing a known shared contract lock.
+Then pin the displayed contract separately from prompt selection, validate only
+new admission while preserving exact frozen replay and omitted legacy hashes,
+compare proof base/config independently, and inherit the existing shared lock on
+every history owner. Keep raw drafts and all owner/catalog/request fences.
+
+Reach: API DTO/router and canonical exporter if needed, shared admission hash only
+if required to preserve immutable request identity, Atom Lab browser, focused API/
+unit/Node/Chromium regressions, generated OpenAPI/client artifacts and this plan.
+Use isolated fixtures/mocked transport; no working DB, migration, provider,
+dependency, CI/Sonar change or Git/GitHub write. Parent owns commit/push, fresh
+independent review and CI; never merge. Run connected backend/docs/architecture,
+focused browser tests, one final canonical frontend-check, generation/diff and
+Ruff comparison after final source edits.
+
+The three roots were reproduced before production edits: 16 isolated API/core
+failures with six passing controls (`.quick-check-tmp/p9-api-before-escalated.log`),
+two Node missing-pin failures (`p9-node-before.log`), five browser admission/history
+failures (`p9-browser-before.log`), and two proof failures with an unrelated-owner
+control passing (`p9-proof-before.log`). The sandbox's SQLite setup hit its bounded
+90-second timeout; the identical isolated tests ran with the established escalation.
+
+`expected_contract` is an optional, closed API assertion containing action type,
+base action-config ID, base prompt ref, typed schema refs/versions and both schema
+contents. It never selects server configuration. New admission compares it before
+runtime rows, quota increments and queueing. The Core request hash includes it only
+when non-null, so omitted/null legacy hashes remain unchanged. Exact frozen replay
+still precedes validation; a changed assertion with the same key conflicts. The
+browser freezes the assertion with each submission, forces authoritative recovery
+even when prompt refs have not changed, and refuses trial evidence from a mismatched
+successful snapshot. Ordinary transport retries retain the identical body/key.
+
+Saved-prompt proof now checks its run's base prompt and action config independently
+of the selected source, retaining the existing scope/status/text/schema checks.
+A definite `422 source_run_id` response clears only the matching current owner's
+rejected proof and explains that the next explicit Save is untested. Legacy history
+without `source_ref` checks the same known atom failure before preparing its owner.
+Known shared ordering and owner/catalog fences remain in force. A further focused
+regression caught forced recovery rebinding a deliberately detached source; the
+existing reconciliation now preserves that absence until explicit source selection.
+
+Final connected backend verification passed 490 DB-free API/core/preset/docs/Atom
+Lab boundary tests (`.quick-check-tmp/p9-backend-connected.log`). The final 81
+connected Chromium cases passed (`p9-focused-final.log`), including the additional
+detached-source regression, and all 56 Node tests passed (`p9-node-final.log`).
+The first broader browser run exposed 12 old fixtures: six successful snapshots
+used invalid/incomplete atom contracts and six exact payload assertions lacked the
+new field. Fixtures now model the actual API without weakening their assertions;
+the affected focused cases passed (`p9-fixtures-fixed.log`, `p9-fences-fixtures.log`).
+Canonical OpenAPI/client generation used existing commands; Markdown did not change.
+Lint, docs validation/generation drift and architecture validation passed. Ruff
+comparison found the same five existing diagnostics and no new ones in five changed
+Python files (`p9-ruff-comparison.json`). The final focused API/core rerun passed
+198 tests with zero errors, failures or skips in 103.386 seconds
+(`p9-api-final.log`, `p9-api-final.xml`). The final canonical `frontend-check`
+exited zero after all source/test edits: lint, typecheck, all 313 Chromium journeys,
+56 Atom Lab Node tests, six demo Node tests, 824 Vitest tests, generated API-type
+drift and production builds passed (`p9-frontend-check-final.log`). The established
+pnpm-store/Temp escalation used the installed browser cache and bundled model cost
+map; no check, assertion, skip, threshold or configuration was weakened.
+
+The repair changes only the 11 owned files, leaves staging empty and HEAD at
+`2e25217f66c27ccede7dc5d1b63027015f353dec`, and preserves unrelated untracked reports.
+No working DB, PostgreSQL/live provider, migration, dependency, deployment or Git/
+GitHub write was used. Parent owns fresh independent review, commit/push and CI.
+Ambiguous Save recovery and unbounded library pagination remain separate existing
+follow-ups; never merge.
+
 - State: active
 - Owner: agent
 - Created: 2026-11-06

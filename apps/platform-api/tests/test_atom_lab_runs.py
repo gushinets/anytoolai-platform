@@ -212,6 +212,147 @@ def _counts(app: FastAPI) -> tuple[int, ...]:
         )
 
 
+def _expected_contract(atom) -> dict[str, Any]:
+    return atom.model_dump(include={
+        "base_action_config_id", "prompt_ref", "action_type", "schema_refs",
+        "input_schema", "output_schema",
+    })
+
+
+def _changed_atom_registry(app, change):
+    registry = app.state.runtime.config_registry
+    atom = get_atom_catalog_entry(registry, "A07")
+    if change in {"base", "base-and-schema", "config"}:
+        configs = dict(registry.action_configurations)
+        config = configs.pop(atom.base_action_config_id)
+        if change == "config":
+            config = replace(config, action_config_id=f"{config.action_config_id}_next")
+        else:
+            prompts = dict(registry.prompts)
+            prompt = prompts[atom.prompt_ref]
+            prompt = replace(prompt, prompt_ref="kernel_demo.compose_reply.v2", version=2)
+            prompts[prompt.prompt_ref] = prompt
+            registry = replace(registry, prompts=prompts)
+            config = replace(config, prompt_ref=prompt.prompt_ref)
+        configs[config.action_config_id] = config
+        registry = replace(registry, action_configurations=configs)
+    if change in {"input-version", "output-version", "input-content", "base-and-schema"}:
+        schemas = dict(registry.schemas)
+        ref = atom.schema_refs.output if change == "output-version" else atom.schema_refs.input
+        definition = schemas[ref.schema_ref]
+        schemas[ref.schema_ref] = replace(
+            definition,
+            **({"schema": {**atom.input_schema, "description": "Changed contract"}}
+               if change == "input-content" else {"version": 2}),
+        )
+        registry = replace(registry, schemas=schemas)
+    return registry
+
+
+@pytest.mark.parametrize("source", ["product", "lab"])
+@pytest.mark.parametrize("change", [
+    "base-and-schema", "base", "config", "input-version", "output-version", "input-content",
+])
+def test_new_run_checks_displayed_contract_before_any_admission_writes(app, source, change):
+    atom = get_atom_catalog_entry(app.state.runtime.config_registry, "A07")
+    source_ref = "client_update_writer.reply_draft_compose_reply.v1"
+    if source == "lab":
+        async def save():
+            async with httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=app), base_url="http://test",
+            ) as client:
+                return await client.post("/v1/atom-lab/atoms/A07/prompts", headers={
+                    "X-Atom-Lab-Access-Code": ACCESS_CODE,
+                }, json={"name": "Lab source", "prompt": "Saved", "source_ref": source_ref})
+        saved = asyncio.run(save())
+        assert saved.status_code == HTTPStatus.CREATED, saved.text
+        source_ref = saved.json()["ref"]
+    changed = _changed_atom_registry(app, change)
+    app.dependency_overrides[get_config_registry] = lambda: changed
+    payload = _payload(
+        "A07", prompt_source_ref=source_ref, expected_contract=_expected_contract(atom),
+    )
+    rejected = _post(app, payload)
+    _error(rejected, HTTPStatus.CONFLICT, "contract_unavailable")
+    assert rejected.json()["error"]["field_errors"] == [
+        {"path": "expected_contract", "message": "Недопустимое значение."},
+    ]
+    assert _counts(app) == (0, 0, 0, 0, 0)
+
+
+def test_pinned_run_replays_frozen_request_after_server_contract_changes(app):
+    registry = app.state.runtime.config_registry
+    atom = get_atom_catalog_entry(registry, "A07")
+    payload = _payload("A07", prompt_source_ref="client_update_writer.reply_draft_compose_reply.v1",
+                       expected_contract=_expected_contract(atom))
+    first = _post(app, payload)
+    assert first.status_code == HTTPStatus.ACCEPTED, first.text
+    changed = _changed_atom_registry(app, "base-and-schema")
+    app.dependency_overrides[get_config_registry] = lambda: changed
+    replay = _post(app, payload)
+    assert replay.status_code == HTTPStatus.ACCEPTED, replay.text
+    assert replay.json() == first.json()
+    fresh_contract = _expected_contract(get_atom_catalog_entry(changed, "A07"))
+    _error(_post(app, {**payload, "expected_contract": fresh_contract}),
+           HTTPStatus.CONFLICT, "idempotency_conflict")
+    _error(_post(app, payload, key="new-stale-key"), HTTPStatus.CONFLICT, "contract_unavailable")
+    assert _counts(app) == (1, 1, 1, 1, 1)
+    with transaction_boundary(_factory(app)) as session:
+        assert session.scalar(sa.select(atom_lab_admission_scopes_table.c.accepted_count)) == 1
+        run = AtomLabRunRepository(session).get(first.json()["run_id"])
+        assert run.prompt_ref == atom.prompt_ref
+        assert run.input_schema_version == atom.schema_refs.input.version
+
+
+@pytest.mark.parametrize("change", ["missing", "extra", "schema"])
+def test_expected_run_contract_has_a_closed_typed_shape(app, change):
+    invalid = _expected_contract(get_atom_catalog_entry(app.state.runtime.config_registry, "A01"))
+    if change == "missing":
+        invalid.pop("base_action_config_id")
+    elif change == "extra":
+        invalid["provider"] = "openai"
+    else:
+        invalid["schema_refs"]["input"]["version"] = "invalid"
+    _error(_post(app, _payload(expected_contract=invalid)), HTTPStatus.UNPROCESSABLE_ENTITY,
+           "input_invalid")
+    assert _counts(app) == (0, 0, 0, 0, 0)
+
+
+@pytest.mark.parametrize("change", [
+    "unchanged", "base", "config", "input-version", "output-version",
+])
+def test_saved_prompt_proof_checks_base_and_config_independently_of_source(app, change):
+    source_ref = "client_update_writer.reply_draft_compose_reply.v1"
+    accepted = _post(app, _payload("A07", prompt_source_ref=source_ref))
+    assert accepted.status_code == HTTPStatus.ACCEPTED, accepted.text
+    with transaction_boundary(_factory(app)) as session:
+        session.execute(sa.update(jobs_table).where(jobs_table.c.id == accepted.json()["job_id"])
+                        .values(status="succeeded"))
+    if change != "unchanged":
+        changed = _changed_atom_registry(app, change)
+        app.dependency_overrides[get_config_registry] = lambda: changed
+
+    async def save(source_run_id):
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test",
+        ) as client:
+            return await client.post("/v1/atom-lab/atoms/A07/prompts", headers={
+                "X-Atom-Lab-Access-Code": ACCESS_CODE,
+            }, json={"name": "Tested text", "prompt": "Точный промпт", "source_ref": source_ref,
+                     "source_run_id": source_run_id})
+
+    tested = asyncio.run(save(accepted.json()["run_id"]))
+    if change == "unchanged":
+        assert tested.status_code == HTTPStatus.CREATED, tested.text
+        assert tested.json()["source_run_id"] == accepted.json()["run_id"]
+    else:
+        _error(tested, HTTPStatus.UNPROCESSABLE_ENTITY, "prompt_invalid")
+        assert tested.json()["error"]["field_errors"][0]["path"] == "source_run_id"
+    unbound = asyncio.run(save(None))
+    assert unbound.status_code == HTTPStatus.CREATED, unbound.text
+    assert unbound.json()["source_run_id"] is None
+
+
 def _error(response: httpx.Response, status: int, code: str) -> None:
     assert response.status_code == status, response.text
     body = response.json()

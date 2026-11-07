@@ -573,7 +573,17 @@ export function createRunSubmission(session, {modelId, reasoningEffort, idempote
     idempotencyKey,
     atom: session.atom,
     snapshot: cloneJson(snapshot),
-    body: {...cloneJson(snapshot), preset_ref: cloneJson(session.presetRef)},
+    body: {
+      ...cloneJson(snapshot), preset_ref: cloneJson(session.presetRef),
+      expected_contract: cloneJson({
+        action_type: session.atom.action_type,
+        base_action_config_id: session.atom.base_action_config_id,
+        prompt_ref: session.atom.prompt_ref,
+        schema_refs: session.atom.schema_refs,
+        input_schema: session.atom.input_schema,
+        output_schema: session.atom.output_schema,
+      }),
+    },
   };
 }
 
@@ -3067,7 +3077,15 @@ export function bootstrapAtomLab({
         `${submission.snapshot.atom_id} · ${diagnostics.response_model_id ?? diagnostics.requested_model_id}`;
       renderReadableResult(document, nodes["result-readable"], detail.result);
       nodes["result-json"].textContent = JSON.stringify(detail.result, null, 2);
-      completedPromptTrial = {runId: submission.runId, snapshot: submission.snapshot, atom: submission.atom};
+      if (presetContractMatchesAtom(historyPresetConfiguration(detail), submission.atom)
+        && detail.snapshot.action?.type === submission.atom.action_type
+        && sameJsonSemantically(detail.snapshot.schemas?.input?.content, submission.atom.input_schema)
+        && sameJsonSemantically(detail.snapshot.schemas?.output?.content, submission.atom.output_schema)) {
+        completedPromptTrial = {runId: submission.runId, snapshot: submission.snapshot, atom: submission.atom};
+      } else {
+        setRunState("Контракт результата отличается от отправленного. Проба не подтверждена.", "warning");
+        if (session === submission.ownerSession && session.atom === submission.atom) session.sourceRunId = null;
+      }
     }
     const debugArtifact = (diagnostics.debug_artifacts ?? [])[0];
     const invalid = detail.status === "failed" && Boolean(debugArtifact);
@@ -3302,6 +3320,11 @@ export function bootstrapAtomLab({
         activeSubmission = null;
         if (code === "prompt_source_invalid" && admissionErrors.some(({path}) => path === "prompt_source_ref")) {
           refreshRejectedPromptSource(session, submission.body.prompt_source_ref);
+        } else if (code === "contract_unavailable"
+          && error?.fieldErrors.some(({path}) => path === "expected_contract")
+          && session === submission.ownerSession && session.atom === submission.atom) {
+          refreshRejectedPromptSource(session, submission.body.prompt_source_ref ?? submission.atom.prompt_ref,
+            submission.atom.prompt_ref, true);
         }
         return;
       }
@@ -3464,7 +3487,8 @@ export function bootstrapAtomLab({
   };
 
   const reconcilePromptSource = (draft, options) => {
-    draft.promptSourceDetached = !options.some((option) => option.ref === promptRefFor(draft));
+    draft.promptSourceDetached = (draft.promptSourceDetached && draft.promptSourceRef === null)
+      || !options.some((option) => option.ref === promptRefFor(draft));
     if (draft.promptSourceDetached) draft.promptSourceRef = null;
     draft.promptSourceNeedsValidation = false;
     draft.promptContractNeedsValidation = false;
@@ -3515,8 +3539,13 @@ export function bootstrapAtomLab({
     if (presetEditorActive) renderPresetState();
   };
 
-  const refreshRejectedPromptSource = (draft, ref, baseRef = draft.atom.prompt_ref) => {
+  const refreshRejectedPromptSource = (draft, ref, baseRef = draft.atom.prompt_ref, forceContract = false) => {
     if (!isCurrentPromptOwner(draft) || draft.atom.prompt_ref !== baseRef || promptRefFor(draft) !== ref) return;
+    if (forceContract) {
+      const message = "Контракт запуска отклонён. Проверяем актуальный атом; черновик сохранён.";
+      promptContractChecks.set(draft.atom, {error: message});
+      rememberPromptContractFailure(draft.atom, message);
+    }
     draft.promptSourceNeedsValidation = true;
     if (draft === session) renderPromptStatus();
     updateRunButton();
@@ -3854,6 +3883,13 @@ export function bootstrapAtomLab({
         nodes["save-prompt-status"].textContent = error.message;
         if (error?.code === "prompt_invalid" && error.fieldErrors?.some(({path}) => path === "source_ref")) {
           refreshRejectedPromptSource(draft, payload.source_ref);
+        } else if (error?.status === 422 && error.code === "prompt_invalid"
+          && error.fieldErrors?.some(({path}) => path === "source_run_id")
+          && payload.source_run_id !== null && matchingPromptTrial() === payload.source_run_id) {
+          if (restoredPromptTrial?.runId === payload.source_run_id && restoredPromptTrial.atom === draft.atom) restoredPromptTrial = null;
+          if (completedPromptTrial?.runId === payload.source_run_id && completedPromptTrial.atom === draft.atom) completedPromptTrial = null;
+          if (draft.sourceRunId === payload.source_run_id) draft.sourceRunId = null;
+          nodes["save-prompt-status"].textContent = "Проба больше не подтверждает этот промпт. Повторный Save сохранит текст без подтверждения пробы.";
         } else if (error.outcomeUnknown) {
           draft.promptOptions = null;
           void loadPromptOptions();
@@ -4150,7 +4186,7 @@ export function bootstrapAtomLab({
       reasoningEffort: configuration.reasoning_effort,
       sourceRunId: selectedHistoryDetail.run_id,
     };
-    if (source.promptSourceRef !== null) {
+    if (source.promptSourceRef !== null || promptContractChecks.get(atom)?.error) {
       const ownerSession = session;
       const ownerDetail = selectedHistoryDetail;
       const generation = ++historyOpenGeneration;
