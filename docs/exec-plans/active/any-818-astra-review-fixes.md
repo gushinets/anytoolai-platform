@@ -2,6 +2,72 @@
 
 ## Status
 
+Fresh review follow-up (2026-11-07, HEAD `2cb984fd218e67210c64f6699b749db3908bb7ba`):
+repair discussion `4499016952`. Doctor passed before edits. Reproduce successful
+stored runs and history restore accepting changed input/output schema contents
+under unchanged refs/versions, with unchanged/reordered-key and version controls.
+Compare the actual frozen schemas to the current contract for prompt proof and
+reuse the result compatibility predicate for history. Missing/malformed snapshots
+must fail closed; explicit adaptation and untested Save preserve user data.
+Use type-aware JSON comparison for schema content and the existing displayed
+contract assertion: boolean/number changes differ, numeric 1/1.0 and object-key
+reordering remain equivalent.
+
+Reach: Atom Lab router, shared JavaScript, API/Node/Chromium tests and this plan.
+No new API fields, migrations, dependencies, working DB, providers, generated
+artifacts, CI/Sonar, Git/GitHub writes or delegation. Parent owns publication,
+fresh independent review and CI; never merge. After final edits run connected
+backend/browser/Node checks, one canonical frontend-check, docs/generation,
+architecture, diff and Ruff comparison.
+
+Before production edits, the isolated API checks exposed eight actual
+regressions and ten passing controls (`.quick-check-tmp/p10-api-before.log`).
+Two additional missing-schema fixtures initially supplied SQL NULL and hit the
+column's NOT NULL constraint before Save; they now use SQLAlchemy JSON.NULL to
+exercise the stored JSON null through the real repository. The corrected focused
+API run passed all 20 cases with no errors/failures/skips
+(`p10-api-focused-final.log`, `p10-api-focused-final.xml`). Chromium reproduced
+history accepting changed contents under the same refs/versions. The first
+control fixture forgot that successful Save closes its panel; after correcting
+that fixture before production edits, all six unchanged/reordered/version
+controls passed (`p10-browser-controls-before.log`).
+
+Save now compares the stored action type and both frozen schema contents against
+the current atom, alongside the existing base/config/source/status checks. Its
+existing source_run_id validation explicitly names the current contract. A small
+recursive JSON comparator is shared with the displayed admission assertion;
+object order and 1/1.0 remain equivalent while true/1 differ. Request hashes and
+frozen replay are untouched. History and newly completed results share the same
+complete contract predicate, so incompatible history can be explicitly adapted
+without inheriting successful proof. Neither path rewrites immutable history.
+
+All 16 new Chromium schema/history cases passed (`p10-browser-after.log`), as did
+197 connected Chromium cases (`p10-browser-connected.log`), 56 Node tests and
+lint (`p10-node-after.log`, `p10-lint-after.log`). The new cases cover both schema
+directions, required/properties changes, object order, missing/malformed content,
+boolean/number and version drift, compatible proof, explicit untested Save,
+model/effort/prompt/input preservation, subsequent manual edits and history
+immutability. Connected backend verification passed 540 DB-free API/Core/docs/
+architecture-import tests with zero errors/failures/skips in 263.710 seconds
+(`p10-backend-connected.log`, `p10-backend-connected.xml`). PostgreSQL/slow-marked
+cases were not selected. Documentation validation, generated-doc drift and
+architecture validation passed; Ruff retains four old router diagnostics and no
+new diagnostics in either changed Python file (`p10-ruff-comparison.json`).
+
+The one final canonical managed `runner.py frontend-check` exited zero after all
+source/test edits (`p10-frontend-check-final.log`): lint, typecheck, all 329
+Chromium cases, 56 Atom Lab Node tests, six demo Node tests, 824 Vitest tests,
+generated API-type drift and production builds passed. It used the established
+pnpm-store/Temp escalation, installed Chromium cache and bundled LiteLLM cost
+map; no dependency, configuration, assertion, timeout or check was weakened.
+Only the five owned router/JavaScript/API-test/browser-test/plan files changed;
+the Node source test needed no change. HEAD remains
+`2cb984fd218e67210c64f6699b749db3908bb7ba`, staging is empty and unrelated untracked
+reports are preserved. No working DB, PostgreSQL, provider, migration, generated
+artifact, dependency, deployment, Git/GitHub write or delegation was used.
+Parent owns fresh independent review, commit/push and CI; never merge. Existing
+ambiguous-Save recovery and unbounded-library follow-ups remain separate.
+
 Fresh review follow-up (2026-11-07, HEAD `2e25217f66c27ccede7dc5d1b63027015f353dec`):
 repair review comments 4498804412, 4498804420 and 4498804424. Doctor passed before
 edits. First reproduce real API admission of a stale displayed atom contract with

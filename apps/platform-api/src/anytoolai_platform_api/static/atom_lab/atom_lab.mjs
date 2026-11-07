@@ -473,6 +473,15 @@ function historyPresetConfiguration(detail) {
   };
 }
 
+function runContractMatchesAtom(detail, atom) {
+  const schemas = detail.snapshot.schemas;
+  return presetContractMatchesAtom(historyPresetConfiguration(detail), atom)
+    && detail.snapshot.action?.type === atom.action_type
+    && isRecord(schemas?.input?.content) && isRecord(schemas?.output?.content)
+    && sameJsonSemantically(schemas.input.content, atom.input_schema)
+    && sameJsonSemantically(schemas.output.content, atom.output_schema);
+}
+
 export function parsePresetVersion(value, expectedPresetId = null, expectedVersion = null) {
   if (
     !isRecord(value)
@@ -2961,9 +2970,8 @@ export function bootstrapAtomLab({
   };
 
   const currentContractMatchesHistory = (detail) => {
-    const configuration = historyPresetConfiguration(detail);
     const atom = catalog.find((item) => item.atom_id === detail.snapshot.atom_id);
-    return presetContractMatchesAtom(configuration, atom);
+    return runContractMatchesAtom(detail, atom);
   };
 
   const updateHistoryControls = () => {
@@ -3077,10 +3085,7 @@ export function bootstrapAtomLab({
         `${submission.snapshot.atom_id} · ${diagnostics.response_model_id ?? diagnostics.requested_model_id}`;
       renderReadableResult(document, nodes["result-readable"], detail.result);
       nodes["result-json"].textContent = JSON.stringify(detail.result, null, 2);
-      if (presetContractMatchesAtom(historyPresetConfiguration(detail), submission.atom)
-        && detail.snapshot.action?.type === submission.atom.action_type
-        && sameJsonSemantically(detail.snapshot.schemas?.input?.content, submission.atom.input_schema)
-        && sameJsonSemantically(detail.snapshot.schemas?.output?.content, submission.atom.output_schema)) {
+      if (runContractMatchesAtom(detail, submission.atom)) {
         completedPromptTrial = {runId: submission.runId, snapshot: submission.snapshot, atom: submission.atom};
       } else {
         setRunState("Контракт результата отличается от отправленного. Проба не подтверждена.", "warning");

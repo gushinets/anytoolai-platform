@@ -7421,6 +7421,102 @@ test("open history model availability follows delayed catalog load and refresh",
   await expect(page.locator("#history-warning")).toContainText("Историческая модель недоступна");
 });
 
+for (const direction of ["input", "output"]) {
+  for (const change of ["unchanged", "required", "properties", "reordered", "missing", "malformed", "boolean-number", "version"]) {
+    test(`history frozen schema ${direction} ${change} keeps only compatible trial proof`, async ({page}) => {
+      page.on("dialog", dialog => dialog.accept());
+      const input = {...A06.example_input, context: {nested: {active: false, budget: 0}}, audience: "Сохранённая аудитория"};
+      const detail = structuredClone(historyDetail({input, prompt: "Ручной исторический текст"}));
+      const current = structuredClone(A06);
+      const compatible = change === "unchanged" || change === "reordered";
+      const content = current[`${direction}_schema`];
+      if (change === "required" || change === "properties") {
+        content.properties = {...content.properties, new_field: {type: "string"}};
+        if (change === "required") content.required = [...(content.required ?? []), "new_field"];
+      } else if (change === "reordered") {
+        current[`${direction}_schema`] = Object.fromEntries(Object.entries(content).reverse());
+        if (content.properties) current[`${direction}_schema`].properties = Object.fromEntries(Object.entries(content.properties).reverse());
+      } else if (change === "missing") delete detail.snapshot.schemas[direction].content;
+      else if (change === "malformed") detail.snapshot.schemas[direction].content = [];
+      else if (change === "boolean-number") {
+        detail.snapshot.schemas[direction].content.$defs = {trial_constant: {const: true}};
+        content.$defs = {trial_constant: {const: 1}};
+      } else if (change === "version") current.schema_refs[direction].version += 1;
+      const original = structuredClone(detail);
+      const writes = [];
+      let runPosts = 0;
+      await page.route("http://atom-lab.test/v1/atom-lab/**", async route => {
+        const request = route.request();
+        const pathname = new URL(request.url()).pathname;
+        if (pathname === "/v1/atom-lab/runs" && request.method() === "GET") {
+          await route.fulfill({json: {items: [{run_id: detail.run_id, status: detail.status,
+            atom_id: "A06", model_id: detail.snapshot.provider.model_id, preset_id: null, preset_version: null,
+            created_at: detail.created_at, started_at: detail.started_at, finished_at: detail.finished_at}], next_cursor: null}});
+        } else if (pathname === `/v1/atom-lab/runs/${detail.run_id}`) await route.fulfill({json: detail});
+        else if (pathname === "/v1/atom-lab/runs") {
+          runPosts += 1;
+          await route.abort();
+        } else if (pathname === "/v1/atom-lab/atoms/A06/prompts") {
+          if (request.method() === "POST") {
+            const body = request.postDataJSON();
+            writes.push(body);
+            await route.fulfill({status: 201, json: {ref: `saved.${writes.length}`, name: body.name,
+              prompt: body.prompt, group: "lab", source_ref: body.source_ref, source_run_id: body.source_run_id}});
+          } else await route.fulfill({json: [{ref: A06.prompt_ref, name: "Платформенный", prompt: A06.prompt,
+            group: "platform", source_ref: null, source_run_id: null}]});
+        } else await route.fallback();
+      });
+      await openLab(page);
+      await page.route("http://atom-lab.test/v1/atom-lab/atoms", route => route.fulfill({
+        json: catalog().map(atom => atom.atom_id === "A06" ? current : atom),
+      }));
+      await page.locator("#access-code").fill("secret");
+      await page.locator("#access-form button").click();
+      await page.getByRole("button", {name: /A06/}).click();
+      await page.locator("#history-button").click();
+      await page.locator("#history-list .history-open").click();
+      await expect(page.locator("#restore-history")).toHaveText(compatible
+        ? "Восстановить запрос в лаборатории" : "Адаптировать к текущему контракту");
+      await expect(page.locator("#save-history-preset"))[compatible ? "toBeEnabled" : "toBeDisabled"]();
+      await page.locator("#restore-history").click();
+      await expect(page.locator("#model-select")).toHaveValue("gpt-supported");
+      await expect(page.locator("#reasoning-effort")).toHaveValue("high");
+      await page.locator("#prompt-tab").click();
+      await expect(page.locator("#prompt-editor")).toHaveValue(detail.snapshot.prompt.content);
+      if (compatible) await expect(page.locator("#prompt-test-status")).toContainText("Ответ прошёл контракт");
+      else await expect(page.locator("#prompt-test-status")).not.toContainText("Ответ прошёл контракт");
+      await page.locator("#save-prompt-panel summary").click();
+      await page.locator("#save-prompt-name").fill("Из снимка");
+      await page.locator("#save-prompt").click();
+      await expect.poll(() => writes.length).toBe(1);
+      expect(writes[0]).toEqual({name: "Из снимка", prompt: detail.snapshot.prompt.content,
+        source_ref: current.prompt_ref, source_run_id: compatible ? detail.run_id : null});
+      await page.locator("#input-tab").click();
+      await page.locator("#json-mode").click();
+      expect(JSON.parse(await page.locator("#json-editor").inputValue())).toEqual(input);
+      const editedInput = {...input, audience: "Ручная правка после восстановления"};
+      await page.locator("#json-editor").fill(JSON.stringify(editedInput));
+      await page.locator("#reasoning-effort").selectOption("low");
+      await page.locator("#prompt-tab").click();
+      await page.locator("#prompt-editor").fill("Ручная правка промпта после восстановления");
+      await page.locator("#save-prompt-panel summary").click();
+      await page.locator("#save-prompt-name").fill("После ручной правки");
+      await page.locator("#save-prompt").click();
+      await expect.poll(() => writes.length).toBe(2);
+      expect(writes[1].source_run_id).toBeNull();
+      expect(writes[1].prompt).toBe("Ручная правка промпта после восстановления");
+      await expect(page.locator("#model-select")).toHaveValue("gpt-supported");
+      await expect(page.locator("#reasoning-effort")).toHaveValue("low");
+      await page.locator("#input-tab").click();
+      expect(JSON.parse(await page.locator("#json-editor").inputValue())).toEqual(editedInput);
+      await page.locator("#history-button").click();
+      await page.locator("#history-list .history-open").click();
+      expect(JSON.parse(await page.locator("#history-detail").textContent())).toEqual(original);
+      expect(runPosts).toBe(0);
+    });
+  }
+}
+
 for (const followup of ["row", "unrelated-page", "fresh-status", "fresh-times"]) {
   test(`history detail newer than its list stays coherent through ${followup}`, async ({page}) => {
     const complete = historyDetail({runId: "run-newer-history-detail"});

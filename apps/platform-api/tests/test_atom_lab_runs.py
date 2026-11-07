@@ -236,15 +236,30 @@ def _changed_atom_registry(app, change):
             config = replace(config, prompt_ref=prompt.prompt_ref)
         configs[config.action_config_id] = config
         registry = replace(registry, action_configurations=configs)
-    if change in {"input-version", "output-version", "input-content", "base-and-schema"}:
+    if change.startswith(("input-", "output-")) or change == "base-and-schema":
         schemas = dict(registry.schemas)
-        ref = atom.schema_refs.output if change == "output-version" else atom.schema_refs.input
+        ref = atom.schema_refs.output if change.startswith("output-") else atom.schema_refs.input
         definition = schemas[ref.schema_ref]
-        schemas[ref.schema_ref] = replace(
-            definition,
-            **({"schema": {**atom.input_schema, "description": "Changed contract"}}
-               if change == "input-content" else {"version": 2}),
-        )
+        content = json.loads(json.dumps(
+            atom.output_schema if change.startswith("output-") else atom.input_schema,
+        ))
+        if change.endswith("-content"):
+            content["required"] = [*content.get("required", []), "new_required"]
+            content["properties"]["new_required"] = {"type": "string"}
+        elif change.endswith("-properties"):
+            content["properties"]["new_optional"] = {"type": "string"}
+        elif change.endswith("-reordered"):
+            content = dict(reversed(content.items()))
+            content["properties"] = dict(reversed(content["properties"].items()))
+        elif change.endswith(("-boolean", "-number")):
+            constant = True if change.endswith("-boolean") else 1
+            content["$defs"] = {"trial_constant": {"const": constant}}
+        elif change.endswith("-float"):
+            content["$defs"] = {"trial_constant": {"const": 1.0}}
+        schemas[ref.schema_ref] = replace(definition, **(
+            {"version": 2} if change.endswith("-version") or change == "base-and-schema"
+            else {"schema": content}
+        ))
         registry = replace(registry, schemas=schemas)
     return registry
 
@@ -318,18 +333,60 @@ def test_expected_run_contract_has_a_closed_typed_shape(app, change):
     assert _counts(app) == (0, 0, 0, 0, 0)
 
 
+@pytest.mark.parametrize("change", ["reordered", "boolean-number", "float-integer"])
+def test_expected_run_contract_compares_schema_json_types_and_ignores_object_order(app, change):
+    before = (
+        _changed_atom_registry(app, "input-boolean") if change == "boolean-number"
+        else app.state.runtime.config_registry
+    )
+    atom = get_atom_catalog_entry(before, "A07")
+    changed = _changed_atom_registry(
+        app, "input-number" if change == "boolean-number" else "input-reordered",
+    )
+    if change == "float-integer":
+        changed = _changed_atom_registry(app, "input-float")
+        atom = get_atom_catalog_entry(_changed_atom_registry(app, "input-number"), "A07")
+    app.dependency_overrides[get_config_registry] = lambda: changed
+    response = _post(app, _payload("A07", expected_contract=_expected_contract(atom)))
+    if change == "boolean-number":
+        _error(response, HTTPStatus.CONFLICT, "contract_unavailable")
+        assert response.json()["error"]["field_errors"][0]["path"] == "expected_contract"
+        assert _counts(app) == (0, 0, 0, 0, 0)
+    else:
+        assert response.status_code == HTTPStatus.ACCEPTED, response.text
+
+
 @pytest.mark.parametrize("change", [
     "unchanged", "base", "config", "input-version", "output-version",
+    "input-content", "output-content", "input-properties", "output-properties",
+    "input-reordered", "output-reordered", "input-boolean-number", "input-float-integer",
+    "input-missing", "output-missing", "input-malformed", "output-malformed",
 ])
 def test_saved_prompt_proof_checks_base_and_config_independently_of_source(app, change):
     source_ref = "client_update_writer.reply_draft_compose_reply.v1"
+    if change == "input-boolean-number":
+        before = _changed_atom_registry(app, "input-boolean")
+        app.dependency_overrides[get_config_registry] = lambda: before
+    elif change == "input-float-integer":
+        before = _changed_atom_registry(app, "input-float")
+        app.dependency_overrides[get_config_registry] = lambda: before
     accepted = _post(app, _payload("A07", prompt_source_ref=source_ref))
     assert accepted.status_code == HTTPStatus.ACCEPTED, accepted.text
     with transaction_boundary(_factory(app)) as session:
         session.execute(sa.update(jobs_table).where(jobs_table.c.id == accepted.json()["job_id"])
                         .values(status="succeeded"))
-    if change != "unchanged":
-        changed = _changed_atom_registry(app, change)
+        if change.endswith(("-missing", "-malformed")):
+            column = f"{change.split('-')[0]}_schema"
+            content = sa.JSON.NULL if change.endswith("-missing") else []
+            session.execute(sa.update(atom_lab_runs_table)
+                            .where(atom_lab_runs_table.c.id == accepted.json()["run_id"])
+                            .values(**{column: content}))
+        frozen = AtomLabRunRepository(session).get(accepted.json()["run_id"]).snapshot_payload()
+    if change != "unchanged" and not change.endswith(("-missing", "-malformed")):
+        changed = _changed_atom_registry(
+            app, "input-number"
+            if change in {"input-boolean-number", "input-float-integer"} else change,
+        )
         app.dependency_overrides[get_config_registry] = lambda: changed
 
     async def save(source_run_id):
@@ -342,7 +399,7 @@ def test_saved_prompt_proof_checks_base_and_config_independently_of_source(app, 
                      "source_run_id": source_run_id})
 
     tested = asyncio.run(save(accepted.json()["run_id"]))
-    if change == "unchanged":
+    if change in {"unchanged", "input-reordered", "output-reordered", "input-float-integer"}:
         assert tested.status_code == HTTPStatus.CREATED, tested.text
         assert tested.json()["source_run_id"] == accepted.json()["run_id"]
     else:
@@ -351,6 +408,9 @@ def test_saved_prompt_proof_checks_base_and_config_independently_of_source(app, 
     unbound = asyncio.run(save(None))
     assert unbound.status_code == HTTPStatus.CREATED, unbound.text
     assert unbound.json()["source_run_id"] is None
+    with transaction_boundary(_factory(app)) as session:
+        run = AtomLabRunRepository(session).get(accepted.json()["run_id"])
+        assert run.snapshot_payload() == frozen
 
 
 def _error(response: httpx.Response, status: int, code: str) -> None:

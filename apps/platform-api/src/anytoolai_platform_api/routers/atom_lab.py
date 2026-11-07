@@ -240,6 +240,20 @@ def _contains_nul(value: Any) -> bool:
     return False
 
 
+def _same_json_content(left: Any, right: Any) -> bool:
+    if isinstance(left, dict):
+        return (
+            isinstance(right, dict) and left.keys() == right.keys()
+            and all(_same_json_content(value, right[key]) for key, value in left.items())
+        )
+    if isinstance(left, list):
+        return (
+            isinstance(right, list) and len(left) == len(right)
+            and all(_same_json_content(a, b) for a, b in zip(left, right, strict=True))
+        )
+    return isinstance(left, bool) == isinstance(right, bool) and left == right
+
+
 def _run_input_bytes(payload: AtomLabRunRequest) -> bytes:
     return json.dumps(
         payload.input,
@@ -534,8 +548,9 @@ def _validate_run_contract(
         raise _run_error(HTTPStatus.CONFLICT, "contract_unavailable") from exc
     if atom is None:
         raise _run_error(HTTPStatus.NOT_FOUND, "atom_not_found")
-    if payload.expected_contract is not None and payload.expected_contract != (
-        AtomLabRunExpectedContract.model_validate(atom, from_attributes=True)
+    if payload.expected_contract is not None and not _same_json_content(
+        payload.expected_contract.model_dump(),
+        AtomLabRunExpectedContract.model_validate(atom, from_attributes=True).model_dump(),
     ):
         raise _run_error(HTTPStatus.CONFLICT, "contract_unavailable", "expected_contract")
     try:
@@ -748,18 +763,22 @@ def create_atom_prompt(
                     not runs
                     or AtomLabRunHistoryService.status(runs[0]) is not AtomLabRunStatus.succeeded
                     or runs[0].run.atom_id != atom.atom_id
+                    or runs[0].run.action_type != atom.action_type
                     or runs[0].run.action_config_id != atom.base_action_config_id
                     or runs[0].run.prompt_ref != atom.prompt_ref
                     or runs[0].run.input_schema_ref != atom.schema_refs.input.schema_ref
                     or runs[0].run.input_schema_version != atom.schema_refs.input.version
                     or runs[0].run.output_schema_ref != atom.schema_refs.output.schema_ref
                     or runs[0].run.output_schema_version != atom.schema_refs.output.version
+                    or not _same_json_content(runs[0].run.input_schema, atom.input_schema)
+                    or not _same_json_content(runs[0].run.output_schema, atom.output_schema)
                     or runs[0].run.prompt != payload.prompt
                     or (runs[0].run.prompt_source_ref or runs[0].run.prompt_ref)
                     != payload.source_ref
                 ):
                     raise invalid_prompt(
-                        "Пробный запуск должен соответствовать промпту.", "source_run_id"
+                        "Пробный запуск должен соответствовать промпту и текущему контракту атома.",
+                        "source_run_id",
                     )
             record = AtomLabSavedPrompt(
                 ref=new_id("atom_lab_prompt"), tenant_id=settings.default_tenant_id,
