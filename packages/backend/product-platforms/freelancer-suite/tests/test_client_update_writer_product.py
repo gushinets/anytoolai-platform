@@ -538,6 +538,59 @@ def test_prepaid_request_prompt_forbids_invented_dates_without_a_due_date() -> N
     assert "If `context` has no `due_date`, do not state or imply any date" in prompt
 
 
+def test_prepaid_request_prompt_preserves_deadline_relation_across_languages() -> None:
+    prompt = _normalized_prepaid_prompt()
+
+    assert (
+        'a bare due date means "no later than", allowing earlier payment, not "on that day"'
+        in prompt
+    )
+    assert '"by Friday", "не позднее пятницы" or "a más tardar el viernes"' in prompt
+    assert "Keep explicitly stated on/before/after conditions as given" in prompt
+    assert "with notes taking precedence" in prompt
+    assert "no later than that date, never waiting until that day" in prompt
+    deadline_rule = prompt.split("- In a payment request, when", 1)[1].split(
+        "- If `context` has no `due_date`", 1
+    )[0]
+    assert (
+        "Unless the notes say the payment is not urgent or not to be rushed, "
+        "ASAP with a due-by date means" in deadline_rule
+    )
+
+
+def test_prepaid_request_prompt_preserves_the_payment_arrangement() -> None:
+    # Protects the prompt contract; model retention is checked by the ANY-604 live series.
+    prompt = _normalized_prepaid_prompt()
+
+    assert "preserve the complete explicitly stated payment arrangement" in prompt
+    assert "the deposit percentage and agreed total" in prompt
+    assert "when the remaining balance is payable (including its delivery condition)" in prompt
+    assert "whether payment details will come in a separate invoice" in prompt
+    assert "mentioning the agreed later balance does not make it due now" in prompt
+    assert "Do not calculate an unstated balance or invent any terms" in prompt
+    assert "without claiming it has already been sent" in prompt
+    assert "explicit withholding directions still win" in prompt
+
+
+def test_prepaid_request_prompt_keeps_percentage_attached_to_total() -> None:
+    prompt = _normalized_prepaid_prompt()
+
+    assert "explicitly attach it to the agreed total, not to the deposit amount" in prompt
+    assert "Name the deposit amount separately as that share of the total" in prompt
+    assert "must not suggest applying the percentage to the deposit amount again" in prompt
+
+
+def test_prepaid_request_prompt_requires_a_payment_request_only_in_rule_d() -> None:
+    prompt = _normalized_prepaid_prompt()
+    rule_d = prompt.split("- D. Otherwise", 1)[1].split("Rules:", 1)[0]
+
+    assert "Explicitly and politely ask the client to pay that amount" in rule_d
+    assert "asking only to be notified after payment does not replace the request to pay" in rule_d
+    assert "in addition to the explicit request to pay" in prompt
+    assert "Only rule D may ask for payment" in prompt
+    assert "Rules A–C never ask the client to report a payment" in prompt
+
+
 # ANY-628 (Q-001): a client message must not lose or contradict the limits and exclusions it was given,
 # and must not leak the freelancer's internal figures or present a requested term as accepted.
 @pytest.mark.parametrize(
@@ -714,6 +767,36 @@ def test_prepaid_request_max_length_floor_fits_longest_amount_and_due_date() -> 
 # new case maps onto a bullet instead of a new branch that needs its own priority clause. Model
 # behavior is only provable live (ANY-604): the fake provider returns one fixed response, so the
 # rule text is what is pinned here.
+def test_prepaid_request_prompt_preserves_conflicting_values_without_length_limit() -> None:
+    prompt = _normalized_prepaid_prompt()
+    confirmation = prompt.split("B. Any condition is open", 1)[1].split(
+        "C. The notes say not to ask for payment yet", 1
+    )[0]
+    assert (
+        "include every concrete current candidate value from the fields and notes" in confirmation
+    )
+    assert "with its currency or timing relation" in confirmation
+    assert (
+        "do not replace known conflicting amounts or dates with a generic request" in confirmation
+    )
+    assert (
+        "does not override an explicit instruction to withhold private information" in confirmation
+    )
+    assert "Only if an explicitly supplied `constraints.length` is too short" in prompt
+    assert "brevity alone never permits omitting them" in prompt
+
+
+def test_prepaid_request_confirmation_omits_editorial_payment_request_sequence() -> None:
+    confirmation = _normalized_prepaid_prompt().split("B. Any condition is open", 1)[1].split(
+        "C. The notes say not to ask for payment yet", 1
+    )[0]
+    assert "Directions about when to ask for payment select this message kind" in confirmation
+    assert "do not announce, promise or describe a later payment request" in confirmation
+    assert "Ask for confirmation directly" in confirmation
+    assert "Preserve actual invoice, delivery and payment terms" in confirmation
+    assert "stated separately from such editorial directions" in confirmation
+
+
 def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     prompt = " ".join(
         _load_prompt_template(
@@ -810,7 +893,8 @@ def test_prepaid_request_prompt_has_terms_confirmation_rule() -> None:
     assert "final with an agreed amount still owed is an ordinary unpaid payment" in prompt
     assert "rejected, superseded or replaced is history, not a conflict" in prompt
     assert (
-        "the stated remaining figure after a partial receipt, else `context.amount`, never both"
+        "the stated remaining figure after a partial receipt, else `context.amount`, "
+        "never request both as still owed"
         in prompt
     )
     assert "that conflicts with nothing stays stated as agreed" in prompt
