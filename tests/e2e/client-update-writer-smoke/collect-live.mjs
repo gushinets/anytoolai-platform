@@ -1,5 +1,5 @@
 /** Experimental supporting collector; not an independent ANY-624 acceptance decision.
- * Scope and limitations: docs/exec-plans/active/any-624-update-model-comparison.md.
+ * Scope and limitations: docs/exec-plans/completed/any-624-update-model-comparison.md.
  */
 import { chromium } from '@playwright/test';
 import { readFileSync } from 'node:fs';
