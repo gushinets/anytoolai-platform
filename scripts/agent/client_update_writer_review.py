@@ -2,7 +2,7 @@
 
 Experimental review aid; it does not reopen ANY-624's accepted live review.
 Known limitations and the frozen scope are documented in
-docs/exec-plans/active/any-624-update-model-comparison.md (Supporting tooling: scope frozen).
+docs/exec-plans/completed/any-624-update-model-comparison.md (Supporting tooling: scope frozen).
 
 python scripts/agent/client_update_writer_eval.py review \
     --directory <results-directory> --series sol-medium --reviewer Putilin
