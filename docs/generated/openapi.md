@@ -15,6 +15,8 @@ Version: 0.1.0
 | GET | /internal/v1/capability-manifest | get_capability_manifest_internal_v1_capability_manifest_get | 200, 401, 403, 422, 500, 503 |
 | GET | /v1/atom-lab/atoms | list_atoms_v1_atom_lab_atoms_get | 200, 401, 422, 503 |
 | GET | /v1/atom-lab/atoms/{atom_id} | get_atom_v1_atom_lab_atoms__atom_id__get | 200, 401, 404, 422, 503 |
+| GET | /v1/atom-lab/atoms/{atom_id}/prompts | list_atom_prompts_v1_atom_lab_atoms__atom_id__prompts_get | 200, 401, 404, 422, 503 |
+| POST | /v1/atom-lab/atoms/{atom_id}/prompts | create_atom_prompt_v1_atom_lab_atoms__atom_id__prompts_post | 201, 401, 404, 413, 422, 503 |
 | GET | /v1/atom-lab/models | list_models_v1_atom_lab_models_get | 200, 401, 422, 503 |
 | POST | /v1/atom-lab/models/refresh | request_model_refresh_v1_atom_lab_models_refresh_post | 202, 401, 422, 503 |
 | GET | /v1/atom-lab/presets | list_presets_v1_atom_lab_presets_get | 200, 401, 422, 503 |
@@ -60,6 +62,7 @@ Version: 0.1.0
 - AtomLabPresetVersionRequest
 - AtomLabPresetVersionResponse
 - AtomLabPresetVersionSummaryResponse
+- AtomLabPromptOption
 - AtomLabProviderCallDiagnosticResponse
 - AtomLabRunAcceptedResponse
 - AtomLabRunDetailResponse

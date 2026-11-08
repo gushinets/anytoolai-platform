@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 import sqlalchemy as sa
+from alembic import command
 from anytoolai_platform_core.actions.models import ActionRunRecord
 from anytoolai_platform_core.actions.repository import ActionRunRepository
 from anytoolai_platform_core.actions.runner import _recover_atom_lab_action_link_after_rollback
@@ -16,10 +17,12 @@ from anytoolai_platform_core.atom_lab.models import (
     AtomLabPresetIdentityRecord,
     AtomLabPresetVersionRecord,
     AtomLabRunRecord,
+    AtomLabSavedPrompt,
     ReasoningEffort,
 )
 from anytoolai_platform_core.atom_lab.repository import (
     AtomLabPresetRepository,
+    AtomLabPromptRepository,
     AtomLabRunRepository,
     PresetVersionConflictError,
 )
@@ -34,6 +37,52 @@ from tests.db_support import provision_database
 
 pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
 SECOND_VERSION = 2
+
+
+def test_saved_prompts_upgrade_after_execution_metering_and_preserve_scope_on_replay() -> None:
+    with provision_database(
+        database_name_prefix="anytoolai_lab_prompts_migration_test",
+        upgrade_target="0017",
+        skip_reason="PostgreSQL saved-prompt migration coverage",
+    ) as (engine, config, _database_url):
+        with engine.begin() as connection:
+            config.attributes["connection"] = connection
+            command.upgrade(config, "head")
+        factory = build_session_factory(engine)
+        saved = AtomLabSavedPrompt(
+            ref="atom_lab_prompt_migration", tenant_id="tenant_demo", region="eu-central",
+            atom_id="A01", name="Migration prompt", prompt="Saved prompt text",
+            source_ref="kernel_demo.extract_structured_fields.v1",
+            schema_refs={
+                "input": {"schema_ref": "kernel.schemas.extract_input_v1", "version": 1},
+                "output": {"schema_ref": "kernel.schemas.extract_output_v1", "version": 1},
+            },
+            source_run_id=None, created_at=utc_now(),
+        )
+        with transaction_boundary(factory) as session:
+            AtomLabPromptRepository(session).create(saved)
+        # A development Lab database can already contain these additive objects.
+        with engine.begin() as connection:
+            config.attributes["connection"] = connection
+            command.stamp(config, "0017")
+            command.upgrade(config, "head")
+        with transaction_boundary(factory) as session:
+            repository = AtomLabPromptRepository(session)
+            assert repository.list_for_atom(
+                tenant_id="tenant_demo", region="eu-central", atom_id="A01",
+            ) == [saved]
+            for tenant, region, atom in [
+                ("other", "eu-central", "A01"),
+                ("tenant_demo", "other", "A01"),
+                ("tenant_demo", "eu-central", "A07"),
+            ]:
+                assert repository.list_for_atom(tenant_id=tenant, region=region, atom_id=atom) == []
+        inspector = sa.inspect(engine)
+        assert inspector.has_table("execution_reservations", schema="platform")
+        for table in ("atom_lab_runs", "atom_lab_preset_versions"):
+            assert "prompt_source_ref" in {
+                column["name"] for column in inspector.get_columns(table, schema="platform")
+            }
 
 
 @pytest.fixture
@@ -315,6 +364,7 @@ def test_preset_version_number_is_atomic_under_postgresql_concurrency(
         "prompt": "Initial prompt",
         "prompt_ref": "kernel_demo.extract_structured_fields.v1",
         "model_id": "openai/gpt-6-luna",
+        "prompt_source_ref": "product.extract.v1",
         "reasoning_effort": ReasoningEffort.high,
         "fixed_fields": ("fields",),
         "example_input": {"source_text": "fixture", "fields": [], "strict": False},
@@ -365,3 +415,4 @@ def test_preset_version_number_is_atomic_under_postgresql_concurrency(
     assert stored_identity is not None
     assert stored_identity.latest_version == SECOND_VERSION
     assert [version.version for version in versions] == [SECOND_VERSION, 1]
+    assert all(version.prompt_source_ref == "product.extract.v1" for version in versions)

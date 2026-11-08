@@ -18,6 +18,7 @@ from anytoolai_platform_core.atom_lab.models import (
     AtomLabPresetVersionRecord,
     AtomLabRunHistoryState,
     AtomLabRunRecord,
+    AtomLabSavedPrompt,
 )
 from anytoolai_platform_core.providers.models import ProviderCallRecord, ReasoningEffort
 from anytoolai_platform_core.scenarios.models import ScenarioSessionRecord, ScenarioSessionStatus
@@ -32,6 +33,7 @@ from anytoolai_platform_core.storage.db import (
     atom_lab_admission_scopes_table,
     atom_lab_preset_versions_table,
     atom_lab_presets_table,
+    atom_lab_prompts_table,
     atom_lab_runs_table,
     jobs_table,
     provider_calls_table,
@@ -40,6 +42,28 @@ from anytoolai_platform_core.storage.db import (
 from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
 
 ATOM_LAB_DIAGNOSTIC_ITEMS_MAX = 100
+
+
+class AtomLabPromptRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def create(self, record: AtomLabSavedPrompt) -> None:
+        self._session.execute(sa.insert(atom_lab_prompts_table).values(asdict(record)))
+
+    def list_for_atom(
+        self, *, tenant_id: str, region: str, atom_id: str, ref: str | None = None,
+    ) -> list[AtomLabSavedPrompt]:
+        table = atom_lab_prompts_table
+        query = sa.select(table).where(
+            table.c.tenant_id == tenant_id,
+            table.c.region == region,
+            table.c.atom_id == atom_id,
+        )
+        if ref is not None:
+            query = query.where(table.c.ref == ref)
+        rows = self._session.execute(query.order_by(table.c.created_at.desc(), table.c.ref)).mappings()
+        return [AtomLabSavedPrompt(**row) for row in rows]
 
 
 class PresetVersionConflictError(RuntimeError):

@@ -17,7 +17,18 @@ from anytoolai_platform_api.schemas import CapabilityManifestResponse
 def build_openapi_schema() -> dict[str, Any]:
     from anytoolai_platform_api.main import create_app
 
-    return create_app().openapi()
+    schema = create_app().openapi()
+    atom_path = "/v1/atom-lab/atoms/{atom_id}"
+    # Share the same error response in clients without changing FastAPI's runtime routes.
+    schema["components"].setdefault("responses", {})["AtomLabAtomNotFound"] = (
+        schema["paths"][atom_path]["get"]["responses"]["404"]
+    )
+    for path, method in ((atom_path, "get"), (f"{atom_path}/prompts", "get"),
+                         (f"{atom_path}/prompts", "post")):
+        schema["paths"][path][method]["responses"]["404"] = {
+            "$ref": "#/components/responses/AtomLabAtomNotFound",
+        }
+    return schema
 
 
 def render_openapi_json(schema: dict[str, Any] | None = None) -> str:

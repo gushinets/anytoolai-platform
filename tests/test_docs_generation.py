@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import importlib.util
 import json
+from copy import deepcopy
 from pathlib import Path
 
+from anytoolai_platform_api.main import create_app
+from anytoolai_platform_api.openapi.generate import build_openapi_schema
 from anytoolai_platform_api.schemas import CapabilityManifestResponse
 
 
@@ -87,10 +90,45 @@ def test_openapi_json_is_valid_and_matches_the_live_schema() -> None:
     module = load_module()
     schema = json.loads(module.render_openapi_json())
 
-    from anytoolai_platform_api.openapi.generate import build_openapi_schema
-
     assert "/v1/products/{product_id}/runtime-config" in schema["paths"]
     assert schema == build_openapi_schema()
+
+
+def test_atom_not_found_response_is_shared_without_changing_the_live_contract() -> None:
+    schema = build_openapi_schema()
+    live = create_app().openapi()
+    response = schema["components"]["responses"]["AtomLabAtomNotFound"]
+    assert response == {
+        "description": "Atom not found.",
+        "content": {"application/json": {"schema": {
+            "$ref": "#/components/schemas/AtomLabErrorResponse",
+        }}},
+    }
+    envelope = schema["components"]["schemas"]["AtomLabErrorResponse"]
+    assert envelope["properties"]["error"] == {
+        "$ref": "#/components/schemas/AtomLabErrorDetailResponse",
+    }
+    assert set(envelope["required"]) == {"error", "request_id"}
+
+    resolved = deepcopy(schema)
+    atom_path = "/v1/atom-lab/atoms/{atom_id}"
+    for path, method in ((atom_path, "get"), (f"{atom_path}/prompts", "get"),
+                         (f"{atom_path}/prompts", "post")):
+        assert schema["paths"][path][method]["responses"]["404"] == {
+            "$ref": "#/components/responses/AtomLabAtomNotFound",
+        }
+        assert live["paths"][path][method]["responses"]["404"] == response
+        resolved["paths"][path][method]["responses"]["404"] = response
+    del resolved["components"]["responses"]["AtomLabAtomNotFound"]
+    if not resolved["components"]["responses"]:
+        del resolved["components"]["responses"]
+    assert resolved == live
+
+    markdown = load_module().render_openapi()
+    for method in ("GET", "POST"):
+        row = next(line for line in markdown.splitlines()
+                   if f"| {method} | {atom_path}/prompts |" in line)
+        assert "404" in row
 
 
 def test_manifest_schema_matches_serialization_model_and_openapi_success() -> None:
