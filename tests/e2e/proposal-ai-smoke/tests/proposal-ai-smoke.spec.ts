@@ -2,7 +2,9 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import {
-  countEvents as countBackendEvents,
+  trackScenarioStarts,
+  trackRun,
+  expectCopyActivation,
   expectWorkspaceLayout,
   overrideFailedSession,
 } from "@anytoolai/smoke-support";
@@ -22,7 +24,6 @@ const WEB_MIRROR_BASE_URL = process.env.WEB_MIRROR_BASE_URL ?? "http://localhost
 const PRODUCT_URL = `${WEB_MIRROR_BASE_URL}/products/proposal_ai`;
 
 const START_ROUTE_PATTERN = /\/scenarios\/[^/]+\/start$/;
-const COPY_NEXT_ACTION_PATTERN = /\/scenario-sessions\/([^/]+)\/next-actions\/copy_result$/;
 
 // The real fake-provider adapter (packages/backend/platform-core/.../providers/adapters/fake.py,
 // FakeProviderAdapter._fixture_key_for()) resolves its fixture strictly from the action config id
@@ -82,12 +83,7 @@ test.describe("ProposalAI web product", () => {
     await expect(form.getByRole("textbox", { name: /Language/i })).toHaveCount(0);
     await expect(form.getByRole("combobox", { name: "Proposal language" })).toHaveValue("auto");
 
-    const nextActionRequests: string[] = [];
-    page.on("request", (request) => {
-      if (request.method() === "POST" && COPY_NEXT_ACTION_PATTERN.test(request.url())) {
-        nextActionRequests.push(request.url());
-      }
-    });
+    const run = trackRun(page, START_ROUTE_PATTERN);
 
     await fillValidForm(page);
     await page.getByRole("button", { name: "Generate proposal" }).click();
@@ -101,21 +97,7 @@ test.describe("ProposalAI web product", () => {
     const resultText = await page.locator("main p").last().innerText();
     expect(resultText.trim().length).toBeGreaterThan(0);
 
-    await copyButton.click();
-    await expect(page.getByRole("button", { name: "Copied" })).toBeVisible();
-    const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
-    expect(clipboardText).toBe(resultText);
-
-    // Exactly one copy_result next-action call from the browser's own single click.
-    await expect.poll(() => nextActionRequests.length, { timeout: 5_000 }).toBe(1);
-    const scenarioSessionId = COPY_NEXT_ACTION_PATTERN.exec(nextActionRequests[0]!)?.[1];
-    expect(scenarioSessionId).toBeTruthy();
-
-    // And the backend actually persisted it for *this* run's session -- not just that the browser
-    // sent the request -- exactly once.
-    await expect
-      .poll(() => countBackendEvents("client.next_action_clicked", scenarioSessionId!), { timeout: 5_000 })
-      .toBe(1);
+    await expectCopyActivation(page, run.sessionId(), resultText);
 
     await expectWorkspaceLayout(page, "side-by-side");
     await page.setViewportSize({ width: 390, height: 844 });
@@ -131,17 +113,12 @@ test.describe("ProposalAI web product", () => {
     await page.goto(PRODUCT_URL);
     await expect(page.locator("h1")).toHaveText("ProposalAI");
 
-    let startRequested = false;
-    page.on("request", (request) => {
-      if (request.method() === "POST" && START_ROUTE_PATTERN.test(request.url())) {
-        startRequested = true;
-      }
-    });
+    const starts = trackScenarioStarts(page, START_ROUTE_PATTERN);
 
     await page.getByRole("button", { name: "Generate proposal" }).click();
     await expect(page.getByText("Task description: required.")).toBeVisible();
     await expect(page.getByText("Your experience and strengths: required.")).toBeVisible();
-    expect(startRequested).toBe(false);
+    expect(starts).toEqual([]);
   });
 
   test("weak input: a vague-but-schema-valid task reaches the real backend and renders the documented safe result", async ({

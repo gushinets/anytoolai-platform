@@ -413,7 +413,10 @@ describe("HandoffConsent", () => {
     expect(readAttachSessionId("acceptance_builder")).toBe("s1");
   });
 
-  it("after the person left, an Accept error ('already accepted') refetches once to keep the queued session, and does nothing else", async () => {
+  it.each([
+    { name: "already accepted", response: () => errorResponse(409, "handoff_already_accepted") },
+    { name: "unreadable success", response: () => jsonResponse(200, { unexpected: true }) },
+  ])("after leaving, $name refetches once and keeps the queued session without navigating", async ({ response }) => {
     const { client, calls, resolveDeferred } = makeClientWithDeferredRoute(
       {
         [PREVIEW_ROUTE]: [
@@ -431,11 +434,11 @@ describe("HandoffConsent", () => {
     await waitFor(() => expect(accept.getAttribute("aria-busy")).toBe("true"));
 
     unmount();
-    resolveDeferred(errorResponse(409, "handoff_already_accepted"));
+    resolveDeferred(response());
     await waitFor(() => expect(calls.filter((call) => call.key === PREVIEW_ROUTE)).toHaveLength(2));
     await settle();
 
-    // The 409 proves the Accept went through: its session is kept; no navigation, nothing more is read.
+    // The authoritative preview retains the charged session after either ambiguous response.
     expect(readAttachSessionId("acceptance_builder")).toBe("s1");
     expect(routerPush).not.toHaveBeenCalled();
     expect(calls.filter((call) => call.key === PREVIEW_ROUTE)).toHaveLength(2);
@@ -475,32 +478,6 @@ describe("HandoffConsent", () => {
     expect(accept.disabled).toBe(false);
     expect(routerPush).not.toHaveBeenCalled();
     expect(readAttachSessionId("acceptance_builder")).toBeUndefined();
-  });
-
-  it("after the person left, an Accept whose answer is unreadable (2xx, not a preview) refetches the preview and keeps the queued session", async () => {
-    const { client, calls, resolveDeferred } = makeClientWithDeferredRoute(
-      {
-        [PREVIEW_ROUTE]: [
-          jsonResponse(200, previewPayload()),
-          jsonResponse(200, previewPayload({ status: "consumed", target_scenario_session_id: "s1", target_product_id: "acceptance_builder" })),
-        ],
-        [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
-      },
-      ACCEPT_ROUTE,
-    );
-    const { unmount } = render(<HandoffConsent client={client} handoffToken="token_abc" canOpenTarget={() => true} />);
-    const accept = (await screen.findByRole("button", { name: "Accept" })) as HTMLButtonElement;
-    await waitFor(() => expect(accept.disabled).toBe(false));
-    fireEvent.click(accept);
-    await waitFor(() => expect(accept.getAttribute("aria-busy")).toBe("true"));
-
-    unmount();
-    resolveDeferred(jsonResponse(200, { unexpected: true }));
-    await waitFor(() => expect(calls.filter((call) => call.key === PREVIEW_ROUTE)).toHaveLength(2));
-    await settle();
-
-    expect(readAttachSessionId("acceptance_builder")).toBe("s1");
-    expect(routerPush).not.toHaveBeenCalled();
   });
 
   it("keeps nothing for a target the host cannot open, even after the Accept succeeded while the person was away", async () => {
@@ -597,7 +574,7 @@ describe("HandoffConsent", () => {
     expect(readAttachSessionId("acceptance_builder")).toBe(B.session);
   });
 
-  it("does not navigate after Decline", async () => {
+  it("renders the declined terminal view without navigating after Decline", async () => {
     const { client } = makeRoutedClient({
       [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload())],
       [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
@@ -635,30 +612,7 @@ describe("HandoffConsent", () => {
     });
 
     try {
-      const { client, calls } = makeRoutedClient({
-        [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload())],
-        [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse("guest_stale"), guestIdentityResponse("guest_fresh")],
-        [ACCEPT_ROUTE]: [
-          errorResponse(404, "handoff_source_invalid"),
-          jsonResponse(200, previewPayload({ status: "accepted", target_scenario_session_id: "scenario_session_1" })),
-        ],
-      });
-
-      render(<HandoffConsent client={client} handoffToken="token_abc" />);
-      await waitFor(() => expect(screen.getByRole("button", { name: "Accept" })).toBeTruthy());
-
-      fireEvent.click(screen.getByRole("button", { name: "Accept" }));
-      await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/could not be completed/i));
-      // If the failed removeItem() left "guest_stale" readable from localStorage,
-      // createGuestIdentity() would short-circuit on that cached read and never reach the backend
-      // a second time -- this assertion is what the ephemeral-fallback-on-failed-clear fix buys.
-      expect(calls.filter((call) => call.key === GUEST_IDENTITY_ROUTE)).toHaveLength(2);
-
-      fireEvent.click(screen.getByRole("button", { name: "Accept" }));
-
-      await waitFor(() => expect(screen.getByText("Accepted")).toBeTruthy());
-      const acceptCalls = calls.filter((call) => call.key === ACCEPT_ROUTE);
-      expect(JSON.parse(acceptCalls[1]?.init.body as string)).toEqual({ guest_id: "guest_fresh" });
+      await expectStaleGuestRetry();
     } finally {
       removeItemSpy.mockRestore();
     }
@@ -761,21 +715,6 @@ describe("HandoffConsent", () => {
     expect(screen.queryByRole("button", { name: "Accept" })).toBeNull();
   });
 
-  it("transitions to the declined terminal view on a successful decline", async () => {
-    const { client } = makeRoutedClient({
-      [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload())],
-      [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
-      [DECLINE_ROUTE]: [jsonResponse(200, previewPayload({ status: "declined" }))],
-    });
-
-    render(<HandoffConsent client={client} handoffToken="token_abc" />);
-    await waitFor(() => expect(screen.getByRole("button", { name: "Decline" })).toBeTruthy());
-
-    fireEvent.click(screen.getByRole("button", { name: "Decline" }));
-
-    await waitFor(() => expect(screen.getByText("Declined")).toBeTruthy());
-  });
-
   it("on a stale accept that races an already-consumed token, refetches and renders the authoritative terminal state instead of retrying", async () => {
     const { client, calls } = makeRoutedClient({
       [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload()), jsonResponse(200, previewPayload({ status: "consumed" }))],
@@ -844,30 +783,7 @@ describe("HandoffConsent", () => {
   });
 
   it("on an accept rejected because the persisted guest id no longer resolves, clears it, mints a fresh one, and lets a retry succeed", async () => {
-    const { client, calls } = makeRoutedClient({
-      [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload())],
-      [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse("guest_stale"), guestIdentityResponse("guest_fresh")],
-      [ACCEPT_ROUTE]: [
-        errorResponse(404, "handoff_source_invalid"),
-        jsonResponse(200, previewPayload({ status: "accepted", target_scenario_session_id: "scenario_session_1" })),
-      ],
-    });
-
-    render(<HandoffConsent client={client} handoffToken="token_abc" />);
-    await waitFor(() => expect(screen.getByRole("button", { name: "Accept" })).toBeTruthy());
-
-    fireEvent.click(screen.getByRole("button", { name: "Accept" }));
-    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/could not be completed/i));
-    // Clearing the stale persisted id makes createGuestIdentity() miss its localStorage read on
-    // retry and hit the backend again for a fresh one.
-    expect(calls.filter((call) => call.key === GUEST_IDENTITY_ROUTE)).toHaveLength(2);
-
-    fireEvent.click(screen.getByRole("button", { name: "Accept" }));
-
-    await waitFor(() => expect(screen.getByText("Accepted")).toBeTruthy());
-    const acceptCalls = calls.filter((call) => call.key === ACCEPT_ROUTE);
-    expect(acceptCalls).toHaveLength(2);
-    expect(JSON.parse(acceptCalls[1]?.init.body as string)).toEqual({ guest_id: "guest_fresh" });
+    await expectStaleGuestRetry();
   });
 
   it("on an accept against an unknown token, refetches and renders the not-found view", async () => {
@@ -988,3 +904,29 @@ describe("HandoffConsent", () => {
     }
   });
 });
+
+async function expectStaleGuestRetry(): Promise<void> {
+  const { client, calls } = makeRoutedClient({
+    [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload())],
+    [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse("guest_stale"), guestIdentityResponse("guest_fresh")],
+    [ACCEPT_ROUTE]: [
+      errorResponse(404, "handoff_source_invalid"),
+      jsonResponse(200, previewPayload({ status: "accepted", target_scenario_session_id: "scenario_session_1" })),
+    ],
+  });
+
+  render(<HandoffConsent client={client} handoffToken="token_abc" />);
+  await waitFor(() => expect(screen.getByRole("button", { name: "Accept" })).toBeTruthy());
+
+  fireEvent.click(screen.getByRole("button", { name: "Accept" }));
+  await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/could not be completed/i));
+  // Retry must mint a fresh identity even when clearing the stale storage entry failed.
+  expect(calls.filter((call) => call.key === GUEST_IDENTITY_ROUTE)).toHaveLength(2);
+
+  fireEvent.click(screen.getByRole("button", { name: "Accept" }));
+
+  await waitFor(() => expect(screen.getByText("Accepted")).toBeTruthy());
+  const acceptCalls = calls.filter((call) => call.key === ACCEPT_ROUTE);
+  expect(acceptCalls).toHaveLength(2);
+  expect(JSON.parse(acceptCalls[1]?.init.body as string)).toEqual({ guest_id: "guest_fresh" });
+}

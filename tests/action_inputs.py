@@ -25,3 +25,11 @@ def extract_fields() -> list[dict[str, Any]]:
             "required": False,
         },
     ]
+
+
+def extract_input(
+    source_text: str = "deadline budget deliverables",
+    **overrides: Any,
+) -> dict[str, Any]:
+    """Fresh A01 input with caller-specified overrides."""
+    return {"source_text": source_text, "fields": extract_fields(), **overrides}

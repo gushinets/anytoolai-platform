@@ -35,12 +35,9 @@ from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
 from anytoolai_platform_core.providers.models import ProviderResponse, ResolvedProviderRequest
 from anytoolai_platform_core.scenarios.checkpoints import RESULT_READY_CHECKPOINT_ID
 from anytoolai_platform_core.storage.db import (
-    action_runs_table,
-    artifacts_table,
     event_log_table,
     guest_quota_usage_table,
     jobs_table,
-    provider_calls_table,
     scenario_sessions_table,
 )
 from anytoolai_platform_core.storage.transactions import SessionFactory, transaction_boundary
@@ -49,6 +46,8 @@ from anytoolai_platform_core.workflows.mappings import resolve_step_input
 from anytoolai_platform_core.workflows.models import JobStatus
 from anytoolai_platform_worker.composition import build_worker
 from test_atom_runtime_matrix import _EXPECTED_EVENT_TYPES
+
+from tests.db_support import read_execution_rows
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
@@ -356,31 +355,8 @@ def test_mode_happy_path_produces_the_deterministic_fixture_result(
     # Code review finding: prove session/job/action/provider/artifact/event correlation across the
     # real pipeline, not just that the final output matches.
     with transaction_boundary(session_factory) as session:
-        action_runs = list(
-            session.execute(
-                sa.select(action_runs_table)
-                .where(action_runs_table.c.job_id == started["job_id"])
-                .order_by(action_runs_table.c.created_at, action_runs_table.c.id)
-            ).mappings()
-        )
-        provider_calls = list(
-            session.execute(
-                sa.select(provider_calls_table).where(provider_calls_table.c.job_id == started["job_id"])
-            ).mappings()
-        )
-        artifacts = list(
-            session.execute(
-                sa.select(artifacts_table)
-                .where(artifacts_table.c.job_id == started["job_id"])
-                .order_by(artifacts_table.c.created_at, artifacts_table.c.id)
-            ).mappings()
-        )
-        events = list(
-            session.execute(
-                sa.select(event_log_table)
-                .where(event_log_table.c.scenario_session_id == started["scenario_session_id"])
-                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
-            ).mappings()
+        action_runs, provider_calls, artifacts, events = read_execution_rows(
+            session, job_id=started["job_id"], scenario_session_id=started["scenario_session_id"],
         )
 
     # Step order: the action_runs row sequence matches the workflow's declared step order exactly

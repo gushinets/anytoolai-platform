@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import {
+  trackScenarioStarts,
+  expectMobileTaskReset,
   withDb,
   countEvents,
   trackRun,
@@ -180,22 +182,11 @@ test.describe("Acceptance Builder web product", () => {
     await page.locator("#acceptance-builder-brief-text").fill(`${BRIEF} Also a PDF preview.`);
     await expect(page.getByText("Created from previous details")).toBeVisible();
 
-    await page.setViewportSize({ width: 390, height: 844 });
-    await expectWorkspaceLayout(page, "stacked");
-
-    await page.getByRole("button", { name: "New task" }).click();
-    await expect(page.locator("#acceptance-builder-brief-text")).toHaveValue("");
-    await expect(page.locator("#acceptance-builder-brief-text")).toBeFocused();
-    await expect(page.getByRole("button", { name: "Copy" })).toHaveCount(0);
+    await expectMobileTaskReset(page, "#acceptance-builder-brief-text");
   });
 
   test("validation: empty fields show the errors and never start a scenario", async ({ page }) => {
-    let startRequested = false;
-    page.on("request", (request) => {
-      if (request.method() === "POST" && ANY_START.test(request.url())) {
-        startRequested = true;
-      }
-    });
+    const starts = trackScenarioStarts(page, ANY_START);
     await page.goto(PRODUCT_URL);
     await page.getByRole("button", { name: "Draft criteria" }).click();
     await expect(page.getByText("Client brief: required.")).toBeVisible();
@@ -204,7 +195,7 @@ test.describe("Acceptance Builder web product", () => {
     await page.locator("#acceptance-builder-brief-text").fill(BRIEF);
     await page.getByRole("button", { name: "Check deliverable" }).click();
     await expect(page.getByText("Finished work: required.")).toBeVisible();
-    expect(startRequested).toBe(false);
+    expect(starts).toEqual([]);
   });
 
   test("weak input (draft): a brief with no criteria renders the documented gaps, completes, and reports no result_viewed", async ({

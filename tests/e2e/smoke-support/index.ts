@@ -26,6 +26,23 @@ const RESULT_ROUTE = /\/v1\/results\/([^/?]+)/;
 const SESSION_ROUTE = /\/v1\/scenario-sessions\/([^/?]+)$/;
 const COPY_NEXT_ACTION = /\/scenario-sessions\/[^/]+\/next-actions\/copy_result$/;
 
+export function trackScenarioStarts(page: Page, route: RegExp = ANY_START): string[] {
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST" && route.test(request.url())) requests.push(request.url());
+  });
+  return requests;
+}
+
+export async function expectMobileTaskReset(page: Page, inputSelector: string): Promise<void> {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectWorkspaceLayout(page, "stacked");
+  await page.getByRole("button", { name: "New task" }).click();
+  await expect(page.locator(inputSelector)).toHaveValue("");
+  await expect(page.locator(inputSelector)).toBeFocused();
+  await expect(page.getByRole("button", { name: "Copy" })).toHaveCount(0);
+}
+
 /** Records the session id the start response returns and the artifact id the browser's result GET
  * used, so backend rows can be tied to this exact run. */
 export function trackRun(page: Page, startRoute: RegExp = ANY_START): { sessionId: () => string; resultArtifactId: () => string } {
@@ -123,6 +140,8 @@ export async function expectCopyActivation(page: Page, sessionId: string, expect
   await expect(page.getByRole("button", { name: "Copied" })).toBeVisible();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(expectedText);
   await expect.poll(() => copyRequests.length, { timeout: 5_000 }).toBe(1);
+  expect(sessionId).not.toBe("");
+  expect(new URL(copyRequests[0]).pathname.endsWith(`/scenario-sessions/${sessionId}/next-actions/copy_result`)).toBe(true);
   await expect.poll(() => countEvents("client.next_action_clicked", sessionId), { timeout: 5_000 }).toBe(1);
 }
 

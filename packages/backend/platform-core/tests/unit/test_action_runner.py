@@ -67,12 +67,13 @@ from anytoolai_platform_core.storage.transactions import (
 )
 from anytoolai_platform_core.structured_output.errors import StructuredOutputValidationError
 
-from tests.action_inputs import extract_fields
+from tests.action_inputs import extract_input
 from tests.db_support import provision_database
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "provider" / "fake_provider_outputs"
+VALIDATION_RETRY_ATTEMPTS = 2
 pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
 
 
@@ -166,22 +167,8 @@ def test_action_runner_executes_extract_structured_fields_and_persists_context(
     with transaction_boundary(session_factory) as session:
         runner = _build_runner(session)
 
-        result = asyncio.run(
-            runner.run(
-                "text.extract_structured_fields",
-                "kernel_demo.extract_structured_fields_v1",
-                {"source_text": "deadline budget deliverables", "fields": extract_fields()},
-                _context(
-                    step_id="extract",
-                    action_type="text.extract_structured_fields",
-                    action_config_id="kernel_demo.extract_structured_fields_v1",
-                ),
-            )
-        )
-        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
-        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
-        provider_call = session.execute(sa.select(provider_calls_table)).mappings().one()
-        events = _event_rows(session)
+        result = _run_extract_action(runner)
+        action_run, artifact, provider_call, events = _read_single_action_ledger(session)
 
     assert result.status.value == "succeeded"
     assert result.output_payload == {
@@ -277,40 +264,25 @@ def test_action_runner_executes_generate_clarifying_questions_from_a04_issue_art
     with transaction_boundary(session_factory) as session:
         runner = _build_runner(session)
 
-        result = asyncio.run(
-            runner.run(
-                "text.generate_clarifying_questions",
-                "kernel_demo.generate_clarifying_questions_v1",
+        result = _run_question_action(
+            runner,
+            [
                 {
-                    "issues": [
-                        {
-                            "category": "timeline",
-                            "description": "Delivery date not specified",
-                            "severity": "high",
-                            "evidence": "We need this soon.",
-                        },
-                        {
-                            "category": "scope",
-                            "description": "Deliverables list is incomplete",
-                            "severity": "medium",
-                        },
-                    ],
-                    "context": "Client project kickoff conversation.",
-                    "target_audience": "client stakeholder",
+                    "category": "timeline",
+                    "description": "Delivery date not specified",
+                    "severity": "high",
+                    "evidence": "We need this soon.",
                 },
-                _context(
-                    step_id="generate_clarifying_questions",
-                    action_type="text.generate_clarifying_questions",
-                    action_config_id="kernel_demo.generate_clarifying_questions_v1",
-                ),
-            )
+                {
+                    "category": "scope",
+                    "description": "Deliverables list is incomplete",
+                    "severity": "medium",
+                },
+            ],
         )
-        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
-        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
-        provider_call = session.execute(sa.select(provider_calls_table)).mappings().one()
-        events = _event_rows(session)
+        action_run, artifact, provider_call, events = _read_single_action_ledger(session)
 
-    assert result.status.value == "succeeded"
+    _assert_question_action_lineage(result, action_run, artifact, provider_call, events)
     assert result.output_payload == {
         "questions": [
             {
@@ -322,27 +294,6 @@ def test_action_runner_executes_generate_clarifying_questions_from_a04_issue_art
             },
         ]
     }
-    assert result.output_artifact_id == artifact["id"]
-    assert action_run["status"].value == "succeeded"
-    assert action_run["output_artifact_id"] == artifact["id"]
-    assert artifact["action_run_id"] == action_run["id"]
-    assert artifact["metadata"]["schema_ref"] == "kernel.schemas.generate_questions_output_v1"
-    assert provider_call["action_run_id"] == action_run["id"]
-    assert _event_counts(events) == Counter(
-        {
-            "action.started": 1,
-            "provider.request_started": 1,
-            "provider.request_succeeded": 1,
-            "artifact.created": 1,
-            "action.succeeded": 1,
-        }
-    )
-    action_started = _event_by_type(events, "action.started")
-    artifact_created = _event_by_type(events, "artifact.created")
-    action_succeeded = _event_by_type(events, "action.succeeded")
-    assert action_started["action_run_id"] == action_run["id"]
-    assert artifact_created["artifact_id"] == artifact["id"]
-    assert action_succeeded["action_run_id"] == action_run["id"]
 
 
 def test_action_runner_executes_generate_clarifying_questions_with_empty_output_when_no_issue_is_actionable(
@@ -355,56 +306,20 @@ def test_action_runner_executes_generate_clarifying_questions_with_empty_output_
     with transaction_boundary(session_factory) as session:
         runner = _build_runner(session, fake_adapter=EmptyQuestionsFakeAdapter())
 
-        result = asyncio.run(
-            runner.run(
-                "text.generate_clarifying_questions",
-                "kernel_demo.generate_clarifying_questions_v1",
+        result = _run_question_action(
+            runner,
+            [
                 {
-                    "issues": [
-                        {
-                            "category": "context",
-                            "description": "Purely informational note, nothing to resolve.",
-                            "severity": "low",
-                        }
-                    ],
-                    "context": "Client project kickoff conversation.",
-                    "target_audience": "client stakeholder",
-                },
-                _context(
-                    step_id="generate_clarifying_questions",
-                    action_type="text.generate_clarifying_questions",
-                    action_config_id="kernel_demo.generate_clarifying_questions_v1",
-                ),
-            )
+                    "category": "context",
+                    "description": "Purely informational note, nothing to resolve.",
+                    "severity": "low",
+                }
+            ],
         )
-        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
-        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
-        provider_call = session.execute(sa.select(provider_calls_table)).mappings().one()
-        events = _event_rows(session)
+        action_run, artifact, provider_call, events = _read_single_action_ledger(session)
 
-    assert result.status.value == "succeeded"
+    _assert_question_action_lineage(result, action_run, artifact, provider_call, events)
     assert result.output_payload == {"questions": []}
-    assert result.output_artifact_id == artifact["id"]
-    assert action_run["status"].value == "succeeded"
-    assert action_run["output_artifact_id"] == artifact["id"]
-    assert artifact["action_run_id"] == action_run["id"]
-    assert artifact["metadata"]["schema_ref"] == "kernel.schemas.generate_questions_output_v1"
-    assert provider_call["action_run_id"] == action_run["id"]
-    assert _event_counts(events) == Counter(
-        {
-            "action.started": 1,
-            "provider.request_started": 1,
-            "provider.request_succeeded": 1,
-            "artifact.created": 1,
-            "action.succeeded": 1,
-        }
-    )
-    action_started = _event_by_type(events, "action.started")
-    artifact_created = _event_by_type(events, "artifact.created")
-    action_succeeded = _event_by_type(events, "action.succeeded")
-    assert action_started["action_run_id"] == action_run["id"]
-    assert artifact_created["artifact_id"] == artifact["id"]
-    assert action_succeeded["action_run_id"] == action_run["id"]
 
 
 def test_action_runner_executes_generate_document_atom_and_persists_event_lineage(
@@ -432,10 +347,7 @@ def test_action_runner_executes_generate_document_atom_and_persists_event_lineag
                 ),
             )
         )
-        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
-        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
-        provider_call = session.execute(sa.select(provider_calls_table)).mappings().one()
-        events = _event_rows(session)
+        action_run, artifact, provider_call, events = _read_single_action_ledger(session)
 
     assert result.status.value == "succeeded"
     assert result.output_payload == {
@@ -501,10 +413,7 @@ def test_action_runner_executes_compose_persuasive_text_atom_and_persists_event_
                 ),
             )
         )
-        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
-        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
-        provider_call = session.execute(sa.select(provider_calls_table)).mappings().one()
-        events = _event_rows(session)
+        action_run, artifact, provider_call, events = _read_single_action_ledger(session)
 
     assert result.status.value == "succeeded"
     assert result.output_payload == {
@@ -568,10 +477,7 @@ def test_action_runner_executes_synthesize_angle_atom_through_generic_path(
                 ),
             )
         )
-        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
-        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
-        provider_call = session.execute(sa.select(provider_calls_table)).mappings().one()
-        events = _event_rows(session)
+        action_run, artifact, provider_call, events = _read_single_action_ledger(session)
 
     assert result.status.value == "succeeded"
     assert result.output_payload == {
@@ -605,34 +511,37 @@ def test_action_runner_executes_synthesize_angle_atom_through_generic_path(
     assert action_succeeded["action_run_id"] == action_run["id"]
 
 
+@pytest.mark.parametrize(
+    ("adapter_factory", "options", "expected_output"),
+    [
+        pytest.param(
+            SynthesizeAngleOutOfOptionsThenValidAdapter,
+            ["Lead with urgency"],
+            {"angle": "Lead with urgency", "rationale": "r"},
+            id="primary-angle",
+        ),
+        pytest.param(
+            SynthesizeAngleSecondaryOutOfOptionsThenValidAdapter,
+            ["Lead with urgency", "Anchor on budget"],
+            {"angle": "Lead with urgency", "rationale": "r", "secondary_angle": "Anchor on budget"},
+            id="secondary-angle",
+        ),
+    ],
+)
 def test_action_runner_retries_synthesize_angle_cross_validation_through_real_ledger(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    adapter_factory: Any,
+    options: list[str],
+    expected_output: dict[str, Any],
 ) -> None:
     """A09: proves the options-membership cross-validation retry through the real
     ProviderGateway/ActionRunner path (not an in-memory spy) - an out-of-options angle
     followed by success must create two physical provider_calls rows with the expected
     semantic/physical indexes, provider events, and final artifact lineage."""
-    adapter = SynthesizeAngleOutOfOptionsThenValidAdapter()
+    adapter = adapter_factory()
     with transaction_boundary(session_factory) as session:
         runner = _build_runner(session, fake_adapter=adapter)
-        # default_fake_provider_v1 allows 1 validation attempt / 1 physical call per action;
-        # widen both so the semantic retry this test drives can actually reach a 2nd
-        # physical call through the real ProviderGateway hard-limit check, not just PydanticAI.
-        executor = runner._executors["structured_llm"]
-        base_policy = executor._require_provider_policy("default_fake_provider_v1")
-        patched_policy = replace(
-            base_policy,
-            retry_policy=replace(
-                base_policy.retry_policy,
-                validation=ProviderValidationRetryPolicy(
-                    owner=base_policy.retry_policy.validation.owner,
-                    max_attempts=2,
-                ),
-                hard_limits=ProviderRetryHardLimits(max_physical_provider_calls_per_action=2),
-            ),
-        )
-        executor._require_provider_policy = lambda _provider_policy_ref: patched_policy
-        executor._provider_gateway._policy_resolver.resolve = lambda _provider_policy_ref: patched_policy
+        _allow_validation_retry(runner)
 
         result = asyncio.run(
             runner.run(
@@ -641,7 +550,7 @@ def test_action_runner_retries_synthesize_angle_cross_validation_through_real_le
                 {
                     "signals": [{"id": "s1", "label": "Timeline gap", "value": "unconfirmed"}],
                     "objective": "Win the deal",
-                    "options": ["Lead with urgency"],
+                    "options": options,
                 },
                 _context(
                     step_id="synthesize_angle",
@@ -650,128 +559,15 @@ def test_action_runner_retries_synthesize_angle_cross_validation_through_real_le
                 ),
             )
         )
-        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
-        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
-        provider_calls = list(
-            session.execute(
-                sa.select(provider_calls_table).order_by(
-                    provider_calls_table.c.created_at, provider_calls_table.c.id
-                )
-            ).mappings()
-        )
-        events = _event_rows(session)
+        action_run, artifact, provider_calls, events = _read_retry_ledger(session)
 
     assert result.status.value == "succeeded"
-    assert result.output_payload == {"angle": "Lead with urgency", "rationale": "r"}
+    assert result.output_payload == expected_output
     assert result.output_artifact_id == artifact["id"]
     assert adapter.call_count == 2
-    assert len(provider_calls) == 2
-    assert [row["semantic_attempt_index"] for row in provider_calls] == [1, 2]
-    # physical_call_index tracks the action-wide physical-call budget, not a per-semantic-
-    # attempt counter, so it keeps climbing across semantic attempts too.
-    assert [row["physical_call_index"] for row in provider_calls] == [1, 2]
-    assert all(row["action_run_id"] == action_run["id"] for row in provider_calls)
-    assert action_run["status"].value == "succeeded"
-    assert action_run["output_artifact_id"] == artifact["id"]
-    assert artifact["action_run_id"] == action_run["id"]
-    assert _event_counts(events) == Counter(
-        {
-            "action.started": 1,
-            "provider.request_started": 2,
-            "provider.request_succeeded": 2,
-            "artifact.created": 1,
-            "action.succeeded": 1,
-        }
-    )
-    artifact_created = _event_by_type(events, "artifact.created")
-    assert artifact_created["artifact_id"] == artifact["id"]
+    _assert_validation_retry_ledger(action_run, artifact, provider_calls, events)
 
 
-def test_action_runner_retries_synthesize_angle_secondary_cross_validation_through_real_ledger(
-    session_factory: sa.orm.sessionmaker[sa.orm.Session],
-) -> None:
-    """A09: proves the options-membership cross-validation retry for `secondary_angle`
-    (not just `angle`) through the real ProviderGateway/ActionRunner path - a valid `angle`
-    paired with an out-of-options `secondary_angle` followed by a fully valid reply must
-    create two physical provider_calls rows with the expected semantic/physical indexes,
-    provider events, and final artifact lineage."""
-    adapter = SynthesizeAngleSecondaryOutOfOptionsThenValidAdapter()
-    with transaction_boundary(session_factory) as session:
-        runner = _build_runner(session, fake_adapter=adapter)
-        # default_fake_provider_v1 allows 1 validation attempt / 1 physical call per action;
-        # widen both so the semantic retry this test drives can actually reach a 2nd
-        # physical call through the real ProviderGateway hard-limit check, not just PydanticAI.
-        executor = runner._executors["structured_llm"]
-        base_policy = executor._require_provider_policy("default_fake_provider_v1")
-        patched_policy = replace(
-            base_policy,
-            retry_policy=replace(
-                base_policy.retry_policy,
-                validation=ProviderValidationRetryPolicy(
-                    owner=base_policy.retry_policy.validation.owner,
-                    max_attempts=2,
-                ),
-                hard_limits=ProviderRetryHardLimits(max_physical_provider_calls_per_action=2),
-            ),
-        )
-        executor._require_provider_policy = lambda _provider_policy_ref: patched_policy
-        executor._provider_gateway._policy_resolver.resolve = lambda _provider_policy_ref: patched_policy
-
-        result = asyncio.run(
-            runner.run(
-                "text.synthesize_angle",
-                "kernel_demo.synthesize_angle_v1",
-                {
-                    "signals": [{"id": "s1", "label": "Timeline gap", "value": "unconfirmed"}],
-                    "objective": "Win the deal",
-                    "options": ["Lead with urgency", "Anchor on budget"],
-                },
-                _context(
-                    step_id="synthesize_angle",
-                    action_type="text.synthesize_angle",
-                    action_config_id="kernel_demo.synthesize_angle_v1",
-                ),
-            )
-        )
-        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
-        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
-        provider_calls = list(
-            session.execute(
-                sa.select(provider_calls_table).order_by(
-                    provider_calls_table.c.created_at, provider_calls_table.c.id
-                )
-            ).mappings()
-        )
-        events = _event_rows(session)
-
-    assert result.status.value == "succeeded"
-    assert result.output_payload == {
-        "angle": "Lead with urgency",
-        "rationale": "r",
-        "secondary_angle": "Anchor on budget",
-    }
-    assert result.output_artifact_id == artifact["id"]
-    assert adapter.call_count == 2
-    assert len(provider_calls) == 2
-    assert [row["semantic_attempt_index"] for row in provider_calls] == [1, 2]
-    # physical_call_index tracks the action-wide physical-call budget, not a per-semantic-
-    # attempt counter, so it keeps climbing across semantic attempts too.
-    assert [row["physical_call_index"] for row in provider_calls] == [1, 2]
-    assert all(row["action_run_id"] == action_run["id"] for row in provider_calls)
-    assert action_run["status"].value == "succeeded"
-    assert action_run["output_artifact_id"] == artifact["id"]
-    assert artifact["action_run_id"] == action_run["id"]
-    assert _event_counts(events) == Counter(
-        {
-            "action.started": 1,
-            "provider.request_started": 2,
-            "provider.request_succeeded": 2,
-            "artifact.created": 1,
-            "action.succeeded": 1,
-        }
-    )
-    artifact_created = _event_by_type(events, "artifact.created")
-    assert artifact_created["artifact_id"] == artifact["id"]
 
 
 def test_action_runner_executes_generate_gap_rewrites_atom_and_persists_event_lineage(
@@ -796,10 +592,7 @@ def test_action_runner_executes_generate_gap_rewrites_atom_and_persists_event_li
                 ),
             )
         )
-        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
-        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
-        provider_call = session.execute(sa.select(provider_calls_table)).mappings().one()
-        events = _event_rows(session)
+        action_run, artifact, provider_call, events = _read_single_action_ledger(session)
 
     assert result.status.value == "succeeded"
     assert result.output_payload == {
@@ -909,24 +702,7 @@ def test_action_runner_retries_generate_gap_rewrites_cross_validation_through_re
     adapter = GapRewritesCountMismatchThenValidAdapter()
     with transaction_boundary(session_factory) as session:
         runner = _build_runner(session, fake_adapter=adapter)
-        # default_fake_provider_v1 allows 1 validation attempt / 1 physical call per action;
-        # widen both so the semantic retry this test drives can actually reach a 2nd
-        # physical call through the real ProviderGateway hard-limit check, not just PydanticAI.
-        executor = runner._executors["structured_llm"]
-        base_policy = executor._require_provider_policy("default_fake_provider_v1")
-        patched_policy = replace(
-            base_policy,
-            retry_policy=replace(
-                base_policy.retry_policy,
-                validation=ProviderValidationRetryPolicy(
-                    owner=base_policy.retry_policy.validation.owner,
-                    max_attempts=2,
-                ),
-                hard_limits=ProviderRetryHardLimits(max_physical_provider_calls_per_action=2),
-            ),
-        )
-        executor._require_provider_policy = lambda _provider_policy_ref: patched_policy
-        executor._provider_gateway._policy_resolver.resolve = lambda _provider_policy_ref: patched_policy
+        _allow_validation_retry(runner)
 
         result = asyncio.run(
             runner.run(
@@ -945,16 +721,7 @@ def test_action_runner_retries_generate_gap_rewrites_cross_validation_through_re
                 ),
             )
         )
-        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
-        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
-        provider_calls = list(
-            session.execute(
-                sa.select(provider_calls_table).order_by(
-                    provider_calls_table.c.created_at, provider_calls_table.c.id
-                )
-            ).mappings()
-        )
-        events = _event_rows(session)
+        action_run, artifact, provider_calls, events = _read_retry_ledger(session)
 
     assert result.status.value == "succeeded"
     assert result.output_payload == {
@@ -966,26 +733,7 @@ def test_action_runner_retries_generate_gap_rewrites_cross_validation_through_re
     }
     assert result.output_artifact_id == artifact["id"]
     assert adapter.call_count == 2
-    assert len(provider_calls) == 2
-    assert [row["semantic_attempt_index"] for row in provider_calls] == [1, 2]
-    # physical_call_index tracks the action-wide physical-call budget, not a per-semantic-
-    # attempt counter, so it keeps climbing across semantic attempts too.
-    assert [row["physical_call_index"] for row in provider_calls] == [1, 2]
-    assert all(row["action_run_id"] == action_run["id"] for row in provider_calls)
-    assert action_run["status"].value == "succeeded"
-    assert action_run["output_artifact_id"] == artifact["id"]
-    assert artifact["action_run_id"] == action_run["id"]
-    assert _event_counts(events) == Counter(
-        {
-            "action.started": 1,
-            "provider.request_started": 2,
-            "provider.request_succeeded": 2,
-            "artifact.created": 1,
-            "action.succeeded": 1,
-        }
-    )
-    artifact_created = _event_by_type(events, "artifact.created")
-    assert artifact_created["artifact_id"] == artifact["id"]
+    _assert_validation_retry_ledger(action_run, artifact, provider_calls, events)
 
 
 def test_action_runner_executes_compose_reply_atom_and_persists_event_lineage(
@@ -1010,10 +758,7 @@ def test_action_runner_executes_compose_reply_atom_and_persists_event_lineage(
                 ),
             )
         )
-        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
-        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
-        provider_call = session.execute(sa.select(provider_calls_table)).mappings().one()
-        events = _event_rows(session)
+        action_run, artifact, provider_call, events = _read_single_action_ledger(session)
 
     assert result.status.value == "succeeded"
     assert result.output_payload == {
@@ -1056,24 +801,7 @@ def test_action_runner_retries_compose_reply_cross_validation_through_real_ledge
     adapter = ComposeReplyOverLimitThenValidAdapter()
     with transaction_boundary(session_factory) as session:
         runner = _build_runner(session, fake_adapter=adapter)
-        # default_fake_provider_v1 allows 1 validation attempt / 1 physical call per action;
-        # widen both so the semantic retry this test drives can actually reach a 2nd
-        # physical call through the real ProviderGateway hard-limit check, not just PydanticAI.
-        executor = runner._executors["structured_llm"]
-        base_policy = executor._require_provider_policy("default_fake_provider_v1")
-        patched_policy = replace(
-            base_policy,
-            retry_policy=replace(
-                base_policy.retry_policy,
-                validation=ProviderValidationRetryPolicy(
-                    owner=base_policy.retry_policy.validation.owner,
-                    max_attempts=2,
-                ),
-                hard_limits=ProviderRetryHardLimits(max_physical_provider_calls_per_action=2),
-            ),
-        )
-        executor._require_provider_policy = lambda _provider_policy_ref: patched_policy
-        executor._provider_gateway._policy_resolver.resolve = lambda _provider_policy_ref: patched_policy
+        _allow_validation_retry(runner)
 
         result = asyncio.run(
             runner.run(
@@ -1092,41 +820,13 @@ def test_action_runner_retries_compose_reply_cross_validation_through_real_ledge
                 ),
             )
         )
-        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
-        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
-        provider_calls = list(
-            session.execute(
-                sa.select(provider_calls_table).order_by(
-                    provider_calls_table.c.created_at, provider_calls_table.c.id
-                )
-            ).mappings()
-        )
-        events = _event_rows(session)
+        action_run, artifact, provider_calls, events = _read_retry_ledger(session)
 
     assert result.status.value == "succeeded"
     assert result.output_payload == {"text": "Short."}
     assert result.output_artifact_id == artifact["id"]
     assert adapter.call_count == 2
-    assert len(provider_calls) == 2
-    assert [row["semantic_attempt_index"] for row in provider_calls] == [1, 2]
-    # physical_call_index tracks the action-wide physical-call budget, not a per-semantic-
-    # attempt counter, so it keeps climbing across semantic attempts too.
-    assert [row["physical_call_index"] for row in provider_calls] == [1, 2]
-    assert all(row["action_run_id"] == action_run["id"] for row in provider_calls)
-    assert action_run["status"].value == "succeeded"
-    assert action_run["output_artifact_id"] == artifact["id"]
-    assert artifact["action_run_id"] == action_run["id"]
-    assert _event_counts(events) == Counter(
-        {
-            "action.started": 1,
-            "provider.request_started": 2,
-            "provider.request_succeeded": 2,
-            "artifact.created": 1,
-            "action.succeeded": 1,
-        }
-    )
-    artifact_created = _event_by_type(events, "artifact.created")
-    assert artifact_created["artifact_id"] == artifact["id"]
+    _assert_validation_retry_ledger(action_run, artifact, provider_calls, events)
 
 
 def test_action_runner_executes_compare_and_classify_atom_through_generic_path(
@@ -1155,10 +855,7 @@ def test_action_runner_executes_compare_and_classify_atom_through_generic_path(
                 ),
             )
         )
-        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
-        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
-        provider_call = session.execute(sa.select(provider_calls_table)).mappings().one()
-        events = _event_rows(session)
+        action_run, artifact, provider_call, events = _read_single_action_ledger(session)
 
     assert result.status.value == "succeeded"
     assert result.output_payload == {
@@ -1214,24 +911,7 @@ def test_action_runner_retries_compare_and_classify_cross_validation_through_rea
     adapter = CompareAndClassifyOutOfCategoriesThenValidAdapter()
     with transaction_boundary(session_factory) as session:
         runner = _build_runner(session, fake_adapter=adapter)
-        # default_fake_provider_v1 allows 1 validation attempt / 1 physical call per action;
-        # widen both so the semantic retry this test drives can actually reach a 2nd
-        # physical call through the real ProviderGateway hard-limit check, not just PydanticAI.
-        executor = runner._executors["structured_llm"]
-        base_policy = executor._require_provider_policy("default_fake_provider_v1")
-        patched_policy = replace(
-            base_policy,
-            retry_policy=replace(
-                base_policy.retry_policy,
-                validation=ProviderValidationRetryPolicy(
-                    owner=base_policy.retry_policy.validation.owner,
-                    max_attempts=2,
-                ),
-                hard_limits=ProviderRetryHardLimits(max_physical_provider_calls_per_action=2),
-            ),
-        )
-        executor._require_provider_policy = lambda _provider_policy_ref: patched_policy
-        executor._provider_gateway._policy_resolver.resolve = lambda _provider_policy_ref: patched_policy
+        _allow_validation_retry(runner)
 
         result = asyncio.run(
             runner.run(
@@ -1250,16 +930,7 @@ def test_action_runner_retries_compare_and_classify_cross_validation_through_rea
                 ),
             )
         )
-        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
-        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
-        provider_calls = list(
-            session.execute(
-                sa.select(provider_calls_table).order_by(
-                    provider_calls_table.c.created_at, provider_calls_table.c.id
-                )
-            ).mappings()
-        )
-        events = _event_rows(session)
+        action_run, artifact, provider_calls, events = _read_retry_ledger(session)
 
     assert result.status.value == "succeeded"
     assert result.output_payload == {
@@ -1270,26 +941,7 @@ def test_action_runner_retries_compare_and_classify_cross_validation_through_rea
     }
     assert result.output_artifact_id == artifact["id"]
     assert adapter.call_count == 2
-    assert len(provider_calls) == 2
-    assert [row["semantic_attempt_index"] for row in provider_calls] == [1, 2]
-    # physical_call_index tracks the action-wide physical-call budget, not a per-semantic-
-    # attempt counter, so it keeps climbing across semantic attempts too.
-    assert [row["physical_call_index"] for row in provider_calls] == [1, 2]
-    assert all(row["action_run_id"] == action_run["id"] for row in provider_calls)
-    assert action_run["status"].value == "succeeded"
-    assert action_run["output_artifact_id"] == artifact["id"]
-    assert artifact["action_run_id"] == action_run["id"]
-    assert _event_counts(events) == Counter(
-        {
-            "action.started": 1,
-            "provider.request_started": 2,
-            "provider.request_succeeded": 2,
-            "artifact.created": 1,
-            "action.succeeded": 1,
-        }
-    )
-    artifact_created = _event_by_type(events, "artifact.created")
-    assert artifact_created["artifact_id"] == artifact["id"]
+    _assert_validation_retry_ledger(action_run, artifact, provider_calls, events)
 
 
 def test_action_runner_marks_failed_on_provider_failure(
@@ -1299,18 +951,7 @@ def test_action_runner_marks_failed_on_provider_failure(
         runner = _build_runner(session, fake_adapter=AlwaysFailFakeAdapter())
 
         with pytest.raises(ProviderGatewayExecutionError) as exc_info:
-            asyncio.run(
-                runner.run(
-                    "text.extract_structured_fields",
-                    "kernel_demo.extract_structured_fields_v1",
-                    {"source_text": "deadline budget deliverables", "fields": extract_fields()},
-                    _context(
-                        step_id="extract",
-                        action_type="text.extract_structured_fields",
-                        action_config_id="kernel_demo.extract_structured_fields_v1",
-                    ),
-                )
-            )
+            _run_extract_action(runner)
         action_run = session.execute(sa.select(action_runs_table)).mappings().one()
         events = _event_rows(session)
 
@@ -1337,23 +978,10 @@ def test_action_runner_persists_failed_state_when_exception_escapes_transaction_
     with pytest.raises(ProviderGatewayExecutionError) as exc_info:
         with transaction_boundary(session_factory) as session:
             runner = _build_runner(session, fake_adapter=AlwaysFailFakeAdapter())
-            asyncio.run(
-                runner.run(
-                    "text.extract_structured_fields",
-                    "kernel_demo.extract_structured_fields_v1",
-                    {"source_text": "deadline budget deliverables", "fields": extract_fields()},
-                    _context(
-                        step_id="extract",
-                        action_type="text.extract_structured_fields",
-                        action_config_id="kernel_demo.extract_structured_fields_v1",
-                    ),
-                )
-            )
+            _run_extract_action(runner)
 
     with transaction_boundary(session_factory) as session:
-        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
-        provider_call = session.execute(sa.select(provider_calls_table)).mappings().one()
-        events = _event_rows(session)
+        action_run, provider_call, events = _read_failed_action(session)
 
     assert exc_info.value.error_code == "provider_request_failed"
     assert action_run["status"].value == "failed"
@@ -1381,18 +1009,7 @@ def test_action_runner_persists_succeeded_state_when_later_failure_rolls_back_tr
     with pytest.raises(RuntimeError, match="force rollback"):
         with transaction_boundary(session_factory) as session:
             runner = _build_runner(session)
-            asyncio.run(
-                runner.run(
-                    "text.extract_structured_fields",
-                    "kernel_demo.extract_structured_fields_v1",
-                    {"source_text": "deadline budget deliverables", "fields": extract_fields()},
-                    _context(
-                        step_id="extract",
-                        action_type="text.extract_structured_fields",
-                        action_config_id="kernel_demo.extract_structured_fields_v1",
-                    ),
-                )
-            )
+            _run_extract_action(runner)
             raise RuntimeError("force rollback")
 
     with transaction_boundary(session_factory) as session:
@@ -1418,18 +1035,7 @@ def test_action_recovery_rerun_does_not_duplicate_recovered_events(
     with pytest.raises(RuntimeError, match="force rollback"):
         with transaction_boundary(session_factory) as session:
             runner = _build_runner(session)
-            result = asyncio.run(
-                runner.run(
-                    "text.extract_structured_fields",
-                    "kernel_demo.extract_structured_fields_v1",
-                    {"source_text": "deadline budget deliverables", "fields": extract_fields()},
-                    _context(
-                        step_id="extract",
-                        action_type="text.extract_structured_fields",
-                        action_config_id="kernel_demo.extract_structured_fields_v1",
-                    ),
-                )
-            )
+            result = _run_extract_action(runner)
             raise RuntimeError(f"force rollback {result.action_run_id}")
 
     with transaction_boundary(session_factory) as session:
@@ -1464,23 +1070,10 @@ def test_action_runner_persists_failed_state_when_cancellation_escapes_transacti
     with pytest.raises(asyncio.CancelledError):
         with transaction_boundary(session_factory) as session:
             runner = _build_runner(session, fake_adapter=CancelledFakeAdapter())
-            asyncio.run(
-                runner.run(
-                    "text.extract_structured_fields",
-                    "kernel_demo.extract_structured_fields_v1",
-                    {"source_text": "deadline budget deliverables", "fields": extract_fields()},
-                    _context(
-                        step_id="extract",
-                        action_type="text.extract_structured_fields",
-                        action_config_id="kernel_demo.extract_structured_fields_v1",
-                    ),
-                )
-            )
+            _run_extract_action(runner)
 
     with transaction_boundary(session_factory) as session:
-        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
-        provider_call = session.execute(sa.select(provider_calls_table)).mappings().one()
-        events = _event_rows(session)
+        action_run, provider_call, events = _read_failed_action(session)
 
     assert action_run["status"].value == "failed"
     assert action_run["error_code"] == "action_execution_cancelled"
@@ -1591,18 +1184,7 @@ def test_action_runner_allows_executor_responses_without_provider_call(
             artifact_repository=ArtifactRepository(session),
         )
 
-        result = asyncio.run(
-            runner.run(
-                "text.extract_structured_fields",
-                "kernel_demo.extract_structured_fields_v1",
-                {"source_text": "deadline budget deliverables", "fields": extract_fields()},
-                _context(
-                    step_id="extract",
-                    action_type="text.extract_structured_fields",
-                    action_config_id="kernel_demo.extract_structured_fields_v1",
-                ),
-            )
-        )
+        result = _run_extract_action(runner)
         action_run = session.execute(sa.select(action_runs_table)).mappings().one()
         artifact_count = session.execute(
             sa.select(sa.func.count()).select_from(artifacts_table)
@@ -1652,18 +1234,7 @@ def test_action_runner_ignores_non_structured_output_artifact_id_from_executor_m
             artifact_repository=ArtifactRepository(session),
         )
 
-        result = asyncio.run(
-            runner.run(
-                "text.extract_structured_fields",
-                "kernel_demo.extract_structured_fields_v1",
-                {"source_text": "deadline budget deliverables", "fields": extract_fields()},
-                _context(
-                    step_id="extract",
-                    action_type="text.extract_structured_fields",
-                    action_config_id="kernel_demo.extract_structured_fields_v1",
-                ),
-            )
-        )
+        result = _run_extract_action(runner)
         action_run = session.execute(sa.select(action_runs_table)).mappings().one()
 
     assert debug_artifact.artifact_type == "structured_output_debug_raw"
@@ -1679,18 +1250,7 @@ def test_action_runner_does_not_link_failed_action_to_debug_raw_artifact(
         runner = _build_runner(session, fake_adapter=InvalidStructuredOutputAdapter())
 
         with pytest.raises(StructuredOutputValidationError) as exc_info:
-            asyncio.run(
-                runner.run(
-                    "text.extract_structured_fields",
-                    "kernel_demo.extract_structured_fields_v1",
-                    {"source_text": "deadline budget deliverables", "fields": extract_fields()},
-                    _context(
-                        step_id="extract",
-                        action_type="text.extract_structured_fields",
-                        action_config_id="kernel_demo.extract_structured_fields_v1",
-                    ),
-                )
-            )
+            _run_extract_action(runner)
         action_run = session.execute(sa.select(action_runs_table)).mappings().one()
         artifacts = session.execute(sa.select(artifacts_table)).mappings().all()
 
@@ -1790,7 +1350,7 @@ def test_action_runner_rejects_missing_workflow_version_before_creating_action_r
                 runner.run(
                     "text.extract_structured_fields",
                     "kernel_demo.extract_structured_fields_v1",
-                    {"source_text": "deadline budget deliverables", "fields": extract_fields()},
+                    extract_input(),
                     _context(
                         step_id="extract",
                         action_type="text.extract_structured_fields",
@@ -1834,10 +1394,7 @@ def test_action_runner_executes_score_multidimensional_axes_atom_through_generic
                 ),
             )
         )
-        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
-        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
-        provider_call = session.execute(sa.select(provider_calls_table)).mappings().one()
-        events = _event_rows(session)
+        action_run, artifact, provider_call, events = _read_single_action_ledger(session)
 
     assert result.status.value == "succeeded"
     assert result.output_payload == {
@@ -1889,24 +1446,7 @@ def test_action_runner_retries_score_multidimensional_axes_cross_validation_thro
     adapter = ScoreMultidimensionalAxesDominantMismatchThenValidAdapter()
     with transaction_boundary(session_factory) as session:
         runner = _build_runner(session, fake_adapter=adapter)
-        # default_fake_provider_v1 allows 1 validation attempt / 1 physical call per action;
-        # widen both so the semantic retry this test drives can actually reach a 2nd
-        # physical call through the real ProviderGateway hard-limit check, not just PydanticAI.
-        executor = runner._executors["structured_llm"]
-        base_policy = executor._require_provider_policy("default_fake_provider_v1")
-        patched_policy = replace(
-            base_policy,
-            retry_policy=replace(
-                base_policy.retry_policy,
-                validation=ProviderValidationRetryPolicy(
-                    owner=base_policy.retry_policy.validation.owner,
-                    max_attempts=2,
-                ),
-                hard_limits=ProviderRetryHardLimits(max_physical_provider_calls_per_action=2),
-            ),
-        )
-        executor._require_provider_policy = lambda _provider_policy_ref: patched_policy
-        executor._provider_gateway._policy_resolver.resolve = lambda _provider_policy_ref: patched_policy
+        _allow_validation_retry(runner)
 
         result = asyncio.run(
             runner.run(
@@ -1926,41 +1466,13 @@ def test_action_runner_retries_score_multidimensional_axes_cross_validation_thro
                 ),
             )
         )
-        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
-        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
-        provider_calls = list(
-            session.execute(
-                sa.select(provider_calls_table).order_by(
-                    provider_calls_table.c.created_at, provider_calls_table.c.id
-                )
-            ).mappings()
-        )
-        events = _event_rows(session)
+        action_run, artifact, provider_calls, events = _read_retry_ledger(session)
 
     assert result.status.value == "succeeded"
     assert result.output_payload["dominant_axes"] == ["clarity"]
     assert result.output_artifact_id == artifact["id"]
     assert adapter.call_count == 2
-    assert len(provider_calls) == 2
-    assert [row["semantic_attempt_index"] for row in provider_calls] == [1, 2]
-    # physical_call_index tracks the action-wide physical-call budget, not a per-semantic-
-    # attempt counter, so it keeps climbing across semantic attempts too.
-    assert [row["physical_call_index"] for row in provider_calls] == [1, 2]
-    assert all(row["action_run_id"] == action_run["id"] for row in provider_calls)
-    assert action_run["status"].value == "succeeded"
-    assert action_run["output_artifact_id"] == artifact["id"]
-    assert artifact["action_run_id"] == action_run["id"]
-    assert _event_counts(events) == Counter(
-        {
-            "action.started": 1,
-            "provider.request_started": 2,
-            "provider.request_succeeded": 2,
-            "artifact.created": 1,
-            "action.succeeded": 1,
-        }
-    )
-    artifact_created = _event_by_type(events, "artifact.created")
-    assert artifact_created["artifact_id"] == artifact["id"]
+    _assert_validation_retry_ledger(action_run, artifact, provider_calls, events)
 
 
 def test_action_runner_rejects_duplicate_axes_ids_before_any_provider_call(
@@ -2023,10 +1535,7 @@ def test_action_runner_executes_score_match_by_rubric_atom_through_generic_path(
                 ),
             )
         )
-        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
-        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
-        provider_call = session.execute(sa.select(provider_calls_table)).mappings().one()
-        events = _event_rows(session)
+        action_run, artifact, provider_call, events = _read_single_action_ledger(session)
 
     assert result.status.value == "succeeded"
     assert result.output_payload == {
@@ -2083,24 +1592,7 @@ def test_action_runner_retries_score_match_by_rubric_cross_validation_through_re
     adapter = ScoreMatchByRubricAggregateMismatchThenValidAdapter()
     with transaction_boundary(session_factory) as session:
         runner = _build_runner(session, fake_adapter=adapter)
-        # default_fake_provider_v1 allows 1 validation attempt / 1 physical call per action;
-        # widen both so the semantic retry this test drives can actually reach a 2nd
-        # physical call through the real ProviderGateway hard-limit check, not just PydanticAI.
-        executor = runner._executors["structured_llm"]
-        base_policy = executor._require_provider_policy("default_fake_provider_v1")
-        patched_policy = replace(
-            base_policy,
-            retry_policy=replace(
-                base_policy.retry_policy,
-                validation=ProviderValidationRetryPolicy(
-                    owner=base_policy.retry_policy.validation.owner,
-                    max_attempts=2,
-                ),
-                hard_limits=ProviderRetryHardLimits(max_physical_provider_calls_per_action=2),
-            ),
-        )
-        executor._require_provider_policy = lambda _provider_policy_ref: patched_policy
-        executor._provider_gateway._policy_resolver.resolve = lambda _provider_policy_ref: patched_policy
+        _allow_validation_retry(runner)
 
         result = asyncio.run(
             runner.run(
@@ -2125,41 +1617,13 @@ def test_action_runner_retries_score_match_by_rubric_cross_validation_through_re
                 ),
             )
         )
-        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
-        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
-        provider_calls = list(
-            session.execute(
-                sa.select(provider_calls_table).order_by(
-                    provider_calls_table.c.created_at, provider_calls_table.c.id
-                )
-            ).mappings()
-        )
-        events = _event_rows(session)
+        action_run, artifact, provider_calls, events = _read_retry_ledger(session)
 
     assert result.status.value == "succeeded"
     assert result.output_payload["score"] == 80
     assert result.output_artifact_id == artifact["id"]
     assert adapter.call_count == 2
-    assert len(provider_calls) == 2
-    assert [row["semantic_attempt_index"] for row in provider_calls] == [1, 2]
-    # physical_call_index tracks the action-wide physical-call budget, not a per-semantic-
-    # attempt counter, so it keeps climbing across semantic attempts too.
-    assert [row["physical_call_index"] for row in provider_calls] == [1, 2]
-    assert all(row["action_run_id"] == action_run["id"] for row in provider_calls)
-    assert action_run["status"].value == "succeeded"
-    assert action_run["output_artifact_id"] == artifact["id"]
-    assert artifact["action_run_id"] == action_run["id"]
-    assert _event_counts(events) == Counter(
-        {
-            "action.started": 1,
-            "provider.request_started": 2,
-            "provider.request_succeeded": 2,
-            "artifact.created": 1,
-            "action.succeeded": 1,
-        }
-    )
-    artifact_created = _event_by_type(events, "artifact.created")
-    assert artifact_created["artifact_id"] == artifact["id"]
+    _assert_validation_retry_ledger(action_run, artifact, provider_calls, events)
 
 
 def test_action_runner_rejects_duplicate_rubric_ids_before_any_provider_call(
@@ -2195,3 +1659,144 @@ def test_action_runner_rejects_duplicate_rubric_ids_before_any_provider_call(
     assert counting_adapter.call_count == 0
     assert action_run["status"].value == "failed"
     assert action_run["error_code"] == "action_input_validation_failed"
+
+
+def _run_extract_action(runner: ActionRunner) -> Any:
+    return asyncio.run(
+        runner.run(
+            "text.extract_structured_fields",
+            "kernel_demo.extract_structured_fields_v1",
+            extract_input(),
+            _context(
+                step_id="extract",
+                action_type="text.extract_structured_fields",
+                action_config_id="kernel_demo.extract_structured_fields_v1",
+            ),
+        )
+    )
+
+
+def _read_failed_action(session: sa.orm.Session):
+    action_run = session.execute(sa.select(action_runs_table)).mappings().one()
+    provider_call = session.execute(sa.select(provider_calls_table)).mappings().one()
+    events = _event_rows(session)
+    return action_run, provider_call, events
+
+
+def _allow_validation_retry(runner: ActionRunner) -> None:
+    # Both retry layers must allow the second physical provider call.
+    executor = runner._executors["structured_llm"]
+    base_policy = executor._require_provider_policy("default_fake_provider_v1")
+    patched_policy = replace(
+        base_policy,
+        retry_policy=replace(
+            base_policy.retry_policy,
+            validation=ProviderValidationRetryPolicy(
+                owner=base_policy.retry_policy.validation.owner,
+                max_attempts=VALIDATION_RETRY_ATTEMPTS,
+            ),
+            hard_limits=ProviderRetryHardLimits(
+                max_physical_provider_calls_per_action=VALIDATION_RETRY_ATTEMPTS
+            ),
+        ),
+    )
+    executor._require_provider_policy = lambda _provider_policy_ref: patched_policy
+    executor._provider_gateway._policy_resolver.resolve = lambda _provider_policy_ref: (
+        patched_policy
+    )
+
+
+def _assert_validation_retry_ledger(
+    action_run: Any, artifact: Any, provider_calls: list[Any], events: list[Any]
+):
+    assert len(provider_calls) == VALIDATION_RETRY_ATTEMPTS
+    assert [row["semantic_attempt_index"] for row in provider_calls] == [
+        1,
+        VALIDATION_RETRY_ATTEMPTS,
+    ]
+    # physical_call_index tracks the action-wide physical-call budget, not a per-semantic-
+    # attempt counter, so it keeps climbing across semantic attempts too.
+    assert [row["physical_call_index"] for row in provider_calls] == [1, VALIDATION_RETRY_ATTEMPTS]
+    assert all(row["action_run_id"] == action_run["id"] for row in provider_calls)
+    assert action_run["status"].value == "succeeded"
+    assert action_run["output_artifact_id"] == artifact["id"]
+    assert artifact["action_run_id"] == action_run["id"]
+    assert _event_counts(events) == Counter(
+        {
+            "action.started": 1,
+            "provider.request_started": VALIDATION_RETRY_ATTEMPTS,
+            "provider.request_succeeded": VALIDATION_RETRY_ATTEMPTS,
+            "artifact.created": 1,
+            "action.succeeded": 1,
+        }
+    )
+    artifact_created = _event_by_type(events, "artifact.created")
+    assert artifact_created["artifact_id"] == artifact["id"]
+
+
+def _read_retry_ledger(session: sa.orm.Session):
+    action_run = session.execute(sa.select(action_runs_table)).mappings().one()
+    artifact = session.execute(sa.select(artifacts_table)).mappings().one()
+    provider_calls = list(
+        session.execute(
+            sa.select(provider_calls_table).order_by(
+                provider_calls_table.c.created_at, provider_calls_table.c.id
+            )
+        ).mappings()
+    )
+    events = _event_rows(session)
+    return action_run, artifact, provider_calls, events
+
+
+def _assert_question_action_lineage(
+    result: Any, action_run: Any, artifact: Any, provider_call: Any, events: list[Any]
+) -> None:
+    assert result.status.value == "succeeded"
+    assert result.output_artifact_id == artifact["id"]
+    assert action_run["status"].value == "succeeded"
+    assert action_run["output_artifact_id"] == artifact["id"]
+    assert artifact["action_run_id"] == action_run["id"]
+    assert artifact["metadata"]["schema_ref"] == "kernel.schemas.generate_questions_output_v1"
+    assert provider_call["action_run_id"] == action_run["id"]
+    assert _event_counts(events) == Counter(
+        {
+            "action.started": 1,
+            "provider.request_started": 1,
+            "provider.request_succeeded": 1,
+            "artifact.created": 1,
+            "action.succeeded": 1,
+        }
+    )
+    action_started = _event_by_type(events, "action.started")
+    artifact_created = _event_by_type(events, "artifact.created")
+    action_succeeded = _event_by_type(events, "action.succeeded")
+    assert action_started["action_run_id"] == action_run["id"]
+    assert artifact_created["artifact_id"] == artifact["id"]
+    assert action_succeeded["action_run_id"] == action_run["id"]
+
+
+def _run_question_action(runner: ActionRunner, issues: list[dict[str, Any]]) -> Any:
+    return asyncio.run(
+        runner.run(
+            "text.generate_clarifying_questions",
+            "kernel_demo.generate_clarifying_questions_v1",
+            {
+                "issues": issues,
+                "context": "Client project kickoff conversation.",
+                "target_audience": "client stakeholder",
+            },
+            _context(
+                step_id="generate_clarifying_questions",
+                action_type="text.generate_clarifying_questions",
+                action_config_id="kernel_demo.generate_clarifying_questions_v1",
+            ),
+        )
+    )
+
+
+def _read_single_action_ledger(session: sa.orm.Session) -> tuple[Any, Any, Any, list[Any]]:
+    action_run = session.execute(sa.select(action_runs_table)).mappings().one()
+    artifact = session.execute(sa.select(artifacts_table)).mappings().one()
+    provider_call = session.execute(sa.select(provider_calls_table)).mappings().one()
+    events = _event_rows(session)
+    return action_run, artifact, provider_call, events

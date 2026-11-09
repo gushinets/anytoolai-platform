@@ -42,7 +42,7 @@ from anytoolai_platform_core.workflows.models import JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
 from anytoolai_platform_worker.composition import build_worker
 
-from tests.action_inputs import extract_fields
+from tests.action_inputs import extract_input
 from tests.db_support import assert_scenario_runtime_correlation, provision_database
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -108,11 +108,7 @@ def _start_payload(**overrides: Any) -> dict[str, Any]:
     payload = {
         "frontend_id": "kernel_demo_ce",
         "guest_id": "guest_demo",
-        "input": {
-            "source_text": "deadline budget deliverables",
-            "fields": extract_fields(),
-            "strict": False,
-        },
+        "input": extract_input(strict=False),
     }
     payload.update(overrides)
     return payload
@@ -146,28 +142,7 @@ def _mark_completed(
     job_id: str,
 ) -> str:
     with transaction_boundary(session_factory) as session:
-        job = JobRepository(session).get(job_id)
-        assert job is not None
-        scenario = ScenarioSessionRepository(session).get_in_scope(
-            scenario_session_id,
-            tenant_id="anytoolai",
-            region="ru",
-        )
-        assert scenario is not None
-        if job.status is JobStatus.created:
-            claimed_job = JobRepository(session).claim_created(job.id)
-            assert claimed_job is not None
-            job = claimed_job
-            ScenarioSessionService(
-                ScenarioSessionRepository(session),
-                EventEmitter(EventLogRepository(session)),
-            ).mark_running(scenario)
-            scenario = ScenarioSessionRepository(session).get_in_scope(
-                scenario_session_id,
-                tenant_id="anytoolai",
-                region="ru",
-            )
-            assert scenario is not None
+        job, scenario = _claim_scenario_job(session, scenario_session_id, job_id)
 
         artifact = ArtifactRepository(session).create(
             ArtifactRecord(
@@ -204,28 +179,7 @@ def _mark_failed(
     job_id: str,
 ) -> None:
     with transaction_boundary(session_factory) as session:
-        job = JobRepository(session).get(job_id)
-        assert job is not None
-        scenario = ScenarioSessionRepository(session).get_in_scope(
-            scenario_session_id,
-            tenant_id="anytoolai",
-            region="ru",
-        )
-        assert scenario is not None
-        if job.status is JobStatus.created:
-            claimed_job = JobRepository(session).claim_created(job.id)
-            assert claimed_job is not None
-            job = claimed_job
-            ScenarioSessionService(
-                ScenarioSessionRepository(session),
-                EventEmitter(EventLogRepository(session)),
-            ).mark_running(scenario)
-            scenario = ScenarioSessionRepository(session).get_in_scope(
-                scenario_session_id,
-                tenant_id="anytoolai",
-                region="ru",
-            )
-            assert scenario is not None
+        job, scenario = _claim_scenario_job(session, scenario_session_id, job_id)
 
         failed_job = JobRepository(session).mark_failed(
             replace(
@@ -277,11 +231,7 @@ def test_start_scenario_creates_session_and_linked_job(
         job = JobRepository(session).get(data["job_id"])
 
     assert scenario is not None
-    assert scenario.metadata["input"] == {
-        "source_text": "deadline budget deliverables",
-        "fields": extract_fields(),
-        "strict": False,
-    }
+    assert scenario.metadata["input"] == extract_input(strict=False)
     assert scenario.current_checkpoint_id == PROCESSING_CHECKPOINT_ID
     assert job is not None
     assert job.scenario_session_id == data["scenario_session_id"]
@@ -1086,3 +1036,31 @@ def test_openapi_contains_scenario_runtime_endpoints() -> None:
         ]["code"]
         == "scenario_checkpoint_conflict"
     )
+
+
+def _claim_scenario_job(
+    session: sa.orm.Session, scenario_session_id: str, job_id: str
+) -> tuple[Any, Any]:
+    job = JobRepository(session).get(job_id)
+    assert job is not None
+    scenario = ScenarioSessionRepository(session).get_in_scope(
+        scenario_session_id,
+        tenant_id="anytoolai",
+        region="ru",
+    )
+    assert scenario is not None
+    if job.status is JobStatus.created:
+        claimed_job = JobRepository(session).claim_created(job.id)
+        assert claimed_job is not None
+        job = claimed_job
+        ScenarioSessionService(
+            ScenarioSessionRepository(session),
+            EventEmitter(EventLogRepository(session)),
+        ).mark_running(scenario)
+        scenario = ScenarioSessionRepository(session).get_in_scope(
+            scenario_session_id,
+            tenant_id="anytoolai",
+            region="ru",
+        )
+        assert scenario is not None
+    return job, scenario

@@ -48,6 +48,7 @@ from anytoolai_platform_core.workflows.repository import JobRepository
 from sqlalchemy.exc import IntegrityError
 
 from tests.db_support import provision_database
+from tests.runtime_records import make_action_run, make_job, make_scenario_session
 
 PROVIDER_INPUT_TOKENS = 128
 PROVIDER_OUTPUT_TOKENS = 64
@@ -76,50 +77,6 @@ def runtime_engine() -> Any:
 @pytest.fixture
 def session_factory(runtime_engine: sa.Engine) -> sa.orm.sessionmaker[sa.orm.Session]:
     return build_session_factory(runtime_engine)
-
-
-def make_scenario_session(**overrides: Any) -> ScenarioSessionRecord:
-    values = {
-        "tenant_id": "tenant_demo",
-        "region": "eu-central",
-        "product_id": "kernel_demo",
-        "frontend_id": "kernel_demo_ce",
-        "scenario_id": "smoke_start",
-        "scenario_version": 1,
-    }
-    values.update(overrides)
-    return ScenarioSessionRecord(**values)
-
-
-def make_job(scenario_session_id: str, **overrides: Any) -> JobRecord:
-    values = {
-        "tenant_id": "tenant_demo",
-        "region": "eu-central",
-        "product_id": "kernel_demo",
-        "frontend_id": "kernel_demo_ce",
-        "scenario_session_id": scenario_session_id,
-        "workflow_id": "wf_smoke",
-        "workflow_version": 1,
-    }
-    values.update(overrides)
-    return JobRecord(**values)
-
-
-def make_action_run(scenario_session_id: str, job_id: str, **overrides: Any) -> ActionRunRecord:
-    values = {
-        "tenant_id": "tenant_demo",
-        "region": "eu-central",
-        "product_id": "kernel_demo",
-        "frontend_id": "kernel_demo_ce",
-        "scenario_session_id": scenario_session_id,
-        "job_id": job_id,
-        "workflow_id": "wf_smoke",
-        "step_id": "step_1",
-        "action_type": "text.extract_structured_fields",
-        "action_config_id": "cfg_extract",
-    }
-    values.update(overrides)
-    return ActionRunRecord(**values)
 
 
 def make_provider_call(

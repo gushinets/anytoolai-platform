@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import {
+  trackScenarioStarts,
+  expectMobileTaskReset,
   countEvents,
   trackRun,
   expectWorkspaceLayout,
@@ -166,26 +168,15 @@ test.describe("Brief Decoder web product", () => {
     await expect(page.getByRole("status")).toHaveCount(0, { timeout: 60_000 });
     await expect(page.getByRole("button", { name: "New task" })).toBeVisible();
 
-    await page.setViewportSize({ width: 390, height: 844 });
-    await expectWorkspaceLayout(page, "stacked");
-
-    await page.getByRole("button", { name: "New task" }).click();
-    await expect(page.locator("#brief-decoder-brief-text")).toHaveValue("");
-    await expect(page.locator("#brief-decoder-brief-text")).toBeFocused();
-    await expect(page.getByRole("button", { name: "Copy" })).toHaveCount(0);
+    await expectMobileTaskReset(page, "#brief-decoder-brief-text");
   });
 
   test("validation: an empty brief shows the error and never starts a scenario", async ({ page }) => {
-    let startRequested = false;
-    page.on("request", (request) => {
-      if (request.method() === "POST" && START_ROUTE_PATTERN.test(request.url())) {
-        startRequested = true;
-      }
-    });
+    const starts = trackScenarioStarts(page, START_ROUTE_PATTERN);
     await page.goto(PRODUCT_URL);
     await page.getByRole("button", { name: "Decode brief" }).click();
     await expect(page.getByText("Client brief: required.")).toBeVisible();
-    expect(startRequested).toBe(false);
+    expect(starts).toEqual([]);
   });
 
   test("weak input: the vague-brief fixtures render a full result with four questions and one result_viewed", async ({

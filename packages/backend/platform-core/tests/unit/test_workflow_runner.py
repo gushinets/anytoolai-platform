@@ -62,7 +62,7 @@ from anytoolai_platform_core.workflows.runner import (
     _emit_recovered_workflow_events,
 )
 
-from tests.action_inputs import extract_fields
+from tests.action_inputs import extract_input
 from tests.db_support import provision_database
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
@@ -370,11 +370,7 @@ def test_workflow_runner_executes_single_step_workflow_and_creates_final_artifac
         result = asyncio.run(
             runner.run(
                 "kernel_demo.single_action_extract_v1",
-                {
-                    "source_text": "deadline budget deliverables",
-                    "fields": extract_fields(),
-                    "strict": False,
-                },
+                extract_input(strict=False),
                 context,
             )
         )
@@ -476,33 +472,12 @@ def test_workflow_runner_executes_an_existing_claimed_job_without_duplicate_job(
         context = _base_context()
         _seed_context_scenario(session, context)
         runner = _build_structured_workflow_runner(session)
-        repository = JobRepository(session)
-        claimed = WorkflowJobService(
-            repository,
-            EventEmitter(EventLogRepository(session)),
-        ).claim_created(
-            repository.create(
-                JobRecord(
-                    tenant_id="tenant_demo",
-                    region="eu-central",
-                    product_id="kernel_demo",
-                    frontend_id="kernel_demo_ce",
-                    scenario_session_id="scenario_session_demo",
-                    workflow_id="kernel_demo.single_action_extract_v1",
-                    workflow_version=1,
-                )
-            ).id
-        )
-        assert claimed is not None
+        claimed = _create_claimed_extract_job(session)
 
         result = asyncio.run(
             runner.run_claimed_job(
                 claimed,
-                {
-                    "source_text": "deadline budget deliverables",
-                    "fields": extract_fields(),
-                    "strict": False,
-                },
+                extract_input(strict=False),
                 context,
             )
         )
@@ -527,54 +502,20 @@ def test_workflow_runner_recovers_failed_state_for_existing_claimed_job_after_ro
     context = _base_context()
     with transaction_boundary(session_factory) as session:
         _seed_context_scenario(session, context)
-        repository = JobRepository(session)
-        claimed = WorkflowJobService(
-            repository,
-            EventEmitter(EventLogRepository(session)),
-        ).claim_created(
-            repository.create(
-                JobRecord(
-                    tenant_id="tenant_demo",
-                    region="eu-central",
-                    product_id="kernel_demo",
-                    frontend_id="kernel_demo_ce",
-                    scenario_session_id="scenario_session_demo",
-                    workflow_id="kernel_demo.single_action_extract_v1",
-                    workflow_version=1,
-                )
-            ).id
-        )
-        assert claimed is not None
-        claimed_job_id = claimed.id
+        claimed_job_id = _create_claimed_extract_job(session).id
 
     with pytest.raises(ProviderGatewayExecutionError):
         with transaction_boundary(session_factory) as session:
             runner = _build_structured_workflow_runner(session, adapter=AlwaysFailAdapter())
             job = JobRepository(session).get(claimed_job_id)
             assert job is not None
-            asyncio.run(
-                runner.run_claimed_job(
-                    job,
-                    {
-                        "source_text": "deadline budget deliverables",
-                        "fields": extract_fields(),
-                        "strict": False,
-                    },
-                    context,
-                )
-            )
+            _run_claimed_extract(runner, job, context)
 
     with transaction_boundary(session_factory) as session:
         job = session.execute(
             sa.select(jobs_table).where(jobs_table.c.id == claimed_job_id)
         ).mappings().one()
-        events = list(
-            session.execute(
-                sa.select(event_log_table)
-                .where(event_log_table.c.job_id == claimed_job_id)
-                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
-            ).mappings()
-        )
+        events = _job_events(session, claimed_job_id)
 
     assert job["status"] is JobStatus.failed
     assert job["error_code"] == "provider_request_failed"
@@ -617,54 +558,20 @@ def test_workflow_runner_recovers_canceled_state_for_existing_claimed_job_after_
     context = _base_context()
     with transaction_boundary(session_factory) as session:
         _seed_context_scenario(session, context)
-        repository = JobRepository(session)
-        claimed = WorkflowJobService(
-            repository,
-            EventEmitter(EventLogRepository(session)),
-        ).claim_created(
-            repository.create(
-                JobRecord(
-                    tenant_id="tenant_demo",
-                    region="eu-central",
-                    product_id="kernel_demo",
-                    frontend_id="kernel_demo_ce",
-                    scenario_session_id="scenario_session_demo",
-                    workflow_id="kernel_demo.single_action_extract_v1",
-                    workflow_version=1,
-                )
-            ).id
-        )
-        assert claimed is not None
-        claimed_job_id = claimed.id
+        claimed_job_id = _create_claimed_extract_job(session).id
 
     with pytest.raises(asyncio.CancelledError):
         with transaction_boundary(session_factory) as session:
             runner = _build_structured_workflow_runner(session, adapter=CancelledAdapter())
             job = JobRepository(session).get(claimed_job_id)
             assert job is not None
-            asyncio.run(
-                runner.run_claimed_job(
-                    job,
-                    {
-                        "source_text": "deadline budget deliverables",
-                        "fields": extract_fields(),
-                        "strict": False,
-                    },
-                    context,
-                )
-            )
+            _run_claimed_extract(runner, job, context)
 
     with transaction_boundary(session_factory) as session:
         job = session.execute(
             sa.select(jobs_table).where(jobs_table.c.id == claimed_job_id)
         ).mappings().one()
-        events = list(
-            session.execute(
-                sa.select(event_log_table)
-                .where(event_log_table.c.job_id == claimed_job_id)
-                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
-            ).mappings()
-        )
+        events = _job_events(session, claimed_job_id)
 
     assert job["status"] is JobStatus.canceled
     assert job["completed_at"] is not None
@@ -699,42 +606,14 @@ def test_workflow_runner_recovers_succeeded_state_for_existing_claimed_job_after
     context = _base_context()
     with transaction_boundary(session_factory) as session:
         _seed_context_scenario(session, context)
-        repository = JobRepository(session)
-        claimed = WorkflowJobService(
-            repository,
-            EventEmitter(EventLogRepository(session)),
-        ).claim_created(
-            repository.create(
-                JobRecord(
-                    tenant_id="tenant_demo",
-                    region="eu-central",
-                    product_id="kernel_demo",
-                    frontend_id="kernel_demo_ce",
-                    scenario_session_id="scenario_session_demo",
-                    workflow_id="kernel_demo.single_action_extract_v1",
-                    workflow_version=1,
-                )
-            ).id
-        )
-        assert claimed is not None
-        claimed_job_id = claimed.id
+        claimed_job_id = _create_claimed_extract_job(session).id
 
     with pytest.raises(RuntimeError, match="forced rollback after workflow success"):
         with transaction_boundary(session_factory) as session:
             runner = _build_structured_workflow_runner(session)
             job = JobRepository(session).get(claimed_job_id)
             assert job is not None
-            result = asyncio.run(
-                runner.run_claimed_job(
-                    job,
-                    {
-                        "source_text": "deadline budget deliverables",
-                        "fields": extract_fields(),
-                        "strict": False,
-                    },
-                    context,
-                )
-            )
+            result = _run_claimed_extract(runner, job, context)
             assert result.status is JobStatus.succeeded
             # Simulates a downstream failure (e.g. ScenarioSessionService.mark_completed)
             # raising after the workflow already succeeded but before the transaction commits.
@@ -749,38 +628,9 @@ def test_workflow_runner_recovers_succeeded_state_for_existing_claimed_job_after
                 sa.select(artifacts_table).where(artifacts_table.c.job_id == claimed_job_id)
             ).mappings()
         )
-        events = list(
-            session.execute(
-                sa.select(event_log_table)
-                .where(event_log_table.c.job_id == claimed_job_id)
-                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
-            ).mappings()
-        )
+        events = _job_events(session, claimed_job_id)
 
-    assert job["status"] is JobStatus.succeeded
-    assert job["result_artifact_id"] is not None
-    assert any(artifact["id"] == job["result_artifact_id"] for artifact in artifacts)
-    artifact_created_events = _event_by_type(events, "artifact.created")
-    # Two artifact.created events: one for the action's own structured-output
-    # artifact (action_run_id set, replayed through the shared sequencer along with
-    # the rest of the step's events) and one for the final workflow-result artifact
-    # (action_run_id=None).
-    assert len(artifact_created_events) == 2
-    final_artifact_created = [
-        row for row in artifact_created_events if row["action_run_id"] is None
-    ]
-    assert len(final_artifact_created) == 1
-    assert final_artifact_created[0]["artifact_id"] == job["result_artifact_id"]
-    # Only the final result artifact (action_run_id=None) is replayed independently by
-    # ArtifactService's own recovery callback (phase artifact_events, unsequenced raw
-    # created_at) rather than through _emit_recovered_workflow_events' shared
-    # sequencer, so its timestamp has no ordering guarantee relative to the other
-    # events - excluded from the ordering check below, not part of this fix.
-    workflow_events = [row for row in events if row is not final_artifact_created[0]]
-    _assert_strictly_increasing_event_timestamps(workflow_events)
-    event_types = _event_types(workflow_events)
-    assert event_types[0] == "workflow.started"
-    assert event_types[-1] == "workflow.succeeded"
+    event_types = _assert_recovered_success(job, artifacts, events)
     assert "workflow.step_succeeded" in event_types
     workflow_succeeded = _event_by_type(events, "workflow.succeeded")[0]
     assert workflow_succeeded["job_id"] == claimed_job_id
@@ -801,11 +651,7 @@ def test_workflow_runner_recovers_succeeded_state_for_newly_created_job_after_ro
             result = asyncio.run(
                 runner.run(
                     "kernel_demo.single_action_extract_v1",
-                    {
-                        "source_text": "deadline budget deliverables",
-                        "fields": extract_fields(),
-                        "strict": False,
-                    },
+                    extract_input(strict=False),
                     context,
                 )
             )
@@ -820,24 +666,7 @@ def test_workflow_runner_recovers_succeeded_state_for_newly_created_job_after_ro
         artifacts = list(session.execute(sa.select(artifacts_table)).mappings())
         events = _event_rows(session)
 
-    assert job["status"] is JobStatus.succeeded
-    assert job["result_artifact_id"] is not None
-    assert any(artifact["id"] == job["result_artifact_id"] for artifact in artifacts)
-    artifact_created_events = _event_by_type(events, "artifact.created")
-    # See the analogous comment in the existing-claimed-job recovery test: two
-    # artifact.created events (the action's own and the final workflow result), only
-    # the final one (action_run_id=None) is unsequenced relative to the rest.
-    assert len(artifact_created_events) == 2
-    final_artifact_created = [
-        row for row in artifact_created_events if row["action_run_id"] is None
-    ]
-    assert len(final_artifact_created) == 1
-    assert final_artifact_created[0]["artifact_id"] == job["result_artifact_id"]
-    workflow_events = [row for row in events if row is not final_artifact_created[0]]
-    _assert_strictly_increasing_event_timestamps(workflow_events)
-    event_types = _event_types(workflow_events)
-    assert event_types[0] == "workflow.started"
-    assert event_types[-1] == "workflow.succeeded"
+    _assert_recovered_success(job, artifacts, events)
     workflow_succeeded = _event_by_type(events, "workflow.succeeded")[0]
     assert workflow_succeeded["job_id"] == job["id"]
     assert workflow_succeeded["result_status"] == JobStatus.succeeded.value
@@ -862,12 +691,7 @@ def test_workflow_runner_recovers_skipped_action_run_after_success_rollback(
             result = asyncio.run(
                 runner.run(
                     "kernel_demo.conditional_skip_extract_v1",
-                    {
-                        "source_text": "deadline budget deliverables",
-                        "fields": extract_fields(),
-                        "strict": False,
-                        "run_optional_step": False,
-                    },
+                    extract_input(strict=False, run_optional_step=False),
                     context,
                 )
             )
@@ -912,25 +736,7 @@ def test_workflow_runner_fails_loudly_instead_of_recovering_succeeded_job_with_l
     context = _base_context()
     with transaction_boundary(session_factory) as session:
         _seed_context_scenario(session, context)
-        repository = JobRepository(session)
-        claimed = WorkflowJobService(
-            repository,
-            EventEmitter(EventLogRepository(session)),
-        ).claim_created(
-            repository.create(
-                JobRecord(
-                    tenant_id="tenant_demo",
-                    region="eu-central",
-                    product_id="kernel_demo",
-                    frontend_id="kernel_demo_ce",
-                    scenario_session_id="scenario_session_demo",
-                    workflow_id="kernel_demo.single_action_extract_v1",
-                    workflow_version=1,
-                )
-            ).id
-        )
-        assert claimed is not None
-        claimed_job_id = claimed.id
+        claimed_job_id = _create_claimed_extract_job(session).id
 
     import anytoolai_platform_core.artifacts.service as artifact_service_module
 
@@ -953,17 +759,7 @@ def test_workflow_runner_fails_loudly_instead_of_recovering_succeeded_job_with_l
             runner = _build_structured_workflow_runner(session)
             job = JobRepository(session).get(claimed_job_id)
             assert job is not None
-            result = asyncio.run(
-                runner.run_claimed_job(
-                    job,
-                    {
-                        "source_text": "deadline budget deliverables",
-                        "fields": extract_fields(),
-                        "strict": False,
-                    },
-                    context,
-                )
-            )
+            result = _run_claimed_extract(runner, job, context)
             assert result.status is JobStatus.succeeded
             raise RuntimeError("forced rollback after workflow success")
 
@@ -989,34 +785,13 @@ def test_workflow_runner_rejects_claimed_job_context_with_mismatched_ownership_d
         context = _base_context()
         _seed_context_scenario(session, context)
         runner = _build_structured_workflow_runner(session)
-        repository = JobRepository(session)
-        claimed = WorkflowJobService(
-            repository,
-            EventEmitter(EventLogRepository(session)),
-        ).claim_created(
-            repository.create(
-                JobRecord(
-                    tenant_id="tenant_demo",
-                    region="eu-central",
-                    product_id="kernel_demo",
-                    frontend_id="kernel_demo_ce",
-                    scenario_session_id="scenario_session_demo",
-                    workflow_id="kernel_demo.single_action_extract_v1",
-                    workflow_version=1,
-                )
-            ).id
-        )
-        assert claimed is not None
+        claimed = _create_claimed_extract_job(session)
 
         with pytest.raises(ValueError, match="product_id"):
             asyncio.run(
                 runner.run_claimed_job(
                     claimed,
-                    {
-                        "source_text": "deadline budget deliverables",
-                        "fields": extract_fields(),
-                        "strict": False,
-                    },
+                    extract_input(strict=False),
                     replace(context, product_id="kernel_demo_other"),
                 )
             )
@@ -1051,12 +826,7 @@ def test_workflow_runner_executes_multi_step_workflow_with_input_and_output_mapp
         result = asyncio.run(
             runner.run(
                 "kernel_demo.extract_detect_report_v1",
-                {
-                    "source_text": "deadline budget deliverables",
-                    "fields": extract_fields(),
-                    "strict": False,
-                    "taxonomy": ["timeline", "scope"],
-                },
+                extract_input(strict=False, taxonomy=["timeline", "scope"]),
                 context,
             )
         )
@@ -1069,11 +839,7 @@ def test_workflow_runner_executes_multi_step_workflow_with_input_and_output_mapp
         artifacts = list(session.execute(sa.select(artifacts_table)).mappings())
 
     assert result.status.value == "succeeded"
-    assert executor.inputs_by_step["extract"][0] == {
-        "source_text": "deadline budget deliverables",
-        "fields": extract_fields(),
-        "strict": False,
-    }
+    assert executor.inputs_by_step["extract"][0] == extract_input(strict=False)
     assert executor.inputs_by_step["detect_issues"][0] == {
         "source_text": "deadline budget deliverables",
         "taxonomy": ["timeline", "scope"],
@@ -1147,7 +913,7 @@ def test_workflow_runner_output_mapping_passes_scenario_input_through_verbatim(
         result = asyncio.run(
             runner.run(
                 workflow.workflow_id,
-                {"source_text": source_text, "fields": extract_fields(), "strict": False},
+                extract_input(source_text=source_text, strict=False),
                 context,
             )
         )
@@ -1229,12 +995,7 @@ def test_workflow_runner_skips_step_and_records_reason(
         result = asyncio.run(
             runner.run(
                 "kernel_demo.conditional_skip_extract_v1",
-                {
-                    "source_text": "deadline budget deliverables",
-                    "fields": extract_fields(),
-                    "strict": False,
-                    "run_optional_step": False,
-                },
+                extract_input(strict=False, run_optional_step=False),
                 context,
             )
         )
@@ -1270,11 +1031,7 @@ def test_workflow_runner_retries_step_without_mixing_provider_retry_layers(
         result = asyncio.run(
             runner.run(
                 "kernel_demo.retry_extract_v1",
-                {
-                    "source_text": "deadline budget deliverables",
-                    "fields": extract_fields(),
-                    "strict": False,
-                },
+                extract_input(strict=False),
                 context,
             )
         )
@@ -1316,12 +1073,7 @@ def test_workflow_runner_stops_after_failed_step(
             asyncio.run(
                 runner.run(
                     "kernel_demo.extract_detect_report_v1",
-                    {
-                        "source_text": "deadline budget deliverables",
-                        "fields": extract_fields(),
-                        "strict": False,
-                        "taxonomy": ["timeline", "scope"],
-                    },
+                    extract_input(strict=False, taxonomy=["timeline", "scope"]),
                     context,
                 )
             )
@@ -1416,11 +1168,7 @@ def test_workflow_runner_persists_generic_safe_message_for_unknown_exceptions(
             asyncio.run(
                 runner.run(
                     "kernel_demo.single_action_extract_v1",
-                    {
-                        "source_text": "deadline budget deliverables",
-                        "fields": extract_fields(),
-                        "strict": False,
-                    },
+                    extract_input(strict=False),
                     context,
                 )
             )
@@ -1447,7 +1195,7 @@ def test_workflow_runner_preserves_safe_validation_failure_category(
             asyncio.run(
                 runner.run(
                     "kernel_demo.single_action_extract_v1",
-                    {"source_text": "invalid output", "fields": extract_fields(), "strict": False},
+                    extract_input(source_text="invalid output", strict=False),
                     context,
                 )
             )
@@ -1474,11 +1222,7 @@ def test_workflow_runner_persists_failed_state_when_exception_escapes_transactio
             asyncio.run(
                 runner.run(
                     "kernel_demo.single_action_extract_v1",
-                    {
-                        "source_text": "deadline budget deliverables",
-                        "fields": extract_fields(),
-                        "strict": False,
-                    },
+                    extract_input(strict=False),
                     context,
                 )
             )
@@ -1532,12 +1276,7 @@ def test_workflow_runner_recovers_consistent_failed_state_after_multi_step_rollb
             asyncio.run(
                 runner.run(
                     "kernel_demo.extract_detect_report_v1",
-                    {
-                        "source_text": "deadline budget deliverables",
-                        "fields": extract_fields(),
-                        "strict": False,
-                        "taxonomy": ["timeline", "scope"],
-                    },
+                    extract_input(strict=False, taxonomy=["timeline", "scope"]),
                     context,
                 )
             )
@@ -1676,11 +1415,7 @@ def test_workflow_runner_recovery_does_not_synthesize_step_started_for_pre_start
             asyncio.run(
                 runner.run(
                     "kernel_demo.conditional_skip_extract_v1",
-                    {
-                        "source_text": "deadline budget deliverables",
-                        "fields": extract_fields(),
-                        "strict": False,
-                    },
+                    extract_input(strict=False),
                     context,
                 )
             )
@@ -1736,11 +1471,7 @@ def test_workflow_runner_caught_condition_failure_does_not_emit_step_started(
             asyncio.run(
                 runner.run(
                     "kernel_demo.conditional_skip_extract_v1",
-                    {
-                        "source_text": "deadline budget deliverables",
-                        "fields": extract_fields(),
-                        "strict": False,
-                    },
+                    extract_input(strict=False),
                     context,
                 )
             )
@@ -1796,11 +1527,7 @@ def test_workflow_runner_recovery_replays_step_started_for_input_mapping_failure
             asyncio.run(
                 runner.run(
                     "kernel_demo.extract_detect_report_v1",
-                    {
-                        "source_text": "deadline budget deliverables",
-                        "fields": extract_fields(),
-                        "strict": False,
-                    },
+                    extract_input(strict=False),
                     context,
                 )
             )
@@ -2152,11 +1879,7 @@ def test_workflow_runner_uses_generic_safe_provider_message_for_unknown_adapter_
             asyncio.run(
                 runner.run(
                     "kernel_demo.single_action_extract_v1",
-                    {
-                        "source_text": "deadline budget deliverables",
-                        "fields": extract_fields(),
-                        "strict": False,
-                    },
+                    extract_input(strict=False),
                     context,
                 )
             )
@@ -2168,3 +1891,72 @@ def test_workflow_runner_uses_generic_safe_provider_message_for_unknown_adapter_
     assert job["error_message_safe"] == "Provider request failed."
     assert provider_call["error_message_safe"] == "Provider request failed."
     assert "deadline budget deliverables" not in job["error_message_safe"]
+
+
+def _create_claimed_extract_job(session: sa.orm.Session) -> JobRecord:
+    repository = JobRepository(session)
+    claimed = WorkflowJobService(
+        repository,
+        EventEmitter(EventLogRepository(session)),
+    ).claim_created(
+        repository.create(
+            JobRecord(
+                tenant_id="tenant_demo",
+                region="eu-central",
+                product_id="kernel_demo",
+                frontend_id="kernel_demo_ce",
+                scenario_session_id="scenario_session_demo",
+                workflow_id="kernel_demo.single_action_extract_v1",
+                workflow_version=1,
+            )
+        ).id
+    )
+    assert claimed is not None
+    return claimed
+
+
+def _run_claimed_extract(
+    runner: SequentialWorkflowRunner,
+    job: JobRecord,
+    context: ExecutionContext,
+) -> Any:
+    return asyncio.run(runner.run_claimed_job(job, extract_input(strict=False), context))
+
+
+def _job_events(session: sa.orm.Session, job_id: str) -> list[Any]:
+    return list(
+        session.execute(
+            sa.select(event_log_table)
+            .where(event_log_table.c.job_id == job_id)
+            .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
+        ).mappings()
+    )
+
+
+def _assert_recovered_success(job: Any, artifacts: list[Any], events: list[Any]) -> list[str]:
+    assert job["status"] is JobStatus.succeeded
+    assert job["result_artifact_id"] is not None
+    assert any(artifact["id"] == job["result_artifact_id"] for artifact in artifacts)
+    artifact_created_events = _event_by_type(events, "artifact.created")
+    # Two artifact.created events: one for the action's own structured-output
+    # artifact (action_run_id set, replayed through the shared sequencer along with
+    # the rest of the step's events) and one for the final workflow-result artifact
+    # (action_run_id=None).
+    expected_artifact_count = 2
+    assert len(artifact_created_events) == expected_artifact_count
+    final_artifact_created = [
+        row for row in artifact_created_events if row["action_run_id"] is None
+    ]
+    assert len(final_artifact_created) == 1
+    assert final_artifact_created[0]["artifact_id"] == job["result_artifact_id"]
+    # Only the final result artifact (action_run_id=None) is replayed independently by
+    # ArtifactService's own recovery callback (phase artifact_events, unsequenced raw
+    # created_at) rather than through _emit_recovered_workflow_events' shared
+    # sequencer, so its timestamp has no ordering guarantee relative to the other
+    # events - excluded from the ordering check below, not part of this fix.
+    workflow_events = [row for row in events if row is not final_artifact_created[0]]
+    _assert_strictly_increasing_event_timestamps(workflow_events)
+    event_types = _event_types(workflow_events)
+    assert event_types[0] == "workflow.started"
+    assert event_types[-1] == "workflow.succeeded"
+    return event_types

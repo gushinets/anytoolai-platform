@@ -2,7 +2,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import {
-  countEvents as countBackendEvents,
+  trackScenarioStarts,
+  trackRun,
+  expectCopyActivation,
+  expectMobileTaskReset,
   expectWorkspaceLayout,
   overrideResult,
 } from "@anytoolai/smoke-support";
@@ -29,7 +32,6 @@ const WEB_MIRROR_BASE_URL = process.env.WEB_MIRROR_BASE_URL ?? "http://localhost
 const PRODUCT_URL = `${WEB_MIRROR_BASE_URL}/products/client_update_writer`;
 
 const START_ROUTE_PATTERN = /\/scenarios\/[^/]+\/start$/;
-const COPY_NEXT_ACTION_PATTERN = /\/scenario-sessions\/([^/]+)\/next-actions\/copy_result$/;
 
 // Same reasoning as proposal-ai-smoke's own WEAK_INPUT_FIXTURE_PATH: the real fake-provider
 // adapter resolves its fixture strictly from the action config id, never from request content, so
@@ -63,12 +65,7 @@ test.describe("Client Update Writer web product (Update mode)", () => {
     await page.goto(PRODUCT_URL);
     await expect(page.locator("h1")).toHaveText("Client Update Writer");
 
-    const nextActionRequests: string[] = [];
-    page.on("request", (request) => {
-      if (request.method() === "POST" && COPY_NEXT_ACTION_PATTERN.test(request.url())) {
-        nextActionRequests.push(request.url());
-      }
-    });
+    const run = trackRun(page, START_ROUTE_PATTERN);
 
     await fillValidForm(page);
     await page.getByRole("button", { name: "Write update" }).click();
@@ -83,21 +80,7 @@ test.describe("Client Update Writer web product (Update mode)", () => {
       .innerText();
     expect(resultText.trim().length).toBeGreaterThan(0);
 
-    await copyButton.click();
-    await expect(page.getByRole("button", { name: "Copied" })).toBeVisible();
-    const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
-    expect(clipboardText).toBe(resultText);
-
-    // Exactly one copy_result next-action call from the browser's own single click.
-    await expect.poll(() => nextActionRequests.length, { timeout: 5_000 }).toBe(1);
-    const scenarioSessionId = COPY_NEXT_ACTION_PATTERN.exec(nextActionRequests[0]!)?.[1];
-    expect(scenarioSessionId).toBeTruthy();
-
-    // And the backend actually persisted it for *this* run's session -- not just that the browser
-    // sent the request -- exactly once.
-    await expect
-      .poll(() => countBackendEvents("client.next_action_clicked", scenarioSessionId!), { timeout: 5_000 })
-      .toBe(1);
+    await expectCopyActivation(page, run.sessionId(), resultText);
   });
 
   test("workspace: inputs and result side by side on wide screens, stacked on narrow, repeat and new task reset", async ({
@@ -123,38 +106,27 @@ test.describe("Client Update Writer web product (Update mode)", () => {
     await expect(page.getByRole("button", { name: "Copy" })).toBeVisible();
     await expect(page.getByRole("status")).toHaveCount(0, { timeout: 30_000 });
 
-    await page.setViewportSize({ width: 390, height: 844 });
-    await expectWorkspaceLayout(page, "stacked");
-
-    await page.getByRole("button", { name: "New task" }).click();
-    await expect(page.locator("#client-update-writer-progress-notes")).toBeEmpty();
+    await expectMobileTaskReset(page, "#client-update-writer-progress-notes");
     await expect(page.locator("#client-update-writer-tone-neutral")).toBeChecked();
-    await expect(page.locator("#client-update-writer-progress-notes")).toBeFocused();
-    await expect(page.getByRole("button", { name: "Copy" })).toHaveCount(0);
   });
 
   test("validation: empty required fields show validation errors and never start a scenario", async ({ page }) => {
     await page.goto(PRODUCT_URL);
     await expect(page.locator("h1")).toHaveText("Client Update Writer");
 
-    let startRequested = false;
-    page.on("request", (request) => {
-      if (request.method() === "POST" && START_ROUTE_PATTERN.test(request.url())) {
-        startRequested = true;
-      }
-    });
+    const starts = trackScenarioStarts(page, START_ROUTE_PATTERN);
 
     await page.getByRole("button", { name: "Write update" }).click();
     await expect(page.getByText("Progress notes: required.")).toBeVisible();
     await expect(page.locator("#client-update-writer-tone-neutral")).toBeChecked();
     await expect(page.getByText("Tone: required.")).toHaveCount(0);
-    expect(startRequested).toBe(false);
+    expect(starts).toEqual([]);
     const toneGroup = page.getByRole("radiogroup", { name: "Tone" });
     await expect(toneGroup.getByRole("radio")).toHaveCount(3);
     await page.locator('label[for="client-update-writer-tone-warm"]').click();
     await expect(page.locator("#client-update-writer-tone-warm")).toBeChecked();
     await expect(page.getByText("Tone: required.")).toHaveCount(0);
-    expect(startRequested).toBe(false);
+    expect(starts).toEqual([]);
   });
 
   test("weak input: a vague-but-schema-valid update reaches the real backend and renders the documented safe result", async ({

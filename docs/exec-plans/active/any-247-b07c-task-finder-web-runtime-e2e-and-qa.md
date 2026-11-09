@@ -445,3 +445,61 @@ retain their different contracts and package boundaries. Independent test assert
 These categories are not exclusions, and this work does not claim that every baseline textual match
 has disappeared. A new remote Sonar analysis is still required to establish the PR metric and gate.
 No commit, push or GitHub write was performed for this follow-up.
+
+
+## Implementation plan — authorized remaining test duplication, 2026-11-09
+
+The user approved all findings from the latest Sonar analysis. Keep Sonar configuration and
+exclusions unchanged. Refactor shared test mechanics without changing production behavior,
+transaction boundaries, fault injection, lifecycle ordering or distinct assertions.
+
+1. Share A01 input construction, action invocation and claimed-job setup/readback in rollback tests.
+2. Share cross-validation retry-policy setup and common ledger invariants; move the three identical
+   record factories into test support. Preserve provider-gateway-specific defaults.
+3. Reuse smoke copy helpers, preserve session correlation, share start-request tracking and
+   mobile reset assertions across actual callers. Merge redundant Decline coverage and parameterize
+   equivalent handoff response/identity variants without hiding race ordering.
+4. Deduplicate worker setup and cleanup, API job-claim/readback helpers, and runner manifest/HTTP
+   readiness stubs. Retain all product- and failure-specific assertions.
+5. Validate collection, modified Python lint against HEAD, focused PostgreSQL suites, web unit tests,
+   smoke lint/typecheck and all five browser suites. Run canonical baseline and docs checks.
+
+No new dependencies, production changes, test skips or assertion removal merely for CPD.
+Commit/push are not included in this implementation request.
+
+
+### Completed test-duplication refactor
+
+All approved groups in the 13 Sonar-listed test files were addressed, including their shared
+callers across packages. A01 payloads and identical runtime record factories now live in test
+support; retry ledgers, rollback setup, worker contention, scenario readback and runner stubs use
+small helpers. Product smoke suites share copy correlation, start tracking and mobile reset
+checks. Guest/authenticated and deferred-response variants remain separate parameterized cases.
+Only the redundant Decline case was merged into its stronger counterpart; unique assertions,
+transaction boundaries, recovery fault injection and concurrency barriers were retained.
+
+Validation completed:
+
+- Focused core/storage/action/workflow and input-helper tests: 134 passed.
+- Final affected API/worker/action tests against real PostgreSQL: 126 passed, including contention
+  and lease recovery. Focused runner readiness tests: 11 passed.
+- Web lint and typecheck passed; 480 unit tests passed (one duplicate Decline test removed).
+- Smoke-package lint/typecheck passed. Browser suites: ProposalAI 10, Client Update Writer 4,
+  Brief Decoder 8, Acceptance Builder 11 and Task Finder 7 passed. Client Update Writer was rerun
+  after its final mobile-reset helper migration and all four tests passed again.
+- Ruff comparison against HEAD: existing diagnostics decreased from 201 to 180, with no added
+  diagnostic category/count. Whitespace checks passed.
+
+Sonar configuration, exclusions, production code, dependencies and lockfiles are unchanged.
+The remote CPD metric requires a new analysis after a future push; local passing tests do not
+establish a zero-duplication result. No commit, push or GitHub write was performed.
+
+
+Final canonical baseline: 3,576 passed, 12 skipped, 657 deselected, one warning and one failure
+in 625.64 seconds. The sole failure is the pre-existing activation-marker non-root read test:
+`sudo: interactive authentication is required`. The check, its assertions and host sudo policy
+were not changed. The full-check wrapper remains blocked by that baseline stage; affected
+frontend and PostgreSQL suites passed separately. Config, architecture, documentation and
+generated-document checks in quick-check passed; documentation validation also passed after
+updating this execution record. Existing local-skill-name references found in five unrelated
+historical execution plans were left untouched; none was introduced here.

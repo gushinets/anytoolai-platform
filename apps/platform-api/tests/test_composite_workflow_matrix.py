@@ -14,16 +14,9 @@ from dataclasses import dataclass, field
 from typing import Any, Iterator
 
 import pytest
-import sqlalchemy as sa
 from anytoolai_platform_core.config.loader import ConfigLoader
 from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
 from anytoolai_platform_core.scenarios.checkpoints import RESULT_READY_CHECKPOINT_ID
-from anytoolai_platform_core.storage.db import (
-    action_runs_table,
-    artifacts_table,
-    event_log_table,
-    provider_calls_table,
-)
 from anytoolai_platform_core.storage.transactions import (
     SessionFactory,
     build_session_factory,
@@ -38,8 +31,8 @@ from test_atom_runtime_matrix import (
 )
 from test_scenario_runtime_api import CONFIG_ROOT, FIXTURE_ROOT, _create_test_app, _request
 
-from tests.action_inputs import extract_fields
-from tests.db_support import provision_database
+from tests.action_inputs import extract_input
+from tests.db_support import provision_database, read_execution_rows
 
 # Deliberately NOT a module-level pytestmark: test_composite_workflow_matrix_reports_three_of_three
 # below does no DB I/O and must keep running under quick-check's "not slow" pytest subset -- only
@@ -95,11 +88,7 @@ COMPOSITE_MATRIX: tuple[CompositeCase, ...] = (
         workflow_id="kernel_demo.composite_analyze_and_clarify_v1",
         scenario_id="kernel_demo.composite_analyze_and_clarify_smoke_v1",
         expected_output_schema_ref="kernel.schemas.generate_document_output_v1",
-        start_input={
-            "source_text": "We need this soon.",
-            "fields": extract_fields(),
-            "strict": False,
-        },
+        start_input=extract_input(source_text="We need this soon.", strict=False),
         expected_steps=(
             (
                 "extract",
@@ -245,33 +234,8 @@ def _run_composite_scenario_and_assert_full_path(
     assert session_body["result_artifact_id"] == processed.result_artifact_id
 
     with transaction_boundary(session_factory) as session:
-        action_runs = list(
-            session.execute(
-                sa.select(action_runs_table)
-                .where(action_runs_table.c.job_id == started["job_id"])
-                .order_by(action_runs_table.c.created_at, action_runs_table.c.id)
-            ).mappings()
-        )
-        provider_calls = list(
-            session.execute(
-                sa.select(provider_calls_table).where(
-                    provider_calls_table.c.job_id == started["job_id"]
-                )
-            ).mappings()
-        )
-        artifacts = list(
-            session.execute(
-                sa.select(artifacts_table)
-                .where(artifacts_table.c.job_id == started["job_id"])
-                .order_by(artifacts_table.c.created_at, artifacts_table.c.id)
-            ).mappings()
-        )
-        events = list(
-            session.execute(
-                sa.select(event_log_table)
-                .where(event_log_table.c.scenario_session_id == started["scenario_session_id"])
-                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
-            ).mappings()
+        action_runs, provider_calls, artifacts, events = read_execution_rows(
+            session, job_id=started["job_id"], scenario_session_id=started["scenario_session_id"],
         )
 
     # Step order: the action_runs row sequence for this job matches the workflow's declared

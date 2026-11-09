@@ -10,8 +10,6 @@ import pytest
 import sqlalchemy as sa
 from alembic import command
 from alembic.config import Config
-from sqlalchemy.engine import URL, make_url
-
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
 from anytoolai_platform_core.storage.db import (
     action_runs_table,
@@ -21,6 +19,7 @@ from anytoolai_platform_core.storage.db import (
 )
 from anytoolai_platform_core.storage.transactions import SessionFactory, transaction_boundary
 from anytoolai_platform_core.workflows.repository import JobRepository
+from sqlalchemy.engine import URL, make_url
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 POSTGRES_TEST_DATABASE_URL_ENV = "ANYTOOLAI_POSTGRES_TEST_DATABASE_URL"
@@ -185,3 +184,38 @@ def assert_scenario_runtime_correlation(
     for event_row in events:
         if event_row["job_id"] is not None:
             assert event_row["job_id"] == job_id
+
+
+def read_execution_rows(
+    session: sa.orm.Session,
+    *,
+    job_id: str,
+    scenario_session_id: str,
+) -> tuple[list[sa.RowMapping], list[sa.RowMapping], list[sa.RowMapping], list[sa.RowMapping]]:
+    action_runs = list(
+        session.execute(
+            sa.select(action_runs_table)
+            .where(action_runs_table.c.job_id == job_id)
+            .order_by(action_runs_table.c.created_at, action_runs_table.c.id)
+        ).mappings()
+    )
+    provider_calls = list(
+        session.execute(
+            sa.select(provider_calls_table).where(provider_calls_table.c.job_id == job_id)
+        ).mappings()
+    )
+    artifacts = list(
+        session.execute(
+            sa.select(artifacts_table)
+            .where(artifacts_table.c.job_id == job_id)
+            .order_by(artifacts_table.c.created_at, artifacts_table.c.id)
+        ).mappings()
+    )
+    events = list(
+        session.execute(
+            sa.select(event_log_table)
+            .where(event_log_table.c.scenario_session_id == scenario_session_id)
+            .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
+        ).mappings()
+    )
+    return action_runs, provider_calls, artifacts, events

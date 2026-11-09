@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import {
+  trackScenarioStarts,
+  expectMobileTaskReset,
   countEvents,
   trackRun,
   expectWorkspaceLayout,
@@ -89,18 +91,11 @@ test.describe("Task Finder web product", () => {
     await page.locator("#task-finder-task-text").fill(`${TASK} Also a PDF preview.`);
     await expect(page.getByText("Created from previous details")).toBeVisible();
 
-    await page.setViewportSize({ width: 390, height: 844 });
-    await expectWorkspaceLayout(page, "stacked");
-
-    await page.getByRole("button", { name: "New task" }).click();
-    await expect(page.locator("#task-finder-task-text")).toHaveValue("");
-    await expect(page.locator("#task-finder-task-text")).toBeFocused();
-    await expect(page.getByRole("button", { name: "Copy" })).toHaveCount(0);
+    await expectMobileTaskReset(page, "#task-finder-task-text");
   });
 
   test("validation: empty fields never start a scenario", async ({ page }) => {
-    const starts: string[] = [];
-    page.on("request", (request) => { if (request.method() === "POST" && ANY_START.test(request.url())) starts.push(request.url()); });
+    const starts = trackScenarioStarts(page, ANY_START);
     await page.goto(PRODUCT_URL);
     await page.getByRole("button", { name: "Check fit" }).click();
     await expect(page.getByText("Task description: required.")).toBeVisible();

@@ -35,7 +35,7 @@ from test_worker_boot import (
     _seed_running_job,
 )
 
-from tests.action_inputs import extract_fields
+from tests.action_inputs import extract_input
 from tests.db_support import provision_database
 
 pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
@@ -217,11 +217,7 @@ def test_real_sigterm_drains_inflight_job_before_exiting(
     _engine, session_factory, database_url = db
     job = _seed_job(
         session_factory,
-        input_payload={
-            "source_text": "deadline budget deliverables",
-            "fields": extract_fields(),
-            "strict": False,
-        },
+        input_payload=extract_input(strict=False),
     )
 
     script = _SUBPROCESS_WORKER_SCRIPT.format(
