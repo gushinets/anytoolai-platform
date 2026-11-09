@@ -1,7 +1,5 @@
-// ANY-521 gave ProposalAI its own tone labels ("Warm & personable" etc.), distinct from the shared
-// neutral|warm|firm word labels Client Update Writer still uses -- this product intentionally does
-// not import `products/shared/toneMessages` (its own exec-plan: "no speculative shared RadioGroup
-// abstraction for one product"). Wire values (`toneOptions`' keys, sent as-is) stay neutral|warm|firm.
+// ProposalAI's descriptive tone labels differ from Client Update Writer's plain labels;
+// wire values stay neutral|warm|firm in both products.
 export const en = {
   title: "ProposalAI",
   description: "Turn a client brief and your relevant strengths into a proposal ready to send.",

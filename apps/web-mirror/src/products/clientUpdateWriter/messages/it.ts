@@ -1,11 +1,10 @@
 // Italian Client Update Writer messages (ICU); typographic ’ only.
 import type { Shape } from "../../../i18n/messageTypes";
 import type { en } from "./en";
-import { it as tone } from "../../shared/toneMessages/it";
 
 export const it: Shape<typeof en> = {
   title: "Client Update Writer",
-  tone,
+  tone: { neutral: "neutro", warm: "cordiale", firm: "fermo" },
   quotaRemaining: "Ne restano {remaining} su {limit, plural, one {# esecuzione di Client Update Writer} many {# di esecuzioni di Client Update Writer} other {# esecuzioni di Client Update Writer}}.",
   modes: {
     legend: "Modalità",

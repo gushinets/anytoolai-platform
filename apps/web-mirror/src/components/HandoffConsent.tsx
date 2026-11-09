@@ -421,7 +421,11 @@ export function HandoffConsent({ client, handoffToken, canOpenTarget }: HandoffC
           {guestId === undefined ? (
             <Toast variant="error">{th("identityUnavailable")}</Toast>
           ) : null}
-          {state.actionError ? <Toast variant="error">{t(state.actionError)}</Toast> : null}
+          {state.actionError ? (
+            <Toast variant="error">
+              {state.actionError === "capacityReserved" ? th("errors.quotaCapacityReserved") : t(state.actionError)}
+            </Toast>
+          ) : null}
         </>
       ) : null}
       {/* A spent token still names the target session the accept queued (and reserved capacity for) until its TTL. If

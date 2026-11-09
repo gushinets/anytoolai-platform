@@ -153,3 +153,157 @@ remote model-map fetch; the same command passed with network access. No dependen
 The refactor removes 225 net lines of test code. Full-check was not repeated for this test-only
 extraction; its earlier sudo-dependent baseline failure remains documented above. No remote Sonar
 analysis, commit, push or GitHub write was performed for this follow-up.
+
+## Dictionary audit and proposed design — 2026-11-09
+
+Status: proposal only, not approved for implementation. This supersedes the narrower 14-file
+proposal above. The user requested a repository-wide dictionary audit and the smallest maintainable
+solution; Sonar analysis and exclusions must remain unchanged.
+
+### Evidence and ownership
+
+The repository has nine web translation bundles, each with seven locale modules: 63 locale files
+plus nine index modules. Locale-file contents total 2,682 lines including comments. The bundles are
+host (33 message keys per locale), home (18), handoff (23), ProposalAI (29), Client Update Writer
+(42 including imported tone labels), Brief Decoder (40), Acceptance Builder (26), Task Finder (35),
+and shared tone labels (3). Extension `extensions/kernel-demo-ce/src/content/messages.ts` defines an IPC message contract, not
+translations, and is outside the migration.
+
+A read-only TypeScript AST inventory checked every locale, rejected duplicate object properties,
+and confirmed identical key sets and nonempty values. The existing web i18n suite passes 32/32,
+including placeholder parity, ICU syntax, plural behavior and locale fallback. The latest Sonar
+analysis of 7ea42e4d reports zero new smoke duplication; all 364 remaining duplicated new lines are
+translation structure. This is not evidence of repeated execution logic or untranslated locales.
+
+Two concrete simplifications exist:
+- `products/shared/toneMessages` has one real consumer, Client Update Writer's seven locale files.
+  `TONE_MESSAGES` itself has no importer. ProposalAI deliberately uses different tone wording.
+  Move those three values into Client Update Writer's own locale resources and remove the eight
+  obsolete shared tone files. This preserves product ownership and removes indirection.
+- Handoff's `capacityReserved` and host's `errors.quotaCapacityReserved` have identical translations
+  in all seven languages and describe the same backend quota condition. Handoff already uses
+  `useHostT`; render this condition from the host key and remove the seven handoff copies. Preserve
+  the existing state transitions and the handoff-specific `actionFailed` message.
+
+Other equal words occur in independent roles (mode/button/result heading, directory tag, field
+label/validation name) or in different product domains. Do not join their keys merely because
+English or all current translations happen to match. Some English-identical messages already have
+different wording in other languages. Do not parameterize product action/error sentences or nouns:
+that would introduce grammatical coupling. Runtime translation, fallback and locale storage already
+have one implementation and do not need a replacement.
+
+### Recommendation after the independent builder check
+
+The smallest fix for actual duplication is to keep the current TypeScript representation and make
+only the two ownership simplifications above. There is already one translation runtime; a generic
+dictionary factory would add code without removing repeated behavior. Existing per-locale schemas
+are useful data repetition. This recommendation supersedes the earlier unconditional JSON proposal.
+It does not make the structural Sonar findings disappear, and that limitation must be explicit.
+
+Minimal implementation plan, if authorized:
+1. Put the existing tone labels directly into Client Update Writer's seven typed locale objects;
+   delete the now-unused seven tone locale modules and their unused index.
+2. Use the existing host translator for handoff's quota-capacity error; delete that key from the
+   seven handoff dictionaries. Preserve the closed error state and re-localization behavior.
+3. Update current frontend recipes/comments referencing the removed tone source. Keep historical
+   execution-plan records intact. Add a focused handoff capacity-error locale-switch test.
+4. Check effective values before/after, then run web unit tests, typecheck/lint/build, documentation
+   checks and the Client Update Writer, Brief Decoder and Acceptance Builder smokes (tone and both
+   accepted/declined handoff journeys). Retain the existing JSON-free validation approach.
+5. Report results; only commit/push when authorized. Expect the known structural CPD findings to
+   remain unless a separate representation decision is made.
+
+### Optional uniform data-format migration
+
+Choose this only if separating translation resources from executable modules is itself desired,
+not merely as proof that duplicated behavior was fixed. This is the smallest reasonable JSON
+migration, not the smallest code change. It has no demonstrated runtime speed benefit.
+
+Use plain UTF-8 JSON per bundle and locale, preserving the existing directory ownership, nesting,
+ICU strings and consumer exports. After folding tone into its sole consumer, there will be eight
+bundles and 56 JSON resources. Retain eight small TypeScript index modules with explicit static
+imports and the existing closed `Record<Locale, Shape<typeof en>>` contracts. Keep `HostMessages`
+compatible. No dynamic imports, factory, message-reference DSL, code generation, new dependency,
+new localization framework or Sonar exclusion is needed. Existing `resolveJsonModule` supports
+these imports. Preserve explanatory ownership/grammar comments in the relevant bundle index or
+frontend architecture documentation rather than discarding their decisions.
+
+The benefit is a consistent data format and simpler ownership, not a guarantee that Sonar becomes
+green. Repeated message keys across locales are the necessary schema of translation data. JSON
+does not remove this data repetition; it removes executable-module scaffolding. The analyzer's
+actual result must be measured after an explicitly authorized push.
+
+Alternatives considered:
+- Keep TypeScript and apply only the two concrete simplifications: smallest diff, existing
+  conventions and object-literal excess-key checks preserved; structural CPD findings remain.
+- Put all locales into one JSON file per bundle: fewer files/imports, but mixes translator work
+  across languages and changes the current per-locale editing convention without a runtime benefit.
+- A generic factory, positional translation arrays or reordered/split source blocks: rejected;
+  adds runtime/type machinery or hides structure merely to change duplication metrics.
+
+### Optional JSON migration: validation contract and implementation plan
+
+1. Capture the currently exported message trees before migration. Compare every locale's effective
+   values after conversion, allowing only removal of the handoff capacity key and relocation of the
+   shared tone source; visible text must remain byte-for-byte identical. Do not retain snapshots or
+   a permanent migration script as a second source of truth.
+2. Convert all eight retained bundles mechanically, fold tone into Client Update Writer and update
+   static index imports. Preserve their public exports and all product/host namespace boundaries.
+3. Route the handoff capacity error through its existing host translator. Add a focused check that
+   this error re-localizes while visible. Update frontend translation/add-locale recipes and comments
+   that refer to the removed shared tone bundle or `.ts` locale resources. Historical execution-plan
+   records remain historical; do not rewrite them.
+4. Extend the existing i18n tests rather than adding a separate validator/framework. Check the exact
+   recursive key structure (including empty objects), string leaves, locale completeness, placeholders
+   and ICU syntax. Add one small raw-JSON duplicate-key assertion using the already-installed
+   TypeScript parser; JSON.parse and the TypeScript compiler both silently accept duplicate JSON keys.
+   Include a negative case with a repeated nested key to prove that assertion fails. Keep this parser
+   in test code only. The import type contract still rejects missing/wrongly typed values; tests own
+   extra-key detection. A local compiler experiment confirmed valid JSON passes, a missing key fails,
+   and extra/repeated keys do not fail typecheck. Do not claim excess-property compile checks survive
+   JSON imports unchanged.
+5. Run web lint/typecheck, all web unit tests (including localization and handoff), production build,
+   documentation checks and all five product smokes because every product's resources change.
+   Verify no old locale/tone imports remain, then review the resulting diff. Do not change runtime
+   versions or lockfiles. Do not modify CI/quality gates to accommodate the conversion.
+6. Report results and any remaining warnings. Commit/push and any further GitHub write require the
+   user's authorization. Recheck Sonar after an authorized push; no green-gate promise beforehand.
+
+Potential implementation risks: dropped comments, accidental translation edits, a missed direct
+locale import, loss of extra-key validation, or a hardcoded error string that fails to re-localize.
+The plan above explicitly covers each. Native-speaker translation review and live-provider quality
+are outside this structural audit. A new abstraction to prevent all repeated words is not a goal.
+
+
+Audit completion: web i18n tests pass 32/32; the AST audit covered all 63 locale modules. A fresh
+builder review found no important unresolved implementation questions and confirmed the ownership
+simplifications, but correctly distinguished the minimal TypeScript fix from a larger JSON format
+migration. No product source, tests, configuration, dependencies or Sonar settings changed during
+this audit. Only this execution plan and the local task plan were updated.
+
+## Authorized TypeScript dictionary simplification — 2026-11-09
+
+The user approved only the two minimal ownership simplifications and their verification. Keep all
+locale resources in TypeScript; do not implement the optional JSON design or modify Sonar settings.
+Doctor passes. Follow the minimal implementation plan above, preserving all effective translations
+and checking capacity-error re-localization before retry. The earlier audit-only status records the
+previous turn; implementation is now authorized.
+
+Implementation complete: Client Update Writer owns its three tone labels in each typed locale;
+the eight shared tone files are removed. Handoff renders occupied-capacity errors from the existing
+host translator, with its seven duplicate entries removed. Current recipes and ownership comments
+are updated; no locale format, Sonar rule, exclusion, dependency or runtime version changed.
+
+Verification: all effective translations match their pre-change values; the removed handoff values
+match the host key in all seven locales. All 478 web unit tests pass, including the extended retry
+case that switches the visible capacity error through every locale and retains the same handoff and
+guest for retry. Web typecheck and lint pass. Three canonical product smokes pass: Client Update
+Writer 4, Brief Decoder 8, Acceptance Builder 11 (23 total), including accepted and declined handoffs.
+Each smoke's production build passes. Doctor, architecture/documentation validation, generated-doc
+checks and diff whitespace checks pass. Initial standalone typecheck overlapped the first smoke's
+recreation of `.next` and reported missing generated files; rerunning after all builds passed without
+source/config changes. No additional unit-test rerun was needed.
+
+Full-check was not repeated for these frontend-only changes; the earlier sudo-dependent baseline
+failure remains documented. No commit, push or GitHub write was performed in this implementation
+turn. Structural dictionary CPD findings remain expected; no new Sonar analysis was requested.

@@ -1,11 +1,10 @@
 // Spanish (neutral) Client Update Writer messages; keys mirror en.ts.
 import type { Shape } from "../../../i18n/messageTypes";
 import type { en } from "./en";
-import { es as tone } from "../../shared/toneMessages/es";
 
 export const es: Shape<typeof en> = {
   title: "Client Update Writer",
-  tone,
+  tone: { neutral: "neutral", warm: "cálido", firm: "firme" },
   quotaRemaining: "Quedan {remaining} de {limit, plural, one {# ejecución de Client Update Writer} many {# de ejecuciones de Client Update Writer} other {# ejecuciones de Client Update Writer}}.",
   modes: {
     legend: "Modo",

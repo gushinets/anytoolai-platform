@@ -249,12 +249,9 @@ product-owned. Code: `apps/web-mirror/src/i18n/` (library `use-intl`, imported o
   English literals -- one optional flag, `hasDescription`, tells the shared runtime whether to look
   up a product's own `description` message, without the definition itself holding any text. `neutral|warm|firm` tone labels are product
   vocabulary (a product-owned wire enum's visible labels), never host's: Client Update Writer's
-  native tone radios read them from `products/shared/toneMessages/` (one translation per locale,
-  spread into its own `product` namespace so a product with a differently-meaning `tone`-shaped enum
-  needs no host change); ProposalAI instead defines its own descriptive `toneOptions` labels
-  ("Warm & personable" etc.) in its own messages for its radio choices -- the shared
-  bundle is an opt-in convenience for products that want the same plain wording, not a contract every
-  `tone`-shaped product must join.
+  native tone radios read the plain labels from its own `tone` messages; ProposalAI defines
+  descriptive `toneOptions` labels ("Warm & personable" etc.) in its own messages. Each product
+  owns its wording even when the wire enum is the same.
 - **One-screen workspace (ANY-528, ANY-530):** `ProductRunPage` renders every product as an input
   card beside a result card (stacked below 860px; `ProductPageShell` always uses the wide shell).
   The runtime keeps the form and the latest successful result together, with the result tied to the
@@ -294,9 +291,9 @@ product-owned. Code: `apps/web-mirror/src/i18n/` (library `use-intl`, imported o
    title? Add `description` here and set `hasDescription: true` on the `ProductDefinition` -- the
    shared runtime only looks it up when the flag is set.
 2. Add `fr it de es ru pt` files typed `Shape<typeof en>`; use the typographic apostrophe `’` (a
-   plain `'` before `{` starts ICU quoting); keep placeholders and plural categories. Reusing
-   the plain tone labels? Spread `TONE_MESSAGES[locale]` from `products/shared/toneMessages/` under a `tone`
-   key in each locale file instead of retranslating `neutral|warm|firm`.
+   plain `'` before `{` starts ICU quoting); keep placeholders and plural categories. Keep
+   product-owned vocabulary such as tone labels in the product's locale files. Reuse host keys
+   for shared runtime conditions; handoff uses `errors.quotaCapacityReserved` for occupied capacity.
 3. Export `Record<Locale, Shape<typeof en>>` from `messages/index.ts`.
 4. Register the product with `messages` in `products/registry.ts`; every locale must include a
    nonempty `title` for the page shell. The shell supplies the provider and language selector;
@@ -310,9 +307,9 @@ product-owned. Code: `apps/web-mirror/src/i18n/` (library `use-intl`, imported o
 ### Recipe: add a locale
 
 1. Add it to `LOCALE_NAMES` in `i18n/locales.ts` (endonym).
-2. TypeScript then requires an entry in `HOST_MESSAGES`, `TONE_MESSAGES` and every product's
-   messages record: add `i18n/messages/<code>.ts`, `products/shared/toneMessages/<code>.ts` and
-   `products/*/messages/<code>.ts`, typed `Shape<typeof en>`.
+2. TypeScript then requires an entry in every locale record: add `i18n/messages/<code>.ts`,
+   `app/homeMessages/<code>.ts`, `components/handoffMessages/<code>.ts` and
+   `products/*/messages/<code>.ts`, typed `Shape<typeof en>`, and register each in its bundle's index.
 3. Run `pnpm --filter @anytoolai/web-mirror test`; the parity, placeholder and ICU-syntax checks
    fail on any gap. No product runtime change is needed.
 

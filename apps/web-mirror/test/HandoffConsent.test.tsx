@@ -9,6 +9,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { HandoffConsent } from "../src/components/HandoffConsent";
 import { readAttachSessionId, rememberAttachSession } from "../src/products/runtime/attachSession";
 import { HANDOFF_MESSAGES } from "../src/components/handoffMessages";
+import { LOCALES } from "../src/i18n";
+import { HOST_MESSAGES } from "../src/i18n/messages";
 import { makeClientWithDeferredCalls, makeClientWithDeferredRoute } from "./fixtures/platformResponses";
 import { LOCALE_STORAGE_KEY } from "../src/i18n/localeStorage";
 import { makeRender } from "./support/renderWithI18n";
@@ -82,7 +84,7 @@ function guestIdentityResponse(guestId = "guest_1"): Response {
 }
 
 describe("HandoffConsent", () => {
-  it("keeps the same handoff and guest retryable while capacity is reserved", async () => {
+  it("re-localizes the capacity error and keeps the same handoff and guest retryable", async () => {
     const { client, calls } = makeRoutedClient({
       [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
       [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload())],
@@ -94,6 +96,12 @@ describe("HandoffConsent", () => {
     render(<HandoffConsent client={client} handoffToken="token_abc" />);
     fireEvent.click(await screen.findByRole("button", { name: "Accept" }));
     await screen.findByText("Capacity is temporarily in use. Please try again shortly.");
+    for (const locale of LOCALES) {
+      fireEvent.change(screen.getByRole("combobox"), { target: { value: locale } });
+      await screen.findByText(HOST_MESSAGES[locale].errors.quotaCapacityReserved);
+      expect(screen.getByRole("button", { name: HANDOFF_MESSAGES[locale].accept }).hasAttribute("disabled")).toBe(false);
+    }
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "en" } });
     const accept = screen.getByRole("button", { name: "Accept" });
     expect(accept.hasAttribute("disabled")).toBe(false);
     fireEvent.click(accept);

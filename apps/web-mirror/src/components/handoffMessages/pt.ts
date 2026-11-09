@@ -7,7 +7,6 @@ export const pt: Shape<typeof en> = {
   notFound: "Este link de transferência não é válido.",
   loadFailed: "Algo deu errado ao carregar esta transferência. Tente novamente.",
   retry: "Tentar novamente",
-  capacityReserved: "A capacidade está temporariamente ocupada. Tente novamente em instantes.",
   actionFailed: "Não foi possível concluir a ação. Tente novamente.",
   fields: {
     from: "De",
