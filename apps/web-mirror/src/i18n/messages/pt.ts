@@ -29,6 +29,7 @@ export const pt: Shape<typeof en> = {
     handoffFailed: "Não foi possível abrir a próxima etapa. Tente novamente.",
   },
   errors: {
+    attachmentUnavailable: "Não é possível abrir esta sessão nesta ferramenta. Selecione «Nova tarefa» para abrir um formulário vazio.",
     quotaCapacityReserved: "A capacidade está temporariamente ocupada. Tente novamente em instantes.",
     startFailed: "Não foi possível iniciar {product}. Tente novamente.",
     timeout: "Está demorando mais do que o esperado. Tente novamente.",

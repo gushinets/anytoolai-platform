@@ -1030,11 +1030,11 @@ it.each(MODE_SCENARIOS.flatMap((scenario) => [false, true].map((recover) => ({ s
   expect(readAttachSessionId("client_update_writer")).toBeUndefined();
 });
 
-it.each([undefined, "foreign_product.run_v1"])("does not guess a mode for an unsupported identity %s", async (scenarioId) => {
+it("preserves an accepted session without identity for retry instead of guessing its mode", async () => {
   const { routes, queues } = bootAndHappyPathRoutes(MODE_IDS.update, { text: "Not shown." });
   const { client, calls } = makeClient({
     ...queues,
-    [routes.SESSION]: [sessionResponse({ scenario_id: scenarioId })],
+    [routes.SESSION]: [sessionResponse()],
   });
   render(<AttachedClientUpdateWriterProduct client={client} sessionId="session_1" />);
   await screen.findByRole("button", { name: "Try again" });

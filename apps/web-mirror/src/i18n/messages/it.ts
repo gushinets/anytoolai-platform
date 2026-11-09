@@ -31,6 +31,7 @@ export const it: Shape<typeof en> = {
     handoffFailed: "Impossibile aprire il passaggio successivo. Riprovi.",
   },
   errors: {
+    attachmentUnavailable: "Questa sessione non può essere aperta in questo strumento. Scegli «Nuova attività» per aprire un modulo vuoto.",
     quotaCapacityReserved: "La capacità è temporaneamente occupata. Riprova tra poco.",
     startFailed: "Impossibile avviare {product}. Riprovi.",
     timeout: "L’operazione richiede più tempo del previsto. Riprovi.",

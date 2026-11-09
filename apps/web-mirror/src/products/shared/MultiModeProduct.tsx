@@ -2,6 +2,7 @@
 
 import { useContext, useEffect, useRef, useState } from "react";
 import { getScenarioSession } from "@anytoolai/ce-kit";
+import { Button, Card } from "@anytoolai/shared-ui";
 import { useIsomorphicLayoutEffect } from "../../lib/useIsomorphicLayoutEffect";
 import { ProductShellContext } from "../runtime/ProductShellContext";
 import { ErrorState } from "../../components/ErrorState";
@@ -12,6 +13,7 @@ import { callSafely } from "../runtime/callSafely";
 import { ProductRunPage } from "../runtime/ProductRunPage";
 import type { ProductDefinition, ProductRunEvent } from "../runtime/productDefinition";
 import { ModeSwitch } from "./ModeSwitch";
+import styles from "../../components/cardStack.module.css";
 
 // Each mode's own values shape is distinct and incompatible, so the mode list can only hold the
 // definitions loosely; this is the list's element type only, not a loosening of any individual
@@ -47,6 +49,7 @@ export function MultiModeProduct<Id extends string, R>({
   attachSessionId: initialAttachSessionId,
   onAttachBegin,
   onAttachEnd,
+  onAttachDiscard,
 }: AttachProps & {
   client: PlatformApiClient;
   onEvent?: (event: ProductRunEvent) => void;
@@ -61,43 +64,57 @@ export function MultiModeProduct<Id extends string, R>({
   const [locked, setLocked] = useState(false);
   const [attachSessionId, setAttachSessionId] = useState(initialAttachSessionId);
   // The server cannot read tab storage; both hydration renders must show the same loading view.
-  const [resolution, setResolution] = useState<"loading" | "ready" | "error">("loading");
+  const [resolution, setResolution] = useState<"loading" | "ready" | "error" | "unavailable">("loading");
   const [attempt, setAttempt] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const focusFreshFormRef = useRef(false);
   const modesRef = useRef(modes);
   modesRef.current = modes;
   const shell = useContext(ProductShellContext);
   useIsomorphicLayoutEffect(() => {
-    if (resolution === "ready" || !initialAttachSessionId) return;
+    if (resolution === "ready" || !attachSessionId) return;
     shell?.reportBusy(true);
     return () => shell?.reportBusy(false);
-  }, [shell, resolution, initialAttachSessionId]);
+  }, [shell, resolution, attachSessionId]);
   const th = useHostT();
   const t = useProductT();
 
   useEffect(() => {
-    if (!initialAttachSessionId) {
+    if (!attachSessionId) {
       setResolution("ready");
       return;
     }
     const controller = new AbortController();
-    void getScenarioSession(client, initialAttachSessionId, { signal: controller.signal }).then((result) => {
+    void getScenarioSession(client, attachSessionId, { signal: controller.signal }).then((result) => {
       if (controller.signal.aborted) return;
-      const target = result.ok
-        ? modesRef.current.find((candidate) => candidate.definition.scenarioId === result.value.scenarioId)
-        : undefined;
+      if (!result.ok) {
+        setResolution(result.error.type === "backend_error" && result.error.status === 404 ? "unavailable" : "error");
+        return;
+      }
+      const target = modesRef.current.find((candidate) => candidate.definition.scenarioId === result.value.scenarioId);
       if (!target) {
-        setResolution("error");
+        // A legacy response without identity cannot prove that the accepted session is invalid.
+        setResolution(result.value.scenarioId === undefined ? "error" : "unavailable");
         return;
       }
       setModeId(target.id);
       setResolution("ready");
     });
     return () => controller.abort();
-  }, [client, initialAttachSessionId, attempt]);
+  }, [client, attachSessionId, attempt]);
+
+  useEffect(() => {
+    if (!focusFreshFormRef.current || resolution !== "ready" || locked) return;
+    const selected = containerRef.current?.querySelector<HTMLInputElement>('input[type="radio"]:checked:not(:disabled)');
+    if (selected) {
+      selected.focus();
+      focusFreshFormRef.current = false;
+    }
+  }, [resolution, locked]);
 
   const mode = modes.find((candidate) => candidate.id === modeId) ?? modes[0];
   return (
-    <>
+    <div ref={containerRef}>
       <ModeSwitch
         legend={legend}
         name={name}
@@ -115,6 +132,15 @@ export function MultiModeProduct<Id extends string, R>({
         }}
       />
       {resolution === "loading" ? <p role="status">{th("loading", { product: t("title") })}</p> :
+        resolution === "unavailable" ? <Card className={styles.stack}>
+          <ErrorState message={th("errors.attachmentUnavailable")} embedded />
+          <Button variant="secondary" onClick={() => {
+            callSafely(onAttachDiscard);
+            focusFreshFormRef.current = true;
+            setAttachSessionId(undefined);
+            setResolution("ready");
+          }}>{th("workspace.newTask")}</Button>
+        </Card> :
         resolution === "error" ? <ErrorState message={th("errors.connectionLost")} onRetry={() => {
           setResolution("loading");
           setAttempt((previous) => previous + 1);
@@ -129,6 +155,6 @@ export function MultiModeProduct<Id extends string, R>({
         onAttachBegin={onAttachBegin}
         onAttachEnd={onAttachEnd}
       />}
-    </>
+    </div>
   );
 }

@@ -7,8 +7,8 @@
 - Created: 2026-11-09
 - Last updated: 2026-11-09
 - Review date: 2026-11-09
-- Next action: Review the change and run the canonical dependency-install gate in CI.
-- Blocker: None for implementation; canonical frontend-check remains blocked by registry access.
+- Next action: Review the stale-attachment fix and its recorded Chrome MCP evidence.
+- Blocker: None for this frontend fix; canonical frontend-check passed on 2026-11-09.
 
 ## Goal
 
@@ -34,6 +34,18 @@ SDK default; it does not use the web continuation behavior.
 - [x] Set the SDK window to 600 seconds; continue healthy windows in the web runtime.
 - [x] Verify late results, multiple windows, recovery, cancellation and product regressions.
 - [x] Run frontend/docs checks and a controlled browser journey exceeding 60 seconds.
+
+### Stale-attachment recovery (authorized 2026-11-09)
+
+- [x] Classify a definite backend 404 or a known incompatible scenario separately from ambiguous failures.
+- [x] Add explicit pre-runtime discard in the route owner; retain begin/end protection and unrelated newer/active sessions.
+- [x] Open a fresh form without execution, clear effective attachment state, and retain transient retries of the same session.
+- [x] Cover both products, URL/storage/reload, all valid modes, failed boot and storage races with regression tests.
+- [x] Run web checks/build and Chrome MCP recovery journeys; compare execution/provider/quota records before and after.
+
+No backend contract, provider policy, dependency or design-token changes are needed. A discarded
+attachment is only a local reference; this action neither cancels nor starts a backend execution.
+Missing scenario identity remains ambiguous, so it preserves the accepted session for retry.
 
 ## Decision log
 
@@ -230,3 +242,43 @@ fixtures were used; PostgreSQL production concurrency is not asserted.
 
 The backend identity API and matching frontend must be deployed together for mode restoration.
 Local services remain up for inspection. No commit, GitHub write or Linear update was performed.
+
+
+## Stale-attachment blocker resolved — 2026-11-09
+
+Both multi-mode products now distinguish a definite backend 404 or known incompatible scenario
+from ambiguous reads. The former offers explicit New task, which opens an empty form without
+starting execution; network/timeout/5xx, missing identity, and malformed responses retain the
+session and retry the same GET. Shared copy is translated in all seven locales.
+
+The route owner has an explicit pre-boot discard callback, independent of guarded begin/end.
+Cleanup removes only the matching reference, preserves another active/newest session and its
+ordering, and clears the route's in-memory ID. The resolver follows its effective ID instead of
+re-reading a discarded initial prop. A bare link also preserves an explicitly opened session whose
+order is unknown. The fresh form restores keyboard focus to the selected mode. No API/backend,
+dependency, quota-policy or design-token change was required.
+
+Canonical frontend-check passed: locked installation, workspace lint/typecheck, all tests
+(including 501 web, 336 SDK, 52 shared UI, 57 Atom Lab Node, 339 Atom Lab browser and six
+stakeholder-demo Node tests), generated API type drift and all builds. Installation initially
+hit esbuild postinstall EPERM inside sandbox; the same gate passed outside it. Documentation
+validation passed. Generated docs check initially hit a LiteLLM remote-cost-map import race;
+using its supported local cost-map option passed without changing dependencies or source.
+
+Chrome MCP verified real 404 → explicit exit → every mode → reload without restoring the bad ID,
+and foreign identity → explicit exit, in both products. One explicitly injected 503 per product
+retained the same ID and Retry restored the original result. URL and reload checks restored the
+original artifact in all three Client Update Writer and both Acceptance Builder modes, with
+zero start requests. On the final canonical build, repeated invalid bare links/discards preserved
+another active session (including its unknown-rank state); reload restored that original result.
+Final console checks were clean.
+
+After baseline execution, global isolated DB counts remained sessions=10, jobs=10, action_runs=19,
+provider_calls=19, execution_reservations=6. Every quota row was unchanged. Acceptance Builder
+remained used=2/reserved=0/available=1, also confirmed through its real quota API in Chrome.
+Client Update Writer has no configured quota policy: unchanged execution/provider counts prove
+no regeneration, without inventing a quota charge. See
+[the recorded evidence](any-777-stale-attachment-recovery-evidence.json).
+
+All providers were deterministic fakes and storage was isolated SQLite. No paid provider or
+PostgreSQL concurrency run. No GitHub reply or PR edit was made in this follow-up.
