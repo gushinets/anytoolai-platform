@@ -29,6 +29,7 @@ export const es: Shape<typeof en> = {
     handoffFailed: "No se pudo abrir el siguiente paso. Inténtelo de nuevo.",
   },
   errors: {
+    attachmentUnrecognized: "No se pudo restaurar esta sesión guardada. Inténtalo de nuevo o selecciona «Nueva tarea» para abrir un formulario vacío.",
     attachmentUnavailable: "No se puede abrir esta sesión en esta herramienta. Selecciona «Nueva tarea» para abrir un formulario vacío.",
     quotaCapacityReserved: "La capacidad está ocupada temporalmente. Inténtalo de nuevo en un momento.",
     startFailed: "No se pudo iniciar {product}. Inténtelo de nuevo.",

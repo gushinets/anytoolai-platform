@@ -72,20 +72,28 @@ describe.each(products)("$productId attachment recovery", (product) => {
     };
   }
 
-  it.each(["404", "foreign", "unsupported"].flatMap((failure) => [false, true].map((stored) => ({ failure, stored }))))(
+  it.each(["404", "foreign", "unsupported", "legacy"].flatMap((failure) => [false, true].map((stored) => ({ failure, stored }))))(
     "$failure → explicit New task → all modes and reload (stored=$stored), without a start", async ({ failure, stored }) => {
       const made = makeClientCapturingRequests({
         ...bootRoutes(),
-        [r.SESSION]: [failure === "404" ? errorResponse(404, "scenario_session_not_found") :
-          sessionResponse({ scenario_id: failure === "foreign" ? "proposal_ai.generate_v1" : `${productId}.future_v1` })],
+        [r.SESSION]: failure === "legacy" ? [sessionResponse(), sessionResponse()] :
+          [failure === "404" ? errorResponse(404, "scenario_session_not_found") :
+            sessionResponse({ scenario_id: failure === "foreign" ? "proposal_ai.generate_v1" : `${productId}.future_v1` })],
       });
       if (stored) rememberAttachSession(productId, "session_1", "2026-10-01T10:00:00Z");
       const view = render(<Attached client={made.client} sessionId={stored ? undefined : "session_1"} />);
-      const exit = await screen.findByRole("button", { name: "New task" });
+      await screen.findByRole("button", { name: "New task" });
+      if (failure === "legacy") {
+        fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+        await screen.findByRole("button", { name: "Try again" });
+        expect(made.calls.filter((call) => call.key === r.SESSION)).toHaveLength(2);
+      } else {
+        expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+      }
       expect(readAttachSessionId(productId)).toBe("session_1");
-      expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+      expect(screen.queryByRole("form")).toBeNull();
       expect(screen.getAllByRole("radio").every((node) => (node as HTMLInputElement).disabled)).toBe(true);
-      fireEvent.click(exit);
+      fireEvent.click(screen.getByRole("button", { name: "New task" }));
       await screen.findByLabelText(modes[0].field);
       await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("radio", { name: modes[0].label })));
       expect(readAttachSessionId(productId)).toBeUndefined();
@@ -96,7 +104,7 @@ describe.each(products)("$productId attachment recovery", (product) => {
       view.unmount();
       render(<Attached client={made.client} />);
       await screen.findByLabelText(modes[0].field);
-      expect(made.calls.filter((call) => call.key === r.SESSION)).toHaveLength(1);
+      expect(made.calls.filter((call) => call.key === r.SESSION)).toHaveLength(failure === "legacy" ? 2 : 1);
       expect(made.calls.some((call) => call.key.endsWith("/start"))).toBe(false);
       expect(screen.getByText(/2 of 3/)).toBeTruthy();
     },
@@ -120,9 +128,9 @@ describe.each(products)("$productId attachment recovery", (product) => {
     render(<Attached client={made.client} sessionId="session_1" />);
     const retry = await screen.findByRole("button", { name: "Try again" });
     expect(readAttachSessionId(productId)).toBe("session_1");
-    expect(screen.queryByRole("button", { name: "New task" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "New task" }) !== null).toBe(_label === "missing identity");
     fireEvent.click(retry);
-    await screen.findByRole("button", { name: "New task" });
+    await screen.findByRole("button", { name: "Copy" });
     expect(readAttachSessionId(productId)).toBe("session_1");
     expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy();
     expect(made.calls.filter((call) => call.key === r.SESSION)).toHaveLength(failure ? 3 : 2);
@@ -131,10 +139,10 @@ describe.each(products)("$productId attachment recovery", (product) => {
     expect(screen.getByText(/2 of 3/)).toBeTruthy();
   });
 
-  it("a newer accepted session survives discarding an unavailable older one, then reload restores it", async () => {
+  it.each(["404", "legacy"])("a newer accepted session survives discarding an older %s attachment, then reload restores it", async (failure) => {
     const made = makeClientCapturingRequests({
       ...bootRoutes(),
-      [r.SESSION]: [errorResponse(404, "scenario_session_not_found")],
+      [r.SESSION]: [failure === "legacy" ? sessionResponse() : errorResponse(404, "scenario_session_not_found")],
       "GET /v1/scenario-sessions/newer": Array.from({ length: 2 }, () => sessionResponse({
         scenario_session_id: "newer", scenario_id: ids.scenarioId,
       })),

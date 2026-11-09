@@ -76,8 +76,13 @@ def test_scenario_start_response_rejects_an_off_enum_status() -> None:
 
 
 def test_scenario_session_response_rejects_an_off_enum_status() -> None:
-    with pytest.raises(ValidationError):
-        ScenarioSessionResponse(scenario_session_id="s1", job_id="j1", status="cancelled")
+    with pytest.raises(ValidationError) as exc_info:
+        ScenarioSessionResponse(
+            scenario_session_id="s1", scenario_id="demo.run_v1", job_id="j1", status="cancelled"
+        )
+    assert [(error["loc"], error["type"]) for error in exc_info.value.errors()] == [
+        (("status",), "enum")
+    ]
 
 
 def test_handoff_create_response_rejects_an_off_enum_status() -> None:

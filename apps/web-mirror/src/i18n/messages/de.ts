@@ -29,6 +29,7 @@ export const de: Shape<typeof en> = {
     handoffFailed: "Der nächste Schritt konnte nicht geöffnet werden. Bitte versuchen Sie es erneut.",
   },
   errors: {
+    attachmentUnrecognized: "Diese gespeicherte Sitzung konnte nicht wiederhergestellt werden. Versuchen Sie es erneut oder wählen Sie „Neue Aufgabe“, um ein leeres Formular zu öffnen.",
     attachmentUnavailable: "Diese Sitzung kann in diesem Tool nicht geöffnet werden. Wählen Sie „Neue Aufgabe“, um ein leeres Formular zu öffnen.",
     quotaCapacityReserved: "Die Kapazität ist vorübergehend belegt. Bitte versuche es gleich noch einmal.",
     startFailed: "{product} konnte nicht gestartet werden. Bitte versuchen Sie es erneut.",

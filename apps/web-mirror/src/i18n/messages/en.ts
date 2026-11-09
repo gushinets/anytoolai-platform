@@ -31,6 +31,7 @@ export const en = {
     handoffFailed: "Could not open the next step. Please try again.",
   },
   errors: {
+    attachmentUnrecognized: "We couldn’t restore this saved session. Try again, or choose New task to open an empty form.",
     attachmentUnavailable: "This session cannot be opened in this tool. Choose New task to open an empty form.",
     quotaCapacityReserved: "Capacity is temporarily in use. Please try again shortly.",
     startFailed: "Could not start {product}. Please try again.",

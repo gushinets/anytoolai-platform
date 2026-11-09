@@ -29,6 +29,7 @@ export const fr: Shape<typeof en> = {
     handoffFailed: "Impossible d’ouvrir l’étape suivante. Veuillez réessayer.",
   },
   errors: {
+    attachmentUnrecognized: "Impossible de restaurer cette session enregistrée. Réessayez ou choisissez « Nouvelle tâche » pour ouvrir un formulaire vide.",
     attachmentUnavailable: "Cette session ne peut pas être ouverte dans cet outil. Choisissez « Nouvelle tâche » pour ouvrir un formulaire vide.",
     quotaCapacityReserved: "La capacité est temporairement occupée. Réessayez dans un instant.",
     startFailed: "Impossible de démarrer {product}. Veuillez réessayer.",

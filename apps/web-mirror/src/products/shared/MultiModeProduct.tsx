@@ -64,7 +64,7 @@ export function MultiModeProduct<Id extends string, R>({
   const [locked, setLocked] = useState(false);
   const [attachSessionId, setAttachSessionId] = useState(initialAttachSessionId);
   // The server cannot read tab storage; both hydration renders must show the same loading view.
-  const [resolution, setResolution] = useState<"loading" | "ready" | "error" | "unavailable">("loading");
+  const [resolution, setResolution] = useState<"loading" | "ready" | "error" | "unavailable" | "identity-missing">("loading");
   const [attempt, setAttempt] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const focusFreshFormRef = useRef(false);
@@ -94,7 +94,7 @@ export function MultiModeProduct<Id extends string, R>({
       const target = modesRef.current.find((candidate) => candidate.definition.scenarioId === result.value.scenarioId);
       if (!target) {
         // A legacy response without identity cannot prove that the accepted session is invalid.
-        setResolution(result.value.scenarioId === undefined ? "error" : "unavailable");
+        setResolution(result.value.scenarioId === undefined ? "identity-missing" : "unavailable");
         return;
       }
       setModeId(target.id);
@@ -111,6 +111,11 @@ export function MultiModeProduct<Id extends string, R>({
       focusFreshFormRef.current = false;
     }
   }, [resolution, locked]);
+
+  function retryResolution() {
+    setResolution("loading");
+    setAttempt((previous) => previous + 1);
+  }
 
   const mode = modes.find((candidate) => candidate.id === modeId) ?? modes[0];
   return (
@@ -132,8 +137,12 @@ export function MultiModeProduct<Id extends string, R>({
         }}
       />
       {resolution === "loading" ? <p role="status">{th("loading", { product: t("title") })}</p> :
-        resolution === "unavailable" ? <Card className={styles.stack}>
-          <ErrorState message={th("errors.attachmentUnavailable")} embedded />
+        resolution === "unavailable" || resolution === "identity-missing" ? <Card className={styles.stack}>
+          <ErrorState
+            message={th(resolution === "identity-missing" ? "errors.attachmentUnrecognized" : "errors.attachmentUnavailable")}
+            onRetry={resolution === "identity-missing" ? retryResolution : undefined}
+            embedded
+          />
           <Button variant="secondary" onClick={() => {
             callSafely(onAttachDiscard);
             focusFreshFormRef.current = true;
@@ -141,10 +150,7 @@ export function MultiModeProduct<Id extends string, R>({
             setResolution("ready");
           }}>{th("workspace.newTask")}</Button>
         </Card> :
-        resolution === "error" ? <ErrorState message={th("errors.connectionLost")} onRetry={() => {
-          setResolution("loading");
-          setAttempt((previous) => previous + 1);
-        }} /> : <ProductRunPage
+        resolution === "error" ? <ErrorState message={th("errors.connectionLost")} onRetry={retryResolution} /> : <ProductRunPage
         key={mode.id}
         definition={mode.definition}
         client={client}

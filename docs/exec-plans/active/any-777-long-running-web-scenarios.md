@@ -7,7 +7,7 @@
 - Created: 2026-11-09
 - Last updated: 2026-11-09
 - Review date: 2026-11-09
-- Next action: Review the stale-attachment fix and its recorded Chrome MCP evidence.
+- Next action: Review the completed second-review fixes and validation evidence.
 - Blocker: None for this frontend fix; canonical frontend-check passed on 2026-11-09.
 
 ## Goal
@@ -46,6 +46,17 @@ SDK default; it does not use the web continuation behavior.
 No backend contract, provider policy, dependency or design-token changes are needed. A discarded
 attachment is only a local reference; this action neither cancels nor starts a backend execution.
 Missing scenario identity remains ambiguous, so it preserves the accepted session for retry.
+
+### Second review follow-up (authorized 2026-11-09)
+
+- [x] Keep successful identity-less session reads distinct from transport failures: preserve Retry and offer explicit New task using the existing discard operation in both multi-mode products.
+- [x] Cover persistent legacy responses, URL/storage/reload, newer-session preservation and zero-start recovery with product regressions; keep mode selection backend-owned.
+- [x] Supply the required scenario identity in the API enum-validation fixture and assert that the sole validation error concerns status.
+- [x] Run affected API/frontend checks and Chrome MCP legacy-response journeys with unchanged execution/quota counters.
+
+This is an explicit user choice to leave a saved session. Missing identity does not prove the
+session invalid, so it must never cause automatic discard, automatic generation or a guessed mode.
+Reuse the existing discard lifecycle and shared error card; no new storage or backend contract.
 
 ## Decision log
 
@@ -282,3 +293,46 @@ no regeneration, without inventing a quota charge. See
 
 All providers were deterministic fakes and storage was isolated SQLite. No paid provider or
 PostgreSQL concurrency run. No GitHub reply or PR edit was made in this follow-up.
+
+
+## Second review resolved — 2026-11-09
+
+Confirmed and fixed both non-blocking findings. A successful legacy snapshot without scenario
+identity now has a distinct resolution state: Retry reads the original session, and opt-in New
+task reuses the existing pre-boot discard to open an empty form. Transport failures keep their
+existing recovery behavior. Nothing guesses a mode, discards a reference automatically, starts
+execution or changes backend state. The shared implementation covers Client Update Writer and
+Acceptance Builder; the explanation is translated in all seven locales.
+
+Product regressions cover repeated identity-less 200 responses through URL and stored attachment,
+explicit exit, every mode, reload without reattachment, recovery when identity returns, and
+preservation/restoration of a newer accepted session. Six new legacy cases failed before the fix.
+The existing transient-recovery assertion now awaits Copy (the actual result), since New task
+is also available in the legacy error state.
+
+The API enum test supplies the required valid scenario_id and asserts its only error is the
+status enum. All nine tests in that API schema file pass. In an isolated mutation check, widening
+status to str makes this regression fail with DID NOT RAISE, proving that the missing fixture
+field no longer masks loss of enum validation. No backend production code changed.
+
+The initial canonical frontend-check timed out in the pre-existing SDK ESLint-config test under
+parallel load. The complete command passed with npm_config_workspace_concurrency=1, without
+changing tests or timeouts: 507 web, 336 SDK, 52 shared UI, 339 Atom Lab browser, 57 Atom Lab
+Node and six stakeholder-demo Node tests, workspace lint/typecheck, generated type drift and
+all production builds. Documentation validation and generated-docs check passed. Five Ruff
+findings already existed in the API test file on HEAD; a baseline comparison confirms none
+were introduced, and formatter changes are confined to old unrelated lines.
+
+Chrome MCP used real existing Prepaid Request and Check sessions with persistent scenario_id
+omission simulated only in isolated API middleware. Both products preserved their ID across
+two retries and reload, offered explicit exit to an empty form with keyboard focus/mode switching,
+and stayed fresh after another reload. Restoring identity allowed Retry and reload to show
+the exact original artifact in its original mode. No new start requests; final console checks
+were clean. DB counts remained sessions=10/jobs=10/action_runs=19/provider_calls=19/reservations=6;
+all quota rows were unchanged, with Acceptance Builder used=2/reserved=0/available=1 also checked
+through its real quota API. Client Update Writer has no configured quota policy.
+
+The browser harness used deterministic fakes and isolated SQLite. No paid provider or PostgreSQL
+concurrency run; no GitHub review comments, thread resolution or PR edit in this follow-up.
+
+[Legacy recovery and validation evidence](any-777-legacy-session-recovery-evidence.json).
