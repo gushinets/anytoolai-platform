@@ -1,3 +1,5 @@
+import { isRecord, isStringArray } from "../shared/resultGuards";
+
 // Backend schemas own validation; this boundary checks the fields and closed sets the UI consumes.
 export const CRITERIA = {
   skills_fit: "Skills fit",
@@ -23,37 +25,31 @@ export type TaskFinderResult = {
 };
 export const CRITERION_ORDER = Object.keys(CRITERIA) as Criterion[];
 
-function record(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 function member<T extends object>(set: T, value: unknown): value is keyof T & string {
   return typeof value === "string" && Object.hasOwn(set, value);
 }
 function score(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100;
 }
-function strings(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === "string");
-}
 
 export function parseTaskFinder(output: Record<string, unknown>): TaskFinderResult | null {
   const { comparison, match } = output;
-  if (!record(comparison) || !record(match) || !member(VERDICTS, comparison.verdict) ||
+  if (!isRecord(comparison) || !isRecord(match) || !member(VERDICTS, comparison.verdict) ||
       typeof comparison.rationale !== "string" || typeof match.overall_rationale !== "string" ||
-      !score(match.score) || !strings(match.strengths) || !strings(match.gaps) ||
+      !score(match.score) || !isStringArray(match.strengths) || !isStringArray(match.gaps) ||
       !Array.isArray(comparison.deltas) || comparison.deltas.length !== CRITERION_ORDER.length ||
       !Array.isArray(match.criterion_scores) || match.criterion_scores.length !== CRITERION_ORDER.length) {
     return null;
   }
   const deltas = new Map<Criterion, Delta>();
   for (const item of comparison.deltas) {
-    if (!record(item) || !member(CRITERIA, item.criterion_id) || deltas.has(item.criterion_id) ||
+    if (!isRecord(item) || !member(CRITERIA, item.criterion_id) || deltas.has(item.criterion_id) ||
         !member(STATUSES, item.status) || typeof item.evidence !== "string") return null;
     deltas.set(item.criterion_id, { criterionId: item.criterion_id, status: item.status, evidence: item.evidence });
   }
   const scores = new Map<Criterion, CriterionScore>();
   for (const item of match.criterion_scores) {
-    if (!record(item) || !member(CRITERIA, item.criterion_id) || scores.has(item.criterion_id) ||
+    if (!isRecord(item) || !member(CRITERIA, item.criterion_id) || scores.has(item.criterion_id) ||
         !score(item.score) || typeof item.rationale !== "string") return null;
     scores.set(item.criterion_id, { criterionId: item.criterion_id, score: item.score, rationale: item.rationale });
   }

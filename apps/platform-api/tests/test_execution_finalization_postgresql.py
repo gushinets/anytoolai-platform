@@ -61,6 +61,7 @@ from anytoolai_platform_core.workflows.repository import JobRepository
 from anytoolai_platform_core.workflows.runner import (
     SequentialWorkflowRunner,
     WorkflowJobService,
+    _recover_canceled_workflow_row_after_rollback,
     _recover_failed_workflow_row_after_rollback,
     _recover_succeeded_workflow_row_after_rollback,
 )
@@ -420,10 +421,12 @@ def test_competing_terminal_transactions_have_one_decision(runtime, winner):
         second.result(timeout=10)
     if winner != "failure":
         assert_meter(runtime, acceptance, ReservationState.consumed, 1, 0)
-        _recover_failed_workflow_row_after_rollback(
-            factory, replace(final.job, status=JobStatus.failed), failed_step=None
-        )
-        assert_meter(runtime, acceptance, ReservationState.consumed, 1, 0)
+        for recover, status in (
+            (_recover_failed_workflow_row_after_rollback, JobStatus.failed),
+            (_recover_canceled_workflow_row_after_rollback, JobStatus.canceled),
+        ):
+            recover(factory, replace(final.job, status=status), failed_step=None)
+            assert_meter(runtime, acceptance, ReservationState.consumed, 1, 0)
     else:
         assert_meter(runtime, acceptance, ReservationState.released, 0, 0)
         assert rows(factory, artifacts_table) == []

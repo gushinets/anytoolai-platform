@@ -42,33 +42,13 @@ from anytoolai_platform_core.workflows.models import JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
 from anytoolai_platform_worker.composition import build_worker
 
+from tests.action_inputs import extract_fields
 from tests.db_support import assert_scenario_runtime_correlation, provision_database
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "provider" / "fake_provider_outputs"
 pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
-
-_EXTRACT_FIELDS = [
-    {
-        "name": "deadline",
-        "type": "string",
-        "description": "Project deadline mentioned in the text.",
-        "required": True,
-    },
-    {
-        "name": "budget",
-        "type": "string",
-        "description": "Budget mentioned in the text.",
-        "required": False,
-    },
-    {
-        "name": "deliverables",
-        "type": "array_of_strings",
-        "description": "Deliverables mentioned in the text.",
-        "required": False,
-    },
-]
 
 
 @pytest.fixture
@@ -130,7 +110,7 @@ def _start_payload(**overrides: Any) -> dict[str, Any]:
         "guest_id": "guest_demo",
         "input": {
             "source_text": "deadline budget deliverables",
-            "fields": _EXTRACT_FIELDS,
+            "fields": extract_fields(),
             "strict": False,
         },
     }
@@ -299,7 +279,7 @@ def test_start_scenario_creates_session_and_linked_job(
     assert scenario is not None
     assert scenario.metadata["input"] == {
         "source_text": "deadline budget deliverables",
-        "fields": _EXTRACT_FIELDS,
+        "fields": extract_fields(),
         "strict": False,
     }
     assert scenario.current_checkpoint_id == PROCESSING_CHECKPOINT_ID

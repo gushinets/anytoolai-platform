@@ -283,14 +283,14 @@ product-owned. Code: `apps/web-mirror/src/i18n/` (library `use-intl`, imported o
 
 ### Recipe: translations for a new web product
 
-1. Create `products/<name>/messages/en.ts` (English is the semantic source: `title`,
+1. Create `products/<name>/messages/en.json` (English is the semantic source: `title`,
    `quotaRemaining` with `{remaining}`/`{limit}`, per-scope `submit`/`running`/`runFailed`, `fields`,
    `fieldNames`, and any product validation keys). Every scope also needs `resultTitle` (the
    result card heading, a noun for what the run produces), `placeholder` (shown before the first
    result) and `regenerate` (the submit label once a result is shown). Want a description under the
    title? Add `description` here and set `hasDescription: true` on the `ProductDefinition` -- the
    shared runtime only looks it up when the flag is set.
-2. Add `fr it de es ru pt` files typed `Shape<typeof en>`; use the typographic apostrophe `’` (a
+2. Add `fr it de es ru pt` JSON files with the same structure; use the typographic apostrophe `’` (a
    plain `'` before `{` starts ICU quoting); keep placeholders and plural categories. Keep
    product-owned vocabulary such as tone labels in the product's locale files. Reuse host keys
    for shared runtime conditions; handoff uses `errors.quotaCapacityReserved` for occupied capacity.
@@ -307,9 +307,11 @@ product-owned. Code: `apps/web-mirror/src/i18n/` (library `use-intl`, imported o
 ### Recipe: add a locale
 
 1. Add it to `LOCALE_NAMES` in `i18n/locales.ts` (endonym).
-2. TypeScript then requires an entry in every locale record: add `i18n/messages/<code>.ts`,
-   `app/homeMessages/<code>.ts`, `components/handoffMessages/<code>.ts` and
-   `products/*/messages/<code>.ts`, typed `Shape<typeof en>`, and register each in its bundle's index.
+2. TypeScript then requires an entry in every locale record: add `i18n/messages/<code>.json`,
+   `app/homeMessages/<code>.json`, `components/handoffMessages/<code>.json` and
+   `products/*/messages/<code>.json` and register each in its typed bundle index.
+   TypeScript checks required keys and value types; i18n tests compare exact structure and inspect
+   raw JSON for strict syntax and duplicate keys.
 3. Run `pnpm --filter @anytoolai/web-mirror test`; the parity, placeholder and ICU-syntax checks
    fail on any gap. No product runtime change is needed.
 

@@ -57,33 +57,13 @@ from anytoolai_platform_worker.queues import DatabaseJobQueue, WorkflowJobMessag
 from anytoolai_platform_worker.reconciliation import OrphanedRunningJobReconciler
 from anytoolai_platform_worker.worker import Worker
 
+from tests.action_inputs import extract_fields
 from tests.db_support import provision_database
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "provider" / "fake_provider_outputs"
 pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
-
-_EXTRACT_FIELDS = [
-    {
-        "name": "deadline",
-        "type": "string",
-        "description": "Project deadline mentioned in the text.",
-        "required": True,
-    },
-    {
-        "name": "budget",
-        "type": "string",
-        "description": "Budget mentioned in the text.",
-        "required": False,
-    },
-    {
-        "name": "deliverables",
-        "type": "array_of_strings",
-        "description": "Deliverables mentioned in the text.",
-        "required": False,
-    },
-]
 
 
 @pytest.fixture
@@ -1312,7 +1292,7 @@ def test_production_composed_worker_processes_real_runtime_path_end_to_end(
         session_factory,
         input_payload={
             "source_text": "deadline budget deliverables",
-            "fields": _EXTRACT_FIELDS,
+            "fields": extract_fields(),
             "strict": False,
         },
     )
@@ -1411,7 +1391,7 @@ def test_production_worker_recovers_scenario_completion_after_mark_completed_fai
         session_factory,
         input_payload={
             "source_text": "deadline budget deliverables",
-            "fields": _EXTRACT_FIELDS,
+            "fields": extract_fields(),
             "strict": False,
         },
     )
@@ -1571,7 +1551,7 @@ def test_production_worker_retries_scenario_reconciliation_on_subsequent_handle_
         session_factory,
         input_payload={
             "source_text": "deadline budget deliverables",
-            "fields": _EXTRACT_FIELDS,
+            "fields": extract_fields(),
             "strict": False,
         },
     )
@@ -1644,7 +1624,7 @@ def test_production_worker_cancellation_recovers_inflight_action_and_provider_le
         session_factory,
         input_payload={
             "source_text": "deadline budget deliverables",
-            "fields": _EXTRACT_FIELDS,
+            "fields": extract_fields(),
             "strict": False,
         },
     )
@@ -1751,7 +1731,7 @@ def test_production_worker_provider_failure_uses_generic_safe_message(
         session_factory,
         input_payload={
             "source_text": "deadline budget deliverables",
-            "fields": _EXTRACT_FIELDS,
+            "fields": extract_fields(),
             "strict": False,
         },
     )
@@ -1805,7 +1785,7 @@ def test_production_worker_provider_failure_preserves_claimed_job_recovery_state
         session_factory,
         input_payload={
             "source_text": "deadline budget deliverables",
-            "fields": _EXTRACT_FIELDS,
+            "fields": extract_fields(),
             "strict": False,
             "taxonomy": ["timeline", "scope"],
         },

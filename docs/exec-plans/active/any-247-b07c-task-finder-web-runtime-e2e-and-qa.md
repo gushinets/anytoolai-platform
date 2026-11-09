@@ -15,7 +15,9 @@ Deliver Task Finder through the shared web runtime with deterministic browser ev
 ## Scope
 Shared smoke infrastructure (TD-014); product fields, parser, renderer, seven locales, registration,
 unit and browser tests, runner command, optional CI workflow, documentation.
-No execution-kernel, atom, Provider Gateway, mapping DSL or handoff changes.
+The original feature excluded execution-kernel, atom, Provider Gateway, mapping DSL and handoff changes.
+The later authorized duplication follow-up also refactors shared workflow storage/recovery and
+architecture analysis without changing their contracts.
 
 ## Implementation steps
 - [x] Extract shared DB helpers, smoke configuration, runner preamble and CI workflow; verify four existing smokes.
@@ -87,7 +89,7 @@ The development database's previous anonymous volume had incompatible credential
 containers without deleting that volume gave the test stack a fresh database. The original data
 volume was preserved. Sanitized failure context was collected for the sudo-dependent baseline test.
 
-## Final outcome
+## Original delivery outcome
 
 Implementation complete on feature/ANY-247. The infrastructure extraction is commit 2f017cd1;
 the product implementation is a separate follow-up commit. No kernel, atom, provider gateway,
@@ -307,3 +309,139 @@ source/config changes. No additional unit-test rerun was needed.
 Full-check was not repeated for these frontend-only changes; the earlier sudo-dependent baseline
 failure remains documented. No commit, push or GitHub write was performed in this implementation
 turn. Structural dictionary CPD findings remain expected; no new Sonar analysis was requested.
+
+## Whole-project duplication inspection — 2026-11-09
+
+The user requested analysis across the monorepo as one project. This is a read-only code review;
+no additional implementation was authorized. The previous two dictionary cleanups did not solve
+the remaining structural CPD findings.
+
+Latest PR analysis: revision 27a6615a, 2026-11-09 14:46 UTC. New duplicated lines are 371 / 1,444
+(25.7%): Task Finder locale modules 336, home locale modules 28, and the newly inlined Client Update
+Writer tone entries 7. Queried duplicate-block details for all 21 affected files: three block groups,
+each matching the seven locale versions within its bundle. Smoke files have no new duplication.
+Sonar already compares the entire repository under a single project key; merging source folders
+or presenting the products as one project does not change these matches.
+
+Separately inspected all 967 file measures in the latest main analysis (72ff15bc, 2026-11-08 16:28
+UTC). This is baseline evidence, not the PR's new-code metric. Nonzero duplicated-line counts:
+- tests: 4,604 lines in 46 files;
+- translations: 2,071 lines in 49 files;
+- generated OpenAPI TypeScript: 2,004 lines in one file;
+- other source: 408 lines in nine files;
+- migrations: 346 lines in six files.
+These are analyzer counts, not a claim that every block is an actionable defect. Main and PR
+analyses are different revisions and must not be added together.
+
+Confirmed current-source cross-module reuse candidates:
+1. `_EXTRACT_FIELDS` has exactly equal parsed values in six modules: platform-worker's
+   `test_worker_boot.py` and `test_worker_claim_postgresql.py`; platform-api's
+   `test_composite_workflow_matrix.py` and `test_scenario_runtime_api.py`; platform-core's
+   `test_action_runner.py` and `test_workflow_runner.py`. A shared test fixture belongs in test
+   support, preserving independent mutable inputs for each test rather than sharing mutable state.
+2. Brief Decoder and Acceptance Builder parsers repeat `isRecord`, `isStringArray` and `isOneOf`.
+   Task Finder repeats the first two under `record` and `strings`. Shared structural guards can
+   serve these real callers; product-specific closed enums, ordering and copy contracts must stay
+   product-owned. `ce-kit/src/api/parsing.ts` has a different `isRecord` contract (allows arrays),
+   so importing it as a supposedly equivalent helper would weaken product validation.
+
+Generated OpenAPI code must remain generated; historical migrations must remain reproducible and
+must not import evolving runtime table definitions merely to remove duplicated column declarations.
+Neither is permission to add Sonar exclusions. Fixing the confirmed source/test candidates will not
+eliminate the 371 translation lines in the PR metric. Any further dictionary model change needs a
+separate concrete design consistent with the user's requirement to retain TypeScript. No new
+source/config edits, test runs, commit, push or GitHub writes were made during this inspection.
+
+## Approved resource direction and whole-project remediation design — 2026-11-09
+
+The user requested remediation of Sonar findings first and the other confirmed duplicates too,
+across the monorepo. They explicitly approved JSON for translated text with TypeScript contracts,
+superseding the earlier TS-only constraint. Analysis rules, gates and exclusions remain unchanged.
+The detailed optional JSON migration contract above now supplies the resource migration design.
+
+Execution order and boundaries:
+1. Convert all 56 remaining locale resources to JSON, preserving every effective value and the eight
+   existing named TypeScript bundle exports. Preserve comments explaining translation semantics in
+   bundle indexes/current documentation. Keep static imports and existing locale/provider APIs.
+   Strengthen current i18n tests with exact recursive structure and raw duplicate-key checks using
+   the already-installed TypeScript parser; no runtime parser/framework/dependency is added.
+2. Extract identical structural guards used by the three web product parsers into a product-shared
+   utility. Preserve rejection of arrays as records. Keep enum membership policy, criterion order,
+   schema-specific validation and rendering/copy semantics local. Do not silently substitute the
+   less strict ce-kit record guard.
+3. Replace the six identical `_EXTRACT_FIELDS` lists in API, worker and core tests with one shared
+   test-support function returning fresh mutable data. Do not share mutable state between tests.
+4. Consolidate job repository transitions through one private implementation parameterized by
+   required source status and target status, preserving atomic UPDATE predicates, validation,
+   idempotent replay, not-found errors and status-conflict failures. Preserve public methods.
+5. In workflow recovery, share the repeated decision to release an existing terminal reserved job
+   while preserving row locks, transaction ownership and distinct failure/cancellation recovery. The
+   Sonar main-line offsets point at recovery code, not error-message redaction; do not refactor an
+   unrelated sanitizer. For the JS scope resolver, share only the chronological/filtering
+   mechanics of write replay; keep possible-value and definite-presence reductions separate. Both
+   consumers are real and covered by the architecture validation tests; no general callback framework.
+6. Review remaining Sonar categories against current source before changing them. Tests can reuse
+   setup/fixtures and parameterize genuinely identical cases, never delete independent assertions
+   merely to reduce the counter. Generated TypeScript is changed only through its source generator
+   or canonical OpenAPI definitions when the representation can safely improve. Historical migration
+   table declarations and independent SDK/runtime representations are not blindly merged: immutable
+   migration history, schema compatibility, dataclass/Pydantic behavior and package boundaries take
+   precedence over eliminating every textual match. Record any justified remaining match explicitly.
+
+Validation: compare before/after messages, all web tests, typecheck/lint/build, generated docs/types
+checks, all five product smokes after resource migration, focused Python/JS regression tests for
+changed helpers, and PostgreSQL-backed transition tests with an explicitly provisioned test DB.
+Use the canonical repository runners where applicable. Do not accept skipped DB tests as evidence.
+Run broader gates after focused checks; document existing environment failures honestly.
+No claim of a green Sonar gate until a new remote analysis. Commit/push/GitHub writes still require
+explicit authorization. The broad baseline inventory is a prioritization source, not proof that all
+9,433 baseline duplicated lines are defects or safe to mechanically refactor.
+
+
+## Implemented JSON resources and shared logic — 2026-11-09
+
+- Migrated all 56 dictionaries (eight bundles, seven locales) to JSON. An exact before/after
+  comparison verified every effective key and string. Named TypeScript exports, locale records,
+  required-key/value typing, fallback, ICU validation and product ownership remain intact.
+  Added strict JSON, repeated/escaped key and exact recursive structure checks; documented the
+  JSON/TypeScript contract and retained translation guidance in bundle indexes.
+- Shared structural guards now serve Brief Decoder, Acceptance Builder and Task Finder without
+  weakening array rejection, product enums or result ordering. All 481 web tests, ESLint and
+  TypeScript checks passed.
+- Replaced six copied A01 field definitions with a fresh-data helper. Also updated the seventh
+  consumer in worker lease recovery, which previously imported another test module's constant.
+  The isolation regression passed. Initial runs caught a missing import and the seventh consumer;
+  both are fixed and their affected suites were rerun.
+- Consolidated job transitions and failure normalization while preserving public methods,
+  source-state UPDATE predicates, idempotent replay and conflict errors. Added regression coverage
+  for created/running source states and replay; all nine JobRepository cases passed on PostgreSQL.
+- Shared the terminal reserved-job recovery decision. Both failure and cancellation recovery are
+  exercised against a competing successful commit, preserving consumed quota. The API/finalization
+  and new transition regression run passed 73 tests; the expanded competing-transaction cases
+  passed separately. The other changed backend suites passed 158 tests in the initial combined run.
+  Worker lease recovery passed all five tests, including an actual SIGTERM subprocess.
+- Shared write-replay iteration in the JS analyzer while retaining its distinct value/presence
+  reductions. Architecture regression matrix: 242 passed; import-validator/helper checks: 27 passed.
+- All five browser suites passed after migration: ProposalAI 10, Client Update Writer 4,
+  Brief Decoder 8, Acceptance Builder 11 and Task Finder 7. Each ran against a production web build
+  and the local API/worker/PostgreSQL stack. Generated documentation and OpenAPI types are current;
+  config, architecture and documentation validators passed. No Sonar settings or exclusions changed.
+
+Environment: LiteLLM's remote model-cost fetch intermittently timed out during import, including
+in a worker subprocess. The verification commands use its supported
+`LITELLM_LOCAL_MODEL_COST_MAP=True` option to load the installed table. This is a command-local
+setting, not a source/dependency/config change or skipped check. The canonical baseline rerun
+completed: 3,576 passed, 12 skipped, 657 deselected, one warning and one failure. The sole failure
+is the unchanged activation-marker permission test: `sudo: interactive authentication is required`.
+No baseline assertion, skip or host privilege policy was changed. The broader full-check wrapper
+therefore remains blocked by its baseline stage; affected frontend and PostgreSQL checks passed
+separately as recorded above. The development containers were stopped with volumes preserved.
+Existing Ruff findings remain outside this refactor; comparison against HEAD found no added
+findings after wrapping the modified long input lines.
+
+Remaining intentional matches: generated OpenAPI declarations remain generator-owned; historical
+migration declarations remain immutable; provider request and SDK/runtime event representations
+retain their different contracts and package boundaries. Independent test assertions are retained.
+These categories are not exclusions, and this work does not claim that every baseline textual match
+has disappeared. A new remote Sonar analysis is still required to establish the PR metric and gate.
+No commit, push or GitHub write was performed for this follow-up.

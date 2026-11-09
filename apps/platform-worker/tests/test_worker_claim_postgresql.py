@@ -52,32 +52,14 @@ from anytoolai_platform_worker.queues import DatabaseJobQueue
 from anytoolai_platform_worker.worker import Worker
 from sqlalchemy.engine import URL
 from sqlalchemy.orm import Session, sessionmaker
+
+from tests.action_inputs import extract_fields
 from tests.db_support import provision_database
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "provider" / "fake_provider_outputs"
 _UNSAFE_PROVIDER_TEXT = "unsafe internal provider text secret_token=should-not-persist"
-_EXTRACT_FIELDS = [
-    {
-        "name": "deadline",
-        "type": "string",
-        "description": "Project deadline mentioned in the text.",
-        "required": True,
-    },
-    {
-        "name": "budget",
-        "type": "string",
-        "description": "Budget mentioned in the text.",
-        "required": False,
-    },
-    {
-        "name": "deliverables",
-        "type": "array_of_strings",
-        "description": "Deliverables mentioned in the text.",
-        "required": False,
-    },
-]
 
 pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
 
@@ -593,7 +575,7 @@ def test_two_postgresql_workers_claim_one_job_success_once(
             seed_factory,
             input_payload={
             "source_text": "deadline budget deliverables",
-            "fields": _EXTRACT_FIELDS,
+            "fields": extract_fields(),
             "strict": False,
         },
         )
@@ -718,7 +700,7 @@ def test_two_postgresql_workers_claim_one_job_failure_once(
             seed_factory,
             input_payload={
             "source_text": "deadline budget deliverables",
-            "fields": _EXTRACT_FIELDS,
+            "fields": extract_fields(),
             "strict": False,
         },
         )

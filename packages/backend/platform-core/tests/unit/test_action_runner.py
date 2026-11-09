@@ -18,8 +18,8 @@ from action_runner import (
     GapRewritesCountMismatchThenValidAdapter,
     GenericExecutor,
     InvalidStructuredOutputAdapter,
-    ScoreMultidimensionalAxesDominantMismatchThenValidAdapter,
     ScoreMatchByRubricAggregateMismatchThenValidAdapter,
+    ScoreMultidimensionalAxesDominantMismatchThenValidAdapter,
     SynthesizeAngleOutOfOptionsThenValidAdapter,
     SynthesizeAngleSecondaryOutOfOptionsThenValidAdapter,
 )
@@ -67,33 +67,13 @@ from anytoolai_platform_core.storage.transactions import (
 )
 from anytoolai_platform_core.structured_output.errors import StructuredOutputValidationError
 
+from tests.action_inputs import extract_fields
 from tests.db_support import provision_database
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "provider" / "fake_provider_outputs"
 pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
-
-_EXTRACT_FIELDS = [
-    {
-        "name": "deadline",
-        "type": "string",
-        "description": "Project deadline mentioned in the text.",
-        "required": True,
-    },
-    {
-        "name": "budget",
-        "type": "string",
-        "description": "Budget mentioned in the text.",
-        "required": False,
-    },
-    {
-        "name": "deliverables",
-        "type": "array_of_strings",
-        "description": "Deliverables mentioned in the text.",
-        "required": False,
-    },
-]
 
 
 @pytest.fixture
@@ -190,7 +170,7 @@ def test_action_runner_executes_extract_structured_fields_and_persists_context(
             runner.run(
                 "text.extract_structured_fields",
                 "kernel_demo.extract_structured_fields_v1",
-                {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS},
+                {"source_text": "deadline budget deliverables", "fields": extract_fields()},
                 _context(
                     step_id="extract",
                     action_type="text.extract_structured_fields",
@@ -1323,7 +1303,7 @@ def test_action_runner_marks_failed_on_provider_failure(
                 runner.run(
                     "text.extract_structured_fields",
                     "kernel_demo.extract_structured_fields_v1",
-                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS},
+                    {"source_text": "deadline budget deliverables", "fields": extract_fields()},
                     _context(
                         step_id="extract",
                         action_type="text.extract_structured_fields",
@@ -1361,7 +1341,7 @@ def test_action_runner_persists_failed_state_when_exception_escapes_transaction_
                 runner.run(
                     "text.extract_structured_fields",
                     "kernel_demo.extract_structured_fields_v1",
-                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS},
+                    {"source_text": "deadline budget deliverables", "fields": extract_fields()},
                     _context(
                         step_id="extract",
                         action_type="text.extract_structured_fields",
@@ -1405,7 +1385,7 @@ def test_action_runner_persists_succeeded_state_when_later_failure_rolls_back_tr
                 runner.run(
                     "text.extract_structured_fields",
                     "kernel_demo.extract_structured_fields_v1",
-                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS},
+                    {"source_text": "deadline budget deliverables", "fields": extract_fields()},
                     _context(
                         step_id="extract",
                         action_type="text.extract_structured_fields",
@@ -1442,7 +1422,7 @@ def test_action_recovery_rerun_does_not_duplicate_recovered_events(
                 runner.run(
                     "text.extract_structured_fields",
                     "kernel_demo.extract_structured_fields_v1",
-                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS},
+                    {"source_text": "deadline budget deliverables", "fields": extract_fields()},
                     _context(
                         step_id="extract",
                         action_type="text.extract_structured_fields",
@@ -1488,7 +1468,7 @@ def test_action_runner_persists_failed_state_when_cancellation_escapes_transacti
                 runner.run(
                     "text.extract_structured_fields",
                     "kernel_demo.extract_structured_fields_v1",
-                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS},
+                    {"source_text": "deadline budget deliverables", "fields": extract_fields()},
                     _context(
                         step_id="extract",
                         action_type="text.extract_structured_fields",
@@ -1615,7 +1595,7 @@ def test_action_runner_allows_executor_responses_without_provider_call(
             runner.run(
                 "text.extract_structured_fields",
                 "kernel_demo.extract_structured_fields_v1",
-                {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS},
+                {"source_text": "deadline budget deliverables", "fields": extract_fields()},
                 _context(
                     step_id="extract",
                     action_type="text.extract_structured_fields",
@@ -1676,7 +1656,7 @@ def test_action_runner_ignores_non_structured_output_artifact_id_from_executor_m
             runner.run(
                 "text.extract_structured_fields",
                 "kernel_demo.extract_structured_fields_v1",
-                {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS},
+                {"source_text": "deadline budget deliverables", "fields": extract_fields()},
                 _context(
                     step_id="extract",
                     action_type="text.extract_structured_fields",
@@ -1703,7 +1683,7 @@ def test_action_runner_does_not_link_failed_action_to_debug_raw_artifact(
                 runner.run(
                     "text.extract_structured_fields",
                     "kernel_demo.extract_structured_fields_v1",
-                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS},
+                    {"source_text": "deadline budget deliverables", "fields": extract_fields()},
                     _context(
                         step_id="extract",
                         action_type="text.extract_structured_fields",
@@ -1810,7 +1790,7 @@ def test_action_runner_rejects_missing_workflow_version_before_creating_action_r
                 runner.run(
                     "text.extract_structured_fields",
                     "kernel_demo.extract_structured_fields_v1",
-                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS},
+                    {"source_text": "deadline budget deliverables", "fields": extract_fields()},
                     _context(
                         step_id="extract",
                         action_type="text.extract_structured_fields",

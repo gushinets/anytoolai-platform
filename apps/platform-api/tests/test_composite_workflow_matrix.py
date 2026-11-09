@@ -32,38 +32,19 @@ from anytoolai_platform_core.storage.transactions import (
 from anytoolai_platform_core.workflows.models import JobStatus
 from anytoolai_platform_worker.composition import build_worker
 from test_atom_runtime_matrix import (
-    ATOM_MATRIX,
     _EXPECTED_EVENT_TYPES,
+    ATOM_MATRIX,
     _fixture_response_json,
 )
 from test_scenario_runtime_api import CONFIG_ROOT, FIXTURE_ROOT, _create_test_app, _request
 
+from tests.action_inputs import extract_fields
 from tests.db_support import provision_database
 
 # Deliberately NOT a module-level pytestmark: test_composite_workflow_matrix_reports_three_of_three
 # below does no DB I/O and must keep running under quick-check's "not slow" pytest subset -- only
 # the parametrized DB-backed test needs postgresql/slow (mirrors test_atom_runtime_matrix.py).
 
-_EXTRACT_FIELDS = [
-    {
-        "name": "deadline",
-        "type": "string",
-        "description": "Project deadline mentioned in the text.",
-        "required": True,
-    },
-    {
-        "name": "budget",
-        "type": "string",
-        "description": "Budget mentioned in the text.",
-        "required": False,
-    },
-    {
-        "name": "deliverables",
-        "type": "array_of_strings",
-        "description": "Deliverables mentioned in the text.",
-        "required": False,
-    },
-]
 
 _ACTION_EVENT_TYPES = ("action.started", "action.succeeded")
 
@@ -116,7 +97,7 @@ COMPOSITE_MATRIX: tuple[CompositeCase, ...] = (
         expected_output_schema_ref="kernel.schemas.generate_document_output_v1",
         start_input={
             "source_text": "We need this soon.",
-            "fields": _EXTRACT_FIELDS,
+            "fields": extract_fields(),
             "strict": False,
         },
         expected_steps=(

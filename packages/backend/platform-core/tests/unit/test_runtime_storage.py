@@ -1000,6 +1000,35 @@ def test_job_repository_failed_transition_completes_safe_terminal_contract(
     assert failed.error_message_safe == "Workflow execution failed."
 
 
+@pytest.mark.parametrize("from_created", [False, True])
+def test_job_failure_transition_preserves_source_state_and_idempotent_replay(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session], from_created: bool,
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        scenario_session = ScenarioSessionRepository(session).create(make_scenario_session())
+        repository = JobRepository(session)
+        transition = (
+            repository.mark_failed_from_created if from_created else repository.mark_failed
+        )
+        source = repository.create(make_job(scenario_session.id))
+        wrong_source = repository.create(make_job(scenario_session.id))
+        if from_created:
+            wrong_source = repository.claim_created(wrong_source.id)
+        else:
+            source = repository.claim_created(source.id)
+        assert source is not None and wrong_source is not None
+
+        with pytest.raises(RuntimeError, match="cannot transition"):
+            transition(wrong_source)
+        assert repository.get(wrong_source.id) == wrong_source
+
+        failed = transition(source)
+        replayed = transition(replace(source, error_message_safe="must not overwrite"))
+        assert replayed == failed
+        assert failed.status is JobStatus.failed
+        assert failed.error_message_safe == "Workflow execution failed."
+
+
 def test_job_repository_mark_succeeded_requires_valid_result_artifact(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
