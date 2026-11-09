@@ -1242,6 +1242,8 @@ export interface components {
             job_id: string | null;
             /** Result Artifact Id */
             result_artifact_id?: string | null;
+            /** Scenario Id */
+            scenario_id: string;
             /** Scenario Session Id */
             scenario_session_id: string;
             status: components["schemas"]["ScenarioSessionStatus"];
@@ -3197,6 +3199,7 @@ export interface operations {
                      *       "current_checkpoint_id": "result_ready",
                      *       "job_id": "job_123",
                      *       "result_artifact_id": "artifact_123",
+                     *       "scenario_id": "kernel_demo.single_action_smoke_v1",
                      *       "scenario_session_id": "scenario_session_123",
                      *       "status": "completed"
                      *     }
@@ -3264,6 +3267,7 @@ export interface operations {
                      *       "current_checkpoint_id": "result_ready",
                      *       "job_id": "job_123",
                      *       "result_artifact_id": "artifact_123",
+                     *       "scenario_id": "kernel_demo.single_action_smoke_v1",
                      *       "scenario_session_id": "scenario_session_123",
                      *       "status": "completed"
                      *     }

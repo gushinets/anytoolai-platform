@@ -97,8 +97,7 @@ export type AcceptanceBuilderProductProps = AttachProps & {
   visitId?: string;
 };
 
-/** One `ProductDefinition` per mode. An attached session (an accepted Brief Decoder handoff) is
- * always a `draft_v1` run, so only draft mode receives it. */
+/** One definition per mode; the backend session identity selects the restored mode. */
 export function AcceptanceBuilderProduct({ client, onEvent, visitId, ...attach }: AcceptanceBuilderProductProps) {
   const t = useProductT();
   return (
@@ -113,7 +112,6 @@ export function AcceptanceBuilderProduct({ client, onEvent, visitId, ...attach }
         { id: "check", label: t("modes.check"), definition: checkDefinition },
       ]}
       {...attach}
-      attachModeId="draft"
     />
   );
 }

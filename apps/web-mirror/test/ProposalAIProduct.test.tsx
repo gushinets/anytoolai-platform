@@ -1,6 +1,8 @@
 // ProposalAI's own meaning only -- fields and their validation copy, the mapping to
 // `proposal_ai.generate_input_v1`, the canonical `text` field, and the `copy_result`
 // activation. The shared runtime behavior it rides on is proven in ProductRunPage.test.tsx.
+import type { PlatformApiClient } from "@anytoolai/ce-kit";
+import { useAttachSession, readAttachSessionId } from "../src/products/runtime/attachSession";
 import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProposalAIProduct, proposalAiDefinition } from "../src/products/proposalAi/ProposalAIProduct";
@@ -29,6 +31,7 @@ const PROPOSAL_TEXT = "Dear client, here is my proposal.";
 afterEach(() => {
   cleanup();
   window.localStorage.clear();
+  window.sessionStorage.clear();
 });
 
 beforeEach(() => {
@@ -449,4 +452,36 @@ describe("ProposalAI product definition", () => {
     await waitFor(() => expect(screen.getByText(PROPOSAL_TEXT)).toBeTruthy());
     expect(screen.queryByRole("region", { name: "Not covered by your experience" })).toBeNull();
   });
+});
+
+function AttachedProposalAIProduct({ client, sessionId }: { client: PlatformApiClient; sessionId?: string }) {
+  const attach = useAttachSession("proposal_ai", sessionId);
+  return <ProposalAIProduct client={client} {...attach} />;
+}
+
+it.each([false, true])("restores an accepted session and reloads without another start (poll recovery=%s)", async (recover) => {
+  const { client, calls } = makeClient({
+    [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
+    [ROUTES.RESULT]: Array.from({ length: 2 }, () => resultResponse(IDS, { output: { text: PROPOSAL_TEXT } })),
+    [ROUTES.RUNTIME_CONFIG]: Array.from({ length: 2 }, () => runtimeConfigResponse(IDS)),
+    [ROUTES.QUOTA]: Array.from({ length: 4 }, () => quotaResponse(IDS, { used_count: 1, remaining_count: 2 })),
+    [ROUTES.SESSION]: [
+      ...(recover ? [errorResponse(503, "internal_error")] : []),
+      sessionResponse(), sessionResponse(),
+    ],
+  });
+  const first = render(<AttachedProposalAIProduct client={client} sessionId="session_1" />);
+  if (recover) {
+    fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
+  }
+  await screen.findByRole("button", { name: "New task" });
+  expect(readAttachSessionId("proposal_ai")).toBe("session_1");
+  first.unmount();
+  render(<AttachedProposalAIProduct client={client} />);
+  await screen.findByRole("button", { name: "New task" });
+  expect(calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(recover ? 3 : 2);
+  expect(calls.some((call) => call.key.endsWith("/start"))).toBe(false);
+  expect(screen.getByText(/2 of 3/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "New task" }));
+  expect(readAttachSessionId("proposal_ai")).toBeUndefined();
 });

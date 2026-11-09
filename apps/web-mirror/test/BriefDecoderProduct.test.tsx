@@ -2,6 +2,8 @@
 // contract's copy composition, and the activation rule (`web.result_viewed` only for a non-empty
 // question list). Shared runtime behavior is proven once in ProductRunPage.test.tsx. Results are
 // composed from the on-disk fake-provider fixtures exactly as the backend bundle test composes them.
+import type { PlatformApiClient } from "@anytoolai/ce-kit";
+import { useAttachSession, readAttachSessionId } from "../src/products/runtime/attachSession";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -80,6 +82,7 @@ function composedOutput(suffix: "" | ".weak_input" | ".no_issues"): Record<strin
 afterEach(() => {
   cleanup();
   window.localStorage.clear();
+  window.sessionStorage.clear();
 });
 
 beforeEach(() => {
@@ -381,4 +384,39 @@ describe("Brief Decoder page", () => {
     await decode({ ...routes(composedOutput("")), [ROUTES.START]: [errorResponse(429, "quota_exhausted")] });
     expect(await screen.findByText(/used all your/)).toBeTruthy();
   });
+});
+
+function AttachedBriefDecoderProduct({ client, sessionId }: { client: PlatformApiClient; sessionId?: string }) {
+  const attach = useAttachSession("brief_decoder", sessionId);
+  return <BriefDecoderProduct client={client} {...attach} />;
+}
+
+it.each([false, true])("restores an accepted session and reloads without another start (poll recovery=%s)", async (recover) => {
+  const queues = {
+    ...routes(composedOutput(".no_issues")),
+    [ROUTES.RESULT]: Array.from({ length: 2 }, () => resultResponse(IDS, { output: composedOutput(".no_issues") })),
+  };
+  const { client, calls } = makeClient({
+    ...queues,
+    [ROUTES.RUNTIME_CONFIG]: Array.from({ length: 2 }, () => runtimeConfigResponse(IDS)),
+    [ROUTES.QUOTA]: Array.from({ length: 4 }, () => quotaResponse(IDS, { used_count: 1, remaining_count: 2 })),
+    [ROUTES.SESSION]: [
+      ...(recover ? [errorResponse(503, "internal_error")] : []),
+      sessionResponse(), sessionResponse(),
+    ],
+  });
+  const first = render(<AttachedBriefDecoderProduct client={client} sessionId="session_1" />);
+  if (recover) {
+    fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
+  }
+  await screen.findByRole("button", { name: "New task" });
+  expect(readAttachSessionId("brief_decoder")).toBe("session_1");
+  first.unmount();
+  render(<AttachedBriefDecoderProduct client={client} />);
+  await screen.findByRole("button", { name: "New task" });
+  expect(calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(recover ? 3 : 2);
+  expect(calls.some((call) => call.key.endsWith("/start"))).toBe(false);
+  expect(screen.getByText(/2 of 3/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "New task" }));
+  expect(readAttachSessionId("brief_decoder")).toBeUndefined();
 });

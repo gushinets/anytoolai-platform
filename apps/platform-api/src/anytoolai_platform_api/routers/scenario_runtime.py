@@ -46,6 +46,7 @@ START_RESPONSE_EXAMPLE = {
 }
 
 SESSION_RESPONSE_EXAMPLE = {
+    "scenario_id": "kernel_demo.single_action_smoke_v1",
     "scenario_session_id": "scenario_session_123",
     "job_id": "job_123",
     "status": "completed",
@@ -395,6 +396,7 @@ def _start_response_payload(snapshot: ScenarioSessionSnapshot) -> dict[str, obje
 def _session_response_payload(snapshot: ScenarioSessionSnapshot) -> dict[str, object]:
     payload = _start_response_payload(snapshot)
     payload["current_checkpoint_id"] = snapshot.current_checkpoint_id
+    payload["scenario_id"] = snapshot.scenario_id
     return payload
 
 

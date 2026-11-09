@@ -2424,6 +2424,10 @@
             ],
             "title": "Result Artifact Id"
           },
+          "scenario_id": {
+            "title": "Scenario Id",
+            "type": "string"
+          },
           "scenario_session_id": {
             "title": "Scenario Session Id",
             "type": "string"
@@ -2434,6 +2438,7 @@
         },
         "required": [
           "scenario_session_id",
+          "scenario_id",
           "job_id",
           "status"
         ],
@@ -5513,6 +5518,7 @@
                   "current_checkpoint_id": "result_ready",
                   "job_id": "job_123",
                   "result_artifact_id": "artifact_123",
+                  "scenario_id": "kernel_demo.single_action_smoke_v1",
                   "scenario_session_id": "scenario_session_123",
                   "status": "completed"
                 },
@@ -5602,6 +5608,7 @@
                   "current_checkpoint_id": "result_ready",
                   "job_id": "job_123",
                   "result_artifact_id": "artifact_123",
+                  "scenario_id": "kernel_demo.single_action_smoke_v1",
                   "scenario_session_id": "scenario_session_123",
                   "status": "completed"
                 },

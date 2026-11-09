@@ -725,6 +725,7 @@ class ScenarioRuntimeService:
         )
         return ScenarioSessionSnapshot(
             scenario_session_id=session.id,
+            scenario_id=session.scenario_id,
             job_id=None if job is None else job.id,
             status=resolve_effective_status(session=session, job=job),
             allowed_next_actions=checkpoint_state.allowed_next_actions,

@@ -309,6 +309,15 @@ def test_mode_happy_path_produces_the_deterministic_fixture_result(
         )
     ).json()
 
+    queued = asyncio.run(request_platform_api(
+        app, "GET", f"/v1/scenario-sessions/{started['scenario_session_id']}",
+        request_id=REQUEST_ID,
+    ))
+    assert queued.status_code == HTTPStatus.OK
+    assert queued.json()["scenario_id"] == scenario_id
+    assert queued.json()["status"] == "started"
+    assert queued.json()["result_artifact_id"] is None
+
     worker = build_worker(
         session_factory=session_factory,
         config_root=CONFIG_ROOT,
@@ -335,6 +344,7 @@ def test_mode_happy_path_produces_the_deterministic_fixture_result(
     )
     assert session_response.status_code == HTTPStatus.OK
     session_body = session_response.json()
+    assert session_body["scenario_id"] == scenario_id
     assert session_body["status"] == "completed"
     assert session_body["current_checkpoint_id"] == RESULT_READY_CHECKPOINT_ID
     assert session_body["allowed_next_actions"] == ["copy_result"]
