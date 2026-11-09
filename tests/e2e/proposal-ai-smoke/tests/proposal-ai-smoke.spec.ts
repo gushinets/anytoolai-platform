@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { Client as PgClient } from "pg";
+import { countEvents as countBackendEvents } from "@anytoolai/smoke-support";
 
 /**
  * ANY-243 browser-evidence smoke: proves the ProposalAI web vertical end to end against a real
@@ -76,24 +76,6 @@ async function fillValidForm(page: Page): Promise<void> {
 async function submitAndWaitForResult(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Generate proposal" }).click();
   await expect(page.getByRole("button", { name: "Copy" })).toBeVisible({ timeout: 30_000 });
-}
-
-/** Queries the real `event_log` table directly -- the acceptance criterion is that the backend,
- * not just the browser, recorded this event for this specific run; ANY-17's own generic backend
- * tests prove the endpoint works in isolation, not that this vertical's E2E run actually persisted
- * it. `DATABASE_URL` is dev-up's own Postgres, host-reachable via its published compose port. */
-async function countBackendEvents(eventType: string, scenarioSessionId: string): Promise<number> {
-  const client = new PgClient({ connectionString: process.env.DATABASE_URL });
-  await client.connect();
-  try {
-    const result = await client.query<{ count: number }>(
-      "SELECT count(*)::int AS count FROM platform.event_log WHERE event_type = $1 AND scenario_session_id = $2",
-      [eventType, scenarioSessionId],
-    );
-    return result.rows[0]!.count;
-  } finally {
-    await client.end();
-  }
 }
 
 test.describe("ProposalAI web product", () => {

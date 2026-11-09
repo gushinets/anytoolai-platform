@@ -4925,3 +4925,33 @@ def test_automated_python_installs_check_locks_and_use_shared_build_config():
                 assert "uv run --no-sync " in line, (relative, line)
             if "uv pip install " in line:
                 assert "--config-file infra/python/uv-build.toml" in line, (relative, line)
+
+
+@pytest.mark.parametrize(
+    ("command", "port", "code"),
+    [("proposal_ai", 3100, "PAS"), ("client_update_writer", 3200, "CUS"),
+     ("brief_decoder", 3300, "BDS"), ("acceptance_builder", 3400, "ABS")],
+)
+def test_product_smoke_preserves_command_configuration(monkeypatch, command, port, code):
+    runner = load_runner_module()
+    calls = []
+    monkeypatch.setattr(runner, "runtime_identity", lambda: SimpleNamespace(api_url="http://api", database_url="postgresql://test"))
+    monkeypatch.setattr(runner, "_check_ports_available", lambda *args: True)
+    monkeypatch.setattr(runner, "run_with_env", lambda *args: 0)
+    monkeypatch.setattr(runner, "_serve_web_mirror_and_run_smoke", lambda **kwargs: calls.append(kwargs) or 0)
+    assert getattr(runner, f"{command}_smoke")() == 0
+    assert calls[0]["web_mirror_port"] == port
+    assert calls[0]["readiness_error_code"] == f"{code}002"
+    assert calls[0]["smoke_pnpm_filter"] == f"@anytoolai/{command.replace('_', '-')}-smoke"
+    assert calls[0]["env"]["PLATFORM_API_BASE_URL"] == "http://api"
+    assert calls[0]["smoke_extra_env"]["DATABASE_URL"] == "postgresql://test"
+
+
+@pytest.mark.parametrize("failure", ["port", "build"])
+def test_product_smoke_does_not_launch_after_preflight_failure(monkeypatch, failure):
+    runner = load_runner_module()
+    monkeypatch.setattr(runner, "runtime_identity", lambda: SimpleNamespace(api_url="http://api"))
+    monkeypatch.setattr(runner, "_check_ports_available", lambda *args: failure != "port")
+    monkeypatch.setattr(runner, "run_with_env", lambda *args: 7)
+    monkeypatch.setattr(runner, "_serve_web_mirror_and_run_smoke", lambda **kwargs: pytest.fail("must not serve"))
+    assert runner.proposal_ai_smoke() == (1 if failure == "port" else 7)
