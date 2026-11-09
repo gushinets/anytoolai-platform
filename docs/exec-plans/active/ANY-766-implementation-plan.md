@@ -1,6 +1,6 @@
 # ANY-766 — Portal–Kernel Paid Execution Integration
 
-Status: **STEPS 1–2 COMPLETE; production declarations/bindings implemented; paid runtime integration and later gates remain**
+Status: **STEPS 1–3 COMPLETE; production declarations/bindings and immutable purchased quantities implemented; paid runtime integration and later gates remain**
 
 Date: **2026-11-09**
 
@@ -8,10 +8,10 @@ Issue: [ANY-766](https://linear.app/paveldik/issue/ANY-766)
 
 - State: active
 - Owner: mixed — Portal and Kernel execution owners
-- Last updated: 2026-11-09
-- Review date: 2026-11-09
-- Next action: Step 3 immutable production allowance terms, only when separately requested. Steps 3–14 have not been executed.
-- Blocker: none for completed Steps 1–2. Sales, live-proof, staging and production conditions apply only to their dependent actions under Section 3.8. The inherited broader Kernel permission-test limitation remains recorded below.
+- Last updated: 2026-11-10
+- Review date: 2026-11-10
+- Next action: Step 4 scoped session delegation, only when separately requested. Steps 4–14 have not been executed.
+- Blocker: none for completed Steps 1–3. A fresh PostgreSQL review rerun remains BLOCKED pending explicit authorization to start the local test container; the recorded passing 68/115 reports remain existing evidence. Sales, live-proof, staging and production conditions apply only to their dependent actions under Section 3.8. The inherited broader Kernel permission-test limitation remains recorded below.
 
 This replaces the previous proposal completely. PLAN-1 through PLAN-5 are addressed below.
 
@@ -713,6 +713,166 @@ plan copies byte for byte and retain all recorded verification limits.
 
 ### Step 3 — Publish and accept purchased quantities
 
+#### Step 3 execution checkpoint — 2026-11-09
+
+**Result: COMPLETE within publication, immutable acceptance and pre-consent UI scope.**
+Only Step 3 was executed. Starting/current HEADs remain Portal
+`338edf22fbdc9101f25039b49e3a060b87ba32c4` and Kernel
+`b9b6c78bf524a613496f1053278c074c4c4554cc`, both on local `ANY-766` branches,
+plus this uncommitted diff. Both working trees and indexes were clean initially.
+No staging, commit, push, branch change, real association publication, sales
+enablement, live LBX call or application-database migration was performed.
+
+Implemented:
+
+- The existing protected CLI requires `--metric-key`, `--unit` and
+  `--allowance-quantity` for dry-run/publication. `--quantity` retains its LBX
+  commercial service meaning. The shared exact technical-offer value type lives
+  in Catalog, avoiding a Catalog dependency on Purchases. Strict integer bounds
+  remain 0…2^53−1; bool, float, string, negative and overflowing quantities fail.
+- `product-link-v3` pins one fixed-per-cycle technical offer in the existing
+  immutable mapping table. Publication validates fresh enabled product/metric
+  ownership/unit and the selected LBX offer through existing source clients.
+  Configured terms require configured Kernel/LBX provenance. OS principal,
+  source deadlines, product-head CAS, offer ownership, history, no-op publication
+  and uncertain-commit recovery remain on their original paths.
+- `purchased-technical-terms:v2` and `accepted-purchase:v3` pin configured terms,
+  mapping identity/revision, account/selection, commercial fingerprint and fresh
+  manifest evidence. The final acceptance transaction checks the current head
+  and exact published technical binding. `confirmation_digest()` semantics are
+  unchanged; selected meaning stays separate from full source/audit digests.
+  Unrelated source/manifest changes do not require fresh selected consent.
+- Legacy v1/v2 mapping/purchase documents and SIMULATED technical terms remain
+  readable without rewriting their fields/digests. Exact historical full-digest
+  v2 replay is preserved. Original acceptance replay and uncertain-operation
+  recovery run before new-sale I/O. New production purchases require a published
+  quantity; legacy history cannot supply an invented production offer. Existing
+  subscriptions retain their original accepted quantity after republication and
+  through proven subsequent cycles.
+- Purchase review and paid-read response contracts now represent both provenance
+  values; OpenAPI/TypeScript were regenerated. The UI shows exact quantity/unit
+  before consent, labels SIMULATED evidence only when applicable, and resets
+  consent after changed terms. The generic limit label is updated in all seven
+  catalogs. Runbook, schema reference and Portal integration map are updated.
+
+Fresh verification (repository-root commands):
+
+- **PASS — required API/PostgreSQL selection, 68 passed / 0 skipped:**
+  `./.venv/bin/python -m pytest -q apps/api/tests/test_any765_purchase_terms.py apps/api/tests/test_commercial_mapping_postgres.py apps/api/tests/test_any766_purchase_terms_postgres.py`.
+  Executed through `/tmp/any766_step3_tests.py`, which uses the repository's
+  `canonical_check_environment()`, test defaults and
+  `api_test_environment('api-postgres', ...)`, then assigns a unique disposable
+  `_tests` database. PostgreSQL 18 was started through
+  `./.venv/bin/python scripts/repo.py test-db up` using the already-local image.
+  The final HTTP cases use production settings with fully intercepted synthetic
+  sources; no real provider endpoint is contacted. Local evidence:
+  `.harness/any766-step3-required.log` and `.harness/any766-step3-required.xml`.
+- **PASS — related PostgreSQL regressions, 48 cases:**
+  `apps/api/tests/test_any765_purchase_terms_postgres.py`,
+  `apps/api/tests/test_any709_step1_postgres.py` and
+  `apps/api/tests/test_paid_access_terms_postgres.py`, included in the passing
+  combined **115-test / 0-skip** run. This covers selected/global-source changes,
+  exact saved full-digest replay, legacy history, concurrent publication,
+  credentials/origin rotation, uncertain commits and frozen cycle issuance.
+  Evidence: `.harness/any766-step3-final.log` and its XML report. The final
+  production-legacy rule and production-mode HTTP cases also pass the subsequent
+  required 68-test run above.
+- **PASS — source, architecture and documentation tests, 304 passed:**
+  `./.venv/bin/python -m pytest -q apps/api/tests/test_any709_step1_sources.py apps/api/tests/test_repository_docs.py apps/api/tests/test_architecture.py`.
+  Documentation tests were rerun after the as-built map/schema/runbook changes
+  (**195 passed**).
+- **PASS — web components, 54 passed:**
+  `npm --workspace @anytoolai/web run test:components -- tests/components/any766-purchase-terms.test.tsx tests/components/any709-step4.test.tsx tests/components/any765-paid-access.test.tsx`.
+  Covers configured/zero/maximum, SIMULATED/unknown history, display before
+  consent and fresh unchecked consent after a quantity/revision change.
+- **PASS — non-fixing checks:** Ruff check and format check on all **15** changed
+  Python files; `npm run lint:web`; `npm run typecheck:web`;
+  `npm run test:boundaries:web` (**38 passed**);
+  `PATH="$PWD/.venv/bin:$PATH" npm run architecture:check` and `npm run docs:check`.
+- **PASS — generation:** `PATH="$PWD/.venv/bin:$PATH" npm run generate` and
+  `PATH="$PWD/.venv/bin:$PATH" npm run generate:check`. Existing local Node
+  dependencies were copied from a checkout with the byte-identical lockfile;
+  nothing was installed or updated.
+- **PASS — focused browser rendering:** eight desktop/mobile screenshots of the
+  actual `PurchaseTerms` component with repository CSS and synthetic inputs
+  (configured Q=7, Q=0, Q=2^53−1 and SIMULATED). All eight axe runs report zero
+  violations, no page errors and no horizontal overflow; representative desktop
+  and maximum-quantity mobile screenshots were visually inspected. Evidence:
+  `.harness/any766-step3-ui/report.json` and adjacent PNGs. This local Vite
+  component preview uses a fallback font, not a full Next.js route or two-service
+  execution. All browser requests outside loopback were blocked.
+- **PASS — Kernel documentation-only scope:** repository doctor; documentation
+  validation and whole-plan equality are checked after synchronization. Kernel
+  runtime/configuration and both repositories' dependency locks are unchanged.
+
+Resolved verification failures and remaining limits:
+
+- Initial UI tests lost the intl provider on rerender and compared nonbreaking
+  spaces without normalization; the corrected tests pass. The updated CLI
+  rotation fixture also needed the same configured-source mode after credential
+  rotation; its regression now passes.
+- Two overlapping pytest processes initially collided on the same disposable
+  database and invalidated that regression attempt. The runner now assigns a
+  unique `_tests` database; the full sequential rerun and final required gate
+  pass. Only disposable test databases were affected. The web boundary gate's
+  sandbox subprocess `EPERM` was resolved by a local unsandboxed rerun; no
+  network access or installation was required.
+- **NOT_RUN — Section 6 broad suites, full routed Next.js/browser journey,
+  real two-service paid HTTP, live LBX, publication, staging and production:**
+  these are later-step or separately gated evidence, not Step 3 acceptance.
+  Current proofs use real disposable PostgreSQL and synthetic source/provider
+  transports; no synthetic quantity approves a commercial offer.
+- **BLOCKED — real sale configuration/live positive acceptance:** approved launch
+  quantities, LBX associations and sales enablement remain owner inputs under
+  Section 3.8. Ordinary Kernel commercial flags remain disabled. This does not
+  block the completed independent Step 3 implementation.
+- Production allowance derivation/provenance admission and V2 snapshot serving
+  remain Step 5. This step only preserves the existing issuer's immutable
+  quantity behavior and widens customer response provenance. New v3 purchased
+  documents additionally require a **Step 3-compatible reader**, even though
+  migration head `20261031_0006` is unchanged; pre-Step-3 binaries cannot consume
+  them. Steps 12–14 must retain that reader floor alongside the earlier ANY-765
+  selected-digest floor. No historical document rewrite enables rollback.
+
+Portal remains authoritative; the entire file is synchronized byte-for-byte to
+Kernel and equality is verified before handoff. Steps 4–14 remain unexecuted.
+
+#### Step 3 review follow-up — REV-2, 2026-11-10
+
+**REV-2: RESOLVED.** The top-level Status, Next action and Blocker now agree
+with the completed Step 3 checkpoint. The next implementation step is Step 4,
+requiring a separate user request; no Step 3 repetition is directed.
+
+The supplied review reports no confirmed functional defect in the inspected
+Portal/Kernel diff. Its fresh API (1949), UI (420), web-boundary (38), Kernel
+contract/binding/manifest (211) and exact-JSON quantity (10 scenarios) results
+are reviewer-reported evidence, not reruns performed by this documentation
+correction. The earlier PostgreSQL 68/115 reports were reused by that review.
+Its attempted fresh PostgreSQL rerun was blocked by automatic approval review
+because starting the local container requires explicit infrastructure permission.
+The pasted permission request does not grant that permission. This correction
+starts no container and claims no fresh database verification; Step 3 remains
+complete with that review-verification limitation. Whole-program readiness,
+live LBX and joint paid runtime remain unproven. REV-1 remains resolved.
+
+Only the authoritative plan and its full Kernel mirror are changed by this
+follow-up. Existing source changes and indexes are preserved. Documentation
+checks, non-plan integrity and byte-for-byte mirror equality are verified before
+handoff.
+
+#### Step 3 local commit authorization — 2026-11-10
+
+After the Step 3 review and REV-2 correction, the user explicitly requested
+local commits in both repositories. This narrowly overrides the common
+protocol's no-staging/no-commit rule for the completed Step 3 changes and their
+synchronized plan/evidence. Commit the Portal implementation as
+`ANY-766 - Publish immutable production allowance terms` and the Kernel plan
+mirror as `ANY-766 - Record purchased allowance terms progress`.
+Earlier unchanged-HEAD/empty-index/no-commit statements describe their execution
+checkpoints. This authorization does not permit push, merge, rebase, branch
+switching, later implementation steps or operational actions, including the
+blocked fresh PostgreSQL review rerun. Preserve both plan copies byte for byte.
+
 **Goal / Expected behavior:** an operator publishes exact terms and a buyer sees and immutably accepts them.
 
 **Repository / Read before implementation:** Portal; [CLI](https://github.com/gushinets/payments-portal/blob/7f985031034f45fde0203f710eb64283cd086e86/apps/api/app/cli/commercial_mappings.py), [product links](https://github.com/gushinets/payments-portal/blob/7f985031034f45fde0203f710eb64283cd086e86/apps/api/app/domains/catalog/product_link.py), [technical terms](https://github.com/gushinets/payments-portal/blob/7f985031034f45fde0203f710eb64283cd086e86/apps/api/app/domains/purchases/technical_terms.py).
@@ -1122,7 +1282,7 @@ This revised plan closes:
 - **PLAN-2:** usage variants, exhaustion identity and durable acknowledgement are specified.
 - **PLAN-3:** token custody and original-operation recovery are specified.
 - **PLAN-4:** release compatibility and host/container profile mapping are specified.
-- **PLAN-5:** Step 1 materialization and contract formalization/technical review are complete in both repositories; Portal remains authoritative and the Kernel copy is synchronized after progress updates. Every later prompt names the exact Portal path and every step has concrete verification targets. Step 2 now supplies production declarations and scenario bindings; paid runtime integration and later delivery remain for Steps 3–14.
+- **PLAN-5:** Step 1 materialization and contract formalization/technical review are complete in both repositories; Portal remains authoritative and the Kernel copy is synchronized after progress updates. Every later prompt names the exact Portal path and every step has concrete verification targets. Step 2 supplies production declarations and scenario bindings; Step 3 supplies immutable purchased quantities and pre-consent presentation. Paid runtime integration and later delivery remain for Steps 4–14.
 
 Remaining gates concern commercial and operational inputs for their dependent actions. Step 1 and implementation following the accepted strategy require no additional preliminary protocol approval. No launch quantity, LBX association, credential or host is invented.
 
