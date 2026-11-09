@@ -14,6 +14,9 @@ This directory is the system of record for agents. Keep it current. If a decisio
 
 - [Payment Portal](integrations/payment-portal.md) — ownership, current/target contracts, peer evidence and change workflow.
 - [Kernel Capability Manifest v1](contracts/kernel-capability-manifest/v1/README.md) — generated producer schema, canonical fixtures, byte checksums and independent semantic checks.
+- [ANY-766 paid integration target contracts](contracts/portal-kernel-paid/README.md) — reviewed
+  snapshot V2, identity, invalidation, usage/exhaustion and cabinet schemas/fixtures;
+  independent offline checks, without runtime implementation or sales approval.
 
 ## Architecture
 
