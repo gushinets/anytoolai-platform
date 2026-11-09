@@ -4930,7 +4930,8 @@ def test_automated_python_installs_check_locks_and_use_shared_build_config():
 @pytest.mark.parametrize(
     ("command", "port", "code"),
     [("proposal_ai", 3100, "PAS"), ("client_update_writer", 3200, "CUS"),
-     ("brief_decoder", 3300, "BDS"), ("acceptance_builder", 3400, "ABS")],
+     ("brief_decoder", 3300, "BDS"), ("acceptance_builder", 3400, "ABS"),
+     ("task_finder", 3500, "TFS")],
 )
 def test_product_smoke_preserves_command_configuration(monkeypatch, command, port, code):
     runner = load_runner_module()

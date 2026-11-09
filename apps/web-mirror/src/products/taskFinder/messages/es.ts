@@ -1,0 +1,49 @@
+export const es = {
+  "title": "Evaluador de tareas",
+  "description": "Compara una tarea con tus habilidades y experiencia antes de postularte.",
+  "quotaRemaining": "Quedan {remaining} de {limit, plural, one {# intento} other {# intentos}}.",
+  "fields": {
+    "taskText": "Descripción de la tarea",
+    "taskTextPlaceholder": "Pega la tarea o la oferta de trabajo.",
+    "taskTextHelp": "Incluye el alcance, los requisitos, el presupuesto y los plazos disponibles.",
+    "positioning": "Tu perfil",
+    "positioningPlaceholder": "Describe tus habilidades, experiencia y condiciones de trabajo.",
+    "positioningHelp": "Incluye tus servicios y límites de alcance o disponibilidad."
+  },
+  "fit": {
+    "submit": "Evaluar encaje",
+    "running": "Evaluando tu encaje…",
+    "runFailed": "No se pudo evaluar el encaje. Inténtalo de nuevo.",
+    "resultTitle": "Encaje con la tarea",
+    "placeholder": "Tu evaluación aparecerá aquí.",
+    "regenerate": "Evaluar de nuevo"
+  },
+  "result": {
+    "fitScore": "Puntuación de encaje",
+    "verdict": "Veredicto",
+    "criteriaComparison": "Comparación por criterios",
+    "criterionScores": "Puntuaciones por criterio",
+    "strengths": "Fortalezas",
+    "gaps": "Carencias",
+    "rationale": "Explicación del veredicto",
+    "scoreRationale": "Explicación de la puntuación",
+    "notSpecified": "No especificado.",
+    "verdictScope": "La puntuación y el veredicto evalúan de forma independiente habilidades, experiencia, alcance y restricciones. Pueden diferir; esto no comprueba los requisitos declarados de la tarea."
+  },
+  "criteria": {
+    "skills_fit": "Habilidades",
+    "experience_fit": "Experiencia",
+    "scope_fit": "Alcance",
+    "constraints_fit": "Restricciones"
+  },
+  "verdicts": {
+    "strong_fit": "Encaje alto",
+    "partial_fit": "Encaje parcial",
+    "weak_fit": "Encaje bajo"
+  },
+  "statuses": {
+    "match": "Coincidencia",
+    "partial": "Coincidencia parcial",
+    "mismatch": "Desajuste"
+  }
+};

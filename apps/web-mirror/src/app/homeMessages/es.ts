@@ -6,6 +6,10 @@ export const es: Shape<typeof en> = {
   lead: "Herramientas pequeñas para freelancers. Describa el trabajo y reciba un texto listo para enviar al cliente.",
   open: "Abrir",
   cards: {
+    task_finder: {
+      blurb: "Compara una tarea con tu perfil: fortalezas, carencias y puntuación de encaje.",
+      sample: "Puntuación: 64/100. Encaje bajo: la aplicación móvil queda fuera de tus servicios.",
+    },
     proposal_ai: {
       blurb: "Convierta el brief de un cliente y sus puntos fuertes en una propuesta lista para enviar.",
       sample: "Hola Dana, me encantaría ayudarle con el rediseño de su landing page. Dos rondas de revisiones, entrega en tres semanas. Hagamos una llamada breve para confirmar el alcance.",

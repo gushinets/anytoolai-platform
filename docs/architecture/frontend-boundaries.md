@@ -556,3 +556,19 @@ after acceptance and terminal success/release. `quota_capacity_reserved`
 is retryable with the same prepared key or handoff token/guest, without exhausted/paywall UI.
 `quota_exhausted` remains final used exhaustion. Advisory reads and result-fetch retries create no
 logical execution; an active/completed result is never replaced by a quota refresh.
+
+## Structured fit results (ANY-247)
+
+Task Finder uses the shared `ProductRunPage` with two product-owned fields and a typed result.
+Its parser orders comparison deltas and criterion scores by criterion id (skills, experience,
+scope, constraints), rejecting missing, duplicate or unknown ids. Array position is not a backend
+contract. Score and verdict are independent indicators; the renderer shows both without reconciling
+them and keeps comparison statuses separate from criterion scores. The numeric score has a native
+meter as a decorative supplement; text carries the accessible meaning.
+
+`ResultView hideText` supplies shared copy states without duplicating the structured display.
+If copying fails, it reveals the copy text so the existing Select text fallback remains usable.
+The default still displays text. Task Finder's copy composition is fixed English under every UI
+locale, as required by its renderer contract. Empty strengths/gaps say “Not specified.” Echoed
+inputs and comparison confidence never enter the frontend result model, display, copy or events.
+The product has no handoff definition; Task Finder to ProposalAI remains an optional later journey.

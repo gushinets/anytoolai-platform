@@ -1,6 +1,8 @@
 import type { ComponentType } from "react";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
 import type { ProductMessagesByLocale } from "../i18n";
+import { TaskFinderProduct } from "./taskFinder/TaskFinderProduct";
+import { TASK_FINDER_MESSAGES } from "./taskFinder/messages";
 import { AcceptanceBuilderProduct } from "./acceptanceBuilder/AcceptanceBuilderProduct";
 import { ACCEPTANCE_BUILDER_MESSAGES } from "./acceptanceBuilder/messages";
 import { BriefDecoderProduct } from "./briefDecoder/BriefDecoderProduct";
@@ -42,6 +44,7 @@ const PRODUCT_DEFINITIONS: readonly Omit<RegisteredProduct, "enabled">[] = [
   },
   { productId: "brief_decoder", messages: BRIEF_DECODER_MESSAGES, Component: BriefDecoderProduct },
   { productId: "acceptance_builder", messages: ACCEPTANCE_BUILDER_MESSAGES, Component: AcceptanceBuilderProduct },
+  { productId: "task_finder", messages: TASK_FINDER_MESSAGES, Component: TaskFinderProduct },
 ];
 
 for (const productId of enabledIds ?? []) {

@@ -1,0 +1,49 @@
+export const fr = {
+  "title": "Évaluation des missions",
+  "description": "Comparez une mission à vos compétences et à votre expérience avant de postuler.",
+  "quotaRemaining": "Il reste {remaining} sur {limit, plural, one {# essai} other {# essais}}.",
+  "fields": {
+    "taskText": "Description de la mission",
+    "taskTextPlaceholder": "Collez la mission ou l’offre.",
+    "taskTextHelp": "Précisez le périmètre, les exigences, le budget et les délais connus.",
+    "positioning": "Votre profil",
+    "positioningPlaceholder": "Décrivez vos compétences, votre expérience et vos conditions.",
+    "positioningHelp": "Précisez vos services et vos limites de périmètre ou de disponibilité."
+  },
+  "fit": {
+    "submit": "Évaluer l’adéquation",
+    "running": "Évaluation en cours…",
+    "runFailed": "Impossible d’évaluer l’adéquation. Réessayez.",
+    "resultTitle": "Adéquation à la mission",
+    "placeholder": "Votre évaluation apparaîtra ici.",
+    "regenerate": "Évaluer à nouveau"
+  },
+  "result": {
+    "fitScore": "Score d’adéquation",
+    "verdict": "Verdict",
+    "criteriaComparison": "Comparaison par critère",
+    "criterionScores": "Scores par critère",
+    "strengths": "Points forts",
+    "gaps": "Lacunes",
+    "rationale": "Explication du verdict",
+    "scoreRationale": "Explication du score",
+    "notSpecified": "Non précisé.",
+    "verdictScope": "Le score et le verdict évaluent indépendamment les compétences, l’expérience, le périmètre et les contraintes. Ils peuvent différer ; il ne s’agit pas d’une vérification des exigences de la mission."
+  },
+  "criteria": {
+    "skills_fit": "Compétences",
+    "experience_fit": "Expérience",
+    "scope_fit": "Périmètre",
+    "constraints_fit": "Contraintes"
+  },
+  "verdicts": {
+    "strong_fit": "Forte adéquation",
+    "partial_fit": "Adéquation partielle",
+    "weak_fit": "Faible adéquation"
+  },
+  "statuses": {
+    "match": "Correspondance",
+    "partial": "Correspondance partielle",
+    "mismatch": "Écart"
+  }
+};

@@ -1321,50 +1321,18 @@ CLIENT_HANDOFF_SMOKE_REPORT_PATH = (
 )
 
 PROPOSAL_AI_SMOKE_WEB_MIRROR_PORT_ENV = "ANYTOOLAI_PROPOSAL_AI_SMOKE_WEB_MIRROR_PORT"
-PROPOSAL_AI_SMOKE_EVIDENCE_ROOT = ROOT / ".agent" / "proposal-ai-smoke"
-PROPOSAL_AI_SMOKE_REPORT_PATH = (
-    ROOT / "tests" / "e2e" / "proposal-ai-smoke" / "playwright-report.json"
-)
 
 CLIENT_UPDATE_WRITER_SMOKE_WEB_MIRROR_PORT_ENV = (
     "ANYTOOLAI_CLIENT_UPDATE_WRITER_SMOKE_WEB_MIRROR_PORT"
 )
-CLIENT_UPDATE_WRITER_SMOKE_EVIDENCE_ROOT = ROOT / ".agent" / "client-update-writer-smoke"
-CLIENT_UPDATE_WRITER_SMOKE_REPORT_PATH = (
-    ROOT / "tests" / "e2e" / "client-update-writer-smoke" / "playwright-report.json"
-)
 
 BRIEF_DECODER_SMOKE_WEB_MIRROR_PORT_ENV = "ANYTOOLAI_BRIEF_DECODER_SMOKE_WEB_MIRROR_PORT"
-BRIEF_DECODER_SMOKE_EVIDENCE_ROOT = ROOT / ".agent" / "brief-decoder-smoke"
-BRIEF_DECODER_SMOKE_REPORT_PATH = (
-    ROOT / "tests" / "e2e" / "brief-decoder-smoke" / "playwright-report.json"
-)
 
 ACCEPTANCE_BUILDER_SMOKE_WEB_MIRROR_PORT_ENV = "ANYTOOLAI_ACCEPTANCE_BUILDER_SMOKE_WEB_MIRROR_PORT"
-ACCEPTANCE_BUILDER_SMOKE_EVIDENCE_ROOT = ROOT / ".agent" / "acceptance-builder-smoke"
-ACCEPTANCE_BUILDER_SMOKE_REPORT_PATH = (
-    ROOT / "tests" / "e2e" / "acceptance-builder-smoke" / "playwright-report.json"
-)
 
 
 def _client_handoff_smoke_web_mirror_port() -> int:
     return _port_override(CLIENT_HANDOFF_SMOKE_WEB_MIRROR_PORT_ENV, 3000)
-
-
-def _proposal_ai_smoke_web_mirror_port() -> int:
-    return _port_override(PROPOSAL_AI_SMOKE_WEB_MIRROR_PORT_ENV, 3100)
-
-
-def _client_update_writer_smoke_web_mirror_port() -> int:
-    return _port_override(CLIENT_UPDATE_WRITER_SMOKE_WEB_MIRROR_PORT_ENV, 3200)
-
-
-def _brief_decoder_smoke_web_mirror_port() -> int:
-    return _port_override(BRIEF_DECODER_SMOKE_WEB_MIRROR_PORT_ENV, 3300)
-
-
-def _acceptance_builder_smoke_web_mirror_port() -> int:
-    return _port_override(ACCEPTANCE_BUILDER_SMOKE_WEB_MIRROR_PORT_ENV, 3400)
 
 
 def _terminate_process_group(process: subprocess.Popen) -> None:
@@ -1632,6 +1600,15 @@ def acceptance_builder_smoke() -> int:
         port_env=ACCEPTANCE_BUILDER_SMOKE_WEB_MIRROR_PORT_ENV,
         default_port=3400,
         error_prefix="ABS",
+    )
+
+
+def task_finder_smoke() -> int:
+    return _run_product_smoke(
+        command="task-finder-smoke",
+        port_env="ANYTOOLAI_TASK_FINDER_SMOKE_WEB_MIRROR_PORT",
+        default_port=3500,
+        error_prefix="TFS",
     )
 
 
@@ -3119,6 +3096,7 @@ COMMANDS = {
     "client-update-writer-smoke": client_update_writer_smoke,
     "brief-decoder-smoke": brief_decoder_smoke,
     "acceptance-builder-smoke": acceptance_builder_smoke,
+    "task-finder-smoke": task_finder_smoke,
     "atom-lab-up": atom_lab_up,
     "atom-lab-ready": atom_lab_ready,
     "atom-lab-status": atom_lab_status,

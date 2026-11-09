@@ -4,6 +4,10 @@ export const en = {
   lead: "Small tools for freelancers. Describe the job, get text you can send to the client.",
   open: "Open tool",
   cards: {
+    task_finder: {
+      blurb: "Compare a task with your profile to see strengths, gaps, and a fit score.",
+      sample: "Fit score: 64/100. Weak fit: the mobile app is outside your offered scope.",
+    },
     proposal_ai: {
       blurb: "Turn a client brief and your strengths into a proposal ready to send.",
       sample: "Hi Dana, I'd love to help with your landing page redesign. Two revision rounds, delivered in three weeks. Let's set up a quick call to confirm scope.",

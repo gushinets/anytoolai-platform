@@ -142,3 +142,18 @@ its registry. The product needs no separate proxy or Compose configuration.
 
 If a product needs a kernel change to ship, that is a kernel bug or a new generic atom — file it
 against MVP-A, do not special-case the product into platform-core.
+
+## Structured results without a document
+
+Task Finder (`apps/web-mirror/src/products/taskFinder`) is the worked example for a structured
+result with no generated document. Keep extraction, canonical criterion ordering, labels and
+copy composition product-owned; reuse `ProductRunPage`, `TextAreaField` and `ResultView hideText`.
+Provide all seven locale dictionaries and a home-directory card. The shared runtime owns retries,
+quota, errors, clipboard activation and the New task reset.
+
+New product browser suites reuse `tests/e2e/smoke-support` for database event checks and test
+configuration, `_run_product_smoke` for the Python command, and the reusable
+`.github/workflows/product-smoke.yml` workflow. Preserve product-specific correlation assertions
+inside each suite. Declare its workspace dependency and regenerate the lockfile with pnpm.
+`task-finder-smoke` covers the real happy path, fixture-substituted weak result, mobile layout,
+validation, terminal errors and authoritative quota exhaustion. It is an optional CI check.
