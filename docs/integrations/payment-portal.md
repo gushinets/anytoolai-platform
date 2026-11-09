@@ -107,6 +107,26 @@ Its canonical snapshot specification remains V1 with calendar bounds. Proposed V
 integration remain ANY-766 work; this observation is not a final ANY-715/765 handoff or deployment
 readiness claim. No peer source or producer/consumer artifact changed.
 
+## ANY-766 target contract checkpoint — 2026-11-09
+
+At Kernel `72ff15bc0b77903c87aa39f7b10186dccc556d09` and Portal
+`7f985031034f45fde0203f710eb64283cd086e86`, Step 1 adds only the
+[paired target schemas/fixtures](../contracts/portal-kernel-paid/README.md) and
+updates the peer's two canonical designs. Snapshot V2 removes calendar interval
+fields and freezes owner/allowance/product/metric/unit/quantity; manifest and
+invalidation stay V1. Delegation/recovery, coherent paid admission/events and
+usage/exhaustion/cabinet delivery are specified, not implemented. The historical
+observations above are unchanged. Internal ANY-507 readback is not paid HTTP.
+
+ANY-766 owns selected production vocabulary/scenario bindings under the
+[dated scope clarification](https://linear.app/paveldik/issue/ANY-766); ANY-711
+remains Done for manifest/TEST-ONLY delivery. Quantities, LBX associations and
+sales approval remain separate. The target extends the credentials/receiver
+permissions below without enabling routes: Portal → Kernel adds usage:read;
+Kernel → Portal adds kernel-session:exchange, kernel-session:introspect and
+allowance-exhaustion:write. Tests independently validate the retained copies
+without a shared runtime dependency. Compatible consumers precede V2 connection.
+
 ## Service authentication and scope convention (ANY-711 handoff)
 
 This is the normative service-authentication handoff for all three operations. ANY-711

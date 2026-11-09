@@ -1,0 +1,180 @@
+{
+  "status": "TARGET_ONLY",
+  "schema_owners": {
+    "snapshot-v2": "Portal",
+    "invalidation-v1": "Portal",
+    "code-request-v1": "Portal",
+    "code-response-v1": "Portal",
+    "exchange-request-v1": "Portal",
+    "exchange-response-v1": "Portal",
+    "introspection-request-v1": "Portal",
+    "introspection-response-v1": "Portal",
+    "usage-query-v1": "Kernel",
+    "usage-response-v1": "Kernel",
+    "exhaustion-v1": "Kernel",
+    "cabinet-usage-v1": "Portal"
+  },
+  "operations": [
+    {
+      "contract": "snapshot-v2",
+      "payload_owner": "Portal",
+      "host": "Portal",
+      "method": "GET",
+      "path": "/internal/v1/access-snapshots/{user_id}",
+      "permission": "access-snapshot:read",
+      "statuses": [
+        200,
+        401,
+        403,
+        404,
+        422,
+        503
+      ],
+      "cache_control": "no-store"
+    },
+    {
+      "contract": "invalidation-v1",
+      "payload_owner": "Portal",
+      "host": "Kernel",
+      "method": "POST",
+      "path": "/internal/v1/access-invalidations",
+      "permission": "access:invalidate",
+      "statuses": [
+        204,
+        401,
+        403,
+        422,
+        503
+      ],
+      "cache_control": "no-store"
+    },
+    {
+      "contract": "code-request-v1",
+      "payload_owner": "Portal",
+      "host": "Portal",
+      "method": "POST",
+      "path": "/api/kernel-session-codes",
+      "permission": "portal-session",
+      "statuses": [
+        200,
+        401,
+        403,
+        422,
+        503
+      ],
+      "cache_control": "no-store"
+    },
+    {
+      "contract": "exchange-request-v1",
+      "payload_owner": "Portal",
+      "host": "Kernel",
+      "method": "POST",
+      "path": "/v1/portal-session/exchange",
+      "permission": "one-use-code+PKCE",
+      "statuses": [
+        200,
+        401,
+        403,
+        422,
+        503
+      ],
+      "cache_control": "no-store"
+    },
+    {
+      "contract": "exchange-response-v1",
+      "payload_owner": "Portal",
+      "host": "Portal",
+      "method": "POST",
+      "path": "/internal/v1/kernel-sessions/exchange",
+      "permission": "kernel-session:exchange",
+      "statuses": [
+        200,
+        401,
+        403,
+        422,
+        503
+      ],
+      "cache_control": "no-store"
+    },
+    {
+      "contract": "introspection-response-v1",
+      "payload_owner": "Portal",
+      "host": "Portal",
+      "method": "POST",
+      "path": "/internal/v1/kernel-sessions/introspect",
+      "permission": "kernel-session:introspect",
+      "statuses": [
+        200,
+        401,
+        403,
+        422,
+        503
+      ],
+      "cache_control": "no-store"
+    },
+    {
+      "contract": "usage-response-v1",
+      "payload_owner": "Kernel",
+      "host": "Kernel",
+      "method": "GET",
+      "path": "/internal/v1/usage/{user_id}",
+      "permission": "usage:read",
+      "statuses": [
+        200,
+        401,
+        403,
+        422,
+        503
+      ],
+      "cache_control": "no-store"
+    },
+    {
+      "contract": "usage-response-v1",
+      "payload_owner": "Kernel",
+      "host": "Kernel",
+      "method": "GET",
+      "path": "/v1/products/{product_id}/paid-usage",
+      "permission": "delegated-identity",
+      "statuses": [
+        200,
+        401,
+        403,
+        422,
+        503
+      ],
+      "cache_control": "no-store"
+    },
+    {
+      "contract": "exhaustion-v1",
+      "payload_owner": "Kernel",
+      "host": "Portal",
+      "method": "POST",
+      "path": "/internal/v1/allowance-exhaustions",
+      "permission": "allowance-exhaustion:write",
+      "statuses": [
+        204,
+        401,
+        403,
+        409,
+        422,
+        503
+      ],
+      "cache_control": "no-store"
+    },
+    {
+      "contract": "cabinet-usage-v1",
+      "payload_owner": "Portal",
+      "host": "Portal",
+      "method": "GET",
+      "path": "/api/paid-usage",
+      "permission": "verified-email-billing-session",
+      "statuses": [
+        200,
+        401,
+        403,
+        503
+      ],
+      "cache_control": "no-store"
+    }
+  ]
+}
