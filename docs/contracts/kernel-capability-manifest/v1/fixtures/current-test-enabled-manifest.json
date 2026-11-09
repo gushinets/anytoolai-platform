@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "tenant_id": "anytoolai",
+  "region": "ru",
+  "manifest_version": "sha256:5a743b1eb5e50ebed25259fb745e6b2dda743f01bd0def1cae77d12e9697aa62",
+  "generated_at": "2026-11-09T00:00:00Z",
+  "products": [
+    {
+      "product_id": "acceptance_builder",
+      "enabled": false
+    },
+    {
+      "product_id": "brief_decoder",
+      "enabled": true
+    },
+    {
+      "product_id": "client_update_writer",
+      "enabled": false
+    },
+    {
+      "product_id": "kernel_demo",
+      "enabled": false
+    },
+    {
+      "product_id": "proposal_ai",
+      "enabled": true
+    },
+    {
+      "product_id": "task_finder",
+      "enabled": false
+    }
+  ],
+  "usage_metrics": [
+    {
+      "metric_key": "acceptance_builder.results",
+      "product_id": "acceptance_builder",
+      "unit": "result",
+      "enabled": false
+    },
+    {
+      "metric_key": "brief_decoder.analyses",
+      "product_id": "brief_decoder",
+      "unit": "analysis",
+      "enabled": false
+    },
+    {
+      "metric_key": "brief_decoder.test_analyses",
+      "product_id": "brief_decoder",
+      "unit": "analysis",
+      "enabled": true
+    },
+    {
+      "metric_key": "client_update_writer.messages",
+      "product_id": "client_update_writer",
+      "unit": "message",
+      "enabled": false
+    },
+    {
+      "metric_key": "proposal_ai.generations",
+      "product_id": "proposal_ai",
+      "unit": "generation",
+      "enabled": false
+    },
+    {
+      "metric_key": "proposal_ai.test_generations",
+      "product_id": "proposal_ai",
+      "unit": "generation",
+      "enabled": true
+    }
+  ]
+}

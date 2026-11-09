@@ -77,7 +77,9 @@ def configured_app(scenario: str) -> Iterator[Any]:
             if definition["product_id"] in {"proposal_ai", "brief_decoder"}:
                 definition["commercial_admission_enabled"] = True
                 for metric in definition["usage_metrics"]:
-                    metric["enabled"] = not (
+                    metric["enabled"] = metric["metric_key"] in {
+                        "proposal_ai.test_generations", "brief_decoder.test_analyses"
+                    } and not (
                         scenario == "material"
                         and metric["metric_key"] == "proposal_ai.test_generations"
                     )

@@ -112,9 +112,33 @@ def test_complete_ordinary_output_uses_real_registry_and_independent_digest(
     assert all(not p["enabled"] for p in body["products"])
     assert body["usage_metrics"] == [
         {
+            "metric_key": "acceptance_builder.results",
+            "product_id": "acceptance_builder",
+            "unit": "result",
+            "enabled": False,
+        },
+        {
+            "metric_key": "brief_decoder.analyses",
+            "product_id": "brief_decoder",
+            "unit": "analysis",
+            "enabled": False,
+        },
+        {
             "metric_key": "brief_decoder.test_analyses",
             "product_id": "brief_decoder",
             "unit": "analysis",
+            "enabled": False,
+        },
+        {
+            "metric_key": "client_update_writer.messages",
+            "product_id": "client_update_writer",
+            "unit": "message",
+            "enabled": False,
+        },
+        {
+            "metric_key": "proposal_ai.generations",
+            "product_id": "proposal_ai",
+            "unit": "generation",
             "enabled": False,
         },
         {
@@ -128,7 +152,7 @@ def test_complete_ordinary_output_uses_real_registry_and_independent_digest(
     canonical = json.dumps(semantic, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     assert body["manifest_version"] == "sha256:" + hashlib.sha256(canonical.encode()).hexdigest()
     assert body["manifest_version"] == (
-        "sha256:478761c681d02330ed052aabe5e1b472dc1c2ee56d79a568a8009f4b4503a694"
+        "sha256:359cc0ff7c7bbacb69ba8e0de0444738b46032c846b10a962298bfb8e0d9cf85"
     )
     assert datetime.fromisoformat(body["generated_at"]).utcoffset() == timedelta(0)
     assert response.headers["X-Request-ID"] == "req_manifest"

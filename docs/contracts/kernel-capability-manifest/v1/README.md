@@ -71,12 +71,33 @@ Its independently retained [semantic version pin](fixtures/valid-manifest.digest
 sha256:a39bac9f210a6ac67e97e117f8481a5954dc3f36bdaab2fd54c7522b27d6ec29
 ```
 
-[default-disabled-manifest.json](fixtures/default-disabled-manifest.json) records
-the ordinary six-product/two-metric configuration with all flags disabled:
+[historical-disabled-manifest.json](fixtures/historical-disabled-manifest.json)
+preserves the former ordinary six-product/two-TEST-ONLY-metric bytes and version:
 
 ```text
 sha256:478761c681d02330ed052aabe5e1b472dc1c2ee56d79a568a8009f4b4503a694
 ```
+
+ANY-766 Step 2 updates [default-disabled-manifest.json](fixtures/default-disabled-manifest.json)
+to the current six-product/six-metric inventory, with every commercial flag disabled:
+
+```text
+sha256:359cc0ff7c7bbacb69ba8e0de0444738b46032c846b10a962298bfb8e0d9cf85
+```
+
+[current-test-enabled-manifest.json](fixtures/current-test-enabled-manifest.json)
+retains that complete inventory while enabling only the same two test products
+and TEST-ONLY metrics in isolated conformance configurations:
+
+```text
+sha256:5a743b1eb5e50ebed25259fb745e6b2dda743f01bd0def1cae77d12e9697aa62
+```
+
+Both current fixtures are retained independently by Portal and checked byte for
+byte. The four production metrics and seven scenario bindings are documented in
+the [config model](../../../architecture/config-model.md). Their approval under
+ANY-766 does not approve quantities, LBX associations, sales or paid runtime.
+The historical positive fixture, digest and negative corpus remain unchanged.
 
 [SHA256SUMS](SHA256SUMS) hashes the exact bytes of every file in `fixtures/`;
 it is independent of semantic versioning. Semantic versions hash only
@@ -97,8 +118,9 @@ manifest startup/security tests; invalid declarations fail configuration loading
 The Portal copy at inspected commit `2bb07d778edc5ea56011b0034ba24b0702ede81f`
 has identical positive fixture/digest bytes and equivalent resolved schema constraints.
 Its provisional documentation and historical SIMULATED evidence remain unchanged.
-Canonical ownership here does not relabel that evidence or approve production metrics,
-charging, quantities, purchases or paid execution.
+That historical ANY-711 checkpoint did not approve production vocabulary,
+charging, quantities, purchases or paid execution. ANY-766 Step 2 declares the
+selected production vocabulary above, with sales still disabled.
 
 ## Reproduce artifact verification
 
@@ -223,6 +245,10 @@ probe was never started, remove the temporary token file from terminal A as well
 Normal automated runs need no secret provisioning or manual cleanup.
 
 ## Local evidence, 2026-10-29
+
+This dated evidence uses the historical two-metric inventory. Current conformance
+uses the complete ANY-766 inventory above; new results are recorded in the
+[ANY-766 execution plan](../../../exec-plans/active/ANY-766-implementation-plan.md).
 
 Producer: `feature/ANY-711`, base SHA
 `7634eb09533846268a96ade004bca518c580b588` plus the uncommitted Step 4 diff.
