@@ -21,6 +21,7 @@ from anytoolai_platform_core.storage.db import event_log_table, scenario_session
 from anytoolai_platform_core.storage.transactions import SessionFactory, transaction_boundary
 from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, ConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -43,13 +44,17 @@ async def _request(
     access_code: str | None = None,
     request_id: str = "req_atom_lab",
     raise_app_exceptions: bool = True,
+    base_url: str = "http://testserver",
+    origin: str | None = None,
 ) -> httpx.Response:
     headers = {"X-Request-ID": request_id}
+    if origin is not None:
+        headers["Origin"] = origin
     if access_code is not None:
         headers["X-Atom-Lab-Access-Code"] = access_code
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app, raise_app_exceptions=raise_app_exceptions),
-        base_url="http://testserver",
+        base_url=base_url,
     ) as client:
         return await client.request(method, path, headers=headers, json=json)
 
@@ -113,6 +118,177 @@ def test_atom_lab_catalog_fails_closed_without_server_configuration(
         },
         "request_id": "req_unavailable",
     }
+
+
+@pytest.mark.parametrize(
+    "base_url", ["http://127.0.0.1:8000", "http://localhost:8000", "http://[::1]:8000"]
+)
+def test_explicit_local_open_access_loads_catalog_without_code(app, monkeypatch, base_url) -> None:
+    monkeypatch.setenv("ANYTOOLAI_ATOM_LAB_AUTH_DISABLED", "true")
+    monkeypatch.delenv("ANYTOOLAI_ATOM_LAB_ACCESS_CODE")
+    catalog = asyncio.run(_request(app, "/v1/atom-lab/atoms", base_url=base_url, origin=base_url))
+    assert catalog.status_code == HTTPStatus.OK
+    assert len(catalog.json()) == 11
+    cli_catalog = asyncio.run(_request(app, "/v1/atom-lab/atoms", base_url=base_url))
+    assert cli_catalog.status_code == HTTPStatus.OK
+    page = asyncio.run(_request(app, "/atom-lab"))
+    assert 'id="access-panel" data-auto-open="true" hidden' in page.text
+    assert page.headers["cache-control"] == "no-store"
+    invalid_run = asyncio.run(_request(
+        app, "/v1/atom-lab/runs", method="POST", json={}, base_url=base_url, origin=base_url,
+    ))
+    assert invalid_run.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+
+
+@pytest.mark.parametrize("base_url,origin", [
+    ("http://127.0.0.1:8000", "chrome-extension://" + "a" * 32),
+    ("http://127.0.0.1:8000", "https://untrusted.example"),
+    ("http://127.0.0.1:8000", "http://127.0.0.1:9000"),
+    ("http://127.0.0.1:8000", "http://localhost:8000"),
+    ("http://127.0.0.1:8000", "null"),
+    ("http://rebound.example:8000", None),
+    ("http://rebound.example:8000", "http://rebound.example:8000"),
+    ("http://localhost.untrusted.example", None),
+])
+@pytest.mark.parametrize("method,path", [
+    ("GET", "/v1/atom-lab/atoms"),
+    ("GET", "/v1/atom-lab/atoms/A07/prompts"),
+    ("GET", "/v1/atom-lab/runs"),
+    ("POST", "/v1/atom-lab/runs"),
+    ("POST", "/v1/atom-lab/presets"),
+    ("POST", "/v1/atom-lab/atoms/A07/prompts"),
+])
+def test_local_open_access_rejects_untrusted_host_or_origin(
+    app, monkeypatch, base_url, origin, method, path,
+) -> None:
+    monkeypatch.setenv("ANYTOOLAI_ATOM_LAB_AUTH_DISABLED", "true")
+    response = asyncio.run(_request(
+        app, path, method=method, json={} if method == "POST" else None,
+        base_url=base_url, origin=origin,
+    ))
+    assert response.status_code == HTTPStatus.UNAUTHORIZED
+    assert response.json()["error"]["code"] == (
+        "access_denied" if path == "/v1/atom-lab/runs" else "atom_lab_access_denied"
+    )
+    assert "prompt_ref" not in response.text
+
+
+def test_code_protected_remote_access_keeps_working(app) -> None:
+    response = asyncio.run(_request(
+        app, "/v1/atom-lab/atoms", access_code=ACCESS_CODE,
+        base_url="https://lab.example", origin="https://lab.example",
+    ))
+    assert response.status_code == HTTPStatus.OK
+
+
+@pytest.mark.parametrize("path", ["/docs", "/redoc", "/docs/oauth2-redirect", "/demo", "/atom-lab"])
+@pytest.mark.parametrize("auth_disabled", [False, True])
+def test_api_html_cannot_be_framed(app, monkeypatch, path, auth_disabled) -> None:
+    monkeypatch.setenv("ANYTOOLAI_ATOM_LAB_AUTH_DISABLED", str(auth_disabled).lower())
+    response = asyncio.run(_request(app, path))
+
+    assert response.status_code == HTTPStatus.OK
+    assert response.headers["content-type"].startswith("text/html")
+    assert "frame-ancestors 'none'" in response.headers.get_list("content-security-policy")
+    assert response.headers["X-Request-ID"] == "req_atom_lab"
+
+
+def test_html_framing_policy_preserves_existing_headers_and_non_html(app) -> None:
+    @app.get("/html-policy-probe", include_in_schema=False)
+    def html_probe() -> HTMLResponse:
+        return HTMLResponse("<p>probe</p>", headers={
+            "Content-Security-Policy": "script-src 'self'; frame-ancestors 'self'",
+            "X-Frame-Options": "SAMEORIGIN",
+            "Cache-Control": "private",
+        })
+
+    response = asyncio.run(_request(app, "/html-policy-probe"))
+    assert response.headers.get_list("content-security-policy") == [
+        "script-src 'self'; frame-ancestors 'self'", "frame-ancestors 'none'",
+    ]
+    assert response.headers["X-Frame-Options"] == "SAMEORIGIN"
+    assert response.headers["Cache-Control"] == "private"
+    api_response = asyncio.run(_request(app, "/health"))
+    assert "content-security-policy" not in api_response.headers
+
+
+@pytest.mark.parametrize("content_length", [None, "1048576"])
+@pytest.mark.parametrize("malformed", [False, True])
+@pytest.mark.parametrize("access_mode", [
+    "missing-code", "wrong-code", "untrusted-host", "untrusted-origin",
+])
+def test_saved_prompt_denies_access_without_consuming_body(
+    app, monkeypatch, content_length, malformed, access_mode,
+) -> None:
+    consumed = []
+    headers = {"Content-Type": "application/json"}
+    base_url = "http://127.0.0.1:8000"
+    if content_length is not None:
+        headers["Content-Length"] = content_length
+    if access_mode == "wrong-code":
+        headers["X-Atom-Lab-Access-Code"] = "wrong"
+    if access_mode.startswith("untrusted-"):
+        monkeypatch.setenv("ANYTOOLAI_ATOM_LAB_AUTH_DISABLED", "true")
+        if access_mode == "untrusted-host":
+            base_url = "http://rebound.example:8000"
+        else:
+            headers["Origin"] = "https://untrusted.example"
+
+    async def request():
+        async def body():
+            for chunk in (b"{" if malformed else b'{"prompt":"', b"a" * 1048576, b'"}'):
+                consumed.append(len(chunk))
+                yield chunk
+
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url=base_url,
+        ) as client:
+            return await client.post(
+                "/v1/atom-lab/atoms/A07/prompts", headers=headers, content=body(),
+            )
+
+    response = asyncio.run(request())
+    assert response.status_code == HTTPStatus.UNAUTHORIZED
+    assert response.json()["error"]["code"] == "atom_lab_access_denied"
+    assert consumed == []
+
+
+def test_saved_prompt_bounded_body_preserves_openapi_contract(app) -> None:
+    operation = app.openapi()["paths"]["/v1/atom-lab/atoms/{atom_id}/prompts"]["post"]
+    assert operation["requestBody"] == {
+        "required": True,
+        "content": {"application/json": {"schema": {
+            "title": "AtomLabPromptCreateRequest", "type": "object", "additionalProperties": False,
+            "required": ["name", "prompt", "source_ref"],
+            "properties": {
+                "name": {"title": "Name", "type": "string", "minLength": 1, "maxLength": 80},
+                "prompt": {"title": "Prompt", "type": "string", "minLength": 1},
+                "source_ref": {
+                    "title": "Source Ref", "type": "string", "minLength": 1, "maxLength": 128,
+                    "pattern": "^[A-Za-z0-9_.-]+$",
+                },
+                "source_run_id": {
+                    "title": "Source Run Id",
+                    "anyOf": [
+                        {"type": "string", "maxLength": 128, "pattern": "^[A-Za-z0-9_-]+$"},
+                        {"type": "null"},
+                    ],
+                },
+            },
+        }}},
+    }
+    assert operation["responses"]["413"] == {
+        "description": "Atom Lab payload is too large.",
+        "content": {"application/json": {"schema": {
+            "$ref": "#/components/schemas/AtomLabErrorResponse",
+        }}},
+    }
+
+
+@pytest.mark.parametrize("value", ["false", "", "TRUE"])
+def test_open_access_requires_explicit_true(app, monkeypatch, value) -> None:
+    monkeypatch.setenv("ANYTOOLAI_ATOM_LAB_AUTH_DISABLED", value)
+    assert asyncio.run(_request(app, "/v1/atom-lab/atoms")).status_code == HTTPStatus.UNAUTHORIZED
 
 
 def test_atom_lab_models_use_atom_lab_error_envelope_when_storage_is_unavailable(app) -> None:
@@ -252,12 +428,19 @@ def test_atom_lab_request_validation_uses_the_lab_error_envelope(app) -> None:
     assert "must-not-be-echoed" not in response.text
 
 
-def test_atom_lab_shell_is_public_but_contains_no_protected_catalog_data(app) -> None:
+@pytest.mark.parametrize("auth_disabled", [False, True])
+def test_atom_lab_shell_is_public_but_contains_no_protected_catalog_data(
+    app, monkeypatch, auth_disabled,
+) -> None:
+    if auth_disabled:
+        monkeypatch.setenv("ANYTOOLAI_ATOM_LAB_AUTH_DISABLED", "true")
     page = asyncio.run(_request(app, "/atom-lab"))
     styles = asyncio.run(_request(app, "/atom-lab/atom_lab.css"))
     script = asyncio.run(_request(app, "/atom-lab/atom_lab.mjs"))
 
     assert page.status_code == HTTPStatus.OK
+    assert page.headers["Content-Security-Policy"] == "frame-ancestors 'none'"
+    assert page.headers["Cache-Control"] == "no-store"
     assert styles.status_code == HTTPStatus.OK
     assert script.status_code == HTTPStatus.OK
     assert '<input id="access-code" type="password"' in page.text

@@ -41,6 +41,7 @@ class AtomLabSnapshotRequest:
     capability_provenance: Mapping[str, Any]
     preset_id: str | None = None
     preset_version: int | None = None
+    prompt_source_ref: str | None = None
 
 
 def build_atom_lab_run_record(
@@ -96,6 +97,7 @@ def build_atom_lab_run_record(
         prompt_version=prompt.version,
         base_prompt=prompt.content,
         prompt=request.prompt,
+        prompt_source_ref=request.prompt_source_ref,
         input_schema_ref=input_schema.schema_ref,
         input_schema_version=input_schema.version,
         input_schema=_mutable_json(input_schema.schema),

@@ -2,17 +2,22 @@ from __future__ import annotations
 
 import asyncio
 import json
+import socket
+import sqlite3
+import threading
 from collections.abc import Iterator
 from dataclasses import replace
 from datetime import timedelta
 from http import HTTPStatus
 from pathlib import Path
+from time import monotonic, sleep
 from typing import Any
 
 import httpx
 import psycopg
 import pytest
 import sqlalchemy as sa
+import uvicorn
 from anytoolai_platform_api.atom_lab.catalog import get_atom_catalog_entry
 from anytoolai_platform_api.dependencies import (
     get_atom_lab_run_settings,
@@ -34,6 +39,7 @@ from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
 from anytoolai_platform_core.storage.db import (
     atom_lab_admission_scopes_table,
+    atom_lab_prompts_table,
     atom_lab_runs_table,
     guest_identities_table,
     jobs_table,
@@ -47,6 +53,7 @@ from anytoolai_platform_core.workflows.repository import JobRepository
 from fastapi import FastAPI
 from psycopg.types.string import StrDumper
 from pydantic import ValidationError
+from test_atom_lab_presets import _version_payload
 
 from tests.support.sqlite_harness import build_sqlite_runtime_engine
 
@@ -205,6 +212,285 @@ def _counts(app: FastAPI) -> tuple[int, ...]:
         )
 
 
+def _expected_contract(atom) -> dict[str, Any]:
+    return atom.model_dump(include={
+        "base_action_config_id", "prompt_ref", "action_type", "schema_refs",
+        "input_schema", "output_schema",
+    })
+
+
+def _changed_atom_registry(app, change):
+    registry = app.state.runtime.config_registry
+    atom = get_atom_catalog_entry(registry, "A07")
+    if change in {"base", "base-and-schema", "config"}:
+        configs = dict(registry.action_configurations)
+        config = configs.pop(atom.base_action_config_id)
+        if change == "config":
+            config = replace(config, action_config_id=f"{config.action_config_id}_next")
+        else:
+            prompts = dict(registry.prompts)
+            prompt = prompts[atom.prompt_ref]
+            prompt = replace(prompt, prompt_ref="kernel_demo.compose_reply.v2", version=2)
+            prompts[prompt.prompt_ref] = prompt
+            registry = replace(registry, prompts=prompts)
+            config = replace(config, prompt_ref=prompt.prompt_ref)
+        configs[config.action_config_id] = config
+        registry = replace(registry, action_configurations=configs)
+    if change.startswith(("input-", "output-")) or change == "base-and-schema":
+        schemas = dict(registry.schemas)
+        ref = atom.schema_refs.output if change.startswith("output-") else atom.schema_refs.input
+        definition = schemas[ref.schema_ref]
+        content = json.loads(json.dumps(
+            atom.output_schema if change.startswith("output-") else atom.input_schema,
+        ))
+        if change.endswith("-content"):
+            content["required"] = [*content.get("required", []), "new_required"]
+            content["properties"]["new_required"] = {"type": "string"}
+        elif change.endswith("-properties"):
+            content["properties"]["new_optional"] = {"type": "string"}
+        elif change.endswith("-reordered"):
+            content = dict(reversed(content.items()))
+            content["properties"] = dict(reversed(content["properties"].items()))
+        elif change.endswith(("-boolean", "-number")):
+            constant = True if change.endswith("-boolean") else 1
+            content["$defs"] = {"trial_constant": {"const": constant}}
+        elif change.endswith("-float"):
+            content["$defs"] = {"trial_constant": {"const": 1.0}}
+        schemas[ref.schema_ref] = replace(definition, **(
+            {"version": 2} if change.endswith("-version") or change == "base-and-schema"
+            else {"schema": content}
+        ))
+        registry = replace(registry, schemas=schemas)
+    return registry
+
+
+@pytest.mark.parametrize("source", ["product", "lab"])
+@pytest.mark.parametrize("change", [
+    "base-and-schema", "base", "config", "input-version", "output-version", "input-content",
+])
+def test_new_run_checks_displayed_contract_before_any_admission_writes(app, source, change):
+    atom = get_atom_catalog_entry(app.state.runtime.config_registry, "A07")
+    source_ref = "client_update_writer.reply_draft_compose_reply.v1"
+    if source == "lab":
+        async def save():
+            async with httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=app), base_url="http://test",
+            ) as client:
+                return await client.post("/v1/atom-lab/atoms/A07/prompts", headers={
+                    "X-Atom-Lab-Access-Code": ACCESS_CODE,
+                }, json={"name": "Lab source", "prompt": "Saved", "source_ref": source_ref})
+        saved = asyncio.run(save())
+        assert saved.status_code == HTTPStatus.CREATED, saved.text
+        source_ref = saved.json()["ref"]
+    changed = _changed_atom_registry(app, change)
+    app.dependency_overrides[get_config_registry] = lambda: changed
+    payload = _payload(
+        "A07", prompt_source_ref=source_ref, expected_contract=_expected_contract(atom),
+    )
+    rejected = _post(app, payload)
+    _error(rejected, HTTPStatus.CONFLICT, "contract_unavailable")
+    assert rejected.json()["error"]["field_errors"] == [
+        {"path": "expected_contract", "message": "Недопустимое значение."},
+    ]
+    assert _counts(app) == (0, 0, 0, 0, 0)
+
+
+def test_pinned_run_replays_frozen_request_after_server_contract_changes(app):
+    registry = app.state.runtime.config_registry
+    atom = get_atom_catalog_entry(registry, "A07")
+    payload = _payload("A07", prompt_source_ref="client_update_writer.reply_draft_compose_reply.v1",
+                       expected_contract=_expected_contract(atom))
+    first = _post(app, payload)
+    assert first.status_code == HTTPStatus.ACCEPTED, first.text
+    changed = _changed_atom_registry(app, "base-and-schema")
+    app.dependency_overrides[get_config_registry] = lambda: changed
+    replay = _post(app, payload)
+    assert replay.status_code == HTTPStatus.ACCEPTED, replay.text
+    assert replay.json() == first.json()
+    fresh_contract = _expected_contract(get_atom_catalog_entry(changed, "A07"))
+    _error(_post(app, {**payload, "expected_contract": fresh_contract}),
+           HTTPStatus.CONFLICT, "idempotency_conflict")
+    _error(_post(app, payload, key="new-stale-key"), HTTPStatus.CONFLICT, "contract_unavailable")
+    assert _counts(app) == (1, 1, 1, 1, 1)
+    with transaction_boundary(_factory(app)) as session:
+        assert session.scalar(sa.select(atom_lab_admission_scopes_table.c.accepted_count)) == 1
+        run = AtomLabRunRepository(session).get(first.json()["run_id"])
+        assert run.prompt_ref == atom.prompt_ref
+        assert run.input_schema_version == atom.schema_refs.input.version
+
+
+@pytest.mark.parametrize("change", ["missing", "extra", "schema"])
+def test_expected_run_contract_has_a_closed_typed_shape(app, change):
+    invalid = _expected_contract(get_atom_catalog_entry(app.state.runtime.config_registry, "A01"))
+    if change == "missing":
+        invalid.pop("base_action_config_id")
+    elif change == "extra":
+        invalid["provider"] = "openai"
+    else:
+        invalid["schema_refs"]["input"]["version"] = "invalid"
+    _error(_post(app, _payload(expected_contract=invalid)), HTTPStatus.UNPROCESSABLE_ENTITY,
+           "input_invalid")
+    assert _counts(app) == (0, 0, 0, 0, 0)
+
+
+@pytest.mark.parametrize("direction", ["input", "output"])
+@pytest.mark.parametrize("version", [True, "1", 1.0, None, [], {}])
+def test_expected_contract_schema_versions_reject_coercion_before_admission(
+    app, direction, version,
+):
+    contract = _expected_contract(get_atom_catalog_entry(app.state.runtime.config_registry, "A01"))
+    contract["schema_refs"][direction]["version"] = version
+    response = _post(app, _payload(expected_contract=contract))
+    _error(response, HTTPStatus.UNPROCESSABLE_ENTITY, "input_invalid")
+    assert response.json()["error"]["field_errors"] == []
+    assert _counts(app) == (0, 0, 0, 0, 0)
+
+
+@pytest.mark.parametrize("assertion", ["integer", "null", "omitted"])
+def test_expected_contract_accepts_integer_versions_and_legacy_omission_with_exact_replay(
+    app, assertion,
+):
+    payload = _payload()
+    if assertion == "integer":
+        payload["expected_contract"] = _expected_contract(
+            get_atom_catalog_entry(app.state.runtime.config_registry, "A01"),
+        )
+    elif assertion == "null":
+        payload["expected_contract"] = None
+    first = _post(app, payload)
+    assert first.status_code == HTTPStatus.ACCEPTED, first.text
+    assert _post(app, payload).json() == first.json()
+    assert _counts(app) == (1, 1, 1, 1, 1)
+    with transaction_boundary(_factory(app)) as session:
+        assert session.scalar(sa.select(atom_lab_admission_scopes_table.c.accepted_count)) == 1
+
+
+@pytest.mark.parametrize("origin", ["detached", "legacy-platform", "product"])
+@pytest.mark.parametrize("matching_source", [True, False])
+def test_successful_detached_or_known_origin_run_can_only_prove_its_save_source(
+    app, origin, matching_source,
+):
+    atom = get_atom_catalog_entry(app.state.runtime.config_registry, "A07")
+    product_ref = "client_update_writer.reply_draft_compose_reply.v1"
+    source_ref = product_ref if origin == "product" else atom.prompt_ref
+    prompt = atom.prompt if origin == "legacy-platform" else "Точный ручной промпт"
+    accepted = _post(app, _payload(
+        "A07", prompt=prompt, prompt_source_ref=product_ref if origin == "product" else None,
+    ))
+    assert accepted.status_code == HTTPStatus.ACCEPTED, accepted.text
+    with transaction_boundary(_factory(app)) as session:
+        session.execute(sa.update(jobs_table).where(jobs_table.c.id == accepted.json()["job_id"])
+                        .values(status="succeeded"))
+        frozen = AtomLabRunRepository(session).get(accepted.json()["run_id"]).snapshot_payload()
+    assert frozen["prompt"].get("source_ref") == (product_ref if origin == "product" else None)
+
+    async def save():
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test",
+        ) as client:
+            return await client.post("/v1/atom-lab/atoms/A07/prompts", headers={
+                "X-Atom-Lab-Access-Code": ACCESS_CODE,
+            }, json={"name": "Проверенный текст", "prompt": prompt,
+                     "source_ref": source_ref if matching_source else (
+                         atom.prompt_ref if origin == "product" else product_ref
+                     ), "source_run_id": accepted.json()["run_id"]})
+
+    saved = asyncio.run(save())
+    if matching_source:
+        assert saved.status_code == HTTPStatus.CREATED, saved.text
+        assert saved.json()["source_run_id"] == accepted.json()["run_id"]
+        assert saved.json()["source_ref"] == source_ref
+    else:
+        _error(saved, HTTPStatus.UNPROCESSABLE_ENTITY, "prompt_invalid")
+        assert saved.json()["error"]["field_errors"][0]["path"] == "source_run_id"
+    with transaction_boundary(_factory(app)) as session:
+        run = AtomLabRunRepository(session).get(accepted.json()["run_id"])
+        assert run.snapshot_payload() == frozen
+        assert session.scalar(sa.select(sa.func.count()).select_from(atom_lab_prompts_table)) == (
+            1 if matching_source else 0
+        )
+
+
+@pytest.mark.parametrize("change", ["reordered", "boolean-number", "float-integer"])
+def test_expected_run_contract_compares_schema_json_types_and_ignores_object_order(app, change):
+    before = (
+        _changed_atom_registry(app, "input-boolean") if change == "boolean-number"
+        else app.state.runtime.config_registry
+    )
+    atom = get_atom_catalog_entry(before, "A07")
+    changed = _changed_atom_registry(
+        app, "input-number" if change == "boolean-number" else "input-reordered",
+    )
+    if change == "float-integer":
+        changed = _changed_atom_registry(app, "input-float")
+        atom = get_atom_catalog_entry(_changed_atom_registry(app, "input-number"), "A07")
+    app.dependency_overrides[get_config_registry] = lambda: changed
+    response = _post(app, _payload("A07", expected_contract=_expected_contract(atom)))
+    if change == "boolean-number":
+        _error(response, HTTPStatus.CONFLICT, "contract_unavailable")
+        assert response.json()["error"]["field_errors"][0]["path"] == "expected_contract"
+        assert _counts(app) == (0, 0, 0, 0, 0)
+    else:
+        assert response.status_code == HTTPStatus.ACCEPTED, response.text
+
+
+@pytest.mark.parametrize("change", [
+    "unchanged", "base", "config", "input-version", "output-version",
+    "input-content", "output-content", "input-properties", "output-properties",
+    "input-reordered", "output-reordered", "input-boolean-number", "input-float-integer",
+    "input-missing", "output-missing", "input-malformed", "output-malformed",
+])
+def test_saved_prompt_proof_checks_base_and_config_independently_of_source(app, change):
+    source_ref = "client_update_writer.reply_draft_compose_reply.v1"
+    if change == "input-boolean-number":
+        before = _changed_atom_registry(app, "input-boolean")
+        app.dependency_overrides[get_config_registry] = lambda: before
+    elif change == "input-float-integer":
+        before = _changed_atom_registry(app, "input-float")
+        app.dependency_overrides[get_config_registry] = lambda: before
+    accepted = _post(app, _payload("A07", prompt_source_ref=source_ref))
+    assert accepted.status_code == HTTPStatus.ACCEPTED, accepted.text
+    with transaction_boundary(_factory(app)) as session:
+        session.execute(sa.update(jobs_table).where(jobs_table.c.id == accepted.json()["job_id"])
+                        .values(status="succeeded"))
+        if change.endswith(("-missing", "-malformed")):
+            column = f"{change.split('-')[0]}_schema"
+            content = sa.JSON.NULL if change.endswith("-missing") else []
+            session.execute(sa.update(atom_lab_runs_table)
+                            .where(atom_lab_runs_table.c.id == accepted.json()["run_id"])
+                            .values(**{column: content}))
+        frozen = AtomLabRunRepository(session).get(accepted.json()["run_id"]).snapshot_payload()
+    if change != "unchanged" and not change.endswith(("-missing", "-malformed")):
+        changed = _changed_atom_registry(
+            app, "input-number"
+            if change in {"input-boolean-number", "input-float-integer"} else change,
+        )
+        app.dependency_overrides[get_config_registry] = lambda: changed
+
+    async def save(source_run_id):
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test",
+        ) as client:
+            return await client.post("/v1/atom-lab/atoms/A07/prompts", headers={
+                "X-Atom-Lab-Access-Code": ACCESS_CODE,
+            }, json={"name": "Tested text", "prompt": "Точный промпт", "source_ref": source_ref,
+                     "source_run_id": source_run_id})
+
+    tested = asyncio.run(save(accepted.json()["run_id"]))
+    if change in {"unchanged", "input-reordered", "output-reordered", "input-float-integer"}:
+        assert tested.status_code == HTTPStatus.CREATED, tested.text
+        assert tested.json()["source_run_id"] == accepted.json()["run_id"]
+    else:
+        _error(tested, HTTPStatus.UNPROCESSABLE_ENTITY, "prompt_invalid")
+        assert tested.json()["error"]["field_errors"][0]["path"] == "source_run_id"
+    unbound = asyncio.run(save(None))
+    assert unbound.status_code == HTTPStatus.CREATED, unbound.text
+    assert unbound.json()["source_run_id"] is None
+    with transaction_boundary(_factory(app)) as session:
+        run = AtomLabRunRepository(session).get(accepted.json()["run_id"])
+        assert run.snapshot_payload() == frozen
+
+
 def _error(response: httpx.Response, status: int, code: str) -> None:
     assert response.status_code == status, response.text
     body = response.json()
@@ -215,6 +501,348 @@ def _error(response: httpx.Response, status: int, code: str) -> None:
     assert ACCESS_CODE not in response.text
     assert LIVE_TOKEN not in response.text
     assert "Точный промпт" not in response.text
+
+
+@pytest.mark.parametrize(
+    "limit,prompt,accepted", [
+        (16, "a" * 16, True), (16, "a" * 17, False),
+        (16, "я" * 8, True), (16, "я" * 8 + "!", False),
+        (70000, "a" * 65537, True), (70000, "a" * 70000, True),
+        (70000, "a" * 70001, False), (70000, "я" * 35000, True),
+        (70000, "я" * 35000 + "!", False),
+    ],
+    ids=["ascii-limit", "ascii-over", "utf8-limit", "utf8-over", "raised-ascii-above-64k",
+         "raised-ascii-limit", "raised-ascii-over", "raised-utf8-limit", "raised-utf8-over"],
+)
+def test_saved_prompt_uses_run_admission_utf8_limit(app, monkeypatch, limit, prompt, accepted):
+    monkeypatch.setenv("ANYTOOLAI_ATOM_LAB_RUN_PROMPT_MAX_BYTES", str(limit))
+
+    async def save():
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test",
+            headers={"X-Atom-Lab-Access-Code": ACCESS_CODE},
+        ) as client:
+            response = await client.post("/v1/atom-lab/atoms/A07/prompts", json={
+                "name": "UTF-8 boundary", "prompt": prompt,
+                "source_ref": "kernel_demo.compose_reply.v1",
+            })
+            options = (await client.get("/v1/atom-lab/atoms/A07/prompts")).json()
+            assert any(option["name"] == "UTF-8 boundary" for option in options) == accepted
+            return response
+
+    response = asyncio.run(save())
+    if accepted:
+        assert response.status_code == HTTPStatus.CREATED, response.text
+    else:
+        _error(response, HTTPStatus.UNPROCESSABLE_ENTITY, "prompt_invalid")
+        assert response.json()["error"]["field_errors"] == [
+            {"path": "prompt", "message": "Недопустимое значение."},
+        ]
+
+
+@pytest.mark.parametrize("content_length", [None, "actual", "1"])
+@pytest.mark.parametrize("over_limit", [False, True])
+@pytest.mark.parametrize("access_mode", ["code", "local-origin", "local-cli"])
+def test_saved_prompt_bounds_stream_before_parsing(
+    app, monkeypatch, content_length, over_limit, access_mode,
+):
+    raw = json.dumps({
+        "name": "Stream boundary", "prompt": "я" * 8,
+        "source_ref": "kernel_demo.compose_reply.v1",
+    }, ensure_ascii=False).encode("utf-8")
+    monkeypatch.setenv("ANYTOOLAI_ATOM_LAB_RUN_BODY_MAX_BYTES", str(len(raw) - int(over_limit)))
+    monkeypatch.setenv("ANYTOOLAI_ATOM_LAB_RUN_PROMPT_MAX_BYTES", "16")
+    consumed = []
+
+    async def request():
+        async def body():
+            for chunk in (raw[:-1], raw[-1:], b"unread trailing data" if over_limit else b""):
+                consumed.append(len(chunk))
+                yield chunk
+
+        headers = {"Content-Type": "application/json"}
+        if access_mode == "code":
+            headers["X-Atom-Lab-Access-Code"] = ACCESS_CODE
+        else:
+            monkeypatch.setenv("ANYTOOLAI_ATOM_LAB_AUTH_DISABLED", "true")
+            if access_mode == "local-origin":
+                headers["Origin"] = "http://127.0.0.1:8000"
+        if content_length is not None:
+            headers["Content-Length"] = (
+                str(len(raw)) if content_length == "actual" else content_length
+            )
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1:8000",
+        ) as client:
+            return await client.post(
+                "/v1/atom-lab/atoms/A07/prompts", headers=headers, content=body(),
+            )
+
+    response = asyncio.run(request())
+    if over_limit:
+        _error(response, HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "payload_too_large")
+        assert consumed == [len(raw) - 1, 1]
+    else:
+        assert response.status_code == HTTPStatus.CREATED, response.text
+        assert response.json()["prompt"] == "я" * 8
+
+
+@pytest.mark.parametrize("raw", [b"{", b"{}", b'{"name": "x", "prompt": 42, "source_ref": "x"}'])
+def test_saved_prompt_bounded_parser_keeps_validation_envelope(app, raw):
+    async def request():
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test",
+            headers={"Content-Type": "application/json", "X-Atom-Lab-Access-Code": ACCESS_CODE},
+        ) as client:
+            return await client.post("/v1/atom-lab/atoms/A07/prompts", content=raw)
+
+    response = asyncio.run(request())
+    _error(response, HTTPStatus.UNPROCESSABLE_ENTITY, "request_validation_failed")
+    assert response.json()["error"]["field_errors"]
+    if b"42" in raw:
+        assert response.json()["error"]["field_errors"] == [
+            {"path": "prompt", "message": "Недопустимое значение."},
+        ]
+
+
+@pytest.mark.parametrize("stage", ["begin", "insert", "commit", "after_commit"])
+def test_saved_prompt_database_failure_is_contained(app, caplog, stage):
+    factory = _factory(app)
+    target = factory if stage == "after_commit" else factory.kw["bind"]
+    event_name = "before_cursor_execute" if stage == "insert" else stage
+    secret = "saved-prompt-private-marker"
+    attempts = []
+
+    def fail(*args, **kwargs):
+        if stage == "insert" and not args[2].startswith("INSERT INTO platform.atom_lab_prompts"):
+            return
+        attempts.append(stage)
+        raise sa.exc.ProgrammingError("INSERT private", {"prompt": secret}, Exception(secret))
+
+    async def save():
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test",
+            headers={"X-Atom-Lab-Access-Code": ACCESS_CODE, "X-Request-ID": "prompt-db-error"},
+        ) as client:
+            return await client.post("/v1/atom-lab/atoms/A07/prompts", json={
+                "name": "Private", "prompt": secret, "source_ref": "kernel_demo.compose_reply.v1",
+            })
+
+    sa.event.listen(target, event_name, fail)
+    try:
+        response = asyncio.run(save())
+    finally:
+        sa.event.remove(target, event_name, fail)
+    _error(response, HTTPStatus.SERVICE_UNAVAILABLE, "lab_unavailable")
+    assert response.json()["request_id"] == "prompt-db-error"
+    assert secret not in response.text + caplog.text
+    records = [
+        record for record in caplog.records if record.message == "atom_lab.prompt_database_error"
+    ]
+    assert len(records) == 1
+    assert records[0].exception_type == "ProgrammingError"
+    assert records[0].exc_info is None
+    assert attempts == [stage]
+    with transaction_boundary(factory) as session:
+        count = session.scalar(sa.select(sa.func.count()).select_from(atom_lab_prompts_table))
+    assert count == int(stage == "after_commit")
+
+
+def test_refused_prompt_insert_never_reaches_uvicorn_error_log(app, capfd, caplog):
+    engine = _factory(app).kw["bind"]
+    secret = "saved-prompt-uvicorn-private-marker"
+
+    def refuse_insert(connection, cursor, statement, parameters, context, executemany):
+        def authorize(action, table, *args):
+            if action == sqlite3.SQLITE_INSERT and table == "atom_lab_prompts":
+                return sqlite3.SQLITE_DENY
+            return sqlite3.SQLITE_OK
+
+        connection.connection.driver_connection.set_authorizer(authorize)
+
+    server_socket = socket.socket()
+    server_socket.bind(("127.0.0.1", 0))
+    server = uvicorn.Server(uvicorn.Config(
+        app, host="127.0.0.1", port=server_socket.getsockname()[1], access_log=False,
+    ))
+    thread = threading.Thread(target=server.run, kwargs={"sockets": [server_socket]}, daemon=True)
+    sa.event.listen(engine, "before_cursor_execute", refuse_insert)
+    thread.start()
+    try:
+        deadline = monotonic() + 5
+        while not server.started and monotonic() < deadline:
+            sleep(0.01)
+        assert server.started
+        response = httpx.post(
+            f"http://127.0.0.1:{server_socket.getsockname()[1]}/v1/atom-lab/atoms/A07/prompts",
+            headers={"X-Atom-Lab-Access-Code": ACCESS_CODE},
+            json={
+                "name": "Private", "prompt": secret, "source_ref": "kernel_demo.compose_reply.v1",
+            },
+            timeout=5,
+        )
+    finally:
+        server.should_exit = True
+        thread.join(timeout=5)
+        server_socket.close()
+        sa.event.remove(engine, "before_cursor_execute", refuse_insert)
+    assert not thread.is_alive()
+    captured = capfd.readouterr()
+    emitted = captured.out + captured.err + caplog.text
+    assert secret not in emitted
+    assert "[parameters:" not in emitted
+    assert "INSERT INTO" not in emitted
+    assert "Exception in ASGI application" not in emitted
+    _error(response, HTTPStatus.SERVICE_UNAVAILABLE, "lab_unavailable")
+    with transaction_boundary(_factory(app)) as session:
+        assert session.scalar(sa.select(sa.func.count()).select_from(atom_lab_prompts_table)) == 0
+
+
+@pytest.mark.parametrize("path", ["prompt", "name"])
+def test_saved_prompt_nul_remains_a_validation_error(app, path):
+    async def save():
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test",
+            headers={"X-Atom-Lab-Access-Code": ACCESS_CODE},
+        ) as client:
+            return await client.post("/v1/atom-lab/atoms/A07/prompts", json={
+                "name": "Private", "prompt": "Private",
+                "source_ref": "kernel_demo.compose_reply.v1",
+                path: "private\x00value",
+            })
+
+    response = asyncio.run(save())
+    _error(response, HTTPStatus.UNPROCESSABLE_ENTITY, "prompt_invalid")
+    assert response.json()["error"]["field_errors"] == [
+        {"path": path, "message": "Недопустимое значение."},
+    ]
+
+
+@pytest.mark.parametrize("method", ["get", "post"])
+def test_prompt_routes_document_and_return_atom_not_found(app, method):
+    path = "/v1/atom-lab/atoms/{atom_id}/prompts"
+    assert app.openapi()["paths"][path][method]["responses"]["404"]["content"][
+        "application/json"
+    ]["schema"] == {"$ref": "#/components/schemas/AtomLabErrorResponse"}
+
+    async def request():
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test",
+            headers={"X-Atom-Lab-Access-Code": ACCESS_CODE},
+        ) as client:
+            return await client.request(
+                method.upper(), path.replace("{atom_id}", "missing"),
+                json={"name": "Test", "prompt": "Test", "source_ref": "missing"}
+                if method == "post" else None,
+            )
+
+    _error(asyncio.run(request()), HTTPStatus.NOT_FOUND, "atom_not_found")
+
+
+def test_workbench_prompts_are_protected_atom_scoped_and_run_local(app: FastAPI) -> None:
+    product_ref = "client_update_writer.reply_draft_compose_reply.v1"
+    platform_ref = "kernel_demo.compose_reply.v1"
+    path = "/v1/atom-lab/atoms/A07/prompts"
+    edited = "Точный промпт для ответа с конкретным следующим шагом"
+
+    async def exercise_library() -> str:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            assert (await client.get(path)).status_code == HTTPStatus.UNAUTHORIZED
+            client.headers["X-Atom-Lab-Access-Code"] = ACCESS_CODE
+            options = (await client.get(path)).json()
+            by_ref = {option["ref"]: option for option in options}
+            assert by_ref[platform_ref]["group"] == "platform"
+            assert by_ref[product_ref]["group"] == "product"
+            assert "client_update_writer.prepaid_request_compose_persuasive_text.v1" not in by_ref
+            draft = {"name": "Ответ", "prompt": edited, "source_ref": product_ref}
+            assert (await client.post(path, json={
+                **draft, "source_run_id": "missing",
+            })).status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+            assert (await client.post(path, json={
+                **draft, "source_ref": "kernel_demo.extract_structured_fields.v1",
+            })).status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+            response = await client.post(path, json=draft)
+            assert response.status_code == HTTPStatus.CREATED, response.text
+            saved = response.json()
+            assert saved["prompt"] == edited
+            assert saved["group"] == "lab"
+            assert saved["source_ref"] == product_ref
+            assert saved in (await client.get(path)).json()
+            assert saved not in (await client.get("/v1/atom-lab/atoms/A01/prompts")).json()
+            return saved["ref"]
+
+    saved_ref = asyncio.run(exercise_library())
+    wrong_atom = _post(app, _payload(prompt_source_ref=saved_ref))
+    _error(wrong_atom, HTTPStatus.UNPROCESSABLE_ENTITY, "prompt_source_invalid")
+    payload = _payload("A07", prompt=edited, prompt_source_ref=saved_ref)
+    response = _post(app, payload)
+    assert response.status_code == HTTPStatus.ACCEPTED, response.text
+    _error(_post(app, {**payload, "prompt_source_ref": product_ref}), HTTPStatus.CONFLICT,
+           "idempotency_conflict")
+    with transaction_boundary(_factory(app)) as session:
+        run = AtomLabRunRepository(session).get(response.json()["run_id"])
+        assert run.snapshot_payload()["prompt"] == {
+            "ref": platform_ref, "version": 1, "base": run.base_prompt,
+            "content": edited, "source_ref": saved_ref,
+        }
+
+
+@pytest.mark.parametrize("saved_lab_prompt", [False, True])
+def test_prompt_origin_roundtrips_presets_export_and_run_history(app, saved_lab_prompt):
+    product_ref = "client_update_writer.reply_draft_compose_reply.v1"
+    atom = get_atom_catalog_entry(app.state.runtime.config_registry, "A07")
+    configuration = _version_payload(
+        atom_id=atom.atom_id, base_action_config_id=atom.base_action_config_id,
+        schema_refs=atom.schema_refs.model_dump(), prompt=atom.prompt, prompt_ref=atom.prompt_ref,
+        fixed_fields=[], example_input=atom.example_input,
+    )
+
+    async def roundtrip():
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test",
+            headers={"X-Atom-Lab-Access-Code": ACCESS_CODE},
+        ) as client:
+            source_ref = product_ref
+            if saved_lab_prompt:
+                saved = await client.post("/v1/atom-lab/atoms/A07/prompts", json={
+                    "name": "Saved origin", "prompt": configuration["prompt"],
+                    "source_ref": product_ref,
+                })
+                assert saved.status_code == HTTPStatus.CREATED, saved.text
+                source_ref = saved.json()["ref"]
+            payload = {**configuration, "prompt_source_ref": source_ref}
+            created = await client.post("/v1/atom-lab/presets", json=payload)
+            assert created.status_code == HTTPStatus.CREATED, created.text
+            preset_id = created.json()["preset_id"]
+            path = f"/v1/atom-lab/presets/{preset_id}/versions"
+            exported = await client.get(f"{path}/1/export")
+            assert exported.status_code == HTTPStatus.OK, exported.text
+            assert exported.json()["configuration"] == {**payload, "source_run_id": None}
+            updated = await client.post(path, json={
+                **exported.json()["configuration"], "base_version": 1,
+            })
+            assert updated.status_code == HTTPStatus.CREATED, updated.text
+            restored = await client.get(f"{path}/2")
+            assert restored.status_code == HTTPStatus.OK, restored.text
+            restored = restored.json()
+            assert restored["prompt_source_ref"] == source_ref
+            accepted = await client.post("/v1/atom-lab/runs", json=_payload(
+                "A07", prompt=restored["prompt"], prompt_source_ref=restored["prompt_source_ref"],
+                preset_ref={"preset_id": preset_id, "version": 2},
+            ), headers={"Idempotency-Key": "preset-origin"})
+            assert accepted.status_code == HTTPStatus.ACCEPTED, accepted.text
+            history = await client.get(f"/v1/atom-lab/runs/{accepted.json()['run_id']}")
+            assert history.status_code == HTTPStatus.OK, history.text
+            assert history.json()["snapshot"]["prompt"]["source_ref"] == source_ref
+            invalid = await client.post("/v1/atom-lab/presets", json={
+                **payload, "prompt_source_ref": "kernel_demo.extract_structured_fields.v1",
+            })
+            assert invalid.status_code == HTTPStatus.UNPROCESSABLE_ENTITY, invalid.text
+            assert invalid.json()["error"]["field_errors"][0]["path"] == "prompt_source_ref"
+
+    asyncio.run(roundtrip())
 
 
 @pytest.mark.parametrize("atom_id", list(INPUTS))

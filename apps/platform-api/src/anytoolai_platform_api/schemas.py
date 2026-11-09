@@ -183,7 +183,7 @@ class AtomLabVersionedSchemaRefResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     schema_ref: str
-    version: int
+    version: int = Field(strict=True)
 
 
 class AtomLabSchemaRefsResponse(BaseModel):
@@ -269,6 +269,9 @@ class AtomLabPresetVersionRequest(BaseModel):
     fixed_fields: list[str] = Field(default_factory=list)
     example_input: dict[str, Any]
     source_run_id: str | None = Field(default=None, max_length=128)
+    prompt_source_ref: str | None = Field(
+        default=None, max_length=128, pattern=r"^[A-Za-z0-9_.-]+$",
+    )
 
 
 class AtomLabRunPresetRef(BaseModel):
@@ -276,6 +279,17 @@ class AtomLabRunPresetRef(BaseModel):
 
     preset_id: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
     version: int = Field(strict=True, ge=1, le=2_147_483_647)
+
+
+class AtomLabRunExpectedContract(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    action_type: str = Field(min_length=1, max_length=128)
+    base_action_config_id: str = Field(min_length=1, max_length=128)
+    prompt_ref: str = Field(min_length=1, max_length=128)
+    schema_refs: AtomLabSchemaRefsResponse
+    input_schema: dict[str, Any]
+    output_schema: dict[str, Any]
 
 
 class AtomLabRunRequest(BaseModel):
@@ -287,6 +301,26 @@ class AtomLabRunRequest(BaseModel):
     model_id: str = Field(min_length=1, max_length=256)
     reasoning_effort: ReasoningEffort | None
     preset_ref: AtomLabRunPresetRef | None = None
+    prompt_source_ref: str | None = Field(default=None, max_length=128, pattern=r"^[A-Za-z0-9_.-]+$")
+    expected_contract: AtomLabRunExpectedContract | None = None
+
+
+class AtomLabPromptOption(BaseModel):
+    ref: str
+    name: str
+    prompt: str
+    group: Literal["platform", "product", "lab"]
+    source_ref: str | None = None
+    source_run_id: str | None = None
+
+
+class AtomLabPromptCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=80)
+    prompt: str = Field(min_length=1)
+    source_ref: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.-]+$")
+    source_run_id: str | None = Field(default=None, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
 
 
 class AtomLabRunRuntimeIdsResponse(BaseModel):

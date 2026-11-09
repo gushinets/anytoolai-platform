@@ -1,0 +1,302 @@
+# Execution Plan: ANY-818 Atom Lab Laboratory delivery
+
+## Status
+
+- State: active
+- Owner: agent
+- Created: 2026-11-06
+- Last updated: 2026-11-06
+- Review date: 2026-11-06
+- Next action: complete fresh independent reviews and check CI on the resulting head; do not merge
+- Blocker: none
+
+## Goal
+
+Deliver the accumulated Atom Lab prompt editor, saved prompts, compact request/response UI,
+preset/history redesign and Laboratory naming under
+[ANY-818](https://linear.app/paveldik/issue/ANY-818/atom-lab-redaktor-produktovyh-promptov-i-interfejs-laboratoriya).
+
+## Scope
+
+Include Atom Lab production changes, migration, generated contracts, feature tests and the
+November feature plans. Leave unrelated product reports and earlier experiments out of this PR.
+Preserve the default protected surface, local operator opt-out and existing provider boundary.
+
+## Integration
+
+The tested local base was 2b492099. Current origin/main is 4cd2e0aa and already owns migrations
+0016 and 0017 for execution metering. Renumber the saved-prompt migration to 0018 after 0017,
+retain both sets of schema/API changes and regenerate derived docs/contracts after integration.
+The running local acceptance DB has the old development revision numbering; it must not be
+stamped or migrated as part of publishing the PR. Prove a clean upgrade on an isolated test DB.
+
+## Verification
+
+Previous feature checks: 53 Node tests, 96 Chromium journeys, lint, live Docker desktop/mobile
+inspection and zero-write saved-run verification. Run repository and migration checks on the
+integrated branch, record exact results and disclose any unresolved limitations in the PR.
+
+The branch is based on 4cd2e0aa with migration 0018 after 0017. Generated docs and API types
+are current. Canonical frontend-check passed, as did the Atom Lab DB-free API/Core suite and
+five PostgreSQL storage/migration/concurrency tests. The latter use disposable databases and
+cover saved-prompt replay plus tenant/region/atom isolation. A clean checkout passed all 242
+architecture tests after updating the atom-ID drift guard for the label-derived catalog.
+
+Windows full-check was attempted but did not complete successfully. Local ignored QA snapshots
+cause four provider-boundary failures in the working folder; those pass in the clean checkout.
+The unchanged deployment runner test also fails on the local Temp ACL before its selector
+assertion. No permissions or lock-safety rules were changed. Full required CI remains pending.
+
+## Independent review round 1
+
+Reviewer: GPT-6.1 Sol (`gpt-6.1-sol`), xhigh; reviewed head `b038fb055dabeb345b067d952214b2c6c4cca5cb`.
+All three findings were confirmed and repaired:
+
+- P1: update both current-head assertions to 0018; reflect the historical 0016 schema and assert
+  the exact 0016-to-0017 data transition before upgrading the disposable database to current head.
+- P2: retain prompt origin through history restoration, preset create/version/apply/export and
+  subsequent submissions. Optional preset `prompt_source_ref` is stored by migration 0018;
+  existing presets remain valid with null provenance. New writes validate the referenced prompt
+  against the current atom and tenant/region scope.
+- P2: a saved prompt's successful trial must match both input/output schema references and versions.
+  Tests also cover valid evidence and cross-tenant/cross-region rejection.
+
+Validation: doctor passed; 291 focused API/Core tests passed; all eight targeted PostgreSQL tests
+passed (the three reported migration regressions plus five Atom Lab migration/storage/concurrency
+tests). Canonical frontend-check passed, including 53 Node tests and 97 Chromium journeys.
+The added parser compatibility/negative assertions and three prompt-origin browser journeys also
+passed after the final test edits. Documentation validation and generated-document drift passed.
+All database checks use UUID-named disposable databases via the container's `/postgres` maintenance
+database; the acceptance application database was not migrated or stamped. No provider was called.
+
+The canonical PostgreSQL run completed with two failures and three teardown errors, all connection
+timeouts or unexpected connection closure. The affected cases were:
+
+- `test_failed_0016_migration_rolls_back_ddl_counters_and_version_then_retries` (failed while
+  seeding 0015, before exercising the migration).
+- `test_client_event_rejects_uppercase_mode_value` (connection closed during identity lookup).
+- Teardown of `test_paid_counter_constraints[values0]`,
+  `test_workflow_runner_output_mapping_passes_scenario_input_through_verbatim`, and
+  `test_unavailable_final_candidate_never_consumes_or_publishes[provenance]`.
+
+All five cases passed in a 12-test retry alongside the full targeted migration/Atom Lab PG set.
+The two existing POSIX-only SIGTERM tests were skipped on Windows. Three disposable databases
+left by failed teardowns were individually verified inactive and removed by exact UUID name.
+The broad PostgreSQL command remains a non-green local run; required GitHub CI must confirm it.
+Local diagnostics: `.quick-check-tmp/fix-round1-postgresql.log` and
+`.quick-check-tmp/fix-round1-pg-retry.log` (ignored test artifacts, not PR content).
+
+The next reviewers must inspect the same resulting commit: fresh GPT-6.1 Sol xhigh, then GPT-6 Sol
+xhigh (the user-approved replacement for unavailable GPT-5.6). Leave PR 259 open and do not merge.
+
+## Independent review round 2
+
+Reviewer: GPT-6.1 Sol (`gpt-6.1-sol`), xhigh; reviewed the entire PR at head
+`93b75056205a2cc46a9d415e33784eae71588c52` and found one P2: historical preset/history
+adaptation retained a saved Lab prompt origin whose schema contract was no longer current,
+so strict backend validation rejected subsequent runs and preset saves.
+
+Repair: reconcile origins only during explicit adaptation against the existing
+current prompt-options endpoint. Preserve available origins and historical prompt text; detach
+only unavailable origins with a visible explanation. Block new run/preset writes until that
+check succeeds, and retain the existing retry path on loading failures. Compatible restore,
+save, apply and export keep their provenance. Backend validation and immutable records stay strict.
+
+Four focused Chromium regressions passed: preset/history adaptation with unavailable and available
+Lab origins. They verify schema v1-to-v2 drift, delayed options, 503 and malformed-list recovery,
+blocked write handlers while unresolved, preservation of edits, both resulting run/preset payloads,
+and an already-open prompt tab with an abandoned draft's request still pending. The platform prompt
+must be present in a valid options response before absence can detach an origin.
+
+Validation: doctor and canonical frontend-check passed, including lint, typecheck, all 53 Atom Lab
+Node tests, all 101 Chromium journeys, generated API-contract drift and frontend builds. The six
+focused new/existing origin journeys also passed together; ordinary prompt loads retain the
+existing saved-version status because only adaptation reconciliation updates draft state.
+Documentation validation and generated-document drift passed. Final frontend log:
+`.quick-check-tmp/fix-round2-frontend-final.log` (ignored diagnostic, not PR content).
+
+All required CI checks passed on the prior head `93b75056`: full-check, Windows baseline,
+PostgreSQL quota/concurrency, atoms-proof and production Compose smoke. The round 1 broad local
+transport-failure evidence above remains historical. No backend or migration changes are needed in round 2, so
+PostgreSQL checks are not repeated; the acceptance database stays untouched and no provider is
+called. Fresh review of the resulting entire PR remains required before the second-model review.
+
+## Independent review round 3
+
+Reviewer: GPT-6.1 Sol (`gpt-6.1-sol`), xhigh; reviewed the entire PR at head
+`92393395c9f55743ba3de93059c4c7d1f8299a84` and found two UI validation defects:
+
+- P2: preset validation selected the input tab while the library still hid the editor and errors.
+- P3: the empty-input quiet state hid required-field feedback after a draft had been edited.
+
+Repair: explicit input/prompt tab navigation now reveals the laboratory. Failed preset input
+validation requests feedback, opens and focuses the current editor, and explains how to return
+to the preserved preset draft. JSON validation links target the visible JSON editor. The existing
+`validationRequested` flag latches actual draft changes, so returning to `{}` cannot hide errors;
+a new untouched session stays quiet. Ordinary preset/history rendering does not switch views.
+
+Three browser regressions first failed against the reviewed code at the hidden request panel or
+missing required errors. The repaired journeys cover new/versioned presets, visible errors and
+focus, correction and successful saves preserving name/description/fixed fields/base version,
+empty input after saved baselines and edits returned to the initial baseline, and an untouched
+empty draft whose Save must explicitly reveal validation. The existing backend-field-error
+journey also verifies that empty-prompt feedback stays visible in the preset panel and the text
+is retained when returning to the editor.
+
+Validation: doctor and canonical frontend-check passed, including lint, typecheck, all 53 Atom Lab
+Node tests, all 104 Chromium journeys, generated API-contract drift and frontend builds.
+Documentation validation and generated-document drift passed; the latter uses the managed
+`.quick-check-venv` because the system Python lacks `markdown_it` and the sandbox Temp ACL blocks
+cleanup. Frontend log: `.quick-check-tmp/fix-round3-frontend.log` (ignored diagnostic).
+Backend and PostgreSQL checks are not repeated for this UI-only repair. The acceptance database
+stays untouched and no provider is called. Fresh entire-PR review of the resulting commit remains
+required before the second-model review; do not merge.
+
+## Independent review round 4
+
+Reviewer: GPT-6.1 Sol (`gpt-6.1-sol`), xhigh; reviewed all 42 PR files at head
+`d0838474fd3d536435e767bc43665e4b1adacaf7` and found one P2: compatible preset/history
+restores and direct history-to-preset saves retain retired product prompt origins because
+source reconciliation was restricted to explicit contract adaptation.
+
+Repair: check every restored editor source independently of schema compatibility, using the
+existing prompt-options parser and reconciliation. Direct history-to-preset creation checks a
+cloned source against the historical atom before opening the preset draft. Failed checks keep
+the history action retryable; session, selection, list and view ownership checks discard stale
+results. Preserve historical text, immutable snapshots, available origins, unrelated current
+drafts and saved-version success feedback. Backend source validation remains strict.
+
+Six new Chromium regressions first failed on the reviewed source. They cover compatible
+preset/history restores with retired product v1 replaced by v2 and with available sources, plus
+direct history saves with both origins. Delayed requests, 503/malformed-list recovery, blocked
+writes, stale navigation, unchanged snapshots, and another atom's input/prompt/origin are checked.
+The 12 focused new/existing origin and adaptation journeys passed. An existing direct-history
+fixture was updated to return its valid origin for the newly required prompt-options read; that
+journey also passed.
+
+Validation: `python scripts/agent/runner.py frontend-check` passed, including lint, typecheck,
+all 53 Atom Lab Node tests, all 110 Chromium journeys, generated API-contract drift and builds.
+Doctor, `validate-docs`, `generate-docs --check` and `git diff --check` passed. Generated docs use
+the managed `.quick-check-venv`; host Chromium and Temp access require the same sandbox escalation
+as earlier rounds. Frontend log: `.quick-check-tmp/fix-round4-frontend-final.log` (ignored diagnostic).
+
+The parent confirmed every required GitHub check passed on the reviewed prior head `d0838474`,
+including full-check, Windows baseline, PostgreSQL, atoms-proof and production Compose smoke.
+No backend or PostgreSQL checks are repeated for this UI-only repair. The acceptance database
+stays untouched and no provider is called. Fresh entire-PR review of the resulting commit remains
+required before the second-model review; do not merge.
+
+## SonarCloud follow-up
+
+All required GitHub checks and the other code CI checks passed on `17233e7ee6440ccbfa71c96d971e4368315f3c6f`.
+SonarCloud alone failed with 21 issues and 3.7% duplicated new lines. A fresh independent
+GPT-6.1 Sol xhigh review confirmed the 21 issues are false positives: trusted catalog regular
+expressions, the valid library-mode switch, headings hidden until populated and keyboard-focusable
+scrolling regions. Issue classification is separate from this test cleanup; runtime behavior and
+Sonar's advisory status remain unchanged.
+
+Using only the in-app browser requested by the user, the existing Mikhail Gushinets (`gushinets`)
+Sonar account signed in through its existing GitHub session. All 21 independently verified findings
+were bulk-classified as False positive; the UI confirmed all 21 statuses and "All issues 0".
+This follows Sonar's [issue-editing workflow](https://docs.sonarsource.com/sonarqube-cloud/managing-your-projects/issues/editing);
+the keyboard-focusable overflow regions also match the W3C
+[scrollable-element keyboard-access rule](https://www.w3.org/WAI/standards-guidelines/act/rules/0ssw9k/).
+No rules, quality thresholds, exclusions or permissions changed, and no public comments or optional
+sharing with Sonar were submitted. The gate still fails on duplication, pending a new analysis.
+
+The duplication report contains 123 duplicated new lines: 96 in generated CE-kit API contracts
+and 27 in Chromium tests; production code has none. Generated contracts remain intact. One small
+`openNewPresetFromExample` helper replaces 12 identical four-step setups, removing 29 source lines
+overall. Expanding its calls reproduces the previous test file exactly, preserving every scenario's
+transport, write behavior and assertions.
+
+Validation: all 12 affected Chromium journeys passed, then canonical frontend-check passed with
+lint, typecheck, all 53 Atom Lab Node tests, all 110 Chromium journeys, generated API-contract drift
+and frontend builds. Doctor, documentation validation, generated-document drift and `git diff --check`
+passed. Frontend log: `.quick-check-tmp/sonar259/test-cleanup-frontend.log` (ignored diagnostic).
+The next PR scan must recompute the Sonar metric; no threshold, exclusion or suppression changed.
+No backend, PostgreSQL or provider checks were repeated for this test-only cleanup, and the old
+acceptance DB remains untouched. Fresh reviews and CI on the resulting commit remain required.
+
+### Second duplication cleanup
+
+The scan on `0195579734ef930ae6006abe0c3f078ac66ab6cf` retained all 21 False positive
+classifications and A ratings. Duplication fell from 3.7% to 3.2%, with 96 generated and 12 Chromium
+test duplicated new lines remaining; the gate is still red. A fresh GPT-6.1 Sol full-PR review of
+that head returned no findings.
+
+The three invalid-201 preset-response cases now share a small table of their exact raw response
+bodies, existing preset names and test-title prefixes, removing 35 source lines overall. All three
+scenarios and their assertions remain. Source outside those three cases is unchanged, including
+the separate gateway and structured pre-write failures. Before/after browser collection confirms
+the same 110 test names in the same order.
+
+Validation: the three cases and two neighboring failure journeys passed together (5/5). Canonical
+frontend-check passed with lint, typecheck, all 53 Atom Lab Node tests, all 110 Chromium journeys,
+generated API-contract drift and frontend builds. Doctor, documentation validation,
+`generate-docs --check` and `git diff --check` passed. Frontend log:
+`.quick-check-tmp/sonar259/test-response-table-frontend.log` (ignored diagnostic).
+The resulting Sonar metric remains pending a new PR analysis; do not infer a green gate from
+local tests. No generated code, rules, thresholds or exclusions changed. Backend, PostgreSQL and
+provider checks were not repeated; the acceptance DB remains untouched. Restart the final fresh
+review pair and check CI on the resulting commit without merging.
+
+### Third duplication cleanup
+
+The user-requested in-app browser verification on
+`0fb157fa91be9fd126e2840a3dab637e80425468` showed exactly 3.03% duplication and 102 duplicated
+new lines: 96 generated and six in Chromium tests. The progression is 3.7% to 3.2% to 3.03%; the
+gate is still red. A fresh full-PR review of that head returned no findings.
+
+`submitNewPresetFromExample(page, name)` now shares only the four repeated submit steps: open the
+example preset, fill its name, call the existing editor check and click Save. Three source consumers
+cover the gateway, structured pre-write and three invalid-201 scenarios. Unlock, transport mocks,
+assertions and retry polling remain in their tests; recovery fixtures are unchanged. Expanding the
+helper reproduces the previous test file exactly, including every `editPreset` check. Before/after
+collection confirms all 110 browser test names and their order are unchanged.
+
+Validation: all five affected Chromium journeys passed, then canonical frontend-check passed with
+lint, typecheck, all 53 Atom Lab Node tests, all 110 Chromium journeys, generated API-contract drift
+and frontend builds. Doctor, documentation validation, `generate-docs --check` and `git diff --check`
+passed. Frontend log: `.quick-check-tmp/sonar259/test-submit-helper-frontend.log` (ignored diagnostic).
+The final Sonar metric remains pending a new scan. No generated code, runtime, rules, thresholds
+or exclusions changed. Backend, PostgreSQL and provider checks were not repeated; the acceptance
+DB remains untouched. Fresh reviews and CI on the resulting commit remain required; do not merge.
+
+## Fresh GPT-6 Sol review: reopening an edited preset
+
+The SonarCloud analysis of `8d3a6c038d4acf76b1752ee3002a93b1f5b1b43e` passed with
+zero open issues and 2.91% duplicated new lines (limit 3%). All 21 previously verified
+False positive classifications remain; rules, thresholds, exclusions and generated files are unchanged.
+The parent verified GitHub's final check summary on that head: all checks passed, with 21 successful
+checks and the neutral CodeRabbit rate-limit result. All five required gates, including full-check
+and Windows baseline, passed. The resulting repair commit still needs its own CI and fresh review pair.
+
+A fresh GPT-6 Sol review found one P2: after opening saved v1, editing its laboratory draft
+and cancelling the preset editor, reopening v1 compares only the retained preset reference.
+It can therefore label modified run settings as the saved immutable version without restoring it.
+
+Repair: explicit Open in Laboratory compares actual settings through the existing draft-snapshot
+matcher and confirms before restoring a changed draft, including model/reasoning/origin changes
+that the ordinary dirty flag does not track. New version keeps the already-applied draft so users
+can save laboratory edits; ordinary navigation back to an active preset editor also preserves them.
+
+Both new Chromium regressions first failed against the reviewed source because reopening skipped
+the discard confirmation. The repaired tests cover prompt/input edits and settings-only changes,
+Cancel with an unchanged immutable snapshot, decline preserving all draft settings, accept restoring
+exact v1 settings and a mocked run sending the full persisted payload plus its preset reference.
+The two new cases and both existing product/Lab-origin immutable-version journeys passed together
+(4/4). Canonical `python scripts/agent/runner.py frontend-check` passed on the final source,
+including lint, typecheck, all 53 Atom Lab Node tests, all 112 Chromium journeys, API-contract drift
+and frontend builds. Doctor, documentation validation, generated-document drift and `git diff --check`
+passed. Final frontend log: `.quick-check-tmp/sonar259/preset-reopen-frontend-final.log`; reproduction
+and focused logs: `preset-reopen-red.log` and `preset-reopen-focused.log` in the same ignored folder.
+
+No provider, backend, database, migration, Docker or remote changes are part of this repair.
+Fresh entire-PR reviews and CI on the resulting commit remain required; do not merge.
+
+## Publication
+
+Create a codex/any-818 branch, commit only the explicit feature file set, push and create a PR
+with the required ANY-818 title and Linear issue section. Add the PR link to the Linear issue
+and move it to In Review; do not merge or deploy to production.

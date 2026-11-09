@@ -6,15 +6,32 @@ from http import HTTPStatus
 from typing import Annotated
 
 from anytoolai_platform_api.errors import AtomLabApiError
-from fastapi import Header
+from fastapi import Header, Request
 
 ATOM_LAB_ACCESS_CODE_ENV = "ANYTOOLAI_ATOM_LAB_ACCESS_CODE"
 ATOM_LAB_ACCESS_CODE_HEADER = "X-Atom-Lab-Access-Code"
+ATOM_LAB_AUTH_DISABLED_ENV = "ANYTOOLAI_ATOM_LAB_AUTH_DISABLED"
+
+
+def atom_lab_access_code_required() -> bool:
+    return os.getenv(ATOM_LAB_AUTH_DISABLED_ENV) != "true"
 
 
 def require_atom_lab_access(
+    request: Request,
     access_code: Annotated[str | None, Header(alias=ATOM_LAB_ACCESS_CODE_HEADER)] = None,
 ) -> None:
+    if not atom_lab_access_code_required():
+        origin = request.headers.get("Origin")
+        if request.url.hostname in {"localhost", "127.0.0.1", "::1"} and (
+            origin is None or origin == f"{request.url.scheme}://{request.url.netloc}"
+        ):
+            return
+        raise AtomLabApiError(
+            status_code=HTTPStatus.UNAUTHORIZED,
+            code="atom_lab_access_denied",
+            message="Доступ к Atom Lab запрещён.",
+        )
     configured_access_code = os.getenv(ATOM_LAB_ACCESS_CODE_ENV, "")
     if not configured_access_code.strip():
         raise AtomLabApiError(
