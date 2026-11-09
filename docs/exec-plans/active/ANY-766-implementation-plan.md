@@ -1,6 +1,6 @@
 # ANY-766 — Portal–Kernel Paid Execution Integration
 
-Status: **STEP 1 COMPLETE; runtime implementation not started; later commercial/operational gates remain**
+Status: **STEPS 1–2 COMPLETE; production declarations/bindings implemented; paid runtime integration and later gates remain**
 
 Date: **2026-11-09**
 
@@ -10,8 +10,8 @@ Issue: [ANY-766](https://linear.app/paveldik/issue/ANY-766)
 - Owner: mixed — Portal and Kernel execution owners
 - Last updated: 2026-11-09
 - Review date: 2026-11-09
-- Next action: Step 2 production metric declarations and scenario bindings, only when separately requested. Steps 2–14 have not been executed.
-- Blocker: none for completed Step 1. Sales, live-proof, staging and production conditions apply only to their dependent actions under Section 3.8. The inherited broader Kernel permission-test limitation remains recorded below.
+- Next action: Step 3 immutable production allowance terms, only when separately requested. Steps 3–14 have not been executed.
+- Blocker: none for completed Steps 1–2. Sales, live-proof, staging and production conditions apply only to their dependent actions under Section 3.8. The inherited broader Kernel permission-test limitation remains recorded below.
 
 This replaces the previous proposal completely. PLAN-1 through PLAN-5 are addressed below.
 
@@ -69,7 +69,7 @@ ANY-766 delivers both applications’ integration, actual paid execution, truthf
 - [ ] **FAIL — existing Kernel cross-user activation test, environment limitation:** `tests/test_runner.py::test_activation_marker_is_readable_by_non_root_api_user` was reproduced independently and fails because `sudo -n -u nobody` reports `sudo: a password is required`. System permission policy was not changed. Kernel config, architecture, docs and generated-doc checks passed during validation. The broader `quick-check` was interrupted after the reproduced failure and is not a full PASS; remaining cases are NOT_RUN. This limitation does not prevent Step 1 document/contract work, but the affected permission check needs a supported execution environment before its verification can pass.
 - [x] **PASS — preparation integrity:** both branches/HEADs match the recorded bases with zero ANY-766 commits; Portal main is an ancestor of its refreshed base; both indexes are empty; no unresolved files, residual stash or active rebase exist. Portal tracked changes remain the one documentation-index addition, with this plan untracked; Kernel changes remain this untracked plan only. `git diff --check`, all pinned source-path existence checks and byte-for-byte plan equality pass. At that re-preparation checkpoint, all 14 step headings and the B10/delegation/admission decisions were unchanged; only predecessor preservation requirements and execution context were refined.
 - [x] **COMPLETE — Step 1 plan materialization only.** Both repositories already had the complete revised plan; this refresh updates the same authoritative file and mirror rather than starting a numbered implementation step.
-- **Historical preparation boundary:** Step 1 contract changes, schemas, fixtures and tests were NOT_RUN during re-preparation. They are now COMPLETE under the separate Step 1 execution checkpoint below; Steps 2–14 remain NOT_RUN. Re-preparation itself did not complete a numbered implementation step.
+- **Historical preparation boundary:** Step 1 contract changes, schemas, fixtures and tests were NOT_RUN during re-preparation. They are now COMPLETE under the separate Step 1 execution checkpoint below; Steps 2–14 remained NOT_RUN at that checkpoint. Step 2 is subsequently completed below. Re-preparation itself did not complete a numbered implementation step.
 - [ ] **NOT_RUN — broad application/PostgreSQL/browser/image/live-LBX/staging/production acceptance.** Re-preparation verifies the selected bases, environment and documentation; it neither starts workloads nor re-certifies inherited runtime behavior. Previous results remain dated evidence for their recorded snapshots.
 - **Step 1 availability:** preparation originally left contract work READY without a separate preliminary approval; the subsequently requested Step 1 is now COMPLETE. Sales, live positive proof, staging and production retain their separately scoped conditions.
 
@@ -543,7 +543,7 @@ Initial Step 1 verification (historical local/offline checkpoint; current REV-1 
 - **NOT_RUN — broader quick/full/PostgreSQL/browser/real two-service suites:** not part of this document/schema/fixture-only step; no runtime/migration/config changes were made. The pre-existing Kernel `sudo -n -u nobody` quick-check limitation in Section 2 remains unresolved and is not relabelled PASS.
 - **NOT_RUN — live LBX, publication, staging and production:** no such actions were performed. Section 3.8 gates remain in force; synthetic Q=1 and fixture-shaped secrets approve neither sales nor live authority. Future runtime endpoints and generated web DTOs remain unimplemented.
 
-**Step 1 result: COMPLETE.** Portal's plan remains authoritative and its whole-file Kernel copy is synchronized. Steps 2–14 remain unexecuted.
+**Step 1 result: COMPLETE.** Portal's plan remains authoritative and its whole-file Kernel copy is synchronized. Steps 2–14 remained unexecuted at this checkpoint; the subsequent Step 2 checkpoint is recorded below.
 
 #### Step 1 review follow-up — REV-1, 2026-11-09
 
@@ -601,6 +601,90 @@ PATH="$PWD/.venv/bin:$PATH" npm run docs:check
 **Proposed commit:** `ANY-766 - Define Portal Kernel paid contracts`
 
 ### Step 2 — Declare production metrics and scenario bindings
+
+#### Step 2 execution checkpoint — 2026-11-09
+
+**Result: COMPLETE within configuration and manifest-inventory scope.** Only Step 2
+was executed. Paired starting/current HEADs remain Portal
+`791d41d36d451de30c19f6439be1abd42fde2b8e` and Kernel
+`0ff8dfca2763f71214a3eed441e2188191b950c5`, both local `ANY-766` branches,
+plus the uncommitted Step 2 diff. No staging, commit, push, branch move, database
+migration, deployment or financial operation was performed.
+
+Implemented:
+
+- Added optional nonblank `paid_metric_key` to Core/SDK scenario definitions and
+  existing ConfigLoader parsing/reference validation. References must resolve
+  within the scenario's product, including when commercial flags are disabled;
+  missing/foreign references and incompatible scalar values are rejected.
+- Declared all four approved production metric/unit pairs and all seven
+  bindings from Section 1. Shared scenarios resolve the same product metric.
+  All ordinary product/metric commercial flags remain disabled. Existing
+  TEST-ONLY identities, guest policies (including Client Update Writer's absent
+  guest quota), Task Finder surfaces and historical runtime data are unchanged.
+- Updated the complete current manifest inventory to six products/six metrics.
+  The ordinary disabled digest is
+  `sha256:359cc0ff7c7bbacb69ba8e0de0444738b46032c846b10a962298bfb8e0d9cf85`;
+  the isolated current test-enabled digest is
+  `sha256:5a743b1eb5e50ebed25259fb745e6b2dda743f01bd0def1cae77d12e9697aa62`.
+  Only the original two TEST-ONLY metrics are enabled in the synthetic profile.
+  Portal retains independent current fixture copies. Historical positive,
+  digest and negative fixture bytes are unchanged; the former ordinary disabled
+  fixture is preserved byte-for-byte as `historical-disabled-manifest.json`.
+- Updated the existing manifest conformance harness for the current inventory
+  and removed references to Portal's already removed webhook settings. Its
+  report distinguishes current inventory from TEST-ONLY enablement. No Portal
+  runtime source changed. Updated configuration/contract/integration documents.
+
+Fresh verification (all commands run from their respective repository roots):
+
+- **PASS — Kernel doctor:** `./.quick-check-venv/bin/python scripts/agent/runner.py doctor`.
+- **PASS — required focused tests, 160 passed:** `./.quick-check-venv/bin/python -m pytest -o addopts='' -q packages/backend/platform-core/tests/unit/test_config_loader.py apps/platform-api/tests/test_paid_metric_bindings.py apps/platform-api/tests/test_capability_manifest_contract.py`.
+- **PASS — config and architecture:** `./.quick-check-venv/bin/python scripts/agent/runner.py validate-configs` and `./.quick-check-venv/bin/python scripts/agent/runner.py validate-architecture`.
+- **PASS — related regressions, 179 passed:** `./.quick-check-venv/bin/python -m pytest -o addopts='' -o faulthandler_timeout=60 -q apps/platform-api/tests/test_capability_manifest.py apps/platform-api/tests/test_capability_projection.py packages/backend/platform-core/tests/test_contract_field_compatibility.py packages/backend/platform-sdk/tests/test_contracts_importable.py tests/test_manifest_conformance.py tests/test_validate_configs.py`.
+- **PASS — projection/documentation tests, 43 passed:** `./.quick-check-venv/bin/python -m pytest -o addopts='' -q apps/platform-api/tests/test_capability_projection.py tests/test_validate_docs.py tests/test_docs_generation.py`.
+- **PASS — real local Kernel → Portal typed-consumer HTTP conformance:** `./.quick-check-venv/bin/python scripts/agent/runner.py manifest-conformance --portal-root /home/wstanley/www/work_unirec/runtime-research/payments-portal --portal-python /home/wstanley/www/work_unirec/runtime-research/payments-portal/.venv/bin/python`. Ordinary/test/reordered/material inventories, authentication/scope/rotation, fault recovery, restart, concurrency, poisoned-dotenv isolation and zero storage/provider side effects pass. Its isolated Portal regression subprocess reports **94 passed**. This is actual local TCP HTTP evidence using synthetic test configurations, not paid execution, live LBX or deployed TLS evidence.
+- **PASS — Portal consumer regressions, 93 passed:** `./.venv/bin/python -m pytest -o addopts='' -q apps/api/tests/test_kernel_manifest_client.py apps/api/tests/test_kernel_contract_checker.py`.
+- **PASS — contract artifacts:** `./.quick-check-venv/bin/python scripts/agent/check_capability_manifest_contract.py --portal-root ../payments-portal`; independent fixture/schema/digest checks and current consumer-copy equality pass. Historical positive byte SHA-256 remains `25f39800090615eeba04cb27ab020332d0cf7cf7250fac6d2e5c38754c89b354`.
+- **PASS — docs/generation:** Kernel `./.quick-check-venv/bin/python scripts/agent/runner.py validate-docs`, `./.quick-check-venv/bin/python scripts/agent/runner.py generate-docs` and `./.quick-check-venv/bin/python scripts/agent/runner.py generate-docs --check`; Portal `PATH="$PWD/.venv/bin:$PATH" npm run docs:check`. Generation produces no artifact drift.
+- **PASS — lint ratchet:** non-fixing Ruff checks pass for changed Python files except the two files with inherited diagnostics. Comparing those and every other changed/new Python file against HEAD gives **25 baseline / 25 current / 0 introduced** diagnostics. **FAIL (inherited) — unrestricted whole-file Ruff** still reports those existing loader/unit-test violations; they were not suppressed or expanded. No new Python typechecking gate was introduced; Core/SDK field compatibility and boundary validation tests pass.
+- **PASS — scope/integrity:** diff inspection and `git diff --check` in both repositories; empty indexes, unchanged HEADs/branches, retained historical fixture bytes, current consumer fixtures and byte-for-byte whole-plan equality. Portal was updated first and the entire Kernel copy synchronized.
+
+Resolved verification failures and limits:
+
+- The first new SDK compatibility test incorrectly used `dataclasses.asdict` on
+  frozen registry metadata; it now validates from attributes. A pre-existing
+  digest mutation test assumed the first product and metric had different
+  owners; the expanded inventory exposed that assumption, and the test now
+  explicitly selects a different owner. All affected reruns pass.
+- The first conformance run exposed the obsolete webhook-settings references
+  above; the updated harness passes. Sandbox TCP restrictions caused five
+  Portal HTTP-test failures and prevented conformance startup. HTTP checks were
+  rerun with approved local-socket access and pass. A combined sandbox ASGI
+  regression run stalled and was terminated; it is not counted as a PASS.
+  Its focused and related replacements above completed successfully.
+- **NOT_RUN — broad quick/full/PostgreSQL/browser/image/live-LBX/staging/production
+  acceptance:** outside this configuration-only step. No schema/storage change
+  requires a new database test. The inherited cross-user activation permission
+  limitation in Section 2 remains unresolved and was not bypassed.
+- **BLOCKED — actual sale publication/enablement and operational acceptance**
+  retain Section 3.8's owner-approved quantities/LBX associations, supported
+  paid purchase and infrastructure/authorization inputs. These do not block
+  completed Step 2. Paid identity, enforcement, usage delivery and immutable
+  purchased terms remain later steps; no production-readiness claim is made.
+
+
+#### Step 2 local commit authorization — 2026-11-09
+
+After Step 2 verification, the user explicitly requested local commits in both
+repositories. This narrowly overrides the common protocol's no-staging/no-commit
+rule for the completed Step 2 changes and their synchronized plan/evidence.
+Use one commit per repository titled
+`ANY-766 - Declare production metrics and scenario bindings`.
+Earlier unchanged-HEAD/empty-index/no-commit statements describe their execution
+checkpoints. This authorization does not permit push, merge, rebase, branch
+switching, later implementation steps or operational actions. Preserve both
+plan copies byte for byte and retain all recorded verification limits.
 
 **Goal / Expected behavior:** all seven scenarios resolve their approved metric through product-owned configuration.
 
@@ -1038,7 +1122,7 @@ This revised plan closes:
 - **PLAN-2:** usage variants, exhaustion identity and durable acknowledgement are specified.
 - **PLAN-3:** token custody and original-operation recovery are specified.
 - **PLAN-4:** release compatibility and host/container profile mapping are specified.
-- **PLAN-5:** Step 1 materialization and contract formalization/technical review are complete in both repositories; Portal remains authoritative and the Kernel copy is synchronized after progress updates. Every later prompt names the exact Portal path and every step has concrete verification targets. Runtime implementation remains for Steps 2–14.
+- **PLAN-5:** Step 1 materialization and contract formalization/technical review are complete in both repositories; Portal remains authoritative and the Kernel copy is synchronized after progress updates. Every later prompt names the exact Portal path and every step has concrete verification targets. Step 2 now supplies production declarations and scenario bindings; paid runtime integration and later delivery remain for Steps 3–14.
 
 Remaining gates concern commercial and operational inputs for their dependent actions. Step 1 and implementation following the accepted strategy require no additional preliminary protocol approval. No launch quantity, LBX association, credential or host is invented.
 

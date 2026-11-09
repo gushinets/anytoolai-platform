@@ -6,4 +6,7 @@ scenarios:
   - client_update_writer.prepaid_request_v1
   - client_update_writer.reply_draft_v1
 commercial_admission_enabled: false
-usage_metrics: []
+usage_metrics:
+  - metric_key: client_update_writer.messages
+    unit: message
+    enabled: false

@@ -2,8 +2,8 @@
   "schema_version": 1,
   "tenant_id": "anytoolai",
   "region": "ru",
-  "manifest_version": "sha256:478761c681d02330ed052aabe5e1b472dc1c2ee56d79a568a8009f4b4503a694",
-  "generated_at": "2026-10-15T00:00:00Z",
+  "manifest_version": "sha256:359cc0ff7c7bbacb69ba8e0de0444738b46032c846b10a962298bfb8e0d9cf85",
+  "generated_at": "2026-11-09T00:00:00Z",
   "products": [
     {
       "product_id": "acceptance_builder",
@@ -32,9 +32,33 @@
   ],
   "usage_metrics": [
     {
+      "metric_key": "acceptance_builder.results",
+      "product_id": "acceptance_builder",
+      "unit": "result",
+      "enabled": false
+    },
+    {
+      "metric_key": "brief_decoder.analyses",
+      "product_id": "brief_decoder",
+      "unit": "analysis",
+      "enabled": false
+    },
+    {
       "metric_key": "brief_decoder.test_analyses",
       "product_id": "brief_decoder",
       "unit": "analysis",
+      "enabled": false
+    },
+    {
+      "metric_key": "client_update_writer.messages",
+      "product_id": "client_update_writer",
+      "unit": "message",
+      "enabled": false
+    },
+    {
+      "metric_key": "proposal_ai.generations",
+      "product_id": "proposal_ai",
+      "unit": "generation",
       "enabled": false
     },
     {

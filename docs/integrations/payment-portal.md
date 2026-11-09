@@ -127,6 +127,14 @@ Kernel → Portal adds kernel-session:exchange, kernel-session:introspect and
 allowance-exhaustion:write. Tests independently validate the retained copies
 without a shared runtime dependency. Compatible consumers precede V2 connection.
 
+Step 2 implements the four disabled production metric declarations and seven
+product-owned `paid_metric_key` bindings described in the
+[config model](../architecture/config-model.md). Core/SDK and loader reference
+checks agree; current manifest inventory fixtures include all six metrics.
+Historical two-metric TEST-ONLY fixtures retain their bytes and identity. The
+Portal consumer retains independent current fixture copies. Sales, paid HTTP
+identity/admission, usage delivery and purchased quantities remain separate work.
+
 ## Service authentication and scope convention (ANY-711 handoff)
 
 This is the normative service-authentication handoff for all three operations. ANY-711

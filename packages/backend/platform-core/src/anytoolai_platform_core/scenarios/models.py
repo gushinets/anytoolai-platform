@@ -32,6 +32,7 @@ class ScenarioDefinition:
     metadata: dict[str, Any] = field(default_factory=dict)
     # ScenarioRuntimeService requires the live-canary token for new admission, not accepted replay.
     internal_only: bool = False
+    paid_metric_key: str | None = None
 
 
 @dataclass(frozen=True)

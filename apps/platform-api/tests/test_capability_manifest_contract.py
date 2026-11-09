@@ -16,7 +16,7 @@ from jsonschema import Draft202012Validator
 
 ROOT = Path(__file__).resolve().parents[3]
 EXPECTED_PRODUCT_COUNT = 6
-EXPECTED_METRIC_COUNT = 2
+EXPECTED_METRIC_COUNT = 6
 
 
 @pytest.fixture(scope="module")
@@ -46,7 +46,12 @@ def positive(oracle: ModuleType) -> dict[str, Any]:
 def peer_contract(oracle: ModuleType, schema: dict[str, Any], tmp_path: Path) -> Path:
     peer = tmp_path / "docs/contracts/kernel-capability-manifest/v1"
     (peer / "fixtures").mkdir(parents=True)
-    for name in ("valid-manifest.json", "valid-manifest.digest"):
+    for name in (
+        "valid-manifest.json",
+        "valid-manifest.digest",
+        "default-disabled-manifest.json",
+        "current-test-enabled-manifest.json",
+    ):
         (peer / "fixtures" / name).write_bytes((oracle.CONTRACT / "fixtures" / name).read_bytes())
     (peer / "manifest.schema.json").write_text(json.dumps(schema), encoding="utf-8")
     return peer
@@ -89,10 +94,15 @@ def test_timestamp_and_array_object_order_do_not_change_version(
     assert oracle.semantic_digest(reordered) == oracle.POSITIVE_VERSION
 
 
-def test_enabled_test_declarations_serialize_to_retained_positive_semantics(
-    oracle: ModuleType, schema: dict[str, Any], positive: dict[str, Any]
+def test_enabled_test_declarations_serialize_to_current_inventory(
+    oracle: ModuleType, schema: dict[str, Any]
 ) -> None:
     registry = build_runtime(config_root=ROOT / "configs/kernel", database_url="").config_registry
+    positive = json.loads(
+        (oracle.CONTRACT / "fixtures/current-test-enabled-manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
     enabled = {"proposal_ai", "brief_decoder"}
     isolated = replace(
         registry,
@@ -101,7 +111,13 @@ def test_enabled_test_declarations_serialize_to_retained_positive_semantics(
                 product,
                 commercial_admission_enabled=key in enabled,
                 usage_metrics=tuple(
-                    replace(metric, enabled=True) for metric in product.usage_metrics
+                    replace(
+                        metric,
+                        enabled=metric.metric_key in {
+                            "proposal_ai.test_generations", "brief_decoder.test_analyses"
+                        },
+                    )
+                    for metric in product.usage_metrics
                 ),
             )
             for key, product in registry.products.items()
@@ -111,7 +127,7 @@ def test_enabled_test_declarations_serialize_to_retained_positive_semantics(
         PortalPrincipal(tenant_id="anytoolai", region="ru"), isolated
     ).model_dump(mode="json")
     oracle.validate_manifest(response, schema)
-    assert response["manifest_version"] == oracle.POSITIVE_VERSION
+    assert response["manifest_version"] == oracle.CURRENT_TEST_VERSION
     positive["usage_metrics"].sort(key=lambda row: row["metric_key"])
     assert {k: v for k, v in response.items() if k != "generated_at"} == {
         k: v for k, v in positive.items() if k != "generated_at"

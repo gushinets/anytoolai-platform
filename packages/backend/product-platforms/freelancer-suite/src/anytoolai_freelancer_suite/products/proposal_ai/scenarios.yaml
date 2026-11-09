@@ -2,5 +2,6 @@ scenarios:
   - scenario_id: proposal_ai.generate_v1
     version: 1
     workflow_id: proposal_ai.generate_v1
+    paid_metric_key: proposal_ai.generations
     allowed_next_actions:
       - copy_result
