@@ -103,3 +103,53 @@ The sole remaining validation blocker is the pre-existing sudo-dependent baselin
 3,576 other baseline tests pass. Remote workflow dispatch and live-provider tests were not run.
 Translations are structurally tested but still need native-speaker review. The optional future
 Task Finder to ProposalAI handoff and broad visual polish remain out of scope.
+
+## Sonar duplication follow-up — 2026-11-09
+
+The user authorized removal of real smoke duplication and a proposal for translation dictionaries.
+Sonar checks and exclusions must stay unchanged. The analyzed PR reports 484 duplicated new lines:
+120 in Task Finder smoke and 364 in structurally parallel locale dictionaries.
+
+Implementation plan:
+1. Reuse smoke-support for layout/overflow checks in all five product suites; extract repeated run
+   tracking, canonical-output substitution, failed-session substitution, execution correlation and
+   copy activation where their contracts match. Preserve product-specific assertions and intercepts.
+2. Run doctor, smoke-package lint/typecheck, documentation checks and all five browser suites.
+3. Propose a maintainable dictionary representation separately; leave translations and Sonar settings
+   unchanged in this follow-up. Do not claim the remote duplication gate passes without a new analysis.
+
+### Dictionary proposal (not implemented)
+
+The repeated keys describe the same message schema in seven languages; the translated values are
+independent data. Removing those keys through positional arrays or a generic dictionary factory
+would make translation maintenance harder without removing duplicate behavior.
+
+Recommended follow-up: represent the 14 pure locale resources under
+`apps/web-mirror/src/products/taskFinder/messages/` and `apps/web-mirror/src/app/homeMessages/`
+as JSON, keeping each directory's TypeScript index and its existing
+`Record<Locale, Shape<typeof en>>` contract. `resolveJsonModule` is already enabled. Preserve every
+key and translated value, use ordinary static JSON imports, and keep the current consumer exports.
+This separates resources from executable code and makes them usable by translation tooling without
+introducing a loader, dependency or Sonar exclusion. Comments explaining a bundle belong in its
+index; no translation text should be generated or silently replaced with English.
+
+Retain the existing i18n tests for exact key sets, nonempty strings, ICU placeholder parity and
+syntax, and untranslated whole-locale detection. Verify all locale values before/after migration,
+then run web typecheck/lint, i18n and product tests, and a production build. Measure Sonar's result
+after the next authorized push; changing the resource format is not evidence that duplication is
+below the gate threshold.
+
+Alternative: keep the current TypeScript dictionaries. This has zero migration cost and preserves
+the present convention, but leaves the structural CPD findings. Either option is preferable to
+reordering keys, splitting files, or adding exclusions solely to affect the metric. No dictionary
+migration or analysis-setting change is part of the authorized code fix.
+
+Follow-up verification: doctor passes; all E2E workspace packages pass typecheck and lint. All
+five product smokes pass through their canonical runner commands: Task Finder 7, ProposalAI 10,
+Client Update Writer 4, Brief Decoder 8, Acceptance Builder 11 (40 total), including accepted and
+declined handoffs. Documentation validation, generated documentation drift and diff whitespace
+checks pass. Generated-doc checking initially hit a LiteLLM import failure during its sandboxed
+remote model-map fetch; the same command passed with network access. No dependency change was needed.
+The refactor removes 225 net lines of test code. Full-check was not repeated for this test-only
+extraction; its earlier sudo-dependent baseline failure remains documented above. No remote Sonar
+analysis, commit, push or GitHub write was performed for this follow-up.

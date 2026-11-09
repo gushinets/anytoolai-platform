@@ -1,7 +1,11 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { countEvents as countBackendEvents } from "@anytoolai/smoke-support";
+import {
+  countEvents as countBackendEvents,
+  expectWorkspaceLayout,
+  overrideFailedSession,
+} from "@anytoolai/smoke-support";
 
 /**
  * ANY-243 browser-evidence smoke: proves the ProposalAI web vertical end to end against a real
@@ -44,29 +48,6 @@ const WEAK_INPUT_FIXTURE_PATH = join(
   import.meta.dirname,
   "../../../../tests/fixtures/provider/fake_provider_outputs/proposal_ai.compose_persuasive_text_v1.weak_input.json",
 );
-
-/** Wide screens: the result card sits right of the inputs card on the same top line; narrow screens:
- * the two cards are stacked. Either way nothing overflows horizontally. */
-async function expectWorkspaceLayout(page: Page, layout: "side-by-side" | "stacked"): Promise<void> {
-  const inputs = await page.locator("#product-inputs").boundingBox();
-  const result = await page.locator('section[aria-labelledby="product-result-heading"]').boundingBox();
-  expect(inputs).not.toBeNull();
-  expect(result).not.toBeNull();
-  if (layout === "side-by-side") {
-    expect(result!.x).toBeGreaterThanOrEqual(inputs!.x + inputs!.width - 1);
-    expect(Math.abs(result!.y - inputs!.y)).toBeLessThanOrEqual(2);
-    // Two equal cards: same width (height follows content and may differ).
-    expect(Math.abs(result!.width - inputs!.width)).toBeLessThanOrEqual(2);
-  } else {
-    expect(result!.y).toBeGreaterThanOrEqual(inputs!.y + inputs!.height - 1);
-    expect(Math.abs(result!.x - inputs!.x)).toBeLessThanOrEqual(2);
-  }
-  const { scrollWidth, clientWidth } = await page.evaluate(() => ({
-    scrollWidth: document.documentElement.scrollWidth,
-    clientWidth: document.documentElement.clientWidth,
-  }));
-  expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
-}
 
 async function fillValidForm(page: Page): Promise<void> {
   await page.locator("#proposal-ai-task-text").fill("Write a landing page hero section for a bakery.");
@@ -271,20 +252,7 @@ test.describe("ProposalAI web product", () => {
     await page.goto(PRODUCT_URL);
     await fillValidForm(page);
 
-    await page.route("**/v1/scenario-sessions/**", async (route) => {
-      if (route.request().method() !== "GET") {
-        await route.continue();
-        return;
-      }
-      const response = await route.fetch();
-      const body = (await response.json()) as { status: string; result_artifact_id: string | null };
-      // Force the very first poll to already be terminal-failed, regardless of the real session's
-      // actual (likely still in-progress) status -- deterministic and fast, no need to wait out a
-      // real backend failure this product's fake-provider composition can't produce on demand.
-      body.status = "failed";
-      body.result_artifact_id = null;
-      await route.fulfill({ response, json: body });
-    });
+    await overrideFailedSession(page);
 
     await page.getByRole("button", { name: "Generate proposal" }).click();
     await expect(page.getByText("Something went wrong generating your proposal. Please try again.")).toBeVisible({
