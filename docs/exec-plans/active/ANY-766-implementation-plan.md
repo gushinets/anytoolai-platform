@@ -1,6 +1,6 @@
 # ANY-766 — Portal–Kernel Paid Execution Integration
 
-Status: **STEPS 1–6 COMPLETE within local verification; Steps 7–12 pending; delivery ends at PR readiness**
+Status: **STEPS 1–7 COMPLETE within local verification; Steps 8–12 pending; delivery ends at PR readiness**
 
 Date: **2026-11-09**
 
@@ -10,8 +10,8 @@ Issue: [ANY-766](https://linear.app/paveldik/issue/ANY-766)
 - Owner: mixed — Portal and Kernel execution owners
 - Last updated: 2026-11-10
 - Review date: 2026-11-10
-- Next action: Step 7 durable Portal invalidation delivery, only when separately requested.
-- Blocker: none for Step 7 implementation. Missing remote-server, live-provider and registry inputs do not block local integration or PR readiness; later operational actions retain the gates in Section 3.8.
+- Next action: Step 8 recoverable paid browser journeys, only when separately requested.
+- Blocker: none for Step 8 implementation. Missing remote-server, live-provider and registry inputs do not block local integration or PR readiness; later operational actions retain the gates in Section 3.8.
 
 Portal's `docs/exec-plans/active/ANY-766-implementation-plan.md` is authoritative;
 Kernel keeps a byte-for-byte copy at the same repository-relative path.
@@ -63,7 +63,7 @@ plan; the paid-access contracts and product behavior remain unchanged.
 Development bases: Portal ANY-766 is based on ANY-765
 `b2ef280048ac634a60c18e820fbf702beddba19c`; Kernel is based on
 `72ff15bc0b77903c87aa39f7b10186dccc556d09` and includes ANY-507/814.
-Current migration heads after Steps 4/6 are Portal `20261110_0007` and Kernel `0019`.
+Current migration heads after Step 7 are Portal `20261110_0008` and Kernel `0019`.
 
 Development may continue above the verified ANY-765 base while its PR is reviewed.
 After it merges, transfer only ANY-766 changes onto accepted main under a
@@ -77,7 +77,7 @@ Read the [current Step 10 producer handoff](https://github.com/gushinets/payment
 - Preserve the inherited trust-observation provenance, paused automatic UNKNOWN recovery, explicit GET-only recovery, informational `block_to_close_days`, metric admission before new financial sends, isolated paid reads and cancellation ownership.
 - Keep selected-meaning `confirmation_digest()` separate from full-source/audit identity (`source_digest`, full `kernel_manifest_version`, technical `digest`). Another product or global source-version change cannot invalidate unchanged selected consent. Historical v2 full-audit-digest acceptances remain readable and replay the exact saved buyer digest; v1 receives no invented technical quantity. Steps 3/11 must preserve these regressions.
 - Primary selection uses complete relevant product inventory and original owner/version/fence proof. Financial CREATE admission and `restore-original`/`bind-original` retain customer-wide completeness. Steps 5/11 must preserve independence from unrelated incomplete products without weakening financial admission.
-- Preserve the sole whole-user paid writer, atomic revision/causal observation/outbox/deadline commit, finite source trust, immutable same-cycle allowance identity and calendar precision. Current local calendar documents are internal evidence, not the target HTTP snapshot contract. B10 and exact-N delivery/ACK remain ANY-766 implementation work.
+- Preserve the sole whole-user paid writer, atomic revision/causal observation/outbox/deadline commit, finite source trust, immutable same-cycle allowance identity and calendar precision. Calendar evidence stays Portal-internal; Step 5 implements snapshot V2 and Step 7 implements exact-N delivery/ACK.
 - Current `/api/paid-access` requires an active verified-email session, derives scope/user server-side, is local and read-only after identity bookkeeping, and retains its reserved DB/thread budget and cancellation ownership. Step 10's separate usage API must preserve those authorization and availability guarantees.
 - Reader compatibility is stricter than the unchanged migration head: pre-fix Step 9 binaries cannot read newly accepted selected-digest purchases. Step 12 installation preparation and the Section 7 handoff must record this format-compatibility floor for subsequent ANY-767 deployment/recovery; same migration head does not authorize rolling back to an older reader.
 - At preparation, the refreshed handoff and Portal integration map still assigned production vocabulary to ANY-711. The [2026-11-09 ANY-766 scope clarification](https://linear.app/paveldik/issue/ANY-766) explicitly assigns selected production declarations/bindings to ANY-766 and leaves ANY-711 Done for its delivered manifest/TEST-ONLY baseline. **Step 1 now aligns both statements** without reopening ANY-711 or adding a dependency on new work there. Commercial quantity/LBX/sales approval remains separate.
@@ -89,18 +89,17 @@ Read the [current Step 10 producer handoff](https://github.com/gushinets/payment
 - Steps 3/5 now implement immutable configured-source technical terms and production allowance derivation. Ordinary commercial enablement and live positive proof retain their separate gates.
 - ANY-507 supplies paid owner partitioning, replay, reserve/finalize/release, recovery and readback. It already uses the required immutable allowance tuple.
 - Kernel Step 6 attaches the Step 4 principal adapter to coherent paid admission and reservation/deferred ownership protection. Its existing `ClientEventService` now supports trusted paid owners, including events before a scenario exists; guest validation and deduplication remain intact.
-- Kernel Step 6 implements the durable coherence/invalidation receiver. Portal invalidation transport and Kernel exhaustion delivery remain later work.
+- Kernel Step 6 implements the durable coherence/invalidation receiver. Portal Step 7 implements bounded durable invalidation transport with exact-N ACK, parking/CLI retry and restart repair. Kernel exhaustion delivery remains later work.
 - Existing independent Compose projects, runners, migration services and Kernel profile activation are reusable. Add only the image/build and installation preparation needed for the selected Portal/Kernel pair; server installation follows PR review in ANY-767.
 
 ### Current completion and verification limits
 
-- Steps 1–6 are complete within their contract/configuration and local test scope:
+- Steps 1–7 are complete within their contract/configuration and local test scope:
   production metric bindings and purchased terms, session delegation, Portal V2
   snapshots, Kernel coherent admission, ownership, invalidation receiver and paid
-  client events. The Step 6 final required PostgreSQL/ASGI selection recorded
-  85 passing tests with no skips; this is prior execution evidence, not a new run.
-- Portal invalidation delivery, browser launch/recovery, usage/exhaustion delivery,
-  cabinet integration, local joint verification and build preparation remain Steps 7–12.
+  client events and durable Portal invalidation delivery.
+- Browser launch/recovery, usage/exhaustion delivery, cabinet integration, local
+  joint verification and build preparation remain Steps 8–12.
 - Real paired local paid HTTP/browser acceptance is not yet established and must
   pass in Step 11. Live-LBX and remote staging acceptance remain future ANY-767
   work; synthetic/ASGI evidence does not establish those external outcomes.
