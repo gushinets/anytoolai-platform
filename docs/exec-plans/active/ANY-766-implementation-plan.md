@@ -1,6 +1,6 @@
 # ANY-766 — Portal API and Paid Execution for Product Backends
 
-Status: **STEPS 1–8 COMPLETE; Steps 9–17 pending; delivery ends at PR readiness**
+Status: **STEPS 1–9 COMPLETE; Steps 10–17 pending; delivery ends at PR readiness**
 
 Date: **2026-11-09**
 
@@ -12,7 +12,7 @@ Related requirements: [ANY-833](https://linear.app/paveldik/issue/ANY-833).
 - Owner: mixed — Portal and Kernel execution owners
 - Last updated: 2026-11-10
 - Review date: 2026-11-10
-- Next action: Step 9 consumer-neutral contract and refactoring inventory, only when requested.
+- Next action: Step 10 consumer authentication and delegation, only when requested.
 - Blocker: none for the planned local work; real external-product integration is outside this plan.
 
 Portal's `docs/exec-plans/active/ANY-766-implementation-plan.md` is authoritative;
@@ -1060,7 +1060,10 @@ Cover all scenario modes, reload, lost start/exchange responses, expiry, differe
 
 ### Step 9 — Formalize the common backend API and bounded refactoring
 
-**Status:** PENDING. Documentation/contract work; does not authorize later runtime steps.
+**Status:** COMPLETE. Common guide, consumer-neutral schemas/fixtures and bounded
+refactoring/forward-migration inventory formalized; focused offline contracts,
+documentation and applicable non-fixing checks PASS. Runtime/OpenAPI remains the
+Steps 1–8 baseline; working auth/access is still Step 12.
 
 **Goal / Expected behavior:** the external team and implementing agents have one
 unambiguous target contract, a bounded change inventory and an explicit local

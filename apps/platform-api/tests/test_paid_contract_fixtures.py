@@ -10,6 +10,7 @@ import base64
 import hashlib
 import json
 from datetime import datetime, timedelta
+from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
@@ -38,8 +39,8 @@ def load(name: str) -> Any:
     return json.loads((CONTRACT / name).read_text(encoding="utf-8"))
 
 
-VALID = load("fixtures/valid.json")
-INVALID = load("fixtures/invalid.json")
+VALID = load("fixtures/valid.json") + load("fixtures/backend-valid.json")
+INVALID = load("fixtures/invalid.json") + load("fixtures/backend-invalid.json")
 CONTEXTUAL = load("fixtures/contextual-invalid.json")
 
 
@@ -69,7 +70,7 @@ def validate_contract(contract: str, payload: dict[str, Any]) -> None:
     except ValidationError:
         raise ValueError("wire schema") from None
     check_scalar_semantics(payload)
-    if contract == "snapshot-v2":
+    if contract in {"snapshot-v2", "snapshot-v3"}:
         products = [row["product_id"] for row in payload["grants"]]
         ids = [row["allowance_id"] for row in payload["allowances"]]
         require(len(set(products)) == len(products), "duplicate grant")
@@ -250,3 +251,140 @@ def test_shape_valid_usage_tuple_mismatch_requires_item_unavailability() -> None
         validate_contract("usage-response-v1", {**owner, "items": [case["item"]]})
         matches = all(case["item"][field] == value for field, value in case["local"].items())
         assert case["cabinet_status"] == ("observed" if matches else "unavailable")
+
+
+@pytest.mark.parametrize(
+    "case", load("fixtures/backend-contextual.json"), ids=lambda row: row["name"]
+)
+def test_v3_context_requires_consumer_policy_and_immutable_semantics(case: dict[str, Any]) -> None:
+    """Specification oracle; no future runtime installer is exercised here."""
+    candidate = case["snapshot"]
+    validate_contract("snapshot-v3", candidate)
+    principal = case["principal"]
+    actual_identity = tuple(candidate[field] for field in ("consumer_id", "tenant_id", "region"))
+    trusted_identity = tuple(principal[field] for field in ("consumer_id", "tenant_id", "region"))
+    refused = (
+        actual_identity != trusted_identity or candidate["user_id"] != case["requested_user_id"]
+    )
+    refused |= "access-snapshot:read" not in principal["permissions"]
+    refused |= candidate["consumer_policy_revision"] != principal["consumer_policy_revision"]
+    refused |= candidate["consumer_policy_revision"] < case["policy_floor"]
+    refused |= candidate["access_revision"] < case["access_floor"]
+    refused |= bool(
+        {row["product_id"] for row in candidate["grants"]} - set(principal["allowed_products"])
+    )
+    previous = case["accepted"]
+    if previous is not None:
+        semantic_key = load("contract-index.json")["identity"]["semantic_key"]
+        if all(candidate[field] == previous[field] for field in semantic_key):
+            for field, key in (("grants", "product_id"), ("allowances", "allowance_id")):
+                refused |= sorted(candidate[field], key=lambda row: row[key]) != sorted(
+                    previous[field], key=lambda row: row[key]
+                )
+    assert case["result"] == ("REFUSE" if refused else "ACCEPT")
+
+
+def test_consumer_protocol_vectors_are_independent_of_paid_revision_and_other_recipients() -> None:
+    vectors = load("fixtures/backend-protocol.json")
+    for case in vectors["identity"]:
+        principal = case["principal"]
+        identity = (principal["consumer_id"], principal["tenant_id"], principal["region"])
+        audience = (case["audience"], case["tenant_id"], case["region"])
+        permission = "backend-session:" + case["operation"]
+        assert case["result"] == (
+            "ACCEPT"
+            if identity == audience and permission in principal["permissions"]
+            else "REFUSE"
+        )
+    for case in vectors["policies"]:
+        for side in ("stored", "configured"):
+            policy = {
+                key: vectors["principals"][0][key] for key in ("tenant_id", "region", "consumer_id")
+            }
+            policy["allowed_products"] = sorted(set(case[side + "_products"]))
+            encoded = json.dumps(policy, ensure_ascii=True, separators=(",", ":"), sort_keys=True)
+            assert (
+                case[side + "_digest"]
+                == "sha256:" + hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+            )
+        reuse = case["configured_revision"] == case["stored_revision"]
+        rollback = case["configured_revision"] < case["stored_revision"]
+        conflict = reuse and case["configured_digest"] != case["stored_digest"]
+        invalid = type(case["configured_revision"]) is not int or case["configured_revision"] < 1
+        assert case["result"] == ("REFUSE" if rollback or conflict or invalid else "ACCEPT")
+        assert case["access_revision_after"] == case["access_revision_before"]
+    now = datetime.fromisoformat(vectors["now"])
+    for case in vectors["filtered_deadlines"]:
+        relevant = [
+            datetime.fromisoformat(case["deadlines"][product])
+            for product in case["allowed_products"]
+        ]
+        bound = min(now + timedelta(minutes=5), *relevant) - timedelta(seconds=5)
+        assert case["status"] == (503 if bound <= now else 200)
+        if case["status"] == HTTPStatus.OK:
+            assert bound == datetime.fromisoformat(case["expires_at"])
+    ack = vectors["recipient_ack"]
+    for recipient, old in ack["before"].items():
+        after = ack["after"][recipient]
+        assert after["pending"] == old["pending"]
+        assert after["delivered"] == (
+            max(old["delivered"], ack["sent"])
+            if recipient == ack["recipient"]
+            else old["delivered"]
+        )
+    synthetic_owner = (
+        "synthetic-summary",
+        "synthetic_summary",
+        "synthetic_summary.results",
+        "result",
+    )
+    for case in vectors["source_ownership"]:
+        binding = tuple(case[key] for key in ("consumer_id", "product_id", "metric_key", "unit"))
+        assert case["result"] == ("ACCEPT" if binding == synthetic_owner else "REFUSE")
+
+
+def test_historical_portal_evidence_has_no_new_serialized_owner_or_invented_quantity() -> None:
+    """Kernel retains producer-owned history bytes; Portal independently runs its readers."""
+    histories = load("fixtures/backend-history.json")
+    for case in histories:
+        assert hashlib.sha256(case["serialized"].encode()).hexdigest() == case["sha256"]
+        document = json.loads(case["serialized"])
+        assert "technical_source_id" not in document and "backend_consumer_id" not in document
+        assert (
+            case["resolved_technical_source_id"]
+            == case["resolved_backend_consumer_id"]
+            == "platform-kernel"
+        )
+        if case["name"] == "legacy-purchase-v1-no-quantity":
+            assert document["technical_terms"] is None
+    purchases = {
+        row["name"]: json.loads(row["serialized"]) for row in histories if row["kind"] == "purchase"
+    }
+    audit = purchases["purchase-v2-full-audit"]
+    selected = purchases["purchase-v2-selected"]
+    assert audit["technical_terms"] == selected["technical_terms"]
+    assert audit["meaning"]["expected_technical_terms_digest"] == audit["technical_terms"]["digest"]
+    assert (
+        audit["meaning"]["expected_technical_terms_digest"]
+        != selected["meaning"]["expected_technical_terms_digest"]
+    )
+
+
+def test_v3_consumer_and_policy_do_not_change_any507_allowance_or_replay_owner() -> None:
+    snapshots = [
+        row["payload"]
+        for row in VALID
+        if row["contract"] == "snapshot-v3" and row["payload"]["allowances"]
+    ]
+    for snapshot in snapshots:
+        owner = ExecutionOwner(
+            owner_kind=ExecutionOwnerKind.portal_user,
+            tenant_id=snapshot["tenant_id"],
+            region=snapshot["region"],
+            owner_id=snapshot["user_id"],
+        )
+        allowance = PaidAllowance(owner=owner, **snapshot["allowances"][0])
+        assert allowance.owner == owner
+        assert not hasattr(owner, "consumer_id") and not hasattr(
+            allowance, "consumer_policy_revision"
+        )

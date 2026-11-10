@@ -4,7 +4,7 @@ Status: **protocol specifications and fixtures**, formalized 2026-11-09.
 Server implementation through ANY-766 Step 7 includes delegated identity,
 snapshot V2, coherent paid admission/ownership/events and Portal invalidation
 delivery. Step 8 implements recoverable paid browser journeys; usage/exhaustion
-and cabinet integration remain pending. Paired local acceptance is Step 11; remote/live acceptance and
+and cabinet integration remain pending. Paired local acceptance is Step 16; remote/live acceptance and
 production rollout belong to ANY-767. All quantities and
 credential-shaped strings in fixtures are synthetic. Q=1 is an isolated test
 quantity, never a commercial offer or approval.
@@ -15,6 +15,38 @@ ANY-766 implementation plan. The 2026-11-09 scope clarification leaves ANY-711
 Done for manifest/TEST-ONLY delivery; ANY-766 owns selected production
 declarations and scenario bindings. Commercial quantities, LBX associations and
 sales enablement still require their separate owner inputs.
+
+## Step 9 consumer-neutral target — 2026-11-10
+
+The [common backend guide](https://github.com/gushinets/payments-portal/blob/main/docs/contracts/product-backend-api/README.md)
+is the single target guide for Section 3.9: independent consumers, audience-bound
+delegation V2, snapshot V3/P/R, versioned source/owner metadata, recipient delivery
+and owner-directed V1 usage/exhaustion. These additions are **specified only**;
+working auth/access and accurate generated Swagger remain due at Step 12.
+Steps 13–15 implement remaining delivery/usage, Step 16 local acceptance and
+Step 17 build/install preparation. No runtime/generator change occurs in Step 9.
+
+The sections below retain the Steps 1–8 Kernel baseline and original wire meaning.
+The common target replaces their Kernel-only assumptions at synchronized cutover;
+retention is not concurrent old-route support or permission to reset history.
+Original schemas and fixture payloads remain exact. New schemas are snapshot-v3,
+code-request-v2 (unversioned body adds consumer_id), exchange-response-v2 and
+introspection-response-v2 (integer version 2, consumer_id and positive P).
+Exchange/introspection requests, code response, manifest/invalidation/usage/
+exhaustion wire shapes stay V1. Portal owns the new schemas. Kernel owns neutral
+usage/exhaustion V1 wire definitions, reusable by other backends without a shared
+runtime package. contract-index lists target operations, preserved baseline
+operations, schema owners, versions, semantic/digest fields and history rules.
+
+backend-valid/invalid fixtures cover two consumers, V3 empty states and strict
+versions/P. backend-contextual fixtures specify scope/product/consumer refusal,
+policy/access floors, same-P/R conflict and allowed envelope refresh. The
+backend-protocol fixtures cover audience/permissions, monotonic policy/digest,
+filtered deadlines and independent recipient ACK. They are offline target
+contracts, not an implementation of future service authentication or migrations.
+Historical purchase serialization is checked independently against the existing
+Portal readers; populated database migration/recovery proof remains in owning
+Steps 10–13/16. Unknown/foreign usage remains unobserved with no invented counters.
 
 ## Inventory and ownership
 
@@ -241,10 +273,18 @@ complete without altering the new cycle. No financial action, grant revocation,
 subscription termination, quota refill or Portal counter is authorized.
 
 Portal `GET /api/paid-usage` requires the existing active verified-email billing
-session. Derive scope/user and current production IDs locally, falling back to
-the latest issued allowance per product when none is current. Use independent
-bounded Kernel HTTP resources outside DB transactions; preserve `/api/paid-access`
-reserved DB/thread/cancellation capacity. Validate remote tuples, then reread
+session. Derive scope/user and current production IDs locally. For each product
+without a current allowance, select its most recently issued eligible historical
+allowance, ordered by `created_at` then `allowance_id`. Eligibility requires
+compatible, proven `CONFIGURED_SOURCE` technical terms and the saved
+product/metric/unit/quantity. Exclude SIMULATED evidence, legacy rows without
+proven unit/terms, and future allowances awaiting authoritative activation,
+even after their start boundary passes. Resolve the persisted source/backend
+owner without rewriting history. No eligible allowance means no item for that
+product; excluded rows cause no backend usage request or invented tuple.
+
+Use independent bounded backend HTTP resources outside DB transactions; preserve
+`/api/paid-access` reserved DB/thread/cancellation capacity. Validate remote tuples, then reread
 local access revision; change returns `503 paid_usage_state_changed`.
 `cabinet-usage-v1` records local terms, current/historical classification and
 observed/unobserved/unavailable variants. Unknown/unavailable items omit counters;
@@ -274,7 +314,7 @@ Neither validator is used by runtime code. Run the focused commands in Step 1
 of the plan and compare both bundle directories before handoff. Offline fixture
 checks validate the protocol only. Runtime durability/concurrency checks belong
 to their implementation steps; assembled local HTTP/browser acceptance is
-Step 11, and remote/live acceptance belongs to ANY-767.
+Step 16, and remote/live acceptance belongs to ANY-767.
 
 ## Step 4 server implementation
 
@@ -283,7 +323,7 @@ implements only the identity server slice: Portal code issuance, internal
 exchange/introspection, Kernel public exchange and the reusable Kernel identity
 dependency. Step 5 adds snapshot V2 serving, Step 6 attaches identity to paid
 runtime ownership/admission, and Step 7 delivers invalidations. Browser
-launch/callback/storage is implemented in Step 8 below; usage/exhaustion remains Step 9.
+launch/callback/storage is implemented in Step 8 below; usage/exhaustion remains Step 14.
 The original Portal bearer is not sent to Portal's internal service
 endpoints or forwarded by Kernel.
 
@@ -360,7 +400,7 @@ configured permission and trusted scope. The receiver returns `204` only after
 floor/eviction commit, including repeated/lower revisions. Portal Step 7 now
 delivers invalidations through its embedded worker. The sender starts with the
 existing manifest URL/token when that worker is enabled, so configure this
-receiver permission first. The usage API and exhaustion delivery remain Step 9.
+receiver permission first. The usage API and exhaustion delivery remain Step 14.
 
 Focused evidence uses real disposable PostgreSQL and in-process ASGI with
 synthetic Portal responses. It does not establish real paired HTTP, browser,
@@ -449,5 +489,5 @@ the same key for unchanged retries, while edits or another mode can use a new ke
 
 Step 8 evidence is local component/transport testing and synthetic browser UI
 coverage, distinct from the real two-service HTTP/PostgreSQL/browser acceptance
-required by Step 11. Usage/exhaustion and cabinet counters remain Steps 9–10;
+required by Step 16. Usage/exhaustion and cabinet counters remain Steps 14–15;
 remote/live-service acceptance remains ANY-767.

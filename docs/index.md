@@ -14,8 +14,10 @@ This directory is the system of record for agents. Keep it current. If a decisio
 
 - [Payment Portal](integrations/payment-portal.md) — ownership, current/target contracts, peer evidence and change workflow.
 - [Kernel Capability Manifest v1](contracts/kernel-capability-manifest/v1/README.md) — generated producer schema, canonical fixtures, byte checksums and independent semantic checks.
+- [Common product backend API target](https://github.com/gushinets/payments-portal/blob/main/docs/contracts/product-backend-api/README.md) — Portal-owned Step 9 specification, bounded migration inventory and Step 12 working auth/access checkpoint.
 - [ANY-766 paid integration target contracts](contracts/portal-kernel-paid/README.md) — reviewed
-  snapshot V2, identity, invalidation, usage/exhaustion and cabinet schemas/fixtures;
+  retained snapshot V2/identity V1 and target V3/identity V2, invalidation,
+  usage/exhaustion and cabinet schemas/fixtures;
   independent offline checks, implemented delegation/coherent paid admission and
   snapshot/invalidation transport and recoverable paid browser launch; usage,
   paired local acceptance and sales gates remain pending.
@@ -85,7 +87,7 @@ This directory is the system of record for agents. Keep it current. If a decisio
 
 - `exec-plans/template.md`
 - `exec-plans/active/`
-- [ANY-766 active implementation plan](exec-plans/active/ANY-766-implementation-plan.md) — synchronized copy of the authoritative Portal plan; Steps 1–8 complete, common backend API and local integration work remain in Steps 9–17.
+- [ANY-766 active implementation plan](exec-plans/active/ANY-766-implementation-plan.md) — synchronized copy of the authoritative Portal plan; Steps 1–9 complete, consumer-neutral runtime and local integration work remain in Steps 10–17.
 - `exec-plans/completed/`
 - `exec-plans/completed/proposal-ai-vps-135-safe-cutover.md` — ProposalAI public URL, shared HAProxy access, and cutover gates that protect existing VPS services.
 

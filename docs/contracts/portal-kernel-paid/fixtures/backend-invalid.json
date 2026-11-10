@@ -1,0 +1,790 @@
+[
+  {
+    "name": "snapshot-v3-missing-consumer",
+    "contract": "snapshot-v3",
+    "payload": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 1
+    }
+  },
+  {
+    "name": "snapshot-v3-empty-consumer",
+    "contract": "snapshot-v3",
+    "payload": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 1,
+      "consumer_id": ""
+    }
+  },
+  {
+    "name": "snapshot-v3-caller-callback",
+    "contract": "snapshot-v3",
+    "payload": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel",
+      "callback_url": "https://attacker.invalid/callback"
+    }
+  },
+  {
+    "name": "snapshot-v3-missing-policy",
+    "contract": "snapshot-v3",
+    "payload": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "snapshot-v3-invalid-policy-int-0",
+    "contract": "snapshot-v3",
+    "payload": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 0,
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "snapshot-v3-invalid-policy-int--1",
+    "contract": "snapshot-v3",
+    "payload": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": -1,
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "snapshot-v3-invalid-policy-bool-True",
+    "contract": "snapshot-v3",
+    "payload": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": true,
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "snapshot-v3-invalid-policy-float-1.0",
+    "contract": "snapshot-v3",
+    "payload": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 1.0,
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "snapshot-v3-invalid-policy-str-1",
+    "contract": "snapshot-v3",
+    "payload": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": "1",
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "snapshot-v3-unsupported-version-int-1",
+    "contract": "snapshot-v3",
+    "payload": {
+      "schema_version": 1,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "snapshot-v3-unsupported-version-int-4",
+    "contract": "snapshot-v3",
+    "payload": {
+      "schema_version": 4,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "snapshot-v3-unsupported-version-bool-True",
+    "contract": "snapshot-v3",
+    "payload": {
+      "schema_version": true,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "snapshot-v3-unsupported-version-float-3.0",
+    "contract": "snapshot-v3",
+    "payload": {
+      "schema_version": 3.0,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "code-request-v2-missing-consumer",
+    "contract": "code-request-v2",
+    "payload": {
+      "code_challenge": "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+      "code_challenge_method": "S256"
+    }
+  },
+  {
+    "name": "code-request-v2-empty-consumer",
+    "contract": "code-request-v2",
+    "payload": {
+      "code_challenge": "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+      "code_challenge_method": "S256",
+      "consumer_id": ""
+    }
+  },
+  {
+    "name": "code-request-v2-caller-callback",
+    "contract": "code-request-v2",
+    "payload": {
+      "code_challenge": "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+      "code_challenge_method": "S256",
+      "consumer_id": "platform-kernel",
+      "callback_url": "https://attacker.invalid/callback"
+    }
+  },
+  {
+    "name": "code-request-v2-invented-version-field",
+    "contract": "code-request-v2",
+    "payload": {
+      "code_challenge": "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+      "code_challenge_method": "S256",
+      "consumer_id": "platform-kernel",
+      "schema_version": 2
+    }
+  },
+  {
+    "name": "exchange-response-v2-missing-consumer",
+    "contract": "exchange-response-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_token": "synthetic-never-a-credential-DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+      "token_type": "Bearer",
+      "expires_at": "2026-11-09T04:30:00Z",
+      "consumer_policy_revision": 1
+    }
+  },
+  {
+    "name": "exchange-response-v2-empty-consumer",
+    "contract": "exchange-response-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_token": "synthetic-never-a-credential-DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+      "token_type": "Bearer",
+      "expires_at": "2026-11-09T04:30:00Z",
+      "consumer_policy_revision": 1,
+      "consumer_id": ""
+    }
+  },
+  {
+    "name": "exchange-response-v2-caller-callback",
+    "contract": "exchange-response-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_token": "synthetic-never-a-credential-DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+      "token_type": "Bearer",
+      "expires_at": "2026-11-09T04:30:00Z",
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel",
+      "callback_url": "https://attacker.invalid/callback"
+    }
+  },
+  {
+    "name": "exchange-response-v2-missing-policy",
+    "contract": "exchange-response-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_token": "synthetic-never-a-credential-DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+      "token_type": "Bearer",
+      "expires_at": "2026-11-09T04:30:00Z",
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "exchange-response-v2-invalid-policy-int-0",
+    "contract": "exchange-response-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_token": "synthetic-never-a-credential-DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+      "token_type": "Bearer",
+      "expires_at": "2026-11-09T04:30:00Z",
+      "consumer_policy_revision": 0,
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "exchange-response-v2-invalid-policy-int--1",
+    "contract": "exchange-response-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_token": "synthetic-never-a-credential-DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+      "token_type": "Bearer",
+      "expires_at": "2026-11-09T04:30:00Z",
+      "consumer_policy_revision": -1,
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "exchange-response-v2-invalid-policy-bool-True",
+    "contract": "exchange-response-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_token": "synthetic-never-a-credential-DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+      "token_type": "Bearer",
+      "expires_at": "2026-11-09T04:30:00Z",
+      "consumer_policy_revision": true,
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "exchange-response-v2-invalid-policy-float-1.0",
+    "contract": "exchange-response-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_token": "synthetic-never-a-credential-DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+      "token_type": "Bearer",
+      "expires_at": "2026-11-09T04:30:00Z",
+      "consumer_policy_revision": 1.0,
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "exchange-response-v2-invalid-policy-str-1",
+    "contract": "exchange-response-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_token": "synthetic-never-a-credential-DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+      "token_type": "Bearer",
+      "expires_at": "2026-11-09T04:30:00Z",
+      "consumer_policy_revision": "1",
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "exchange-response-v2-unsupported-version-int-1",
+    "contract": "exchange-response-v2",
+    "payload": {
+      "schema_version": 1,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_token": "synthetic-never-a-credential-DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+      "token_type": "Bearer",
+      "expires_at": "2026-11-09T04:30:00Z",
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "exchange-response-v2-unsupported-version-int-4",
+    "contract": "exchange-response-v2",
+    "payload": {
+      "schema_version": 4,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_token": "synthetic-never-a-credential-DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+      "token_type": "Bearer",
+      "expires_at": "2026-11-09T04:30:00Z",
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "exchange-response-v2-unsupported-version-bool-True",
+    "contract": "exchange-response-v2",
+    "payload": {
+      "schema_version": true,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_token": "synthetic-never-a-credential-DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+      "token_type": "Bearer",
+      "expires_at": "2026-11-09T04:30:00Z",
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "exchange-response-v2-unsupported-version-float-2.0",
+    "contract": "exchange-response-v2",
+    "payload": {
+      "schema_version": 2.0,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_token": "synthetic-never-a-credential-DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+      "token_type": "Bearer",
+      "expires_at": "2026-11-09T04:30:00Z",
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "introspection-response-v2-missing-consumer",
+    "contract": "introspection-response-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "valid_until": "2026-11-09T04:29:55Z",
+      "consumer_policy_revision": 1
+    }
+  },
+  {
+    "name": "introspection-response-v2-empty-consumer",
+    "contract": "introspection-response-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "valid_until": "2026-11-09T04:29:55Z",
+      "consumer_policy_revision": 1,
+      "consumer_id": ""
+    }
+  },
+  {
+    "name": "introspection-response-v2-caller-callback",
+    "contract": "introspection-response-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "valid_until": "2026-11-09T04:29:55Z",
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel",
+      "callback_url": "https://attacker.invalid/callback"
+    }
+  },
+  {
+    "name": "introspection-response-v2-missing-policy",
+    "contract": "introspection-response-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "valid_until": "2026-11-09T04:29:55Z",
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "introspection-response-v2-invalid-policy-int-0",
+    "contract": "introspection-response-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "valid_until": "2026-11-09T04:29:55Z",
+      "consumer_policy_revision": 0,
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "introspection-response-v2-invalid-policy-int--1",
+    "contract": "introspection-response-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "valid_until": "2026-11-09T04:29:55Z",
+      "consumer_policy_revision": -1,
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "introspection-response-v2-invalid-policy-bool-True",
+    "contract": "introspection-response-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "valid_until": "2026-11-09T04:29:55Z",
+      "consumer_policy_revision": true,
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "introspection-response-v2-invalid-policy-float-1.0",
+    "contract": "introspection-response-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "valid_until": "2026-11-09T04:29:55Z",
+      "consumer_policy_revision": 1.0,
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "introspection-response-v2-invalid-policy-str-1",
+    "contract": "introspection-response-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "valid_until": "2026-11-09T04:29:55Z",
+      "consumer_policy_revision": "1",
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "introspection-response-v2-unsupported-version-int-1",
+    "contract": "introspection-response-v2",
+    "payload": {
+      "schema_version": 1,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "valid_until": "2026-11-09T04:29:55Z",
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "introspection-response-v2-unsupported-version-int-4",
+    "contract": "introspection-response-v2",
+    "payload": {
+      "schema_version": 4,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "valid_until": "2026-11-09T04:29:55Z",
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "introspection-response-v2-unsupported-version-bool-True",
+    "contract": "introspection-response-v2",
+    "payload": {
+      "schema_version": true,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "valid_until": "2026-11-09T04:29:55Z",
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "introspection-response-v2-unsupported-version-float-2.0",
+    "contract": "introspection-response-v2",
+    "payload": {
+      "schema_version": 2.0,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "valid_until": "2026-11-09T04:29:55Z",
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    }
+  }
+]

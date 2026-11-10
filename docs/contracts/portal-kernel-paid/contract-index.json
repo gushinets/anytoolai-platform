@@ -12,9 +12,187 @@
     "usage-query-v1": "Kernel",
     "usage-response-v1": "Kernel",
     "exhaustion-v1": "Kernel",
-    "cabinet-usage-v1": "Portal"
+    "cabinet-usage-v1": "Portal",
+    "snapshot-v3": "Portal",
+    "code-request-v2": "Portal",
+    "exchange-response-v2": "Portal",
+    "introspection-response-v2": "Portal"
   },
   "operations": [
+    {
+      "contract": "snapshot-v3",
+      "payload_owner": "Portal",
+      "host": "Portal",
+      "method": "GET",
+      "path": "/internal/v1/access-snapshots/{user_id}",
+      "permission": "access-snapshot:read",
+      "statuses": [
+        200,
+        401,
+        403,
+        404,
+        422,
+        503
+      ],
+      "cache_control": "no-store",
+      "implementation_step": 12
+    },
+    {
+      "contract": "invalidation-v1",
+      "payload_owner": "Portal",
+      "host": "Product backend (Kernel first)",
+      "method": "POST",
+      "path": "/internal/v1/access-invalidations",
+      "permission": "access:invalidate",
+      "statuses": [
+        204,
+        401,
+        403,
+        422,
+        503
+      ],
+      "cache_control": "no-store",
+      "implementation_step": 13
+    },
+    {
+      "contract": "code-request-v2",
+      "payload_owner": "Portal",
+      "host": "Portal",
+      "method": "POST",
+      "path": "/api/backend-session-codes",
+      "permission": "portal-session",
+      "statuses": [
+        200,
+        401,
+        403,
+        422,
+        503
+      ],
+      "cache_control": "no-store",
+      "implementation_step": 10
+    },
+    {
+      "contract": "exchange-request-v1",
+      "payload_owner": "Portal",
+      "host": "Kernel",
+      "method": "POST",
+      "path": "/v1/portal-session/exchange",
+      "permission": "one-use-code+PKCE",
+      "statuses": [
+        200,
+        401,
+        403,
+        422,
+        503
+      ],
+      "cache_control": "no-store",
+      "response_contract": "exchange-response-v2",
+      "implementation_step": 10
+    },
+    {
+      "contract": "exchange-response-v2",
+      "payload_owner": "Portal",
+      "host": "Portal",
+      "method": "POST",
+      "path": "/internal/v1/backend-sessions/exchange",
+      "permission": "backend-session:exchange",
+      "statuses": [
+        200,
+        401,
+        403,
+        422,
+        503
+      ],
+      "cache_control": "no-store",
+      "implementation_step": 10
+    },
+    {
+      "contract": "introspection-response-v2",
+      "payload_owner": "Portal",
+      "host": "Portal",
+      "method": "POST",
+      "path": "/internal/v1/backend-sessions/introspect",
+      "permission": "backend-session:introspect",
+      "statuses": [
+        200,
+        401,
+        403,
+        422,
+        503
+      ],
+      "cache_control": "no-store",
+      "implementation_step": 10
+    },
+    {
+      "contract": "usage-response-v1",
+      "payload_owner": "Kernel",
+      "host": "Product backend (Kernel first)",
+      "method": "GET",
+      "path": "/internal/v1/usage/{user_id}",
+      "permission": "usage:read",
+      "statuses": [
+        200,
+        401,
+        403,
+        422,
+        503
+      ],
+      "cache_control": "no-store",
+      "implementation_step": 14
+    },
+    {
+      "contract": "usage-response-v1",
+      "payload_owner": "Kernel",
+      "host": "Kernel",
+      "method": "GET",
+      "path": "/v1/products/{product_id}/paid-usage",
+      "permission": "delegated-identity",
+      "statuses": [
+        200,
+        401,
+        403,
+        422,
+        503
+      ],
+      "cache_control": "no-store",
+      "implementation_step": 14
+    },
+    {
+      "contract": "exhaustion-v1",
+      "payload_owner": "Kernel",
+      "host": "Portal",
+      "method": "POST",
+      "path": "/internal/v1/allowance-exhaustions",
+      "permission": "allowance-exhaustion:write",
+      "statuses": [
+        204,
+        401,
+        403,
+        409,
+        422,
+        503
+      ],
+      "cache_control": "no-store",
+      "implementation_step": 14
+    },
+    {
+      "contract": "cabinet-usage-v1",
+      "payload_owner": "Portal",
+      "host": "Portal",
+      "method": "GET",
+      "path": "/api/paid-usage",
+      "permission": "verified-email-billing-session",
+      "statuses": [
+        200,
+        401,
+        403,
+        503
+      ],
+      "cache_control": "no-store",
+      "implementation_step": 15
+    }
+  ],
+  "baseline_operations": [
     {
       "contract": "snapshot-v2",
       "payload_owner": "Portal",
@@ -176,5 +354,64 @@
       ],
       "cache_control": "no-store"
     }
-  ]
+  ],
+  "baseline_status": "STEP_8_KERNEL_WIRE; usage/exhaustion/cabinet remain specified only",
+  "identity": {
+    "semantic_key": [
+      "consumer_id",
+      "tenant_id",
+      "region",
+      "user_id",
+      "consumer_policy_revision",
+      "access_revision"
+    ],
+    "policy_digest_fields": [
+      "consumer_id",
+      "tenant_id",
+      "region",
+      "allowed_products"
+    ],
+    "policy_digest_encoding": "sha256:hex of UTF-8 JSON; sorted keys; compact separators; ensure_ascii=true; sorted distinct allowed_products",
+    "minimum_policy_revision": 1,
+    "kernel_consumer_id": "platform-kernel",
+    "legacy_technical_source_id": "platform-kernel",
+    "unchanged_usage_owner": [
+      "tenant_id",
+      "region",
+      "user_id",
+      "allowance_id",
+      "product_id",
+      "metric_key",
+      "unit",
+      "quantity"
+    ]
+  },
+  "history": {
+    "read_only_baselines": [
+      "snapshot-v2",
+      "code-request-v1",
+      "exchange-response-v1",
+      "introspection-response-v1"
+    ],
+    "new_document_versions": [
+      "product-link-v4",
+      "purchased-technical-terms:v3",
+      "accepted-purchase:v4",
+      "selected-technical-terms:v2"
+    ],
+    "new_owner_fields": [
+      "technical_source_id",
+      "backend_consumer_id"
+    ],
+    "legacy_owner_resolution": "in-memory only: platform-kernel; never add defaults to old serialization or digest inputs",
+    "forward_migration_from": {
+      "Portal": "20261110_0008",
+      "Kernel": "0019"
+    },
+    "new_source_evidence_fields": [
+      "manifest_version",
+      "manifest_provenance"
+    ],
+    "selected_digest_rule": "selected-technical-terms:v2 binds source/owner and selected offer/account/revision/selection/commercial fingerprint/provenance; excludes unrelated full manifest version/source audit changes; old v1 inputs unchanged"
+  }
 }
