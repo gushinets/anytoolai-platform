@@ -6,7 +6,7 @@ import { Client as PgClient } from "pg";
 /**
  * ANY-244 browser-evidence smoke for the Acceptance Builder web vertical, scoped like its siblings
  * to "prove the client<->backend seam once": product page -> shared client -> Platform API ->
- * scenario session -> job/worker -> A01 (+A11) -> A10 workflow -> canonical artifact -> product
+ * scenario session -> job/worker -> A01 (+A11) workflow -> canonical artifact -> product
  * renderer -> activation. Per-product meaning (mapping, validation, parser, every renderer branch)
  * is proven by apps/web-mirror/test/AcceptanceBuilderProduct.test.tsx and the backend bundle tests.
  *
@@ -348,7 +348,7 @@ test.describe("Acceptance Builder web product", () => {
     await expectCopyActivation(page, run.sessionId(), composeCopyText(output));
   });
 
-  test("mobile: a long unbroken token in the result does not widen the page", async ({ page }) => {
+  test("mobile: a long token fits with the recap collapsed and expanded", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 800 });
     const output = composedOutput("draft", "");
     const longUrl = `https://example.com/${"a".repeat(200)}`;
@@ -356,7 +356,15 @@ test.describe("Acceptance Builder web product", () => {
     await overrideResult(page, output);
     await page.goto(PRODUCT_URL);
     await submitDraft(page);
-    await expect(page.getByText(longUrl).first()).toBeVisible({ timeout: 60_000 });
+    const result = page.getByRole("region", { name: "Acceptance criteria", exact: true });
+    await expect(result.getByRole("paragraph").filter({ hasText: longUrl })).toBeVisible({ timeout: 60_000 });
+    const recap = result.locator("details");
+    await expect(recap).not.toHaveAttribute("open", "");
+    await expectNoHorizontalScroll(page);
+
+    await recap.locator("summary").click();
+    await expect(recap).toHaveAttribute("open", "");
+    await expect(recap.getByText(`- ${longUrl}`, { exact: true })).toBeVisible();
     await expectNoHorizontalScroll(page);
   });
 

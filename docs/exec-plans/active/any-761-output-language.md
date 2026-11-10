@@ -81,3 +81,20 @@ unsafe suite IDs, manifest keys, ordinary review flow, overwrite protection and 
 escapes. Real filesystem symlink checks passed locally for manifest/result/review. Ruff and
 config/architecture/docs/generated/whitespace checks passed. No provider calls or product/prompt
 changes; full baseline delegated to CI. Commit/push authorized; Sonar reanalysis remains pending.
+
+
+## Implementation plan — mobile smoke recap states
+
+The first text match now belongs to the collapsed structured recap. Scope the mobile long-token
+assertion to the result region's copy paragraph, assert the recap starts collapsed, and verify
+page width before and after opening the recap. Assert that the recap token becomes visible so
+the expanded-width check cannot pass while content stays hidden. Keep product styling unchanged.
+Run lint/typecheck and the complete canonical acceptance-builder-smoke against an isolated fake
+provider dev stack, stop that stack with volumes retained, then commit/push on feature/ANY-761.
+No new experiment directories or paid model calls.
+
+Mobile smoke correction validated: canonical acceptance-builder-smoke passed11/11 in headless
+Chromium against the isolated fake-provider stack, with no skips/retries. The long-token test
+checked page width with recap collapsed and expanded and confirmed expanded token visibility.
+Smoke-package lint/typecheck and web production build passed. Stack stopped with volumes
+retained; no paid model calls or product styling changes. Commit/push authorized.
