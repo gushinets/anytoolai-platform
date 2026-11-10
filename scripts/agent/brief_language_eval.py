@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import time
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -72,8 +73,19 @@ def digest(value: object) -> str:
     ).hexdigest()
 
 
+def evidence_path(directory: Path, filename: str) -> Path:
+    if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*(?:\.review)?\.json", filename) is None:
+        raise ValueError("invalid evidence filename")
+    path = directory / filename
+    if not path.resolve().is_relative_to(directory.resolve()):
+        raise ValueError("evidence path resolves outside the output directory")
+    return path
+
+
 def write_json(path: Path, value: object) -> None:
-    path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    with path.open("x", encoding="utf-8") as stream:
+        json.dump(value, stream, ensure_ascii=False, indent=2)
+        stream.write("\n")
 
 
 def authored_fields(output: dict) -> dict[str, str]:
@@ -280,10 +292,10 @@ def main() -> int:
     report.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
     if args.command == "report":
-        manifest = json.loads((args.out / "manifest.json").read_text(encoding="utf-8"))
+        manifest = json.loads(evidence_path(args.out, "manifest.json").read_text(encoding="utf-8"))
         statuses = []
         for key in manifest["runs"]:
-            path = args.out / f"{key}.json"
+            path = evidence_path(args.out, f"{key}.json")
             if not path.exists():
                 status = "PENDING"
             else:
@@ -296,7 +308,9 @@ def main() -> int:
                     or record["snapshot"] != manifest["snapshot"]
                 ):
                     raise ValueError("run differs from the planned case/configuration")
-                review = json.loads((args.out / f"{key}.review.json").read_text(encoding="utf-8"))
+                review = json.loads(
+                    evidence_path(args.out, f"{key}.review.json").read_text(encoding="utf-8")
+                )
                 status = review_status(record, review)
             statuses.append(status)
             print(f"{key}: {status}")
@@ -321,19 +335,21 @@ def main() -> int:
         if case["scenario_id"] == args.scenario
         and (args.family is None or case["family"] == args.family)
     ]
+    runs = [f"{case['id']}--{attempt}" for attempt in range(1, args.repeats + 1) for case in cases]
+    for key in runs:
+        evidence_path(args.out, f"{key}.json")
     snapshot = json.loads(_docker(args.project, "platform-worker", WORKER_PYTHON, "-c", SNAPSHOT))
     args.out.mkdir(parents=True, exist_ok=False)
-    runs = [f"{case['id']}--{attempt}" for attempt in range(1, args.repeats + 1) for case in cases]
     write_json(
-        args.out / "manifest.json",
+        evidence_path(args.out, "manifest.json"),
         {"cases": cases, "runs": runs, "snapshot": snapshot, "source": _git_state()},
     )
     for attempt in range(1, args.repeats + 1):
         for case in cases:
             key = f"{case['id']}--{attempt}"
             record = collect(args, case, attempt, snapshot)
-            write_json(args.out / f"{key}.json", record)
-            write_json(args.out / f"{key}.review.json", review_template(record))
+            write_json(evidence_path(args.out, f"{key}.json"), record)
+            write_json(evidence_path(args.out, f"{key}.review.json"), review_template(record))
             print(
                 f"{key}: {'ERROR' if record['error'] else 'collected; review pending'}", flush=True
             )

@@ -61,3 +61,23 @@ Additional budget/date omissions, BD renovation-budget semantics, mixed HTML jud
 the earlier no-question runtime failure remain outside the authorized language correction.
 Agent semantic assessment is finite; independent human QA and production rollout are unclaimed.
 Isolated stack stopped with volumes retained; router restored and checked against the repository.
+
+
+## Implementation plan — SonarCloud path traversal
+
+The CLI currently interpolates suite case IDs and manifest run keys into filesystem paths.
+Use one product-evidence filename boundary in both run/report: permit only the existing ASCII
+JSON filename format, resolve it beneath the chosen output directory, and reject escapes before
+reading/writing evidence. Preflight all planned run names before Docker/provider calls or output
+directory creation. Keep JSON content as data through json.dump, and create evidence files
+exclusively so failures/duplicates cannot overwrite captures. Add negative CLI regressions for
+POSIX/Windows traversal, absolute names and malformed names, plus a normal run/review/report
+round trip and overwrite protection. No prompt/model/output-contract changes or paid live runs.
+Verify targeted tests, lint/docs/config checks, commit and push on feature/ANY-761; inspect the
+new Sonar result without suppressing or resolving the finding manually.
+
+Path traversal correction validated:96 targeted collector/product tests passed, including
+unsafe suite IDs, manifest keys, ordinary review flow, overwrite protection and resolved-path
+escapes. Real filesystem symlink checks passed locally for manifest/result/review. Ruff and
+config/architecture/docs/generated/whitespace checks passed. No provider calls or product/prompt
+changes; full baseline delegated to CI. Commit/push authorized; Sonar reanalysis remains pending.

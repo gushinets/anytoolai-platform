@@ -6,6 +6,7 @@ import sys
 from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
@@ -174,3 +175,131 @@ def test_machine_only_weak_draft_has_no_prose_to_review():
     assert evaluation.authored_fields(run["output"]) == {}
     assert evaluation.review_status(run, evaluation.review_template(run)) == "PENDING"
     assert evaluation.review_status(run, completed_review(run)) == "PASS"
+
+
+UNSAFE_KEYS = (
+    "../escaped",
+    "../../escaped",
+    "/absolute",
+    "sub/file",
+    r"..\escaped",
+    r"sub\file",
+    r"C:\absolute",
+    r"\\server\share\file",
+    "",
+    ".",
+    "..",
+    "bad.name",
+    "bad\x00name",
+)
+
+
+def cli_args(command, out):
+    arguments = ["brief_language_eval.py", command, "--out", str(out)]
+    if command == "run":
+        arguments += [
+            "--api-url",
+            "http://127.0.0.1:18000",
+            "--project",
+            "anytoolai-test",
+            "--scenario",
+            "acceptance_builder.check_v1",
+            "--repeats",
+            "1",
+        ]
+    return arguments
+
+
+@pytest.mark.parametrize("case_id", UNSAFE_KEYS)
+def test_run_rejects_all_unsafe_case_ids_before_any_collection(monkeypatch, tmp_path, case_id):
+    valid = deepcopy(record()["case"])
+    unsafe = {**valid, "id": case_id}
+    suite = tmp_path / "cases.json"
+    suite.write_text(json.dumps({"cases": [valid, unsafe]}), encoding="utf-8")
+    out = tmp_path / "results"
+    docker = Mock(side_effect=AssertionError("must reject before Docker access"))
+    collect = Mock(side_effect=AssertionError("must reject before provider access"))
+    monkeypatch.setattr(evaluation, "SUITE", suite)
+    monkeypatch.setattr(evaluation, "_docker", docker)
+    monkeypatch.setattr(evaluation, "collect", collect)
+    monkeypatch.setattr(sys, "argv", cli_args("run", out))
+
+    with pytest.raises(ValueError, match="invalid evidence filename"):
+        evaluation.main()
+
+    docker.assert_not_called()
+    collect.assert_not_called()
+    assert not out.exists()
+    assert set(tmp_path.iterdir()) == {suite}
+
+
+@pytest.mark.parametrize("key", UNSAFE_KEYS)
+def test_report_rejects_unsafe_manifest_keys(monkeypatch, tmp_path, key):
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(json.dumps({"runs": [key]}), encoding="utf-8")
+    monkeypatch.setattr(sys, "argv", cli_args("report", tmp_path))
+
+    with pytest.raises(ValueError, match="invalid evidence filename"):
+        evaluation.main()
+
+    assert set(tmp_path.iterdir()) == {manifest}
+
+
+def test_cli_run_and_review_report_round_trip_preserves_json_data(monkeypatch, tmp_path):
+    case = deepcopy(record()["case"])
+    case["input"]["brief_text"] = 'Русский текст: ../../outside, C:\\file, "цитата"'
+    suite = tmp_path / "cases.json"
+    suite.write_text(json.dumps({"cases": [case]}), encoding="utf-8")
+    snapshot = {"source_sha256": {}}
+    out = tmp_path / "results"
+    run = {**record(), "case": case, "attempt": 1, "snapshot": snapshot, "evidence_error": None}
+    collector = Mock(return_value=run)
+    monkeypatch.setattr(evaluation, "SUITE", suite)
+    monkeypatch.setattr(evaluation, "_docker", Mock(return_value=json.dumps(snapshot)))
+    monkeypatch.setattr(evaluation, "_git_state", lambda: {})
+    monkeypatch.setattr(evaluation, "collect", collector)
+    monkeypatch.setattr(sys, "argv", cli_args("run", out))
+
+    assert evaluation.main() == 0
+    collector.assert_called_once()
+    key = case["id"] + "--1"
+    saved = json.loads((out / f"{key}.json").read_text(encoding="utf-8"))
+    assert saved == run
+    assert {path.name for path in out.iterdir()} == {
+        "manifest.json",
+        f"{key}.json",
+        f"{key}.review.json",
+    }
+
+    monkeypatch.setattr(sys, "argv", cli_args("report", out))
+    assert evaluation.main() == 1  # Generation alone still awaits review.
+    (out / f"{key}.review.json").write_text(json.dumps(completed_review(saved)), encoding="utf-8")
+    assert evaluation.main() == 0
+
+
+def test_write_json_never_overwrites_existing_evidence(tmp_path):
+    path = evaluation.evidence_path(tmp_path, "case--1.json")
+    original = {"result": "original"}
+    evaluation.write_json(path, original)
+
+    with pytest.raises(FileExistsError):
+        evaluation.write_json(path, {"result": "replacement"})
+
+    assert json.loads(path.read_text(encoding="utf-8")) == original
+
+
+@pytest.mark.parametrize("filename", ["manifest.json", "case--1.json", "case--1.review.json"])
+def test_evidence_path_rejects_a_filename_resolving_outside_root(monkeypatch, tmp_path, filename):
+    directory = tmp_path / "results"
+    link = directory / filename
+    outside = tmp_path / "outside.json"
+    resolve = Path.resolve
+
+    def resolve_path(path, *args, **kwargs):
+        if path == link:
+            return outside
+        return resolve(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "resolve", resolve_path)
+    with pytest.raises(ValueError, match="outside the output directory"):
+        evaluation.evidence_path(directory, filename)
