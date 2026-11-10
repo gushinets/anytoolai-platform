@@ -1,10 +1,11 @@
 # ANY-766 paid integration target contracts
 
-Status: **target specifications and offline fixtures only**, formalized 2026-11-09.
-The bundle itself is protocol documentation. The identity server slice is now
-implemented in Step 4 as recorded below. Step 6 now implements coherent paid
-admission, ownership and observational events. Production configuration, delivery
-workers, browser journeys and live acceptance remain later work. All quantities and
+Status: **protocol specifications and fixtures**, formalized 2026-11-09.
+Server implementation through ANY-766 Step 7 includes delegated identity,
+snapshot V2, coherent paid admission/ownership/events and Portal invalidation
+delivery. Browser journeys, usage/exhaustion and cabinet integration remain
+pending. Paired local acceptance is Step 11; remote/live acceptance and
+production rollout belong to ANY-767. All quantities and
 credential-shaped strings in fixtures are synthetic. Q=1 is an isolated test
 quantity, never a commercial offer or approval.
 
@@ -266,17 +267,20 @@ Kernel uses JSON Schema with strict integer
 types and independent semantic checks; it also verifies compatibility with
 ANY-507 PaidAllowance/readback. Each repository checks byte inventory/hashes.
 Neither validator is used by runtime code. Run the focused commands in Step 1
-of the plan and compare both bundle directories before handoff. Runtime races,
-durability, real HTTP/browser, live LBX, staging and production retain later gates.
+of the plan and compare both bundle directories before handoff. Offline fixture
+checks validate the protocol only. Runtime durability/concurrency checks belong
+to their implementation steps; assembled local HTTP/browser acceptance is
+Step 11, and remote/live acceptance belongs to ANY-767.
 
 ## Step 4 server implementation
 
 The schemas/fixtures above remain the normative protocol bundle. ANY-766 Step 4
 implements only the identity server slice: Portal code issuance, internal
 exchange/introspection, Kernel public exchange and the reusable Kernel identity
-dependency. Browser launch/callback/storage is Step 8; attaching the dependency
-to paid runtime ownership/admission is Step 6. Snapshot, usage and delivery remain
-later steps. The original Portal bearer is not sent to Portal's internal service
+dependency. Step 5 adds snapshot V2 serving, Step 6 attaches identity to paid
+runtime ownership/admission, and Step 7 delivers invalidations. Browser
+launch/callback/storage remains Step 8; usage/exhaustion remains Step 9.
+The original Portal bearer is not sent to Portal's internal service
 endpoints or forwarded by Kernel.
 
 Portal settings (server environment only):
@@ -286,9 +290,9 @@ Portal settings (server environment only):
   character syntax. Orphaned/equal previous slots and equality with the opposite
   direction's `KERNEL_SERVICE_TOKEN` fail validation.
 - `KERNEL_ACCESS_PERMISSIONS`: explicit comma-separated receiver grants from
-  `kernel-session:exchange,kernel-session:introspect`. The default is empty;
-  configuring a token alone does not grant either permission. Other operations
-  are not implemented by this step and their future permissions are not enabled.
+  `kernel-session:exchange,kernel-session:introspect,access-snapshot:read`.
+  The default is empty; configuring a token alone grants none of them.
+  The target exhaustion receiver remains unimplemented.
 - Existing `PAID_ACCESS_CLOCK_SKEW_SECONDS` is required by introspection; the
   selected local/staging value is 5. Missing clock configuration returns `503`.
   Supporting that clock budget in a deployed environment remains an operator gate.
@@ -349,8 +353,10 @@ without granting access or charging usage.
 `ANYTOOLAI_PORTAL_ACCESS_INVALIDATION_ENABLED=true`; default is false, retaining
 manifest-only authority. Current/previous Portal service tokens share this
 configured permission and trusted scope. The receiver returns `204` only after
-floor/eviction commit, including repeated/lower revisions. Portal sender delivery
-remains Step 7; the usage API and exhaustion delivery remain Step 9.
+floor/eviction commit, including repeated/lower revisions. Portal Step 7 now
+delivers invalidations through its embedded worker. The sender starts with the
+existing manifest URL/token when that worker is enabled, so configure this
+receiver permission first. The usage API and exhaustion delivery remain Step 9.
 
 Focused evidence uses real disposable PostgreSQL and in-process ASGI with
 synthetic Portal responses. It does not establish real paired HTTP, browser,
