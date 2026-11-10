@@ -1,6 +1,6 @@
 # ANY-766 — Portal–Kernel Paid Execution Integration
 
-Status: **STEPS 1–3 COMPLETE; production declarations/bindings and immutable purchased quantities implemented; paid runtime integration and later gates remain**
+Status: **STEPS 1–4 COMPLETE; REV-3 lock-order defect resolved; paid runtime integration and later gates remain**
 
 Date: **2026-11-09**
 
@@ -10,8 +10,8 @@ Issue: [ANY-766](https://linear.app/paveldik/issue/ANY-766)
 - Owner: mixed — Portal and Kernel execution owners
 - Last updated: 2026-11-10
 - Review date: 2026-11-10
-- Next action: Step 4 scoped session delegation, only when separately requested. Steps 4–14 have not been executed.
-- Blocker: none for completed Steps 1–3. A fresh PostgreSQL review rerun remains BLOCKED pending explicit authorization to start the local test container; the recorded passing 68/115 reports remain existing evidence. Sales, live-proof, staging and production conditions apply only to their dependent actions under Section 3.8. The inherited broader Kernel permission-test limitation remains recorded below.
+- Next action: Step 5 production allowance derivation and V2 snapshots, only when separately requested. Step 4 REV-3 is resolved; Steps 5–14 have not been executed.
+- Blocker: none for completed Steps 1–4. Step 4 PostgreSQL checks, including the REV-3 concurrency correction, pass under explicit local test-db/temporary-migration authorization; the historical Step 3 review selection was not rerun. Sales, live-proof, staging and production conditions apply only to their dependent actions under Section 3.8. The inherited broader Kernel permission-test limitation remains recorded below.
 
 This replaces the previous proposal completely. PLAN-1 through PLAN-5 are addressed below.
 
@@ -902,6 +902,202 @@ Cover Q changes, immutable renewal quantity, CAS/replay, unsupported metric/unit
 
 ### Step 4 — Implement scoped session delegation
 
+#### Step 4 execution checkpoint — 2026-11-10
+
+**Result: COMPLETE within scoped server-side identity delegation.** Only Step 4
+was executed. Starting/current HEADs remain Portal
+`4a34948eb02d034b46871d739bbf066ffc67d48a` and Kernel
+`89296ddce3c7b187881cb1730bf7fbacf3ffd302`, on local `ANY-766` branches,
+plus this uncommitted diff. Both working trees and indexes were clean initially.
+No staging, commit, push, branch change, dependency installation, real service
+configuration, live LBX, publication or deployment was performed.
+
+Implemented:
+
+- Portal migration `20261110_0007` adds one hash-only
+  `kernel_session_delegations` table, with unique code/token hashes, exchange
+  shape constraint and `ON DELETE CASCADE` to the existing AuthSession. No user
+  directory or identity matching is added. Portal now has 28 application tables;
+  Kernel's migration head remains `0018`.
+- `POST /api/kernel-session-codes` authenticates the existing Portal bearer and
+  issues a random 32-byte S256-bound code for at most 60 seconds. Internal
+  exchange is atomic and single-use; the random delegated token expires at the
+  earlier of 30 minutes and parent expiry. Fixed audience is `platform-kernel`.
+  Writes lock User → AuthSession → delegation and recheck authority after waits.
+- Internal introspection reads delegation/session/user together, verifies scope,
+  audience, active user, parent revocation/deletion/expiry and token expiry, and
+  returns only canonical identity with the configured clock budget subtracted.
+  Public session bookkeeping is separated from `validate_session`; identity
+  reads perform no last-seen mutation or commit. Existing logout and password
+  reset invalidate parent authority. `UserStatus.INACTIVE` explicitly represents
+  deactivation without adding an administration endpoint.
+- Reverse-direction credentials have current/previous rotation, explicit
+  receiver-owned exchange/introspection permissions (empty by default), trusted
+  scope and directional-secret separation. Internal receivers reject Origin
+  before public CORS. Validation errors are redacted, dependency failures are
+  safe `503`, identity `401` codes distinguish expiry from parent invalidation,
+  and responses/refusals use no-store.
+- Kernel implements `POST /v1/portal-session/exchange` and the reusable
+  `authenticate_portal_user` dependency. It validates the independent wire
+  version/scope/UUID/UTC/deadline contract and returns the existing Core
+  Portal-user ExecutionOwner. Every dependency invocation introspects; no local
+  identity cache, refresh token or guest fallback exists. TLS verification,
+  socket timeout, response-size limit, redirect/proxy refusal and no automatic
+  exchange retry keep secrets in the selected service direction.
+- Generated Portal OpenAPI/schema/TypeScript and Kernel OpenAPI/CE-kit types,
+  the current data model, both integration maps and paired contract README are
+  updated. No fixture/schema checksum or commercial enablement was changed.
+
+Fresh verification (repository-root commands):
+
+- **PASS — Portal required selection plus HTTP/security cases: 55 passed,
+  0 skipped, including 8 PostgreSQL cases.**
+  `./.venv/bin/python -m pytest -p no:cacheprovider -q apps/api/tests/test_api_identity_session.py apps/api/tests/test_kernel_session_delegation.py apps/api/tests/test_kernel_session_delegation_postgres.py`.
+  `/tmp/any766_step4_portal_tests.py` uses the existing
+  `canonical_check_environment()` / `api_test_environment('api-postgres', ...)`
+  and a unique disposable `_tests` database. Evidence:
+  `.harness/any766-step4-identity.log` and `.harness/any766-step4-identity.xml`.
+  Covers PKCE/single-use races, scope/audience, TTL/clock bounds, logout, actual
+  password reset, deactivation, parent changes during exchange waits, cascade,
+  migration round trip preserving parent rows, rejected partial exchange state,
+  read-only introspection, rotation/permissions, outages and secret canaries.
+- **PASS — Portal related regressions: 481 passed, 0 skipped:**
+  `./.venv/bin/python -m pytest -p no:cacheprovider -q apps/api/tests/test_architecture.py apps/api/tests/test_repository_docs.py apps/api/tests/test_presentation_di.py apps/api/tests/test_any766_contracts.py apps/api/tests/test_api_password_reset.py apps/api/tests/test_api_email_verification.py`.
+  Evidence: `.harness/any766-step4-regressions.xml`. Existing SQLite FK-sort and
+  Python datetime-adapter warnings remain; they are not skipped tests.
+- **PASS — Kernel required identity module: 63 passed, 0 skipped:**
+  `LITELLM_LOCAL_MODEL_COST_MAP=True ./.quick-check-venv/bin/python -m pytest -p no:cacheprovider -o addopts='' -q apps/platform-api/tests/test_portal_session_api.py`.
+  HTTP is intercepted. Includes independent positive/negative contract fixtures,
+  canonical principal, request-by-request introspection, refusal without guest
+  authority, directional auth, malformed owner/version/expiry, safe identity
+  codes, dependency/error-body outages and secret-log canaries. Evidence:
+  `/tmp/any766-step4-kernel-identity.xml`.
+- **PASS — Kernel manifest/service-auth and contract regressions: 215 passed,
+  0 skipped:** the same command selects
+  `apps/platform-api/tests/test_capability_manifest.py apps/platform-api/tests/test_paid_contract_fixtures.py`.
+  Evidence: `/tmp/any766-step4-kernel-regressions.xml`.
+- **PASS — applicable non-fixing checks:** Portal Ruff check/format check on all
+  16 changed/new Python files, `npm run architecture:check`, `npm run docs:check`
+  and `npm run typecheck:web`; Kernel Ruff check/format check on all 6 changed/new
+  Python files, `runner.py validate-architecture`, `validate-configs`,
+  `validate-docs`, and `pnpm --filter @anytoolai/ce-kit typecheck`.
+- **PASS — generation:** Portal `PATH="$PWD/.venv/bin:$PATH" npm run generate`
+  and `npm run generate:check`; Kernel `runner.py generate-docs`,
+  `generate-docs --check`, `pnpm --filter @anytoolai/ce-kit generate-api-types`
+  and `generate-api-types:check`. Kernel commands set
+  `LITELLM_LOCAL_MODEL_COST_MAP=True` to use the shipped local cost map.
+- **PASS — diagnostics/integrity:** Kernel doctor; Portal doctor after stopping
+  the test server; both `git diff --check`, unchanged HEADs/branches, empty
+  indexes, paired contract README equality and byte-for-byte plan equality.
+
+Authorization, corrections and limits:
+
+- The user explicitly authorized starting the isolated local test-db and applying
+  migrations **only to a temporary test database**. The existing local pinned
+  PostgreSQL image was used through `scripts/repo.py test-db up`; no image was
+  downloaded. Fixtures created/migrated/dropped unique `_tests` databases.
+  `scripts/repo.py test-db stop` stopped the server afterwards without removing
+  its volume. No application database was migrated. This is fresh Step 4
+  evidence, not a rerun of the historical Step 3 review selection.
+- Introduced fixture mistakes (registration/reset data, UTC serialization and
+  interrupted HTTP-error body) were corrected. Architecture checks required SQL
+  availability translation in a focused infrastructure capability; its neutral
+  failure is exposed by the identity use case, with transaction ownership left
+  in Application. No boundary guard or failure was suppressed. All affected
+  checks now pass. Sandbox TestClient restrictions and the doctor's busy port
+  while the test server was running were resolved by local checks and shutdown.
+- **NOT_RUN — assembled broad suites, real two-service TCP HTTP, browser launch/
+  recovery, paid runtime ownership/admission, V2 snapshots, live LBX, staging and
+  production.** These remain later steps and operational gates. In particular,
+  Step 6 must attach the identity dependency to paid runtime surfaces and Step 8
+  must implement browser custody/recovery. Step 4 does not enable paid execution
+  or alter existing guest routes. Earlier broader Kernel permission-test limits
+  remain historical and were not reclassified as passing by these selections.
+- **BLOCKED — commercial/live/staging actions** retain Section 3.8 owner inputs;
+  none blocks the completed Step 4 server slice. Real configuration, application
+  migration and deployment still require their own authorization.
+
+Portal remains authoritative; the complete file is synchronized byte-for-byte to
+Kernel. Next is Step 5 only on a separate request. Steps 5–14 are unexecuted.
+
+#### Step 4 review follow-up — REV-3, 2026-11-10
+
+**REV-3: RESOLVED (important).** The original Step 4 checkpoint verified serial
+password-reset invalidation but missed the real reset/exchange lock inversion.
+The supplied earlier diagnostic log `/tmp/any766-step4-review-race.log` records
+PostgreSQL `40P01`. This follow-up independently reproduced it with checked-in
+regressions before changing the production function.
+
+Cause and correction:
+
+- With `autoflush=False`, `confirm_password_reset()` updated AuthSession rows
+  before flushing its dirty User at commit, while delegation locked User first.
+  Each transaction could retain the row needed by the other. Both actual
+  exchange-first and reset-first interleavings reproduced the deadlock.
+- Reset now resolves the scoped token owner without writes, acquires the existing
+  active scoped User lock, then atomically claims the reset token using fresh
+  time sampled after the wait. Password replacement, token invalidation and
+  all-session revocation retain the same application-owned transaction. Thus
+  reset and delegation use User before AuthSession, without a retry loop or
+  error suppression. Public HTTP contracts and persistence schema are unchanged.
+- Taking User before the token claim also prevents two different reset tokens
+  from each holding one token while invalidating the other. A new concurrent
+  test requires exactly one committed reset and one ordinary invalid-token
+  refusal. Another test expires the token while reset waits for User and proves
+  that no password, session or token mutation commits after expiry.
+
+Fresh evidence:
+
+- **FAIL — pre-fix reproduction, expected red result:**
+  `./.venv/bin/python /tmp/any766_rev3_tests.py red apps/api/tests/test_kernel_session_delegation_postgres.py -k 'password_reset_and_exchange_share_user_first_lock_order or concurrent_distinct_password_reset_tokens'`
+  — **3 failed / 8 deselected**, each with a real PostgreSQL deadlock. Both
+  exchange/reset orderings and distinct-token concurrency execute the actual
+  service functions with SQL barriers. Evidence:
+  `.harness/any766-rev3-red.log` and `.harness/any766-rev3-red.xml`.
+- **PASS — same three regressions after the correction:** the same command with
+  `green` — **3 passed / 8 deselected**. Evidence:
+  `.harness/any766-rev3-green.log` and `.harness/any766-rev3-green.xml`.
+- **PASS — final affected selection, 541 passed / 0 skipped:**
+  `./.venv/bin/python /tmp/any766_rev3_tests.py final apps/api/tests/test_api_identity_session.py apps/api/tests/test_kernel_session_delegation.py apps/api/tests/test_kernel_session_delegation_postgres.py apps/api/tests/test_api_password_reset.py apps/api/tests/test_password_reset_persistence_postgres.py apps/api/tests/test_architecture.py apps/api/tests/test_repository_docs.py apps/api/tests/test_presentation_di.py apps/api/tests/test_any766_contracts.py apps/api/tests/test_api_email_verification.py`.
+  This includes the four new PostgreSQL cases, the original Step 4 migration/
+  single-use/cascade/security checks, actual reset/logout behavior and the
+  existing architecture, documentation and contract regressions. Evidence:
+  `.harness/any766-rev3-final.log` and `.harness/any766-rev3-final.xml`.
+  Existing SQLite FK-sort/datetime-adapter warnings remain; there are no skips.
+- **PASS — non-fixing checks:** Ruff check and format check on the two Python
+  files changed by this follow-up; Portal `npm run architecture:check`,
+  `npm run generate:check` and `npm run docs:check`; Kernel
+  `runner.py validate-docs`; both `git diff --check` and byte-for-byte plan
+  equality. No generated file, contract fixture/checksum or dependency changed.
+- **PASS — preservation and cleanup:** the earlier explicit local test-db /
+  temporary-migration authorization was reused. The runner derives the existing
+  isolated test configuration and assigns a unique `_tests` database; fixtures
+  create/migrate/drop only that database. The test server was stopped afterwards
+  without removing its volume. All other pre-existing Step 4 files, both HEADs
+  and both empty indexes remain unchanged outside the production reset function,
+  its PostgreSQL regressions and the synchronized plan follow-up.
+- **REUSED, not rerun here — Kernel identity 63 and regressions 215:** Kernel
+  runtime and all wire contracts are unchanged by REV-3. Earlier Step 4 evidence
+  remains recorded above. Real paired HTTP, browser recovery, paid runtime and
+  whole-program readiness remain **NOT_RUN** under their later steps/gates.
+
+Step 4 is complete with REV-3 corrected. REV-1 and REV-2 remain resolved;
+Steps 5–14 remain unexecuted. Portal is authoritative and its complete Kernel
+copy is synchronized before handoff. No Git staging/commit, publication,
+application-database migration or external service operation was performed.
+
+#### Step 4 local commit authorization — 2026-11-10
+
+After the Step 4 implementation and REV-3 correction, the user explicitly
+requested local commits in both repositories. This narrowly overrides the
+common protocol's no-staging/no-commit rule for the completed Step 4 changes,
+its reset lock-order correction and synchronized plan/evidence. Commit Portal as
+`ANY-766 - Delegate Portal sessions to Kernel` and Kernel as
+`ANY-766 - Authenticate delegated Portal sessions`.
+Earlier unchanged-HEAD/empty-index/no-commit statements describe their execution
+and review checkpoints. This authorization does not permit push, merge, rebase,
+branch switching, later implementation steps or publication/deployment.
+
 **Goal / Expected behavior:** Kernel verifies the existing Portal identity without receiving its original bearer.
 
 **Repositories / Read before implementation:** both; [Portal authentication](https://github.com/gushinets/payments-portal/blob/7f985031034f45fde0203f710eb64283cd086e86/apps/api/app/domains/identity/services/auth.py), identity models and [Kernel service authentication](https://github.com/gushinets/anytoolai-platform/blob/72ff15bc0b77903c87aa39f7b10186dccc556d09/apps/platform-api/src/anytoolai_platform_api/manifest_auth.py).
@@ -1282,7 +1478,7 @@ This revised plan closes:
 - **PLAN-2:** usage variants, exhaustion identity and durable acknowledgement are specified.
 - **PLAN-3:** token custody and original-operation recovery are specified.
 - **PLAN-4:** release compatibility and host/container profile mapping are specified.
-- **PLAN-5:** Step 1 materialization and contract formalization/technical review are complete in both repositories; Portal remains authoritative and the Kernel copy is synchronized after progress updates. Every later prompt names the exact Portal path and every step has concrete verification targets. Step 2 supplies production declarations and scenario bindings; Step 3 supplies immutable purchased quantities and pre-consent presentation. Paid runtime integration and later delivery remain for Steps 4–14.
+- **PLAN-5:** Step 1 materialization and contract formalization/technical review are complete in both repositories; Portal remains authoritative and the Kernel copy is synchronized after progress updates. Every later prompt names the exact Portal path and every step has concrete verification targets. Step 2 supplies production declarations and scenario bindings; Step 3 supplies immutable purchased quantities and pre-consent presentation. Step 4 supplies scoped server-side session delegation and the Kernel principal adapter. Paid runtime integration and later delivery remain for Steps 5–14.
 
 Remaining gates concern commercial and operational inputs for their dependent actions. Step 1 and implementation following the accepted strategy require no additional preliminary protocol approval. No launch quantity, LBX association, credential or host is invented.
 

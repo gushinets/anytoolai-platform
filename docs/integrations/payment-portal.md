@@ -135,6 +135,24 @@ Historical two-metric TEST-ONLY fixtures retain their bytes and identity. The
 Portal consumer retains independent current fixture copies. Sales, paid HTTP
 identity/admission, usage delivery and purchased quantities remain separate work.
 
+## ANY-766 Step 4 identity checkpoint — 2026-11-10
+
+Peer Portal `4a34948eb02d034b46871d739bbf066ffc67d48a` and local Kernel
+`89296ddce3c7b187881cb1730bf7fbacf3ffd302` were inspected, plus the paired
+uncommitted Step 4 change. Portal implements one-use S256 codes, atomic exchange
+and parent-bound introspection; Kernel implements public code exchange and the
+reusable `authenticate_portal_user` dependency. It creates the existing Core
+Portal-user `ExecutionOwner` directly from validated scope/UUID and introspects
+on each invocation. It never falls back to a guest or matches a local user.
+
+See [identity configuration and limits](../contracts/portal-kernel-paid/README.md#step-4-server-implementation).
+The reverse-direction token and explicit Portal receiver permissions are now
+implemented for exchange/introspection only. Snapshot/invalidation/usage/
+exhaustion keep their later-step gates. Local evidence uses disposable Portal
+PostgreSQL and intercepted Kernel HTTP; real paired HTTP remains Step 11.
+Paid runtime wiring remains Step 6 and browser custody/recovery remains Step 8.
+The historical snapshots above remain historical evidence.
+
 ## Service authentication and scope convention (ANY-711 handoff)
 
 This is the normative service-authentication handoff for all three operations. ANY-711

@@ -1,8 +1,9 @@
 # ANY-766 paid integration target contracts
 
 Status: **target specifications and offline fixtures only**, formalized 2026-11-09.
-No paid route, migration, production configuration, delivery worker, browser
-journey or live acceptance is implemented by this bundle. All quantities and
+The bundle itself is protocol documentation. The identity server slice is now
+implemented in Step 4 as recorded below; paid runtime, production configuration,
+delivery workers, browser journeys and live acceptance remain later work. All quantities and
 credential-shaped strings in fixtures are synthetic. Q=1 is an isolated test
 quantity, never a commercial offer or approval.
 
@@ -266,3 +267,63 @@ ANY-507 PaidAllowance/readback. Each repository checks byte inventory/hashes.
 Neither validator is used by runtime code. Run the focused commands in Step 1
 of the plan and compare both bundle directories before handoff. Runtime races,
 durability, real HTTP/browser, live LBX, staging and production retain later gates.
+
+## Step 4 server implementation
+
+The schemas/fixtures above remain the normative protocol bundle. ANY-766 Step 4
+implements only the identity server slice: Portal code issuance, internal
+exchange/introspection, Kernel public exchange and the reusable Kernel identity
+dependency. Browser launch/callback/storage is Step 8; attaching the dependency
+to paid runtime ownership/admission is Step 6. Snapshot, usage and delivery remain
+later steps. The original Portal bearer is not sent to Portal's internal service
+endpoints or forwarded by Kernel.
+
+Portal settings (server environment only):
+
+- `KERNEL_ACCESS_SERVICE_TOKEN`, optional `KERNEL_ACCESS_SERVICE_TOKEN_PREVIOUS`:
+  independent reverse-direction secrets, with the existing 32–256 Bearer-safe
+  character syntax. Orphaned/equal previous slots and equality with the opposite
+  direction's `KERNEL_SERVICE_TOKEN` fail validation.
+- `KERNEL_ACCESS_PERMISSIONS`: explicit comma-separated receiver grants from
+  `kernel-session:exchange,kernel-session:introspect`. The default is empty;
+  configuring a token alone does not grant either permission. Other operations
+  are not implemented by this step and their future permissions are not enabled.
+- Existing `PAID_ACCESS_CLOCK_SKEW_SECONDS` is required by introspection; the
+  selected local/staging value is 5. Missing clock configuration returns `503`.
+  Supporting that clock budget in a deployed environment remains an operator gate.
+
+Kernel settings (server environment only):
+
+- `ANYTOOLAI_PORTAL_BASE_URL`: Portal origin, required together with
+  `ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN`. HTTPS is mandatory except loopback
+  HTTP in `dev`/`test`; credentials, paths, query and fragment are rejected.
+- `ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN`: matches a Portal receiver slot and
+  differs from both opposite-direction receiver slots. Rotation switches this
+  sender only after Portal accepts current and previous slots; remove the
+  previous Portal slot after verifying the new sender. At most two receiver
+  credentials are accepted, with no automatic overlap expiry.
+
+The stored audience is the fixed `platform-kernel`, never a caller parameter.
+Code/token hashes are linked to the existing session with cascading deletion.
+Security writes lock User → AuthSession → delegation and recheck authority after
+waiting. Introspection is one joined read without bookkeeping or commit. Logout,
+password reset, inactive users and parent expiry/deletion invalidate delegation.
+Unknown/deleted credentials use `kernel_parent_authority_invalid`; proven token
+expiry uses `kernel_delegation_expired`. Invalid/used code, verifier or audience
+at exchange uses `kernel_session_code_invalid`. Internal receivers reject Origin
+before CORS and use exactly one authenticated service Bearer, explicit operation
+permission and trusted scope. Payload validation refuses unknown fields and
+returns a redacted `422`. All identity responses/refusals use no-store.
+
+Kernel validates independent version/scope/UUID/UTC/deadline contracts and
+returns the existing Core Portal-user owner. Each protected dependency invocation
+performs introspection; it has no identity cache or guest fallback. The adapter
+uses verified TLS, a two-second socket timeout, a 16 KiB response limit and no
+redirects, environment proxy or automatic exchange retry. Its TTL sanity bound
+allows the selected five-second interservice clock budget without extending a
+returned deadline. Transport, malformed-response and service-auth failures are
+safe `503`; only allowlisted identity `401` codes are relayed. A response that
+expires in transit is refused as ordinary delegation expiry.
+
+Local tests use SQLite, disposable PostgreSQL and intercepted Kernel HTTP.
+They do not prove real paired HTTP, browser recovery, sales or deployment.

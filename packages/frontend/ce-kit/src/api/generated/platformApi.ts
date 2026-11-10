@@ -348,6 +348,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/portal-session/exchange": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Exchange Portal Session */
+        post: operations["exchange_portal_session_v1_portal_session_exchange_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product_id}/quota": {
         parameters: {
             query?: never;
@@ -1079,6 +1096,39 @@ export interface components {
          * @enum {string}
          */
         ModelCatalogRefreshStatus: "current" | "pending" | "running";
+        /** PortalExchangeRequest */
+        PortalExchangeRequest: {
+            /** Code */
+            code: string;
+            /** Code Verifier */
+            code_verifier: string;
+        };
+        /** PortalExchangeResponse */
+        PortalExchangeResponse: {
+            /** Access Token */
+            access_token: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Region */
+            region: string;
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: 1;
+            /** Tenant Id */
+            tenant_id: string;
+            /**
+             * Token Type
+             * @constant
+             */
+            token_type: "Bearer";
+            /** User Id */
+            user_id: string;
+        };
         /**
          * ProviderCallStatus
          * @enum {string}
@@ -2761,6 +2811,39 @@ export interface operations {
                      *     }
                      */
                     "application/json": components["schemas"]["GuestIdentityResponse"];
+                };
+            };
+        };
+    };
+    exchange_portal_session_v1_portal_session_exchange_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortalExchangeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalExchangeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
