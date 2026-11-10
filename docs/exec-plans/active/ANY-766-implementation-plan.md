@@ -1,17 +1,19 @@
-# ANY-766 — Portal–Kernel Paid Execution Integration
+# ANY-766 — Portal API and Paid Execution for Product Backends
 
-Status: **STEPS 1–8 COMPLETE; Steps 9–12 pending; delivery ends at PR readiness**
+Status: **STEPS 1–8 COMPLETE; Steps 9–17 pending; delivery ends at PR readiness**
 
 Date: **2026-11-09**
 
 Issue: [ANY-766](https://linear.app/paveldik/issue/ANY-766)
 
+Related requirements: [ANY-833](https://linear.app/paveldik/issue/ANY-833).
+
 - State: active
 - Owner: mixed — Portal and Kernel execution owners
 - Last updated: 2026-11-10
 - Review date: 2026-11-10
-- Next action: Step 9 usage/exhaustion delivery, only when separately requested.
-- Blocker: none for Step 9 implementation.
+- Next action: Step 9 consumer-neutral contract and refactoring inventory, only when requested.
+- Blocker: none for the planned local work; real external-product integration is outside this plan.
 
 Portal's `docs/exec-plans/active/ANY-766-implementation-plan.md` is authoritative;
 Kernel keeps a byte-for-byte copy at the same repository-relative path.
@@ -33,6 +35,18 @@ combined guest/paid journeys, identity changes, modes and StrictMode with focuse
 regressions, types and changed-file lint. Backend/wire/commercial scope is unchanged.
 
 ## 1. Goal & Final Expected Outcome
+
+Portal exposes one documented API for authenticated product backends. Kernel is
+the first configured consumer; an independently maintained backend uses the same
+identity, access and purchased-limit contracts with its own service credentials
+and product permissions. Portal owns identity and purchased authority; the
+backend responsible for each product owns execution and durable usage.
+
+The 2026-11-10 requirements in ANY-766 and ANY-833 will be implemented by the narrow
+amendment in Section 3.9 and new Steps 9–13. Completed Steps 1–8 remain the
+implementation baseline. Previous Steps 9–12 become Steps 14–17. Section 3.9
+supersedes Kernel-only target assumptions in Sections 3.2–3.6; it does not claim
+that the generic contract is already implemented.
 
 An authenticated Portal user with confirmed paid test access can launch the selected Kernel products through actual local browser and HTTP boundaries. Kernel verifies the existing Portal identity through scoped session delegation, obtains current access authority, resolves the scenario’s declared metric and passes the exact purchased allowance into ANY-507.
 
@@ -60,10 +74,19 @@ Actual staging deployment, real external-service configuration, the complete
 registration/payment/product journey, remaining natural-renewal acceptance and
 production rollout belong to ANY-767, **stage 11 of parent ANY-504**. No remote
 server, public domain, live purchase or registry credential is required to close
-this plan's local development scope. Internal Step 11 below is the local
+this plan's local development scope. Internal Step 16 below is the local
 integration check; it is distinct from parent ANY-504 stage 11.
 This delivery boundary supersedes earlier staging-completion wording for this
-plan; the paid-access contracts and product behavior remain unchanged.
+plan. Section 3.9 separately defines the later consumer-neutral API amendment.
+
+**External-team handoff — Friday, 2026-11-13:** prioritize the common API guide,
+documented OpenAPI/Swagger and locally working authentication/access endpoints.
+Step 9 supplies the clearly labelled target contract; Step 12 is the working
+authentication/access handoff checkpoint. Full local ANY-766 completion also
+requires Steps 13–17. A target specification is not evidence of a running API.
+We implement and verify only our Portal and Kernel plus a synthetic local second
+consumer. The Document Summary team implements and tests its own backend;
+contacting its services or accepting its integration is not an ANY-766 gate.
 
 ## 2. Current State & Reusable Implementation
 
@@ -79,14 +102,14 @@ affected behavior and extend the actual migration heads without rewriting them.
 
 ### Consumed ANY-765 handoff and preservation requirements
 
-Read the [current Step 10 producer handoff](https://github.com/gushinets/payments-portal/blob/7f985031034f45fde0203f710eb64283cd086e86/docs/engineering/billing-background-operations.md#step-10-handoff--any-765) and [completed review/evidence record](https://github.com/gushinets/payments-portal/blob/7f985031034f45fde0203f710eb64283cd086e86/docs/exec-plans/completed/ANY-765-implementation-plan-refactor.md). “Step 10” in that handoff means the whole program ticket ANY-766, not only this plan's internal Step 10 cabinet work.
+Read the [current Step 10 producer handoff](https://github.com/gushinets/payments-portal/blob/7f985031034f45fde0203f710eb64283cd086e86/docs/engineering/billing-background-operations.md#step-10-handoff--any-765) and [completed review/evidence record](https://github.com/gushinets/payments-portal/blob/7f985031034f45fde0203f710eb64283cd086e86/docs/exec-plans/completed/ANY-765-implementation-plan-refactor.md). “Step 10” in that handoff means the whole program ticket ANY-766, not only this plan's internal Step 15 cabinet work.
 
 - Preserve the inherited trust-observation provenance, paused automatic UNKNOWN recovery, explicit GET-only recovery, informational `block_to_close_days`, metric admission before new financial sends, isolated paid reads and cancellation ownership.
-- Keep selected-meaning `confirmation_digest()` separate from full-source/audit identity (`source_digest`, full `kernel_manifest_version`, technical `digest`). Another product or global source-version change cannot invalidate unchanged selected consent. Historical v2 full-audit-digest acceptances remain readable and replay the exact saved buyer digest; v1 receives no invented technical quantity. Steps 3/11 must preserve these regressions.
-- Primary selection uses complete relevant product inventory and original owner/version/fence proof. Financial CREATE admission and `restore-original`/`bind-original` retain customer-wide completeness. Steps 5/11 must preserve independence from unrelated incomplete products without weakening financial admission.
+- Keep selected-meaning `confirmation_digest()` separate from full-source/audit identity (`source_digest`, full `kernel_manifest_version`, technical `digest`). Another product or global source-version change cannot invalidate unchanged selected consent. Historical v2 full-audit-digest acceptances remain readable and replay the exact saved buyer digest; v1 receives no invented technical quantity. Steps 3/16 must preserve these regressions.
+- Primary selection uses complete relevant product inventory and original owner/version/fence proof. Financial CREATE admission and `restore-original`/`bind-original` retain customer-wide completeness. Steps 5/16 must preserve independence from unrelated incomplete products without weakening financial admission.
 - Preserve the sole whole-user paid writer, atomic revision/causal observation/outbox/deadline commit, finite source trust, immutable same-cycle allowance identity and calendar precision. Calendar evidence stays Portal-internal; Step 5 implements snapshot V2 and Step 7 implements exact-N delivery/ACK.
-- Current `/api/paid-access` requires an active verified-email session, derives scope/user server-side, is local and read-only after identity bookkeeping, and retains its reserved DB/thread budget and cancellation ownership. Step 10's separate usage API must preserve those authorization and availability guarantees.
-- Reader compatibility is stricter than the unchanged migration head: pre-fix Step 9 binaries cannot read newly accepted selected-digest purchases. Step 12 installation preparation and the Section 7 handoff must record this format-compatibility floor for subsequent ANY-767 deployment/recovery; same migration head does not authorize rolling back to an older reader.
+- Current `/api/paid-access` requires an active verified-email session, derives scope/user server-side, is local and read-only after identity bookkeeping, and retains its reserved DB/thread budget and cancellation ownership. Step 15's separate usage API must preserve those authorization and availability guarantees.
+- Reader compatibility is stricter than the unchanged migration head: pre-fix Step 9 binaries cannot read newly accepted selected-digest purchases. Step 17 installation preparation and the Section 7 handoff must record this format-compatibility floor for subsequent ANY-767 deployment/recovery; same migration head does not authorize rolling back to an older reader.
 - The [2026-11-09 ANY-766 scope clarification](https://linear.app/paveldik/issue/ANY-766) assigns selected production declarations/bindings to ANY-766 and leaves ANY-711 Done for its delivered manifest/TEST-ONLY baseline. Do not reopen ANY-711 or add a dependency on new work there. Commercial quantity/LBX/sales approval remains separate.
 
 ### Reuse and actual gaps
@@ -148,7 +171,10 @@ Extend the existing provenance policy and customer response types together. Prod
 
 Tests use temporary product configurations with explicitly enabled capabilities and isolated synthetic quantities. They do not enable ordinary sales or promote simulated history.
 
-### 3.3 B10: selected AccessSnapshot V2 contract
+### 3.3 B10: implemented AccessSnapshot V2 baseline
+
+This is the completed Step 5 baseline. Section 3.9 defines the planned V3
+consumer scope and compatibility cutover; retain the finite-authority rules here.
 
 Keep:
 
@@ -220,7 +246,10 @@ Keep manifest and invalidation at version 1. Install compatible consumers before
 
 Update both canonical designs, producer schemas, positive/negative fixtures and independently validated consumer copies. Portal owns snapshot/invalidation/identity fixtures; Kernel owns manifest/usage/exhaustion fixtures.
 
-### 3.4 Portal-session delegation and browser recovery
+### 3.4 Implemented Portal-session delegation and browser recovery
+
+This is the completed Steps 4/8 baseline. Section 3.9 generalizes the audience,
+routes and configured callback while retaining PKCE, custody and recovery.
 
 Use the user-selected one-use code with S256 PKCE and a narrow Kernel token.
 
@@ -407,7 +436,18 @@ The local worker may request existing GET-only reconciliation for a current allo
 
 Add separate authenticated `GET /api/paid-usage`. Reuse the existing active verified-email billing-session guard and server-derived tenant/region/user; generic identity-session authentication alone does not enforce verified email. Success and refusal responses are no-store. Kernel usage calls use their own bounded HTTP resources and cannot occupy the existing local `/api/paid-access` reserved DB/thread budget.
 
-Derive requested IDs locally: current production allowances, or the most recent issued allowance per product when no current allowance exists. Mark historical items explicitly.
+Derive requested IDs locally from current production allowances. For each product
+without a current allowance, select the most recently issued eligible historical
+allowance, ordered by `created_at` then `allowance_id`. Eligibility requires
+compatible, proven `CONFIGURED_SOURCE` technical terms and the saved
+product/metric/unit/quantity; resolve its historical source/owner under Section
+3.9. Exclude SIMULATED evidence, legacy rows without proven unit/terms, and
+issued future allowances still awaiting authoritative activation. Passing a start
+boundary alone does not make the latter current or historical; use existing
+committed paid-state/reconciliation evidence. Mark eligible fallback items as
+historical. If no eligible allowance exists, return no usage item for that
+product (`items: []` when none qualify). Do not request backend usage for excluded
+rows, invent missing DTO fields or rewrite their stored history.
 
 Read Kernel outside Portal transactions, validate scope/owner and observed tuples, then re-read the local access revision. A changed revision returns retryable `503 paid_usage_state_changed`; do not present a mixed result.
 
@@ -464,10 +504,10 @@ reuse container paths as host paths. Preserve profile fingerprints, API/worker
 source checks and the existing activation marker; retain the previous profile
 until successful activation. Do not add another activation mechanism.
 
-Step 12 verifies the chosen image/configuration locally using disposable resources
+Step 17 verifies the chosen image/configuration locally using disposable resources
 and records reproducible installation commands. Remote-host configuration,
 actual registry publication, deployment and the post-review installed-version
-acceptance belong to ANY-767. Missing remote inputs do not block Step 12.
+acceptance belong to ANY-767. Missing remote inputs do not block Step 17.
 
 ### 3.8 Commercial and operational gates
 
@@ -481,12 +521,231 @@ strategy needs no additional preliminary protocol approval.
 - **Registry/staging — ANY-767:** after PR review/corrections, the infrastructure owner supplies the server/operator, domains/TLS, registry access, secrets, data roots, backups, SMTP, approved AI/LBX configuration and deployment authorization. Missing inputs defer those actions without blocking this plan.
 - **Production — ANY-767:** rollout follows the full billing-journey and environment acceptance.
 
+Preserve the named M1/M2/R3/R4 production gates in ANY-766. Local synthetic
+quantities, source fixtures and passing checks do not approve commercial terms,
+LBX associations, sales enablement or live-service conformance.
+
 Record local readiness separately from later live/staging/production acceptance.
 Unexecuted external checks remain NOT_RUN; they do not become a failed local
 criterion or a synthetic live PASS.
 
+### 3.9 Consumer-neutral API amendment — 2026-11-10
+
+**Scope and replacement boundary**
+
+Implement the six added ANY-766 requirements: explicit consumer identity,
+consumer-bound delegation, scoped/versioned snapshots, technical-source
+ownership, recipient-specific delivery and neutral usage/exhaustion. ANY-833
+defines the related independent-product capability, not another implementation
+project inside this plan. Real external registration, purchases, deployment and
+third-party backend changes remain outside local ANY-766 acceptance.
+
+Use existing composition/settings and protected operator tooling for a small
+explicit set of consumers. Each entry identifies `consumer_id`, tenant/region,
+allowed products, operation permissions, fixed browser callback, technical
+source and independent credentials for both service directions. Kernel is one
+entry, not a privileged protocol branch. Test a second synthetic identity with
+its own products and secrets. There is no registration/admin API, universal
+plugin framework, source-catalog mirror or external-product UI implementation.
+
+Classify existing assumptions before changing them: active Kernel integration
+to generalize; Kernel-specific execution/product behavior to retain; genuinely
+unused code to remove only with evidence. Replace active assumptions in their
+owning steps. Do not add a preliminary purge or rewrite the completed runtime.
+
+**Service identity and delegated user identity**
+
+Both Kernel and other backends call Portal with an independently configured
+service Bearer credential. The trusted principal supplies consumer identity,
+tenant/region and permissions; caller fields can only narrow that authority.
+Preserve separate Portal-to-backend credentials and current/previous rotation.
+An external backend never receives Kernel's key or the user's primary Portal
+bearer. Rotation alone does not change product scope or snapshot meaning.
+
+The common Portal identity endpoints replace the Kernel-named endpoints:
+
+```text
+POST /api/backend-session-codes
+POST /internal/v1/backend-sessions/exchange
+POST /internal/v1/backend-sessions/introspect
+```
+
+Code issuance uses the existing Portal session and an explicit configured
+`consumer_id` plus S256 challenge. The localized Portal authorization page
+becomes `/[locale]/backend/authorize`; its consumer selection resolves a fixed
+registered callback. Caller-selected external callbacks are refused. Kernel's
+own launch/callback and `/v1/portal-session/exchange` can retain their local
+names while using the common Portal endpoints.
+
+Bind each hash-only code and delegation to the selected consumer/audience and
+existing parent AuthSession. Exchange/introspection obtain consumer identity
+from service authentication, and cannot redeem or inspect another consumer's
+token. Preserve atomic single use, 60-second codes, token expiry at the earlier
+of 30 minutes and parent expiry, parent revocation, active-user checks and safe
+errors/no-store behavior. Generic delegation responses use schema version 2
+and include canonical UUID/scope, `consumer_id`, expiry and current
+`consumer_policy_revision`; no PII is needed. No primary-session forwarding,
+email matching, refresh-token subsystem or alternate identity authority.
+
+Kernel introspects on every protected request and supplies the resulting
+canonical principal to its existing admission/ownership boundary. Keep Core's
+`ExecutionOwner`, persisted replay meaning and the ANY-507 allowance tuple
+unchanged. Browser storage format may advance with explicit invalidation of
+old delegated tokens, while preserving an owner-bound frozen pending start
+and its original key/request across reauthorization by the same owner.
+
+**AccessSnapshot V3 and policy revisions**
+
+Keep the common read endpoint and explicit scope query:
+
+```text
+GET /internal/v1/access-snapshots/{user_id}?tenant_id=anytoolai&region=ru
+```
+
+Version 3 retains the V2 grants/allowances and adds `consumer_id` and
+`consumer_policy_revision` (P). `access_revision` (R) remains the existing
+whole-user paid-state revision. The semantic identity is
+`consumer / tenant / region / user / P / R`; identical identity requires
+identical grants and allowance tuples, apart from refresh/expiry timestamps.
+Snapshot contents include only that consumer's authorized products.
+
+Persist the current policy version and digest alongside existing integration
+configuration state, with initial version 1 for the migrated Kernel policy.
+A change to the authorized product/snapshot scope requires a strictly higher
+configured P; reject a changed policy at a reused version or a version rollback.
+No policy editor or background policy service is required. Introspection returns
+the current P, so permission changes do not require impersonating a paid-state
+transition. A cached snapshot must match the current introspected policy and
+the authenticated consumer; concurrent stale installations cannot restore an
+older policy. Changing P does not reset or lower the paid-state revision floor.
+
+Cache/coherence identity includes consumer and scoped user, with independent
+durable monotonic policy and access floors. The existing coherence lock
+serializes policy observation, snapshot installation, invalidation and new
+admission. Admission requires matching current P and R at/above its floor,
+including the existing post-wait expiry/floor checks. Missing or conflicting
+authority fails closed; eviction removes the cached document, not either floor.
+Do not add consumer identity to usage buckets, accepted replay or job ownership.
+
+Filter relevant products and their supporting provenance/deadlines before
+evaluating snapshot availability and expiry. The current whole-user
+`CommittedPaidState.require_current()`/`effective_until` cannot be used unchanged
+and followed only by response filtering: an unrelated consumer's overdue product
+must not make this consumer's complete snapshot unavailable. Conversely, an
+overdue fact for an included product requires `503` until the existing writer
+commits its reduction; silently dropping it at the same P/R is forbidden.
+Preserve whole-user writer/cabinet guarantees and the original B10 bounds:
+300-second maximum snapshot, conservative clock budget, finite source trust,
+read-only local GET, no extension of expired authority and known empty R0.
+
+Snapshot quantity is the purchased ceiling, not current remaining capacity.
+Each backend enforces it through its own durable reserve/finalize/release and
+replay/recovery; Kernel reuses ANY-507. Instances of the same backend share its
+durable usage storage. An unknown execution outcome cannot release capacity
+on timeout while the original execution can still finish. An API read alone cannot atomically authorize a paid
+execution, and no central Portal usage ledger or second meter is added.
+
+**Technical sources and immutable purchase history**
+
+Select the product/metric manifest through an explicit technical-source
+boundary instead of an unconditional `require_kernel()` call. Reuse the V1
+manifest shape and existing client validation. Associate each product with
+one execution/usage owner in this contour; external products need no Kernel
+scenario registration. New source/owner metadata is versioned in product links
+and accepted technical terms, with existing live publication/purchase proof.
+Offer quantity remains Portal-owned, fixed at purchase; do not infer it from
+price, LBX commercial quantity, guest quota or source defaults.
+
+Existing links, acceptances, terms and issued allowances retain exact stored
+documents, serialization, hashes, selected-consent digests and cycle identities.
+Normalize missing historical source/owner to Kernel only in a compatible
+in-memory view. Adding default fields to old `model_dump()` output is not a
+compatible migration: `terms_document` comparisons in allowance materialization
+must still see the original historical representation. Preserve both historical
+digest variants, SIMULATED labels and existing accepted renewal quantities.
+No rewriting old JSON/digests, allowance-ID recreation, automatic reassignment
+of existing subscribers or usage reset. A real product-owner transfer requires
+a separate explicit continuity procedure, outside this plan.
+
+**Recipient-specific delivery, usage and exhaustion**
+
+Partition outbox state, coalescing/work keys, claims, retries, parking, repair
+and delivered revision by recipient plus scoped user. Fan out a committed
+whole-user R to configured in-scope snapshot consumers in the existing writer
+transaction, including consumers whose product grant has just been removed.
+One recipient's failure/ACK cannot affect another. Retain the V1 invalidation
+payload: the configured authenticated destination determines the recipient.
+Capture N before HTTP; an ACK advances only that recipient through N and
+cannot erase pending N+1. Policy changes are fenced by per-request introspection
+and P; do not invent a second policy-delivery protocol.
+
+The existing Section 3.6 usage/exhaustion contracts apply to every product
+backend. Route usage reads by the persisted allowance/source owner; authenticate
+exhaustion through its consumer principal and validate product ownership plus
+the immutable full tuple before durable acknowledgement. Unknown usage remains
+unobserved, dependency failure remains unavailable, and reservation pressure
+is distinct from final exhaustion. A same-cycle recovery retains the allowance
+and backend usage. Keep the existing ANY-507 finalization/outbox attachment
+points and immutable duplicate handling; exhaustion is only a reconciliation
+hint, never a financial command or direct grant revocation/refill.
+
+**Forward migrations and synchronized local cutover**
+
+Extend the actual migration heads, currently Portal `20261110_0008` and Kernel
+`0019`; never edit applied migrations or rebuild retained data. Quiesce both
+local APIs/workers before the synchronized cutover and run forward migrations
+against isolated local test databases first. New and old wire contracts do not
+need concurrent support; update our Portal, Kernel and browser configuration
+together, remove replaced routes/settings only when no active use remains,
+and explicitly exclude old binaries from the new installation contract.
+
+Migration acceptance must retain existing Kernel delegation bindings; bind
+historical delegation rows to Kernel and require fresh browser delegation when
+the old response/storage format cannot be used. Preserve Kernel's durable R
+floor while discarding incompatible cached snapshot/semantic metadata, and
+initialize consumer/policy scope without resetting ANY-507 buckets or owners.
+Existing outbox rows become Kernel-recipient rows with exact pending/delivered
+revisions; migrate scheduling/coalescing keys and retire stale claims after
+workers are stopped so repair resumes unresolved work. Test pending, parked,
+in-flight and N+1 states; do not infer safety from an empty fresh database.
+
+**Documentation and external-team handoff**
+
+Publish one common guide, planned at
+`docs/contracts/product-backend-api/README.md`, alongside the Portal's generated
+OpenAPI and Swagger UI. Use the existing FastAPI schema/generation pipeline;
+no duplicate hand-maintained external API or new generator dependency. A
+filtered view of the same schema is optional convenience, not another contract.
+
+Document both roles and service directions, canonical identity, PKCE exchange,
+fixed callbacks, permissions, snapshot/policy revisions, purchased versus
+remaining limits, TTL/revocation, errors, retry/idempotency, reverse backend
+endpoints and durable enforcement responsibilities. Include complete safe
+examples, onboarding configuration and the distinction between the early
+auth/access delivery and later usage/delivery implementation. Reference backend
+owned contracts/fixtures for reverse endpoints; do not list unimplemented
+backend routes as implemented Portal endpoints.
+
+The current generated Portal schema has no documented security schemes or
+per-operation security and lacks meaningful descriptions for these endpoints.
+Declare named Portal-user and backend-service Bearer schemes in FastAPI,
+attach the correct operation security, and describe secret-body delegation
+tokens separately from the service Authorization header. Document request and
+response schemas, examples, refusal codes and no-store behavior. Regenerate
+existing artifacts rather than hand-editing them. Swagger must describe the
+actual implemented endpoints and retain internal endpoint browser restrictions;
+it does not make service keys safe to use from an external browser.
+
 ## 4. Local Functional DoD & Acceptance Coverage
 
+- Kernel and a synthetic second backend use the same Portal API with separate
+  directional credentials, consumer-bound delegations and product permissions.
+- Auth/access guide and generated Swagger describe the implemented endpoints,
+  security, examples, failures and backend quota-enforcement responsibilities.
+- Consumer/policy/access semantic identity is stable; policy changes and
+  unrelated expired products cannot leak or silently reinterpret authority.
+- Forward migrations preserve historical purchase bytes/digests, delegations,
+  allowance/usage identity, revision floors and unresolved Kernel delivery.
 - Known-user empty revision zero is read-only; refusal creates no job, reservation or debit.
 - All seven selected scenarios use the approved metric; shared product counters behave consistently.
 - Actual local Portal–Kernel HTTP/browser execution from committed test purchase/access state produces one accessible result and one debit; cabinet and Kernel readback agree. Do not substitute either app, their authentication or databases with endpoint mocks.
@@ -499,12 +758,14 @@ criterion or a synthetic live PASS.
 - Foreign identity/scope/audience/resource access fails without disclosure.
 - Paid client events work without a guest, retain deduplication and cannot impersonate another owner.
 - N acknowledgement cannot clear N+1; exhaustion acknowledgement follows durable hint commit.
+- Recipient ACK/failure cannot settle or starve another recipient's delivery;
+  usage/exhaustion resolve and validate the product's backend owner.
 - New quantities affect new purchases only; legacy and SIMULATED evidence remain compatible.
 - Browser expiry/relaunch preserves the original logical start and rejects stale-account responses.
 - The selected local image/configuration rehearsal preserves databases, usage and active profiles, including a frontend-only update; unsupported reader/image combinations are refused or excluded by the installation contract.
 
-Steps 2–10 implement the product integration. Step 11 is the assembled local
-HTTP/PostgreSQL/browser proof; Step 12 prepares and locally verifies minimal build
+Steps 2–15 implement the product integration. Step 16 is the assembled local
+HTTP/PostgreSQL/browser proof; Step 17 prepares and locally verifies minimal build
 and installation support. The PR readiness checklist closes this plan. Remote
 staging acceptance is not part of its DoD and follows review in ANY-767.
 
@@ -523,7 +784,7 @@ Shared execution rules for both repositories:
 7. Do not stage, commit, push, merge, rebase or switch branches during execution. Do not reset, stash, discard or overwrite existing work. Proposed commit messages below grant no authorization.
 8. Escalate only a concrete departure from the accepted strategy or a genuinely unresolved material decision, with evidence. Do not request another approval of the already selected strategy or an approval record for Sections 3.3–3.6. Continue independent authorized work when a commercial/operational condition blocks another action; record its precise scope without guessing or bypassing it.
 9. Portal remains the authoritative plan. Update only concise status, necessary decisions or step instructions here; keep detailed execution evidence outside the plan. Synchronize the entire file byte-for-byte to Kernel after each plan change and verify equality before handoff.
-10. Keep affected as-built documentation and runbooks current within their owning steps. Step 11 supplies the combined local acceptance; the final PR checklist adds no implementation stage or repeated full test campaign.
+10. Keep affected as-built documentation and runbooks current within their owning steps. Step 16 supplies the combined local acceptance; the final PR checklist adds no implementation stage or repeated full test campaign.
 
 Repository roots:
 
@@ -532,7 +793,21 @@ Repository roots:
 
 Commands below run from the indicated root. New test targets are planned additions and must be created by their step.
 
-Use Portal’s root `.venv` and Kernel’s `.quick-check-venv`. Bootstrap through existing setup commands if needed; do not install into system Python. Portal root npm aliases need a command-scoped PATH:
+Use Portal’s root `.venv` and Kernel’s `.quick-check-venv`. If dependencies are
+missing, record the exact missing prerequisite; installation/bootstrap, including
+lock-file restoration, requires separate user authorization. Do not install into
+system Python.
+
+Kernel `runner.py full-check` always invokes `pnpm install --frozen-lockfile`
+and Python package installation into `.quick-check-venv`, even when dependencies
+are already present. Before invoking it, the implementing agent must obtain the
+user's explicit authorization for those workspace-local installations, unless
+that scope was already authorized in the current task. Readiness of the existing
+environment does not satisfy this gate. Without authorization, continue independent
+non-installing checks and record `full-check` as NOT_RUN with that reason; the
+required full-check gate remains unsatisfied and local completion cannot be claimed.
+
+Portal root npm aliases need a command-scoped PATH:
 
 ```bash
 PATH="$PWD/.venv/bin:$PATH" npm run check:fast
@@ -748,7 +1023,7 @@ Cover crashes around send/apply/ack, N/N+1, lease/generation loss, outage, perma
 
 ### Step 8 — Connect browser launch and recoverable paid journeys
 
-**Status:** COMPLETE in the local Step 8 scope. REV-1 includes persisted custody epochs and PKCE binding; REV-2 checks current descriptor ownership before sends, acceptance and dismissal. Regression checks PASS; assembled browser/HTTP/PostgreSQL acceptance remains NOT_RUN (Step 11).
+**Status:** COMPLETE in the local Step 8 scope. REV-1 includes persisted custody epochs and PKCE binding; REV-2 checks current descriptor ownership before sends, acceptance and dismissal. Regression checks PASS; assembled browser/HTTP/PostgreSQL acceptance remains NOT_RUN (Step 16).
 
 **Goal / Expected behavior:** Portal users reach Kernel products and continue the original operation across reload or reauthorization.
 
@@ -773,7 +1048,7 @@ pnpm --filter @anytoolai/ce-kit exec vitest run test/identity/portalSession.test
 pnpm --filter @anytoolai/web-mirror exec vitest run test/paidProductJourney.test.tsx test/paidRecoveryContinuity.test.tsx test/attachSession.test.tsx test/HandoffConsent.test.tsx
 ```
 
-Cover all scenario modes, reload, lost start/exchange responses, expiry, different owner, invalid state, storage refusal, result deep links and late responses. Actual desktop/mobile integration follows in Step 11.
+Cover all scenario modes, reload, lost start/exchange responses, expiry, different owner, invalid state, storage refusal, result deep links and late responses. Actual desktop/mobile integration follows in Step 16.
 
 **Expected completion:** reauthorization preserves original request/key or accepted session; account changes expose no previous-user data.
 
@@ -783,13 +1058,236 @@ Cover all scenario modes, reload, lost start/exchange responses, expiry, differe
 
 **Proposed commit:** `ANY-766 - Connect recoverable paid browser journeys`
 
-### Step 9 — Expose usage and deliver exhaustion
+### Step 9 — Formalize the common backend API and bounded refactoring
 
-**Goal / Expected behavior:** actual counters are readable and committed exhaustion is recoverably delivered.
+**Status:** PENDING. Documentation/contract work; does not authorize later runtime steps.
+
+**Goal / Expected behavior:** the external team and implementing agents have one
+unambiguous target contract, a bounded change inventory and an explicit local
+authentication/access delivery checkpoint.
+
+**Repositories / Read before implementation:** both; Section 3.9, the two canonical
+billing/access designs and contract bundles, Portal service authentication,
+delegation, paid reads, technical-term serialization, source composition and
+invalidation work; Kernel identity/coherence and ANY-507 ownership/replay.
+
+**Implement / reuse:** reconcile the canonical designs and owning schemas/fixtures
+with Section 3.9. Start the common backend guide with complete auth/access
+examples and documented reverse-endpoint responsibilities. Label target versus
+implemented behavior explicitly. Preserve current runtime OpenAPI until its
+routes implement the replacement contract; document its security/description
+gaps for Steps 10/12 rather than hand-writing a second Swagger specification.
+
+Record the concrete replacement inventory and migration expectations within
+the contract guide: service config/principals, delegation/audience/callbacks,
+snapshot filtering/deadlines and P/R coherence, source/owner serialization,
+recipient outbox/work keys and usage routing. For each affected mechanism name
+its existing owner, minimal replacement, preserved history and focused check.
+List proven unused code separately; active Kernel code is not a deletion target.
+Record ownership/version rules in the contract fixtures, including the V3
+snapshot and version-2 generic delegation responses.
+
+**Verification:** run both existing focused contract/fixture suites and applicable
+documentation checks. Cover two distinct consumers, wrong consumer/scope/product,
+unsupported versions, same P/R with different content, historical documents and
+unknown usage. These are contract checks, not evidence of future runtime behavior.
+
+**Expected completion:** the six added requirements have a producer, consumer,
+implementation step and local acceptance case. The guide can be shared as a
+clearly labelled target; working auth/access and accurate Swagger remain due
+at Step 12. No unresolved policy/revision or history-conversion decision remains.
+
+**AI execution prompt:**
+
+> Read the authoritative plan and complete only Step 9. Follow both repositories' instructions and the common protocol. Formalize Section 3.9 in the owning designs, schemas/fixtures and common guide; document the bounded refactoring/migration inventory and auth/access handoff. Reuse the existing pipeline and preserve historical contracts as explicit baselines. Do not implement later runtime steps, create another API, or remove active Kernel behavior. Run focused contract/documentation checks, synchronize the plan and report actual PASS/FAIL/NOT_RUN/BLOCKED evidence. No third-party services, dependency installation or Git mutation is authorized.
+
+**Proposed commit:** `ANY-766 - Specify the common product backend API`
+
+### Step 10 — Generalize consumer authentication and session delegation
+
+**Status:** PENDING; depends on Step 9.
+
+**Goal / Expected behavior:** Kernel and a synthetic second backend authenticate
+independently and can exchange/introspect only their own Portal delegations.
+
+**Repositories / Read before implementation:** both; current service auth/settings,
+identity delegation table/service/router/policy, Portal authorization component,
+Kernel Portal-session client and CE-kit custody/recovery from Steps 4/8.
+
+**Implement / reuse:** add the bounded configured consumer model and explicit
+trusted principal. Preserve directional secrets, rotation, narrowing-only scope,
+no-store, secret-safe failures and operation permissions. Persist the monotonic
+policy version/digest guard and expose current P through introspection. Replace
+the Portal Kernel-named identity routes with the common endpoints and bind
+code/token audience to authenticated consumer identity. Generalize configured
+authorization/callback selection and update our Kernel client/browser together.
+
+Forward-migrate historical delegations to Kernel without losing parent linkage,
+hashes, expiry or single-use state. Invalidate incompatible browser token formats
+while retaining same-owner pending prepared requests/keys. Preserve the Core
+execution owner and replay partition; no guest fallback or token forwarding.
+Add named FastAPI security schemes and per-operation descriptions/examples/errors
+for the implemented identity routes; regenerate existing API artifacts.
+
+**Verification:** extend the existing identity/API/PostgreSQL/browser component
+checks. Exercise cross-consumer code redemption/introspection, permission/scope
+refusal, callback tampering, current/previous key isolation, expired/revoked
+parent sessions, concurrent single-use exchange and persisted-delegation migration.
+Cover policy digest/version reuse and rollback refusal, and same-owner recovery
+of an uncertain paid start after the browser contract change. Assert generated
+OpenAPI distinguishes primary Portal auth from backend service auth and the
+delegated token in the introspection body.
+
+**Expected completion:** the actual generic identity endpoints work locally for
+both identities; Kernel retains its paid browser journey and pending-start
+recovery. Snapshot V3 and complete auth/access handoff remain Step 12.
+
+**AI execution prompt:**
+
+> Read the authoritative plan and complete only Step 10. Generalize the existing auth/delegation and callback composition per Section 3.9, update Kernel and generated documentation together, and add forward migration coverage from populated Step 8 state. Preserve primary-session secrecy, parent revocation, consumer isolation, prepared-start recovery and unchanged execution ownership. Run focused local checks, synchronize the plan and report actual results. Do not implement an admin/registration platform, contact an external backend, install dependencies or mutate Git.
+
+**Proposed commit:** `ANY-766 - Bind backend authentication and delegation to consumers`
+
+### Step 11 — Generalize technical sources without rewriting purchase history
+
+**Status:** PENDING; depends on Steps 9/10.
+
+**Goal / Expected behavior:** publication/purchase and allowance derivation know
+the technical source and sole backend owner, while historical Kernel purchases
+continue to materialize their original allowances and replay exact saved consent.
+
+**Repository / Read before implementation:** primarily Portal; current source
+composition/client, catalog/mapping/purchase admission, versioned product links,
+technical terms, accepted purchases and `terms_document` equality in allowance
+materialization. Kernel's manifest fixture/producer remains the first source.
+
+**Implement / reuse:** route technical reads through the configured source seam,
+using the existing manifest contract/validation. Add source/owner to new
+versioned records and keep source proof tied to publication/new purchases.
+Retain old schemas and serialization; normalize legacy owner to Kernel in the
+read model without reserializing stored evidence or changing digest inputs.
+Remove unconditional Kernel-source requirements only where this seam replaces
+them. Test the second source locally; do not register the real Document Summary
+product or add its scenarios/UI to Kernel.
+
+**Verification:** extend mapping, purchase-consent/replay, paid derivation and
+PostgreSQL tests with populated historical links/acceptances/terms/allowances.
+Compare exact old serialized documents, digests and selected-consent replay,
+and prove same-cycle renewal/recovery retains IDs and quantities after the
+refactor. Distinguish simulated/configured evidence. Verify independent source
+selection, product/metric/unit ownership refusal and unchanged commercial gates.
+
+**Expected completion:** new products can have a configured non-Kernel technical
+owner; existing subscriptions and usage identity require no conversion/reset.
+No automatic backend-owner transfer or bulk data rewrite is introduced.
+
+**AI execution prompt:**
+
+> Read the authoritative plan and complete only Step 11. Replace the unconditional Kernel source assumption with the explicit configured source/owner seam, preserving live admission and exact historical serialization, digest replay and allowance identities. Use synthetic local source evidence and the existing manifest contract. Run focused history/publication/purchase/derivation checks, synchronize the plan and report actual results. Do not rewrite old JSON, infer quantities, enable sales, integrate the real external product, add another meter or mutate Git.
+
+**Proposed commit:** `ANY-766 - Support backend-owned technical sources without changing history`
+
+### Step 12 — Serve consumer-scoped snapshots and hand off auth/access API
+
+**Status:** PENDING; depends on Steps 10/11. Prioritized handoff: 2026-11-13.
+
+**Goal / Expected behavior:** both backend identities obtain only their products
+through one locally working, documented Portal authentication/access API.
+
+**Repositories / Read before implementation:** both; Portal committed paid-state
+reader/provenance/scopes and reserved read resources; Kernel strict snapshot
+client/installer, durable coherence, post-wait admission and ANY-507 buckets.
+
+**Implement / reuse:** implement snapshot V3, consumer/product filtering and
+policy/access semantic identity per Section 3.9. Compute completeness and finite
+deadlines from included products and supporting facts before availability
+checks, without weakening the whole-user writer or cabinet read. Extend Kernel's
+existing coherence row/lock with consumer scope and policy floor, matching every
+request's current introspected P. Keep its R floor, semantic immutability,
+post-wait checks and ANY-507 bucket/replay identities.
+
+Forward-migrate populated coherence state: retain R, discard only incompatible
+cached documents/digests and initialize Kernel's consumer/policy dimensions.
+Do not reset reservations/usage. Cut Portal and Kernel to V3 together; retain
+no old wire route/translation layer. Complete the guide and generate documented
+OpenAPI/Swagger from the actual auth/access routes, with versioned examples,
+security, schemas, errors and backend enforcement obligations.
+
+**Verification:** run focused snapshot/API/PostgreSQL concurrency and identity
+regressions plus actual local Portal/Kernel TCP auth/access smoke checks. Use
+the synthetic second principal for product/data isolation. Cover empty R0,
+unrelated overdue product versus included overdue product, expiry/outage,
+same P/R digest conflict, policy change without R change, old-P response racing
+new P, N+1 versus stale install and post-lock expiry. Prove existing buckets,
+usage, reservations and replay survive migration/policy change. Check Swagger
+operation security, examples, responses and schema/generator consistency.
+
+**Expected completion / external handoff:** the common guide, generated OpenAPI,
+Swagger location and safe end-to-end examples describe the working local
+auth/access API. Record versions and actual local checks; mark recipient
+delivery and usage runtime status honestly. No external-server availability,
+third-party acceptance or live financial operation is needed for this checkpoint.
+
+**AI execution prompt:**
+
+> Read the authoritative plan and complete only Step 12, including the prioritized auth/access documentation handoff. Implement Section 3.9 V3 snapshot filtering/deadlines and policy/access coherence using existing mechanisms, with populated-state migration tests and local real HTTP. Preserve historical buckets/replay and the durable R floor. Complete the common guide and accurately generated security-documented OpenAPI/Swagger. Verify two configured identities locally; do not use the real external backend or represent pending delivery/usage as complete. Synchronize the plan and report actual results; no installation, publication, deployment or Git mutation is authorized.
+
+**Proposed commit:** `ANY-766 - Serve documented consumer-scoped access snapshots`
+
+### Step 13 — Partition durable delivery by backend recipient
+
+**Status:** PENDING; depends on Steps 10–12.
+
+**Goal / Expected behavior:** paid-state invalidations are delivered independently
+to each configured recipient without losing already queued Kernel work.
+
+**Repositories / Read before implementation:** Portal writer/outbox, work claims,
+queue/worker/repair/CLI and directional client composition; Kernel invalidation
+receiver/coherence from Steps 6/7. Preserve V1 invalidation payload semantics.
+
+**Implement / reuse:** make recipient part of outbox uniqueness, work/coalescing
+identity, claim ownership, destination selection, retries/parking and restart
+repair. Fan out R atomically with the existing whole-user writer. Retain bounded
+delivery lanes and exact-N acknowledgement; isolate a failing recipient from
+another recipient and from local paid deadlines. Do not create another worker
+framework or policy-event protocol.
+
+Migrate populated outbox/work state to the Kernel recipient, preserving pending
+and delivered revisions. Quiesce workers before retiring old claims/changing
+work keys, then prove existing repair schedules each unresolved recipient.
+Update existing CLI/runbook diagnostics to identify the recipient safely.
+
+**Verification:** extend the existing delivery/concurrency/capacity/PostgreSQL
+checks. Cover Kernel ACK while the second consumer fails, ACK N racing N+1,
+grant removal, parked/missing work, restart, claim loss, migration of pending
+and in-flight work, duplicate scheduling and no-op paid recomputation. No
+recipient ACK can clear another's pending revision; old claims cannot settle
+replacement work.
+
+**Expected completion:** recipient-specific delivery and migrated Kernel history
+are locally proven. Continue with generic usage/exhaustion in Step 14 and cabinet
+read routing in Step 15; complete assembled local acceptance in Step 16.
+
+**AI execution prompt:**
+
+> Read the authoritative plan and complete only Step 13. Generalize the existing outbox/work/delivery mechanism by recipient with atomic fan-out and exact-N ACK. Preserve queued Kernel work through populated-state forward migrations and worker quiescence; use Kernel plus a synthetic local recipient to prove failure and ACK isolation. Keep V1 wire payloads, existing bounds, repair, parking and CLI. Run focused local checks, synchronize the plan and report actual results. No external services, new worker platform, data reset or Git mutation is authorized.
+
+**Proposed commit:** `ANY-766 - Isolate access invalidation delivery by backend`
+
+### Step 14 — Expose usage and deliver exhaustion
+
+**Goal / Expected behavior:** actual counters are readable and committed exhaustion is recoverably delivered under the common backend contract. Kernel is the implemented backend; a synthetic consumer verifies isolation.
 
 **Repositories / Read before implementation:** both; [Kernel readback](https://github.com/gushinets/anytoolai-platform/blob/72ff15bc0b77903c87aa39f7b10186dccc556d09/packages/backend/platform-core/src/anytoolai_platform_core/quotas/readback.py), [workflow runner](https://github.com/gushinets/anytoolai-platform/blob/72ff15bc0b77903c87aa39f7b10186dccc556d09/packages/backend/platform-core/src/anytoolai_platform_core/workflows/runner.py), worker lifecycle and Portal issued-allowance/work queries.
 
 **Implement / reuse:** implement Section 3.6 routes and fixtures. Add the transactional exhaustion outbox at both success orchestration paths. Run bounded leased delivery in the existing worker. Add immutable deduplicated Portal hints and corresponding work-index migration.
+
+Apply Section 3.9 consumer permissions and persisted product/allowance ownership:
+Portal selects the correct backend for usage, and an exhaustion sender cannot
+claim another owner's allowance. Preserve old Kernel-owned history without
+adding consumer identity to ANY-507 buckets/replay or changing the V1 usage and
+exhaustion payload meanings. Document the reverse endpoint contract in the
+common guide; a real external backend remains its team's responsibility.
 
 **Invariants:** no second debit, Portal counters, financial command or zero manufactured by reads.
 
@@ -805,23 +1303,26 @@ Cover all scenario modes, reload, lost start/exchange responses, expiry, differe
 ./.venv/bin/python -m pytest -q apps/api/tests/test_allowance_exhaustion_receiver_postgres.py
 ```
 
-Cover result/debit/outbox rollback, duplicate finalization/delivery, crash before acknowledgement, unknown/foreign usage, tuple conflict, old-cycle delivery and busy versus exhausted.
+Cover result/debit/outbox rollback, duplicate finalization/delivery, crash before acknowledgement, unknown/foreign usage, tuple conflict, old-cycle delivery and busy versus exhausted. Add wrong-consumer/product refusal and authenticated synthetic-consumer acceptance without a real third-party service.
 
 **Expected completion:** actual usage and one durable exhaustion edge survive rollback/restart without repeated effects.
 
 **AI execution prompt:**
 
-> Read /home/wstanley/www/work_unirec/runtime-research/payments-portal/docs/exec-plans/active/ANY-766-implementation-plan.md and complete only Step 9. Follow both repositories’ instructions and the common protocol. Implement the exact usage/exhaustion contracts using ANY-507 readback/finalization and existing workers/work storage. Preserve durable-commit acknowledgement and immutable deduplication. Run focused PostgreSQL/contract/recovery checks, fix introduced failures and report PASS/FAIL/NOT_RUN/BLOCKED. Do not stage, commit, push, merge, rebase or switch branches. Do not perform unapproved live LBX or production operations. Stop only for an irresolvable material decision.
+> Read /home/wstanley/www/work_unirec/runtime-research/payments-portal/docs/exec-plans/active/ANY-766-implementation-plan.md and complete only Step 14. Follow both repositories’ instructions and the common protocol. Implement the exact usage/exhaustion contracts using ANY-507 readback/finalization and existing workers/work storage. Preserve durable-commit acknowledgement and immutable deduplication. Run focused PostgreSQL/contract/recovery checks, fix introduced failures and report PASS/FAIL/NOT_RUN/BLOCKED. Do not stage, commit, push, merge, rebase or switch branches. Do not perform unapproved live LBX or production operations. Stop only for an irresolvable material decision.
 
 **Proposed commit:** `ANY-766 - Expose usage and deliver exhaustion`
 
-### Step 10 — Display actual usage in the cabinet
+### Step 15 — Display actual usage in the cabinet
 
 **Goal / Expected behavior:** the existing cabinet shows truthful current/historical usage independently of access reads.
 
 **Repository / Read before implementation:** Portal; [paid panel](https://github.com/gushinets/payments-portal/blob/7f985031034f45fde0203f710eb64283cd086e86/apps/web/src/features/billing/PaidProductAccess.tsx), [refresh hook](https://github.com/gushinets/payments-portal/blob/7f985031034f45fde0203f710eb64283cd086e86/apps/web/src/features/billing/use-paid-access.ts), bounded read composition.
 
-**Implement / reuse:** add `/api/paid-usage` with its own bounded Kernel HTTP resources. Reuse the existing verified-email billing-session guard, derive scope/user on the server and use no-store success/refusal responses. Perform remote I/O outside SQL, validate tuples and recheck local revision. Preserve the independent local `/api/paid-access` pool/thread/cancellation ownership while Kernel usage is slow or unavailable. Reuse generated DTOs, session-operation guards and visibility refresh.
+**Implement / reuse:** add `/api/paid-usage` with its own bounded backend HTTP resources. Route each allowance to its persisted backend owner using the source/recipient composition from Steps 11/13; Kernel is the first actual provider. Reuse the existing verified-email billing-session guard, derive scope/user on the server and use no-store success/refusal responses. Perform remote I/O outside SQL, validate tuples and recheck local revision. Preserve the independent local `/api/paid-access` pool/thread/cancellation ownership while backend usage is slow or unavailable. Reuse generated DTOs, session-operation guards and visibility refresh.
+
+Apply Section 3.6's historical eligibility, deterministic selection and empty-item
+rules while preserving all excluded stored rows and their original meaning.
 
 Show successful used, reserved, remaining, available and read time. Distinguish current/historical, unobserved/unavailable and temporary busy/final exhaustion. Do not invent reset dates.
 
@@ -834,17 +1335,24 @@ PATH="$PWD/.venv/bin:$PATH" npm run generate
 PATH="$PWD/.venv/bin:$PATH" npm run generate:check
 ```
 
-Cover revision changes, partial tuple failure, outages, blocked history, new cycles and late account responses. Reject inactive/unverified/foreign identity, verify no-store responses, and prove local paid-read availability under usage timeout, cancellation and capacity pressure.
+Cover revision changes, partial tuple failure, outages, blocked history, new cycles and late account responses. Verify mixed-owner routing with a synthetic provider and prevent foreign tuple attribution. Reject inactive/unverified/foreign identity, verify no-store responses, and prove local paid-read availability under usage timeout, cancellation and capacity pressure.
+
+Cover a compatible historical allowance followed by a newer future allowance
+awaiting authoritative activation, including after its start boundary passes,
+and histories containing only legacy rows without unit/terms or SIMULATED rows.
+Prove the eligible historical item retains its actual usage, excluded rows cause
+no backend usage request or invented tuple, and no eligible history yields no
+item for that product. Stored documents and allowance identities remain unchanged.
 
 **Expected completion:** cabinet values match authenticated Kernel readback while local access remains usable during usage outage.
 
 **AI execution prompt:**
 
-> Read /home/wstanley/www/work_unirec/runtime-research/payments-portal/docs/exec-plans/active/ANY-766-implementation-plan.md and complete only Step 10. Follow Portal API/web instructions and the common protocol. Reuse generated contracts, bounded resources, session guards and Bundle 3. Implement separate truthful usage reads and presentation. Run focused checks and generation, fix introduced failures and report PASS/FAIL/NOT_RUN/BLOCKED. Do not stage, commit, push, merge, rebase or switch branches. Do not perform unapproved live LBX or production operations. Stop only for an irresolvable material decision.
+> Read /home/wstanley/www/work_unirec/runtime-research/payments-portal/docs/exec-plans/active/ANY-766-implementation-plan.md and complete only Step 15. Follow Portal API/web instructions and the common protocol. Reuse generated contracts, bounded resources, session guards and Bundle 3. Implement separate truthful usage reads and presentation. Run focused checks and generation, fix introduced failures and report PASS/FAIL/NOT_RUN/BLOCKED. Do not stage, commit, push, merge, rebase or switch branches. Do not perform unapproved live LBX or production operations. Stop only for an irresolvable material decision.
 
 **Proposed commit:** `ANY-766 - Display actual Kernel usage in the cabinet`
 
-### Step 11 — Verify the assembled integration locally
+### Step 16 — Verify the assembled integration locally
 
 **Goal / Expected behavior:** both real applications work together locally through browser and HTTP with separate PostgreSQL state. Confirm that a test user with committed paid access can execute the selected products and see correct results/usage. This is the current plan's combined integration acceptance, not parent ANY-504 stage 11.
 
@@ -872,17 +1380,25 @@ The new browser cases use the harness-provided Portal/Kernel origins and run exi
 
 Verify all service directions, session launch, seven scenarios, paid events, replay, exhaustion, revocation, last-unit competition, same-cycle recovery, new cycle and process restart. Regress selected-digest/historical replay and product-scoped primary decisions while an unrelated product is incomplete; financial admission must retain its customer-wide requirements. Recreate containers and compare retained identities, purchases, floors and usage. Collect accessibility evidence for changed Portal surfaces.
 
+Add the second synthetic backend identity to the local harness for actual Portal
+auth/access and recipient isolation. Prove policy-only changes without paid R
+changes, unrelated versus included expiry, cross-consumer denials, independent
+ACK/retry and owner-directed usage/exhaustion. Seed populated Step 8 state and
+verify the forward cutover preserves original purchases/digests, prepared starts,
+allowance buckets/usage, durable floors and pending delivery. The synthetic
+consumer demonstrates our protocol, not the real Document Summary implementation.
+
 **Invariants:** no shared database, global cleanup, real financial mutation or new orchestration framework.
 
 **Expected completion:** actual local browser/HTTP/PostgreSQL evidence proves the integration and its failure/recovery behavior on pinned sources. Provider/LBX substitutes remain labelled; live payment, remote staging and production acceptance are deferred to ANY-767.
 
 **AI execution prompt:**
 
-> Read /home/wstanley/www/work_unirec/runtime-research/payments-portal/docs/exec-plans/active/ANY-766-implementation-plan.md and complete only Step 11, the assembled local integration acceptance. Follow both runtime instruction sets and the common protocol. Reuse existing runners and independent Compose projects; add the bounded joint harness and required storage/network corrections. Exercise real Portal/Kernel APIs, sessions, service authentication, PostgreSQL and browser journeys from committed test purchase/access state; only external LBX/AI responses may be substituted. Run the stated checks, fix introduced failures and report evidence by source. No remote host or live purchase is needed. Do not stage, commit, push, merge, rebase, switch branches, publish or deploy. Preserve unrelated volumes. Escalate only an unresolved material decision.
+> Read /home/wstanley/www/work_unirec/runtime-research/payments-portal/docs/exec-plans/active/ANY-766-implementation-plan.md and complete only Step 16, the assembled local integration acceptance. Follow both runtime instruction sets and the common protocol. Reuse existing runners and independent Compose projects; add the bounded joint harness and required storage/network corrections. Exercise real Portal/Kernel APIs, sessions, service authentication, PostgreSQL and browser journeys from committed test purchase/access state; only external LBX/AI responses may be substituted. Run the stated checks, fix introduced failures and report evidence by source. No remote host or live purchase is needed. Do not stage, commit, push, merge, rebase, switch branches, publish or deploy. Preserve unrelated volumes. Escalate only an unresolved material decision.
 
 **Proposed commit:** `ANY-766 - Prove durable joint Portal Kernel execution`
 
-### Step 12 — Prepare minimal builds and installation instructions
+### Step 17 — Prepare minimal builds and installation instructions
 
 **Goal / Expected behavior:** the Portal and Kernel changes needed to build and
 later install the selected versions are locally verified and ready for PR review.
@@ -896,7 +1412,9 @@ metering cutover safeguards.
 workflow definitions and the minimal app-owned image overrides/runner support.
 Keep frontend/backend independent, pin selected image versions in ordinary Compose
 inputs and document source/migration/wire/build-origin compatibility in existing
-runbooks. Preserve the Portal purchased-document reader floor and Kernel profile
+runbooks. Include the Section 3.9 synchronized API cutover, worker quiescence,
+consumer/policy/recipient migration order and exclusion of obsolete binaries.
+Preserve the Portal purchased-document reader floor and Kernel profile
 path/fingerprint/activation rules. Control scripts may use matching reviewed
 checkouts; no portable installer bundle, universal selection schema or new release
 manager is required. Document parameterized future installation/update commands.
@@ -917,7 +1435,7 @@ Use local configurations/images and disposable resources to verify the selected
 pair, build-time origins, migration failure handling, Kernel profile generation
 and activation, backend/data retention and frontend-only updates. Check or
 explicitly exclude unsupported image/reader combinations, including old Portal
-readers with unchanged migration heads. Reuse valid Step 11 evidence where the
+readers with unchanged migration heads. Reuse valid Step 16 evidence where the
 sources/configuration are unchanged; rerun affected cases after packaging changes.
 
 Validate workflow/configuration locally and rehearse the documented image-based
@@ -933,14 +1451,14 @@ remote publication/deployment is outside this plan.
 
 **AI execution prompt:**
 
-> Read /home/wstanley/www/work_unirec/runtime-research/payments-portal/docs/exec-plans/active/ANY-766-implementation-plan.md and complete only Step 12. Follow both delivery instruction sets, Section 3.7 and the common protocol. Reuse Dockerfiles, Compose, runners and existing deployment safeguards; implement only minimal component builds, image inputs and installation commands/runbooks. Preserve frontend/backend independence, purchased-document reader compatibility, Kernel profile activation and data. Validate and rehearse locally, rerun affected integration checks and report actual results. Do not create a portable release manager or require remote server/registry inputs. Do not stage, commit, push, merge, rebase, switch branches, publish or deploy remotely. Keep remaining external acceptance in the Section 7 handoff.
+> Read /home/wstanley/www/work_unirec/runtime-research/payments-portal/docs/exec-plans/active/ANY-766-implementation-plan.md and complete only Step 17. Follow both delivery instruction sets, Section 3.7 and the common protocol. Reuse Dockerfiles, Compose, runners and existing deployment safeguards; implement only minimal component builds, image inputs and installation commands/runbooks. Preserve frontend/backend independence, purchased-document reader compatibility, Kernel profile activation and data. Validate and rehearse locally, rerun affected integration checks and report actual results. Do not create a portable release manager or require remote server/registry inputs. Do not stage, commit, push, merge, rebase, switch branches, publish or deploy remotely. Keep remaining external acceptance in the Section 7 handoff.
 
 **Proposed commit:** `ANY-766 - Prepare minimal image builds and installation`
 
 ### PR readiness checklist
 
 - [ ] Inspect the final paired diff against the local DoD; resolve confirmed
-  in-scope issues. Record the source revisions and evidence from Steps 11/12 and
+  in-scope issues. Record the source revisions and evidence from Steps 16/17 and
   applicable Section 6 checks; rerun only checks invalidated by later changes.
 - [ ] Keep affected as-built docs, generated contracts and existing runbooks
   accurate. Document supersession of obsolete ANY-286/287 access-check direction;
@@ -956,11 +1474,11 @@ remote deployment or production readiness.
 ## 6. Final Verification & Review
 
 Run focused checks during implementation and the applicable broad checks on the
-assembled local pair in Step 11, plus build/install checks in Step 12. Reuse valid
+assembled local pair in Step 16, plus build/install checks in Step 17. Reuse valid
 results in the PR checklist; do not repeat an unchanged full suite just for the
 handoff. After PR review corrections, rerun affected checks before rollout.
 Configure these runs for the isolated local test environment, with external
-LBX/AI responses controlled as in Step 11.
+LBX/AI responses controlled as in Step 16.
 
 **Portal:**
 
@@ -973,6 +1491,9 @@ npm run test:e2e -- any766-kernel-launch.spec.ts any766-paid-execution.spec.ts s
 ```
 
 **Kernel:**
+
+The `full-check` command below requires the dependency-installation authorization
+gate in the common execution protocol, including for an already prepared environment.
 
 ```bash
 ./.quick-check-venv/bin/python scripts/agent/runner.py quick-check
@@ -987,6 +1508,10 @@ Run applicable atoms/Compose smoke gates for changed runtime paths. PostgreSQL v
 
 The final review must cover:
 
+- Common consumer credentials, product permissions and audience-bound delegation.
+- Consumer/P/R semantics, filtered deadlines and independent recipient state.
+- Actual auth/access OpenAPI security/descriptions and the shared API guide.
+- Forward cutover from populated Step 8 history without serialization or usage reset.
 - Metric/unit/action binding and shared-counter meaning.
 - Immutable terms, historical compatibility and renewal retention.
 - Delegation, browser custody/recovery, identity-generation changes and paid events.
@@ -1004,6 +1529,9 @@ Record **historical**, **new local**, **synthetic fixture/provider**, **real two
 
 Deliver one compact handoff for PR review and parent ANY-504 stage 11:
 
+- Common backend API guide, generated OpenAPI/Swagger location and auth/access
+  checkpoint evidence, with the implemented versions and remaining delivery/usage
+  status. Real Document Summary adoption/testing belongs to its owning team.
 - Paired source revisions, predecessor corrections and consumed ANY-507/814 versions.
 - Migration heads/order, purchased-document reader floor, locally verified image IDs/digests and build inputs, supported configuration and installation/update/recovery commands.
 - Contract versions/checksums, session/service-auth setup, permissions and implemented admission/readback/delivery attachment points.
@@ -1020,6 +1548,8 @@ natural-renewal/deployment acceptance and production rollout.
 Reuse valid local and predecessor evidence; do not repeat completed research or
 the entire unchanged local matrix. Verify the actual installed configuration,
 remaining real-service lifecycle cases and behavior affected by review changes.
+Real independent-product setup and integration follow ANY-833; implementing or
+accepting another team's backend is not a completion condition of ANY-766.
 Missing remote inputs defer this later acceptance and do not prevent completion
 of ANY-766's local plan. Missing core identity, enforcement, delivery, usage or
 local browser/HTTP proof remains incomplete ANY-766 work.
