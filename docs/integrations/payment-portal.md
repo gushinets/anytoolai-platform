@@ -32,8 +32,8 @@ Historical Portal contracts and execution plans do not override accepted sources
 
 ## Current local implementation
 
-Sources: Kernel `9cfaba98a980a66ee2d26b2a6340260fd4d7a007`; Portal
-`e8362fdcf6ae25b2b688885aa76a2c1abe1be71f` plus its Step 7 working-tree change.
+Sources: Kernel `729f0675` and Portal `f4f6fbf`, plus the paired Step 8
+working-tree changes.
 The [active plan](../exec-plans/active/ANY-766-implementation-plan.md) owns the
 current scope and remaining gates.
 
@@ -47,8 +47,9 @@ current scope and remaining gates.
   worker: Portal reuses the configured manifest URL/token and starts delivery
   automatically. A disabled receiver permission parks delivery with `403`;
   operator retry is required after repair.
-- Browser launch/recovery, usage/exhaustion and cabinet integration remain
-  Steps 8–10; Step 11 is paired local acceptance and Step 12 is build/install
+- Step 8 implements recoverable browser launch, owner-bound tab custody and
+  paid runtime/event/handoff continuity. Usage/exhaustion and cabinet integration
+  remain Steps 9–10; Step 11 is paired local acceptance and Step 12 is build/install
   preparation. ANY-767 owns remote deployment and live-service acceptance.
 
 ## Observed implementation
@@ -284,8 +285,9 @@ describes the independent reverse connection.
   fixture pins and SIMULATED mapping history must not be relabelled as real.
 - **Usage and launch:** the
   [target bundle](../contracts/portal-kernel-paid/README.md) specifies usage,
-  exhaustion and authenticated browser launch; their runtime remains pending
-  in Steps 8–10. Kernel product handoff is not Portal login handoff;
+  exhaustion and authenticated browser launch. Step 8 implements browser launch;
+  usage/exhaustion and cabinet usage remain Steps 9–10, with paired local
+  acceptance in Step 11. Kernel product handoff is not Portal login handoff;
   shared product IDs do not imply shared origins/routes or sessions.
 - **Commercial meaning:** deployed product configuration, guest quota and the
   fixture's `proposal_ai.test_generations` do not approve paid metrics/quantity.
@@ -336,3 +338,15 @@ Portal Step 7 now supplies the sender. Browser integration, usage/exhaustion,
 local connection/acceptance and build preparation remain Steps 8–12; remote
 installation/live acceptance belong to ANY-767. Local PostgreSQL/ASGI
 synthetic evidence does not supersede earlier historical or live-provider gates.
+
+
+## ANY-766 Step 8 browser checkpoint — 2026-11-10
+
+At Portal `f4f6fbf` and Kernel `729f0675` plus the paired Step 8 changes,
+CE-kit and the existing web host implement fixed PKCE launch, canonical-owner
+tab custody, frozen same-key replay, accepted-session/mode restoration and
+identity-generation guards for paid events/results/handoffs without guest
+fallback. See [browser configuration and limits](../contracts/portal-kernel-paid/README.md#step-8-browser-implementation).
+Local component/synthetic browser evidence does not establish the real paired
+HTTP/PostgreSQL acceptance required in Step 11. Historical snapshots above are
+unchanged; usage/exhaustion and delivery/build gates retain their owning steps.

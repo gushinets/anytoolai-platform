@@ -1,6 +1,13 @@
 import type { PlatformApiError } from "../errors";
 import type { PlatformApiMethod } from "./http";
 import type { PlatformApiRetryPolicy } from "./retry";
+import type { PortalOwner } from "../../identity/portalSession";
+
+export type PortalClientIdentity = {
+  owner: PortalOwner;
+  isCurrent: () => boolean;
+  refuse: (code: string) => void;
+};
 
 export type PlatformApiResult<T> =
   | { ok: true; value: T; status: number }
@@ -24,4 +31,5 @@ export type PlatformApiClientOptions = {
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
   defaultHeaders?: Record<string, string>;
+  portalIdentity?: PortalClientIdentity;
 };

@@ -1,4 +1,5 @@
 import { PlatformApiClient } from "@anytoolai/ce-kit";
+import { getPortalIdentity, isPortalGenerationCurrent, requirePortalAuthorization } from "./portalSession";
 
 /**
  * Same-origin base URL: `next.config.ts` rewrites `/v1/:path*` to platform-api, whose port
@@ -7,12 +8,22 @@ import { PlatformApiClient } from "@anytoolai/ce-kit";
  * no `window.location` to read.
  */
 export function createPlatformApiClient(): PlatformApiClient {
+  const identity = typeof window === "undefined" ? null : getPortalIdentity();
+  if (identity?.kind === "required") throw new Error("portal_authorization_required");
   return new PlatformApiClient({
     baseUrl: typeof window !== "undefined" ? window.location.origin : "http://localhost",
+    ...(identity?.kind === "authorized" ? {
+      defaultHeaders: { Authorization: `Bearer ${identity.session.accessToken}` },
+      portalIdentity: { owner: identity.session.owner,
+        isCurrent: () => isPortalGenerationCurrent(identity.generation),
+        refuse: (code: string) => requirePortalAuthorization(code !== "kernel_delegation_expired"),
+      },
+    } : {}),
   });
 }
 
 let browserClient: PlatformApiClient | undefined;
+let browserGeneration: number | undefined;
 
 /**
  * The one client for this page load. Everything that must outlive a component remount -- the
@@ -29,6 +40,11 @@ export function getPlatformApiClient(): PlatformApiClient {
   if (typeof window === "undefined") {
     return createPlatformApiClient();
   }
-  browserClient ??= createPlatformApiClient();
+  const identity = getPortalIdentity();
+  if (identity.kind === "required") throw new Error("portal_authorization_required");
+  if (!browserClient || browserGeneration !== identity.generation) {
+    browserClient = createPlatformApiClient();
+    browserGeneration = identity.generation;
+  }
   return browserClient;
 }

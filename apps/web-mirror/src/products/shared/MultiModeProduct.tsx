@@ -1,13 +1,14 @@
 "use client";
 
 import { useContext, useEffect, useRef, useState } from "react";
-import { getScenarioSession } from "@anytoolai/ce-kit";
+import { clearPaidStartRecovery, getScenarioSession, readPaidStartRecovery } from "@anytoolai/ce-kit";
 import { Button, Card } from "@anytoolai/shared-ui";
 import { useIsomorphicLayoutEffect } from "../../lib/useIsomorphicLayoutEffect";
 import { ProductShellContext } from "../runtime/ProductShellContext";
 import { ErrorState } from "../../components/ErrorState";
 import { useHostT, useProductT } from "../../i18n";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
+import { getPaidPersistence } from "../../lib/portalSession";
 import type { AttachProps } from "../runtime/attachSession";
 import { callSafely } from "../runtime/callSafely";
 import { ProductRunPage } from "../runtime/ProductRunPage";
@@ -51,6 +52,7 @@ export function MultiModeProduct<Id extends string, R>({
   onAttachBegin,
   onAttachEnd,
   onAttachDiscard,
+  attachFromUrl,
 }: AttachProps & {
   client: PlatformApiClient;
   onEvent?: (event: ProductRunEvent) => void;
@@ -70,6 +72,7 @@ export function MultiModeProduct<Id extends string, R>({
   const containerRef = useRef<HTMLDivElement>(null);
   const focusFreshFormRef = useRef(false);
   const ownModeResolvedRef = useRef(false);
+  const resolvedSessionIdRef = useRef<string | undefined>(undefined);
   const modesRef = useRef(modes);
   modesRef.current = modes;
   const shell = useContext(ProductShellContext);
@@ -82,7 +85,27 @@ export function MultiModeProduct<Id extends string, R>({
   const t = useProductT();
 
   useEffect(() => {
-    if (!attachSessionId) {
+    let sessionId = attachSessionId;
+    if (!attachFromUrl || !attachSessionId) {
+      const persistence = getPaidPersistence(client);
+      if (persistence) {
+        try {
+          const recovery = readPaidStartRecovery(persistence, modesRef.current[0].definition.productId);
+          if (recovery?.kind === "pending") {
+            const target = modesRef.current.find((candidate) => candidate.definition.scenarioId === recovery.scenarioId);
+            if (target) {
+              // No session exists yet: resume the original request before an older remembered handoff.
+              setModeId(target.id);
+              setResolution("ready");
+              return;
+            }
+          } else if (recovery?.kind === "accepted") {
+            sessionId = recovery.scenarioSessionId;
+          }
+        } catch { /* ProductRunPage reports unreadable recovery and refuses a new send. */ }
+      }
+    }
+    if (!sessionId) {
       if (!ownModeResolvedRef.current) {
         ownModeResolvedRef.current = true;
         const savedId = readProductDraftScenario(modesRef.current[0].definition.productId);
@@ -92,9 +115,10 @@ export function MultiModeProduct<Id extends string, R>({
       setResolution("ready");
       return;
     }
+    resolvedSessionIdRef.current = sessionId;
     const controller = new AbortController();
-    void getScenarioSession(client, attachSessionId, { signal: controller.signal }).then((result) => {
-      if (controller.signal.aborted) return;
+    void getScenarioSession(client, sessionId, { signal: controller.signal }).then((result) => {
+      if (controller.signal.aborted || (client.portalIdentity && !client.portalIdentity.isCurrent())) return;
       if (!result.ok) {
         setResolution(result.error.type === "backend_error" && result.error.status === 404 ? "unavailable" : "error");
         return;
@@ -109,7 +133,7 @@ export function MultiModeProduct<Id extends string, R>({
       setResolution("ready");
     });
     return () => controller.abort();
-  }, [client, attachSessionId, attempt]);
+  }, [client, attachSessionId, attachFromUrl, attempt]);
 
   useEffect(() => {
     if (!focusFreshFormRef.current || resolution !== "ready" || locked) return;
@@ -155,6 +179,20 @@ export function MultiModeProduct<Id extends string, R>({
             embedded
           />
           <Button variant="secondary" onClick={() => {
+            const persistence = getPaidPersistence(client);
+            if (persistence) {
+              if (!persistence.isCurrent()) return;
+              try {
+                const current = readPaidStartRecovery(persistence, modes[0].definition.productId);
+                // Explicit discard applies only to this accepted session, never to a pending/newer operation.
+                if (current?.kind === "accepted" && current.scenarioSessionId === resolvedSessionIdRef.current) {
+                  clearPaidStartRecovery(persistence.storage, current.productId);
+                }
+              } catch {
+                setResolution("error");
+                return;
+              }
+            }
             callSafely(onAttachDiscard);
             focusFreshFormRef.current = true;
             setAttachSessionId(undefined);
@@ -169,6 +207,7 @@ export function MultiModeProduct<Id extends string, R>({
         onLockedChange={setLocked}
         visitId={visitId}
         attachSessionId={attachSessionId}
+        attachFromUrl={attachFromUrl && attachSessionId !== undefined}
         onAttachBegin={onAttachBegin}
         onAttachEnd={onAttachEnd}
       />}

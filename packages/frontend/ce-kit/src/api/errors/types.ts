@@ -10,6 +10,7 @@ export type PlatformApiError =
   | NetworkApiError
   | TimeoutApiError
   | AbortedApiError
+  | { type: "local_error"; code: "paid_storage_unavailable" | "paid_recovery_pending" }
   | InvalidResponseApiError;
 
 export type PlatformApiErrorType = PlatformApiError["type"];

@@ -3,8 +3,8 @@
 Status: **protocol specifications and fixtures**, formalized 2026-11-09.
 Server implementation through ANY-766 Step 7 includes delegated identity,
 snapshot V2, coherent paid admission/ownership/events and Portal invalidation
-delivery. Browser journeys, usage/exhaustion and cabinet integration remain
-pending. Paired local acceptance is Step 11; remote/live acceptance and
+delivery. Step 8 implements recoverable paid browser journeys; usage/exhaustion
+and cabinet integration remain pending. Paired local acceptance is Step 11; remote/live acceptance and
 production rollout belong to ANY-767. All quantities and
 credential-shaped strings in fixtures are synthetic. Q=1 is an isolated test
 quantity, never a commercial offer or approval.
@@ -160,8 +160,12 @@ Internal identity reads do not commit session bookkeeping.
 Keep the delegated token/owner in tab sessionStorage and the original bearer
 only at Portal. Before a new paid send, durably store a versioned CE-kit prepared
 start descriptor with original key, frozen request and canonical owner. Storage
-failure refuses the new send but permits existing result reads. After acceptance
-retain the session reference and delete frozen input. Uncertainty/reload/ordinary
+failure refuses the new send but permits existing result reads. On an accepted
+response, replace the pending descriptor with the session reference and delete
+frozen input. If that post-acceptance storage update fails, preserve the accepted
+response; any retained pending descriptor remains owner-bound and replays the
+original request/key until replacement succeeds or private state is cleared.
+This failure never permits a new logical start. Uncertainty/reload/ordinary
 expiry reuses the same key/request after same-owner reauthorization. Owner change,
 logout or parent revocation clears token, pending input and private display;
 ignore old-generation responses. Rebuild the API client on generation change,
@@ -279,7 +283,7 @@ implements only the identity server slice: Portal code issuance, internal
 exchange/introspection, Kernel public exchange and the reusable Kernel identity
 dependency. Step 5 adds snapshot V2 serving, Step 6 attaches identity to paid
 runtime ownership/admission, and Step 7 delivers invalidations. Browser
-launch/callback/storage remains Step 8; usage/exhaustion remains Step 9.
+launch/callback/storage is implemented in Step 8 below; usage/exhaustion remains Step 9.
 The original Portal bearer is not sent to Portal's internal service
 endpoints or forwarded by Kernel.
 
@@ -361,3 +365,89 @@ receiver permission first. The usage API and exhaustion delivery remain Step 9.
 Focused evidence uses real disposable PostgreSQL and in-process ASGI with
 synthetic Portal responses. It does not establish real paired HTTP, browser,
 clock/TLS deployment, live LBX, sales enablement or staging acceptance.
+
+
+## Step 8 browser implementation
+
+The localized Portal authorization page reuses the existing account/session UI
+and generated `KernelCodeRequest`/`KernelCodeResponse` adapter. A confirmed
+cabinet grant exposes the existing Kernel product through its launch route.
+Configure Portal `NEXT_PUBLIC_KERNEL_WEB_BASE_URL` with the Kernel **web** base
+URL (including its optional base path), separately from server-only
+`KERNEL_BASE_URL` and service credentials. Configure Kernel web
+`NEXT_PUBLIC_PORTAL_AUTHORIZE_URL` with a supported localized Portal route, e.g.
+`https://portal.example/ru/kernel/authorize`. Both are frontend build inputs;
+HTTPS is required except for loopback development. Kernel's existing
+`ANYTOOLAI_WEB_BASE_PATH` remains the source of its web base path. No endpoint,
+service permission, migration, product placement or sales gate changes here.
+
+Kernel's launch/callback pages use secure-context Web Crypto S256, unpredictable
+state and tab `sessionStorage`. Only registered product pages, their
+`?session=<id>&scenario=<scenario_id>&paid=1` result continuations and handoff pages
+are allowed. Paid result/handoff links carry the non-secret `paid=1` marker so
+a fresh tab requires authorization before mounting a product or creating any guest.
+Reauthorization keeps handoff continuations in tab storage instead
+of placing their capability token in a query. Portal always selects the
+configured fixed callback; code/state arrive in its fragment, which Kernel
+clears before any asynchronous operation. A lost one-use exchange starts a new
+authorization while preserving the original operation, rather than guessing an
+exchange outcome or creating a guest.
+
+CE-kit extends `prepareScenarioStart` with a version-1 canonical-owner-bound
+recovery descriptor. Before any new paid send, the original key and frozen
+request must be written and read back successfully. An accepted response replaces
+that input with its session/scenario reference; a lost response replays the
+original key/body. If storage becomes unavailable **after** acceptance, the
+already accepted result still opens; any retained pending descriptor replays its
+original key on reload. This is the recovery path for that browser-storage
+failure, not a second execution. Existing explicit result reads remain usable
+when new-start storage is refused.
+
+The shared web runtime restores every selected scenario/mode, attaches accepted
+sessions, uses the existing paid client-event transport and reuses backend-owned
+handoff consent. Paid mode creates no guest and makes no guest quota read.
+The browser client survives ordinary remounts and is replaced on identity
+changes; obsolete generations cannot send, persist, display or navigate from a
+late response. Ordinary delegation expiry preserves owner-bound recovery.
+Different owner, explicit tab sign-out or observed parent-authority revocation
+clears token, pending inputs, attach/event marks and displayed private state.
+Portal logout revokes the parent on the server; Kernel observes that revocation
+on its next protected request. Tab sign-out clears this Kernel tab and does not
+log out the Portal parent. Paid mode remains explicit during reauthorization.
+
+History restoration and focus reconcile the cached document with the current
+tab identity; paid-client generation checks repeat that comparison before sends,
+persistence and response use. Authorization launch and code exchange also reconcile
+custody, including after the exchange await and before installing its session.
+Callback pages reconcile on history restoration and focus. The tab's version-1
+mode record includes a fresh `custodyId` for each authorization transition and
+session installation. Comparing this persisted epoch detects an intervening login
+and logout even when owner/token fields return to their original values. PKCE
+context is bound to the launch epoch; obsolete callbacks are refused before
+exchange as well as after its await. A suspended PKCE computation cannot replace
+a newer authorization record or redirect its older launch. Legacy custody or
+PKCE records without an epoch require reauthorization, preserving owner-bound
+paid recovery. Custody/session writes must read back successfully; failed writes
+cannot authorize a new client. A different stored epoch/token/owner invalidates
+the old client without deleting a newer document's recovery.
+Result-link session/scenario parameters are consumed together and remain paired
+for the current visit.
+On reload, pending or accepted paid recovery supersedes an older remembered
+handoff attachment; an explicitly opened result retains precedence for that visit.
+Selecting a result through a deep link or handoff consent preserves an existing
+pending descriptor, including its original key and frozen request. Ending or failing
+that selected result does not clear another operation. A new form submission cannot
+replace the saved pending operation; the retry action reloads the page to resume it.
+CE-kit rereads the current descriptor immediately before every pending write/send,
+including retries from a restored document. A different unresolved key or changed
+frozen request is refused locally. Acceptance replaces only its matching pending
+key; a late accepted response cannot replace a newer pending. Prepared handles
+forget only their own pending key or known accepted session. An attached result
+can clear only its own accepted reference. A definitive rejection with no earlier
+uncertain send releases its persisted descriptor; the in-memory handle still reuses
+the same key for unchanged retries, while edits or another mode can use a new key. Superseding the old attachment preserves any newer handoff fallback.
+
+Step 8 evidence is local component/transport testing and synthetic browser UI
+coverage, distinct from the real two-service HTTP/PostgreSQL/browser acceptance
+required by Step 11. Usage/exhaustion and cabinet counters remain Steps 9–10;
+remote/live-service acceptance remains ANY-767.

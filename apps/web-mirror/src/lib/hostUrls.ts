@@ -3,8 +3,9 @@
 export const ATTACH_SESSION_PARAM = "session";
 
 /** `/products/{productId}?session={id}`: the product page attached to an already-queued session. */
-export function productAttachPath(productId: string, scenarioSessionId: string): string {
-  return `/products/${encodeURIComponent(productId)}?${ATTACH_SESSION_PARAM}=${encodeURIComponent(scenarioSessionId)}`;
+export function productAttachPath(productId: string, scenarioSessionId: string, scenarioId?: string, paid = false): string {
+  return `/products/${encodeURIComponent(productId)}?${ATTACH_SESSION_PARAM}=${encodeURIComponent(scenarioSessionId)}` +
+    (scenarioId ? `&scenario=${encodeURIComponent(scenarioId)}` : "") + (paid ? "&paid=1" : "");
 }
 
 /** Origin plus basePath (everything before `/products/`) of a product page location. */

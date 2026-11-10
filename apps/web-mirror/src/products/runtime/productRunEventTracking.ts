@@ -100,6 +100,7 @@ export function createProductRunEventTracker(
   storage: AsyncStorage,
 ): (event: ProductRunEvent) => void {
   return (event) => {
+    if (client.portalIdentity && !client.portalIdentity.isCurrent()) return;
     const eventType = webEventTypeForRunEvent(event.type);
     // A completed run the product does not count as "viewed" (ProductDefinition.emitsResultViewed).
     if (eventType === undefined || (event.type === "scenario_completed" && !event.resultViewed)) {
@@ -123,6 +124,7 @@ export function createProductRunEventTracker(
 
     void getOrCreateWebSessionId(storage)
       .then((currentWebSessionId) => {
+        if (client.portalIdentity && !client.portalIdentity.isCurrent()) return null;
         // A retry keeps the web session id of the first attempt (see the mark's docstring).
         const webSessionId = sentWebSessionId ?? currentWebSessionId;
         if (resultViewedSessionId !== undefined && eventId !== undefined) {
@@ -139,6 +141,7 @@ export function createProductRunEventTracker(
         });
       })
       .then((result) => {
+        if (result === null || (client.portalIdentity && !client.portalIdentity.isCurrent())) return;
         // An id conflict means the backend already holds an event under our own id (minted per session): it
         // is recorded, just under other details (an older mark without a web session id), so it is done too.
         const recorded = result.ok || (result.error.type === "backend_error" && result.error.code === "client_event_id_conflict");

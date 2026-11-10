@@ -21,6 +21,18 @@ describe("useAttachSession", () => {
     expect(readAttachSessionId("acceptance_builder")).toBe("s 1");
   });
 
+  it("consumes the linked scenario with the session and keeps the explicit choice until this visit ends", () => {
+    window.history.replaceState(null, "", "/products/acceptance_builder?session=s1&scenario=acceptance_builder.check_v1&paid=1");
+    const linked = renderHook(({ session }) => useAttachSession("acceptance_builder", session), { initialProps: { session: "s1" as string | undefined } });
+    expect(window.location.search).toBe("?paid=1");
+    linked.rerender({ session: undefined });
+    expect(linked.result.current.attachFromUrl).toBe(true);
+    expect(linked.result.current.attachSessionId).toBe("s1");
+    const reloaded = renderHook(() => useAttachSession("acceptance_builder", undefined));
+    expect(reloaded.result.current.attachFromUrl).toBe(false);
+    expect(reloaded.result.current.attachSessionId).toBe("s1");
+  });
+
   it("restores the id after a reload (no URL param) until the person moves on from the shown session", () => {
     rememberAttachSession("acceptance_builder", "s 1", "2026-10-01T10:00:00Z");
     const reloaded = renderHook(() => useAttachSession("acceptance_builder", undefined));

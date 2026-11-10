@@ -7,6 +7,8 @@ export type OpenHandoffConsentOptions = {
   /** The opaque token from `createHandoff()`. Only ever used as an opaque path segment -- never parsed. */
   handoffToken: string;
   navigate: Navigate;
+  /** Explicit paid links require reauthorization even when opened in a fresh tab. */
+  paid?: boolean;
 };
 
 /**
@@ -21,5 +23,5 @@ export type OpenHandoffConsentOptions = {
 export function openHandoffConsent(options: OpenHandoffConsentOptions): void | Promise<void> {
   const baseUrl = normalizeBaseUrl(options.webConsentBaseUrl, "openHandoffConsent");
   const url = joinUrl(baseUrl, `/handoff/${encodeURIComponent(options.handoffToken)}`);
-  return options.navigate(url);
+  return options.navigate(url + (options.paid ? "?paid=1" : ""));
 }

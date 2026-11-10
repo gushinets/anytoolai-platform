@@ -8,6 +8,7 @@ const platformApiBaseUrl = process.env.PLATFORM_API_BASE_URL ?? "http://localhos
 const webBasePath = process.env.ANYTOOLAI_WEB_BASE_PATH;
 
 const nextConfig: NextConfig = {
+  env: { NEXT_PUBLIC_ANYTOOLAI_WEB_BASE_PATH: webBasePath ?? "" },
   ...(webBasePath ? { basePath: webBasePath } : {}),
   rewrites() {
     return Promise.resolve([
