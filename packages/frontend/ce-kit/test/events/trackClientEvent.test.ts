@@ -41,6 +41,22 @@ const REQUEST: TrackClientEventRequest = {
 };
 
 describe("trackClientEvent", () => {
+  it("sends paid product events before a scenario without a guest and preserves retry identity", async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(200, { event_id: "paid_event", event_type: "web.product_viewed" }));
+    const client = new PlatformApiClient({ baseUrl: "https://api.example.com", fetchImpl,
+      defaultHeaders: { Authorization: `Bearer ${"t".repeat(43)}` },
+      portalIdentity: { owner: { tenantId: "anytoolai", region: "ru", userId: "11111111-1111-1111-1111-111111111111" }, isCurrent: () => true, refuse: () => {} },
+    });
+    const request: TrackClientEventRequest = { eventType: "web.product_viewed", productId: "proposal_ai", frontendId: "web_mirror", webSessionId: "web_paid", eventId: "paid_event" };
+    await trackClientEvent(client, request);
+    await trackClientEvent(client, request);
+    const bodies = fetchImpl.mock.calls.map(([, init]) => parseBody(init!));
+    expect(bodies[0]).toEqual(bodies[1]);
+    expect(bodies[0]).not.toHaveProperty("guest_id");
+    expect(bodies[0]).not.toHaveProperty("user_id");
+    expect(bodies[0]).not.toHaveProperty("scenario_session_id");
+    expect(new Headers(fetchImpl.mock.calls[0][1]?.headers).get("Authorization")).toBe(`Bearer ${"t".repeat(43)}`);
+  });
   it("posts an allowlisted event with a generated idempotent event_id and maps the response", async () => {
     const fetchImpl = vi.fn(async () =>
       jsonResponse(200, { event_id: "web_evt_1", event_type: "web.product_viewed" }),

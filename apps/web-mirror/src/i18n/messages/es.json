@@ -40,7 +40,9 @@
     "startFailed": "No se pudo iniciar {product}. Inténtelo de nuevo.",
     "timeout": "Esto está tardando más de lo esperado. Inténtelo de nuevo.",
     "connectionLost": "Se perdió la conexión mientras esperaba su resultado. Inténtelo de nuevo.",
-    "tryAgain": "Inténtelo de nuevo."
+    "tryAgain": "Inténtelo de nuevo.",
+    "savedOperationPending": "Hay una operación pendiente guardada. Pulsa «Intentar de nuevo» para recargar la página y continuarla.",
+    "storageUnavailable": "Almacenamiento del navegador no disponible. Actívalo y reintenta la misma solicitud."
   },
   "result": {
     "copy": "Copiar",
@@ -58,5 +60,14 @@
     "text": "Lo que introduces se envía a nuestro servicio y a un proveedor de modelos de IA para crear el resultado, y se almacena junto con tu ejecución en nuestros servidores. Tu borrador se mantiene en este navegador y puede perderse si recargas la página o sales de ella. No introduzcas contraseñas, códigos de acceso, claves de API ni datos completos de tarjetas de pago.",
     "policyLink": "Política de privacidad",
     "opensInNewTab": "(se abre en una pestaña nueva)"
+  },
+  "portalSession": {
+    "title": "Sesión del Portal",
+    "required": "Inicia sesión de nuevo para continuar la misma operación.",
+    "continue": "Continuar con el Portal",
+    "loading": "Iniciando sesión…",
+    "failed": "No se pudo autorizar la pestaña. Revisa el almacenamiento del navegador y reinténtalo.",
+    "retry": "Reintentar autorización",
+    "signOut": "Cerrar sesión en esta pestaña"
   }
 }

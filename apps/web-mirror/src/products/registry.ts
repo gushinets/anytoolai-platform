@@ -1,15 +1,15 @@
 import type { ComponentType } from "react";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
 import type { ProductMessagesByLocale } from "../i18n";
-import { TaskFinderProduct } from "./taskFinder/TaskFinderProduct";
+import { TaskFinderProduct, taskFinderDefinition } from "./taskFinder/TaskFinderProduct";
 import { TASK_FINDER_MESSAGES } from "./taskFinder/messages";
-import { AcceptanceBuilderProduct } from "./acceptanceBuilder/AcceptanceBuilderProduct";
+import { AcceptanceBuilderProduct, draftDefinition, checkDefinition } from "./acceptanceBuilder/AcceptanceBuilderProduct";
 import { ACCEPTANCE_BUILDER_MESSAGES } from "./acceptanceBuilder/messages";
-import { BriefDecoderProduct } from "./briefDecoder/BriefDecoderProduct";
+import { BriefDecoderProduct, briefDecoderDefinition } from "./briefDecoder/BriefDecoderProduct";
 import { BRIEF_DECODER_MESSAGES } from "./briefDecoder/messages";
-import { ClientUpdateWriterProduct } from "./clientUpdateWriter/ClientUpdateWriterProduct";
+import { ClientUpdateWriterProduct, updateDefinition, replyDraftDefinition, prepaidRequestDefinition } from "./clientUpdateWriter/ClientUpdateWriterProduct";
 import { CLIENT_UPDATE_WRITER_MESSAGES } from "./clientUpdateWriter/messages";
-import { ProposalAIProduct } from "./proposalAi/ProposalAIProduct";
+import { ProposalAIProduct, proposalAiDefinition } from "./proposalAi/ProposalAIProduct";
 import { PROPOSAL_AI_MESSAGES } from "./proposalAi/messages";
 import { enabledProductIds, isProductEnabled } from "./runtime/enabledProducts";
 import type { AttachProps } from "./runtime/attachSession";
@@ -17,6 +17,7 @@ import type { ProductRunEvent } from "./runtime/productDefinition";
 
 export type RegisteredProduct = {
   productId: string;
+  scenarioIds: readonly string[];
   enabled: boolean;
   /** The shell renders each locale's title and supplies the language selector and locale state. */
   messages: ProductMessagesByLocale & Record<keyof ProductMessagesByLocale, { title: string }>;
@@ -36,15 +37,16 @@ export type RegisteredProduct = {
 const enabledIds = enabledProductIds();
 
 const PRODUCT_DEFINITIONS: readonly Omit<RegisteredProduct, "enabled">[] = [
-  { productId: "proposal_ai", messages: PROPOSAL_AI_MESSAGES, Component: ProposalAIProduct },
+  { productId: "proposal_ai", scenarioIds: [proposalAiDefinition.scenarioId], messages: PROPOSAL_AI_MESSAGES, Component: ProposalAIProduct },
   {
     productId: "client_update_writer",
+    scenarioIds: [updateDefinition.scenarioId, replyDraftDefinition.scenarioId, prepaidRequestDefinition.scenarioId],
     messages: CLIENT_UPDATE_WRITER_MESSAGES,
     Component: ClientUpdateWriterProduct,
   },
-  { productId: "brief_decoder", messages: BRIEF_DECODER_MESSAGES, Component: BriefDecoderProduct },
-  { productId: "acceptance_builder", messages: ACCEPTANCE_BUILDER_MESSAGES, Component: AcceptanceBuilderProduct },
-  { productId: "task_finder", messages: TASK_FINDER_MESSAGES, Component: TaskFinderProduct },
+  { productId: "brief_decoder", scenarioIds: [briefDecoderDefinition.scenarioId], messages: BRIEF_DECODER_MESSAGES, Component: BriefDecoderProduct },
+  { productId: "acceptance_builder", scenarioIds: [draftDefinition.scenarioId, checkDefinition.scenarioId], messages: ACCEPTANCE_BUILDER_MESSAGES, Component: AcceptanceBuilderProduct },
+  { productId: "task_finder", scenarioIds: [taskFinderDefinition.scenarioId], messages: TASK_FINDER_MESSAGES, Component: TaskFinderProduct },
 ];
 
 for (const productId of enabledIds ?? []) {

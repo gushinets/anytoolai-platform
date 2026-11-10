@@ -130,7 +130,7 @@ function selectionOf(current: StoredAttach | undefined): Pick<StoredAttach, "act
 }
 
 /** Remove only this reference; another explicitly opened or later accepted session survives. */
-function forgetAttachSession(productId: string, id: string): void {
+export function forgetAttachSession(productId: string, id: string): void {
   const current = readEntry(productId);
   if (current?.active === id) {
     writeEntry(productId, { ...current, active: undefined, ...(current.id === id ? { id: undefined, rank: 0 } : {}) });
@@ -143,6 +143,10 @@ function forgetAttachSession(productId: string, id: string): void {
 /** What a product page needs to show an already-queued session, threaded route -> shell -> product ->
  * `ProductRunPage`. The route's `useAttachSession` is the one owner of the state behind it. */
 export type AttachProps = {
+  /** This visit explicitly selected a session, rather than restoring an older remembered handoff. */
+  attachFromUrl?: boolean;
+  /** Explicit scenario of a result deep link; the product selects its own matching mode. */
+  attachScenarioId?: string;
   /**
    * The queued session to show (an accepted handoff's target); undefined for an ordinary visit. The page
    * polls it and renders its result with no start request and no quota charge (the accept already charged
@@ -171,6 +175,7 @@ export type AttachProps = {
  */
 export function useAttachSession(productId: string, fromUrl: string | undefined): AttachProps {
   const [attachSessionId, setAttachSessionId] = useState(() => fromUrl || readAttachSessionId(productId));
+  const [attachFromUrl] = useState(() => Boolean(fromUrl));
   // The id this route attached, once the page started showing it. `onAttachEnd` forgets only that one: a late
   // Accept may have stored another session for the product meanwhile (`rememberAttachSession`).
   const begunIdRef = useRef<string | undefined>(undefined);
@@ -189,6 +194,7 @@ export function useAttachSession(productId: string, fromUrl: string | undefined)
     }
     const url = new URL(window.location.href);
     url.searchParams.delete(ATTACH_SESSION_PARAM);
+    url.searchParams.delete("scenario");
     // `null` state: Next then copies its own history internals into it and syncs `useSearchParams`;
     // passing `history.state` (which carries Next's `__NA` marker) would make it skip that sync.
     window.history.replaceState(null, "", url);
@@ -207,5 +213,5 @@ export function useAttachSession(productId: string, fromUrl: string | undefined)
     if (begunIdRef.current === attachSessionId) begunIdRef.current = undefined;
     setAttachSessionId((current) => current === attachSessionId ? undefined : current);
   }, [productId, attachSessionId]);
-  return { attachSessionId, onAttachBegin, onAttachEnd, onAttachDiscard };
+  return { attachSessionId, attachFromUrl, onAttachBegin, onAttachEnd, onAttachDiscard };
 }

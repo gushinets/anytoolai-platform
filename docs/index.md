@@ -17,7 +17,8 @@ This directory is the system of record for agents. Keep it current. If a decisio
 - [ANY-766 paid integration target contracts](contracts/portal-kernel-paid/README.md) — reviewed
   snapshot V2, identity, invalidation, usage/exhaustion and cabinet schemas/fixtures;
   independent offline checks, implemented delegation/coherent paid admission and
-  snapshot/invalidation transport, and remaining browser/usage/sales gates.
+  snapshot/invalidation transport and recoverable paid browser launch; usage,
+  paired local acceptance and sales gates remain pending.
 
 ## Architecture
 

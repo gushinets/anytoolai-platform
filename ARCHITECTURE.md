@@ -58,8 +58,9 @@ apps/web-mirror -> web-result-kit
 The separate Portal owns identity, legal acceptance, discovery and the cabinet;
 it also owns commercial mappings and paid-access decisions. Kernel owns
 execution, artifacts and runtime usage/quota enforcement. Kernel supports guest
-quotas and Portal-delegated paid admission. Browser launch, usage delivery,
-paired local acceptance and build preparation remain ANY-766 work. Remote
+quotas and Portal-delegated paid admission. ANY-766 Step 8 implements recoverable
+paid browser launch. Usage delivery, paired local acceptance and build preparation
+remain ANY-766 work. Remote
 deployment/live acceptance belong to ANY-767. The
 [integration map](docs/integrations/payment-portal.md) records both repositories'
 actual state, implemented service directions and enablement dependencies.

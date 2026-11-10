@@ -40,7 +40,9 @@
     "startFailed": "{product} konnte nicht gestartet werden. Bitte versuchen Sie es erneut.",
     "timeout": "Das dauert länger als erwartet. Bitte versuchen Sie es erneut.",
     "connectionLost": "Die Verbindung ging beim Warten auf Ihr Ergebnis verloren. Bitte versuchen Sie es erneut.",
-    "tryAgain": "Bitte versuchen Sie es erneut."
+    "tryAgain": "Bitte versuchen Sie es erneut.",
+    "savedOperationPending": "Ein nicht abgeschlossener Vorgang ist gespeichert. Wähle „Erneut versuchen“, um die Seite neu zu laden und ihn fortzusetzen.",
+    "storageUnavailable": "Browserspeicher nicht verfügbar. Aktivieren Sie ihn und wiederholen Sie dieselbe Anfrage."
   },
   "result": {
     "copy": "Kopieren",
@@ -58,5 +60,14 @@
     "text": "Ihre Eingaben werden an unseren Dienst und an einen KI-Modellanbieter gesendet, um das Ergebnis zu erstellen, und zusammen mit Ihrem Durchlauf auf unseren Servern gespeichert. Ihr Entwurf wird in diesem Browser gehalten und kann verloren gehen, wenn Sie die Seite neu laden oder verlassen. Geben Sie keine Passwörter, Zugangscodes, API-Schlüssel oder vollständigen Zahlungskartendaten ein.",
     "policyLink": "Datenschutzerklärung",
     "opensInNewTab": "(öffnet sich in einem neuen Tab)"
+  },
+  "portalSession": {
+    "title": "Portal-Sitzung",
+    "required": "Melden Sie sich erneut an, um denselben Vorgang fortzusetzen.",
+    "continue": "Weiter mit dem Portal",
+    "loading": "Anmeldung…",
+    "failed": "Autorisierung fehlgeschlagen. Prüfen Sie den Browserspeicher und versuchen Sie es erneut.",
+    "retry": "Autorisierung wiederholen",
+    "signOut": "Diesen Tab abmelden"
   }
 }

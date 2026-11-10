@@ -40,7 +40,9 @@
     "startFailed": "Could not start {product}. Please try again.",
     "timeout": "This is taking longer than expected. Please try again.",
     "connectionLost": "Lost connection while waiting for your result. Please try again.",
-    "tryAgain": "Please try again."
+    "tryAgain": "Please try again.",
+    "savedOperationPending": "An unfinished operation is saved. Choose Try again to reload and continue it.",
+    "storageUnavailable": "Browser storage is unavailable. Enable it and retry the same request."
   },
   "result": {
     "copy": "Copy",
@@ -58,5 +60,14 @@
     "text": "What you enter is sent to our service and to an AI model provider to create the result, and is stored with your run on our servers. Your draft is kept in this browser and may be lost if you reload or leave the page. Do not enter passwords, access codes, API keys or full payment card details.",
     "policyLink": "Privacy policy",
     "opensInNewTab": "(opens in a new tab)"
+  },
+  "portalSession": {
+    "title": "Portal session",
+    "required": "Sign in again to continue the same operation.",
+    "continue": "Continue with Portal",
+    "loading": "Signing in…",
+    "failed": "Could not authorize this tab. Check browser storage and try again.",
+    "retry": "Try authorization again",
+    "signOut": "Sign out of this tab"
   }
 }

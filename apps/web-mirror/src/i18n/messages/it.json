@@ -40,7 +40,9 @@
     "startFailed": "Impossibile avviare {product}. Riprovi.",
     "timeout": "L’operazione richiede più tempo del previsto. Riprovi.",
     "connectionLost": "Connessione persa durante l’attesa del risultato. Riprovi.",
-    "tryAgain": "Riprovi."
+    "tryAgain": "Riprovi.",
+    "savedOperationPending": "È salvata un’operazione non completata. Scegli «Riprova» per ricaricare la pagina e continuarla.",
+    "storageUnavailable": "Spazio del browser non disponibile. Abilitalo e riprova la stessa richiesta."
   },
   "result": {
     "copy": "Copi",
@@ -58,5 +60,14 @@
     "text": "Ciò che inserisce viene inviato al nostro servizio e a un fornitore di modelli di IA per creare il risultato, e viene conservato insieme alla Sua esecuzione sui nostri server. La Sua bozza viene conservata in questo browser e potrebbe andare persa se ricarica o lascia la pagina. Non inserisca password, codici di accesso, chiavi API o dati completi di carte di pagamento.",
     "policyLink": "Informativa sulla privacy",
     "opensInNewTab": "(si apre in una nuova scheda)"
+  },
+  "portalSession": {
+    "title": "Sessione del Portale",
+    "required": "Accedi di nuovo per continuare la stessa operazione.",
+    "continue": "Continua con il Portale",
+    "loading": "Accesso…",
+    "failed": "Impossibile autorizzare la scheda. Controlla lo spazio del browser e riprova.",
+    "retry": "Riprova l’autorizzazione",
+    "signOut": "Esci da questa scheda"
   }
 }

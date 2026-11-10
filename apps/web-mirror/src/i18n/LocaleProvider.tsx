@@ -34,7 +34,7 @@ export function LocaleProvider({
   productMessages,
   children,
 }: {
-  productMessages: ProductMessagesByLocale;
+  productMessages?: ProductMessagesByLocale;
   children: ReactNode;
 }) {
   const [locale, setLocaleState] = useState<Locale>(DEFAULT_LOCALE);
@@ -94,7 +94,7 @@ export function LocaleProvider({
     // English underneath every locale: a key missing from a locale falls back to English.
     () => ({
       host: mergeMessages(HOST_MESSAGES[DEFAULT_LOCALE], HOST_MESSAGES[locale]),
-      product: mergeMessages(productMessages[DEFAULT_LOCALE], productMessages[locale]),
+      product: productMessages ? mergeMessages(productMessages[DEFAULT_LOCALE], productMessages[locale]) : {},
     }),
     [locale, productMessages],
   );
