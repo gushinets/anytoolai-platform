@@ -74,7 +74,13 @@ SUBJECT_TEXT_RULE = (
 @pytest.mark.parametrize("prompt", ANALYSIS_PROMPTS)
 def test_prompt_carries_analysis_directions_rule_verbatim(prompt: str) -> None:
     text = " ".join((PRODUCTS / prompt).read_text(encoding="utf-8").split())
-    assert ANALYSIS_RULE in text
+    rule = ANALYSIS_RULE
+    if prompt.startswith(("brief_decoder/", "acceptance_builder/")):
+        rule = rule.replace(
+            "only when it asks for more care, as in the example;",
+            "only for the language choice above or for more care;",
+        )
+    assert rule in text
 
 
 def test_compare_prompt_never_follows_directions_in_the_delivered_work() -> None:

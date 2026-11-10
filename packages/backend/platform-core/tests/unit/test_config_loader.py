@@ -578,12 +578,15 @@ def test_loader_preserves_provider_policy_yaml_metadata() -> None:
     assert policy.metadata["_file_path"].endswith("provider_policies.yaml")
 
 
-def test_default_text_generation_policy_has_no_duplicate_retry_key_in_yaml() -> None:
+@pytest.mark.parametrize("policy_ref", ["default_text_generation_v1", "sol_text_generation_v1"])
+def test_default_text_generation_policy_has_no_duplicate_retry_key_in_yaml(policy_ref) -> None:
     provider_policies_yaml = (CONFIG_ROOT / "provider_policies.yaml").read_text(encoding="utf-8")
     default_policy_start = provider_policies_yaml.index(
-        "  - provider_policy_ref: default_text_generation_v1"
+        f"  - provider_policy_ref: {policy_ref}"
     )
-    default_policy_block = provider_policies_yaml[default_policy_start:]
+    default_policy_block = provider_policies_yaml[default_policy_start:].split(
+        "\n  - provider_policy_ref:", 1
+    )[0]
 
     assert default_policy_block.count("litellm_num_retries_per_attempt:") == 1
 

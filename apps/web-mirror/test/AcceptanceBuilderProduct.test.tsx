@@ -67,12 +67,10 @@ function schema<T>(name: string): T {
 type Suffix = "" | ".weak_input";
 const draftOutput = (suffix: Suffix = "") => ({
   extracted: fixture("extract", suffix),
-  document: fixture("draft_document", suffix),
 });
 const checkOutput = (suffix: Suffix = "") => ({
   extracted: fixture("extract", suffix),
   comparison: fixture("compare", suffix),
-  document: fixture("check_document", suffix),
 });
 
 afterEach(() => {
@@ -101,7 +99,7 @@ describe("Acceptance Builder definitions", () => {
 
   it("copies the schemas' enums, delta order and text length limits (drift guard)", () => {
     const output = schema<CheckOutputSchema>("check_output.schema.json");
-    expect([...LIST_FIELDS]).toEqual(Object.keys(output.properties.extracted.properties.values.properties));
+    expect([...LIST_FIELDS]).toEqual(Object.keys(output.properties.extracted.properties.values.properties).filter((key) => key !== "analysis_language"));
     const { comparison } = output.properties;
     expect([...VERDICTS]).toEqual(comparison.properties.verdict.enum);
     expect(DELTA_CRITERIA.map((id) => `#/$defs/delta_${id}`)).toEqual(
@@ -240,7 +238,7 @@ describe("Acceptance Builder page", () => {
   it("draft: shows the structured copy text, copies exactly it, and never the narrative", async () => {
     const events: ProductRunEvent[] = [];
     const { calls } = await run("draft", draftOutput(), events);
-    await waitFor(() => expect(screen.getByText("Acceptance criteria")).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByText("Acceptance criteria")[0]).toBeTruthy());
 
     const expected = [
       "Acceptance criteria\n- A student who finishes a course automatically receives a PDF certificate\n- The certificate is issued for every existing course\n- The certificate uses the brand colors",
@@ -252,7 +250,7 @@ describe("Acceptance Builder page", () => {
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expected));
     await waitFor(() => expect(calls.some((c) => c.key.endsWith("/next-actions/copy_result"))).toBe(true));
 
-    const narrative = (draftOutput().document as { summary: string }).summary;
+    const narrative = (fixture("draft_document", "") as { summary: string }).summary;
     expect(expected).not.toContain(narrative);
     await waitFor(() => expect(events.find((e) => e.type === "scenario_completed")).toMatchObject({ resultViewed: true }));
   });
@@ -279,7 +277,7 @@ describe("Acceptance Builder page", () => {
     expect(resultText()).not.toMatch(/went wrong/i);
   });
 
-  it("keeps the contract's English copy text whatever the UI locale", () => {
+  it("keeps English analysis output in English when UI locale differs", () => {
     window.localStorage.setItem(LOCALE_STORAGE_KEY, "fr");
     const result = extractDraftResult(draftOutput())!;
     render(<AcceptanceBuilderResultView result={result} onCopy={() => Promise.resolve(true)} />);

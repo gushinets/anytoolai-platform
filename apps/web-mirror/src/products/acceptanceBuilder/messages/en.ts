@@ -33,6 +33,6 @@ export const en = {
   },
   result: {
     verdictScope: "The verdict is judged on four general review criteria, not item by item on the criteria listed below.",
-    recap: "Narrative recap (display only, not copied)",
+    recap: "Structured recap",
   },
 };

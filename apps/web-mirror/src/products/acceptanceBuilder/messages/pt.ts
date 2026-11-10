@@ -36,6 +36,6 @@ export const pt: Shape<typeof en> = {
   },
   result: {
     verdictScope: "O veredito se baseia em quatro critérios gerais de revisão, não item a item nos critérios listados abaixo.",
-    recap: "Resumo narrativo (somente exibição, não copiado)",
+    recap: "Resumo estruturado",
   },
 };

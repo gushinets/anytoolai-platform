@@ -17,6 +17,7 @@ Canonical source: configs/kernel via ConfigLoader.
 |---|---|---|---|---|---|---|---|---|
 | default_fake_provider_v1 | fake | fake-json-v1 | 0.0 | 30 | hard_limits.max_physical_provider_calls_per_action=1, transport.litellm_num_retries_per_attempt=0, transport.max_attempts=1, transport.owner=fake_adapter, validation.max_attempts=1, validation.owner=pydanticai | none | json_schema | 1 |
 | default_text_generation_v1 | litellm | anytoolai.default_text | 1.0 | 60 | hard_limits.max_physical_provider_calls_per_action=4, transport.litellm_num_retries_per_attempt=0, transport.max_attempts=2, transport.owner=litellm, validation.max_attempts=2, validation.owner=pydanticai | none | json_schema | 1 |
+| sol_text_generation_v1 | litellm | anytoolai.sol_text | 1.0 | 60 | hard_limits.max_physical_provider_calls_per_action=4, transport.litellm_num_retries_per_attempt=0, transport.max_attempts=2, transport.owner=litellm, validation.max_attempts=2, validation.owner=pydanticai | none | json_schema | 1 |
 
 ## Action definitions
 

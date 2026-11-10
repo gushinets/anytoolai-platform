@@ -659,8 +659,7 @@ describe("attach props through the shell and the registry", () => {
   it("reach a registered product: the queued session is polled, shown and reported (begin), with no start request", async () => {
     const ids = routesFor(AB_IDS);
     const output = {
-      extracted: { values: { acceptance_criteria: ["Students get a PDF"] }, missing_fields: ["assumptions", "deliverables"] },
-      document: { sections: [], summary: "Recap" },
+      extracted: { values: { acceptance_criteria: ["Students get a PDF"], analysis_language: "en" }, missing_fields: ["assumptions", "deliverables"] },
     };
     const { client, calls } = makeClientCapturingRequests({
       [ids.RUNTIME_CONFIG]: [runtimeConfigResponse(AB_IDS)],

@@ -1,0 +1,845 @@
+{
+  "ANY761-BD-RU-basic": {
+    "brief_text": "Нужна статья для блога о ремонте кухни в старом доме: как составить список работ и подготовиться к разговору с мастером. Объём 6–8 тысяч знаков, аудитория — владельцы квартир без строительного опыта. Нужны понятные подзаголовки и список вопросов к мастеру. Расчёт несущих конструкций, юридические советы и обещание фиксированной цены ремонта исключены. Текст должен быть оригинальным, без скрытой рекламы. Источники с техническими фактами нужно указать ссылками. Бюджет и дата сдачи пока не согласованы.",
+    "brief": {
+      "values": {
+        "project_goal": "Подготовить читателя к планированию ремонта кухни и разговору с мастером",
+        "target_audience": "Владельцы квартир без строительного опыта",
+        "deliverables": [
+          "Статья о ремонте кухни в старом доме",
+          "Список вопросов к мастеру"
+        ],
+        "constraints": [
+          "Объём 6–8 тысяч знаков",
+          "Понятные подзаголовки",
+          "Без расчёта несущих конструкций, юридических советов и обещания фиксированной цены ремонта",
+          "Оригинальный текст без скрытой рекламы",
+          "Ссылки на источники технических фактов"
+        ]
+      },
+      "missing_fields": [
+        "deadline",
+        "budget"
+      ],
+      "confidence": {
+        "project_goal": 0.95,
+        "target_audience": 0.95,
+        "deliverables": 0.95,
+        "constraints": 0.95
+      }
+    },
+    "issues": [
+      {
+        "category": "budget_risk",
+        "description": "Бюджет не согласован, поэтому оплату необходимо уточнить до начала работы.",
+        "severity": "high"
+      },
+      {
+        "category": "timeline_risk",
+        "description": "Дата сдачи не согласована, поэтому срок выполнения необходимо уточнить.",
+        "severity": "high"
+      }
+    ],
+    "questions": [
+      {
+        "question": "Какой бюджет согласован на статью?",
+        "rationale": "Ответ позволит согласовать оплату работы.",
+        "priority": "high",
+        "category": "budget_risk",
+        "source_issue_index": 0
+      },
+      {
+        "question": "К какой дате нужно сдать статью?",
+        "rationale": "Ответ позволит составить график работы.",
+        "priority": "high",
+        "category": "timeline_risk",
+        "source_issue_index": 1
+      }
+    ],
+    "document": {
+      "summary": "Бриф пока не готов к началу работы: сначала согласуйте бюджет и дату сдачи.",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Project overview",
+          "content": "Подготовить читателя к планированию ремонта кухни и разговору с мастером. Владельцы квартир без строительного опыта."
+        },
+        {
+          "id": "key-details",
+          "title": "Key details",
+          "content": "- Статья о ремонте кухни в старом доме\n- Список вопросов к мастеру\n- Объём 6–8 тысяч знаков\n- Понятные подзаголовки\n- Без расчёта несущих конструкций, юридических советов и обещания фиксированной цены ремонта\n- Оригинальный текст без скрытой рекламы\n- Ссылки на источники технических фактов",
+          "metadata": {
+            "kind": "list"
+          }
+        },
+        {
+          "id": "gaps",
+          "title": "Gaps and risks",
+          "content": "Бюджет не согласован, поэтому оплату необходимо уточнить до начала работы. Дата сдачи не согласована, поэтому срок выполнения необходимо уточнить."
+        },
+        {
+          "id": "next-steps",
+          "title": "Questions to ask",
+          "content": "- Какой бюджет согласован на статью?\n- К какой дате нужно сдать статью?",
+          "metadata": {
+            "kind": "list"
+          }
+        }
+      ]
+    }
+  },
+  "ANY761-AB-D-RU-basic": {
+    "extracted": {
+      "values": {
+        "acceptance_criteria": [
+          "PDF и JSON содержат точную строку \"Ready to ship\"",
+          "Срок: 15 ноября",
+          "Бюджет: 500 EUR"
+        ],
+        "assumptions": [
+          "Исходные данные уже предоставлены"
+        ],
+        "deliverables": [
+          "PDF для Acme",
+          "JSON для Acme"
+        ],
+        "analysis_language": "ru"
+      },
+      "missing_fields": [],
+      "confidence": {
+        "acceptance_criteria": 0.95,
+        "assumptions": 0.95,
+        "deliverables": 0.95
+      }
+    }
+  },
+  "ANY761-AB-C-RU-basic": {
+    "extracted": {
+      "values": {
+        "acceptance_criteria": [
+          "PDF и JSON содержат точную строку \"Ready to ship\"",
+          "Срок: 15 ноября",
+          "Бюджет: 500 EUR"
+        ],
+        "assumptions": [
+          "Исходные данные уже предоставлены"
+        ],
+        "deliverables": [
+          "PDF для Acme",
+          "JSON для Acme"
+        ],
+        "analysis_language": "ru"
+      },
+      "missing_fields": [],
+      "confidence": {
+        "acceptance_criteria": 0.95,
+        "assumptions": 0.95,
+        "deliverables": 0.95
+      }
+    },
+    "comparison": {
+      "verdict": "does_not_meet",
+      "confidence": 0.95,
+      "deltas": [
+        {
+          "criterion_id": "scope_coverage",
+          "status": "partial",
+          "evidence": "Предоставлен только PDF; JSON отсутствует."
+        },
+        {
+          "criterion_id": "requirement_fit",
+          "status": "partial",
+          "evidence": "В PDF есть строка \"Ready to ship\"; наличие строки в JSON не подтверждено."
+        },
+        {
+          "criterion_id": "completeness",
+          "status": "mismatch",
+          "evidence": "Из двух файлов предоставлен только PDF."
+        },
+        {
+          "criterion_id": "clarity",
+          "status": "match",
+          "evidence": "Прямо указано, что PDF предоставлен, а JSON отсутствует."
+        }
+      ],
+      "rationale": "Работа не соответствует ожиданиям: обязательный файл JSON не предоставлен."
+    }
+  },
+  "ANY761-BD-EN-basic": {
+    "brief_text": "We need a blog article about renovating a kitchen in an old house: how to list the work and prepare to talk to a contractor. Length: 6–8 thousand characters; audience: apartment owners without construction experience. Include clear subheadings and a list of questions for the contractor. Exclude load-bearing calculations, legal advice and promises of a fixed renovation price. The text must be original, without hidden advertising. Link sources for technical facts. The budget and delivery date have not yet been agreed.",
+    "brief": {
+      "values": {
+        "project_goal": "Prepare readers to plan a kitchen renovation and talk to a contractor",
+        "target_audience": "Apartment owners without construction experience",
+        "deliverables": [
+          "Article about renovating a kitchen in an old house",
+          "List of questions for the contractor"
+        ],
+        "constraints": [
+          "Length: 6–8 thousand characters",
+          "Clear subheadings",
+          "No load-bearing calculations, legal advice or promises of a fixed renovation price",
+          "Original text without hidden advertising",
+          "Links to sources for technical facts"
+        ]
+      },
+      "missing_fields": [
+        "deadline",
+        "budget"
+      ],
+      "confidence": {
+        "project_goal": 0.95,
+        "target_audience": 0.95,
+        "deliverables": 0.95,
+        "constraints": 0.95
+      }
+    },
+    "issues": [
+      {
+        "category": "budget_risk",
+        "description": "The budget has not been agreed, so compensation must be clarified before work starts.",
+        "severity": "high"
+      },
+      {
+        "category": "timeline_risk",
+        "description": "The delivery date has not been agreed, so the deadline must be clarified.",
+        "severity": "high"
+      }
+    ],
+    "questions": [
+      {
+        "question": "What budget has been agreed for the article?",
+        "rationale": "The answer will establish compensation for the work.",
+        "priority": "high",
+        "category": "budget_risk",
+        "source_issue_index": 0
+      },
+      {
+        "question": "On what date must the article be delivered?",
+        "rationale": "The answer will allow the work to be scheduled.",
+        "priority": "high",
+        "category": "timeline_risk",
+        "source_issue_index": 1
+      }
+    ],
+    "document": {
+      "summary": "The brief is not ready to start work: agree the budget and delivery date first.",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Project overview",
+          "content": "Prepare readers to plan a kitchen renovation and talk to a contractor. Apartment owners without construction experience."
+        },
+        {
+          "id": "key-details",
+          "title": "Key details",
+          "content": "- Article about renovating a kitchen in an old house\n- List of questions for the contractor\n- Length: 6–8 thousand characters\n- Clear subheadings\n- No load-bearing calculations, legal advice or promises of a fixed renovation price\n- Original text without hidden advertising\n- Links to sources for technical facts",
+          "metadata": {
+            "kind": "list"
+          }
+        },
+        {
+          "id": "gaps",
+          "title": "Gaps and risks",
+          "content": "The budget has not been agreed, so compensation must be clarified before work starts. The delivery date has not been agreed, so the deadline must be clarified."
+        },
+        {
+          "id": "next-steps",
+          "title": "Questions to ask",
+          "content": "- What budget has been agreed for the article?\n- On what date must the article be delivered?",
+          "metadata": {
+            "kind": "list"
+          }
+        }
+      ]
+    }
+  },
+  "ANY761-AB-D-EN-basic": {
+    "extracted": {
+      "values": {
+        "acceptance_criteria": [
+          "PDF and JSON contain the exact string \"Ready to ship\"",
+          "Deadline: November 15",
+          "Budget: 500 EUR"
+        ],
+        "assumptions": [
+          "The source data has already been provided"
+        ],
+        "deliverables": [
+          "PDF for Acme",
+          "JSON for Acme"
+        ],
+        "analysis_language": "en"
+      },
+      "missing_fields": [],
+      "confidence": {
+        "acceptance_criteria": 0.95,
+        "assumptions": 0.95,
+        "deliverables": 0.95
+      }
+    }
+  },
+  "ANY761-AB-C-EN-basic": {
+    "extracted": {
+      "values": {
+        "acceptance_criteria": [
+          "PDF and JSON contain the exact string \"Ready to ship\"",
+          "Deadline: November 15",
+          "Budget: 500 EUR"
+        ],
+        "assumptions": [
+          "The source data has already been provided"
+        ],
+        "deliverables": [
+          "PDF for Acme",
+          "JSON for Acme"
+        ],
+        "analysis_language": "en"
+      },
+      "missing_fields": [],
+      "confidence": {
+        "acceptance_criteria": 0.95,
+        "assumptions": 0.95,
+        "deliverables": 0.95
+      }
+    },
+    "comparison": {
+      "verdict": "does_not_meet",
+      "confidence": 0.95,
+      "deltas": [
+        {
+          "criterion_id": "scope_coverage",
+          "status": "partial",
+          "evidence": "Only the PDF was delivered; JSON is missing."
+        },
+        {
+          "criterion_id": "requirement_fit",
+          "status": "partial",
+          "evidence": "The PDF contains \"Ready to ship\"; the string cannot be verified in JSON."
+        },
+        {
+          "criterion_id": "completeness",
+          "status": "mismatch",
+          "evidence": "Only the PDF of the two required files was delivered."
+        },
+        {
+          "criterion_id": "clarity",
+          "status": "match",
+          "evidence": "The text clearly states that PDF was delivered and JSON is missing."
+        }
+      ],
+      "rationale": "The work does not meet expectations: the required JSON file has not been delivered."
+    }
+  },
+  "ANY761-BD-ES-basic": {
+    "brief_text": "Necesitamos un artículo de blog sobre la reforma de una cocina en una casa antigua: cómo hacer una lista de trabajos y prepararse para hablar con el contratista. Extensión: 6–8 mil caracteres; público: propietarios de pisos sin experiencia en construcción. Debe incluir subtítulos claros y una lista de preguntas para el contratista. Se excluyen cálculos de estructuras portantes, asesoramiento jurídico y promesas de un precio fijo de reforma. El texto debe ser original y sin publicidad encubierta. Hay que enlazar las fuentes de los datos técnicos. El presupuesto y la fecha de entrega aún no se han acordado.",
+    "brief": {
+      "values": {
+        "project_goal": "Preparar al lector para planificar la reforma de la cocina y hablar con el contratista",
+        "target_audience": "Propietarios de pisos sin experiencia en construcción",
+        "deliverables": [
+          "Artículo sobre la reforma de una cocina en una casa antigua",
+          "Lista de preguntas para el contratista"
+        ],
+        "constraints": [
+          "Extensión: 6–8 mil caracteres",
+          "Subtítulos claros",
+          "Sin cálculos de estructuras portantes, asesoramiento jurídico ni promesas de precio fijo",
+          "Texto original sin publicidad encubierta",
+          "Enlaces a las fuentes de datos técnicos"
+        ]
+      },
+      "missing_fields": [
+        "deadline",
+        "budget"
+      ],
+      "confidence": {
+        "project_goal": 0.95,
+        "target_audience": 0.95,
+        "deliverables": 0.95,
+        "constraints": 0.95
+      }
+    },
+    "issues": [
+      {
+        "category": "budget_risk",
+        "description": "El presupuesto no se ha acordado, por lo que hay que aclarar la remuneración antes de empezar.",
+        "severity": "high"
+      },
+      {
+        "category": "timeline_risk",
+        "description": "La fecha de entrega no se ha acordado, por lo que hay que aclarar el plazo.",
+        "severity": "high"
+      }
+    ],
+    "questions": [
+      {
+        "question": "¿Qué presupuesto se ha acordado para el artículo?",
+        "rationale": "La respuesta permitirá acordar la remuneración del trabajo.",
+        "priority": "high",
+        "category": "budget_risk",
+        "source_issue_index": 0
+      },
+      {
+        "question": "¿En qué fecha se debe entregar el artículo?",
+        "rationale": "La respuesta permitirá planificar el trabajo.",
+        "priority": "high",
+        "category": "timeline_risk",
+        "source_issue_index": 1
+      }
+    ],
+    "document": {
+      "summary": "El encargo aún no está listo para empezar: primero hay que acordar el presupuesto y la fecha de entrega.",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Project overview",
+          "content": "Preparar al lector para planificar la reforma de la cocina y hablar con el contratista. Propietarios de pisos sin experiencia en construcción."
+        },
+        {
+          "id": "key-details",
+          "title": "Key details",
+          "content": "- Artículo sobre la reforma de una cocina en una casa antigua\n- Lista de preguntas para el contratista\n- Extensión: 6–8 mil caracteres\n- Subtítulos claros\n- Sin cálculos de estructuras portantes, asesoramiento jurídico ni promesas de precio fijo\n- Texto original sin publicidad encubierta\n- Enlaces a las fuentes de datos técnicos",
+          "metadata": {
+            "kind": "list"
+          }
+        },
+        {
+          "id": "gaps",
+          "title": "Gaps and risks",
+          "content": "El presupuesto no se ha acordado, por lo que hay que aclarar la remuneración antes de empezar. La fecha de entrega no se ha acordado, por lo que hay que aclarar el plazo."
+        },
+        {
+          "id": "next-steps",
+          "title": "Questions to ask",
+          "content": "- ¿Qué presupuesto se ha acordado para el artículo?\n- ¿En qué fecha se debe entregar el artículo?",
+          "metadata": {
+            "kind": "list"
+          }
+        }
+      ]
+    }
+  },
+  "ANY761-AB-D-ES-basic": {
+    "extracted": {
+      "values": {
+        "acceptance_criteria": [
+          "PDF y JSON contienen la cadena exacta \"Ready to ship\"",
+          "Plazo: 15 de noviembre",
+          "Presupuesto: 500 EUR"
+        ],
+        "assumptions": [
+          "Los datos de origen ya se han proporcionado"
+        ],
+        "deliverables": [
+          "PDF para Acme",
+          "JSON para Acme"
+        ],
+        "analysis_language": "es"
+      },
+      "missing_fields": [],
+      "confidence": {
+        "acceptance_criteria": 0.95,
+        "assumptions": 0.95,
+        "deliverables": 0.95
+      }
+    }
+  },
+  "ANY761-AB-C-ES-basic": {
+    "extracted": {
+      "values": {
+        "acceptance_criteria": [
+          "PDF y JSON contienen la cadena exacta \"Ready to ship\"",
+          "Plazo: 15 de noviembre",
+          "Presupuesto: 500 EUR"
+        ],
+        "assumptions": [
+          "Los datos de origen ya se han proporcionado"
+        ],
+        "deliverables": [
+          "PDF para Acme",
+          "JSON para Acme"
+        ],
+        "analysis_language": "es"
+      },
+      "missing_fields": [],
+      "confidence": {
+        "acceptance_criteria": 0.95,
+        "assumptions": 0.95,
+        "deliverables": 0.95
+      }
+    },
+    "comparison": {
+      "verdict": "does_not_meet",
+      "confidence": 0.95,
+      "deltas": [
+        {
+          "criterion_id": "scope_coverage",
+          "status": "partial",
+          "evidence": "Solo se ha entregado el PDF; falta el JSON."
+        },
+        {
+          "criterion_id": "requirement_fit",
+          "status": "partial",
+          "evidence": "El PDF contiene \"Ready to ship\"; no se puede comprobar la cadena en el JSON."
+        },
+        {
+          "criterion_id": "completeness",
+          "status": "mismatch",
+          "evidence": "De los dos archivos requeridos solo se ha entregado el PDF."
+        },
+        {
+          "criterion_id": "clarity",
+          "status": "match",
+          "evidence": "El texto indica claramente que se entregó el PDF y falta el JSON."
+        }
+      ],
+      "rationale": "El trabajo no cumple las expectativas: no se ha entregado el archivo JSON requerido."
+    }
+  },
+  "ANY761-BD-RU-weak": {
+    "brief_text": "Нужно что-нибудь хорошее.",
+    "brief": {
+      "values": {},
+      "missing_fields": [
+        "project_goal",
+        "deliverables",
+        "deadline",
+        "budget",
+        "target_audience",
+        "constraints"
+      ],
+      "confidence": {}
+    },
+    "issues": [
+      {
+        "category": "missing_information",
+        "description": "Не указаны цель проекта, результаты работы, срок, бюджет, целевая аудитория и ограничения.",
+        "severity": "high"
+      }
+    ],
+    "questions": [
+      {
+        "question": "Какую задачу нужно решить и какой результат вы хотите получить?",
+        "rationale": "Ответ позволит определить содержание проекта.",
+        "priority": "high",
+        "category": "missing_information",
+        "source_issue_index": 0
+      }
+    ],
+    "document": {
+      "summary": "Не указаны цель проекта, результаты работы, срок, бюджет, целевая аудитория и ограничения. Какую задачу нужно решить и какой результат вы хотите получить?",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Project overview",
+          "content": "Цель проекта и целевая аудитория не указаны."
+        },
+        {
+          "id": "key-details",
+          "title": "Key details",
+          "content": "Конкретные результаты работы, сроки, бюджет и ограничения не указаны.",
+          "metadata": {
+            "kind": "list"
+          }
+        },
+        {
+          "id": "gaps",
+          "title": "Gaps and risks",
+          "content": "Не указаны цель проекта, результаты работы, срок, бюджет, целевая аудитория и ограничения."
+        },
+        {
+          "id": "next-steps",
+          "title": "Questions to ask",
+          "content": "Какую задачу нужно решить и какой результат вы хотите получить?",
+          "metadata": {
+            "kind": "list"
+          }
+        }
+      ]
+    }
+  },
+  "ANY761-AB-D-RU-weak": {
+    "extracted": {
+      "values": {
+        "analysis_language": "ru"
+      },
+      "missing_fields": [
+        "acceptance_criteria",
+        "assumptions",
+        "deliverables"
+      ],
+      "confidence": {}
+    }
+  },
+  "ANY761-AB-C-RU-weak": {
+    "extracted": {
+      "values": {
+        "analysis_language": "ru"
+      },
+      "missing_fields": [
+        "acceptance_criteria",
+        "assumptions",
+        "deliverables"
+      ],
+      "confidence": {}
+    },
+    "comparison": {
+      "verdict": "does_not_meet",
+      "confidence": 0.2,
+      "deltas": [
+        {
+          "criterion_id": "scope_coverage",
+          "status": "mismatch",
+          "evidence": "Из описания невозможно установить соответствие: конкретные требования и результаты не указаны."
+        },
+        {
+          "criterion_id": "requirement_fit",
+          "status": "mismatch",
+          "evidence": "Из описания невозможно установить соответствие: конкретные требования и результаты не указаны."
+        },
+        {
+          "criterion_id": "completeness",
+          "status": "mismatch",
+          "evidence": "Из описания невозможно установить соответствие: конкретные требования и результаты не указаны."
+        },
+        {
+          "criterion_id": "clarity",
+          "status": "mismatch",
+          "evidence": "Из описания невозможно установить соответствие: конкретные требования и результаты не указаны."
+        }
+      ],
+      "rationale": "Из описания невозможно установить соответствие: конкретные требования и результаты не указаны."
+    }
+  },
+  "ANY761-BD-EN-weak": {
+    "brief_text": "Need something good.",
+    "brief": {
+      "values": {},
+      "missing_fields": [
+        "project_goal",
+        "deliverables",
+        "deadline",
+        "budget",
+        "target_audience",
+        "constraints"
+      ],
+      "confidence": {}
+    },
+    "issues": [
+      {
+        "category": "missing_information",
+        "description": "The project goal, deliverables, deadline, budget, target audience and constraints are not specified.",
+        "severity": "high"
+      }
+    ],
+    "questions": [
+      {
+        "question": "What problem should be solved and what result do you want?",
+        "rationale": "The answer will establish the project scope.",
+        "priority": "high",
+        "category": "missing_information",
+        "source_issue_index": 0
+      }
+    ],
+    "document": {
+      "summary": "The project goal, deliverables, deadline, budget, target audience and constraints are not specified. What problem should be solved and what result do you want?",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Project overview",
+          "content": "The project goal and target audience are not specified."
+        },
+        {
+          "id": "key-details",
+          "title": "Key details",
+          "content": "Concrete deliverables, deadline, budget and constraints are not specified.",
+          "metadata": {
+            "kind": "list"
+          }
+        },
+        {
+          "id": "gaps",
+          "title": "Gaps and risks",
+          "content": "The project goal, deliverables, deadline, budget, target audience and constraints are not specified."
+        },
+        {
+          "id": "next-steps",
+          "title": "Questions to ask",
+          "content": "What problem should be solved and what result do you want?",
+          "metadata": {
+            "kind": "list"
+          }
+        }
+      ]
+    }
+  },
+  "ANY761-AB-D-EN-weak": {
+    "extracted": {
+      "values": {
+        "analysis_language": "en"
+      },
+      "missing_fields": [
+        "acceptance_criteria",
+        "assumptions",
+        "deliverables"
+      ],
+      "confidence": {}
+    }
+  },
+  "ANY761-AB-C-EN-weak": {
+    "extracted": {
+      "values": {
+        "analysis_language": "en"
+      },
+      "missing_fields": [
+        "acceptance_criteria",
+        "assumptions",
+        "deliverables"
+      ],
+      "confidence": {}
+    },
+    "comparison": {
+      "verdict": "does_not_meet",
+      "confidence": 0.2,
+      "deltas": [
+        {
+          "criterion_id": "scope_coverage",
+          "status": "mismatch",
+          "evidence": "Compliance cannot be established: concrete requirements and deliverables are not specified."
+        },
+        {
+          "criterion_id": "requirement_fit",
+          "status": "mismatch",
+          "evidence": "Compliance cannot be established: concrete requirements and deliverables are not specified."
+        },
+        {
+          "criterion_id": "completeness",
+          "status": "mismatch",
+          "evidence": "Compliance cannot be established: concrete requirements and deliverables are not specified."
+        },
+        {
+          "criterion_id": "clarity",
+          "status": "mismatch",
+          "evidence": "Compliance cannot be established: concrete requirements and deliverables are not specified."
+        }
+      ],
+      "rationale": "Compliance cannot be established: concrete requirements and deliverables are not specified."
+    }
+  },
+  "ANY761-BD-ES-weak": {
+    "brief_text": "Necesito algo bueno.",
+    "brief": {
+      "values": {},
+      "missing_fields": [
+        "project_goal",
+        "deliverables",
+        "deadline",
+        "budget",
+        "target_audience",
+        "constraints"
+      ],
+      "confidence": {}
+    },
+    "issues": [
+      {
+        "category": "missing_information",
+        "description": "No se indican el objetivo, los entregables, el plazo, el presupuesto, el público destinatario ni las restricciones.",
+        "severity": "high"
+      }
+    ],
+    "questions": [
+      {
+        "question": "¿Qué problema hay que resolver y qué resultado desea obtener?",
+        "rationale": "La respuesta permitirá definir el alcance del proyecto.",
+        "priority": "high",
+        "category": "missing_information",
+        "source_issue_index": 0
+      }
+    ],
+    "document": {
+      "summary": "No se indican el objetivo, los entregables, el plazo, el presupuesto, el público destinatario ni las restricciones. ¿Qué problema hay que resolver y qué resultado desea obtener?",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Project overview",
+          "content": "No se indican el objetivo del proyecto ni el público destinatario."
+        },
+        {
+          "id": "key-details",
+          "title": "Key details",
+          "content": "No se indican entregables concretos, plazo, presupuesto ni restricciones.",
+          "metadata": {
+            "kind": "list"
+          }
+        },
+        {
+          "id": "gaps",
+          "title": "Gaps and risks",
+          "content": "No se indican el objetivo, los entregables, el plazo, el presupuesto, el público destinatario ni las restricciones."
+        },
+        {
+          "id": "next-steps",
+          "title": "Questions to ask",
+          "content": "¿Qué problema hay que resolver y qué resultado desea obtener?",
+          "metadata": {
+            "kind": "list"
+          }
+        }
+      ]
+    }
+  },
+  "ANY761-AB-D-ES-weak": {
+    "extracted": {
+      "values": {
+        "analysis_language": "es"
+      },
+      "missing_fields": [
+        "acceptance_criteria",
+        "assumptions",
+        "deliverables"
+      ],
+      "confidence": {}
+    }
+  },
+  "ANY761-AB-C-ES-weak": {
+    "extracted": {
+      "values": {
+        "analysis_language": "es"
+      },
+      "missing_fields": [
+        "acceptance_criteria",
+        "assumptions",
+        "deliverables"
+      ],
+      "confidence": {}
+    },
+    "comparison": {
+      "verdict": "does_not_meet",
+      "confidence": 0.2,
+      "deltas": [
+        {
+          "criterion_id": "scope_coverage",
+          "status": "mismatch",
+          "evidence": "No se puede establecer el cumplimiento: no se indican requisitos ni entregables concretos."
+        },
+        {
+          "criterion_id": "requirement_fit",
+          "status": "mismatch",
+          "evidence": "No se puede establecer el cumplimiento: no se indican requisitos ni entregables concretos."
+        },
+        {
+          "criterion_id": "completeness",
+          "status": "mismatch",
+          "evidence": "No se puede establecer el cumplimiento: no se indican requisitos ni entregables concretos."
+        },
+        {
+          "criterion_id": "clarity",
+          "status": "mismatch",
+          "evidence": "No se puede establecer el cumplimiento: no se indican requisitos ni entregables concretos."
+        }
+      ],
+      "rationale": "No se puede establecer el cumplimiento: no se indican requisitos ni entregables concretos."
+    }
+  }
+}

@@ -1,8 +1,8 @@
 """ANY-228 quick-check-covered evidence for the acceptance_builder product bundle.
 
 1. The product loads through anytoolai_platform_api.bootstrap.build_runtime()'s real default
-   bundle set, with exact per-scenario action-type sequences (A01 -> A10 for draft_v1,
-   A01 -> A11 -> A10 for check_v1).
+   bundle set, with exact per-scenario action-type sequences (A01 for draft_v1,
+   A01 -> A11 for check_v1).
 2. Its input and composed-output schemas are non-permissive.
 3. A real scenario start + one worker pass runs every step against the fake provider and the
    composed artifact equals the deterministic fixtures -- happy path and weak input, per scenario
@@ -15,6 +15,7 @@ apps/platform-api/tests/conftest.py, shared with the other product bundle tests.
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 from http import HTTPStatus
 from pathlib import Path
@@ -33,6 +34,7 @@ from anytoolai_platform_core.structured_output.schemas import normalize_schema_m
 from anytoolai_platform_core.workflows.models import JobStatus
 from anytoolai_platform_worker.composition import build_worker
 
+from tests.support.brief_language import CANONICAL, golden_cases, write_provider_fixtures
 from tests.support.fake_provider_recording import RecordingProviderAdapter
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -44,18 +46,15 @@ DRAFT = "acceptance_builder.draft_v1"
 CHECK = "acceptance_builder.check_v1"
 EXTRACT = "acceptance_builder.extract_v1"
 COMPARE = "acceptance_builder.compare_v1"
-DRAFT_DOCUMENT = "acceptance_builder.draft_document_v1"
-CHECK_DOCUMENT = "acceptance_builder.check_document_v1"
 STEPS = {
-    DRAFT: (EXTRACT, DRAFT_DOCUMENT),
-    CHECK: (EXTRACT, COMPARE, CHECK_DOCUMENT),
+    DRAFT: (EXTRACT,),
+    CHECK: (EXTRACT, COMPARE),
 }
 ACTION_TYPES = {
-    DRAFT: ("text.extract_structured_fields", "document.generate_from_template"),
+    DRAFT: ("text.extract_structured_fields",),
     CHECK: (
         "text.extract_structured_fields",
         "text.compare_and_classify",
-        "document.generate_from_template",
     ),
 }
 INPUT_SCHEMA_REFS = {
@@ -89,13 +88,10 @@ def _fixture(key: str) -> dict[str, Any]:
 
 def _expected_output(scenario_id: str, suffix: str = "") -> dict[str, Any]:
     """The composed workflow output the fixtures must produce: extracted = A01 output whole,
-    comparison = A11 output whole (check_v1 only), document = A10."""
+    comparison = A11 output whole (check_v1 only)."""
     output: dict[str, Any] = {"extracted": _fixture(EXTRACT + suffix)}
     if scenario_id == CHECK:
         output["comparison"] = _fixture(COMPARE + suffix)
-        output["document"] = _fixture(CHECK_DOCUMENT + suffix)
-    else:
-        output["document"] = _fixture(DRAFT_DOCUMENT + suffix)
     return output
 
 
@@ -175,13 +171,9 @@ def _mutated(valid: dict[str, Any], mutate: Any) -> dict[str, Any]:
 def _shared_invalid_outputs(valid: dict[str, Any]) -> dict[str, dict[str, Any]]:
     """Mutations that must be rejected by both output schemas."""
 
-    def swap_first_two_sections(o: dict[str, Any]) -> None:
-        sections = o["document"]["sections"]
-        sections[0], sections[1] = sections[1], sections[0]
-
     return {
         "unknown_top_level_key": _mutated(valid, lambda o: o.update(extra=1)),
-        "missing_document": _mutated(valid, lambda o: o.pop("document")),
+        "independent_document": _mutated(valid, lambda o: o.update(document={"summary": "false"})),
         "missing_extracted": _mutated(valid, lambda o: o.pop("extracted")),
         "unknown_extracted_value": _mutated(
             valid, lambda o: o["extracted"]["values"].update(invented=["x"])
@@ -219,12 +211,6 @@ def _shared_invalid_outputs(valid: dict[str, Any]) -> dict[str, dict[str, Any]]:
                 o["extracted"]["confidence"].update(assumptions=0.5),
             ),
         ),
-        "document_section_with_arbitrary_id": _mutated(
-            valid, lambda o: o["document"]["sections"][0].update(id="random", title="Random")
-        ),
-        "document_missing_a_section": _mutated(valid, lambda o: o["document"]["sections"].pop()),
-        "document_sections_reordered": _mutated(valid, swap_first_two_sections),
-        "empty_summary": _mutated(valid, lambda o: o["document"].update(summary=" ")),
     }
 
 
@@ -237,15 +223,6 @@ def test_output_schema_accepts_the_fixtures_and_rejects_open_shapes(scenario_id:
 
     valid = _expected_output(scenario_id)
     invalid = _shared_invalid_outputs(valid)
-    # The list sections must carry metadata.kind = list (the prompts require it).
-    list_section = 1 if scenario_id == CHECK else 0
-    invalid["list_section_missing_metadata"] = _mutated(
-        valid, lambda o: o["document"]["sections"][list_section].pop("metadata")
-    )
-    invalid["list_section_wrong_kind"] = _mutated(
-        valid,
-        lambda o: o["document"]["sections"][list_section].update(metadata={"kind": "table"}),
-    )
     if scenario_id == CHECK:
         invalid.update(_comparison_mutations(valid))
     for name, candidate in invalid.items():
@@ -267,7 +244,9 @@ def _comparison_mutations(valid: dict[str, Any]) -> dict[str, dict[str, Any]]:
             valid, lambda o: o["comparison"].update(verdict="meets_bar")
         ),
         "confidence_out_of_range": _mutated(valid, lambda o: o["comparison"].update(confidence=2)),
-        "rationale_too_long": _mutated(valid, lambda o: o["comparison"].update(rationale="x" * 501)),
+        "rationale_too_long": _mutated(
+            valid, lambda o: o["comparison"].update(rationale="x" * 501)
+        ),
         "missing_a_delta": _mutated(valid, lambda o: o["comparison"]["deltas"].pop()),
         "extra_delta": _mutated(
             valid, lambda o: o["comparison"]["deltas"].append(o["comparison"]["deltas"][0])
@@ -305,24 +284,12 @@ def _comparison_mutations(valid: dict[str, Any]) -> dict[str, dict[str, Any]]:
     }
 
 
-_VERDICT_PHRASES = {
-    "meets_expectations": "meets expectations",
-    "partially_meets": "partially meets expectations",
-    "does_not_meet": "does not meet expectations",
-}
-_CRITERION_LABELS = ("Scope coverage", "Requirement fit", "Completeness", "Clarity")
-
-
 def _check_output_with(verdict: str, statuses: list[str]) -> dict[str, Any]:
-    """The happy check output re-stated with `verdict` and per-criterion `statuses`, its verdict
-    section rewritten to agree -- so a schema failure can only come from the verdict/status rule."""
+    """Control only verdict/status values to isolate the structured consistency rule."""
     output = _expected_output(CHECK)
     output["comparison"]["verdict"] = verdict
     for delta, status in zip(output["comparison"]["deltas"], statuses, strict=True):
         delta["status"] = status
-    output["document"]["sections"][0]["content"] = f"Verdict: {_VERDICT_PHRASES[verdict]}. " + " ".join(
-        f"{label}: {status}. Evidence." for label, status in zip(_CRITERION_LABELS, statuses, strict=True)
-    )
     return output
 
 
@@ -365,61 +332,6 @@ def test_verdict_that_contradicts_the_delta_statuses_is_rejected(
     validator = jsonschema.validators.validator_for(schema)(schema)
 
     assert not validator.is_valid(_check_output_with(verdict, statuses))
-
-
-def _document_binding_mutations(scenario_id: str) -> dict[str, dict[str, Any]]:
-    """Free-form A10 text must agree with the structured result it was generated from."""
-    first, second = (1, 2) if scenario_id == CHECK else (0, 1)
-    gaps = 4 if scenario_id == CHECK else 3
-    happy, weak = _expected_output(scenario_id), _expected_output(scenario_id, ".weak_input")
-
-    def section(candidate: dict[str, Any], index: int) -> dict[str, Any]:
-        return candidate["document"]["sections"][index]
-
-    invalid = {
-        # extracted lists: a list absent from `values` must read "Not specified", a present one not
-        "absent_list_with_content": _mutated(weak, lambda o: section(o, first).update(content="- x")),
-        "present_list_reported_absent": _mutated(
-            happy, lambda o: section(o, second).update(content="Not specified in the brief.")
-        ),
-        "missing_field_not_named_in_open_gaps": _mutated(
-            weak, lambda o: section(o, gaps).update(content="Please confirm the details.")
-        ),
-    }
-    if scenario_id == CHECK:
-        invalid.update(
-            {
-                "verdict_text_contradicts_comparison": _mutated(
-                    happy,
-                    lambda o: section(o, 0).update(
-                        content=section(o, 0)["content"].replace(
-                            "Verdict: partially meets", "Verdict: meets"
-                        )
-                    ),
-                ),
-                "verdict_section_lacks_verdict_phrase": _mutated(
-                    happy, lambda o: section(o, 0).update(content="The delivery looks fine.")
-                ),
-                "criterion_status_text_contradicts_delta": _mutated(
-                    happy,
-                    lambda o: section(o, 0).update(
-                        content=section(o, 0)["content"].replace(
-                            "Scope coverage: partial", "Scope coverage: match"
-                        )
-                    ),
-                ),
-            }
-        )
-    return invalid
-
-
-@pytest.mark.parametrize("scenario_id", [DRAFT, CHECK])
-def test_document_text_is_bound_to_the_structured_result(scenario_id: str) -> None:
-    schema = _schema(OUTPUT_SCHEMA_REFS[scenario_id])
-    validator = jsonschema.validators.validator_for(schema)(schema)
-
-    for name, candidate in _document_binding_mutations(scenario_id).items():
-        assert not validator.is_valid(candidate), name
 
 
 @pytest.fixture
@@ -505,7 +417,7 @@ def _run_to_result(
     return started, body["output"]
 
 
-def test_draft_happy_path_composes_the_two_step_result(
+def test_draft_happy_path_composes_the_structured_result(
     app: Any, request_platform_api, session_factory: SessionFactory
 ) -> None:
     adapter = RecordingProviderAdapter(FIXTURE_ROOT)
@@ -514,19 +426,18 @@ def test_draft_happy_path_composes_the_two_step_result(
     )
 
     assert tuple(call.action_config_id for call in adapter.calls) == STEPS[DRAFT]
-    assert tuple(call.step_id for call in adapter.calls) == ("extract", "generate_document")
+    assert tuple(call.step_id for call in adapter.calls) == ("extract",)
     assert output == _expected_output(DRAFT)
 
-    extract_input, document_input = adapter.input_payload(0), adapter.input_payload(1)
+    extract_input = adapter.input_payload(0)
     assert extract_input["source_text"] == BRIEF_TEXT
-    assert extract_input["strict"] is False
+    assert extract_input["strict"] is True
     assert [field["name"] for field in extract_input["fields"]] == [
         "acceptance_criteria",
         "assumptions",
         "deliverables",
+        "analysis_language",
     ]
-    assert document_input["template_ref"] == DRAFT
-    assert document_input["data"] == {"extracted": _fixture(EXTRACT)}
 
     # The one next action this product allows is recorded through the generic endpoint.
     response = asyncio.run(
@@ -556,7 +467,7 @@ def test_draft_happy_path_composes_the_two_step_result(
     }
 
 
-def test_check_happy_path_composes_the_three_step_result(
+def test_check_happy_path_composes_the_structured_result(
     app: Any, request_platform_api, session_factory: SessionFactory
 ) -> None:
     adapter = RecordingProviderAdapter(FIXTURE_ROOT)
@@ -573,11 +484,10 @@ def test_check_happy_path_composes_the_three_step_result(
     assert tuple(call.step_id for call in adapter.calls) == (
         "extract",
         "compare",
-        "generate_document",
     )
     assert output == _expected_output(CHECK)
 
-    extract_input, compare_input, document_input = (adapter.input_payload(i) for i in range(3))
+    extract_input, compare_input = (adapter.input_payload(i) for i in range(2))
     assert extract_input["source_text"] == BRIEF_TEXT
     assert compare_input["subject_text"] == DELIVERABLE_TEXT  # the work under review
     assert compare_input["reference_text"] == BRIEF_TEXT  # the expectations
@@ -588,11 +498,6 @@ def test_check_happy_path_composes_the_three_step_result(
         "completeness",
         "clarity",
     ]
-    assert document_input["template_ref"] == CHECK
-    assert document_input["data"] == {
-        "extracted": _fixture(EXTRACT),
-        "comparison": _fixture(COMPARE),
-    }
 
 
 def test_weak_input_fixtures_are_reachable_end_to_end(
@@ -659,3 +564,47 @@ def test_invalid_input_is_rejected_at_start_before_any_job_or_provider_call(
     with transaction_boundary(session_factory) as session:
         count = session.execute(sa.select(sa.func.count()).select_from(provider_calls_table))
         assert count.scalar_one() == 0
+
+
+@pytest.mark.parametrize("case", golden_cases("acceptance_builder"), ids=lambda case: case["id"])
+def test_multilingual_canonical_output_and_original_language_source(
+    app: Any,
+    request_platform_api,
+    session_factory: SessionFactory,
+    tmp_path: Path,
+    case: dict[str, Any],
+) -> None:
+    expected = write_provider_fixtures(tmp_path, case)
+    adapter = RecordingProviderAdapter(tmp_path)
+    _, output = _run_to_result(
+        app, request_platform_api, session_factory, case["scenario_id"], case["input"], adapter
+    )
+    assert output == expected  # Includes summary, evidence, rationale and every section.
+    source = case["input"]["brief_text"]
+    assert adapter.input_payload(0)["source_text"] == source
+    if case["scenario_id"] == CHECK:
+        assert adapter.input_payload(1)["reference_text"] == source
+        assert adapter.input_payload(1)["subject_text"] == case["input"]["deliverable_text"]
+
+
+@pytest.mark.parametrize("language", ["RU", "ES"])
+@pytest.mark.parametrize("scenario", ["D", "C"])
+def test_output_rejects_independent_contradictory_recap(language, scenario):
+    output = copy.deepcopy(CANONICAL[f"ANY761-AB-{scenario}-{language}-basic"])
+    assert "document" not in output
+    mode = DRAFT if scenario == "D" else CHECK
+    schema = _schema(OUTPUT_SCHEMA_REFS[mode])
+    jsonschema.validate(output, schema)
+    output["document"] = {
+        "summary": "Все три списка отсутствуют" if language == "RU" else "Faltan las tres listas",
+        "sections": [
+            {
+                "id": "verdict",
+                "content": "Соответствует ожиданиям"
+                if language == "RU"
+                else "Cumple las expectativas",
+            }
+        ],
+    }
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(output, schema)

@@ -36,6 +36,6 @@ export const de: Shape<typeof en> = {
   },
   result: {
     verdictScope: "Das Urteil beruht auf vier allgemeinen Prüfkriterien, nicht Punkt für Punkt auf den unten aufgeführten Kriterien.",
-    recap: "Erzählende Zusammenfassung (nur Anzeige, nicht kopiert)",
+    recap: "Strukturierte Zusammenfassung",
   },
 };

@@ -40,6 +40,7 @@ from anytoolai_platform_core.structured_output.schemas import normalize_schema_m
 from anytoolai_platform_core.workflows.models import JobStatus
 from anytoolai_platform_worker.composition import build_worker
 
+from tests.support.brief_language import golden_cases, write_provider_fixtures
 from tests.support.fake_provider_recording import RecordingProviderAdapter
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -396,6 +397,7 @@ def test_happy_path_composes_the_four_step_result(
     assert questions_input["context"] == BRIEF_TEXT
     assert questions_input["max_questions"] == MAX_QUESTIONS
     assert document_input["data"]["brief"] == _fixture(EXTRACT)
+    assert document_input["data"]["source_brief"] == BRIEF_TEXT
     assert document_input["data"]["issues"] == detected_issues
     assert document_input["data"]["questions"] == _fixture(QUESTIONS)["questions"]
 
@@ -438,6 +440,7 @@ def test_weak_input_fixtures_are_reachable_end_to_end(
     assert tuple(call.action_config_id for call in adapter.calls) == STEP_ORDER
     assert output == _expected_output(".weak_input", WEAK_BRIEF_TEXT)
     assert output["brief"]["missing_fields"]  # a vague brief reports gaps instead of failing
+    assert adapter.input_payload(-1)["data"]["source_brief"] == WEAK_BRIEF_TEXT
 
 
 def test_no_issues_skips_question_generation_and_still_produces_a_consistent_document(
@@ -476,6 +479,7 @@ def test_no_issues_skips_question_generation_and_still_produces_a_consistent_doc
     extract_input, detect_input, _ = (adapter.input_payload(i) for i in range(3))
     assert extract_input["source_text"] == CLEAN_BRIEF_TEXT
     assert detect_input["source_text"] == CLEAN_BRIEF_TEXT
+    assert adapter.input_payload(-1)["data"]["source_brief"] == CLEAN_BRIEF_TEXT
     assert output["brief_text"] == CLEAN_BRIEF_TEXT
     assert output["issues"] == []
     assert output["questions"] == []
@@ -568,3 +572,21 @@ def test_handoff_to_acceptance_builder_feeds_the_original_brief_to_the_draft(
     assert target_job is not None and target_job.id == accepted.json()["target_job_id"]
     assert target_job.status is JobStatus.succeeded, target_job.error_message_safe
     assert target_adapter.input_payload(0)["source_text"] == BRIEF_TEXT
+
+
+@pytest.mark.parametrize("case", golden_cases("brief_decoder"), ids=lambda case: case["id"])
+def test_multilingual_canonical_output_and_original_language_source(
+    app: Any, request_platform_api, session_factory: SessionFactory, tmp_path: Path,
+    case: dict[str, Any],
+) -> None:
+    expected = write_provider_fixtures(tmp_path, case)
+    adapter = RecordingProviderAdapter(tmp_path)
+    source = case["input"]["brief_text"]
+    _, output = _run_to_result(app, request_platform_api, session_factory, source, adapter)
+    assert output == expected  # Includes summary, questions/rationale and every section.
+    assert adapter.input_payload(0)["source_text"] == source
+    assert adapter.input_payload(1)["source_text"] == source
+    assert adapter.input_payload(2)["context"] == source
+    data = adapter.input_payload(-1)["data"]
+    assert data == {"source_brief": source, "brief": output["brief"],
+                    "issues": output["issues"], "questions": output["questions"]}

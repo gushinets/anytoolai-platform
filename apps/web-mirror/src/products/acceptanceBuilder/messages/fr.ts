@@ -36,6 +36,6 @@ export const fr: Shape<typeof en> = {
   },
   result: {
     verdictScope: "Le verdict repose sur quatre critères de revue généraux, et non sur chacun des critères listés ci-dessous.",
-    recap: "Récapitulatif rédigé (affichage seul, non copié)",
+    recap: "Récapitulatif structuré",
   },
 };

@@ -36,6 +36,6 @@ export const es: Shape<typeof en> = {
   },
   result: {
     verdictScope: "El veredicto se basa en cuatro criterios generales de revisión, no punto por punto en los criterios listados abajo.",
-    recap: "Resumen narrativo (solo visualización, no se copia)",
+    recap: "Resumen estructurado",
   },
 };

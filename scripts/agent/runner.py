@@ -878,6 +878,14 @@ def _check_source_fingerprint(manifest: dict[str, object], env: dict[str, str]) 
 
 
 def _profile_check_args(manifest: dict[str, object]) -> list[str]:
+    script_dir = str(Path(__file__).resolve().parent)
+    if script_dir not in sys.path:
+        sys.path.insert(0, script_dir)
+    from live_provider_policies import (  # noqa: PLC0415
+        LIVE_PROVIDER_POLICY_REF,
+        PRODUCT_LIVE_PROVIDER_POLICIES,
+    )
+
     args = [
         "scripts/agent/validate_configs.py",
         "check-deployment-profile",
@@ -892,7 +900,9 @@ def _profile_check_args(manifest: dict[str, object]) -> list[str]:
     for product_id, expectation in sorted(enabled_products.items()):
         if not isinstance(expectation, dict):
             raise ValueError(f"profile manifest has invalid expectation for {product_id}")
-        if expectation.get("provider_policy_ref") != "default_text_generation_v1":
+        if expectation.get("provider_policy_ref") != PRODUCT_LIVE_PROVIDER_POLICIES.get(
+            product_id, LIVE_PROVIDER_POLICY_REF
+        ):
             raise ValueError(f"profile manifest has non-live provider policy for {product_id}")
         quota = expectation["quota_policy_ref"] or "-"
         args.extend(
@@ -1125,7 +1135,8 @@ def dev_live_up(product_id: str, quota_mode: str = "unmetered") -> int:
     print(f"Compose project: {identity.compose_project}")
     print(f"API: {identity.api_url}")
     print(f"PostgreSQL: 127.0.0.1:{identity.postgres_port}")
-    print(f"{product_id}: provider=default_text_generation_v1 quota={quota_mode}")
+    provider_ref = manifest["enabled_products"][product_id]["provider_policy_ref"]
+    print(f"{product_id}: provider={provider_ref} quota={quota_mode}")
     print("Development live environment is ready")
     return 0
 

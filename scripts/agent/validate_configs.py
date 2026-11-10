@@ -11,6 +11,12 @@ from pathlib import Path
 
 import yaml
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from live_provider_policies import (  # noqa: E402
+    LIVE_PROVIDER_POLICY_REF,
+    PRODUCT_LIVE_PROVIDER_POLICIES,
+)
+
 ROOT = Path(__file__).resolve().parents[2]
 PLATFORM_CORE_SRC = ROOT / "packages" / "backend" / "platform-core" / "src"
 # ANY-32 code review finding: this is one of the modules allowed to import a product-platforms
@@ -47,7 +53,6 @@ from anytoolai_platform_sdk import ProductBundle  # noqa: E402
 # tests/architecture/test_bundle_composition_parity.py).
 DEFAULT_PRODUCT_BUNDLES: tuple[ProductBundle, ...] = (FreelancerSuiteBundle(),)
 
-LIVE_PROVIDER_POLICY_REF = "default_text_generation_v1"
 FAKE_PROVIDER_POLICY_REF = "default_fake_provider_v1"
 CONTAINER_PRODUCTS_ROOT = Path(
     "/app/packages/backend/product-platforms/freelancer-suite/src/"
@@ -143,7 +148,9 @@ def _transform_live_product(product_dir: Path, *, unmetered: bool) -> None:
     changed = 0
     for item in payload["action_configs"]:
         if item.get("provider_policy_ref") == FAKE_PROVIDER_POLICY_REF:
-            item["provider_policy_ref"] = LIVE_PROVIDER_POLICY_REF
+            item["provider_policy_ref"] = PRODUCT_LIVE_PROVIDER_POLICIES.get(
+                product_dir.name, LIVE_PROVIDER_POLICY_REF
+            )
             changed += 1
     if changed == 0:
         raise ValueError(f"{product_dir.name}: no action config uses {FAKE_PROVIDER_POLICY_REF}")
@@ -200,7 +207,7 @@ def build_deployment_profile(
             )
             _transform_live_product(product_dir, unmetered=product_id in unmetered_product_ids)
             expectations[product_id] = ProductProfileExpectation(
-                LIVE_PROVIDER_POLICY_REF,
+                PRODUCT_LIVE_PROVIDER_POLICIES.get(product_id, LIVE_PROVIDER_POLICY_REF),
                 None
                 if product_id in unmetered_product_ids
                 else source_product.get("quota_policy_ref"),
@@ -294,7 +301,9 @@ def check_deployment_profile_from_manifest(
         raise ValueError("profile manifest quota modes differ from deployment selection")
     expectations = {}
     for product_id, refs in products.items():
-        if refs["provider_policy_ref"] != LIVE_PROVIDER_POLICY_REF:
+        if refs["provider_policy_ref"] != PRODUCT_LIVE_PROVIDER_POLICIES.get(
+            product_id, LIVE_PROVIDER_POLICY_REF
+        ):
             raise ValueError(f"{product_id}: profile manifest has non-live provider policy")
         expectations[product_id] = ProductProfileExpectation(
             refs["provider_policy_ref"], refs["quota_policy_ref"]

@@ -36,6 +36,6 @@ export const it: Shape<typeof en> = {
   },
   result: {
     verdictScope: "Il verdetto si basa su quattro criteri di revisione generali, non voce per voce sui criteri elencati sotto.",
-    recap: "Riepilogo narrativo (solo visualizzazione, non copiato)",
+    recap: "Riepilogo strutturato",
   },
 };

@@ -8,6 +8,13 @@ model_list:
       # yet would have this parameter rejected as unsupported although the API accepts it.
       allowed_openai_params: [reasoning_effort]
 
+  - model_name: anytoolai.sol_text
+    litellm_params:
+      model: openai/gpt-6.1-sol
+      api_key: env/OPENAI_API_KEY
+      reasoning_effort: medium
+      allowed_openai_params: [reasoning_effort]
+
 router_settings:
   routing_strategy: simple-shuffle
   enable_pre_call_checks: true

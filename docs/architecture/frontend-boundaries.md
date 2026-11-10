@@ -214,8 +214,9 @@ The shared runtime, not a product, owns the web side of a handoff:
   arrives after the person left proves the Accept went through, so one read of the authoritative preview
   names the session it queued and that is kept too; nothing else continues. Left before any answer
   arrived, the id is simply unknown.
-- The copy text of a product whose renderer contract fixes its wording (Acceptance Builder) is the
-  contract's English text, not UI-locale copy.
+- Acceptance Builder composes both recap and Copy from structured extraction/comparison.
+  Deterministic wording follows the explicit analysis language, independently of UI locale;
+  legacy model-written documents are ignored.
 
 ## Web i18n (ANY-519)
 
