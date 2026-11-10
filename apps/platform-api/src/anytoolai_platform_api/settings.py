@@ -1,5 +1,6 @@
 import os
 import re
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 
@@ -33,6 +34,8 @@ class Settings(BaseModel):
     default_region: str = "ru"
     portal_service_token: SecretStr | None = Field(default=None, repr=False)
     portal_service_token_previous: SecretStr | None = Field(default=None, repr=False)
+    portal_base_url: str = ""
+    portal_access_service_token: SecretStr | None = Field(default=None, repr=False)
     atom_lab_run_body_max_bytes: int = Field(default=384 * 1024, gt=0)
     atom_lab_run_input_max_bytes: int = Field(default=256 * 1024, gt=0)
     atom_lab_run_prompt_max_bytes: int = Field(default=64 * 1024, gt=0)
@@ -50,7 +53,9 @@ class Settings(BaseModel):
             raise ValueError("Scope identities must be nonblank without surrounding whitespace")
         return value
 
-    @field_validator("portal_service_token", "portal_service_token_previous")
+    @field_validator(
+        "portal_service_token", "portal_service_token_previous", "portal_access_service_token"
+    )
     @classmethod
     def validate_service_token(cls, value: SecretStr | None) -> SecretStr | None:
         if value is not None and not re.fullmatch(
@@ -66,6 +71,33 @@ class Settings(BaseModel):
                 raise ValueError("A previous service token requires a current token")
             if self.portal_service_token_previous == self.portal_service_token:
                 raise ValueError("Current and previous service tokens must differ")
+        if bool(self.portal_base_url) != (self.portal_access_service_token is not None):
+            raise ValueError("Portal URL and reverse-direction service token must be set together")
+        if self.portal_access_service_token is not None and self.portal_access_service_token in (
+            self.portal_service_token,
+            self.portal_service_token_previous,
+        ):
+            raise ValueError("Portal directional service tokens must differ")
+        if self.portal_base_url:
+            url = urlsplit(self.portal_base_url)
+            if (
+                not url.hostname
+                or url.username is not None
+                or url.password is not None
+                or url.path not in ("", "/")
+                or url.query
+                or url.fragment
+                or not (
+                    url.scheme == "https"
+                    or (
+                        self.app_env in {"dev", "test"}
+                        and url.scheme == "http"
+                        and url.hostname in {"localhost", "127.0.0.1", "::1"}
+                    )
+                )
+            ):
+                raise ValueError("Portal URL requires an HTTPS origin (loopback HTTP in dev/test)")
+            self.portal_base_url = self.portal_base_url.rstrip("/")
         return self
 
     @classmethod
@@ -88,6 +120,9 @@ class Settings(BaseModel):
             "ANYTOOLAI_REGION": "default_region",
             "ANYTOOLAI_PORTAL_SERVICE_TOKEN": "portal_service_token",
             "ANYTOOLAI_PORTAL_SERVICE_TOKEN_PREVIOUS": "portal_service_token_previous",
+            "ANYTOOLAI_PORTAL_BASE_URL": "portal_base_url",
+            "ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN": "portal_access_service_token",
+            "ANYTOOLAI_APP_ENV": "app_env",
         }.items():
             if env_name in os.environ:
                 values[field] = os.environ[env_name]

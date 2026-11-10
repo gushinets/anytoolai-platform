@@ -1968,6 +1968,79 @@
         "title": "ModelCatalogRefreshStatus",
         "type": "string"
       },
+      "PortalExchangeRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "title": "Code",
+            "type": "string"
+          },
+          "code_verifier": {
+            "pattern": "^[A-Za-z0-9._~-]{43,128}$",
+            "title": "Code Verifier",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "code_verifier"
+        ],
+        "title": "PortalExchangeRequest",
+        "type": "object"
+      },
+      "PortalExchangeResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "access_token": {
+            "maxLength": 512,
+            "minLength": 43,
+            "title": "Access Token",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "region": {
+            "minLength": 1,
+            "title": "Region",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "tenant_id": {
+            "minLength": 1,
+            "title": "Tenant Id",
+            "type": "string"
+          },
+          "token_type": {
+            "const": "Bearer",
+            "title": "Token Type",
+            "type": "string"
+          },
+          "user_id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "access_token",
+          "token_type",
+          "tenant_id",
+          "region",
+          "user_id",
+          "expires_at"
+        ],
+        "title": "PortalExchangeResponse",
+        "type": "object"
+      },
       "ProviderCallStatus": {
         "enum": [
           "created",
@@ -4880,6 +4953,47 @@
         "summary": "Create an opaque guest identity",
         "tags": [
           "access-lite"
+        ]
+      }
+    },
+    "/v1/portal-session/exchange": {
+      "post": {
+        "operationId": "exchange_portal_session_v1_portal_session_exchange_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortalExchangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortalExchangeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Exchange Portal Session",
+        "tags": [
+          "portal-session"
         ]
       }
     },
