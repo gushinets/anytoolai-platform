@@ -116,9 +116,10 @@ ProposalAI's `generate_v1` binds to `proposal_ai.generations`; Client Update Wri
 `client_update_writer.messages`; Brief Decoder's `decode_v1` binds to
 `brief_decoder.analyses`; Acceptance Builder's `draft_v1` and `check_v1` share
 `acceptance_builder.results`. One successful final scenario result is one declared
-unit; internal workflow steps, provider calls and retries add no units. Paid admission
-and consumption through these bindings remain later ANY-766 steps. Client Update
-Writer's absent guest quota policy and Task Finder's existing surfaces are unchanged.
+unit; internal workflow steps, provider calls and retries add no units. ANY-766
+Step 6 connects these bindings to the existing paid admission and finalization
+path. Client Update Writer's absent guest quota policy and Task Finder's existing
+surfaces are unchanged.
 
 `products.capabilities.project_capability_manifest` is a pure Core projection of all registered
 products and declared metrics, including disabled entries. It takes an explicit scope and
@@ -131,9 +132,8 @@ through its authenticated internal manifest route in the validated trusted tenan
 [receiver configuration](../../infra/deployment/README.md#portal-capability-manifest-receiver-any-711).
 The [producer contract](../contracts/kernel-capability-manifest/v1/README.md) publishes the generated
 serialization schema, canonical positive/negative fixtures, byte checksums and independent digest
-checks. The same contract documents the isolated real Portal TCP HTTP harness;
-current inventory evidence belongs to
-[ANY-766 Step 2](../exec-plans/active/ANY-766-implementation-plan.md#step-2--declare-production-metrics-and-scenario-bindings).
+checks. The same contract documents the isolated real Portal TCP HTTP harness
+and current inventory fixtures.
 
 ## Provider policy ownership
 
