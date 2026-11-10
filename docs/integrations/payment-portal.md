@@ -49,8 +49,29 @@ current scope and remaining gates.
   operator retry is required after repair.
 - Step 8 implements recoverable browser launch, owner-bound tab custody and
   paid runtime/event/handoff continuity. Usage/exhaustion and cabinet integration
-  remain Steps 9–10; Step 11 is paired local acceptance and Step 12 is build/install
+  remain Steps 14–15; Step 16 is paired local acceptance and Step 17 is build/install
   preparation. ANY-767 owns remote deployment and live-service acceptance.
+
+## ANY-766 Step 9 common backend specification — 2026-11-10
+
+Inspected local sources: Portal `119d3d86175f35006d2ef90259bb43e19a9ef82f`
+and Kernel `6697b9f5c271eb1c77f507e037661fd92a048b74`, plus the Step 9
+documentation/test-only diff. The
+[Portal-owned common guide](https://github.com/gushinets/payments-portal/blob/main/docs/contracts/product-backend-api/README.md)
+now specifies independent consumers, audience-bound V2 delegation, V3/P/R
+snapshots, immutable source/owner history and recipient/usage routing. The
+[paired bundle](../contracts/portal-kernel-paid/README.md) retains exact baseline
+schemas/fixture payloads and independently checked target additions.
+
+This checkpoint does not change runtime, migrations or generated OpenAPI.
+Current servers still implement Kernel identity V1/snapshot V2. The guide records
+actual owning modules, minimal replacements, populated-state forward migration
+requirements and focused acceptance cases; active Kernel code is not a purge
+target. Common identity is Step 10, technical-source ownership Step 11, working
+auth/access with documented generated Swagger Step 12 (2026-11-13 priority),
+recipient delivery Step 13, usage/cabinet Steps 14/15, assembled local acceptance
+Step 16 and build/install preparation Step 17. Real external backend adoption
+belongs to its owning team; remote/live acceptance remains ANY-767.
 
 ## Observed implementation
 
@@ -173,7 +194,7 @@ See [identity configuration and limits](../contracts/portal-kernel-paid/README.m
 At this checkpoint the reverse connection implemented exchange/introspection.
 The current local summary above records the subsequent snapshot/admission/delivery
 implementation. Local evidence here uses disposable Portal PostgreSQL and
-intercepted Kernel HTTP; real paired HTTP remains Step 11. Browser custody/recovery
+intercepted Kernel HTTP; real paired HTTP remains Step 16. Browser custody/recovery
 remains Step 8. The historical snapshots above remain historical evidence.
 
 ## Service authentication and scope convention (ANY-711 handoff)
@@ -286,8 +307,8 @@ describes the independent reverse connection.
 - **Usage and launch:** the
   [target bundle](../contracts/portal-kernel-paid/README.md) specifies usage,
   exhaustion and authenticated browser launch. Step 8 implements browser launch;
-  usage/exhaustion and cabinet usage remain Steps 9–10, with paired local
-  acceptance in Step 11. Kernel product handoff is not Portal login handoff;
+  usage/exhaustion and cabinet usage remain Steps 14–15, with paired local
+  acceptance in Step 16. Kernel product handoff is not Portal login handoff;
   shared product IDs do not imply shared origins/routes or sessions.
 - **Commercial meaning:** deployed product configuration, guest quota and the
   fixture's `proposal_ai.test_generations` do not approve paid metrics/quantity.
@@ -348,5 +369,5 @@ tab custody, frozen same-key replay, accepted-session/mode restoration and
 identity-generation guards for paid events/results/handoffs without guest
 fallback. See [browser configuration and limits](../contracts/portal-kernel-paid/README.md#step-8-browser-implementation).
 Local component/synthetic browser evidence does not establish the real paired
-HTTP/PostgreSQL acceptance required in Step 11. Historical snapshots above are
+HTTP/PostgreSQL acceptance required in Step 16. Historical snapshots above are
 unchanged; usage/exhaustion and delivery/build gates retain their owning steps.
