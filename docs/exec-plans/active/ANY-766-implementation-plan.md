@@ -1,6 +1,6 @@
 # ANY-766 — Portal–Kernel Paid Execution Integration
 
-Status: **STEPS 1–4 COMPLETE; REV-3 lock-order defect resolved; paid runtime integration and later gates remain**
+Status: **STEPS 1–5 COMPLETE; REV-4 and REV-5 start-boundary defects resolved; later gates remain**
 
 Date: **2026-11-09**
 
@@ -10,8 +10,8 @@ Issue: [ANY-766](https://linear.app/paveldik/issue/ANY-766)
 - Owner: mixed — Portal and Kernel execution owners
 - Last updated: 2026-11-10
 - Review date: 2026-11-10
-- Next action: Step 5 production allowance derivation and V2 snapshots, only when separately requested. Step 4 REV-3 is resolved; Steps 5–14 have not been executed.
-- Blocker: none for completed Steps 1–4. Step 4 PostgreSQL checks, including the REV-3 concurrency correction, pass under explicit local test-db/temporary-migration authorization; the historical Step 3 review selection was not rerun. Sales, live-proof, staging and production conditions apply only to their dependent actions under Section 3.8. The inherited broader Kernel permission-test limitation remains recorded below.
+- Next action: Step 6 coherent paid admission, ownership and events, only when separately requested. Steps 6–14 remain unexecuted.
+- Blocker: none for completed Steps 1–5. REV-1–REV-5 are resolved; REV-5 has fresh boundary-crossing and full Step 5 PostgreSQL/API regression evidence under the retained test-db authorization. Earlier complete selections remain dated evidence, not new reruns. Sales, live-proof, staging and production conditions apply only to their dependent actions under Section 3.8; the earlier Step 3 review and broader Kernel permission-test limits remain recorded below.
 
 This replaces the previous proposal completely. PLAN-1 through PLAN-5 are addressed below.
 
@@ -95,9 +95,9 @@ Read the [current Step 10 producer handoff](https://github.com/gushinets/payment
 
 - ANY-711 supplies real manifest delivery, independent consumer validation, fixture ownership and directional service authentication.
 - ANY-765 supplies immutable accepted evidence, primary selection, calendar classification, stable allowance identities, semantic revisions, deadlines and atomic invalidation outbox updates.
-- Production terms remain missing: current technical terms and positive allowance materialization are development/SIMULATED-oriented.
+- Steps 3/5 now implement immutable configured-source technical terms and production allowance derivation. Ordinary commercial enablement and live positive proof retain their separate gates.
 - ANY-507 supplies paid owner partitioning, replay, reserve/finalize/release, recovery and readback. It already uses the required immutable allowance tuple.
-- Kernel HTTP still needs trusted paid identity and ownership protection. Its existing `ClientEventService` also rejects sessions without a verified guest; this must be extended for authenticated paid events.
+- Kernel has the Step 4 principal adapter; attaching trusted paid identity, ownership protection and authenticated paid events remains Step 6. Its existing `ClientEventService` still rejects sessions without a verified guest.
 - Portal invalidation transport and Kernel exhaustion delivery remain missing.
 - Existing independent Compose projects, runners, migration services and Kernel profile activation are reusable. Image deployment must remove host application-build and managed-venv requirements.
 
@@ -1132,6 +1132,297 @@ Cover single-use races, wrong verifier/audience/scope, expiry, logout/reset/deac
 
 ### Step 5 — Derive production allowances and serve snapshots
 
+#### Step 5 execution checkpoint — 2026-11-10
+
+**Result: COMPLETE within Portal production allowance derivation and V2 snapshot
+serving, with the REV-4 and REV-5 corrections recorded below.** Only Step 5 was executed.
+Both working trees and indexes were clean
+initially. Starting/current local `ANY-766` HEADs remain Portal
+`7a8b28df071fdd3b46da8ae3be17670669cdbea8` and Kernel
+`5804593aec21babed976a53c9fac0dce3414b9bf`, plus this uncommitted diff. Kernel
+changes only this plan mirror. No staging, commit, branch move, dependency
+installation, real service configuration, commercial publication or deployment
+was performed. Migration heads remain Portal `20261110_0007` / Kernel `0018`.
+
+Implemented:
+
+- Replaced the simulation-only switches with `MeteringPolicy`. Configured-source
+  accepted terms can issue production allowances through the existing issuer;
+  production rejects SIMULATED/missing provenance. Nonproduction retains its
+  explicitly labelled history. Legacy purchases without proven quantities retain
+  independently supported grants without invented metering. The sole paid writer
+  still owns semantic revisions, causal evidence, outbox and deadline changes.
+- Preserved immutable accepted quantity/unit, same-cycle IDs, original calendar
+  anchors, renewal retention and scoped primary proof. The strengthened real
+  inventory regression proves that an unrelated incomplete product permits a
+  proven primary while both financial CREATE and original-resolution admission
+  still refuse incomplete customer-wide proof.
+- Future timestamp buckets may be saved as immutable issuance history but are
+  omitted from the effective set before the frozen conservative start. Existing
+  reconciliation work is scheduled no later than that boundary, retaining earlier
+  work. Local time/expiry cannot activate the bucket; a new eligible source apply
+  reuses its saved ID. Date-only evidence gains no invented UTC boundaries.
+- Added scoped committed-state reads shared with the cabinet and the authenticated
+  `GET /internal/v1/access-snapshots/{user_id}` V2 producer. It requires the
+  separate `access-snapshot:read` receiver permission, exactly one service Bearer,
+  explicit matching scope, no Origin and no-store success/refusal. Unknown scoped
+  users return `404`; known implicit empty revision zero is read-only. Overdue or
+  uncommitted provenance/start corrections refuse the entire saved revision.
+- Reused the reserved two-connection/two-thread read pool and eight-operation
+  waiting bound, including cancellation/shutdown ownership. Header-only snapshot
+  authentication runs without waiting for shared sale threads. DB contention,
+  storage failure and overload have safe bounded `503` responses. GET has no
+  identity bookkeeping, state writes or source/peer I/O.
+- Database time is sampled after waiting reads. Snapshot expiry uses the selected
+  300/60-second formula with the configured five-second local/staging budget and
+  every included effective source/grant/UTC deadline. Existing committed grant
+  bounds and the issuer's frozen UTC bounds are not haircut again by GET; the
+  separate interservice budget bounds the envelope once. Source trust stays at
+  most six hours. Missing clock configuration or no remaining lifetime is `503`.
+- Added named strict V2 Pydantic/OpenAPI components with required version/scope
+  fields and explicit required query parameters, then regenerated TypeScript.
+  Customer provenance DTOs already supported both values from Step 3 and remain
+  compatible. Updated the as-built Portal architecture, integration map and
+  billing operations documentation. Normative paired fixtures/hashes are unchanged.
+
+Fresh verification (repository-root commands, local evidence only):
+
+- **PASS — pre-change regression baseline, 120 passed / 0 skipped:** the five
+  existing Step 5 PostgreSQL modules plus `test_paid_access_policy.py`.
+  Evidence: `.harness/any766-step5-baseline.xml`.
+- **PASS — required and affected selection, 225 passed / 0 skipped:**
+  `./.venv/bin/python /tmp/any766_step5_tests.py -q apps/api/tests/test_access_snapshot_postgres.py apps/api/tests/test_paid_access_recovery_postgres.py apps/api/tests/test_paid_access_capacity_postgres.py apps/api/tests/test_paid_access_terms_postgres.py apps/api/tests/test_paid_access_primary_scope_postgres.py apps/api/tests/test_paid_access_review_regressions_postgres.py apps/api/tests/test_paid_access_policy.py apps/api/tests/test_paid_access_read_postgres.py apps/api/tests/test_paid_access_reconciliation_postgres.py apps/api/tests/test_paid_access_cadence_postgres.py apps/api/tests/test_paid_access_inventory_failure_postgres.py apps/api/tests/test_paid_access_rebase_postgres.py --junitxml=.harness/any766-step5-final.xml`.
+  This includes **169 actual PostgreSQL cases** and 56 DB-free policy cases;
+  includes the retained finite-end/one-skew, overdue reduction/restoration,
+  both-phase rollback, calendar-month offset and product-local failure controls.
+- **PASS — final affected rerun after the schema/capacity and stronger financial
+  admission assertions, 23 passed / 0 skipped:** the same wrapper selects
+  `apps/api/tests/test_access_snapshot_postgres.py apps/api/tests/test_paid_access_primary_scope_postgres.py`
+  with `--junitxml=.harness/any766-step5-final-affected.xml`. Its 17 snapshot cases
+  cover required OpenAPI fields, real read-only zero/N state, service auth/scope/
+  rotation, strict zero/maximum quantities, no-op/block/recovery, original renewal
+  quantity, source/grant/UTC bounds, future starts, simulation isolation, atomic
+  rollback, writer/read races, delayed clock sampling, storage failure,
+  overload/cancellation and shared-thread saturation. Six primary cases retain
+  operator fences and the stricter financial/original proof distinction.
+- **PASS — final contract/document/architecture regressions, 534 passed:**
+  `./.venv/bin/python -m pytest -p no:cacheprovider -q apps/api/tests/test_architecture.py apps/api/tests/test_repository_docs.py apps/api/tests/test_billing_subscription_reconciliation.py apps/api/tests/test_any766_contracts.py apps/api/tests/test_any765_purchase_terms.py --junitxml=.harness/any766-step5-contracts-final.xml`.
+- **PASS — related identity and policy regression selection, 312 passed:**
+  `test_architecture.py`, `test_any766_contracts.py`, `test_paid_access_policy.py`,
+  `test_any765_purchase_terms.py`, `test_kernel_session_delegation.py`, using
+  `./.venv/bin/python -m pytest -p no:cacheprovider -q` and
+  `--junitxml=.harness/any766-step5-unit.xml`. Existing SQLite FK-cycle warnings
+  remain; there are no skips. The initial sandbox TestClient attempt was
+  interrupted without a completion claim; the local unsandboxed rerun passed.
+- **PASS — generation and applicable non-fixing checks:** command-scoped venv
+  PATH with `npm run generate`, `npm run generate:check`,
+  `npm run architecture:check`, `npm run typecheck:web`, `npm run docs:check`;
+  Ruff check and format check on all 20 changed/new Python files. Generation
+  required no installation. Kernel managed `runner.py validate-docs` passes for
+  the documentation-only mirror. Both diffs, empty indexes, unchanged branches/
+  HEADs, paired bundle equality and whole-plan byte equality are checked.
+
+Authorization, corrections and limits:
+
+- The user explicitly authorized starting the isolated `payments-4973adb2`
+  PostgreSQL server, recreating `payments_4973adb2_tests`, temporary migrations
+  and fixture cleanup. The wrapper uses the existing
+  `canonical_check_environment()` / `api_test_environment('api-postgres', ...)`
+  and exactly that disposable test database on loopback port 32074; it prints no
+  credentials. Fixtures create/migrate/drop only that database. The pre-existing
+  local pinned image was used; no download or application-database migration
+  occurred. `scripts/repo.py test-db stop` stopped the server after verification
+  without deleting its volume or any unrelated resource.
+- Review corrected the shared-thread authentication bottleneck and the initial
+  OpenAPI omission of required query/version fields before handoff. The affected
+  rerun above passes. All introduced lint/test-shape issues were fixed; no test,
+  type, contract fixture, architecture gate or error was suppressed.
+- **NOT_RUN — Section 6 broad suites, actual two-service paid HTTP, browser,
+  runtime Compose connection/configuration, image/deployed clock/TLS acceptance,
+  live LBX, staging and production:** these remain later-step or operational
+  gates. The evidence uses real disposable PostgreSQL, local ASGI HTTP and
+  intercepted synthetic configured-source transports, not live sales authority.
+  Kernel V2 consumption/admission remains Step 6; invalidation/usage/exhaustion
+  delivery and commercial enablement were not implemented here. The historical
+  Step 3 review rerun and broader Kernel permission-test limits remain as recorded.
+- **BLOCKED — real sale configuration/live positive/staging acceptance** retain
+  Section 3.8 owner inputs; they do not block the completed independent Step 5.
+  Install compatible consumers before enabling V2. No production readiness or
+  real joint execution is claimed.
+
+Portal remains authoritative and the entire Kernel copy is synchronized before
+handoff. Steps 1–5 are complete within their recorded scope; Steps 6–14 remain
+unexecuted and require their own requests.
+
+#### Step 5 review follow-up — REV-4, 2026-11-10
+
+**REV-4: RESOLVED (important / P2).** The original Step 5 checks covered initial
+future issuance but missed a claimed same-cycle semantic no-op. This follow-up
+independently reproduced the reviewer diagnostic and the actual PostgreSQL
+source-apply/queue path before changing production code.
+
+Cause and correction:
+
+- `schedule_reconciliation()` left the claimed queue row's ordinary polling
+  deadline dirty in SQLAlchemy. `schedule_deadline()` then updated that same SQL
+  row through its future-start upsert. With `autoflush=False`, the final flush
+  could overwrite the earlier start boundary with polling roughly 14 minutes
+  away. A material semantic transition happened to flush first and hid the defect.
+- The future-start branch now flushes pending caller-owned ORM writes before
+  applying its SQL hint. The upsert is consequently the final scheduling write;
+  a later no-op/commit cannot restore the stale polling deadline. This adds no
+  commit, retry, scheduler, schema or wire change. The existing user-first lock
+  order, whole-transaction rollback and ordinary polling rules remain intact.
+- The existing future-bucket PostgreSQL scenario now covers initial issuance,
+  a same-cycle reread through a real `work_claim`, and a reread changing the grant.
+  It checks the persisted start deadline, priority, generation, released lease,
+  unchanged allowance ID and no premature snapshot membership. Only a subsequent
+  authoritative read after the start can expose the same bucket. The production
+  rollback scenario additionally covers a future timestamp cycle after flushing.
+
+Fresh evidence:
+
+- **FAIL — expected pre-fix SQLite reproduction, 1 failed / 2 passed:**
+  `./.venv/bin/python -m pytest -p no:cacheprovider -q -s /tmp/test_any766_step5_review_schedule.py --junitxml=.harness/any766-rev4-sqlite-red.xml`.
+  The no-op case misses the two-minute boundary; the material-change and
+  no-future-start controls pass. Log: `.harness/any766-rev4-sqlite-red.log`.
+- **FAIL — expected pre-fix PostgreSQL reproduction, 1 failed / 2 passed /
+  16 deselected:**
+  `./.venv/bin/python /tmp/any766_step5_tests.py -q --tb=short --show-capture=no apps/api/tests/test_access_snapshot_postgres.py -k future_timestamp_bucket --junitxml=.harness/any766-rev4-postgres-red-valid.xml`.
+  The actual claimed no-op loses the boundary; initial issuance and changed-grant
+  controls pass. Log: `.harness/any766-rev4-postgres-red-valid.log`. An initial
+  expanded fixture placed the terminal grant bound before the cycle end and
+  correctly lost metering; its synthetic calendar was corrected before this
+  valid red run. Production eligibility checks were not weakened.
+- **PASS — same SQLite diagnostic after correction, 3 passed:** the first command
+  with `--junitxml=.harness/any766-rev4-sqlite-green.xml`; adjacent green log.
+- **PASS — focused PostgreSQL green run, 5 passed / 15 deselected:** the wrapper
+  selects `test_access_snapshot_postgres.py` with
+  `-k 'future_timestamp_bucket or production_paid_commit_rolls_back'` and
+  `--junitxml=.harness/any766-rev4-postgres-green.xml`; adjacent green log.
+- **PASS — final affected PostgreSQL/API selection, 112 passed / 0 skipped:**
+  `./.venv/bin/python /tmp/any766_step5_tests.py -q --tb=short --show-capture=no apps/api/tests/test_access_snapshot_postgres.py apps/api/tests/test_paid_access_cadence_postgres.py apps/api/tests/test_paid_access_reconciliation_postgres.py apps/api/tests/test_paid_access_review_regressions_postgres.py apps/api/tests/test_paid_access_recovery_postgres.py --junitxml=.harness/any766-rev4-final.xml`.
+  Log: `.harness/any766-rev4-final.log`. This covers the final 20 snapshot cases,
+  cadence/claim controls, semantic no-ops, both-phase overdue transitions and
+  rollback, finite-end history, same-cycle recovery and product-local failures.
+- **PASS — contract/policy/architecture/documentation regressions, 479 passed /
+  0 skipped:**
+  `./.venv/bin/python -m pytest -p no:cacheprovider -q apps/api/tests/test_architecture.py apps/api/tests/test_repository_docs.py apps/api/tests/test_any766_contracts.py apps/api/tests/test_paid_access_policy.py --junitxml=.harness/any766-rev4-contracts.xml`.
+- **PASS — non-fixing checks:** Ruff check/format check on all 20 changed/new
+  Python files; Portal command-scoped venv `npm run architecture:check`,
+  `npm run generate:check`, `npm run docs:check`; Kernel managed
+  `runner.py validate-docs`; both `git diff --check` and whole-plan byte equality.
+
+Preservation and limits:
+
+- Reused the existing explicit local `payments-4973adb2` test-server and
+  `payments_4973adb2_tests` recreation/temporary-migration authorization. The same
+  wrapper derives the existing isolated loopback configuration; sources are
+  intercepted. Fixtures created/migrated/dropped only the disposable test DB.
+  The server was stopped afterwards without deleting its volume. No dependency,
+  application database, migration file, real source or deployed configuration
+  was changed.
+- The correction changes only `paid_deadlines.py`, its existing snapshot test
+  module and the two plan copies. Pre-follow-up hashes confirm all other Step 5
+  files, including generated artifacts, are preserved byte-for-byte. Both local
+  HEADs/branches and empty indexes remain unchanged; the paired contract bundle
+  is unchanged and still byte-identical. No staging/commit or external action
+  was performed.
+- **REUSED, not rerun in full here — earlier Step 5 selections 225/23 and the
+  reviewer-reported 611 tests.** Fresh correction evidence is explicitly listed
+  above. Broader Section 6, real joint HTTP, browser, image/live-LBX/staging and
+  production acceptance remain **NOT_RUN** under their existing later-step gates.
+
+Step 5 is complete with REV-4 corrected. REV-1–REV-3 remain resolved. Portal is
+authoritative and its complete Kernel mirror is synchronized before handoff.
+Steps 6–14 remain unexecuted.
+
+#### Step 5 review follow-up — REV-5, 2026-11-10
+
+**REV-5: RESOLVED (important / P2).** Independent pre-fix verification reproduced a
+boundary crossing during allowance materialization on the authorized local
+PostgreSQL server: **1 failed / 1 passed / 0 skipped**. The before-boundary
+control passes; crossing the conservative start leaves ordinary reconciliation
+almost fifteen minutes away. Local repair does not activate the bucket; another
+authoritative read restores the same immutable allowance ID. Evidence:
+`/tmp/any766-rev5-verify.xml` and `/tmp/any766-rev5-verify.log`.
+
+The correction preserves the paid evaluation time through both final deadline
+scheduling branches (semantic change and no-op). `schedule_deadline()` compares
+the frozen conservative start with that cutoff, rather than discarding it after
+sampling a later clock. A boundary that passed during processing remains a due
+priority-1 authoritative reconciliation hint. The existing pre-upsert flush
+preserves REV-4; the source decision, lock/transaction ownership, schema and
+wire contracts are unchanged. This shared commit path also covers first-primary
+selection without another scheduling mechanism or persisted state.
+
+Fresh correction evidence:
+
+- **FAIL — expected pre-fix regression, 6 failed / 3 passed / 20 deselected:**
+  `./.venv/bin/python /tmp/any766-rev5-tests.py .harness/any766-rev5-red.log -q --tb=short --show-capture=no apps/api/tests/test_access_snapshot_postgres.py -k excluded_start_survives --junitxml=.harness/any766-rev5-red.xml`.
+  Every before-start control passes; exact/after-start cases fail for initial
+  issuance, a claimed same-cycle reread and first-primary selection.
+- **PASS — focused correction/REV-4/rollback selection, 14 passed / 15
+  deselected / 0 skipped:** the same wrapper selects the snapshot module with
+  `-k 'excluded_start_survives or future_timestamp_bucket or production_paid_commit_rolls_back'`
+  and `.harness/any766-rev5-focused.{log,xml}` evidence. The new nine cases also
+  verify immutable ID/revision behavior, no local repair/GET activation, released
+  claims/generation hints, and normal polling after the due authoritative read
+  includes the bucket (no continuous urgent loop).
+- **PASS — independent reviewer diagnostic after correction, 2 passed / 0
+  skipped:**
+  `./.venv/bin/python /tmp/any766-rev5-tests.py .harness/any766-rev5-review-green.log -q --tb=short --show-capture=no -p apps.api.tests.conftest -p apps.api.tests.test_access_snapshot_postgres -c pytest.ini /tmp/any766-review-pg-si94bf7d/test_boundary.py --junitxml=.harness/any766-rev5-review-green.xml`.
+  The original diagnostic bytes
+  and earlier failed evidence remain unchanged.
+- **PASS — contract/policy/architecture/documentation regression, 479 passed /
+  0 skipped:** the REV-4 four-module selection with
+  `--junitxml=.harness/any766-rev5-contracts.xml`.
+- **PASS — Ruff check/format check on all 20 changed/new Python files, Portal
+  `npm run architecture:check`, `npm run generate:check`, and Kernel doctor.**
+  No dependencies were installed; generated files are unchanged.
+- **PASS — full Step 5 required and affected PostgreSQL/API selection, 239
+  passed / 0 skipped:**
+  `./.venv/bin/python /tmp/any766-rev5-tests.py .harness/any766-rev5-final.log -q --tb=short --show-capture=no apps/api/tests/test_access_snapshot_postgres.py apps/api/tests/test_paid_access_recovery_postgres.py apps/api/tests/test_paid_access_capacity_postgres.py apps/api/tests/test_paid_access_terms_postgres.py apps/api/tests/test_paid_access_primary_scope_postgres.py apps/api/tests/test_paid_access_review_regressions_postgres.py apps/api/tests/test_paid_access_policy.py apps/api/tests/test_paid_access_read_postgres.py apps/api/tests/test_paid_access_reconciliation_postgres.py apps/api/tests/test_paid_access_cadence_postgres.py apps/api/tests/test_paid_access_inventory_failure_postgres.py apps/api/tests/test_paid_access_rebase_postgres.py --junitxml=.harness/any766-rev5-final.xml`.
+  This reruns the mandatory Step 5 cases and all related writer, finite-end,
+  overdue two-phase, immutable terms, capacity/read, cadence/claim, scoped-primary,
+  customer-wide financial admission, inventory failure and rollback controls.
+
+Only `paid_access.py`, `paid_deadlines.py`, the existing snapshot test module and
+both plan copies changed in this correction. Earlier Step 5/REV-4 selections
+remain dated evidence. **PASS — final documentation/integrity:** Portal
+command-scoped venv `npm run docs:check`, Kernel managed
+`runner.py validate-docs`, both `git diff --check`, unchanged branches/HEADs and
+indexes, and byte-identical complete plans. Pre-follow-up hashes preserve every
+other tracked/untracked Step 5 file; the paired 19-file contract bundle remains
+unchanged and byte-identical.
+The prior explicit authorization was reused for the isolated
+`payments-4973adb2` server and `payments_4973adb2_tests` on 127.0.0.1:32074. The
+wrapper rejects another host/port/database; all source HTTP is intercepted.
+Fixtures recreated/migrated/dropped only that disposable database; the matching
+`scripts/repo.py test-db stop` stopped the server without deleting its volume.
+No dependencies, application database, migration files, branch/HEAD/index,
+contract bundle, generated artifacts, real service or deployment were changed.
+Steps 6–14 and their real joint HTTP/browser/live/staging gates remain
+**NOT_RUN**; existing commercial/operational and Kernel permission-test limits
+remain as recorded above. No live or production acceptance is claimed.
+
+Step 5 is complete with REV-5 corrected; REV-1–REV-4 remain resolved. Portal is
+authoritative and its complete Kernel mirror is synchronized before handoff.
+
+#### Step 5 local commit authorization — 2026-11-10
+
+After the Step 5 implementation and REV-4/REV-5 corrections passed the recorded
+checks, the user explicitly requested local commits in both repositories. This
+narrowly overrides the common protocol's no-staging/no-commit rule for the
+completed Step 5 changes, regression tests, generated contracts and synchronized
+plan/evidence. Commit Portal as `ANY-766 - Serve production paid access snapshots`
+and the documentation-only Kernel mirror as
+`ANY-766 - Record production snapshot progress`.
+Earlier unchanged-HEAD/empty-index/no-commit statements describe their execution
+and review checkpoints. This authorization does not permit push, merge, rebase,
+branch switching, later implementation steps or publication/deployment. Keep the
+complete plan copies byte-identical and preserve all recorded verification limits.
+
 **Goal / Expected behavior:** accepted production terms produce complete, finite V2 authority.
 
 **Repository / Read before implementation:** Portal; [paid writer](https://github.com/gushinets/payments-portal/blob/b2ef280048ac634a60c18e820fbf702beddba19c/apps/api/app/domains/billing/paid_access.py), [allowance issuance](https://github.com/gushinets/payments-portal/blob/b2ef280048ac634a60c18e820fbf702beddba19c/apps/api/app/domains/billing/paid_allowances.py), [paid read](https://github.com/gushinets/payments-portal/blob/b2ef280048ac634a60c18e820fbf702beddba19c/apps/api/app/domains/billing/paid_read.py).
@@ -1480,7 +1771,7 @@ This revised plan closes:
 - **PLAN-2:** usage variants, exhaustion identity and durable acknowledgement are specified.
 - **PLAN-3:** token custody and original-operation recovery are specified.
 - **PLAN-4:** release compatibility and host/container profile mapping are specified.
-- **PLAN-5:** Step 1 materialization and contract formalization/technical review are complete in both repositories; Portal remains authoritative and the Kernel copy is synchronized after progress updates. Every later prompt names the exact Portal path and every step has concrete verification targets. Step 2 supplies production declarations and scenario bindings; Step 3 supplies immutable purchased quantities and pre-consent presentation. Step 4 supplies scoped server-side session delegation and the Kernel principal adapter. Paid runtime integration and later delivery remain for Steps 5–14.
+- **PLAN-5:** Step 1 materialization and contract formalization/technical review are complete in both repositories; Portal remains authoritative and the Kernel copy is synchronized after progress updates. Every later prompt names the exact Portal path and every step has concrete verification targets. Step 2 supplies production declarations and scenario bindings; Step 3 supplies immutable purchased quantities and pre-consent presentation. Step 4 supplies scoped server-side session delegation and the Kernel principal adapter. Step 5 supplies production provenance admission and finite read-only V2 snapshots. Paid runtime integration and later delivery remain for Steps 6–14.
 
 Remaining gates concern commercial and operational inputs for their dependent actions. Step 1 and implementation following the accepted strategy require no additional preliminary protocol approval. No launch quantity, LBX association, credential or host is invented.
 
