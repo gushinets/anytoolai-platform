@@ -44,11 +44,11 @@ const BRIEF = "Build a certificate that students receive by email after finishin
 const DELIVERABLE = "We built the certificate template and the PDF generation for 12 courses; 5 legacy courses are not connected.";
 const BRIEF_DECODER_BRIEF = "Need a website for my bakery by the holidays, modern but traditional.";
 
-const DRAFT_ACTIONS = ["acceptance_builder.extract_v1", "acceptance_builder.draft_document_v1"];
-const CHECK_ACTIONS = ["acceptance_builder.extract_v1", "acceptance_builder.compare_v1", "acceptance_builder.check_document_v1"];
+const DRAFT_ACTIONS = ["acceptance_builder.extract_v1"];
+const CHECK_ACTIONS = ["acceptance_builder.extract_v1", "acceptance_builder.compare_v1"];
 
 type Suffix = "" | ".weak_input";
-type Output = { extracted: Extracted; comparison?: Comparison; document: unknown };
+type Output = { extracted: Extracted; comparison?: Comparison };
 type Extracted = { values: Partial<Record<ListField, string[]>>; missing_fields: ListField[] };
 type ListField = "acceptance_criteria" | "assumptions" | "deliverables";
 type Comparison = { verdict: string; deltas: { criterion_id: string; status: string; evidence: string }[]; rationale: string };
@@ -63,7 +63,6 @@ function composedOutput(mode: "draft" | "check", suffix: Suffix): Output {
   return {
     extracted: fixture("extract", suffix) as unknown as Extracted,
     ...(mode === "check" ? { comparison: fixture("compare", suffix) as unknown as Comparison } : {}),
-    document: fixture(`${mode}_document`, suffix),
   };
 }
 
@@ -239,7 +238,7 @@ test.describe("Acceptance Builder web product", () => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   });
 
-  test("draft happy path: two actions in order, artifact correlation, copy text from the structured fields, one result_viewed, one copy activation", async ({
+  test("draft happy path: one action, artifact correlation, copy text from the structured fields, one result_viewed, one copy activation", async ({
     page,
   }) => {
     const run = trackRun(page);
@@ -252,7 +251,7 @@ test.describe("Acceptance Builder web product", () => {
     const expected = composedOutput("draft", "");
     const copyText = composeCopyText(expected);
     await expect(page.locator("main")).toContainText(expected.extracted.values.acceptance_criteria![0]!);
-    // The narrative recap is display-only and starts collapsed.
+    // The structured recap is display-only and starts collapsed.
     await expect(page.locator("details")).not.toHaveAttribute("open", "");
 
     await expectCorrelatedRun(run.sessionId(), run.resultArtifactId(), DRAFT_ACTIONS);
@@ -263,7 +262,7 @@ test.describe("Acceptance Builder web product", () => {
     expect(await countEvents("web.result_viewed", run.sessionId())).toBe(1);
   });
 
-  test("check happy path: three actions in order, the verdict leads the copy text, one result_viewed", async ({ page }) => {
+  test("check happy path: two actions in order, the verdict leads the copy text, one result_viewed", async ({ page }) => {
     const run = trackRun(page);
     await page.goto(PRODUCT_URL);
     await submitCheck(page);

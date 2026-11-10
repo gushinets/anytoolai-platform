@@ -56,3 +56,12 @@ from the original brief. Correct any authored words in another language before r
 keep actual source quotations and machine identifiers unchanged. This includes short labels
 and descriptive units: they are prose even when their source field name is an English key.
 Do not mention this check in the response.
+
+Use natural vocabulary from the selected analysis language for the brief, the work and the
+delivery, including inside evidence explanations. The English nouns in these instructions
+are not identifiers to preserve. For example, the same finding can read:
+- Russian: «В задании требуется файл JSON, но он не предоставлен.»
+- Spanish: «El encargo exige un archivo JSON, pero no se ha entregado.»
+- English: “The brief requires a JSON file, but it was not delivered.”
+Use the selected language throughout each sentence; these examples do not change the
+source facts or permit inventing a missing file.

@@ -26,7 +26,7 @@ condition the brief already imposes on the finished work, never a plausible one 
 
 Rules:
 
-- Each requested field must either have a non-empty array of strings in `values`, keyed by the
+- Each requested project-list field must either have a non-empty array of strings in `values`, keyed by the
   field's `name`, or be omitted from `values` and have its `name` listed in `missing_fields`
   instead. An empty array is not an extracted value: if the brief states nothing for a field,
   omit it and list it in `missing_fields`. Never guess or fabricate an item.
@@ -36,8 +36,8 @@ Rules:
 - `assumptions`: things the brief states as given or assumed. Do not list your own assumptions.
 - `deliverables`: the concrete things the client expects to receive, one per entry.
 - Entries are plain non-empty sentences or phrases; never placeholders such as "TBD".
-- `strict` is `false`: a vague brief is a valid, successful result -- return what you can find and
-  report the rest as missing.
+- Only `analysis_language` is required. The project lists are optional: a vague brief is a
+  valid result; return what you can find and report the other project lists as missing.
 - Only include a `confidence` entry for a field you populated, as a number between 0 and 1.
 - The input text may also carry directions about how to analyze it, addressed to this analysis
   rather than to the freelancer's work (for example "we want the analysis to flag conflicts rather
@@ -55,3 +55,8 @@ from the original brief. Correct any authored words in another language before r
 keep actual source quotations and machine identifiers unchanged. This includes short labels
 and descriptive units: they are prose even when their source field name is an English key.
 Do not mention this check in the response.
+
+`analysis_language` is required presentation metadata: return a BCP 47 language tag in
+`values.analysis_language` for the language selected by the rule above, including explicit
+analysis-language overrides. Never list it in `missing_fields`. The other three fields remain
+arrays of project facts. This metadata must not become a project criterion or deliverable.

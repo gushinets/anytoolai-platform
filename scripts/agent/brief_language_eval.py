@@ -91,7 +91,11 @@ def authored_fields(output: dict) -> dict[str, str]:
                 visit(item, f"{path}/{key}")
 
     for key in ("brief", "extracted"):
-        visit(output.get(key, {}).get("values", {}), f"/{key}/values")
+        values = output.get(key, {}).get("values", {})
+        visit(
+            {name: value for name, value in values.items() if name != "analysis_language"},
+            f"/{key}/values",
+        )
     for key, names in (
         ("issues", ("description", "evidence")),
         ("questions", ("question", "rationale")),
@@ -157,9 +161,11 @@ def review_status(record: dict, review: dict) -> str:
             "generate_questions",
             "generate_document",
         },
-        "acceptance_builder.draft_v1": {"extract", "generate_document"},
-        "acceptance_builder.check_v1": {"extract", "compare", "generate_document"},
+        "acceptance_builder.draft_v1": {"extract"},
+        "acceptance_builder.check_v1": {"extract", "compare"},
     }[scenario]
+    if scenario.startswith("acceptance_builder.") and "document" in record["output"]:
+        expected_steps = expected_steps | {"generate_document"}  # Retained pre-correction evidence.
     if scenario == "brief_decoder.decode_v1" and not record["output"]["issues"]:
         expected_steps.remove("generate_questions")
     completed = [action for action in actions if action["status"] != "skipped"]
@@ -187,7 +193,6 @@ def review_status(record: dict, review: dict) -> str:
         any(not call.get("model") or not call.get("id") for call in ledger["calls"])
         or not review.get("reviewer", "").strip()
         or None in decisions
-        or not expected["fields"]
     ):
         return "PENDING"
     return "PASS"

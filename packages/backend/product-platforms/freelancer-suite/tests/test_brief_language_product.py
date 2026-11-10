@@ -20,8 +20,6 @@ SOURCES = {
     "acceptance_builder": {
         "extract": "source_text",
         "compare": "reference_text",
-        "draft_document": "data.source_brief",
-        "check_document": "data.source_brief",
     },
 }
 
@@ -44,8 +42,11 @@ def test_same_language_policy_reaches_every_product_prompt_and_document_mapping(
             policies.add(policy.replace(f"`{source}`", "`SOURCE`"))
         workflows = yaml.safe_load((root / "workflows.yaml").read_text(encoding="utf-8"))
         for workflow in workflows["workflows"]:
-            step = workflow["steps"][-1]
-            assert step["input_mapping"]["data.source_brief"] == "scenario.input.brief_text"
+            if product == "brief_decoder":
+                step = workflow["steps"][-1]
+                assert step["input_mapping"]["data.source_brief"] == "scenario.input.brief_text"
+            else:
+                assert all(step["step_id"] != "generate_document" for step in workflow["steps"])
     assert len(policies) == 1
 
 
@@ -71,22 +72,8 @@ def test_full_canonical_fixture_and_semantic_invariants(case):
             assert set(extracted["missing_fields"]) == {"deadline", "budget"}
             assert "6–8" in json.dumps(output, ensure_ascii=False)
     else:
-        sections = {section["id"]: section["content"] for section in output["document"]["sections"]}
-        missing = {
-            "ru": "Не указано в брифе.",
-            "en": "Not specified in the brief.",
-            "es": "No se especifica en el encargo.",
-        }[case["expected_language"]]
-        for name in ("acceptance_criteria", "assumptions", "deliverables"):
-            content = sections[name.replace("_", "-")]
-            if name in extracted["values"]:
-                assert content.splitlines() == [f"- {item}" for item in extracted["values"][name]]
-            else:
-                assert content == missing
-        if case["family"] == "basic":
-            assert "500 EUR" in sections["acceptance-criteria"]
-            assert '"Ready to ship"' in sections["acceptance-criteria"]
-            assert "Acme" in sections["deliverables"]
+        assert "document" not in output
+        assert extracted["values"]["analysis_language"] == case["expected_language"]
     if "comparison" in output:
         comparison = output["comparison"]
         statuses = {delta["status"] for delta in comparison["deltas"]}
@@ -98,4 +85,3 @@ def test_full_canonical_fixture_and_semantic_invariants(case):
             else "meets_expectations"
         )
         assert comparison["verdict"] == expected
-        assert output["document"]["summary"]

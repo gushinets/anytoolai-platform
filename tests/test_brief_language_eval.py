@@ -33,7 +33,7 @@ def record():
                     "status": "succeeded",
                     "scenario_session_id": "session-1",
                 }
-                for step in ("extract", "compare", "generate_document")
+                for step in ("extract", "compare")
             ],
             "actions": [
                 {
@@ -43,7 +43,7 @@ def record():
                     "output_artifact_id": "result-1",
                     "scenario_session_id": "session-1",
                 }
-                for step in ("extract", "compare", "generate_document")
+                for step in ("extract", "compare")
             ],
             "artifacts": [
                 {
@@ -66,7 +66,7 @@ def completed_review(run):
 
 def test_every_authored_field_including_hidden_summary_is_reviewed():
     fields = evaluation.authored_fields(record()["output"])
-    assert fields["/document/summary"].startswith("Работа")
+    assert "/document/summary" not in fields
     assert fields["/comparison/deltas/0/evidence"].startswith("Предоставлен")
     assert "/comparison/rationale" in fields
     assert "/extracted/values/acceptance_criteria/0" in fields
@@ -82,21 +82,21 @@ def test_generated_output_is_pending_until_every_field_and_fact_is_reviewed():
     assert evaluation.review_status(run, evaluation.review_template(run)) == "PENDING"
     review = completed_review(run)
     assert evaluation.review_status(run, review) == "PASS"
-    review["fields"]["/document/summary"] = None
+    review["fields"]["/comparison/rationale"] = None
     assert evaluation.review_status(run, review) == "PENDING"
-    review["fields"]["/document/summary"] = False
+    review["fields"]["/comparison/rationale"] = False
     assert evaluation.review_status(run, review) == "FAIL"
 
 
 def test_incomplete_stale_and_invalid_reviews_cannot_pass():
     run = record()
     review = completed_review(run)
-    del review["fields"]["/document/summary"]
+    del review["fields"]["/comparison/rationale"]
     with pytest.raises(ValueError, match="incomplete"):
         evaluation.review_status(run, review)
     review = completed_review(run)
     changed = deepcopy(run)
-    changed["output"]["document"]["summary"] = "An English leak."
+    changed["output"]["comparison"]["rationale"] = "An English leak."
     with pytest.raises(ValueError, match="evidence"):
         evaluation.review_status(changed, review)
     review["criteria"][next(iter(review["criteria"]))] = "yes"
@@ -162,3 +162,15 @@ def test_suite_has_twelve_families_in_three_languages_and_honest_provenance():
         assert case["input"]["brief_text"]
     assert not {"BD-RU-10", "AB-D-RU-03", "AB-C-RU-01"} & {case["id"] for case in CASES}
     json.dumps(CASES, ensure_ascii=False)
+
+
+def test_machine_only_weak_draft_has_no_prose_to_review():
+    run = record()
+    run["case"] = next(case for case in CASES if case["id"] == "ANY761-AB-D-RU-weak")
+    run["output"] = CANONICAL[run["case"]["id"]]
+    run["ledger"]["actions"] = run["ledger"]["actions"][:1]
+    run["ledger"]["calls"] = run["ledger"]["calls"][:1]
+    run["ledger"]["artifacts"][0]["content_json"] = run["output"]
+    assert evaluation.authored_fields(run["output"]) == {}
+    assert evaluation.review_status(run, evaluation.review_template(run)) == "PENDING"
+    assert evaluation.review_status(run, completed_review(run)) == "PASS"

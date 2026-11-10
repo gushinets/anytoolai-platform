@@ -102,7 +102,8 @@
         "deliverables": [
           "PDF для Acme",
           "JSON для Acme"
-        ]
+        ],
+        "analysis_language": "ru"
       },
       "missing_fields": [],
       "confidence": {
@@ -110,40 +111,6 @@
         "assumptions": 0.95,
         "deliverables": 0.95
       }
-    },
-    "document": {
-      "summary": "Найдены три критерия приёмки. Все три списка указаны; подтвердите с клиентом передачу обоих файлов.",
-      "sections": [
-        {
-          "id": "acceptance-criteria",
-          "title": "Acceptance criteria",
-          "content": "- PDF и JSON содержат точную строку \"Ready to ship\"\n- Срок: 15 ноября\n- Бюджет: 500 EUR",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "assumptions",
-          "title": "Assumptions",
-          "content": "- Исходные данные уже предоставлены",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "deliverables",
-          "title": "Deliverables",
-          "content": "- PDF для Acme\n- JSON для Acme",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "open-gaps",
-          "title": "Open gaps",
-          "content": "В брифе указаны критерии приёмки, допущения и результаты работы."
-        }
-      ]
     }
   },
   "ANY761-AB-C-RU-basic": {
@@ -160,7 +127,8 @@
         "deliverables": [
           "PDF для Acme",
           "JSON для Acme"
-        ]
+        ],
+        "analysis_language": "ru"
       },
       "missing_fields": [],
       "confidence": {
@@ -168,45 +136,6 @@
         "assumptions": 0.95,
         "deliverables": 0.95
       }
-    },
-    "document": {
-      "summary": "Работа не соответствует ожиданиям: обязательный файл JSON не предоставлен.",
-      "sections": [
-        {
-          "id": "verdict",
-          "title": "Verdict",
-          "content": "Вердикт: не соответствует ожиданиям. Охват объёма: частично выполнено. Предоставлен только PDF; JSON отсутствует. Соответствие требованиям: частично выполнено. В PDF есть строка \"Ready to ship\"; наличие строки в JSON не подтверждено. Полнота: не выполнено. Из двух файлов предоставлен только PDF. Ясность: выполнено. Прямо указано, что PDF предоставлен, а JSON отсутствует. Оценка дана по четырём общим критериям, а не по каждому извлечённому критерию приёмки."
-        },
-        {
-          "id": "acceptance-criteria",
-          "title": "Acceptance criteria",
-          "content": "- PDF и JSON содержат точную строку \"Ready to ship\"\n- Срок: 15 ноября\n- Бюджет: 500 EUR",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "assumptions",
-          "title": "Assumptions",
-          "content": "- Исходные данные уже предоставлены",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "deliverables",
-          "title": "Deliverables",
-          "content": "- PDF для Acme\n- JSON для Acme",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "open-gaps",
-          "title": "Open gaps",
-          "content": "В брифе указаны критерии приёмки, допущения и результаты работы."
-        }
-      ]
     },
     "comparison": {
       "verdict": "does_not_meet",
@@ -339,7 +268,8 @@
         "deliverables": [
           "PDF for Acme",
           "JSON for Acme"
-        ]
+        ],
+        "analysis_language": "en"
       },
       "missing_fields": [],
       "confidence": {
@@ -347,40 +277,6 @@
         "assumptions": 0.95,
         "deliverables": 0.95
       }
-    },
-    "document": {
-      "summary": "Three acceptance criteria were found. All three lists are stated; confirm delivery of both files with the client.",
-      "sections": [
-        {
-          "id": "acceptance-criteria",
-          "title": "Acceptance criteria",
-          "content": "- PDF and JSON contain the exact string \"Ready to ship\"\n- Deadline: November 15\n- Budget: 500 EUR",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "assumptions",
-          "title": "Assumptions",
-          "content": "- The source data has already been provided",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "deliverables",
-          "title": "Deliverables",
-          "content": "- PDF for Acme\n- JSON for Acme",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "open-gaps",
-          "title": "Open gaps",
-          "content": "The brief states all three lists: acceptance criteria, assumptions and deliverables."
-        }
-      ]
     }
   },
   "ANY761-AB-C-EN-basic": {
@@ -397,7 +293,8 @@
         "deliverables": [
           "PDF for Acme",
           "JSON for Acme"
-        ]
+        ],
+        "analysis_language": "en"
       },
       "missing_fields": [],
       "confidence": {
@@ -405,45 +302,6 @@
         "assumptions": 0.95,
         "deliverables": 0.95
       }
-    },
-    "document": {
-      "summary": "The work does not meet expectations: the required JSON file has not been delivered.",
-      "sections": [
-        {
-          "id": "verdict",
-          "title": "Verdict",
-          "content": "Verdict: does not meet expectations. Scope coverage: partial. Only the PDF was delivered; JSON is missing. Requirement fit: partial. The PDF contains \"Ready to ship\"; the string cannot be verified in JSON. Completeness: mismatch. Only the PDF of the two required files was delivered. Clarity: match. The text clearly states that PDF was delivered and JSON is missing. The verdict is based on four general review criteria, not item by item on the extracted acceptance criteria."
-        },
-        {
-          "id": "acceptance-criteria",
-          "title": "Acceptance criteria",
-          "content": "- PDF and JSON contain the exact string \"Ready to ship\"\n- Deadline: November 15\n- Budget: 500 EUR",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "assumptions",
-          "title": "Assumptions",
-          "content": "- The source data has already been provided",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "deliverables",
-          "title": "Deliverables",
-          "content": "- PDF for Acme\n- JSON for Acme",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "open-gaps",
-          "title": "Open gaps",
-          "content": "The brief states all three lists: acceptance criteria, assumptions and deliverables."
-        }
-      ]
     },
     "comparison": {
       "verdict": "does_not_meet",
@@ -576,7 +434,8 @@
         "deliverables": [
           "PDF para Acme",
           "JSON para Acme"
-        ]
+        ],
+        "analysis_language": "es"
       },
       "missing_fields": [],
       "confidence": {
@@ -584,40 +443,6 @@
         "assumptions": 0.95,
         "deliverables": 0.95
       }
-    },
-    "document": {
-      "summary": "Se han encontrado tres criterios de aceptación. Se indican las tres listas; confirme con el cliente la entrega de ambos archivos.",
-      "sections": [
-        {
-          "id": "acceptance-criteria",
-          "title": "Acceptance criteria",
-          "content": "- PDF y JSON contienen la cadena exacta \"Ready to ship\"\n- Plazo: 15 de noviembre\n- Presupuesto: 500 EUR",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "assumptions",
-          "title": "Assumptions",
-          "content": "- Los datos de origen ya se han proporcionado",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "deliverables",
-          "title": "Deliverables",
-          "content": "- PDF para Acme\n- JSON para Acme",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "open-gaps",
-          "title": "Open gaps",
-          "content": "El encargo incluye las tres listas: criterios de aceptación, supuestos y entregables."
-        }
-      ]
     }
   },
   "ANY761-AB-C-ES-basic": {
@@ -634,7 +459,8 @@
         "deliverables": [
           "PDF para Acme",
           "JSON para Acme"
-        ]
+        ],
+        "analysis_language": "es"
       },
       "missing_fields": [],
       "confidence": {
@@ -642,45 +468,6 @@
         "assumptions": 0.95,
         "deliverables": 0.95
       }
-    },
-    "document": {
-      "summary": "El trabajo no cumple las expectativas: no se ha entregado el archivo JSON requerido.",
-      "sections": [
-        {
-          "id": "verdict",
-          "title": "Verdict",
-          "content": "Veredicto: no cumple las expectativas. Cobertura del alcance: cumplimiento parcial. Solo se ha entregado el PDF; falta el JSON. Cumplimiento de requisitos: cumplimiento parcial. El PDF contiene \"Ready to ship\"; no se puede comprobar la cadena en el JSON. Integridad: no cumplido. De los dos archivos requeridos solo se ha entregado el PDF. Claridad: cumplido. El texto indica claramente que se entregó el PDF y falta el JSON. La evaluación se basa en cuatro criterios generales, no en cada criterio de aceptación extraído."
-        },
-        {
-          "id": "acceptance-criteria",
-          "title": "Acceptance criteria",
-          "content": "- PDF y JSON contienen la cadena exacta \"Ready to ship\"\n- Plazo: 15 de noviembre\n- Presupuesto: 500 EUR",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "assumptions",
-          "title": "Assumptions",
-          "content": "- Los datos de origen ya se han proporcionado",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "deliverables",
-          "title": "Deliverables",
-          "content": "- PDF para Acme\n- JSON para Acme",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "open-gaps",
-          "title": "Open gaps",
-          "content": "El encargo incluye las tres listas: criterios de aceptación, supuestos y entregables."
-        }
-      ]
     },
     "comparison": {
       "verdict": "does_not_meet",
@@ -774,97 +561,28 @@
   },
   "ANY761-AB-D-RU-weak": {
     "extracted": {
-      "values": {},
+      "values": {
+        "analysis_language": "ru"
+      },
       "missing_fields": [
         "acceptance_criteria",
         "assumptions",
         "deliverables"
       ],
       "confidence": {}
-    },
-    "document": {
-      "summary": "Критерии приёмки не найдены. Сначала уточните ожидаемые результаты работы.",
-      "sections": [
-        {
-          "id": "acceptance-criteria",
-          "title": "Acceptance criteria",
-          "content": "Не указано в брифе.",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "assumptions",
-          "title": "Assumptions",
-          "content": "Не указано в брифе.",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "deliverables",
-          "title": "Deliverables",
-          "content": "Не указано в брифе.",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "open-gaps",
-          "title": "Open gaps",
-          "content": "Нужно уточнить критерии приёмки, допущения и результаты работы."
-        }
-      ]
     }
   },
   "ANY761-AB-C-RU-weak": {
     "extracted": {
-      "values": {},
+      "values": {
+        "analysis_language": "ru"
+      },
       "missing_fields": [
         "acceptance_criteria",
         "assumptions",
         "deliverables"
       ],
       "confidence": {}
-    },
-    "document": {
-      "summary": "Вердикт: не соответствует ожиданиям. Из описания невозможно установить соответствие: конкретные требования и результаты не указаны.",
-      "sections": [
-        {
-          "id": "verdict",
-          "title": "Verdict",
-          "content": "Вердикт: не соответствует ожиданиям. Охват объёма: не выполнено. Из описания невозможно установить соответствие: конкретные требования и результаты не указаны. Соответствие требованиям: не выполнено. Из описания невозможно установить соответствие: конкретные требования и результаты не указаны. Полнота: не выполнено. Из описания невозможно установить соответствие: конкретные требования и результаты не указаны. Ясность: не выполнено. Из описания невозможно установить соответствие: конкретные требования и результаты не указаны. Оценка дана по четырём общим критериям, а не по каждому извлечённому критерию приёмки."
-        },
-        {
-          "id": "acceptance-criteria",
-          "title": "Acceptance criteria",
-          "content": "Не указано в брифе.",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "assumptions",
-          "title": "Assumptions",
-          "content": "Не указано в брифе.",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "deliverables",
-          "title": "Deliverables",
-          "content": "Не указано в брифе.",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "open-gaps",
-          "title": "Open gaps",
-          "content": "Нужно уточнить критерии приёмки, допущения и результаты работы."
-        }
-      ]
     },
     "comparison": {
       "verdict": "does_not_meet",
@@ -958,97 +676,28 @@
   },
   "ANY761-AB-D-EN-weak": {
     "extracted": {
-      "values": {},
+      "values": {
+        "analysis_language": "en"
+      },
       "missing_fields": [
         "acceptance_criteria",
         "assumptions",
         "deliverables"
       ],
       "confidence": {}
-    },
-    "document": {
-      "summary": "No acceptance criteria were found. Clarify the expected deliverables first.",
-      "sections": [
-        {
-          "id": "acceptance-criteria",
-          "title": "Acceptance criteria",
-          "content": "Not specified in the brief.",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "assumptions",
-          "title": "Assumptions",
-          "content": "Not specified in the brief.",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "deliverables",
-          "title": "Deliverables",
-          "content": "Not specified in the brief.",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "open-gaps",
-          "title": "Open gaps",
-          "content": "Confirm the acceptance criteria, assumptions and deliverables."
-        }
-      ]
     }
   },
   "ANY761-AB-C-EN-weak": {
     "extracted": {
-      "values": {},
+      "values": {
+        "analysis_language": "en"
+      },
       "missing_fields": [
         "acceptance_criteria",
         "assumptions",
         "deliverables"
       ],
       "confidence": {}
-    },
-    "document": {
-      "summary": "Verdict: does not meet expectations. Compliance cannot be established: concrete requirements and deliverables are not specified.",
-      "sections": [
-        {
-          "id": "verdict",
-          "title": "Verdict",
-          "content": "Verdict: does not meet expectations. Scope coverage: mismatch. Compliance cannot be established: concrete requirements and deliverables are not specified. Requirement fit: mismatch. Compliance cannot be established: concrete requirements and deliverables are not specified. Completeness: mismatch. Compliance cannot be established: concrete requirements and deliverables are not specified. Clarity: mismatch. Compliance cannot be established: concrete requirements and deliverables are not specified. The verdict is based on four general review criteria, not item by item on the extracted acceptance criteria."
-        },
-        {
-          "id": "acceptance-criteria",
-          "title": "Acceptance criteria",
-          "content": "Not specified in the brief.",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "assumptions",
-          "title": "Assumptions",
-          "content": "Not specified in the brief.",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "deliverables",
-          "title": "Deliverables",
-          "content": "Not specified in the brief.",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "open-gaps",
-          "title": "Open gaps",
-          "content": "Confirm the acceptance criteria, assumptions and deliverables."
-        }
-      ]
     },
     "comparison": {
       "verdict": "does_not_meet",
@@ -1142,97 +791,28 @@
   },
   "ANY761-AB-D-ES-weak": {
     "extracted": {
-      "values": {},
+      "values": {
+        "analysis_language": "es"
+      },
       "missing_fields": [
         "acceptance_criteria",
         "assumptions",
         "deliverables"
       ],
       "confidence": {}
-    },
-    "document": {
-      "summary": "No se encontraron criterios de aceptación. Aclare primero los entregables esperados.",
-      "sections": [
-        {
-          "id": "acceptance-criteria",
-          "title": "Acceptance criteria",
-          "content": "No se especifica en el encargo.",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "assumptions",
-          "title": "Assumptions",
-          "content": "No se especifica en el encargo.",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "deliverables",
-          "title": "Deliverables",
-          "content": "No se especifica en el encargo.",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "open-gaps",
-          "title": "Open gaps",
-          "content": "Confirme los criterios de aceptación, los supuestos y los entregables."
-        }
-      ]
     }
   },
   "ANY761-AB-C-ES-weak": {
     "extracted": {
-      "values": {},
+      "values": {
+        "analysis_language": "es"
+      },
       "missing_fields": [
         "acceptance_criteria",
         "assumptions",
         "deliverables"
       ],
       "confidence": {}
-    },
-    "document": {
-      "summary": "Veredicto: no cumple las expectativas. No se puede establecer el cumplimiento: no se indican requisitos ni entregables concretos.",
-      "sections": [
-        {
-          "id": "verdict",
-          "title": "Verdict",
-          "content": "Veredicto: no cumple las expectativas. Cobertura del alcance: no cumplido. No se puede establecer el cumplimiento: no se indican requisitos ni entregables concretos. Cumplimiento de requisitos: no cumplido. No se puede establecer el cumplimiento: no se indican requisitos ni entregables concretos. Integridad: no cumplido. No se puede establecer el cumplimiento: no se indican requisitos ni entregables concretos. Claridad: no cumplido. No se puede establecer el cumplimiento: no se indican requisitos ni entregables concretos. La evaluación se basa en cuatro criterios generales, no en cada criterio de aceptación extraído."
-        },
-        {
-          "id": "acceptance-criteria",
-          "title": "Acceptance criteria",
-          "content": "No se especifica en el encargo.",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "assumptions",
-          "title": "Assumptions",
-          "content": "No se especifica en el encargo.",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "deliverables",
-          "title": "Deliverables",
-          "content": "No se especifica en el encargo.",
-          "metadata": {
-            "kind": "list"
-          }
-        },
-        {
-          "id": "open-gaps",
-          "title": "Open gaps",
-          "content": "Confirme los criterios de aceptación, los supuestos y los entregables."
-        }
-      ]
     },
     "comparison": {
       "verdict": "does_not_meet",

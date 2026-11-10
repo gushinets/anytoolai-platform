@@ -31,12 +31,10 @@ def write_provider_fixtures(directory: Path, case: dict[str, Any]) -> dict[str, 
             "brief_decoder.generate_summary_v1": output["document"],
         }
     else:
-        mode = "check" if scenario == "acceptance_builder.check_v1" else "draft"
         actions = {
             "acceptance_builder.extract_v1": output["extracted"],
-            f"acceptance_builder.{mode}_document_v1": output["document"],
         }
-        if mode == "check":
+        if scenario == "acceptance_builder.check_v1":
             actions["acceptance_builder.compare_v1"] = output["comparison"]
     for action, response in actions.items():
         (directory / f"{action}.json").write_text(
