@@ -21,6 +21,9 @@ from anytoolai_platform_api.errors import (
     request_validation_error_handler,
     unhandled_exception_handler,
 )
+from anytoolai_platform_api.routers.access_invalidations import (
+    router as access_invalidations_router,
+)
 from anytoolai_platform_api.routers.atom_lab import router as atom_lab_router
 from anytoolai_platform_api.routers.capability_manifest import router as capability_manifest_router
 from anytoolai_platform_api.routers.client_events import router as client_events_router
@@ -88,6 +91,7 @@ def create_app(
     _install_request_context(app)
     _install_error_handlers(app)
 
+    app.include_router(access_invalidations_router)
     app.include_router(health_router)
     app.include_router(capability_manifest_router)
     app.include_router(portal_session_router)
@@ -182,7 +186,10 @@ def _install_request_context(app: FastAPI) -> None:
             if media_type == "text/html":
                 # Separate policies preserve route CSP directives while refusing every ancestor.
                 response.headers.append("Content-Security-Policy", "frame-ancestors 'none'")
-            if request.url.path.startswith(("/internal/", "/v1/portal-session/")):
+            if (
+                request.url.path.startswith(("/internal/", "/v1/portal-session/"))
+                or "authorization" in request.headers
+            ):
                 response.headers["Cache-Control"] = "no-store"
             apply_atom_lab_cache_policy(request, response)
             log_event(

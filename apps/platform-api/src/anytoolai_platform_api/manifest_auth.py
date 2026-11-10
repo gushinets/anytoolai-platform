@@ -17,6 +17,7 @@ portal_bearer = HTTPBearer(scheme_name="PortalServiceBearer", auto_error=False)
 
 class PortalPermission(StrEnum):
     MANIFEST_READ = "manifest:read"
+    ACCESS_INVALIDATE = "access:invalidate"
 
 
 @dataclass(frozen=True)
@@ -58,7 +59,11 @@ def authenticate_portal(
             message="Valid service authentication is required.",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    return PortalPrincipal(tenant_id=settings.default_tenant_id, region=settings.default_region)
+    permissions = {PortalPermission.MANIFEST_READ}
+    if settings.portal_access_invalidation_enabled:
+        permissions.add(PortalPermission.ACCESS_INVALIDATE)
+    return PortalPrincipal(tenant_id=settings.default_tenant_id, region=settings.default_region,
+                           permissions=frozenset(permissions))
 
 
 def authorize_manifest_read(

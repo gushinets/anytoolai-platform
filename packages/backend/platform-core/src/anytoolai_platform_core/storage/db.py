@@ -675,7 +675,10 @@ paid_allowance_usage_table = sa.Table(
     sa.Column("created_at", utc_datetime, nullable=False),
     sa.Column("updated_at", utc_datetime, nullable=False),
     sa.UniqueConstraint(
-        "tenant_id", "region", "allowance_id", name="uq_paid_allowance_usage_scope_allowance",
+        "tenant_id",
+        "region",
+        "allowance_id",
+        name="uq_paid_allowance_usage_scope_allowance",
     ),
     sa.CheckConstraint(
         f"quantity BETWEEN 0 AND {MAX_ALLOWANCE_QUANTITY}",
@@ -704,7 +707,8 @@ execution_reservations_table = sa.Table(
     sa.Column("guest_quota_usage_id", sa.String(128)),
     sa.Column("paid_allowance_usage_id", sa.String(128)),
     sa.Column(
-        "replay_namespace", _enum_type(ExecutionReplayNamespace, "execution_replay_namespace"),
+        "replay_namespace",
+        _enum_type(ExecutionReplayNamespace, "execution_replay_namespace"),
     ),
     sa.Column("replay_key", sa.String(256)),
     sa.Column("request_hash", sa.String(64)),
@@ -717,8 +721,15 @@ execution_reservations_table = sa.Table(
     sa.UniqueConstraint("scenario_session_id", name="uq_execution_reservations_session"),
     sa.UniqueConstraint("job_id", name="uq_execution_reservations_job"),
     sa.UniqueConstraint(
-        "tenant_id", "region", "owner_kind", "owner_id", "product_id", "scenario_id",
-        "replay_namespace", "replay_key", name="uq_execution_reservations_owner_replay",
+        "tenant_id",
+        "region",
+        "owner_kind",
+        "owner_id",
+        "product_id",
+        "scenario_id",
+        "replay_namespace",
+        "replay_key",
+        name="uq_execution_reservations_owner_replay",
     ),
     sa.CheckConstraint(
         "(owner_kind = 'guest' AND guest_quota_usage_id IS NOT NULL "
@@ -746,7 +757,9 @@ execution_reservations_table = sa.Table(
     ),
     *(
         sa.ForeignKeyConstraint(
-            [column], [f"{PLATFORM_SCHEMA}.{table}.id"], name=f"fk_execution_reservations_{name}",
+            [column],
+            [f"{PLATFORM_SCHEMA}.{table}.id"],
+            name=f"fk_execution_reservations_{name}",
         )
         for column, table, name in (
             ("scenario_session_id", "scenario_sessions", "session"),
@@ -907,6 +920,21 @@ atom_lab_prompts_table = sa.Table(
     sa.Index("ix_atom_lab_prompts_scope", "tenant_id", "region", "atom_id"),
 )
 
+
+paid_access_coherence_table = sa.Table(
+    "paid_access_coherence",
+    runtime_metadata,
+    sa.Column("tenant_id", sa.String(128), primary_key=True),
+    sa.Column("region", sa.String(64), primary_key=True),
+    sa.Column("user_id", sa.String(128), primary_key=True),
+    sa.Column("revision_floor", sa.BigInteger(), nullable=False, server_default="0"),
+    sa.Column("snapshot_revision", sa.BigInteger()),
+    sa.Column("semantic_digest", sa.String(64)),
+    sa.Column("snapshot", _json_document_type()),
+    sa.CheckConstraint("revision_floor >= 0", name="ck_paid_access_floor_nonnegative"),
+)
+
+
 runtime_tables = {
     "scenario_sessions": scenario_sessions_table,
     "jobs": jobs_table,
@@ -923,6 +951,7 @@ runtime_tables = {
     "guest_quota_usage": guest_quota_usage_table,
     "paid_allowance_usage": paid_allowance_usage_table,
     "execution_reservations": execution_reservations_table,
+    "paid_access_coherence": paid_access_coherence_table,
     "product_handoffs": product_handoffs_table,
     "event_log": event_log_table,
 }

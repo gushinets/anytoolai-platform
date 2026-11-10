@@ -1,6 +1,6 @@
 # ANY-766 — Portal–Kernel Paid Execution Integration
 
-Status: **STEPS 1–5 COMPLETE; REV-4 and REV-5 start-boundary defects resolved; later gates remain**
+Status: **STEPS 1–6 COMPLETE within local verification; Steps 7–12 pending; delivery ends at PR readiness**
 
 Date: **2026-11-09**
 
@@ -10,22 +10,24 @@ Issue: [ANY-766](https://linear.app/paveldik/issue/ANY-766)
 - Owner: mixed — Portal and Kernel execution owners
 - Last updated: 2026-11-10
 - Review date: 2026-11-10
-- Next action: Step 6 coherent paid admission, ownership and events, only when separately requested. Steps 6–14 remain unexecuted.
-- Blocker: none for completed Steps 1–5. REV-1–REV-5 are resolved; REV-5 has fresh boundary-crossing and full Step 5 PostgreSQL/API regression evidence under the retained test-db authorization. Earlier complete selections remain dated evidence, not new reruns. Sales, live-proof, staging and production conditions apply only to their dependent actions under Section 3.8; the earlier Step 3 review and broader Kernel permission-test limits remain recorded below.
+- Next action: Step 7 durable Portal invalidation delivery, only when separately requested.
+- Blocker: none for Step 7 implementation. Missing remote-server, live-provider and registry inputs do not block local integration or PR readiness; later operational actions retain the gates in Section 3.8.
 
-This replaces the previous proposal completely. PLAN-1 through PLAN-5 are addressed below.
+Portal's `docs/exec-plans/active/ANY-766-implementation-plan.md` is authoritative;
+Kernel keeps a byte-for-byte copy at the same repository-relative path.
+The active repositories are the two clones under
+`/home/wstanley/www/work_unirec/runtime-research`.
 
-Destination: `/home/wstanley/www/work_unirec/runtime-research/payments-portal/docs/exec-plans/active/ANY-766-implementation-plan.md`.
-
-Plan materialization is **COMPLETE** in both prepared repositories. Portal's file at the destination above is authoritative. Kernel's byte-for-byte working copy is `/home/wstanley/www/work_unirec/runtime-research/anytoolai-platform/docs/exec-plans/active/ANY-766-implementation-plan.md`. Update Portal first and synchronize the Kernel copy after every subsequent progress update, before handoff.
-
-The user selected the two clones inside `/home/wstanley/www/work_unirec/runtime-research` as the active ANY-766 workspace. This supersedes the earlier workspace selection outside that directory. The earlier prepared clones were left unchanged and are not the active execution pair for this task.
-
-The latest user-saved revised plan was already present at the authoritative Portal path above as an untracked file. Its original SHA-256 was `58871cc2838d422161251201e8a5c7870b3aba0e9a2c25b3ab4b7b077ca92a4a`; its exact pre-preparation bytes are preserved at `/tmp/ANY-766-user-saved-revision-58871cc2838d.md`. It was updated in place with the initial preparation results and shared execution rules; Section 2 now records the subsequent predecessor-base refresh. The older plan outside the repositories remains historical context. Materialization and branch preparation did not perform Step 1's contract work. The execution clarification in Section 3.1 removes the incorrectly added preliminary contract-approval requirement.
+This is an execution plan, not a verification journal. Keep the goal, decisions,
+step instructions, required checks and a concise current status here. Record
+necessary decision changes with their reason and affected steps; keep detailed
+run histories, commands, output and commit bookkeeping in execution reports or
+PR/issue evidence rather than appending them to this plan. The first committed
+plan remains available through Git: Portal `cde9a66`, Kernel `0ff8dfca`.
 
 ## 1. Goal & Final Expected Outcome
 
-An authenticated Portal user with confirmed paid access can launch the selected Kernel products through the real browser and HTTP boundaries. Kernel verifies the existing Portal identity through scoped session delegation, obtains current access authority, resolves the scenario’s declared metric and passes the exact purchased allowance into ANY-507.
+An authenticated Portal user with confirmed paid test access can launch the selected Kernel products through actual local browser and HTTP boundaries. Kernel verifies the existing Portal identity through scoped session delegation, obtains current access authority, resolves the scenario’s declared metric and passes the exact purchased allowance into ANY-507.
 
 Acceptance commits the session/job and reservation atomically. One valid, durably saved, user-accessible final result consumes one unit. Terminal failure without that result releases the reservation. Replays return the original execution and bucket without another reservation or debit. The cabinet shows Kernel’s actual usage, reservations, remaining quantity and available capacity.
 
@@ -40,44 +42,33 @@ Counters are independent between products. Each successful scenario result consu
 
 Existing test metrics and history retain their identities and TEST-ONLY meaning. Commercial quantities, exact LBX associations and sales enablement require separate owner approval.
 
-ANY-766 delivers both applications’ integration, actual paid execution, truthful usage, durable delivery, image packaging and the selected staging implementation. ANY-767 receives this result for the complete billing journey, remaining natural-renewal verification, final deployment acceptance and production rollout.
+**Delivery boundary — user decision, 2026-11-10:** ANY-766 ends with implemented
+integration verified locally, minimal image-build/installation preparation and PRs
+ready for review. Local acceptance uses real Portal and Kernel applications,
+separate PostgreSQL databases and actual browser/TCP HTTP; external LBX and AI
+provider responses may be deterministic test substitutes, labelled as such.
+
+PR review and corrections precede registry publication and remote deployment.
+Actual staging deployment, real external-service configuration, the complete
+registration/payment/product journey, remaining natural-renewal acceptance and
+production rollout belong to ANY-767, **stage 11 of parent ANY-504**. No remote
+server, public domain, live purchase or registry credential is required to close
+this plan's local development scope. Internal Step 11 below is the local
+integration check; it is distinct from parent ANY-504 stage 11.
+This delivery boundary supersedes earlier staging-completion wording for this
+plan; the paid-access contracts and product behavior remain unchanged.
 
 ## 2. Current State & Reusable Implementation
 
-Current development bases: Portal ANY-766 is based on ANY-765 `b2ef280048ac634a60c18e820fbf702beddba19c`; Kernel remains based on `72ff15bc0b77903c87aa39f7b10186dccc556d09`.
+Development bases: Portal ANY-766 is based on ANY-765
+`b2ef280048ac634a60c18e820fbf702beddba19c`; Kernel is based on
+`72ff15bc0b77903c87aa39f7b10186dccc556d09` and includes ANY-507/814.
+Current migration heads after Steps 4/6 are Portal `20261110_0007` and Kernel `0019`.
 
-### Development bases and predecessor corrections
-
-**Historical re-preparation checkpoint — 2026-11-09 (Asia/Ulaanbaatar).** The user requested re-preparation of the existing runtime-research pair after ANY-715 merged, then explicitly authorized incorporating fresh predecessor commits after validation found the runbook-test follow-up. Numbered implementation steps had not started at that checkpoint. The development bases above supersede that checkpoint; the preparation evidence below remains historical.
-
-- Portal repository: `/home/wstanley/www/work_unirec/runtime-research/payments-portal`; current local branch `ANY-766`.
-- Fresh `git fetch --no-tags origin` verified Portal `origin/main` at **`576c2d88cf902ae7b5abddbc1e4f438f6c27366e`**, the merge of [ANY-715 PR #161](https://github.com/gushinets/payments-portal/pull/161), merged on 2026-11-09. [ANY-765 PR #164](https://github.com/gushinets/payments-portal/pull/164) remains open, based on that main, with head **`7f985031034f45fde0203f710eb64283cd086e86`**. PR state/ref metadata was freshly checked through GitHub; no current CI or live-acceptance PASS is inferred.
-- Portal's actual refreshed ANY-766 base is **`7f985031034f45fde0203f710eb64283cd086e86`**, identical to refreshed `origin/ANY-765` and including merged ANY-715/main. There are zero ANY-766 commits above that base. The first re-preparation moved the empty own-change range with `git rebase --autostash --onto d86a31732faeb1f383610f78aa85ecd703b2ab6f ac8743ff35c5cfaf0fdaf108fa89ad5e71bf49cd ANY-766`. The latest authorized refresh used `git merge --ff-only 7f985031034f45fde0203f710eb64283cd086e86` from `d86a317`, without a new stash or merge commit. The untracked plan and existing documentation-index change were preserved exactly. No old ANY-715/765 patches were replayed onto main.
-- The initial `ac8743ff35c5cfaf0fdaf108fa89ad5e71bf49cd` and rebased `2948010` trees are identical. Subsequent content changes are the `d86a317` scoped-primary/selected-digest fixes and documentation handoff, followed by `7f98503` runbook/test alignment. The latter changes only `test_billing_subscription_reconciliation.py` and the billing operations runbook: it normalizes whitespace in the documentation contract test, checks the scoped-primary/customer-wide distinction and states the existing six-hour trust formula. Application code, migrations and wire contracts are unchanged from `d86a317`.
-- Kernel repository: `/home/wstanley/www/work_unirec/runtime-research/anytoolai-platform`; current local branch `ANY-766`. Fresh `git fetch --no-tags origin` left its actual base **`72ff15bc0b77903c87aa39f7b10186dccc556d09`**, exactly refreshed `origin/main`. No Kernel branch move was necessary; delivered ANY-507/814 remain included.
-- Both repositories have one registered worktree. Both ANY-766 branches remain local with no upstream or push. Existing local predecessor/main branches were not moved. The initial state contained only the Portal plan/index preparation changes and the Kernel plan copy; no uncommitted application work or ANY-766 application commits had to be preserved or ported.
-- Before the first re-preparation, both plans, the Portal index file, patches and branch/status records were backed up under `/tmp/any766-reprepare-owg__1m_/` with plan SHA-256 `021e7750cee1faa6a20ca3b9cd61b541242635482ac1d258519fff79e5e082d4`. Before the latest fast-forward, the same preparation artifacts were backed up under `/tmp/any766-base-refresh-b4a8s56r/`; both plans then had SHA-256 `26002a4b7f8d3dd86ec36acbf8420c4414f27419f433f374ee11db167724dfe6`. The initial user-saved snapshot also remains at the path recorded above.
-- Actual migration heads remain Portal **`20261031_0006`** and Kernel **`0018`**, determined from revision/down-revision declarations. No database, migration, service, deployment, secret or environment configuration was changed by this re-preparation.
-
-### Re-preparation progress and evidence
-
-- [x] **PASS — existing work preserved and both remote-ref sets refreshed.** GitHub confirms ANY-715 merged and ANY-765 open at the SHAs above; Kernel main remains unchanged.
-- [x] **PASS — Portal ANY-766 base refreshed to `7f98503`, Kernel ANY-766 base retained at current main.** Both authorized preparation refreshes preserved existing work. The earlier automatic stash was reapplied; the latest fast-forward required no stash. No unresolved paths, residual stash, new ANY-766 implementation, staged changes, commits or pushes were introduced.
-- [x] **PASS — repository instructions and updated ANY-765 handoff inspected against source.** Section 2's alignment below records the consumed corrections and the remaining documentation ownership discrepancy.
-- [x] **PASS — Portal environment diagnostic:** `PATH="$PWD/.venv/bin:$PATH" npm run repo:doctor`. Worktree `4973adb2` / Compose project `payments-4973adb2` and existing isolated ports remain usable; no workloads were started.
-- [x] **PASS — Kernel environment diagnostic:** `./.quick-check-venv/bin/python scripts/agent/runner.py doctor`. Required tools/modules and the optional Docker client probe passed; no workloads were started.
-- [x] **PASS — current-pair documentation:** Portal `PATH="$PWD/.venv/bin:$PATH" npm run docs:check`; Kernel `./.quick-check-venv/bin/python scripts/agent/runner.py validate-docs`. These are fresh results in runtime-research after the base/plan refresh.
-- [x] **PASS — Portal inherited unit and affected reconciliation/runbook regressions on `7f98503`:** `./.venv/bin/python -m pytest -p no:cacheprovider -q apps/api/tests/test_any765_purchase_terms.py apps/api/tests/test_paid_access_policy.py apps/api/tests/test_paid_access_models.py apps/api/tests/test_billing_subscription_reconciliation.py` — **157 passed**. This includes the previously failing runbook contract test, which the earlier 65-case selection did not cover. These DB-free results do not establish PostgreSQL, browser or live acceptance.
-- [ ] **FAIL — existing Kernel cross-user activation test, environment limitation:** `tests/test_runner.py::test_activation_marker_is_readable_by_non_root_api_user` was reproduced independently and fails because `sudo -n -u nobody` reports `sudo: a password is required`. System permission policy was not changed. Kernel config, architecture, docs and generated-doc checks passed during validation. The broader `quick-check` was interrupted after the reproduced failure and is not a full PASS; remaining cases are NOT_RUN. This limitation does not prevent Step 1 document/contract work, but the affected permission check needs a supported execution environment before its verification can pass.
-- [x] **PASS — preparation integrity:** both branches/HEADs match the recorded bases with zero ANY-766 commits; Portal main is an ancestor of its refreshed base; both indexes are empty; no unresolved files, residual stash or active rebase exist. Portal tracked changes remain the one documentation-index addition, with this plan untracked; Kernel changes remain this untracked plan only. `git diff --check`, all pinned source-path existence checks and byte-for-byte plan equality pass. At that re-preparation checkpoint, all 14 step headings and the B10/delegation/admission decisions were unchanged; only predecessor preservation requirements and execution context were refined.
-- [x] **COMPLETE — Step 1 plan materialization only.** Both repositories already had the complete revised plan; this refresh updates the same authoritative file and mirror rather than starting a numbered implementation step.
-- **Historical preparation boundary:** Step 1 contract changes, schemas, fixtures and tests were NOT_RUN during re-preparation. They are now COMPLETE under the separate Step 1 execution checkpoint below; Steps 2–14 remained NOT_RUN at that checkpoint. Step 2 is subsequently completed below. Re-preparation itself did not complete a numbered implementation step.
-- [ ] **NOT_RUN — broad application/PostgreSQL/browser/image/live-LBX/staging/production acceptance.** Re-preparation verifies the selected bases, environment and documentation; it neither starts workloads nor re-certifies inherited runtime behavior. Previous results remain dated evidence for their recorded snapshots.
-- **Step 1 availability:** preparation originally left contract work READY without a separate preliminary approval; the subsequently requested Step 1 is now COMPLETE. Sales, live positive proof, staging and production retain their separately scoped conditions.
-
-Initial preparation created both local ANY-766 branches from Portal `ac8743ff35c5cfaf0fdaf108fa89ad5e71bf49cd` and Kernel `72ff15bc0b77903c87aa39f7b10186dccc556d09`, materialized the same plan in both repositories and added Portal's documentation-index entry. Its diagnostics, documentation and integrity checks passed at that earlier checkpoint. Those base-selection facts are historical; the refreshed bases and new check outcomes above are current. The earlier prepared clones outside runtime-research are not the execution pair and remain unchanged by this re-preparation.
-
-Development may proceed above the verified ANY-765 head while that PR is reviewed; its merge is not a prerequisite. After ANY-765 merges, transfer only ANY-766's own changes onto accepted main, preserving intervening corrections, under a separately authorized base refresh. Repeat affected migration, recovery, contract, concurrency and browser checks on the resulting pair. Extend the actual migration heads; do not rewrite existing migrations.
+Development may continue above the verified ANY-765 base while its PR is reviewed.
+After it merges, transfer only ANY-766 changes onto accepted main under a
+separately authorized base refresh, preserving intervening corrections. Recheck
+affected behavior and extend the actual migration heads without rewriting them.
 
 ### Consumed ANY-765 handoff and preservation requirements
 
@@ -88,7 +79,7 @@ Read the [current Step 10 producer handoff](https://github.com/gushinets/payment
 - Primary selection uses complete relevant product inventory and original owner/version/fence proof. Financial CREATE admission and `restore-original`/`bind-original` retain customer-wide completeness. Steps 5/11 must preserve independence from unrelated incomplete products without weakening financial admission.
 - Preserve the sole whole-user paid writer, atomic revision/causal observation/outbox/deadline commit, finite source trust, immutable same-cycle allowance identity and calendar precision. Current local calendar documents are internal evidence, not the target HTTP snapshot contract. B10 and exact-N delivery/ACK remain ANY-766 implementation work.
 - Current `/api/paid-access` requires an active verified-email session, derives scope/user server-side, is local and read-only after identity bookkeeping, and retains its reserved DB/thread budget and cancellation ownership. Step 10's separate usage API must preserve those authorization and availability guarantees.
-- Reader compatibility is stricter than the unchanged migration head: pre-fix Step 9 binaries cannot read newly accepted selected-digest purchases. Step 12 release validation, Step 13 recovery and Step 14 handoff must record this format-compatibility floor; same migration head does not authorize rolling back to an older reader.
+- Reader compatibility is stricter than the unchanged migration head: pre-fix Step 9 binaries cannot read newly accepted selected-digest purchases. Step 12 installation preparation and the Section 7 handoff must record this format-compatibility floor for subsequent ANY-767 deployment/recovery; same migration head does not authorize rolling back to an older reader.
 - At preparation, the refreshed handoff and Portal integration map still assigned production vocabulary to ANY-711. The [2026-11-09 ANY-766 scope clarification](https://linear.app/paveldik/issue/ANY-766) explicitly assigns selected production declarations/bindings to ANY-766 and leaves ANY-711 Done for its delivered manifest/TEST-ONLY baseline. **Step 1 now aligns both statements** without reopening ANY-711 or adding a dependency on new work there. Commercial quantity/LBX/sales approval remains separate.
 
 ### Reuse and actual gaps
@@ -97,11 +88,29 @@ Read the [current Step 10 producer handoff](https://github.com/gushinets/payment
 - ANY-765 supplies immutable accepted evidence, primary selection, calendar classification, stable allowance identities, semantic revisions, deadlines and atomic invalidation outbox updates.
 - Steps 3/5 now implement immutable configured-source technical terms and production allowance derivation. Ordinary commercial enablement and live positive proof retain their separate gates.
 - ANY-507 supplies paid owner partitioning, replay, reserve/finalize/release, recovery and readback. It already uses the required immutable allowance tuple.
-- Kernel has the Step 4 principal adapter; attaching trusted paid identity, ownership protection and authenticated paid events remains Step 6. Its existing `ClientEventService` still rejects sessions without a verified guest.
-- Portal invalidation transport and Kernel exhaustion delivery remain missing.
-- Existing independent Compose projects, runners, migration services and Kernel profile activation are reusable. Image deployment must remove host application-build and managed-venv requirements.
+- Kernel Step 6 attaches the Step 4 principal adapter to coherent paid admission and reservation/deferred ownership protection. Its existing `ClientEventService` now supports trusted paid owners, including events before a scenario exists; guest validation and deduplication remain intact.
+- Kernel Step 6 implements the durable coherence/invalidation receiver. Portal invalidation transport and Kernel exhaustion delivery remain later work.
+- Existing independent Compose projects, runners, migration services and Kernel profile activation are reusable. Add only the image/build and installation preparation needed for the selected Portal/Kernel pair; server installation follows PR review in ANY-767.
 
-Previous QA and CI results remain historical evidence. This revision used static inspection and checked the referenced existing paths. No new application, PostgreSQL, browser, live-LBX or deployment acceptance is claimed.
+### Current completion and verification limits
+
+- Steps 1–6 are complete within their contract/configuration and local test scope:
+  production metric bindings and purchased terms, session delegation, Portal V2
+  snapshots, Kernel coherent admission, ownership, invalidation receiver and paid
+  client events. The Step 6 final required PostgreSQL/ASGI selection recorded
+  85 passing tests with no skips; this is prior execution evidence, not a new run.
+- Portal invalidation delivery, browser launch/recovery, usage/exhaustion delivery,
+  cabinet integration, local joint verification and build preparation remain Steps 7–12.
+- Real paired local paid HTTP/browser acceptance is not yet established and must
+  pass in Step 11. Live-LBX and remote staging acceptance remain future ANY-767
+  work; synthetic/ASGI evidence does not establish those external outcomes.
+- The broader Kernel activation-marker test remains environment-limited:
+  `test_activation_marker_is_readable_by_non_root_api_user` needs supported
+  noninteractive execution as the target user. Do not treat the interrupted
+  broader `quick-check` as a full PASS.
+- The Step 6 invalidation receiver's permission is disabled by default through
+  `ANYTOOLAI_PORTAL_ACCESS_INVALIDATION_ENABLED`; configure it explicitly when
+  connecting the Portal sender. Sales enablement retains its separate gate.
 
 ## 3. Decisions, Contracts, Ownership & Dependencies
 
@@ -397,78 +406,83 @@ Read Kernel outside Portal transactions, validate scope/owner and observed tuple
 
 The generated Portal DTO includes local allowance identity/terms and `current | historical` classification. Observed items include actual counters/read time; unobserved items omit counters. A mismatching item becomes unavailable with diagnostics. A dependency outage returns `503`; `/api/paid-access` remains independently usable.
 
-### 3.7 Runtime, images and compatibility
+### 3.7 Minimal build and installation preparation
 
 Ownership:
 
-- Portal team: Portal code, migrations, embedded worker, images, app Compose and runner.
-- Kernel team: Kernel code, migrations, worker, images, profile/activation and runner.
-- Infrastructure owner assigned by Mikhail: host, domains/TLS, shared ingress/network, registry access, secrets and backups.
+- Portal team: Portal code, embedded worker, migrations, image builds and app-owned Compose/runner changes.
+- Kernel team: Kernel code, API/worker builds, migrations, profile activation and app-owned Compose/runner changes.
+- Infrastructure owner assigned for ANY-767: server/operator, domains/TLS, registry access, secrets, shared ingress/network and backups.
 
-App-owned image Compose files:
+Reuse existing Dockerfiles, independent Compose projects, repository-owned runners,
+private databases and retained volumes. Optional image overrides belong to each
+app: Portal `deploy/compose.images.yml`, Kernel
+`infra/compose/docker-compose.images.yml`. Component-selectable build/publish
+workflows belong in each repository's `.github/workflows/publish-images.yml`.
+Implementing these files does not execute publication or deployment.
 
-- Portal: `deploy/compose.images.yml`.
-- Kernel: `infra/compose/docker-compose.images.yml`.
-- Both: `.github/workflows/publish-images.yml`.
+Prepare independent frontend/backend builds for GitHub Actions and subsequent
+GHCR publication. Portal API/migration use the same backend image. Kernel API and
+worker use their existing Dockerfiles and one matching backend source revision.
+Frontend-only changes must not require rebuilding or restarting an unchanged
+compatible backend. Preserve the existing environment-specific frontend
+origins/base paths as explicit build inputs; use local test origins for rehearsal.
 
-Keep neutral joint-deployment templates in Portal `deploy/joint/`. The operator assembles their deployment copy under `runtime/portal-kernel/`; a new infrastructure repository is not required.
+Keep version selection simple: pin the chosen image references/digests in app-owned
+Compose environment inputs and record their source revisions, migration heads,
+peer wire versions and frontend build inputs in the existing runbooks. Application
+builds run before server installation. Control scripts may use a checkout at the
+matching reviewed revision; application-specific migration/profile commands run
+inside the selected images.
 
-Use independent Compose projects, private databases, migration services and retained volumes. Only necessary peer callers join the integration network, including the Kernel exhaustion worker.
+Do not build a general release manager, portable installer bundle, new web API
+compatibility-ID catalogue or shared version-selection schema. A universal
+`selection.json` and copied runner/helper release bundles are not required.
+Support the concrete locally verified pair and document its compatibility limits;
+do not infer compatibility from equal Git SHAs. Record the Portal purchased-document
+reader floor: an unchanged migration head does not make older pre-selected-digest
+readers compatible with new purchase history. Installation instructions must reject
+or exclude unsupported reader/image combinations without rewriting history.
 
-Build frontend/backend independently through manually dispatched GitHub Actions and publish immutable GHCR digests. Portal API/migration share one image. Kernel API/worker form one backend release from the same source revision. Keep environment-specific frontend builds for existing origins/base paths.
+Provide the smallest repository-owned build/install commands and parameterized
+configuration needed by this pair, reusing existing runners. Backend updates
+preserve deployment locks, quiesce/drain, migration-before-start, readiness and
+activation. Migration failure keeps admission closed; recovery follows the existing
+backup procedure. Frontend-only update uses the existing Compose service with
+`--no-deps`, preserving backend, migrations, active profile and volumes.
 
-Each component artifact includes version-1 release metadata:
+For Kernel, generate the candidate profile inside the selected API image, bind an
+explicit operator-owned host directory and derive host mount paths from it. Do not
+reuse container paths as host paths. Preserve profile fingerprints, API/worker
+source checks and the existing activation marker; retain the previous profile
+until successful activation. Do not add another activation mechanism.
 
-- Application/component, source SHA and immutable image digest(s).
-- Backend migration head.
-- Provided/required contract versions.
-- Frontend-required or backend-provided web API compatibility IDs.
-- Frontend build origins/base path.
-
-Initial web compatibility IDs are `portal-web:any766-v1` and `kernel-web:any766-v1`. A selected frontend requires an ID explicitly provided by its backend. Older artifacts without this metadata are incompatible. A breaking API change introduces a new ID; retain an old ID only with its compatibility tests.
-
-A selected `selection.json` identifies all four components and peer contract requirements. Validate metadata, web build origins, migration selection and peer compatibility before mutation. Do not infer compatibility from matching Git SHAs. Record the Portal purchased-document reader compatibility floor as well as migration heads: pre-fix Step 9 binaries cannot consume new selected-digest acceptances even though both use `20261031_0006`. Reject an incompatible rollback; do not rewrite accepted history to enable it.
-
-Extend both runners with:
-
-```text
-deploy-images --release-dir ... --env-file ... --component backend|frontend|all
-```
-
-The release bundle includes matching app-owned runner/helper files, Compose and metadata. Image mode needs Docker Compose and Python 3.12, without a host application checkout, application dependency installation or source build.
-
-Frontend-only deployment pulls/recreates only the frontend with `--no-deps`; it does not migrate, regenerate profiles, stop backend services or touch volumes.
-
-Backend deployment preserves lifecycle locks, quiesce/drain, migration-before-start, activation and readiness. A migration failure keeps admission closed. Old binaries are not resumed against an incompatible schema; recovery uses the existing verified backup procedure.
-
-**Kernel deployment profile**
-
-- Generate the candidate profile inside the selected API image, overriding its normal entrypoint.
-- Bind the operator-owned host profile root to `/release-profile`; generate `/release-profile/<candidate>/`.
-- Preserve the generated manifest and its fingerprints.
-- Derive host Compose mount paths explicitly from the selected host root/candidate. Do not interpret manifest container paths as host paths.
-- Check the unmodified source fingerprint inside the selected API and worker images before profile mounts.
-- Mount candidate products/manifest read-only into their existing runtime locations, run both effective-profile checks and activate the existing shared marker only after readiness.
-- Parameterize existing lifecycle helpers with the release state root; do not add another activation system.
-- Retain the previous profile until successful activation. Frontend-only updates preserve the active profile.
+Step 12 verifies the chosen image/configuration locally using disposable resources
+and records reproducible installation commands. Remote-host configuration,
+actual registry publication, deployment and the post-review installed-version
+acceptance belong to ANY-767. Missing remote inputs do not block Step 12.
 
 ### 3.8 Commercial and operational gates
 
-Contract formalization and consistency checks belong to Step 1. No additional Mikhail/designated-reviewer approval of Sections 3.3–3.6 is a prerequisite for that step or for implementation following the accepted strategy.
+Contract formalization and consistency checks belong to Step 1. The accepted
+strategy needs no additional preliminary protocol approval.
 
-- **Base re-preparation — COMPLETE for this request:** Section 2 records the actual refreshed bases, diagnostics, documentation/unit checks and preservation evidence. ANY-715 is merged; verified ANY-765 may remain under review during development. Preparation did not execute Step 1 and does not authorize later Git integration.
-- **Sales:** owner approves quantities, LBX account/tariff/service/period associations and enablement before publishing real sale configuration.
-- **Live positive proof:** an authorized supported paid test purchase and authoritative eligible cycle must exist. Otherwise live acceptance remains BLOCKED.
-- **Staging:** infrastructure owner supplies host/operator, domains/TLS, secret delivery, GHCR access, data roots, backups, SMTP, approved AI configuration and deployment authorization before Step 13.
-- **Production:** ANY-767 owns production rollout.
+- **Development base:** use Section 2's bases and preservation rules. Further Git integration requires separate authorization.
+- **Local acceptance:** use isolated test users, known test quantities and temporary enabled product profiles. Real interservice HTTP/authentication, PostgreSQL and browser checks are mandatory; replacing LBX/AI provider responses is permitted when clearly labelled. Do not enable ordinary sales or promote simulated history.
+- **Sales/live proof:** approved quantities, exact LBX associations and an authorized supported paid test purchase are prerequisites for their later live actions, not for the local completion of ANY-766.
+- **Review before rollout:** prepare PRs for review, resolve review changes and rerun affected checks before publication/deployment. This plan's endpoint is local development and PR readiness; external PR review follows it.
+- **Registry/staging — ANY-767:** after PR review/corrections, the infrastructure owner supplies the server/operator, domains/TLS, registry access, secrets, data roots, backups, SMTP, approved AI/LBX configuration and deployment authorization. Missing inputs defer those actions without blocking this plan.
+- **Production — ANY-767:** rollout follows the full billing-journey and environment acceptance.
 
-Missing operational inputs do not block independent implementation. A failed gate prevents its dependent action; it does not turn synthetic evidence into live acceptance.
+Record local readiness separately from later live/staging/production acceptance.
+Unexecuted external checks remain NOT_RUN; they do not become a failed local
+criterion or a synthetic live PASS.
 
-## 4. Functional DoD & Acceptance Coverage
+## 4. Local Functional DoD & Acceptance Coverage
 
 - Known-user empty revision zero is read-only; refusal creates no job, reservation or debit.
 - All seven selected scenarios use the approved metric; shared product counters behave consistently.
-- A real Portal–Kernel execution produces one accessible result and one debit; cabinet and Kernel readback agree.
+- Actual local Portal–Kernel HTTP/browser execution from committed test purchase/access state produces one accessible result and one debit; cabinet and Kernel readback agree. Do not substitute either app, their authentication or databases with endpoint mocks.
 - Failure/cancellation without a successful result releases capacity.
 - Same-key replay returns original execution/bucket across reauthorization, reload, grant changes and rollover.
 - Last-unit races accept only affordable work; reserved capacity is distinct from final exhaustion.
@@ -480,9 +494,12 @@ Missing operational inputs do not block independent implementation. A failed gat
 - N acknowledgement cannot clear N+1; exhaustion acknowledgement follows durable hint commit.
 - New quantities affect new purchases only; legacy and SIMULATED evidence remain compatible.
 - Browser expiry/relaunch preserves the original logical start and rejects stale-account responses.
-- Independent image updates preserve databases, usage and active profiles; incompatible selections are refused before mutation.
+- The selected local image/configuration rehearsal preserves databases, usage and active profiles, including a frontend-only update; unsupported reader/image combinations are refused or excluded by the installation contract.
 
-Steps 2–10 implement these behaviors. Step 11 proves actual HTTP integration, Step 13 proves the selected staging release, and Step 14 closes review and handoff.
+Steps 2–10 implement the product integration. Step 11 is the assembled local
+HTTP/PostgreSQL/browser proof; Step 12 prepares and locally verifies minimal build
+and installation support. The PR readiness checklist closes this plan. Remote
+staging acceptance is not part of its DoD and follows review in ANY-767.
 
 ## 5. Sequential Implementation Steps
 
@@ -498,7 +515,8 @@ Shared execution rules for both repositories:
 6. Apply Section 3.8 and other applicable commercial/operational conditions only to the actions they govern. Do not perform unapproved live LBX, financial, publication, staging or production operations.
 7. Do not stage, commit, push, merge, rebase or switch branches during subsequent execution. Do not reset, stash, discard or overwrite existing work. Initial branch creation and the 2026-11-09 predecessor-base refreshes were preparation-only authorizations; they do not authorize later Git operations. Proposed commit messages below grant no authorization.
 8. Escalate only a concrete departure from the accepted strategy or a genuinely unresolved material decision, with evidence. Do not request another approval of the already selected strategy or an approval record for Sections 3.3–3.6. Continue independent authorized work when a commercial/operational condition blocks another action; record its precise scope without guessing or bypassing it.
-9. Portal remains the authoritative plan. Update its progress and evidence first, then synchronize the entire file byte-for-byte to Kernel at the path above after every progress update and verify equality before handoff. Do not maintain divergent plan copies.
+9. Portal remains the authoritative plan. Update only concise status, necessary decisions or step instructions here; keep detailed execution evidence outside the plan. Synchronize the entire file byte-for-byte to Kernel after each plan change and verify equality before handoff.
+10. Keep affected as-built documentation and runbooks current within their owning steps. Step 11 supplies the combined local acceptance; the final PR checklist adds no implementation stage or repeated full test campaign.
 
 Repository roots:
 
@@ -515,60 +533,11 @@ PATH="$PWD/.venv/bin:$PATH" npm run check:fast
 
 Portal PostgreSQL cases require its isolated test server/configuration. Kernel cases require `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` pointing to a maintenance database for disposable test databases. Do not print credentials. Skipped database cases are NOT_RUN, never PASS.
 
-All prompts below require the complete authoritative plan file and this common protocol, including Russian communication with the user. Step 1 plan materialization is already complete; a request to execute Step 1 starts its remaining contract formalization and validation work without a separate approval prerequisite. If the plan file is absent or ambiguous, report the exact problem instead of reconstructing it from the historical external file.
+All prompts below require the complete authoritative plan and this common protocol, including Russian communication with the user. Consult Section 2 for completed steps. If the plan file is absent or ambiguous, report the exact problem instead of reconstructing it from a historical external file.
 
 After each code step, run its focused checks and applicable non-fixing lint/type/architecture checks. Fix failures introduced by the step. Broad suites run on the assembled result.
 
 ### Step 1 — Formalize and validate Portal–Kernel contracts
-
-**Preparation checkpoint (2026-11-09): plan materialization COMPLETE; predecessor-base re-preparation recorded in Section 2.** Actual refreshed bases, predecessor corrections, migration heads and shared execution rules remain unchanged. The user subsequently requested Step 1; its contract work and technical consistency review are **COMPLETE** at the execution checkpoint below. No runtime implementation or later step is included.
-
-#### Step 1 execution checkpoint — 2026-11-09
-
-- [x] **PASS — prepared state verified and preserved.** Portal remains local branch `ANY-766` at `7f985031034f45fde0203f710eb64283cd086e86`; Kernel remains local branch `ANY-766` at `72ff15bc0b77903c87aa39f7b10186dccc556d09`. Revision/down-revision inspection confirms unchanged migration heads `20261031_0006` / `0018`. Existing plan/index preparation work was retained; indexes remain empty. No staging, commit, push, merge, rebase, branch switch, reset or stash occurred.
-- [x] **PASS — canonical target formalization.** Both Portal canonical designs now have explicit dated ANY-766 sections covering Sections 3.3–3.6, with scoped precedence over the preserved September text. V2 removes UTC period fields, includes unit, retains finite authority and freezes the exact ANY-507 tuple. Identity/recovery, coherence/admission/paid events, exact-N delivery, usage/exhaustion and cabinet authorization/capacity are specified as future runtime work.
-- [x] **PASS — producer/consumer artifacts.** The [paired target bundle](../../contracts/portal-kernel-paid/README.md) contains 12 reviewed JSON schemas, an explicit route-host/payload-owner/permission/status index, 25 positive and 126 negative payload cases (117 before the REV-1 follow-up below), six valid-shape contextual rejection cases, and clock/ACK/exhaustion/usage-tuple vectors. Portal owns identity, snapshot and invalidation; Kernel owns usage/exhaustion. Both directories, including SHA256SUMS and README, match byte for byte. Existing manifest V1 fixtures, TEST-ONLY identities and semantic digest pins are unchanged.
-- [x] **PASS — independent offline validation.** Portal has a test-only strict Pydantic oracle and a resolved schema-shape comparison. Kernel uses JSON Schema with strict integer handling and independent semantic/context checks, plus existing ANY-507 PaidAllowance/readback compatibility. Neither imports peer code or adds a runtime dependency. Cases include known-user empty revisions, unsupported versions, zero/maximum/bool/float/overflow, missing unit/forbidden calendar fields, unknown/foreign usage, ordered completeness, busy versus exhausted, duplicate/historical exhaustion, full-tuple mismatch and PKCE/expiry consistency.
-- [x] **PASS — consumed handoff/scope alignment.** The current Linear ANY-766 description was read through the connected read-only tool. Both stale ANY-711 production-vocabulary statements in Portal's consumed handoff/integration map now assign the selected declarations/bindings to ANY-766, preserve ANY-711 Done and retain separate commercial approvals. Kernel's integration map records the new target without rewriting historical observations.
-- [x] **PASS — technical consistency review.** Applied Portal correctness/payment-security checklists and Kernel's agent review checklist to the paired change. Checked producer versus host ownership, authority/version precedence, canonical scope, no calendar conversion, no double clock haircut, replay/transaction/ownership rules, observational events, exact-N ACK, durable exhaustion acknowledgement, historical usage and independent cabinet resources. Review corrected identity-request ownership, correlated PKCE fixtures and added shape-valid observed-tuple mismatch vectors. All introduced fixture/oracle/lint failures were fixed; no production code was changed to make tests pass.
-
-Initial Step 1 verification (historical local/offline checkpoint; current REV-1 results follow below):
-
-- **PASS — Portal:** `PATH="$PWD/.venv/bin:$PATH" npm run docs:check`.
-- **PASS — Portal:** `./.venv/bin/python -m pytest -q apps/api/tests/test_any766_contracts.py` — **168 passed**, no skips.
-- **PASS — Portal:** `./.venv/bin/python scripts/check_kernel_manifest_contract.py --local` — `LOCAL_SPEC_CONFORMANCE=PASS`; its separate `REAL_KERNEL_CONFORMANCE=DEFERRED_NOT_IMPLEMENTED` marker remains unchanged. This command tests the retained local mock/client contract, not new real paid HTTP.
-- **PASS — Kernel:** `./.quick-check-venv/bin/python scripts/agent/runner.py validate-docs`.
-- **PASS — Kernel:** `./.quick-check-venv/bin/python scripts/agent/runner.py generate-docs --check` — generated documentation is current. The optional LiteLLM remote cost-map lookup was unavailable in the restricted environment and used its shipped backup; no generated artifact or dependency was modified.
-- **PASS — Kernel:** `./.quick-check-venv/bin/python -m pytest -o addopts='' -q apps/platform-api/tests/test_paid_contract_fixtures.py` — **156 passed**, no skips. The addopts override only restores pytest's visible pass count; it selects the exact planned test module.
-- **PASS — applicable static checks:** Portal `npm run architecture:check` with command-scoped venv PATH; Kernel `runner.py validate-architecture`; scoped `ruff check` and `ruff format --check` on all three new Python files.
-- **PASS — diagnostics/integrity:** Portal `PATH="$PWD/.venv/bin:$PATH" npm run repo:doctor` and Kernel managed `runner.py doctor`; paired bundle/plan byte equality, migration-head inspection and both `git diff --check` checks. Portal's sandbox-only Docker/loopback attempts initially failed; the read-only doctor and temporary-loopback checker passed outside that restriction. No permanent services or LBX clients were started.
-- **NOT_RUN — broader quick/full/PostgreSQL/browser/real two-service suites:** not part of this document/schema/fixture-only step; no runtime/migration/config changes were made. The pre-existing Kernel `sudo -n -u nobody` quick-check limitation in Section 2 remains unresolved and is not relabelled PASS.
-- **NOT_RUN — live LBX, publication, staging and production:** no such actions were performed. Section 3.8 gates remain in force; synthetic Q=1 and fixture-shaped secrets approve neither sales nor live authority. Future runtime endpoints and generated web DTOs remain unimplemented.
-
-**Step 1 result: COMPLETE.** Portal's plan remains authoritative and its whole-file Kernel copy is synchronized. Steps 2–14 remained unexecuted at this checkpoint; the subsequent Step 2 checkpoint is recorded below.
-
-#### Step 1 review follow-up — REV-1, 2026-11-09
-
-- **CONFIRMED — test-oracle defect, no runtime impact.** A raw JSON `valid_until: "1794196800"` was accepted by Portal's strict Pydantic oracle as `2026-11-09T04:00:00Z`, while Kernel/schema rejected it. The previous after-conversion UTC check lost the original wire format, and the resolved shape comparison ignored timestamp patterns. The nine new epoch-string regression cases all failed against Portal's pre-fix oracle and passed against the unchanged Kernel oracle.
-- **FIXED — raw timestamp parsing and shape comparison.** Every test-only timestamp field now uses one annotated timestamp type that checks the raw UTC RFC3339 pattern before datetime conversion. The same pattern is present in the oracle's JSON schema, and timestamp patterns are no longer excluded from resolved schema comparison. Nullable grant deadlines still accept null. Producer wire schemas and runtime code are unchanged.
-- **PASS — paired fixtures and controls.** Nine negative fixtures cover snapshot refresh/expiry, nullable grant deadline, code/delegation expiry, introspection deadline, usage read time, exhaustion time and nested cabinet read time. Both fixture/checksum copies are synchronized. Raw-JSON controls confirm rejection of the reported epoch string and acceptance of UTC `Z`, `+00:00` and fractional-second RFC3339 timestamps.
-- **PASS — Portal contracts:** `./.venv/bin/python -m pytest -q apps/api/tests/test_any766_contracts.py` — **177 passed**, no skips; includes the timestamp-pattern schema comparisons and all existing positive/negative/contextual vectors.
-- **PASS — Kernel contracts:** `./.quick-check-venv/bin/python -m pytest -o addopts='' -q apps/platform-api/tests/test_paid_contract_fixtures.py` — **165 passed**, no skips, using the unchanged independent validator.
-- **PASS — affected static/documentation checks:** Portal scoped `ruff check` and `ruff format --check` on the two changed test Python files; Portal `PATH="$PWD/.venv/bin:$PATH" npm run architecture:check` and `npm run docs:check`; Kernel managed `runner.py validate-architecture` and `validate-docs`; both bundle/plan byte comparisons, checksums and `git diff --check`.
-- **NOT_RUN — unrelated runtime/operational verification:** manifest HTTP, generated-doc, broader quick/full/PostgreSQL/browser/live/staging checks were not repeated for this test-oracle/fixture correction. Their prior results remain historical. The inherited `sudo -n -u nobody` limitation remains open. No remote refs were refreshed; local ANY-766 HEADs and empty indexes remain unchanged. No Git integration, financial action or later implementation step was performed.
-
-**REV-1: RESOLVED. Step 1 remains COMPLETE within its offline contract scope.**
-
-#### Local commit authorization — 2026-11-09
-
-The user explicitly requested local commits in both repositories after REV-1 was
-resolved. This narrowly overrides the common protocol's no-staging/no-commit rule
-for the completed Step 1 changes, preparation artifacts and REV-1 correction.
-Use one commit per repository titled `ANY-766 - Define Portal Kernel paid contracts`.
-Earlier no-commit/empty-index statements describe their historical checkpoints.
-This authorization does not permit push, merge, rebase, branch switching, later
-implementation steps or operational actions. Preserve the paired plans and target
-contract bundles byte for byte; retain all recorded verification limits.
 
 **Goal / Expected behavior:** future chats receive the synchronized plan and matching canonical specifications, schemas and fixtures that both producers and consumers validate against the selected contracts.
 
@@ -604,90 +573,6 @@ PATH="$PWD/.venv/bin:$PATH" npm run docs:check
 
 ### Step 2 — Declare production metrics and scenario bindings
 
-#### Step 2 execution checkpoint — 2026-11-09
-
-**Result: COMPLETE within configuration and manifest-inventory scope.** Only Step 2
-was executed. Paired starting/current HEADs remain Portal
-`791d41d36d451de30c19f6439be1abd42fde2b8e` and Kernel
-`0ff8dfca2763f71214a3eed441e2188191b950c5`, both local `ANY-766` branches,
-plus the uncommitted Step 2 diff. No staging, commit, push, branch move, database
-migration, deployment or financial operation was performed.
-
-Implemented:
-
-- Added optional nonblank `paid_metric_key` to Core/SDK scenario definitions and
-  existing ConfigLoader parsing/reference validation. References must resolve
-  within the scenario's product, including when commercial flags are disabled;
-  missing/foreign references and incompatible scalar values are rejected.
-- Declared all four approved production metric/unit pairs and all seven
-  bindings from Section 1. Shared scenarios resolve the same product metric.
-  All ordinary product/metric commercial flags remain disabled. Existing
-  TEST-ONLY identities, guest policies (including Client Update Writer's absent
-  guest quota), Task Finder surfaces and historical runtime data are unchanged.
-- Updated the complete current manifest inventory to six products/six metrics.
-  The ordinary disabled digest is
-  `sha256:359cc0ff7c7bbacb69ba8e0de0444738b46032c846b10a962298bfb8e0d9cf85`;
-  the isolated current test-enabled digest is
-  `sha256:5a743b1eb5e50ebed25259fb745e6b2dda743f01bd0def1cae77d12e9697aa62`.
-  Only the original two TEST-ONLY metrics are enabled in the synthetic profile.
-  Portal retains independent current fixture copies. Historical positive,
-  digest and negative fixture bytes are unchanged; the former ordinary disabled
-  fixture is preserved byte-for-byte as `historical-disabled-manifest.json`.
-- Updated the existing manifest conformance harness for the current inventory
-  and removed references to Portal's already removed webhook settings. Its
-  report distinguishes current inventory from TEST-ONLY enablement. No Portal
-  runtime source changed. Updated configuration/contract/integration documents.
-
-Fresh verification (all commands run from their respective repository roots):
-
-- **PASS — Kernel doctor:** `./.quick-check-venv/bin/python scripts/agent/runner.py doctor`.
-- **PASS — required focused tests, 160 passed:** `./.quick-check-venv/bin/python -m pytest -o addopts='' -q packages/backend/platform-core/tests/unit/test_config_loader.py apps/platform-api/tests/test_paid_metric_bindings.py apps/platform-api/tests/test_capability_manifest_contract.py`.
-- **PASS — config and architecture:** `./.quick-check-venv/bin/python scripts/agent/runner.py validate-configs` and `./.quick-check-venv/bin/python scripts/agent/runner.py validate-architecture`.
-- **PASS — related regressions, 179 passed:** `./.quick-check-venv/bin/python -m pytest -o addopts='' -o faulthandler_timeout=60 -q apps/platform-api/tests/test_capability_manifest.py apps/platform-api/tests/test_capability_projection.py packages/backend/platform-core/tests/test_contract_field_compatibility.py packages/backend/platform-sdk/tests/test_contracts_importable.py tests/test_manifest_conformance.py tests/test_validate_configs.py`.
-- **PASS — projection/documentation tests, 43 passed:** `./.quick-check-venv/bin/python -m pytest -o addopts='' -q apps/platform-api/tests/test_capability_projection.py tests/test_validate_docs.py tests/test_docs_generation.py`.
-- **PASS — real local Kernel → Portal typed-consumer HTTP conformance:** `./.quick-check-venv/bin/python scripts/agent/runner.py manifest-conformance --portal-root /home/wstanley/www/work_unirec/runtime-research/payments-portal --portal-python /home/wstanley/www/work_unirec/runtime-research/payments-portal/.venv/bin/python`. Ordinary/test/reordered/material inventories, authentication/scope/rotation, fault recovery, restart, concurrency, poisoned-dotenv isolation and zero storage/provider side effects pass. Its isolated Portal regression subprocess reports **94 passed**. This is actual local TCP HTTP evidence using synthetic test configurations, not paid execution, live LBX or deployed TLS evidence.
-- **PASS — Portal consumer regressions, 93 passed:** `./.venv/bin/python -m pytest -o addopts='' -q apps/api/tests/test_kernel_manifest_client.py apps/api/tests/test_kernel_contract_checker.py`.
-- **PASS — contract artifacts:** `./.quick-check-venv/bin/python scripts/agent/check_capability_manifest_contract.py --portal-root ../payments-portal`; independent fixture/schema/digest checks and current consumer-copy equality pass. Historical positive byte SHA-256 remains `25f39800090615eeba04cb27ab020332d0cf7cf7250fac6d2e5c38754c89b354`.
-- **PASS — docs/generation:** Kernel `./.quick-check-venv/bin/python scripts/agent/runner.py validate-docs`, `./.quick-check-venv/bin/python scripts/agent/runner.py generate-docs` and `./.quick-check-venv/bin/python scripts/agent/runner.py generate-docs --check`; Portal `PATH="$PWD/.venv/bin:$PATH" npm run docs:check`. Generation produces no artifact drift.
-- **PASS — lint ratchet:** non-fixing Ruff checks pass for changed Python files except the two files with inherited diagnostics. Comparing those and every other changed/new Python file against HEAD gives **25 baseline / 25 current / 0 introduced** diagnostics. **FAIL (inherited) — unrestricted whole-file Ruff** still reports those existing loader/unit-test violations; they were not suppressed or expanded. No new Python typechecking gate was introduced; Core/SDK field compatibility and boundary validation tests pass.
-- **PASS — scope/integrity:** diff inspection and `git diff --check` in both repositories; empty indexes, unchanged HEADs/branches, retained historical fixture bytes, current consumer fixtures and byte-for-byte whole-plan equality. Portal was updated first and the entire Kernel copy synchronized.
-
-Resolved verification failures and limits:
-
-- The first new SDK compatibility test incorrectly used `dataclasses.asdict` on
-  frozen registry metadata; it now validates from attributes. A pre-existing
-  digest mutation test assumed the first product and metric had different
-  owners; the expanded inventory exposed that assumption, and the test now
-  explicitly selects a different owner. All affected reruns pass.
-- The first conformance run exposed the obsolete webhook-settings references
-  above; the updated harness passes. Sandbox TCP restrictions caused five
-  Portal HTTP-test failures and prevented conformance startup. HTTP checks were
-  rerun with approved local-socket access and pass. A combined sandbox ASGI
-  regression run stalled and was terminated; it is not counted as a PASS.
-  Its focused and related replacements above completed successfully.
-- **NOT_RUN — broad quick/full/PostgreSQL/browser/image/live-LBX/staging/production
-  acceptance:** outside this configuration-only step. No schema/storage change
-  requires a new database test. The inherited cross-user activation permission
-  limitation in Section 2 remains unresolved and was not bypassed.
-- **BLOCKED — actual sale publication/enablement and operational acceptance**
-  retain Section 3.8's owner-approved quantities/LBX associations, supported
-  paid purchase and infrastructure/authorization inputs. These do not block
-  completed Step 2. Paid identity, enforcement, usage delivery and immutable
-  purchased terms remain later steps; no production-readiness claim is made.
-
-
-#### Step 2 local commit authorization — 2026-11-09
-
-After Step 2 verification, the user explicitly requested local commits in both
-repositories. This narrowly overrides the common protocol's no-staging/no-commit
-rule for the completed Step 2 changes and their synchronized plan/evidence.
-Use one commit per repository titled
-`ANY-766 - Declare production metrics and scenario bindings`.
-Earlier unchanged-HEAD/empty-index/no-commit statements describe their execution
-checkpoints. This authorization does not permit push, merge, rebase, branch
-switching, later implementation steps or operational actions. Preserve both
-plan copies byte for byte and retain all recorded verification limits.
-
 **Goal / Expected behavior:** all seven scenarios resolve their approved metric through product-owned configuration.
 
 **Repository / Read before implementation:** Kernel; [loader](https://github.com/gushinets/anytoolai-platform/blob/72ff15bc0b77903c87aa39f7b10186dccc556d09/packages/backend/platform-core/src/anytoolai_platform_core/config/loader.py), product declarations and Core/SDK scenario contracts.
@@ -714,166 +599,6 @@ plan copies byte for byte and retain all recorded verification limits.
 **Proposed commit:** `ANY-766 - Declare production metrics and scenario bindings`
 
 ### Step 3 — Publish and accept purchased quantities
-
-#### Step 3 execution checkpoint — 2026-11-09
-
-**Result: COMPLETE within publication, immutable acceptance and pre-consent UI scope.**
-Only Step 3 was executed. Starting/current HEADs remain Portal
-`338edf22fbdc9101f25039b49e3a060b87ba32c4` and Kernel
-`b9b6c78bf524a613496f1053278c074c4c4554cc`, both on local `ANY-766` branches,
-plus this uncommitted diff. Both working trees and indexes were clean initially.
-No staging, commit, push, branch change, real association publication, sales
-enablement, live LBX call or application-database migration was performed.
-
-Implemented:
-
-- The existing protected CLI requires `--metric-key`, `--unit` and
-  `--allowance-quantity` for dry-run/publication. `--quantity` retains its LBX
-  commercial service meaning. The shared exact technical-offer value type lives
-  in Catalog, avoiding a Catalog dependency on Purchases. Strict integer bounds
-  remain 0…2^53−1; bool, float, string, negative and overflowing quantities fail.
-- `product-link-v3` pins one fixed-per-cycle technical offer in the existing
-  immutable mapping table. Publication validates fresh enabled product/metric
-  ownership/unit and the selected LBX offer through existing source clients.
-  Configured terms require configured Kernel/LBX provenance. OS principal,
-  source deadlines, product-head CAS, offer ownership, history, no-op publication
-  and uncertain-commit recovery remain on their original paths.
-- `purchased-technical-terms:v2` and `accepted-purchase:v3` pin configured terms,
-  mapping identity/revision, account/selection, commercial fingerprint and fresh
-  manifest evidence. The final acceptance transaction checks the current head
-  and exact published technical binding. `confirmation_digest()` semantics are
-  unchanged; selected meaning stays separate from full source/audit digests.
-  Unrelated source/manifest changes do not require fresh selected consent.
-- Legacy v1/v2 mapping/purchase documents and SIMULATED technical terms remain
-  readable without rewriting their fields/digests. Exact historical full-digest
-  v2 replay is preserved. Original acceptance replay and uncertain-operation
-  recovery run before new-sale I/O. New production purchases require a published
-  quantity; legacy history cannot supply an invented production offer. Existing
-  subscriptions retain their original accepted quantity after republication and
-  through proven subsequent cycles.
-- Purchase review and paid-read response contracts now represent both provenance
-  values; OpenAPI/TypeScript were regenerated. The UI shows exact quantity/unit
-  before consent, labels SIMULATED evidence only when applicable, and resets
-  consent after changed terms. The generic limit label is updated in all seven
-  catalogs. Runbook, schema reference and Portal integration map are updated.
-
-Fresh verification (repository-root commands):
-
-- **PASS — required API/PostgreSQL selection, 68 passed / 0 skipped:**
-  `./.venv/bin/python -m pytest -q apps/api/tests/test_any765_purchase_terms.py apps/api/tests/test_commercial_mapping_postgres.py apps/api/tests/test_any766_purchase_terms_postgres.py`.
-  Executed through `/tmp/any766_step3_tests.py`, which uses the repository's
-  `canonical_check_environment()`, test defaults and
-  `api_test_environment('api-postgres', ...)`, then assigns a unique disposable
-  `_tests` database. PostgreSQL 18 was started through
-  `./.venv/bin/python scripts/repo.py test-db up` using the already-local image.
-  The final HTTP cases use production settings with fully intercepted synthetic
-  sources; no real provider endpoint is contacted. Local evidence:
-  `.harness/any766-step3-required.log` and `.harness/any766-step3-required.xml`.
-- **PASS — related PostgreSQL regressions, 48 cases:**
-  `apps/api/tests/test_any765_purchase_terms_postgres.py`,
-  `apps/api/tests/test_any709_step1_postgres.py` and
-  `apps/api/tests/test_paid_access_terms_postgres.py`, included in the passing
-  combined **115-test / 0-skip** run. This covers selected/global-source changes,
-  exact saved full-digest replay, legacy history, concurrent publication,
-  credentials/origin rotation, uncertain commits and frozen cycle issuance.
-  Evidence: `.harness/any766-step3-final.log` and its XML report. The final
-  production-legacy rule and production-mode HTTP cases also pass the subsequent
-  required 68-test run above.
-- **PASS — source, architecture and documentation tests, 304 passed:**
-  `./.venv/bin/python -m pytest -q apps/api/tests/test_any709_step1_sources.py apps/api/tests/test_repository_docs.py apps/api/tests/test_architecture.py`.
-  Documentation tests were rerun after the as-built map/schema/runbook changes
-  (**195 passed**).
-- **PASS — web components, 54 passed:**
-  `npm --workspace @anytoolai/web run test:components -- tests/components/any766-purchase-terms.test.tsx tests/components/any709-step4.test.tsx tests/components/any765-paid-access.test.tsx`.
-  Covers configured/zero/maximum, SIMULATED/unknown history, display before
-  consent and fresh unchecked consent after a quantity/revision change.
-- **PASS — non-fixing checks:** Ruff check and format check on all **15** changed
-  Python files; `npm run lint:web`; `npm run typecheck:web`;
-  `npm run test:boundaries:web` (**38 passed**);
-  `PATH="$PWD/.venv/bin:$PATH" npm run architecture:check` and `npm run docs:check`.
-- **PASS — generation:** `PATH="$PWD/.venv/bin:$PATH" npm run generate` and
-  `PATH="$PWD/.venv/bin:$PATH" npm run generate:check`. Existing local Node
-  dependencies were copied from a checkout with the byte-identical lockfile;
-  nothing was installed or updated.
-- **PASS — focused browser rendering:** eight desktop/mobile screenshots of the
-  actual `PurchaseTerms` component with repository CSS and synthetic inputs
-  (configured Q=7, Q=0, Q=2^53−1 and SIMULATED). All eight axe runs report zero
-  violations, no page errors and no horizontal overflow; representative desktop
-  and maximum-quantity mobile screenshots were visually inspected. Evidence:
-  `.harness/any766-step3-ui/report.json` and adjacent PNGs. This local Vite
-  component preview uses a fallback font, not a full Next.js route or two-service
-  execution. All browser requests outside loopback were blocked.
-- **PASS — Kernel documentation-only scope:** repository doctor; documentation
-  validation and whole-plan equality are checked after synchronization. Kernel
-  runtime/configuration and both repositories' dependency locks are unchanged.
-
-Resolved verification failures and remaining limits:
-
-- Initial UI tests lost the intl provider on rerender and compared nonbreaking
-  spaces without normalization; the corrected tests pass. The updated CLI
-  rotation fixture also needed the same configured-source mode after credential
-  rotation; its regression now passes.
-- Two overlapping pytest processes initially collided on the same disposable
-  database and invalidated that regression attempt. The runner now assigns a
-  unique `_tests` database; the full sequential rerun and final required gate
-  pass. Only disposable test databases were affected. The web boundary gate's
-  sandbox subprocess `EPERM` was resolved by a local unsandboxed rerun; no
-  network access or installation was required.
-- **NOT_RUN — Section 6 broad suites, full routed Next.js/browser journey,
-  real two-service paid HTTP, live LBX, publication, staging and production:**
-  these are later-step or separately gated evidence, not Step 3 acceptance.
-  Current proofs use real disposable PostgreSQL and synthetic source/provider
-  transports; no synthetic quantity approves a commercial offer.
-- **BLOCKED — real sale configuration/live positive acceptance:** approved launch
-  quantities, LBX associations and sales enablement remain owner inputs under
-  Section 3.8. Ordinary Kernel commercial flags remain disabled. This does not
-  block the completed independent Step 3 implementation.
-- Production allowance derivation/provenance admission and V2 snapshot serving
-  remain Step 5. This step only preserves the existing issuer's immutable
-  quantity behavior and widens customer response provenance. New v3 purchased
-  documents additionally require a **Step 3-compatible reader**, even though
-  migration head `20261031_0006` is unchanged; pre-Step-3 binaries cannot consume
-  them. Steps 12–14 must retain that reader floor alongside the earlier ANY-765
-  selected-digest floor. No historical document rewrite enables rollback.
-
-Portal remains authoritative; the entire file is synchronized byte-for-byte to
-Kernel and equality is verified before handoff. Steps 4–14 remain unexecuted.
-
-#### Step 3 review follow-up — REV-2, 2026-11-10
-
-**REV-2: RESOLVED.** The top-level Status, Next action and Blocker now agree
-with the completed Step 3 checkpoint. The next implementation step is Step 4,
-requiring a separate user request; no Step 3 repetition is directed.
-
-The supplied review reports no confirmed functional defect in the inspected
-Portal/Kernel diff. Its fresh API (1949), UI (420), web-boundary (38), Kernel
-contract/binding/manifest (211) and exact-JSON quantity (10 scenarios) results
-are reviewer-reported evidence, not reruns performed by this documentation
-correction. The earlier PostgreSQL 68/115 reports were reused by that review.
-Its attempted fresh PostgreSQL rerun was blocked by automatic approval review
-because starting the local container requires explicit infrastructure permission.
-The pasted permission request does not grant that permission. This correction
-starts no container and claims no fresh database verification; Step 3 remains
-complete with that review-verification limitation. Whole-program readiness,
-live LBX and joint paid runtime remain unproven. REV-1 remains resolved.
-
-Only the authoritative plan and its full Kernel mirror are changed by this
-follow-up. Existing source changes and indexes are preserved. Documentation
-checks, non-plan integrity and byte-for-byte mirror equality are verified before
-handoff.
-
-#### Step 3 local commit authorization — 2026-11-10
-
-After the Step 3 review and REV-2 correction, the user explicitly requested
-local commits in both repositories. This narrowly overrides the common
-protocol's no-staging/no-commit rule for the completed Step 3 changes and their
-synchronized plan/evidence. Commit the Portal implementation as
-`ANY-766 - Publish immutable production allowance terms` and the Kernel plan
-mirror as `ANY-766 - Record purchased allowance terms progress`.
-Earlier unchanged-HEAD/empty-index/no-commit statements describe their execution
-checkpoints. This authorization does not permit push, merge, rebase, branch
-switching, later implementation steps or operational actions, including the
-blocked fresh PostgreSQL review rerun. Preserve both plan copies byte for byte.
 
 **Goal / Expected behavior:** an operator publishes exact terms and a buyer sees and immutably accepts them.
 
@@ -903,202 +628,6 @@ Cover Q changes, immutable renewal quantity, CAS/replay, unsupported metric/unit
 **Proposed commit:** `ANY-766 - Publish immutable production allowance terms`
 
 ### Step 4 — Implement scoped session delegation
-
-#### Step 4 execution checkpoint — 2026-11-10
-
-**Result: COMPLETE within scoped server-side identity delegation.** Only Step 4
-was executed. Starting/current HEADs remain Portal
-`4a34948eb02d034b46871d739bbf066ffc67d48a` and Kernel
-`89296ddce3c7b187881cb1730bf7fbacf3ffd302`, on local `ANY-766` branches,
-plus this uncommitted diff. Both working trees and indexes were clean initially.
-No staging, commit, push, branch change, dependency installation, real service
-configuration, live LBX, publication or deployment was performed.
-
-Implemented:
-
-- Portal migration `20261110_0007` adds one hash-only
-  `kernel_session_delegations` table, with unique code/token hashes, exchange
-  shape constraint and `ON DELETE CASCADE` to the existing AuthSession. No user
-  directory or identity matching is added. Portal now has 28 application tables;
-  Kernel's migration head remains `0018`.
-- `POST /api/kernel-session-codes` authenticates the existing Portal bearer and
-  issues a random 32-byte S256-bound code for at most 60 seconds. Internal
-  exchange is atomic and single-use; the random delegated token expires at the
-  earlier of 30 minutes and parent expiry. Fixed audience is `platform-kernel`.
-  Writes lock User → AuthSession → delegation and recheck authority after waits.
-- Internal introspection reads delegation/session/user together, verifies scope,
-  audience, active user, parent revocation/deletion/expiry and token expiry, and
-  returns only canonical identity with the configured clock budget subtracted.
-  Public session bookkeeping is separated from `validate_session`; identity
-  reads perform no last-seen mutation or commit. Existing logout and password
-  reset invalidate parent authority. `UserStatus.INACTIVE` explicitly represents
-  deactivation without adding an administration endpoint.
-- Reverse-direction credentials have current/previous rotation, explicit
-  receiver-owned exchange/introspection permissions (empty by default), trusted
-  scope and directional-secret separation. Internal receivers reject Origin
-  before public CORS. Validation errors are redacted, dependency failures are
-  safe `503`, identity `401` codes distinguish expiry from parent invalidation,
-  and responses/refusals use no-store.
-- Kernel implements `POST /v1/portal-session/exchange` and the reusable
-  `authenticate_portal_user` dependency. It validates the independent wire
-  version/scope/UUID/UTC/deadline contract and returns the existing Core
-  Portal-user ExecutionOwner. Every dependency invocation introspects; no local
-  identity cache, refresh token or guest fallback exists. TLS verification,
-  socket timeout, response-size limit, redirect/proxy refusal and no automatic
-  exchange retry keep secrets in the selected service direction.
-- Generated Portal OpenAPI/schema/TypeScript and Kernel OpenAPI/CE-kit types,
-  the current data model, both integration maps and paired contract README are
-  updated. No fixture/schema checksum or commercial enablement was changed.
-
-Fresh verification (repository-root commands):
-
-- **PASS — Portal required selection plus HTTP/security cases: 55 passed,
-  0 skipped, including 8 PostgreSQL cases.**
-  `./.venv/bin/python -m pytest -p no:cacheprovider -q apps/api/tests/test_api_identity_session.py apps/api/tests/test_kernel_session_delegation.py apps/api/tests/test_kernel_session_delegation_postgres.py`.
-  `/tmp/any766_step4_portal_tests.py` uses the existing
-  `canonical_check_environment()` / `api_test_environment('api-postgres', ...)`
-  and a unique disposable `_tests` database. Evidence:
-  `.harness/any766-step4-identity.log` and `.harness/any766-step4-identity.xml`.
-  Covers PKCE/single-use races, scope/audience, TTL/clock bounds, logout, actual
-  password reset, deactivation, parent changes during exchange waits, cascade,
-  migration round trip preserving parent rows, rejected partial exchange state,
-  read-only introspection, rotation/permissions, outages and secret canaries.
-- **PASS — Portal related regressions: 481 passed, 0 skipped:**
-  `./.venv/bin/python -m pytest -p no:cacheprovider -q apps/api/tests/test_architecture.py apps/api/tests/test_repository_docs.py apps/api/tests/test_presentation_di.py apps/api/tests/test_any766_contracts.py apps/api/tests/test_api_password_reset.py apps/api/tests/test_api_email_verification.py`.
-  Evidence: `.harness/any766-step4-regressions.xml`. Existing SQLite FK-sort and
-  Python datetime-adapter warnings remain; they are not skipped tests.
-- **PASS — Kernel required identity module: 63 passed, 0 skipped:**
-  `LITELLM_LOCAL_MODEL_COST_MAP=True ./.quick-check-venv/bin/python -m pytest -p no:cacheprovider -o addopts='' -q apps/platform-api/tests/test_portal_session_api.py`.
-  HTTP is intercepted. Includes independent positive/negative contract fixtures,
-  canonical principal, request-by-request introspection, refusal without guest
-  authority, directional auth, malformed owner/version/expiry, safe identity
-  codes, dependency/error-body outages and secret-log canaries. Evidence:
-  `/tmp/any766-step4-kernel-identity.xml`.
-- **PASS — Kernel manifest/service-auth and contract regressions: 215 passed,
-  0 skipped:** the same command selects
-  `apps/platform-api/tests/test_capability_manifest.py apps/platform-api/tests/test_paid_contract_fixtures.py`.
-  Evidence: `/tmp/any766-step4-kernel-regressions.xml`.
-- **PASS — applicable non-fixing checks:** Portal Ruff check/format check on all
-  16 changed/new Python files, `npm run architecture:check`, `npm run docs:check`
-  and `npm run typecheck:web`; Kernel Ruff check/format check on all 6 changed/new
-  Python files, `runner.py validate-architecture`, `validate-configs`,
-  `validate-docs`, and `pnpm --filter @anytoolai/ce-kit typecheck`.
-- **PASS — generation:** Portal `PATH="$PWD/.venv/bin:$PATH" npm run generate`
-  and `npm run generate:check`; Kernel `runner.py generate-docs`,
-  `generate-docs --check`, `pnpm --filter @anytoolai/ce-kit generate-api-types`
-  and `generate-api-types:check`. Kernel commands set
-  `LITELLM_LOCAL_MODEL_COST_MAP=True` to use the shipped local cost map.
-- **PASS — diagnostics/integrity:** Kernel doctor; Portal doctor after stopping
-  the test server; both `git diff --check`, unchanged HEADs/branches, empty
-  indexes, paired contract README equality and byte-for-byte plan equality.
-
-Authorization, corrections and limits:
-
-- The user explicitly authorized starting the isolated local test-db and applying
-  migrations **only to a temporary test database**. The existing local pinned
-  PostgreSQL image was used through `scripts/repo.py test-db up`; no image was
-  downloaded. Fixtures created/migrated/dropped unique `_tests` databases.
-  `scripts/repo.py test-db stop` stopped the server afterwards without removing
-  its volume. No application database was migrated. This is fresh Step 4
-  evidence, not a rerun of the historical Step 3 review selection.
-- Introduced fixture mistakes (registration/reset data, UTC serialization and
-  interrupted HTTP-error body) were corrected. Architecture checks required SQL
-  availability translation in a focused infrastructure capability; its neutral
-  failure is exposed by the identity use case, with transaction ownership left
-  in Application. No boundary guard or failure was suppressed. All affected
-  checks now pass. Sandbox TestClient restrictions and the doctor's busy port
-  while the test server was running were resolved by local checks and shutdown.
-- **NOT_RUN — assembled broad suites, real two-service TCP HTTP, browser launch/
-  recovery, paid runtime ownership/admission, V2 snapshots, live LBX, staging and
-  production.** These remain later steps and operational gates. In particular,
-  Step 6 must attach the identity dependency to paid runtime surfaces and Step 8
-  must implement browser custody/recovery. Step 4 does not enable paid execution
-  or alter existing guest routes. Earlier broader Kernel permission-test limits
-  remain historical and were not reclassified as passing by these selections.
-- **BLOCKED — commercial/live/staging actions** retain Section 3.8 owner inputs;
-  none blocks the completed Step 4 server slice. Real configuration, application
-  migration and deployment still require their own authorization.
-
-Portal remains authoritative; the complete file is synchronized byte-for-byte to
-Kernel. Next is Step 5 only on a separate request. Steps 5–14 are unexecuted.
-
-#### Step 4 review follow-up — REV-3, 2026-11-10
-
-**REV-3: RESOLVED (important).** The original Step 4 checkpoint verified serial
-password-reset invalidation but missed the real reset/exchange lock inversion.
-The supplied earlier diagnostic log `/tmp/any766-step4-review-race.log` records
-PostgreSQL `40P01`. This follow-up independently reproduced it with checked-in
-regressions before changing the production function.
-
-Cause and correction:
-
-- With `autoflush=False`, `confirm_password_reset()` updated AuthSession rows
-  before flushing its dirty User at commit, while delegation locked User first.
-  Each transaction could retain the row needed by the other. Both actual
-  exchange-first and reset-first interleavings reproduced the deadlock.
-- Reset now resolves the scoped token owner without writes, acquires the existing
-  active scoped User lock, then atomically claims the reset token using fresh
-  time sampled after the wait. Password replacement, token invalidation and
-  all-session revocation retain the same application-owned transaction. Thus
-  reset and delegation use User before AuthSession, without a retry loop or
-  error suppression. Public HTTP contracts and persistence schema are unchanged.
-- Taking User before the token claim also prevents two different reset tokens
-  from each holding one token while invalidating the other. A new concurrent
-  test requires exactly one committed reset and one ordinary invalid-token
-  refusal. Another test expires the token while reset waits for User and proves
-  that no password, session or token mutation commits after expiry.
-
-Fresh evidence:
-
-- **FAIL — pre-fix reproduction, expected red result:**
-  `./.venv/bin/python /tmp/any766_rev3_tests.py red apps/api/tests/test_kernel_session_delegation_postgres.py -k 'password_reset_and_exchange_share_user_first_lock_order or concurrent_distinct_password_reset_tokens'`
-  — **3 failed / 8 deselected**, each with a real PostgreSQL deadlock. Both
-  exchange/reset orderings and distinct-token concurrency execute the actual
-  service functions with SQL barriers. Evidence:
-  `.harness/any766-rev3-red.log` and `.harness/any766-rev3-red.xml`.
-- **PASS — same three regressions after the correction:** the same command with
-  `green` — **3 passed / 8 deselected**. Evidence:
-  `.harness/any766-rev3-green.log` and `.harness/any766-rev3-green.xml`.
-- **PASS — final affected selection, 541 passed / 0 skipped:**
-  `./.venv/bin/python /tmp/any766_rev3_tests.py final apps/api/tests/test_api_identity_session.py apps/api/tests/test_kernel_session_delegation.py apps/api/tests/test_kernel_session_delegation_postgres.py apps/api/tests/test_api_password_reset.py apps/api/tests/test_password_reset_persistence_postgres.py apps/api/tests/test_architecture.py apps/api/tests/test_repository_docs.py apps/api/tests/test_presentation_di.py apps/api/tests/test_any766_contracts.py apps/api/tests/test_api_email_verification.py`.
-  This includes the four new PostgreSQL cases, the original Step 4 migration/
-  single-use/cascade/security checks, actual reset/logout behavior and the
-  existing architecture, documentation and contract regressions. Evidence:
-  `.harness/any766-rev3-final.log` and `.harness/any766-rev3-final.xml`.
-  Existing SQLite FK-sort/datetime-adapter warnings remain; there are no skips.
-- **PASS — non-fixing checks:** Ruff check and format check on the two Python
-  files changed by this follow-up; Portal `npm run architecture:check`,
-  `npm run generate:check` and `npm run docs:check`; Kernel
-  `runner.py validate-docs`; both `git diff --check` and byte-for-byte plan
-  equality. No generated file, contract fixture/checksum or dependency changed.
-- **PASS — preservation and cleanup:** the earlier explicit local test-db /
-  temporary-migration authorization was reused. The runner derives the existing
-  isolated test configuration and assigns a unique `_tests` database; fixtures
-  create/migrate/drop only that database. The test server was stopped afterwards
-  without removing its volume. All other pre-existing Step 4 files, both HEADs
-  and both empty indexes remain unchanged outside the production reset function,
-  its PostgreSQL regressions and the synchronized plan follow-up.
-- **REUSED, not rerun here — Kernel identity 63 and regressions 215:** Kernel
-  runtime and all wire contracts are unchanged by REV-3. Earlier Step 4 evidence
-  remains recorded above. Real paired HTTP, browser recovery, paid runtime and
-  whole-program readiness remain **NOT_RUN** under their later steps/gates.
-
-Step 4 is complete with REV-3 corrected. REV-1 and REV-2 remain resolved;
-Steps 5–14 remain unexecuted. Portal is authoritative and its complete Kernel
-copy is synchronized before handoff. No Git staging/commit, publication,
-application-database migration or external service operation was performed.
-
-#### Step 4 local commit authorization — 2026-11-10
-
-After the Step 4 implementation and REV-3 correction, the user explicitly
-requested local commits in both repositories. This narrowly overrides the
-common protocol's no-staging/no-commit rule for the completed Step 4 changes,
-its reset lock-order correction and synchronized plan/evidence. Commit Portal as
-`ANY-766 - Delegate Portal sessions to Kernel` and Kernel as
-`ANY-766 - Authenticate delegated Portal sessions`.
-Earlier unchanged-HEAD/empty-index/no-commit statements describe their execution
-and review checkpoints. This authorization does not permit push, merge, rebase,
-branch switching, later implementation steps or publication/deployment.
 
 **Goal / Expected behavior:** Kernel verifies the existing Portal identity without receiving its original bearer.
 
@@ -1131,297 +660,6 @@ Cover single-use races, wrong verifier/audience/scope, expiry, logout/reset/deac
 **Proposed commit:** `ANY-766 - Delegate Portal sessions to Kernel`
 
 ### Step 5 — Derive production allowances and serve snapshots
-
-#### Step 5 execution checkpoint — 2026-11-10
-
-**Result: COMPLETE within Portal production allowance derivation and V2 snapshot
-serving, with the REV-4 and REV-5 corrections recorded below.** Only Step 5 was executed.
-Both working trees and indexes were clean
-initially. Starting/current local `ANY-766` HEADs remain Portal
-`7a8b28df071fdd3b46da8ae3be17670669cdbea8` and Kernel
-`5804593aec21babed976a53c9fac0dce3414b9bf`, plus this uncommitted diff. Kernel
-changes only this plan mirror. No staging, commit, branch move, dependency
-installation, real service configuration, commercial publication or deployment
-was performed. Migration heads remain Portal `20261110_0007` / Kernel `0018`.
-
-Implemented:
-
-- Replaced the simulation-only switches with `MeteringPolicy`. Configured-source
-  accepted terms can issue production allowances through the existing issuer;
-  production rejects SIMULATED/missing provenance. Nonproduction retains its
-  explicitly labelled history. Legacy purchases without proven quantities retain
-  independently supported grants without invented metering. The sole paid writer
-  still owns semantic revisions, causal evidence, outbox and deadline changes.
-- Preserved immutable accepted quantity/unit, same-cycle IDs, original calendar
-  anchors, renewal retention and scoped primary proof. The strengthened real
-  inventory regression proves that an unrelated incomplete product permits a
-  proven primary while both financial CREATE and original-resolution admission
-  still refuse incomplete customer-wide proof.
-- Future timestamp buckets may be saved as immutable issuance history but are
-  omitted from the effective set before the frozen conservative start. Existing
-  reconciliation work is scheduled no later than that boundary, retaining earlier
-  work. Local time/expiry cannot activate the bucket; a new eligible source apply
-  reuses its saved ID. Date-only evidence gains no invented UTC boundaries.
-- Added scoped committed-state reads shared with the cabinet and the authenticated
-  `GET /internal/v1/access-snapshots/{user_id}` V2 producer. It requires the
-  separate `access-snapshot:read` receiver permission, exactly one service Bearer,
-  explicit matching scope, no Origin and no-store success/refusal. Unknown scoped
-  users return `404`; known implicit empty revision zero is read-only. Overdue or
-  uncommitted provenance/start corrections refuse the entire saved revision.
-- Reused the reserved two-connection/two-thread read pool and eight-operation
-  waiting bound, including cancellation/shutdown ownership. Header-only snapshot
-  authentication runs without waiting for shared sale threads. DB contention,
-  storage failure and overload have safe bounded `503` responses. GET has no
-  identity bookkeeping, state writes or source/peer I/O.
-- Database time is sampled after waiting reads. Snapshot expiry uses the selected
-  300/60-second formula with the configured five-second local/staging budget and
-  every included effective source/grant/UTC deadline. Existing committed grant
-  bounds and the issuer's frozen UTC bounds are not haircut again by GET; the
-  separate interservice budget bounds the envelope once. Source trust stays at
-  most six hours. Missing clock configuration or no remaining lifetime is `503`.
-- Added named strict V2 Pydantic/OpenAPI components with required version/scope
-  fields and explicit required query parameters, then regenerated TypeScript.
-  Customer provenance DTOs already supported both values from Step 3 and remain
-  compatible. Updated the as-built Portal architecture, integration map and
-  billing operations documentation. Normative paired fixtures/hashes are unchanged.
-
-Fresh verification (repository-root commands, local evidence only):
-
-- **PASS — pre-change regression baseline, 120 passed / 0 skipped:** the five
-  existing Step 5 PostgreSQL modules plus `test_paid_access_policy.py`.
-  Evidence: `.harness/any766-step5-baseline.xml`.
-- **PASS — required and affected selection, 225 passed / 0 skipped:**
-  `./.venv/bin/python /tmp/any766_step5_tests.py -q apps/api/tests/test_access_snapshot_postgres.py apps/api/tests/test_paid_access_recovery_postgres.py apps/api/tests/test_paid_access_capacity_postgres.py apps/api/tests/test_paid_access_terms_postgres.py apps/api/tests/test_paid_access_primary_scope_postgres.py apps/api/tests/test_paid_access_review_regressions_postgres.py apps/api/tests/test_paid_access_policy.py apps/api/tests/test_paid_access_read_postgres.py apps/api/tests/test_paid_access_reconciliation_postgres.py apps/api/tests/test_paid_access_cadence_postgres.py apps/api/tests/test_paid_access_inventory_failure_postgres.py apps/api/tests/test_paid_access_rebase_postgres.py --junitxml=.harness/any766-step5-final.xml`.
-  This includes **169 actual PostgreSQL cases** and 56 DB-free policy cases;
-  includes the retained finite-end/one-skew, overdue reduction/restoration,
-  both-phase rollback, calendar-month offset and product-local failure controls.
-- **PASS — final affected rerun after the schema/capacity and stronger financial
-  admission assertions, 23 passed / 0 skipped:** the same wrapper selects
-  `apps/api/tests/test_access_snapshot_postgres.py apps/api/tests/test_paid_access_primary_scope_postgres.py`
-  with `--junitxml=.harness/any766-step5-final-affected.xml`. Its 17 snapshot cases
-  cover required OpenAPI fields, real read-only zero/N state, service auth/scope/
-  rotation, strict zero/maximum quantities, no-op/block/recovery, original renewal
-  quantity, source/grant/UTC bounds, future starts, simulation isolation, atomic
-  rollback, writer/read races, delayed clock sampling, storage failure,
-  overload/cancellation and shared-thread saturation. Six primary cases retain
-  operator fences and the stricter financial/original proof distinction.
-- **PASS — final contract/document/architecture regressions, 534 passed:**
-  `./.venv/bin/python -m pytest -p no:cacheprovider -q apps/api/tests/test_architecture.py apps/api/tests/test_repository_docs.py apps/api/tests/test_billing_subscription_reconciliation.py apps/api/tests/test_any766_contracts.py apps/api/tests/test_any765_purchase_terms.py --junitxml=.harness/any766-step5-contracts-final.xml`.
-- **PASS — related identity and policy regression selection, 312 passed:**
-  `test_architecture.py`, `test_any766_contracts.py`, `test_paid_access_policy.py`,
-  `test_any765_purchase_terms.py`, `test_kernel_session_delegation.py`, using
-  `./.venv/bin/python -m pytest -p no:cacheprovider -q` and
-  `--junitxml=.harness/any766-step5-unit.xml`. Existing SQLite FK-cycle warnings
-  remain; there are no skips. The initial sandbox TestClient attempt was
-  interrupted without a completion claim; the local unsandboxed rerun passed.
-- **PASS — generation and applicable non-fixing checks:** command-scoped venv
-  PATH with `npm run generate`, `npm run generate:check`,
-  `npm run architecture:check`, `npm run typecheck:web`, `npm run docs:check`;
-  Ruff check and format check on all 20 changed/new Python files. Generation
-  required no installation. Kernel managed `runner.py validate-docs` passes for
-  the documentation-only mirror. Both diffs, empty indexes, unchanged branches/
-  HEADs, paired bundle equality and whole-plan byte equality are checked.
-
-Authorization, corrections and limits:
-
-- The user explicitly authorized starting the isolated `payments-4973adb2`
-  PostgreSQL server, recreating `payments_4973adb2_tests`, temporary migrations
-  and fixture cleanup. The wrapper uses the existing
-  `canonical_check_environment()` / `api_test_environment('api-postgres', ...)`
-  and exactly that disposable test database on loopback port 32074; it prints no
-  credentials. Fixtures create/migrate/drop only that database. The pre-existing
-  local pinned image was used; no download or application-database migration
-  occurred. `scripts/repo.py test-db stop` stopped the server after verification
-  without deleting its volume or any unrelated resource.
-- Review corrected the shared-thread authentication bottleneck and the initial
-  OpenAPI omission of required query/version fields before handoff. The affected
-  rerun above passes. All introduced lint/test-shape issues were fixed; no test,
-  type, contract fixture, architecture gate or error was suppressed.
-- **NOT_RUN — Section 6 broad suites, actual two-service paid HTTP, browser,
-  runtime Compose connection/configuration, image/deployed clock/TLS acceptance,
-  live LBX, staging and production:** these remain later-step or operational
-  gates. The evidence uses real disposable PostgreSQL, local ASGI HTTP and
-  intercepted synthetic configured-source transports, not live sales authority.
-  Kernel V2 consumption/admission remains Step 6; invalidation/usage/exhaustion
-  delivery and commercial enablement were not implemented here. The historical
-  Step 3 review rerun and broader Kernel permission-test limits remain as recorded.
-- **BLOCKED — real sale configuration/live positive/staging acceptance** retain
-  Section 3.8 owner inputs; they do not block the completed independent Step 5.
-  Install compatible consumers before enabling V2. No production readiness or
-  real joint execution is claimed.
-
-Portal remains authoritative and the entire Kernel copy is synchronized before
-handoff. Steps 1–5 are complete within their recorded scope; Steps 6–14 remain
-unexecuted and require their own requests.
-
-#### Step 5 review follow-up — REV-4, 2026-11-10
-
-**REV-4: RESOLVED (important / P2).** The original Step 5 checks covered initial
-future issuance but missed a claimed same-cycle semantic no-op. This follow-up
-independently reproduced the reviewer diagnostic and the actual PostgreSQL
-source-apply/queue path before changing production code.
-
-Cause and correction:
-
-- `schedule_reconciliation()` left the claimed queue row's ordinary polling
-  deadline dirty in SQLAlchemy. `schedule_deadline()` then updated that same SQL
-  row through its future-start upsert. With `autoflush=False`, the final flush
-  could overwrite the earlier start boundary with polling roughly 14 minutes
-  away. A material semantic transition happened to flush first and hid the defect.
-- The future-start branch now flushes pending caller-owned ORM writes before
-  applying its SQL hint. The upsert is consequently the final scheduling write;
-  a later no-op/commit cannot restore the stale polling deadline. This adds no
-  commit, retry, scheduler, schema or wire change. The existing user-first lock
-  order, whole-transaction rollback and ordinary polling rules remain intact.
-- The existing future-bucket PostgreSQL scenario now covers initial issuance,
-  a same-cycle reread through a real `work_claim`, and a reread changing the grant.
-  It checks the persisted start deadline, priority, generation, released lease,
-  unchanged allowance ID and no premature snapshot membership. Only a subsequent
-  authoritative read after the start can expose the same bucket. The production
-  rollback scenario additionally covers a future timestamp cycle after flushing.
-
-Fresh evidence:
-
-- **FAIL — expected pre-fix SQLite reproduction, 1 failed / 2 passed:**
-  `./.venv/bin/python -m pytest -p no:cacheprovider -q -s /tmp/test_any766_step5_review_schedule.py --junitxml=.harness/any766-rev4-sqlite-red.xml`.
-  The no-op case misses the two-minute boundary; the material-change and
-  no-future-start controls pass. Log: `.harness/any766-rev4-sqlite-red.log`.
-- **FAIL — expected pre-fix PostgreSQL reproduction, 1 failed / 2 passed /
-  16 deselected:**
-  `./.venv/bin/python /tmp/any766_step5_tests.py -q --tb=short --show-capture=no apps/api/tests/test_access_snapshot_postgres.py -k future_timestamp_bucket --junitxml=.harness/any766-rev4-postgres-red-valid.xml`.
-  The actual claimed no-op loses the boundary; initial issuance and changed-grant
-  controls pass. Log: `.harness/any766-rev4-postgres-red-valid.log`. An initial
-  expanded fixture placed the terminal grant bound before the cycle end and
-  correctly lost metering; its synthetic calendar was corrected before this
-  valid red run. Production eligibility checks were not weakened.
-- **PASS — same SQLite diagnostic after correction, 3 passed:** the first command
-  with `--junitxml=.harness/any766-rev4-sqlite-green.xml`; adjacent green log.
-- **PASS — focused PostgreSQL green run, 5 passed / 15 deselected:** the wrapper
-  selects `test_access_snapshot_postgres.py` with
-  `-k 'future_timestamp_bucket or production_paid_commit_rolls_back'` and
-  `--junitxml=.harness/any766-rev4-postgres-green.xml`; adjacent green log.
-- **PASS — final affected PostgreSQL/API selection, 112 passed / 0 skipped:**
-  `./.venv/bin/python /tmp/any766_step5_tests.py -q --tb=short --show-capture=no apps/api/tests/test_access_snapshot_postgres.py apps/api/tests/test_paid_access_cadence_postgres.py apps/api/tests/test_paid_access_reconciliation_postgres.py apps/api/tests/test_paid_access_review_regressions_postgres.py apps/api/tests/test_paid_access_recovery_postgres.py --junitxml=.harness/any766-rev4-final.xml`.
-  Log: `.harness/any766-rev4-final.log`. This covers the final 20 snapshot cases,
-  cadence/claim controls, semantic no-ops, both-phase overdue transitions and
-  rollback, finite-end history, same-cycle recovery and product-local failures.
-- **PASS — contract/policy/architecture/documentation regressions, 479 passed /
-  0 skipped:**
-  `./.venv/bin/python -m pytest -p no:cacheprovider -q apps/api/tests/test_architecture.py apps/api/tests/test_repository_docs.py apps/api/tests/test_any766_contracts.py apps/api/tests/test_paid_access_policy.py --junitxml=.harness/any766-rev4-contracts.xml`.
-- **PASS — non-fixing checks:** Ruff check/format check on all 20 changed/new
-  Python files; Portal command-scoped venv `npm run architecture:check`,
-  `npm run generate:check`, `npm run docs:check`; Kernel managed
-  `runner.py validate-docs`; both `git diff --check` and whole-plan byte equality.
-
-Preservation and limits:
-
-- Reused the existing explicit local `payments-4973adb2` test-server and
-  `payments_4973adb2_tests` recreation/temporary-migration authorization. The same
-  wrapper derives the existing isolated loopback configuration; sources are
-  intercepted. Fixtures created/migrated/dropped only the disposable test DB.
-  The server was stopped afterwards without deleting its volume. No dependency,
-  application database, migration file, real source or deployed configuration
-  was changed.
-- The correction changes only `paid_deadlines.py`, its existing snapshot test
-  module and the two plan copies. Pre-follow-up hashes confirm all other Step 5
-  files, including generated artifacts, are preserved byte-for-byte. Both local
-  HEADs/branches and empty indexes remain unchanged; the paired contract bundle
-  is unchanged and still byte-identical. No staging/commit or external action
-  was performed.
-- **REUSED, not rerun in full here — earlier Step 5 selections 225/23 and the
-  reviewer-reported 611 tests.** Fresh correction evidence is explicitly listed
-  above. Broader Section 6, real joint HTTP, browser, image/live-LBX/staging and
-  production acceptance remain **NOT_RUN** under their existing later-step gates.
-
-Step 5 is complete with REV-4 corrected. REV-1–REV-3 remain resolved. Portal is
-authoritative and its complete Kernel mirror is synchronized before handoff.
-Steps 6–14 remain unexecuted.
-
-#### Step 5 review follow-up — REV-5, 2026-11-10
-
-**REV-5: RESOLVED (important / P2).** Independent pre-fix verification reproduced a
-boundary crossing during allowance materialization on the authorized local
-PostgreSQL server: **1 failed / 1 passed / 0 skipped**. The before-boundary
-control passes; crossing the conservative start leaves ordinary reconciliation
-almost fifteen minutes away. Local repair does not activate the bucket; another
-authoritative read restores the same immutable allowance ID. Evidence:
-`/tmp/any766-rev5-verify.xml` and `/tmp/any766-rev5-verify.log`.
-
-The correction preserves the paid evaluation time through both final deadline
-scheduling branches (semantic change and no-op). `schedule_deadline()` compares
-the frozen conservative start with that cutoff, rather than discarding it after
-sampling a later clock. A boundary that passed during processing remains a due
-priority-1 authoritative reconciliation hint. The existing pre-upsert flush
-preserves REV-4; the source decision, lock/transaction ownership, schema and
-wire contracts are unchanged. This shared commit path also covers first-primary
-selection without another scheduling mechanism or persisted state.
-
-Fresh correction evidence:
-
-- **FAIL — expected pre-fix regression, 6 failed / 3 passed / 20 deselected:**
-  `./.venv/bin/python /tmp/any766-rev5-tests.py .harness/any766-rev5-red.log -q --tb=short --show-capture=no apps/api/tests/test_access_snapshot_postgres.py -k excluded_start_survives --junitxml=.harness/any766-rev5-red.xml`.
-  Every before-start control passes; exact/after-start cases fail for initial
-  issuance, a claimed same-cycle reread and first-primary selection.
-- **PASS — focused correction/REV-4/rollback selection, 14 passed / 15
-  deselected / 0 skipped:** the same wrapper selects the snapshot module with
-  `-k 'excluded_start_survives or future_timestamp_bucket or production_paid_commit_rolls_back'`
-  and `.harness/any766-rev5-focused.{log,xml}` evidence. The new nine cases also
-  verify immutable ID/revision behavior, no local repair/GET activation, released
-  claims/generation hints, and normal polling after the due authoritative read
-  includes the bucket (no continuous urgent loop).
-- **PASS — independent reviewer diagnostic after correction, 2 passed / 0
-  skipped:**
-  `./.venv/bin/python /tmp/any766-rev5-tests.py .harness/any766-rev5-review-green.log -q --tb=short --show-capture=no -p apps.api.tests.conftest -p apps.api.tests.test_access_snapshot_postgres -c pytest.ini /tmp/any766-review-pg-si94bf7d/test_boundary.py --junitxml=.harness/any766-rev5-review-green.xml`.
-  The original diagnostic bytes
-  and earlier failed evidence remain unchanged.
-- **PASS — contract/policy/architecture/documentation regression, 479 passed /
-  0 skipped:** the REV-4 four-module selection with
-  `--junitxml=.harness/any766-rev5-contracts.xml`.
-- **PASS — Ruff check/format check on all 20 changed/new Python files, Portal
-  `npm run architecture:check`, `npm run generate:check`, and Kernel doctor.**
-  No dependencies were installed; generated files are unchanged.
-- **PASS — full Step 5 required and affected PostgreSQL/API selection, 239
-  passed / 0 skipped:**
-  `./.venv/bin/python /tmp/any766-rev5-tests.py .harness/any766-rev5-final.log -q --tb=short --show-capture=no apps/api/tests/test_access_snapshot_postgres.py apps/api/tests/test_paid_access_recovery_postgres.py apps/api/tests/test_paid_access_capacity_postgres.py apps/api/tests/test_paid_access_terms_postgres.py apps/api/tests/test_paid_access_primary_scope_postgres.py apps/api/tests/test_paid_access_review_regressions_postgres.py apps/api/tests/test_paid_access_policy.py apps/api/tests/test_paid_access_read_postgres.py apps/api/tests/test_paid_access_reconciliation_postgres.py apps/api/tests/test_paid_access_cadence_postgres.py apps/api/tests/test_paid_access_inventory_failure_postgres.py apps/api/tests/test_paid_access_rebase_postgres.py --junitxml=.harness/any766-rev5-final.xml`.
-  This reruns the mandatory Step 5 cases and all related writer, finite-end,
-  overdue two-phase, immutable terms, capacity/read, cadence/claim, scoped-primary,
-  customer-wide financial admission, inventory failure and rollback controls.
-
-Only `paid_access.py`, `paid_deadlines.py`, the existing snapshot test module and
-both plan copies changed in this correction. Earlier Step 5/REV-4 selections
-remain dated evidence. **PASS — final documentation/integrity:** Portal
-command-scoped venv `npm run docs:check`, Kernel managed
-`runner.py validate-docs`, both `git diff --check`, unchanged branches/HEADs and
-indexes, and byte-identical complete plans. Pre-follow-up hashes preserve every
-other tracked/untracked Step 5 file; the paired 19-file contract bundle remains
-unchanged and byte-identical.
-The prior explicit authorization was reused for the isolated
-`payments-4973adb2` server and `payments_4973adb2_tests` on 127.0.0.1:32074. The
-wrapper rejects another host/port/database; all source HTTP is intercepted.
-Fixtures recreated/migrated/dropped only that disposable database; the matching
-`scripts/repo.py test-db stop` stopped the server without deleting its volume.
-No dependencies, application database, migration files, branch/HEAD/index,
-contract bundle, generated artifacts, real service or deployment were changed.
-Steps 6–14 and their real joint HTTP/browser/live/staging gates remain
-**NOT_RUN**; existing commercial/operational and Kernel permission-test limits
-remain as recorded above. No live or production acceptance is claimed.
-
-Step 5 is complete with REV-5 corrected; REV-1–REV-4 remain resolved. Portal is
-authoritative and its complete Kernel mirror is synchronized before handoff.
-
-#### Step 5 local commit authorization — 2026-11-10
-
-After the Step 5 implementation and REV-4/REV-5 corrections passed the recorded
-checks, the user explicitly requested local commits in both repositories. This
-narrowly overrides the common protocol's no-staging/no-commit rule for the
-completed Step 5 changes, regression tests, generated contracts and synchronized
-plan/evidence. Commit Portal as `ANY-766 - Serve production paid access snapshots`
-and the documentation-only Kernel mirror as
-`ANY-766 - Record production snapshot progress`.
-Earlier unchanged-HEAD/empty-index/no-commit statements describe their execution
-and review checkpoints. This authorization does not permit push, merge, rebase,
-branch switching, later implementation steps or publication/deployment. Keep the
-complete plan copies byte-identical and preserve all recorded verification limits.
 
 **Goal / Expected behavior:** accepted production terms produce complete, finite V2 authority.
 
@@ -1597,15 +835,22 @@ Cover revision changes, partial tuple failure, outages, blocked history, new cyc
 
 **Proposed commit:** `ANY-766 - Display actual Kernel usage in the cabinet`
 
-### Step 11 — Prove independent runtime and real HTTP execution
+### Step 11 — Verify the assembled integration locally
 
-**Goal / Expected behavior:** both applications run independently and jointly with retained state and actual protected execution.
+**Goal / Expected behavior:** both real applications work together locally through browser and HTTP with separate PostgreSQL state. Confirm that a test user with committed paid access can execute the selected products and see correct results/usage. This is the current plan's combined integration acceptance, not parent ANY-504 stage 11.
 
 **Repositories / Read before implementation:** both Compose/runners and [metering cutover](https://github.com/gushinets/anytoolai-platform/blob/72ff15bc0b77903c87aa39f7b10186dccc556d09/infra/deployment/execution-metering-cutover.md).
 
 **Implement / reuse:** add optional peer-network/config inputs and the Kernel development PostgreSQL named-volume correction. Pin the selected PostgreSQL 18 patch/digest without changing database major versions or abandoning retained volumes.
 
-Add a bounded Portal-owned joint harness under `tools/joint_paid_runtime/`. Reuse existing process/composition/test seams; launch real APIs/workers with separate disposable PostgreSQL databases and TCP HTTP. Use temporary enabled product profiles, isolated purchased quantities and deterministic provider/LBX substitutes.
+Add a bounded Portal-owned joint harness under `tools/joint_paid_runtime/`.
+Reuse existing process/composition/test seams; launch real APIs/workers with
+separate disposable PostgreSQL databases and TCP HTTP. Start from confirmed
+persisted test purchase/access facts through existing application/domain paths.
+Use real Portal identity/session and service authentication, temporary enabled
+product profiles, isolated purchased quantities and deterministic provider/LBX
+substitutes. Never replace Portal–Kernel transport or trusted identity with test
+principal overrides in the joint acceptance. No remote server is needed.
 
 **Verification — Portal:**
 
@@ -1620,21 +865,32 @@ Verify all service directions, session launch, seven scenarios, paid events, rep
 
 **Invariants:** no shared database, global cleanup, real financial mutation or new orchestration framework.
 
-**Expected completion:** real transport and storage prove the assembled system; synthetic provider evidence remains explicitly labelled.
+**Expected completion:** actual local browser/HTTP/PostgreSQL evidence proves the integration and its failure/recovery behavior on pinned sources. Provider/LBX substitutes remain labelled; live payment, remote staging and production acceptance are deferred to ANY-767.
 
 **AI execution prompt:**
 
-> Read /home/wstanley/www/work_unirec/runtime-research/payments-portal/docs/exec-plans/active/ANY-766-implementation-plan.md and complete only Step 11. Follow both runtime instruction sets and the common protocol. Reuse runners, independent Compose projects and recovery gates; implement the bounded joint harness and required storage/network corrections. Run actual HTTP/PostgreSQL/browser checks, fix introduced failures and report PASS/FAIL/NOT_RUN/BLOCKED with evidence labels. Do not stage, commit, push, merge, rebase or switch branches. Preserve unrelated volumes. Do not perform unapproved live LBX or production operations. Stop only for an irresolvable material decision.
+> Read /home/wstanley/www/work_unirec/runtime-research/payments-portal/docs/exec-plans/active/ANY-766-implementation-plan.md and complete only Step 11, the assembled local integration acceptance. Follow both runtime instruction sets and the common protocol. Reuse existing runners and independent Compose projects; add the bounded joint harness and required storage/network corrections. Exercise real Portal/Kernel APIs, sessions, service authentication, PostgreSQL and browser journeys from committed test purchase/access state; only external LBX/AI responses may be substituted. Run the stated checks, fix introduced failures and report evidence by source. No remote host or live purchase is needed. Do not stage, commit, push, merge, rebase, switch branches, publish or deploy. Preserve unrelated volumes. Escalate only an unresolved material decision.
 
 **Proposed commit:** `ANY-766 - Prove durable joint Portal Kernel execution`
 
-### Step 12 — Package independent image releases
+### Step 12 — Prepare minimal builds and installation instructions
 
-**Goal / Expected behavior:** compatible selected components deploy without application builds on staging.
+**Goal / Expected behavior:** the Portal and Kernel changes needed to build and
+later install the selected versions are locally verified and ready for PR review.
+A remote server and registry credentials are not prerequisites.
 
-**Repositories / Read before implementation:** both Dockerfiles, production Compose, CI and runners; Kernel profile generation/activation.
+**Repositories / Read before implementation:** both existing Dockerfiles, production
+Compose files, CI, runners and runbooks; Section 3.7; Kernel profile activation and
+metering cutover safeguards.
 
-**Implement / reuse:** add component-selectable GHCR workflows, release metadata, selection validation, image Compose and `deploy-images`. Package matching runner/helper files. Implement the explicit host/container profile mapping and frontend-only behavior from Section 3.7.
+**Implement / reuse:** follow Section 3.7. Add component-selectable build/publish
+workflow definitions and the minimal app-owned image overrides/runner support.
+Keep frontend/backend independent, pin selected image versions in ordinary Compose
+inputs and document source/migration/wire/build-origin compatibility in existing
+runbooks. Preserve the Portal purchased-document reader floor and Kernel profile
+path/fingerprint/activation rules. Control scripts may use matching reviewed
+checkouts; no portable installer bundle, universal selection schema or new release
+manager is required. Document parameterized future installation/update commands.
 
 **Verification — Portal:**
 
@@ -1648,84 +904,54 @@ Verify all service directions, session launch, seven scenarios, paid events, rep
 ./.quick-check-venv/bin/python -m pytest -q tests/test_image_deploy.py tests/test_runner.py
 ```
 
-Use fixture selections to verify incompatible IDs, origins, peer versions and image pairs are rejected before mutation. Include rejection of a pre-selected-digest Portal reader against new acceptance history even when migration heads match; retain historical v1/v2 readability with compatible readers. Rehearse actual image deployment on a disposable local stack where Docker is available. Verify no host build, profile fingerprints/mounts/activation, migration failure handling, frontend-only update and retained data.
+Use local configurations/images and disposable resources to verify the selected
+pair, build-time origins, migration failure handling, Kernel profile generation
+and activation, backend/data retention and frontend-only updates. Check or
+explicitly exclude unsupported image/reader combinations, including old Portal
+readers with unchanged migration heads. Reuse valid Step 11 evidence where the
+sources/configuration are unchanged; rerun affected cases after packaging changes.
 
-Workflow publication requires authorized dispatch; implementing workflows does not authorize publication.
+Validate workflow/configuration locally and rehearse the documented image-based
+installation commands on a disposable local stack. Record actual local image IDs
+or available digests and build inputs. Do not dispatch registry publication or
+contact a staging server to satisfy this step. Missing remote inputs are deferred
+ANY-767 work; an unverified essential local build/install path remains incomplete.
 
-**Expected completion:** matching release bundles reproduce selected images and enforce compatibility before changing runtime.
-
-**AI execution prompt:**
-
-> Read /home/wstanley/www/work_unirec/runtime-research/payments-portal/docs/exec-plans/active/ANY-766-implementation-plan.md and complete only Step 12. Follow both delivery instruction sets and the common protocol. Reuse Dockerfiles, runners and deployment safeguards. Implement explicit compatibility metadata, image-mode deployment and profile path mapping; preserve frontend-only independence. Run focused tooling/build/rehearsal checks, fix introduced failures and report PASS/FAIL/NOT_RUN/BLOCKED. Do not stage, commit, push, merge, rebase or switch branches. Do not dispatch publication or perform live LBX/production operations without authorization. Stop only for an irresolvable material decision.
-
-**Proposed commit:** `ANY-766 - Package compatible independent image releases`
-
-### Step 13 — Deploy and verify the selected staging pair
-
-**Goal / Expected behavior:** approved staging runs selected immutable images and preserves existing data.
-
-**Read before implementation:** both release runbooks, approved `selection.json`, infrastructure inputs and ANY-768 owner decisions.
-
-After the staging gate passes, publish/select exact images, configure ingress/private connectivity and deploy through app-owned commands. The operator supplies the following variables as absolute paths to the assembled release bundles and secret env files.
-
-**Portal deployment:**
-
-```bash
-python3.12 "$ANY766_PORTAL_RELEASE_DIR/scripts/repo.py" deploy-images --release-dir "$ANY766_PORTAL_RELEASE_DIR" --env-file "$ANY766_PORTAL_ENV_FILE" --component all
-```
-
-**Kernel deployment:**
-
-```bash
-python3.12 "$ANY766_KERNEL_RELEASE_DIR/scripts/agent/runner.py" deploy-images --release-dir "$ANY766_KERNEL_RELEASE_DIR" --env-file "$ANY766_KERNEL_ENV_FILE" --component all
-```
-
-Run acceptance from the prepared development/CI environment, without installing test dependencies on staging:
-
-```bash
-./.venv/bin/python tools/joint_paid_runtime/staging_probe.py --release-dir "$ANY766_SELECTION_DIR"
-npm run test:e2e -- any766-kernel-launch.spec.ts any766-paid-execution.spec.ts
-```
-
-The staging probe uses approved origins/test identity from secret environment inputs. It performs only explicitly authorized test execution and reconciliation; it never creates a payment or subscription.
-
-Verify HTTPS/readiness, actual identity/snapshot/invalidation/usage/exhaustion, an accessible paid result, cabinet agreement, backend update, restart and recovery. Enforce the purchased-document reader compatibility floor during rollback/recovery; an unchanged migration head does not prove binary compatibility. Select a second compatible frontend digest and demonstrate `--component frontend` without restarting backend or migrating.
-
-Use an existing authorized paid test purchase for live positive proof. If absent, an owner-operated payment is a separate input. Do not infer live PASS from deterministic evidence.
-
-**Expected completion:** selected staging works reproducibly. Missing essential inputs leave this step BLOCKED and prevent a claim of completed staging delivery.
+**Expected completion:** minimal build and installation changes pass their local
+checks, the chosen configuration can be reproduced and existing runbooks explain
+how to install/update it after review. Proceed to the PR readiness checklist;
+remote publication/deployment is outside this plan.
 
 **AI execution prompt:**
 
-> Read /home/wstanley/www/work_unirec/runtime-research/payments-portal/docs/exec-plans/active/ANY-766-implementation-plan.md and complete only Step 13. Follow both app runbooks, infrastructure ownership and the common protocol. Verify the staging gate, then use approved release digests and app deployment commands. Preserve databases and history. Run the specified staging/browser checks, fix integration failures and report PASS/FAIL/NOT_RUN/BLOCKED by evidence source. Do not stage, commit, push, merge, rebase or switch branches. Execute only authorized publication/staging actions; never perform unapproved financial or production operations. Continue independent work when an operational input is missing.
+> Read /home/wstanley/www/work_unirec/runtime-research/payments-portal/docs/exec-plans/active/ANY-766-implementation-plan.md and complete only Step 12. Follow both delivery instruction sets, Section 3.7 and the common protocol. Reuse Dockerfiles, Compose, runners and existing deployment safeguards; implement only minimal component builds, image inputs and installation commands/runbooks. Preserve frontend/backend independence, purchased-document reader compatibility, Kernel profile activation and data. Validate and rehearse locally, rerun affected integration checks and report actual results. Do not create a portable release manager or require remote server/registry inputs. Do not stage, commit, push, merge, rebase, switch branches, publish or deploy remotely. Keep remaining external acceptance in the Section 7 handoff.
 
-**Proposed commit:** `ANY-766 - Record verified selected staging integration`
+**Proposed commit:** `ANY-766 - Prepare minimal image builds and installation`
 
-### Step 14 — Complete review and handoff
+### PR readiness checklist
 
-**Goal / Expected behavior:** ANY-767 receives the working integration, reproducible releases and honest acceptance status.
+- [ ] Inspect the final paired diff against the local DoD; resolve confirmed
+  in-scope issues. Record the source revisions and evidence from Steps 11/12 and
+  applicable Section 6 checks; rerun only checks invalidated by later changes.
+- [ ] Keep affected as-built docs, generated contracts and existing runbooks
+  accurate. Document supersession of obsolete ANY-286/287 access-check direction;
+  do not edit external tickets without authorization.
+- [ ] Prepare concise PR descriptions and the Section 7 handoff: behavior,
+  actual validation, limitations and deferred ANY-767 deployment inputs. External
+  PR review/corrections precede publication and server installation.
 
-**Repositories / Read before implementation:** final paired diff, this plan’s DoD, predecessor records and applicable review checklists.
-
-**Implement / reuse:** update as-built architecture/integration maps, security/reliability, schema references and runbooks. Prepare traceable supersession of obsolete ANY-286/287 access-check direction; ANY-79 is already canceled. External ticket edits require their own authorization.
-
-Review authority, identity, transaction boundaries, ownership, recovery, delivery and actual end-to-end behavior. Verify the consumed ANY-765 corrections, production-vocabulary attribution and purchased-document rollback floor remain reflected in as-built docs and release metadata. Resolve confirmed findings and repeat affected checks.
-
-**Verification:** run Section 6 on the assembled pair.
-
-**Invariants:** no parallel `POST /v1/access/check`, speculative cleanup, hidden skipped acceptance or production-readiness claim.
-
-**Expected completion:** exact paired sources/builds and their evidence are ready for human review; required blocked scenarios remain explicit.
-
-**AI execution prompt:**
-
-> Read /home/wstanley/www/work_unirec/runtime-research/payments-portal/docs/exec-plans/active/ANY-766-implementation-plan.md and complete only Step 14. Follow both repositories’ delivery instructions and the common protocol. Review the combined result against DoD, reuse valid evidence and fix confirmed ANY-766 omissions. Run the broadest supported canonical checks and affected reruns. Produce the Section 7 handoff with PASS/FAIL/NOT_RUN/BLOCKED evidence. Do not stage, commit, push, merge, rebase, switch branches or mutate external tickets without authorization. Do not perform unapproved live LBX or production operations. Stop only for an irresolvable material decision.
-
-**Proposed commit:** `ANY-766 - Finalize integration evidence and handoff`
+This checklist adds no numbered implementation step or second full acceptance
+campaign. Completing it establishes local readiness for PR review, not approval,
+remote deployment or production readiness.
 
 ## 6. Final Verification & Review
 
-Run focused checks during steps and broad checks on the final paired result.
+Run focused checks during implementation and the applicable broad checks on the
+assembled local pair in Step 11, plus build/install checks in Step 12. Reuse valid
+results in the PR checklist; do not repeat an unchanged full suite just for the
+handoff. After PR review corrections, rerun affected checks before rollout.
+Configure these runs for the isolated local test environment, with external
+LBX/AI responses controlled as in Step 11.
 
 **Portal:**
 
@@ -1760,33 +986,36 @@ The final review must cover:
 - Existing ANY-507 success/release/replay/recovery under paid authority.
 - Owned historical result access and original-bucket finalization.
 - Usage tuple/revision validation and honest unavailable states.
-- Migration/image/profile compatibility and independent updates.
-- Real HTTP, browser and selected staging evidence.
+- Locally verified image/profile/data compatibility and independent updates.
+- Actual local HTTP, PostgreSQL and browser evidence on the pinned sources.
 
 Record **historical**, **new local**, **synthetic fixture/provider**, **real two-service HTTP**, **live LBX**, and **deployed/production** evidence separately.
 
-This revised plan closes:
+The local result includes paid client events, usage/exhaustion delivery,
+owner-bound browser recovery and minimal verified build/install support. Current
+completion is recorded in Section 2. Section 3.8 separates local readiness from
+future sales, external-service and deployment acceptance.
 
-- **PLAN-1:** existing paid client-event ingestion and browser tracking are included in Steps 6/8.
-- **PLAN-2:** usage variants, exhaustion identity and durable acknowledgement are specified.
-- **PLAN-3:** token custody and original-operation recovery are specified.
-- **PLAN-4:** release compatibility and host/container profile mapping are specified.
-- **PLAN-5:** Step 1 materialization and contract formalization/technical review are complete in both repositories; Portal remains authoritative and the Kernel copy is synchronized after progress updates. Every later prompt names the exact Portal path and every step has concrete verification targets. Step 2 supplies production declarations and scenario bindings; Step 3 supplies immutable purchased quantities and pre-consent presentation. Step 4 supplies scoped server-side session delegation and the Kernel principal adapter. Step 5 supplies production provenance admission and finite read-only V2 snapshots. Paid runtime integration and later delivery remain for Steps 6–14.
+## 7. Local result and handoff to ANY-767
 
-Remaining gates concern commercial and operational inputs for their dependent actions. Step 1 and implementation following the accepted strategy require no additional preliminary protocol approval. No launch quantity, LBX association, credential or host is invented.
+Deliver one compact handoff for PR review and parent ANY-504 stage 11:
 
-## 7. Handoff to ANY-767
+- Paired source revisions, predecessor corrections and consumed ANY-507/814 versions.
+- Migration heads/order, purchased-document reader floor, locally verified image IDs/digests and build inputs, supported configuration and installation/update/recovery commands.
+- Contract versions/checksums, session/service-auth setup, permissions and implemented admission/readback/delivery attachment points.
+- A correlated local trace: committed test purchase/access state → actual Portal snapshot HTTP → authenticated Kernel execution → accessible result → durable usage → cabinet display.
+- Applicable replay, last-unit, revocation, events, same-cycle/rollover, restart and independent-update evidence, with its exact sources/configuration and limitations. Label external substitutes; do not claim a real payment or deployed acceptance.
+- Remaining external inputs and owners: sales quantities/LBX associations, supported paid test purchase, server/operator, domains/TLS, registry access, secrets, SMTP, AI configuration and backups.
 
-Deliver one compact handoff containing:
+After PR review and corrections, **ANY-767 (parent ANY-504 stage 11)** owns actual
+registry publication and staging installation of the reviewed versions, real
+LBX/SMTP/provider wiring and the complete registration → offer/consent → test
+payment → reconciliation → paid product/result/usage journey. It also owns remaining
+natural-renewal/deployment acceptance and production rollout.
 
-- Final Portal/Kernel SHAs, predecessor correction disposition and consumed ANY-507/814 versions.
-- Migration heads/order, purchased-document reader compatibility/rollback floor, component digests, release metadata, selection and actual staging deployment.
-- Reviewed contract versions, fixtures/checksums and producer/consumer ownership.
-- Delegation, browser recovery, directional credentials, permissions, rotation and expiry behavior.
-- Actual coherence/admission/finalization/readback/delivery attachment points.
-- Deployment, readiness, inspection/retry, backup and recovery commands.
-- A correlated trace from committed Portal authority through real snapshot HTTP, paid Kernel execution, accessible result, durable usage and cabinet display.
-- Replay, last-unit, revocation, paid events, same-cycle recovery, rollover, restart and independent-update evidence.
-- Exact remaining sales, live-provider, renewal, infrastructure and production gates with owners.
-
-ANY-767 owns the complete registration → Widget/payment → reconciliation → product journey, remaining natural-renewal verification, final deployment acceptance and production rollout. Unfinished identity, enforcement, usage delivery, core connectivity or staging implementation must remain visible as incomplete ANY-766 work.
+Reuse valid local and predecessor evidence; do not repeat completed research or
+the entire unchanged local matrix. Verify the actual installed configuration,
+remaining real-service lifecycle cases and behavior affected by review changes.
+Missing remote inputs defer this later acceptance and do not prevent completion
+of ANY-766's local plan. Missing core identity, enforcement, delivery, usage or
+local browser/HTTP proof remains incomplete ANY-766 work.

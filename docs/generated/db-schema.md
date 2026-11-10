@@ -298,6 +298,18 @@ Definitions remain in repository configuration; these tables store runtime state
 | created_at | DATETIME | no |
 | updated_at | DATETIME | no |
 
+## platform.paid_access_coherence
+
+| Column | Type | Nullable |
+|---|---|---|
+| tenant_id | VARCHAR(128) | no |
+| region | VARCHAR(64) | no |
+| user_id | VARCHAR(128) | no |
+| revision_floor | BIGINT | no |
+| snapshot_revision | BIGINT | yes |
+| semantic_digest | VARCHAR(64) | yes |
+| snapshot | JSON | yes |
+
 ## platform.paid_allowance_usage
 
 | Column | Type | Nullable |
