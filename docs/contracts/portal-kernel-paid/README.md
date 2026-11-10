@@ -2,8 +2,9 @@
 
 Status: **target specifications and offline fixtures only**, formalized 2026-11-09.
 The bundle itself is protocol documentation. The identity server slice is now
-implemented in Step 4 as recorded below; paid runtime, production configuration,
-delivery workers, browser journeys and live acceptance remain later work. All quantities and
+implemented in Step 4 as recorded below. Step 6 now implements coherent paid
+admission, ownership and observational events. Production configuration, delivery
+workers, browser journeys and live acceptance remain later work. All quantities and
 credential-shaped strings in fixtures are synthetic. Q=1 is an isolated test
 quantity, never a commercial offer or approval.
 
@@ -327,3 +328,30 @@ expires in transit is refused as ordinary delegation expiry.
 
 Local tests use SQLite, disposable PostgreSQL and intercepted Kernel HTTP.
 They do not prove real paired HTTP, browser recovery, sales or deployment.
+
+
+## Step 6 server implementation
+
+Kernel consumes snapshot V2 with strict version, UTC, integer and contextual
+scope checks. Requests use the existing reverse-direction credential, verified
+TLS, a two-second timeout, a 256 KiB response bound and no redirects/environment
+proxies. Valid finite cached authority may survive refresh failure; it cannot
+cross its original expiry or durable revision floor.
+
+Migration `0019` and Core's coherence repository serialize installation,
+invalidation and new admission. The API reuses ANY-507 reservations, replay and
+original-bucket finalization. Reservation/deferred ownership protects every paid
+runtime surface; the existing client-event service supports trusted paid owners
+without granting access or charging usage.
+
+`POST /internal/v1/access-invalidations` is implemented. Its receiver-owned
+`access:invalidate` permission requires explicit trusted
+`ANYTOOLAI_PORTAL_ACCESS_INVALIDATION_ENABLED=true`; default is false, retaining
+manifest-only authority. Current/previous Portal service tokens share this
+configured permission and trusted scope. The receiver returns `204` only after
+floor/eviction commit, including repeated/lower revisions. Portal sender delivery
+remains Step 7; the usage API and exhaustion delivery remain Step 9.
+
+Focused evidence uses real disposable PostgreSQL and in-process ASGI with
+synthetic Portal responses. It does not establish real paired HTTP, browser,
+clock/TLS deployment, live LBX, sales enablement or staging acceptance.

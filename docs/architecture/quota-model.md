@@ -1,8 +1,9 @@
 # Quota Model
 
-MVP-A exposes guest quota. ANY-507 also provides typed paid metering internally; paid
-HTTP authentication, AccessSnapshot, scenario metric selection and interservice usage remain
-ANY-766 responsibilities. See the [shared contract and execution plan](../exec-plans/completed/ANY-507-implementation-plan.md).
+MVP-A exposes guest quota. ANY-507 supplies typed paid metering. ANY-766 Step 6
+connects Portal delegation, finite AccessSnapshot V2 and scenario-owned metric
+selection to that same admission path. Interservice usage and exhaustion delivery
+remain later ANY-766 work. See the [shared contract and execution plan](../exec-plans/completed/ANY-507-implementation-plan.md).
 
 ## Admission and replay
 
@@ -158,3 +159,33 @@ Before a product YAML switches from `lifetime` to a calendar period: (1) Core/SD
 value, (2) CE-kit and all supported web/extension clients understand it, (3) those clients are
 deployed, (4) only then switch the YAML. Never switch a product before every supported client version
 understands the new `QuotaPeriod` values.
+
+
+## ANY-766 coherent paid admission
+
+`platform.paid_access_coherence` (migration `0019`) retains one scoped user's
+revision floor, last snapshot revision/semantic digest and nullable snapshot.
+Core's `AccessCoherenceRepository` owns locking and writes. The HTTP composition
+validates Portal V2 documents and performs bounded request-driven refresh outside
+SQL. Installation, invalidation and new execution all hold the same row lock.
+Eviction removes only the document; revision/digest and usage survive.
+
+The paid start adapter first attempts owner/hash-matched replay without mutable
+configuration or a snapshot dependency. New admission refreshes outside SQL,
+locks coherence, repeats replay, resolves the scenario metric and exactly one
+eligible allowance, and invokes ANY-507 in the caller's Session. After bucket
+waits, it resamples PostgreSQL wall time and rechecks principal, revision, snapshot
+and grant before commit. No local expiry extension or second reservation path
+exists. Conflicting immutable tuples and ambiguous metric allowances refuse only
+their dependent admission.
+
+Paid polling, next-actions, canonical results, all handoff operations and client
+events use reservation ownership or server-written deferred ownership. Historical
+body `user_id` never proves ownership. Authenticated historical reads and replay
+do not require a current grant. Paid events may precede a scenario; their trusted
+user correlation is derived from authentication and remains observational.
+
+Handoff late authority refusal escapes the acceptance transaction and rolls back
+consent, target linkage, jobs, reservations and events. It does not turn a
+retryable authority/dependency refusal into terminal handoff failure. Existing
+expiry, decline, busy-capacity and terminal execution behavior remains in place.

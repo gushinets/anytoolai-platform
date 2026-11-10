@@ -12,6 +12,7 @@ Version: 0.1.0
 | Method | Path | Operation ID | Responses |
 |---|---|---|---|
 | GET | /health | health_health_get | 200 |
+| POST | /internal/v1/access-invalidations | post_access_invalidation_internal_v1_access_invalidations_post | 204, 401, 403, 422, 503 |
 | GET | /internal/v1/capability-manifest | get_capability_manifest_internal_v1_capability_manifest_get | 200, 401, 403, 422, 500, 503 |
 | GET | /v1/atom-lab/atoms | list_atoms_v1_atom_lab_atoms_get | 200, 401, 422, 503 |
 | GET | /v1/atom-lab/atoms/{atom_id} | get_atom_v1_atom_lab_atoms__atom_id__get | 200, 401, 404, 422, 503 |
@@ -28,23 +29,24 @@ Version: 0.1.0
 | GET | /v1/atom-lab/runs | list_runs_v1_atom_lab_runs_get | 200, 401, 422, 503 |
 | POST | /v1/atom-lab/runs | start_run_v1_atom_lab_runs_post | 202, 401, 404, 409, 413, 422, 429, 503 |
 | GET | /v1/atom-lab/runs/{run_id} | get_run_v1_atom_lab_runs__run_id__get | 200, 401, 404, 422, 503 |
-| POST | /v1/client-events | post_client_event_v1_client_events_post | 200, 404, 409, 422 |
+| POST | /v1/client-events | post_client_event_v1_client_events_post | 200, 401, 403, 404, 409, 422, 503 |
 | POST | /v1/demo/runs | start_demo_run_v1_demo_runs_post | 200, 401, 409, 422, 429, 503 |
-| POST | /v1/handoffs | create_handoff_v1_handoffs_post | 200, 404, 409, 422 |
-| GET | /v1/handoffs/{handoff_token} | get_handoff_v1_handoffs__handoff_token__get | 200, 404, 422 |
-| POST | /v1/handoffs/{handoff_token}/accept | accept_handoff_v1_handoffs__handoff_token__accept_post | 200, 404, 409, 410, 422, 429 |
-| POST | /v1/handoffs/{handoff_token}/decline | decline_handoff_v1_handoffs__handoff_token__decline_post | 200, 404, 409, 410, 422 |
+| POST | /v1/handoffs | create_handoff_v1_handoffs_post | 200, 401, 403, 404, 409, 422, 503 |
+| GET | /v1/handoffs/{handoff_token} | get_handoff_v1_handoffs__handoff_token__get | 200, 401, 403, 404, 422, 503 |
+| POST | /v1/handoffs/{handoff_token}/accept | accept_handoff_v1_handoffs__handoff_token__accept_post | 200, 401, 403, 404, 409, 410, 422, 429, 503 |
+| POST | /v1/handoffs/{handoff_token}/decline | decline_handoff_v1_handoffs__handoff_token__decline_post | 200, 401, 403, 404, 409, 410, 422, 503 |
 | POST | /v1/identity/guest | create_guest_identity_v1_identity_guest_post | 200 |
 | POST | /v1/portal-session/exchange | exchange_portal_session_v1_portal_session_exchange_post | 200, 422 |
 | GET | /v1/products/{product_id}/quota | get_product_quota_v1_products__product_id__quota_get | 200, 404, 422 |
 | GET | /v1/products/{product_id}/runtime-config | get_runtime_config_v1_products__product_id__runtime_config_get | 200, 404, 422 |
-| POST | /v1/products/{product_id}/scenarios/{scenario_id}/start | start_scenario_v1_products__product_id__scenarios__scenario_id__start_post | 200, 404, 409, 422, 429 |
-| GET | /v1/results/{result_artifact_id} | get_result_artifact_v1_results__result_artifact_id__get | 200, 404, 422 |
-| GET | /v1/scenario-sessions/{scenario_session_id} | get_scenario_session_v1_scenario_sessions__scenario_session_id__get | 200, 404, 422 |
-| POST | /v1/scenario-sessions/{scenario_session_id}/next-actions/{next_action_id} | post_next_action_v1_scenario_sessions__scenario_session_id__next_actions__next_action_id__post | 200, 404, 409, 422 |
+| POST | /v1/products/{product_id}/scenarios/{scenario_id}/start | start_scenario_v1_products__product_id__scenarios__scenario_id__start_post | 200, 401, 403, 404, 409, 422, 429, 503 |
+| GET | /v1/results/{result_artifact_id} | get_result_artifact_v1_results__result_artifact_id__get | 200, 401, 403, 404, 422, 503 |
+| GET | /v1/scenario-sessions/{scenario_session_id} | get_scenario_session_v1_scenario_sessions__scenario_session_id__get | 200, 401, 403, 404, 422, 503 |
+| POST | /v1/scenario-sessions/{scenario_session_id}/next-actions/{next_action_id} | post_next_action_v1_scenario_sessions__scenario_session_id__next_actions__next_action_id__post | 200, 401, 403, 404, 409, 422, 503 |
 
 ## Component schemas
 
+- AccessInvalidation
 - AtomLabAtomId
 - AtomLabAtomResponse
 - AtomLabDebugArtifactResponse

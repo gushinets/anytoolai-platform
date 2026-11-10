@@ -34,6 +34,7 @@ class Settings(BaseModel):
     default_region: str = "ru"
     portal_service_token: SecretStr | None = Field(default=None, repr=False)
     portal_service_token_previous: SecretStr | None = Field(default=None, repr=False)
+    portal_access_invalidation_enabled: bool = False
     portal_base_url: str = ""
     portal_access_service_token: SecretStr | None = Field(default=None, repr=False)
     atom_lab_run_body_max_bytes: int = Field(default=384 * 1024, gt=0)
@@ -121,6 +122,7 @@ class Settings(BaseModel):
             "ANYTOOLAI_PORTAL_SERVICE_TOKEN": "portal_service_token",
             "ANYTOOLAI_PORTAL_SERVICE_TOKEN_PREVIOUS": "portal_service_token_previous",
             "ANYTOOLAI_PORTAL_BASE_URL": "portal_base_url",
+            "ANYTOOLAI_PORTAL_ACCESS_INVALIDATION_ENABLED": "portal_access_invalidation_enabled",
             "ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN": "portal_access_service_token",
             "ANYTOOLAI_APP_ENV": "app_env",
         }.items():

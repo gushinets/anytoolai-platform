@@ -57,8 +57,9 @@ apps/web-mirror -> web-result-kit
 
 The separate Portal owns identity, legal acceptance, discovery and the cabinet;
 its target also owns commercial mappings and paid-access decisions. Kernel owns
-execution, artifacts and runtime usage/quota enforcement. Current Kernel runs
-guest quotas; authenticated paid integration is future work. The
+execution, artifacts and runtime usage/quota enforcement. Kernel supports guest
+quotas and Portal-delegated paid admission. Browser launch, usage delivery and
+paired deployment remain later ANY-766 work. The
 [integration map](docs/integrations/payment-portal.md) records both repositories'
 actual state, the three target request directions and enablement dependencies.
 

@@ -1023,3 +1023,36 @@ the canonical system-profile location. Once no old runner is
 active, old `/tmp/anytoolai-prod.deployment.lock` and `/tmp/anytoolai-atom-lab.deployment.lock`
 markers can be removed. Never delete the new persistent lock files during operation; process
 exit (including a crash) releases the lock automatically.
+
+
+## ANY-766 paid authority receiver (Step 6)
+
+The API implementation requires migration `0019` before paid admission or
+invalidation is enabled. Apply it only through the environment's authorized
+migration procedure. This checkpoint has applied it only to disposable test
+bases; no running application database has been migrated.
+
+Set the API's existing `ANYTOOLAI_PORTAL_BASE_URL` and independent
+`ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN` to reach Portal identity/snapshot reads.
+The Portal receiver must explicitly grant session exchange/introspection and
+`access-snapshot:read`. Kernel accepts only snapshot V2; no V1 period conversion
+or local extension of expiry exists. HTTPS verification stays enabled; existing
+settings permit loopback HTTP only in dev/test.
+
+To grant Portal invalidation permission, explicitly set
+`ANYTOOLAI_PORTAL_ACCESS_INVALIDATION_ENABLED=true` in the API receiver environment.
+It defaults false. Existing current/previous `ANYTOOLAI_PORTAL_SERVICE_TOKEN`
+slots then bind to the same trusted scope and `access:invalidate` permission.
+Manifest-only credentials do not acquire it from any request field. Keep the
+existing token rotation procedure and no-browser/no-store internal boundary.
+
+Inspect `platform.paid_access_coherence` read-only when diagnosing revision or
+snapshot refusal. Never delete or lower a floor to repair access. Request-driven
+refresh obtains a document at or above the durable floor; cache eviction does not
+remove that floor, its semantic identity or immutable usage history. Failed
+identity/snapshot dependencies return safe refusals without creating new work.
+
+Compose peer connectivity/environment forwarding, Portal invalidation delivery,
+browser launch, usage/exhaustion and image/staging activation remain their later
+ANY-766 steps. These settings describe implemented API capabilities, not an
+already connected or approved deployment.

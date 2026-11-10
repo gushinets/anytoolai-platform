@@ -288,3 +288,24 @@ local checker remains its own CI gate. External source monitoring was removed
 by the owner on 2026-10-19; real producer conformance is a later enablement gate.
 Read [ANY-727](https://linear.app/paveldik/issue/ANY-727) and companion
 [ANY-728](https://linear.app/paveldik/issue/ANY-728) for this map's delivery work.
+
+
+## ANY-766 Step 6 runtime checkpoint — 2026-11-10
+
+The local paired Step 6 change consumes Portal's Step 5 snapshot V2 and reuses
+Step 4's per-request principal introspection. Kernel migration `0019` adds durable
+coherence. Installation, invalidation and new admission share its scoped-user row
+lock; post-bucket-wait checks use PostgreSQL wall time. Accepted replay and owned
+historical results remain independent of current grants/configuration.
+
+The existing start/handoff/reservation path now receives the exact scenario-bound
+allowance. Polling, next-actions, results, all handoff operations and existing
+client events verify reservation/deferred ownership. Paid pre-scenario events
+require no guest and retain event-id deduplication. A late handoff authority
+refusal rolls back all acceptance effects and leaves consent retryable.
+
+The invalidation receiver is available behind the explicit receiver permission
+in the [server contract checkpoint](../contracts/portal-kernel-paid/README.md#step-6-server-implementation).
+Portal's sender remains Step 7. Browser integration, usage/exhaustion, Compose
+connection and deployed acceptance remain Steps 8–13. Local PostgreSQL/ASGI
+synthetic evidence does not supersede earlier historical or live-provider gates.

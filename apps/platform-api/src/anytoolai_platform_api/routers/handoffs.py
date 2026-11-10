@@ -12,6 +12,18 @@ from anytoolai_platform_api.dependencies import (
     require_enabled_product,
 )
 from anytoolai_platform_api.errors import ApiError, platform_error_to_api_error
+from anytoolai_platform_api.paid_access import (
+    PAID_RUNTIME_ERROR_RESPONSES,
+    AccessSnapshotClient,
+    db_now,
+    eligible_allowance,
+    get_snapshot_client,
+    lock_authority,
+    optional_portal_user,
+    refresh_authority,
+    require_session_owner,
+)
+from anytoolai_platform_api.portal_session import PortalUserPrincipal
 from anytoolai_platform_api.schemas import (
     ErrorResponse,
     HandoffAcceptRequest,
@@ -29,10 +41,13 @@ from anytoolai_platform_core.handoffs.models import (
     AcceptHandoffCommand,
     CreateHandoffCommand,
     HandoffPreview,
+    HandoffRecord,
+    HandoffStatus,
 )
 from anytoolai_platform_core.handoffs.payloads import HandoffPayloadBuilder
 from anytoolai_platform_core.handoffs.repository import HandoffRepository
 from anytoolai_platform_core.handoffs.service import HandoffAcceptanceExecutionError, HandoffService
+from anytoolai_platform_core.handoffs.tokens import HandoffTokenService
 from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.quotas.repository import QuotaUsageRepository
 from anytoolai_platform_core.quotas.service import QUOTA_CAPACITY_RESERVED, GuestQuotaService
@@ -41,6 +56,7 @@ from anytoolai_platform_core.scenarios.service import ScenarioRuntimeService, Sc
 from anytoolai_platform_core.storage.transactions import transaction_boundary
 from anytoolai_platform_core.workflows.repository import JobRepository
 from fastapi import APIRouter, Body, Depends
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/v1/handoffs", tags=["handoffs"])
 
@@ -48,16 +64,28 @@ router = APIRouter(prefix="/v1/handoffs", tags=["handoffs"])
 @router.post(
     "",
     response_model=HandoffCreateResponse,
-    responses={404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}},
+    responses={
+        **PAID_RUNTIME_ERROR_RESPONSES,
+        404: {"model": ErrorResponse},
+        409: {"model": ErrorResponse},
+    },
 )
 def create_handoff(
     request: Annotated[HandoffCreateRequest, Body()],
     registry: Annotated[ConfigRegistry, Depends(get_config_registry)],
     session_factory: Annotated[Any, Depends(get_session_factory)],
     settings: Annotated[Settings, Depends(get_settings)],
+    principal: Annotated[PortalUserPrincipal | None, Depends(optional_portal_user)],
 ) -> HandoffCreateResponse:
     with transaction_boundary(session_factory) as session:
         try:
+            require_session_owner(
+                session,
+                request.source_scenario_session_id,
+                settings,
+                principal,
+                code="handoff_not_found",
+            )
             created = _service(session, registry).create_handoff(
                 CreateHandoffCommand(
                     tenant_id=settings.default_tenant_id,
@@ -80,16 +108,18 @@ def create_handoff(
 @router.get(
     "/{handoff_token}",
     response_model=HandoffPreviewResponse,
-    responses={404: {"model": ErrorResponse}},
+    responses={**PAID_RUNTIME_ERROR_RESPONSES, 404: {"model": ErrorResponse}},
 )
 def get_handoff(
     handoff_token: str,
     registry: Annotated[ConfigRegistry, Depends(get_config_registry)],
     session_factory: Annotated[Any, Depends(get_session_factory)],
     settings: Annotated[Settings, Depends(get_settings)],
+    principal: Annotated[PortalUserPrincipal | None, Depends(optional_portal_user)],
 ) -> HandoffPreviewResponse:
     with transaction_boundary(session_factory) as session:
         try:
+            _owned_record(session, handoff_token, settings, principal)
             preview = _service(session, registry).get_preview(
                 handoff_token,
                 tenant_id=settings.default_tenant_id,
@@ -104,6 +134,7 @@ def get_handoff(
     "/{handoff_token}/accept",
     response_model=HandoffPreviewResponse,
     responses={
+        **PAID_RUNTIME_ERROR_RESPONSES,
         404: {"model": ErrorResponse},
         409: {"model": ErrorResponse},
         410: {"model": ErrorResponse},
@@ -115,22 +146,50 @@ def accept_handoff(
     registry: Annotated[ConfigRegistry, Depends(get_config_registry)],
     session_factory: Annotated[Any, Depends(get_session_factory)],
     settings: Annotated[Settings, Depends(get_settings)],
+    principal: Annotated[PortalUserPrincipal | None, Depends(optional_portal_user)],
+    snapshot_client: Annotated[AccessSnapshotClient, Depends(get_snapshot_client)],
     request: Annotated[HandoffAcceptRequest | None, Body()] = None,
 ) -> HandoffPreviewResponse:
+    if principal is not None:
+        with transaction_boundary(session_factory) as session:
+            record = _owned_record(session, handoff_token, settings, principal)
+            accepted_replay = record.status in {HandoffStatus.accepted, HandoffStatus.consumed}
+        if not accepted_replay:
+            refresh_authority(session_factory, principal, snapshot_client)
     accepted = None
     deferred_error: ApiError | None = None
     command = request or HandoffAcceptRequest()
     try:
         with transaction_boundary(session_factory) as session:
             try:
+                if principal is not None:
+                    lock_authority(session, principal.owner)
+                record = _owned_record(session, handoff_token, settings, principal)
+                replay = record.status in {HandoffStatus.accepted, HandoffStatus.consumed}
+                needs_admission = record.status in {
+                    HandoffStatus.created,
+                    HandoffStatus.viewed,
+                } and record.expires_at > db_now(session)
+                allowance = (
+                    None
+                    if principal is None or not needs_admission
+                    else eligible_allowance(
+                        session,
+                        principal,
+                        registry,
+                        record.target_product_id,
+                        record.target_scenario_id,
+                    )
+                )
                 service = _service(session, registry)
                 source_product_id, target_product_id = service.product_ids_by_token(
                     handoff_token,
                     tenant_id=settings.default_tenant_id,
                     region=settings.default_region,
                 )
-                require_enabled_product(source_product_id, settings)
-                require_enabled_product(target_product_id, settings)
+                if not replay:
+                    require_enabled_product(source_product_id, settings)
+                    require_enabled_product(target_product_id, settings)
                 accepted = service.accept(
                     handoff_token,
                     AcceptHandoffCommand(
@@ -139,7 +198,19 @@ def accept_handoff(
                         guest_id=command.guest_id,
                         source_frontend_instance_id=command.source_frontend_instance_id,
                     ),
+                    execution_owner=None if principal is None else principal.owner,
+                    paid_allowance=allowance,
                 )
+                if principal is not None and not accepted.is_replay:
+                    # Outside the deferred PlatformError path: any late refusal rolls back
+                    # consent, target linkage, job, events and reservation together.
+                    eligible_allowance(
+                        session,
+                        principal,
+                        registry,
+                        record.target_product_id,
+                        record.target_scenario_id,
+                    )
             except PlatformError as exc:
                 deferred_error = _api_error(exc)
     except HandoffAcceptanceExecutionError as exc:
@@ -176,6 +247,7 @@ def accept_handoff(
     "/{handoff_token}/decline",
     response_model=HandoffPreviewResponse,
     responses={
+        **PAID_RUNTIME_ERROR_RESPONSES,
         404: {"model": ErrorResponse},
         409: {"model": ErrorResponse},
         410: {"model": ErrorResponse},
@@ -186,11 +258,13 @@ def decline_handoff(
     registry: Annotated[ConfigRegistry, Depends(get_config_registry)],
     session_factory: Annotated[Any, Depends(get_session_factory)],
     settings: Annotated[Settings, Depends(get_settings)],
+    principal: Annotated[PortalUserPrincipal | None, Depends(optional_portal_user)],
 ) -> HandoffPreviewResponse:
     preview = None
     deferred_error: ApiError | None = None
     with transaction_boundary(session_factory) as session:
         try:
+            _owned_record(session, handoff_token, settings, principal)
             preview = _service(session, registry).decline(
                 handoff_token,
                 tenant_id=settings.default_tenant_id,
@@ -203,6 +277,32 @@ def decline_handoff(
     if preview is None:
         raise RuntimeError("handoff decline did not produce a response")
     return _preview_response(preview)
+
+
+def _owned_record(
+    session: Session, token: str, settings: Settings, principal: PortalUserPrincipal | None
+) -> HandoffRecord:
+    record = HandoffRepository(session).get_by_token_hash(
+        HandoffTokenService.hash(token),
+        tenant_id=settings.default_tenant_id,
+        region=settings.default_region,
+    )
+    if record is None:
+        raise ApiError(
+            status_code=HTTPStatus.NOT_FOUND, code="handoff_not_found", message="Handoff not found."
+        )
+    require_session_owner(
+        session, record.source_scenario_session_id, settings, principal, code="handoff_not_found"
+    )
+    if record.target_scenario_session_id is not None:
+        require_session_owner(
+            session,
+            record.target_scenario_session_id,
+            settings,
+            principal,
+            code="handoff_not_found",
+        )
+    return record
 
 
 def _service(
