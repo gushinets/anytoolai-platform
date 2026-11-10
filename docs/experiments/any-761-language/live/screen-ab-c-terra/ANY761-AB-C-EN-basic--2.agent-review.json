@@ -1,0 +1,29 @@
+{
+  "evidence_sha256": "bf80b5457c696c30c1a3c6a04b84e02400c18d309b9d7ac2925312912a591bd1",
+  "reviewer": "Codex agent — semantic inspection; independent human review pending",
+  "fields": {
+    "/extracted/values/assumptions/0": true,
+    "/extracted/values/deliverables/0": true,
+    "/extracted/values/deliverables/1": true,
+    "/extracted/values/acceptance_criteria/0": true,
+    "/extracted/values/acceptance_criteria/1": true,
+    "/extracted/values/acceptance_criteria/2": true,
+    "/comparison/rationale": true,
+    "/comparison/deltas/0/evidence": true,
+    "/comparison/deltas/1/evidence": true,
+    "/comparison/deltas/2/evidence": true,
+    "/comparison/deltas/3/evidence": true,
+    "/document/summary": true,
+    "/document/sections/0/content": true,
+    "/document/sections/1/content": true,
+    "/document/sections/2/content": true,
+    "/document/sections/3/content": true,
+    "/document/sections/4/content": true
+  },
+  "criteria": {
+    "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.": true,
+    "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.": false,
+    "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.": true
+  },
+  "notes": "Inspected all canonical fields. Correct expected language, faithful quoted Ready to ship, missing-JSON does_not_meet and matched narrative statuses. FAIL retention: 500 EUR omitted in all four; ES repeat 1 and RU repeat 2 also omit the date. No verdict inversion."
+}

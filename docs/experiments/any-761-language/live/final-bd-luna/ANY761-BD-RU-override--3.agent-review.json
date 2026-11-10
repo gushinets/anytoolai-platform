@@ -1,0 +1,39 @@
+{
+  "evidence_sha256": "63ced3489ccb1eaa4d1bdf5330680801531ca38bb87627b01c564de6968730cc",
+  "reviewer": "Codex agent — semantic inspection; independent human review pending",
+  "fields": {
+    "/brief/values/constraints/0": true,
+    "/brief/values/constraints/1": true,
+    "/brief/values/constraints/2": true,
+    "/brief/values/constraints/3": true,
+    "/brief/values/constraints/4": true,
+    "/brief/values/deliverables/0": true,
+    "/brief/values/deliverables/1": true,
+    "/brief/values/project_goal": true,
+    "/brief/values/target_audience": true,
+    "/issues/0/description": true,
+    "/issues/0/evidence": true,
+    "/issues/1/description": true,
+    "/issues/1/evidence": true,
+    "/issues/2/description": true,
+    "/issues/2/evidence": true,
+    "/questions/0/question": true,
+    "/questions/0/rationale": true,
+    "/questions/1/question": true,
+    "/questions/1/rationale": true,
+    "/questions/2/question": true,
+    "/questions/2/rationale": true,
+    "/document/summary": true,
+    "/document/sections/0/content": true,
+    "/document/sections/1/content": true,
+    "/document/sections/2/content": true,
+    "/document/sections/3/content": true
+  },
+  "criteria": {
+    "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.": true,
+    "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.": true,
+    "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.": true,
+    "The explicit analysis-language request is honored and is not extracted as a project requirement.": true
+  },
+  "notes": "Complete canonical fields inspected. Requested Spanish / source English honored; facts, exclusions, quotation meaning and unresolved budget/deadline preserved. Budget question correctly concerns the article commission. Weak input remains empty/incomplete without invented facts. Later successful repeats do not override earlier failures."
+}

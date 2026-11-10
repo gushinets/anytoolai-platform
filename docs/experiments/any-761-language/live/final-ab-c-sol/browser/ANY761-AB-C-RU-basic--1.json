@@ -1,0 +1,125 @@
+{
+  "id": "ANY761-AB-C-RU-basic",
+  "mode": "live browser; real local API, no mocked responses",
+  "ui_locale": "en",
+  "input": {
+    "brief_text": "Нужны два файла для Acme: PDF и JSON. Оба файла должны содержать точную строку \"Ready to ship\". Срок: 15 ноября. Бюджет: 500 EUR. Предполагается, что исходные данные уже предоставлены.",
+    "deliverable_text": "Предоставлен только PDF для Acme со строкой \"Ready to ship\". JSON не предоставлен. Срок и бюджет соблюдены."
+  },
+  "start_input": {
+    "brief_text": "Нужны два файла для Acme: PDF и JSON. Оба файла должны содержать точную строку \"Ready to ship\". Срок: 15 ноября. Бюджет: 500 EUR. Предполагается, что исходные данные уже предоставлены.",
+    "deliverable_text": "Предоставлен только PDF для Acme со строкой \"Ready to ship\". JSON не предоставлен. Срок и бюджет соблюдены."
+  },
+  "start": {
+    "scenario_session_id": "scenario_session_01794298025283374506_0000000363_9f6c11e539594c4abe9ddd22577d14f6",
+    "job_id": "job_01794298025286096633_0000000365_ac5cb6ef75bd4648bd3cf574c9b1ead5",
+    "status": "started",
+    "allowed_next_actions": [],
+    "result_artifact_id": null
+  },
+  "result": {
+    "result_artifact_id": "artifact_01794298040162226422_0000000967_d6d1de791fdf44c98493983af024ccbb",
+    "scenario_session_id": "scenario_session_01794298025283374506_0000000363_9f6c11e539594c4abe9ddd22577d14f6",
+    "job_id": "job_01794298025286096633_0000000365_ac5cb6ef75bd4648bd3cf574c9b1ead5",
+    "workflow_id": "acceptance_builder.check_v1",
+    "workflow_version": 1,
+    "schema_ref": "acceptance_builder.check_output_v1",
+    "schema_version": 1,
+    "created_at": "2026-11-10T08:07:20.162259Z",
+    "output": {
+      "document": {
+        "summary": "Работа не соответствует ожиданиям: отсутствует обязательный JSON. В первую очередь необходимо предоставить файл JSON для Acme с точной строкой «Ready to ship», чтобы выполнить требование о двух файлах.",
+        "sections": [
+          {
+            "id": "verdict",
+            "title": "Verdict",
+            "content": "Работа не соответствует ожиданиям. Вердикт основан на четырёх общих критериях проверки, а не на поэлементной оценке критериев приёмки, перечисленных ниже.\nОхват задания — не выполнен: в задании нужны два файла для Acme — PDF и JSON, но в результате указан только PDF и прямо сказано: «JSON не предоставлен».\nСоответствие требованиям — не выполнено: оба файла должны содержать точную строку «Ready to ship», но в результате эта строка указана только для PDF, а обязательный JSON отсутствует; соблюдение срока и бюджета заявлено.\nПолнота — не выполнена: из двух требуемых файлов предоставлен только PDF, а требуемый JSON не предоставлен.\nЯсность — выполнена: текст прямо сообщает, что предоставлен PDF для Acme со строкой «Ready to ship», JSON не предоставлен, а срок и бюджет соблюдены."
+          },
+          {
+            "id": "acceptance-criteria",
+            "title": "Acceptance criteria",
+            "content": "- Предоставлены два файла для Acme: PDF и JSON.\n- PDF содержит точную строку \"Ready to ship\".\n- JSON содержит точную строку \"Ready to ship\".\n- Файлы предоставлены к 15 ноября.\n- Бюджет составляет 500 EUR.",
+            "metadata": {
+              "kind": "list"
+            }
+          },
+          {
+            "id": "assumptions",
+            "title": "Assumptions",
+            "content": "- Исходные данные уже предоставлены.",
+            "metadata": {
+              "kind": "list"
+            }
+          },
+          {
+            "id": "deliverables",
+            "title": "Deliverables",
+            "content": "- Файл PDF для Acme.\n- Файл JSON для Acme.",
+            "metadata": {
+              "kind": "list"
+            }
+          },
+          {
+            "id": "open-gaps",
+            "title": "Open gaps",
+            "content": "В брифе указаны все три списка: критерии приёмки, предположения и результаты к предоставлению."
+          }
+        ]
+      },
+      "extracted": {
+        "values": {
+          "assumptions": [
+            "Исходные данные уже предоставлены."
+          ],
+          "deliverables": [
+            "Файл PDF для Acme.",
+            "Файл JSON для Acme."
+          ],
+          "acceptance_criteria": [
+            "Предоставлены два файла для Acme: PDF и JSON.",
+            "PDF содержит точную строку \"Ready to ship\".",
+            "JSON содержит точную строку \"Ready to ship\".",
+            "Файлы предоставлены к 15 ноября.",
+            "Бюджет составляет 500 EUR."
+          ]
+        },
+        "confidence": {
+          "assumptions": 1,
+          "deliverables": 1,
+          "acceptance_criteria": 0.98
+        },
+        "missing_fields": []
+      },
+      "comparison": {
+        "deltas": [
+          {
+            "status": "mismatch",
+            "evidence": "В задании нужны два файла для Acme: PDF и JSON. В результате указан только PDF; прямо сказано: «JSON не предоставлен».",
+            "criterion_id": "scope_coverage"
+          },
+          {
+            "status": "mismatch",
+            "evidence": "Оба файла должны содержать точную строку «Ready to ship». В результате эта строка указана для PDF, но обязательный JSON отсутствует. Соблюдение срока и бюджета заявлено.",
+            "criterion_id": "requirement_fit"
+          },
+          {
+            "status": "mismatch",
+            "evidence": "Из двух требуемых файлов предоставлен только PDF. Требуемый JSON не предоставлен.",
+            "criterion_id": "completeness"
+          },
+          {
+            "status": "match",
+            "evidence": "Текст прямо сообщает, что предоставлен PDF для Acme со строкой «Ready to ship», JSON не предоставлен, а срок и бюджет соблюдены.",
+            "criterion_id": "clarity"
+          }
+        ],
+        "verdict": "does_not_meet",
+        "rationale": "Результат не соответствует заданию: отсутствует обязательный JSON, поэтому требование о двух файлах с точной строкой не выполнено. При этом текст ясно описывает предоставленное и недостающее и заявляет соблюдение срока и бюджета.",
+        "confidence": 0.99
+      }
+    }
+  },
+  "clipboard": "Verdict\nVerdict: does not meet expectations.\nScope coverage: mismatch. В задании нужны два файла для Acme: PDF и JSON. В результате указан только PDF; прямо сказано: «JSON не предоставлен».\nRequirement fit: mismatch. Оба файла должны содержать точную строку «Ready to ship». В результате эта строка указана для PDF, но обязательный JSON отсутствует. Соблюдение срока и бюджета заявлено.\nCompleteness: mismatch. Из двух требуемых файлов предоставлен только PDF. Требуемый JSON не предоставлен.\nClarity: match. Текст прямо сообщает, что предоставлен PDF для Acme со строкой «Ready to ship», JSON не предоставлен, а срок и бюджет соблюдены.\nРезультат не соответствует заданию: отсутствует обязательный JSON, поэтому требование о двух файлах с точной строкой не выполнено. При этом текст ясно описывает предоставленное и недостающее и заявляет соблюдение срока и бюджета.\n\nAcceptance criteria\n- Предоставлены два файла для Acme: PDF и JSON.\n- PDF содержит точную строку \"Ready to ship\".\n- JSON содержит точную строку \"Ready to ship\".\n- Файлы предоставлены к 15 ноября.\n- Бюджет составляет 500 EUR.\n\nAssumptions\n- Исходные данные уже предоставлены.\n\nDeliverables\n- Файл PDF для Acme.\n- Файл JSON для Acme.\n\nOpen gaps\nThe brief states all three lists.",
+  "visible_text": "‹\nAll tools\nAcceptance Builder\nLanguage\nEnglish\nFrançais\nItaliano\nDeutsch\nEspañol\nРусский\nPortuguês\nMode\nDraft criteria\nCheck deliverable\n\nTurn a client brief into acceptance criteria, or check finished work against the brief.\n\nYour details\nClient brief\n\nPaste the brief as written.\n\nFinished work\n\nPaste the text you plan to hand over.\n\nCheck again\nDeliverable check\n\nThe verdict is judged on four general review criteria, not item by item on the criteria listed below.\n\nNarrative recap (display only, not copied)\n\nРабота не соответствует ожиданиям: отсутствует обязательный JSON. В первую очередь необходимо предоставить файл JSON для Acme с точной строкой «Ready to ship», чтобы выполнить требование о двух файлах.\n\nVerdict\nРабота не соответствует ожиданиям. Вердикт основан на четырёх общих критериях проверки, а не на поэлементной оценке критериев приёмки, перечисленных ниже. Охват задания — не выполнен: в задании нужны два файла для Acme — PDF и JSON, но в результате указан только PDF и прямо сказано: «JSON не предоставлен». Соответствие требованиям — не выполнено: оба файла должны содержать точную строку «Ready to ship», но в результате эта строка указана только для PDF, а обязательный JSON отсутствует; соблюдение срока и бюджета заявлено. Полнота — не выполнена: из двух требуемых файлов предоставлен только PDF, а требуемый JSON не предоставлен. Ясность — выполнена: текст прямо сообщает, что предоставлен PDF для Acme со строкой «Ready to ship», JSON не предоставлен, а срок и бюджет соблюдены.\nAcceptance criteria\n- Предоставлены два файла для Acme: PDF и JSON. - PDF содержит точную строку \"Ready to ship\". - JSON содержит точную строку \"Ready to ship\". - Файлы предоставлены к 15 ноября. - Бюджет составляет 500 EUR.\nAssumptions\n- Исходные данные уже предоставлены.\nDeliverables\n- Файл PDF для Acme. - Файл JSON для Acme.\nOpen gaps\nВ брифе указаны все три списка: критерии приёмки, предположения и результаты к предоставлению.\n\nVerdict\nVerdict: does not meet expectations.\nScope coverage: mismatch. В задании нужны два файла для Acme: PDF и JSON. В результате указан только PDF; прямо сказано: «JSON не предоставлен».\nRequirement fit: mismatch. Оба файла должны содержать точную строку «Ready to ship». В результате эта строка указана для PDF, но обязательный JSON отсутствует. Соблюдение срока и бюджета заявлено.\nCompleteness: mismatch. Из двух требуемых файлов предоставлен только PDF. Требуемый JSON не предоставлен.\nClarity: match. Текст прямо сообщает, что предоставлен PDF для Acme со строкой «Ready to ship», JSON не предоставлен, а срок и бюджет соблюдены.\nРезультат не соответствует заданию: отсутствует обязательный JSON, поэтому требование о двух файлах с точной строкой не выполнено. При этом текст ясно описывает предоставленное и недостающее и заявляет соблюдение срока и бюджета.\n\nAcceptance criteria\n- Предоставлены два файла для Acme: PDF и JSON.\n- PDF содержит точную строку \"Ready to ship\".\n- JSON содержит точную строку \"Ready to ship\".\n- Файлы предоставлены к 15 ноября.\n- Бюджет составляет 500 EUR.\n\nAssumptions\n- Исходные данные уже предоставлены.\n\nDeliverables\n- Файл PDF для Acme.\n- Файл JSON для Acme.\n\nOpen gaps\nThe brief states all three lists.\n\nCopied\nNew task",
+  "error": null
+}

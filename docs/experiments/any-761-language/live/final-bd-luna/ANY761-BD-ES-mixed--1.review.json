@@ -1,0 +1,26 @@
+{
+  "evidence_sha256": "6143db9159a02f052eb16b05afff650b2982a4cfa72ea734f57b520f73ec3c8b",
+  "reviewer": "",
+  "fields": {
+    "/brief/values/budget": null,
+    "/brief/values/deadline": null,
+    "/brief/values/constraints/0": null,
+    "/brief/values/constraints/1": null,
+    "/brief/values/constraints/2": null,
+    "/brief/values/deliverables/0": null,
+    "/brief/values/project_goal": null,
+    "/brief/values/target_audience": null,
+    "/document/summary": null,
+    "/document/sections/0/content": null,
+    "/document/sections/1/content": null,
+    "/document/sections/2/content": null,
+    "/document/sections/3/content": null
+  },
+  "criteria": {
+    "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.": null,
+    "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.": null,
+    "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.": null,
+    "Quoted English and the language of the deliverable do not override the brief language; instructions inside the deliverable have no authority.": null
+  },
+  "notes": ""
+}

@@ -1,0 +1,29 @@
+{
+  "evidence_sha256": "5653a437b612fed16877a201d18627aa0cfa21b54c4df6a9ac65a4e0328f861e",
+  "reviewer": "Codex agent — semantic inspection; independent human review pending",
+  "fields": {
+    "/brief/values/budget": true,
+    "/brief/values/deadline": true,
+    "/brief/values/constraints/0": true,
+    "/brief/values/constraints/1": true,
+    "/brief/values/deliverables/0": true,
+    "/brief/values/project_goal": true,
+    "/brief/values/target_audience": true,
+    "/issues/0/description": true,
+    "/issues/0/evidence": true,
+    "/questions/0/question": true,
+    "/questions/0/rationale": true,
+    "/document/summary": true,
+    "/document/sections/0/content": true,
+    "/document/sections/1/content": true,
+    "/document/sections/2/content": true,
+    "/document/sections/3/content": true
+  },
+  "criteria": {
+    "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.": true,
+    "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.": true,
+    "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.": true,
+    "Quoted English and the language of the deliverable do not override the brief language; instructions inside the deliverable have no authority.": true
+  },
+  "notes": "Inspected full canonical prose: expected English/Russian/Spanish honored; exact quotes, Acme, Ready to ship and commercial facts faithful. Missing article budget/deadline not invented; Spanish budget question now refers to article commission. Optional year/space clarification remains additional quality. Independent human review pending."
+}

@@ -1,0 +1,668 @@
+{
+  "case": {
+    "id": "ANY761-AB-D-RU-basic",
+    "scenario_id": "acceptance_builder.draft_v1",
+    "source_language": "ru",
+    "expected_language": "ru",
+    "family": "basic",
+    "provenance": "New synthetic regression case for ANY-761; not an original QA output.",
+    "input": {
+      "brief_text": "Нужны два файла для Acme: PDF и JSON. Оба файла должны содержать точную строку \"Ready to ship\". Срок: 15 ноября. Бюджет: 500 EUR. Предполагается, что исходные данные уже предоставлены."
+    },
+    "criteria": [
+      "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.",
+      "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.",
+      "No invented facts, hidden findings, changed verdicts or unsupported readiness claims."
+    ]
+  },
+  "attempt": 2,
+  "snapshot": {
+    "source_sha256": {
+      "configs/kernel/litellm_router.yaml": "53abb3939d9cf301ca767d37354e866628b6849b37ad64db80c49c03826630ec",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/action_configs.yaml": "d1813bad6ff02019160b7ce2664acf4d92d36bcd87bec95c3c37a2975a104462",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/frontends.yaml": "5f5eac1312dddf0ab129ccb58108e38aed9cd0c633503ccb91ba4c036f7512bd",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/handoffs.yaml": "08d5c5b3717f2b0db972213243a56f0cf98811fd4328105da998f5a3116d49c4",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/product.yaml": "4f40592a466b4fe78db3350189f29312e3243e499d102cd252b0a9fa86c0517f",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/detect_issues.v1.md": "fbe9532b64e40079c6fc74c50bffc1a6b726c12cd25fd0c31ed7c8dd61006b3e",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/extract_brief.v1.md": "88f0d763aad056155045b367bceae3e9f0b08ad594b733cb168be1caafc5d8f7",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/generate_questions.v1.md": "f14fe8eddb4226bcc1105ad79d429e1f18d47d07b31af980ad270a0dc958cf56",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/generate_summary.v1.md": "3eec86211db8fe9b344e21f5d65b457ab6d9a4b49e0c0a998810dcf637bb78d2",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts.yaml": "03cb35d961dd1d9b1d95a1d1490eb2355e438c239a391b757c5a554473845daf",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/quotas.yaml": "2fcee433e370547ff34d27f8ddfbf9abff01d456586ae2627203ee6745d298ba",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/renderer_contract.yaml": "386f963a75379f224d581f42d72abae110a3369308aba3d196d06f2a4589e95d",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/scenarios.yaml": "5c6577450040daa795e9dbd245dc9757ea59427157fd3debecbd774f61e64c3d",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas/decode_input.schema.json": "998b82bde28beb6be77e0fb522a8e0a9871c88d9500b884523912f2d257d8454",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas/decode_output.schema.json": "5a76652a23623ba7a025410a8d0a509e9b8495636f3f6adca8ecb5288610cc0a",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas.yaml": "e2038c31be3810ee6a04ac82994f9b7bbcc8cd0d68a74ff90e4e0ad3973188f9",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/workflows.yaml": "06e0268670118d4156fc6fb8eab4e2954257178243e2693dc44b9e211fb5a1de",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/action_configs.yaml": "56250e227b62b196d52649abf0e551229a4dd23c9e10c89ca65afaeab1000ec8",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/frontends.yaml": "8e43fb844dd43efb59a2c3ba4b9757795c546ea49fd79e837031f58092f5c1e6",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/product.yaml": "488d8baecc2aae035aea53e955d36f335102e0334d53d79efbc55691a4714318",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/check_document.v1.md": "c4b2e19dd1df3c2bc0d377fc749292a841ccb5e19ddc6fba07b8fa3371b3da59",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/compare.v1.md": "6ea407f09f7075a26f95b6d9d7eede06f76ce024390b2857295a763512e9a696",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/draft_document.v1.md": "3bfa48bf6d75c19de9cf99bf0d7099dd2e05c2b102787b6db8865c4bc1a2351a",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/extract.v1.md": "faaa30d051e34e7551e1a6e632a544257b1c820ad995b0b2dc4aab5a94a629df",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts.yaml": "69da98bf54727ffad9feb34dd5e5bc99de39e48b45445c7349121d2a4ac4d05d",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/quotas.yaml": "1ed4154065125cf4da02e88015f8112caf11090279f292bebd7dd4534d98df6c",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/renderer_contract.yaml": "c6e5360239048e01dc7b802cc2057d1708596ed60801fcd04fc957d5996823bd",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/scenarios.yaml": "570fdf7f211132f8c4024ca2f4073ed5a0566ca584656daa45670869de4883e3",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/check_input.schema.json": "909e70ffbc6b6a7acbf5bc4eb64065a0beb0858be2f200a5b7573e45191def09",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/check_output.schema.json": "40703d6d7483066744d7fe7c0b19491a86bf326e19c2e8a11109bdaff05caa9f",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/draft_input.schema.json": "268d5301b8b8cc610e1f4cc7668878913d2eefb877bb1c4ab2d9ab2118bfba7e",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/draft_output.schema.json": "f6eb44bf452328b9daa65229bdb6d156410a3e0e45f91788c784ad99b87ddf2f",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas.yaml": "6c32116dcd116268045aeb45cd881c5fba8144ac0e22b5fcb8a1750216f43c1b",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/workflows.yaml": "e1fe1c43eb7228cfc857113364a36fecb87a8fed49f7ca2e8bbdd2c789831528"
+    },
+    "configured_models": [
+      {
+        "model": "openai/gpt-6-luna",
+        "reasoning_effort": "medium",
+        "alias": "anytoolai.default_text"
+      }
+    ]
+  },
+  "channel": "api",
+  "session_id": "scenario_session_01794302954284316768_0000000032_04ddc575be114f7c8799c727ee62a2f8",
+  "job_id": "job_01794302954290380792_0000000034_61e4f308d72d4d80b64c61692cce8653",
+  "result_id": "artifact_01794302973350261357_0000000177_efd8fd5024cc4e11836bea587631decd",
+  "output": {
+    "document": {
+      "summary": "Найдены 2 критерия приемки. Фрилансеру следует сначала подтвердить с клиентом, что указанные критерии, предположение и результаты поставки верны.",
+      "sections": [
+        {
+          "id": "acceptance-criteria",
+          "title": "Acceptance criteria",
+          "content": "- PDF-файл должен содержать точную строку \"Ready to ship\".\n- JSON-файл должен содержать точную строку \"Ready to ship\".",
+          "metadata": {
+            "kind": "list"
+          }
+        },
+        {
+          "id": "assumptions",
+          "title": "Assumptions",
+          "content": "- Исходные данные уже предоставлены.",
+          "metadata": {
+            "kind": "list"
+          }
+        },
+        {
+          "id": "deliverables",
+          "title": "Deliverables",
+          "content": "- PDF-файл для Acme.\n- JSON-файл для Acme.",
+          "metadata": {
+            "kind": "list"
+          }
+        },
+        {
+          "id": "open-gaps",
+          "title": "Open gaps",
+          "content": "В брифе указаны все три списка."
+        }
+      ]
+    },
+    "extracted": {
+      "values": {
+        "assumptions": [
+          "Исходные данные уже предоставлены."
+        ],
+        "deliverables": [
+          "PDF-файл для Acme.",
+          "JSON-файл для Acme."
+        ],
+        "acceptance_criteria": [
+          "PDF-файл должен содержать точную строку \"Ready to ship\".",
+          "JSON-файл должен содержать точную строку \"Ready to ship\"."
+        ]
+      },
+      "confidence": {
+        "assumptions": 1,
+        "deliverables": 1,
+        "acceptance_criteria": 1
+      },
+      "missing_fields": []
+    }
+  },
+  "error": null,
+  "evidence_error": null,
+  "ledger": {
+    "actions": [
+      {
+        "id": "action_run_01794302965772511253_0000000158_a72980d6504b464bbf0616696610442d",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "acceptance_builder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302954284316768_0000000032_04ddc575be114f7c8799c727ee62a2f8",
+        "job_id": "job_01794302954290380792_0000000034_61e4f308d72d4d80b64c61692cce8653",
+        "workflow_id": "acceptance_builder.draft_v1",
+        "step_id": "extract",
+        "action_type": "text.extract_structured_fields",
+        "action_config_id": "acceptance_builder.extract_v1",
+        "status": "succeeded",
+        "input_artifact_id": null,
+        "output_artifact_id": "artifact_01794302968515763687_0000000163_f5c75be13e3f4b4685621e9cb1c93c8b",
+        "error_code": null,
+        "created_at": "2026-11-10 09:29:25.772532+00:00",
+        "started_at": "2026-11-10 09:29:25.772494+00:00",
+        "completed_at": "2026-11-10 09:29:28.519709+00:00",
+        "metadata": {
+          "model": "gpt-6-luna",
+          "user_id": null,
+          "guest_id": "guest_01794302954252390701_0000000030_68c352738a1a4434a923fea0334de488",
+          "provider": "openai",
+          "handoff_id": null,
+          "prompt_ref": "acceptance_builder.extract.v1",
+          "input_schema_ref": "kernel.schemas.extract_input_v1",
+          "workflow_version": 1,
+          "output_schema_ref": "kernel.schemas.extract_output_v1",
+          "scenario_chain_id": "scenario_session_01794302954284316768_0000000032_04ddc575be114f7c8799c727ee62a2f8",
+          "acquisition_source": "web_mirror",
+          "provider_policy_ref": "default_text_generation_v1",
+          "llm_response_metadata": {
+            "usage": {
+              "total_tokens": 1321
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicSMvuMAVmlph1BnZew4f8VcFUc1",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 9.678e-05,
+              "actual_provider": "openai"
+            },
+            "structured_output_artifact_id": "artifact_01794302968515763687_0000000163_f5c75be13e3f4b4685621e9cb1c93c8b"
+          },
+          "structured_output_artifact_id": "artifact_01794302968515763687_0000000163_f5c75be13e3f4b4685621e9cb1c93c8b"
+        }
+      },
+      {
+        "id": "action_run_01794302968527142289_0000000168_1c91e27484c34c0e82f7d87d3480c066",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "acceptance_builder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302954284316768_0000000032_04ddc575be114f7c8799c727ee62a2f8",
+        "job_id": "job_01794302954290380792_0000000034_61e4f308d72d4d80b64c61692cce8653",
+        "workflow_id": "acceptance_builder.draft_v1",
+        "step_id": "generate_document",
+        "action_type": "document.generate_from_template",
+        "action_config_id": "acceptance_builder.draft_document_v1",
+        "status": "succeeded",
+        "input_artifact_id": null,
+        "output_artifact_id": "artifact_01794302973318897656_0000000173_7077e4750e1241a7861ad02e926f273f",
+        "error_code": null,
+        "created_at": "2026-11-10 09:29:28.527154+00:00",
+        "started_at": "2026-11-10 09:29:28.527131+00:00",
+        "completed_at": "2026-11-10 09:29:33.325494+00:00",
+        "metadata": {
+          "model": "gpt-6-luna",
+          "user_id": null,
+          "guest_id": "guest_01794302954252390701_0000000030_68c352738a1a4434a923fea0334de488",
+          "provider": "openai",
+          "handoff_id": null,
+          "prompt_ref": "acceptance_builder.draft_document.v1",
+          "input_schema_ref": "kernel.schemas.generate_document_input_v1",
+          "workflow_version": 1,
+          "output_schema_ref": "kernel.schemas.generate_document_output_v1",
+          "scenario_chain_id": "scenario_session_01794302954284316768_0000000032_04ddc575be114f7c8799c727ee62a2f8",
+          "acquisition_source": "web_mirror",
+          "provider_policy_ref": "default_text_generation_v1",
+          "llm_response_metadata": {
+            "usage": {
+              "total_tokens": 1713
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicSPHYNm0S8XRrPqAktoeYp4BH97",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.00035505,
+              "actual_provider": "openai"
+            },
+            "structured_output_artifact_id": "artifact_01794302973318897656_0000000173_7077e4750e1241a7861ad02e926f273f"
+          },
+          "structured_output_artifact_id": "artifact_01794302973318897656_0000000173_7077e4750e1241a7861ad02e926f273f"
+        }
+      }
+    ],
+    "artifacts": [
+      {
+        "id": "artifact_01794302968515763687_0000000163_f5c75be13e3f4b4685621e9cb1c93c8b",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "acceptance_builder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302954284316768_0000000032_04ddc575be114f7c8799c727ee62a2f8",
+        "job_id": "job_01794302954290380792_0000000034_61e4f308d72d4d80b64c61692cce8653",
+        "action_run_id": "action_run_01794302965772511253_0000000158_a72980d6504b464bbf0616696610442d",
+        "artifact_type": "structured_output",
+        "status": "stored",
+        "content_text": null,
+        "content_json": {
+          "values": {
+            "assumptions": [
+              "Исходные данные уже предоставлены."
+            ],
+            "deliverables": [
+              "PDF-файл для Acme.",
+              "JSON-файл для Acme."
+            ],
+            "acceptance_criteria": [
+              "PDF-файл должен содержать точную строку \"Ready to ship\".",
+              "JSON-файл должен содержать точную строку \"Ready to ship\"."
+            ]
+          },
+          "confidence": {
+            "assumptions": 1,
+            "deliverables": 1,
+            "acceptance_criteria": 1
+          },
+          "missing_fields": []
+        },
+        "object_storage_key": null,
+        "metadata": {
+          "model": "gpt-6-luna",
+          "guest_id": "guest_01794302954252390701_0000000030_68c352738a1a4434a923fea0334de488",
+          "provider": "openai",
+          "schema_ref": "kernel.schemas.extract_output_v1",
+          "action_type": "text.extract_structured_fields",
+          "workflow_id": "acceptance_builder.draft_v1",
+          "schema_version": 1,
+          "pydantic_run_id": "01a1c4ca-7815-7033-ab9e-b86372d46f06",
+          "action_config_id": "acceptance_builder.extract_v1",
+          "provider_call_id": "provider_call_01794302965783709873_0000000160_8c8719a047c047edbec076521ae08761",
+          "workflow_version": 1,
+          "scenario_chain_id": "scenario_session_01794302954284316768_0000000032_04ddc575be114f7c8799c727ee62a2f8",
+          "acquisition_source": "web_mirror",
+          "litellm_response_id": "chatcmpl-EicSMvuMAVmlph1BnZew4f8VcFUc1",
+          "physical_call_index": 1,
+          "provider_policy_ref": "default_text_generation_v1",
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1
+        },
+        "created_at": "2026-11-10 09:29:28.515786+00:00"
+      },
+      {
+        "id": "artifact_01794302973318897656_0000000173_7077e4750e1241a7861ad02e926f273f",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "acceptance_builder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302954284316768_0000000032_04ddc575be114f7c8799c727ee62a2f8",
+        "job_id": "job_01794302954290380792_0000000034_61e4f308d72d4d80b64c61692cce8653",
+        "action_run_id": "action_run_01794302968527142289_0000000168_1c91e27484c34c0e82f7d87d3480c066",
+        "artifact_type": "structured_output",
+        "status": "stored",
+        "content_text": null,
+        "content_json": {
+          "summary": "Найдены 2 критерия приемки. Фрилансеру следует сначала подтвердить с клиентом, что указанные критерии, предположение и результаты поставки верны.",
+          "sections": [
+            {
+              "id": "acceptance-criteria",
+              "title": "Acceptance criteria",
+              "content": "- PDF-файл должен содержать точную строку \"Ready to ship\".\n- JSON-файл должен содержать точную строку \"Ready to ship\".",
+              "metadata": {
+                "kind": "list"
+              }
+            },
+            {
+              "id": "assumptions",
+              "title": "Assumptions",
+              "content": "- Исходные данные уже предоставлены.",
+              "metadata": {
+                "kind": "list"
+              }
+            },
+            {
+              "id": "deliverables",
+              "title": "Deliverables",
+              "content": "- PDF-файл для Acme.\n- JSON-файл для Acme.",
+              "metadata": {
+                "kind": "list"
+              }
+            },
+            {
+              "id": "open-gaps",
+              "title": "Open gaps",
+              "content": "В брифе указаны все три списка."
+            }
+          ]
+        },
+        "object_storage_key": null,
+        "metadata": {
+          "model": "gpt-6-luna",
+          "guest_id": "guest_01794302954252390701_0000000030_68c352738a1a4434a923fea0334de488",
+          "provider": "openai",
+          "schema_ref": "kernel.schemas.generate_document_output_v1",
+          "action_type": "document.generate_from_template",
+          "workflow_id": "acceptance_builder.draft_v1",
+          "schema_version": 1,
+          "pydantic_run_id": "01a1c4ca-82d3-7751-94bd-8ed974a8d071",
+          "action_config_id": "acceptance_builder.draft_document_v1",
+          "provider_call_id": "provider_call_01794302968533403187_0000000170_b7d29372a88e481d8a35598e831959fc",
+          "workflow_version": 1,
+          "scenario_chain_id": "scenario_session_01794302954284316768_0000000032_04ddc575be114f7c8799c727ee62a2f8",
+          "acquisition_source": "web_mirror",
+          "litellm_response_id": "chatcmpl-EicSPHYNm0S8XRrPqAktoeYp4BH97",
+          "physical_call_index": 1,
+          "provider_policy_ref": "default_text_generation_v1",
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1
+        },
+        "created_at": "2026-11-10 09:29:33.318925+00:00"
+      },
+      {
+        "id": "artifact_01794302973350261357_0000000177_efd8fd5024cc4e11836bea587631decd",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "acceptance_builder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302954284316768_0000000032_04ddc575be114f7c8799c727ee62a2f8",
+        "job_id": "job_01794302954290380792_0000000034_61e4f308d72d4d80b64c61692cce8653",
+        "action_run_id": null,
+        "artifact_type": "structured_output",
+        "status": "stored",
+        "content_text": null,
+        "content_json": {
+          "document": {
+            "summary": "Найдены 2 критерия приемки. Фрилансеру следует сначала подтвердить с клиентом, что указанные критерии, предположение и результаты поставки верны.",
+            "sections": [
+              {
+                "id": "acceptance-criteria",
+                "title": "Acceptance criteria",
+                "content": "- PDF-файл должен содержать точную строку \"Ready to ship\".\n- JSON-файл должен содержать точную строку \"Ready to ship\".",
+                "metadata": {
+                  "kind": "list"
+                }
+              },
+              {
+                "id": "assumptions",
+                "title": "Assumptions",
+                "content": "- Исходные данные уже предоставлены.",
+                "metadata": {
+                  "kind": "list"
+                }
+              },
+              {
+                "id": "deliverables",
+                "title": "Deliverables",
+                "content": "- PDF-файл для Acme.\n- JSON-файл для Acme.",
+                "metadata": {
+                  "kind": "list"
+                }
+              },
+              {
+                "id": "open-gaps",
+                "title": "Open gaps",
+                "content": "В брифе указаны все три списка."
+              }
+            ]
+          },
+          "extracted": {
+            "values": {
+              "assumptions": [
+                "Исходные данные уже предоставлены."
+              ],
+              "deliverables": [
+                "PDF-файл для Acme.",
+                "JSON-файл для Acme."
+              ],
+              "acceptance_criteria": [
+                "PDF-файл должен содержать точную строку \"Ready to ship\".",
+                "JSON-файл должен содержать точную строку \"Ready to ship\"."
+              ]
+            },
+            "confidence": {
+              "assumptions": 1,
+              "deliverables": 1,
+              "acceptance_criteria": 1
+            },
+            "missing_fields": []
+          }
+        },
+        "object_storage_key": null,
+        "metadata": {
+          "guest_id": "guest_01794302954252390701_0000000030_68c352738a1a4434a923fea0334de488",
+          "schema_ref": "acceptance_builder.draft_output_v1",
+          "workflow_id": "acceptance_builder.draft_v1",
+          "artifact_role": "workflow_result",
+          "schema_version": 1,
+          "workflow_version": 1,
+          "scenario_chain_id": "scenario_session_01794302954284316768_0000000032_04ddc575be114f7c8799c727ee62a2f8",
+          "acquisition_source": "web_mirror"
+        },
+        "created_at": "2026-11-10 09:29:33.350294+00:00"
+      }
+    ],
+    "calls": [
+      {
+        "id": "provider_call_01794302965783709873_0000000160_8c8719a047c047edbec076521ae08761",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "acceptance_builder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302954284316768_0000000032_04ddc575be114f7c8799c727ee62a2f8",
+        "job_id": "job_01794302954290380792_0000000034_61e4f308d72d4d80b64c61692cce8653",
+        "action_run_id": "action_run_01794302965772511253_0000000158_a72980d6504b464bbf0616696610442d",
+        "workflow_id": "acceptance_builder.draft_v1",
+        "workflow_version": 1,
+        "step_id": "extract",
+        "action_type": "text.extract_structured_fields",
+        "action_config_id": "acceptance_builder.extract_v1",
+        "provider_policy_ref": "default_text_generation_v1",
+        "provider": "openai",
+        "model": "gpt-6-luna",
+        "gateway_backend": "litellm",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "transport_attempt_index": 1,
+        "physical_call_index": 1,
+        "status": "succeeded",
+        "input_tokens": 1151,
+        "output_tokens": 170,
+        "total_tokens": 1321,
+        "latency_ms": 2706,
+        "estimated_cost": 9.678e-05,
+        "error_code": null,
+        "error_message_safe": null,
+        "failure_kind": null,
+        "http_status": null,
+        "pydantic_run_id": "01a1c4ca-7815-7033-ab9e-b86372d46f06",
+        "litellm_response_id": "chatcmpl-EicSMvuMAVmlph1BnZew4f8VcFUc1",
+        "created_at": "2026-11-10 09:29:25.783726+00:00",
+        "started_at": "2026-11-10 09:29:25.783677+00:00",
+        "completed_at": "2026-11-10 09:29:28.497066+00:00",
+        "metadata": {
+          "litellm": {
+            "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+            "http_status": null,
+            "model_group": "anytoolai.default_text",
+            "response_id": "chatcmpl-EicSMvuMAVmlph1BnZew4f8VcFUc1",
+            "actual_model": "gpt-6-luna",
+            "response_cost": 9.678e-05,
+            "actual_provider": "openai"
+          },
+          "timeout": {
+            "configured_seconds": 60
+          },
+          "attempts": {
+            "pydantic_run_id": "01a1c4ca-7815-7033-ab9e-b86372d46f06",
+            "physical_call_index": 1,
+            "semantic_attempt_index": 1,
+            "transport_attempt_index": 1
+          },
+          "response": {
+            "http_status": null,
+            "total_tokens": 1321,
+            "litellm_response_id": "chatcmpl-EicSMvuMAVmlph1BnZew4f8VcFUc1"
+          },
+          "prompt_ref": "acceptance_builder.extract.v1",
+          "request_id": null,
+          "fixture_key": null,
+          "temperature": 1.0,
+          "retry_policy": {
+            "transport": {
+              "owner": "litellm",
+              "max_attempts": 2,
+              "litellm_num_retries_per_attempt": 0
+            },
+            "validation": {
+              "owner": "pydanticai",
+              "max_attempts": 2
+            },
+            "hard_limits": {
+              "max_physical_provider_calls_per_action": 4
+            }
+          },
+          "correlation_id": null,
+          "request_payload": {
+            "prompt_chars": 4853,
+            "message_count": 1,
+            "response_schema_present": true
+          },
+          "model_addressing": "policy_alias",
+          "reasoning_effort": null,
+          "request_metadata": {
+            "user_id": null,
+            "guest_id": "guest_01794302954252390701_0000000030_68c352738a1a4434a923fea0334de488",
+            "handoff_id": null,
+            "scenario_chain_id": "scenario_session_01794302954284316768_0000000032_04ddc575be114f7c8799c727ee62a2f8",
+            "acquisition_source": "web_mirror"
+          },
+          "response_metadata": {
+            "usage": {
+              "total_tokens": 1321
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicSMvuMAVmlph1BnZew4f8VcFUc1",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 9.678e-05,
+              "actual_provider": "openai"
+            }
+          },
+          "structured_output_mode": "json_schema",
+          "fallback_from_policy_ref": null
+        }
+      },
+      {
+        "id": "provider_call_01794302968533403187_0000000170_b7d29372a88e481d8a35598e831959fc",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "acceptance_builder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302954284316768_0000000032_04ddc575be114f7c8799c727ee62a2f8",
+        "job_id": "job_01794302954290380792_0000000034_61e4f308d72d4d80b64c61692cce8653",
+        "action_run_id": "action_run_01794302968527142289_0000000168_1c91e27484c34c0e82f7d87d3480c066",
+        "workflow_id": "acceptance_builder.draft_v1",
+        "workflow_version": 1,
+        "step_id": "generate_document",
+        "action_type": "document.generate_from_template",
+        "action_config_id": "acceptance_builder.draft_document_v1",
+        "provider_policy_ref": "default_text_generation_v1",
+        "provider": "openai",
+        "model": "gpt-6-luna",
+        "gateway_backend": "litellm",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "transport_attempt_index": 1,
+        "physical_call_index": 1,
+        "status": "succeeded",
+        "input_tokens": 1337,
+        "output_tokens": 376,
+        "total_tokens": 1713,
+        "latency_ms": 4761,
+        "estimated_cost": 0.00035505,
+        "error_code": null,
+        "error_message_safe": null,
+        "failure_kind": null,
+        "http_status": null,
+        "pydantic_run_id": "01a1c4ca-82d3-7751-94bd-8ed974a8d071",
+        "litellm_response_id": "chatcmpl-EicSPHYNm0S8XRrPqAktoeYp4BH97",
+        "created_at": "2026-11-10 09:29:28.533415+00:00",
+        "started_at": "2026-11-10 09:29:28.533377+00:00",
+        "completed_at": "2026-11-10 09:29:33.298239+00:00",
+        "metadata": {
+          "litellm": {
+            "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+            "http_status": null,
+            "model_group": "anytoolai.default_text",
+            "response_id": "chatcmpl-EicSPHYNm0S8XRrPqAktoeYp4BH97",
+            "actual_model": "gpt-6-luna",
+            "response_cost": 0.00035505,
+            "actual_provider": "openai"
+          },
+          "timeout": {
+            "configured_seconds": 60
+          },
+          "attempts": {
+            "pydantic_run_id": "01a1c4ca-82d3-7751-94bd-8ed974a8d071",
+            "physical_call_index": 1,
+            "semantic_attempt_index": 1,
+            "transport_attempt_index": 1
+          },
+          "response": {
+            "http_status": null,
+            "total_tokens": 1713,
+            "litellm_response_id": "chatcmpl-EicSPHYNm0S8XRrPqAktoeYp4BH97"
+          },
+          "prompt_ref": "acceptance_builder.draft_document.v1",
+          "request_id": null,
+          "fixture_key": null,
+          "temperature": 1.0,
+          "retry_policy": {
+            "transport": {
+              "owner": "litellm",
+              "max_attempts": 2,
+              "litellm_num_retries_per_attempt": 0
+            },
+            "validation": {
+              "owner": "pydanticai",
+              "max_attempts": 2
+            },
+            "hard_limits": {
+              "max_physical_provider_calls_per_action": 4
+            }
+          },
+          "correlation_id": null,
+          "request_payload": {
+            "prompt_chars": 5092,
+            "message_count": 1,
+            "response_schema_present": true
+          },
+          "model_addressing": "policy_alias",
+          "reasoning_effort": null,
+          "request_metadata": {
+            "user_id": null,
+            "guest_id": "guest_01794302954252390701_0000000030_68c352738a1a4434a923fea0334de488",
+            "handoff_id": null,
+            "scenario_chain_id": "scenario_session_01794302954284316768_0000000032_04ddc575be114f7c8799c727ee62a2f8",
+            "acquisition_source": "web_mirror"
+          },
+          "response_metadata": {
+            "usage": {
+              "total_tokens": 1713
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicSPHYNm0S8XRrPqAktoeYp4BH97",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.00035505,
+              "actual_provider": "openai"
+            }
+          },
+          "structured_output_mode": "json_schema",
+          "fallback_from_policy_ref": null
+        }
+      }
+    ]
+  },
+  "confirmed_reasoning_effort": null,
+  "latency_ms": 19424
+}

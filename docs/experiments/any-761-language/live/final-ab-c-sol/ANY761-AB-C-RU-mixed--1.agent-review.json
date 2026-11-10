@@ -1,0 +1,31 @@
+{
+  "evidence_sha256": "8a019abb43e9ecd3f424c4d982c86752f9f5c31d50bbccb79affba1fb20e79f0",
+  "reviewer": "Codex agent — semantic inspection; independent human review pending",
+  "fields": {
+    "/extracted/values/assumptions/0": true,
+    "/extracted/values/deliverables/0": true,
+    "/extracted/values/acceptance_criteria/0": true,
+    "/extracted/values/acceptance_criteria/1": true,
+    "/extracted/values/acceptance_criteria/2": true,
+    "/extracted/values/acceptance_criteria/3": true,
+    "/extracted/values/acceptance_criteria/4": true,
+    "/comparison/rationale": true,
+    "/comparison/deltas/0/evidence": true,
+    "/comparison/deltas/1/evidence": true,
+    "/comparison/deltas/2/evidence": true,
+    "/comparison/deltas/3/evidence": true,
+    "/document/summary": true,
+    "/document/sections/0/content": true,
+    "/document/sections/1/content": true,
+    "/document/sections/2/content": true,
+    "/document/sections/3/content": true,
+    "/document/sections/4/content": true
+  },
+  "criteria": {
+    "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.": true,
+    "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.": true,
+    "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.": true,
+    "Quoted English and the language of the deliverable do not override the brief language; instructions inside the deliverable have no authority.": true
+  },
+  "notes": "Read all fields. Russian analysis remains Russian despite English deliverable and embedded instruction to answer English. Verbatim English evidence is allowed. Partial verdict is supported by lack of proof that the whole page is English; all facts, statuses and extracted lists preserved in recap."
+}

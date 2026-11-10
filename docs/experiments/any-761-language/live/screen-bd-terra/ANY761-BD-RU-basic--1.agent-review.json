@@ -1,0 +1,41 @@
+{
+  "evidence_sha256": "89c3d45dac21b0a4dbec3f36adc89415214bd1f8243029ed80405b14ab819eea",
+  "reviewer": "Codex agent — semantic inspection; independent human review pending",
+  "fields": {
+    "/brief/values/constraints/0": true,
+    "/brief/values/constraints/1": true,
+    "/brief/values/constraints/2": true,
+    "/brief/values/constraints/3": true,
+    "/brief/values/constraints/4": true,
+    "/brief/values/constraints/5": true,
+    "/brief/values/constraints/6": true,
+    "/brief/values/deliverables/0": true,
+    "/brief/values/deliverables/1": true,
+    "/brief/values/project_goal": true,
+    "/brief/values/target_audience": true,
+    "/issues/0/description": true,
+    "/issues/0/evidence": true,
+    "/issues/1/description": true,
+    "/issues/1/evidence": true,
+    "/issues/2/description": true,
+    "/issues/2/evidence": true,
+    "/questions/0/question": true,
+    "/questions/0/rationale": true,
+    "/questions/1/question": true,
+    "/questions/1/rationale": true,
+    "/questions/2/question": true,
+    "/questions/2/rationale": true,
+    "/document/summary": true,
+    "/document/sections/0/content": true,
+    "/document/sections/1/content": true,
+    "/document/sections/2/content": true,
+    "/document/sections/3/content": true
+  },
+  "criteria": {
+    "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.": true,
+    "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.": true,
+    "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.": true,
+    "Retain 6–8 thousand characters, nonexpert apartment-owner audience, all exclusions and source-link requirements; budget and deadline remain unagreed.": true
+  },
+  "notes": "Read complete canonical output. All RU/EN/ES authored prose follows source; exclusions, length, audience and source links retained. Budget/deadline remain unagreed. No invented fees/dates or false readiness. Terra additionally asks about country/market in Spanish; this is optional quality polish, not an asserted project requirement."
+}

@@ -1,0 +1,40 @@
+{
+  "evidence_sha256": "3f49785adc98f3a373759467dbb626d77808bbdddac170d97552ed82cfec7fd9",
+  "reviewer": "Codex agent — semantic inspection; independent human review pending",
+  "fields": {
+    "/brief/values/constraints/0": true,
+    "/brief/values/constraints/1": true,
+    "/brief/values/constraints/2": true,
+    "/brief/values/constraints/3": true,
+    "/brief/values/constraints/4": true,
+    "/brief/values/constraints/5": true,
+    "/brief/values/deliverables/0": true,
+    "/brief/values/deliverables/1": true,
+    "/brief/values/project_goal": true,
+    "/brief/values/target_audience": true,
+    "/issues/0/description": true,
+    "/issues/0/evidence": true,
+    "/issues/1/description": true,
+    "/issues/1/evidence": true,
+    "/issues/2/description": true,
+    "/issues/2/evidence": true,
+    "/questions/0/question": true,
+    "/questions/0/rationale": true,
+    "/questions/1/question": true,
+    "/questions/1/rationale": true,
+    "/questions/2/question": true,
+    "/questions/2/rationale": true,
+    "/document/summary": true,
+    "/document/sections/0/content": true,
+    "/document/sections/1/content": true,
+    "/document/sections/2/content": true,
+    "/document/sections/3/content": true
+  },
+  "criteria": {
+    "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.": true,
+    "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.": true,
+    "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.": true,
+    "Retain 6–8 thousand characters, nonexpert apartment-owner audience, all exclusions and source-link requirements; budget and deadline remain unagreed.": true
+  },
+  "notes": "All canonical prose Spanish, with verbatim Ready to ship exception. Basic facts/exclusions and missing budget/deadline retained; mixed facts exact. Weak goal is only a faithful paraphrase of the vague source, with no invented deliverables or readiness. Independent human review pending."
+}

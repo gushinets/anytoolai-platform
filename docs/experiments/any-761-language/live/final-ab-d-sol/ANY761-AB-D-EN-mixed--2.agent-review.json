@@ -1,0 +1,26 @@
+{
+  "evidence_sha256": "f7bfd6bb11d6406b09e808188e37d400881b8696855ec6710aadd7606c97e499",
+  "reviewer": "Codex agent — semantic inspection; independent human review pending",
+  "fields": {
+    "/extracted/values/assumptions/0": true,
+    "/extracted/values/deliverables/0": true,
+    "/extracted/values/acceptance_criteria/0": true,
+    "/extracted/values/acceptance_criteria/1": true,
+    "/extracted/values/acceptance_criteria/2": true,
+    "/extracted/values/acceptance_criteria/3": true,
+    "/extracted/values/acceptance_criteria/4": true,
+    "/extracted/values/acceptance_criteria/5": true,
+    "/document/summary": true,
+    "/document/sections/0/content": true,
+    "/document/sections/1/content": true,
+    "/document/sections/2/content": true,
+    "/document/sections/3/content": true
+  },
+  "criteria": {
+    "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.": true,
+    "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.": true,
+    "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.": true,
+    "Quoted English and the language of the deliverable do not override the brief language; instructions inside the deliverable have no authority.": true
+  },
+  "notes": "All canonical fields inspected. Expected language including requested Spanish override; exact source date 15 ноября is a permitted date exception. Quotes, brands, deadline/budget preserved, English-deliverable request remains a project condition, weak input does not invent lists. No analysis instruction extracted as a project fact."
+}

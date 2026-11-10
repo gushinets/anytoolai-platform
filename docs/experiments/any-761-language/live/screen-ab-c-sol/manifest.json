@@ -1,0 +1,112 @@
+{
+  "cases": [
+    {
+      "id": "ANY761-AB-C-RU-basic",
+      "scenario_id": "acceptance_builder.check_v1",
+      "source_language": "ru",
+      "expected_language": "ru",
+      "family": "basic",
+      "provenance": "New synthetic regression case for ANY-761; not an original QA output.",
+      "input": {
+        "brief_text": "Нужны два файла для Acme: PDF и JSON. Оба файла должны содержать точную строку \"Ready to ship\". Срок: 15 ноября. Бюджет: 500 EUR. Предполагается, что исходные данные уже предоставлены.",
+        "deliverable_text": "Предоставлен только PDF для Acme со строкой \"Ready to ship\". JSON не предоставлен. Срок и бюджет соблюдены."
+      },
+      "criteria": [
+        "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.",
+        "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.",
+        "No invented facts, hidden findings, changed verdicts or unsupported readiness claims."
+      ]
+    },
+    {
+      "id": "ANY761-AB-C-EN-basic",
+      "scenario_id": "acceptance_builder.check_v1",
+      "source_language": "en",
+      "expected_language": "en",
+      "family": "basic",
+      "provenance": "New synthetic regression case for ANY-761; not an original QA output.",
+      "input": {
+        "brief_text": "We need two files for Acme: PDF and JSON. Both files must contain the exact string \"Ready to ship\". Deadline: November 15. Budget: 500 EUR. We assume the source data has already been provided.",
+        "deliverable_text": "Only the PDF for Acme with the string \"Ready to ship\" has been delivered. JSON has not been delivered. The deadline and budget were met."
+      },
+      "criteria": [
+        "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.",
+        "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.",
+        "No invented facts, hidden findings, changed verdicts or unsupported readiness claims."
+      ]
+    },
+    {
+      "id": "ANY761-AB-C-ES-basic",
+      "scenario_id": "acceptance_builder.check_v1",
+      "source_language": "es",
+      "expected_language": "es",
+      "family": "basic",
+      "provenance": "New synthetic regression case for ANY-761; not an original QA output.",
+      "input": {
+        "brief_text": "Necesitamos dos archivos para Acme: PDF y JSON. Ambos deben contener la cadena exacta \"Ready to ship\". Plazo: 15 de noviembre. Presupuesto: 500 EUR. Se supone que los datos de origen ya se han proporcionado.",
+        "deliverable_text": "Solo se ha entregado el PDF para Acme con la cadena \"Ready to ship\". No se ha entregado el JSON. Se han respetado el plazo y el presupuesto."
+      },
+      "criteria": [
+        "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.",
+        "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.",
+        "No invented facts, hidden findings, changed verdicts or unsupported readiness claims."
+      ]
+    }
+  ],
+  "runs": [
+    "ANY761-AB-C-RU-basic--1",
+    "ANY761-AB-C-EN-basic--1",
+    "ANY761-AB-C-ES-basic--1",
+    "ANY761-AB-C-RU-basic--2",
+    "ANY761-AB-C-EN-basic--2",
+    "ANY761-AB-C-ES-basic--2"
+  ],
+  "snapshot": {
+    "source_sha256": {
+      "configs/kernel/litellm_router.yaml": "8c3e09283b50eee9da5a192d977ee46c9bfb7fd6def60fafc13d5355c6e3b60d",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/action_configs.yaml": "d1813bad6ff02019160b7ce2664acf4d92d36bcd87bec95c3c37a2975a104462",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/frontends.yaml": "5f5eac1312dddf0ab129ccb58108e38aed9cd0c633503ccb91ba4c036f7512bd",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/handoffs.yaml": "08d5c5b3717f2b0db972213243a56f0cf98811fd4328105da998f5a3116d49c4",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/product.yaml": "4f40592a466b4fe78db3350189f29312e3243e499d102cd252b0a9fa86c0517f",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/detect_issues.v1.md": "4db429fd656d82d3c42ec90361a874e5722bc41f3e21af8c2c352a98f8604605",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/extract_brief.v1.md": "9e1b17ec0686a51f3f7dd26ae7ce7ad226021c089f1a9f02f440feb2fee87e9c",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/generate_questions.v1.md": "eb3f9defcd289f920a41bc7d6ed2a9e55a7d6de2bd278d8e25a9b93855ee2066",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/generate_summary.v1.md": "98ecc9bd964f13f2e48f5d0cfdd867a2ff91b24ff1578a7ea7918044781817aa",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts.yaml": "03cb35d961dd1d9b1d95a1d1490eb2355e438c239a391b757c5a554473845daf",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/quotas.yaml": "2fcee433e370547ff34d27f8ddfbf9abff01d456586ae2627203ee6745d298ba",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/renderer_contract.yaml": "386f963a75379f224d581f42d72abae110a3369308aba3d196d06f2a4589e95d",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/scenarios.yaml": "5c6577450040daa795e9dbd245dc9757ea59427157fd3debecbd774f61e64c3d",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas/decode_input.schema.json": "998b82bde28beb6be77e0fb522a8e0a9871c88d9500b884523912f2d257d8454",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas/decode_output.schema.json": "5a76652a23623ba7a025410a8d0a509e9b8495636f3f6adca8ecb5288610cc0a",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas.yaml": "e2038c31be3810ee6a04ac82994f9b7bbcc8cd0d68a74ff90e4e0ad3973188f9",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/workflows.yaml": "06e0268670118d4156fc6fb8eab4e2954257178243e2693dc44b9e211fb5a1de",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/action_configs.yaml": "56250e227b62b196d52649abf0e551229a4dd23c9e10c89ca65afaeab1000ec8",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/frontends.yaml": "8e43fb844dd43efb59a2c3ba4b9757795c546ea49fd79e837031f58092f5c1e6",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/product.yaml": "488d8baecc2aae035aea53e955d36f335102e0334d53d79efbc55691a4714318",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/check_document.v1.md": "105f60451f68a51705d07478ed07c80d739db737f9dbb3027ac57485435ec9f7",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/compare.v1.md": "9bfcd37fbe889772a1db6cc89b63f6bff0ea92a814536f94142e70c128c33d5a",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/draft_document.v1.md": "06629b42a9b8576742b02992928ccfd1cf05a8f205c7f7108d77b21fe8c9834c",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/extract.v1.md": "8e762196bab4dcf4859540db3f874dfd0f93e364d97a85aec2bab39041b3a801",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts.yaml": "69da98bf54727ffad9feb34dd5e5bc99de39e48b45445c7349121d2a4ac4d05d",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/quotas.yaml": "1ed4154065125cf4da02e88015f8112caf11090279f292bebd7dd4534d98df6c",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/renderer_contract.yaml": "c6e5360239048e01dc7b802cc2057d1708596ed60801fcd04fc957d5996823bd",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/scenarios.yaml": "570fdf7f211132f8c4024ca2f4073ed5a0566ca584656daa45670869de4883e3",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/check_input.schema.json": "909e70ffbc6b6a7acbf5bc4eb64065a0beb0858be2f200a5b7573e45191def09",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/check_output.schema.json": "40703d6d7483066744d7fe7c0b19491a86bf326e19c2e8a11109bdaff05caa9f",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/draft_input.schema.json": "268d5301b8b8cc610e1f4cc7668878913d2eefb877bb1c4ab2d9ab2118bfba7e",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/draft_output.schema.json": "f6eb44bf452328b9daa65229bdb6d156410a3e0e45f91788c784ad99b87ddf2f",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas.yaml": "6c32116dcd116268045aeb45cd881c5fba8144ac0e22b5fcb8a1750216f43c1b",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/workflows.yaml": "e1fe1c43eb7228cfc857113364a36fecb87a8fed49f7ca2e8bbdd2c789831528"
+    },
+    "configured_models": [
+      {
+        "model": "openai/gpt-6.1-sol",
+        "reasoning_effort": "medium",
+        "alias": "anytoolai.default_text"
+      }
+    ]
+  },
+  "source": {
+    "git_sha": "9e3c419ea4881a2ea48df1f4430572e35910f741",
+    "git_dirty": true
+  }
+}

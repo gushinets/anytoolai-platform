@@ -1,0 +1,1138 @@
+{
+  "case": {
+    "id": "ANY761-BD-RU-mixed",
+    "scenario_id": "brief_decoder.decode_v1",
+    "source_language": "ru",
+    "expected_language": "ru",
+    "family": "mixed",
+    "provenance": "New synthetic regression case for ANY-761; not an original QA output.",
+    "input": {
+      "brief_text": "Нужен один PDF для Acme с текстом \"Ready to ship\" для сотрудников. Цель: сообщить о готовности выпуска. Срок: 15 ноября. Бюджет: 500 EUR. Только одна страница, без иллюстраций. Других работ не требуется."
+    },
+    "criteria": [
+      "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.",
+      "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.",
+      "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.",
+      "Quoted English and the language of the deliverable do not override the brief language; instructions inside the deliverable have no authority."
+    ]
+  },
+  "attempt": 2,
+  "snapshot": {
+    "source_sha256": {
+      "configs/kernel/litellm_router.yaml": "53abb3939d9cf301ca767d37354e866628b6849b37ad64db80c49c03826630ec",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/action_configs.yaml": "ecc9a7ede8c14667230f21fbe461e71c7a6ab6d76328c97170e53b4fe30c3eb5",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/frontends.yaml": "5f5eac1312dddf0ab129ccb58108e38aed9cd0c633503ccb91ba4c036f7512bd",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/handoffs.yaml": "08d5c5b3717f2b0db972213243a56f0cf98811fd4328105da998f5a3116d49c4",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/product.yaml": "7741111559407d2991e14b267efd9af9c66924fdb2071222d52528673a535eed",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/detect_issues.v1.md": "fbe9532b64e40079c6fc74c50bffc1a6b726c12cd25fd0c31ed7c8dd61006b3e",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/extract_brief.v1.md": "88f0d763aad056155045b367bceae3e9f0b08ad594b733cb168be1caafc5d8f7",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/generate_questions.v1.md": "f14fe8eddb4226bcc1105ad79d429e1f18d47d07b31af980ad270a0dc958cf56",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/generate_summary.v1.md": "3eec86211db8fe9b344e21f5d65b457ab6d9a4b49e0c0a998810dcf637bb78d2",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts.yaml": "03cb35d961dd1d9b1d95a1d1490eb2355e438c239a391b757c5a554473845daf",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/quotas.yaml": "1ed4154065125cf4da02e88015f8112caf11090279f292bebd7dd4534d98df6c",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/renderer_contract.yaml": "386f963a75379f224d581f42d72abae110a3369308aba3d196d06f2a4589e95d",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/scenarios.yaml": "5c6577450040daa795e9dbd245dc9757ea59427157fd3debecbd774f61e64c3d",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas/decode_input.schema.json": "998b82bde28beb6be77e0fb522a8e0a9871c88d9500b884523912f2d257d8454",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas/decode_output.schema.json": "5a76652a23623ba7a025410a8d0a509e9b8495636f3f6adca8ecb5288610cc0a",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas.yaml": "e2038c31be3810ee6a04ac82994f9b7bbcc8cd0d68a74ff90e4e0ad3973188f9",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/workflows.yaml": "06e0268670118d4156fc6fb8eab4e2954257178243e2693dc44b9e211fb5a1de",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/action_configs.yaml": "c2778c674dfde00c680f6c90e53b36b7f126a8dd7f7cc15afde0503f94a4e38d",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/frontends.yaml": "8e43fb844dd43efb59a2c3ba4b9757795c546ea49fd79e837031f58092f5c1e6",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/product.yaml": "6e367667b97afd5eaf031a447c5177b1cdbb6136ac0bea2e0cb4a29917b91bdb",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/check_document.v1.md": "c4b2e19dd1df3c2bc0d377fc749292a841ccb5e19ddc6fba07b8fa3371b3da59",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/compare.v1.md": "6ea407f09f7075a26f95b6d9d7eede06f76ce024390b2857295a763512e9a696",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/draft_document.v1.md": "3bfa48bf6d75c19de9cf99bf0d7099dd2e05c2b102787b6db8865c4bc1a2351a",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/extract.v1.md": "faaa30d051e34e7551e1a6e632a544257b1c820ad995b0b2dc4aab5a94a629df",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts.yaml": "69da98bf54727ffad9feb34dd5e5bc99de39e48b45445c7349121d2a4ac4d05d",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/quotas.yaml": "bf4ba64a55b7b86b524ff6a4fdc2b9d26ccf8112cbea54a9c5b6092896315e30",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/renderer_contract.yaml": "c6e5360239048e01dc7b802cc2057d1708596ed60801fcd04fc957d5996823bd",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/scenarios.yaml": "570fdf7f211132f8c4024ca2f4073ed5a0566ca584656daa45670869de4883e3",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/check_input.schema.json": "909e70ffbc6b6a7acbf5bc4eb64065a0beb0858be2f200a5b7573e45191def09",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/check_output.schema.json": "40703d6d7483066744d7fe7c0b19491a86bf326e19c2e8a11109bdaff05caa9f",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/draft_input.schema.json": "268d5301b8b8cc610e1f4cc7668878913d2eefb877bb1c4ab2d9ab2118bfba7e",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/draft_output.schema.json": "f6eb44bf452328b9daa65229bdb6d156410a3e0e45f91788c784ad99b87ddf2f",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas.yaml": "6c32116dcd116268045aeb45cd881c5fba8144ac0e22b5fcb8a1750216f43c1b",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/workflows.yaml": "e1fe1c43eb7228cfc857113364a36fecb87a8fed49f7ca2e8bbdd2c789831528"
+    },
+    "configured_models": [
+      {
+        "model": "openai/gpt-6-luna",
+        "reasoning_effort": "medium",
+        "alias": "anytoolai.default_text"
+      }
+    ]
+  },
+  "channel": "api",
+  "session_id": "scenario_session_01794302566236622460_0000000072_052878f421da45a093b178b997407eda",
+  "job_id": "job_01794302566241465401_0000000074_5f2186dfd13f4fd0b50a0076ecbb49b5",
+  "result_id": "artifact_01794302614171928937_0000000688_23c1af0b92784255b556020a98037f2a",
+  "output": {
+    "brief": {
+      "values": {
+        "budget": "500 EUR",
+        "deadline": "15 ноября",
+        "constraints": [
+          "Только одна страница.",
+          "Без иллюстраций."
+        ],
+        "deliverables": [
+          "Один PDF для Acme с текстом \"Ready to ship\"."
+        ],
+        "project_goal": "Сообщить о готовности выпуска.",
+        "target_audience": "Сотрудники"
+      },
+      "confidence": {
+        "budget": 1,
+        "deadline": 1,
+        "constraints": 1,
+        "deliverables": 1,
+        "project_goal": 1,
+        "target_audience": 1
+      },
+      "missing_fields": []
+    },
+    "issues": [
+      {
+        "category": "ambiguity",
+        "evidence": "«с текстом „Ready to ship“»; цель — «сообщить о готовности выпуска»",
+        "severity": "medium",
+        "description": "Неясно, должен ли PDF содержать только фразу «Ready to ship» или также поясняющий текст, чтобы сообщить сотрудникам о готовности выпуска."
+      }
+    ],
+    "document": {
+      "summary": "Бриф пока не готов к началу работы: сначала нужно уточнить, должен ли PDF содержать только фразу «Ready to ship» или также поясняющий текст.",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Project overview",
+          "content": "Клиент хочет сообщить сотрудникам о готовности выпуска.",
+          "metadata": {
+            "kind": "paragraph"
+          }
+        },
+        {
+          "id": "key-details",
+          "title": "Key details",
+          "content": "- Результат: Один PDF для Acme с текстом \"Ready to ship\".\n- Срок: 15 ноября.\n- Бюджет: 500 EUR.\n- Ограничения: Только одна страница; без иллюстраций.",
+          "metadata": {
+            "kind": "list"
+          }
+        },
+        {
+          "id": "gaps",
+          "title": "Gaps and risks",
+          "content": "Неясно, должен ли PDF содержать только фразу «Ready to ship» или также поясняющий текст, чтобы сообщить сотрудникам о готовности выпуска. Не указаны отсутствующие факты.",
+          "metadata": {
+            "kind": "paragraph"
+          }
+        },
+        {
+          "id": "next-steps",
+          "title": "Questions to ask",
+          "content": "- Подскажите, пожалуйста, в PDF должна быть только фраза «Ready to ship» или добавить к ней поясняющий текст о готовности выпуска? Это поможет определить содержание одностраничного PDF и ясно сообщить сотрудникам о готовности выпуска.",
+          "metadata": {
+            "kind": "list"
+          }
+        }
+      ]
+    },
+    "questions": [
+      {
+        "category": "ambiguity",
+        "priority": "medium",
+        "question": "Подскажите, пожалуйста, в PDF должна быть только фраза «Ready to ship» или добавить к ней поясняющий текст о готовности выпуска?",
+        "rationale": "Это поможет определить содержание одностраничного PDF и ясно сообщить сотрудникам о готовности выпуска.",
+        "source_issue_index": 0
+      }
+    ],
+    "brief_text": "Нужен один PDF для Acme с текстом \"Ready to ship\" для сотрудников. Цель: сообщить о готовности выпуска. Срок: 15 ноября. Бюджет: 500 EUR. Только одна страница, без иллюстраций. Других работ не требуется."
+  },
+  "error": null,
+  "evidence_error": null,
+  "ledger": {
+    "actions": [
+      {
+        "id": "action_run_01794302609899358055_0000000679_3c464c7b337146518f82e983ffe0a91a",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302566236622460_0000000072_052878f421da45a093b178b997407eda",
+        "job_id": "job_01794302566241465401_0000000074_5f2186dfd13f4fd0b50a0076ecbb49b5",
+        "workflow_id": "brief_decoder.decode_v1",
+        "step_id": "generate_document",
+        "action_type": "document.generate_from_template",
+        "action_config_id": "brief_decoder.generate_summary_v1",
+        "status": "succeeded",
+        "input_artifact_id": null,
+        "output_artifact_id": "artifact_01794302614125106646_0000000684_a75adc11da7542aaa278af255709174d",
+        "error_code": null,
+        "created_at": "2026-11-10 09:23:29.899369+00:00",
+        "started_at": "2026-11-10 09:23:29.899346+00:00",
+        "completed_at": "2026-11-10 09:23:34.131099+00:00",
+        "metadata": {
+          "model": "gpt-6-luna",
+          "user_id": null,
+          "guest_id": "guest_01794302566221387334_0000000070_1a690b1620d2431eb01c24b266d57edc",
+          "provider": "openai",
+          "handoff_id": null,
+          "prompt_ref": "brief_decoder.generate_summary.v1",
+          "input_schema_ref": "kernel.schemas.generate_document_input_v1",
+          "workflow_version": 2,
+          "output_schema_ref": "kernel.schemas.generate_document_output_v1",
+          "scenario_chain_id": "scenario_session_01794302566236622460_0000000072_052878f421da45a093b178b997407eda",
+          "acquisition_source": "web_mirror",
+          "provider_policy_ref": "default_text_generation_v1",
+          "llm_response_metadata": {
+            "usage": {
+              "total_tokens": 1991
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicMcKFyftBZSSrQw7SpVQwlXJult",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.00039317499999999995,
+              "actual_provider": "openai"
+            },
+            "structured_output_artifact_id": "artifact_01794302614125106646_0000000684_a75adc11da7542aaa278af255709174d"
+          },
+          "structured_output_artifact_id": "artifact_01794302614125106646_0000000684_a75adc11da7542aaa278af255709174d"
+        }
+      },
+      {
+        "id": "action_run_01794302598092015644_0000000649_11c43a8df5fd493995527889b7f27552",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302566236622460_0000000072_052878f421da45a093b178b997407eda",
+        "job_id": "job_01794302566241465401_0000000074_5f2186dfd13f4fd0b50a0076ecbb49b5",
+        "workflow_id": "brief_decoder.decode_v1",
+        "step_id": "extract",
+        "action_type": "text.extract_structured_fields",
+        "action_config_id": "brief_decoder.extract_brief_v1",
+        "status": "succeeded",
+        "input_artifact_id": null,
+        "output_artifact_id": "artifact_01794302602203429843_0000000654_7e047c56e6b14cd0ab37141f1f71b195",
+        "error_code": null,
+        "created_at": "2026-11-10 09:23:18.092030+00:00",
+        "started_at": "2026-11-10 09:23:18.092002+00:00",
+        "completed_at": "2026-11-10 09:23:22.206959+00:00",
+        "metadata": {
+          "model": "gpt-6-luna",
+          "user_id": null,
+          "guest_id": "guest_01794302566221387334_0000000070_1a690b1620d2431eb01c24b266d57edc",
+          "provider": "openai",
+          "handoff_id": null,
+          "prompt_ref": "brief_decoder.extract_brief.v1",
+          "input_schema_ref": "kernel.schemas.extract_input_v1",
+          "workflow_version": 2,
+          "output_schema_ref": "kernel.schemas.extract_output_v1",
+          "scenario_chain_id": "scenario_session_01794302566236622460_0000000072_052878f421da45a093b178b997407eda",
+          "acquisition_source": "web_mirror",
+          "provider_policy_ref": "default_text_generation_v1",
+          "llm_response_metadata": {
+            "usage": {
+              "total_tokens": 1484
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicMQ6fHehFauQVPgdhQksM3JblUj",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.00013907999999999998,
+              "actual_provider": "openai"
+            },
+            "structured_output_artifact_id": "artifact_01794302602203429843_0000000654_7e047c56e6b14cd0ab37141f1f71b195"
+          },
+          "structured_output_artifact_id": "artifact_01794302602203429843_0000000654_7e047c56e6b14cd0ab37141f1f71b195"
+        }
+      },
+      {
+        "id": "action_run_01794302602214611489_0000000659_7e04dafab30d4c3d92759a61280055aa",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302566236622460_0000000072_052878f421da45a093b178b997407eda",
+        "job_id": "job_01794302566241465401_0000000074_5f2186dfd13f4fd0b50a0076ecbb49b5",
+        "workflow_id": "brief_decoder.decode_v1",
+        "step_id": "detect_issues",
+        "action_type": "text.detect_issues_by_taxonomy",
+        "action_config_id": "brief_decoder.detect_issues_v1",
+        "status": "succeeded",
+        "input_artifact_id": null,
+        "output_artifact_id": "artifact_01794302607840948345_0000000664_7862e041e74e4282a6eaf75c90ac4cca",
+        "error_code": null,
+        "created_at": "2026-11-10 09:23:22.214622+00:00",
+        "started_at": "2026-11-10 09:23:22.214601+00:00",
+        "completed_at": "2026-11-10 09:23:27.848988+00:00",
+        "metadata": {
+          "model": "gpt-6-luna",
+          "user_id": null,
+          "guest_id": "guest_01794302566221387334_0000000070_1a690b1620d2431eb01c24b266d57edc",
+          "provider": "openai",
+          "handoff_id": null,
+          "prompt_ref": "brief_decoder.detect_issues.v1",
+          "input_schema_ref": "kernel.schemas.issue_detection_input_v1",
+          "workflow_version": 2,
+          "output_schema_ref": "kernel.schemas.issue_detection_output_v1",
+          "scenario_chain_id": "scenario_session_01794302566236622460_0000000072_052878f421da45a093b178b997407eda",
+          "acquisition_source": "web_mirror",
+          "provider_policy_ref": "default_text_generation_v1",
+          "llm_response_metadata": {
+            "usage": {
+              "total_tokens": 1438
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicMUBt8fw9oJl2qzLpJIKjdRAf9y",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.0003118,
+              "actual_provider": "openai"
+            },
+            "structured_output_artifact_id": "artifact_01794302607840948345_0000000664_7862e041e74e4282a6eaf75c90ac4cca"
+          },
+          "structured_output_artifact_id": "artifact_01794302607840948345_0000000664_7862e041e74e4282a6eaf75c90ac4cca"
+        }
+      },
+      {
+        "id": "action_run_01794302607859708034_0000000669_bca783df121b47c2863efbd8159cf5b0",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302566236622460_0000000072_052878f421da45a093b178b997407eda",
+        "job_id": "job_01794302566241465401_0000000074_5f2186dfd13f4fd0b50a0076ecbb49b5",
+        "workflow_id": "brief_decoder.decode_v1",
+        "step_id": "generate_questions",
+        "action_type": "text.generate_clarifying_questions",
+        "action_config_id": "brief_decoder.generate_questions_v1",
+        "status": "succeeded",
+        "input_artifact_id": null,
+        "output_artifact_id": "artifact_01794302609887068707_0000000674_1125aeb7f7fb474a959ffdb0f117bf07",
+        "error_code": null,
+        "created_at": "2026-11-10 09:23:27.859725+00:00",
+        "started_at": "2026-11-10 09:23:27.859693+00:00",
+        "completed_at": "2026-11-10 09:23:29.890930+00:00",
+        "metadata": {
+          "model": "gpt-6-luna",
+          "user_id": null,
+          "guest_id": "guest_01794302566221387334_0000000070_1a690b1620d2431eb01c24b266d57edc",
+          "provider": "openai",
+          "handoff_id": null,
+          "prompt_ref": "brief_decoder.generate_questions.v1",
+          "input_schema_ref": "kernel.schemas.generate_questions_input_v1",
+          "workflow_version": 2,
+          "output_schema_ref": "kernel.schemas.generate_questions_output_v1",
+          "scenario_chain_id": "scenario_session_01794302566236622460_0000000072_052878f421da45a093b178b997407eda",
+          "acquisition_source": "web_mirror",
+          "provider_policy_ref": "default_text_generation_v1",
+          "llm_response_metadata": {
+            "usage": {
+              "total_tokens": 1293
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicMaeGAUAPFETwgpIaW9FSg3yV0A",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.00020955000000000002,
+              "actual_provider": "openai"
+            },
+            "structured_output_artifact_id": "artifact_01794302609887068707_0000000674_1125aeb7f7fb474a959ffdb0f117bf07"
+          },
+          "structured_output_artifact_id": "artifact_01794302609887068707_0000000674_1125aeb7f7fb474a959ffdb0f117bf07"
+        }
+      }
+    ],
+    "artifacts": [
+      {
+        "id": "artifact_01794302602203429843_0000000654_7e047c56e6b14cd0ab37141f1f71b195",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302566236622460_0000000072_052878f421da45a093b178b997407eda",
+        "job_id": "job_01794302566241465401_0000000074_5f2186dfd13f4fd0b50a0076ecbb49b5",
+        "action_run_id": "action_run_01794302598092015644_0000000649_11c43a8df5fd493995527889b7f27552",
+        "artifact_type": "structured_output",
+        "status": "stored",
+        "content_text": null,
+        "content_json": {
+          "values": {
+            "budget": "500 EUR",
+            "deadline": "15 ноября",
+            "constraints": [
+              "Только одна страница.",
+              "Без иллюстраций."
+            ],
+            "deliverables": [
+              "Один PDF для Acme с текстом \"Ready to ship\"."
+            ],
+            "project_goal": "Сообщить о готовности выпуска.",
+            "target_audience": "Сотрудники"
+          },
+          "confidence": {
+            "budget": 1,
+            "deadline": 1,
+            "constraints": 1,
+            "deliverables": 1,
+            "project_goal": 1,
+            "target_audience": 1
+          },
+          "missing_fields": []
+        },
+        "object_storage_key": null,
+        "metadata": {
+          "model": "gpt-6-luna",
+          "guest_id": "guest_01794302566221387334_0000000070_1a690b1620d2431eb01c24b266d57edc",
+          "provider": "openai",
+          "schema_ref": "kernel.schemas.extract_output_v1",
+          "action_type": "text.extract_structured_fields",
+          "workflow_id": "brief_decoder.decode_v1",
+          "schema_version": 1,
+          "pydantic_run_id": "01a1c4c4-dbd2-75fa-91f7-280d3dc258b7",
+          "action_config_id": "brief_decoder.extract_brief_v1",
+          "provider_call_id": "provider_call_01794302598100771486_0000000651_96478a096b3d4a0c98d96f06f40849b7",
+          "workflow_version": 2,
+          "scenario_chain_id": "scenario_session_01794302566236622460_0000000072_052878f421da45a093b178b997407eda",
+          "acquisition_source": "web_mirror",
+          "litellm_response_id": "chatcmpl-EicMQ6fHehFauQVPgdhQksM3JblUj",
+          "physical_call_index": 1,
+          "provider_policy_ref": "default_text_generation_v1",
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1
+        },
+        "created_at": "2026-11-10 09:23:22.203449+00:00"
+      },
+      {
+        "id": "artifact_01794302607840948345_0000000664_7862e041e74e4282a6eaf75c90ac4cca",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302566236622460_0000000072_052878f421da45a093b178b997407eda",
+        "job_id": "job_01794302566241465401_0000000074_5f2186dfd13f4fd0b50a0076ecbb49b5",
+        "action_run_id": "action_run_01794302602214611489_0000000659_7e04dafab30d4c3d92759a61280055aa",
+        "artifact_type": "structured_output",
+        "status": "stored",
+        "content_text": null,
+        "content_json": {
+          "issues": [
+            {
+              "category": "ambiguity",
+              "evidence": "«с текстом „Ready to ship“»; цель — «сообщить о готовности выпуска»",
+              "severity": "medium",
+              "description": "Неясно, должен ли PDF содержать только фразу «Ready to ship» или также поясняющий текст, чтобы сообщить сотрудникам о готовности выпуска."
+            }
+          ]
+        },
+        "object_storage_key": null,
+        "metadata": {
+          "model": "gpt-6-luna",
+          "guest_id": "guest_01794302566221387334_0000000070_1a690b1620d2431eb01c24b266d57edc",
+          "provider": "openai",
+          "schema_ref": "kernel.schemas.issue_detection_output_v1",
+          "action_type": "text.detect_issues_by_taxonomy",
+          "workflow_id": "brief_decoder.decode_v1",
+          "schema_version": 1,
+          "pydantic_run_id": "01a1c4c4-ebeb-7464-a214-0473b21a21f7",
+          "action_config_id": "brief_decoder.detect_issues_v1",
+          "provider_call_id": "provider_call_01794302602222443545_0000000661_e745b4d2683d4262b7fd112f03f1e0e5",
+          "workflow_version": 2,
+          "scenario_chain_id": "scenario_session_01794302566236622460_0000000072_052878f421da45a093b178b997407eda",
+          "acquisition_source": "web_mirror",
+          "litellm_response_id": "chatcmpl-EicMUBt8fw9oJl2qzLpJIKjdRAf9y",
+          "physical_call_index": 1,
+          "provider_policy_ref": "default_text_generation_v1",
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1
+        },
+        "created_at": "2026-11-10 09:23:27.840976+00:00"
+      },
+      {
+        "id": "artifact_01794302609887068707_0000000674_1125aeb7f7fb474a959ffdb0f117bf07",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302566236622460_0000000072_052878f421da45a093b178b997407eda",
+        "job_id": "job_01794302566241465401_0000000074_5f2186dfd13f4fd0b50a0076ecbb49b5",
+        "action_run_id": "action_run_01794302607859708034_0000000669_bca783df121b47c2863efbd8159cf5b0",
+        "artifact_type": "structured_output",
+        "status": "stored",
+        "content_text": null,
+        "content_json": {
+          "questions": [
+            {
+              "category": "ambiguity",
+              "priority": "medium",
+              "question": "Подскажите, пожалуйста, в PDF должна быть только фраза «Ready to ship» или добавить к ней поясняющий текст о готовности выпуска?",
+              "rationale": "Это поможет определить содержание одностраничного PDF и ясно сообщить сотрудникам о готовности выпуска.",
+              "source_issue_index": 0
+            }
+          ]
+        },
+        "object_storage_key": null,
+        "metadata": {
+          "model": "gpt-6-luna",
+          "guest_id": "guest_01794302566221387334_0000000070_1a690b1620d2431eb01c24b266d57edc",
+          "provider": "openai",
+          "schema_ref": "kernel.schemas.generate_questions_output_v1",
+          "action_type": "text.generate_clarifying_questions",
+          "workflow_id": "brief_decoder.decode_v1",
+          "schema_version": 1,
+          "pydantic_run_id": "01a1c4c5-01fb-73b1-b4a1-1d2a6e09b9d5",
+          "action_config_id": "brief_decoder.generate_questions_v1",
+          "provider_call_id": "provider_call_01794302607869752949_0000000671_b94a21354c0344c3abe55ec2e7e887e7",
+          "workflow_version": 2,
+          "scenario_chain_id": "scenario_session_01794302566236622460_0000000072_052878f421da45a093b178b997407eda",
+          "acquisition_source": "web_mirror",
+          "litellm_response_id": "chatcmpl-EicMaeGAUAPFETwgpIaW9FSg3yV0A",
+          "physical_call_index": 1,
+          "provider_policy_ref": "default_text_generation_v1",
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1
+        },
+        "created_at": "2026-11-10 09:23:29.887097+00:00"
+      },
+      {
+        "id": "artifact_01794302614125106646_0000000684_a75adc11da7542aaa278af255709174d",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302566236622460_0000000072_052878f421da45a093b178b997407eda",
+        "job_id": "job_01794302566241465401_0000000074_5f2186dfd13f4fd0b50a0076ecbb49b5",
+        "action_run_id": "action_run_01794302609899358055_0000000679_3c464c7b337146518f82e983ffe0a91a",
+        "artifact_type": "structured_output",
+        "status": "stored",
+        "content_text": null,
+        "content_json": {
+          "summary": "Бриф пока не готов к началу работы: сначала нужно уточнить, должен ли PDF содержать только фразу «Ready to ship» или также поясняющий текст.",
+          "sections": [
+            {
+              "id": "overview",
+              "title": "Project overview",
+              "content": "Клиент хочет сообщить сотрудникам о готовности выпуска.",
+              "metadata": {
+                "kind": "paragraph"
+              }
+            },
+            {
+              "id": "key-details",
+              "title": "Key details",
+              "content": "- Результат: Один PDF для Acme с текстом \"Ready to ship\".\n- Срок: 15 ноября.\n- Бюджет: 500 EUR.\n- Ограничения: Только одна страница; без иллюстраций.",
+              "metadata": {
+                "kind": "list"
+              }
+            },
+            {
+              "id": "gaps",
+              "title": "Gaps and risks",
+              "content": "Неясно, должен ли PDF содержать только фразу «Ready to ship» или также поясняющий текст, чтобы сообщить сотрудникам о готовности выпуска. Не указаны отсутствующие факты.",
+              "metadata": {
+                "kind": "paragraph"
+              }
+            },
+            {
+              "id": "next-steps",
+              "title": "Questions to ask",
+              "content": "- Подскажите, пожалуйста, в PDF должна быть только фраза «Ready to ship» или добавить к ней поясняющий текст о готовности выпуска? Это поможет определить содержание одностраничного PDF и ясно сообщить сотрудникам о готовности выпуска.",
+              "metadata": {
+                "kind": "list"
+              }
+            }
+          ]
+        },
+        "object_storage_key": null,
+        "metadata": {
+          "model": "gpt-6-luna",
+          "guest_id": "guest_01794302566221387334_0000000070_1a690b1620d2431eb01c24b266d57edc",
+          "provider": "openai",
+          "schema_ref": "kernel.schemas.generate_document_output_v1",
+          "action_type": "document.generate_from_template",
+          "workflow_id": "brief_decoder.decode_v1",
+          "schema_version": 1,
+          "pydantic_run_id": "01a1c4c5-09ef-773d-a63e-c90718dd79a0",
+          "action_config_id": "brief_decoder.generate_summary_v1",
+          "provider_call_id": "provider_call_01794302609905551244_0000000681_4a23dde498734aa9bb5c24f1c2b823ce",
+          "workflow_version": 2,
+          "scenario_chain_id": "scenario_session_01794302566236622460_0000000072_052878f421da45a093b178b997407eda",
+          "acquisition_source": "web_mirror",
+          "litellm_response_id": "chatcmpl-EicMcKFyftBZSSrQw7SpVQwlXJult",
+          "physical_call_index": 1,
+          "provider_policy_ref": "default_text_generation_v1",
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1
+        },
+        "created_at": "2026-11-10 09:23:34.125137+00:00"
+      },
+      {
+        "id": "artifact_01794302614171928937_0000000688_23c1af0b92784255b556020a98037f2a",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302566236622460_0000000072_052878f421da45a093b178b997407eda",
+        "job_id": "job_01794302566241465401_0000000074_5f2186dfd13f4fd0b50a0076ecbb49b5",
+        "action_run_id": null,
+        "artifact_type": "structured_output",
+        "status": "stored",
+        "content_text": null,
+        "content_json": {
+          "brief": {
+            "values": {
+              "budget": "500 EUR",
+              "deadline": "15 ноября",
+              "constraints": [
+                "Только одна страница.",
+                "Без иллюстраций."
+              ],
+              "deliverables": [
+                "Один PDF для Acme с текстом \"Ready to ship\"."
+              ],
+              "project_goal": "Сообщить о готовности выпуска.",
+              "target_audience": "Сотрудники"
+            },
+            "confidence": {
+              "budget": 1,
+              "deadline": 1,
+              "constraints": 1,
+              "deliverables": 1,
+              "project_goal": 1,
+              "target_audience": 1
+            },
+            "missing_fields": []
+          },
+          "issues": [
+            {
+              "category": "ambiguity",
+              "evidence": "«с текстом „Ready to ship“»; цель — «сообщить о готовности выпуска»",
+              "severity": "medium",
+              "description": "Неясно, должен ли PDF содержать только фразу «Ready to ship» или также поясняющий текст, чтобы сообщить сотрудникам о готовности выпуска."
+            }
+          ],
+          "document": {
+            "summary": "Бриф пока не готов к началу работы: сначала нужно уточнить, должен ли PDF содержать только фразу «Ready to ship» или также поясняющий текст.",
+            "sections": [
+              {
+                "id": "overview",
+                "title": "Project overview",
+                "content": "Клиент хочет сообщить сотрудникам о готовности выпуска.",
+                "metadata": {
+                  "kind": "paragraph"
+                }
+              },
+              {
+                "id": "key-details",
+                "title": "Key details",
+                "content": "- Результат: Один PDF для Acme с текстом \"Ready to ship\".\n- Срок: 15 ноября.\n- Бюджет: 500 EUR.\n- Ограничения: Только одна страница; без иллюстраций.",
+                "metadata": {
+                  "kind": "list"
+                }
+              },
+              {
+                "id": "gaps",
+                "title": "Gaps and risks",
+                "content": "Неясно, должен ли PDF содержать только фразу «Ready to ship» или также поясняющий текст, чтобы сообщить сотрудникам о готовности выпуска. Не указаны отсутствующие факты.",
+                "metadata": {
+                  "kind": "paragraph"
+                }
+              },
+              {
+                "id": "next-steps",
+                "title": "Questions to ask",
+                "content": "- Подскажите, пожалуйста, в PDF должна быть только фраза «Ready to ship» или добавить к ней поясняющий текст о готовности выпуска? Это поможет определить содержание одностраничного PDF и ясно сообщить сотрудникам о готовности выпуска.",
+                "metadata": {
+                  "kind": "list"
+                }
+              }
+            ]
+          },
+          "questions": [
+            {
+              "category": "ambiguity",
+              "priority": "medium",
+              "question": "Подскажите, пожалуйста, в PDF должна быть только фраза «Ready to ship» или добавить к ней поясняющий текст о готовности выпуска?",
+              "rationale": "Это поможет определить содержание одностраничного PDF и ясно сообщить сотрудникам о готовности выпуска.",
+              "source_issue_index": 0
+            }
+          ],
+          "brief_text": "Нужен один PDF для Acme с текстом \"Ready to ship\" для сотрудников. Цель: сообщить о готовности выпуска. Срок: 15 ноября. Бюджет: 500 EUR. Только одна страница, без иллюстраций. Других работ не требуется."
+        },
+        "object_storage_key": null,
+        "metadata": {
+          "guest_id": "guest_01794302566221387334_0000000070_1a690b1620d2431eb01c24b266d57edc",
+          "schema_ref": "brief_decoder.decode_output_v1",
+          "workflow_id": "brief_decoder.decode_v1",
+          "artifact_role": "workflow_result",
+          "schema_version": 2,
+          "workflow_version": 2,
+          "scenario_chain_id": "scenario_session_01794302566236622460_0000000072_052878f421da45a093b178b997407eda",
+          "acquisition_source": "web_mirror"
+        },
+        "created_at": "2026-11-10 09:23:34.171976+00:00"
+      }
+    ],
+    "calls": [
+      {
+        "id": "provider_call_01794302609905551244_0000000681_4a23dde498734aa9bb5c24f1c2b823ce",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302566236622460_0000000072_052878f421da45a093b178b997407eda",
+        "job_id": "job_01794302566241465401_0000000074_5f2186dfd13f4fd0b50a0076ecbb49b5",
+        "action_run_id": "action_run_01794302609899358055_0000000679_3c464c7b337146518f82e983ffe0a91a",
+        "workflow_id": "brief_decoder.decode_v1",
+        "workflow_version": 2,
+        "step_id": "generate_document",
+        "action_type": "document.generate_from_template",
+        "action_config_id": "brief_decoder.generate_summary_v1",
+        "provider_policy_ref": "default_text_generation_v1",
+        "provider": "openai",
+        "model": "gpt-6-luna",
+        "gateway_backend": "litellm",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "transport_attempt_index": 1,
+        "physical_call_index": 1,
+        "status": "succeeded",
+        "input_tokens": 1606,
+        "output_tokens": 385,
+        "total_tokens": 1991,
+        "latency_ms": 4197,
+        "estimated_cost": 0.00039317499999999995,
+        "error_code": null,
+        "error_message_safe": null,
+        "failure_kind": null,
+        "http_status": null,
+        "pydantic_run_id": "01a1c4c5-09ef-773d-a63e-c90718dd79a0",
+        "litellm_response_id": "chatcmpl-EicMcKFyftBZSSrQw7SpVQwlXJult",
+        "created_at": "2026-11-10 09:23:29.905563+00:00",
+        "started_at": "2026-11-10 09:23:29.905523+00:00",
+        "completed_at": "2026-11-10 09:23:34.107712+00:00",
+        "metadata": {
+          "litellm": {
+            "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+            "http_status": null,
+            "model_group": "anytoolai.default_text",
+            "response_id": "chatcmpl-EicMcKFyftBZSSrQw7SpVQwlXJult",
+            "actual_model": "gpt-6-luna",
+            "response_cost": 0.00039317499999999995,
+            "actual_provider": "openai"
+          },
+          "timeout": {
+            "configured_seconds": 60
+          },
+          "attempts": {
+            "pydantic_run_id": "01a1c4c5-09ef-773d-a63e-c90718dd79a0",
+            "physical_call_index": 1,
+            "semantic_attempt_index": 1,
+            "transport_attempt_index": 1
+          },
+          "response": {
+            "http_status": null,
+            "total_tokens": 1991,
+            "litellm_response_id": "chatcmpl-EicMcKFyftBZSSrQw7SpVQwlXJult"
+          },
+          "prompt_ref": "brief_decoder.generate_summary.v1",
+          "request_id": null,
+          "fixture_key": null,
+          "temperature": 1.0,
+          "retry_policy": {
+            "transport": {
+              "owner": "litellm",
+              "max_attempts": 2,
+              "litellm_num_retries_per_attempt": 0
+            },
+            "validation": {
+              "owner": "pydanticai",
+              "max_attempts": 2
+            },
+            "hard_limits": {
+              "max_physical_provider_calls_per_action": 4
+            }
+          },
+          "correlation_id": null,
+          "request_payload": {
+            "prompt_chars": 6194,
+            "message_count": 1,
+            "response_schema_present": true
+          },
+          "model_addressing": "policy_alias",
+          "reasoning_effort": null,
+          "request_metadata": {
+            "user_id": null,
+            "guest_id": "guest_01794302566221387334_0000000070_1a690b1620d2431eb01c24b266d57edc",
+            "handoff_id": null,
+            "scenario_chain_id": "scenario_session_01794302566236622460_0000000072_052878f421da45a093b178b997407eda",
+            "acquisition_source": "web_mirror"
+          },
+          "response_metadata": {
+            "usage": {
+              "total_tokens": 1991
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicMcKFyftBZSSrQw7SpVQwlXJult",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.00039317499999999995,
+              "actual_provider": "openai"
+            }
+          },
+          "structured_output_mode": "json_schema",
+          "fallback_from_policy_ref": null
+        }
+      },
+      {
+        "id": "provider_call_01794302598100771486_0000000651_96478a096b3d4a0c98d96f06f40849b7",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302566236622460_0000000072_052878f421da45a093b178b997407eda",
+        "job_id": "job_01794302566241465401_0000000074_5f2186dfd13f4fd0b50a0076ecbb49b5",
+        "action_run_id": "action_run_01794302598092015644_0000000649_11c43a8df5fd493995527889b7f27552",
+        "workflow_id": "brief_decoder.decode_v1",
+        "workflow_version": 2,
+        "step_id": "extract",
+        "action_type": "text.extract_structured_fields",
+        "action_config_id": "brief_decoder.extract_brief_v1",
+        "provider_policy_ref": "default_text_generation_v1",
+        "provider": "openai",
+        "model": "gpt-6-luna",
+        "gateway_backend": "litellm",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "transport_attempt_index": 1,
+        "physical_call_index": 1,
+        "status": "succeeded",
+        "input_tokens": 1231,
+        "output_tokens": 253,
+        "total_tokens": 1484,
+        "latency_ms": 4080,
+        "estimated_cost": 0.00013907999999999998,
+        "error_code": null,
+        "error_message_safe": null,
+        "failure_kind": null,
+        "http_status": null,
+        "pydantic_run_id": "01a1c4c4-dbd2-75fa-91f7-280d3dc258b7",
+        "litellm_response_id": "chatcmpl-EicMQ6fHehFauQVPgdhQksM3JblUj",
+        "created_at": "2026-11-10 09:23:18.100790+00:00",
+        "started_at": "2026-11-10 09:23:18.100738+00:00",
+        "completed_at": "2026-11-10 09:23:22.187321+00:00",
+        "metadata": {
+          "litellm": {
+            "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+            "http_status": null,
+            "model_group": "anytoolai.default_text",
+            "response_id": "chatcmpl-EicMQ6fHehFauQVPgdhQksM3JblUj",
+            "actual_model": "gpt-6-luna",
+            "response_cost": 0.00013907999999999998,
+            "actual_provider": "openai"
+          },
+          "timeout": {
+            "configured_seconds": 60
+          },
+          "attempts": {
+            "pydantic_run_id": "01a1c4c4-dbd2-75fa-91f7-280d3dc258b7",
+            "physical_call_index": 1,
+            "semantic_attempt_index": 1,
+            "transport_attempt_index": 1
+          },
+          "response": {
+            "http_status": null,
+            "total_tokens": 1484,
+            "litellm_response_id": "chatcmpl-EicMQ6fHehFauQVPgdhQksM3JblUj"
+          },
+          "prompt_ref": "brief_decoder.extract_brief.v1",
+          "request_id": null,
+          "fixture_key": null,
+          "temperature": 1.0,
+          "retry_policy": {
+            "transport": {
+              "owner": "litellm",
+              "max_attempts": 2,
+              "litellm_num_retries_per_attempt": 0
+            },
+            "validation": {
+              "owner": "pydanticai",
+              "max_attempts": 2
+            },
+            "hard_limits": {
+              "max_physical_provider_calls_per_action": 4
+            }
+          },
+          "correlation_id": null,
+          "request_payload": {
+            "prompt_chars": 5053,
+            "message_count": 1,
+            "response_schema_present": true
+          },
+          "model_addressing": "policy_alias",
+          "reasoning_effort": null,
+          "request_metadata": {
+            "user_id": null,
+            "guest_id": "guest_01794302566221387334_0000000070_1a690b1620d2431eb01c24b266d57edc",
+            "handoff_id": null,
+            "scenario_chain_id": "scenario_session_01794302566236622460_0000000072_052878f421da45a093b178b997407eda",
+            "acquisition_source": "web_mirror"
+          },
+          "response_metadata": {
+            "usage": {
+              "total_tokens": 1484
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicMQ6fHehFauQVPgdhQksM3JblUj",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.00013907999999999998,
+              "actual_provider": "openai"
+            }
+          },
+          "structured_output_mode": "json_schema",
+          "fallback_from_policy_ref": null
+        }
+      },
+      {
+        "id": "provider_call_01794302602222443545_0000000661_e745b4d2683d4262b7fd112f03f1e0e5",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302566236622460_0000000072_052878f421da45a093b178b997407eda",
+        "job_id": "job_01794302566241465401_0000000074_5f2186dfd13f4fd0b50a0076ecbb49b5",
+        "action_run_id": "action_run_01794302602214611489_0000000659_7e04dafab30d4c3d92759a61280055aa",
+        "workflow_id": "brief_decoder.decode_v1",
+        "workflow_version": 2,
+        "step_id": "detect_issues",
+        "action_type": "text.detect_issues_by_taxonomy",
+        "action_config_id": "brief_decoder.detect_issues_v1",
+        "provider_policy_ref": "default_text_generation_v1",
+        "provider": "openai",
+        "model": "gpt-6-luna",
+        "gateway_backend": "litellm",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "transport_attempt_index": 1,
+        "physical_call_index": 1,
+        "status": "succeeded",
+        "input_tokens": 1018,
+        "output_tokens": 420,
+        "total_tokens": 1438,
+        "latency_ms": 5599,
+        "estimated_cost": 0.0003118,
+        "error_code": null,
+        "error_message_safe": null,
+        "failure_kind": null,
+        "http_status": null,
+        "pydantic_run_id": "01a1c4c4-ebeb-7464-a214-0473b21a21f7",
+        "litellm_response_id": "chatcmpl-EicMUBt8fw9oJl2qzLpJIKjdRAf9y",
+        "created_at": "2026-11-10 09:23:22.222455+00:00",
+        "started_at": "2026-11-10 09:23:22.222417+00:00",
+        "completed_at": "2026-11-10 09:23:27.825807+00:00",
+        "metadata": {
+          "litellm": {
+            "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+            "http_status": null,
+            "model_group": "anytoolai.default_text",
+            "response_id": "chatcmpl-EicMUBt8fw9oJl2qzLpJIKjdRAf9y",
+            "actual_model": "gpt-6-luna",
+            "response_cost": 0.0003118,
+            "actual_provider": "openai"
+          },
+          "timeout": {
+            "configured_seconds": 60
+          },
+          "attempts": {
+            "pydantic_run_id": "01a1c4c4-ebeb-7464-a214-0473b21a21f7",
+            "physical_call_index": 1,
+            "semantic_attempt_index": 1,
+            "transport_attempt_index": 1
+          },
+          "response": {
+            "http_status": null,
+            "total_tokens": 1438,
+            "litellm_response_id": "chatcmpl-EicMUBt8fw9oJl2qzLpJIKjdRAf9y"
+          },
+          "prompt_ref": "brief_decoder.detect_issues.v1",
+          "request_id": null,
+          "fixture_key": null,
+          "temperature": 1.0,
+          "retry_policy": {
+            "transport": {
+              "owner": "litellm",
+              "max_attempts": 2,
+              "litellm_num_retries_per_attempt": 0
+            },
+            "validation": {
+              "owner": "pydanticai",
+              "max_attempts": 2
+            },
+            "hard_limits": {
+              "max_physical_provider_calls_per_action": 4
+            }
+          },
+          "correlation_id": null,
+          "request_payload": {
+            "prompt_chars": 4099,
+            "message_count": 1,
+            "response_schema_present": true
+          },
+          "model_addressing": "policy_alias",
+          "reasoning_effort": null,
+          "request_metadata": {
+            "user_id": null,
+            "guest_id": "guest_01794302566221387334_0000000070_1a690b1620d2431eb01c24b266d57edc",
+            "handoff_id": null,
+            "scenario_chain_id": "scenario_session_01794302566236622460_0000000072_052878f421da45a093b178b997407eda",
+            "acquisition_source": "web_mirror"
+          },
+          "response_metadata": {
+            "usage": {
+              "total_tokens": 1438
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicMUBt8fw9oJl2qzLpJIKjdRAf9y",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.0003118,
+              "actual_provider": "openai"
+            }
+          },
+          "structured_output_mode": "json_schema",
+          "fallback_from_policy_ref": null
+        }
+      },
+      {
+        "id": "provider_call_01794302607869752949_0000000671_b94a21354c0344c3abe55ec2e7e887e7",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302566236622460_0000000072_052878f421da45a093b178b997407eda",
+        "job_id": "job_01794302566241465401_0000000074_5f2186dfd13f4fd0b50a0076ecbb49b5",
+        "action_run_id": "action_run_01794302607859708034_0000000669_bca783df121b47c2863efbd8159cf5b0",
+        "workflow_id": "brief_decoder.decode_v1",
+        "workflow_version": 2,
+        "step_id": "generate_questions",
+        "action_type": "text.generate_clarifying_questions",
+        "action_config_id": "brief_decoder.generate_questions_v1",
+        "provider_policy_ref": "default_text_generation_v1",
+        "provider": "openai",
+        "model": "gpt-6-luna",
+        "gateway_backend": "litellm",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "transport_attempt_index": 1,
+        "physical_call_index": 1,
+        "status": "succeeded",
+        "input_tokens": 1165,
+        "output_tokens": 128,
+        "total_tokens": 1293,
+        "latency_ms": 2000,
+        "estimated_cost": 0.00020955000000000002,
+        "error_code": null,
+        "error_message_safe": null,
+        "failure_kind": null,
+        "http_status": null,
+        "pydantic_run_id": "01a1c4c5-01fb-73b1-b4a1-1d2a6e09b9d5",
+        "litellm_response_id": "chatcmpl-EicMaeGAUAPFETwgpIaW9FSg3yV0A",
+        "created_at": "2026-11-10 09:23:27.869766+00:00",
+        "started_at": "2026-11-10 09:23:27.869724+00:00",
+        "completed_at": "2026-11-10 09:23:29.873657+00:00",
+        "metadata": {
+          "litellm": {
+            "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+            "http_status": null,
+            "model_group": "anytoolai.default_text",
+            "response_id": "chatcmpl-EicMaeGAUAPFETwgpIaW9FSg3yV0A",
+            "actual_model": "gpt-6-luna",
+            "response_cost": 0.00020955000000000002,
+            "actual_provider": "openai"
+          },
+          "timeout": {
+            "configured_seconds": 60
+          },
+          "attempts": {
+            "pydantic_run_id": "01a1c4c5-01fb-73b1-b4a1-1d2a6e09b9d5",
+            "physical_call_index": 1,
+            "semantic_attempt_index": 1,
+            "transport_attempt_index": 1
+          },
+          "response": {
+            "http_status": null,
+            "total_tokens": 1293,
+            "litellm_response_id": "chatcmpl-EicMaeGAUAPFETwgpIaW9FSg3yV0A"
+          },
+          "prompt_ref": "brief_decoder.generate_questions.v1",
+          "request_id": null,
+          "fixture_key": null,
+          "temperature": 1.0,
+          "retry_policy": {
+            "transport": {
+              "owner": "litellm",
+              "max_attempts": 2,
+              "litellm_num_retries_per_attempt": 0
+            },
+            "validation": {
+              "owner": "pydanticai",
+              "max_attempts": 2
+            },
+            "hard_limits": {
+              "max_physical_provider_calls_per_action": 4
+            }
+          },
+          "correlation_id": null,
+          "request_payload": {
+            "prompt_chars": 4636,
+            "message_count": 1,
+            "response_schema_present": true
+          },
+          "model_addressing": "policy_alias",
+          "reasoning_effort": null,
+          "request_metadata": {
+            "user_id": null,
+            "guest_id": "guest_01794302566221387334_0000000070_1a690b1620d2431eb01c24b266d57edc",
+            "handoff_id": null,
+            "scenario_chain_id": "scenario_session_01794302566236622460_0000000072_052878f421da45a093b178b997407eda",
+            "acquisition_source": "web_mirror"
+          },
+          "response_metadata": {
+            "usage": {
+              "total_tokens": 1293
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicMaeGAUAPFETwgpIaW9FSg3yV0A",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.00020955000000000002,
+              "actual_provider": "openai"
+            }
+          },
+          "structured_output_mode": "json_schema",
+          "fallback_from_policy_ref": null
+        }
+      }
+    ]
+  },
+  "confirmed_reasoning_effort": null,
+  "latency_ms": 48664
+}

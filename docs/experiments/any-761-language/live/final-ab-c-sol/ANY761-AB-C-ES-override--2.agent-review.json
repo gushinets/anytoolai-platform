@@ -1,0 +1,31 @@
+{
+  "evidence_sha256": "a3263f7c054f799b3ba53656980d1810b7520f5d3c36c5b1ee5f89dd83b07785",
+  "reviewer": "Codex agent — semantic inspection; independent human review pending",
+  "fields": {
+    "/extracted/values/assumptions/0": true,
+    "/extracted/values/deliverables/0": true,
+    "/extracted/values/deliverables/1": true,
+    "/extracted/values/acceptance_criteria/0": true,
+    "/extracted/values/acceptance_criteria/1": true,
+    "/extracted/values/acceptance_criteria/2": true,
+    "/extracted/values/acceptance_criteria/3": true,
+    "/comparison/rationale": true,
+    "/comparison/deltas/0/evidence": true,
+    "/comparison/deltas/1/evidence": true,
+    "/comparison/deltas/2/evidence": true,
+    "/comparison/deltas/3/evidence": true,
+    "/document/summary": true,
+    "/document/sections/0/content": true,
+    "/document/sections/1/content": true,
+    "/document/sections/2/content": true,
+    "/document/sections/3/content": true,
+    "/document/sections/4/content": true
+  },
+  "criteria": {
+    "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.": true,
+    "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.": true,
+    "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.": true,
+    "The explicit analysis-language request is honored and is not extracted as a project requirement.": true
+  },
+  "notes": "All canonical fields inspected. Expected requested English/Russian with source quote/date exceptions. Full explicit facts retained where supplied; weak input leaves lists missing. Missing JSON and unsupported Done correctly rejected; no between-step verdict/status drift."
+}

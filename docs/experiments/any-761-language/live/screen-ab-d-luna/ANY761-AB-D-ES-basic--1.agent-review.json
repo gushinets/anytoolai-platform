@@ -1,0 +1,21 @@
+{
+  "evidence_sha256": "9007e25cb05dc09663d55d285c522156a9bc769d5d73cc5883c62ecc7df7c0d1",
+  "reviewer": "Codex agent — semantic inspection; independent human review pending",
+  "fields": {
+    "/extracted/values/assumptions/0": true,
+    "/extracted/values/deliverables/0": true,
+    "/extracted/values/deliverables/1": true,
+    "/extracted/values/acceptance_criteria/0": true,
+    "/document/summary": true,
+    "/document/sections/0/content": true,
+    "/document/sections/1/content": true,
+    "/document/sections/2/content": true,
+    "/document/sections/3/content": true
+  },
+  "criteria": {
+    "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.": true,
+    "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.": false,
+    "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.": true
+  },
+  "notes": "All canonical prose follows the expected language and Ready to ship is preserved. FAIL fact retention: extraction and document omit the explicit 15 November deadline and 500 EUR budget. The EN first repeat also drops Acme. Canonical fixtures expect deadline/budget in the criteria. No language regression attributed to this separate extraction gap; causation by this patch is not established."
+}

@@ -1,0 +1,30 @@
+{
+  "evidence_sha256": "9834108f32d67595c4267356688f1dd380ebe4c9ce726b9c9070f7813d6d12c0",
+  "reviewer": "Codex agent — semantic inspection; independent human review pending",
+  "fields": {
+    "/extracted/values/assumptions/0": true,
+    "/extracted/values/deliverables/0": true,
+    "/extracted/values/deliverables/1": true,
+    "/extracted/values/acceptance_criteria/0": true,
+    "/extracted/values/acceptance_criteria/1": true,
+    "/extracted/values/acceptance_criteria/2": true,
+    "/extracted/values/acceptance_criteria/3": true,
+    "/comparison/rationale": true,
+    "/comparison/deltas/0/evidence": true,
+    "/comparison/deltas/1/evidence": true,
+    "/comparison/deltas/2/evidence": true,
+    "/comparison/deltas/3/evidence": true,
+    "/document/summary": true,
+    "/document/sections/0/content": true,
+    "/document/sections/1/content": true,
+    "/document/sections/2/content": true,
+    "/document/sections/3/content": true,
+    "/document/sections/4/content": true
+  },
+  "criteria": {
+    "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.": true,
+    "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.": true,
+    "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.": true
+  },
+  "notes": "All canonical fields inspected. Expected Spanish/Russian/requested English and exact quote/date exceptions respected. Weak Done rejected without fabricated lists; missing JSON rejected with statuses faithfully carried into recap. All explicit known facts retained in extracted criteria for non-weak cases."
+}

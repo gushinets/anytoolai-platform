@@ -1,0 +1,968 @@
+{
+  "case": {
+    "id": "ANY761-AB-C-EN-basic",
+    "scenario_id": "acceptance_builder.check_v1",
+    "source_language": "en",
+    "expected_language": "en",
+    "family": "basic",
+    "provenance": "New synthetic regression case for ANY-761; not an original QA output.",
+    "input": {
+      "brief_text": "We need two files for Acme: PDF and JSON. Both files must contain the exact string \"Ready to ship\". Deadline: November 15. Budget: 500 EUR. We assume the source data has already been provided.",
+      "deliverable_text": "Only the PDF for Acme with the string \"Ready to ship\" has been delivered. JSON has not been delivered. The deadline and budget were met."
+    },
+    "criteria": [
+      "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.",
+      "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.",
+      "No invented facts, hidden findings, changed verdicts or unsupported readiness claims."
+    ]
+  },
+  "attempt": 2,
+  "snapshot": {
+    "source_sha256": {
+      "configs/kernel/litellm_router.yaml": "8c3e09283b50eee9da5a192d977ee46c9bfb7fd6def60fafc13d5355c6e3b60d",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/action_configs.yaml": "d1813bad6ff02019160b7ce2664acf4d92d36bcd87bec95c3c37a2975a104462",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/frontends.yaml": "5f5eac1312dddf0ab129ccb58108e38aed9cd0c633503ccb91ba4c036f7512bd",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/handoffs.yaml": "08d5c5b3717f2b0db972213243a56f0cf98811fd4328105da998f5a3116d49c4",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/product.yaml": "4f40592a466b4fe78db3350189f29312e3243e499d102cd252b0a9fa86c0517f",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/detect_issues.v1.md": "fbe9532b64e40079c6fc74c50bffc1a6b726c12cd25fd0c31ed7c8dd61006b3e",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/extract_brief.v1.md": "88f0d763aad056155045b367bceae3e9f0b08ad594b733cb168be1caafc5d8f7",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/generate_questions.v1.md": "f14fe8eddb4226bcc1105ad79d429e1f18d47d07b31af980ad270a0dc958cf56",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/generate_summary.v1.md": "3eec86211db8fe9b344e21f5d65b457ab6d9a4b49e0c0a998810dcf637bb78d2",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts.yaml": "03cb35d961dd1d9b1d95a1d1490eb2355e438c239a391b757c5a554473845daf",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/quotas.yaml": "2fcee433e370547ff34d27f8ddfbf9abff01d456586ae2627203ee6745d298ba",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/renderer_contract.yaml": "386f963a75379f224d581f42d72abae110a3369308aba3d196d06f2a4589e95d",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/scenarios.yaml": "5c6577450040daa795e9dbd245dc9757ea59427157fd3debecbd774f61e64c3d",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas/decode_input.schema.json": "998b82bde28beb6be77e0fb522a8e0a9871c88d9500b884523912f2d257d8454",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas/decode_output.schema.json": "5a76652a23623ba7a025410a8d0a509e9b8495636f3f6adca8ecb5288610cc0a",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas.yaml": "e2038c31be3810ee6a04ac82994f9b7bbcc8cd0d68a74ff90e4e0ad3973188f9",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/workflows.yaml": "06e0268670118d4156fc6fb8eab4e2954257178243e2693dc44b9e211fb5a1de",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/action_configs.yaml": "56250e227b62b196d52649abf0e551229a4dd23c9e10c89ca65afaeab1000ec8",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/frontends.yaml": "8e43fb844dd43efb59a2c3ba4b9757795c546ea49fd79e837031f58092f5c1e6",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/product.yaml": "488d8baecc2aae035aea53e955d36f335102e0334d53d79efbc55691a4714318",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/check_document.v1.md": "c4b2e19dd1df3c2bc0d377fc749292a841ccb5e19ddc6fba07b8fa3371b3da59",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/compare.v1.md": "6ea407f09f7075a26f95b6d9d7eede06f76ce024390b2857295a763512e9a696",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/draft_document.v1.md": "3bfa48bf6d75c19de9cf99bf0d7099dd2e05c2b102787b6db8865c4bc1a2351a",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/extract.v1.md": "faaa30d051e34e7551e1a6e632a544257b1c820ad995b0b2dc4aab5a94a629df",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts.yaml": "69da98bf54727ffad9feb34dd5e5bc99de39e48b45445c7349121d2a4ac4d05d",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/quotas.yaml": "1ed4154065125cf4da02e88015f8112caf11090279f292bebd7dd4534d98df6c",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/renderer_contract.yaml": "c6e5360239048e01dc7b802cc2057d1708596ed60801fcd04fc957d5996823bd",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/scenarios.yaml": "570fdf7f211132f8c4024ca2f4073ed5a0566ca584656daa45670869de4883e3",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/check_input.schema.json": "909e70ffbc6b6a7acbf5bc4eb64065a0beb0858be2f200a5b7573e45191def09",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/check_output.schema.json": "40703d6d7483066744d7fe7c0b19491a86bf326e19c2e8a11109bdaff05caa9f",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/draft_input.schema.json": "268d5301b8b8cc610e1f4cc7668878913d2eefb877bb1c4ab2d9ab2118bfba7e",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/draft_output.schema.json": "f6eb44bf452328b9daa65229bdb6d156410a3e0e45f91788c784ad99b87ddf2f",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas.yaml": "6c32116dcd116268045aeb45cd881c5fba8144ac0e22b5fcb8a1750216f43c1b",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/workflows.yaml": "e1fe1c43eb7228cfc857113364a36fecb87a8fed49f7ca2e8bbdd2c789831528"
+    },
+    "configured_models": [
+      {
+        "model": "openai/gpt-6.1-sol",
+        "reasoning_effort": "medium",
+        "alias": "anytoolai.default_text"
+      }
+    ]
+  },
+  "channel": "api",
+  "session_id": "scenario_session_01794303362521707819_0000000222_87d6822451e944a799781e84e5053b24",
+  "job_id": "job_01794303362529953221_0000000224_274139b1a69b413c9eb04c748f79092c",
+  "result_id": "artifact_01794303407493361343_0000000631_80aa8bd2494945fe863a5bf54088287f",
+  "output": {
+    "document": {
+      "summary": "The work does not meet expectations because the required JSON file is missing. The first priority is to deliver the JSON file for Acme containing the exact string \"Ready to ship\".",
+      "sections": [
+        {
+          "id": "verdict",
+          "title": "Verdict",
+          "content": "The work does not meet expectations. Scope coverage is not satisfied: the brief requires PDF and JSON files for Acme, but the delivery states that only the PDF was delivered and that JSON has not been delivered. Requirement fit is not satisfied: both files must contain the exact string \"Ready to ship\"; the delivered PDF contains it, but the required JSON is absent, while the delivery states that the deadline and budget were met. Completeness is not satisfied: the brief lists two deliverables, PDF and JSON, and the delivery explicitly confirms that JSON has not been delivered. Clarity is satisfied: the delivery plainly identifies the PDF containing \"Ready to ship\" as delivered and the JSON as not delivered, and states that the deadline and budget were met. This verdict is judged on the four general review criteria, not item by item on the acceptance criteria listed below."
+        },
+        {
+          "id": "acceptance-criteria",
+          "title": "Acceptance criteria",
+          "content": "- The deliverables consist of one PDF file and one JSON file for Acme.\n- Both files contain the exact string \"Ready to ship\".\n- The files are delivered by November 15.\n- The work stays within the budget of 500 EUR.",
+          "metadata": {
+            "kind": "list"
+          }
+        },
+        {
+          "id": "assumptions",
+          "title": "Assumptions",
+          "content": "- The source data has already been provided.",
+          "metadata": {
+            "kind": "list"
+          }
+        },
+        {
+          "id": "deliverables",
+          "title": "Deliverables",
+          "content": "- A PDF file for Acme.\n- A JSON file for Acme.",
+          "metadata": {
+            "kind": "list"
+          }
+        },
+        {
+          "id": "open-gaps",
+          "title": "Open gaps",
+          "content": "The brief states all three lists: acceptance criteria, assumptions, and deliverables."
+        }
+      ]
+    },
+    "extracted": {
+      "values": {
+        "assumptions": [
+          "The source data has already been provided."
+        ],
+        "deliverables": [
+          "A PDF file for Acme.",
+          "A JSON file for Acme."
+        ],
+        "acceptance_criteria": [
+          "The deliverables consist of one PDF file and one JSON file for Acme.",
+          "Both files contain the exact string \"Ready to ship\".",
+          "The files are delivered by November 15.",
+          "The work stays within the budget of 500 EUR."
+        ]
+      },
+      "confidence": {
+        "assumptions": 1,
+        "deliverables": 1,
+        "acceptance_criteria": 0.99
+      },
+      "missing_fields": []
+    },
+    "comparison": {
+      "deltas": [
+        {
+          "status": "mismatch",
+          "evidence": "The brief requires PDF and JSON files for Acme. The delivery states that only the PDF was delivered and that JSON has not been delivered.",
+          "criterion_id": "scope_coverage"
+        },
+        {
+          "status": "mismatch",
+          "evidence": "Both files must contain the exact string \"Ready to ship\". The delivered PDF contains it, but the required JSON is absent. The delivery states that the deadline and budget were met.",
+          "criterion_id": "requirement_fit"
+        },
+        {
+          "status": "mismatch",
+          "evidence": "The brief lists two deliverables, PDF and JSON. The delivery explicitly confirms that JSON has not been delivered.",
+          "criterion_id": "completeness"
+        },
+        {
+          "status": "match",
+          "evidence": "The delivery plainly identifies what was delivered—the PDF containing \"Ready to ship\"—and what was not—the JSON. It also states that the deadline and budget were met.",
+          "criterion_id": "clarity"
+        }
+      ],
+      "verdict": "does_not_meet",
+      "rationale": "The missing JSON file leaves the requested scope, requirements and deliverable set unmet. The PDF contains the required string, and the delivery reports meeting the deadline and budget. Its description of what was and was not delivered is clear.",
+      "confidence": 0.99
+    }
+  },
+  "error": null,
+  "evidence_error": null,
+  "ledger": {
+    "actions": [
+      {
+        "id": "action_run_01794303393752235870_0000000602_4afa4bb405b84b92bc93ece913b29265",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "acceptance_builder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794303362521707819_0000000222_87d6822451e944a799781e84e5053b24",
+        "job_id": "job_01794303362529953221_0000000224_274139b1a69b413c9eb04c748f79092c",
+        "workflow_id": "acceptance_builder.check_v1",
+        "step_id": "extract",
+        "action_type": "text.extract_structured_fields",
+        "action_config_id": "acceptance_builder.extract_v1",
+        "status": "succeeded",
+        "input_artifact_id": null,
+        "output_artifact_id": "artifact_01794303396255166271_0000000607_fd433f2d18734ca3b3a476b507d983d9",
+        "error_code": null,
+        "created_at": "2026-11-10 09:36:33.752251+00:00",
+        "started_at": "2026-11-10 09:36:33.752223+00:00",
+        "completed_at": "2026-11-10 09:36:36.263136+00:00",
+        "metadata": {
+          "model": "gpt-6.1-sol",
+          "user_id": null,
+          "guest_id": "guest_01794303362484086079_0000000220_9334203320a145b5a38e915c1c2f17df",
+          "provider": "openai",
+          "handoff_id": null,
+          "prompt_ref": "acceptance_builder.extract.v1",
+          "input_schema_ref": "kernel.schemas.extract_input_v1",
+          "workflow_version": 1,
+          "output_schema_ref": "kernel.schemas.extract_output_v1",
+          "scenario_chain_id": "scenario_session_01794303362521707819_0000000222_87d6822451e944a799781e84e5053b24",
+          "acquisition_source": "web_mirror",
+          "provider_policy_ref": "default_text_generation_v1",
+          "llm_response_metadata": {
+            "usage": {
+              "total_tokens": 1258
+            },
+            "litellm": {
+              "model_id": "979a5128f9177c1bb24176f7b836b5726bf3afbaa926068b29f5841645830ebd",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicZGUCFIoPiN0ZVtuAD5tmjPBE6T",
+              "actual_model": "gpt-6.1-sol",
+              "response_cost": 0.0012997,
+              "actual_provider": "openai"
+            },
+            "structured_output_artifact_id": "artifact_01794303396255166271_0000000607_fd433f2d18734ca3b3a476b507d983d9"
+          },
+          "structured_output_artifact_id": "artifact_01794303396255166271_0000000607_fd433f2d18734ca3b3a476b507d983d9"
+        }
+      },
+      {
+        "id": "action_run_01794303396272609010_0000000612_6e466185d04e42b99e0a92aad1832342",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "acceptance_builder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794303362521707819_0000000222_87d6822451e944a799781e84e5053b24",
+        "job_id": "job_01794303362529953221_0000000224_274139b1a69b413c9eb04c748f79092c",
+        "workflow_id": "acceptance_builder.check_v1",
+        "step_id": "compare",
+        "action_type": "text.compare_and_classify",
+        "action_config_id": "acceptance_builder.compare_v1",
+        "status": "succeeded",
+        "input_artifact_id": null,
+        "output_artifact_id": "artifact_01794303401836416208_0000000617_6d949694fd3441ca94ca4fd44881ab28",
+        "error_code": null,
+        "created_at": "2026-11-10 09:36:36.272629+00:00",
+        "started_at": "2026-11-10 09:36:36.272594+00:00",
+        "completed_at": "2026-11-10 09:36:41.845283+00:00",
+        "metadata": {
+          "model": "gpt-6.1-sol",
+          "user_id": null,
+          "guest_id": "guest_01794303362484086079_0000000220_9334203320a145b5a38e915c1c2f17df",
+          "provider": "openai",
+          "handoff_id": null,
+          "prompt_ref": "acceptance_builder.compare.v1",
+          "input_schema_ref": "kernel.schemas.compare_classify_input_v1",
+          "workflow_version": 1,
+          "output_schema_ref": "kernel.schemas.compare_classify_output_v1",
+          "scenario_chain_id": "scenario_session_01794303362521707819_0000000222_87d6822451e944a799781e84e5053b24",
+          "acquisition_source": "web_mirror",
+          "provider_policy_ref": "default_text_generation_v1",
+          "llm_response_metadata": {
+            "usage": {
+              "total_tokens": 1602
+            },
+            "litellm": {
+              "model_id": "979a5128f9177c1bb24176f7b836b5726bf3afbaa926068b29f5841645830ebd",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicZJCk9PP63H4Zv6QmmQ3XjjRNXJ",
+              "actual_model": "gpt-6.1-sol",
+              "response_cost": 0.0026904000000000003,
+              "actual_provider": "openai"
+            },
+            "structured_output_artifact_id": "artifact_01794303401836416208_0000000617_6d949694fd3441ca94ca4fd44881ab28"
+          },
+          "structured_output_artifact_id": "artifact_01794303401836416208_0000000617_6d949694fd3441ca94ca4fd44881ab28"
+        }
+      },
+      {
+        "id": "action_run_01794303401859051565_0000000622_54b041925a434e24a7135c317fd4b89a",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "acceptance_builder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794303362521707819_0000000222_87d6822451e944a799781e84e5053b24",
+        "job_id": "job_01794303362529953221_0000000224_274139b1a69b413c9eb04c748f79092c",
+        "workflow_id": "acceptance_builder.check_v1",
+        "step_id": "generate_document",
+        "action_type": "document.generate_from_template",
+        "action_config_id": "acceptance_builder.check_document_v1",
+        "status": "succeeded",
+        "input_artifact_id": null,
+        "output_artifact_id": "artifact_01794303407448644535_0000000627_fc21725e341147199532e52dd0b5c93c",
+        "error_code": null,
+        "created_at": "2026-11-10 09:36:41.859065+00:00",
+        "started_at": "2026-11-10 09:36:41.859039+00:00",
+        "completed_at": "2026-11-10 09:36:47.457050+00:00",
+        "metadata": {
+          "model": "gpt-6.1-sol",
+          "user_id": null,
+          "guest_id": "guest_01794303362484086079_0000000220_9334203320a145b5a38e915c1c2f17df",
+          "provider": "openai",
+          "handoff_id": null,
+          "prompt_ref": "acceptance_builder.check_document.v1",
+          "input_schema_ref": "kernel.schemas.generate_document_input_v1",
+          "workflow_version": 1,
+          "output_schema_ref": "kernel.schemas.generate_document_output_v1",
+          "scenario_chain_id": "scenario_session_01794303362521707819_0000000222_87d6822451e944a799781e84e5053b24",
+          "acquisition_source": "web_mirror",
+          "provider_policy_ref": "default_text_generation_v1",
+          "llm_response_metadata": {
+            "usage": {
+              "total_tokens": 2321
+            },
+            "litellm": {
+              "model_id": "979a5128f9177c1bb24176f7b836b5726bf3afbaa926068b29f5841645830ebd",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicZOK6bVaS2W9Rka2GKvFJ6B0eAi",
+              "actual_model": "gpt-6.1-sol",
+              "response_cost": 0.009491000000000001,
+              "actual_provider": "openai"
+            },
+            "structured_output_artifact_id": "artifact_01794303407448644535_0000000627_fc21725e341147199532e52dd0b5c93c"
+          },
+          "structured_output_artifact_id": "artifact_01794303407448644535_0000000627_fc21725e341147199532e52dd0b5c93c"
+        }
+      }
+    ],
+    "artifacts": [
+      {
+        "id": "artifact_01794303407493361343_0000000631_80aa8bd2494945fe863a5bf54088287f",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "acceptance_builder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794303362521707819_0000000222_87d6822451e944a799781e84e5053b24",
+        "job_id": "job_01794303362529953221_0000000224_274139b1a69b413c9eb04c748f79092c",
+        "action_run_id": null,
+        "artifact_type": "structured_output",
+        "status": "stored",
+        "content_text": null,
+        "content_json": {
+          "document": {
+            "summary": "The work does not meet expectations because the required JSON file is missing. The first priority is to deliver the JSON file for Acme containing the exact string \"Ready to ship\".",
+            "sections": [
+              {
+                "id": "verdict",
+                "title": "Verdict",
+                "content": "The work does not meet expectations. Scope coverage is not satisfied: the brief requires PDF and JSON files for Acme, but the delivery states that only the PDF was delivered and that JSON has not been delivered. Requirement fit is not satisfied: both files must contain the exact string \"Ready to ship\"; the delivered PDF contains it, but the required JSON is absent, while the delivery states that the deadline and budget were met. Completeness is not satisfied: the brief lists two deliverables, PDF and JSON, and the delivery explicitly confirms that JSON has not been delivered. Clarity is satisfied: the delivery plainly identifies the PDF containing \"Ready to ship\" as delivered and the JSON as not delivered, and states that the deadline and budget were met. This verdict is judged on the four general review criteria, not item by item on the acceptance criteria listed below."
+              },
+              {
+                "id": "acceptance-criteria",
+                "title": "Acceptance criteria",
+                "content": "- The deliverables consist of one PDF file and one JSON file for Acme.\n- Both files contain the exact string \"Ready to ship\".\n- The files are delivered by November 15.\n- The work stays within the budget of 500 EUR.",
+                "metadata": {
+                  "kind": "list"
+                }
+              },
+              {
+                "id": "assumptions",
+                "title": "Assumptions",
+                "content": "- The source data has already been provided.",
+                "metadata": {
+                  "kind": "list"
+                }
+              },
+              {
+                "id": "deliverables",
+                "title": "Deliverables",
+                "content": "- A PDF file for Acme.\n- A JSON file for Acme.",
+                "metadata": {
+                  "kind": "list"
+                }
+              },
+              {
+                "id": "open-gaps",
+                "title": "Open gaps",
+                "content": "The brief states all three lists: acceptance criteria, assumptions, and deliverables."
+              }
+            ]
+          },
+          "extracted": {
+            "values": {
+              "assumptions": [
+                "The source data has already been provided."
+              ],
+              "deliverables": [
+                "A PDF file for Acme.",
+                "A JSON file for Acme."
+              ],
+              "acceptance_criteria": [
+                "The deliverables consist of one PDF file and one JSON file for Acme.",
+                "Both files contain the exact string \"Ready to ship\".",
+                "The files are delivered by November 15.",
+                "The work stays within the budget of 500 EUR."
+              ]
+            },
+            "confidence": {
+              "assumptions": 1,
+              "deliverables": 1,
+              "acceptance_criteria": 0.99
+            },
+            "missing_fields": []
+          },
+          "comparison": {
+            "deltas": [
+              {
+                "status": "mismatch",
+                "evidence": "The brief requires PDF and JSON files for Acme. The delivery states that only the PDF was delivered and that JSON has not been delivered.",
+                "criterion_id": "scope_coverage"
+              },
+              {
+                "status": "mismatch",
+                "evidence": "Both files must contain the exact string \"Ready to ship\". The delivered PDF contains it, but the required JSON is absent. The delivery states that the deadline and budget were met.",
+                "criterion_id": "requirement_fit"
+              },
+              {
+                "status": "mismatch",
+                "evidence": "The brief lists two deliverables, PDF and JSON. The delivery explicitly confirms that JSON has not been delivered.",
+                "criterion_id": "completeness"
+              },
+              {
+                "status": "match",
+                "evidence": "The delivery plainly identifies what was delivered—the PDF containing \"Ready to ship\"—and what was not—the JSON. It also states that the deadline and budget were met.",
+                "criterion_id": "clarity"
+              }
+            ],
+            "verdict": "does_not_meet",
+            "rationale": "The missing JSON file leaves the requested scope, requirements and deliverable set unmet. The PDF contains the required string, and the delivery reports meeting the deadline and budget. Its description of what was and was not delivered is clear.",
+            "confidence": 0.99
+          }
+        },
+        "object_storage_key": null,
+        "metadata": {
+          "guest_id": "guest_01794303362484086079_0000000220_9334203320a145b5a38e915c1c2f17df",
+          "schema_ref": "acceptance_builder.check_output_v1",
+          "workflow_id": "acceptance_builder.check_v1",
+          "artifact_role": "workflow_result",
+          "schema_version": 1,
+          "workflow_version": 1,
+          "scenario_chain_id": "scenario_session_01794303362521707819_0000000222_87d6822451e944a799781e84e5053b24",
+          "acquisition_source": "web_mirror"
+        },
+        "created_at": "2026-11-10 09:36:47.493395+00:00"
+      },
+      {
+        "id": "artifact_01794303396255166271_0000000607_fd433f2d18734ca3b3a476b507d983d9",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "acceptance_builder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794303362521707819_0000000222_87d6822451e944a799781e84e5053b24",
+        "job_id": "job_01794303362529953221_0000000224_274139b1a69b413c9eb04c748f79092c",
+        "action_run_id": "action_run_01794303393752235870_0000000602_4afa4bb405b84b92bc93ece913b29265",
+        "artifact_type": "structured_output",
+        "status": "stored",
+        "content_text": null,
+        "content_json": {
+          "values": {
+            "assumptions": [
+              "The source data has already been provided."
+            ],
+            "deliverables": [
+              "A PDF file for Acme.",
+              "A JSON file for Acme."
+            ],
+            "acceptance_criteria": [
+              "The deliverables consist of one PDF file and one JSON file for Acme.",
+              "Both files contain the exact string \"Ready to ship\".",
+              "The files are delivered by November 15.",
+              "The work stays within the budget of 500 EUR."
+            ]
+          },
+          "confidence": {
+            "assumptions": 1,
+            "deliverables": 1,
+            "acceptance_criteria": 0.99
+          },
+          "missing_fields": []
+        },
+        "object_storage_key": null,
+        "metadata": {
+          "model": "gpt-6.1-sol",
+          "guest_id": "guest_01794303362484086079_0000000220_9334203320a145b5a38e915c1c2f17df",
+          "provider": "openai",
+          "schema_ref": "kernel.schemas.extract_output_v1",
+          "action_type": "text.extract_structured_fields",
+          "workflow_id": "acceptance_builder.check_v1",
+          "schema_version": 1,
+          "pydantic_run_id": "01a1c4d0-ffde-714e-b211-eb96b7f80cc0",
+          "action_config_id": "acceptance_builder.extract_v1",
+          "provider_call_id": "provider_call_01794303393761713314_0000000604_f1c7cdd551db4699b25bcb31a2e046cb",
+          "workflow_version": 1,
+          "scenario_chain_id": "scenario_session_01794303362521707819_0000000222_87d6822451e944a799781e84e5053b24",
+          "acquisition_source": "web_mirror",
+          "litellm_response_id": "chatcmpl-EicZGUCFIoPiN0ZVtuAD5tmjPBE6T",
+          "physical_call_index": 1,
+          "provider_policy_ref": "default_text_generation_v1",
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1
+        },
+        "created_at": "2026-11-10 09:36:36.255209+00:00"
+      },
+      {
+        "id": "artifact_01794303401836416208_0000000617_6d949694fd3441ca94ca4fd44881ab28",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "acceptance_builder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794303362521707819_0000000222_87d6822451e944a799781e84e5053b24",
+        "job_id": "job_01794303362529953221_0000000224_274139b1a69b413c9eb04c748f79092c",
+        "action_run_id": "action_run_01794303396272609010_0000000612_6e466185d04e42b99e0a92aad1832342",
+        "artifact_type": "structured_output",
+        "status": "stored",
+        "content_text": null,
+        "content_json": {
+          "deltas": [
+            {
+              "status": "mismatch",
+              "evidence": "The brief requires PDF and JSON files for Acme. The delivery states that only the PDF was delivered and that JSON has not been delivered.",
+              "criterion_id": "scope_coverage"
+            },
+            {
+              "status": "mismatch",
+              "evidence": "Both files must contain the exact string \"Ready to ship\". The delivered PDF contains it, but the required JSON is absent. The delivery states that the deadline and budget were met.",
+              "criterion_id": "requirement_fit"
+            },
+            {
+              "status": "mismatch",
+              "evidence": "The brief lists two deliverables, PDF and JSON. The delivery explicitly confirms that JSON has not been delivered.",
+              "criterion_id": "completeness"
+            },
+            {
+              "status": "match",
+              "evidence": "The delivery plainly identifies what was delivered—the PDF containing \"Ready to ship\"—and what was not—the JSON. It also states that the deadline and budget were met.",
+              "criterion_id": "clarity"
+            }
+          ],
+          "verdict": "does_not_meet",
+          "rationale": "The missing JSON file leaves the requested scope, requirements and deliverable set unmet. The PDF contains the required string, and the delivery reports meeting the deadline and budget. Its description of what was and was not delivered is clear.",
+          "confidence": 0.99
+        },
+        "object_storage_key": null,
+        "metadata": {
+          "model": "gpt-6.1-sol",
+          "guest_id": "guest_01794303362484086079_0000000220_9334203320a145b5a38e915c1c2f17df",
+          "provider": "openai",
+          "schema_ref": "kernel.schemas.compare_classify_output_v1",
+          "action_type": "text.compare_and_classify",
+          "workflow_id": "acceptance_builder.check_v1",
+          "schema_version": 1,
+          "pydantic_run_id": "01a1c4d1-09b9-71f3-8a10-a20d42b5fd54",
+          "action_config_id": "acceptance_builder.compare_v1",
+          "provider_call_id": "provider_call_01794303396286586007_0000000614_66f991ad8efd46a79c40dd7726cb7b44",
+          "workflow_version": 1,
+          "scenario_chain_id": "scenario_session_01794303362521707819_0000000222_87d6822451e944a799781e84e5053b24",
+          "acquisition_source": "web_mirror",
+          "litellm_response_id": "chatcmpl-EicZJCk9PP63H4Zv6QmmQ3XjjRNXJ",
+          "physical_call_index": 1,
+          "provider_policy_ref": "default_text_generation_v1",
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1
+        },
+        "created_at": "2026-11-10 09:36:41.836451+00:00"
+      },
+      {
+        "id": "artifact_01794303407448644535_0000000627_fc21725e341147199532e52dd0b5c93c",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "acceptance_builder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794303362521707819_0000000222_87d6822451e944a799781e84e5053b24",
+        "job_id": "job_01794303362529953221_0000000224_274139b1a69b413c9eb04c748f79092c",
+        "action_run_id": "action_run_01794303401859051565_0000000622_54b041925a434e24a7135c317fd4b89a",
+        "artifact_type": "structured_output",
+        "status": "stored",
+        "content_text": null,
+        "content_json": {
+          "summary": "The work does not meet expectations because the required JSON file is missing. The first priority is to deliver the JSON file for Acme containing the exact string \"Ready to ship\".",
+          "sections": [
+            {
+              "id": "verdict",
+              "title": "Verdict",
+              "content": "The work does not meet expectations. Scope coverage is not satisfied: the brief requires PDF and JSON files for Acme, but the delivery states that only the PDF was delivered and that JSON has not been delivered. Requirement fit is not satisfied: both files must contain the exact string \"Ready to ship\"; the delivered PDF contains it, but the required JSON is absent, while the delivery states that the deadline and budget were met. Completeness is not satisfied: the brief lists two deliverables, PDF and JSON, and the delivery explicitly confirms that JSON has not been delivered. Clarity is satisfied: the delivery plainly identifies the PDF containing \"Ready to ship\" as delivered and the JSON as not delivered, and states that the deadline and budget were met. This verdict is judged on the four general review criteria, not item by item on the acceptance criteria listed below."
+            },
+            {
+              "id": "acceptance-criteria",
+              "title": "Acceptance criteria",
+              "content": "- The deliverables consist of one PDF file and one JSON file for Acme.\n- Both files contain the exact string \"Ready to ship\".\n- The files are delivered by November 15.\n- The work stays within the budget of 500 EUR.",
+              "metadata": {
+                "kind": "list"
+              }
+            },
+            {
+              "id": "assumptions",
+              "title": "Assumptions",
+              "content": "- The source data has already been provided.",
+              "metadata": {
+                "kind": "list"
+              }
+            },
+            {
+              "id": "deliverables",
+              "title": "Deliverables",
+              "content": "- A PDF file for Acme.\n- A JSON file for Acme.",
+              "metadata": {
+                "kind": "list"
+              }
+            },
+            {
+              "id": "open-gaps",
+              "title": "Open gaps",
+              "content": "The brief states all three lists: acceptance criteria, assumptions, and deliverables."
+            }
+          ]
+        },
+        "object_storage_key": null,
+        "metadata": {
+          "model": "gpt-6.1-sol",
+          "guest_id": "guest_01794303362484086079_0000000220_9334203320a145b5a38e915c1c2f17df",
+          "provider": "openai",
+          "schema_ref": "kernel.schemas.generate_document_output_v1",
+          "action_type": "document.generate_from_template",
+          "workflow_id": "acceptance_builder.check_v1",
+          "schema_version": 1,
+          "pydantic_run_id": "01a1c4d1-1f89-772c-8342-2e4acddb9bd9",
+          "action_config_id": "acceptance_builder.check_document_v1",
+          "provider_call_id": "provider_call_01794303401867318161_0000000624_c1e2075c753c478a879f788d75a9a14e",
+          "workflow_version": 1,
+          "scenario_chain_id": "scenario_session_01794303362521707819_0000000222_87d6822451e944a799781e84e5053b24",
+          "acquisition_source": "web_mirror",
+          "litellm_response_id": "chatcmpl-EicZOK6bVaS2W9Rka2GKvFJ6B0eAi",
+          "physical_call_index": 1,
+          "provider_policy_ref": "default_text_generation_v1",
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1
+        },
+        "created_at": "2026-11-10 09:36:47.448685+00:00"
+      }
+    ],
+    "calls": [
+      {
+        "id": "provider_call_01794303393761713314_0000000604_f1c7cdd551db4699b25bcb31a2e046cb",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "acceptance_builder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794303362521707819_0000000222_87d6822451e944a799781e84e5053b24",
+        "job_id": "job_01794303362529953221_0000000224_274139b1a69b413c9eb04c748f79092c",
+        "action_run_id": "action_run_01794303393752235870_0000000602_4afa4bb405b84b92bc93ece913b29265",
+        "workflow_id": "acceptance_builder.check_v1",
+        "workflow_version": 1,
+        "step_id": "extract",
+        "action_type": "text.extract_structured_fields",
+        "action_config_id": "acceptance_builder.extract_v1",
+        "provider_policy_ref": "default_text_generation_v1",
+        "provider": "openai",
+        "model": "gpt-6.1-sol",
+        "gateway_backend": "litellm",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "transport_attempt_index": 1,
+        "physical_call_index": 1,
+        "status": "succeeded",
+        "input_tokens": 1140,
+        "output_tokens": 118,
+        "total_tokens": 1258,
+        "latency_ms": 2467,
+        "estimated_cost": 0.0012997,
+        "error_code": null,
+        "error_message_safe": null,
+        "failure_kind": null,
+        "http_status": null,
+        "pydantic_run_id": "01a1c4d0-ffde-714e-b211-eb96b7f80cc0",
+        "litellm_response_id": "chatcmpl-EicZGUCFIoPiN0ZVtuAD5tmjPBE6T",
+        "created_at": "2026-11-10 09:36:33.761743+00:00",
+        "started_at": "2026-11-10 09:36:33.761647+00:00",
+        "completed_at": "2026-11-10 09:36:36.236860+00:00",
+        "metadata": {
+          "litellm": {
+            "model_id": "979a5128f9177c1bb24176f7b836b5726bf3afbaa926068b29f5841645830ebd",
+            "http_status": null,
+            "model_group": "anytoolai.default_text",
+            "response_id": "chatcmpl-EicZGUCFIoPiN0ZVtuAD5tmjPBE6T",
+            "actual_model": "gpt-6.1-sol",
+            "response_cost": 0.0012997,
+            "actual_provider": "openai"
+          },
+          "timeout": {
+            "configured_seconds": 60
+          },
+          "attempts": {
+            "pydantic_run_id": "01a1c4d0-ffde-714e-b211-eb96b7f80cc0",
+            "physical_call_index": 1,
+            "semantic_attempt_index": 1,
+            "transport_attempt_index": 1
+          },
+          "response": {
+            "http_status": null,
+            "total_tokens": 1258,
+            "litellm_response_id": "chatcmpl-EicZGUCFIoPiN0ZVtuAD5tmjPBE6T"
+          },
+          "prompt_ref": "acceptance_builder.extract.v1",
+          "request_id": null,
+          "fixture_key": null,
+          "temperature": 1.0,
+          "retry_policy": {
+            "transport": {
+              "owner": "litellm",
+              "max_attempts": 2,
+              "litellm_num_retries_per_attempt": 0
+            },
+            "validation": {
+              "owner": "pydanticai",
+              "max_attempts": 2
+            },
+            "hard_limits": {
+              "max_physical_provider_calls_per_action": 4
+            }
+          },
+          "correlation_id": null,
+          "request_payload": {
+            "prompt_chars": 4861,
+            "message_count": 1,
+            "response_schema_present": true
+          },
+          "model_addressing": "policy_alias",
+          "reasoning_effort": null,
+          "request_metadata": {
+            "user_id": null,
+            "guest_id": "guest_01794303362484086079_0000000220_9334203320a145b5a38e915c1c2f17df",
+            "handoff_id": null,
+            "scenario_chain_id": "scenario_session_01794303362521707819_0000000222_87d6822451e944a799781e84e5053b24",
+            "acquisition_source": "web_mirror"
+          },
+          "response_metadata": {
+            "usage": {
+              "total_tokens": 1258
+            },
+            "litellm": {
+              "model_id": "979a5128f9177c1bb24176f7b836b5726bf3afbaa926068b29f5841645830ebd",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicZGUCFIoPiN0ZVtuAD5tmjPBE6T",
+              "actual_model": "gpt-6.1-sol",
+              "response_cost": 0.0012997,
+              "actual_provider": "openai"
+            }
+          },
+          "structured_output_mode": "json_schema",
+          "fallback_from_policy_ref": null
+        }
+      },
+      {
+        "id": "provider_call_01794303396286586007_0000000614_66f991ad8efd46a79c40dd7726cb7b44",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "acceptance_builder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794303362521707819_0000000222_87d6822451e944a799781e84e5053b24",
+        "job_id": "job_01794303362529953221_0000000224_274139b1a69b413c9eb04c748f79092c",
+        "action_run_id": "action_run_01794303396272609010_0000000612_6e466185d04e42b99e0a92aad1832342",
+        "workflow_id": "acceptance_builder.check_v1",
+        "workflow_version": 1,
+        "step_id": "compare",
+        "action_type": "text.compare_and_classify",
+        "action_config_id": "acceptance_builder.compare_v1",
+        "provider_policy_ref": "default_text_generation_v1",
+        "provider": "openai",
+        "model": "gpt-6.1-sol",
+        "gateway_backend": "litellm",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "transport_attempt_index": 1,
+        "physical_call_index": 1,
+        "status": "succeeded",
+        "input_tokens": 1347,
+        "output_tokens": 255,
+        "total_tokens": 1602,
+        "latency_ms": 5521,
+        "estimated_cost": 0.0026904000000000003,
+        "error_code": null,
+        "error_message_safe": null,
+        "failure_kind": null,
+        "http_status": null,
+        "pydantic_run_id": "01a1c4d1-09b9-71f3-8a10-a20d42b5fd54",
+        "litellm_response_id": "chatcmpl-EicZJCk9PP63H4Zv6QmmQ3XjjRNXJ",
+        "created_at": "2026-11-10 09:36:36.286636+00:00",
+        "started_at": "2026-11-10 09:36:36.286515+00:00",
+        "completed_at": "2026-11-10 09:36:41.815598+00:00",
+        "metadata": {
+          "litellm": {
+            "model_id": "979a5128f9177c1bb24176f7b836b5726bf3afbaa926068b29f5841645830ebd",
+            "http_status": null,
+            "model_group": "anytoolai.default_text",
+            "response_id": "chatcmpl-EicZJCk9PP63H4Zv6QmmQ3XjjRNXJ",
+            "actual_model": "gpt-6.1-sol",
+            "response_cost": 0.0026904000000000003,
+            "actual_provider": "openai"
+          },
+          "timeout": {
+            "configured_seconds": 60
+          },
+          "attempts": {
+            "pydantic_run_id": "01a1c4d1-09b9-71f3-8a10-a20d42b5fd54",
+            "physical_call_index": 1,
+            "semantic_attempt_index": 1,
+            "transport_attempt_index": 1
+          },
+          "response": {
+            "http_status": null,
+            "total_tokens": 1602,
+            "litellm_response_id": "chatcmpl-EicZJCk9PP63H4Zv6QmmQ3XjjRNXJ"
+          },
+          "prompt_ref": "acceptance_builder.compare.v1",
+          "request_id": null,
+          "fixture_key": null,
+          "temperature": 1.0,
+          "retry_policy": {
+            "transport": {
+              "owner": "litellm",
+              "max_attempts": 2,
+              "litellm_num_retries_per_attempt": 0
+            },
+            "validation": {
+              "owner": "pydanticai",
+              "max_attempts": 2
+            },
+            "hard_limits": {
+              "max_physical_provider_calls_per_action": 4
+            }
+          },
+          "correlation_id": null,
+          "request_payload": {
+            "prompt_chars": 5240,
+            "message_count": 1,
+            "response_schema_present": true
+          },
+          "model_addressing": "policy_alias",
+          "reasoning_effort": null,
+          "request_metadata": {
+            "user_id": null,
+            "guest_id": "guest_01794303362484086079_0000000220_9334203320a145b5a38e915c1c2f17df",
+            "handoff_id": null,
+            "scenario_chain_id": "scenario_session_01794303362521707819_0000000222_87d6822451e944a799781e84e5053b24",
+            "acquisition_source": "web_mirror"
+          },
+          "response_metadata": {
+            "usage": {
+              "total_tokens": 1602
+            },
+            "litellm": {
+              "model_id": "979a5128f9177c1bb24176f7b836b5726bf3afbaa926068b29f5841645830ebd",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicZJCk9PP63H4Zv6QmmQ3XjjRNXJ",
+              "actual_model": "gpt-6.1-sol",
+              "response_cost": 0.0026904000000000003,
+              "actual_provider": "openai"
+            }
+          },
+          "structured_output_mode": "json_schema",
+          "fallback_from_policy_ref": null
+        }
+      },
+      {
+        "id": "provider_call_01794303401867318161_0000000624_c1e2075c753c478a879f788d75a9a14e",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "acceptance_builder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794303362521707819_0000000222_87d6822451e944a799781e84e5053b24",
+        "job_id": "job_01794303362529953221_0000000224_274139b1a69b413c9eb04c748f79092c",
+        "action_run_id": "action_run_01794303401859051565_0000000622_54b041925a434e24a7135c317fd4b89a",
+        "workflow_id": "acceptance_builder.check_v1",
+        "workflow_version": 1,
+        "step_id": "generate_document",
+        "action_type": "document.generate_from_template",
+        "action_config_id": "acceptance_builder.check_document_v1",
+        "provider_policy_ref": "default_text_generation_v1",
+        "provider": "openai",
+        "model": "gpt-6.1-sol",
+        "gateway_backend": "litellm",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "transport_attempt_index": 1,
+        "physical_call_index": 1,
+        "status": "succeeded",
+        "input_tokens": 1829,
+        "output_tokens": 492,
+        "total_tokens": 2321,
+        "latency_ms": 5555,
+        "estimated_cost": 0.009491000000000001,
+        "error_code": null,
+        "error_message_safe": null,
+        "failure_kind": null,
+        "http_status": null,
+        "pydantic_run_id": "01a1c4d1-1f89-772c-8342-2e4acddb9bd9",
+        "litellm_response_id": "chatcmpl-EicZOK6bVaS2W9Rka2GKvFJ6B0eAi",
+        "created_at": "2026-11-10 09:36:41.867337+00:00",
+        "started_at": "2026-11-10 09:36:41.867283+00:00",
+        "completed_at": "2026-11-10 09:36:47.428875+00:00",
+        "metadata": {
+          "litellm": {
+            "model_id": "979a5128f9177c1bb24176f7b836b5726bf3afbaa926068b29f5841645830ebd",
+            "http_status": null,
+            "model_group": "anytoolai.default_text",
+            "response_id": "chatcmpl-EicZOK6bVaS2W9Rka2GKvFJ6B0eAi",
+            "actual_model": "gpt-6.1-sol",
+            "response_cost": 0.009491000000000001,
+            "actual_provider": "openai"
+          },
+          "timeout": {
+            "configured_seconds": 60
+          },
+          "attempts": {
+            "pydantic_run_id": "01a1c4d1-1f89-772c-8342-2e4acddb9bd9",
+            "physical_call_index": 1,
+            "semantic_attempt_index": 1,
+            "transport_attempt_index": 1
+          },
+          "response": {
+            "http_status": null,
+            "total_tokens": 2321,
+            "litellm_response_id": "chatcmpl-EicZOK6bVaS2W9Rka2GKvFJ6B0eAi"
+          },
+          "prompt_ref": "acceptance_builder.check_document.v1",
+          "request_id": null,
+          "fixture_key": null,
+          "temperature": 1.0,
+          "retry_policy": {
+            "transport": {
+              "owner": "litellm",
+              "max_attempts": 2,
+              "litellm_num_retries_per_attempt": 0
+            },
+            "validation": {
+              "owner": "pydanticai",
+              "max_attempts": 2
+            },
+            "hard_limits": {
+              "max_physical_provider_calls_per_action": 4
+            }
+          },
+          "correlation_id": null,
+          "request_payload": {
+            "prompt_chars": 7279,
+            "message_count": 1,
+            "response_schema_present": true
+          },
+          "model_addressing": "policy_alias",
+          "reasoning_effort": null,
+          "request_metadata": {
+            "user_id": null,
+            "guest_id": "guest_01794303362484086079_0000000220_9334203320a145b5a38e915c1c2f17df",
+            "handoff_id": null,
+            "scenario_chain_id": "scenario_session_01794303362521707819_0000000222_87d6822451e944a799781e84e5053b24",
+            "acquisition_source": "web_mirror"
+          },
+          "response_metadata": {
+            "usage": {
+              "total_tokens": 2321
+            },
+            "litellm": {
+              "model_id": "979a5128f9177c1bb24176f7b836b5726bf3afbaa926068b29f5841645830ebd",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicZOK6bVaS2W9Rka2GKvFJ6B0eAi",
+              "actual_model": "gpt-6.1-sol",
+              "response_cost": 0.009491000000000001,
+              "actual_provider": "openai"
+            }
+          },
+          "structured_output_mode": "json_schema",
+          "fallback_from_policy_ref": null
+        }
+      }
+    ]
+  },
+  "confirmed_reasoning_effort": null,
+  "latency_ms": 45872
+}

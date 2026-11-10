@@ -1,0 +1,22 @@
+{
+  "evidence_sha256": "09e577e2a05d5e709a7f050d1b430031eb70fdb8c80f75fba78cd96d502ef8d4",
+  "reviewer": "Codex agent — semantic inspection; independent human review pending",
+  "fields": {
+    "/issues/0/description": true,
+    "/issues/0/evidence": true,
+    "/questions/0/question": true,
+    "/questions/0/rationale": true,
+    "/document/summary": true,
+    "/document/sections/0/content": true,
+    "/document/sections/1/content": true,
+    "/document/sections/2/content": true,
+    "/document/sections/3/content": true
+  },
+  "criteria": {
+    "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.": true,
+    "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.": true,
+    "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.": true,
+    "Unspecified facts/lists remain missing; the summary does not claim readiness or a complete specification.": true
+  },
+  "notes": "Read all authored fields: Russian throughout, empty extraction faithful, missing-field names localized; no invented readiness or facts. Independent review pending."
+}

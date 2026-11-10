@@ -1,0 +1,30 @@
+{
+  "evidence_sha256": "e84df2fe976c63e766a6ad60fe346dad4da965e4395455929b8a06d8f33b49f8",
+  "reviewer": "",
+  "fields": {
+    "/extracted/values/assumptions/0": null,
+    "/extracted/values/deliverables/0": null,
+    "/extracted/values/deliverables/1": null,
+    "/extracted/values/acceptance_criteria/0": null,
+    "/extracted/values/acceptance_criteria/1": null,
+    "/extracted/values/acceptance_criteria/2": null,
+    "/extracted/values/acceptance_criteria/3": null,
+    "/comparison/rationale": null,
+    "/comparison/deltas/0/evidence": null,
+    "/comparison/deltas/1/evidence": null,
+    "/comparison/deltas/2/evidence": null,
+    "/comparison/deltas/3/evidence": null,
+    "/document/summary": null,
+    "/document/sections/0/content": null,
+    "/document/sections/1/content": null,
+    "/document/sections/2/content": null,
+    "/document/sections/3/content": null,
+    "/document/sections/4/content": null
+  },
+  "criteria": {
+    "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.": null,
+    "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.": null,
+    "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.": null
+  },
+  "notes": ""
+}

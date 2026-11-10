@@ -1,0 +1,25 @@
+{
+  "evidence_sha256": "e978d404c25c73f1ed618812c17e3bc86c976daf65b331019c0fc76a283baf70",
+  "reviewer": "Codex agent — semantic inspection; independent human review pending",
+  "fields": {
+    "/extracted/values/assumptions/0": true,
+    "/extracted/values/deliverables/0": true,
+    "/extracted/values/deliverables/1": true,
+    "/extracted/values/acceptance_criteria/0": true,
+    "/extracted/values/acceptance_criteria/1": true,
+    "/extracted/values/acceptance_criteria/2": true,
+    "/extracted/values/acceptance_criteria/3": true,
+    "/document/summary": true,
+    "/document/sections/0/content": true,
+    "/document/sections/1/content": true,
+    "/document/sections/2/content": true,
+    "/document/sections/3/content": true
+  },
+  "criteria": {
+    "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.": true,
+    "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.": true,
+    "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.": true,
+    "The explicit analysis-language request is honored and is not extracted as a project requirement.": true
+  },
+  "notes": "Full authored prose inspected: expected analysis language; deliverable English does not override analysis, explicit analysis override honored without becoming project criterion. Ready to ship/Acme and exact source dates/amounts retained. Source-language date literals are permitted exceptions. Independent review pending."
+}

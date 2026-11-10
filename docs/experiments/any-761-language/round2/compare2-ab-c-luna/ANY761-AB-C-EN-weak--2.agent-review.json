@@ -1,0 +1,24 @@
+{
+  "evidence_sha256": "231ddc52f161cbe28bd65de83c381692c8690a31790601adbdecbf2e3e2d2ecd",
+  "reviewer": "Codex agent — semantic inspection; independent human review pending",
+  "fields": {
+    "/comparison/rationale": true,
+    "/comparison/deltas/0/evidence": true,
+    "/comparison/deltas/1/evidence": true,
+    "/comparison/deltas/2/evidence": true,
+    "/comparison/deltas/3/evidence": true,
+    "/document/summary": true,
+    "/document/sections/0/content": true,
+    "/document/sections/1/content": true,
+    "/document/sections/2/content": true,
+    "/document/sections/3/content": true,
+    "/document/sections/4/content": true
+  },
+  "criteria": {
+    "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.": true,
+    "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.": true,
+    "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.": true,
+    "Unspecified facts/lists remain missing; the summary does not claim readiness or a complete specification.": true
+  },
+  "notes": "All prose inspected: language PASS; Done literal preserved, empty extraction and low-evidence rejection consistent. No invented requirement. Independent review pending."
+}

@@ -1,0 +1,35 @@
+{
+  "evidence_sha256": "d575dca87f5357aeb596a887e7b73eee41c20cb60ca1faa65ea0e321fa05ca6d",
+  "reviewer": "Codex agent — semantic inspection; independent human review pending",
+  "fields": {
+    "/brief/values/constraints/0": true,
+    "/brief/values/constraints/1": true,
+    "/brief/values/constraints/2": true,
+    "/brief/values/constraints/3": true,
+    "/brief/values/deliverables/0": true,
+    "/brief/values/deliverables/1": true,
+    "/brief/values/deliverables/2": true,
+    "/brief/values/project_goal": true,
+    "/brief/values/target_audience": true,
+    "/issues/0/description": true,
+    "/issues/0/evidence": true,
+    "/issues/1/description": true,
+    "/issues/1/evidence": true,
+    "/questions/0/question": true,
+    "/questions/0/rationale": true,
+    "/questions/1/question": true,
+    "/questions/1/rationale": true,
+    "/document/summary": true,
+    "/document/sections/0/content": true,
+    "/document/sections/1/content": true,
+    "/document/sections/2/content": true,
+    "/document/sections/3/content": true
+  },
+  "criteria": {
+    "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.": true,
+    "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.": true,
+    "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.": true,
+    "Retain 6–8 thousand characters, nonexpert apartment-owner audience, all exclusions and source-link requirements; budget and deadline remain unagreed.": true
+  },
+  "notes": "All canonical prose inspected. Expected Spanish/Russian/requested English preserved; source facts, exclusions, quotes and absent budget/deadline faithful. Weak Spanish remains empty/missing, without readiness. ES mixed has all six fields and no issues/questions, exercising live skipped-questions path; ready statement follows that data. Extra country/character-count clarifications and abbreviated quotation grammar are quality caveats."
+}

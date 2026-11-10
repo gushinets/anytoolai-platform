@@ -4925,3 +4925,20 @@ def test_automated_python_installs_check_locks_and_use_shared_build_config():
                 assert "uv run --no-sync " in line, (relative, line)
             if "uv pip install " in line:
                 assert "--config-file infra/python/uv-build.toml" in line, (relative, line)
+
+
+def test_profile_check_args_accepts_selected_ab_policy_and_rejects_default():
+    runner = load_runner_module()
+    manifest = {
+        "container_products_root": "/app/products",
+        "profile_fingerprint": "test",
+        "enabled_products": {"acceptance_builder": {
+            "provider_policy_ref": "sol_text_generation_v1", "quota_policy_ref": None,
+        }},
+    }
+    assert "acceptance_builder=sol_text_generation_v1,-" in runner._profile_check_args(manifest)
+    manifest["enabled_products"]["acceptance_builder"].update(
+        provider_policy_ref="default_text_generation_v1"
+    )
+    with pytest.raises(ValueError, match="non-live provider policy"):
+        runner._profile_check_args(manifest)

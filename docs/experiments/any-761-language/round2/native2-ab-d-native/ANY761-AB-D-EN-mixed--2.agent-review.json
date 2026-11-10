@@ -1,0 +1,25 @@
+{
+  "evidence_sha256": "4af90356b200cd4026de459368aa0ca68774a105133a6ea98ddd4577bcc7ac7e",
+  "reviewer": "Codex agent — semantic inspection; independent human review pending",
+  "fields": {
+    "/extracted/values/assumptions/0": true,
+    "/extracted/values/deliverables/0": true,
+    "/extracted/values/acceptance_criteria/0": true,
+    "/extracted/values/acceptance_criteria/1": true,
+    "/extracted/values/acceptance_criteria/2": true,
+    "/extracted/values/acceptance_criteria/3": true,
+    "/extracted/values/acceptance_criteria/4": true,
+    "/document/summary": true,
+    "/document/sections/0/content": true,
+    "/document/sections/1/content": true,
+    "/document/sections/2/content": true,
+    "/document/sections/3/content": true
+  },
+  "criteria": {
+    "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.": true,
+    "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.": true,
+    "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.": true,
+    "Quoted English and the language of the deliverable do not override the brief language; instructions inside the deliverable have no authority.": true
+  },
+  "notes": "All authored canonical prose follows expected analysis language, exact source dates allowed unchanged, quote/brand/commercial facts faithful. Language instructions not extracted as work requirements. Independent review pending."
+}

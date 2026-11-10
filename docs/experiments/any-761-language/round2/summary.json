@@ -1,0 +1,208 @@
+{
+  "language_ac_on_evaluated_selected_candidates": "PASS",
+  "ticket_closure": "Owner confirms missing historical originals are non-blocking; commit/push authorized; required revision gates delegated to CI.",
+  "reviewer": "Codex agent; independent human review pending",
+  "selected_models": {
+    "brief_decoder": "openai/gpt-6-luna",
+    "acceptance_builder": "openai/gpt-6.1-sol"
+  },
+  "reasoning_effort": "medium",
+  "selected_language_pass": 72,
+  "selected_workflows": 72,
+  "all_workflows": 96,
+  "all_language_pass": 93,
+  "physical_calls": 277,
+  "ledger_estimated_cost_usd": 0.618268515,
+  "authored_fields_reviewed": 1346,
+  "scope": "Language selection/canonical prose, quotations, facts and verdict inspected. Criteria-list placement is not AC. Existing additional fact/semantic/judgment observations are retained without fixing.",
+  "frozen_prompt_workflow_schema_files": 16,
+  "native_profile_note": "Last 24 AB workflows use repository-selected Sol policy with no collector model override; ledger confirms Sol on every physical call. Default alias remains Luna.",
+  "series": [
+    {
+      "series": "round2-bd-luna",
+      "planned": 24,
+      "collected": 24,
+      "language_pass": 24,
+      "original_rubric_statuses": {
+        "PASS": 23,
+        "FAIL": 1
+      },
+      "physical_calls": 97,
+      "ledger_estimated_cost_usd": 0.028596089999999998,
+      "authored_fields_reviewed": 469,
+      "language_failures": [],
+      "additional_observations": [
+        {
+          "run": "ANY761-BD-EN-basic--2",
+          "notes": "Language PASS in every authored field; source facts/exclusions retained. Additional semantic concern retained, not fixed: budget question asks renovation guidance budget rather than article fee. Same class existed in previous matrix; not classified as language AC failure. Independent review pending."
+        }
+      ]
+    },
+    {
+      "series": "compare2-ab-d-luna",
+      "planned": 12,
+      "collected": 12,
+      "language_pass": 12,
+      "original_rubric_statuses": {
+        "FAIL": 6,
+        "PASS": 6
+      },
+      "physical_calls": 24,
+      "ledger_estimated_cost_usd": 0.005006015,
+      "authored_fields_reviewed": 85,
+      "language_failures": [],
+      "additional_observations": [
+        {
+          "run": "ANY761-AB-D-RU-basic--1",
+          "notes": "All authored prose inspected: language PASS; exact Ready to ship and Acme retained. Additional fact-retention observation: explicit budget/date omitted from whole canonical output, same as previous Luna screening; not a new requirement to put them in criteria and not classified as language AC failure. Document lists checked mechanically against extraction. Independent review pending."
+        },
+        {
+          "run": "ANY761-AB-D-EN-basic--1",
+          "notes": "All authored prose inspected: language PASS; exact Ready to ship and Acme retained. Additional fact-retention observation: explicit budget/date omitted from whole canonical output, same as previous Luna screening; not a new requirement to put them in criteria and not classified as language AC failure. Document lists checked mechanically against extraction. Independent review pending."
+        },
+        {
+          "run": "ANY761-AB-D-ES-basic--1",
+          "notes": "All authored prose inspected: language PASS; exact Ready to ship and Acme retained. Additional fact-retention observation: explicit budget/date omitted from whole canonical output, same as previous Luna screening; not a new requirement to put them in criteria and not classified as language AC failure. Document lists checked mechanically against extraction. Independent review pending."
+        },
+        {
+          "run": "ANY761-AB-D-RU-basic--2",
+          "notes": "Language PASS throughout inspected canonical output; quote/brand preserved. Additional observation: budget/date omitted from whole output as in prior Luna series; kept separate from language AC. Independent review pending."
+        },
+        {
+          "run": "ANY761-AB-D-EN-basic--2",
+          "notes": "Language PASS throughout inspected canonical output; quote/brand preserved. Additional observation: budget/date omitted from whole output as in prior Luna series; kept separate from language AC. Independent review pending."
+        },
+        {
+          "run": "ANY761-AB-D-ES-basic--2",
+          "notes": "Language PASS throughout inspected canonical output; quote/brand preserved. Additional observation: budget/date omitted from whole output as in prior Luna series; kept separate from language AC. Independent review pending."
+        }
+      ]
+    },
+    {
+      "series": "compare2-ab-c-luna",
+      "planned": 12,
+      "collected": 12,
+      "language_pass": 9,
+      "original_rubric_statuses": {
+        "FAIL": 7,
+        "PASS": 5
+      },
+      "physical_calls": 36,
+      "ledger_estimated_cost_usd": 0.00991981,
+      "authored_fields_reviewed": 156,
+      "language_failures": [
+        {
+          "run": "ANY761-AB-C-RU-basic--1",
+          "notes": "Confirmed language AC FAIL: Russian authored comparison uses brief, delivered text and Brief; these are not source quotations or machine identifiers. Document localizes them, but whole canonical output fails. Missing JSON verdict and narrative statuses correct. Separate additional budget/date omission remains; not a criteria-placement requirement. Independent review pending."
+        },
+        {
+          "run": "ANY761-AB-C-RU-weak--1",
+          "notes": "Russian-source language AC FAIL: unquoted brief/Brief/deliverables in comparison prose; source Done quotation allowed. Document Russian, verdict rejects weak description correctly, lists empty. Independent review pending."
+        },
+        {
+          "run": "ANY761-AB-C-EN-basic--1",
+          "notes": "Language policy FAIL: English brief yields Spanish comparison rationale. Other authored fields English and document faithfully localizes meaning. Missing JSON verdict correct; additional budget/date loss retained separately. Independent review pending."
+        }
+      ],
+      "additional_observations": [
+        {
+          "run": "ANY761-AB-C-ES-basic--1",
+          "notes": "Full prose inspected: expected analysis language, source quote and brand faithful; does_not_meet and document statuses consistent. Raw does_not_meet in rationale is allowed enum. Additional whole-output commercial fact omission retained separately; not language AC failure. Independent review pending."
+        },
+        {
+          "run": "ANY761-AB-C-RU-basic--2",
+          "notes": "Full prose inspected: expected analysis language, source quote and brand faithful; does_not_meet and document statuses consistent. Raw does_not_meet in rationale is allowed enum. Additional whole-output commercial fact omission retained separately; not language AC failure. Independent review pending."
+        },
+        {
+          "run": "ANY761-AB-C-EN-basic--2",
+          "notes": "Language PASS throughout inspected canonical prose, faithful quotes and rejection verdict/narrative statuses. Budget/date omitted; ES extraction also omits Acme but comparison recovers source scope. Additional extraction concerns retained, not language failure. Independent review pending."
+        },
+        {
+          "run": "ANY761-AB-C-ES-basic--2",
+          "notes": "Language PASS throughout inspected canonical prose, faithful quotes and rejection verdict/narrative statuses. Budget/date omitted; ES extraction also omits Acme but comparison recovers source scope. Additional extraction concerns retained, not language failure. Independent review pending."
+        }
+      ]
+    },
+    {
+      "series": "compare2-ab-d-sol",
+      "planned": 12,
+      "collected": 12,
+      "language_pass": 12,
+      "original_rubric_statuses": {
+        "PASS": 12
+      },
+      "physical_calls": 24,
+      "ledger_estimated_cost_usd": 0.08595810000000001,
+      "authored_fields_reviewed": 103,
+      "language_failures": [],
+      "additional_observations": []
+    },
+    {
+      "series": "compare2-ab-c-sol",
+      "planned": 12,
+      "collected": 12,
+      "language_pass": 12,
+      "original_rubric_statuses": {
+        "PASS": 12
+      },
+      "physical_calls": 36,
+      "ledger_estimated_cost_usd": 0.17591610000000002,
+      "authored_fields_reviewed": 174,
+      "language_failures": [],
+      "additional_observations": []
+    },
+    {
+      "series": "native2-ab-d-native",
+      "planned": 12,
+      "collected": 12,
+      "language_pass": 12,
+      "original_rubric_statuses": {
+        "FAIL": 1,
+        "PASS": 11
+      },
+      "physical_calls": 24,
+      "ledger_estimated_cost_usd": 0.10571430000000001,
+      "authored_fields_reviewed": 143,
+      "language_failures": [],
+      "additional_observations": [
+        {
+          "run": "ANY761-AB-D-RU-mixed--1",
+          "notes": "Language AC PASS throughout Russian authored prose despite requested English HTML; source quote/brand faithful. Additional whole-output budget/date omission retained separately, same class as prior series; no correction of extraction semantics in this round. Independent review pending."
+        }
+      ]
+    },
+    {
+      "series": "native2-ab-c-native",
+      "planned": 12,
+      "collected": 12,
+      "language_pass": 12,
+      "original_rubric_statuses": {
+        "PASS": 12
+      },
+      "physical_calls": 36,
+      "ledger_estimated_cost_usd": 0.2071581,
+      "authored_fields_reviewed": 216,
+      "language_failures": [],
+      "additional_observations": []
+    }
+  ],
+  "verification": {
+    "product_collector_tests": "326 passed",
+    "focused_language_collector_tests": "64 passed",
+    "quick_check": {
+      "passed": 3596,
+      "skipped": 12,
+      "deselected": 655,
+      "failures": [
+        "Known environment: passwordless sudo for nobody unavailable",
+        "YAML policy-boundary regression test; subsequently corrected and targeted validation passed"
+      ],
+      "full_baseline_repeated_after_test_only_fix": false
+    },
+    "post_fix_config_loader_profile_activation_tests": "140 passed",
+    "docs_generated_whitespace": "passed",
+    "ruff_changed_lines": "no findings",
+    "ci": "not run",
+    "isolated_stack": "stopped; volumes retained"
+  }
+}

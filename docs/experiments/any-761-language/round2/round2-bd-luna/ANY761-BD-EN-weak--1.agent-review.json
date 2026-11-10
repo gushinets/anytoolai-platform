@@ -1,0 +1,22 @@
+{
+  "evidence_sha256": "8d05afa0598226debd9c80c3f119328c42043dbb8db4b997fe345eb4e67f078b",
+  "reviewer": "Codex agent — semantic inspection; independent human review pending",
+  "fields": {
+    "/issues/0/description": true,
+    "/issues/0/evidence": true,
+    "/questions/0/question": true,
+    "/questions/0/rationale": true,
+    "/document/summary": true,
+    "/document/sections/0/content": true,
+    "/document/sections/1/content": true,
+    "/document/sections/2/content": true,
+    "/document/sections/3/content": true
+  },
+  "criteria": {
+    "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.": true,
+    "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.": true,
+    "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.": true,
+    "Unspecified facts/lists remain missing; the summary does not claim readiness or a complete specification.": true
+  },
+  "notes": "All authored canonical prose inspected in expected language, including units and next steps. Quotes preserved as source excerpts with editorial elisions. Facts faithful and missing fields not invented; optional questions remain additional quality observations. Independent human review pending."
+}

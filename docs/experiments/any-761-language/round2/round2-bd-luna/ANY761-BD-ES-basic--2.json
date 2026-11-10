@@ -1,0 +1,1168 @@
+{
+  "case": {
+    "id": "ANY761-BD-ES-basic",
+    "scenario_id": "brief_decoder.decode_v1",
+    "source_language": "es",
+    "expected_language": "es",
+    "family": "basic",
+    "provenance": "Translation of the BD-RU-08 input from ANY-761; expected output authored for regression, not historical QA.",
+    "input": {
+      "brief_text": "Necesitamos un artículo de blog sobre la reforma de una cocina en una casa antigua: cómo hacer una lista de trabajos y prepararse para hablar con el contratista. Extensión: 6–8 mil caracteres; público: propietarios de pisos sin experiencia en construcción. Debe incluir subtítulos claros y una lista de preguntas para el contratista. Se excluyen cálculos de estructuras portantes, asesoramiento jurídico y promesas de un precio fijo de reforma. El texto debe ser original y sin publicidad encubierta. Hay que enlazar las fuentes de los datos técnicos. El presupuesto y la fecha de entrega aún no se han acordado."
+    },
+    "criteria": [
+      "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.",
+      "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.",
+      "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.",
+      "Retain 6–8 thousand characters, nonexpert apartment-owner audience, all exclusions and source-link requirements; budget and deadline remain unagreed."
+    ]
+  },
+  "attempt": 2,
+  "snapshot": {
+    "source_sha256": {
+      "configs/kernel/litellm_router.yaml": "53abb3939d9cf301ca767d37354e866628b6849b37ad64db80c49c03826630ec",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/action_configs.yaml": "ecc9a7ede8c14667230f21fbe461e71c7a6ab6d76328c97170e53b4fe30c3eb5",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/frontends.yaml": "5f5eac1312dddf0ab129ccb58108e38aed9cd0c633503ccb91ba4c036f7512bd",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/handoffs.yaml": "08d5c5b3717f2b0db972213243a56f0cf98811fd4328105da998f5a3116d49c4",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/product.yaml": "7741111559407d2991e14b267efd9af9c66924fdb2071222d52528673a535eed",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/detect_issues.v1.md": "fbe9532b64e40079c6fc74c50bffc1a6b726c12cd25fd0c31ed7c8dd61006b3e",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/extract_brief.v1.md": "88f0d763aad056155045b367bceae3e9f0b08ad594b733cb168be1caafc5d8f7",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/generate_questions.v1.md": "f14fe8eddb4226bcc1105ad79d429e1f18d47d07b31af980ad270a0dc958cf56",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/generate_summary.v1.md": "3eec86211db8fe9b344e21f5d65b457ab6d9a4b49e0c0a998810dcf637bb78d2",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts.yaml": "03cb35d961dd1d9b1d95a1d1490eb2355e438c239a391b757c5a554473845daf",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/quotas.yaml": "1ed4154065125cf4da02e88015f8112caf11090279f292bebd7dd4534d98df6c",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/renderer_contract.yaml": "386f963a75379f224d581f42d72abae110a3369308aba3d196d06f2a4589e95d",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/scenarios.yaml": "5c6577450040daa795e9dbd245dc9757ea59427157fd3debecbd774f61e64c3d",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas/decode_input.schema.json": "998b82bde28beb6be77e0fb522a8e0a9871c88d9500b884523912f2d257d8454",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas/decode_output.schema.json": "5a76652a23623ba7a025410a8d0a509e9b8495636f3f6adca8ecb5288610cc0a",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas.yaml": "e2038c31be3810ee6a04ac82994f9b7bbcc8cd0d68a74ff90e4e0ad3973188f9",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/workflows.yaml": "06e0268670118d4156fc6fb8eab4e2954257178243e2693dc44b9e211fb5a1de",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/action_configs.yaml": "c2778c674dfde00c680f6c90e53b36b7f126a8dd7f7cc15afde0503f94a4e38d",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/frontends.yaml": "8e43fb844dd43efb59a2c3ba4b9757795c546ea49fd79e837031f58092f5c1e6",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/product.yaml": "6e367667b97afd5eaf031a447c5177b1cdbb6136ac0bea2e0cb4a29917b91bdb",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/check_document.v1.md": "c4b2e19dd1df3c2bc0d377fc749292a841ccb5e19ddc6fba07b8fa3371b3da59",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/compare.v1.md": "6ea407f09f7075a26f95b6d9d7eede06f76ce024390b2857295a763512e9a696",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/draft_document.v1.md": "3bfa48bf6d75c19de9cf99bf0d7099dd2e05c2b102787b6db8865c4bc1a2351a",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/extract.v1.md": "faaa30d051e34e7551e1a6e632a544257b1c820ad995b0b2dc4aab5a94a629df",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts.yaml": "69da98bf54727ffad9feb34dd5e5bc99de39e48b45445c7349121d2a4ac4d05d",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/quotas.yaml": "bf4ba64a55b7b86b524ff6a4fdc2b9d26ccf8112cbea54a9c5b6092896315e30",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/renderer_contract.yaml": "c6e5360239048e01dc7b802cc2057d1708596ed60801fcd04fc957d5996823bd",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/scenarios.yaml": "570fdf7f211132f8c4024ca2f4073ed5a0566ca584656daa45670869de4883e3",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/check_input.schema.json": "909e70ffbc6b6a7acbf5bc4eb64065a0beb0858be2f200a5b7573e45191def09",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/check_output.schema.json": "40703d6d7483066744d7fe7c0b19491a86bf326e19c2e8a11109bdaff05caa9f",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/draft_input.schema.json": "268d5301b8b8cc610e1f4cc7668878913d2eefb877bb1c4ab2d9ab2118bfba7e",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/draft_output.schema.json": "f6eb44bf452328b9daa65229bdb6d156410a3e0e45f91788c784ad99b87ddf2f",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas.yaml": "6c32116dcd116268045aeb45cd881c5fba8144ac0e22b5fcb8a1750216f43c1b",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/workflows.yaml": "e1fe1c43eb7228cfc857113364a36fecb87a8fed49f7ca2e8bbdd2c789831528"
+    },
+    "configured_models": [
+      {
+        "model": "openai/gpt-6-luna",
+        "reasoning_effort": "medium",
+        "alias": "anytoolai.default_text"
+      }
+    ]
+  },
+  "channel": "api",
+  "session_id": "scenario_session_01794302666384118408_0000000102_9ac0369282ae470bba53ec1323a5171b",
+  "job_id": "job_01794302666388513246_0000000104_eddbc15eb8e244479707f13da25bacb5",
+  "result_id": "artifact_01794302720340085326_0000000964_bc80ac2f2e4a4d5d9eb87c528d505f74",
+  "output": {
+    "brief": {
+      "values": {
+        "constraints": [
+          "Extensión: 6–8 mil caracteres",
+          "Excluir cálculos de estructuras portantes, asesoramiento jurídico y promesas de un precio fijo de reforma",
+          "El texto debe ser original y sin publicidad encubierta",
+          "Enlazar las fuentes de los datos técnicos"
+        ],
+        "deliverables": [
+          "Artículo de blog",
+          "Subtítulos claros",
+          "Lista de preguntas para el contratista"
+        ],
+        "project_goal": "Ayudar a preparar una reforma de cocina en una casa antigua y a conversar con el contratista.",
+        "target_audience": "Propietarios de pisos sin experiencia en construcción"
+      },
+      "confidence": {
+        "constraints": 1,
+        "deliverables": 0.99,
+        "project_goal": 0.98,
+        "target_audience": 1
+      },
+      "missing_fields": [
+        "deadline",
+        "budget"
+      ]
+    },
+    "issues": [
+      {
+        "category": "budget_risk",
+        "evidence": "«El presupuesto [...] aún no se han acordado»",
+        "severity": "medium",
+        "description": "El presupuesto del encargo no está acordado, por lo que falta definir la remuneración y el alcance de trabajo que puede cubrir."
+      },
+      {
+        "category": "timeline_risk",
+        "evidence": "«la fecha de entrega aún no se han acordado»",
+        "severity": "medium",
+        "description": "La fecha de entrega no está acordada, así que no se puede planificar cuándo debe completarse el artículo."
+      }
+    ],
+    "document": {
+      "summary": "El encargo aún no está listo para empezar: primero hay que acordar el presupuesto y la fecha de entrega, que son los principales datos pendientes y riesgos identificados.",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Project overview",
+          "content": "El cliente quiere un artículo para ayudar a preparar la reforma de una cocina en una casa antigua y conversar con el contratista. Está dirigido a propietarios de pisos sin experiencia en construcción."
+        },
+        {
+          "id": "key-details",
+          "title": "Key details",
+          "content": "Entregables y condiciones:\n- Artículo de blog.\n- Subtítulos claros.\n- Lista de preguntas para el contratista.\n- Extensión: 6–8 mil caracteres.\n- Excluir cálculos de estructuras portantes, asesoramiento jurídico y promesas de un precio fijo de reforma.\n- El texto debe ser original y sin publicidad encubierta.\n- Enlazar las fuentes de los datos técnicos.",
+          "metadata": {
+            "kind": "list"
+          }
+        },
+        {
+          "id": "gaps",
+          "title": "Gaps and risks",
+          "content": "El presupuesto del encargo no está acordado, por lo que falta definir la remuneración y el alcance de trabajo que puede cubrir. La fecha de entrega tampoco está acordada, así que no se puede planificar cuándo debe completarse el artículo. Faltan el presupuesto y la fecha de entrega."
+        },
+        {
+          "id": "next-steps",
+          "title": "Questions to ask",
+          "content": "- ¿Qué presupuesto tienes previsto para la redacción del artículo? Definirlo permitirá acordar la remuneración y ajustar el alcance del trabajo.\n- ¿Para qué fecha necesitas que esté terminado el artículo? Conocerla permitirá planificar el trabajo y cumplir el plazo que necesitas.",
+          "metadata": {
+            "kind": "list"
+          }
+        }
+      ]
+    },
+    "questions": [
+      {
+        "category": "budget_risk",
+        "priority": "medium",
+        "question": "¿Qué presupuesto tienes previsto para la redacción del artículo?",
+        "rationale": "Definir el presupuesto permitirá acordar la remuneración y ajustar el alcance del trabajo.",
+        "source_issue_index": 0
+      },
+      {
+        "category": "timeline_risk",
+        "priority": "medium",
+        "question": "¿Para qué fecha necesitas que esté terminado el artículo?",
+        "rationale": "Conocer la fecha de entrega permitirá planificar el trabajo y cumplir el plazo que necesitas.",
+        "source_issue_index": 1
+      }
+    ],
+    "brief_text": "Necesitamos un artículo de blog sobre la reforma de una cocina en una casa antigua: cómo hacer una lista de trabajos y prepararse para hablar con el contratista. Extensión: 6–8 mil caracteres; público: propietarios de pisos sin experiencia en construcción. Debe incluir subtítulos claros y una lista de preguntas para el contratista. Se excluyen cálculos de estructuras portantes, asesoramiento jurídico y promesas de un precio fijo de reforma. El texto debe ser original y sin publicidad encubierta. Hay que enlazar las fuentes de los datos técnicos. El presupuesto y la fecha de entrega aún no se han acordado."
+  },
+  "error": null,
+  "evidence_error": null,
+  "ledger": {
+    "actions": [
+      {
+        "id": "action_run_01794302701011747274_0000000925_40d34a0dcb6f4300bd501a631f344fd2",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302666384118408_0000000102_9ac0369282ae470bba53ec1323a5171b",
+        "job_id": "job_01794302666388513246_0000000104_eddbc15eb8e244479707f13da25bacb5",
+        "workflow_id": "brief_decoder.decode_v1",
+        "step_id": "extract",
+        "action_type": "text.extract_structured_fields",
+        "action_config_id": "brief_decoder.extract_brief_v1",
+        "status": "succeeded",
+        "input_artifact_id": null,
+        "output_artifact_id": "artifact_01794302705006827464_0000000930_dec1d4144d484c73aef483c6e9641c77",
+        "error_code": null,
+        "created_at": "2026-11-10 09:25:01.011764+00:00",
+        "started_at": "2026-11-10 09:25:01.011732+00:00",
+        "completed_at": "2026-11-10 09:25:05.012852+00:00",
+        "metadata": {
+          "model": "gpt-6-luna",
+          "user_id": null,
+          "guest_id": "guest_01794302666364305816_0000000100_096f233b0a9d4f3b915850db0b095505",
+          "provider": "openai",
+          "handoff_id": null,
+          "prompt_ref": "brief_decoder.extract_brief.v1",
+          "input_schema_ref": "kernel.schemas.extract_input_v1",
+          "workflow_version": 2,
+          "output_schema_ref": "kernel.schemas.extract_output_v1",
+          "scenario_chain_id": "scenario_session_01794302666384118408_0000000102_9ac0369282ae470bba53ec1323a5171b",
+          "acquisition_source": "web_mirror",
+          "provider_policy_ref": "default_text_generation_v1",
+          "llm_response_metadata": {
+            "usage": {
+              "total_tokens": 1566
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicO5Sjr3vsALR0QwgZjfh3iafQsp",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.00014725,
+              "actual_provider": "openai"
+            },
+            "structured_output_artifact_id": "artifact_01794302705006827464_0000000930_dec1d4144d484c73aef483c6e9641c77"
+          },
+          "structured_output_artifact_id": "artifact_01794302705006827464_0000000930_dec1d4144d484c73aef483c6e9641c77"
+        }
+      },
+      {
+        "id": "action_run_01794302705030355260_0000000935_32bd2e983d6f472f9b1c9b59bd4bcfe9",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302666384118408_0000000102_9ac0369282ae470bba53ec1323a5171b",
+        "job_id": "job_01794302666388513246_0000000104_eddbc15eb8e244479707f13da25bacb5",
+        "workflow_id": "brief_decoder.decode_v1",
+        "step_id": "detect_issues",
+        "action_type": "text.detect_issues_by_taxonomy",
+        "action_config_id": "brief_decoder.detect_issues_v1",
+        "status": "succeeded",
+        "input_artifact_id": null,
+        "output_artifact_id": "artifact_01794302711078018416_0000000940_d54134fc3aab47c5bb7d672304ac4544",
+        "error_code": null,
+        "created_at": "2026-11-10 09:25:05.030369+00:00",
+        "started_at": "2026-11-10 09:25:05.030343+00:00",
+        "completed_at": "2026-11-10 09:25:11.082367+00:00",
+        "metadata": {
+          "model": "gpt-6-luna",
+          "user_id": null,
+          "guest_id": "guest_01794302666364305816_0000000100_096f233b0a9d4f3b915850db0b095505",
+          "provider": "openai",
+          "handoff_id": null,
+          "prompt_ref": "brief_decoder.detect_issues.v1",
+          "input_schema_ref": "kernel.schemas.issue_detection_input_v1",
+          "workflow_version": 2,
+          "output_schema_ref": "kernel.schemas.issue_detection_output_v1",
+          "scenario_chain_id": "scenario_session_01794302666384118408_0000000102_9ac0369282ae470bba53ec1323a5171b",
+          "acquisition_source": "web_mirror",
+          "provider_policy_ref": "default_text_generation_v1",
+          "llm_response_metadata": {
+            "usage": {
+              "total_tokens": 1501
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicO94MYAxRNXcjtXA6u3feJN5i9d",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.00021912,
+              "actual_provider": "openai"
+            },
+            "structured_output_artifact_id": "artifact_01794302711078018416_0000000940_d54134fc3aab47c5bb7d672304ac4544"
+          },
+          "structured_output_artifact_id": "artifact_01794302711078018416_0000000940_d54134fc3aab47c5bb7d672304ac4544"
+        }
+      },
+      {
+        "id": "action_run_01794302711092905805_0000000945_fc94e47ef34445aa9e58cf6563a2e640",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302666384118408_0000000102_9ac0369282ae470bba53ec1323a5171b",
+        "job_id": "job_01794302666388513246_0000000104_eddbc15eb8e244479707f13da25bacb5",
+        "workflow_id": "brief_decoder.decode_v1",
+        "step_id": "generate_questions",
+        "action_type": "text.generate_clarifying_questions",
+        "action_config_id": "brief_decoder.generate_questions_v1",
+        "status": "succeeded",
+        "input_artifact_id": null,
+        "output_artifact_id": "artifact_01794302713505917956_0000000950_4beb82d552214be0b7472e3eb6957f6e",
+        "error_code": null,
+        "created_at": "2026-11-10 09:25:11.092923+00:00",
+        "started_at": "2026-11-10 09:25:11.092891+00:00",
+        "completed_at": "2026-11-10 09:25:13.509750+00:00",
+        "metadata": {
+          "model": "gpt-6-luna",
+          "user_id": null,
+          "guest_id": "guest_01794302666364305816_0000000100_096f233b0a9d4f3b915850db0b095505",
+          "provider": "openai",
+          "handoff_id": null,
+          "prompt_ref": "brief_decoder.generate_questions.v1",
+          "input_schema_ref": "kernel.schemas.generate_questions_input_v1",
+          "workflow_version": 2,
+          "output_schema_ref": "kernel.schemas.generate_questions_output_v1",
+          "scenario_chain_id": "scenario_session_01794302666384118408_0000000102_9ac0369282ae470bba53ec1323a5171b",
+          "acquisition_source": "web_mirror",
+          "provider_policy_ref": "default_text_generation_v1",
+          "llm_response_metadata": {
+            "usage": {
+              "total_tokens": 1426
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicOF8ScmkLdXArfXY7eSfpBXw1LK",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.000235175,
+              "actual_provider": "openai"
+            },
+            "structured_output_artifact_id": "artifact_01794302713505917956_0000000950_4beb82d552214be0b7472e3eb6957f6e"
+          },
+          "structured_output_artifact_id": "artifact_01794302713505917956_0000000950_4beb82d552214be0b7472e3eb6957f6e"
+        }
+      },
+      {
+        "id": "action_run_01794302713519092031_0000000955_8f8dbaf617f44476a92067f161d6007c",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302666384118408_0000000102_9ac0369282ae470bba53ec1323a5171b",
+        "job_id": "job_01794302666388513246_0000000104_eddbc15eb8e244479707f13da25bacb5",
+        "workflow_id": "brief_decoder.decode_v1",
+        "step_id": "generate_document",
+        "action_type": "document.generate_from_template",
+        "action_config_id": "brief_decoder.generate_summary_v1",
+        "status": "succeeded",
+        "input_artifact_id": null,
+        "output_artifact_id": "artifact_01794302720293094042_0000000960_2ffedd4e030343699516ac96ddfd59bb",
+        "error_code": null,
+        "created_at": "2026-11-10 09:25:13.519105+00:00",
+        "started_at": "2026-11-10 09:25:13.519080+00:00",
+        "completed_at": "2026-11-10 09:25:20.297558+00:00",
+        "metadata": {
+          "model": "gpt-6-luna",
+          "user_id": null,
+          "guest_id": "guest_01794302666364305816_0000000100_096f233b0a9d4f3b915850db0b095505",
+          "provider": "openai",
+          "handoff_id": null,
+          "prompt_ref": "brief_decoder.generate_summary.v1",
+          "input_schema_ref": "kernel.schemas.generate_document_input_v1",
+          "workflow_version": 2,
+          "output_schema_ref": "kernel.schemas.generate_document_output_v1",
+          "scenario_chain_id": "scenario_session_01794302666384118408_0000000102_9ac0369282ae470bba53ec1323a5171b",
+          "acquisition_source": "web_mirror",
+          "provider_policy_ref": "default_text_generation_v1",
+          "llm_response_metadata": {
+            "usage": {
+              "total_tokens": 2388
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicOIhO2WOHRMVXbGCvCAosZliBeV",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.0005192999999999999,
+              "actual_provider": "openai"
+            },
+            "structured_output_artifact_id": "artifact_01794302720293094042_0000000960_2ffedd4e030343699516ac96ddfd59bb"
+          },
+          "structured_output_artifact_id": "artifact_01794302720293094042_0000000960_2ffedd4e030343699516ac96ddfd59bb"
+        }
+      }
+    ],
+    "artifacts": [
+      {
+        "id": "artifact_01794302705006827464_0000000930_dec1d4144d484c73aef483c6e9641c77",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302666384118408_0000000102_9ac0369282ae470bba53ec1323a5171b",
+        "job_id": "job_01794302666388513246_0000000104_eddbc15eb8e244479707f13da25bacb5",
+        "action_run_id": "action_run_01794302701011747274_0000000925_40d34a0dcb6f4300bd501a631f344fd2",
+        "artifact_type": "structured_output",
+        "status": "stored",
+        "content_text": null,
+        "content_json": {
+          "values": {
+            "constraints": [
+              "Extensión: 6–8 mil caracteres",
+              "Excluir cálculos de estructuras portantes, asesoramiento jurídico y promesas de un precio fijo de reforma",
+              "El texto debe ser original y sin publicidad encubierta",
+              "Enlazar las fuentes de los datos técnicos"
+            ],
+            "deliverables": [
+              "Artículo de blog",
+              "Subtítulos claros",
+              "Lista de preguntas para el contratista"
+            ],
+            "project_goal": "Ayudar a preparar una reforma de cocina en una casa antigua y a conversar con el contratista.",
+            "target_audience": "Propietarios de pisos sin experiencia en construcción"
+          },
+          "confidence": {
+            "constraints": 1,
+            "deliverables": 0.99,
+            "project_goal": 0.98,
+            "target_audience": 1
+          },
+          "missing_fields": [
+            "deadline",
+            "budget"
+          ]
+        },
+        "object_storage_key": null,
+        "metadata": {
+          "model": "gpt-6-luna",
+          "guest_id": "guest_01794302666364305816_0000000100_096f233b0a9d4f3b915850db0b095505",
+          "provider": "openai",
+          "schema_ref": "kernel.schemas.extract_output_v1",
+          "action_type": "text.extract_structured_fields",
+          "workflow_id": "brief_decoder.decode_v1",
+          "schema_version": 1,
+          "pydantic_run_id": "01a1c4c6-6ddb-757c-9a41-9a3165f20ba9",
+          "action_config_id": "brief_decoder.extract_brief_v1",
+          "provider_call_id": "provider_call_01794302701021850526_0000000927_c56b122c39e7477384d3390cb1e991af",
+          "workflow_version": 2,
+          "scenario_chain_id": "scenario_session_01794302666384118408_0000000102_9ac0369282ae470bba53ec1323a5171b",
+          "acquisition_source": "web_mirror",
+          "litellm_response_id": "chatcmpl-EicO5Sjr3vsALR0QwgZjfh3iafQsp",
+          "physical_call_index": 1,
+          "provider_policy_ref": "default_text_generation_v1",
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1
+        },
+        "created_at": "2026-11-10 09:25:05.006856+00:00"
+      },
+      {
+        "id": "artifact_01794302711078018416_0000000940_d54134fc3aab47c5bb7d672304ac4544",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302666384118408_0000000102_9ac0369282ae470bba53ec1323a5171b",
+        "job_id": "job_01794302666388513246_0000000104_eddbc15eb8e244479707f13da25bacb5",
+        "action_run_id": "action_run_01794302705030355260_0000000935_32bd2e983d6f472f9b1c9b59bd4bcfe9",
+        "artifact_type": "structured_output",
+        "status": "stored",
+        "content_text": null,
+        "content_json": {
+          "issues": [
+            {
+              "category": "budget_risk",
+              "evidence": "«El presupuesto [...] aún no se han acordado»",
+              "severity": "medium",
+              "description": "El presupuesto del encargo no está acordado, por lo que falta definir la remuneración y el alcance de trabajo que puede cubrir."
+            },
+            {
+              "category": "timeline_risk",
+              "evidence": "«la fecha de entrega aún no se han acordado»",
+              "severity": "medium",
+              "description": "La fecha de entrega no está acordada, así que no se puede planificar cuándo debe completarse el artículo."
+            }
+          ]
+        },
+        "object_storage_key": null,
+        "metadata": {
+          "model": "gpt-6-luna",
+          "guest_id": "guest_01794302666364305816_0000000100_096f233b0a9d4f3b915850db0b095505",
+          "provider": "openai",
+          "schema_ref": "kernel.schemas.issue_detection_output_v1",
+          "action_type": "text.detect_issues_by_taxonomy",
+          "workflow_id": "brief_decoder.decode_v1",
+          "schema_version": 1,
+          "pydantic_run_id": "01a1c4c6-7d8b-73bc-93ff-c06814abf67a",
+          "action_config_id": "brief_decoder.detect_issues_v1",
+          "provider_call_id": "provider_call_01794302705038204311_0000000937_beb8321beb5c42258567cd5b90650f70",
+          "workflow_version": 2,
+          "scenario_chain_id": "scenario_session_01794302666384118408_0000000102_9ac0369282ae470bba53ec1323a5171b",
+          "acquisition_source": "web_mirror",
+          "litellm_response_id": "chatcmpl-EicO94MYAxRNXcjtXA6u3feJN5i9d",
+          "physical_call_index": 1,
+          "provider_policy_ref": "default_text_generation_v1",
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1
+        },
+        "created_at": "2026-11-10 09:25:11.078038+00:00"
+      },
+      {
+        "id": "artifact_01794302713505917956_0000000950_4beb82d552214be0b7472e3eb6957f6e",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302666384118408_0000000102_9ac0369282ae470bba53ec1323a5171b",
+        "job_id": "job_01794302666388513246_0000000104_eddbc15eb8e244479707f13da25bacb5",
+        "action_run_id": "action_run_01794302711092905805_0000000945_fc94e47ef34445aa9e58cf6563a2e640",
+        "artifact_type": "structured_output",
+        "status": "stored",
+        "content_text": null,
+        "content_json": {
+          "questions": [
+            {
+              "category": "budget_risk",
+              "priority": "medium",
+              "question": "¿Qué presupuesto tienes previsto para la redacción del artículo?",
+              "rationale": "Definir el presupuesto permitirá acordar la remuneración y ajustar el alcance del trabajo.",
+              "source_issue_index": 0
+            },
+            {
+              "category": "timeline_risk",
+              "priority": "medium",
+              "question": "¿Para qué fecha necesitas que esté terminado el artículo?",
+              "rationale": "Conocer la fecha de entrega permitirá planificar el trabajo y cumplir el plazo que necesitas.",
+              "source_issue_index": 1
+            }
+          ]
+        },
+        "object_storage_key": null,
+        "metadata": {
+          "model": "gpt-6-luna",
+          "guest_id": "guest_01794302666364305816_0000000100_096f233b0a9d4f3b915850db0b095505",
+          "provider": "openai",
+          "schema_ref": "kernel.schemas.generate_questions_output_v1",
+          "action_type": "text.generate_clarifying_questions",
+          "workflow_id": "brief_decoder.decode_v1",
+          "schema_version": 1,
+          "pydantic_run_id": "01a1c4c6-953e-7101-a972-27d33cb2f5b5",
+          "action_config_id": "brief_decoder.generate_questions_v1",
+          "provider_call_id": "provider_call_01794302711104975671_0000000947_0efe9970be2c487d97207f21d51f18f7",
+          "workflow_version": 2,
+          "scenario_chain_id": "scenario_session_01794302666384118408_0000000102_9ac0369282ae470bba53ec1323a5171b",
+          "acquisition_source": "web_mirror",
+          "litellm_response_id": "chatcmpl-EicOF8ScmkLdXArfXY7eSfpBXw1LK",
+          "physical_call_index": 1,
+          "provider_policy_ref": "default_text_generation_v1",
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1
+        },
+        "created_at": "2026-11-10 09:25:13.505947+00:00"
+      },
+      {
+        "id": "artifact_01794302720293094042_0000000960_2ffedd4e030343699516ac96ddfd59bb",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302666384118408_0000000102_9ac0369282ae470bba53ec1323a5171b",
+        "job_id": "job_01794302666388513246_0000000104_eddbc15eb8e244479707f13da25bacb5",
+        "action_run_id": "action_run_01794302713519092031_0000000955_8f8dbaf617f44476a92067f161d6007c",
+        "artifact_type": "structured_output",
+        "status": "stored",
+        "content_text": null,
+        "content_json": {
+          "summary": "El encargo aún no está listo para empezar: primero hay que acordar el presupuesto y la fecha de entrega, que son los principales datos pendientes y riesgos identificados.",
+          "sections": [
+            {
+              "id": "overview",
+              "title": "Project overview",
+              "content": "El cliente quiere un artículo para ayudar a preparar la reforma de una cocina en una casa antigua y conversar con el contratista. Está dirigido a propietarios de pisos sin experiencia en construcción."
+            },
+            {
+              "id": "key-details",
+              "title": "Key details",
+              "content": "Entregables y condiciones:\n- Artículo de blog.\n- Subtítulos claros.\n- Lista de preguntas para el contratista.\n- Extensión: 6–8 mil caracteres.\n- Excluir cálculos de estructuras portantes, asesoramiento jurídico y promesas de un precio fijo de reforma.\n- El texto debe ser original y sin publicidad encubierta.\n- Enlazar las fuentes de los datos técnicos.",
+              "metadata": {
+                "kind": "list"
+              }
+            },
+            {
+              "id": "gaps",
+              "title": "Gaps and risks",
+              "content": "El presupuesto del encargo no está acordado, por lo que falta definir la remuneración y el alcance de trabajo que puede cubrir. La fecha de entrega tampoco está acordada, así que no se puede planificar cuándo debe completarse el artículo. Faltan el presupuesto y la fecha de entrega."
+            },
+            {
+              "id": "next-steps",
+              "title": "Questions to ask",
+              "content": "- ¿Qué presupuesto tienes previsto para la redacción del artículo? Definirlo permitirá acordar la remuneración y ajustar el alcance del trabajo.\n- ¿Para qué fecha necesitas que esté terminado el artículo? Conocerla permitirá planificar el trabajo y cumplir el plazo que necesitas.",
+              "metadata": {
+                "kind": "list"
+              }
+            }
+          ]
+        },
+        "object_storage_key": null,
+        "metadata": {
+          "model": "gpt-6-luna",
+          "guest_id": "guest_01794302666364305816_0000000100_096f233b0a9d4f3b915850db0b095505",
+          "provider": "openai",
+          "schema_ref": "kernel.schemas.generate_document_output_v1",
+          "action_type": "document.generate_from_template",
+          "workflow_id": "brief_decoder.decode_v1",
+          "schema_version": 1,
+          "pydantic_run_id": "01a1c4c6-9eb6-72bd-8088-724b9a8b67b0",
+          "action_config_id": "brief_decoder.generate_summary_v1",
+          "provider_call_id": "provider_call_01794302713528549940_0000000957_113803c9f3d043698f7e33018e7124a0",
+          "workflow_version": 2,
+          "scenario_chain_id": "scenario_session_01794302666384118408_0000000102_9ac0369282ae470bba53ec1323a5171b",
+          "acquisition_source": "web_mirror",
+          "litellm_response_id": "chatcmpl-EicOIhO2WOHRMVXbGCvCAosZliBeV",
+          "physical_call_index": 1,
+          "provider_policy_ref": "default_text_generation_v1",
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1
+        },
+        "created_at": "2026-11-10 09:25:20.293122+00:00"
+      },
+      {
+        "id": "artifact_01794302720340085326_0000000964_bc80ac2f2e4a4d5d9eb87c528d505f74",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302666384118408_0000000102_9ac0369282ae470bba53ec1323a5171b",
+        "job_id": "job_01794302666388513246_0000000104_eddbc15eb8e244479707f13da25bacb5",
+        "action_run_id": null,
+        "artifact_type": "structured_output",
+        "status": "stored",
+        "content_text": null,
+        "content_json": {
+          "brief": {
+            "values": {
+              "constraints": [
+                "Extensión: 6–8 mil caracteres",
+                "Excluir cálculos de estructuras portantes, asesoramiento jurídico y promesas de un precio fijo de reforma",
+                "El texto debe ser original y sin publicidad encubierta",
+                "Enlazar las fuentes de los datos técnicos"
+              ],
+              "deliverables": [
+                "Artículo de blog",
+                "Subtítulos claros",
+                "Lista de preguntas para el contratista"
+              ],
+              "project_goal": "Ayudar a preparar una reforma de cocina en una casa antigua y a conversar con el contratista.",
+              "target_audience": "Propietarios de pisos sin experiencia en construcción"
+            },
+            "confidence": {
+              "constraints": 1,
+              "deliverables": 0.99,
+              "project_goal": 0.98,
+              "target_audience": 1
+            },
+            "missing_fields": [
+              "deadline",
+              "budget"
+            ]
+          },
+          "issues": [
+            {
+              "category": "budget_risk",
+              "evidence": "«El presupuesto [...] aún no se han acordado»",
+              "severity": "medium",
+              "description": "El presupuesto del encargo no está acordado, por lo que falta definir la remuneración y el alcance de trabajo que puede cubrir."
+            },
+            {
+              "category": "timeline_risk",
+              "evidence": "«la fecha de entrega aún no se han acordado»",
+              "severity": "medium",
+              "description": "La fecha de entrega no está acordada, así que no se puede planificar cuándo debe completarse el artículo."
+            }
+          ],
+          "document": {
+            "summary": "El encargo aún no está listo para empezar: primero hay que acordar el presupuesto y la fecha de entrega, que son los principales datos pendientes y riesgos identificados.",
+            "sections": [
+              {
+                "id": "overview",
+                "title": "Project overview",
+                "content": "El cliente quiere un artículo para ayudar a preparar la reforma de una cocina en una casa antigua y conversar con el contratista. Está dirigido a propietarios de pisos sin experiencia en construcción."
+              },
+              {
+                "id": "key-details",
+                "title": "Key details",
+                "content": "Entregables y condiciones:\n- Artículo de blog.\n- Subtítulos claros.\n- Lista de preguntas para el contratista.\n- Extensión: 6–8 mil caracteres.\n- Excluir cálculos de estructuras portantes, asesoramiento jurídico y promesas de un precio fijo de reforma.\n- El texto debe ser original y sin publicidad encubierta.\n- Enlazar las fuentes de los datos técnicos.",
+                "metadata": {
+                  "kind": "list"
+                }
+              },
+              {
+                "id": "gaps",
+                "title": "Gaps and risks",
+                "content": "El presupuesto del encargo no está acordado, por lo que falta definir la remuneración y el alcance de trabajo que puede cubrir. La fecha de entrega tampoco está acordada, así que no se puede planificar cuándo debe completarse el artículo. Faltan el presupuesto y la fecha de entrega."
+              },
+              {
+                "id": "next-steps",
+                "title": "Questions to ask",
+                "content": "- ¿Qué presupuesto tienes previsto para la redacción del artículo? Definirlo permitirá acordar la remuneración y ajustar el alcance del trabajo.\n- ¿Para qué fecha necesitas que esté terminado el artículo? Conocerla permitirá planificar el trabajo y cumplir el plazo que necesitas.",
+                "metadata": {
+                  "kind": "list"
+                }
+              }
+            ]
+          },
+          "questions": [
+            {
+              "category": "budget_risk",
+              "priority": "medium",
+              "question": "¿Qué presupuesto tienes previsto para la redacción del artículo?",
+              "rationale": "Definir el presupuesto permitirá acordar la remuneración y ajustar el alcance del trabajo.",
+              "source_issue_index": 0
+            },
+            {
+              "category": "timeline_risk",
+              "priority": "medium",
+              "question": "¿Para qué fecha necesitas que esté terminado el artículo?",
+              "rationale": "Conocer la fecha de entrega permitirá planificar el trabajo y cumplir el plazo que necesitas.",
+              "source_issue_index": 1
+            }
+          ],
+          "brief_text": "Necesitamos un artículo de blog sobre la reforma de una cocina en una casa antigua: cómo hacer una lista de trabajos y prepararse para hablar con el contratista. Extensión: 6–8 mil caracteres; público: propietarios de pisos sin experiencia en construcción. Debe incluir subtítulos claros y una lista de preguntas para el contratista. Se excluyen cálculos de estructuras portantes, asesoramiento jurídico y promesas de un precio fijo de reforma. El texto debe ser original y sin publicidad encubierta. Hay que enlazar las fuentes de los datos técnicos. El presupuesto y la fecha de entrega aún no se han acordado."
+        },
+        "object_storage_key": null,
+        "metadata": {
+          "guest_id": "guest_01794302666364305816_0000000100_096f233b0a9d4f3b915850db0b095505",
+          "schema_ref": "brief_decoder.decode_output_v1",
+          "workflow_id": "brief_decoder.decode_v1",
+          "artifact_role": "workflow_result",
+          "schema_version": 2,
+          "workflow_version": 2,
+          "scenario_chain_id": "scenario_session_01794302666384118408_0000000102_9ac0369282ae470bba53ec1323a5171b",
+          "acquisition_source": "web_mirror"
+        },
+        "created_at": "2026-11-10 09:25:20.340121+00:00"
+      }
+    ],
+    "calls": [
+      {
+        "id": "provider_call_01794302701021850526_0000000927_c56b122c39e7477384d3390cb1e991af",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302666384118408_0000000102_9ac0369282ae470bba53ec1323a5171b",
+        "job_id": "job_01794302666388513246_0000000104_eddbc15eb8e244479707f13da25bacb5",
+        "action_run_id": "action_run_01794302701011747274_0000000925_40d34a0dcb6f4300bd501a631f344fd2",
+        "workflow_id": "brief_decoder.decode_v1",
+        "workflow_version": 2,
+        "step_id": "extract",
+        "action_type": "text.extract_structured_fields",
+        "action_config_id": "brief_decoder.extract_brief_v1",
+        "provider_policy_ref": "default_text_generation_v1",
+        "provider": "openai",
+        "model": "gpt-6-luna",
+        "gateway_backend": "litellm",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "transport_attempt_index": 1,
+        "physical_call_index": 1,
+        "status": "succeeded",
+        "input_tokens": 1298,
+        "output_tokens": 268,
+        "total_tokens": 1566,
+        "latency_ms": 3946,
+        "estimated_cost": 0.00014725,
+        "error_code": null,
+        "error_message_safe": null,
+        "failure_kind": null,
+        "http_status": null,
+        "pydantic_run_id": "01a1c4c6-6ddb-757c-9a41-9a3165f20ba9",
+        "litellm_response_id": "chatcmpl-EicO5Sjr3vsALR0QwgZjfh3iafQsp",
+        "created_at": "2026-11-10 09:25:01.021864+00:00",
+        "started_at": "2026-11-10 09:25:01.021823+00:00",
+        "completed_at": "2026-11-10 09:25:04.976701+00:00",
+        "metadata": {
+          "litellm": {
+            "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+            "http_status": null,
+            "model_group": "anytoolai.default_text",
+            "response_id": "chatcmpl-EicO5Sjr3vsALR0QwgZjfh3iafQsp",
+            "actual_model": "gpt-6-luna",
+            "response_cost": 0.00014725,
+            "actual_provider": "openai"
+          },
+          "timeout": {
+            "configured_seconds": 60
+          },
+          "attempts": {
+            "pydantic_run_id": "01a1c4c6-6ddb-757c-9a41-9a3165f20ba9",
+            "physical_call_index": 1,
+            "semantic_attempt_index": 1,
+            "transport_attempt_index": 1
+          },
+          "response": {
+            "http_status": null,
+            "total_tokens": 1566,
+            "litellm_response_id": "chatcmpl-EicO5Sjr3vsALR0QwgZjfh3iafQsp"
+          },
+          "prompt_ref": "brief_decoder.extract_brief.v1",
+          "request_id": null,
+          "fixture_key": null,
+          "temperature": 1.0,
+          "retry_policy": {
+            "transport": {
+              "owner": "litellm",
+              "max_attempts": 2,
+              "litellm_num_retries_per_attempt": 0
+            },
+            "validation": {
+              "owner": "pydanticai",
+              "max_attempts": 2
+            },
+            "hard_limits": {
+              "max_physical_provider_calls_per_action": 4
+            }
+          },
+          "correlation_id": null,
+          "request_payload": {
+            "prompt_chars": 5460,
+            "message_count": 1,
+            "response_schema_present": true
+          },
+          "model_addressing": "policy_alias",
+          "reasoning_effort": null,
+          "request_metadata": {
+            "user_id": null,
+            "guest_id": "guest_01794302666364305816_0000000100_096f233b0a9d4f3b915850db0b095505",
+            "handoff_id": null,
+            "scenario_chain_id": "scenario_session_01794302666384118408_0000000102_9ac0369282ae470bba53ec1323a5171b",
+            "acquisition_source": "web_mirror"
+          },
+          "response_metadata": {
+            "usage": {
+              "total_tokens": 1566
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicO5Sjr3vsALR0QwgZjfh3iafQsp",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.00014725,
+              "actual_provider": "openai"
+            }
+          },
+          "structured_output_mode": "json_schema",
+          "fallback_from_policy_ref": null
+        }
+      },
+      {
+        "id": "provider_call_01794302705038204311_0000000937_beb8321beb5c42258567cd5b90650f70",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302666384118408_0000000102_9ac0369282ae470bba53ec1323a5171b",
+        "job_id": "job_01794302666388513246_0000000104_eddbc15eb8e244479707f13da25bacb5",
+        "action_run_id": "action_run_01794302705030355260_0000000935_32bd2e983d6f472f9b1c9b59bd4bcfe9",
+        "workflow_id": "brief_decoder.decode_v1",
+        "workflow_version": 2,
+        "step_id": "detect_issues",
+        "action_type": "text.detect_issues_by_taxonomy",
+        "action_config_id": "brief_decoder.detect_issues_v1",
+        "provider_policy_ref": "default_text_generation_v1",
+        "provider": "openai",
+        "model": "gpt-6-luna",
+        "gateway_backend": "litellm",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "transport_attempt_index": 1,
+        "physical_call_index": 1,
+        "status": "succeeded",
+        "input_tokens": 1085,
+        "output_tokens": 416,
+        "total_tokens": 1501,
+        "latency_ms": 6023,
+        "estimated_cost": 0.00021912,
+        "error_code": null,
+        "error_message_safe": null,
+        "failure_kind": null,
+        "http_status": null,
+        "pydantic_run_id": "01a1c4c6-7d8b-73bc-93ff-c06814abf67a",
+        "litellm_response_id": "chatcmpl-EicO94MYAxRNXcjtXA6u3feJN5i9d",
+        "created_at": "2026-11-10 09:25:05.038221+00:00",
+        "started_at": "2026-11-10 09:25:05.038164+00:00",
+        "completed_at": "2026-11-10 09:25:11.066503+00:00",
+        "metadata": {
+          "litellm": {
+            "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+            "http_status": null,
+            "model_group": "anytoolai.default_text",
+            "response_id": "chatcmpl-EicO94MYAxRNXcjtXA6u3feJN5i9d",
+            "actual_model": "gpt-6-luna",
+            "response_cost": 0.00021912,
+            "actual_provider": "openai"
+          },
+          "timeout": {
+            "configured_seconds": 60
+          },
+          "attempts": {
+            "pydantic_run_id": "01a1c4c6-7d8b-73bc-93ff-c06814abf67a",
+            "physical_call_index": 1,
+            "semantic_attempt_index": 1,
+            "transport_attempt_index": 1
+          },
+          "response": {
+            "http_status": null,
+            "total_tokens": 1501,
+            "litellm_response_id": "chatcmpl-EicO94MYAxRNXcjtXA6u3feJN5i9d"
+          },
+          "prompt_ref": "brief_decoder.detect_issues.v1",
+          "request_id": null,
+          "fixture_key": null,
+          "temperature": 1.0,
+          "retry_policy": {
+            "transport": {
+              "owner": "litellm",
+              "max_attempts": 2,
+              "litellm_num_retries_per_attempt": 0
+            },
+            "validation": {
+              "owner": "pydanticai",
+              "max_attempts": 2
+            },
+            "hard_limits": {
+              "max_physical_provider_calls_per_action": 4
+            }
+          },
+          "correlation_id": null,
+          "request_payload": {
+            "prompt_chars": 4506,
+            "message_count": 1,
+            "response_schema_present": true
+          },
+          "model_addressing": "policy_alias",
+          "reasoning_effort": null,
+          "request_metadata": {
+            "user_id": null,
+            "guest_id": "guest_01794302666364305816_0000000100_096f233b0a9d4f3b915850db0b095505",
+            "handoff_id": null,
+            "scenario_chain_id": "scenario_session_01794302666384118408_0000000102_9ac0369282ae470bba53ec1323a5171b",
+            "acquisition_source": "web_mirror"
+          },
+          "response_metadata": {
+            "usage": {
+              "total_tokens": 1501
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicO94MYAxRNXcjtXA6u3feJN5i9d",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.00021912,
+              "actual_provider": "openai"
+            }
+          },
+          "structured_output_mode": "json_schema",
+          "fallback_from_policy_ref": null
+        }
+      },
+      {
+        "id": "provider_call_01794302711104975671_0000000947_0efe9970be2c487d97207f21d51f18f7",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302666384118408_0000000102_9ac0369282ae470bba53ec1323a5171b",
+        "job_id": "job_01794302666388513246_0000000104_eddbc15eb8e244479707f13da25bacb5",
+        "action_run_id": "action_run_01794302711092905805_0000000945_fc94e47ef34445aa9e58cf6563a2e640",
+        "workflow_id": "brief_decoder.decode_v1",
+        "workflow_version": 2,
+        "step_id": "generate_questions",
+        "action_type": "text.generate_clarifying_questions",
+        "action_config_id": "brief_decoder.generate_questions_v1",
+        "provider_policy_ref": "default_text_generation_v1",
+        "provider": "openai",
+        "model": "gpt-6-luna",
+        "gateway_backend": "litellm",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "transport_attempt_index": 1,
+        "physical_call_index": 1,
+        "status": "succeeded",
+        "input_tokens": 1274,
+        "output_tokens": 152,
+        "total_tokens": 1426,
+        "latency_ms": 2376,
+        "estimated_cost": 0.000235175,
+        "error_code": null,
+        "error_message_safe": null,
+        "failure_kind": null,
+        "http_status": null,
+        "pydantic_run_id": "01a1c4c6-953e-7101-a972-27d33cb2f5b5",
+        "litellm_response_id": "chatcmpl-EicOF8ScmkLdXArfXY7eSfpBXw1LK",
+        "created_at": "2026-11-10 09:25:11.104992+00:00",
+        "started_at": "2026-11-10 09:25:11.104943+00:00",
+        "completed_at": "2026-11-10 09:25:13.487037+00:00",
+        "metadata": {
+          "litellm": {
+            "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+            "http_status": null,
+            "model_group": "anytoolai.default_text",
+            "response_id": "chatcmpl-EicOF8ScmkLdXArfXY7eSfpBXw1LK",
+            "actual_model": "gpt-6-luna",
+            "response_cost": 0.000235175,
+            "actual_provider": "openai"
+          },
+          "timeout": {
+            "configured_seconds": 60
+          },
+          "attempts": {
+            "pydantic_run_id": "01a1c4c6-953e-7101-a972-27d33cb2f5b5",
+            "physical_call_index": 1,
+            "semantic_attempt_index": 1,
+            "transport_attempt_index": 1
+          },
+          "response": {
+            "http_status": null,
+            "total_tokens": 1426,
+            "litellm_response_id": "chatcmpl-EicOF8ScmkLdXArfXY7eSfpBXw1LK"
+          },
+          "prompt_ref": "brief_decoder.generate_questions.v1",
+          "request_id": null,
+          "fixture_key": null,
+          "temperature": 1.0,
+          "retry_policy": {
+            "transport": {
+              "owner": "litellm",
+              "max_attempts": 2,
+              "litellm_num_retries_per_attempt": 0
+            },
+            "validation": {
+              "owner": "pydanticai",
+              "max_attempts": 2
+            },
+            "hard_limits": {
+              "max_physical_provider_calls_per_action": 4
+            }
+          },
+          "correlation_id": null,
+          "request_payload": {
+            "prompt_chars": 5250,
+            "message_count": 1,
+            "response_schema_present": true
+          },
+          "model_addressing": "policy_alias",
+          "reasoning_effort": null,
+          "request_metadata": {
+            "user_id": null,
+            "guest_id": "guest_01794302666364305816_0000000100_096f233b0a9d4f3b915850db0b095505",
+            "handoff_id": null,
+            "scenario_chain_id": "scenario_session_01794302666384118408_0000000102_9ac0369282ae470bba53ec1323a5171b",
+            "acquisition_source": "web_mirror"
+          },
+          "response_metadata": {
+            "usage": {
+              "total_tokens": 1426
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicOF8ScmkLdXArfXY7eSfpBXw1LK",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.000235175,
+              "actual_provider": "openai"
+            }
+          },
+          "structured_output_mode": "json_schema",
+          "fallback_from_policy_ref": null
+        }
+      },
+      {
+        "id": "provider_call_01794302713528549940_0000000957_113803c9f3d043698f7e33018e7124a0",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302666384118408_0000000102_9ac0369282ae470bba53ec1323a5171b",
+        "job_id": "job_01794302666388513246_0000000104_eddbc15eb8e244479707f13da25bacb5",
+        "action_run_id": "action_run_01794302713519092031_0000000955_8f8dbaf617f44476a92067f161d6007c",
+        "workflow_id": "brief_decoder.decode_v1",
+        "workflow_version": 2,
+        "step_id": "generate_document",
+        "action_type": "document.generate_from_template",
+        "action_config_id": "brief_decoder.generate_summary_v1",
+        "provider_policy_ref": "default_text_generation_v1",
+        "provider": "openai",
+        "model": "gpt-6-luna",
+        "gateway_backend": "litellm",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "transport_attempt_index": 1,
+        "physical_call_index": 1,
+        "status": "succeeded",
+        "input_tokens": 1799,
+        "output_tokens": 589,
+        "total_tokens": 2388,
+        "latency_ms": 6744,
+        "estimated_cost": 0.0005192999999999999,
+        "error_code": null,
+        "error_message_safe": null,
+        "failure_kind": null,
+        "http_status": null,
+        "pydantic_run_id": "01a1c4c6-9eb6-72bd-8088-724b9a8b67b0",
+        "litellm_response_id": "chatcmpl-EicOIhO2WOHRMVXbGCvCAosZliBeV",
+        "created_at": "2026-11-10 09:25:13.528562+00:00",
+        "started_at": "2026-11-10 09:25:13.528521+00:00",
+        "completed_at": "2026-11-10 09:25:20.276974+00:00",
+        "metadata": {
+          "litellm": {
+            "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+            "http_status": null,
+            "model_group": "anytoolai.default_text",
+            "response_id": "chatcmpl-EicOIhO2WOHRMVXbGCvCAosZliBeV",
+            "actual_model": "gpt-6-luna",
+            "response_cost": 0.0005192999999999999,
+            "actual_provider": "openai"
+          },
+          "timeout": {
+            "configured_seconds": 60
+          },
+          "attempts": {
+            "pydantic_run_id": "01a1c4c6-9eb6-72bd-8088-724b9a8b67b0",
+            "physical_call_index": 1,
+            "semantic_attempt_index": 1,
+            "transport_attempt_index": 1
+          },
+          "response": {
+            "http_status": null,
+            "total_tokens": 2388,
+            "litellm_response_id": "chatcmpl-EicOIhO2WOHRMVXbGCvCAosZliBeV"
+          },
+          "prompt_ref": "brief_decoder.generate_summary.v1",
+          "request_id": null,
+          "fixture_key": null,
+          "temperature": 1.0,
+          "retry_policy": {
+            "transport": {
+              "owner": "litellm",
+              "max_attempts": 2,
+              "litellm_num_retries_per_attempt": 0
+            },
+            "validation": {
+              "owner": "pydanticai",
+              "max_attempts": 2
+            },
+            "hard_limits": {
+              "max_physical_provider_calls_per_action": 4
+            }
+          },
+          "correlation_id": null,
+          "request_payload": {
+            "prompt_chars": 7285,
+            "message_count": 1,
+            "response_schema_present": true
+          },
+          "model_addressing": "policy_alias",
+          "reasoning_effort": null,
+          "request_metadata": {
+            "user_id": null,
+            "guest_id": "guest_01794302666364305816_0000000100_096f233b0a9d4f3b915850db0b095505",
+            "handoff_id": null,
+            "scenario_chain_id": "scenario_session_01794302666384118408_0000000102_9ac0369282ae470bba53ec1323a5171b",
+            "acquisition_source": "web_mirror"
+          },
+          "response_metadata": {
+            "usage": {
+              "total_tokens": 2388
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicOIhO2WOHRMVXbGCvCAosZliBeV",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.0005192999999999999,
+              "actual_provider": "openai"
+            }
+          },
+          "structured_output_mode": "json_schema",
+          "fallback_from_policy_ref": null
+        }
+      }
+    ]
+  },
+  "confirmed_reasoning_effort": null,
+  "latency_ms": 54801
+}

@@ -1,0 +1,35 @@
+{
+  "evidence_sha256": "5194c4a6f57cb9d2d4b0396813722f610ae1135fe5417282c232764b95656de2",
+  "reviewer": "Codex agent — semantic inspection; independent human review pending",
+  "fields": {
+    "/brief/values/constraints/0": true,
+    "/brief/values/constraints/1": true,
+    "/brief/values/constraints/2": true,
+    "/brief/values/constraints/3": true,
+    "/brief/values/deliverables/0": true,
+    "/brief/values/deliverables/1": true,
+    "/brief/values/project_goal": true,
+    "/brief/values/target_audience": true,
+    "/issues/0/description": true,
+    "/issues/1/description": true,
+    "/issues/2/description": true,
+    "/questions/0/question": true,
+    "/questions/0/rationale": true,
+    "/questions/1/question": true,
+    "/questions/1/rationale": true,
+    "/questions/2/question": true,
+    "/questions/2/rationale": true,
+    "/document/summary": true,
+    "/document/sections/0/content": true,
+    "/document/sections/1/content": true,
+    "/document/sections/2/content": true,
+    "/document/sections/3/content": true
+  },
+  "criteria": {
+    "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.": true,
+    "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.": true,
+    "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.": false,
+    "The explicit analysis-language request is honored and is not extracted as a project requirement.": true
+  },
+  "notes": "Spanish override correctly honored in all authored fields and not extracted as a project requirement. FAIL meaning: the budget question asks for presupuesto ... para la reforma (renovation budget) and its rationale adjusts article guidance to renovation scope, instead of clarifying payment/budget for writing the commissioned article. This semantic drift is copied into next steps. Other source facts and exclusions retained."
+}

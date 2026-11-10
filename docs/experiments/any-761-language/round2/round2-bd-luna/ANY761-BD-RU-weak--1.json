@@ -1,0 +1,1193 @@
+{
+  "case": {
+    "id": "ANY761-BD-RU-weak",
+    "scenario_id": "brief_decoder.decode_v1",
+    "source_language": "ru",
+    "expected_language": "ru",
+    "family": "weak",
+    "provenance": "New synthetic regression case for ANY-761; not an original QA output.",
+    "input": {
+      "brief_text": "Нужно что-нибудь хорошее."
+    },
+    "criteria": [
+      "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.",
+      "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.",
+      "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.",
+      "Unspecified facts/lists remain missing; the summary does not claim readiness or a complete specification."
+    ]
+  },
+  "attempt": 1,
+  "snapshot": {
+    "source_sha256": {
+      "configs/kernel/litellm_router.yaml": "53abb3939d9cf301ca767d37354e866628b6849b37ad64db80c49c03826630ec",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/action_configs.yaml": "ecc9a7ede8c14667230f21fbe461e71c7a6ab6d76328c97170e53b4fe30c3eb5",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/frontends.yaml": "5f5eac1312dddf0ab129ccb58108e38aed9cd0c633503ccb91ba4c036f7512bd",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/handoffs.yaml": "08d5c5b3717f2b0db972213243a56f0cf98811fd4328105da998f5a3116d49c4",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/product.yaml": "7741111559407d2991e14b267efd9af9c66924fdb2071222d52528673a535eed",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/detect_issues.v1.md": "fbe9532b64e40079c6fc74c50bffc1a6b726c12cd25fd0c31ed7c8dd61006b3e",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/extract_brief.v1.md": "88f0d763aad056155045b367bceae3e9f0b08ad594b733cb168be1caafc5d8f7",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/generate_questions.v1.md": "f14fe8eddb4226bcc1105ad79d429e1f18d47d07b31af980ad270a0dc958cf56",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/generate_summary.v1.md": "3eec86211db8fe9b344e21f5d65b457ab6d9a4b49e0c0a998810dcf637bb78d2",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts.yaml": "03cb35d961dd1d9b1d95a1d1490eb2355e438c239a391b757c5a554473845daf",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/quotas.yaml": "1ed4154065125cf4da02e88015f8112caf11090279f292bebd7dd4534d98df6c",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/renderer_contract.yaml": "386f963a75379f224d581f42d72abae110a3369308aba3d196d06f2a4589e95d",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/scenarios.yaml": "5c6577450040daa795e9dbd245dc9757ea59427157fd3debecbd774f61e64c3d",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas/decode_input.schema.json": "998b82bde28beb6be77e0fb522a8e0a9871c88d9500b884523912f2d257d8454",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas/decode_output.schema.json": "5a76652a23623ba7a025410a8d0a509e9b8495636f3f6adca8ecb5288610cc0a",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas.yaml": "e2038c31be3810ee6a04ac82994f9b7bbcc8cd0d68a74ff90e4e0ad3973188f9",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/workflows.yaml": "06e0268670118d4156fc6fb8eab4e2954257178243e2693dc44b9e211fb5a1de",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/action_configs.yaml": "c2778c674dfde00c680f6c90e53b36b7f126a8dd7f7cc15afde0503f94a4e38d",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/frontends.yaml": "8e43fb844dd43efb59a2c3ba4b9757795c546ea49fd79e837031f58092f5c1e6",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/product.yaml": "6e367667b97afd5eaf031a447c5177b1cdbb6136ac0bea2e0cb4a29917b91bdb",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/check_document.v1.md": "c4b2e19dd1df3c2bc0d377fc749292a841ccb5e19ddc6fba07b8fa3371b3da59",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/compare.v1.md": "6ea407f09f7075a26f95b6d9d7eede06f76ce024390b2857295a763512e9a696",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/draft_document.v1.md": "3bfa48bf6d75c19de9cf99bf0d7099dd2e05c2b102787b6db8865c4bc1a2351a",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/extract.v1.md": "faaa30d051e34e7551e1a6e632a544257b1c820ad995b0b2dc4aab5a94a629df",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts.yaml": "69da98bf54727ffad9feb34dd5e5bc99de39e48b45445c7349121d2a4ac4d05d",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/quotas.yaml": "bf4ba64a55b7b86b524ff6a4fdc2b9d26ccf8112cbea54a9c5b6092896315e30",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/renderer_contract.yaml": "c6e5360239048e01dc7b802cc2057d1708596ed60801fcd04fc957d5996823bd",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/scenarios.yaml": "570fdf7f211132f8c4024ca2f4073ed5a0566ca584656daa45670869de4883e3",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/check_input.schema.json": "909e70ffbc6b6a7acbf5bc4eb64065a0beb0858be2f200a5b7573e45191def09",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/check_output.schema.json": "40703d6d7483066744d7fe7c0b19491a86bf326e19c2e8a11109bdaff05caa9f",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/draft_input.schema.json": "268d5301b8b8cc610e1f4cc7668878913d2eefb877bb1c4ab2d9ab2118bfba7e",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/draft_output.schema.json": "f6eb44bf452328b9daa65229bdb6d156410a3e0e45f91788c784ad99b87ddf2f",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas.yaml": "6c32116dcd116268045aeb45cd881c5fba8144ac0e22b5fcb8a1750216f43c1b",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/workflows.yaml": "e1fe1c43eb7228cfc857113364a36fecb87a8fed49f7ca2e8bbdd2c789831528"
+    },
+    "configured_models": [
+      {
+        "model": "openai/gpt-6-luna",
+        "reasoning_effort": "medium",
+        "alias": "anytoolai.default_text"
+      }
+    ]
+  },
+  "channel": "api",
+  "session_id": "scenario_session_01794302343166920495_0000000006_9946cb6cc4a24b2484b748443d8e7738",
+  "job_id": "job_01794302343203464931_0000000010_5392bde256c14b2986cf2350c0fdc776",
+  "result_id": "artifact_01794302363948180183_0000000044_a596746caef54bfb8197e0f48754a635",
+  "output": {
+    "brief": {
+      "values": {},
+      "missing_fields": [
+        "project_goal",
+        "deliverables",
+        "deadline",
+        "budget",
+        "target_audience",
+        "constraints"
+      ]
+    },
+    "issues": [
+      {
+        "category": "missing_information",
+        "evidence": "«Нужно что-нибудь хорошее.»",
+        "severity": "high",
+        "description": "Не указано, какую именно работу нужно выполнить и какой результат будет считаться хорошим, поэтому нельзя определить задачу и начать её выполнение."
+      }
+    ],
+    "document": {
+      "summary": "Бриф пока не готов к работе: сначала нужно уточнить, какую именно работу выполнить и какой результат будет считаться хорошим; также не указаны остальные ключевые детали проекта.",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Project overview",
+          "content": "В извлечённых данных сведения о проекте отсутствуют."
+        },
+        {
+          "id": "key-details",
+          "title": "Key details",
+          "content": "Ключевые детали проекта не указаны.",
+          "metadata": {
+            "kind": "list"
+          }
+        },
+        {
+          "id": "gaps",
+          "title": "Gaps and risks",
+          "content": "Не указано, какую именно работу нужно выполнить и какой результат будет считаться хорошим, поэтому нельзя определить задачу и начать её выполнение. Также не указаны цель проекта, результаты работы, срок, бюджет, целевая аудитория и ограничения."
+        },
+        {
+          "id": "next-steps",
+          "title": "Questions to ask",
+          "content": "• Какую именно работу вы хотели бы поручить и каким должен быть результат, чтобы вы сочли его хорошим? Это поможет определить задачу и подготовить результат, который будет соответствовать вашим ожиданиям.",
+          "metadata": {
+            "kind": "list"
+          }
+        }
+      ]
+    },
+    "questions": [
+      {
+        "category": "missing_information",
+        "priority": "high",
+        "question": "Какую именно работу вы хотели бы поручить и каким должен быть результат, чтобы вы сочли его хорошим?",
+        "rationale": "Это поможет определить задачу и подготовить результат, который будет соответствовать вашим ожиданиям.",
+        "source_issue_index": 0
+      }
+    ],
+    "brief_text": "Нужно что-нибудь хорошее."
+  },
+  "error": null,
+  "evidence_error": null,
+  "ledger": {
+    "actions": [
+      {
+        "id": "action_run_01794302345388927005_0000000002_1a9ef4ff1d2444839c324f1af4e6c60d",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302343166920495_0000000006_9946cb6cc4a24b2484b748443d8e7738",
+        "job_id": "job_01794302343203464931_0000000010_5392bde256c14b2986cf2350c0fdc776",
+        "workflow_id": "brief_decoder.decode_v1",
+        "step_id": "extract",
+        "action_type": "text.extract_structured_fields",
+        "action_config_id": "brief_decoder.extract_brief_v1",
+        "status": "succeeded",
+        "input_artifact_id": null,
+        "output_artifact_id": "artifact_01794302354187296741_0000000010_79837dc23c004eb3ae6afd6e4fb9f8d5",
+        "error_code": null,
+        "created_at": "2026-11-10 09:19:05.388944+00:00",
+        "started_at": "2026-11-10 09:19:05.388910+00:00",
+        "completed_at": "2026-11-10 09:19:14.193667+00:00",
+        "metadata": {
+          "model": "gpt-6-luna",
+          "user_id": null,
+          "guest_id": "guest_01794302343092384322_0000000000_39684c453dd046f89f6364badc0ddbdc",
+          "provider": "openai",
+          "handoff_id": null,
+          "prompt_ref": "brief_decoder.extract_brief.v1",
+          "input_schema_ref": "kernel.schemas.extract_input_v1",
+          "workflow_version": 2,
+          "output_schema_ref": "kernel.schemas.extract_output_v1",
+          "scenario_chain_id": "scenario_session_01794302343166920495_0000000006_9946cb6cc4a24b2484b748443d8e7738",
+          "acquisition_source": "web_mirror",
+          "provider_policy_ref": "default_text_generation_v1",
+          "llm_response_metadata": {
+            "usage": {
+              "total_tokens": 1323
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicISTTDZKXmi1WwxgVWe5iU0Mxlb",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 7.803e-05,
+              "actual_provider": "openai"
+            },
+            "structured_output_artifact_id": "artifact_01794302354187296741_0000000010_79837dc23c004eb3ae6afd6e4fb9f8d5"
+          },
+          "structured_output_artifact_id": "artifact_01794302354187296741_0000000010_79837dc23c004eb3ae6afd6e4fb9f8d5"
+        }
+      },
+      {
+        "id": "action_run_01794302354203073517_0000000015_7d100e737c6c493b81c70c7379a5020b",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302343166920495_0000000006_9946cb6cc4a24b2484b748443d8e7738",
+        "job_id": "job_01794302343203464931_0000000010_5392bde256c14b2986cf2350c0fdc776",
+        "workflow_id": "brief_decoder.decode_v1",
+        "step_id": "detect_issues",
+        "action_type": "text.detect_issues_by_taxonomy",
+        "action_config_id": "brief_decoder.detect_issues_v1",
+        "status": "succeeded",
+        "input_artifact_id": null,
+        "output_artifact_id": "artifact_01794302356638139164_0000000020_1c023dc450d345409717c3bcd026b69c",
+        "error_code": null,
+        "created_at": "2026-11-10 09:19:14.203085+00:00",
+        "started_at": "2026-11-10 09:19:14.203059+00:00",
+        "completed_at": "2026-11-10 09:19:16.642722+00:00",
+        "metadata": {
+          "model": "gpt-6-luna",
+          "user_id": null,
+          "guest_id": "guest_01794302343092384322_0000000000_39684c453dd046f89f6364badc0ddbdc",
+          "provider": "openai",
+          "handoff_id": null,
+          "prompt_ref": "brief_decoder.detect_issues.v1",
+          "input_schema_ref": "kernel.schemas.issue_detection_input_v1",
+          "workflow_version": 2,
+          "output_schema_ref": "kernel.schemas.issue_detection_output_v1",
+          "scenario_chain_id": "scenario_session_01794302343166920495_0000000006_9946cb6cc4a24b2484b748443d8e7738",
+          "acquisition_source": "web_mirror",
+          "provider_policy_ref": "default_text_generation_v1",
+          "llm_response_metadata": {
+            "usage": {
+              "total_tokens": 1073
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicIVm3hkSeuRbCvc8UeWUmJBAvF8",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.0001513,
+              "actual_provider": "openai"
+            },
+            "structured_output_artifact_id": "artifact_01794302356638139164_0000000020_1c023dc450d345409717c3bcd026b69c"
+          },
+          "structured_output_artifact_id": "artifact_01794302356638139164_0000000020_1c023dc450d345409717c3bcd026b69c"
+        }
+      },
+      {
+        "id": "action_run_01794302356652354501_0000000025_3fba6130d2bc4fb491d358d34917c944",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302343166920495_0000000006_9946cb6cc4a24b2484b748443d8e7738",
+        "job_id": "job_01794302343203464931_0000000010_5392bde256c14b2986cf2350c0fdc776",
+        "workflow_id": "brief_decoder.decode_v1",
+        "step_id": "generate_questions",
+        "action_type": "text.generate_clarifying_questions",
+        "action_config_id": "brief_decoder.generate_questions_v1",
+        "status": "succeeded",
+        "input_artifact_id": null,
+        "output_artifact_id": "artifact_01794302358794308357_0000000030_e9b973504e324138aedd247f70af884d",
+        "error_code": null,
+        "created_at": "2026-11-10 09:19:16.652367+00:00",
+        "started_at": "2026-11-10 09:19:16.652344+00:00",
+        "completed_at": "2026-11-10 09:19:18.799839+00:00",
+        "metadata": {
+          "model": "gpt-6-luna",
+          "user_id": null,
+          "guest_id": "guest_01794302343092384322_0000000000_39684c453dd046f89f6364badc0ddbdc",
+          "provider": "openai",
+          "handoff_id": null,
+          "prompt_ref": "brief_decoder.generate_questions.v1",
+          "input_schema_ref": "kernel.schemas.generate_questions_input_v1",
+          "workflow_version": 2,
+          "output_schema_ref": "kernel.schemas.generate_questions_output_v1",
+          "scenario_chain_id": "scenario_session_01794302343166920495_0000000006_9946cb6cc4a24b2484b748443d8e7738",
+          "acquisition_source": "web_mirror",
+          "provider_policy_ref": "default_text_generation_v1",
+          "llm_response_metadata": {
+            "usage": {
+              "total_tokens": 1202
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicIXiJwJEFMWR8rI9EMcYM81lG5Z",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.000192175,
+              "actual_provider": "openai"
+            },
+            "structured_output_artifact_id": "artifact_01794302358794308357_0000000030_e9b973504e324138aedd247f70af884d"
+          },
+          "structured_output_artifact_id": "artifact_01794302358794308357_0000000030_e9b973504e324138aedd247f70af884d"
+        }
+      },
+      {
+        "id": "action_run_01794302358809707756_0000000035_d80289016d8b4758b4e5a32090c79e93",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302343166920495_0000000006_9946cb6cc4a24b2484b748443d8e7738",
+        "job_id": "job_01794302343203464931_0000000010_5392bde256c14b2986cf2350c0fdc776",
+        "workflow_id": "brief_decoder.decode_v1",
+        "step_id": "generate_document",
+        "action_type": "document.generate_from_template",
+        "action_config_id": "brief_decoder.generate_summary_v1",
+        "status": "succeeded",
+        "input_artifact_id": null,
+        "output_artifact_id": "artifact_01794302363891982849_0000000040_20154a31cb9347f09744c56dfde33402",
+        "error_code": null,
+        "created_at": "2026-11-10 09:19:18.809723+00:00",
+        "started_at": "2026-11-10 09:19:18.809696+00:00",
+        "completed_at": "2026-11-10 09:19:23.900865+00:00",
+        "metadata": {
+          "model": "gpt-6-luna",
+          "user_id": null,
+          "guest_id": "guest_01794302343092384322_0000000000_39684c453dd046f89f6364badc0ddbdc",
+          "provider": "openai",
+          "handoff_id": null,
+          "prompt_ref": "brief_decoder.generate_summary.v1",
+          "input_schema_ref": "kernel.schemas.generate_document_input_v1",
+          "workflow_version": 2,
+          "output_schema_ref": "kernel.schemas.generate_document_output_v1",
+          "scenario_chain_id": "scenario_session_01794302343166920495_0000000006_9946cb6cc4a24b2484b748443d8e7738",
+          "acquisition_source": "web_mirror",
+          "provider_policy_ref": "default_text_generation_v1",
+          "llm_response_metadata": {
+            "usage": {
+              "total_tokens": 1869
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicIZG7HxQiFRBllFKSq4Zg74b7X4",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.00040005,
+              "actual_provider": "openai"
+            },
+            "structured_output_artifact_id": "artifact_01794302363891982849_0000000040_20154a31cb9347f09744c56dfde33402"
+          },
+          "structured_output_artifact_id": "artifact_01794302363891982849_0000000040_20154a31cb9347f09744c56dfde33402"
+        }
+      }
+    ],
+    "artifacts": [
+      {
+        "id": "artifact_01794302354187296741_0000000010_79837dc23c004eb3ae6afd6e4fb9f8d5",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302343166920495_0000000006_9946cb6cc4a24b2484b748443d8e7738",
+        "job_id": "job_01794302343203464931_0000000010_5392bde256c14b2986cf2350c0fdc776",
+        "action_run_id": "action_run_01794302345388927005_0000000002_1a9ef4ff1d2444839c324f1af4e6c60d",
+        "artifact_type": "structured_output",
+        "status": "stored",
+        "content_text": null,
+        "content_json": {
+          "values": {},
+          "missing_fields": [
+            "project_goal",
+            "deliverables",
+            "deadline",
+            "budget",
+            "target_audience",
+            "constraints"
+          ]
+        },
+        "object_storage_key": null,
+        "metadata": {
+          "model": "gpt-6-luna",
+          "guest_id": "guest_01794302343092384322_0000000000_39684c453dd046f89f6364badc0ddbdc",
+          "provider": "openai",
+          "schema_ref": "kernel.schemas.extract_output_v1",
+          "action_type": "text.extract_structured_fields",
+          "workflow_id": "brief_decoder.decode_v1",
+          "schema_version": 1,
+          "pydantic_run_id": "01a1c4c1-0134-75dc-bcc3-c7fd6c10e4fe",
+          "action_config_id": "brief_decoder.extract_brief_v1",
+          "provider_call_id": "provider_call_01794302351323732493_0000000007_74e5f235ee65447085b2ea149a598566",
+          "workflow_version": 2,
+          "scenario_chain_id": "scenario_session_01794302343166920495_0000000006_9946cb6cc4a24b2484b748443d8e7738",
+          "acquisition_source": "web_mirror",
+          "litellm_response_id": "chatcmpl-EicISTTDZKXmi1WwxgVWe5iU0Mxlb",
+          "physical_call_index": 2,
+          "provider_policy_ref": "default_text_generation_v1",
+          "semantic_attempt_index": 2,
+          "transport_attempt_index": 1
+        },
+        "created_at": "2026-11-10 09:19:14.187320+00:00"
+      },
+      {
+        "id": "artifact_01794302356638139164_0000000020_1c023dc450d345409717c3bcd026b69c",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302343166920495_0000000006_9946cb6cc4a24b2484b748443d8e7738",
+        "job_id": "job_01794302343203464931_0000000010_5392bde256c14b2986cf2350c0fdc776",
+        "action_run_id": "action_run_01794302354203073517_0000000015_7d100e737c6c493b81c70c7379a5020b",
+        "artifact_type": "structured_output",
+        "status": "stored",
+        "content_text": null,
+        "content_json": {
+          "issues": [
+            {
+              "category": "missing_information",
+              "evidence": "«Нужно что-нибудь хорошее.»",
+              "severity": "high",
+              "description": "Не указано, какую именно работу нужно выполнить и какой результат будет считаться хорошим, поэтому нельзя определить задачу и начать её выполнение."
+            }
+          ]
+        },
+        "object_storage_key": null,
+        "metadata": {
+          "model": "gpt-6-luna",
+          "guest_id": "guest_01794302343092384322_0000000000_39684c453dd046f89f6364badc0ddbdc",
+          "provider": "openai",
+          "schema_ref": "kernel.schemas.issue_detection_output_v1",
+          "action_type": "text.detect_issues_by_taxonomy",
+          "workflow_id": "brief_decoder.decode_v1",
+          "schema_version": 1,
+          "pydantic_run_id": "01a1c4c1-2321-71a0-a7a1-c2ed52d4e1e8",
+          "action_config_id": "brief_decoder.detect_issues_v1",
+          "provider_call_id": "provider_call_01794302354213231599_0000000017_867ae8a7ee4f438b90d7c4ed8058e59b",
+          "workflow_version": 2,
+          "scenario_chain_id": "scenario_session_01794302343166920495_0000000006_9946cb6cc4a24b2484b748443d8e7738",
+          "acquisition_source": "web_mirror",
+          "litellm_response_id": "chatcmpl-EicIVm3hkSeuRbCvc8UeWUmJBAvF8",
+          "physical_call_index": 1,
+          "provider_policy_ref": "default_text_generation_v1",
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1
+        },
+        "created_at": "2026-11-10 09:19:16.638162+00:00"
+      },
+      {
+        "id": "artifact_01794302358794308357_0000000030_e9b973504e324138aedd247f70af884d",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302343166920495_0000000006_9946cb6cc4a24b2484b748443d8e7738",
+        "job_id": "job_01794302343203464931_0000000010_5392bde256c14b2986cf2350c0fdc776",
+        "action_run_id": "action_run_01794302356652354501_0000000025_3fba6130d2bc4fb491d358d34917c944",
+        "artifact_type": "structured_output",
+        "status": "stored",
+        "content_text": null,
+        "content_json": {
+          "questions": [
+            {
+              "category": "missing_information",
+              "priority": "high",
+              "question": "Какую именно работу вы хотели бы поручить и каким должен быть результат, чтобы вы сочли его хорошим?",
+              "rationale": "Это поможет определить задачу и подготовить результат, который будет соответствовать вашим ожиданиям.",
+              "source_issue_index": 0
+            }
+          ]
+        },
+        "object_storage_key": null,
+        "metadata": {
+          "model": "gpt-6-luna",
+          "guest_id": "guest_01794302343092384322_0000000000_39684c453dd046f89f6364badc0ddbdc",
+          "provider": "openai",
+          "schema_ref": "kernel.schemas.generate_questions_output_v1",
+          "action_type": "text.generate_clarifying_questions",
+          "workflow_id": "brief_decoder.decode_v1",
+          "schema_version": 1,
+          "pydantic_run_id": "01a1c4c1-2cb2-7365-bda3-4b51bdd591f4",
+          "action_config_id": "brief_decoder.generate_questions_v1",
+          "provider_call_id": "provider_call_01794302356661880442_0000000027_daacc46a7c0b4f6eb1e4bebc941e6b17",
+          "workflow_version": 2,
+          "scenario_chain_id": "scenario_session_01794302343166920495_0000000006_9946cb6cc4a24b2484b748443d8e7738",
+          "acquisition_source": "web_mirror",
+          "litellm_response_id": "chatcmpl-EicIXiJwJEFMWR8rI9EMcYM81lG5Z",
+          "physical_call_index": 1,
+          "provider_policy_ref": "default_text_generation_v1",
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1
+        },
+        "created_at": "2026-11-10 09:19:18.794332+00:00"
+      },
+      {
+        "id": "artifact_01794302363891982849_0000000040_20154a31cb9347f09744c56dfde33402",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302343166920495_0000000006_9946cb6cc4a24b2484b748443d8e7738",
+        "job_id": "job_01794302343203464931_0000000010_5392bde256c14b2986cf2350c0fdc776",
+        "action_run_id": "action_run_01794302358809707756_0000000035_d80289016d8b4758b4e5a32090c79e93",
+        "artifact_type": "structured_output",
+        "status": "stored",
+        "content_text": null,
+        "content_json": {
+          "summary": "Бриф пока не готов к работе: сначала нужно уточнить, какую именно работу выполнить и какой результат будет считаться хорошим; также не указаны остальные ключевые детали проекта.",
+          "sections": [
+            {
+              "id": "overview",
+              "title": "Project overview",
+              "content": "В извлечённых данных сведения о проекте отсутствуют."
+            },
+            {
+              "id": "key-details",
+              "title": "Key details",
+              "content": "Ключевые детали проекта не указаны.",
+              "metadata": {
+                "kind": "list"
+              }
+            },
+            {
+              "id": "gaps",
+              "title": "Gaps and risks",
+              "content": "Не указано, какую именно работу нужно выполнить и какой результат будет считаться хорошим, поэтому нельзя определить задачу и начать её выполнение. Также не указаны цель проекта, результаты работы, срок, бюджет, целевая аудитория и ограничения."
+            },
+            {
+              "id": "next-steps",
+              "title": "Questions to ask",
+              "content": "• Какую именно работу вы хотели бы поручить и каким должен быть результат, чтобы вы сочли его хорошим? Это поможет определить задачу и подготовить результат, который будет соответствовать вашим ожиданиям.",
+              "metadata": {
+                "kind": "list"
+              }
+            }
+          ]
+        },
+        "object_storage_key": null,
+        "metadata": {
+          "model": "gpt-6-luna",
+          "guest_id": "guest_01794302343092384322_0000000000_39684c453dd046f89f6364badc0ddbdc",
+          "provider": "openai",
+          "schema_ref": "kernel.schemas.generate_document_output_v1",
+          "action_type": "document.generate_from_template",
+          "workflow_id": "brief_decoder.decode_v1",
+          "schema_version": 1,
+          "pydantic_run_id": "01a1c4c1-351f-7544-87b5-51491a96aa61",
+          "action_config_id": "brief_decoder.generate_summary_v1",
+          "provider_call_id": "provider_call_01794302358817387743_0000000037_f886dc657b9d402688507bb863543ee7",
+          "workflow_version": 2,
+          "scenario_chain_id": "scenario_session_01794302343166920495_0000000006_9946cb6cc4a24b2484b748443d8e7738",
+          "acquisition_source": "web_mirror",
+          "litellm_response_id": "chatcmpl-EicIZG7HxQiFRBllFKSq4Zg74b7X4",
+          "physical_call_index": 1,
+          "provider_policy_ref": "default_text_generation_v1",
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1
+        },
+        "created_at": "2026-11-10 09:19:23.892014+00:00"
+      },
+      {
+        "id": "artifact_01794302363948180183_0000000044_a596746caef54bfb8197e0f48754a635",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302343166920495_0000000006_9946cb6cc4a24b2484b748443d8e7738",
+        "job_id": "job_01794302343203464931_0000000010_5392bde256c14b2986cf2350c0fdc776",
+        "action_run_id": null,
+        "artifact_type": "structured_output",
+        "status": "stored",
+        "content_text": null,
+        "content_json": {
+          "brief": {
+            "values": {},
+            "missing_fields": [
+              "project_goal",
+              "deliverables",
+              "deadline",
+              "budget",
+              "target_audience",
+              "constraints"
+            ]
+          },
+          "issues": [
+            {
+              "category": "missing_information",
+              "evidence": "«Нужно что-нибудь хорошее.»",
+              "severity": "high",
+              "description": "Не указано, какую именно работу нужно выполнить и какой результат будет считаться хорошим, поэтому нельзя определить задачу и начать её выполнение."
+            }
+          ],
+          "document": {
+            "summary": "Бриф пока не готов к работе: сначала нужно уточнить, какую именно работу выполнить и какой результат будет считаться хорошим; также не указаны остальные ключевые детали проекта.",
+            "sections": [
+              {
+                "id": "overview",
+                "title": "Project overview",
+                "content": "В извлечённых данных сведения о проекте отсутствуют."
+              },
+              {
+                "id": "key-details",
+                "title": "Key details",
+                "content": "Ключевые детали проекта не указаны.",
+                "metadata": {
+                  "kind": "list"
+                }
+              },
+              {
+                "id": "gaps",
+                "title": "Gaps and risks",
+                "content": "Не указано, какую именно работу нужно выполнить и какой результат будет считаться хорошим, поэтому нельзя определить задачу и начать её выполнение. Также не указаны цель проекта, результаты работы, срок, бюджет, целевая аудитория и ограничения."
+              },
+              {
+                "id": "next-steps",
+                "title": "Questions to ask",
+                "content": "• Какую именно работу вы хотели бы поручить и каким должен быть результат, чтобы вы сочли его хорошим? Это поможет определить задачу и подготовить результат, который будет соответствовать вашим ожиданиям.",
+                "metadata": {
+                  "kind": "list"
+                }
+              }
+            ]
+          },
+          "questions": [
+            {
+              "category": "missing_information",
+              "priority": "high",
+              "question": "Какую именно работу вы хотели бы поручить и каким должен быть результат, чтобы вы сочли его хорошим?",
+              "rationale": "Это поможет определить задачу и подготовить результат, который будет соответствовать вашим ожиданиям.",
+              "source_issue_index": 0
+            }
+          ],
+          "brief_text": "Нужно что-нибудь хорошее."
+        },
+        "object_storage_key": null,
+        "metadata": {
+          "guest_id": "guest_01794302343092384322_0000000000_39684c453dd046f89f6364badc0ddbdc",
+          "schema_ref": "brief_decoder.decode_output_v1",
+          "workflow_id": "brief_decoder.decode_v1",
+          "artifact_role": "workflow_result",
+          "schema_version": 2,
+          "workflow_version": 2,
+          "scenario_chain_id": "scenario_session_01794302343166920495_0000000006_9946cb6cc4a24b2484b748443d8e7738",
+          "acquisition_source": "web_mirror"
+        },
+        "created_at": "2026-11-10 09:19:23.948216+00:00"
+      }
+    ],
+    "calls": [
+      {
+        "id": "provider_call_01794302345537629769_0000000004_b2332beef50d41b99b35c1d0c2501b88",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302343166920495_0000000006_9946cb6cc4a24b2484b748443d8e7738",
+        "job_id": "job_01794302343203464931_0000000010_5392bde256c14b2986cf2350c0fdc776",
+        "action_run_id": "action_run_01794302345388927005_0000000002_1a9ef4ff1d2444839c324f1af4e6c60d",
+        "workflow_id": "brief_decoder.decode_v1",
+        "workflow_version": 2,
+        "step_id": "extract",
+        "action_type": "text.extract_structured_fields",
+        "action_config_id": "brief_decoder.extract_brief_v1",
+        "provider_policy_ref": "default_text_generation_v1",
+        "provider": "openai",
+        "model": "gpt-6-luna",
+        "gateway_backend": "litellm",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "transport_attempt_index": 1,
+        "physical_call_index": 1,
+        "status": "succeeded",
+        "input_tokens": 1176,
+        "output_tokens": 186,
+        "total_tokens": 1362,
+        "latency_ms": 5760,
+        "estimated_cost": 0.000239925,
+        "error_code": null,
+        "error_message_safe": null,
+        "failure_kind": null,
+        "http_status": null,
+        "pydantic_run_id": "01a1c4c1-0134-75dc-bcc3-c7fd6c10e4fe",
+        "litellm_response_id": "chatcmpl-EicIOea4HPVUHidbLa9aOIM4ufWGl",
+        "created_at": "2026-11-10 09:19:05.537649+00:00",
+        "started_at": "2026-11-10 09:19:05.537589+00:00",
+        "completed_at": "2026-11-10 09:19:11.305288+00:00",
+        "metadata": {
+          "litellm": {
+            "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+            "http_status": null,
+            "model_group": "anytoolai.default_text",
+            "response_id": "chatcmpl-EicIOea4HPVUHidbLa9aOIM4ufWGl",
+            "actual_model": "gpt-6-luna",
+            "response_cost": 0.000239925,
+            "actual_provider": "openai"
+          },
+          "timeout": {
+            "configured_seconds": 60
+          },
+          "attempts": {
+            "pydantic_run_id": "01a1c4c1-0134-75dc-bcc3-c7fd6c10e4fe",
+            "physical_call_index": 1,
+            "semantic_attempt_index": 1,
+            "transport_attempt_index": 1
+          },
+          "response": {
+            "http_status": null,
+            "total_tokens": 1362,
+            "litellm_response_id": "chatcmpl-EicIOea4HPVUHidbLa9aOIM4ufWGl"
+          },
+          "prompt_ref": "brief_decoder.extract_brief.v1",
+          "request_id": null,
+          "fixture_key": null,
+          "temperature": 1.0,
+          "retry_policy": {
+            "transport": {
+              "owner": "litellm",
+              "max_attempts": 2,
+              "litellm_num_retries_per_attempt": 0
+            },
+            "validation": {
+              "owner": "pydanticai",
+              "max_attempts": 2
+            },
+            "hard_limits": {
+              "max_physical_provider_calls_per_action": 4
+            }
+          },
+          "correlation_id": null,
+          "request_payload": {
+            "prompt_chars": 4873,
+            "message_count": 1,
+            "response_schema_present": true
+          },
+          "model_addressing": "policy_alias",
+          "reasoning_effort": null,
+          "request_metadata": {
+            "user_id": null,
+            "guest_id": "guest_01794302343092384322_0000000000_39684c453dd046f89f6364badc0ddbdc",
+            "handoff_id": null,
+            "scenario_chain_id": "scenario_session_01794302343166920495_0000000006_9946cb6cc4a24b2484b748443d8e7738",
+            "acquisition_source": "web_mirror"
+          },
+          "response_metadata": {
+            "usage": {
+              "total_tokens": 1362
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicIOea4HPVUHidbLa9aOIM4ufWGl",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.000239925,
+              "actual_provider": "openai"
+            }
+          },
+          "structured_output_mode": "json_schema",
+          "fallback_from_policy_ref": null
+        }
+      },
+      {
+        "id": "provider_call_01794302351323732493_0000000007_74e5f235ee65447085b2ea149a598566",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302343166920495_0000000006_9946cb6cc4a24b2484b748443d8e7738",
+        "job_id": "job_01794302343203464931_0000000010_5392bde256c14b2986cf2350c0fdc776",
+        "action_run_id": "action_run_01794302345388927005_0000000002_1a9ef4ff1d2444839c324f1af4e6c60d",
+        "workflow_id": "brief_decoder.decode_v1",
+        "workflow_version": 2,
+        "step_id": "extract",
+        "action_type": "text.extract_structured_fields",
+        "action_config_id": "brief_decoder.extract_brief_v1",
+        "provider_policy_ref": "default_text_generation_v1",
+        "provider": "openai",
+        "model": "gpt-6-luna",
+        "gateway_backend": "litellm",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 2,
+        "transport_attempt_index": 1,
+        "physical_call_index": 2,
+        "status": "succeeded",
+        "input_tokens": 1196,
+        "output_tokens": 127,
+        "total_tokens": 1323,
+        "latency_ms": 2838,
+        "estimated_cost": 7.803e-05,
+        "error_code": null,
+        "error_message_safe": null,
+        "failure_kind": null,
+        "http_status": null,
+        "pydantic_run_id": "01a1c4c1-0134-75dc-bcc3-c7fd6c10e4fe",
+        "litellm_response_id": "chatcmpl-EicISTTDZKXmi1WwxgVWe5iU0Mxlb",
+        "created_at": "2026-11-10 09:19:11.323748+00:00",
+        "started_at": "2026-11-10 09:19:11.323704+00:00",
+        "completed_at": "2026-11-10 09:19:14.168660+00:00",
+        "metadata": {
+          "litellm": {
+            "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+            "http_status": null,
+            "model_group": "anytoolai.default_text",
+            "response_id": "chatcmpl-EicISTTDZKXmi1WwxgVWe5iU0Mxlb",
+            "actual_model": "gpt-6-luna",
+            "response_cost": 7.803e-05,
+            "actual_provider": "openai"
+          },
+          "timeout": {
+            "configured_seconds": 60
+          },
+          "attempts": {
+            "pydantic_run_id": "01a1c4c1-0134-75dc-bcc3-c7fd6c10e4fe",
+            "physical_call_index": 2,
+            "semantic_attempt_index": 2,
+            "transport_attempt_index": 1
+          },
+          "response": {
+            "http_status": null,
+            "total_tokens": 1323,
+            "litellm_response_id": "chatcmpl-EicISTTDZKXmi1WwxgVWe5iU0Mxlb"
+          },
+          "prompt_ref": "brief_decoder.extract_brief.v1",
+          "request_id": null,
+          "fixture_key": null,
+          "temperature": 1.0,
+          "retry_policy": {
+            "transport": {
+              "owner": "litellm",
+              "max_attempts": 2,
+              "litellm_num_retries_per_attempt": 0
+            },
+            "validation": {
+              "owner": "pydanticai",
+              "max_attempts": 2
+            },
+            "hard_limits": {
+              "max_physical_provider_calls_per_action": 4
+            }
+          },
+          "correlation_id": null,
+          "request_payload": {
+            "prompt_chars": 4873,
+            "message_count": 2,
+            "response_schema_present": true
+          },
+          "model_addressing": "policy_alias",
+          "reasoning_effort": null,
+          "request_metadata": {
+            "user_id": null,
+            "guest_id": "guest_01794302343092384322_0000000000_39684c453dd046f89f6364badc0ddbdc",
+            "handoff_id": null,
+            "scenario_chain_id": "scenario_session_01794302343166920495_0000000006_9946cb6cc4a24b2484b748443d8e7738",
+            "acquisition_source": "web_mirror"
+          },
+          "response_metadata": {
+            "usage": {
+              "total_tokens": 1323
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicISTTDZKXmi1WwxgVWe5iU0Mxlb",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 7.803e-05,
+              "actual_provider": "openai"
+            }
+          },
+          "structured_output_mode": "json_schema",
+          "fallback_from_policy_ref": null
+        }
+      },
+      {
+        "id": "provider_call_01794302354213231599_0000000017_867ae8a7ee4f438b90d7c4ed8058e59b",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302343166920495_0000000006_9946cb6cc4a24b2484b748443d8e7738",
+        "job_id": "job_01794302343203464931_0000000010_5392bde256c14b2986cf2350c0fdc776",
+        "action_run_id": "action_run_01794302354203073517_0000000015_7d100e737c6c493b81c70c7379a5020b",
+        "workflow_id": "brief_decoder.decode_v1",
+        "workflow_version": 2,
+        "step_id": "detect_issues",
+        "action_type": "text.detect_issues_by_taxonomy",
+        "action_config_id": "brief_decoder.detect_issues_v1",
+        "provider_policy_ref": "default_text_generation_v1",
+        "provider": "openai",
+        "model": "gpt-6-luna",
+        "gateway_backend": "litellm",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "transport_attempt_index": 1,
+        "physical_call_index": 1,
+        "status": "succeeded",
+        "input_tokens": 963,
+        "output_tokens": 110,
+        "total_tokens": 1073,
+        "latency_ms": 2404,
+        "estimated_cost": 0.0001513,
+        "error_code": null,
+        "error_message_safe": null,
+        "failure_kind": null,
+        "http_status": null,
+        "pydantic_run_id": "01a1c4c1-2321-71a0-a7a1-c2ed52d4e1e8",
+        "litellm_response_id": "chatcmpl-EicIVm3hkSeuRbCvc8UeWUmJBAvF8",
+        "created_at": "2026-11-10 09:19:14.213248+00:00",
+        "started_at": "2026-11-10 09:19:14.213197+00:00",
+        "completed_at": "2026-11-10 09:19:16.621426+00:00",
+        "metadata": {
+          "litellm": {
+            "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+            "http_status": null,
+            "model_group": "anytoolai.default_text",
+            "response_id": "chatcmpl-EicIVm3hkSeuRbCvc8UeWUmJBAvF8",
+            "actual_model": "gpt-6-luna",
+            "response_cost": 0.0001513,
+            "actual_provider": "openai"
+          },
+          "timeout": {
+            "configured_seconds": 60
+          },
+          "attempts": {
+            "pydantic_run_id": "01a1c4c1-2321-71a0-a7a1-c2ed52d4e1e8",
+            "physical_call_index": 1,
+            "semantic_attempt_index": 1,
+            "transport_attempt_index": 1
+          },
+          "response": {
+            "http_status": null,
+            "total_tokens": 1073,
+            "litellm_response_id": "chatcmpl-EicIVm3hkSeuRbCvc8UeWUmJBAvF8"
+          },
+          "prompt_ref": "brief_decoder.detect_issues.v1",
+          "request_id": null,
+          "fixture_key": null,
+          "temperature": 1.0,
+          "retry_policy": {
+            "transport": {
+              "owner": "litellm",
+              "max_attempts": 2,
+              "litellm_num_retries_per_attempt": 0
+            },
+            "validation": {
+              "owner": "pydanticai",
+              "max_attempts": 2
+            },
+            "hard_limits": {
+              "max_physical_provider_calls_per_action": 4
+            }
+          },
+          "correlation_id": null,
+          "request_payload": {
+            "prompt_chars": 3919,
+            "message_count": 1,
+            "response_schema_present": true
+          },
+          "model_addressing": "policy_alias",
+          "reasoning_effort": null,
+          "request_metadata": {
+            "user_id": null,
+            "guest_id": "guest_01794302343092384322_0000000000_39684c453dd046f89f6364badc0ddbdc",
+            "handoff_id": null,
+            "scenario_chain_id": "scenario_session_01794302343166920495_0000000006_9946cb6cc4a24b2484b748443d8e7738",
+            "acquisition_source": "web_mirror"
+          },
+          "response_metadata": {
+            "usage": {
+              "total_tokens": 1073
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicIVm3hkSeuRbCvc8UeWUmJBAvF8",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.0001513,
+              "actual_provider": "openai"
+            }
+          },
+          "structured_output_mode": "json_schema",
+          "fallback_from_policy_ref": null
+        }
+      },
+      {
+        "id": "provider_call_01794302356661880442_0000000027_daacc46a7c0b4f6eb1e4bebc941e6b17",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302343166920495_0000000006_9946cb6cc4a24b2484b748443d8e7738",
+        "job_id": "job_01794302343203464931_0000000010_5392bde256c14b2986cf2350c0fdc776",
+        "action_run_id": "action_run_01794302356652354501_0000000025_3fba6130d2bc4fb491d358d34917c944",
+        "workflow_id": "brief_decoder.decode_v1",
+        "workflow_version": 2,
+        "step_id": "generate_questions",
+        "action_type": "text.generate_clarifying_questions",
+        "action_config_id": "brief_decoder.generate_questions_v1",
+        "provider_policy_ref": "default_text_generation_v1",
+        "provider": "openai",
+        "model": "gpt-6-luna",
+        "gateway_backend": "litellm",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "transport_attempt_index": 1,
+        "physical_call_index": 1,
+        "status": "succeeded",
+        "input_tokens": 1090,
+        "output_tokens": 112,
+        "total_tokens": 1202,
+        "latency_ms": 2112,
+        "estimated_cost": 0.000192175,
+        "error_code": null,
+        "error_message_safe": null,
+        "failure_kind": null,
+        "http_status": null,
+        "pydantic_run_id": "01a1c4c1-2cb2-7365-bda3-4b51bdd591f4",
+        "litellm_response_id": "chatcmpl-EicIXiJwJEFMWR8rI9EMcYM81lG5Z",
+        "created_at": "2026-11-10 09:19:16.661893+00:00",
+        "started_at": "2026-11-10 09:19:16.661851+00:00",
+        "completed_at": "2026-11-10 09:19:18.778128+00:00",
+        "metadata": {
+          "litellm": {
+            "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+            "http_status": null,
+            "model_group": "anytoolai.default_text",
+            "response_id": "chatcmpl-EicIXiJwJEFMWR8rI9EMcYM81lG5Z",
+            "actual_model": "gpt-6-luna",
+            "response_cost": 0.000192175,
+            "actual_provider": "openai"
+          },
+          "timeout": {
+            "configured_seconds": 60
+          },
+          "attempts": {
+            "pydantic_run_id": "01a1c4c1-2cb2-7365-bda3-4b51bdd591f4",
+            "physical_call_index": 1,
+            "semantic_attempt_index": 1,
+            "transport_attempt_index": 1
+          },
+          "response": {
+            "http_status": null,
+            "total_tokens": 1202,
+            "litellm_response_id": "chatcmpl-EicIXiJwJEFMWR8rI9EMcYM81lG5Z"
+          },
+          "prompt_ref": "brief_decoder.generate_questions.v1",
+          "request_id": null,
+          "fixture_key": null,
+          "temperature": 1.0,
+          "retry_policy": {
+            "transport": {
+              "owner": "litellm",
+              "max_attempts": 2,
+              "litellm_num_retries_per_attempt": 0
+            },
+            "validation": {
+              "owner": "pydanticai",
+              "max_attempts": 2
+            },
+            "hard_limits": {
+              "max_physical_provider_calls_per_action": 4
+            }
+          },
+          "correlation_id": null,
+          "request_payload": {
+            "prompt_chars": 4434,
+            "message_count": 1,
+            "response_schema_present": true
+          },
+          "model_addressing": "policy_alias",
+          "reasoning_effort": null,
+          "request_metadata": {
+            "user_id": null,
+            "guest_id": "guest_01794302343092384322_0000000000_39684c453dd046f89f6364badc0ddbdc",
+            "handoff_id": null,
+            "scenario_chain_id": "scenario_session_01794302343166920495_0000000006_9946cb6cc4a24b2484b748443d8e7738",
+            "acquisition_source": "web_mirror"
+          },
+          "response_metadata": {
+            "usage": {
+              "total_tokens": 1202
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicIXiJwJEFMWR8rI9EMcYM81lG5Z",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.000192175,
+              "actual_provider": "openai"
+            }
+          },
+          "structured_output_mode": "json_schema",
+          "fallback_from_policy_ref": null
+        }
+      },
+      {
+        "id": "provider_call_01794302358817387743_0000000037_f886dc657b9d402688507bb863543ee7",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302343166920495_0000000006_9946cb6cc4a24b2484b748443d8e7738",
+        "job_id": "job_01794302343203464931_0000000010_5392bde256c14b2986cf2350c0fdc776",
+        "action_run_id": "action_run_01794302358809707756_0000000035_d80289016d8b4758b4e5a32090c79e93",
+        "workflow_id": "brief_decoder.decode_v1",
+        "workflow_version": 2,
+        "step_id": "generate_document",
+        "action_type": "document.generate_from_template",
+        "action_config_id": "brief_decoder.generate_summary_v1",
+        "provider_policy_ref": "default_text_generation_v1",
+        "provider": "openai",
+        "model": "gpt-6-luna",
+        "gateway_backend": "litellm",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "transport_attempt_index": 1,
+        "physical_call_index": 1,
+        "status": "succeeded",
+        "input_tokens": 1425,
+        "output_tokens": 444,
+        "total_tokens": 1869,
+        "latency_ms": 5053,
+        "estimated_cost": 0.00040005,
+        "error_code": null,
+        "error_message_safe": null,
+        "failure_kind": null,
+        "http_status": null,
+        "pydantic_run_id": "01a1c4c1-351f-7544-87b5-51491a96aa61",
+        "litellm_response_id": "chatcmpl-EicIZG7HxQiFRBllFKSq4Zg74b7X4",
+        "created_at": "2026-11-10 09:19:18.817401+00:00",
+        "started_at": "2026-11-10 09:19:18.817319+00:00",
+        "completed_at": "2026-11-10 09:19:23.873771+00:00",
+        "metadata": {
+          "litellm": {
+            "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+            "http_status": null,
+            "model_group": "anytoolai.default_text",
+            "response_id": "chatcmpl-EicIZG7HxQiFRBllFKSq4Zg74b7X4",
+            "actual_model": "gpt-6-luna",
+            "response_cost": 0.00040005,
+            "actual_provider": "openai"
+          },
+          "timeout": {
+            "configured_seconds": 60
+          },
+          "attempts": {
+            "pydantic_run_id": "01a1c4c1-351f-7544-87b5-51491a96aa61",
+            "physical_call_index": 1,
+            "semantic_attempt_index": 1,
+            "transport_attempt_index": 1
+          },
+          "response": {
+            "http_status": null,
+            "total_tokens": 1869,
+            "litellm_response_id": "chatcmpl-EicIZG7HxQiFRBllFKSq4Zg74b7X4"
+          },
+          "prompt_ref": "brief_decoder.generate_summary.v1",
+          "request_id": null,
+          "fixture_key": null,
+          "temperature": 1.0,
+          "retry_policy": {
+            "transport": {
+              "owner": "litellm",
+              "max_attempts": 2,
+              "litellm_num_retries_per_attempt": 0
+            },
+            "validation": {
+              "owner": "pydanticai",
+              "max_attempts": 2
+            },
+            "hard_limits": {
+              "max_physical_provider_calls_per_action": 4
+            }
+          },
+          "correlation_id": null,
+          "request_payload": {
+            "prompt_chars": 5677,
+            "message_count": 1,
+            "response_schema_present": true
+          },
+          "model_addressing": "policy_alias",
+          "reasoning_effort": null,
+          "request_metadata": {
+            "user_id": null,
+            "guest_id": "guest_01794302343092384322_0000000000_39684c453dd046f89f6364badc0ddbdc",
+            "handoff_id": null,
+            "scenario_chain_id": "scenario_session_01794302343166920495_0000000006_9946cb6cc4a24b2484b748443d8e7738",
+            "acquisition_source": "web_mirror"
+          },
+          "response_metadata": {
+            "usage": {
+              "total_tokens": 1869
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicIZG7HxQiFRBllFKSq4Zg74b7X4",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.00040005,
+              "actual_provider": "openai"
+            }
+          },
+          "structured_output_mode": "json_schema",
+          "fallback_from_policy_ref": null
+        }
+      }
+    ]
+  },
+  "confirmed_reasoning_effort": null,
+  "latency_ms": 21687
+}

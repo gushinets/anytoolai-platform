@@ -1,0 +1,924 @@
+{
+  "case": {
+    "id": "ANY761-AB-C-RU-weak",
+    "scenario_id": "acceptance_builder.check_v1",
+    "source_language": "ru",
+    "expected_language": "ru",
+    "family": "weak",
+    "provenance": "New synthetic regression case for ANY-761; not an original QA output.",
+    "input": {
+      "brief_text": "Нужно что-нибудь хорошее.",
+      "deliverable_text": "Done."
+    },
+    "criteria": [
+      "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.",
+      "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.",
+      "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.",
+      "Unspecified facts/lists remain missing; the summary does not claim readiness or a complete specification."
+    ]
+  },
+  "attempt": 1,
+  "snapshot": {
+    "source_sha256": {
+      "configs/kernel/litellm_router.yaml": "8c3e09283b50eee9da5a192d977ee46c9bfb7fd6def60fafc13d5355c6e3b60d",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/action_configs.yaml": "d1813bad6ff02019160b7ce2664acf4d92d36bcd87bec95c3c37a2975a104462",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/frontends.yaml": "5f5eac1312dddf0ab129ccb58108e38aed9cd0c633503ccb91ba4c036f7512bd",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/handoffs.yaml": "08d5c5b3717f2b0db972213243a56f0cf98811fd4328105da998f5a3116d49c4",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/product.yaml": "4f40592a466b4fe78db3350189f29312e3243e499d102cd252b0a9fa86c0517f",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/detect_issues.v1.md": "4db429fd656d82d3c42ec90361a874e5722bc41f3e21af8c2c352a98f8604605",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/extract_brief.v1.md": "9e1b17ec0686a51f3f7dd26ae7ce7ad226021c089f1a9f02f440feb2fee87e9c",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/generate_questions.v1.md": "eb3f9defcd289f920a41bc7d6ed2a9e55a7d6de2bd278d8e25a9b93855ee2066",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/generate_summary.v1.md": "98ecc9bd964f13f2e48f5d0cfdd867a2ff91b24ff1578a7ea7918044781817aa",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts.yaml": "03cb35d961dd1d9b1d95a1d1490eb2355e438c239a391b757c5a554473845daf",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/quotas.yaml": "2fcee433e370547ff34d27f8ddfbf9abff01d456586ae2627203ee6745d298ba",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/renderer_contract.yaml": "386f963a75379f224d581f42d72abae110a3369308aba3d196d06f2a4589e95d",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/scenarios.yaml": "5c6577450040daa795e9dbd245dc9757ea59427157fd3debecbd774f61e64c3d",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas/decode_input.schema.json": "998b82bde28beb6be77e0fb522a8e0a9871c88d9500b884523912f2d257d8454",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas/decode_output.schema.json": "5a76652a23623ba7a025410a8d0a509e9b8495636f3f6adca8ecb5288610cc0a",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas.yaml": "e2038c31be3810ee6a04ac82994f9b7bbcc8cd0d68a74ff90e4e0ad3973188f9",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/workflows.yaml": "06e0268670118d4156fc6fb8eab4e2954257178243e2693dc44b9e211fb5a1de",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/action_configs.yaml": "56250e227b62b196d52649abf0e551229a4dd23c9e10c89ca65afaeab1000ec8",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/frontends.yaml": "8e43fb844dd43efb59a2c3ba4b9757795c546ea49fd79e837031f58092f5c1e6",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/product.yaml": "488d8baecc2aae035aea53e955d36f335102e0334d53d79efbc55691a4714318",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/check_document.v1.md": "105f60451f68a51705d07478ed07c80d739db737f9dbb3027ac57485435ec9f7",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/compare.v1.md": "9bfcd37fbe889772a1db6cc89b63f6bff0ea92a814536f94142e70c128c33d5a",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/draft_document.v1.md": "06629b42a9b8576742b02992928ccfd1cf05a8f205c7f7108d77b21fe8c9834c",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/extract.v1.md": "8e762196bab4dcf4859540db3f874dfd0f93e364d97a85aec2bab39041b3a801",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts.yaml": "69da98bf54727ffad9feb34dd5e5bc99de39e48b45445c7349121d2a4ac4d05d",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/quotas.yaml": "1ed4154065125cf4da02e88015f8112caf11090279f292bebd7dd4534d98df6c",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/renderer_contract.yaml": "c6e5360239048e01dc7b802cc2057d1708596ed60801fcd04fc957d5996823bd",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/scenarios.yaml": "570fdf7f211132f8c4024ca2f4073ed5a0566ca584656daa45670869de4883e3",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/check_input.schema.json": "909e70ffbc6b6a7acbf5bc4eb64065a0beb0858be2f200a5b7573e45191def09",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/check_output.schema.json": "40703d6d7483066744d7fe7c0b19491a86bf326e19c2e8a11109bdaff05caa9f",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/draft_input.schema.json": "268d5301b8b8cc610e1f4cc7668878913d2eefb877bb1c4ab2d9ab2118bfba7e",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/draft_output.schema.json": "f6eb44bf452328b9daa65229bdb6d156410a3e0e45f91788c784ad99b87ddf2f",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas.yaml": "6c32116dcd116268045aeb45cd881c5fba8144ac0e22b5fcb8a1750216f43c1b",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/workflows.yaml": "e1fe1c43eb7228cfc857113364a36fecb87a8fed49f7ca2e8bbdd2c789831528"
+    },
+    "configured_models": [
+      {
+        "model": "openai/gpt-6.1-sol",
+        "reasoning_effort": "medium",
+        "alias": "anytoolai.default_text"
+      }
+    ]
+  },
+  "channel": "api",
+  "session_id": "scenario_session_01794298042986735301_0000000369_93668093820d4e359082db87dd80a7b2",
+  "job_id": "job_01794298042991229622_0000000371_57409c37fa4e4bcda2a649fc90a9163e",
+  "result_id": "artifact_01794298057978630250_0000001003_e2c1eb681a5b4187bc7423b02395a284",
+  "output": {
+    "document": {
+      "summary": "Работа не соответствует ожиданиям: ответ «Done.» не представляет результат и не объясняет, что сделано. В первую очередь необходимо представить выполненный результат или его описание, чтобы можно было проверить соответствие запросу, охват и полноту работы.",
+      "sections": [
+        {
+          "id": "verdict",
+          "title": "Verdict",
+          "content": "Работа не соответствует ожиданиям. Вердикт основан на четырёх общих критериях проверки, а не на поэлементной оценке критериев приёмки, перечисленных ниже.\nОхват запроса — не удовлетворён: в запросе «Нужно что-нибудь хорошее.» не определён объём работ, а ответ «Done.» не описывает результат, поэтому охват запроса оценить невозможно.\nСоответствие требованиям — не удовлетворено: клиент просит «что-нибудь хорошее», но ответ «Done.» не содержит результата или его описания, позволяющего проверить соответствие этому пожеланию.\nПолнота — не удовлетворена: в запросе нет перечня конкретных результатов, а в ответе «Done.» не представлен и не назван какой-либо выполненный результат, поэтому полноту подтвердить невозможно.\nЯсность — не удовлетворена: ответ «Done.» лишь заявляет о завершении, не объясняя, что именно сделано и что не сделано."
+        },
+        {
+          "id": "acceptance-criteria",
+          "title": "Acceptance criteria",
+          "content": "Не указано в брифе.",
+          "metadata": {
+            "kind": "list"
+          }
+        },
+        {
+          "id": "assumptions",
+          "title": "Assumptions",
+          "content": "Не указано в брифе.",
+          "metadata": {
+            "kind": "list"
+          }
+        },
+        {
+          "id": "deliverables",
+          "title": "Deliverables",
+          "content": "Не указано в брифе.",
+          "metadata": {
+            "kind": "list"
+          }
+        },
+        {
+          "id": "open-gaps",
+          "title": "Open gaps",
+          "content": "В брифе не указаны критерии приёмки, допущения и ожидаемые результаты работы. Пожалуйста, подтвердите, какие критерии приёмки, допущения и результаты работы следует зафиксировать."
+        }
+      ]
+    },
+    "extracted": {
+      "values": {},
+      "missing_fields": [
+        "acceptance_criteria",
+        "assumptions",
+        "deliverables"
+      ]
+    },
+    "comparison": {
+      "deltas": [
+        {
+          "status": "mismatch",
+          "evidence": "В запросе «Нужно что-нибудь хорошее.» не определён объём работ. Ответ «Done.» не описывает результат, поэтому охват запроса оценить невозможно.",
+          "criterion_id": "scope_coverage"
+        },
+        {
+          "status": "mismatch",
+          "evidence": "Клиент просит «что-нибудь хорошее», но ответ «Done.» не содержит результата или его описания, позволяющего проверить соответствие этому пожеланию.",
+          "criterion_id": "requirement_fit"
+        },
+        {
+          "status": "mismatch",
+          "evidence": "В запросе нет перечня конкретных результатов, а в ответе «Done.» не представлен и не назван какой-либо выполненный результат; полноту подтвердить невозможно.",
+          "criterion_id": "completeness"
+        },
+        {
+          "status": "mismatch",
+          "evidence": "Ответ «Done.» лишь заявляет о завершении, не объясняя, что именно сделано и что не сделано.",
+          "criterion_id": "clarity"
+        }
+      ],
+      "verdict": "does_not_meet",
+      "rationale": "Запрос крайне неопределён, а ответ лишь сообщает о завершении. В нём нет результата или описания выполненной работы, поэтому соответствие, охват и полноту проверить невозможно. Также неясно, что именно сделано. Низкая уверенность связана с краткостью обоих текстов.",
+      "confidence": 0.42
+    }
+  },
+  "error": null,
+  "evidence_error": null,
+  "ledger": {
+    "actions": [
+      {
+        "id": "action_run_01794298043208499631_0000000974_7f86dda7a2ac4b16b836002fae6c7649",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "acceptance_builder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794298042986735301_0000000369_93668093820d4e359082db87dd80a7b2",
+        "job_id": "job_01794298042991229622_0000000371_57409c37fa4e4bcda2a649fc90a9163e",
+        "workflow_id": "acceptance_builder.check_v1",
+        "step_id": "extract",
+        "action_type": "text.extract_structured_fields",
+        "action_config_id": "acceptance_builder.extract_v1",
+        "status": "succeeded",
+        "input_artifact_id": null,
+        "output_artifact_id": "artifact_01794298045431238415_0000000979_e64d629125c3482192b67752edd4f1f9",
+        "error_code": null,
+        "created_at": "2026-11-10 08:07:23.208515+00:00",
+        "started_at": "2026-11-10 08:07:23.208487+00:00",
+        "completed_at": "2026-11-10 08:07:25.434499+00:00",
+        "metadata": {
+          "model": "gpt-6.1-sol",
+          "user_id": null,
+          "guest_id": "guest_01794298042977445115_0000000367_2bfc5e1c7eaf42ffb5af520e8c3736c2",
+          "provider": "openai",
+          "handoff_id": null,
+          "prompt_ref": "acceptance_builder.extract.v1",
+          "input_schema_ref": "kernel.schemas.extract_input_v1",
+          "workflow_version": 1,
+          "output_schema_ref": "kernel.schemas.extract_output_v1",
+          "scenario_chain_id": "scenario_session_01794298042986735301_0000000369_93668093820d4e359082db87dd80a7b2",
+          "acquisition_source": "web_mirror",
+          "provider_policy_ref": "default_text_generation_v1",
+          "llm_response_metadata": {
+            "usage": {
+              "total_tokens": 1078
+            },
+            "litellm": {
+              "model_id": "979a5128f9177c1bb24176f7b836b5726bf3afbaa926068b29f5841645830ebd",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EibAy9c755NddMRfuuI6YK4Fm3UgO",
+              "actual_model": "gpt-6.1-sol",
+              "response_cost": 0.002588,
+              "actual_provider": "openai"
+            },
+            "structured_output_artifact_id": "artifact_01794298045431238415_0000000979_e64d629125c3482192b67752edd4f1f9"
+          },
+          "structured_output_artifact_id": "artifact_01794298045431238415_0000000979_e64d629125c3482192b67752edd4f1f9"
+        }
+      },
+      {
+        "id": "action_run_01794298045441321493_0000000984_d0d1a96560af4764a4ef582157130f0c",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "acceptance_builder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794298042986735301_0000000369_93668093820d4e359082db87dd80a7b2",
+        "job_id": "job_01794298042991229622_0000000371_57409c37fa4e4bcda2a649fc90a9163e",
+        "workflow_id": "acceptance_builder.check_v1",
+        "step_id": "compare",
+        "action_type": "text.compare_and_classify",
+        "action_config_id": "acceptance_builder.compare_v1",
+        "status": "succeeded",
+        "input_artifact_id": null,
+        "output_artifact_id": "artifact_01794298052033647627_0000000989_a479d560268c49af9cf90f9cfe5569ec",
+        "error_code": null,
+        "created_at": "2026-11-10 08:07:25.441330+00:00",
+        "started_at": "2026-11-10 08:07:25.441313+00:00",
+        "completed_at": "2026-11-10 08:07:32.036405+00:00",
+        "metadata": {
+          "model": "gpt-6.1-sol",
+          "user_id": null,
+          "guest_id": "guest_01794298042977445115_0000000367_2bfc5e1c7eaf42ffb5af520e8c3736c2",
+          "provider": "openai",
+          "handoff_id": null,
+          "prompt_ref": "acceptance_builder.compare.v1",
+          "input_schema_ref": "kernel.schemas.compare_classify_input_v1",
+          "workflow_version": 1,
+          "output_schema_ref": "kernel.schemas.compare_classify_output_v1",
+          "scenario_chain_id": "scenario_session_01794298042986735301_0000000369_93668093820d4e359082db87dd80a7b2",
+          "acquisition_source": "web_mirror",
+          "provider_policy_ref": "default_text_generation_v1",
+          "llm_response_metadata": {
+            "usage": {
+              "total_tokens": 1479
+            },
+            "litellm": {
+              "model_id": "979a5128f9177c1bb24176f7b836b5726bf3afbaa926068b29f5841645830ebd",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EibB0Vy4zlbyhASTUCINJJZgvWXI3",
+              "actual_model": "gpt-6.1-sol",
+              "response_cost": 0.005818500000000001,
+              "actual_provider": "openai"
+            },
+            "structured_output_artifact_id": "artifact_01794298052033647627_0000000989_a479d560268c49af9cf90f9cfe5569ec"
+          },
+          "structured_output_artifact_id": "artifact_01794298052033647627_0000000989_a479d560268c49af9cf90f9cfe5569ec"
+        }
+      },
+      {
+        "id": "action_run_01794298052043007950_0000000994_b2a67cc33e71419384f05a49cf2205b1",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "acceptance_builder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794298042986735301_0000000369_93668093820d4e359082db87dd80a7b2",
+        "job_id": "job_01794298042991229622_0000000371_57409c37fa4e4bcda2a649fc90a9163e",
+        "workflow_id": "acceptance_builder.check_v1",
+        "step_id": "generate_document",
+        "action_type": "document.generate_from_template",
+        "action_config_id": "acceptance_builder.check_document_v1",
+        "status": "succeeded",
+        "input_artifact_id": null,
+        "output_artifact_id": "artifact_01794298057935623057_0000000999_cd5082e4c15040ea8e128c778d044ad5",
+        "error_code": null,
+        "created_at": "2026-11-10 08:07:32.043017+00:00",
+        "started_at": "2026-11-10 08:07:32.042999+00:00",
+        "completed_at": "2026-11-10 08:07:37.940696+00:00",
+        "metadata": {
+          "model": "gpt-6.1-sol",
+          "user_id": null,
+          "guest_id": "guest_01794298042977445115_0000000367_2bfc5e1c7eaf42ffb5af520e8c3736c2",
+          "provider": "openai",
+          "handoff_id": null,
+          "prompt_ref": "acceptance_builder.check_document.v1",
+          "input_schema_ref": "kernel.schemas.generate_document_input_v1",
+          "workflow_version": 1,
+          "output_schema_ref": "kernel.schemas.generate_document_output_v1",
+          "scenario_chain_id": "scenario_session_01794298042986735301_0000000369_93668093820d4e359082db87dd80a7b2",
+          "acquisition_source": "web_mirror",
+          "provider_policy_ref": "default_text_generation_v1",
+          "llm_response_metadata": {
+            "usage": {
+              "total_tokens": 2062
+            },
+            "litellm": {
+              "model_id": "979a5128f9177c1bb24176f7b836b5726bf3afbaa926068b29f5841645830ebd",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EibB6x35bFauTq32IP0RZo7b3KDqL",
+              "actual_model": "gpt-6.1-sol",
+              "response_cost": 0.008416,
+              "actual_provider": "openai"
+            },
+            "structured_output_artifact_id": "artifact_01794298057935623057_0000000999_cd5082e4c15040ea8e128c778d044ad5"
+          },
+          "structured_output_artifact_id": "artifact_01794298057935623057_0000000999_cd5082e4c15040ea8e128c778d044ad5"
+        }
+      }
+    ],
+    "artifacts": [
+      {
+        "id": "artifact_01794298045431238415_0000000979_e64d629125c3482192b67752edd4f1f9",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "acceptance_builder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794298042986735301_0000000369_93668093820d4e359082db87dd80a7b2",
+        "job_id": "job_01794298042991229622_0000000371_57409c37fa4e4bcda2a649fc90a9163e",
+        "action_run_id": "action_run_01794298043208499631_0000000974_7f86dda7a2ac4b16b836002fae6c7649",
+        "artifact_type": "structured_output",
+        "status": "stored",
+        "content_text": null,
+        "content_json": {
+          "values": {},
+          "missing_fields": [
+            "acceptance_criteria",
+            "assumptions",
+            "deliverables"
+          ]
+        },
+        "object_storage_key": null,
+        "metadata": {
+          "model": "gpt-6.1-sol",
+          "guest_id": "guest_01794298042977445115_0000000367_2bfc5e1c7eaf42ffb5af520e8c3736c2",
+          "provider": "openai",
+          "schema_ref": "kernel.schemas.extract_output_v1",
+          "action_type": "text.extract_structured_fields",
+          "workflow_id": "acceptance_builder.check_v1",
+          "schema_version": 1,
+          "pydantic_run_id": "01a1c47f-5b4d-7015-aed7-eda80de30adc",
+          "action_config_id": "acceptance_builder.extract_v1",
+          "provider_call_id": "provider_call_01794298043215818000_0000000976_02946d4d37074a7c86dd0517a93d3a22",
+          "workflow_version": 1,
+          "scenario_chain_id": "scenario_session_01794298042986735301_0000000369_93668093820d4e359082db87dd80a7b2",
+          "acquisition_source": "web_mirror",
+          "litellm_response_id": "chatcmpl-EibAy9c755NddMRfuuI6YK4Fm3UgO",
+          "physical_call_index": 1,
+          "provider_policy_ref": "default_text_generation_v1",
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1
+        },
+        "created_at": "2026-11-10 08:07:25.431256+00:00"
+      },
+      {
+        "id": "artifact_01794298052033647627_0000000989_a479d560268c49af9cf90f9cfe5569ec",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "acceptance_builder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794298042986735301_0000000369_93668093820d4e359082db87dd80a7b2",
+        "job_id": "job_01794298042991229622_0000000371_57409c37fa4e4bcda2a649fc90a9163e",
+        "action_run_id": "action_run_01794298045441321493_0000000984_d0d1a96560af4764a4ef582157130f0c",
+        "artifact_type": "structured_output",
+        "status": "stored",
+        "content_text": null,
+        "content_json": {
+          "deltas": [
+            {
+              "status": "mismatch",
+              "evidence": "В запросе «Нужно что-нибудь хорошее.» не определён объём работ. Ответ «Done.» не описывает результат, поэтому охват запроса оценить невозможно.",
+              "criterion_id": "scope_coverage"
+            },
+            {
+              "status": "mismatch",
+              "evidence": "Клиент просит «что-нибудь хорошее», но ответ «Done.» не содержит результата или его описания, позволяющего проверить соответствие этому пожеланию.",
+              "criterion_id": "requirement_fit"
+            },
+            {
+              "status": "mismatch",
+              "evidence": "В запросе нет перечня конкретных результатов, а в ответе «Done.» не представлен и не назван какой-либо выполненный результат; полноту подтвердить невозможно.",
+              "criterion_id": "completeness"
+            },
+            {
+              "status": "mismatch",
+              "evidence": "Ответ «Done.» лишь заявляет о завершении, не объясняя, что именно сделано и что не сделано.",
+              "criterion_id": "clarity"
+            }
+          ],
+          "verdict": "does_not_meet",
+          "rationale": "Запрос крайне неопределён, а ответ лишь сообщает о завершении. В нём нет результата или описания выполненной работы, поэтому соответствие, охват и полноту проверить невозможно. Также неясно, что именно сделано. Низкая уверенность связана с краткостью обоих текстов.",
+          "confidence": 0.42
+        },
+        "object_storage_key": null,
+        "metadata": {
+          "model": "gpt-6.1-sol",
+          "guest_id": "guest_01794298042977445115_0000000367_2bfc5e1c7eaf42ffb5af520e8c3736c2",
+          "provider": "openai",
+          "schema_ref": "kernel.schemas.compare_classify_output_v1",
+          "action_type": "text.compare_and_classify",
+          "workflow_id": "acceptance_builder.check_v1",
+          "schema_version": 1,
+          "pydantic_run_id": "01a1c47f-6406-761a-a6c4-2137dab8cc5c",
+          "action_config_id": "acceptance_builder.compare_v1",
+          "provider_call_id": "provider_call_01794298045448175789_0000000986_87735378648c46b59006865c4539e01a",
+          "workflow_version": 1,
+          "scenario_chain_id": "scenario_session_01794298042986735301_0000000369_93668093820d4e359082db87dd80a7b2",
+          "acquisition_source": "web_mirror",
+          "litellm_response_id": "chatcmpl-EibB0Vy4zlbyhASTUCINJJZgvWXI3",
+          "physical_call_index": 1,
+          "provider_policy_ref": "default_text_generation_v1",
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1
+        },
+        "created_at": "2026-11-10 08:07:32.033669+00:00"
+      },
+      {
+        "id": "artifact_01794298057935623057_0000000999_cd5082e4c15040ea8e128c778d044ad5",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "acceptance_builder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794298042986735301_0000000369_93668093820d4e359082db87dd80a7b2",
+        "job_id": "job_01794298042991229622_0000000371_57409c37fa4e4bcda2a649fc90a9163e",
+        "action_run_id": "action_run_01794298052043007950_0000000994_b2a67cc33e71419384f05a49cf2205b1",
+        "artifact_type": "structured_output",
+        "status": "stored",
+        "content_text": null,
+        "content_json": {
+          "summary": "Работа не соответствует ожиданиям: ответ «Done.» не представляет результат и не объясняет, что сделано. В первую очередь необходимо представить выполненный результат или его описание, чтобы можно было проверить соответствие запросу, охват и полноту работы.",
+          "sections": [
+            {
+              "id": "verdict",
+              "title": "Verdict",
+              "content": "Работа не соответствует ожиданиям. Вердикт основан на четырёх общих критериях проверки, а не на поэлементной оценке критериев приёмки, перечисленных ниже.\nОхват запроса — не удовлетворён: в запросе «Нужно что-нибудь хорошее.» не определён объём работ, а ответ «Done.» не описывает результат, поэтому охват запроса оценить невозможно.\nСоответствие требованиям — не удовлетворено: клиент просит «что-нибудь хорошее», но ответ «Done.» не содержит результата или его описания, позволяющего проверить соответствие этому пожеланию.\nПолнота — не удовлетворена: в запросе нет перечня конкретных результатов, а в ответе «Done.» не представлен и не назван какой-либо выполненный результат, поэтому полноту подтвердить невозможно.\nЯсность — не удовлетворена: ответ «Done.» лишь заявляет о завершении, не объясняя, что именно сделано и что не сделано."
+            },
+            {
+              "id": "acceptance-criteria",
+              "title": "Acceptance criteria",
+              "content": "Не указано в брифе.",
+              "metadata": {
+                "kind": "list"
+              }
+            },
+            {
+              "id": "assumptions",
+              "title": "Assumptions",
+              "content": "Не указано в брифе.",
+              "metadata": {
+                "kind": "list"
+              }
+            },
+            {
+              "id": "deliverables",
+              "title": "Deliverables",
+              "content": "Не указано в брифе.",
+              "metadata": {
+                "kind": "list"
+              }
+            },
+            {
+              "id": "open-gaps",
+              "title": "Open gaps",
+              "content": "В брифе не указаны критерии приёмки, допущения и ожидаемые результаты работы. Пожалуйста, подтвердите, какие критерии приёмки, допущения и результаты работы следует зафиксировать."
+            }
+          ]
+        },
+        "object_storage_key": null,
+        "metadata": {
+          "model": "gpt-6.1-sol",
+          "guest_id": "guest_01794298042977445115_0000000367_2bfc5e1c7eaf42ffb5af520e8c3736c2",
+          "provider": "openai",
+          "schema_ref": "kernel.schemas.generate_document_output_v1",
+          "action_type": "document.generate_from_template",
+          "workflow_id": "acceptance_builder.check_v1",
+          "schema_version": 1,
+          "pydantic_run_id": "01a1c47f-7dcf-72fd-b688-56b87e0ba741",
+          "action_config_id": "acceptance_builder.check_document_v1",
+          "provider_call_id": "provider_call_01794298052048769217_0000000996_03c241fcc6f447a9819a08072e1ddba7",
+          "workflow_version": 1,
+          "scenario_chain_id": "scenario_session_01794298042986735301_0000000369_93668093820d4e359082db87dd80a7b2",
+          "acquisition_source": "web_mirror",
+          "litellm_response_id": "chatcmpl-EibB6x35bFauTq32IP0RZo7b3KDqL",
+          "physical_call_index": 1,
+          "provider_policy_ref": "default_text_generation_v1",
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1
+        },
+        "created_at": "2026-11-10 08:07:37.935646+00:00"
+      },
+      {
+        "id": "artifact_01794298057978630250_0000001003_e2c1eb681a5b4187bc7423b02395a284",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "acceptance_builder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794298042986735301_0000000369_93668093820d4e359082db87dd80a7b2",
+        "job_id": "job_01794298042991229622_0000000371_57409c37fa4e4bcda2a649fc90a9163e",
+        "action_run_id": null,
+        "artifact_type": "structured_output",
+        "status": "stored",
+        "content_text": null,
+        "content_json": {
+          "document": {
+            "summary": "Работа не соответствует ожиданиям: ответ «Done.» не представляет результат и не объясняет, что сделано. В первую очередь необходимо представить выполненный результат или его описание, чтобы можно было проверить соответствие запросу, охват и полноту работы.",
+            "sections": [
+              {
+                "id": "verdict",
+                "title": "Verdict",
+                "content": "Работа не соответствует ожиданиям. Вердикт основан на четырёх общих критериях проверки, а не на поэлементной оценке критериев приёмки, перечисленных ниже.\nОхват запроса — не удовлетворён: в запросе «Нужно что-нибудь хорошее.» не определён объём работ, а ответ «Done.» не описывает результат, поэтому охват запроса оценить невозможно.\nСоответствие требованиям — не удовлетворено: клиент просит «что-нибудь хорошее», но ответ «Done.» не содержит результата или его описания, позволяющего проверить соответствие этому пожеланию.\nПолнота — не удовлетворена: в запросе нет перечня конкретных результатов, а в ответе «Done.» не представлен и не назван какой-либо выполненный результат, поэтому полноту подтвердить невозможно.\nЯсность — не удовлетворена: ответ «Done.» лишь заявляет о завершении, не объясняя, что именно сделано и что не сделано."
+              },
+              {
+                "id": "acceptance-criteria",
+                "title": "Acceptance criteria",
+                "content": "Не указано в брифе.",
+                "metadata": {
+                  "kind": "list"
+                }
+              },
+              {
+                "id": "assumptions",
+                "title": "Assumptions",
+                "content": "Не указано в брифе.",
+                "metadata": {
+                  "kind": "list"
+                }
+              },
+              {
+                "id": "deliverables",
+                "title": "Deliverables",
+                "content": "Не указано в брифе.",
+                "metadata": {
+                  "kind": "list"
+                }
+              },
+              {
+                "id": "open-gaps",
+                "title": "Open gaps",
+                "content": "В брифе не указаны критерии приёмки, допущения и ожидаемые результаты работы. Пожалуйста, подтвердите, какие критерии приёмки, допущения и результаты работы следует зафиксировать."
+              }
+            ]
+          },
+          "extracted": {
+            "values": {},
+            "missing_fields": [
+              "acceptance_criteria",
+              "assumptions",
+              "deliverables"
+            ]
+          },
+          "comparison": {
+            "deltas": [
+              {
+                "status": "mismatch",
+                "evidence": "В запросе «Нужно что-нибудь хорошее.» не определён объём работ. Ответ «Done.» не описывает результат, поэтому охват запроса оценить невозможно.",
+                "criterion_id": "scope_coverage"
+              },
+              {
+                "status": "mismatch",
+                "evidence": "Клиент просит «что-нибудь хорошее», но ответ «Done.» не содержит результата или его описания, позволяющего проверить соответствие этому пожеланию.",
+                "criterion_id": "requirement_fit"
+              },
+              {
+                "status": "mismatch",
+                "evidence": "В запросе нет перечня конкретных результатов, а в ответе «Done.» не представлен и не назван какой-либо выполненный результат; полноту подтвердить невозможно.",
+                "criterion_id": "completeness"
+              },
+              {
+                "status": "mismatch",
+                "evidence": "Ответ «Done.» лишь заявляет о завершении, не объясняя, что именно сделано и что не сделано.",
+                "criterion_id": "clarity"
+              }
+            ],
+            "verdict": "does_not_meet",
+            "rationale": "Запрос крайне неопределён, а ответ лишь сообщает о завершении. В нём нет результата или описания выполненной работы, поэтому соответствие, охват и полноту проверить невозможно. Также неясно, что именно сделано. Низкая уверенность связана с краткостью обоих текстов.",
+            "confidence": 0.42
+          }
+        },
+        "object_storage_key": null,
+        "metadata": {
+          "guest_id": "guest_01794298042977445115_0000000367_2bfc5e1c7eaf42ffb5af520e8c3736c2",
+          "schema_ref": "acceptance_builder.check_output_v1",
+          "workflow_id": "acceptance_builder.check_v1",
+          "artifact_role": "workflow_result",
+          "schema_version": 1,
+          "workflow_version": 1,
+          "scenario_chain_id": "scenario_session_01794298042986735301_0000000369_93668093820d4e359082db87dd80a7b2",
+          "acquisition_source": "web_mirror"
+        },
+        "created_at": "2026-11-10 08:07:37.978657+00:00"
+      }
+    ],
+    "calls": [
+      {
+        "id": "provider_call_01794298043215818000_0000000976_02946d4d37074a7c86dd0517a93d3a22",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "acceptance_builder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794298042986735301_0000000369_93668093820d4e359082db87dd80a7b2",
+        "job_id": "job_01794298042991229622_0000000371_57409c37fa4e4bcda2a649fc90a9163e",
+        "action_run_id": "action_run_01794298043208499631_0000000974_7f86dda7a2ac4b16b836002fae6c7649",
+        "workflow_id": "acceptance_builder.check_v1",
+        "workflow_version": 1,
+        "step_id": "extract",
+        "action_type": "text.extract_structured_fields",
+        "action_config_id": "acceptance_builder.extract_v1",
+        "provider_policy_ref": "default_text_generation_v1",
+        "provider": "openai",
+        "model": "gpt-6.1-sol",
+        "gateway_backend": "litellm",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "transport_attempt_index": 1,
+        "physical_call_index": 1,
+        "status": "succeeded",
+        "input_tokens": 1024,
+        "output_tokens": 54,
+        "total_tokens": 1078,
+        "latency_ms": 2202,
+        "estimated_cost": 0.002588,
+        "error_code": null,
+        "error_message_safe": null,
+        "failure_kind": null,
+        "http_status": null,
+        "pydantic_run_id": "01a1c47f-5b4d-7015-aed7-eda80de30adc",
+        "litellm_response_id": "chatcmpl-EibAy9c755NddMRfuuI6YK4Fm3UgO",
+        "created_at": "2026-11-10 08:07:23.215829+00:00",
+        "started_at": "2026-11-10 08:07:23.215791+00:00",
+        "completed_at": "2026-11-10 08:07:25.421028+00:00",
+        "metadata": {
+          "litellm": {
+            "model_id": "979a5128f9177c1bb24176f7b836b5726bf3afbaa926068b29f5841645830ebd",
+            "http_status": null,
+            "model_group": "anytoolai.default_text",
+            "response_id": "chatcmpl-EibAy9c755NddMRfuuI6YK4Fm3UgO",
+            "actual_model": "gpt-6.1-sol",
+            "response_cost": 0.002588,
+            "actual_provider": "openai"
+          },
+          "timeout": {
+            "configured_seconds": 60
+          },
+          "attempts": {
+            "pydantic_run_id": "01a1c47f-5b4d-7015-aed7-eda80de30adc",
+            "physical_call_index": 1,
+            "semantic_attempt_index": 1,
+            "transport_attempt_index": 1
+          },
+          "response": {
+            "http_status": null,
+            "total_tokens": 1078,
+            "litellm_response_id": "chatcmpl-EibAy9c755NddMRfuuI6YK4Fm3UgO"
+          },
+          "prompt_ref": "acceptance_builder.extract.v1",
+          "request_id": null,
+          "fixture_key": null,
+          "temperature": 1.0,
+          "retry_policy": {
+            "transport": {
+              "owner": "litellm",
+              "max_attempts": 2,
+              "litellm_num_retries_per_attempt": 0
+            },
+            "validation": {
+              "owner": "pydanticai",
+              "max_attempts": 2
+            },
+            "hard_limits": {
+              "max_physical_provider_calls_per_action": 4
+            }
+          },
+          "correlation_id": null,
+          "request_payload": {
+            "prompt_chars": 4249,
+            "message_count": 1,
+            "response_schema_present": true
+          },
+          "model_addressing": "policy_alias",
+          "reasoning_effort": null,
+          "request_metadata": {
+            "user_id": null,
+            "guest_id": "guest_01794298042977445115_0000000367_2bfc5e1c7eaf42ffb5af520e8c3736c2",
+            "handoff_id": null,
+            "scenario_chain_id": "scenario_session_01794298042986735301_0000000369_93668093820d4e359082db87dd80a7b2",
+            "acquisition_source": "web_mirror"
+          },
+          "response_metadata": {
+            "usage": {
+              "total_tokens": 1078
+            },
+            "litellm": {
+              "model_id": "979a5128f9177c1bb24176f7b836b5726bf3afbaa926068b29f5841645830ebd",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EibAy9c755NddMRfuuI6YK4Fm3UgO",
+              "actual_model": "gpt-6.1-sol",
+              "response_cost": 0.002588,
+              "actual_provider": "openai"
+            }
+          },
+          "structured_output_mode": "json_schema",
+          "fallback_from_policy_ref": null
+        }
+      },
+      {
+        "id": "provider_call_01794298045448175789_0000000986_87735378648c46b59006865c4539e01a",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "acceptance_builder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794298042986735301_0000000369_93668093820d4e359082db87dd80a7b2",
+        "job_id": "job_01794298042991229622_0000000371_57409c37fa4e4bcda2a649fc90a9163e",
+        "action_run_id": "action_run_01794298045441321493_0000000984_d0d1a96560af4764a4ef582157130f0c",
+        "workflow_id": "acceptance_builder.check_v1",
+        "workflow_version": 1,
+        "step_id": "compare",
+        "action_type": "text.compare_and_classify",
+        "action_config_id": "acceptance_builder.compare_v1",
+        "provider_policy_ref": "default_text_generation_v1",
+        "provider": "openai",
+        "model": "gpt-6.1-sol",
+        "gateway_backend": "litellm",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "transport_attempt_index": 1,
+        "physical_call_index": 1,
+        "status": "succeeded",
+        "input_tokens": 1196,
+        "output_tokens": 283,
+        "total_tokens": 1479,
+        "latency_ms": 6565,
+        "estimated_cost": 0.005818500000000001,
+        "error_code": null,
+        "error_message_safe": null,
+        "failure_kind": null,
+        "http_status": null,
+        "pydantic_run_id": "01a1c47f-6406-761a-a6c4-2137dab8cc5c",
+        "litellm_response_id": "chatcmpl-EibB0Vy4zlbyhASTUCINJJZgvWXI3",
+        "created_at": "2026-11-10 08:07:25.448185+00:00",
+        "started_at": "2026-11-10 08:07:25.448154+00:00",
+        "completed_at": "2026-11-10 08:07:32.017205+00:00",
+        "metadata": {
+          "litellm": {
+            "model_id": "979a5128f9177c1bb24176f7b836b5726bf3afbaa926068b29f5841645830ebd",
+            "http_status": null,
+            "model_group": "anytoolai.default_text",
+            "response_id": "chatcmpl-EibB0Vy4zlbyhASTUCINJJZgvWXI3",
+            "actual_model": "gpt-6.1-sol",
+            "response_cost": 0.005818500000000001,
+            "actual_provider": "openai"
+          },
+          "timeout": {
+            "configured_seconds": 60
+          },
+          "attempts": {
+            "pydantic_run_id": "01a1c47f-6406-761a-a6c4-2137dab8cc5c",
+            "physical_call_index": 1,
+            "semantic_attempt_index": 1,
+            "transport_attempt_index": 1
+          },
+          "response": {
+            "http_status": null,
+            "total_tokens": 1479,
+            "litellm_response_id": "chatcmpl-EibB0Vy4zlbyhASTUCINJJZgvWXI3"
+          },
+          "prompt_ref": "acceptance_builder.compare.v1",
+          "request_id": null,
+          "fixture_key": null,
+          "temperature": 1.0,
+          "retry_policy": {
+            "transport": {
+              "owner": "litellm",
+              "max_attempts": 2,
+              "litellm_num_retries_per_attempt": 0
+            },
+            "validation": {
+              "owner": "pydanticai",
+              "max_attempts": 2
+            },
+            "hard_limits": {
+              "max_physical_provider_calls_per_action": 4
+            }
+          },
+          "correlation_id": null,
+          "request_payload": {
+            "prompt_chars": 4460,
+            "message_count": 1,
+            "response_schema_present": true
+          },
+          "model_addressing": "policy_alias",
+          "reasoning_effort": null,
+          "request_metadata": {
+            "user_id": null,
+            "guest_id": "guest_01794298042977445115_0000000367_2bfc5e1c7eaf42ffb5af520e8c3736c2",
+            "handoff_id": null,
+            "scenario_chain_id": "scenario_session_01794298042986735301_0000000369_93668093820d4e359082db87dd80a7b2",
+            "acquisition_source": "web_mirror"
+          },
+          "response_metadata": {
+            "usage": {
+              "total_tokens": 1479
+            },
+            "litellm": {
+              "model_id": "979a5128f9177c1bb24176f7b836b5726bf3afbaa926068b29f5841645830ebd",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EibB0Vy4zlbyhASTUCINJJZgvWXI3",
+              "actual_model": "gpt-6.1-sol",
+              "response_cost": 0.005818500000000001,
+              "actual_provider": "openai"
+            }
+          },
+          "structured_output_mode": "json_schema",
+          "fallback_from_policy_ref": null
+        }
+      },
+      {
+        "id": "provider_call_01794298052048769217_0000000996_03c241fcc6f447a9819a08072e1ddba7",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "acceptance_builder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794298042986735301_0000000369_93668093820d4e359082db87dd80a7b2",
+        "job_id": "job_01794298042991229622_0000000371_57409c37fa4e4bcda2a649fc90a9163e",
+        "action_run_id": "action_run_01794298052043007950_0000000994_b2a67cc33e71419384f05a49cf2205b1",
+        "workflow_id": "acceptance_builder.check_v1",
+        "workflow_version": 1,
+        "step_id": "generate_document",
+        "action_type": "document.generate_from_template",
+        "action_config_id": "acceptance_builder.check_document_v1",
+        "provider_policy_ref": "default_text_generation_v1",
+        "provider": "openai",
+        "model": "gpt-6.1-sol",
+        "gateway_backend": "litellm",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "transport_attempt_index": 1,
+        "physical_call_index": 1,
+        "status": "succeeded",
+        "input_tokens": 1627,
+        "output_tokens": 435,
+        "total_tokens": 2062,
+        "latency_ms": 5864,
+        "estimated_cost": 0.008416,
+        "error_code": null,
+        "error_message_safe": null,
+        "failure_kind": null,
+        "http_status": null,
+        "pydantic_run_id": "01a1c47f-7dcf-72fd-b688-56b87e0ba741",
+        "litellm_response_id": "chatcmpl-EibB6x35bFauTq32IP0RZo7b3KDqL",
+        "created_at": "2026-11-10 08:07:32.048779+00:00",
+        "started_at": "2026-11-10 08:07:32.048744+00:00",
+        "completed_at": "2026-11-10 08:07:37.918424+00:00",
+        "metadata": {
+          "litellm": {
+            "model_id": "979a5128f9177c1bb24176f7b836b5726bf3afbaa926068b29f5841645830ebd",
+            "http_status": null,
+            "model_group": "anytoolai.default_text",
+            "response_id": "chatcmpl-EibB6x35bFauTq32IP0RZo7b3KDqL",
+            "actual_model": "gpt-6.1-sol",
+            "response_cost": 0.008416,
+            "actual_provider": "openai"
+          },
+          "timeout": {
+            "configured_seconds": 60
+          },
+          "attempts": {
+            "pydantic_run_id": "01a1c47f-7dcf-72fd-b688-56b87e0ba741",
+            "physical_call_index": 1,
+            "semantic_attempt_index": 1,
+            "transport_attempt_index": 1
+          },
+          "response": {
+            "http_status": null,
+            "total_tokens": 2062,
+            "litellm_response_id": "chatcmpl-EibB6x35bFauTq32IP0RZo7b3KDqL"
+          },
+          "prompt_ref": "acceptance_builder.check_document.v1",
+          "request_id": null,
+          "fixture_key": null,
+          "temperature": 1.0,
+          "retry_policy": {
+            "transport": {
+              "owner": "litellm",
+              "max_attempts": 2,
+              "litellm_num_retries_per_attempt": 0
+            },
+            "validation": {
+              "owner": "pydanticai",
+              "max_attempts": 2
+            },
+            "hard_limits": {
+              "max_physical_provider_calls_per_action": 4
+            }
+          },
+          "correlation_id": null,
+          "request_payload": {
+            "prompt_chars": 6197,
+            "message_count": 1,
+            "response_schema_present": true
+          },
+          "model_addressing": "policy_alias",
+          "reasoning_effort": null,
+          "request_metadata": {
+            "user_id": null,
+            "guest_id": "guest_01794298042977445115_0000000367_2bfc5e1c7eaf42ffb5af520e8c3736c2",
+            "handoff_id": null,
+            "scenario_chain_id": "scenario_session_01794298042986735301_0000000369_93668093820d4e359082db87dd80a7b2",
+            "acquisition_source": "web_mirror"
+          },
+          "response_metadata": {
+            "usage": {
+              "total_tokens": 2062
+            },
+            "litellm": {
+              "model_id": "979a5128f9177c1bb24176f7b836b5726bf3afbaa926068b29f5841645830ebd",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EibB6x35bFauTq32IP0RZo7b3KDqL",
+              "actual_model": "gpt-6.1-sol",
+              "response_cost": 0.008416,
+              "actual_provider": "openai"
+            }
+          },
+          "structured_output_mode": "json_schema",
+          "fallback_from_policy_ref": null
+        }
+      }
+    ]
+  },
+  "confirmed_reasoning_effort": null,
+  "latency_ms": 15231
+}

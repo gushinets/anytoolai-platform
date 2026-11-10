@@ -1,0 +1,37 @@
+{
+  "evidence_sha256": "4a832bbee25aed0c7aa4b05d5c55078d1cd8794c0bb5c6991505591d2408e077",
+  "reviewer": "Codex agent — semantic inspection; independent human review pending",
+  "fields": {
+    "/brief/values/constraints/0": false,
+    "/brief/values/constraints/1": true,
+    "/brief/values/constraints/2": true,
+    "/brief/values/constraints/3": true,
+    "/brief/values/deliverables/0": true,
+    "/brief/values/project_goal": true,
+    "/brief/values/target_audience": true,
+    "/issues/0/description": true,
+    "/issues/0/evidence": true,
+    "/issues/1/description": true,
+    "/issues/1/evidence": true,
+    "/issues/2/description": true,
+    "/issues/2/evidence": true,
+    "/questions/0/question": true,
+    "/questions/0/rationale": true,
+    "/questions/1/question": true,
+    "/questions/1/rationale": true,
+    "/questions/2/question": true,
+    "/questions/2/rationale": true,
+    "/document/summary": true,
+    "/document/sections/0/content": true,
+    "/document/sections/1/content": true,
+    "/document/sections/2/content": true,
+    "/document/sections/3/content": true
+  },
+  "criteria": {
+    "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.": false,
+    "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.": true,
+    "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.": true,
+    "The explicit analysis-language request is honored and is not extracted as a project requirement.": true
+  },
+  "notes": "Requested Russian honored except extracted constraint «Объём: 6–8 thousand characters.»: unquoted English descriptive units remain in Russian authored prose. Document later translates the length correctly, but full canonical extraction still fails language. Monetary/date literals, brands and actual source quotes are allowed exceptions; these descriptive words are not treated as such. Facts stay faithful; translated evidence enclosed in quotation marks is a quotation-quality caveat."
+}

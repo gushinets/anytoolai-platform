@@ -1,0 +1,22 @@
+{
+  "evidence_sha256": "c54be258b4fabb5d4bf03e9d48ca2ce82cdd279e05019dc3b78f58b2b2b88af4",
+  "reviewer": "Codex agent — semantic inspection; independent human review pending",
+  "fields": {
+    "/issues/0/description": true,
+    "/issues/0/evidence": true,
+    "/questions/0/question": true,
+    "/questions/0/rationale": true,
+    "/document/summary": true,
+    "/document/sections/0/content": true,
+    "/document/sections/1/content": true,
+    "/document/sections/2/content": true,
+    "/document/sections/3/content": true
+  },
+  "criteria": {
+    "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.": true,
+    "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.": true,
+    "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.": true,
+    "Unspecified facts/lists remain missing; the summary does not claim readiness or a complete specification.": true
+  },
+  "notes": "All canonical prose inspected. Expected Spanish/Russian/requested English preserved; source facts, exclusions, quotes and absent budget/deadline faithful. Weak Spanish remains empty/missing, without readiness. ES mixed has all six fields and no issues/questions, exercising live skipped-questions path; ready statement follows that data. Extra country/character-count clarifications and abbreviated quotation grammar are quality caveats."
+}

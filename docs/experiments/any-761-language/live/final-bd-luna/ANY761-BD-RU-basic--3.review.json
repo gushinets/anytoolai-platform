@@ -1,0 +1,38 @@
+{
+  "evidence_sha256": "4e44d958effece8db9a2e51e410c7e30cbebf01533db66659943d88ba2e98550",
+  "reviewer": "",
+  "fields": {
+    "/brief/values/constraints/0": null,
+    "/brief/values/constraints/1": null,
+    "/brief/values/constraints/2": null,
+    "/brief/values/constraints/3": null,
+    "/brief/values/constraints/4": null,
+    "/brief/values/deliverables/0": null,
+    "/brief/values/deliverables/1": null,
+    "/brief/values/deliverables/2": null,
+    "/brief/values/project_goal": null,
+    "/brief/values/target_audience": null,
+    "/issues/0/description": null,
+    "/issues/1/description": null,
+    "/issues/2/description": null,
+    "/issues/2/evidence": null,
+    "/questions/0/question": null,
+    "/questions/0/rationale": null,
+    "/questions/1/question": null,
+    "/questions/1/rationale": null,
+    "/questions/2/question": null,
+    "/questions/2/rationale": null,
+    "/document/summary": null,
+    "/document/sections/0/content": null,
+    "/document/sections/1/content": null,
+    "/document/sections/2/content": null,
+    "/document/sections/3/content": null
+  },
+  "criteria": {
+    "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.": null,
+    "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.": null,
+    "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.": null,
+    "Retain 6–8 thousand characters, nonexpert apartment-owner audience, all exclusions and source-link requirements; budget and deadline remain unagreed.": null
+  },
+  "notes": ""
+}

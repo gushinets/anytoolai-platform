@@ -1,0 +1,18 @@
+{
+  "evidence_sha256": "2eee079b8ad2c77b0aee0ce50eb2ea51c40b8ef366efd2f35cea83508d95ef68",
+  "reviewer": "Codex agent — semantic inspection; independent human review pending",
+  "fields": {
+    "/document/summary": true,
+    "/document/sections/0/content": true,
+    "/document/sections/1/content": true,
+    "/document/sections/2/content": true,
+    "/document/sections/3/content": true
+  },
+  "criteria": {
+    "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.": true,
+    "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.": true,
+    "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.": true,
+    "Unspecified facts/lists remain missing; the summary does not claim readiness or a complete specification.": true
+  },
+  "notes": "All canonical text inspected. Expected language, including explicit analysis overrides; literal source dates permitted. Facts, dates/amounts, Acme, formats and quoted string retained. Weak cases keep all lists missing without fabricated content. English deliverable and language directions handled distinctly."
+}

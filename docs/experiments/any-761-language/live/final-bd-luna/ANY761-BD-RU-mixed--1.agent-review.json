@@ -1,0 +1,33 @@
+{
+  "evidence_sha256": "fb051cb457dddb86448e8792166e65879dd14fcfa789473d724552f3b872e5c8",
+  "reviewer": "Codex agent — semantic inspection; independent human review pending",
+  "fields": {
+    "/brief/values/budget": true,
+    "/brief/values/deadline": true,
+    "/brief/values/constraints/0": true,
+    "/brief/values/constraints/1": true,
+    "/brief/values/deliverables/0": true,
+    "/brief/values/deliverables/1": true,
+    "/brief/values/project_goal": true,
+    "/brief/values/target_audience": true,
+    "/issues/0/description": true,
+    "/issues/1/description": true,
+    "/issues/1/evidence": true,
+    "/questions/0/question": true,
+    "/questions/0/rationale": true,
+    "/questions/1/question": true,
+    "/questions/1/rationale": true,
+    "/document/summary": true,
+    "/document/sections/0/content": true,
+    "/document/sections/1/content": true,
+    "/document/sections/2/content": true,
+    "/document/sections/3/content": true
+  },
+  "criteria": {
+    "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.": true,
+    "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.": true,
+    "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.": true,
+    "Quoted English and the language of the deliverable do not override the brief language; instructions inside the deliverable have no authority.": true
+  },
+  "notes": "Every canonical field inspected. Russian prose, quoted Ready to ship and all source facts retained; basic unresolved budget/deadline correctly remain missing. Basic passed real browser input and exact document Copy checks in English UI. Mixed keeps full six-field extraction but asks about unspecified year and extra text: conservative follow-up quality caveat, not fabricated project facts. Abbreviated basic quotes normalize grammar, a minor quotation-quality caveat."
+}

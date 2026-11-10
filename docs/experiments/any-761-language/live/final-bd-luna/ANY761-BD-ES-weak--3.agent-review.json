@@ -1,0 +1,22 @@
+{
+  "evidence_sha256": "fe7b6bf96e6bdd475114f9f2d72db422c025dfe8b9ae6bf4b787e9c4e2a549f1",
+  "reviewer": "Codex agent — semantic inspection; independent human review pending",
+  "fields": {
+    "/issues/0/description": true,
+    "/issues/0/evidence": true,
+    "/questions/0/question": true,
+    "/questions/0/rationale": true,
+    "/document/summary": true,
+    "/document/sections/0/content": true,
+    "/document/sections/1/content": true,
+    "/document/sections/2/content": true,
+    "/document/sections/3/content": true
+  },
+  "criteria": {
+    "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.": true,
+    "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.": true,
+    "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.": true,
+    "Unspecified facts/lists remain missing; the summary does not claim readiness or a complete specification.": true
+  },
+  "notes": "Inspected every canonical prose field. Authored analysis uses the expected language; source quotations remain distinct. Article scope, exclusions and missing budget/deadline are preserved; mixed PDF facts and exact Ready to ship quotation are retained. Weak extraction remains empty and requests clarification. Questions about spaces/year are optional precision, not invented requirements. Independent human review remains pending."
+}

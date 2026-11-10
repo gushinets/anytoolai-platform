@@ -1,0 +1,22 @@
+{
+  "evidence_sha256": "54e3bcc722374d675ec68fa3fbcc990f7c7014569ad3f9c1d770c86cf0c83b09",
+  "reviewer": "Codex agent — semantic inspection; independent human review pending",
+  "fields": {
+    "/extracted/values/assumptions/0": true,
+    "/extracted/values/deliverables/0": true,
+    "/extracted/values/deliverables/1": true,
+    "/extracted/values/acceptance_criteria/0": true,
+    "/extracted/values/acceptance_criteria/1": true,
+    "/document/summary": true,
+    "/document/sections/0/content": true,
+    "/document/sections/1/content": true,
+    "/document/sections/2/content": true,
+    "/document/sections/3/content": true
+  },
+  "criteria": {
+    "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.": true,
+    "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.": false,
+    "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.": true
+  },
+  "notes": "Spanish throughout authored prose and Ready to ship preserved. FAIL fact retention: both 15 de noviembre and 500 EUR missing from extraction and document."
+}

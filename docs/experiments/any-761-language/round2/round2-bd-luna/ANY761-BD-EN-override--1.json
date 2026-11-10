@@ -1,0 +1,1261 @@
+{
+  "case": {
+    "id": "ANY761-BD-EN-override",
+    "scenario_id": "brief_decoder.decode_v1",
+    "source_language": "en",
+    "expected_language": "ru",
+    "family": "override",
+    "provenance": "New synthetic regression case for ANY-761; not an original QA output.",
+    "input": {
+      "brief_text": "We need a blog article about renovating a kitchen in an old house: how to list the work and prepare to talk to a contractor. Length: 6–8 thousand characters; audience: apartment owners without construction experience. Include clear subheadings and a list of questions for the contractor. Exclude load-bearing calculations, legal advice and promises of a fixed renovation price. The text must be original, without hidden advertising. Link sources for technical facts. The budget and delivery date have not yet been agreed. Write this analysis in Russian."
+    },
+    "criteria": [
+      "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.",
+      "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.",
+      "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.",
+      "The explicit analysis-language request is honored and is not extracted as a project requirement."
+    ]
+  },
+  "attempt": 1,
+  "snapshot": {
+    "source_sha256": {
+      "configs/kernel/litellm_router.yaml": "53abb3939d9cf301ca767d37354e866628b6849b37ad64db80c49c03826630ec",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/action_configs.yaml": "ecc9a7ede8c14667230f21fbe461e71c7a6ab6d76328c97170e53b4fe30c3eb5",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/frontends.yaml": "5f5eac1312dddf0ab129ccb58108e38aed9cd0c633503ccb91ba4c036f7512bd",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/handoffs.yaml": "08d5c5b3717f2b0db972213243a56f0cf98811fd4328105da998f5a3116d49c4",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/product.yaml": "7741111559407d2991e14b267efd9af9c66924fdb2071222d52528673a535eed",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/detect_issues.v1.md": "fbe9532b64e40079c6fc74c50bffc1a6b726c12cd25fd0c31ed7c8dd61006b3e",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/extract_brief.v1.md": "88f0d763aad056155045b367bceae3e9f0b08ad594b733cb168be1caafc5d8f7",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/generate_questions.v1.md": "f14fe8eddb4226bcc1105ad79d429e1f18d47d07b31af980ad270a0dc958cf56",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/generate_summary.v1.md": "3eec86211db8fe9b344e21f5d65b457ab6d9a4b49e0c0a998810dcf637bb78d2",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts.yaml": "03cb35d961dd1d9b1d95a1d1490eb2355e438c239a391b757c5a554473845daf",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/quotas.yaml": "1ed4154065125cf4da02e88015f8112caf11090279f292bebd7dd4534d98df6c",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/renderer_contract.yaml": "386f963a75379f224d581f42d72abae110a3369308aba3d196d06f2a4589e95d",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/scenarios.yaml": "5c6577450040daa795e9dbd245dc9757ea59427157fd3debecbd774f61e64c3d",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas/decode_input.schema.json": "998b82bde28beb6be77e0fb522a8e0a9871c88d9500b884523912f2d257d8454",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas/decode_output.schema.json": "5a76652a23623ba7a025410a8d0a509e9b8495636f3f6adca8ecb5288610cc0a",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas.yaml": "e2038c31be3810ee6a04ac82994f9b7bbcc8cd0d68a74ff90e4e0ad3973188f9",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/workflows.yaml": "06e0268670118d4156fc6fb8eab4e2954257178243e2693dc44b9e211fb5a1de",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/action_configs.yaml": "c2778c674dfde00c680f6c90e53b36b7f126a8dd7f7cc15afde0503f94a4e38d",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/frontends.yaml": "8e43fb844dd43efb59a2c3ba4b9757795c546ea49fd79e837031f58092f5c1e6",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/product.yaml": "6e367667b97afd5eaf031a447c5177b1cdbb6136ac0bea2e0cb4a29917b91bdb",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/check_document.v1.md": "c4b2e19dd1df3c2bc0d377fc749292a841ccb5e19ddc6fba07b8fa3371b3da59",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/compare.v1.md": "6ea407f09f7075a26f95b6d9d7eede06f76ce024390b2857295a763512e9a696",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/draft_document.v1.md": "3bfa48bf6d75c19de9cf99bf0d7099dd2e05c2b102787b6db8865c4bc1a2351a",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/extract.v1.md": "faaa30d051e34e7551e1a6e632a544257b1c820ad995b0b2dc4aab5a94a629df",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts.yaml": "69da98bf54727ffad9feb34dd5e5bc99de39e48b45445c7349121d2a4ac4d05d",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/quotas.yaml": "bf4ba64a55b7b86b524ff6a4fdc2b9d26ccf8112cbea54a9c5b6092896315e30",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/renderer_contract.yaml": "c6e5360239048e01dc7b802cc2057d1708596ed60801fcd04fc957d5996823bd",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/scenarios.yaml": "570fdf7f211132f8c4024ca2f4073ed5a0566ca584656daa45670869de4883e3",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/check_input.schema.json": "909e70ffbc6b6a7acbf5bc4eb64065a0beb0858be2f200a5b7573e45191def09",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/check_output.schema.json": "40703d6d7483066744d7fe7c0b19491a86bf326e19c2e8a11109bdaff05caa9f",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/draft_input.schema.json": "268d5301b8b8cc610e1f4cc7668878913d2eefb877bb1c4ab2d9ab2118bfba7e",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/draft_output.schema.json": "f6eb44bf452328b9daa65229bdb6d156410a3e0e45f91788c784ad99b87ddf2f",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas.yaml": "6c32116dcd116268045aeb45cd881c5fba8144ac0e22b5fcb8a1750216f43c1b",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/workflows.yaml": "e1fe1c43eb7228cfc857113364a36fecb87a8fed49f7ca2e8bbdd2c789831528"
+    },
+    "configured_models": [
+      {
+        "model": "openai/gpt-6-luna",
+        "reasoning_effort": "medium",
+        "alias": "anytoolai.default_text"
+      }
+    ]
+  },
+  "channel": "api",
+  "session_id": "scenario_session_01794302441337645422_0000000037_22ad99d57a154ddc9c1bb41bd4eb1373",
+  "job_id": "job_01794302441349182074_0000000039_9c58fa3a19a5487ba09b22036ad842f9",
+  "result_id": "artifact_01794302494088248151_0000000366_723cad4bc97a424db7f6a274f7b7a0f4",
+  "output": {
+    "brief": {
+      "values": {
+        "constraints": [
+          "Добавить четкие подзаголовки.",
+          "Включить список вопросов подрядчику.",
+          "Не включать расчеты несущих конструкций, юридические советы и обещания фиксированной стоимости ремонта.",
+          "Текст должен быть оригинальным, без скрытой рекламы.",
+          "Указывать ссылки на источники технических фактов."
+        ],
+        "deliverables": [
+          "Статья для блога объемом 6–8 тысяч знаков."
+        ],
+        "project_goal": "Подготовить статью для блога о ремонте кухни в старом доме: рассказать, как составить перечень работ и подготовиться к разговору с подрядчиком.",
+        "target_audience": "Владельцы квартир без опыта в строительстве."
+      },
+      "confidence": {
+        "constraints": 0.99,
+        "deliverables": 0.97,
+        "project_goal": 0.99,
+        "target_audience": 1
+      },
+      "missing_fields": [
+        "deadline",
+        "budget"
+      ]
+    },
+    "issues": [
+      {
+        "category": "budget_risk",
+        "evidence": "«The budget ... [has] not yet been agreed»",
+        "severity": "medium",
+        "description": "Бюджет проекта не согласован, поэтому до начала работы нужно определить оплату и условия её расчёта."
+      },
+      {
+        "category": "timeline_risk",
+        "evidence": "«[The] delivery date [has] not yet been agreed»",
+        "severity": "medium",
+        "description": "Срок сдачи не согласован, поэтому невозможно спланировать выполнение и согласование статьи."
+      },
+      {
+        "category": "ambiguity",
+        "evidence": "«Length: 6–8 thousand characters»",
+        "severity": "low",
+        "description": "Не указано, входят ли пробелы в требование о длине статьи, что может привести к разным оценкам соответствия объёму."
+      },
+      {
+        "category": "ambiguity",
+        "evidence": "«Link sources for technical facts»",
+        "severity": "low",
+        "description": "Не уточнено, в каком формате оформлять ссылки на источники технических фактов, что может привести к разногласиям при приёмке статьи."
+      }
+    ],
+    "document": {
+      "summary": "Бриф пока не готов к началу работы: не согласованы бюджет и срок сдачи, а также нужно уточнить, как считать объём статьи и оформлять ссылки на источники. В первую очередь согласуйте бюджет и дату сдачи.",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Project overview",
+          "content": "Клиент хочет подготовить статью для блога о ремонте кухни в старом доме. В ней нужно рассказать, как составить перечень работ и подготовиться к разговору с подрядчиком. Статья предназначена для владельцев квартир без опыта в строительстве.",
+          "metadata": {
+            "kind": "paragraph"
+          }
+        },
+        {
+          "id": "key-details",
+          "title": "Key details",
+          "content": "• Подготовить статью для блога объёмом 6–8 тысяч знаков.\n• Добавить чёткие подзаголовки и список вопросов подрядчику.\n• Не включать расчёты несущих конструкций, юридические советы и обещания фиксированной стоимости ремонта.\n• Текст должен быть оригинальным, без скрытой рекламы.\n• Указывать ссылки на источники технических фактов.",
+          "metadata": {
+            "kind": "list"
+          }
+        },
+        {
+          "id": "gaps",
+          "title": "Gaps and risks",
+          "content": "Бюджет проекта не согласован, поэтому до начала работы нужно определить оплату и условия её расчёта. Срок сдачи не согласован, поэтому невозможно спланировать выполнение и согласование статьи. Не указано, входят ли пробелы в требование о длине статьи, что может привести к разным оценкам соответствия объёму. Не уточнено, в каком формате оформлять ссылки на источники технических фактов, что может привести к разногласиям при приёмке статьи. Не указаны бюджет и срок сдачи.",
+          "metadata": {
+            "kind": "paragraph"
+          }
+        },
+        {
+          "id": "next-steps",
+          "title": "Questions to ask",
+          "content": "• Какой бюджет вы предусмотрели для статьи и как удобнее рассчитывать оплату — фиксированной суммой или по объёму работы? Это поможет согласовать стоимость и условия оплаты до начала работы.\n• К какой дате нужно подготовить статью? Согласованный срок позволит спланировать работу и вовремя передать статью.\n• Объём статьи в 6–8 тысяч знаков нужно считать с пробелами или без? Уточнение поможет одинаково оценивать соответствие статьи заданному объёму.\n• Как вы хотите оформить ссылки на источники технических фактов — например, активными ссылками в тексте или отдельным списком в конце? Выбранный формат поможет подготовить ссылки так, чтобы статья соответствовала вашим ожиданиям.",
+          "metadata": {
+            "kind": "list"
+          }
+        }
+      ]
+    },
+    "questions": [
+      {
+        "category": "budget_risk",
+        "priority": "medium",
+        "question": "Какой бюджет вы предусмотрели для статьи и как удобнее рассчитывать оплату — фиксированной суммой или по объёму работы?",
+        "rationale": "Это поможет согласовать стоимость и условия оплаты до начала работы.",
+        "source_issue_index": 0
+      },
+      {
+        "category": "timeline_risk",
+        "priority": "medium",
+        "question": "К какой дате нужно подготовить статью?",
+        "rationale": "Согласованный срок позволит спланировать работу и вовремя передать статью.",
+        "source_issue_index": 1
+      },
+      {
+        "category": "ambiguity",
+        "priority": "low",
+        "question": "Объём статьи в 6–8 тысяч знаков нужно считать с пробелами или без?",
+        "rationale": "Уточнение поможет одинаково оценивать соответствие статьи заданному объёму.",
+        "source_issue_index": 2
+      },
+      {
+        "category": "ambiguity",
+        "priority": "low",
+        "question": "Как вы хотите оформить ссылки на источники технических фактов — например, активными ссылками в тексте или отдельным списком в конце?",
+        "rationale": "Выбранный формат поможет подготовить ссылки так, чтобы статья соответствовала вашим ожиданиям.",
+        "source_issue_index": 3
+      }
+    ],
+    "brief_text": "We need a blog article about renovating a kitchen in an old house: how to list the work and prepare to talk to a contractor. Length: 6–8 thousand characters; audience: apartment owners without construction experience. Include clear subheadings and a list of questions for the contractor. Exclude load-bearing calculations, legal advice and promises of a fixed renovation price. The text must be original, without hidden advertising. Link sources for technical facts. The budget and delivery date have not yet been agreed. Write this analysis in Russian."
+  },
+  "error": null,
+  "evidence_error": null,
+  "ledger": {
+    "actions": [
+      {
+        "id": "action_run_01794302475187319711_0000000337_af242f02a5a54bdd8d4cbfcfd6a72029",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302441337645422_0000000037_22ad99d57a154ddc9c1bb41bd4eb1373",
+        "job_id": "job_01794302441349182074_0000000039_9c58fa3a19a5487ba09b22036ad842f9",
+        "workflow_id": "brief_decoder.decode_v1",
+        "step_id": "detect_issues",
+        "action_type": "text.detect_issues_by_taxonomy",
+        "action_config_id": "brief_decoder.detect_issues_v1",
+        "status": "succeeded",
+        "input_artifact_id": null,
+        "output_artifact_id": "artifact_01794302484326288324_0000000342_385299ffbbe34a5c950dbcbc5c1f9d98",
+        "error_code": null,
+        "created_at": "2026-11-10 09:21:15.187331+00:00",
+        "started_at": "2026-11-10 09:21:15.187309+00:00",
+        "completed_at": "2026-11-10 09:21:24.330932+00:00",
+        "metadata": {
+          "model": "gpt-6-luna",
+          "user_id": null,
+          "guest_id": "guest_01794302441323584619_0000000035_de1b24cba4624cc39496083cdde8abf9",
+          "provider": "openai",
+          "handoff_id": null,
+          "prompt_ref": "brief_decoder.detect_issues.v1",
+          "input_schema_ref": "kernel.schemas.issue_detection_input_v1",
+          "workflow_version": 2,
+          "output_schema_ref": "kernel.schemas.issue_detection_output_v1",
+          "scenario_chain_id": "scenario_session_01794302441337645422_0000000037_22ad99d57a154ddc9c1bb41bd4eb1373",
+          "acquisition_source": "web_mirror",
+          "provider_policy_ref": "default_text_generation_v1",
+          "llm_response_metadata": {
+            "usage": {
+              "total_tokens": 1678
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicKShnRvv13iDEp9MaHUGmaXo0H5",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.0004403,
+              "actual_provider": "openai"
+            },
+            "structured_output_artifact_id": "artifact_01794302484326288324_0000000342_385299ffbbe34a5c950dbcbc5c1f9d98"
+          },
+          "structured_output_artifact_id": "artifact_01794302484326288324_0000000342_385299ffbbe34a5c950dbcbc5c1f9d98"
+        }
+      },
+      {
+        "id": "action_run_01794302469677890713_0000000327_cb132e123ddf467db5d72ee58971c89a",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302441337645422_0000000037_22ad99d57a154ddc9c1bb41bd4eb1373",
+        "job_id": "job_01794302441349182074_0000000039_9c58fa3a19a5487ba09b22036ad842f9",
+        "workflow_id": "brief_decoder.decode_v1",
+        "step_id": "extract",
+        "action_type": "text.extract_structured_fields",
+        "action_config_id": "brief_decoder.extract_brief_v1",
+        "status": "succeeded",
+        "input_artifact_id": null,
+        "output_artifact_id": "artifact_01794302475178919916_0000000332_c7edbe20305942b1ac3d4f52e2649af0",
+        "error_code": null,
+        "created_at": "2026-11-10 09:21:09.677903+00:00",
+        "started_at": "2026-11-10 09:21:09.677876+00:00",
+        "completed_at": "2026-11-10 09:21:15.181677+00:00",
+        "metadata": {
+          "model": "gpt-6-luna",
+          "user_id": null,
+          "guest_id": "guest_01794302441323584619_0000000035_de1b24cba4624cc39496083cdde8abf9",
+          "provider": "openai",
+          "handoff_id": null,
+          "prompt_ref": "brief_decoder.extract_brief.v1",
+          "input_schema_ref": "kernel.schemas.extract_input_v1",
+          "workflow_version": 2,
+          "output_schema_ref": "kernel.schemas.extract_output_v1",
+          "scenario_chain_id": "scenario_session_01794302441337645422_0000000037_22ad99d57a154ddc9c1bb41bd4eb1373",
+          "acquisition_source": "web_mirror",
+          "provider_policy_ref": "default_text_generation_v1",
+          "llm_response_metadata": {
+            "usage": {
+              "total_tokens": 1646
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicKM9qAShIOXkfUnOcG3lmoqDGdc",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.000344425,
+              "actual_provider": "openai"
+            },
+            "structured_output_artifact_id": "artifact_01794302475178919916_0000000332_c7edbe20305942b1ac3d4f52e2649af0"
+          },
+          "structured_output_artifact_id": "artifact_01794302475178919916_0000000332_c7edbe20305942b1ac3d4f52e2649af0"
+        }
+      },
+      {
+        "id": "action_run_01794302484338000840_0000000347_4192d25b3d61481395fafe816a0d0431",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302441337645422_0000000037_22ad99d57a154ddc9c1bb41bd4eb1373",
+        "job_id": "job_01794302441349182074_0000000039_9c58fa3a19a5487ba09b22036ad842f9",
+        "workflow_id": "brief_decoder.decode_v1",
+        "step_id": "generate_questions",
+        "action_type": "text.generate_clarifying_questions",
+        "action_config_id": "brief_decoder.generate_questions_v1",
+        "status": "succeeded",
+        "input_artifact_id": null,
+        "output_artifact_id": "artifact_01794302487941734120_0000000352_ba928f6c96544ab8af6b7943fc8aa44d",
+        "error_code": null,
+        "created_at": "2026-11-10 09:21:24.338012+00:00",
+        "started_at": "2026-11-10 09:21:24.337990+00:00",
+        "completed_at": "2026-11-10 09:21:27.945383+00:00",
+        "metadata": {
+          "model": "gpt-6-luna",
+          "user_id": null,
+          "guest_id": "guest_01794302441323584619_0000000035_de1b24cba4624cc39496083cdde8abf9",
+          "provider": "openai",
+          "handoff_id": null,
+          "prompt_ref": "brief_decoder.generate_questions.v1",
+          "input_schema_ref": "kernel.schemas.generate_questions_input_v1",
+          "workflow_version": 2,
+          "output_schema_ref": "kernel.schemas.generate_questions_output_v1",
+          "scenario_chain_id": "scenario_session_01794302441337645422_0000000037_22ad99d57a154ddc9c1bb41bd4eb1373",
+          "acquisition_source": "web_mirror",
+          "provider_policy_ref": "default_text_generation_v1",
+          "llm_response_metadata": {
+            "usage": {
+              "total_tokens": 1684
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicKbR4XP69A022kQRq4pVD0KZk8S",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.000325925,
+              "actual_provider": "openai"
+            },
+            "structured_output_artifact_id": "artifact_01794302487941734120_0000000352_ba928f6c96544ab8af6b7943fc8aa44d"
+          },
+          "structured_output_artifact_id": "artifact_01794302487941734120_0000000352_ba928f6c96544ab8af6b7943fc8aa44d"
+        }
+      },
+      {
+        "id": "action_run_01794302487954790723_0000000357_7933e3b61d6b4e1a8ea672a2fb951bfd",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302441337645422_0000000037_22ad99d57a154ddc9c1bb41bd4eb1373",
+        "job_id": "job_01794302441349182074_0000000039_9c58fa3a19a5487ba09b22036ad842f9",
+        "workflow_id": "brief_decoder.decode_v1",
+        "step_id": "generate_document",
+        "action_type": "document.generate_from_template",
+        "action_config_id": "brief_decoder.generate_summary_v1",
+        "status": "succeeded",
+        "input_artifact_id": null,
+        "output_artifact_id": "artifact_01794302494043954177_0000000362_1b34f107db9d4e098f358609d15cb098",
+        "error_code": null,
+        "created_at": "2026-11-10 09:21:27.954809+00:00",
+        "started_at": "2026-11-10 09:21:27.954773+00:00",
+        "completed_at": "2026-11-10 09:21:34.047972+00:00",
+        "metadata": {
+          "model": "gpt-6-luna",
+          "user_id": null,
+          "guest_id": "guest_01794302441323584619_0000000035_de1b24cba4624cc39496083cdde8abf9",
+          "provider": "openai",
+          "handoff_id": null,
+          "prompt_ref": "brief_decoder.generate_summary.v1",
+          "input_schema_ref": "kernel.schemas.generate_document_input_v1",
+          "workflow_version": 2,
+          "output_schema_ref": "kernel.schemas.generate_document_output_v1",
+          "scenario_chain_id": "scenario_session_01794302441337645422_0000000037_22ad99d57a154ddc9c1bb41bd4eb1373",
+          "acquisition_source": "web_mirror",
+          "provider_policy_ref": "default_text_generation_v1",
+          "llm_response_metadata": {
+            "usage": {
+              "total_tokens": 2804
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicKeb77g1HXNHaw6Kqob9h68xMUd",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.000619675,
+              "actual_provider": "openai"
+            },
+            "structured_output_artifact_id": "artifact_01794302494043954177_0000000362_1b34f107db9d4e098f358609d15cb098"
+          },
+          "structured_output_artifact_id": "artifact_01794302494043954177_0000000362_1b34f107db9d4e098f358609d15cb098"
+        }
+      }
+    ],
+    "artifacts": [
+      {
+        "id": "artifact_01794302475178919916_0000000332_c7edbe20305942b1ac3d4f52e2649af0",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302441337645422_0000000037_22ad99d57a154ddc9c1bb41bd4eb1373",
+        "job_id": "job_01794302441349182074_0000000039_9c58fa3a19a5487ba09b22036ad842f9",
+        "action_run_id": "action_run_01794302469677890713_0000000327_cb132e123ddf467db5d72ee58971c89a",
+        "artifact_type": "structured_output",
+        "status": "stored",
+        "content_text": null,
+        "content_json": {
+          "values": {
+            "constraints": [
+              "Добавить четкие подзаголовки.",
+              "Включить список вопросов подрядчику.",
+              "Не включать расчеты несущих конструкций, юридические советы и обещания фиксированной стоимости ремонта.",
+              "Текст должен быть оригинальным, без скрытой рекламы.",
+              "Указывать ссылки на источники технических фактов."
+            ],
+            "deliverables": [
+              "Статья для блога объемом 6–8 тысяч знаков."
+            ],
+            "project_goal": "Подготовить статью для блога о ремонте кухни в старом доме: рассказать, как составить перечень работ и подготовиться к разговору с подрядчиком.",
+            "target_audience": "Владельцы квартир без опыта в строительстве."
+          },
+          "confidence": {
+            "constraints": 0.99,
+            "deliverables": 0.97,
+            "project_goal": 0.99,
+            "target_audience": 1
+          },
+          "missing_fields": [
+            "deadline",
+            "budget"
+          ]
+        },
+        "object_storage_key": null,
+        "metadata": {
+          "model": "gpt-6-luna",
+          "guest_id": "guest_01794302441323584619_0000000035_de1b24cba4624cc39496083cdde8abf9",
+          "provider": "openai",
+          "schema_ref": "kernel.schemas.extract_output_v1",
+          "action_type": "text.extract_structured_fields",
+          "workflow_id": "brief_decoder.decode_v1",
+          "schema_version": 1,
+          "pydantic_run_id": "01a1c4c2-e633-72f0-8515-92f6142f3619",
+          "action_config_id": "brief_decoder.extract_brief_v1",
+          "provider_call_id": "provider_call_01794302469685355110_0000000329_1ca0588e78dc4ad7b8d46b410fc2f8a9",
+          "workflow_version": 2,
+          "scenario_chain_id": "scenario_session_01794302441337645422_0000000037_22ad99d57a154ddc9c1bb41bd4eb1373",
+          "acquisition_source": "web_mirror",
+          "litellm_response_id": "chatcmpl-EicKM9qAShIOXkfUnOcG3lmoqDGdc",
+          "physical_call_index": 1,
+          "provider_policy_ref": "default_text_generation_v1",
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1
+        },
+        "created_at": "2026-11-10 09:21:15.178941+00:00"
+      },
+      {
+        "id": "artifact_01794302484326288324_0000000342_385299ffbbe34a5c950dbcbc5c1f9d98",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302441337645422_0000000037_22ad99d57a154ddc9c1bb41bd4eb1373",
+        "job_id": "job_01794302441349182074_0000000039_9c58fa3a19a5487ba09b22036ad842f9",
+        "action_run_id": "action_run_01794302475187319711_0000000337_af242f02a5a54bdd8d4cbfcfd6a72029",
+        "artifact_type": "structured_output",
+        "status": "stored",
+        "content_text": null,
+        "content_json": {
+          "issues": [
+            {
+              "category": "budget_risk",
+              "evidence": "«The budget ... [has] not yet been agreed»",
+              "severity": "medium",
+              "description": "Бюджет проекта не согласован, поэтому до начала работы нужно определить оплату и условия её расчёта."
+            },
+            {
+              "category": "timeline_risk",
+              "evidence": "«[The] delivery date [has] not yet been agreed»",
+              "severity": "medium",
+              "description": "Срок сдачи не согласован, поэтому невозможно спланировать выполнение и согласование статьи."
+            },
+            {
+              "category": "ambiguity",
+              "evidence": "«Length: 6–8 thousand characters»",
+              "severity": "low",
+              "description": "Не указано, входят ли пробелы в требование о длине статьи, что может привести к разным оценкам соответствия объёму."
+            },
+            {
+              "category": "ambiguity",
+              "evidence": "«Link sources for technical facts»",
+              "severity": "low",
+              "description": "Не уточнено, в каком формате оформлять ссылки на источники технических фактов, что может привести к разногласиям при приёмке статьи."
+            }
+          ]
+        },
+        "object_storage_key": null,
+        "metadata": {
+          "model": "gpt-6-luna",
+          "guest_id": "guest_01794302441323584619_0000000035_de1b24cba4624cc39496083cdde8abf9",
+          "provider": "openai",
+          "schema_ref": "kernel.schemas.issue_detection_output_v1",
+          "action_type": "text.detect_issues_by_taxonomy",
+          "workflow_id": "brief_decoder.decode_v1",
+          "schema_version": 1,
+          "pydantic_run_id": "01a1c4c2-fbb7-7443-94eb-a0cd48c325c9",
+          "action_config_id": "brief_decoder.detect_issues_v1",
+          "provider_call_id": "provider_call_01794302475193105375_0000000339_cd36a01951c04d25ab60b9d50bbf0774",
+          "workflow_version": 2,
+          "scenario_chain_id": "scenario_session_01794302441337645422_0000000037_22ad99d57a154ddc9c1bb41bd4eb1373",
+          "acquisition_source": "web_mirror",
+          "litellm_response_id": "chatcmpl-EicKShnRvv13iDEp9MaHUGmaXo0H5",
+          "physical_call_index": 1,
+          "provider_policy_ref": "default_text_generation_v1",
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1
+        },
+        "created_at": "2026-11-10 09:21:24.326348+00:00"
+      },
+      {
+        "id": "artifact_01794302487941734120_0000000352_ba928f6c96544ab8af6b7943fc8aa44d",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302441337645422_0000000037_22ad99d57a154ddc9c1bb41bd4eb1373",
+        "job_id": "job_01794302441349182074_0000000039_9c58fa3a19a5487ba09b22036ad842f9",
+        "action_run_id": "action_run_01794302484338000840_0000000347_4192d25b3d61481395fafe816a0d0431",
+        "artifact_type": "structured_output",
+        "status": "stored",
+        "content_text": null,
+        "content_json": {
+          "questions": [
+            {
+              "category": "budget_risk",
+              "priority": "medium",
+              "question": "Какой бюджет вы предусмотрели для статьи и как удобнее рассчитывать оплату — фиксированной суммой или по объёму работы?",
+              "rationale": "Это поможет согласовать стоимость и условия оплаты до начала работы.",
+              "source_issue_index": 0
+            },
+            {
+              "category": "timeline_risk",
+              "priority": "medium",
+              "question": "К какой дате нужно подготовить статью?",
+              "rationale": "Согласованный срок позволит спланировать работу и вовремя передать статью.",
+              "source_issue_index": 1
+            },
+            {
+              "category": "ambiguity",
+              "priority": "low",
+              "question": "Объём статьи в 6–8 тысяч знаков нужно считать с пробелами или без?",
+              "rationale": "Уточнение поможет одинаково оценивать соответствие статьи заданному объёму.",
+              "source_issue_index": 2
+            },
+            {
+              "category": "ambiguity",
+              "priority": "low",
+              "question": "Как вы хотите оформить ссылки на источники технических фактов — например, активными ссылками в тексте или отдельным списком в конце?",
+              "rationale": "Выбранный формат поможет подготовить ссылки так, чтобы статья соответствовала вашим ожиданиям.",
+              "source_issue_index": 3
+            }
+          ]
+        },
+        "object_storage_key": null,
+        "metadata": {
+          "model": "gpt-6-luna",
+          "guest_id": "guest_01794302441323584619_0000000035_de1b24cba4624cc39496083cdde8abf9",
+          "provider": "openai",
+          "schema_ref": "kernel.schemas.generate_questions_output_v1",
+          "action_type": "text.generate_clarifying_questions",
+          "workflow_id": "brief_decoder.decode_v1",
+          "schema_version": 1,
+          "pydantic_run_id": "01a1c4c3-1f7a-77e2-b34c-8d56e7c9be03",
+          "action_config_id": "brief_decoder.generate_questions_v1",
+          "provider_call_id": "provider_call_01794302484348762478_0000000349_40d13713bea44491b165f71688303594",
+          "workflow_version": 2,
+          "scenario_chain_id": "scenario_session_01794302441337645422_0000000037_22ad99d57a154ddc9c1bb41bd4eb1373",
+          "acquisition_source": "web_mirror",
+          "litellm_response_id": "chatcmpl-EicKbR4XP69A022kQRq4pVD0KZk8S",
+          "physical_call_index": 1,
+          "provider_policy_ref": "default_text_generation_v1",
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1
+        },
+        "created_at": "2026-11-10 09:21:27.941757+00:00"
+      },
+      {
+        "id": "artifact_01794302494043954177_0000000362_1b34f107db9d4e098f358609d15cb098",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302441337645422_0000000037_22ad99d57a154ddc9c1bb41bd4eb1373",
+        "job_id": "job_01794302441349182074_0000000039_9c58fa3a19a5487ba09b22036ad842f9",
+        "action_run_id": "action_run_01794302487954790723_0000000357_7933e3b61d6b4e1a8ea672a2fb951bfd",
+        "artifact_type": "structured_output",
+        "status": "stored",
+        "content_text": null,
+        "content_json": {
+          "summary": "Бриф пока не готов к началу работы: не согласованы бюджет и срок сдачи, а также нужно уточнить, как считать объём статьи и оформлять ссылки на источники. В первую очередь согласуйте бюджет и дату сдачи.",
+          "sections": [
+            {
+              "id": "overview",
+              "title": "Project overview",
+              "content": "Клиент хочет подготовить статью для блога о ремонте кухни в старом доме. В ней нужно рассказать, как составить перечень работ и подготовиться к разговору с подрядчиком. Статья предназначена для владельцев квартир без опыта в строительстве.",
+              "metadata": {
+                "kind": "paragraph"
+              }
+            },
+            {
+              "id": "key-details",
+              "title": "Key details",
+              "content": "• Подготовить статью для блога объёмом 6–8 тысяч знаков.\n• Добавить чёткие подзаголовки и список вопросов подрядчику.\n• Не включать расчёты несущих конструкций, юридические советы и обещания фиксированной стоимости ремонта.\n• Текст должен быть оригинальным, без скрытой рекламы.\n• Указывать ссылки на источники технических фактов.",
+              "metadata": {
+                "kind": "list"
+              }
+            },
+            {
+              "id": "gaps",
+              "title": "Gaps and risks",
+              "content": "Бюджет проекта не согласован, поэтому до начала работы нужно определить оплату и условия её расчёта. Срок сдачи не согласован, поэтому невозможно спланировать выполнение и согласование статьи. Не указано, входят ли пробелы в требование о длине статьи, что может привести к разным оценкам соответствия объёму. Не уточнено, в каком формате оформлять ссылки на источники технических фактов, что может привести к разногласиям при приёмке статьи. Не указаны бюджет и срок сдачи.",
+              "metadata": {
+                "kind": "paragraph"
+              }
+            },
+            {
+              "id": "next-steps",
+              "title": "Questions to ask",
+              "content": "• Какой бюджет вы предусмотрели для статьи и как удобнее рассчитывать оплату — фиксированной суммой или по объёму работы? Это поможет согласовать стоимость и условия оплаты до начала работы.\n• К какой дате нужно подготовить статью? Согласованный срок позволит спланировать работу и вовремя передать статью.\n• Объём статьи в 6–8 тысяч знаков нужно считать с пробелами или без? Уточнение поможет одинаково оценивать соответствие статьи заданному объёму.\n• Как вы хотите оформить ссылки на источники технических фактов — например, активными ссылками в тексте или отдельным списком в конце? Выбранный формат поможет подготовить ссылки так, чтобы статья соответствовала вашим ожиданиям.",
+              "metadata": {
+                "kind": "list"
+              }
+            }
+          ]
+        },
+        "object_storage_key": null,
+        "metadata": {
+          "model": "gpt-6-luna",
+          "guest_id": "guest_01794302441323584619_0000000035_de1b24cba4624cc39496083cdde8abf9",
+          "provider": "openai",
+          "schema_ref": "kernel.schemas.generate_document_output_v1",
+          "action_type": "document.generate_from_template",
+          "workflow_id": "brief_decoder.decode_v1",
+          "schema_version": 1,
+          "pydantic_run_id": "01a1c4c3-2d9c-7496-8493-b0164837f62e",
+          "action_config_id": "brief_decoder.generate_summary_v1",
+          "provider_call_id": "provider_call_01794302487969312132_0000000359_da6e448bbd06464388a90996cc91b170",
+          "workflow_version": 2,
+          "scenario_chain_id": "scenario_session_01794302441337645422_0000000037_22ad99d57a154ddc9c1bb41bd4eb1373",
+          "acquisition_source": "web_mirror",
+          "litellm_response_id": "chatcmpl-EicKeb77g1HXNHaw6Kqob9h68xMUd",
+          "physical_call_index": 1,
+          "provider_policy_ref": "default_text_generation_v1",
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1
+        },
+        "created_at": "2026-11-10 09:21:34.043977+00:00"
+      },
+      {
+        "id": "artifact_01794302494088248151_0000000366_723cad4bc97a424db7f6a274f7b7a0f4",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302441337645422_0000000037_22ad99d57a154ddc9c1bb41bd4eb1373",
+        "job_id": "job_01794302441349182074_0000000039_9c58fa3a19a5487ba09b22036ad842f9",
+        "action_run_id": null,
+        "artifact_type": "structured_output",
+        "status": "stored",
+        "content_text": null,
+        "content_json": {
+          "brief": {
+            "values": {
+              "constraints": [
+                "Добавить четкие подзаголовки.",
+                "Включить список вопросов подрядчику.",
+                "Не включать расчеты несущих конструкций, юридические советы и обещания фиксированной стоимости ремонта.",
+                "Текст должен быть оригинальным, без скрытой рекламы.",
+                "Указывать ссылки на источники технических фактов."
+              ],
+              "deliverables": [
+                "Статья для блога объемом 6–8 тысяч знаков."
+              ],
+              "project_goal": "Подготовить статью для блога о ремонте кухни в старом доме: рассказать, как составить перечень работ и подготовиться к разговору с подрядчиком.",
+              "target_audience": "Владельцы квартир без опыта в строительстве."
+            },
+            "confidence": {
+              "constraints": 0.99,
+              "deliverables": 0.97,
+              "project_goal": 0.99,
+              "target_audience": 1
+            },
+            "missing_fields": [
+              "deadline",
+              "budget"
+            ]
+          },
+          "issues": [
+            {
+              "category": "budget_risk",
+              "evidence": "«The budget ... [has] not yet been agreed»",
+              "severity": "medium",
+              "description": "Бюджет проекта не согласован, поэтому до начала работы нужно определить оплату и условия её расчёта."
+            },
+            {
+              "category": "timeline_risk",
+              "evidence": "«[The] delivery date [has] not yet been agreed»",
+              "severity": "medium",
+              "description": "Срок сдачи не согласован, поэтому невозможно спланировать выполнение и согласование статьи."
+            },
+            {
+              "category": "ambiguity",
+              "evidence": "«Length: 6–8 thousand characters»",
+              "severity": "low",
+              "description": "Не указано, входят ли пробелы в требование о длине статьи, что может привести к разным оценкам соответствия объёму."
+            },
+            {
+              "category": "ambiguity",
+              "evidence": "«Link sources for technical facts»",
+              "severity": "low",
+              "description": "Не уточнено, в каком формате оформлять ссылки на источники технических фактов, что может привести к разногласиям при приёмке статьи."
+            }
+          ],
+          "document": {
+            "summary": "Бриф пока не готов к началу работы: не согласованы бюджет и срок сдачи, а также нужно уточнить, как считать объём статьи и оформлять ссылки на источники. В первую очередь согласуйте бюджет и дату сдачи.",
+            "sections": [
+              {
+                "id": "overview",
+                "title": "Project overview",
+                "content": "Клиент хочет подготовить статью для блога о ремонте кухни в старом доме. В ней нужно рассказать, как составить перечень работ и подготовиться к разговору с подрядчиком. Статья предназначена для владельцев квартир без опыта в строительстве.",
+                "metadata": {
+                  "kind": "paragraph"
+                }
+              },
+              {
+                "id": "key-details",
+                "title": "Key details",
+                "content": "• Подготовить статью для блога объёмом 6–8 тысяч знаков.\n• Добавить чёткие подзаголовки и список вопросов подрядчику.\n• Не включать расчёты несущих конструкций, юридические советы и обещания фиксированной стоимости ремонта.\n• Текст должен быть оригинальным, без скрытой рекламы.\n• Указывать ссылки на источники технических фактов.",
+                "metadata": {
+                  "kind": "list"
+                }
+              },
+              {
+                "id": "gaps",
+                "title": "Gaps and risks",
+                "content": "Бюджет проекта не согласован, поэтому до начала работы нужно определить оплату и условия её расчёта. Срок сдачи не согласован, поэтому невозможно спланировать выполнение и согласование статьи. Не указано, входят ли пробелы в требование о длине статьи, что может привести к разным оценкам соответствия объёму. Не уточнено, в каком формате оформлять ссылки на источники технических фактов, что может привести к разногласиям при приёмке статьи. Не указаны бюджет и срок сдачи.",
+                "metadata": {
+                  "kind": "paragraph"
+                }
+              },
+              {
+                "id": "next-steps",
+                "title": "Questions to ask",
+                "content": "• Какой бюджет вы предусмотрели для статьи и как удобнее рассчитывать оплату — фиксированной суммой или по объёму работы? Это поможет согласовать стоимость и условия оплаты до начала работы.\n• К какой дате нужно подготовить статью? Согласованный срок позволит спланировать работу и вовремя передать статью.\n• Объём статьи в 6–8 тысяч знаков нужно считать с пробелами или без? Уточнение поможет одинаково оценивать соответствие статьи заданному объёму.\n• Как вы хотите оформить ссылки на источники технических фактов — например, активными ссылками в тексте или отдельным списком в конце? Выбранный формат поможет подготовить ссылки так, чтобы статья соответствовала вашим ожиданиям.",
+                "metadata": {
+                  "kind": "list"
+                }
+              }
+            ]
+          },
+          "questions": [
+            {
+              "category": "budget_risk",
+              "priority": "medium",
+              "question": "Какой бюджет вы предусмотрели для статьи и как удобнее рассчитывать оплату — фиксированной суммой или по объёму работы?",
+              "rationale": "Это поможет согласовать стоимость и условия оплаты до начала работы.",
+              "source_issue_index": 0
+            },
+            {
+              "category": "timeline_risk",
+              "priority": "medium",
+              "question": "К какой дате нужно подготовить статью?",
+              "rationale": "Согласованный срок позволит спланировать работу и вовремя передать статью.",
+              "source_issue_index": 1
+            },
+            {
+              "category": "ambiguity",
+              "priority": "low",
+              "question": "Объём статьи в 6–8 тысяч знаков нужно считать с пробелами или без?",
+              "rationale": "Уточнение поможет одинаково оценивать соответствие статьи заданному объёму.",
+              "source_issue_index": 2
+            },
+            {
+              "category": "ambiguity",
+              "priority": "low",
+              "question": "Как вы хотите оформить ссылки на источники технических фактов — например, активными ссылками в тексте или отдельным списком в конце?",
+              "rationale": "Выбранный формат поможет подготовить ссылки так, чтобы статья соответствовала вашим ожиданиям.",
+              "source_issue_index": 3
+            }
+          ],
+          "brief_text": "We need a blog article about renovating a kitchen in an old house: how to list the work and prepare to talk to a contractor. Length: 6–8 thousand characters; audience: apartment owners without construction experience. Include clear subheadings and a list of questions for the contractor. Exclude load-bearing calculations, legal advice and promises of a fixed renovation price. The text must be original, without hidden advertising. Link sources for technical facts. The budget and delivery date have not yet been agreed. Write this analysis in Russian."
+        },
+        "object_storage_key": null,
+        "metadata": {
+          "guest_id": "guest_01794302441323584619_0000000035_de1b24cba4624cc39496083cdde8abf9",
+          "schema_ref": "brief_decoder.decode_output_v1",
+          "workflow_id": "brief_decoder.decode_v1",
+          "artifact_role": "workflow_result",
+          "schema_version": 2,
+          "workflow_version": 2,
+          "scenario_chain_id": "scenario_session_01794302441337645422_0000000037_22ad99d57a154ddc9c1bb41bd4eb1373",
+          "acquisition_source": "web_mirror"
+        },
+        "created_at": "2026-11-10 09:21:34.088277+00:00"
+      }
+    ],
+    "calls": [
+      {
+        "id": "provider_call_01794302469685355110_0000000329_1ca0588e78dc4ad7b8d46b410fc2f8a9",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302441337645422_0000000037_22ad99d57a154ddc9c1bb41bd4eb1373",
+        "job_id": "job_01794302441349182074_0000000039_9c58fa3a19a5487ba09b22036ad842f9",
+        "action_run_id": "action_run_01794302469677890713_0000000327_cb132e123ddf467db5d72ee58971c89a",
+        "workflow_id": "brief_decoder.decode_v1",
+        "workflow_version": 2,
+        "step_id": "extract",
+        "action_type": "text.extract_structured_fields",
+        "action_config_id": "brief_decoder.extract_brief_v1",
+        "provider_policy_ref": "default_text_generation_v1",
+        "provider": "openai",
+        "model": "gpt-6-luna",
+        "gateway_backend": "litellm",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "transport_attempt_index": 1,
+        "physical_call_index": 1,
+        "status": "succeeded",
+        "input_tokens": 1276,
+        "output_tokens": 370,
+        "total_tokens": 1646,
+        "latency_ms": 5476,
+        "estimated_cost": 0.000344425,
+        "error_code": null,
+        "error_message_safe": null,
+        "failure_kind": null,
+        "http_status": null,
+        "pydantic_run_id": "01a1c4c2-e633-72f0-8515-92f6142f3619",
+        "litellm_response_id": "chatcmpl-EicKM9qAShIOXkfUnOcG3lmoqDGdc",
+        "created_at": "2026-11-10 09:21:09.685369+00:00",
+        "started_at": "2026-11-10 09:21:09.685328+00:00",
+        "completed_at": "2026-11-10 09:21:15.165604+00:00",
+        "metadata": {
+          "litellm": {
+            "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+            "http_status": null,
+            "model_group": "anytoolai.default_text",
+            "response_id": "chatcmpl-EicKM9qAShIOXkfUnOcG3lmoqDGdc",
+            "actual_model": "gpt-6-luna",
+            "response_cost": 0.000344425,
+            "actual_provider": "openai"
+          },
+          "timeout": {
+            "configured_seconds": 60
+          },
+          "attempts": {
+            "pydantic_run_id": "01a1c4c2-e633-72f0-8515-92f6142f3619",
+            "physical_call_index": 1,
+            "semantic_attempt_index": 1,
+            "transport_attempt_index": 1
+          },
+          "response": {
+            "http_status": null,
+            "total_tokens": 1646,
+            "litellm_response_id": "chatcmpl-EicKM9qAShIOXkfUnOcG3lmoqDGdc"
+          },
+          "prompt_ref": "brief_decoder.extract_brief.v1",
+          "request_id": null,
+          "fixture_key": null,
+          "temperature": 1.0,
+          "retry_policy": {
+            "transport": {
+              "owner": "litellm",
+              "max_attempts": 2,
+              "litellm_num_retries_per_attempt": 0
+            },
+            "validation": {
+              "owner": "pydanticai",
+              "max_attempts": 2
+            },
+            "hard_limits": {
+              "max_physical_provider_calls_per_action": 4
+            }
+          },
+          "correlation_id": null,
+          "request_payload": {
+            "prompt_chars": 5401,
+            "message_count": 1,
+            "response_schema_present": true
+          },
+          "model_addressing": "policy_alias",
+          "reasoning_effort": null,
+          "request_metadata": {
+            "user_id": null,
+            "guest_id": "guest_01794302441323584619_0000000035_de1b24cba4624cc39496083cdde8abf9",
+            "handoff_id": null,
+            "scenario_chain_id": "scenario_session_01794302441337645422_0000000037_22ad99d57a154ddc9c1bb41bd4eb1373",
+            "acquisition_source": "web_mirror"
+          },
+          "response_metadata": {
+            "usage": {
+              "total_tokens": 1646
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicKM9qAShIOXkfUnOcG3lmoqDGdc",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.000344425,
+              "actual_provider": "openai"
+            }
+          },
+          "structured_output_mode": "json_schema",
+          "fallback_from_policy_ref": null
+        }
+      },
+      {
+        "id": "provider_call_01794302475193105375_0000000339_cd36a01951c04d25ab60b9d50bbf0774",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302441337645422_0000000037_22ad99d57a154ddc9c1bb41bd4eb1373",
+        "job_id": "job_01794302441349182074_0000000039_9c58fa3a19a5487ba09b22036ad842f9",
+        "action_run_id": "action_run_01794302475187319711_0000000337_af242f02a5a54bdd8d4cbfcfd6a72029",
+        "workflow_id": "brief_decoder.decode_v1",
+        "workflow_version": 2,
+        "step_id": "detect_issues",
+        "action_type": "text.detect_issues_by_taxonomy",
+        "action_config_id": "brief_decoder.detect_issues_v1",
+        "provider_policy_ref": "default_text_generation_v1",
+        "provider": "openai",
+        "model": "gpt-6-luna",
+        "gateway_backend": "litellm",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "transport_attempt_index": 1,
+        "physical_call_index": 1,
+        "status": "succeeded",
+        "input_tokens": 1063,
+        "output_tokens": 615,
+        "total_tokens": 1678,
+        "latency_ms": 9115,
+        "estimated_cost": 0.0004403,
+        "error_code": null,
+        "error_message_safe": null,
+        "failure_kind": null,
+        "http_status": null,
+        "pydantic_run_id": "01a1c4c2-fbb7-7443-94eb-a0cd48c325c9",
+        "litellm_response_id": "chatcmpl-EicKShnRvv13iDEp9MaHUGmaXo0H5",
+        "created_at": "2026-11-10 09:21:15.193117+00:00",
+        "started_at": "2026-11-10 09:21:15.193078+00:00",
+        "completed_at": "2026-11-10 09:21:24.310897+00:00",
+        "metadata": {
+          "litellm": {
+            "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+            "http_status": null,
+            "model_group": "anytoolai.default_text",
+            "response_id": "chatcmpl-EicKShnRvv13iDEp9MaHUGmaXo0H5",
+            "actual_model": "gpt-6-luna",
+            "response_cost": 0.0004403,
+            "actual_provider": "openai"
+          },
+          "timeout": {
+            "configured_seconds": 60
+          },
+          "attempts": {
+            "pydantic_run_id": "01a1c4c2-fbb7-7443-94eb-a0cd48c325c9",
+            "physical_call_index": 1,
+            "semantic_attempt_index": 1,
+            "transport_attempt_index": 1
+          },
+          "response": {
+            "http_status": null,
+            "total_tokens": 1678,
+            "litellm_response_id": "chatcmpl-EicKShnRvv13iDEp9MaHUGmaXo0H5"
+          },
+          "prompt_ref": "brief_decoder.detect_issues.v1",
+          "request_id": null,
+          "fixture_key": null,
+          "temperature": 1.0,
+          "retry_policy": {
+            "transport": {
+              "owner": "litellm",
+              "max_attempts": 2,
+              "litellm_num_retries_per_attempt": 0
+            },
+            "validation": {
+              "owner": "pydanticai",
+              "max_attempts": 2
+            },
+            "hard_limits": {
+              "max_physical_provider_calls_per_action": 4
+            }
+          },
+          "correlation_id": null,
+          "request_payload": {
+            "prompt_chars": 4447,
+            "message_count": 1,
+            "response_schema_present": true
+          },
+          "model_addressing": "policy_alias",
+          "reasoning_effort": null,
+          "request_metadata": {
+            "user_id": null,
+            "guest_id": "guest_01794302441323584619_0000000035_de1b24cba4624cc39496083cdde8abf9",
+            "handoff_id": null,
+            "scenario_chain_id": "scenario_session_01794302441337645422_0000000037_22ad99d57a154ddc9c1bb41bd4eb1373",
+            "acquisition_source": "web_mirror"
+          },
+          "response_metadata": {
+            "usage": {
+              "total_tokens": 1678
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicKShnRvv13iDEp9MaHUGmaXo0H5",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.0004403,
+              "actual_provider": "openai"
+            }
+          },
+          "structured_output_mode": "json_schema",
+          "fallback_from_policy_ref": null
+        }
+      },
+      {
+        "id": "provider_call_01794302484348762478_0000000349_40d13713bea44491b165f71688303594",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302441337645422_0000000037_22ad99d57a154ddc9c1bb41bd4eb1373",
+        "job_id": "job_01794302441349182074_0000000039_9c58fa3a19a5487ba09b22036ad842f9",
+        "action_run_id": "action_run_01794302484338000840_0000000347_4192d25b3d61481395fafe816a0d0431",
+        "workflow_id": "brief_decoder.decode_v1",
+        "workflow_version": 2,
+        "step_id": "generate_questions",
+        "action_type": "text.generate_clarifying_questions",
+        "action_config_id": "brief_decoder.generate_questions_v1",
+        "provider_policy_ref": "default_text_generation_v1",
+        "provider": "openai",
+        "model": "gpt-6-luna",
+        "gateway_backend": "litellm",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "transport_attempt_index": 1,
+        "physical_call_index": 1,
+        "status": "succeeded",
+        "input_tokens": 1376,
+        "output_tokens": 308,
+        "total_tokens": 1684,
+        "latency_ms": 3574,
+        "estimated_cost": 0.000325925,
+        "error_code": null,
+        "error_message_safe": null,
+        "failure_kind": null,
+        "http_status": null,
+        "pydantic_run_id": "01a1c4c3-1f7a-77e2-b34c-8d56e7c9be03",
+        "litellm_response_id": "chatcmpl-EicKbR4XP69A022kQRq4pVD0KZk8S",
+        "created_at": "2026-11-10 09:21:24.348778+00:00",
+        "started_at": "2026-11-10 09:21:24.348715+00:00",
+        "completed_at": "2026-11-10 09:21:27.928509+00:00",
+        "metadata": {
+          "litellm": {
+            "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+            "http_status": null,
+            "model_group": "anytoolai.default_text",
+            "response_id": "chatcmpl-EicKbR4XP69A022kQRq4pVD0KZk8S",
+            "actual_model": "gpt-6-luna",
+            "response_cost": 0.000325925,
+            "actual_provider": "openai"
+          },
+          "timeout": {
+            "configured_seconds": 60
+          },
+          "attempts": {
+            "pydantic_run_id": "01a1c4c3-1f7a-77e2-b34c-8d56e7c9be03",
+            "physical_call_index": 1,
+            "semantic_attempt_index": 1,
+            "transport_attempt_index": 1
+          },
+          "response": {
+            "http_status": null,
+            "total_tokens": 1684,
+            "litellm_response_id": "chatcmpl-EicKbR4XP69A022kQRq4pVD0KZk8S"
+          },
+          "prompt_ref": "brief_decoder.generate_questions.v1",
+          "request_id": null,
+          "fixture_key": null,
+          "temperature": 1.0,
+          "retry_policy": {
+            "transport": {
+              "owner": "litellm",
+              "max_attempts": 2,
+              "litellm_num_retries_per_attempt": 0
+            },
+            "validation": {
+              "owner": "pydanticai",
+              "max_attempts": 2
+            },
+            "hard_limits": {
+              "max_physical_provider_calls_per_action": 4
+            }
+          },
+          "correlation_id": null,
+          "request_payload": {
+            "prompt_chars": 5626,
+            "message_count": 1,
+            "response_schema_present": true
+          },
+          "model_addressing": "policy_alias",
+          "reasoning_effort": null,
+          "request_metadata": {
+            "user_id": null,
+            "guest_id": "guest_01794302441323584619_0000000035_de1b24cba4624cc39496083cdde8abf9",
+            "handoff_id": null,
+            "scenario_chain_id": "scenario_session_01794302441337645422_0000000037_22ad99d57a154ddc9c1bb41bd4eb1373",
+            "acquisition_source": "web_mirror"
+          },
+          "response_metadata": {
+            "usage": {
+              "total_tokens": 1684
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicKbR4XP69A022kQRq4pVD0KZk8S",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.000325925,
+              "actual_provider": "openai"
+            }
+          },
+          "structured_output_mode": "json_schema",
+          "fallback_from_policy_ref": null
+        }
+      },
+      {
+        "id": "provider_call_01794302487969312132_0000000359_da6e448bbd06464388a90996cc91b170",
+        "tenant_id": "anytoolai",
+        "region": "ru",
+        "product_id": "brief_decoder",
+        "frontend_id": "web_mirror",
+        "scenario_session_id": "scenario_session_01794302441337645422_0000000037_22ad99d57a154ddc9c1bb41bd4eb1373",
+        "job_id": "job_01794302441349182074_0000000039_9c58fa3a19a5487ba09b22036ad842f9",
+        "action_run_id": "action_run_01794302487954790723_0000000357_7933e3b61d6b4e1a8ea672a2fb951bfd",
+        "workflow_id": "brief_decoder.decode_v1",
+        "workflow_version": 2,
+        "step_id": "generate_document",
+        "action_type": "document.generate_from_template",
+        "action_config_id": "brief_decoder.generate_summary_v1",
+        "provider_policy_ref": "default_text_generation_v1",
+        "provider": "openai",
+        "model": "gpt-6-luna",
+        "gateway_backend": "litellm",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "transport_attempt_index": 1,
+        "physical_call_index": 1,
+        "status": "succeeded",
+        "input_tokens": 2086,
+        "output_tokens": 718,
+        "total_tokens": 2804,
+        "latency_ms": 6054,
+        "estimated_cost": 0.000619675,
+        "error_code": null,
+        "error_message_safe": null,
+        "failure_kind": null,
+        "http_status": null,
+        "pydantic_run_id": "01a1c4c3-2d9c-7496-8493-b0164837f62e",
+        "litellm_response_id": "chatcmpl-EicKeb77g1HXNHaw6Kqob9h68xMUd",
+        "created_at": "2026-11-10 09:21:27.969326+00:00",
+        "started_at": "2026-11-10 09:21:27.969285+00:00",
+        "completed_at": "2026-11-10 09:21:34.028302+00:00",
+        "metadata": {
+          "litellm": {
+            "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+            "http_status": null,
+            "model_group": "anytoolai.default_text",
+            "response_id": "chatcmpl-EicKeb77g1HXNHaw6Kqob9h68xMUd",
+            "actual_model": "gpt-6-luna",
+            "response_cost": 0.000619675,
+            "actual_provider": "openai"
+          },
+          "timeout": {
+            "configured_seconds": 60
+          },
+          "attempts": {
+            "pydantic_run_id": "01a1c4c3-2d9c-7496-8493-b0164837f62e",
+            "physical_call_index": 1,
+            "semantic_attempt_index": 1,
+            "transport_attempt_index": 1
+          },
+          "response": {
+            "http_status": null,
+            "total_tokens": 2804,
+            "litellm_response_id": "chatcmpl-EicKeb77g1HXNHaw6Kqob9h68xMUd"
+          },
+          "prompt_ref": "brief_decoder.generate_summary.v1",
+          "request_id": null,
+          "fixture_key": null,
+          "temperature": 1.0,
+          "retry_policy": {
+            "transport": {
+              "owner": "litellm",
+              "max_attempts": 2,
+              "litellm_num_retries_per_attempt": 0
+            },
+            "validation": {
+              "owner": "pydanticai",
+              "max_attempts": 2
+            },
+            "hard_limits": {
+              "max_physical_provider_calls_per_action": 4
+            }
+          },
+          "correlation_id": null,
+          "request_payload": {
+            "prompt_chars": 8282,
+            "message_count": 1,
+            "response_schema_present": true
+          },
+          "model_addressing": "policy_alias",
+          "reasoning_effort": null,
+          "request_metadata": {
+            "user_id": null,
+            "guest_id": "guest_01794302441323584619_0000000035_de1b24cba4624cc39496083cdde8abf9",
+            "handoff_id": null,
+            "scenario_chain_id": "scenario_session_01794302441337645422_0000000037_22ad99d57a154ddc9c1bb41bd4eb1373",
+            "acquisition_source": "web_mirror"
+          },
+          "response_metadata": {
+            "usage": {
+              "total_tokens": 2804
+            },
+            "litellm": {
+              "model_id": "936a35be142a7834544a35b03a6dc6f3d54d49794063841aaf3c718b9253df8b",
+              "http_status": null,
+              "model_group": "anytoolai.default_text",
+              "response_id": "chatcmpl-EicKeb77g1HXNHaw6Kqob9h68xMUd",
+              "actual_model": "gpt-6-luna",
+              "response_cost": 0.000619675,
+              "actual_provider": "openai"
+            }
+          },
+          "structured_output_mode": "json_schema",
+          "fallback_from_policy_ref": null
+        }
+      }
+    ]
+  },
+  "confirmed_reasoning_effort": null,
+  "latency_ms": 53796
+}

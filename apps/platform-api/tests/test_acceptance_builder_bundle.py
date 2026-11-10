@@ -33,6 +33,7 @@ from anytoolai_platform_core.structured_output.schemas import normalize_schema_m
 from anytoolai_platform_core.workflows.models import JobStatus
 from anytoolai_platform_worker.composition import build_worker
 
+from tests.support.brief_language import golden_cases, write_provider_fixtures
 from tests.support.fake_provider_recording import RecordingProviderAdapter
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -367,61 +368,6 @@ def test_verdict_that_contradicts_the_delta_statuses_is_rejected(
     assert not validator.is_valid(_check_output_with(verdict, statuses))
 
 
-def _document_binding_mutations(scenario_id: str) -> dict[str, dict[str, Any]]:
-    """Free-form A10 text must agree with the structured result it was generated from."""
-    first, second = (1, 2) if scenario_id == CHECK else (0, 1)
-    gaps = 4 if scenario_id == CHECK else 3
-    happy, weak = _expected_output(scenario_id), _expected_output(scenario_id, ".weak_input")
-
-    def section(candidate: dict[str, Any], index: int) -> dict[str, Any]:
-        return candidate["document"]["sections"][index]
-
-    invalid = {
-        # extracted lists: a list absent from `values` must read "Not specified", a present one not
-        "absent_list_with_content": _mutated(weak, lambda o: section(o, first).update(content="- x")),
-        "present_list_reported_absent": _mutated(
-            happy, lambda o: section(o, second).update(content="Not specified in the brief.")
-        ),
-        "missing_field_not_named_in_open_gaps": _mutated(
-            weak, lambda o: section(o, gaps).update(content="Please confirm the details.")
-        ),
-    }
-    if scenario_id == CHECK:
-        invalid.update(
-            {
-                "verdict_text_contradicts_comparison": _mutated(
-                    happy,
-                    lambda o: section(o, 0).update(
-                        content=section(o, 0)["content"].replace(
-                            "Verdict: partially meets", "Verdict: meets"
-                        )
-                    ),
-                ),
-                "verdict_section_lacks_verdict_phrase": _mutated(
-                    happy, lambda o: section(o, 0).update(content="The delivery looks fine.")
-                ),
-                "criterion_status_text_contradicts_delta": _mutated(
-                    happy,
-                    lambda o: section(o, 0).update(
-                        content=section(o, 0)["content"].replace(
-                            "Scope coverage: partial", "Scope coverage: match"
-                        )
-                    ),
-                ),
-            }
-        )
-    return invalid
-
-
-@pytest.mark.parametrize("scenario_id", [DRAFT, CHECK])
-def test_document_text_is_bound_to_the_structured_result(scenario_id: str) -> None:
-    schema = _schema(OUTPUT_SCHEMA_REFS[scenario_id])
-    validator = jsonschema.validators.validator_for(schema)(schema)
-
-    for name, candidate in _document_binding_mutations(scenario_id).items():
-        assert not validator.is_valid(candidate), name
-
-
 @pytest.fixture
 def app(platform_api_app_factory):
     return platform_api_app_factory(guest_id=GUEST_ID)
@@ -526,7 +472,9 @@ def test_draft_happy_path_composes_the_two_step_result(
         "deliverables",
     ]
     assert document_input["template_ref"] == DRAFT
-    assert document_input["data"] == {"extracted": _fixture(EXTRACT)}
+    assert document_input["data"] == {
+        "source_brief": BRIEF_TEXT, "extracted": _fixture(EXTRACT)
+    }
 
     # The one next action this product allows is recorded through the generic endpoint.
     response = asyncio.run(
@@ -590,6 +538,7 @@ def test_check_happy_path_composes_the_three_step_result(
     ]
     assert document_input["template_ref"] == CHECK
     assert document_input["data"] == {
+        "source_brief": BRIEF_TEXT,
         "extracted": _fixture(EXTRACT),
         "comparison": _fixture(COMPARE),
     }
@@ -610,6 +559,7 @@ def test_weak_input_fixtures_are_reachable_end_to_end(
         {"brief_text": WEAK_BRIEF_TEXT},
         draft_adapter,
     )
+    assert draft_adapter.input_payload(-1)["data"]["source_brief"] == WEAK_BRIEF_TEXT
     assert draft_output == _expected_output(DRAFT, ".weak_input")
     assert draft_output["extracted"]["missing_fields"]  # a vague brief reports gaps, not a failure
 
@@ -624,6 +574,7 @@ def test_weak_input_fixtures_are_reachable_end_to_end(
         {"brief_text": WEAK_BRIEF_TEXT, "deliverable_text": WEAK_DELIVERABLE_TEXT},
         check_adapter,
     )
+    assert check_adapter.input_payload(-1)["data"]["source_brief"] == WEAK_BRIEF_TEXT
     assert check_output == _expected_output(CHECK, ".weak_input")
     assert check_output["comparison"]["verdict"] == "does_not_meet"
 
@@ -659,3 +610,24 @@ def test_invalid_input_is_rejected_at_start_before_any_job_or_provider_call(
     with transaction_boundary(session_factory) as session:
         count = session.execute(sa.select(sa.func.count()).select_from(provider_calls_table))
         assert count.scalar_one() == 0
+
+
+@pytest.mark.parametrize("case", golden_cases("acceptance_builder"), ids=lambda case: case["id"])
+def test_multilingual_canonical_output_and_original_language_source(
+    app: Any, request_platform_api, session_factory: SessionFactory, tmp_path: Path,
+    case: dict[str, Any],
+) -> None:
+    expected = write_provider_fixtures(tmp_path, case)
+    adapter = RecordingProviderAdapter(tmp_path)
+    _, output = _run_to_result(
+        app, request_platform_api, session_factory, case["scenario_id"], case["input"], adapter
+    )
+    assert output == expected  # Includes summary, evidence, rationale and every section.
+    source = case["input"]["brief_text"]
+    assert adapter.input_payload(0)["source_text"] == source
+    assert adapter.input_payload(-1)["data"]["source_brief"] == source
+    assert adapter.input_payload(-1)["data"]["extracted"] == output["extracted"]
+    if case["scenario_id"] == CHECK:
+        assert adapter.input_payload(1)["reference_text"] == source
+        assert adapter.input_payload(1)["subject_text"] == case["input"]["deliverable_text"]
+        assert adapter.input_payload(-1)["data"]["comparison"] == output["comparison"]

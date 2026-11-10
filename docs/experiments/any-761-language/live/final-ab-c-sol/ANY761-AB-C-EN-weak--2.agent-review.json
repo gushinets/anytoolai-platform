@@ -1,0 +1,24 @@
+{
+  "evidence_sha256": "519d26bfbc02fa8a20a7cd26c795857cb65bd541d8e2936e1b0c695f43dfee2a",
+  "reviewer": "Codex agent — semantic inspection; independent human review pending",
+  "fields": {
+    "/comparison/rationale": true,
+    "/comparison/deltas/0/evidence": true,
+    "/comparison/deltas/1/evidence": true,
+    "/comparison/deltas/2/evidence": true,
+    "/comparison/deltas/3/evidence": true,
+    "/document/summary": true,
+    "/document/sections/0/content": true,
+    "/document/sections/1/content": true,
+    "/document/sections/2/content": true,
+    "/document/sections/3/content": true,
+    "/document/sections/4/content": true
+  },
+  "criteria": {
+    "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.": true,
+    "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.": true,
+    "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.": true,
+    "Unspecified facts/lists remain missing; the summary does not claim readiness or a complete specification.": true
+  },
+  "notes": "Read full canonical output. English, source facts and extraction preserved; weak Done rejected with low confidence and no fabricated lists. Mixed accepts the reported delivery with an explicit HTML-not-shown confidence caveat; its judgment variability is retained as a limitation. Narrative agrees with every structured status/verdict."
+}

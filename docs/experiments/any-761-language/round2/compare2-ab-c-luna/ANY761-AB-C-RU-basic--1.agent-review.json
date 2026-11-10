@@ -1,0 +1,27 @@
+{
+  "evidence_sha256": "48895a5019c48720decd01e87dd7e2b1823b2c5be5d1c744344f740432fdc194",
+  "reviewer": "Codex agent — semantic inspection; independent human review pending",
+  "fields": {
+    "/extracted/values/assumptions/0": true,
+    "/extracted/values/deliverables/0": true,
+    "/extracted/values/deliverables/1": true,
+    "/extracted/values/acceptance_criteria/0": true,
+    "/comparison/rationale": false,
+    "/comparison/deltas/0/evidence": false,
+    "/comparison/deltas/1/evidence": false,
+    "/comparison/deltas/2/evidence": true,
+    "/comparison/deltas/3/evidence": true,
+    "/document/summary": true,
+    "/document/sections/0/content": true,
+    "/document/sections/1/content": true,
+    "/document/sections/2/content": true,
+    "/document/sections/3/content": true,
+    "/document/sections/4/content": true
+  },
+  "criteria": {
+    "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.": false,
+    "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.": false,
+    "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.": true
+  },
+  "notes": "Confirmed language AC FAIL: Russian authored comparison uses brief, delivered text and Brief; these are not source quotations or machine identifiers. Document localizes them, but whole canonical output fails. Missing JSON verdict and narrative statuses correct. Separate additional budget/date omission remains; not a criteria-placement requirement. Independent review pending."
+}
