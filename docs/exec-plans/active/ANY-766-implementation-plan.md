@@ -44,9 +44,11 @@ ANY-766 delivers both applications’ integration, actual paid execution, truthf
 
 ## 2. Current State & Reusable Implementation
 
+Current development bases: Portal ANY-766 is based on ANY-765 `b2ef280048ac634a60c18e820fbf702beddba19c`; Kernel remains based on `72ff15bc0b77903c87aa39f7b10186dccc556d09`.
+
 ### Development bases and predecessor corrections
 
-**Current re-preparation checkpoint — 2026-11-09 (Asia/Ulaanbaatar).** The user requested re-preparation of the existing runtime-research pair after ANY-715 merged, then explicitly authorized incorporating fresh predecessor commits after validation found the runbook-test follow-up. Numbered implementation steps have not started. This section records the latest actual bases and supersedes earlier preparation base selections.
+**Historical re-preparation checkpoint — 2026-11-09 (Asia/Ulaanbaatar).** The user requested re-preparation of the existing runtime-research pair after ANY-715 merged, then explicitly authorized incorporating fresh predecessor commits after validation found the runbook-test follow-up. Numbered implementation steps had not started at that checkpoint. The development bases above supersede that checkpoint; the preparation evidence below remains historical.
 
 - Portal repository: `/home/wstanley/www/work_unirec/runtime-research/payments-portal`; current local branch `ANY-766`.
 - Fresh `git fetch --no-tags origin` verified Portal `origin/main` at **`576c2d88cf902ae7b5abddbc1e4f438f6c27366e`**, the merge of [ANY-715 PR #161](https://github.com/gushinets/payments-portal/pull/161), merged on 2026-11-09. [ANY-765 PR #164](https://github.com/gushinets/payments-portal/pull/164) remains open, based on that main, with head **`7f985031034f45fde0203f710eb64283cd086e86`**. PR state/ref metadata was freshly checked through GitHub; no current CI or live-acceptance PASS is inferred.
@@ -1132,7 +1134,7 @@ Cover single-use races, wrong verifier/audience/scope, expiry, logout/reset/deac
 
 **Goal / Expected behavior:** accepted production terms produce complete, finite V2 authority.
 
-**Repository / Read before implementation:** Portal; [paid writer](https://github.com/gushinets/payments-portal/blob/7f985031034f45fde0203f710eb64283cd086e86/apps/api/app/domains/billing/paid_access.py), [allowance issuance](https://github.com/gushinets/payments-portal/blob/7f985031034f45fde0203f710eb64283cd086e86/apps/api/app/domains/billing/paid_allowances.py), [paid read](https://github.com/gushinets/payments-portal/blob/7f985031034f45fde0203f710eb64283cd086e86/apps/api/app/domains/billing/paid_read.py).
+**Repository / Read before implementation:** Portal; [paid writer](https://github.com/gushinets/payments-portal/blob/b2ef280048ac634a60c18e820fbf702beddba19c/apps/api/app/domains/billing/paid_access.py), [allowance issuance](https://github.com/gushinets/payments-portal/blob/b2ef280048ac634a60c18e820fbf702beddba19c/apps/api/app/domains/billing/paid_allowances.py), [paid read](https://github.com/gushinets/payments-portal/blob/b2ef280048ac634a60c18e820fbf702beddba19c/apps/api/app/domains/billing/paid_read.py).
 
 **Implement / reuse:** replace simulation-only derivation switches with explicit provenance policy. Reuse primary/cycle classification, issuance, deadline scheduling and the sole paid commit. Preserve complete relevant product proof for primary decisions and customer-wide proof for financial CREATE/original-resolution admission; unrelated incomplete products must not block a proven primary. Add a scoped committed-state read and authenticated V2 producer with bounded serving capacity. Update customer DTO provenance and generated contracts.
 
@@ -1146,7 +1148,7 @@ PATH="$PWD/.venv/bin:$PATH" npm run generate
 PATH="$PWD/.venv/bin:$PATH" npm run generate:check
 ```
 
-Cover revision zero/N, no-op, rollback, source/UTC deadlines, future starts, simulation isolation, renewal retention and unrelated-product survival. Retain the scoped-primary/operator regressions and stricter financial admission when another product remains incomplete.
+Cover revision zero/N, no-op, rollback, source/UTC deadlines, future starts, simulation isolation, renewal retention and unrelated-product survival. Retain the scoped-primary/operator regressions and stricter financial admission when another product remains incomplete. Include `apps/api/tests/test_paid_access_review_regressions_postgres.py`: preserve finite source-end history and one skew adjustment, distinct overdue-reduction/restoration revisions, stable same-cycle allowance IDs, rollback of both phases and product-local inventory failures. Retain the explicit calendar-month offset controls in `apps/api/tests/test_paid_access_policy.py`.
 
 **Expected completion:** service reads expose the committed production set with stable IDs and bounded authority.
 
@@ -1198,7 +1200,7 @@ Use PostgreSQL barriers for stale N after N+1, install races, restart/eviction, 
 ./.venv/bin/python -m pytest -q apps/api/tests/test_access_invalidation_delivery_postgres.py apps/api/tests/test_billing_worker_postgres.py
 ```
 
-Cover crashes around send/apply/ack, N/N+1, lease/generation loss, outage, permanent failure and deadline progress under saturation.
+Cover crashes around send/apply/ack, N/N+1, lease/generation loss, outage, permanent failure and deadline progress under saturation. Preserve the predecessor's two causal revisions on overdue refresh and final outbox coalescing; the early reduction must not schedule queue work, and acknowledgement must advance only through the revision actually sent.
 
 **Expected completion:** restart repairs delivery and preserves monotonic acknowledgement.
 
