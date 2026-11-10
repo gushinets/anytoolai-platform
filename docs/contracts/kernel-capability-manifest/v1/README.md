@@ -247,8 +247,7 @@ Normal automated runs need no secret provisioning or manual cleanup.
 ## Local evidence, 2026-10-29
 
 This dated evidence uses the historical two-metric inventory. Current conformance
-uses the complete ANY-766 inventory above; new results are recorded in the
-[ANY-766 execution plan](../../../exec-plans/active/ANY-766-implementation-plan.md).
+uses the complete ANY-766 inventory above.
 
 Producer: `feature/ANY-711`, base SHA
 `7634eb09533846268a96ade004bca518c580b588` plus the uncommitted Step 4 diff.

@@ -1052,7 +1052,10 @@ refresh obtains a document at or above the durable floor; cache eviction does no
 remove that floor, its semantic identity or immutable usage history. Failed
 identity/snapshot dependencies return safe refusals without creating new work.
 
-Compose peer connectivity/environment forwarding, Portal invalidation delivery,
-browser launch, usage/exhaustion and image/staging activation remain their later
-ANY-766 steps. These settings describe implemented API capabilities, not an
-already connected or approved deployment.
+Portal Step 7 implements embedded invalidation delivery using its configured
+manifest URL/token. Enable the receiver permission before starting that sender.
+Compose peer connectivity/environment forwarding, browser launch, usage/exhaustion,
+paired local acceptance and build/install preparation remain ANY-766 work.
+Remote installation, staging/live acceptance and production rollout belong to
+ANY-767. These settings describe implemented capabilities, not an already
+connected or approved deployment.

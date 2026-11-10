@@ -13,6 +13,7 @@ import pytest
 from anytoolai_platform_api import portal_session
 from anytoolai_platform_api.main import create_app
 from anytoolai_platform_api.portal_session import PortalUserPrincipal, authenticate_portal_user
+from anytoolai_platform_api.schemas import ErrorResponse
 from anytoolai_platform_api.settings import Settings
 from fastapi import Depends
 from fastapi.testclient import TestClient
@@ -180,6 +181,12 @@ def test_invalid_deadlines_cannot_grant_authority(
     assert response.status_code == (
         HTTPStatus.UNAUTHORIZED if deadline == "expired" else HTTPStatus.SERVICE_UNAVAILABLE
     )
+    if operation == "exchange":
+        responses = client.app.openapi()["paths"][EXCHANGE_PATH]["post"]["responses"]
+        assert responses[str(response.status_code)]["content"]["application/json"]["schema"] == {
+            "$ref": "#/components/schemas/ErrorResponse"
+        }
+        ErrorResponse.model_validate(response.json())
 
 
 @pytest.mark.parametrize(
@@ -253,6 +260,11 @@ def test_secret_canaries_do_not_enter_responses_logs_or_reprs(
     ):
         response = client.post(EXCHANGE_PATH, json=payload)
         assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+        responses = client.app.openapi()["paths"][EXCHANGE_PATH]["post"]["responses"]
+        assert responses[str(response.status_code)]["content"]["application/json"]["schema"] == {
+            "$ref": "#/components/schemas/ErrorResponse"
+        }
+        ErrorResponse.model_validate(response.json())
         assert all(secret not in response.text for secret in (CODE, VERIFIER, USER_TOKEN))
         assert response.headers["cache-control"] == "no-store"
     assert all(secret not in caplog.text for secret in (SERVICE_TOKEN, CODE, VERIFIER, USER_TOKEN))
