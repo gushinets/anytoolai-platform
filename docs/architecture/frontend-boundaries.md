@@ -181,6 +181,14 @@ The shared runtime, not a product, owns the web side of a handoff:
   polling another mode's saved run. Explicit mode selection, field edits and accepted own starts
   remember that scenario; merely viewing an attached result does not replace it. New task clears
   the current mode's fields/run and retains the mode selection; other modes keep separate drafts.
+- Once an own start and its scenario selection are confirmed saved, the per-product attachment
+  entry records a preferred own-run reference (draft key and session id). The route lets draft
+  recovery resume that run immediately, including while an old attached result is still displayed.
+  Rejected/ambiguous starts retain the previous attachment; failed persistence delays its
+  retirement until the new result commits. Only the replaced attachment reference is retired;
+  other pending attachments remain fallbacks. A late
+  background Accept cannot replace the preferred own run, while an explicit attachment open can.
+  Clearing or losing the referenced saved run releases its priority over remaining attachments.
 - A spent (accepted/consumed) token that still names the target session shows an explicit "Open result" on the
   consent page, for the case where the Accept response was lost and the person reloaded instead of retrying
   (a retry that gets "already accepted" redirects on its own). It never redirects automatically on load.

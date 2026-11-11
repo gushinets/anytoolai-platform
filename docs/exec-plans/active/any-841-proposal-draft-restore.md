@@ -7,7 +7,7 @@
 - Created: 2026-11-11
 - Last updated: 2026-11-11
 - Review date: 2026-11-18
-- Next action: review the completed CUW correction; live backend navigation verification remains pending.
+- Next action: review the completed accepted own-run correction; live backend navigation verification remains pending.
 - Blocker: quick-check requires passwordless sudo for its activation-marker test; that environment limitation remains documented below.
 
 ## Goal
@@ -32,7 +32,7 @@ behavior. Brief Decoder remains a separate follow-up in ANY-852; other products 
 ## Validation
 
 - Passed: doctor with managed Python 3.12.13, Node 24.22.1 and cached pinned pnpm 10.34.1.
-- Passed: web-mirror tests (25 files, 624 tests), typecheck, lint and validate-docs.
+- Passed: web-mirror tests (26 files, 662 tests), typecheck, lint and validate-docs.
 - Passed: frontend-check, including workspace lint/typecheck/tests, 339 Chromium browser cases,
   generated API contract checks and production builds.
 - quick-check: 3,576 passed, 12 skipped, 657 deselected; one failure in
@@ -40,11 +40,12 @@ behavior. Brief Decoder remains a separate follow-up in ANY-852; other products 
   It requires passwordless `sudo -n -u nobody`; outside the sandbox sudo reports
   "interactive authentication is required". Isolated rerun reproduces it. Its runner, marker
   implementation and test are unchanged from the base commit. No test was weakened or excluded.
-- Passed browser navigation: all three CUW modes passed real F5 and catalog/Back in Chromium
-  against the local Next development server with mocked API responses (draft, accepted running,
-  completed result and New task). Pending: the same checks against a running backend/provider.
-  Recovered running/completed sessions send no additional start request.
-- Environment: Linux; CUW follow-up base SHA 1c3949ca5ab9b52eb57e0b66f633c3f1e28243dd plus the local CUW changes.
+- Passed browser navigation: ProposalAI and all three CUW modes passed real F5 before a new
+  own result while an old attached result was displayed, and after start rejection. These eight
+  Chromium journeys used the local Next development server with mocked API responses. Accepted
+  runs restored the new session without another start; rejected starts retained the old session.
+  New task survived reload. Pending: checks against a running backend/provider.
+- Environment: Linux; base SHA 7c1dc5ae3ff93d63f659585628999b401c96535f plus the local accepted own-run correction.
 - Global pnpm launcher fails in the sandbox; checks use the cached pinned 10.34.1 via a temporary
   PATH entry. Full frontend checks need browser launch/local server permissions.
 
@@ -185,3 +186,50 @@ The user authorized including both CUW findings in ANY-841 after the fourth code
 - The user authorized committing and pushing this correction with the documented sudo limitation.
   No external tracker/review writes were requested. Pending-start and Brief Decoder remain separate
   follow-ups in ANY-848 and ANY-852.
+
+## Accepted own-run recovery selection plan
+
+The user authorized the fifth code review correction for ProposalAI and all CUW modes.
+
+1. Record a preferred saved own run in the existing per-product attachment selection entry only
+   after its draft and scenario are persisted. Separate reload selection from the old displayed
+   result; preserve other remembered attachments as fallbacks.
+2. Make the route defer to that valid own-run reference. A deliberate attachment open overrides
+   it; a late remembered Accept preserves it. A missing/cleared own run releases the preference.
+3. Keep the old attachment on rejected/ambiguous starts or failed persistence. Retire only the
+   replaced reference after successful selection; preserve opt-out behavior.
+4. Add actual useAttachSession remount tests with polling deferred before the new result for
+   ProposalAI and all CUW modes, rejection/storage regressions and ordering tests.
+5. Run focused tests, frontend-check, quick-check and docs validation; distinguish mocked
+   browser evidence from a live backend/provider run.
+
+### Accepted own-run recovery progress
+
+- Reproduced eight reload failures through the real useAttachSession before changing the
+  runtime. The regression matrix covers ProposalAI and Update, Reply Draft and Prepaid Request,
+  with either the accepted run's session poll or result response held until after unmount.
+- The existing attachment entry now records a saved own-run preference. Only confirmed draft,
+  scenario and selection persistence retires the replaced attachment before completion, while
+  its visible result remains available during execution. Rejections retain the old selection;
+  storage failures defer retirement until the new result commits, as for opt-out products.
+- Preserved other accepted attachments as fallbacks, explicit attachment choices and opt-out
+  products. Late background Accept responses do not replace a valid own-run preference; clearing
+  its saved run releases the fallback. The ANY-777 polling loop is unchanged.
+- 318 focused tests passed, including 28 new product integration cases and 10 attachment
+  selection cases. Web typecheck and lint passed. Full frontend-check passed: 662 web tests,
+  336 CE-kit tests, 339 Chromium cases, generated API contracts and production builds.
+- quick-check completed: 3,576 passed, 12 skipped, 657 deselected and one unchanged failure in
+  test_activation_marker_is_readable_by_non_root_api_user: sudo requires interactive
+  authentication. The runner and its test are unchanged from 7c1dc5ae. No tests were weakened
+  or excluded. Config, architecture, docs and generated-doc validation passed; no new backend
+  failures. The final documentation validation and whitespace check also passed.
+- All eight Chromium journeys passed against the local Next development server with mocked
+  API responses: accepted start then F5 before result, and rejected start then F5, for ProposalAI
+  and every CUW mode. Accepted runs restored the new session without another start or old-session
+  poll; rejected starts restored the previous session. New task survived another reload, and no
+  page errors occurred. A running backend/provider was not exercised.
+- Verification base: 7c1dc5ae3ff93d63f659585628999b401c96535f plus this local correction.
+  The user authorized committing and pushing this correction with the documented sudo
+  limitation. No external tracker/review comments or edits were requested.
+- Repository-wide terminology check found pre-existing local review-command references in
+  unrelated ANY-17, ANY-339, ANY-391, ANY-221 and ANY-227 plan documents; those files are unchanged.

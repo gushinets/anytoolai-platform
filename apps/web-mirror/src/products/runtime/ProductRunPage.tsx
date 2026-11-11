@@ -30,8 +30,8 @@ import { ErrorState } from "../../components/ErrorState";
 import { LanguageSwitcher, useHostT, useProductT } from "../../i18n";
 import { getClientStorage } from "./clientStorage";
 import { webBaseUrlFromProductLocation } from "../../lib/hostUrls";
-import type { AttachProps } from "./attachSession";
-import { productDraftKey, readProductDraft, saveDraftValues, saveDraftRun, saveProductDraftScenario, clearProductDraft } from "./draftStorage";
+import { preferSavedOwnRun, type AttachProps } from "./attachSession";
+import { productDraftKey, readProductDraft, readProductDraftScenario, saveDraftValues, saveDraftRun, saveProductDraftScenario, clearProductDraft } from "./draftStorage";
 import { callSafely } from "./callSafely";
 import { isProductEnabled } from "./enabledProducts";
 import { useLatest } from "./useLatest";
@@ -370,8 +370,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     // Retain the session-owned identity after resumedRunRef clears on success.
     resumed: boolean;
   } | null>(null);
-  // The person's own run replaced the attached result on screen: said at commit, like the other effects that
-  // describe what is on screen (a renderer that throws on the own result must not have forgotten the paid-for one).
+  // Opt-out runs and failed persistence keep the attachment until the replacement result commits.
   const previousDisplayedRef = useRef(displayedResult);
   useEffect(() => {
     if (previousDisplayedRef.current?.attached && displayedResult && !displayedResult.attached) {
@@ -716,6 +715,10 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     if (draftKey !== null) {
       saveDraftRun(draftKey, { scenarioSessionId: result.value.scenarioSessionId, input: activeInputRef.current });
       saveProductDraftScenario(productId, scenarioId);
+      if (readProductDraftScenario(productId) === scenarioId && preferSavedOwnRun(productId, draftKey, result.value.scenarioSessionId)) {
+        // Reload follows the accepted own run even while the old result remains on screen.
+        if (displayedResult?.attached) callSafely(onAttachEndRef.current);
+      }
     }
     setPhase({ kind: "running", scenarioSessionId: result.value.scenarioSessionId });
     void runPoll(result.value.scenarioSessionId);

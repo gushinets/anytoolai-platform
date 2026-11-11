@@ -1,15 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ATTACH_SESSION_PARAM } from "../../lib/hostUrls";
+import { readProductDraft } from "./draftStorage";
 
 const storageKey = (productId: string) => `anytoolai.attach_session.${productId}`;
 
-/** One remembered entry per product per tab. `id` is the NEWEST accepted session this tab has seen for the
+/** One recovery selection per product per tab. `id` is the NEWEST accepted attachment this tab has seen for the
  * product and `rank` its order (see `rememberAttachSession`): a timestamp in MICROseconds, compared as a number
  * (as strings, "...:00Z" would sort after "...:00.5Z", which is later); a session that arrived without one (a
  * `?session=` link) has the lowest rank, 0. `active` is the session the person explicitly opened
  * (`chooseAttachSession`), whatever its order, the newest included: a visit restores it until it ends, then
- * `id` (if that is another, newer paid-for session). Absent, nothing was explicitly opened. */
-type StoredAttach = { id: string; rank: number; active?: string };
+ * `id` (if that is another, newer paid-for session). A valid `draft` selects an accepted own run instead;
+ * attachments remain fallbacks until that saved run is cleared or an attachment is explicitly opened. */
+type StoredAttach = {
+  id?: string;
+  rank: number;
+  active?: string;
+  draft?: { key: string; scenarioSessionId: string };
+};
 
 /**
  * An ISO timestamp as a rank in microseconds; anything unparseable ranks lowest. The backend stamps
@@ -34,32 +41,58 @@ function readEntry(productId: string): StoredAttach | undefined {
       return undefined;
     }
     const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== "object" || parsed === null || typeof (parsed as StoredAttach).id !== "string") {
+    if (typeof parsed !== "object" || parsed === null) {
       return undefined;
     }
-    const { id, rank, active } = parsed as StoredAttach;
-    return { id, rank: typeof rank === "number" ? rank : 0, ...(typeof active === "string" ? { active } : {}) };
+    const { id, rank, active, draft } = parsed as { id?: unknown; rank?: unknown; active?: unknown; draft?: unknown };
+    let ownRun: StoredAttach["draft"];
+    if (typeof draft === "object" && draft !== null) {
+      const value = draft as { key?: unknown; scenarioSessionId?: unknown };
+      if (typeof value.key === "string" && value.key.startsWith(`anytoolai.product_draft.${productId}.`) &&
+        typeof value.scenarioSessionId === "string" && value.scenarioSessionId.length > 0) {
+        ownRun = { key: value.key, scenarioSessionId: value.scenarioSessionId };
+      }
+    }
+    if (typeof id !== "string" && ownRun === undefined) return undefined;
+    return {
+      id: typeof id === "string" ? id : undefined,
+      rank: typeof rank === "number" ? rank : 0,
+      active: typeof active === "string" ? active : undefined,
+      draft: ownRun,
+    };
   } catch {
     return undefined;
   }
 }
 
-function writeEntry(productId: string, entry: StoredAttach | null): void {
+function writeEntry(productId: string, entry: StoredAttach | null): boolean {
   try {
-    if (entry === null) {
+    if (entry === null || (entry.id === undefined && entry.active === undefined && entry.draft === undefined)) {
       window.sessionStorage.removeItem(storageKey(productId));
     } else {
       window.sessionStorage.setItem(storageKey(productId), JSON.stringify(entry));
     }
+    return true;
   } catch {
     // Storage unavailable: the id then simply does not survive a reload.
+    return false;
   }
 }
 
-/** The remembered session id for `productId`, if any (what a visit would restore). */
+/** The attachment to restore; undefined while a saved own run has recovery priority. */
 export function readAttachSessionId(productId: string): string | undefined {
   const entry = readEntry(productId);
+  if (entry?.draft && readProductDraft(entry.draft.key)?.run?.scenarioSessionId === entry.draft.scenarioSessionId) {
+    return undefined;
+  }
   return entry?.active ?? entry?.id;
+}
+
+/** Select only a persisted own run; keep other accepted attachments as fallbacks. */
+export function preferSavedOwnRun(productId: string, key: string, scenarioSessionId: string): boolean {
+  if (readProductDraft(key)?.run?.scenarioSessionId !== scenarioSessionId) return false;
+  const current = readEntry(productId);
+  return writeEntry(productId, { ...current, rank: current?.rank ?? 0, draft: { key, scenarioSessionId } });
 }
 
 /**
@@ -73,8 +106,8 @@ export function readAttachSessionId(productId: string): string | undefined {
 export function rememberAttachSession(productId: string, scenarioSessionId: string, timestamp: string): void {
   const rank = toRank(timestamp);
   const current = readEntry(productId);
-  if (current === undefined || rank > current.rank) {
-    writeEntry(productId, { id: scenarioSessionId, rank, ...activeOf(current) });
+  if (current?.id === undefined || rank > current.rank) {
+    writeEntry(productId, { id: scenarioSessionId, rank, ...selectionOf(current) });
   }
 }
 
@@ -87,23 +120,23 @@ export function rememberAttachSession(productId: string, scenarioSessionId: stri
 export function chooseAttachSession(productId: string, scenarioSessionId: string, timestamp: string): void {
   const rank = toRank(timestamp);
   const current = readEntry(productId);
-  const newest = current === undefined || rank > current.rank ? { id: scenarioSessionId, rank } : { id: current.id, rank: current.rank };
+  const newest = current?.id === undefined || rank > current.rank ? { id: scenarioSessionId, rank } : { id: current.id, rank: current.rank };
   writeEntry(productId, { ...newest, active: scenarioSessionId });
 }
 
-/** `current`'s explicitly opened session, carried over unchanged. */
-function activeOf(current: StoredAttach | undefined): { active?: string } {
-  return current?.active === undefined ? {} : { active: current.active };
+/** A background Accept cannot replace the person's attached or own selection. */
+function selectionOf(current: StoredAttach | undefined): Pick<StoredAttach, "active" | "draft"> {
+  return { active: current?.active, draft: current?.draft };
 }
 
 /** Remove only this reference; another explicitly opened or later accepted session survives. */
 function forgetAttachSession(productId: string, id: string): void {
   const current = readEntry(productId);
   if (current?.active === id) {
-    writeEntry(productId, current.id === id ? null : { id: current.id, rank: current.rank });
+    writeEntry(productId, { ...current, active: undefined, ...(current.id === id ? { id: undefined, rank: 0 } : {}) });
   } else if (current?.id === id) {
     // The rank belonged to the discarded id, not to the surviving active session.
-    writeEntry(productId, current.active === undefined ? null : { id: current.active, rank: 0, active: current.active });
+    writeEntry(productId, { ...current, id: current.active, rank: 0 });
   }
 }
 
@@ -120,8 +153,8 @@ export type AttachProps = {
   attachSessionId?: string;
   /** The page started polling the session (it is now on its way to the screen). */
   onAttachBegin?: () => void;
-  /** The person moved on from the attached session: "New task", own work replacing its result, a mode
-   * switch, or its terminal failure. Safe to call at any time; it only acts after the attach began. */
+  /** The person moved on: "New task", a persisted own start, a replacement result, a mode switch,
+   * or terminal failure. Safe to call at any time; it only acts after the attach began. */
   onAttachEnd?: () => void;
   /** Explicitly discard an unavailable attachment before runtime boot; never starts or cancels a run. */
   onAttachDiscard?: () => void;
@@ -148,7 +181,10 @@ export function useAttachSession(productId: string, fromUrl: string | undefined)
     // A bare link has no order of its own (rank 0): it keeps the rank of the same session the consent page
     // remembered, and never replaces a different session that has one (a newer accepted handoff).
     const current = readEntry(productId);
-    if (current === undefined || (current.rank === 0 && current.active === undefined)) {
+    if (current?.draft) {
+      // An explicit URL open outranks the saved own run; a late remembered Accept does not.
+      writeEntry(productId, { ...current, id: current.id ?? fromUrl, active: fromUrl, draft: undefined });
+    } else if (current === undefined || (current.rank === 0 && current.active === undefined)) {
       writeEntry(productId, { id: fromUrl, rank: 0 });
     }
     const url = new URL(window.location.href);

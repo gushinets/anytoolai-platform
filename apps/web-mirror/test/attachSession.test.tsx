@@ -2,7 +2,8 @@
 // reload in the same tab, and forgotten only when the person moves on from the session the page showed.
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { chooseAttachSession, readAttachSessionId, rememberAttachSession, useAttachSession } from "../src/products/runtime/attachSession";
+import { chooseAttachSession, preferSavedOwnRun, readAttachSessionId, rememberAttachSession, useAttachSession } from "../src/products/runtime/attachSession";
+import { clearProductDraft, saveDraftRun } from "../src/products/runtime/draftStorage";
 import { canAttachTarget } from "../src/products/attachTargets";
 import { draftDefinition } from "../src/products/acceptanceBuilder/AcceptanceBuilderProduct";
 import { getRegisteredProduct } from "../src/products/registry";
@@ -246,5 +247,61 @@ describe("attach targets", () => {
     expect(canAttachTarget("acceptance_builder", draftDefinition.scenarioId)).toBe(true);
     expect(canAttachTarget("acceptance_builder", "acceptance_builder.check_v1")).toBe(false);
     expect(canAttachTarget("brief_decoder", "brief_decoder.decode_v1")).toBe(false);
+  });
+});
+
+describe("accepted own-run selection", () => {
+  const productId = "proposal_ai";
+  const key = "anytoolai.product_draft.proposal_ai.generate";
+  function saveOwnRun() {
+    saveDraftRun(key, { scenarioSessionId: "own", input: { taskText: "Own task" } });
+  }
+
+  it("prefers the saved own run over old and late attachments without deleting other accepted sessions", () => {
+    chooseAttachSession(productId, "A", "2026-10-01T10:00:00Z");
+    rememberAttachSession(productId, "B", "2026-10-01T10:05:00Z");
+    const attached = renderHook(() => useAttachSession(productId, undefined));
+    act(() => attached.result.current.onAttachBegin?.());
+    saveOwnRun();
+    expect(preferSavedOwnRun(productId, key, "own")).toBe(true);
+    act(() => attached.result.current.onAttachEnd?.());
+    // The visible fallback stays attached in memory; only reload selection changes.
+    expect(attached.result.current.attachSessionId).toBe("A");
+    expect(readAttachSessionId(productId)).toBeUndefined();
+    rememberAttachSession(productId, "C", "2026-10-01T10:10:00Z");
+    expect(renderHook(() => useAttachSession(productId, undefined)).result.current.attachSessionId).toBeUndefined();
+    clearProductDraft(key);
+    expect(renderHook(() => useAttachSession(productId, undefined)).result.current.attachSessionId).toBe("C");
+  });
+
+  it("remembers a late attachment behind an own run even when there was no previous attachment", () => {
+    saveOwnRun();
+    expect(preferSavedOwnRun(productId, key, "own")).toBe(true);
+    rememberAttachSession(productId, "late", "2026-10-01T10:10:00Z");
+    expect(readAttachSessionId(productId)).toBeUndefined();
+    clearProductDraft(key);
+    expect(readAttachSessionId(productId)).toBe("late");
+  });
+
+  it.each(["consent", "url"])("an explicit %s attachment open supersedes an own run", (source) => {
+    saveOwnRun();
+    expect(preferSavedOwnRun(productId, key, "own")).toBe(true);
+    if (source === "consent") chooseAttachSession(productId, "chosen", "2026-10-01T10:00:00Z");
+    else renderHook(() => useAttachSession(productId, "chosen"));
+    expect(renderHook(() => useAttachSession(productId, undefined)).result.current.attachSessionId).toBe("chosen");
+  });
+
+  it("never replaces an attachment with a missing or different stored own run", () => {
+    chooseAttachSession(productId, "A", "2026-10-01T10:00:00Z");
+    expect(preferSavedOwnRun(productId, key, "own")).toBe(false);
+    saveOwnRun();
+    expect(preferSavedOwnRun(productId, key, "other")).toBe(false);
+    expect(readAttachSessionId(productId)).toBe("A");
+  });
+
+  it.each([null, {}, { key: 1, scenarioSessionId: "own" }, { key, scenarioSessionId: [] },
+    { key: "anytoolai.product_draft.other.generate", scenarioSessionId: "own" }])("ignores an invalid own-run reference %j", (draft) => {
+    window.sessionStorage.setItem(`anytoolai.attach_session.${productId}`, JSON.stringify({ id: "A", rank: 0, draft }));
+    expect(readAttachSessionId(productId)).toBe("A");
   });
 });
