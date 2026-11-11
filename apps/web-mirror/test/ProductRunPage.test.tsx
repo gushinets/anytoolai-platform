@@ -2113,7 +2113,7 @@ describe("opt-in draft recovery", () => {
     expect(window.sessionStorage.getItem(key)).toBe(stored);
   });
 
-  it("resumes only once under StrictMode and treats completion as an own run", async () => {
+  it("resumes only once under StrictMode and derives completion identity from the session", async () => {
     seed();
     const routed = makeClient(happyPathRoutes());
     const onEvent = vi.fn();
@@ -2121,7 +2121,7 @@ describe("opt-in draft recovery", () => {
     await waitForResult();
     expect(routed.calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(1);
     expect(routed.calls.some((call) => call.key === ROUTES.START)).toBe(false);
-    expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({ type: "scenario_completed", guestId: "guest_1" }));
+    expect(onEvent).toHaveBeenCalledWith({ type: "scenario_completed", scenarioSessionId: "session_1", guestId: undefined, resultViewed: true });
   });
 
   it("gives handoff attachment precedence over a saved draft and run", async () => {

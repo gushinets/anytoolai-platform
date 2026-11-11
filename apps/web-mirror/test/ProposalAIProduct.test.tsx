@@ -10,6 +10,7 @@ import {
   errorResponse,
   guestIdentityResponse,
   idempotencyKeyOf,
+  jsonResponse,
   makeClient,
   makeClientCapturingRequests,
   makeClientWithDeferredCalls,
@@ -20,6 +21,8 @@ import {
   sessionResponse,
   startResponse,
 } from "./fixtures/platformResponses";
+import { getClientStorage } from "../src/products/runtime/clientStorage";
+import { createProductRunEventTracker } from "../src/products/runtime/productRunEventTracking";
 import { PROPOSAL_AI_MESSAGES } from "../src/products/proposalAi/messages";
 import { makeRender } from "./support/renderWithI18n";
 
@@ -518,6 +521,70 @@ describe("ProposalAI draft and run restore (ANY-841)", () => {
     expect((document.getElementById("proposal-ai-tone-firm") as HTMLInputElement).checked).toBe(true);
     expect((screen.getByLabelText("Proposal language") as HTMLSelectElement).value).toBe("de");
   }
+
+  it.each(["cleared", "unavailable"])("derives restored result-viewed identity from the session after localStorage is %s", async (storageState) => {
+    const first = makeClientWithDeferredCalls({
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse("guest_before_reload")],
+      [ROUTES.QUOTA]: [quotaResponse(IDS), quotaResponse(IDS)],
+      [ROUTES.START]: [startResponse()],
+    }, { [ROUTES.SESSION]: 1 });
+    render(<ProposalAIProduct client={first.client} />);
+    await fillDraft();
+    fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+    await waitFor(() => expect(first.calls.some((call) => call.key === ROUTES.SESSION)).toBe(true));
+    expect(JSON.parse(first.calls.find((call) => call.key === ROUTES.START)!.init.body as string)).toMatchObject({ guest_id: "guest_before_reload" });
+    cleanup();
+    const identityStorage = window.localStorage;
+    identityStorage.clear();
+    const storageSpy = storageState === "unavailable"
+      ? vi.spyOn(window, "localStorage", "get").mockImplementation(() => { throw new DOMException("blocked", "SecurityError"); })
+      : undefined;
+    const viewedKey = "anytoolai.result_viewed.session_1";
+    const eventRoute = "POST /v1/client-events";
+    const makeReloadClient = (guestId: string) => makeClientCapturingRequests({
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse(guestId)],
+      [ROUTES.QUOTA]: [quotaResponse(IDS), quotaResponse(IDS)],
+      [ROUTES.SESSION]: [sessionResponse()],
+      [ROUTES.RESULT]: [resultResponse(IDS, { output: { text: PROPOSAL_TEXT } })],
+    }, (route, init) => {
+      if (route !== eventRoute) return undefined;
+      const body = JSON.parse(init.body as string) as { event_id: string; event_type: string; guest_id?: string };
+      // Match the backend's session-owner check: the new page guest cannot claim the old run.
+      if (body.event_type === "web.result_viewed" && body.guest_id !== undefined && body.guest_id !== "guest_before_reload") {
+        return errorResponse(404, "scenario_session_not_found");
+      }
+      return jsonResponse(200, { event_id: body.event_id, event_type: body.event_type });
+    });
+    try {
+      const second = makeReloadClient("guest_after_reload");
+      render(<ProposalAIProduct client={second.client} onEvent={createProductRunEventTracker(second.client, IDS.productId, getClientStorage(second.client))} />);
+      await screen.findByText(PROPOSAL_TEXT);
+      await waitFor(() => expect(JSON.parse(window.sessionStorage.getItem(viewedKey) ?? "null")).toMatchObject({ accepted: true }));
+      const viewed = second.calls.filter((call) => call.key === eventRoute).map((call) => JSON.parse(call.init.body as string) as { event_type: string; guest_id?: string; scenario_session_id?: string });
+      expect(viewed.find((event) => event.event_type === "web.product_viewed")).toMatchObject({ guest_id: "guest_after_reload" });
+      const resultEvents = viewed.filter((event) => event.event_type === "web.result_viewed");
+      expect(resultEvents).toHaveLength(1);
+      expect(resultEvents[0]).toMatchObject({ scenario_session_id: "session_1" });
+      expect(resultEvents[0]).not.toHaveProperty("guest_id");
+      expect(second.calls.some((call) => call.key === ROUTES.START)).toBe(false);
+      cleanup();
+      identityStorage.clear();
+      const third = makeReloadClient("guest_third_load");
+      render(<ProposalAIProduct client={third.client} onEvent={createProductRunEventTracker(third.client, IDS.productId, getClientStorage(third.client))} />);
+      await screen.findByText(PROPOSAL_TEXT);
+      await waitFor(() => expect(third.calls.some((call) => call.key === eventRoute)).toBe(true));
+      const duplicateViews = third.calls.filter((call) => call.key === eventRoute).filter((call) => (JSON.parse(call.init.body as string) as { event_type: string }).event_type === "web.result_viewed");
+      expect(duplicateViews).toHaveLength(0);
+      expect(JSON.parse(window.sessionStorage.getItem(viewedKey)!)).toMatchObject({ accepted: true });
+      expect(third.calls.some((call) => call.key === ROUTES.START)).toBe(false);
+    } finally {
+      cleanup();
+      storageSpy?.mockRestore();
+      first.resolveCall(ROUTES.SESSION, 0, sessionResponse());
+    }
+  });
 
   it("restores all four draft fields before submit", async () => {
     renderReady();

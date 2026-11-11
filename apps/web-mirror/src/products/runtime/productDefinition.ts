@@ -15,7 +15,7 @@ export function assertNever(value: never): never {
  * or clipboard contents -- only ids/status, matching ANY-453's "keep ... user text out of event
  * payloads" requirement. Real dispatch is ANY-17's; this is the injectable callback contract.
  *
- * Every variant carries the `guestId` `ProductRunPage` itself already resolved (its own `guestId`
+ * Events normally carry the `guestId` `ProductRunPage` itself already resolved (its own `guestId`
  * state, from the single boot-time `client.createGuestIdentity()` call), rather than leaving a
  * consumer to re-resolve it independently: two independent resolutions can diverge whenever
  * `createWindowLocalStorageAdapter()` is unavailable (e.g. some private-browsing modes) and each
@@ -25,7 +25,8 @@ export function assertNever(value: never): never {
  * own callback (once `Promise.all([getRuntimeConfig, createGuestIdentity])` settles) rather than
  * from a separate mount-time effect: it can then carry the exact same resolved (or, on failure,
  * `undefined`) guest id as every other event, with no second identity resolution anywhere in this
- * module. A `guestId` of `undefined` here means identity resolution hadn't succeeded by boot time;
+ * module. Attached/resumed completions omit `guestId` so the backend derives the original owner
+ * from `scenarioSessionId`. Otherwise, `undefined` means identity resolution failed at boot time;
  * that event -- like `product_viewed`/`form_started`/`form_submitted` whenever neither `guestId`
  * nor a `scenarioSessionId` is available -- may be dropped by the backend's identity-required
  * check, matching `trackClientEvent`'s own documented "client analytics may legitimately

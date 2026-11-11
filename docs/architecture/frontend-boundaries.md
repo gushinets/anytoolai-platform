@@ -181,7 +181,7 @@ The shared runtime, not a product, owns the web side of a handoff:
 - The redirect happens only when `products/attachTargets.ts` lists the accepted target scenario
   (a registered, enabled product page that can attach it); otherwise the consent page keeps showing
   the terminal status. The consent route injects that check, so it does not bundle every product.
-- `web.result_viewed` for an attached session is sent with the session alone, without a guest: the backend
+- `web.result_viewed` for an attached or draft-restored session is sent with the session alone, without a guest: the backend
   derives guest and chain from the session and rejects a different explicit guest, which is what the
   current one is after a reload without a usable `localStorage` (a fresh in-memory guest). The tab keeps, per
   session, the event id, the web session id it was sent under, and whether the backend accepted it:

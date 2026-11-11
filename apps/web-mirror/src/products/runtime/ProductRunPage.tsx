@@ -367,6 +367,8 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     input: V | null;
     // True for the attached (handoff) session's result, false for the person's own run.
     attached: boolean;
+    // Retain the session-owned identity after resumedRunRef clears on success.
+    resumed: boolean;
   } | null>(null);
   // The person's own run replaced the attached result on screen: said at commit, like the other effects that
   // describe what is on screen (a renderer that throws on the own result must not have forgotten the paid-for one).
@@ -403,10 +405,8 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     emitEvent(onEventRef.current, {
       type: "scenario_completed",
       scenarioSessionId: phase.scenarioSessionId,
-      // An attached session is its own authority: the backend derives guest and chain from it and rejects a
-      // different explicit guest, which is what the current one is after a reload without a usable
-      // localStorage (a fresh in-memory guest). Own runs started by this guest keep sending it.
-      guestId: displayedResult?.attached ? undefined : guestId,
+      // Recovered sessions own their identity; a reload may have minted a different page guest.
+      guestId: displayedResult?.attached || displayedResult?.resumed ? undefined : guestId,
       resultViewed,
     });
   }, [phase, guestId, definition, displayedResult, onEventRef]);
@@ -897,6 +897,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       result: extracted,
       input: activeInputRef.current,
       attached: attachActiveRef.current,
+      resumed: resumedRunRef.current === scenarioSessionId,
     });
     setHandoffStatus("idle");
     // A completed run must not lend its Idempotency-Key to a later regeneration.
