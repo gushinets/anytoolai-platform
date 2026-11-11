@@ -1,0 +1,19 @@
+# Optional local Portal connection; databases remain on each app's private network.
+services:
+  platform-api:
+    environment:
+      ANYTOOLAI_PORTAL_BASE_URL: ${ANYTOOLAI_PORTAL_BASE_URL:?set Portal origin}
+      ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN: ${ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN:?set backend credential}
+      ANYTOOLAI_PORTAL_ACCESS_INVALIDATION_ENABLED: ${ANYTOOLAI_PORTAL_ACCESS_INVALIDATION_ENABLED:-false}
+    networks:
+      default:
+      peer:
+        aliases: [kernel-api]
+  platform-worker:
+    networks:
+      default:
+      peer:
+networks:
+  peer:
+    external: true
+    name: ${PAID_RUNTIME_PEER_NETWORK:?set the existing peer network name}

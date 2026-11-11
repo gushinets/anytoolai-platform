@@ -458,3 +458,21 @@ See the common backend guide's implemented Step 14 section for settings, errors,
 lease/recovery and enablement. Local PostgreSQL and synthetic reverse transport
 are covered; actual paired browser/HTTP acceptance remains Step 16. Live/deployed
 acceptance is not claimed.
+
+## ANY-766 Step 16 — focused local acceptance
+
+Portal's `tools/joint_paid_runtime/` composes the real APIs/workers with separate
+PostgreSQL databases, TCP service authentication and ordinary Portal sessions.
+Only external LBX/AI responses and the second backend are synthetic. Temporary
+enabled product copies preserve disabled commercial defaults in this repository.
+The main HTTP journey covers all seven selected scenarios, truthful usage,
+replay/failure/recovery and retained state after recreating its own containers.
+
+The user reduced the 2026-11-11 verification scope to the common backend API and
+main journeys. The synchronized plan records actual results and the deferred full
+matrix. Optional peer transport lives in `infra/compose/docker-compose.peer.yml`;
+PostgreSQL remains private. Dev now retains `postgres18-data` at PostgreSQL 18's
+parent mount and pins the same 18.4 image/digest as Portal. Existing anonymous dev
+volumes require explicit backup/reattachment before recreating an old project;
+the harness touches only fresh run-owned resources. Step 17 and ANY-767 retain
+their build/install and remote/live responsibilities.
