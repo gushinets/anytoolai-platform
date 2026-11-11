@@ -11,6 +11,7 @@ import {
   guestIdentityResponse,
   idempotencyKeyOf,
   makeClient,
+  makeClientCapturingRequests,
   makeClientWithDeferredCalls,
   quotaResponse,
   resultResponse,
@@ -602,13 +603,17 @@ describe("ProposalAI draft and run restore (ANY-841)", () => {
     expect(screen.queryByText(PROPOSAL_TEXT)).toBeNull();
   });
 
-  it("keeps a timed-out resumed run locked and retries polling it", async () => {
+  it("keeps polling a restored healthy run beyond 60 seconds and shows its result", async () => {
     seedRun();
     const second = makeClient({
       [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
       [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
       [ROUTES.QUOTA]: Array.from({ length: 4 }, () => quotaResponse(IDS)),
-      [ROUTES.SESSION]: Array.from({ length: 40 }, () => () => sessionResponse({ status: "running" })),
+      [ROUTES.SESSION]: [
+        ...Array.from({ length: 32 }, () => () => sessionResponse({ status: "running" })),
+        sessionResponse(),
+      ],
+      [ROUTES.RESULT]: [resultResponse(IDS, { output: { text: PROPOSAL_TEXT } })],
     });
     vi.useFakeTimers();
     try {
@@ -618,12 +623,94 @@ describe("ProposalAI draft and run restore (ANY-841)", () => {
         for (let elapsed = 0; elapsed < 61_000; elapsed += 50) await vi.advanceTimersByTimeAsync(50);
       });
       expect((screen.getByLabelText(/^Describe the task/) as HTMLTextAreaElement).disabled).toBe(true);
-      const polls = second.calls.filter((call) => call.key === ROUTES.SESSION).length;
-      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-      await act(async () => { await vi.advanceTimersByTimeAsync(50); });
-      expect(second.calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(polls + 1);
-      expect(second.calls.some((call) => call.key === ROUTES.START)).toBe(false);
+      expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+      expect(second.calls.filter((call) => call.key === ROUTES.SESSION).length).toBeGreaterThan(30);
       expect((JSON.parse(window.sessionStorage.getItem(key)!) as { run?: unknown }).run).toBeTruthy();
+      await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+      expect(screen.getByText(PROPOSAL_TEXT)).toBeTruthy();
+      expect(second.calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(33);
+      expect(second.calls.some((call) => call.key === ROUTES.START)).toBe(false);
+    } finally {
+      cleanup();
+      vi.useRealTimers();
+    }
+  });
+
+  const attachmentFailures: Array<{ name: string; session?: () => Response; result?: () => Response }> = [
+    { name: "missing session", session: () => errorResponse(404, "scenario_session_not_found") },
+    { name: "failed session", session: () => sessionResponse({ scenario_session_id: "attached_1", status: "failed" }) },
+    { name: "expired session", session: () => sessionResponse({ scenario_session_id: "attached_1", status: "expired" }) },
+    { name: "missing artifact id", session: () => sessionResponse({ scenario_session_id: "attached_1", result_artifact_id: null }) },
+    { name: "missing result", result: () => errorResponse(404, "result_artifact_not_found") },
+    { name: "unavailable result", result: () => errorResponse(404, "result_artifact_unavailable") },
+    { name: "wrong schema ref", result: () => resultResponse(IDS, { scenario_session_id: "attached_1", schema_ref: "other.output_v1" }) },
+    { name: "wrong schema version", result: () => resultResponse(IDS, { scenario_session_id: "attached_1", schema_version: 2 }) },
+    { name: "unusable result", result: () => resultResponse(IDS, { scenario_session_id: "attached_1", output: {} }) },
+  ];
+
+  it.each(attachmentFailures)("preserves the saved own run after an unrelated attachment has $name", async ({ session = () => sessionResponse({ scenario_session_id: "attached_1" }), result }) => {
+    seedRun();
+    const stored = window.sessionStorage.getItem(key);
+    const attachedSession = "GET /v1/scenario-sessions/attached_1";
+    const first = makeClient({
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
+      [ROUTES.QUOTA]: [quotaResponse(IDS), quotaResponse(IDS)],
+      [attachedSession]: [session()],
+      [ROUTES.RESULT]: result ? [result()] : [],
+    });
+    const onAttachEnd = vi.fn();
+    render(<ProposalAIProduct client={first.client} attachSessionId="attached_1" onAttachEnd={onAttachEnd} />);
+    await waitFor(() => expect(onAttachEnd).toHaveBeenCalledOnce());
+    expect(window.sessionStorage.getItem(key)).toBe(stored);
+    expect(first.calls.filter((call) => call.key === attachedSession)).toHaveLength(1);
+    expect(first.calls.some((call) => call.key === ROUTES.START || call.key === ROUTES.SESSION)).toBe(false);
+    cleanup();
+    const second = recoveryClient();
+    render(<ProposalAIProduct client={second.client} />);
+    expect(await screen.findByText(PROPOSAL_TEXT)).toBeTruthy();
+    await expectDraft();
+    expect(second.calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(1);
+    expect(second.calls.some((call) => call.key === ROUTES.START)).toBe(false);
+  });
+
+  it("forgets a failed attachment only when it matches the saved run", async () => {
+    seedRun();
+    const first = recoveryClient(errorResponse(404, "scenario_session_not_found"));
+    const onAttachEnd = vi.fn();
+    render(<ProposalAIProduct client={first.client} attachSessionId="session_1" onAttachEnd={onAttachEnd} />);
+    await waitFor(() => expect(onAttachEnd).toHaveBeenCalledOnce());
+    expect(JSON.parse(window.sessionStorage.getItem(key)!)).toEqual({ v: 1, values });
+  });
+
+  it("keeps a restored run locked after a request timeout and retries only that session", async () => {
+    seedRun();
+    let timedOut = false;
+    const second = makeClientCapturingRequests({
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
+      [ROUTES.QUOTA]: [quotaResponse(IDS), quotaResponse(IDS)],
+      [ROUTES.SESSION]: [sessionResponse()],
+      [ROUTES.RESULT]: [resultResponse(IDS, { output: { text: PROPOSAL_TEXT } })],
+    }, (route, init) => {
+      if (route !== ROUTES.SESSION || timedOut) return undefined;
+      timedOut = true;
+      return new Promise<Response>((_resolve, reject) => {
+        init.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+      });
+    });
+    vi.useFakeTimers();
+    try {
+      render(<ProposalAIProduct client={second.client} />);
+      await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+      expect((screen.getByLabelText(/^Describe the task/) as HTMLTextAreaElement).disabled).toBe(true);
+      expect((JSON.parse(window.sessionStorage.getItem(key)!) as { run?: unknown }).run).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+      await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+      expect(screen.getByText(PROPOSAL_TEXT)).toBeTruthy();
+      expect(second.calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(2);
+      expect(second.calls.some((call) => call.key === ROUTES.START)).toBe(false);
     } finally {
       cleanup();
       vi.useRealTimers();

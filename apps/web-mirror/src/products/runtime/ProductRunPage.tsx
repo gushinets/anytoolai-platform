@@ -744,7 +744,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       // succeed on retry: end in the run-failed state instead of offering an endless re-poll.
       if (polled.result.error.type === "backend_error" && polled.result.error.status === 404) {
         if (attachActiveRef.current) {
-          enterUnknownError();
+          enterUnknownError(scenarioSessionId);
           return;
         }
         if (resumedRunRef.current === scenarioSessionId) {
@@ -768,11 +768,11 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       // post-completion activation" shape (see `ProductDefinition`'s docstring) -- a mid-flow
       // checkpoint needing a product-chosen next action isn't handled yet, deliberately, until a
       // real product needs it.
-      enterUnknownError();
+      enterUnknownError(scenarioSessionId);
       return;
     }
     if (!session.resultArtifactId) {
-      enterUnknownError();
+      enterUnknownError(scenarioSessionId);
       return;
     }
     await fetchResult(scenarioSessionId, session.resultArtifactId, session.currentCheckpointId);
@@ -787,8 +787,11 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   // form-showing phases below (its retry isn't the only path back to the submit button), so
   // invalidating the stale start only inside one specific "Try again" handler previously left the
   // ordinary form Submit button able to silently replay it too.
-  function enterUnknownError() {
-    if (draftKey !== null) saveDraftRun(draftKey, null);
+  function enterUnknownError(scenarioSessionId: string) {
+    // A failed attachment must not remove a different saved own run.
+    if (draftKey !== null && readProductDraft(draftKey)?.run?.scenarioSessionId === scenarioSessionId) {
+      saveDraftRun(draftKey, null);
+    }
     resumedRunRef.current = null;
     setPendingStart(null);
     if (attachActiveRef.current) {
@@ -846,7 +849,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         // result is ready". This session's own start is as dead as its result: only a fresh run
         // (a new Idempotency-Key) has any chance of a usable result.
         resultFetchSettledRef.current = true;
-        enterUnknownError();
+        enterUnknownError(scenarioSessionId);
         return;
       }
       // Transient/ambiguous: the scenario itself already completed, only this GET failed (network
@@ -872,7 +875,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         (boot.outputSchemaVersion !== null && resultResult.value.schemaVersion !== boot.outputSchemaVersion))
     ) {
       resultFetchSettledRef.current = true;
-      enterUnknownError();
+      enterUnknownError(scenarioSessionId);
       return;
     }
     const extracted = definition.extractResult(resultResult.value.output);
@@ -880,7 +883,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       // The backend returned a genuinely unusable/malformed result -- an unexpected terminal
       // state, not a fetch problem, so this one *does* mean starting over.
       resultFetchSettledRef.current = true;
-      enterUnknownError();
+      enterUnknownError(scenarioSessionId);
       return;
     }
     resultFetchSettledRef.current = true;
