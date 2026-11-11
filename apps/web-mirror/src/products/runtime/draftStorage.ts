@@ -7,6 +7,23 @@ export function productDraftKey(productId: string, messageScope: string): string
   return `anytoolai.product_draft.${productId}.${messageScope}`;
 }
 
+/** The caller validates the saved scenario against its current opt-in definitions. */
+export function readProductDraftScenario(productId: string): string | undefined {
+  try {
+    return window.sessionStorage.getItem(`anytoolai.product_draft_scenario.${productId}`) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function saveProductDraftScenario(productId: string, scenarioId: string): void {
+  try {
+    window.sessionStorage.setItem(`anytoolai.product_draft_scenario.${productId}`, scenarioId);
+  } catch {
+    // Storage unavailable or full: the selected mode does not survive a reload.
+  }
+}
+
 /** Reads and shape-checks the envelope only; product values are validated by the caller. */
 export function readProductDraft(key: string): StoredDraft | undefined {
   try {

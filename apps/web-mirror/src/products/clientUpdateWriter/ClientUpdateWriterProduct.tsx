@@ -16,7 +16,8 @@ import {
 } from "../runtime/fieldValidation";
 import type { ProductDefinition, ProductFieldsProps, ProductResultProps, ProductRunEvent } from "../runtime/productDefinition";
 import { MultiModeProduct } from "../shared/MultiModeProduct";
-import { TONE_OPTIONS, type Tone } from "../shared/tone";
+import { isRecord } from "../shared/resultGuards";
+import { isTone, TONE_OPTIONS, type Tone } from "../shared/tone";
 import styles from "./ClientUpdateWriterProduct.module.css";
 
 const PRODUCT_ID = "client_update_writer";
@@ -137,6 +138,12 @@ export const updateDefinition: ProductDefinition<UpdateValues, ClientUpdateWrite
   scenarioId: "client_update_writer.update_v1",
   messageScope: "update",
   emptyValues: { progressNotes: "", tone: "neutral" },
+  draft: {
+    parseValues: (raw) => isRecord(raw) ? {
+      progressNotes: typeof raw.progressNotes === "string" ? raw.progressNotes : "",
+      tone: typeof raw.tone === "string" && isTone(raw.tone) ? raw.tone : "neutral",
+    } : null,
+  },
   validate: validateUpdate,
   toInput: (values) => ({ progress_notes: trimBackendWhitespace(values.progressNotes), tone: values.tone }),
   extractResult: extractComposeReplyResult,
@@ -197,6 +204,13 @@ export const replyDraftDefinition: ProductDefinition<ReplyDraftValues, ClientUpd
   scenarioId: "client_update_writer.reply_draft_v1",
   messageScope: "reply_draft",
   emptyValues: { clientMessage: "", replyGoal: "", tone: "neutral" },
+  draft: {
+    parseValues: (raw) => isRecord(raw) ? {
+      clientMessage: typeof raw.clientMessage === "string" ? raw.clientMessage : "",
+      replyGoal: typeof raw.replyGoal === "string" ? raw.replyGoal : "",
+      tone: typeof raw.tone === "string" && isTone(raw.tone) ? raw.tone : "neutral",
+    } : null,
+  },
   validate: validateReplyDraft,
   toInput: (values) => ({
     client_message: trimBackendWhitespace(values.clientMessage),
@@ -274,6 +288,14 @@ export const prepaidRequestDefinition: ProductDefinition<PrepaidRequestValues, C
   scenarioId: "client_update_writer.prepaid_request_v1",
   messageScope: "prepaid_request",
   emptyValues: { billingNotes: "", billingAmount: "", billingDueDate: "", tone: "neutral" },
+  draft: {
+    parseValues: (raw) => isRecord(raw) ? {
+      billingNotes: typeof raw.billingNotes === "string" ? raw.billingNotes : "",
+      billingAmount: typeof raw.billingAmount === "string" ? raw.billingAmount : "",
+      billingDueDate: typeof raw.billingDueDate === "string" ? raw.billingDueDate : "",
+      tone: typeof raw.tone === "string" && isTone(raw.tone) ? raw.tone : "neutral",
+    } : null,
+  },
   validate: validatePrepaidRequest,
   toInput: (values) => ({
     billing_context: {

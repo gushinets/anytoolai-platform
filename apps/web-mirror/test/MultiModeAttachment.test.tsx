@@ -103,7 +103,8 @@ describe.each(products)("$productId attachment recovery", (product) => {
       }
       view.unmount();
       render(<Attached client={made.client} />);
-      await screen.findByLabelText(modes[0].field);
+      // Only CUW opts into remembering the selected mode; Acceptance Builder remains opt-out.
+      await screen.findByLabelText((productId === "client_update_writer" ? modes.at(-1)! : modes[0]).field);
       expect(made.calls.filter((call) => call.key === r.SESSION)).toHaveLength(failure === "legacy" ? 2 : 1);
       expect(made.calls.some((call) => call.key.endsWith("/start"))).toBe(false);
       expect(screen.getByText(/2 of 3/)).toBeTruthy();

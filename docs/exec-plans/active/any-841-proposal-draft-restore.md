@@ -1,4 +1,4 @@
-# Execution Plan: ProposalAI draft and accepted run recovery (ANY-841)
+# Execution Plan: ProposalAI and Client Update Writer recovery (ANY-841)
 
 ## Status
 
@@ -7,18 +7,19 @@
 - Created: 2026-11-11
 - Last updated: 2026-11-11
 - Review date: 2026-11-18
-- Next action: review the P2 fix; pending-start is tracked in ANY-848 and live navigation verification remains pending.
-- Blocker: none for commit/push; the sudo-dependent baseline limitation is documented below and explicitly accepted by the user.
+- Next action: review the completed CUW correction; live backend navigation verification remains pending.
+- Blocker: quick-check requires passwordless sudo for its activation-marker test; that environment limitation remains documented below.
 
 ## Goal
 
-Restore ProposalAI form fields and its last accepted run on reload or return in the same tab,
+Restore ProposalAI and Client Update Writer form fields and their last accepted run on reload or return in the same tab,
 without another scenario start or quota reservation.
 
 ## Scope
 
-Opt-in shared frontend storage and recovery, ProposalAI parsing, tests and frontend architecture docs.
-No new API endpoints, database schema, event types or backend behavior. Other products remain opt-out.
+Opt-in shared frontend storage and recovery, ProposalAI and all three Client Update Writer modes,
+tests and frontend architecture docs. No new API endpoints, database schema, event types or backend
+behavior. Brief Decoder remains a separate follow-up in ANY-852; other products remain opt-out.
 
 ## Implementation steps
 
@@ -31,7 +32,7 @@ No new API endpoints, database schema, event types or backend behavior. Other pr
 ## Validation
 
 - Passed: doctor with managed Python 3.12.13, Node 24.22.1 and cached pinned pnpm 10.34.1.
-- Passed: web-mirror tests (25 files, 590 tests), typecheck, lint and validate-docs.
+- Passed: web-mirror tests (25 files, 624 tests), typecheck, lint and validate-docs.
 - Passed: frontend-check, including workspace lint/typecheck/tests, 339 Chromium browser cases,
   generated API contract checks and production builds.
 - quick-check: 3,576 passed, 12 skipped, 657 deselected; one failure in
@@ -39,16 +40,18 @@ No new API endpoints, database schema, event types or backend behavior. Other pr
   It requires passwordless `sudo -n -u nobody`; outside the sandbox sudo reports
   "interactive authentication is required". Isolated rerun reproduces it. Its runner, marker
   implementation and test are unchanged from the base commit. No test was weakened or excluded.
-- Pending manual verification: F5 and catalog/Back checks against a live API were not performed. Automated remount tests cover the three states;
-  recovered running/completed sessions send no start request.
-- Environment: Linux; P2 follow-up base SHA 014f5316c00844074b8bf90fe80a5c075e6049dc plus the local P2 changes.
+- Passed browser navigation: all three CUW modes passed real F5 and catalog/Back in Chromium
+  against the local Next development server with mocked API responses (draft, accepted running,
+  completed result and New task). Pending: the same checks against a running backend/provider.
+  Recovered running/completed sessions send no additional start request.
+- Environment: Linux; CUW follow-up base SHA 1c3949ca5ab9b52eb57e0b66f633c3f1e28243dd plus the local CUW changes.
 - Global pnpm launcher fails in the sandbox; checks use the cached pinned 10.34.1 via a temporary
   PATH entry. Full frontend checks need browser launch/local server permissions.
 
 ## Decision log
 
 - Use existing React/TypeScript runtime: the task requires a frontend fix and explicitly excludes backend changes.
-- Keep shared design tokens and UI unchanged. ProposalAI alone opts in.
+- Keep shared design tokens and UI unchanged. ProposalAI and Client Update Writer opt in.
 - Stay on existing feature/ANY-841 branch per repository rules.
 - User approved commit and push with the documented sudo-dependent quick-check failure; no
   test expectations or results were changed to obtain approval.
@@ -143,3 +146,42 @@ No new API endpoints, database schema, event types or backend behavior. Other pr
 - The user authorized committing and pushing the P2 fix with the documented sudo limitation.
   Pending-start remains tracked in ANY-848. Only the requested pending-start thread reply was
   posted; no threads were resolved. Live F5/catalog-Back checks remain pending.
+
+## Client Update Writer implementation plan
+
+The user authorized including both CUW findings in ANY-841 after the fourth code review.
+
+1. Add validated draft parsers to Update, Reply Draft and Prepaid Request using existing
+   storage and runtime recovery. Keep each mode's fields in its own storage entry.
+2. Resolve the remembered opt-in mode before mounting ProductRunPage. Explicit attachments
+   take precedence; viewing one must not overwrite the user's own selected mode.
+3. Add real product remount regressions for drafts, accepted running/completed sessions,
+   edited input, New task, storage failures, isolation and handoff priority. Keep
+   Acceptance Builder's existing opt-out behavior.
+4. Run focused regressions, frontend-check, quick-check and docs checks. Record any
+   environment failures and distinguish component remount coverage from live F5/Back.
+
+### Client Update Writer progress
+
+- All three CUW definitions now validate and restore their own fields through the existing draft
+  contract. The selected scenario is remembered on explicit mode selection, input edits and
+  accepted own starts, including a new own run started from an attached mode.
+- MultiModeProduct resolves that scenario against opt-in definitions before mounting a form.
+  Unknown/foreign values fall back to the initial mode. Attachments retain precedence without
+  replacing the own selection; Acceptance Builder remains opt-out.
+- 150 focused tests passed, including all three modes, accepted/completed runs without a new
+  start, original versus edited inputs, New task, unavailable/full storage, handoff precedence,
+  isolated drafts, and StrictMode recovery without polling another mode's saved run.
+- Browser verification passed in Chromium against the local Next development server with
+  mocked Platform API responses: all three CUW modes passed F5 and catalog/Back before submit,
+  during an accepted running session and after completion; New task survived reload. Each
+  journey sent exactly one start, and no page errors were observed. This is browser-navigation
+  evidence, not end-to-end evidence against a running backend/provider.
+- Doctor, standalone web typecheck and lint passed. Full frontend-check passed: 624 web tests,
+  336 CE-kit tests, 339 Chromium cases, generated contracts and production builds.
+- quick-check: 3,576 passed, 12 skipped, 657 deselected; the only failure is the unchanged
+  activation-marker test requiring passwordless sudo (interactive authentication required).
+  Config, architecture, documentation and generated-doc checks passed.
+- The user authorized committing and pushing this correction with the documented sudo limitation.
+  No external tracker/review writes were requested. Pending-start and Brief Decoder remain separate
+  follow-ups in ANY-848 and ANY-852.

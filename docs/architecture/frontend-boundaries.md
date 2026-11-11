@@ -174,7 +174,13 @@ The shared runtime, not a product, owns the web side of a handoff:
   (`anytoolai.product_draft.<productId>.<messageScope>`). Reload resumes polling without a new start.
   "New task" clears both; terminal failure clears only the matching saved run and keeps the draft.
   A failed attachment preserves a different saved own run. User text stays in
-  tab storage, never events, URLs or logs. ProposalAI is the first opt-in; handoff attachment takes precedence.
+  tab storage, never events, URLs or logs. ProposalAI and all three Client Update Writer modes opt in;
+  handoff attachment takes precedence. The last selected draft scenario is stored separately under
+  `anytoolai.product_draft_scenario.<productId>`. Multi-mode pages resolve it against their current
+  opt-in definitions before mounting a form, so reload opens the correct mode without briefly
+  polling another mode's saved run. Explicit mode selection, field edits and accepted own starts
+  remember that scenario; merely viewing an attached result does not replace it. New task clears
+  the current mode's fields/run and retains the mode selection; other modes keep separate drafts.
 - A spent (accepted/consumed) token that still names the target session shows an explicit "Open result" on the
   consent page, for the case where the Accept response was lost and the person reloaded instead of retrying
   (a retry that gets "already accepted" redirects on its own). It never redirects automatically on load.

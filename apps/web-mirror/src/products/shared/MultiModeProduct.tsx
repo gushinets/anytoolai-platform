@@ -11,6 +11,7 @@ import type { PlatformApiClient } from "@anytoolai/ce-kit";
 import type { AttachProps } from "../runtime/attachSession";
 import { callSafely } from "../runtime/callSafely";
 import { ProductRunPage } from "../runtime/ProductRunPage";
+import { readProductDraftScenario, saveProductDraftScenario } from "../runtime/draftStorage";
 import type { ProductDefinition, ProductRunEvent } from "../runtime/productDefinition";
 import { ModeSwitch } from "./ModeSwitch";
 import styles from "../../components/cardStack.module.css";
@@ -27,8 +28,8 @@ export type ProductMode<Id extends string, R> = { id: Id; label: string; definit
  * A product whose modes are each their own complete `ProductDefinition` (one scenario per mode):
  * a mode selector above one `ProductRunPage`. Product-owned data is just the mode list.
  *
- * - `key={modeId}` remounts the page on a switch, so a mode always starts from a clean form and run
- *   state; that is load-bearing, since the modes' form values have incompatible shapes.
+ * - `key={modeId}` remounts the page on a switch because modes' form values have incompatible
+ *   shapes. Opt-in drafts restore per mode; other modes start from a clean form and run state.
  * - The switch is disabled while the page is locked (`onLockedChange`): a run in flight, a handoff being
  *   created or navigated to, or an attached session that is still booting. The remount would abort
  *   the poll and abandon an already-accepted, quota-consuming run whose result the user could never
@@ -68,6 +69,7 @@ export function MultiModeProduct<Id extends string, R>({
   const [attempt, setAttempt] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const focusFreshFormRef = useRef(false);
+  const ownModeResolvedRef = useRef(false);
   const modesRef = useRef(modes);
   modesRef.current = modes;
   const shell = useContext(ProductShellContext);
@@ -81,6 +83,12 @@ export function MultiModeProduct<Id extends string, R>({
 
   useEffect(() => {
     if (!attachSessionId) {
+      if (!ownModeResolvedRef.current) {
+        ownModeResolvedRef.current = true;
+        const savedId = readProductDraftScenario(modesRef.current[0].definition.productId);
+        const savedMode = modesRef.current.find((candidate) => candidate.definition.scenarioId === savedId && candidate.definition.draft);
+        if (savedMode) setModeId(savedMode.id);
+      }
       setResolution("ready");
       return;
     }
@@ -127,6 +135,9 @@ export function MultiModeProduct<Id extends string, R>({
         value={modeId}
         disabled={locked || resolution !== "ready"}
         onChange={(id) => {
+          ownModeResolvedRef.current = true;
+          const selected = modes.find((candidate) => candidate.id === id);
+          if (selected?.definition.draft) saveProductDraftScenario(selected.definition.productId, selected.definition.scenarioId);
           if (attachSessionId) {
             // Persisted route state must forget the attached session too, or a reload restores it. Whether the
             // attach had begun is the owner's business (`useAttachSession`): a failed boot forgets nothing.
@@ -147,7 +158,7 @@ export function MultiModeProduct<Id extends string, R>({
             callSafely(onAttachDiscard);
             focusFreshFormRef.current = true;
             setAttachSessionId(undefined);
-            setResolution("ready");
+            setResolution("loading");
           }}>{th("workspace.newTask")}</Button>
         </Card> :
         resolution === "error" ? <ErrorState message={th("errors.connectionLost")} onRetry={retryResolution} /> : <ProductRunPage

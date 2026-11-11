@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { clearProductDraft, productDraftKey, readProductDraft, saveDraftRun, saveDraftValues } from "../src/products/runtime/draftStorage";
+import { clearProductDraft, productDraftKey, readProductDraft, saveDraftRun, saveDraftValues, readProductDraftScenario, saveProductDraftScenario } from "../src/products/runtime/draftStorage";
 
 const key = productDraftKey("proposal_ai", "generate");
 const run = { scenarioSessionId: "session_1", input: { text: "accepted input" } };
@@ -10,6 +10,14 @@ afterEach(() => {
 });
 
 describe("tab draft storage", () => {
+  it("keeps the selected scenario separate for each product", () => {
+    expect(readProductDraftScenario("client_update_writer")).toBeUndefined();
+    saveProductDraftScenario("client_update_writer", "client_update_writer.reply_draft_v1");
+    saveProductDraftScenario("proposal_ai", "proposal_ai.generate_v1");
+    expect(readProductDraftScenario("client_update_writer")).toBe("client_update_writer.reply_draft_v1");
+    expect(readProductDraftScenario("proposal_ai")).toBe("proposal_ai.generate_v1");
+  });
+
   it("scopes keys by product and mode", () => {
     expect(key).toBe("anytoolai.product_draft.proposal_ai.generate");
     expect(productDraftKey("proposal_ai", "other")).not.toBe(key);
@@ -49,6 +57,8 @@ describe("tab draft storage", () => {
       saveDraftValues(key, { text: "draft" });
       saveDraftRun(key, run);
       clearProductDraft(key);
+      readProductDraftScenario("client_update_writer");
+      saveProductDraftScenario("client_update_writer", "client_update_writer.reply_draft_v1");
     }).not.toThrow();
   });
 
@@ -62,6 +72,8 @@ describe("tab draft storage", () => {
       saveDraftValues(key, {});
       saveDraftRun(key, run);
       clearProductDraft(key);
+      readProductDraftScenario("client_update_writer");
+      saveProductDraftScenario("client_update_writer", "client_update_writer.reply_draft_v1");
     }).not.toThrow();
   });
 });

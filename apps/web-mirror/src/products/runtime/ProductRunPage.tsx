@@ -31,7 +31,7 @@ import { LanguageSwitcher, useHostT, useProductT } from "../../i18n";
 import { getClientStorage } from "./clientStorage";
 import { webBaseUrlFromProductLocation } from "../../lib/hostUrls";
 import type { AttachProps } from "./attachSession";
-import { productDraftKey, readProductDraft, saveDraftValues, saveDraftRun, clearProductDraft } from "./draftStorage";
+import { productDraftKey, readProductDraft, saveDraftValues, saveDraftRun, saveProductDraftScenario, clearProductDraft } from "./draftStorage";
 import { callSafely } from "./callSafely";
 import { isProductEnabled } from "./enabledProducts";
 import { useLatest } from "./useLatest";
@@ -715,6 +715,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     // shortcut: pending start keys do not survive reload; persist them when pre-acceptance recovery is required.
     if (draftKey !== null) {
       saveDraftRun(draftKey, { scenarioSessionId: result.value.scenarioSessionId, input: activeInputRef.current });
+      saveProductDraftScenario(productId, scenarioId);
     }
     setPhase({ kind: "running", scenarioSessionId: result.value.scenarioSessionId });
     void runPoll(result.value.scenarioSessionId);
@@ -1159,7 +1160,10 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     }
     const next = { ...values, [field]: value };
     setValues(next);
-    if (draftKey !== null) saveDraftValues(draftKey, next);
+    if (draftKey !== null) {
+      saveDraftValues(draftKey, next);
+      saveProductDraftScenario(productId, scenarioId);
+    }
     // Previously invalid fields stay live after correction, until New task resets the form.
     if (liveValidationFieldsRef.current.has(field)) {
       const error = definition.validate(next)[field];
