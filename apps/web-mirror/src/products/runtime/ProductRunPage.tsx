@@ -251,6 +251,7 @@ function shallowEqualValues<V extends Record<string, unknown>>(a: V, b: V): bool
 type BootState =
   | { kind: "loading" }
   | { kind: "boot-error" }
+  | { kind: "recovery"; outputSchemaRef: string; outputSchemaVersion: number }
   | { kind: "ready"; scenarioId: string; frontendId: string; hasQuota: boolean; outputSchemaRef: string; outputSchemaVersion: number | null };
 
 /** Why a run is retryable. A closed reason -- not finished English prose -- so an error already on
@@ -536,6 +537,8 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     }
   }, [definition]);
   const scenarioId = definition.scenarioId;
+  const recoverySchemaRef = definition.outputSchema.schemaRef;
+  const recoverySchemaVersion = definition.outputSchema.schemaVersion;
   function forgetPaidRecovery() {
     if (!paidPersistence || !paidPersistence.isCurrent()) return;
     try {
@@ -589,6 +592,13 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       markEventFired(client, eventScopeKey, "product_viewed");
       emitEvent(onEventRef.current, { type: "product_viewed", guestId: resolvedGuestId });
     }
+    function unavailableBoot() {
+      // Current admission metadata cannot revoke an existing paid operation. The bundled
+      // renderer pins its own compatible output; this state never enables a fresh start.
+      setBoot(paid && (recovery || attachSessionId)
+        ? { kind: "recovery", outputSchemaRef: recoverySchemaRef, outputSchemaVersion: recoverySchemaVersion }
+        : { kind: "boot-error" });
+    }
     Promise.all([getCachedRuntimeConfig(client, productId), paid ? Promise.resolve(null) : client.createGuestIdentity({ storage: guestStorage })]).then(
       ([runtimeResult, guestResult]) => {
         if (controller?.signal.aborted || (client.portalIdentity && !client.portalIdentity.isCurrent())) {
@@ -598,7 +608,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         setGuestId(resolvedGuestId);
         emitProductViewed(resolvedGuestId);
         if (!runtimeResult.ok) {
-          setBoot({ kind: "boot-error" });
+          unavailableBoot();
           return;
         }
         // Resolved by id, not position: runtime config's `scenarios` array isn't guaranteed to be
@@ -612,7 +622,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
           (candidate) => candidate.type === "web" && candidate.enabled,
         );
         if (!scenario || !frontend) {
-          setBoot({ kind: "boot-error" });
+          unavailableBoot();
           return;
         }
         if (draftKey !== null && !attachSessionId) {
@@ -642,16 +652,16 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         }
       },
       () => {
-        if (!controller?.signal.aborted) {
-          setBoot({ kind: "boot-error" });
+        if (!controller?.signal.aborted && (!client.portalIdentity || client.portalIdentity.isCurrent())) {
+          unavailableBoot();
           emitProductViewed(undefined);
         }
       },
     );
-  }, [client, guestStorage, productId, scenarioId, eventScopeKey, refreshQuota, onEventRef, paid, draftKey, attachSessionId, parseStoredValues]);
+  }, [client, guestStorage, productId, scenarioId, eventScopeKey, refreshQuota, onEventRef, paid, recovery, attachSessionId, recoverySchemaRef, recoverySchemaVersion, draftKey, parseStoredValues]);
 
   useEffect(() => {
-    if (!paidPersistence || recovery?.kind !== "pending" || boot.kind !== "ready" || restoredStartRef.current || attachSessionId) return;
+    if (!paidPersistence || recovery?.kind !== "pending" || (boot.kind !== "ready" && boot.kind !== "recovery") || restoredStartRef.current || attachSessionId) return;
     restoredStartRef.current = true;
     const prepared = restorePaidScenarioStart(recovery, paidPersistence);
     uncertainStartsRef.current.add(prepared);
@@ -661,10 +671,10 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boot.kind, recovery, paidPersistence, attachSessionId]);
 
-  // Attach once per session id, after boot: `boot.kind` only turns "ready" once per mount, so
+  // Attach once per session id, after boot (including recovery without new admission), so
   // StrictMode's effect replay cannot poll twice.
   useEffect(() => {
-    if (!attachSessionId || boot.kind !== "ready" || attachedSessionRef.current === attachSessionId) {
+    if (!attachSessionId || (boot.kind !== "ready" && boot.kind !== "recovery") || attachedSessionRef.current === attachSessionId) {
       return;
     }
     attachedSessionRef.current = attachSessionId;
@@ -944,12 +954,11 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     }
     // An attached id comes from an editable URL, so the backend-owned identity of what it yields must
     // match this product's scenario before the product parser (which only checks payload shape) sees it:
-    // the result's schema ref and version against the selected scenario's output schema from runtime
-    // config (a ref keeps its name across a version bump, and an attached session has no expiry, so an
-    // older session can come back with an older version; no declared version means ref-only).
+    // the result's schema ref and version against runtime config, or the bundled renderer's pinned
+    // contract when only paid recovery is available. Pending replay needs the same check in that mode.
     if (
-      (attachActiveRef.current || resumedRunRef.current === scenarioSessionId) &&
-      boot.kind === "ready" &&
+      (attachActiveRef.current || resumedRunRef.current === scenarioSessionId || boot.kind === "recovery") &&
+      (boot.kind === "ready" || boot.kind === "recovery") &&
       (resultResult.value.schemaRef !== boot.outputSchemaRef ||
         (boot.outputSchemaVersion !== null && resultResult.value.schemaVersion !== boot.outputSchemaVersion))
     ) {
@@ -1305,6 +1314,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   }
 
   const identityUnavailable = !paid && guestId === undefined;
+  const recoveryOnly = boot.kind === "recovery";
   const formCard = (
     <Card className={styles.formCard}>
       <h2 id="product-input-heading" className={styles.workspaceHeading}>{th("workspace.inputTitle")}</h2>
@@ -1315,14 +1325,14 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         noValidate
         onSubmit={handleSubmit}
       >
-        <Fields values={values} errors={fieldErrors} disabled={locked || identityUnavailable} onChange={updateField} />
+        <Fields values={values} errors={fieldErrors} disabled={locked || identityUnavailable || recoveryOnly} onChange={updateField} />
         <DataProcessingNotice />
         <div className={styles.footer}>
           <Button
             type="submit"
             aria-describedby={DATA_NOTICE_ID}
             loading={phase.kind === "submitting" || phase.kind === "running"}
-            disabled={identityUnavailable || locked || phase.kind === "quota-exhausted"}
+            disabled={identityUnavailable || locked || recoveryOnly || phase.kind === "quota-exhausted"}
           >
             {phase.kind === "submitting"
               ? th("starting")
@@ -1334,6 +1344,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
           </Button>
           <div className={styles.statusRegion}>
             {identityUnavailable ? <p role="alert">{th("identityUnavailable")}</p> : null}
+            {recoveryOnly ? <p role="status">{th("unavailable", { product: title })}</p> : null}
           </div>
         </div>
       </form>
@@ -1449,7 +1460,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
                   onCopy={handleCopy}
                   secondaryAction={showNewTask ? (
                     <>
-                      <Button variant="secondary" onClick={handleStartAnother} disabled={handoffLocked}>
+                      <Button variant="secondary" onClick={handleStartAnother} disabled={handoffLocked || recoveryOnly}>
                         {th("workspace.newTask")}
                       </Button>
                       {handoff ? (

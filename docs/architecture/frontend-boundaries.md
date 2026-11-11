@@ -199,6 +199,13 @@ The shared runtime, not a product, owns the web side of a handoff:
   other pending attachments remain fallbacks. A late
   background Accept cannot replace the preferred own run, while an explicit attachment open can.
   Clearing or losing the referenced saved run releases its priority over remaining attachments.
+- Paid recovery does not require current new-start availability. If runtime config is unavailable,
+  or no longer lists the scenario/enabled web frontend, a saved owner-bound pending request or
+  accepted/explicitly selected session opens a recovery-only view. It replays only the original
+  frozen key/request or reads that session; new submissions and "New task" stay disabled. Result
+  schema ref/version must match the bundled product renderer's `outputSchema` before parsing;
+  the architecture contract test checks these pins against product workflows/schema versions.
+  Delegated identity and backend ownership checks remain required for every protected request.
 - A spent (accepted/consumed) token that still names the target session shows an explicit "Open result" on the
   consent page, for the case where the Accept response was lost and the person reloaded instead of retrying
   (a retry that gets "already accepted" redirects on its own). It never redirects automatically on load.
