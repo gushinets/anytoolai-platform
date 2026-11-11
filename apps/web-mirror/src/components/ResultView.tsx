@@ -10,6 +10,8 @@ export type ResultViewProps = {
   text: string;
   /** Render inside an existing Card without adding a second card surface. */
   embedded?: boolean;
+  /** Hide duplicate copy text for structured results; reveal it if copying fails. */
+  hideText?: boolean;
   /** Performs the actual copy (clipboard write, then any next-action recording); resolves `true`
    * iff the clipboard write itself succeeded. Product-specific (e.g. which next action to fire),
    * so it stays out of this shared component -- see `ProductDefinition.onCopy`. */
@@ -19,7 +21,7 @@ export type ResultViewProps = {
 
 /** Canonical text result plus a copy-to-clipboard button. The result stays visible and copyable
  * even if the copy fails -- only `onCopy`'s own outcome gates the "Copied" state. */
-export function ResultView({ text, onCopy, embedded = false, secondaryAction }: ResultViewProps) {
+export function ResultView({ text, onCopy, embedded = false, hideText = false, secondaryAction }: ResultViewProps) {
   const t = useHostT();
   const [copyState, setCopyState] = useState<"idle" | "copying" | "copied" | "error">("idle");
   const anchorRef = useRef<HTMLSpanElement>(null);
@@ -81,7 +83,7 @@ export function ResultView({ text, onCopy, embedded = false, secondaryAction }: 
     <Container className={styles.stack}>
       {/* Empty marker: the text element right after it is what "Select text" selects. */}
       <span ref={anchorRef} hidden />
-      <GeneratedTextRenderer text={text} />
+      {!hideText || copyState === "error" ? <GeneratedTextRenderer text={text} /> : null}
       {/* Always wrapped: a wrapper that appeared only on error would remount the Copy button and drop its focus. */}
       <div className={styles.actions}>
         {copyButton}

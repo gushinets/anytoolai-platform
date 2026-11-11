@@ -130,9 +130,8 @@ export function useLocale(): LocaleContextValue {
  * `use-intl`. Keys are dotted paths inside the namespace. */
 export type Translate = (key: string, values?: Record<string, string | number>) => string;
 
-/** Generic runtime/result/error/validation messages owned by the shared host -- never product
- * meaning (e.g. `tone` labels are product-owned, spread from `products/shared/toneMessages/` into
- * each product's own `product` namespace instead). */
+/** Generic runtime/result/error/validation messages owned by the shared host -- product vocabulary
+ * such as tone labels belongs in each product's own namespace. */
 export function useHostT(): Translate {
   return useTranslations("host");
 }

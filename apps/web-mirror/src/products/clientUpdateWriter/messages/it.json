@@ -1,0 +1,58 @@
+{
+  "title": "Client Update Writer",
+  "tone": {
+    "neutral": "neutro",
+    "warm": "cordiale",
+    "firm": "fermo"
+  },
+  "quotaRemaining": "Ne restano {remaining} su {limit, plural, one {# esecuzione di Client Update Writer} many {# di esecuzioni di Client Update Writer} other {# esecuzioni di Client Update Writer}}.",
+  "modes": {
+    "legend": "Modalità",
+    "update": "Aggiornamento",
+    "reply_draft": "Bozza di risposta",
+    "prepaid_request": "Richiesta di pagamento anticipato"
+  },
+  "fields": {
+    "progressNotes": "Note sull’avanzamento",
+    "clientMessage": "Messaggio del cliente",
+    "replyGoal": "Obiettivo della risposta",
+    "billingNotes": "Note di fatturazione",
+    "billingAmount": "Importo",
+    "billingDueDate": "Scadenza (facoltativa)",
+    "tone": "Tono",
+    "tonePlaceholder": "Selezioni un tono"
+  },
+  "fieldNames": {
+    "progressNotes": "Note sull’avanzamento",
+    "clientMessage": "Messaggio del cliente",
+    "replyGoal": "Obiettivo della risposta",
+    "billingNotes": "Note di fatturazione",
+    "billingAmount": "Importo",
+    "billingDueDate": "Scadenza",
+    "tone": "Tono"
+  },
+  "update": {
+    "submit": "Scriva l’aggiornamento",
+    "running": "Scrittura dell’aggiornamento in corso…",
+    "runFailed": "Si è verificato un problema durante la scrittura dell’aggiornamento. Riprovi.",
+    "resultTitle": "Aggiornamento",
+    "placeholder": "L’aggiornamento apparirà qui dopo la scrittura.",
+    "regenerate": "Riscriva l’aggiornamento"
+  },
+  "reply_draft": {
+    "submit": "Scriva la risposta",
+    "running": "Scrittura della risposta in corso…",
+    "runFailed": "Si è verificato un problema durante la scrittura della risposta. Riprovi.",
+    "resultTitle": "Bozza di risposta",
+    "placeholder": "La risposta apparirà qui dopo la scrittura.",
+    "regenerate": "Riscriva la risposta"
+  },
+  "prepaid_request": {
+    "submit": "Scriva la richiesta",
+    "running": "Scrittura della richiesta in corso…",
+    "runFailed": "Si è verificato un problema durante la scrittura della richiesta. Riprovi.",
+    "resultTitle": "Richiesta di pagamento anticipato",
+    "placeholder": "La richiesta apparirà qui dopo la scrittura.",
+    "regenerate": "Riscriva la richiesta"
+  }
+}

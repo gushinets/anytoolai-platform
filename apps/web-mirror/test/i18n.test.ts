@@ -4,6 +4,14 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { createTranslator } from "use-intl";
+import {
+  forEachChild,
+  isObjectLiteralExpression,
+  isPropertyAssignment,
+  isStringLiteral,
+  parseJsonText,
+  type Node,
+} from "typescript";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LOCALES, LOCALE_NAMES, isLocale, type Locale } from "../src/i18n";
 import {
@@ -180,6 +188,30 @@ function flatten(tree: MessageTree, prefix = ""): Map<string, string> {
   return flat;
 }
 
+function messageShape(tree: MessageTree): unknown {
+  return Object.fromEntries(Object.entries(tree).map(([key, value]) => [
+    key, typeof value === "string" ? "string" : messageShape(value),
+  ]));
+}
+
+function assertUniqueJsonKeys(source: string): void {
+  JSON.parse(source); // The TypeScript parser also accepts syntax that strict JSON forbids.
+  function visit(node: Node): void {
+    if (isObjectLiteralExpression(node)) {
+      const keys = new Set<string>();
+      for (const property of node.properties) {
+        if (isPropertyAssignment(property) && isStringLiteral(property.name)) {
+          const key = property.name.text;
+          if (keys.has(key)) throw new Error(`Duplicate JSON key: ${key}`);
+          keys.add(key);
+        }
+      }
+    }
+    forEachChild(node, visit);
+  }
+  visit(parseJsonText("messages.json", source));
+}
+
 // `{name}` / `{name, plural, ...}` arguments, ignoring the `{...}` bodies of plural branches
 // (`one {# character}`), which are text, not arguments.
 function placeholders(message: string): string[] {
@@ -201,10 +233,33 @@ describe("translation resources", () => {
 
   it("have the same keys as English in every locale (no missing, no extra)", () => {
     for (const bundle of bundles()) {
-      const englishKeys = [...flatten(bundle.byLocale.en).keys()].sort();
       for (const locale of LOCALES) {
-        expect([...flatten(bundle.byLocale[locale]).keys()].sort(), `${bundle.name}/${locale}`).toEqual(englishKeys);
+        expect(messageShape(bundle.byLocale[locale]), `${bundle.name}/${locale}`).toEqual(
+          messageShape(bundle.byLocale.en),
+        );
       }
+    }
+  });
+
+  it("does not hide extra empty objects when comparing message structure", () => {
+    expect(messageShape({ label: "A", extra: {} })).not.toEqual(messageShape({ label: "B" }));
+  });
+
+  it("rejects repeated JSON keys, including escaped aliases in nested objects", () => {
+    expect(() => assertUniqueJsonKeys('{"nested":{"label":"A","label":"B"}}')).toThrow("Duplicate JSON key: label");
+    expect(() => assertUniqueJsonKeys('{"nested":{"label":"A","\\u006cabel":"B"}}')).toThrow("Duplicate JSON key: label");
+    expect(() => assertUniqueJsonKeys('{"a":{"label":"A"},"b":{"label":"B"}}')).not.toThrow();
+    expect(() => assertUniqueJsonKeys('{"label":"A",}')).toThrow();
+  });
+
+  it("stores messages as strict JSON without duplicate keys", () => {
+    const src = join(__dirname, "..", "src");
+    const resources = readdirSync(src, { recursive: true }).filter(
+      (file): file is string => typeof file === "string" && /(?:messages|Messages)[/\\][a-z]{2}\.json$/.test(file),
+    );
+    expect(resources).toHaveLength(bundles().length * LOCALES.length);
+    for (const resource of resources) {
+      expect(() => assertUniqueJsonKeys(readFileSync(join(src, resource), "utf8")), resource).not.toThrow();
     }
   });
 

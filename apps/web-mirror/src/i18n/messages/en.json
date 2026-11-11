@@ -1,0 +1,47 @@
+{
+  "language": {
+    "label": "Language"
+  },
+  "nav": {
+    "label": "Tools",
+    "allTools": "All tools",
+    "runInProgress": "A run is in progress. If you leave now, it will continue; a successful result uses one run."
+  },
+  "loading": "Loading {product}…",
+  "unavailable": "{product} is unavailable right now. Please reload the page.",
+  "quotaReserved": "Available now: {available}. In progress: {reserved}.",
+  "quotaExhausted": "You've used all your {product} runs for now.",
+  "resultFetchFailed": "Your result is ready, but we couldn't load it. Please try again.",
+  "starting": "Starting…",
+  "generating": "Generating…",
+  "identityUnavailable": "We couldn't verify your identity. Please reload the page and try again.",
+  "retry": "Try again",
+  "formLabel": "{product} form",
+  "workspace": {
+    "inputTitle": "Your details",
+    "previousDetails": "Created from previous details",
+    "backToInputs": "Back to details",
+    "newTask": "New task",
+    "handoffOpening": "Opening the next step…",
+    "handoffStay": "Stay on this page",
+    "handoffFailed": "Could not open the next step. Please try again."
+  },
+  "errors": {
+    "quotaCapacityReserved": "Capacity is temporarily in use. Please try again shortly.",
+    "startFailed": "Could not start {product}. Please try again.",
+    "timeout": "This is taking longer than expected. Please try again.",
+    "connectionLost": "Lost connection while waiting for your result. Please try again.",
+    "tryAgain": "Please try again."
+  },
+  "result": {
+    "copy": "Copy",
+    "copying": "Copying…",
+    "copied": "Copied",
+    "copyFailed": "Could not copy to clipboard. Please copy the text above manually.",
+    "selectText": "Select text"
+  },
+  "validation": {
+    "required": "{field}: required.",
+    "maxLength": "{field}: {maxLength, plural, one {# character} other {# characters}} maximum."
+  }
+}

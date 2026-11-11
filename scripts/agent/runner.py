@@ -1321,50 +1321,18 @@ CLIENT_HANDOFF_SMOKE_REPORT_PATH = (
 )
 
 PROPOSAL_AI_SMOKE_WEB_MIRROR_PORT_ENV = "ANYTOOLAI_PROPOSAL_AI_SMOKE_WEB_MIRROR_PORT"
-PROPOSAL_AI_SMOKE_EVIDENCE_ROOT = ROOT / ".agent" / "proposal-ai-smoke"
-PROPOSAL_AI_SMOKE_REPORT_PATH = (
-    ROOT / "tests" / "e2e" / "proposal-ai-smoke" / "playwright-report.json"
-)
 
 CLIENT_UPDATE_WRITER_SMOKE_WEB_MIRROR_PORT_ENV = (
     "ANYTOOLAI_CLIENT_UPDATE_WRITER_SMOKE_WEB_MIRROR_PORT"
 )
-CLIENT_UPDATE_WRITER_SMOKE_EVIDENCE_ROOT = ROOT / ".agent" / "client-update-writer-smoke"
-CLIENT_UPDATE_WRITER_SMOKE_REPORT_PATH = (
-    ROOT / "tests" / "e2e" / "client-update-writer-smoke" / "playwright-report.json"
-)
 
 BRIEF_DECODER_SMOKE_WEB_MIRROR_PORT_ENV = "ANYTOOLAI_BRIEF_DECODER_SMOKE_WEB_MIRROR_PORT"
-BRIEF_DECODER_SMOKE_EVIDENCE_ROOT = ROOT / ".agent" / "brief-decoder-smoke"
-BRIEF_DECODER_SMOKE_REPORT_PATH = (
-    ROOT / "tests" / "e2e" / "brief-decoder-smoke" / "playwright-report.json"
-)
 
 ACCEPTANCE_BUILDER_SMOKE_WEB_MIRROR_PORT_ENV = "ANYTOOLAI_ACCEPTANCE_BUILDER_SMOKE_WEB_MIRROR_PORT"
-ACCEPTANCE_BUILDER_SMOKE_EVIDENCE_ROOT = ROOT / ".agent" / "acceptance-builder-smoke"
-ACCEPTANCE_BUILDER_SMOKE_REPORT_PATH = (
-    ROOT / "tests" / "e2e" / "acceptance-builder-smoke" / "playwright-report.json"
-)
 
 
 def _client_handoff_smoke_web_mirror_port() -> int:
     return _port_override(CLIENT_HANDOFF_SMOKE_WEB_MIRROR_PORT_ENV, 3000)
-
-
-def _proposal_ai_smoke_web_mirror_port() -> int:
-    return _port_override(PROPOSAL_AI_SMOKE_WEB_MIRROR_PORT_ENV, 3100)
-
-
-def _client_update_writer_smoke_web_mirror_port() -> int:
-    return _port_override(CLIENT_UPDATE_WRITER_SMOKE_WEB_MIRROR_PORT_ENV, 3200)
-
-
-def _brief_decoder_smoke_web_mirror_port() -> int:
-    return _port_override(BRIEF_DECODER_SMOKE_WEB_MIRROR_PORT_ENV, 3300)
-
-
-def _acceptance_builder_smoke_web_mirror_port() -> int:
-    return _port_override(ACCEPTANCE_BUILDER_SMOKE_WEB_MIRROR_PORT_ENV, 3400)
 
 
 def _terminate_process_group(process: subprocess.Popen) -> None:
@@ -1568,201 +1536,79 @@ def client_handoff_smoke() -> int:
     )
 
 
-def proposal_ai_smoke() -> int:
-    """ANY-243: builds and serves web-mirror against the running dev-up platform-api, then runs
-    the Playwright browser-evidence smoke (tests/e2e/proposal-ai-smoke) that proves the ProposalAI
-    web vertical end to end in a real (headless, no extension involved) Chromium -- product page ->
-    shared client -> scenario session -> job/worker -> deterministic fake-provider workflow (ANY-227)
-    -> canonical result -> copy activation, plus weak-input, guest-identity-reuse, and
-    quota-exhaustion coverage.
-
-    Requires `dev-up` already running first (same precedent as atoms-proof/client-handoff-smoke:
-    this command only resolves runtime_identity() for the API URL, it never starts Docker itself)
-    and Playwright's Chromium already installed (`pnpm --filter @anytoolai/proposal-ai-smoke exec
-    playwright install chromium`). Unlike client-handoff-smoke, this needs no extension and no
-    visible display -- ordinary web pages run fine in Playwright's default headless Chromium.
-
-    web-mirror's next.config.ts rewrites() destination is baked in at `next build` time (see
-    client_handoff_smoke()'s own docstring), so PLATFORM_API_BASE_URL must be set for that build
-    step too, not just for the later `next start`.
-    """
+def _run_product_smoke(*, command: str, port_env: str, default_port: int, error_prefix: str) -> int:
+    """Build against dev-up, then run a product's browser suite and retain its evidence."""
     try:
         identity = runtime_identity()
-    except ValueError as exc:
-        print(f"DEV001: {exc}", file=sys.stderr)
-        return 2
-
-    try:
-        web_mirror_port = _proposal_ai_smoke_web_mirror_port()
+        web_mirror_port = _port_override(port_env, default_port)
     except ValueError as exc:
         print(f"DEV001: {exc}", file=sys.stderr)
         return 2
     if not _check_ports_available(
-        "PAS001",
-        [("web-mirror", web_mirror_port, PROPOSAL_AI_SMOKE_WEB_MIRROR_PORT_ENV, None)],
+        f"{error_prefix}001", [("web-mirror", web_mirror_port, port_env, None)]
     ):
         return 1
-    web_mirror_url = f"http://localhost:{web_mirror_port}"
-
     env = runner_env()
     env["PLATFORM_API_BASE_URL"] = identity.api_url
-
-    build_command = ["pnpm", "--filter", "@anytoolai/web-mirror", "build"]
-    build_exit = run_with_env(build_command, env)
+    build_exit = run_with_env(["pnpm", "--filter", "@anytoolai/web-mirror", "build"], env)
     if build_exit != 0:
         return build_exit
-
     return _serve_web_mirror_and_run_smoke(
         web_mirror_port=web_mirror_port,
         env=env,
-        readiness_error_code="PAS002",
-        # DATABASE_URL: the happy-path spec asserts the backend actually persisted
-        # `client.next_action_clicked` for its own run (not just that the browser sent the
-        # request) -- host-reachable since postgres's compose port is published, per the same
-        # precedent as identity.api_url above.
+        readiness_error_code=f"{error_prefix}002",
         smoke_extra_env={
-            "WEB_MIRROR_BASE_URL": web_mirror_url,
+            "WEB_MIRROR_BASE_URL": f"http://localhost:{web_mirror_port}",
             "DATABASE_URL": identity.database_url,
         },
-        smoke_pnpm_filter="@anytoolai/proposal-ai-smoke",
-        report_path=PROPOSAL_AI_SMOKE_REPORT_PATH,
-        evidence_root=PROPOSAL_AI_SMOKE_EVIDENCE_ROOT,
+        smoke_pnpm_filter=f"@anytoolai/{command}",
+        report_path=ROOT / "tests" / "e2e" / command / "playwright-report.json",
+        evidence_root=ROOT / ".agent" / command,
+    )
+
+
+def proposal_ai_smoke() -> int:
+    return _run_product_smoke(
+        command="proposal-ai-smoke",
+        port_env=PROPOSAL_AI_SMOKE_WEB_MIRROR_PORT_ENV,
+        default_port=3100,
+        error_prefix="PAS",
     )
 
 
 def client_update_writer_smoke() -> int:
-    """ANY-414 (code review finding): builds and serves web-mirror against the running dev-up
-    platform-api, then runs the Playwright browser-evidence smoke (tests/e2e/client-update-writer-
-    smoke) that proves the Client Update Writer web vertical end to end in a real (headless, no
-    extension involved) Chromium -- product page -> shared client -> scenario session -> job/worker
-    -> deterministic fake-provider workflow (ANY-227) -> canonical result -> copy activation, plus
-    client-side validation and weak-input coverage. Same shape as proposal_ai_smoke() (its own
-    docstring covers the shared requirements/rationale in full); Update mode is this product's one
-    representative mode here, mirroring proposal-ai-smoke's own single-scenario scope -- the other
-    two modes' meaning is already proven end to end at the backend-pipeline level by
-    apps/platform-api/tests/test_client_update_writer_bundle.py.
-    """
-    try:
-        identity = runtime_identity()
-    except ValueError as exc:
-        print(f"DEV001: {exc}", file=sys.stderr)
-        return 2
-
-    try:
-        web_mirror_port = _client_update_writer_smoke_web_mirror_port()
-    except ValueError as exc:
-        print(f"DEV001: {exc}", file=sys.stderr)
-        return 2
-    if not _check_ports_available(
-        "CUS001",
-        [("web-mirror", web_mirror_port, CLIENT_UPDATE_WRITER_SMOKE_WEB_MIRROR_PORT_ENV, None)],
-    ):
-        return 1
-    web_mirror_url = f"http://localhost:{web_mirror_port}"
-
-    env = runner_env()
-    env["PLATFORM_API_BASE_URL"] = identity.api_url
-
-    build_command = ["pnpm", "--filter", "@anytoolai/web-mirror", "build"]
-    build_exit = run_with_env(build_command, env)
-    if build_exit != 0:
-        return build_exit
-
-    return _serve_web_mirror_and_run_smoke(
-        web_mirror_port=web_mirror_port,
-        env=env,
-        readiness_error_code="CUS002",
-        smoke_extra_env={
-            "WEB_MIRROR_BASE_URL": web_mirror_url,
-            "DATABASE_URL": identity.database_url,
-        },
-        smoke_pnpm_filter="@anytoolai/client-update-writer-smoke",
-        report_path=CLIENT_UPDATE_WRITER_SMOKE_REPORT_PATH,
-        evidence_root=CLIENT_UPDATE_WRITER_SMOKE_EVIDENCE_ROOT,
+    return _run_product_smoke(
+        command="client-update-writer-smoke",
+        port_env=CLIENT_UPDATE_WRITER_SMOKE_WEB_MIRROR_PORT_ENV,
+        default_port=3200,
+        error_prefix="CUS",
     )
 
 
 def brief_decoder_smoke() -> int:
-    """ANY-248: builds and serves web-mirror against the running dev-up platform-api, then runs the
-    Playwright browser-evidence smoke (tests/e2e/brief-decoder-smoke) for the Brief Decoder web
-    vertical: happy-path runtime correlation, validation, weak input, zero-question result,
-    terminal error and quota. Same shape as client_update_writer_smoke().
-    """
-    try:
-        identity = runtime_identity()
-    except ValueError as exc:
-        print(f"DEV001: {exc}", file=sys.stderr)
-        return 2
-
-    try:
-        web_mirror_port = _brief_decoder_smoke_web_mirror_port()
-    except ValueError as exc:
-        print(f"DEV001: {exc}", file=sys.stderr)
-        return 2
-    if not _check_ports_available(
-        "BDS001",
-        [("web-mirror", web_mirror_port, BRIEF_DECODER_SMOKE_WEB_MIRROR_PORT_ENV, None)],
-    ):
-        return 1
-    web_mirror_url = f"http://localhost:{web_mirror_port}"
-
-    env = runner_env()
-    env["PLATFORM_API_BASE_URL"] = identity.api_url
-
-    build_exit = run_with_env(["pnpm", "--filter", "@anytoolai/web-mirror", "build"], env)
-    if build_exit != 0:
-        return build_exit
-
-    return _serve_web_mirror_and_run_smoke(
-        web_mirror_port=web_mirror_port,
-        env=env,
-        readiness_error_code="BDS002",
-        smoke_extra_env={"WEB_MIRROR_BASE_URL": web_mirror_url, "DATABASE_URL": identity.database_url},
-        smoke_pnpm_filter="@anytoolai/brief-decoder-smoke",
-        report_path=BRIEF_DECODER_SMOKE_REPORT_PATH,
-        evidence_root=BRIEF_DECODER_SMOKE_EVIDENCE_ROOT,
+    return _run_product_smoke(
+        command="brief-decoder-smoke",
+        port_env=BRIEF_DECODER_SMOKE_WEB_MIRROR_PORT_ENV,
+        default_port=3300,
+        error_prefix="BDS",
     )
 
 
 def acceptance_builder_smoke() -> int:
-    """ANY-244: builds and serves web-mirror against the running dev-up platform-api, then runs the
-    Playwright browser-evidence smoke (tests/e2e/acceptance-builder-smoke) for the Acceptance Builder
-    web vertical: draft and check runtime correlation, validation, weak input, terminal error, quota,
-    and the accepted Brief Decoder -> Acceptance Builder handoff. Same shape as brief_decoder_smoke().
-    """
-    try:
-        identity = runtime_identity()
-    except ValueError as exc:
-        print(f"DEV001: {exc}", file=sys.stderr)
-        return 2
+    return _run_product_smoke(
+        command="acceptance-builder-smoke",
+        port_env=ACCEPTANCE_BUILDER_SMOKE_WEB_MIRROR_PORT_ENV,
+        default_port=3400,
+        error_prefix="ABS",
+    )
 
-    try:
-        web_mirror_port = _acceptance_builder_smoke_web_mirror_port()
-    except ValueError as exc:
-        print(f"DEV001: {exc}", file=sys.stderr)
-        return 2
-    if not _check_ports_available(
-        "ABS001",
-        [("web-mirror", web_mirror_port, ACCEPTANCE_BUILDER_SMOKE_WEB_MIRROR_PORT_ENV, None)],
-    ):
-        return 1
-    web_mirror_url = f"http://localhost:{web_mirror_port}"
 
-    env = runner_env()
-    env["PLATFORM_API_BASE_URL"] = identity.api_url
-
-    build_exit = run_with_env(["pnpm", "--filter", "@anytoolai/web-mirror", "build"], env)
-    if build_exit != 0:
-        return build_exit
-
-    return _serve_web_mirror_and_run_smoke(
-        web_mirror_port=web_mirror_port,
-        env=env,
-        readiness_error_code="ABS002",
-        smoke_extra_env={"WEB_MIRROR_BASE_URL": web_mirror_url, "DATABASE_URL": identity.database_url},
-        smoke_pnpm_filter="@anytoolai/acceptance-builder-smoke",
-        report_path=ACCEPTANCE_BUILDER_SMOKE_REPORT_PATH,
-        evidence_root=ACCEPTANCE_BUILDER_SMOKE_EVIDENCE_ROOT,
+def task_finder_smoke() -> int:
+    return _run_product_smoke(
+        command="task-finder-smoke",
+        port_env="ANYTOOLAI_TASK_FINDER_SMOKE_WEB_MIRROR_PORT",
+        default_port=3500,
+        error_prefix="TFS",
     )
 
 
@@ -3250,6 +3096,7 @@ COMMANDS = {
     "client-update-writer-smoke": client_update_writer_smoke,
     "brief-decoder-smoke": brief_decoder_smoke,
     "acceptance-builder-smoke": acceptance_builder_smoke,
+    "task-finder-smoke": task_finder_smoke,
     "atom-lab-up": atom_lab_up,
     "atom-lab-ready": atom_lab_ready,
     "atom-lab-status": atom_lab_status,

@@ -1,0 +1,36 @@
+{
+  "title": "AnytoolAI",
+  "lead": "Piccoli strumenti per freelance. Descriva il lavoro e ottenga un testo pronto da inviare al cliente.",
+  "open": "Apri",
+  "cards": {
+    "task_finder": {
+      "blurb": "Confronta un incarico con il tuo profilo: punti di forza, lacune e compatibilità.",
+      "sample": "Punteggio: 64/100. Bassa compatibilità: l’app mobile non rientra nei tuoi servizi."
+    },
+    "proposal_ai": {
+      "blurb": "Trasformi il brief di un cliente e i suoi punti di forza in una proposta pronta da inviare.",
+      "sample": "Buongiorno Dana, mi farebbe piacere aiutarla con il restyling della sua landing page. Due giri di revisioni, consegna in tre settimane. Facciamo una breve chiamata per confermare l'ambito."
+    },
+    "client_update_writer": {
+      "blurb": "Scriva un aggiornamento sull'avanzamento, una risposta a un messaggio del cliente o una richiesta di anticipo, con il tono che preferisce.",
+      "sample": "Aggiornamento rapido: il restyling della homepage è completato e pronto per la revisione entro venerdì. Nessun blocco per ora.",
+      "tags": {
+        "update": "Aggiornamento",
+        "replyDraft": "Bozza di risposta",
+        "prepaidRequest": "Richiesta di anticipo"
+      }
+    },
+    "brief_decoder": {
+      "blurb": "Trasformare il brief di un cliente in dettagli strutturati, rischi e domande da porre prima di iniziare.",
+      "sample": "Mancano: scadenza e budget. Da chiedere al cliente: qual è la data di lancio esatta e chi approva il design?"
+    },
+    "acceptance_builder": {
+      "blurb": "Trasformare un brief in criteri di accettazione, o verificare il lavoro finito rispetto al brief.",
+      "sample": "Criteri di accettazione: la home si carica in meno di due secondi; il cliente approva due giri di design.",
+      "tags": {
+        "draft": "Redigi i criteri",
+        "check": "Verifica il lavoro"
+      }
+    }
+  }
+}
