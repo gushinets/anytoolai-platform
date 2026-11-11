@@ -253,7 +253,13 @@ def test_old_policy_install_waiting_for_new_policy_is_refused_and_consumers_are_
         assert summary["snapshot"] is not None
 
 
-def test_populated_v2_forward_migration_retains_floor_usage_reservation_and_replay(runtime) -> None:
+@pytest.mark.parametrize(
+    "upgrade_target,downgrade_error",
+    [("0020", "synchronized V3 reader"), ("0021", "Exhaustion delivery history")],
+)
+def test_populated_v2_forward_migration_retains_floor_usage_reservation_and_replay(
+    runtime, upgrade_target: str, downgrade_error: str,
+) -> None:
     factory, app, registry, principal, document, _ = runtime
     document = document.model_copy(
         update={
@@ -298,7 +304,7 @@ def test_populated_v2_forward_migration_retains_floor_usage_reservation_and_repl
             )
         with engine.begin() as connection:
             config.attributes["connection"] = connection
-            command.upgrade(config, "head")
+            command.upgrade(config, upgrade_target)
         row = rows(migrated, paid_access_coherence_table)[0]
         assert (row["consumer_id"], row["policy_floor"], row["revision_floor"]) == (
             "platform-kernel",
@@ -310,7 +316,7 @@ def test_populated_v2_forward_migration_retains_floor_usage_reservation_and_repl
             table.name: [dict(row) for row in rows(migrated, table)] for table in tables
         }
         with (
-            pytest.raises(RuntimeError, match="synchronized V3 reader"),
+            pytest.raises(RuntimeError, match=downgrade_error),
             engine.begin() as connection,
         ):
             config.attributes["connection"] = connection

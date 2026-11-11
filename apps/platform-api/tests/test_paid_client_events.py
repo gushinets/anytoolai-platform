@@ -157,7 +157,11 @@ def test_guest_and_foreign_owner_cannot_poll_or_record_paid_session(paid_app):
     [
         {"schema_version": True},
         {"schema_version": 1},
-        {"schema_version": 2.0},
+        {"schema_version": 2},
+        {"schema_version": 3.0},
+        {"consumer_id": ""},
+        {"consumer_policy_revision": True},
+        {"consumer_policy_revision": 0},
         {"access_revision": True},
         {"refresh_after": "2026-11-10T00:00:00+01:00"},
         {"extra": "untrusted"},
@@ -165,16 +169,19 @@ def test_guest_and_foreign_owner_cannot_poll_or_record_paid_session(paid_app):
         {"access_revision": 0},
     ],
 )
-def test_snapshot_parser_rejects_invalid_boundary(change):
+def test_snapshot_parser_rejects_invalid_boundary(change: dict[str, object]) -> None:
     payload = snapshot_payload()
+    AccessSnapshot.model_validate(payload)
     with pytest.raises(ValidationError):
         AccessSnapshot.model_validate({**payload, **change})
 
 
-def snapshot_payload():
+def snapshot_payload() -> dict[str, object]:
     now = datetime.now(UTC)
     return {
-        "schema_version": 2,
+        "schema_version": 3,
+        "consumer_id": "platform-kernel",
+        "consumer_policy_revision": 1,
         "tenant_id": "anytoolai",
         "region": "ru",
         "user_id": OWNER.owner_id,
@@ -190,14 +197,22 @@ def constant_identity(value):
     return lambda: value
 
 
-def test_runtime_snapshot_and_invalidation_models_validate_reviewed_fixtures():
+def test_runtime_snapshot_and_invalidation_models_validate_reviewed_fixtures() -> None:
 
     root = Path(__file__).resolve().parents[3] / "docs/contracts/portal-kernel-paid/fixtures"
-    models = {"snapshot-v2": AccessSnapshot, "invalidation-v1": AccessInvalidation}
-    for vector in json.loads((root / "valid.json").read_text()):
+    models = {"snapshot-v3": AccessSnapshot, "invalidation-v1": AccessInvalidation}
+    valid = json.loads((root / "valid.json").read_text()) + json.loads(
+        (root / "backend-valid.json").read_text()
+    )
+    invalid = json.loads((root / "invalid.json").read_text()) + json.loads(
+        (root / "backend-invalid.json").read_text()
+    )
+    assert set(models) <= {vector["contract"] for vector in valid}
+    assert set(models) <= {vector["contract"] for vector in invalid}
+    for vector in valid:
         if vector["contract"] in models:
             models[vector["contract"]].model_validate(vector["payload"])
-    for vector in json.loads((root / "invalid.json").read_text()):
+    for vector in invalid:
         if vector["contract"] in models:
             with pytest.raises(ValidationError):
                 models[vector["contract"]].model_validate(vector["payload"])
