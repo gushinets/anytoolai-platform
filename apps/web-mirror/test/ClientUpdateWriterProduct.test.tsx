@@ -4,10 +4,12 @@
 // `append_after_blank_line`), and the mode switcher. The shared runtime behavior every mode rides
 // on (polling, retry, quota, copy-activation ordering, event callbacks) is proven once in
 // ProductRunPage.test.tsx -- not re-proven per mode here.
+import { StrictMode } from "react";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
 import { useAttachSession, readAttachSessionId } from "../src/products/runtime/attachSession";
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { readProductDraftScenario, saveProductDraftScenario } from "../src/products/runtime/draftStorage";
 import { ProductRunPage } from "../src/products/runtime/ProductRunPage";
 import type { ProductDefinition, ProductRunEvent } from "../src/products/runtime/productDefinition";
 import {
@@ -1055,4 +1057,231 @@ it("blocks every mode while resolving identity and ignores a late response after
   made.resolveDeferred(sessionResponse({ scenario_id: MODE_IDS.reply_draft.scenarioId }));
   await waitFor(() => expect(made.calls.find((call) => call.key === routes.SESSION)!.init.signal!.aborted).toBe(true));
   expect(made.calls.some((call) => call.key === routes.RESULT || call.key.endsWith("/start"))).toBe(false);
+});
+
+describe.each(MODE_SCENARIOS)("Client Update Writer $mode draft recovery", (scenario) => {
+  const r = routesFor(scenario.ids);
+  const fields: Array<[string, string]> = [
+    ...scenario.fields,
+    ...(scenario.mode === "prepaid_request" ? [["Due date (optional)", "Next Friday"] as [string, string]] : []),
+  ];
+
+  function recoveryRoutes() {
+    return {
+      ...bootAndHappyPathRoutes(scenario.ids, { text: "Saved own result." }).queues,
+      [r.RUNTIME_CONFIG]: [fullRuntimeConfigResponse(scenario.ids)],
+      [r.QUOTA]: Array.from({ length: 6 }, () => quotaResponse(scenario.ids)),
+    };
+  }
+
+  async function selectAndFill() {
+    await screen.findByLabelText("Progress notes");
+    fireEvent.click(document.querySelector(`input[name="client-update-writer-mode"][value="${scenario.mode}"]`)!);
+    await screen.findByLabelText(fields[0]![0]);
+    for (const [label, value] of fields) fireEvent.change(screen.getByLabelText(label), { target: { value } });
+    fireEvent.click(screen.getByRole("radio", { name: "firm" }));
+  }
+
+  async function expectRestoredFields(edited = false) {
+    await screen.findByLabelText(fields[0]![0]);
+    for (const [label, value] of fields) {
+      expect((screen.getByLabelText(label) as HTMLInputElement).value)
+        .toBe(edited && label === scenario.edited[0] ? scenario.edited[1] : value);
+    }
+    expect((screen.getByRole("radio", { name: "firm" }) as HTMLInputElement).checked).toBe(true);
+    expect((document.querySelector(`input[name="client-update-writer-mode"][value="${scenario.mode}"]`) as HTMLInputElement).checked).toBe(true);
+  }
+
+  it("restores the selected mode and every unsent field without polling or starting", async () => {
+    render(<ClientUpdateWriterProduct client={makeClient(recoveryRoutes()).client} />);
+    await selectAndFill();
+    cleanup();
+    const second = makeClient(recoveryRoutes());
+    render(<ClientUpdateWriterProduct client={second.client} />);
+    await expectRestoredFields();
+    expect(second.calls.some((call) => call.key === r.SESSION || call.key.endsWith("/start"))).toBe(false);
+  });
+
+  it("resumes its accepted running session in the original mode without a second start", async () => {
+    const first = makeClientWithDeferredCalls(recoveryRoutes(), { [r.SESSION]: 1 });
+    render(<ClientUpdateWriterProduct client={first.client} />);
+    await selectAndFill();
+    fireEvent.click(screen.getByRole("button", { name: scenario.submit }));
+    await waitFor(() => expect(first.calls.filter((call) => call.key === r.SESSION)).toHaveLength(1));
+    cleanup();
+    const second = makeClientWithDeferredCalls(recoveryRoutes(), { [r.SESSION]: 1 });
+    const events: ProductRunEvent[] = [];
+    render(<StrictMode><ClientUpdateWriterProduct client={second.client} onEvent={(event) => events.push(event)} /></StrictMode>);
+    try {
+      await waitFor(() => expect(second.calls.filter((call) => call.key === r.SESSION)).toHaveLength(1));
+      expect(screen.getAllByRole("radio").every((radio) => (radio as HTMLInputElement).disabled)).toBe(true);
+      second.resolveCall(r.SESSION, 0, sessionResponse());
+      await screen.findByText("Saved own result.");
+      await expectRestoredFields();
+      expect(first.calls.filter((call) => call.key.endsWith("/start"))).toHaveLength(1);
+      expect(second.calls.some((call) => call.key.endsWith("/start"))).toBe(false);
+      expect(events).toContainEqual({ type: "scenario_completed", scenarioSessionId: "session_1", guestId: undefined, resultViewed: true });
+    } finally {
+      first.resolveCall(r.SESSION, 0, sessionResponse());
+      second.resolveCall(r.SESSION, 0, sessionResponse());
+    }
+  });
+
+  it.each([false, true])("restores a completed run, then New task clears it across reload (edited=%s)", async (edited) => {
+    render(<ClientUpdateWriterProduct client={makeClient(recoveryRoutes()).client} />);
+    await selectAndFill();
+    fireEvent.click(screen.getByRole("button", { name: scenario.submit }));
+    await screen.findByText("Saved own result.");
+    if (edited) fireEvent.change(screen.getByLabelText(scenario.edited[0]), { target: { value: scenario.edited[1] } });
+    cleanup();
+    const second = makeClient(recoveryRoutes());
+    render(<ClientUpdateWriterProduct client={second.client} />);
+    await screen.findByText("Saved own result.");
+    await expectRestoredFields(edited);
+    expect(screen.getByRole("button", { name: scenario.regenerate })).toBeTruthy();
+    expect(screen.queryByText("Created from previous details") !== null).toBe(edited);
+    expect(second.calls.some((call) => call.key.endsWith("/start"))).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "New task" }));
+    cleanup();
+    const third = makeClient(recoveryRoutes());
+    render(<ClientUpdateWriterProduct client={third.client} />);
+    await screen.findByLabelText(fields[0]![0]);
+    for (const [label] of fields) expect((screen.getByLabelText(label) as HTMLInputElement).value).toBe("");
+    expect((screen.getByRole("radio", { name: "neutral" }) as HTMLInputElement).checked).toBe(true);
+    expect(screen.queryByText("Saved own result.")).toBeNull();
+    expect(third.calls.some((call) => call.key === r.SESSION || call.key.endsWith("/start"))).toBe(false);
+  });
+
+  it.each(["getter", "write"])("keeps the form and generation working when storage %s fails", async (failure) => {
+    const spy = failure === "getter"
+      ? vi.spyOn(window, "sessionStorage", "get").mockImplementation(() => { throw new Error("Storage blocked"); })
+      : vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new DOMException("Full", "QuotaExceededError"); });
+    try {
+      const made = makeClient(recoveryRoutes());
+      render(<ClientUpdateWriterProduct client={made.client} />);
+      await selectAndFill();
+      fireEvent.click(screen.getByRole("button", { name: scenario.submit }));
+      await screen.findByText("Saved own result.");
+      expect(made.calls.filter((call) => call.key.endsWith("/start"))).toHaveLength(1);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("gives an attachment precedence without replacing the saved own mode or run", async () => {
+    render(<ClientUpdateWriterProduct client={makeClient(recoveryRoutes()).client} />);
+    await selectAndFill();
+    fireEvent.click(screen.getByRole("button", { name: scenario.submit }));
+    await screen.findByText("Saved own result.");
+    cleanup();
+    const other = scenario.mode === "update" ? MODE_IDS.reply_draft : MODE_IDS.update;
+    const attached = makeClient({
+      ...recoveryRoutes(),
+      "GET /v1/scenario-sessions/attached": Array.from({ length: 2 }, () => sessionResponse({
+        scenario_session_id: "attached", scenario_id: other.scenarioId, result_artifact_id: "attached_result",
+      })),
+      "GET /v1/results/attached_result": [resultResponse(other, {
+        scenario_session_id: "attached", result_artifact_id: "attached_result", output: { text: "Attached result." },
+      })],
+    });
+    render(<ClientUpdateWriterProduct client={attached.client} attachSessionId="attached" />);
+    await screen.findByText("Attached result.");
+    expect(attached.calls.some((call) => call.key === r.SESSION || call.key.endsWith("/start"))).toBe(false);
+    expect(readProductDraftScenario("client_update_writer")).toBe(scenario.ids.scenarioId);
+    cleanup();
+    const restored = makeClient(recoveryRoutes());
+    render(<ClientUpdateWriterProduct client={restored.client} />);
+    await screen.findByText("Saved own result.");
+    await expectRestoredFields();
+    expect(restored.calls.some((call) => call.key.endsWith("/start"))).toBe(false);
+  });
+
+  it("recovers a new own run started from an attached mode", async () => {
+    const made = makeClient({
+      ...recoveryRoutes(),
+      "GET /v1/scenario-sessions/attached": Array.from({ length: 2 }, () => sessionResponse({
+        scenario_session_id: "attached", scenario_id: scenario.ids.scenarioId, result_artifact_id: "attached_result",
+      })),
+      "GET /v1/results/attached_result": [resultResponse(scenario.ids, {
+        scenario_session_id: "attached", result_artifact_id: "attached_result", output: { text: "Attached result." },
+      })],
+    });
+    render(<ClientUpdateWriterProduct client={made.client} attachSessionId="attached" />);
+    await screen.findByText("Attached result.");
+    for (const [label, value] of fields) fireEvent.change(screen.getByLabelText(label), { target: { value } });
+    fireEvent.click(screen.getByRole("radio", { name: "firm" }));
+    fireEvent.click(screen.getByRole("button", { name: scenario.submit }));
+    await screen.findByText("Saved own result.");
+    cleanup();
+    const restored = makeClient(recoveryRoutes());
+    render(<ClientUpdateWriterProduct client={restored.client} />);
+    await screen.findByText("Saved own result.");
+    await expectRestoredFields();
+    expect(restored.calls.some((call) => call.key.endsWith("/start"))).toBe(false);
+  });
+
+  it("validates stored values and defaults invalid fields without coercion", () => {
+    const parse = scenario.definition.draft?.parseValues;
+    expect(parse).toBeTypeOf("function");
+    for (const raw of [null, [], "text", 5]) expect(parse?.(raw)).toBeNull();
+    expect(parse?.({ tone: "toString", progressNotes: 42, clientMessage: [], replyGoal: false, billingNotes: null, billingAmount: {}, billingDueDate: 10 }))
+      .toEqual(scenario.definition.emptyValues);
+    const valid = Object.fromEntries(Object.keys(scenario.definition.emptyValues as Record<string, unknown>).map((key) => [key, key === "tone" ? "warm" : "  Preserve whitespace  "]));
+    expect(parse?.(valid)).toEqual(valid);
+  });
+});
+
+
+it.each(["", "future", "__proto__", "acceptance_builder.check_v1"])("ignores an unknown or foreign stored CUW scenario %s", async (saved) => {
+  saveProductDraftScenario("client_update_writer", saved);
+  const ids = MODE_IDS.update;
+  const { client, calls } = makeClient(bootAndHappyPathRoutes(ids, { text: "Unused" }).queues);
+  render(<ClientUpdateWriterProduct client={client} />);
+  expect((await screen.findByLabelText("Progress notes") as HTMLTextAreaElement).value).toBe("");
+  expect(calls.some((call) => call.key.endsWith("/start") || call.key.includes("/scenario-sessions/"))).toBe(false);
+});
+
+
+it("keeps fields isolated when switching between saved CUW modes", async () => {
+  const ids = MODE_IDS.update;
+  const r = routesFor(ids);
+  const made = makeClient({
+    ...bootAndHappyPathRoutes(ids, { text: "Unused" }).queues,
+    [r.RUNTIME_CONFIG]: [fullRuntimeConfigResponse(ids)],
+    [r.QUOTA]: Array.from({ length: 6 }, () => quotaResponse(ids)),
+  });
+  render(<ClientUpdateWriterProduct client={made.client} />);
+  await screen.findByLabelText("Progress notes");
+  for (const scenario of MODE_SCENARIOS) {
+    fireEvent.click(document.querySelector(`input[name="client-update-writer-mode"][value="${scenario.mode}"]`)!);
+    await screen.findByLabelText(scenario.fields[0]![0]);
+    for (const [label, value] of scenario.fields) fireEvent.change(screen.getByLabelText(label), { target: { value } });
+  }
+  for (const scenario of MODE_SCENARIOS) {
+    fireEvent.click(document.querySelector(`input[name="client-update-writer-mode"][value="${scenario.mode}"]`)!);
+    await screen.findByLabelText(scenario.fields[0]![0]);
+    for (const [label, value] of scenario.fields) expect((screen.getByLabelText(label) as HTMLInputElement).value).toBe(value);
+  }
+  expect(made.calls.some((call) => call.key.endsWith("/start"))).toBe(false);
+});
+
+it("resolves the saved mode before mounting any other mode's saved run", async () => {
+  const ids = MODE_IDS.reply_draft;
+  const r = routesFor(ids);
+  for (const scenario of MODE_SCENARIOS) {
+    window.sessionStorage.setItem(`anytoolai.product_draft.client_update_writer.${scenario.mode}`, JSON.stringify({
+      v: 1, values: scenario.definition.emptyValues as Record<string, unknown>,
+      run: { scenarioSessionId: scenario.mode === "reply_draft" ? "session_1" : "must_not_poll", input: scenario.definition.emptyValues as Record<string, unknown> },
+    }));
+  }
+  saveProductDraftScenario("client_update_writer", ids.scenarioId);
+  const made = makeClient({
+    ...bootAndHappyPathRoutes(ids, { text: "Saved reply." }).queues,
+    [r.RUNTIME_CONFIG]: [fullRuntimeConfigResponse(ids)],
+    [r.QUOTA]: [quotaResponse(ids), quotaResponse(ids)],
+  });
+  render(<StrictMode><ClientUpdateWriterProduct client={made.client} /></StrictMode>);
+  await screen.findByText("Saved reply.");
+  expect(made.calls.filter((call) => call.key.includes("/scenario-sessions/")).map((call) => call.key)).toEqual([r.SESSION]);
+  expect(made.calls.some((call) => call.key.endsWith("/start"))).toBe(false);
 });

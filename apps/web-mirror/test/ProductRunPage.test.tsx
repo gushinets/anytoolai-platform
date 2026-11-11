@@ -40,6 +40,7 @@ const RUN_FAILED = TEST_PRODUCT_MESSAGES_EN.run.runFailed;
 afterEach(() => {
   cleanup();
   window.localStorage.clear();
+  window.sessionStorage.clear();
 });
 
 beforeEach(() => {
@@ -2077,5 +2078,94 @@ describe("ProductRunPage", () => {
     await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/could not start test product/i));
     expect(deterministicBusyStates.at(-1)).toBe(false);
     expect((screen.getByLabelText("Text") as HTMLInputElement).disabled).toBe(false);
+  });
+});
+
+describe("opt-in draft recovery", () => {
+  const key = "anytoolai.product_draft.test_product.run";
+  const definition = {
+    ...testProductDefinition,
+    draft: {
+      parseValues(raw: unknown): TestProductValues | null {
+        return typeof raw === "object" && raw !== null && "text" in raw && typeof raw.text === "string"
+          ? { text: raw.text }
+          : null;
+      },
+    },
+  };
+
+  function seed() {
+    window.sessionStorage.setItem(key, JSON.stringify({
+      v: 1, values: { text: "Stored draft" }, run: { scenarioSessionId: "session_1", input: { text: "Original input" } },
+    }));
+  }
+
+  it("keeps products without opt-in free of draft restore and writes", async () => {
+    seed();
+    const stored = window.sessionStorage.getItem(key);
+    const routed = makeClient(happyPathRoutes());
+    renderPage({ client: routed.client });
+    await waitForForm();
+    expect((screen.getByLabelText("Text") as HTMLTextAreaElement).value).toBe("");
+    fillValidForm();
+    submit();
+    await waitForResult();
+    expect(window.sessionStorage.getItem(key)).toBe(stored);
+  });
+
+  it("resumes only once under StrictMode and derives completion identity from the session", async () => {
+    seed();
+    const routed = makeClient(happyPathRoutes());
+    const onEvent = vi.fn();
+    render(<StrictMode><ProductRunPage definition={definition} client={routed.client} onEvent={onEvent} /></StrictMode>);
+    await waitForResult();
+    expect(routed.calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(1);
+    expect(routed.calls.some((call) => call.key === ROUTES.START)).toBe(false);
+    expect(onEvent).toHaveBeenCalledWith({ type: "scenario_completed", scenarioSessionId: "session_1", guestId: undefined, resultViewed: true });
+  });
+
+  it("gives handoff attachment precedence over a saved draft and run", async () => {
+    seed();
+    const routed = makeClient(happyPathRoutes());
+    const onAttachBegin = vi.fn();
+    render(<ProductRunPage definition={definition} client={routed.client} attachSessionId="session_1" onAttachBegin={onAttachBegin} />);
+    await waitForResult();
+    expect((screen.getByLabelText("Text") as HTMLTextAreaElement).value).toBe("");
+    expect(routed.calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(1);
+    expect(routed.calls.some((call) => call.key === ROUTES.START)).toBe(false);
+    expect(onAttachBegin).toHaveBeenCalledOnce();
+  });
+
+  it("survives a throwing product parser and removes its unusable saved run", async () => {
+    seed();
+    const routed = makeClient(bootRoutes());
+    render(<ProductRunPage definition={{ ...definition, draft: { parseValues: () => { throw new Error("stale parser"); } } }} client={routed.client} />);
+    await waitForForm();
+    expect((screen.getByLabelText("Text") as HTMLTextAreaElement).value).toBe("");
+    await waitFor(() => expect(window.sessionStorage.getItem(key)).not.toContain('"run"'));
+    expect(routed.calls.some((call) => call.key === ROUTES.SESSION)).toBe(false);
+  });
+
+  it.each(["failed", "expired"])("forgets a terminal %s run and keeps the draft", async (status) => {
+    seed();
+    const routed = makeClient({ ...bootRoutes(), [ROUTES.SESSION]: [sessionResponse({ status })] });
+    render(<ProductRunPage definition={definition} client={routed.client} />);
+    expect(await screen.findByText(RUN_FAILED)).toBeTruthy();
+    expect(JSON.parse(window.sessionStorage.getItem(key)!)).toEqual({ v: 1, values: { text: "Stored draft" } });
+  });
+
+  it("retains the accepted run across a transient result fetch failure and retries only that artifact", async () => {
+    seed();
+    const routed = makeClient({
+      ...happyPathRoutes(),
+      [ROUTES.RESULT]: [errorResponse(503, "temporarily_unavailable"), resultResponse(TEST_PRODUCT_IDS)],
+    });
+    render(<ProductRunPage definition={definition} client={routed.client} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
+    await waitForResult();
+    expect(routed.calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(1);
+    expect(routed.calls.filter((call) => call.key === ROUTES.RESULT)).toHaveLength(2);
+    expect(routed.calls.some((call) => call.key === ROUTES.START)).toBe(false);
+    expect(window.sessionStorage.getItem(key)).toContain('"run"');
   });
 });

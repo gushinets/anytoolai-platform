@@ -169,13 +169,33 @@ The shared runtime, not a product, owns the web side of a handoff:
   from this product's scenario: its backend-owned `schemaRef` and `schemaVersion` are checked
   against the selected scenario's output schema from runtime config (a declared version must match;
   a ref keeps its name across a version bump) before the product parser sees it.
+- Products opting in through `ProductDefinition.draft` keep form values and their last accepted
+  scenario session in the tab's `sessionStorage`
+  (`anytoolai.product_draft.<productId>.<messageScope>`). Reload resumes polling without a new start.
+  "New task" clears both; terminal failure clears only the matching saved run and keeps the draft.
+  A failed attachment preserves a different saved own run. User text stays in
+  tab storage, never events, URLs or logs. ProposalAI and all three Client Update Writer modes opt in;
+  handoff attachment takes precedence. The last selected draft scenario is stored separately under
+  `anytoolai.product_draft_scenario.<productId>`. Multi-mode pages resolve it against their current
+  opt-in definitions before mounting a form, so reload opens the correct mode without briefly
+  polling another mode's saved run. Explicit mode selection, field edits and accepted own starts
+  remember that scenario; merely viewing an attached result does not replace it. New task clears
+  the current mode's fields/run and retains the mode selection; other modes keep separate drafts.
+- Once an own start and its scenario selection are confirmed saved, the per-product attachment
+  entry records a preferred own-run reference (draft key and session id). The route lets draft
+  recovery resume that run immediately, including while an old attached result is still displayed.
+  Rejected/ambiguous starts retain the previous attachment; failed persistence delays its
+  retirement until the new result commits. Only the replaced attachment reference is retired;
+  other pending attachments remain fallbacks. A late
+  background Accept cannot replace the preferred own run, while an explicit attachment open can.
+  Clearing or losing the referenced saved run releases its priority over remaining attachments.
 - A spent (accepted/consumed) token that still names the target session shows an explicit "Open result" on the
   consent page, for the case where the Accept response was lost and the person reloaded instead of retrying
   (a retry that gets "already accepted" redirects on its own). It never redirects automatically on load.
 - The redirect happens only when `products/attachTargets.ts` lists the accepted target scenario
   (a registered, enabled product page that can attach it); otherwise the consent page keeps showing
   the terminal status. The consent route injects that check, so it does not bundle every product.
-- `web.result_viewed` for an attached session is sent with the session alone, without a guest: the backend
+- `web.result_viewed` for an attached or draft-restored session is sent with the session alone, without a guest: the backend
   derives guest and chain from the session and rejects a different explicit guest, which is what the
   current one is after a reload without a usable `localStorage` (a fresh in-memory guest). The tab keeps, per
   session, the event id, the web session id it was sent under, and whether the backend accepted it:
