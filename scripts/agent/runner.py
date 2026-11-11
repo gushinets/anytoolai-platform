@@ -38,6 +38,7 @@ COMPOSE_FILE = ROOT / "infra" / "compose" / "docker-compose.yml"
 COMPOSE_OVERRIDE_FILE = ROOT / "infra" / "compose" / "docker-compose.override.yml"
 COMPOSE_PROD_FILE = ROOT / "infra" / "compose" / "docker-compose.prod.yml"
 COMPOSE_LIVE_FILE = ROOT / "infra" / "compose" / "docker-compose.live.yml"
+COMPOSE_IMAGES_FILE = ROOT / "infra" / "compose" / "docker-compose.images.yml"
 COMPOSE_VPS_135_FILE = ROOT / "infra" / "compose" / "docker-compose.vps-135.yml"
 COMPOSE_ATOM_LAB_FILE = ROOT / "infra" / "compose" / "docker-compose.atom-lab.yml"
 COMPOSE_ATOM_LAB_VPS_135_FILE = ROOT / "infra" / "compose" / "docker-compose.atom-lab.vps-135.yml"
@@ -45,9 +46,11 @@ LIVE_ENV_FILE = ROOT / "infra" / "compose" / ".env.live"
 # Optional, gitignored (see .gitignore's `.env.*` rule) -- a local convenience so credentials
 # don't have to be re-exported in every shell. Never auto-loaded for dev; only prod commands
 # pass it to `docker compose` via --env-file, and only if it actually exists on disk.
-PROD_ENV_FILE = ROOT / "infra" / "compose" / ".env.prod"
+PROD_ENV_FILE = Path(
+    os.environ.get("ANYTOOLAI_PROD_ENV_FILE", str(ROOT / "infra" / "compose" / ".env.prod"))
+)
 ATOM_LAB_ENV_FILE = ROOT / "infra" / "compose" / ".env.atom-lab"
-PROD_COMPOSE_PROJECT = "anytoolai-prod"
+PROD_COMPOSE_PROJECT = os.environ.get("ANYTOOLAI_PROD_PROJECT", "anytoolai-prod")
 PROD_FAKE_COMPOSE_PROJECT = "anytoolai-prod-fake"
 ATOM_LAB_COMPOSE_PROJECT = "anytoolai-atom-lab"
 PROFILE_VERSION_HEX_LENGTH = 32
@@ -786,6 +789,12 @@ def _resolved_env_file(path: Path) -> dict[str, str]:
 
 
 def _deployment_profile_dir(compose_project: str) -> Path:
+    env = _resolved_env_file(PROD_ENV_FILE) if compose_project == PROD_COMPOSE_PROJECT else {}
+    if env.get("ANYTOOLAI_API_IMAGE"):
+        root = Path(env.get("ANYTOOLAI_PROFILE_ROOT", ""))
+        if not root.is_absolute():
+            raise ValueError("ANYTOOLAI_PROFILE_ROOT must be an explicit absolute host directory")
+        return root / "freelancer-suite"
     return ROOT / ".agent" / "deployment-profiles" / compose_project / "freelancer-suite"
 
 
@@ -860,6 +869,38 @@ def _activate_deployment_profile(
 
 
 def _check_source_fingerprint(manifest: dict[str, object], env: dict[str, str]) -> int:
+    if env.get("ANYTOOLAI_API_IMAGE"):
+        for image, project in (
+            (env["ANYTOOLAI_API_IMAGE"], "apps/platform-api"),
+            (env["ANYTOOLAI_WORKER_IMAGE"], "apps/platform-worker"),
+        ):
+            code = run_with_env(
+                [
+                    "docker",
+                    "run",
+                    "--rm",
+                    "--pull=never",
+                    "--network=none",
+                    "--entrypoint",
+                    "uv",
+                    image,
+                    "run",
+                    "--project",
+                    project,
+                    "--no-sync",
+                    "python",
+                    "scripts/agent/validate_configs.py",
+                    "check-source-fingerprint",
+                    "--products-root",
+                    str(manifest["source_products_root"]),
+                    "--expected-fingerprint",
+                    str(manifest["source_fingerprint"]),
+                ],
+                env,
+            )
+            if code != 0:
+                return code
+        return 0
     managed_python = quick_check_venv_python()
     if not quick_check_venv_ready(managed_python):
         print("LIVE001: run python scripts/agent/runner.py quick-check first", file=sys.stderr)
@@ -954,6 +995,10 @@ def _build_deployment_profile(
     unmetered_products: Sequence[str],
     env: dict[str, str],
 ) -> tuple[int, dict[str, object] | None]:
+    if env.get("ANYTOOLAI_API_IMAGE"):
+        return _build_image_deployment_profile(
+            compose_project, enabled_products, unmetered_products, env
+        )
     base_dir = _deployment_profile_dir(compose_project)
     profile_dir = base_dir.with_name(f"{base_dir.name}.{uuid.uuid4().hex}")
     managed_python = quick_check_venv_python()
@@ -2324,8 +2369,11 @@ def _atom_lab_smoke_locked() -> int:  # noqa: PLR0911
 
 def _prod_compose_command(*args: str, include_env_file: bool = True) -> list[str]:
     env_file = PROD_ENV_FILE if include_env_file and PROD_ENV_FILE.is_file() else None
+    files = [COMPOSE_FILE, COMPOSE_PROD_FILE]
+    if include_env_file and _resolved_env_file(PROD_ENV_FILE).get("ANYTOOLAI_API_IMAGE"):
+        files.append(COMPOSE_IMAGES_FILE)
     return _docker_compose_command(
-        PROD_COMPOSE_PROJECT, (COMPOSE_FILE, COMPOSE_PROD_FILE), *args, env_file=env_file
+        PROD_COMPOSE_PROJECT, files, *args, env_file=env_file
     )
 
 
@@ -2347,6 +2395,8 @@ def _vps_135_networks_enabled(env: dict[str, str]) -> bool:
 def _prod_live_compose_command(*args: str, env: dict[str, str] | None = None) -> list[str]:
     env_file = PROD_ENV_FILE if PROD_ENV_FILE.is_file() else None
     files = [COMPOSE_FILE, COMPOSE_PROD_FILE, COMPOSE_LIVE_FILE]
+    if (env if env is not None else _resolved_env_file(PROD_ENV_FILE)).get("ANYTOOLAI_API_IMAGE"):
+        files.append(COMPOSE_IMAGES_FILE)
     if _vps_135_networks_enabled(env if env is not None else runner_env()):
         files.append(COMPOSE_VPS_135_FILE)
     return _docker_compose_command(
@@ -2664,6 +2714,151 @@ def prod_up() -> int:
         return 1
 
 
+def _validate_image_inputs(env: dict[str, str]) -> None:
+    if os.name != "posix":
+        raise ValueError("image installation currently requires a Linux Docker host")
+    for name in ("ANYTOOLAI_API_IMAGE", "ANYTOOLAI_WORKER_IMAGE", "ANYTOOLAI_WEB_IMAGE"):
+        ref = env.get(name, "")
+        if not ref or (
+            "@sha256:" not in ref and (":" not in ref.rsplit("/", 1)[-1] or ref.endswith(":latest"))
+        ):
+            raise ValueError(f"{name} must select a version tag or digest")
+    root = Path(env.get("ANYTOOLAI_PROFILE_ROOT", ""))
+    if not root.is_absolute() or root.is_symlink() or not root.is_dir():
+        raise ValueError(
+            "ANYTOOLAI_PROFILE_ROOT must be an existing operator-owned absolute directory"
+        )
+    info = root.stat()
+    if info.st_uid != os.getuid() or info.st_mode & 0o022:
+        raise ValueError(
+            "ANYTOOLAI_PROFILE_ROOT must be owned by the operator and not shared-writable"
+        )
+    revisions = []
+    for name in ("ANYTOOLAI_API_IMAGE", "ANYTOOLAI_WORKER_IMAGE"):
+        result = subprocess.run(
+            [
+                "docker",
+                "image",
+                "inspect",
+                "--format",
+                '{{index .Config.Labels "org.opencontainers.image.revision"}}',
+                env[name],
+            ],
+            cwd=ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
+        )
+        revisions.append(result.stdout.strip())
+    if not revisions[0] or revisions[0] == "<no value>" or revisions[0] != revisions[1]:
+        raise ValueError("Kernel API/worker images must declare the same reviewed source revision")
+
+
+def _build_image_deployment_profile(
+    compose_project: str,
+    enabled_products: Sequence[str],
+    unmetered_products: Sequence[str],
+    env: dict[str, str],
+) -> tuple[int, dict[str, object] | None]:
+    _validate_image_inputs(env)
+    root = Path(env["ANYTOOLAI_PROFILE_ROOT"])
+    name = f"freelancer-suite.{uuid.uuid4().hex}"
+    command = [
+        "docker",
+        "run",
+        "--rm",
+        "--pull=never",
+        "--network=none",
+        "--user",
+        f"{os.getuid()}:{os.getgid()}",
+        "--env",
+        "UV_CACHE_DIR=/tmp/uv-cache",
+        "--mount",
+        f"type=bind,source={root},target=/deployment",
+        "--entrypoint",
+        "uv",
+        env["ANYTOOLAI_API_IMAGE"],
+        "run",
+        "--project",
+        "apps/platform-api",
+        "--no-sync",
+        "python",
+        "scripts/agent/validate_configs.py",
+        "build-deployment-profile",
+        "--output-dir",
+        f"/deployment/{name}",
+    ]
+    for product in enabled_products:
+        command.extend(["--enabled-product", product])
+    for product in unmetered_products:
+        command.extend(["--unmetered-product", product])
+    code = run_with_env(command, env)
+    if code:
+        return code, None
+    path = root / name / "manifest.json"
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    # Container paths identify image sources; only the generated mount path is host-owned.
+    manifest["generated_products_root"] = str(root / name / "products")
+    _profile_check_args(manifest)
+    path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return _check_source_fingerprint(manifest, env), manifest
+
+
+def prod_web_up() -> int:
+    """Replace only web; backend, migration, profile and volume identities stay intact."""
+    try:
+        with _prod_deployment_lock():
+            env = _resolved_env_file(PROD_ENV_FILE)
+            _validate_image_inputs(env)
+            return run_with_env(
+                [
+                    *_prod_compose_command(),
+                    "up",
+                    "-d",
+                    "--no-deps",
+                    "--no-build",
+                    "--pull",
+                    "never",
+                    "--wait",
+                    "web-mirror",
+                ],
+                env,
+            )
+    except (DeploymentLockError, ValueError, OSError, subprocess.SubprocessError) as exc:
+        print(f"PROD010: image web update failed: {exc}", file=sys.stderr)
+        return 1
+
+
+def _start_prod_candidate(env: dict[str, str]) -> int:
+    compose = _prod_live_compose_command(env=env)
+    if not env.get("ANYTOOLAI_API_IMAGE"):
+        return run_with_env(
+            [*compose, "up", "-d", "--build", "--force-recreate", "--remove-orphans"], env
+        )
+    for args in (
+        ("stop", "platform-api", "platform-worker", "web-mirror"),
+        ("up", "-d", "--no-build", "--pull", "never", "--wait", "postgres"),
+        ("run", "--rm", "--no-deps", "migrate"),
+        (
+            "up",
+            "-d",
+            "--no-deps",
+            "--no-build",
+            "--pull",
+            "never",
+            "platform-api",
+            "platform-worker",
+            "web-mirror",
+        ),
+    ):
+        code = run_with_env([*compose, *args], env)
+        if code:
+            return code
+    return 0
+
+
 def _prod_up_locked() -> int:
     try:
         inputs = _deployment_inputs()
@@ -2724,6 +2919,8 @@ def _prod_up_locked() -> int:
     # No timeout: `--build` can legitimately take minutes on a cold image build.
     # finally, not `except Exception`: Ctrl+C is BaseException and must stop the
     # candidate until active-profile is replaced. After that commit, leave the stack up.
+    if env.get("ANYTOOLAI_API_IMAGE") and stack_running and _prod_quiesce_locked() != 0:
+        return 1
     committed = False
 
     def note_committed() -> None:
@@ -2731,12 +2928,7 @@ def _prod_up_locked() -> int:
         committed = True
 
     try:
-        exit_code = run_with_env(
-            _prod_live_compose_command(
-                "up", "-d", "--build", "--force-recreate", "--remove-orphans", env=env
-            ),
-            env,
-        )
+        exit_code = _start_prod_candidate(env)
         if exit_code != 0:
             return exit_code
         exit_code = prod_ready(inputs=inputs, manifest=manifest, announce=False)
@@ -3149,6 +3341,7 @@ COMMANDS = {
     "atom-lab-down": atom_lab_down,
     "atom-lab-smoke": atom_lab_smoke,
     "prod-up": prod_up,
+    "prod-web-up": prod_web_up,
     "prod-fake-up": prod_fake_up,
     "prod-fake-down": prod_fake_down,
     "prod-ready": prod_ready,

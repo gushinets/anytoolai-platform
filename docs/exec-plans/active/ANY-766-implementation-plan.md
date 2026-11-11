@@ -1,6 +1,6 @@
 # ANY-766 — Portal API and Paid Execution for Product Backends
 
-Status: **STEPS 1–16 COMPLETE in the agreed local scope; Step 17 pending; full acceptance matrix deferred**
+Status: **STEPS 1–17 COMPLETE in the agreed local scope; PR readiness checklist pending; full acceptance matrix deferred**
 
 Date: **2026-11-09**
 
@@ -12,7 +12,7 @@ Related requirements: [ANY-833](https://linear.app/paveldik/issue/ANY-833).
 - Owner: mixed — Portal and Kernel execution owners
 - Last updated: 2026-11-11
 - Review date: 2026-11-11
-- Next action: Step 17 minimal build/install preparation, only when requested.
+- Next action: complete the PR readiness checklist under the accepted focused testing gate.
 - Verification gate: the 18 passing focused cases are accepted for review, PR creation and merge; full testing is deferred by owner decision.
 - Blocker: none for the planned local work; real external-product integration is outside this plan.
 
@@ -1504,7 +1504,8 @@ The full populated historical cutover/expiry/concurrency matrix and broad suites
 remain NOT_RUN to completion under the scope amendment. Earlier broad Portal
 attempts stopped on existing formatter drift in untouched files; interrupted
 Kernel full-check supplies no passing gate. These results are not full-plan PR
-readiness by themselves: Step 17 remains pending. Under Section 3.8's subsequent
+readiness by themselves; Step 17's separate build/install evidence is recorded
+below. Under Section 3.8's subsequent
 owner decision, this focused verification satisfies the testing gate for review,
 PR creation and merge to main; deferred suites do not block those activities.
 Real external-team integration, live LBX and deployed acceptance remain unproven.
@@ -1557,6 +1558,27 @@ consumer demonstrates our protocol, not the real Document Summary implementation
 **Proposed commit:** `ANY-766 - Prove durable joint Portal Kernel execution`
 
 ### Step 17 — Prepare minimal builds and installation instructions
+
+**Status:** COMPLETE in the agreed local scope (2026-11-11). Component-selectable
+workflows, image inputs/runners and synchronized installation/reader safeguards
+are implemented. All five images built locally with explicitly authorized
+Docker-only downloads. Nine disposable installation cases PASS: initial installs,
+web routes/compiled origins, frontend-only isolation, retained data/current heads,
+non-root activation-marker access, and both migration-failure/recovery paths.
+Run-owned containers, networks and volumes were removed. Actual local image IDs
+and build inputs are recorded in both existing deployment runbooks.
+
+Portal deployment tests: **42 PASS** (including all 7 Step 17 tests). Kernel's
+required image/runner suite: **262 PASS, 1 existing environment FAIL, 12 NOT_RUN**
+(Windows-only). The failure requires unavailable passwordless `sudo -u nobody`;
+both real non-root backend containers read the activation marker successfully.
+Kernel Compose tests: **6 PASS**. Workflow YAML/shell, composed image selection,
+changed-file lint and documentation checks PASS; the runner retains 26 existing
+lint diagnostics with no new diagnostics. New files pass formatting; Portal's
+existing controller retains baseline formatting drift. Step 16 HTTP/browser evidence is reused
+for unchanged runtime sources. The full historical matrix/broad suites remain
+deferred; registry publication, remote installation and live-service acceptance
+remain ANY-767 work. No Git mutation, publication or remote deployment was performed.
 
 **Goal / Expected behavior:** the Portal and Kernel changes needed to build and
 later install the selected versions are locally verified and ready for PR review.
@@ -1637,7 +1659,8 @@ Step 16 cases and completed lint/type/docs checks are sufficient testing for
 review, PR creation and merge to main. Full suites and the remaining acceptance
 matrix below are deferred; they must not be restarted merely to close the PR
 checklist. Keep actual PASS/FAIL/NOT_RUN evidence and limitations visible.
-Step 17 remains separate work; the testing decision does not mark it complete.
+Step 17's separate local build/install checks are complete as recorded above;
+the testing decision does not convert deferred checks into PASS.
 
 After review corrections, rerun focused checks affected by those changes.
 Run the deferred full campaign later, alongside the ANY-767 / parent ANY-504
