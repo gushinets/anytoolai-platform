@@ -12,12 +12,14 @@ from anytoolai_platform_core.storage.db import paid_access_coherence_table as co
 
 
 class AccessCoherenceRepository:
-    def __init__(self, session: Session, owner: ExecutionOwner) -> None:
+    def __init__(self, session: Session, owner: ExecutionOwner, *, consumer_id: str) -> None:
         self.session = session
         self.owner = owner
+        self.consumer_id = consumer_id
 
     def _scope(self) -> tuple[sa.ColumnElement[bool], ...]:
         return (
+            coherence.c.consumer_id == self.consumer_id,
             coherence.c.tenant_id == self.owner.tenant_id,
             coherence.c.region == self.owner.region,
             coherence.c.user_id == self.owner.owner_id,
@@ -34,6 +36,7 @@ class AccessCoherenceRepository:
         self.session.execute(
             insert(coherence)
             .values(
+                consumer_id=self.consumer_id,
                 tenant_id=self.owner.tenant_id,
                 region=self.owner.region,
                 user_id=self.owner.owner_id,
@@ -55,11 +58,25 @@ class AccessCoherenceRepository:
             values["snapshot"] = None
         self.session.execute(sa.update(coherence).where(*self._scope()).values(**values))
 
+    def observe_policy(self, revision: int) -> bool:
+        row = self.lock()
+        if revision < row["policy_floor"]:
+            return False
+        if revision > row["policy_floor"]:
+            self.session.execute(
+                sa.update(coherence)
+                .where(*self._scope())
+                .values(policy_floor=revision, snapshot=None)
+            )
+        return True
+
     def evict(self) -> None:
         self.lock()
         self.session.execute(sa.update(coherence).where(*self._scope()).values(snapshot=None))
 
-    def install(self, revision: int, semantic_digest: str, document: dict[str, Any]) -> None:
+    def install(
+        self, revision: int, policy: int, semantic_digest: str, document: dict[str, Any]
+    ) -> None:
         # The owner of installation first locks and validates this row. Keeping the last
         # revision/digest across eviction also prevents same-revision semantic rewrites.
         self.session.execute(
@@ -68,6 +85,7 @@ class AccessCoherenceRepository:
             .values(
                 revision_floor=revision,
                 snapshot_revision=revision,
+                snapshot_policy_revision=policy,
                 semantic_digest=semantic_digest,
                 snapshot=document,
             )

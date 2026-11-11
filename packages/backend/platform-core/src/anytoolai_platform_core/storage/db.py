@@ -924,14 +924,18 @@ atom_lab_prompts_table = sa.Table(
 paid_access_coherence_table = sa.Table(
     "paid_access_coherence",
     runtime_metadata,
+    sa.Column("consumer_id", sa.String(64), primary_key=True),
     sa.Column("tenant_id", sa.String(128), primary_key=True),
     sa.Column("region", sa.String(64), primary_key=True),
     sa.Column("user_id", sa.String(128), primary_key=True),
     sa.Column("revision_floor", sa.BigInteger(), nullable=False, server_default="0"),
+    sa.Column("policy_floor", sa.BigInteger(), nullable=False, server_default="1"),
+    sa.Column("snapshot_policy_revision", sa.BigInteger()),
     sa.Column("snapshot_revision", sa.BigInteger()),
     sa.Column("semantic_digest", sa.String(64)),
     sa.Column("snapshot", _json_document_type()),
     sa.CheckConstraint("revision_floor >= 0", name="ck_paid_access_floor_nonnegative"),
+    sa.CheckConstraint("policy_floor >= 1", name="ck_paid_policy_floor_positive"),
 )
 
 

@@ -50,3 +50,12 @@ uv run alembic -c migrations/platform/alembic.ini upgrade head --sql
 ```
 
 The offline config URL is a placeholder used only to select the PostgreSQL dialect for SQL output.
+
+
+Revision `0020` scopes paid coherence by consumer, initializes legacy Kernel P1
+and retains the durable R floor. It clears only incompatible V2 cached authority
+and digest metadata. Existing buckets, successful usage, active reservations,
+jobs and replay are unchanged. Quiesce Portal/Kernel APIs and workers for the
+synchronized V3 wire cutover; restart matching readers only. Downgrade refuses
+to discard consumer authority: use a compatible backup/binary pair for recovery.
+See the [paid coherence contract](../../docs/architecture/quota-model.md#any-766-coherent-paid-admission).

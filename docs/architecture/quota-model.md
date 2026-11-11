@@ -1,7 +1,7 @@
 # Quota Model
 
 MVP-A exposes guest quota. ANY-507 supplies typed paid metering. ANY-766 Step 6
-connects Portal delegation, finite AccessSnapshot V2 and scenario-owned metric
+connects Portal delegation, finite consumer-scoped AccessSnapshot V3 and scenario-owned metric
 selection to that same admission path. Interservice usage and exhaustion delivery
 remain later ANY-766 work. See the [shared contract and execution plan](../exec-plans/completed/ANY-507-implementation-plan.md).
 
@@ -163,12 +163,18 @@ understands the new `QuotaPeriod` values.
 
 ## ANY-766 coherent paid admission
 
-`platform.paid_access_coherence` (migration `0019`) retains one scoped user's
-revision floor, last snapshot revision/semantic digest and nullable snapshot.
-Core's `AccessCoherenceRepository` owns locking and writes. The HTTP composition
-validates Portal V2 documents and performs bounded request-driven refresh outside
-SQL. Installation, invalidation and new execution all hold the same row lock.
-Eviction removes only the document; revision/digest and usage survive.
+`platform.paid_access_coherence` (migration `0020`) retains one row per
+consumer/tenant/region/user, independent monotonic policy/access floors and the
+last snapshot P/R/digest plus nullable document. Core's repository owns locking
+and writes. The HTTP composition validates Portal V3 consumer/scope/P/R and
+performs bounded refresh outside SQL. A new introspected policy is committed
+before HTTP; it evicts the document without lowering R. Installation, policy
+observation, invalidation and new admission share the same row lock. Snapshot
+installation/admission require the current introspected P; stale P/R installs
+cannot restore authority. Same-P/R semantic immutability survives eviction.
+The forward migration preserves R and all ANY-507 buckets/reservations/usage,
+initializes legacy Kernel rows at P1 and clears only incompatible V2 cache/digest
+metadata. Consumer/P never changes execution ownership or replay identity.
 
 The paid start adapter first attempts owner/hash-matched replay without mutable
 configuration or a snapshot dependency. New admission refreshes outside SQL,

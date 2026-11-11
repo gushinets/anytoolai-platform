@@ -1,7 +1,7 @@
 from http import HTTPStatus
 from typing import Annotated, Any
 
-from anytoolai_platform_api.dependencies import get_session_factory
+from anytoolai_platform_api.dependencies import get_session_factory, get_settings
 from anytoolai_platform_api.errors import ApiError
 from anytoolai_platform_api.manifest_auth import (
     PortalPermission,
@@ -10,6 +10,7 @@ from anytoolai_platform_api.manifest_auth import (
 )
 from anytoolai_platform_api.paid_access import PAID_RUNTIME_ERROR_RESPONSES, invalidate
 from anytoolai_platform_api.portal_session import VersionOne, WireUserId
+from anytoolai_platform_api.settings import Settings
 from anytoolai_platform_core.quotas.models import ExecutionOwner, ExecutionOwnerKind
 from anytoolai_platform_core.storage.transactions import transaction_boundary
 from fastapi import APIRouter, Depends, Response
@@ -36,6 +37,7 @@ def post_access_invalidation(
     payload: AccessInvalidation,
     principal: Annotated[PortalPrincipal, Depends(authenticate_portal)],
     factory: Annotated[Any, Depends(get_session_factory)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> Response:
     if PortalPermission.ACCESS_INVALIDATE not in principal.permissions or (
         payload.tenant_id,
@@ -50,5 +52,5 @@ def post_access_invalidation(
         payload.tenant_id, payload.region, ExecutionOwnerKind.portal_user, payload.user_id
     )
     with transaction_boundary(factory) as session:
-        invalidate(session, owner, payload.access_revision)
+        invalidate(session, owner, payload.access_revision, settings.portal_consumer_id)
     return Response(status_code=HTTPStatus.NO_CONTENT)

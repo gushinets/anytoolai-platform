@@ -51,14 +51,14 @@ PAID_RUNTIME_ERROR_RESPONSES = {
     for status in (HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN, HTTPStatus.SERVICE_UNAVAILABLE)
 }
 
-SNAPSHOT_SCHEMA_VERSION = 2
+SNAPSHOT_SCHEMA_VERSION = 3
 SNAPSHOT_MAX_BYTES = 256 * 1024
 SNAPSHOT_MAX_AGE_SECONDS = 300
 
 
-def _version_two(value: object) -> object:
+def _version_three(value: object) -> object:
     if type(value) is not int or value != SNAPSHOT_SCHEMA_VERSION:
-        raise ValueError("Expected integer version 2")
+        raise ValueError("Expected integer version 3")
     return value
 
 
@@ -79,7 +79,9 @@ class Allowance(BaseModel):
 
 class AccessSnapshot(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    schema_version: Annotated[Literal[2], BeforeValidator(_version_two)]
+    schema_version: Annotated[Literal[3], BeforeValidator(_version_three)]
+    consumer_id: str = Field(pattern=r"^[a-z][a-z0-9-]{0,63}$")
+    consumer_policy_revision: int = Field(strict=True, ge=1, le=2**53 - 1)
     tenant_id: str = Field(min_length=1)
     region: str = Field(min_length=1)
     user_id: WireUserId
@@ -165,16 +167,16 @@ def db_now(session: Session) -> datetime:
     return database_wall_time(session)
 
 
-def lock_authority(session: Session, owner: ExecutionOwner) -> sa.RowMapping:
-    return AccessCoherenceRepository(session, owner).lock()
+def lock_authority(session: Session, owner: ExecutionOwner, consumer_id: str) -> sa.RowMapping:
+    return AccessCoherenceRepository(session, owner, consumer_id=consumer_id).lock()
 
 
-def invalidate(session: Session, owner: ExecutionOwner, revision: int) -> None:
-    AccessCoherenceRepository(session, owner).invalidate(revision)
+def invalidate(session: Session, owner: ExecutionOwner, revision: int, consumer_id: str) -> None:
+    AccessCoherenceRepository(session, owner, consumer_id=consumer_id).invalidate(revision)
 
 
-def evict(session: Session, owner: ExecutionOwner) -> None:
-    AccessCoherenceRepository(session, owner).evict()
+def evict(session: Session, owner: ExecutionOwner, consumer_id: str) -> None:
+    AccessCoherenceRepository(session, owner, consumer_id=consumer_id).evict()
 
 
 def install(session: Session, owner: ExecutionOwner, document: AccessSnapshot) -> bool:
@@ -184,16 +186,24 @@ def install(session: Session, owner: ExecutionOwner, document: AccessSnapshot) -
         owner.owner_id,
     ):
         raise unavailable()
-    row = lock_authority(session, owner)
+    repository = AccessCoherenceRepository(session, owner, consumer_id=document.consumer_id)
+    row = repository.lock()
     now = db_now(session)
-    if document.access_revision < row["revision_floor"]:
+    if (
+        document.consumer_policy_revision != row["policy_floor"]
+        or document.access_revision < row["revision_floor"]
+    ):
         return False
     if document.expires_at <= now or document.expires_at > now + timedelta(
         seconds=SNAPSHOT_MAX_AGE_SECONDS
     ):
         raise unavailable()
     digest = document.semantic_digest()
-    if row["snapshot_revision"] == document.access_revision and row["semantic_digest"] != digest:
+    if (
+        row["snapshot_policy_revision"] == document.consumer_policy_revision
+        and row["snapshot_revision"] == document.access_revision
+        and row["semantic_digest"] != digest
+    ):
         raise unavailable()
     buckets = PaidAllowanceUsageRepository(session)
     for item in document.allowances:
@@ -204,8 +214,11 @@ def install(session: Session, owner: ExecutionOwner, document: AccessSnapshot) -
         # A conflicting frozen tuple refuses only dependent admission, without rewriting history.
         if existing is None or existing.allowance == allowance:
             buckets.ensure_usage(allowance)
-    AccessCoherenceRepository(session, owner).install(
-        document.access_revision, digest, document.model_dump(mode="json")
+    repository.install(
+        document.access_revision,
+        document.consumer_policy_revision,
+        digest,
+        document.model_dump(mode="json"),
     )
     return True
 
@@ -246,7 +259,8 @@ class AccessSnapshotClient:
             raise unavailable() from None
         except (URLError, TimeoutError, OSError, HTTPException, ValidationError):
             raise unavailable() from None
-        if (document.tenant_id, document.region, document.user_id) != (
+        if (document.consumer_id, document.tenant_id, document.region, document.user_id) != (
+            settings.portal_consumer_id,
             owner.tenant_id,
             owner.region,
             owner.owner_id,
@@ -266,7 +280,12 @@ def refresh_authority(
 ) -> None:
     owner = principal.owner
     with transaction_boundary(factory) as session:
-        row = AccessCoherenceRepository(session, owner).read()
+        repository = AccessCoherenceRepository(session, owner, consumer_id=principal.consumer_id)
+        # Commit P before network I/O or admission can fail. A stale in-flight
+        # introspection must never restore an older policy, including after restart.
+        if not repository.observe_policy(principal.consumer_policy_revision):
+            raise unavailable()
+        row = repository.read()
         document = (
             None
             if row is None or row["snapshot"] is None
@@ -274,6 +293,10 @@ def refresh_authority(
         )
         if (
             document is not None
+            and document.consumer_id == principal.consumer_id
+            and document.consumer_policy_revision
+            == principal.consumer_policy_revision
+            == row["policy_floor"]
             and document.access_revision >= row["revision_floor"]
             and (db_now(session) < min(document.refresh_after, document.expires_at))
         ):
@@ -283,6 +306,11 @@ def refresh_authority(
     except ApiError:
         # Admission under the row lock decides whether old finite authority is still usable.
         return
+    if (fresh.consumer_id, fresh.consumer_policy_revision) != (
+        principal.consumer_id,
+        principal.consumer_policy_revision,
+    ):
+        raise unavailable()
     with transaction_boundary(factory) as session:
         install(session, owner, fresh)
 
@@ -294,7 +322,7 @@ def eligible_allowance(
     product_id: str,
     scenario_id: str,
 ) -> PaidAllowance:
-    row = lock_authority(session, principal.owner)
+    row = lock_authority(session, principal.owner, principal.consumer_id)
     document = None if row["snapshot"] is None else AccessSnapshot.model_validate(row["snapshot"])
     now = db_now(session)
     if principal.valid_until <= now:
@@ -306,6 +334,9 @@ def eligible_allowance(
         )
     if (
         document is None
+        or document.consumer_id != principal.consumer_id
+        or document.consumer_policy_revision != principal.consumer_policy_revision
+        or principal.consumer_policy_revision != row["policy_floor"]
         or document.access_revision < row["revision_floor"]
         or document.expires_at <= now
     ):

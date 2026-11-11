@@ -667,7 +667,9 @@ def test_downgrade_without_new_history_preserves_guest_used() -> None:
         _seed_0015(connection, old)
         before = _snapshot(connection, old)
         config.attributes["connection"] = connection
-        command.upgrade(config, "head")
+        # This characterizes the ANY-507 downgrade boundary. The later V3
+        # consumer-coherence cutover intentionally refuses schema downgrade.
+        command.upgrade(config, "0019")
         command.downgrade(config, "0015")
         assert _snapshot(connection, old) == before
         command.upgrade(config, "head")
@@ -677,6 +679,7 @@ def test_downgrade_without_new_history_preserves_guest_used() -> None:
 def test_downgrade_refuses_to_discard_new_history() -> None:
     with provision_database(
         database_name_prefix="any507_refuse_downgrade",
+        upgrade_target="0019",
         skip_reason="metering history safety",
     ) as (engine, config, _):
         with Session(engine) as session, session.begin():

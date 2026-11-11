@@ -15,6 +15,7 @@ from uuid import uuid4
 import httpx
 import pytest
 import sqlalchemy as sa
+from alembic import command
 from anytoolai_platform_api import paid_access
 from anytoolai_platform_api.errors import ApiError
 from anytoolai_platform_api.paid_access import (
@@ -29,6 +30,7 @@ from anytoolai_platform_api.portal_session import PortalUserPrincipal
 from anytoolai_platform_api.routers import handoffs
 from anytoolai_platform_core.handoffs.models import HandoffStartPolicy, HandoffStatus
 from anytoolai_platform_core.products.models import UsageMetricDefinition
+from anytoolai_platform_core.quotas.access_coherence import AccessCoherenceRepository
 from anytoolai_platform_core.quotas.execution_repository import PaidAllowanceUsageRepository
 from anytoolai_platform_core.quotas.models import ExecutionOwner, ExecutionOwnerKind
 from anytoolai_platform_core.storage.db import (
@@ -59,7 +61,9 @@ def snapshot(owner, *, revision=1, quantity=1, allowance_id=None, ttl=180):
     now = datetime.now(UTC)
     return AccessSnapshot.model_validate(
         {
-            "schema_version": 2,
+            "schema_version": 3,
+            "consumer_id": "platform-kernel",
+            "consumer_policy_revision": 1,
             "tenant_id": owner.tenant_id,
             "region": owner.region,
             "user_id": owner.owner_id,
@@ -132,6 +136,203 @@ def rows(factory, table):
         return list(session.execute(sa.select(table)).mappings())
 
 
+def test_policy_floor_fences_stale_install_and_admission_without_resetting_usage(runtime) -> None:
+    factory, app, _, principal, document, _ = runtime
+    client = TestClient(app)
+    first = client.post(START, json=_start_payload(), headers={"Idempotency-Key": "before-policy"})
+    assert first.status_code == HTTPStatus.OK
+    before = {
+        table.name: rows(factory, table)
+        for table in (
+            paid_allowance_usage_table,
+            execution_reservations_table,
+            jobs_table,
+            scenario_sessions_table,
+        )
+    }
+    p2 = replace(principal, consumer_policy_revision=2)
+
+    class OfflineSnapshotClient:
+        def fetch(self, owner: ExecutionOwner) -> AccessSnapshot:
+            assert owner == principal.owner
+            assert factory.kw["bind"].pool.checkedout() == 0
+            raise paid_access.unavailable()
+
+    paid_access.refresh_authority(factory, p2, OfflineSnapshotClient())
+    with transaction_boundary(factory) as session:
+        repository = AccessCoherenceRepository(
+            session, principal.owner, consumer_id=principal.consumer_id
+        )
+        assert repository.read()["policy_floor"] == p2.consumer_policy_revision
+        assert not repository.observe_policy(1)
+        assert not install(session, principal.owner, document)
+        assert repository.read()["revision_floor"] == 1
+    # Introspection can advance P while a slow old-P HTTP response is in flight.
+    with pytest.raises(ApiError):
+        paid_access.refresh_authority(factory, principal, object())
+    reduced = document.model_copy(
+        update={"consumer_policy_revision": 2, "grants": [], "allowances": []}
+    )
+    install_one(factory, principal.owner, reduced)
+    with transaction_boundary(factory) as session:
+        with pytest.raises(ApiError):
+            paid_access.eligible_allowance(
+                session, principal, app.state.runtime.config_registry, "kernel_demo", SCENARIO
+            )
+        evict(session, principal.owner, principal.consumer_id)
+        with pytest.raises(ApiError):
+            install(
+                session,
+                principal.owner,
+                reduced.model_copy(
+                    update={"grants": document.grants, "allowances": document.allowances}
+                ),
+            )
+        assert install(session, principal.owner, reduced)
+    app.dependency_overrides[optional_portal_user] = lambda: p2
+    replay = client.post(START, json=_start_payload(), headers={"Idempotency-Key": "before-policy"})
+    assert replay.json() == first.json()
+    assert (
+        client.post(
+            START, json=_start_payload(), headers={"Idempotency-Key": "after-policy"}
+        ).status_code
+        == HTTPStatus.FORBIDDEN
+    )
+    assert before == {
+        table.name: rows(factory, table)
+        for table in (
+            paid_allowance_usage_table,
+            execution_reservations_table,
+            jobs_table,
+            scenario_sessions_table,
+        )
+    }
+
+
+def test_old_policy_install_waiting_for_new_policy_is_refused_and_consumers_are_independent(
+    runtime,
+) -> None:
+    factory, _, _, principal, document, _ = runtime
+    install_one(factory, principal.owner, document)
+    locked, release = Event(), Event()
+
+    def advance() -> None:
+        with transaction_boundary(factory) as session:
+            AccessCoherenceRepository(
+                session, principal.owner, consumer_id=principal.consumer_id
+            ).observe_policy(2)
+            locked.set()
+            assert release.wait(5)
+
+    with ThreadPoolExecutor(2) as pool:
+        newer = pool.submit(advance)
+        assert locked.wait(5)
+        older = pool.submit(lambda: install_one(factory, principal.owner, document))
+        assert_database_wait(factory)
+        release.set()
+        newer.result(5)
+        assert older.result(5) is False
+    other = document.model_copy(
+        update={"consumer_id": "synthetic-summary", "grants": [], "allowances": []}
+    )
+    assert install_one(factory, principal.owner, other)
+    with transaction_boundary(factory) as session:
+        invalidate(session, principal.owner, 9, principal.consumer_id)
+        kernel = AccessCoherenceRepository(
+            session, principal.owner, consumer_id="platform-kernel"
+        ).read()
+        summary = AccessCoherenceRepository(
+            session, principal.owner, consumer_id="synthetic-summary"
+        ).read()
+        assert (kernel["policy_floor"], kernel["revision_floor"], kernel["snapshot"]) == (
+            2,
+            9,
+            None,
+        )
+        assert (summary["policy_floor"], summary["revision_floor"]) == (1, 1)
+        assert summary["snapshot"] is not None
+
+
+def test_populated_v2_forward_migration_retains_floor_usage_reservation_and_replay(runtime) -> None:
+    factory, app, registry, principal, document, _ = runtime
+    document = document.model_copy(
+        update={
+            "allowances": [document.allowances[0].model_copy(update={"quantity": 3})],
+        }
+    )
+    install_one(factory, principal.owner, document)
+    first = TestClient(app).post(
+        START, json=_start_payload(), headers={"Idempotency-Key": "migrated-replay"}
+    )
+    assert first.status_code == HTTPStatus.OK
+    with transaction_boundary(factory) as session:
+        session.execute(sa.update(paid_allowance_usage_table).values(used_count=1))
+    tables = (
+        scenario_sessions_table,
+        jobs_table,
+        paid_allowance_usage_table,
+        execution_reservations_table,
+    )
+    before = {table.name: [dict(row) for row in rows(factory, table)] for table in tables}
+    with provision_database(
+        database_name_prefix="any766_v2_cutover",
+        upgrade_target="0019",
+        skip_reason="populated coherence migration",
+    ) as (engine, config, _):
+        migrated = build_session_factory(engine)
+        with engine.begin() as connection:
+            for table in tables:
+                connection.execute(sa.insert(table), before[table.name])
+            connection.execute(
+                sa.text(
+                    "INSERT INTO platform.paid_access_coherence "
+                    "(tenant_id, region, user_id, revision_floor, snapshot_revision, "
+                    "semantic_digest, snapshot) "
+                    "VALUES ('anytoolai', 'ru', :user_id, 9, 1, :digest, CAST(:snapshot AS jsonb))"
+                ),
+                {
+                    "user_id": principal.owner.owner_id,
+                    "digest": "a" * 64,
+                    "snapshot": '{"schema_version":2}',
+                },
+            )
+        with engine.begin() as connection:
+            config.attributes["connection"] = connection
+            command.upgrade(config, "head")
+        row = rows(migrated, paid_access_coherence_table)[0]
+        assert (row["consumer_id"], row["policy_floor"], row["revision_floor"]) == (
+            "platform-kernel",
+            1,
+            9,
+        )
+        assert row["snapshot"] is row["snapshot_revision"] is row["semantic_digest"] is None
+        assert before == {
+            table.name: [dict(row) for row in rows(migrated, table)] for table in tables
+        }
+        with (
+            pytest.raises(RuntimeError, match="synchronized V3 reader"),
+            engine.begin() as connection,
+        ):
+            config.attributes["connection"] = connection
+            command.downgrade(config, "0019")
+        assert rows(migrated, paid_access_coherence_table)[0] == row
+        assert before == {
+            table.name: [dict(item) for item in rows(migrated, table)] for table in tables
+        }
+        migrated_app = _create_test_app(migrated)
+        migrated_app.state.runtime = replace(migrated_app.state.runtime, config_registry=registry)
+        migrated_app.dependency_overrides[optional_portal_user] = lambda: principal
+        # Replay precedes new authority and therefore works with the retained floor
+        # and an evicted incompatible document, without another reservation.
+        replay = TestClient(migrated_app).post(
+            START, json=_start_payload(), headers={"Idempotency-Key": "migrated-replay"}
+        )
+        assert replay.json() == first.json()
+        assert before == {
+            table.name: [dict(row) for row in rows(migrated, table)] for table in tables
+        }
+
+
 def test_paid_http_replay_precedes_revocation_outage_and_mutable_configuration(runtime):
     factory, app, registry, principal, document, remote = runtime
     client = TestClient(app)
@@ -143,7 +344,7 @@ def test_paid_http_replay_precedes_revocation_outage_and_mutable_configuration(r
     assert reservation["owner_id"] == principal.owner.owner_id
     assert rows(factory, scenario_sessions_table)[0]["guest_id"] is None
     with transaction_boundary(factory) as session:
-        invalidate(session, principal.owner, 2)
+        invalidate(session, principal.owner, 2, principal.consumer_id)
     app.state.settings = app.state.settings.model_copy(update={"enabled_product_ids": frozenset()})
     app.state.runtime = replace(app.state.runtime, config_registry=replace(registry, scenarios={}))
     replay = client.post(START, json=payload, headers={"Idempotency-Key": "original"})
@@ -177,7 +378,7 @@ def test_stale_install_after_invalidation_and_eviction_never_lowers_floor(runtim
 
     def invalidation():
         with transaction_boundary(factory) as session:
-            invalidate(session, principal.owner, 2)
+            invalidate(session, principal.owner, 2, principal.consumer_id)
             locked.set()
             assert release.wait(5)
 
@@ -195,7 +396,7 @@ def test_stale_install_after_invalidation_and_eviction_never_lowers_floor(runtim
         inv.result(5)
         assert stale.result(5) is False
     with transaction_boundary(factory) as session:
-        evict(session, principal.owner)
+        evict(session, principal.owner, principal.consumer_id)
     row = rows(factory, paid_access_coherence_table)[0]
     assert row["revision_floor"] == NEXT_REVISION and row["snapshot"] is None
     # A new Session/client process observes durable state, not a process cache.
@@ -331,7 +532,7 @@ def test_install_race_and_same_revision_immutability_survive_eviction(runtime):
         first.result(5)
         assert second.result(5) is False
     with transaction_boundary(factory) as session:
-        evict(session, principal.owner)
+        evict(session, principal.owner, principal.consumer_id)
     changed = newer.model_copy(
         update={"allowances": [newer.allowances[0].model_copy(update={"quantity": 2})]}
     )
@@ -406,7 +607,7 @@ def test_late_handoff_authority_refusal_rolls_back_every_effect_and_remains_retr
     monkeypatch.setattr(handoffs, "eligible_allowance", real)
     assert client.post(f"/v1/handoffs/{token}/accept", json={}).status_code == HTTPStatus.OK
     with transaction_boundary(factory) as session:
-        invalidate(session, principal.owner, 2)
+        invalidate(session, principal.owner, 2, principal.consumer_id)
     app.state.settings = app.state.settings.model_copy(update={"enabled_product_ids": frozenset()})
     assert client.post(f"/v1/handoffs/{token}/accept", json={}).status_code == HTTPStatus.OK
 
@@ -606,7 +807,7 @@ def test_owned_historical_results_and_deferred_handoff_need_identity_not_grants(
     target = response.json()["target_scenario_session_id"]
     assert rows(factory, execution_reservations_table) == []
     with transaction_boundary(factory) as session:
-        invalidate(session, principal.owner, 2)
+        invalidate(session, principal.owner, 2, principal.consumer_id)
     assert client.get(f"/v1/results/{artifact}").status_code == HTTPStatus.OK
     assert client.get(f"/v1/scenario-sessions/{target}").status_code == HTTPStatus.OK
     app.dependency_overrides[optional_portal_user] = constant_identity(None)
@@ -629,7 +830,7 @@ def test_admission_commit_and_invalidation_ack_are_serialized(runtime, monkeypat
 
     def invalidate_now():
         with transaction_boundary(factory) as session:
-            invalidate(session, principal.owner, NEXT_REVISION)
+            invalidate(session, principal.owner, NEXT_REVISION, principal.consumer_id)
 
     with ThreadPoolExecutor(2) as pool:
         admission = pool.submit(
@@ -703,8 +904,11 @@ def test_revision_floor_survives_fresh_interpreter_restart(runtime):
     factory, _, _, principal, document, _ = runtime
     install_one(factory, principal.owner, document)
     with transaction_boundary(factory) as session:
-        invalidate(session, principal.owner, NEXT_REVISION)
-        evict(session, principal.owner)
+        AccessCoherenceRepository(
+            session, principal.owner, consumer_id=principal.consumer_id
+        ).observe_policy(2)
+        invalidate(session, principal.owner, NEXT_REVISION, principal.consumer_id)
+        evict(session, principal.owner, principal.consumer_id)
     environment = os.environ.copy()
     environment["ANY766_RESTART_DATABASE"] = factory.kw["bind"].url.render_as_string(
         hide_password=False
@@ -722,8 +926,9 @@ try:
     with transaction_boundary(build_session_factory(engine)) as session:
         owner = ExecutionOwner('anytoolai', 'ru', ExecutionOwnerKind.portal_user,
                                os.environ['ANY766_RESTART_USER'])
-        row = AccessCoherenceRepository(session, owner).read()
+        row = AccessCoherenceRepository(session, owner, consumer_id="platform-kernel").read()
         assert row['revision_floor'] == 2 and row['snapshot'] is None
+        assert row['policy_floor'] == 2 and row['snapshot_policy_revision'] == 1
         assert row['snapshot_revision'] == 1 and row['semantic_digest']
 finally:
     engine.dispose()

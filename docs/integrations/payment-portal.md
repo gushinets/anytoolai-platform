@@ -32,8 +32,8 @@ Historical Portal contracts and execution plans do not override accepted sources
 
 ## Current local implementation
 
-Sources: Kernel `192f4cb2ebf19a697f9fb1298147d26221a0a6a0` and Portal
-`b346f0e90c9745f942847734bc06d0d3f5b0a73d`, plus the Step 11 working diff.
+Sources: Kernel `952a6337a17136cd9d1f3c38cb32d8fa5766a41d` and Portal
+`1caa078418ffb07781467dcb4f62158f17e029a3`, plus the Step 12 working diff.
 The [active plan](../exec-plans/active/ANY-766-implementation-plan.md) owns the
 current scope and remaining gates.
 
@@ -41,8 +41,8 @@ current scope and remaining gates.
 - Portal serves common consumer-bound identity V2 with configured callbacks,
   a persisted policy guard and documented generated security. Kernel validates
   consumer/P on every introspection and retains Core owners/replay semantics.
-- Snapshot remains Kernel-only V2 with existing R coherence and ANY-507
-  admission. Consumer-filtered V3 and P-based admission remain Step 12;
+- Step 12 serves/consumes consumer-filtered V3 with durable consumer/P/R
+  coherence, populated migration `0020` and unchanged ANY-507 buckets/replay;
   Portal Step 11 now routes configured technical sources and preserves immutable
   source/owner history; recipient delivery remains Step 13.
 - Kernel's durable invalidation receiver and Portal's bounded embedded sender
@@ -69,8 +69,9 @@ snapshots, immutable source/owner history and recipient/usage routing. The
 schemas/fixture payloads and independently checked target additions.
 
 At this historical Step 9 checkpoint, runtime, migrations and generated OpenAPI
-were unchanged (Kernel identity V1/snapshot V2). Step 10 now implements common
-identity V2 and its generated security; snapshot remains Kernel-only V2. The guide records
+were unchanged (Kernel identity V1/snapshot V2). Step 10 subsequently implemented
+common identity V2/security while retaining the then-current Kernel-only V2
+snapshot. Step 12 now supersedes that wire with consumer-filtered V3/P/R. The guide records
 actual owning modules, minimal replacements, populated-state forward migration
 requirements and focused acceptance cases; active Kernel code is not a purge
 target. Common identity is Step 10, technical-source ownership Step 11, working
@@ -416,3 +417,20 @@ manifest producer, scenarios, ANY-507 execution and usage require no changes.
 See the [source/history guide](https://github.com/gushinets/payments-portal/blob/main/docs/contracts/product-backend-api/README.md#implemented-step-11-technical-sources-and-history).
 This is synthetic HTTP/disposable PostgreSQL evidence; the real external product
 is not registered or tested. Snapshot V3, recipients and usage remain later work.
+
+
+## ANY-766 Step 12 auth/access checkpoint — 2026-11-11
+
+Peer inspected: Portal `1caa078418ffb07781467dcb4f62158f17e029a3`, plus the paired Step 12 working diff.
+Portal now serves consumer-filtered V3, selecting products before provenance and
+deadline/completeness checks; its cabinet/writer retain whole-user rules. Kernel
+migration `0020` preserves R, usage, active reservations and replay while binding
+old coherence rows to platform-kernel/P1 and evicting incompatible V2 cache
+metadata. Independent durable policy/access floors fence stale response/admission;
+P changes do not require a paid R transition. The Portal-owned common API guide
+and generated OpenAPI/Swagger document actual identity V2/access V3 security,
+schemas, examples, errors, cutover and backend enforcement duties.
+Focused real PostgreSQL and local TCP auth/access evidence is separate from the
+Step 16 assembled browser/execution journey. The second identity and external
+LBX/manifest sources are synthetic; generic recipients/usage remain Steps 13–15.
+No real third-party, live payment or deployed acceptance is claimed.

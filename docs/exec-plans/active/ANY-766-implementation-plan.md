@@ -1,6 +1,6 @@
 # ANY-766 — Portal API and Paid Execution for Product Backends
 
-Status: **STEPS 1–11 COMPLETE; Steps 12–17 pending; delivery ends at PR readiness**
+Status: **STEPS 1–12 COMPLETE; Steps 13–17 pending; delivery ends at PR readiness**
 
 Date: **2026-11-09**
 
@@ -12,7 +12,7 @@ Related requirements: [ANY-833](https://linear.app/paveldik/issue/ANY-833).
 - Owner: mixed — Portal and Kernel execution owners
 - Last updated: 2026-11-11
 - Review date: 2026-11-11
-- Next action: Step 12 consumer-scoped snapshots and auth/access handoff, only when requested.
+- Next action: Step 13 recipient-specific delivery, only when requested.
 - Blocker: none for the planned local work; real external-product integration is outside this plan.
 
 Portal's `docs/exec-plans/active/ANY-766-implementation-plan.md` is authoritative;
@@ -93,7 +93,7 @@ contacting its services or accepting its integration is not an ANY-766 gate.
 Development bases: Portal ANY-766 is based on ANY-765
 `b2ef280048ac634a60c18e820fbf702beddba19c`; Kernel is based on
 `72ff15bc0b77903c87aa39f7b10186dccc556d09` and includes ANY-507/814.
-Current migration heads are Portal `20261111_0009` and Kernel `0019`.
+Current migration heads are Portal `20261111_0009` and Kernel `0020`.
 
 Development may continue above the verified ANY-765 base while its PR is reviewed.
 After it merges, transfer only ANY-766 changes onto accepted main under a
@@ -746,8 +746,6 @@ auth/access delivery and later usage/delivery implementation. Reference backend
 owned contracts/fixtures for reverse endpoints; do not list unimplemented
 backend routes as implemented Portal endpoints.
 
-The current generated Portal schema has no documented security schemes or
-per-operation security and lacks meaningful descriptions for these endpoints.
 Declare named Portal-user and backend-service Bearer schemes in FastAPI,
 attach the correct operation security, and describe secret-body delegation
 tokens separately from the service Authorization header. Document request and
@@ -1237,7 +1235,11 @@ No automatic backend-owner transfer or bulk data rewrite is introduced.
 
 ### Step 12 — Serve consumer-scoped snapshots and hand off auth/access API
 
-**Status:** PENDING; depends on Steps 10/11. Prioritized handoff: 2026-11-13.
+**Status:** COMPLETE (2026-11-11). Consumer-scoped snapshot V3 verifies retained
+allowance ownership. Kernel P/R floors and the common identity V2/access V3
+guide/OpenAPI are implemented.
+Kernel migration `0020` preserves R, buckets, usage, reservations and replay while
+clearing incompatible V2 cache metadata.
 
 **Goal / Expected behavior:** both backend identities obtain only their products
 through one locally working, documented Portal authentication/access API.
@@ -1249,9 +1251,10 @@ client/installer, durable coherence, post-wait admission and ANY-507 buckets.
 **Implement / reuse:** implement snapshot V3, consumer/product filtering and
 policy/access semantic identity per Section 3.9. Compute completeness and finite
 deadlines from included products and supporting facts before availability
-checks, without weakening the whole-user writer or cabinet read. Extend Kernel's
-existing coherence row/lock with consumer scope and policy floor, matching every
-request's current introspected P. Keep its R floor, semantic immutability,
+checks, without weakening the whole-user writer or cabinet read. Refuse a retained
+allowance source/backend owner mismatch; policy changes cannot transfer old authority.
+Extend Kernel's existing coherence row/lock with consumer scope and policy floor,
+matching every request's current introspected P. Keep its R floor, semantic immutability,
 post-wait checks and ANY-507 bucket/replay identities.
 
 Forward-migrate populated coherence state: retain R, discard only incompatible
@@ -1266,8 +1269,9 @@ regressions plus actual local Portal/Kernel TCP auth/access smoke checks. Use
 the synthetic second principal for product/data isolation. Cover empty R0,
 unrelated overdue product versus included overdue product, expiry/outage,
 same P/R digest conflict, policy change without R change, old-P response racing
-new P, N+1 versus stale install and post-lock expiry. Prove existing buckets,
-usage, reservations and replay survive migration/policy change. Check Swagger
+new P, retained owner conflicts (including legacy Kernel terms), N+1 versus stale
+install and post-lock expiry. Prove existing buckets, usage, reservations and
+replay survive migration/policy change. Check Swagger
 operation security, examples, responses and schema/generator consistency.
 
 **Expected completion / external handoff:** the common guide, generated OpenAPI,
