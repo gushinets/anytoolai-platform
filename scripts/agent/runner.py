@@ -2797,12 +2797,36 @@ def _build_image_deployment_profile(
     code = run_with_env(command, env)
     if code:
         return code, None
-    path = root / name / "manifest.json"
+    profile_dir = root / name
+    path = profile_dir / "manifest.json"
+    products = profile_dir / "products"
+    if (
+        profile_dir.is_symlink()
+        or profile_dir.resolve().parent != root.resolve()
+        or path.is_symlink()
+        or not path.is_file()
+        or products.is_symlink()
+        or not products.is_dir()
+    ):
+        raise ValueError("unsafe generated profile paths")
     manifest = json.loads(path.read_text(encoding="utf-8"))
     # Container paths identify image sources; only the generated mount path is host-owned.
-    manifest["generated_products_root"] = str(root / name / "products")
+    manifest["generated_products_root"] = str(products)
     _profile_check_args(manifest)
-    path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    # Replace a newly created file instead of following an image-created link on write.
+    staged_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=profile_dir, prefix=".manifest-", delete=False
+        ) as staged:
+            staged_path = Path(staged.name)
+            staged.write(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+        if os.name == "posix":
+            staged_path.chmod(ACTIVATION_MARKER_FILE_MODE)
+        staged_path.replace(path)
+    finally:
+        if staged_path is not None:
+            staged_path.unlink(missing_ok=True)
     return _check_source_fingerprint(manifest, env), manifest
 
 

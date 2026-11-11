@@ -166,7 +166,7 @@ def accept_handoff(
                     lock_authority(session, principal.owner, principal.consumer_id)
                 record = _owned_record(session, handoff_token, settings, principal)
                 replay = record.status in {HandoffStatus.accepted, HandoffStatus.consumed}
-                needs_admission = record.status in {
+                needs_admission = principal is not None and record.status in {
                     HandoffStatus.created,
                     HandoffStatus.viewed,
                 } and record.expires_at > db_now(session)

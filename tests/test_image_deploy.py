@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from contextlib import nullcontext
 from pathlib import Path
@@ -32,6 +33,7 @@ def test_profile_uses_image_and_translates_only_generated_host_path(
         name = Path(command[command.index("--output-dir") + 1]).name
         output = tmp_path / name
         output.mkdir()
+        (output / "products").mkdir()
         (output / "manifest.json").write_text(
             json.dumps(
                 {
@@ -63,6 +65,49 @@ def test_profile_uses_image_and_translates_only_generated_host_path(
     assert f"type=bind,source={tmp_path},target=/deployment" in calls[0]
     assert "--network=none" in calls[0] and "--no-sync" in calls[0]
     assert "UV_CACHE_DIR=/tmp/uv-cache" in calls[0]
+
+
+@pytest.mark.skipif(os.name != "posix", reason="Image installation requires a Linux host")
+@pytest.mark.parametrize("symlink_target", ["profile", "manifest", "products"])
+def test_image_profile_rejects_symlinks_without_rewriting_external_files(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, symlink_target: str
+) -> None:
+    runner = load_runner_module()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    original = json.dumps({
+        "container_products_root": "/app/products",
+        "profile_fingerprint": "a" * 64,
+        "enabled_products": {},
+    })
+    sentinel = outside / "manifest.json"
+    sentinel.write_text(original, encoding="utf-8")
+
+    def run(command, env):
+        name = Path(command[command.index("--output-dir") + 1]).name
+        output = tmp_path / name
+        if symlink_target == "profile":
+            output.symlink_to(outside, target_is_directory=True)
+        else:
+            output.mkdir()
+            if symlink_target == "manifest":
+                (output / "manifest.json").symlink_to(sentinel)
+            else:
+                (output / "manifest.json").write_text(original, encoding="utf-8")
+            if symlink_target == "products":
+                (output / "products").symlink_to(outside, target_is_directory=True)
+            else:
+                (output / "products").mkdir()
+        return 0
+
+    monkeypatch.setattr(runner, "_validate_image_inputs", lambda env: None)
+    monkeypatch.setattr(runner, "_check_source_fingerprint", lambda *args: 0)
+    monkeypatch.setattr(runner, "run_with_env", run)
+    with pytest.raises(ValueError, match="generated profile"):
+        runner._build_image_deployment_profile(
+            "anytoolai-prod", ["proposal_ai"], [], image_env(tmp_path)
+        )
+    assert sentinel.read_text(encoding="utf-8") == original
 
 
 def test_worker_revision_mismatch_is_refused(

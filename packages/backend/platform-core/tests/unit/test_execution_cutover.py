@@ -119,7 +119,7 @@ def test_failed_0016_migration_rolls_back_ddl_counters_and_version_then_retries(
             config.attributes["connection"] = connection
             command.upgrade(config, "head")
             assert _snapshot(connection, old) == before
-            assert connection.scalar(sa.text("SELECT version_num FROM alembic_version")) == "0018"
+            assert connection.scalar(sa.text("SELECT version_num FROM alembic_version")) == "0021"
 
 
 @pytest.mark.parametrize("new_bucket", [False, True])

@@ -47,6 +47,7 @@ from anytoolai_platform_core.scenarios.service import ScenarioRuntimeService, Sc
 from anytoolai_platform_core.storage.transactions import transaction_boundary
 from anytoolai_platform_core.workflows.repository import JobRepository
 from fastapi import APIRouter, Body, Depends, Header
+from sqlalchemy.orm import Session
 
 router = APIRouter(tags=["scenario-runtime"])
 
@@ -141,9 +142,20 @@ SAFE_IDEMPOTENCY_CONFLICT_409_EXAMPLE = {
 }
 
 
+def _require_start_product(
+    product_id: str,
+    settings: Annotated[Settings, Depends(get_settings)],
+    principal: Annotated[PortalUserPrincipal | None, Depends(optional_portal_user)],
+) -> None:
+    # Guests fail before runtime/storage resolution; paid owners may replay a disabled product.
+    if principal is None:
+        require_enabled_product(product_id, settings)
+
+
 @router.post(
     "/v1/products/{product_id}/scenarios/{scenario_id}/start",
     response_model=ScenarioStartResponse,
+    dependencies=[Depends(_require_start_product)],
     summary="Create a scenario session and queue workflow execution",
     responses={
         **PAID_RUNTIME_ERROR_RESPONSES,
@@ -277,8 +289,6 @@ def start_scenario(
                 registry=registry,
                 paid_admission=None if principal is None else admit_paid_start,
             )
-            if principal is None:
-                require_enabled_product(product_id, settings)
             snapshot = runtime.start_session(**values)
             if not snapshot.is_replay and principal is not None:
                 # Resample database wall time after every bucket/reservation wait.
@@ -331,13 +341,7 @@ def get_scenario_session(
     principal: Annotated[PortalUserPrincipal | None, Depends(optional_portal_user)],
 ) -> ScenarioSessionResponse:
     with transaction_boundary(session_factory) as session:
-        require_session_owner(session, scenario_session_id, settings, principal)
-        _require_public_session(
-            ScenarioSessionRepository(session),
-            scenario_session_id,
-            tenant_id=settings.default_tenant_id,
-            region=settings.default_region,
-        )
+        _require_visible_session(session, scenario_session_id, settings, principal)
         snapshot = _wrap_platform_errors(
             lambda: _runtime_service(
                 session=session,
@@ -393,13 +397,7 @@ def post_next_action(
     principal: Annotated[PortalUserPrincipal | None, Depends(optional_portal_user)],
 ) -> ScenarioSessionResponse:
     with transaction_boundary(session_factory) as session:
-        require_session_owner(session, scenario_session_id, settings, principal)
-        _require_public_session(
-            ScenarioSessionRepository(session),
-            scenario_session_id,
-            tenant_id=settings.default_tenant_id,
-            region=settings.default_region,
-        )
+        _require_visible_session(session, scenario_session_id, settings, principal)
         snapshot = _wrap_platform_errors(
             lambda: _runtime_service(
                 session=session,
@@ -497,17 +495,17 @@ def _wrap_platform_errors(callable_):
         raise _to_api_error(exc) from exc
 
 
-def _require_public_session(
-    repository: ScenarioSessionRepository,
+def _require_visible_session(
+    session: Session,
     scenario_session_id: str,
-    *,
-    tenant_id: str,
-    region: str,
+    settings: Settings,
+    principal: PortalUserPrincipal | None,
 ) -> None:
-    record = repository.get_in_scope(
+    require_session_owner(session, scenario_session_id, settings, principal)
+    record = ScenarioSessionRepository(session).get_in_scope(
         scenario_session_id,
-        tenant_id=tenant_id,
-        region=region,
+        tenant_id=settings.default_tenant_id,
+        region=settings.default_region,
     )
     if record is not None and not is_public_runtime_session(record):
         raise ApiError(

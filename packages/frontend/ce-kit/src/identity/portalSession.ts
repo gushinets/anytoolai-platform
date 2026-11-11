@@ -45,12 +45,12 @@ export function exchangePortalSession(client: PlatformApiClient, code: string, v
   }, parsePortalExchange, "Portal session response was invalid.");
 }
 
-export function writePortalSession(storage: TabStorage, session: PortalSession): void {
-  storage.setItem(PORTAL_SESSION_KEY, JSON.stringify({ version: 2, ...session }));
+export function writePortalSession(tabStorage: TabStorage, session: PortalSession): void {
+  tabStorage.setItem(PORTAL_SESSION_KEY, JSON.stringify({ version: 2, ...session }));
 }
 
-export function readPortalSession(storage: TabStorage): PortalSession | null {
-  const raw = storage.getItem(PORTAL_SESSION_KEY);
+export function readPortalSession(tabStorage: TabStorage): PortalSession | null {
+  const raw = tabStorage.getItem(PORTAL_SESSION_KEY);
   if (!raw) return null;
   const value: unknown = JSON.parse(raw);
   if (!isRecord(value) || value.version !== 2) throw new Error("portal_storage_invalid");
@@ -62,7 +62,7 @@ export function readPortalSession(storage: TabStorage): PortalSession | null {
 }
 
 function base64url(bytes: Uint8Array): string {
-  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
 
 /** Product registration belongs to the host. Only its registered local paths pass this boundary. */
@@ -70,7 +70,8 @@ export function validatePortalReturnTarget(target: string, isRegistered: (produc
   if (!target.startsWith("/") || target.startsWith("//") || /[\\#]/.test(target) || Array.from(target).some((char) => char.charCodeAt(0) <= 32)) return null;
   const url = new URL(target, "https://kernel.invalid");
   const product = /^\/products\/([a-z0-9_]+)$/.exec(url.pathname);
-  if (product && isRegistered(product[1])) {
+  const productId = product?.[1];
+  if (productId && isRegistered(productId)) {
     for (const [key, value] of url.searchParams) {
       if (!["session", "scenario", "paid"].includes(key) || url.searchParams.getAll(key).length !== 1 ||
         (key === "paid" && value !== "1") ||
@@ -84,18 +85,18 @@ export function validatePortalReturnTarget(target: string, isRegistered: (produc
 
 export type PortalAuthorization = { state: string; verifier: string; returnTarget: string; custodyId: string };
 
-export async function preparePortalAuthorization(storage: TabStorage, returnTarget: string, custodyId: string, cryptoApi: Crypto = crypto): Promise<{ state: string; challenge: string }> {
+export async function preparePortalAuthorization(tabStorage: TabStorage, returnTarget: string, custodyId: string, cryptoApi: Crypto = crypto): Promise<{ state: string; challenge: string }> {
   // No insecure randomness fallback: PKCE needs a secure browser context.
   const state = base64url(cryptoApi.getRandomValues(new Uint8Array(RANDOM_BYTES)));
   const verifier = base64url(cryptoApi.getRandomValues(new Uint8Array(RANDOM_BYTES)));
   // Persist before yielding: a suspended older launch must not overwrite a newer authorization.
-  storage.setItem(AUTHORIZATION_KEY, JSON.stringify({ version: 1, state, verifier, returnTarget, custodyId }));
+  tabStorage.setItem(AUTHORIZATION_KEY, JSON.stringify({ version: 1, state, verifier, returnTarget, custodyId }));
   const challenge = base64url(new Uint8Array(await cryptoApi.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
   return { state, challenge };
 }
 
-export function readPortalAuthorization(storage: TabStorage): PortalAuthorization | null {
-  const raw = storage.getItem(AUTHORIZATION_KEY);
+export function readPortalAuthorization(tabStorage: TabStorage): PortalAuthorization | null {
+  const raw = tabStorage.getItem(AUTHORIZATION_KEY);
   const value: unknown = raw ? JSON.parse(raw) : null;
   if (!isRecord(value) || value.version !== 1 || typeof value.state !== "string" ||
     !/^[A-Za-z0-9_-]{43}$/.test(value.state) || typeof value.verifier !== "string" ||
@@ -104,12 +105,12 @@ export function readPortalAuthorization(storage: TabStorage): PortalAuthorizatio
   return { state: value.state, verifier: value.verifier, returnTarget: value.returnTarget, custodyId: value.custodyId };
 }
 
-export function consumePortalCallback(storage: TabStorage, fragment: string): { code: string; authorization: PortalAuthorization } | null {
+export function consumePortalCallback(tabStorage: TabStorage, fragment: string): { code: string; authorization: PortalAuthorization } | null {
   const params = new URLSearchParams(fragment.replace(/^#/, ""));
-  const authorization = readPortalAuthorization(storage);
+  const authorization = readPortalAuthorization(tabStorage);
   if (!authorization || params.getAll("state").length !== 1 || params.getAll("code").length !== 1 ||
     params.get("state") !== authorization.state || !/^[A-Za-z0-9_-]{43}$/.test(params.get("code") ?? "")) return null;
   // One callback attempt only. A lost exchange starts a new authorization, retaining paid recovery.
-  storage.removeItem(AUTHORIZATION_KEY);
+  tabStorage.removeItem(AUTHORIZATION_KEY);
   return { code: params.get("code")!, authorization };
 }

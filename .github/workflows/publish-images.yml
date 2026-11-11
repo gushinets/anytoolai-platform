@@ -25,11 +25,13 @@ on:
         type: string
 permissions:
   contents: read
-  packages: write
 jobs:
   api:
     if: inputs.component == 'all' || inputs.component == 'backend'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Build immutable selection
@@ -52,6 +54,9 @@ jobs:
   worker:
     if: inputs.component == 'all' || inputs.component == 'backend'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Build immutable selection
@@ -74,6 +79,9 @@ jobs:
   web:
     if: inputs.component == 'all' || inputs.component == 'frontend'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Build immutable selection
