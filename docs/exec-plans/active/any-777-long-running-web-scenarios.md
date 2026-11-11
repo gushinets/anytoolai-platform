@@ -5,7 +5,7 @@
 - State: active
 - Owner: agent
 - Created: 2026-11-09
-- Last updated: 2026-11-09
+- Last updated: 2026-11-11
 - Review date: 2026-11-09
 - Next action: Review the completed second-review fixes and validation evidence.
 - Blocker: None for this frontend fix; canonical frontend-check passed on 2026-11-09.
@@ -336,3 +336,17 @@ The browser harness used deterministic fakes and isolated SQLite. No paid provid
 concurrency run; no GitHub review comments, thread resolution or PR edit in this follow-up.
 
 [Legacy recovery and validation evidence](any-777-legacy-session-recovery-evidence.json).
+
+
+## Merge main translation migration — 2026-11-11
+
+Resolved the seven modify/delete conflicts against main 8364cbdb using main's JSON translation
+structure. Transferred attachmentUnrecognized and attachmentUnavailable verbatim from this
+branch's TypeScript dictionaries into all seven host JSON files, and retained main's deletion
+of the old TypeScript dictionaries. A structural comparison confirmed that removing those
+two added keys restores main's exact JSON data in every locale. Other main merge changes were
+retained. No runtime or recovery behavior changed.
+
+All 24 web test files / 542 tests passed, including JSON/ICU resource validation and attachment
+recovery regressions. Web typecheck, lint and production build passed; documentation validation also passed.
+No new browser or backend runtime checks are claimed for this mechanical translation merge.

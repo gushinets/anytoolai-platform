@@ -11,6 +11,7 @@ import sys
 import tempfile
 import time
 import urllib.parse
+from functools import partial
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -1937,27 +1938,8 @@ def test_prod_ready_checks_web_and_identical_container_profiles(monkeypatch, cap
     inputs = runner.DeploymentInputs(
         ("proposal_ai",), frozenset(), PROD_LIVE_VALUES | {"ANYTOOLAI_UNMETERED_PRODUCT_IDS": ""}
     )
-    manifest = {
-        "generated_products_root": "C:/generated/products",
-        "container_products_root": "/app/products",
-        "profile_fingerprint": "fingerprint",
-        "unmetered_product_ids": [],
-        "source_products_root": "C:/source/products",
-        "source_fingerprint": "source-fingerprint",
-        "enabled_products": {
-            "proposal_ai": {
-                "provider_policy_ref": "default_text_generation_v1",
-                "quota_policy_ref": "proposal_ai.guest_quota_v1",
-            }
-        },
-    }
-    urls: list[str] = []
-    commands: list[list[str]] = []
-    monkeypatch.setattr(runner, "_wait_for_http_ok", lambda url, timeout: urls.append(url) or True)
-    monkeypatch.setattr(runner, "_check_source_fingerprint", lambda manifest, env: 0)
-    monkeypatch.setattr(
-        runner, "run_with_env", lambda command, env: commands.append(list(command)) or 0
-    )
+    manifest = _production_manifest()
+    urls, commands = _record_readiness_checks(monkeypatch, runner)
 
     assert runner.prod_ready(inputs=inputs, manifest=manifest) == 0
     assert urls == [
@@ -1991,27 +1973,8 @@ def test_prod_ready_uses_web_base_path_and_vps_overlay(monkeypatch) -> None:
             "ANYTOOLAI_VPS_135_NETWORKS": "1",
         },
     )
-    manifest = {
-        "generated_products_root": "C:/generated/products",
-        "container_products_root": "/app/products",
-        "profile_fingerprint": "fingerprint",
-        "unmetered_product_ids": [],
-        "source_products_root": "C:/source/products",
-        "source_fingerprint": "source-fingerprint",
-        "enabled_products": {
-            "proposal_ai": {
-                "provider_policy_ref": "default_text_generation_v1",
-                "quota_policy_ref": "proposal_ai.guest_quota_v1",
-            }
-        },
-    }
-    urls: list[str] = []
-    commands: list[list[str]] = []
-    monkeypatch.setattr(runner, "_wait_for_http_ok", lambda url, timeout: urls.append(url) or True)
-    monkeypatch.setattr(runner, "_check_source_fingerprint", lambda manifest, env: 0)
-    monkeypatch.setattr(
-        runner, "run_with_env", lambda command, env: commands.append(list(command)) or 0
-    )
+    manifest = _production_manifest()
+    urls, commands = _record_readiness_checks(monkeypatch, runner)
 
     assert runner.prod_ready(inputs=inputs, manifest=manifest) == 0
     assert urls[1] == "http://127.0.0.1:3000/tools"
@@ -3659,18 +3622,9 @@ def test_atom_lab_ready_checks_assets_auth_catalog_and_worker(monkeypatch) -> No
     )
     monkeypatch.setattr(runner, "_wait_for_http_ok", lambda url, timeout: True)
 
-    def request(url, *, access_code=None):
-        if url.endswith("/atom-lab"):
-            return 200, b"html", "text/html"
-        if url.endswith(".css"):
-            return 200, b"css", "text/css"
-        if url.endswith(".mjs"):
-            return 200, b"js", "application/javascript"
-        if access_code == "lab-access":
-            catalog = [{"atom_id": f"A{index:02d}"} for index in range(1, 12)]
-            return 200, json.dumps(catalog).encode(), "application/json"
-        denied = {"error": {"code": "atom_lab_access_denied"}}
-        return 401, json.dumps(denied).encode(), "application/json"
+    request = partial(
+        _atom_lab_http_response, denial_body=b'{"error": {"code": "atom_lab_access_denied"}}'
+    )
 
     monkeypatch.setattr(runner, "_atom_lab_request", request)
     monkeypatch.setattr(
@@ -3692,17 +3646,7 @@ def test_atom_lab_ready_rejects_malformed_denial_envelope(
     )
     monkeypatch.setattr(runner, "_wait_for_http_ok", lambda url, timeout: True)
 
-    def request(url, *, access_code=None):
-        if url.endswith("/atom-lab"):
-            return 200, b"html", "text/html"
-        if url.endswith(".css"):
-            return 200, b"css", "text/css"
-        if url.endswith(".mjs"):
-            return 200, b"js", "application/javascript"
-        if access_code == "lab-access":
-            catalog = [{"atom_id": f"A{index:02d}"} for index in range(1, 12)]
-            return 200, json.dumps(catalog).encode(), "application/json"
-        return 401, denial_body, "application/json"
+    request = partial(_atom_lab_http_response, denial_body=denial_body)
 
     monkeypatch.setattr(runner, "_atom_lab_request", request)
     monkeypatch.setattr(
@@ -4925,3 +4869,75 @@ def test_automated_python_installs_check_locks_and_use_shared_build_config():
                 assert "uv run --no-sync " in line, (relative, line)
             if "uv pip install " in line:
                 assert "--config-file infra/python/uv-build.toml" in line, (relative, line)
+
+
+@pytest.mark.parametrize(
+    ("command", "port", "code"),
+    [("proposal_ai", 3100, "PAS"), ("client_update_writer", 3200, "CUS"),
+     ("brief_decoder", 3300, "BDS"), ("acceptance_builder", 3400, "ABS"),
+     ("task_finder", 3500, "TFS")],
+)
+def test_product_smoke_preserves_command_configuration(monkeypatch, command, port, code):
+    runner = load_runner_module()
+    calls = []
+    monkeypatch.setattr(runner, "runtime_identity", lambda: SimpleNamespace(api_url="http://api", database_url="postgresql://test"))
+    monkeypatch.setattr(runner, "_check_ports_available", lambda *args: True)
+    monkeypatch.setattr(runner, "run_with_env", lambda *args: 0)
+    monkeypatch.setattr(runner, "_serve_web_mirror_and_run_smoke", lambda **kwargs: calls.append(kwargs) or 0)
+    assert getattr(runner, f"{command}_smoke")() == 0
+    assert calls[0]["web_mirror_port"] == port
+    assert calls[0]["readiness_error_code"] == f"{code}002"
+    assert calls[0]["smoke_pnpm_filter"] == f"@anytoolai/{command.replace('_', '-')}-smoke"
+    assert calls[0]["env"]["PLATFORM_API_BASE_URL"] == "http://api"
+    assert calls[0]["smoke_extra_env"]["DATABASE_URL"] == "postgresql://test"
+
+
+@pytest.mark.parametrize("failure", ["port", "build"])
+def test_product_smoke_does_not_launch_after_preflight_failure(monkeypatch, failure):
+    runner = load_runner_module()
+    monkeypatch.setattr(runner, "runtime_identity", lambda: SimpleNamespace(api_url="http://api"))
+    monkeypatch.setattr(runner, "_check_ports_available", lambda *args: failure != "port")
+    monkeypatch.setattr(runner, "run_with_env", lambda *args: 7)
+    monkeypatch.setattr(runner, "_serve_web_mirror_and_run_smoke", lambda **kwargs: pytest.fail("must not serve"))
+    assert runner.proposal_ai_smoke() == (1 if failure == "port" else 7)
+
+
+def _production_manifest():
+    return {
+        "generated_products_root": "C:/generated/products",
+        "container_products_root": "/app/products",
+        "profile_fingerprint": "fingerprint",
+        "unmetered_product_ids": [],
+        "source_products_root": "C:/source/products",
+        "source_fingerprint": "source-fingerprint",
+        "enabled_products": {
+            "proposal_ai": {
+                "provider_policy_ref": "default_text_generation_v1",
+                "quota_policy_ref": "proposal_ai.guest_quota_v1",
+            }
+        },
+    }
+
+
+def _record_readiness_checks(monkeypatch, runner):
+    urls: list[str] = []
+    commands: list[list[str]] = []
+    monkeypatch.setattr(runner, "_wait_for_http_ok", lambda url, timeout: urls.append(url) or True)
+    monkeypatch.setattr(runner, "_check_source_fingerprint", lambda manifest, env: 0)
+    monkeypatch.setattr(
+        runner, "run_with_env", lambda command, env: commands.append(list(command)) or 0
+    )
+    return urls, commands
+
+
+def _atom_lab_http_response(url, *, access_code=None, denial_body):
+    if url.endswith("/atom-lab"):
+        return 200, b"html", "text/html"
+    if url.endswith(".css"):
+        return 200, b"css", "text/css"
+    if url.endswith(".mjs"):
+        return 200, b"js", "application/javascript"
+    if access_code == "lab-access":
+        catalog = [{"atom_id": f"A{index:02d}"} for index in range(1, 12)]
+        return 200, json.dumps(catalog).encode(), "application/json"
+    return 401, denial_body, "application/json"

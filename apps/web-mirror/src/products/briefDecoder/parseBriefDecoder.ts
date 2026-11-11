@@ -1,3 +1,5 @@
+import { isRecord, isStringArray, isOneOf } from "../shared/resultGuards";
+
 // Brief Decoder's canonical result (`brief_decoder.decode_output_v1`) as the page consumes it.
 // The backend schema stays authoritative: this only checks the shapes and closed sets the renderer
 // indexes into, not the 4-section tuple or `questions.maxItems`. `BRIEF_FIELDS`/`LEVELS`/
@@ -27,18 +29,6 @@ export type BriefDecoderResult = {
   questions: ClarifyingQuestion[];
   document: { sections: { title: string; content: string }[]; summary: string };
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isOneOf<T extends string>(set: readonly T[], value: unknown): value is T {
-  return typeof value === "string" && (set as readonly string[]).includes(value);
-}
-
-function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === "string");
-}
 
 function mapAll<T>(items: unknown, map: (item: unknown) => T | null): T[] | null {
   if (!Array.isArray(items)) {

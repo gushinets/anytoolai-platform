@@ -1,0 +1,49 @@
+{
+  "language": {
+    "label": "Lingua"
+  },
+  "nav": {
+    "label": "Strumenti",
+    "allTools": "Tutti gli strumenti",
+    "runInProgress": "È in corso un’esecuzione. Se esci, continuerà; un risultato riuscito utilizza un’esecuzione."
+  },
+  "loading": "Caricamento di {product}…",
+  "unavailable": "{product} non è disponibile al momento. Ricarichi la pagina.",
+  "quotaReserved": "Disponibili ora: {available}. In corso: {reserved}.",
+  "quotaExhausted": "Le esecuzioni di {product} a disposizione sono esaurite per ora.",
+  "resultFetchFailed": "Il risultato è pronto, ma non è stato possibile caricarlo. Riprovi.",
+  "starting": "Avvio in corso…",
+  "generating": "Generazione in corso…",
+  "identityUnavailable": "Non è stato possibile verificare la sua identità. Ricarichi la pagina e riprovi.",
+  "retry": "Riprovi",
+  "formLabel": "Modulo {product}",
+  "workspace": {
+    "inputTitle": "I suoi dati",
+    "previousDetails": "Risultato basato sui dati precedenti",
+    "backToInputs": "Torni ai dati",
+    "newTask": "Nuova attività",
+    "handoffOpening": "Apertura del passaggio successivo…",
+    "handoffStay": "Resti su questa pagina",
+    "handoffFailed": "Impossibile aprire il passaggio successivo. Riprovi."
+  },
+  "errors": {
+    "attachmentUnrecognized": "Non è stato possibile ripristinare questa sessione salvata. Riprova oppure scegli «Nuova attività» per aprire un modulo vuoto.",
+    "attachmentUnavailable": "Questa sessione non può essere aperta in questo strumento. Scegli «Nuova attività» per aprire un modulo vuoto.",
+    "quotaCapacityReserved": "La capacità è temporaneamente occupata. Riprova tra poco.",
+    "startFailed": "Impossibile avviare {product}. Riprovi.",
+    "timeout": "L’operazione richiede più tempo del previsto. Riprovi.",
+    "connectionLost": "Connessione persa durante l’attesa del risultato. Riprovi.",
+    "tryAgain": "Riprovi."
+  },
+  "result": {
+    "copy": "Copi",
+    "copying": "Copia in corso…",
+    "copied": "Copiato",
+    "copyFailed": "Impossibile copiare negli appunti. Copi manualmente il testo qui sopra.",
+    "selectText": "Selezioni il testo"
+  },
+  "validation": {
+    "required": "{field}: campo obbligatorio.",
+    "maxLength": "{field}: massimo {maxLength, plural, one {# carattere} many {# di caratteri} other {# caratteri}}."
+  }
+}

@@ -1,0 +1,40 @@
+name: task-finder-smoke
+on:
+  # Path-filtered, not repo-wide -- same precedent as proposal-ai-smoke.yml/client-handoff-smoke.yml.
+  # Not added to branch protection as a required check yet (per AGENTS.md, smoke checks become
+  # required only once they've proven stable), so it can run on every touching PR without blocking
+  # merges.
+  pull_request:
+    paths:
+      - "apps/web-mirror/**"
+      - "apps/platform-api/**"
+      - "apps/platform-worker/**"
+      - "packages/frontend/ce-kit/**"
+      - "packages/frontend/shared-ui/**"
+      - "packages/frontend/web-result-kit/**"
+      - "packages/backend/platform-core/**"
+      - "packages/backend/platform-actions/**"
+      - "packages/backend/platform-sdk/**"
+      - "packages/backend/product-platforms/freelancer-suite/**"
+      - "configs/kernel/**"
+      - "tests/fixtures/provider/fake_provider_outputs/task_finder.*"
+      - "infra/compose/**"
+      - "infra/docker/**"
+      - "migrations/**"
+      - "tests/e2e/task-finder-smoke/**"
+      - "scripts/agent/runner.py"
+      - ".github/workflows/task-finder-smoke.yml"
+      - "tests/e2e/smoke-support/**"
+      - ".github/workflows/product-smoke.yml"
+      - "pnpm-lock.yaml"
+  workflow_dispatch:
+  schedule:
+    # Weekly baseline run against main, independent of any particular PR's paths.
+    - cron: "0 10 * * 1"
+permissions:
+  contents: read
+jobs:
+  task-finder-smoke:
+    uses: ./.github/workflows/product-smoke.yml
+    with:
+      command: task-finder-smoke

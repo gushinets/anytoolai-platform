@@ -1,3 +1,5 @@
+import { isRecord, isStringArray, isOneOf } from "../shared/resultGuards";
+
 // Acceptance Builder's canonical results (`acceptance_builder.draft_output_v1` / `check_output_v1`)
 // as the page consumes them. The backend schema stays authoritative: this only checks the shapes
 // and closed sets the renderer indexes into. The enum copies below are pinned by
@@ -24,18 +26,6 @@ export type AcceptanceBuilderResult = {
   // Present only for `check_v1`.
   comparison?: Comparison;
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isOneOf<T extends string>(set: readonly T[], value: unknown): value is T {
-  return typeof value === "string" && (set as readonly string[]).includes(value);
-}
-
-function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === "string");
-}
 
 function toLists(values: unknown): AcceptanceBuilderResult["lists"] | null {
   // `values` is a closed object with non-empty lists: an unknown key or an empty list is a

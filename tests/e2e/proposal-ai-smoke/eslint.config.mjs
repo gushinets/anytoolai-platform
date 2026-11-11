@@ -1,3 +1,3 @@
-import { baseConfig } from "../../../eslint.config.base.mjs";
+import { baseConfig } from "@anytoolai/smoke-support/eslint.config";
 
 export default baseConfig({ tsconfigRootDir: import.meta.dirname });

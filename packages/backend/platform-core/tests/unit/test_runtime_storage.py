@@ -48,6 +48,7 @@ from anytoolai_platform_core.workflows.repository import JobRepository
 from sqlalchemy.exc import IntegrityError
 
 from tests.db_support import provision_database
+from tests.runtime_records import make_action_run, make_job, make_scenario_session
 
 PROVIDER_INPUT_TOKENS = 128
 PROVIDER_OUTPUT_TOKENS = 64
@@ -76,50 +77,6 @@ def runtime_engine() -> Any:
 @pytest.fixture
 def session_factory(runtime_engine: sa.Engine) -> sa.orm.sessionmaker[sa.orm.Session]:
     return build_session_factory(runtime_engine)
-
-
-def make_scenario_session(**overrides: Any) -> ScenarioSessionRecord:
-    values = {
-        "tenant_id": "tenant_demo",
-        "region": "eu-central",
-        "product_id": "kernel_demo",
-        "frontend_id": "kernel_demo_ce",
-        "scenario_id": "smoke_start",
-        "scenario_version": 1,
-    }
-    values.update(overrides)
-    return ScenarioSessionRecord(**values)
-
-
-def make_job(scenario_session_id: str, **overrides: Any) -> JobRecord:
-    values = {
-        "tenant_id": "tenant_demo",
-        "region": "eu-central",
-        "product_id": "kernel_demo",
-        "frontend_id": "kernel_demo_ce",
-        "scenario_session_id": scenario_session_id,
-        "workflow_id": "wf_smoke",
-        "workflow_version": 1,
-    }
-    values.update(overrides)
-    return JobRecord(**values)
-
-
-def make_action_run(scenario_session_id: str, job_id: str, **overrides: Any) -> ActionRunRecord:
-    values = {
-        "tenant_id": "tenant_demo",
-        "region": "eu-central",
-        "product_id": "kernel_demo",
-        "frontend_id": "kernel_demo_ce",
-        "scenario_session_id": scenario_session_id,
-        "job_id": job_id,
-        "workflow_id": "wf_smoke",
-        "step_id": "step_1",
-        "action_type": "text.extract_structured_fields",
-        "action_config_id": "cfg_extract",
-    }
-    values.update(overrides)
-    return ActionRunRecord(**values)
 
 
 def make_provider_call(
@@ -998,6 +955,35 @@ def test_job_repository_failed_transition_completes_safe_terminal_contract(
     assert failed.completed_at is not None
     assert failed.error_code == "workflow_execution_failed"
     assert failed.error_message_safe == "Workflow execution failed."
+
+
+@pytest.mark.parametrize("from_created", [False, True])
+def test_job_failure_transition_preserves_source_state_and_idempotent_replay(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session], from_created: bool,
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        scenario_session = ScenarioSessionRepository(session).create(make_scenario_session())
+        repository = JobRepository(session)
+        transition = (
+            repository.mark_failed_from_created if from_created else repository.mark_failed
+        )
+        source = repository.create(make_job(scenario_session.id))
+        wrong_source = repository.create(make_job(scenario_session.id))
+        if from_created:
+            wrong_source = repository.claim_created(wrong_source.id)
+        else:
+            source = repository.claim_created(source.id)
+        assert source is not None and wrong_source is not None
+
+        with pytest.raises(RuntimeError, match="cannot transition"):
+            transition(wrong_source)
+        assert repository.get(wrong_source.id) == wrong_source
+
+        failed = transition(source)
+        replayed = transition(replace(source, error_message_safe="must not overwrite"))
+        assert replayed == failed
+        assert failed.status is JobStatus.failed
+        assert failed.error_message_safe == "Workflow execution failed."
 
 
 def test_job_repository_mark_succeeded_requires_valid_result_artifact(

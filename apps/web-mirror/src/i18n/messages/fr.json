@@ -1,0 +1,49 @@
+{
+  "language": {
+    "label": "Langue"
+  },
+  "nav": {
+    "label": "Outils",
+    "allTools": "Tous les outils",
+    "runInProgress": "Une exécution est en cours. Si vous partez, elle continuera ; un résultat réussi utilise une exécution."
+  },
+  "loading": "Chargement de {product}…",
+  "unavailable": "{product} est indisponible pour le moment. Veuillez recharger la page.",
+  "quotaReserved": "Disponibles maintenant : {available}. En cours : {reserved}.",
+  "quotaExhausted": "Vous avez utilisé toutes vos exécutions de {product} pour le moment.",
+  "resultFetchFailed": "Votre résultat est prêt, mais nous n’avons pas pu le charger. Veuillez réessayer.",
+  "starting": "Démarrage…",
+  "generating": "Génération en cours…",
+  "identityUnavailable": "Nous n’avons pas pu vérifier votre identité. Veuillez recharger la page et réessayer.",
+  "retry": "Réessayer",
+  "formLabel": "Formulaire {product}",
+  "workspace": {
+    "inputTitle": "Vos informations",
+    "previousDetails": "Résultat basé sur les informations précédentes",
+    "backToInputs": "Retour aux informations",
+    "newTask": "Nouvelle tâche",
+    "handoffOpening": "Ouverture de l’étape suivante…",
+    "handoffStay": "Rester sur cette page",
+    "handoffFailed": "Impossible d’ouvrir l’étape suivante. Veuillez réessayer."
+  },
+  "errors": {
+    "attachmentUnrecognized": "Impossible de restaurer cette session enregistrée. Réessayez ou choisissez « Nouvelle tâche » pour ouvrir un formulaire vide.",
+    "attachmentUnavailable": "Cette session ne peut pas être ouverte dans cet outil. Choisissez « Nouvelle tâche » pour ouvrir un formulaire vide.",
+    "quotaCapacityReserved": "La capacité est temporairement occupée. Réessayez dans un instant.",
+    "startFailed": "Impossible de démarrer {product}. Veuillez réessayer.",
+    "timeout": "Cela prend plus de temps que prévu. Veuillez réessayer.",
+    "connectionLost": "Connexion perdue pendant l’attente de votre résultat. Veuillez réessayer.",
+    "tryAgain": "Veuillez réessayer."
+  },
+  "result": {
+    "copy": "Copier",
+    "copying": "Copie en cours…",
+    "copied": "Copié",
+    "copyFailed": "Impossible de copier dans le presse-papiers. Veuillez copier le texte ci-dessus manuellement.",
+    "selectText": "Sélectionner le texte"
+  },
+  "validation": {
+    "required": "{field} : champ obligatoire.",
+    "maxLength": "{field} : {maxLength, plural, one {# caractère} many {# de caractères} other {# caractères}} maximum."
+  }
+}

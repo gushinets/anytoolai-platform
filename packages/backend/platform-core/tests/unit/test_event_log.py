@@ -11,17 +11,17 @@ import sqlalchemy as sa
 from alembic import command
 from alembic.script import ScriptDirectory
 from anytoolai_platform_core.actions.models import ActionRunRecord, ActionRunStatus
-from anytoolai_platform_core.actions.runner import ActionRunService
 from anytoolai_platform_core.actions.repository import ActionRunRepository
+from anytoolai_platform_core.actions.runner import ActionRunService
 from anytoolai_platform_core.artifacts.models import ArtifactRecord
-from anytoolai_platform_core.artifacts.service import ArtifactService
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
+from anytoolai_platform_core.artifacts.service import ArtifactService
 from anytoolai_platform_core.bootstrap.registry import build_config_registry
 from anytoolai_platform_core.common.errors import PlatformError
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.context.execution_context import ExecutionContext
-from anytoolai_platform_core.events.envelope import EventEnvelope
 from anytoolai_platform_core.events.emitter import EventEmitter, EventValidationError
+from anytoolai_platform_core.events.envelope import EventEnvelope
 from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.events.taxonomy import PLATFORM_EVENT_GROUPS, PLATFORM_EVENTS
 from anytoolai_platform_core.providers.gateway import ProviderGateway, ProviderGatewayExecutionError
@@ -34,7 +34,6 @@ from anytoolai_platform_core.providers.models import (
 from anytoolai_platform_core.providers.policies import ProviderPolicyResolver
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
 from anytoolai_platform_core.scenarios.models import (
-    ScenarioSessionRecord,
     ScenarioSessionStatus,
 )
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
@@ -47,11 +46,13 @@ from anytoolai_platform_core.storage.transactions import (
 from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
 from anytoolai_platform_core.workflows.runner import WorkflowJobService
+
 from tests.db_support import (
     PLACEHOLDER_POSTGRESQL_URL,
     build_alembic_config,
     provision_database,
 )
+from tests.runtime_records import make_action_run, make_job, make_scenario_session
 
 
 def _repo_root() -> Path:
@@ -98,50 +99,6 @@ def make_execution_context(**overrides: Any) -> ExecutionContext:
     }
     values.update(overrides)
     return ExecutionContext(**values)
-
-
-def make_scenario_session(**overrides: Any) -> ScenarioSessionRecord:
-    values = {
-        "tenant_id": "tenant_demo",
-        "region": "eu-central",
-        "product_id": "kernel_demo",
-        "frontend_id": "kernel_demo_ce",
-        "scenario_id": "smoke_start",
-        "scenario_version": 1,
-    }
-    values.update(overrides)
-    return ScenarioSessionRecord(**values)
-
-
-def make_job(scenario_session_id: str, **overrides: Any) -> JobRecord:
-    values = {
-        "tenant_id": "tenant_demo",
-        "region": "eu-central",
-        "product_id": "kernel_demo",
-        "frontend_id": "kernel_demo_ce",
-        "scenario_session_id": scenario_session_id,
-        "workflow_id": "wf_smoke",
-        "workflow_version": 1,
-    }
-    values.update(overrides)
-    return JobRecord(**values)
-
-
-def make_action_run(scenario_session_id: str, job_id: str, **overrides: Any) -> ActionRunRecord:
-    values = {
-        "tenant_id": "tenant_demo",
-        "region": "eu-central",
-        "product_id": "kernel_demo",
-        "frontend_id": "kernel_demo_ce",
-        "scenario_session_id": scenario_session_id,
-        "job_id": job_id,
-        "workflow_id": "wf_smoke",
-        "step_id": "step_1",
-        "action_type": "text.extract_structured_fields",
-        "action_config_id": "cfg_extract",
-    }
-    values.update(overrides)
-    return ActionRunRecord(**values)
 
 
 def make_artifact(scenario_session_id: str, **overrides: Any) -> ArtifactRecord:
