@@ -32,9 +32,9 @@ Historical Portal contracts and execution plans do not override accepted sources
 
 ## Current local implementation
 
-Current local sources: Kernel `36be7fa3c3147b032b97f050a898a97423db2070`
-and Portal `9632ec4ce440fa17d8463f230b98df7cccccc934`, plus the paired
-Step 14/15 working-tree changes.
+Historical Steps 14/15 source inspection: Kernel `36be7fa3c3147b032b97f050a898a97423db2070`
+and Portal `9632ec4ce440fa17d8463f230b98df7cccccc934`, plus the then-uncommitted
+paired changes. These pins identify that checkpoint, not current branch tips.
 The [active plan](../exec-plans/active/ANY-766-implementation-plan.md) owns the
 current scope and remaining gates.
 
@@ -59,8 +59,9 @@ current scope and remaining gates.
 - Step 8 implements recoverable browser launch, owner-bound tab custody and
   paid runtime/event/handoff continuity. Step 14 implements usage/exhaustion;
   Step 15 implements independent current/historical cabinet usage with generated
-  Portal DTOs. Step 16 is paired local acceptance and Step 17 is build/install
-  preparation. ANY-767 owns remote deployment and live-service acceptance.
+  Portal DTOs. Steps 16/17 supply focused paired local acceptance and build/install
+  preparation in the agreed scope. ANY-767 owns the full deferred matrix, remote
+  deployment and live-service acceptance.
 
 ## ANY-766 Step 9 common backend specification — 2026-11-10
 
@@ -451,13 +452,13 @@ transaction. A separately bounded worker task delivers with live-lease ACK,
 retry/parking and crash redelivery. Portal validates consumer/product, saved
 source/backend owner and full tuple before durably acknowledging one immutable
 hint; current hints schedule GET-only reconciliation, historical hints are inert.
-Portal's V1 client and retained-owner resolver are ready for Step 15 cabinet
+Portal's V1 client and retained-owner resolver supply Step 15 cabinet
 composition. Kernel `0021` and Portal `20261111_0011` extend previous heads without
 resetting usage, purchases or queue history. V1 wire/fixture bytes are unchanged.
 See the common backend guide's implemented Step 14 section for settings, errors,
 lease/recovery and enablement. Local PostgreSQL and synthetic reverse transport
-are covered; actual paired browser/HTTP acceptance remains Step 16. Live/deployed
-acceptance is not claimed.
+are covered. Step 16 below supplies focused paired local browser/HTTP acceptance;
+the full matrix and live/deployed acceptance remain deferred to ANY-767.
 
 ## ANY-766 Step 16 — focused local acceptance
 

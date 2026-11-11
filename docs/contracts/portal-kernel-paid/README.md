@@ -1,6 +1,6 @@
 # ANY-766 paid integration target contracts
 
-**Current checkpoint — Steps 10–15, 2026-11-11:** the
+**Current checkpoint — Steps 10–17, 2026-11-11:** the
 [common guide](https://github.com/gushinets/payments-portal/blob/main/docs/contracts/product-backend-api/README.md#implemented-step-10-settings-and-cutover)
 owns implemented common routes, V2 delegation, BACKEND_CONSUMERS, policy guard,
 fixed callbacks and browser migration. Its
@@ -24,9 +24,9 @@ recipient-specific Portal invalidation
 delivery, recoverable browser journeys and configured technical-source/owner
 routing with immutable history.
 Kernel usage/exhaustion and owner-checked Portal hints are implemented in Step 14;
-Step 15 adds isolated current/historical cabinet usage reads. Paired local acceptance
-is Step 16; remote/live acceptance and
-production rollout belong to ANY-767. All quantities and
+Step 15 adds isolated current/historical cabinet usage reads. Steps 16/17 supply
+focused paired local acceptance and build/install preparation. The full matrix,
+remote/live acceptance and production rollout belong to ANY-767. All quantities and
 credential-shaped strings in fixtures are synthetic. Q=1 is an isolated test
 quantity, never a commercial offer or approval.
 
@@ -101,16 +101,17 @@ Unknown fields fail validation. This is a new target, not a V1 snapshot adapter.
 
 The directional credentials remain independent:
 
-- Portal → Kernel sends `KERNEL_SERVICE_TOKEN`; Kernel receives current/previous
-  `ANYTOOLAI_PORTAL_SERVICE_TOKEN` slots. Receiver permissions are `manifest:read`,
-  `access:invalidate` for implemented operations; `usage:read` belongs to Step 14.
+- Portal → Kernel sends platform-kernel's `portal_to_backend_current_secret`
+  from `BACKEND_CONSUMERS`; Kernel receives current/previous
+  `ANYTOOLAI_PORTAL_SERVICE_TOKEN` slots. Implemented receiver permissions are
+  `manifest:read`, `access:invalidate` and `usage:read`.
 - Kernel → Portal sends `ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN`; Portal matches it
   against platform-kernel's `backend_to_portal_current_secret` or optional
   `backend_to_portal_previous_secret` in `BACKEND_CONSUMERS`. Other consumers use
   their own independent entries/credentials. Implemented receiver permissions
-  are `access-snapshot:read`, `backend-session:exchange` and
-  `backend-session:introspect`; `allowance-exhaustion:write` is recognized in
-  configuration but its receiver remains Step 14. Snapshot V3 now serves each
+  are `access-snapshot:read`, `backend-session:exchange`,
+  `backend-session:introspect` and `allowance-exhaustion:write`; the exhaustion
+  receiver is implemented in Step 14. Snapshot V3 now serves each
   configured consumer only its authorized products.
 
 Possession of one permission grants none of the others. Scope comes from trusted
@@ -287,7 +288,8 @@ debit authority.
 
 **Implemented — Steps 14/15, 2026-11-11.** Kernel usage/exhaustion and durable
 Portal hints are implemented in Step 14; independent cabinet reads and generated
-DTOs are implemented in Step 15. Assembled two-service acceptance remains Step 16.
+DTOs are implemented in Step 15. Step 16 supplies focused assembled local
+acceptance; the full matrix and remote/live acceptance are deferred to ANY-767.
 
 Kernel `GET /internal/v1/usage/{user_id}` takes tenant/region and repeated
 `allowance_id` parameters: 1–100 distinct canonical UUIDs. Repeating an ID,
