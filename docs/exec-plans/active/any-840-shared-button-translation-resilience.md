@@ -7,8 +7,8 @@
 - Created: 2026-11-11
 - Last updated: 2026-11-11
 - Review date: 2026-11-11
-- Next action: user review, permission to push, and manual device QA.
-- Blocker: physical Android acceptance evidence is still missing. Earlier local gate/smoke limitations are recorded below; SonarCloud's duplication blocker is resolved.
+- Next action: merge PR #268 after required GitHub checks; owner-approved QA acceptance is complete.
+- Blocker: none from Android QA under the owner-approved acceptance decision below. Physical-device evidence remains unavailable; earlier local gate/smoke limitations are retained, and SonarCloud's duplication blocker is resolved.
 
 ## Goal
 
@@ -75,8 +75,9 @@ string label updates replace its translated content safely.
   A direct runtime-config GET confirmed `404 product_not_found`. Stopped the run
   after two failures (one interrupted, seven not run); this is not smoke success.
   No running deployment configuration was changed to enable a product.
-- Physical Honor 50 is unavailable. Device acceptance remains manual QA; DOM
-  simulation is not evidence of device verification.
+- Physical Honor 50 is unavailable. DOM simulation is not evidence of physical-device
+  verification. The owner subsequently accepted mobile emulation for this PR's AC;
+  see the acceptance decision below.
 - Sonar duplication follow-up: removed the web-mirror simulator copy and switched
   its three product tests to the shared-ui test helper. Lint and typecheck passed
   for both packages; all 11 Button/CopyButton tests and 79 product tests passed.
@@ -108,10 +109,12 @@ string label updates replace its translated content safely.
 | 2026-11-11 | Reuse the shared-ui test simulator from web-mirror, replacing the initially duplicated helper. | SonarCloud reported 26 duplicated lines (13.4%, limit 3%). Existing CE-kit test-helper imports establish this pattern; no production export, new package or Sonar exclusion is needed. |
 | 2026-11-11 | Recommend a separate issue: SSR html lang and first render do not match the user's locale. | Locale detection and translated label distortion have a different cause from the button insertion crash. |
 | 2026-11-11 | Leave unrelated gate failures and the running development stack unchanged. | Host sudo access, an Atom Lab test's asynchronous assertion and disabled product availability are outside the shared-button fix. |
+| 2026-11-11 | Owner explicitly accepts the recorded Pixel 7 mobile emulation as sufficient for PR #268's QA AC, retaining all test limitations. | This changes the required acceptance evidence for this PR; it does not claim physical Android or real Chrome Translate was tested. |
 
 ## Follow-up debt
 
-Verify submit/regenerate with browser translation on the reported Honor 50.
+Physical Honor 50 submit/regenerate with real browser translation remains unverified
+and is deferred as an accepted limitation for this PR, not an AC blocker.
 Investigate SSR locale separately: `apps/web-mirror/src/app/layout.tsx` serves
 `lang="en"` before the client locale changes, potentially triggering unwanted translation.
 The supplied attachment analysis attributes distorted Russian labels to translation;
@@ -136,11 +139,12 @@ The simulator covers replacement of text nodes, not arbitrary replacement of the
 label element or all translation mutations elsewhere on the page. Task Finder
 and handoffs share this fix; their translated journeys were not individually tested.
 
-## Android QA record — not executed
+## Physical Android QA record — not executed; deferred by owner
 
-This is the procedure and empty evidence record requested in review round 1.
-No physical Android result is claimed. Passing automated tests or a mobile-sized
-desktop browser does not complete this record or the device acceptance criterion.
+This is the physical-device procedure and empty evidence record requested in review
+round 1. No physical Android result is claimed. The owner explicitly accepted the
+mobile emulation below as sufficient for PR #268's AC; this physical-device record
+remains unexecuted and is retained for future QA.
 
 ### Run metadata
 
@@ -188,7 +192,8 @@ desktop browser does not complete this record or the device acceptance criterion
 | Acceptance Builder (shared-pattern check) | Off | Not executed | None |
 | Acceptance Builder (shared-pattern check) | On | Not executed | None |
 
-Device acceptance remains **open** until the required cases have actual evidence.
+Physical-device verification remains **unexecuted**. PR #268's QA AC is **accepted
+by the owner using mobile emulation**, as recorded below.
 The suspected SSR/locale follow-up is **not filed or linked by this change**; suggested
 title: "SSR html lang and first render do not match the user's locale". Confirm its
 role using the device evidence before claiming that it caused the reported distortion.
@@ -214,8 +219,27 @@ text. Each case checked Russian field labels, touch submission, disabled/busy bu
 with spinner while the start response was held, result display, and regeneration.
 There were 16 completed submissions, no uncaught page errors, no console errors,
 and no unexpected API routes. Captured 32 local screenshots covering pending and
-completed states. These results support the button regression check only; backend
-execution, actual browser translation and physical Android acceptance remain open.
+completed states. These results support the button regression check; real backend
+execution, actual browser translation and physical Android remain unverified.
+The owner accepted these limitations for this PR's QA AC, as recorded below.
+
+### Owner-approved QA acceptance — 2026-11-11
+
+The owner explicitly stated: "Да, принимаю эмуляцию для AC этого PR."
+This decision supersedes the earlier requirement to obtain physical-device evidence
+before accepting PR #268. It applies only to this PR and does not change what ran.
+
+**QA verdict: ready to merge.** By the owner's explicit decision, mobile emulation
+with the Android / Pixel 7 profile is sufficient for this PR's QA AC. All eight
+cases and 16 submissions passed without page or console errors. Required GitHub
+checks and branch protections still apply; this decision does not bypass CI.
+
+Accepted limitations: desktop headless Chrome rather than physical Android or an
+Android OS emulator; API responses from test builders/fixtures; synthetic button
+text-node replacement rather than real Chrome Translate. The 32 screenshots were
+captured locally and are not attached to the PR. Physical-device behavior, real
+translation and backend execution were not verified by this browser run. No
+follow-up issue is claimed to have been filed.
 
 Repository hygiene check found pre-existing local-skill references in execution
 plans for ANY-17, ANY-339, ANY-391, ANY-221 and ANY-227; unrelated files remain untouched.
