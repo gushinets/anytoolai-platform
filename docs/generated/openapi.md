@@ -14,6 +14,7 @@ Version: 0.1.0
 | GET | /health | health_health_get | 200 |
 | POST | /internal/v1/access-invalidations | post_access_invalidation_internal_v1_access_invalidations_post | 204, 401, 403, 422, 503 |
 | GET | /internal/v1/capability-manifest | get_capability_manifest_internal_v1_capability_manifest_get | 200, 401, 403, 422, 500, 503 |
+| GET | /internal/v1/usage/{user_id} | internal_paid_usage_internal_v1_usage__user_id__get | 200, 401, 403, 422, 503 |
 | GET | /v1/atom-lab/atoms | list_atoms_v1_atom_lab_atoms_get | 200, 401, 422, 503 |
 | GET | /v1/atom-lab/atoms/{atom_id} | get_atom_v1_atom_lab_atoms__atom_id__get | 200, 401, 404, 422, 503 |
 | GET | /v1/atom-lab/atoms/{atom_id}/prompts | list_atom_prompts_v1_atom_lab_atoms__atom_id__prompts_get | 200, 401, 404, 422, 503 |
@@ -37,6 +38,7 @@ Version: 0.1.0
 | POST | /v1/handoffs/{handoff_token}/decline | decline_handoff_v1_handoffs__handoff_token__decline_post | 200, 401, 403, 404, 409, 410, 422, 503 |
 | POST | /v1/identity/guest | create_guest_identity_v1_identity_guest_post | 200 |
 | POST | /v1/portal-session/exchange | exchange_portal_session_v1_portal_session_exchange_post | 200, 401, 422, 503 |
+| GET | /v1/products/{product_id}/paid-usage | public_paid_usage_v1_products__product_id__paid_usage_get | 200, 401, 403, 422, 503 |
 | GET | /v1/products/{product_id}/quota | get_product_quota_v1_products__product_id__quota_get | 200, 404, 422 |
 | GET | /v1/products/{product_id}/runtime-config | get_runtime_config_v1_products__product_id__runtime_config_get | 200, 404, 422 |
 | POST | /v1/products/{product_id}/scenarios/{scenario_id}/start | start_scenario_v1_products__product_id__scenarios__scenario_id__start_post | 200, 401, 403, 404, 409, 422, 429, 503 |
@@ -95,6 +97,8 @@ Version: 0.1.0
 - ModelCatalogCompatibility
 - ModelCatalogReason
 - ModelCatalogRefreshStatus
+- ObservedUsage
+- PaidUsageResponse
 - PortalExchangeRequest
 - PortalExchangeResponse
 - ProviderCallStatus
@@ -114,5 +118,6 @@ Version: 0.1.0
 - ScenarioSessionStatus
 - ScenarioStartRequest
 - ScenarioStartResponse
+- UnobservedUsage
 - ValidationError
 - WebClientEventType

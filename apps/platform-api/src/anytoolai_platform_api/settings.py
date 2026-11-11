@@ -35,6 +35,7 @@ class Settings(BaseModel):
     portal_service_token: SecretStr | None = Field(default=None, repr=False)
     portal_service_token_previous: SecretStr | None = Field(default=None, repr=False)
     portal_access_invalidation_enabled: bool = False
+    portal_usage_read_enabled: bool = False
     portal_consumer_id: str = Field(default="platform-kernel", pattern=r"^[a-z][a-z0-9-]{0,63}$")
     portal_base_url: str = ""
     portal_access_service_token: SecretStr | None = Field(default=None, repr=False)
@@ -125,6 +126,7 @@ class Settings(BaseModel):
             "ANYTOOLAI_PORTAL_CONSUMER_ID": "portal_consumer_id",
             "ANYTOOLAI_PORTAL_BASE_URL": "portal_base_url",
             "ANYTOOLAI_PORTAL_ACCESS_INVALIDATION_ENABLED": "portal_access_invalidation_enabled",
+            "ANYTOOLAI_PORTAL_USAGE_READ_ENABLED": "portal_usage_read_enabled",
             "ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN": "portal_access_service_token",
             "ANYTOOLAI_APP_ENV": "app_env",
         }.items():

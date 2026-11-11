@@ -1,6 +1,6 @@
 # ANY-766 — Portal API and Paid Execution for Product Backends
 
-Status: **STEPS 1–13 COMPLETE; Steps 14–17 pending; delivery ends at PR readiness**
+Status: **STEPS 1–15 COMPLETE; Steps 16–17 pending; delivery ends at PR readiness**
 
 Date: **2026-11-09**
 
@@ -12,7 +12,7 @@ Related requirements: [ANY-833](https://linear.app/paveldik/issue/ANY-833).
 - Owner: mixed — Portal and Kernel execution owners
 - Last updated: 2026-11-11
 - Review date: 2026-11-11
-- Next action: Step 14 generic usage/exhaustion, only when requested.
+- Next action: Step 16 assembled local integration acceptance, only when requested.
 - Blocker: none for the planned local work; real external-product integration is outside this plan.
 
 Portal's `docs/exec-plans/active/ANY-766-implementation-plan.md` is authoritative;
@@ -93,7 +93,7 @@ contacting its services or accepting its integration is not an ANY-766 gate.
 Development bases: Portal ANY-766 is based on ANY-765
 `b2ef280048ac634a60c18e820fbf702beddba19c`; Kernel is based on
 `72ff15bc0b77903c87aa39f7b10186dccc556d09` and includes ANY-507/814.
-Current migration heads are Portal `20261111_0010` and Kernel `0020`.
+Current migration heads are Portal `20261111_0011` and Kernel `0021`.
 
 Development may continue above the verified ANY-765 base while its PR is reviewed.
 After it merges, transfer only ANY-766 changes onto accepted main under a
@@ -119,7 +119,7 @@ Read the [current Step 10 producer handoff](https://github.com/gushinets/payment
 - Steps 3/5 now implement immutable configured-source technical terms and production allowance derivation. Ordinary commercial enablement and live positive proof retain their separate gates.
 - ANY-507 supplies paid owner partitioning, replay, reserve/finalize/release, recovery and readback. It already uses the required immutable allowance tuple.
 - Kernel Step 6 attaches the Step 4 principal adapter to coherent paid admission and reservation/deferred ownership protection. Its existing `ClientEventService` now supports trusted paid owners, including events before a scenario exists; guest validation and deduplication remain intact.
-- Kernel Step 6 implements the durable coherence/invalidation receiver. Portal Step 7 implements bounded durable invalidation transport with exact-N ACK, parking/CLI retry and restart repair. Kernel exhaustion delivery remains later work.
+- Kernel Step 6 implements the durable coherence/invalidation receiver. Portal Step 7 implements bounded durable invalidation transport with exact-N ACK, parking/CLI retry and restart repair. Step 14 now implements Kernel usage reads and durable exhaustion delivery.
 - Existing independent Compose projects, runners, migration services and Kernel profile activation are reusable. Add only the image/build and installation preparation needed for the selected Portal/Kernel pair; server installation follows PR review in ANY-767.
 
 ## 3. Decisions, Contracts, Ownership & Dependencies
@@ -472,6 +472,17 @@ Read Kernel outside Portal transactions, validate scope/owner and observed tuple
 
 The generated Portal DTO includes local allowance identity/terms and `current | historical` classification. Observed items include actual counters/read time; unobserved items omit counters. A mismatching item becomes unavailable with diagnostics. A dependency outage returns `503`; `/api/paid-access` remains independently usable.
 
+**Step 15 contract clarification — 2026-11-11:** Portal's `PaidUsageResponse`
+Pydantic model and generated OpenAPI/TypeScript own the unversioned cabinet
+response: only `access_revision` and `items` at the top level, with session-derived
+scope and no versioned owner envelope. This supersedes the historical
+`cabinet-usage-v1` target and corresponding `TARGET_ONLY` index entries for this
+route. Retain exact schema/fixture/oracle/index bytes for historical target checks;
+they do not validate the implemented cabinet response. Backend usage/exhaustion
+V1 is unchanged. Resource isolation still applies the shared whole-user
+committed-state/deadline rules from Steps 5/12; the common guide owns the
+inherited refusal codes and operational recovery.
+
 ### 3.7 Minimal build and installation preparation
 
 Ownership:
@@ -788,6 +799,10 @@ and installation support. The PR readiness checklist closes this plan. Remote
 staging acceptance is not part of its DoD and follows review in ANY-767.
 
 ## 5. Sequential Implementation Steps
+
+Completed-step statuses retain their verification checkpoint scope. Later
+completed steps supersede earlier references to pending work; the top-level
+status records current progress.
 
 ### Common execution protocol
 
@@ -1298,8 +1313,8 @@ migration/concurrency/capacity and affected worker/paid-state regressions PASS,
 including grant removal, N+1, rollback, restart and independent recipient failure.
 Kernel V1 receiver, contract, lint/architecture, documentation and generation
 checks PASS. Backend HTTP responses in Portal delivery tests are synthetic;
-assembled two-service/browser acceptance remains Step 16. Usage/exhaustion,
-cabinet usage and build/install work remain Steps 14–17; no live/deployed
+assembled two-service/browser acceptance remains Step 16. Steps 14/15 now
+implement backend/cabinet usage; build/install work remains Step 17; no live/deployed
 acceptance or Git mutation is claimed.
 
 **Goal / Expected behavior:** paid-state invalidations are delivered independently
@@ -1340,6 +1355,26 @@ read routing in Step 15; complete assembled local acceptance in Step 16.
 
 ### Step 14 — Expose usage and deliver exhaustion
 
+**Status:** COMPLETE (2026-11-11). Kernel V1 internal/product usage reads reuse
+ANY-507 counters without writes; unknown/foreign buckets remain unobserved.
+Normal and recovery finalization atomically persist immutable exhaustion edges.
+The existing worker has an opt-in bounded independent leased delivery task with
+live-claim ACK, retry/parking and restart redelivery. Portal validates the sender,
+saved source/backend owner and full issued tuple before committing one immutable
+hint; duplicate completion and historical cycles remain inert. Its local worker
+only schedules existing GET-only reconciliation for a current allowance. The
+owner resolver and bounded V1 client are consumed by Step 15 cabinet composition.
+Portal `20261111_0011` and Kernel `0021` preserve populated work/usage history.
+Current integration summaries and migration guidance cover completed Steps 1–15;
+the previous Step 13 migration heads are explicitly historical.
+Focused PostgreSQL, contract, recovery, affected worker/queue regressions,
+architecture, generation, documentation and frontend type checks PASS. New and
+changed lint paths pass; two unchanged runner complexity findings are reproduced
+on HEAD and retained outside scope. Evidence is local/synthetic reverse HTTP;
+assembled two-service/browser acceptance remains Step 16. Cabinet usage is
+implemented in Step 15; build/install work remains Step 17. Full-check remains NOT_RUN under its
+installation-authorization gate; no live/deployed acceptance is claimed.
+
 **Goal / Expected behavior:** actual counters are readable and committed exhaustion is recoverably delivered under the common backend contract. Kernel is the implemented backend; a synthetic consumer verifies isolation.
 
 **Repositories / Read before implementation:** both; [Kernel readback](https://github.com/gushinets/anytoolai-platform/blob/72ff15bc0b77903c87aa39f7b10186dccc556d09/packages/backend/platform-core/src/anytoolai_platform_core/quotas/readback.py), [workflow runner](https://github.com/gushinets/anytoolai-platform/blob/72ff15bc0b77903c87aa39f7b10186dccc556d09/packages/backend/platform-core/src/anytoolai_platform_core/workflows/runner.py), worker lifecycle and Portal issued-allowance/work queries.
@@ -1378,6 +1413,18 @@ Cover result/debit/outbox rollback, duplicate finalization/delivery, crash befor
 **Proposed commit:** `ANY-766 - Expose usage and deliver exhaustion`
 
 ### Step 15 — Display actual usage in the cabinet
+
+**Status:** COMPLETE (2026-11-11) in the local Step 15 scope. Independent bounded
+usage reads route by saved owner, preserve excluded history, validate observed
+tuples and recheck session/revision after HTTP. The cabinet shares session and
+visibility guards, labels current/historical and unknown/unavailable usage, and
+distinguishes reservations from exhaustion. Focused PostgreSQL/owner/history,
+component, generation, lint/type, architecture CLI, documentation and synthetic
+desktop/mobile accessibility checks PASS. The general OpenAPI guard also passes
+with an explicit bodyless exhaustion-204 exception and a fixed response-shape
+assertion. Current cabinet DTO authority and inherited paid-state/deadline
+refusals are documented. Assembled two-service acceptance, builds and live/deployed
+acceptance remain deferred to their owning steps; no such acceptance is claimed.
 
 **Goal / Expected behavior:** the existing cabinet shows truthful current/historical usage independently of access reads.
 

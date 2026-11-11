@@ -13,6 +13,7 @@ It covers the design that was implemented for:
 - `platform.guest_quota_usage`
 - `platform.paid_allowance_usage`
 - `platform.execution_reservations`
+- `platform.allowance_exhaustion_outbox`
 - `platform.product_handoffs`
 - `platform.atom_lab_runs`
 - `platform.model_catalog_state`
@@ -946,3 +947,16 @@ It should be revisited if the platform later needs:
 
 If those pressures appear, the likely next step is not to abandon SQLAlchemy, but to decide whether
 the repo has grown enough to justify ORM mapped classes or a more formal storage service layer.
+
+
+## Paid exhaustion outbox — ANY-766 Step 14
+
+Migration `0021` adds `platform.allowance_exhaustion_outbox`. Its immutable columns
+store the full V1 tuple, event type and UTC occurrence time; identity is unique
+by tenant/region/user/allowance/event type. Successful normal and rollback-recovery
+orchestration insert only on `became_exhausted` before the same commit. No consumer
+or revision dimension is added to usage or replay. Existing usage is not backfilled
+into events. Mutable delivery fields are state, next attempt, attempt count, paired
+lease token/expiry and safe last error. A worker claims pending due rows with
+SKIP LOCKED, sends outside SQL, then locks and checks the live lease using database
+wall time before settlement. Crash/restart naturally resumes unresolved rows.

@@ -16,6 +16,12 @@ if TYPE_CHECKING:
     from anytoolai_platform_core.workflows.models import JobRecord
 
 
+class ExhaustionDeliveryState(StrEnum):
+    pending = "pending"
+    delivered = "delivered"
+    parked = "parked"
+
+
 class QuotaUnit(StrEnum):
     scenario_run = "scenario_run"
 

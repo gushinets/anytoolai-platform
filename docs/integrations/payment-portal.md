@@ -32,9 +32,9 @@ Historical Portal contracts and execution plans do not override accepted sources
 
 ## Current local implementation
 
-Baseline sources: Kernel `6dc3e96c26c8ac093614394c6e87787f9f42b395` and Portal
-`126f6755cc684e4cbbb60ea1b1ece92c7575fde6` (completed Step 12). The paired Step 13 changes
-extend this baseline.
+Current local sources: Kernel `36be7fa3c3147b032b97f050a898a97423db2070`
+and Portal `9632ec4ce440fa17d8463f230b98df7cccccc934`, plus the paired
+Step 14/15 working-tree changes.
 The [active plan](../exec-plans/active/ANY-766-implementation-plan.md) owns the
 current scope and remaining gates.
 
@@ -51,12 +51,15 @@ current scope and remaining gates.
   `ANYTOOLAI_PORTAL_ACCESS_INVALIDATION_ENABLED` at Kernel before starting the updated Portal
   worker. Portal's Step 13 sender selects each snapshot recipient's origin and
   outgoing service key from `BACKEND_CONSUMERS`, with independent bounded lanes.
-  Stop APIs/workers before Portal migration `20261111_0010`; Kernel stays at
-  `0020`. Legacy Kernel connection settings no longer select delivery destinations. A disabled receiver permission parks delivery with `403`;
+  Stop affected APIs/workers before migrating the Step 14 pair to Portal
+  `20261111_0011` and Kernel `0021`. The historical Step 13 heads were Portal
+  `20261111_0010` and Kernel `0020`. Legacy Kernel connection settings no longer
+  select delivery destinations. A disabled receiver permission parks delivery with `403`;
   operator retry is required after repair.
 - Step 8 implements recoverable browser launch, owner-bound tab custody and
-  paid runtime/event/handoff continuity. Usage/exhaustion and cabinet integration
-  remain Steps 14–15; Step 16 is paired local acceptance and Step 17 is build/install
+  paid runtime/event/handoff continuity. Step 14 implements usage/exhaustion;
+  Step 15 implements independent current/historical cabinet usage with generated
+  Portal DTOs. Step 16 is paired local acceptance and Step 17 is build/install
   preparation. ANY-767 owns remote deployment and live-service acceptance.
 
 ## ANY-766 Step 9 common backend specification — 2026-11-10
@@ -318,7 +321,7 @@ describes the independent reverse connection.
 - **Usage and launch:** the
   [target bundle](../contracts/portal-kernel-paid/README.md) specifies usage,
   exhaustion and authenticated browser launch. Step 8 implements browser launch;
-  usage/exhaustion and cabinet usage remain Steps 14–15, with paired local
+  usage/exhaustion is implemented in Step 14; cabinet usage remains Step 15, with paired local
   acceptance in Step 16. Kernel product handoff is not Portal login handoff;
   shared product IDs do not imply shared origins/routes or sessions.
 - **Commercial meaning:** deployed product configuration, guest quota and the
@@ -436,3 +439,22 @@ Focused real PostgreSQL and local TCP auth/access evidence is separate from the
 Step 16 assembled browser/execution journey. The second identity and external
 LBX/manifest sources are synthetic; generic recipients/usage remain Steps 13–15.
 No real third-party, live payment or deployed acceptance is claimed.
+
+
+## ANY-766 Step 14 — usage and exhaustion
+
+Kernel now serves authenticated internal and delegated-user product usage V1,
+using actual ANY-507 counters and indistinguishable unknown/foreign results.
+The API permission `ANYTOOLAI_PORTAL_USAGE_READ_ENABLED` defaults off. Successful
+normal/recovery finalization writes one immutable exhaustion edge in the same
+transaction. A separately bounded worker task delivers with live-lease ACK,
+retry/parking and crash redelivery. Portal validates consumer/product, saved
+source/backend owner and full tuple before durably acknowledging one immutable
+hint; current hints schedule GET-only reconciliation, historical hints are inert.
+Portal's V1 client and retained-owner resolver are ready for Step 15 cabinet
+composition. Kernel `0021` and Portal `20261111_0011` extend previous heads without
+resetting usage, purchases or queue history. V1 wire/fixture bytes are unchanged.
+See the common backend guide's implemented Step 14 section for settings, errors,
+lease/recovery and enablement. Local PostgreSQL and synthetic reverse transport
+are covered; actual paired browser/HTTP acceptance remains Step 16. Live/deployed
+acceptance is not claimed.

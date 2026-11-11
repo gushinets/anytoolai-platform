@@ -53,6 +53,7 @@ services:
       # explicitly malformed (including empty) values fail application validation.
       ANYTOOLAI_PORTAL_SERVICE_TOKEN:
       ANYTOOLAI_PORTAL_SERVICE_TOKEN_PREVIOUS:
+      ANYTOOLAI_PORTAL_USAGE_READ_ENABLED: ${ANYTOOLAI_PORTAL_USAGE_READ_ENABLED:-false}
       # platform-api itself checks internal_only scenarios' X-Live-Canary-Token header against
       # this (ScenarioRuntimeService.start_session()) -- unset by default so normal dev-up/
       # quick-check stays credential-free; only live-canary (ANY-221) needs a real token.
@@ -90,6 +91,12 @@ services:
       dockerfile: infra/docker/platform-worker.Dockerfile
     environment:
       <<: *postgres-credentials
+      ANYTOOLAI_TENANT_ID: ${ANYTOOLAI_TENANT_ID:-anytoolai}
+      ANYTOOLAI_REGION: ${ANYTOOLAI_REGION:-ru}
+      ANYTOOLAI_APP_ENV: ${ANYTOOLAI_APP_ENV:-dev}
+      ANYTOOLAI_PORTAL_EXHAUSTION_DELIVERY_ENABLED: ${ANYTOOLAI_PORTAL_EXHAUSTION_DELIVERY_ENABLED:-false}
+      ANYTOOLAI_PORTAL_BASE_URL:
+      ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN:
       # Only the worker calls ProviderGateway; unset by default so normal dev-up/quick-check stays
       # credential-free -- only live-canary (ANY-221) needs a real key.
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
