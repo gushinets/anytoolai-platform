@@ -31,6 +31,7 @@ from anytoolai_platform_api.routers.demo import router as demo_router
 from anytoolai_platform_api.routers.handoffs import router as handoffs_router
 from anytoolai_platform_api.routers.health import router as health_router
 from anytoolai_platform_api.routers.identity_quota import router as identity_quota_router
+from anytoolai_platform_api.routers.paid_usage import router as paid_usage_router
 from anytoolai_platform_api.routers.portal_session import router as portal_session_router
 from anytoolai_platform_api.routers.results import router as results_router
 from anytoolai_platform_api.routers.runtime_config import router as runtime_config_router
@@ -92,6 +93,7 @@ def create_app(
     _install_error_handlers(app)
 
     app.include_router(access_invalidations_router)
+    app.include_router(paid_usage_router)
     app.include_router(health_router)
     app.include_router(capability_manifest_router)
     app.include_router(portal_session_router)
@@ -188,6 +190,7 @@ def _install_request_context(app: FastAPI) -> None:
                 response.headers.append("Content-Security-Policy", "frame-ancestors 'none'")
             if (
                 request.url.path.startswith(("/internal/", "/v1/portal-session/"))
+                or request.url.path.endswith("/paid-usage")
                 or "authorization" in request.headers
             ):
                 response.headers["Cache-Control"] = "no-store"

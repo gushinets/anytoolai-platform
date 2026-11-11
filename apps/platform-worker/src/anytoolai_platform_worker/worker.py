@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from contextlib import suppress
 from typing import Protocol
 
 from anytoolai_platform_core.common.logging import (
@@ -47,6 +48,11 @@ class ModelCatalogRefreshHook(Protocol):
     async def refresh_if_due(self) -> None: ...
 
 
+class ExhaustionDeliveryHook(Protocol):
+    def deliver_once(self) -> bool: ...
+    def dispose(self) -> None: ...
+
+
 class Worker:
     def __init__(
         self,
@@ -56,12 +62,14 @@ class Worker:
         poll_interval_seconds: float = 1.0,
         reconciler: OrphanReconciler | None = None,
         catalog_refresh_hook: ModelCatalogRefreshHook | None = None,
+        exhaustion_delivery: ExhaustionDeliveryHook | None = None,
     ) -> None:
         self._workflow_handler = workflow_handler
         self._job_queue = job_queue
         self._poll_interval_seconds = poll_interval_seconds
         self._reconciler = reconciler
         self._catalog_refresh_hook = catalog_refresh_hook
+        self._exhaustion_delivery = exhaustion_delivery
         self._stopping = asyncio.Event()
 
     def request_shutdown(self) -> None:
@@ -76,6 +84,8 @@ class Worker:
         """Release resources (the lease's dedicated connection pool) after
         `run_forever()` has returned. Call once during shutdown."""
         self._workflow_handler.dispose()
+        if self._exhaustion_delivery is not None:
+            self._exhaustion_delivery.dispose()
 
     async def process_job(self, job_id: str) -> JobRecord | None:
         token = bind_log_context(job_id=job_id)
@@ -117,6 +127,28 @@ class Worker:
         return await self.process_job(message.job_id)
 
     async def run_forever(self) -> None:
+        delivery = (
+            asyncio.create_task(self._deliver_exhaustions()) if self._exhaustion_delivery else None
+        )
+        try:
+            await self._run_workflows()
+        finally:
+            self.request_shutdown()
+            if delivery is not None:
+                # Drain the finite transport/DB owner before disposing its connection.
+                await delivery
+
+    async def _deliver_exhaustions(self) -> None:
+        assert self._exhaustion_delivery is not None
+        while not self._stopping.is_set():
+            try:
+                await asyncio.to_thread(self._exhaustion_delivery.deliver_once)
+            except Exception:
+                logger.exception("worker.allowance_exhaustion_delivery_failed")
+            with suppress(TimeoutError):
+                await asyncio.wait_for(self._stopping.wait(), timeout=self._poll_interval_seconds)
+
+    async def _run_workflows(self) -> None:
         if self._job_queue is None:
             raise RuntimeError("worker has no DB job queue configured")
         self._sweep_orphaned_jobs()

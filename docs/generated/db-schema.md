@@ -29,6 +29,28 @@ Definitions remain in repository configuration; these tables store runtime state
 | completed_at | DATETIME | yes |
 | metadata | JSON | no |
 
+## platform.allowance_exhaustion_outbox
+
+| Column | Type | Nullable |
+|---|---|---|
+| id | VARCHAR(64) | no |
+| tenant_id | VARCHAR(128) | no |
+| region | VARCHAR(64) | no |
+| user_id | VARCHAR(128) | no |
+| allowance_id | VARCHAR(128) | no |
+| event_type | VARCHAR(64) | no |
+| product_id | VARCHAR(128) | no |
+| metric_key | VARCHAR(255) | no |
+| unit | VARCHAR(128) | no |
+| quantity | BIGINT | no |
+| occurred_at | DATETIME | no |
+| state | VARCHAR(32) | no |
+| next_attempt_at | DATETIME | no |
+| attempt_count | INTEGER | no |
+| lease_owner | VARCHAR(64) | yes |
+| lease_expires_at | DATETIME | yes |
+| last_error | VARCHAR(64) | yes |
+
 ## platform.artifacts
 
 | Column | Type | Nullable |

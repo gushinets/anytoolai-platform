@@ -2007,6 +2007,143 @@
         "title": "ModelCatalogRefreshStatus",
         "type": "string"
       },
+      "ObservedUsage": {
+        "additionalProperties": false,
+        "properties": {
+          "allowance_id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Allowance Id",
+            "type": "string"
+          },
+          "available": {
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
+            "title": "Available",
+            "type": "integer"
+          },
+          "metric_key": {
+            "minLength": 1,
+            "title": "Metric Key",
+            "type": "string"
+          },
+          "product_id": {
+            "minLength": 1,
+            "title": "Product Id",
+            "type": "string"
+          },
+          "quantity": {
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "read_at": {
+            "format": "date-time",
+            "title": "Read At",
+            "type": "string"
+          },
+          "remaining": {
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
+            "title": "Remaining",
+            "type": "integer"
+          },
+          "reserved": {
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
+            "title": "Reserved",
+            "type": "integer"
+          },
+          "status": {
+            "const": "observed",
+            "default": "observed",
+            "title": "Status",
+            "type": "string"
+          },
+          "successful_used": {
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
+            "title": "Successful Used",
+            "type": "integer"
+          },
+          "unit": {
+            "minLength": 1,
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "allowance_id",
+          "product_id",
+          "metric_key",
+          "unit",
+          "quantity",
+          "successful_used",
+          "reserved",
+          "remaining",
+          "available",
+          "read_at"
+        ],
+        "title": "ObservedUsage",
+        "type": "object"
+      },
+      "PaidUsageResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "observed": "#/components/schemas/ObservedUsage",
+                  "unobserved": "#/components/schemas/UnobservedUsage"
+                },
+                "propertyName": "status"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/ObservedUsage"
+                },
+                {
+                  "$ref": "#/components/schemas/UnobservedUsage"
+                }
+              ]
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          },
+          "region": {
+            "minLength": 1,
+            "title": "Region",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": 1,
+            "default": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "tenant_id": {
+            "minLength": 1,
+            "title": "Tenant Id",
+            "type": "string"
+          },
+          "user_id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "region",
+          "user_id",
+          "items"
+        ],
+        "title": "PaidUsageResponse",
+        "type": "object"
+      },
       "PortalExchangeRequest": {
         "additionalProperties": false,
         "properties": {
@@ -2674,6 +2811,27 @@
         "title": "ScenarioStartResponse",
         "type": "object"
       },
+      "UnobservedUsage": {
+        "additionalProperties": false,
+        "properties": {
+          "allowance_id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Allowance Id",
+            "type": "string"
+          },
+          "status": {
+            "const": "unobserved",
+            "default": "unobserved",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "allowance_id"
+        ],
+        "title": "UnobservedUsage",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -2731,6 +2889,10 @@
       }
     },
     "securitySchemes": {
+      "PortalDelegatedBearer": {
+        "scheme": "bearer",
+        "type": "http"
+      },
       "PortalServiceBearer": {
         "scheme": "bearer",
         "type": "http"
@@ -2930,6 +3092,119 @@
         "summary": "Get Capability Manifest",
         "tags": [
           "capability-manifest"
+        ]
+      }
+    },
+    "/internal/v1/usage/{user_id}": {
+      "get": {
+        "operationId": "internal_paid_usage_internal_v1_usage__user_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "title": "User Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Tenant Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "region",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Region",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "allowance_id",
+            "required": true,
+            "schema": {
+              "items": {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              "maxItems": 100,
+              "minItems": 1,
+              "title": "Allowance Id",
+              "type": "array"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaidUsageResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "PortalServiceBearer": []
+          }
+        ],
+        "summary": "Read actual usage for 1\u2013100 distinct allowances",
+        "tags": [
+          "paid-usage"
         ]
       }
     },
@@ -5285,6 +5560,98 @@
         "summary": "Exchange Portal Session",
         "tags": [
           "portal-session"
+        ]
+      }
+    },
+    "/v1/products/{product_id}/paid-usage": {
+      "get": {
+        "operationId": "public_paid_usage_v1_products__product_id__paid_usage_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "product_id",
+            "required": true,
+            "schema": {
+              "title": "Product Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "allowance_id",
+            "required": true,
+            "schema": {
+              "items": {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              "maxItems": 100,
+              "minItems": 1,
+              "title": "Allowance Id",
+              "type": "array"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaidUsageResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "PortalDelegatedBearer": []
+          }
+        ],
+        "summary": "Read owned current or historical paid usage",
+        "tags": [
+          "paid-usage"
         ]
       }
     },

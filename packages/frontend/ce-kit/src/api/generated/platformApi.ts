@@ -55,6 +55,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/v1/usage/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read actual usage for 1–100 distinct allowances */
+        get: operations["internal_paid_usage_internal_v1_usage__user_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/atom-lab/atoms": {
         parameters: {
             query?: never;
@@ -376,6 +393,23 @@ export interface paths {
         put?: never;
         /** Exchange Portal Session */
         post: operations["exchange_portal_session_v1_portal_session_exchange_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product_id}/paid-usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read owned current or historical paid usage */
+        get: operations["public_paid_usage_v1_products__product_id__paid_usage_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1129,6 +1163,54 @@ export interface components {
          * @enum {string}
          */
         ModelCatalogRefreshStatus: "current" | "pending" | "running";
+        /** ObservedUsage */
+        ObservedUsage: {
+            /** Allowance Id */
+            allowance_id: string;
+            /** Available */
+            available: number;
+            /** Metric Key */
+            metric_key: string;
+            /** Product Id */
+            product_id: string;
+            /** Quantity */
+            quantity: number;
+            /**
+             * Read At
+             * Format: date-time
+             */
+            read_at: string;
+            /** Remaining */
+            remaining: number;
+            /** Reserved */
+            reserved: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "observed";
+            /** Successful Used */
+            successful_used: number;
+            /** Unit */
+            unit: string;
+        };
+        /** PaidUsageResponse */
+        PaidUsageResponse: {
+            /** Items */
+            items: (components["schemas"]["ObservedUsage"] | components["schemas"]["UnobservedUsage"])[];
+            /** Region */
+            region: string;
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /** Tenant Id */
+            tenant_id: string;
+            /** User Id */
+            user_id: string;
+        };
         /** PortalExchangeRequest */
         PortalExchangeRequest: {
             /** Code */
@@ -1365,6 +1447,16 @@ export interface components {
             scenario_session_id: string;
             status: components["schemas"]["ScenarioSessionStatus"];
         };
+        /** UnobservedUsage */
+        UnobservedUsage: {
+            /** Allowance Id */
+            allowance_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "unobserved";
+        };
         /** ValidationError */
         ValidationError: {
             /** Context */
@@ -1542,6 +1634,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    internal_paid_usage_internal_v1_usage__user_id__get: {
+        parameters: {
+            query: {
+                tenant_id: string;
+                region: string;
+                allowance_id: string[];
+            };
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaidUsageResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
             /** @description Service Unavailable */
@@ -3083,6 +3237,66 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    public_paid_usage_v1_products__product_id__paid_usage_get: {
+        parameters: {
+            query: {
+                allowance_id: string[];
+            };
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaidUsageResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
             /** @description Service Unavailable */

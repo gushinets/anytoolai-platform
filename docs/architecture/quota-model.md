@@ -2,8 +2,8 @@
 
 MVP-A exposes guest quota. ANY-507 supplies typed paid metering. ANY-766 Step 6
 connects Portal delegation, finite consumer-scoped AccessSnapshot V3 and scenario-owned metric
-selection to that same admission path. Interservice usage and exhaustion delivery
-remain later ANY-766 work. See the [shared contract and execution plan](../exec-plans/completed/ANY-507-implementation-plan.md).
+selection to that same admission path. ANY-766 Step 14 adds authenticated usage
+readback and transactional exhaustion delivery. See the [shared contract and execution plan](../exec-plans/completed/ANY-507-implementation-plan.md).
 
 ## Admission and replay
 
@@ -61,7 +61,8 @@ changes. Legacy jobs retain their earlier debit history and are never charged ag
 
 `ConsumptionTransition(applied, reservation, became_exhausted)` exposes an exhaustion edge only on
 an applied consumption. ANY-766 attaches its explicit outbox write before the same outer commit,
-including recovery; this stage introduces no outbox or Portal wire.
+including recovery. Step 14 persists that edge in `allowance_exhaustion_outbox`;
+repeated finalization and guest work create no paid delivery event.
 
 ## Readback and guest HTTP
 
@@ -195,3 +196,26 @@ Handoff late authority refusal escapes the acceptance transaction and rolls back
 consent, target linkage, jobs, reservations and events. It does not turn a
 retryable authority/dependency refusal into terminal handoff failure. Existing
 expiry, decline, busy-capacity and terminal execution behavior remains in place.
+
+
+## ANY-766 Step 14 paid usage and exhaustion
+
+Internal `/internal/v1/usage/{user_id}` requires scoped Portal service identity
+and opt-in `usage:read`; public `/v1/products/{product_id}/paid-usage` introspects
+the Portal owner and restricts the product. Both accept 1–100 distinct allowance
+UUIDs, preserve request order, return unobserved for unknown/foreign IDs, and
+create no bucket. Established zero, reserved capacity and successful exhaustion
+remain distinct. Historical reads need no current grant or commercial flag.
+
+The runner and success recovery insert the immutable paid exhaustion tuple in
+the same transaction as result/debit. Migration `0021` adds the durable outbox,
+without backfilling historical edges or touching ANY-507 buckets/replay. The
+worker's opt-in reverse lane owns one bounded connection/task independent of
+workflow duration. Claims last 30 seconds; HTTP is outside SQL and ACK checks
+lease ownership/expiry after the row lock. Transport/429/5xx retry with bounded
+backoff; other non-204 responses park. Disabled delivery retains pending rows.
+Portal ACK follows its immutable hint commit, including valid historical and
+duplicate events. A hint never terminates, revokes or refills paid authority.
+The common backend guide records settings and operational recovery. Step 15
+implements independent cabinet usage composition; assembled two-service
+acceptance remains Step 16.

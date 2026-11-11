@@ -1,6 +1,6 @@
 # ANY-766 paid integration target contracts
 
-**Current checkpoint — Steps 10–13, 2026-11-11:** the
+**Current checkpoint — Steps 10–15, 2026-11-11:** the
 [common guide](https://github.com/gushinets/payments-portal/blob/main/docs/contracts/product-backend-api/README.md#implemented-step-10-settings-and-cutover)
 owns implemented common routes, V2 delegation, BACKEND_CONSUMERS, policy guard,
 fixed callbacks and browser migration. Its
@@ -18,12 +18,13 @@ Schemas/fixtures retain their exact historical bytes; current implementation
 status is recorded here and in the guide, not inferred from a schema description.
 
 Status: **protocol specifications and fixtures**, formalized 2026-11-09.
-Implementation through ANY-766 Step 13 includes common delegated identity V2,
+Implementation through ANY-766 Step 15 includes common delegated identity V2,
 consumer-filtered snapshot V3, coherent paid admission/ownership/events,
 recipient-specific Portal invalidation
 delivery, recoverable browser journeys and configured technical-source/owner
 routing with immutable history.
-Usage/exhaustion and cabinet usage remain Steps 14/15. Paired local acceptance
+Kernel usage/exhaustion and owner-checked Portal hints are implemented in Step 14;
+Step 15 adds isolated current/historical cabinet usage reads. Paired local acceptance
 is Step 16; remote/live acceptance and
 production rollout belong to ANY-767. All quantities and
 credential-shaped strings in fixtures are synthetic. Q=1 is an isolated test
@@ -45,8 +46,8 @@ and owner-directed V1 usage/exhaustion. At Step 9 completion these additions
 were specified only. Step 10 now implements common identity and its generated
 OpenAPI security; Step 12 now implements V3 access and the working auth/access
 OpenAPI handoff.
-Step 13 implements recipient delivery; Steps 14/15 retain usage work, Step 16
-local acceptance and
+Step 13 implements recipient delivery; Steps 14/15 implement backend/cabinet
+usage. Step 16 owns assembled local acceptance and
 Step 17 build/install preparation. No runtime/generator change occurs in Step 9.
 
 The main identity section below records Step 10; the dated Step 4/8 sections
@@ -284,8 +285,9 @@ debit authority.
 
 ## Usage, exhaustion and cabinet
 
-**Planned — Steps 14/15.** The following routes and delivery behavior are contract
-requirements; the completed Step 10 does not implement them.
+**Implemented — Steps 14/15, 2026-11-11.** Kernel usage/exhaustion and durable
+Portal hints are implemented in Step 14; independent cabinet reads and generated
+DTOs are implemented in Step 15. Assembled two-service acceptance remains Step 16.
 
 Kernel `GET /internal/v1/usage/{user_id}` takes tenant/region and repeated
 `allowance_id` parameters: 1–100 distinct canonical UUIDs. Repeating an ID,
@@ -344,12 +346,24 @@ product; excluded rows cause no backend usage request or invented tuple.
 Use independent bounded backend HTTP resources outside DB transactions; preserve
 `/api/paid-access` reserved DB/thread/cancellation capacity. Validate remote tuples, then reread
 local access revision; change returns `503 paid_usage_state_changed`.
-`cabinet-usage-v1` records local terms, current/historical classification and
+The implemented response is unversioned, with only `access_revision` and `items`
+at the top level. Portal's `PaidUsageResponse` in
+`apps/api/app/domains/billing/usage_contracts.py`, its named OpenAPI component
+and generated TypeScript DTOs own this cabinet HTTP contract. Scope/user are
+derived from the session, with no `schema_version`, `tenant_id`, `region` or
+`user_id` response envelope.
+
+The retained `cabinet-usage-v1` schema, fixtures, test oracle and corresponding
+`TARGET_ONLY` contract-index entries describe the historical Step 1 target.
+Step 15 supersedes that versioned owner envelope for `GET /api/paid-usage`;
+those retained artifacts do not validate its implemented response. Their exact
+bytes and the backend usage/exhaustion V1 wire contracts remain unchanged.
+Current DTOs retain local terms, current/historical classification and
 observed/unobserved/unavailable variants. Unknown/unavailable items omit counters;
 tuple mismatch makes that item unavailable with safe diagnostics; dependency
-outage is `503`. No-store applies to success/refusal. The future runtime API must
-generate named Pydantic/OpenAPI/TypeScript DTOs through Portal's existing tooling;
-this target schema creates no frontend type authority or generated API change.
+outage is `503`. No-store applies to success/refusal. Independent resources still
+apply the shared whole-user committed-state/deadline rules from Steps 5/12;
+the common guide records inherited refusals and recovery.
 
 ## Verification boundaries
 
