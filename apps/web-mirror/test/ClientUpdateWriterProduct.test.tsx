@@ -32,7 +32,7 @@ import {
 } from "./fixtures/platformResponses";
 import { CLIENT_UPDATE_WRITER_MESSAGES } from "../src/products/clientUpdateWriter/messages";
 import { makeRender } from "./support/renderWithI18n";
-import { simulateBrowserTranslation } from "./support/simulateBrowserTranslation";
+import { simulateBrowserTranslation } from "@anytoolai/shared-ui/test/support/simulateBrowserTranslation";
 
 const render = makeRender(CLIENT_UPDATE_WRITER_MESSAGES);
 

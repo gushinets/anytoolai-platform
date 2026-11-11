@@ -34,7 +34,7 @@ import {
   startResponse,
 } from "./fixtures/platformResponses";
 import { makeRender } from "./support/renderWithI18n";
-import { simulateBrowserTranslation } from "./support/simulateBrowserTranslation";
+import { simulateBrowserTranslation } from "@anytoolai/shared-ui/test/support/simulateBrowserTranslation";
 
 const render = makeRender(BRIEF_DECODER_MESSAGES);
 const IDS = { productId: "brief_decoder", scenarioId: "brief_decoder.decode_v1" } as const;

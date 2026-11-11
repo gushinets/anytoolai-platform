@@ -21,7 +21,7 @@ import {
 } from "./fixtures/platformResponses";
 import { PROPOSAL_AI_MESSAGES } from "../src/products/proposalAi/messages";
 import { makeRender } from "./support/renderWithI18n";
-import { simulateBrowserTranslation } from "./support/simulateBrowserTranslation";
+import { simulateBrowserTranslation } from "@anytoolai/shared-ui/test/support/simulateBrowserTranslation";
 
 const render = makeRender(PROPOSAL_AI_MESSAGES);
 

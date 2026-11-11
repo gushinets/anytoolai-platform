@@ -76,6 +76,11 @@ string label updates replace its translated content safely.
   No running deployment configuration was changed to enable a product.
 - Physical Honor 50 is unavailable. Device acceptance remains manual QA; DOM
   simulation is not evidence of device verification.
+- Sonar duplication follow-up: removed the web-mirror simulator copy and switched
+  its three product tests to the shared-ui test helper. Lint and typecheck passed
+  for both packages; all 11 Button/CopyButton tests and 79 product tests passed.
+  Full gates were not repeated for this test-only import change. SonarCloud must
+  analyze the follow-up commit after push before its updated gate is confirmed.
 
 ## Decision log
 
@@ -84,7 +89,7 @@ string label updates replace its translated content safely.
 | 2026-11-11 | Implement in existing TypeScript, confirmed by user. | The crash occurs in React DOM reconciliation; no Python change is needed. |
 | 2026-11-11 | Use a stable label span, preserving shared design tokens. | Fix the common insertion anchor and keep translation enabled. |
 | 2026-11-11 | Defer a global error boundary. | Separate fallback behavior is outside this targeted fix. |
-| 2026-11-11 | Keep the small translation simulator within each package's test tree. | No production export or cross-package test dependency is needed. |
+| 2026-11-11 | Reuse the shared-ui test simulator from web-mirror, replacing the initially duplicated helper. | SonarCloud reported 26 duplicated lines (13.4%, limit 3%). Existing CE-kit test-helper imports establish this pattern; no production export, new package or Sonar exclusion is needed. |
 | 2026-11-11 | Recommend a separate issue: SSR html lang and first render do not match the user's locale. | Locale detection and translated label distortion have a different cause from the button insertion crash. |
 | 2026-11-11 | Leave unrelated gate failures and the running development stack unchanged. | Host sudo access, an Atom Lab test's asynchronous assertion and disabled product availability are outside the shared-button fix. |
 
