@@ -302,8 +302,9 @@ session/job/quota state is created in CE-kit on this path) through the standard 
 `getScenarioSession(client, scenarioSessionId, { signal?, timeoutMs? })` is a single typed
 `GET /v1/scenario-sessions/{id}` read. Its `scenarioId` identifies the backend scenario even
 while the session is running. Multi-mode web products use that identity to restore the correct
-mode before showing a form. Legacy API responses without this field still parse, but cannot
-resolve a mode; restoration stays blocked with a read-only retry until identity is available.
+mode before showing a form. Legacy API responses without this field still parse, but the mode
+is never guessed. Retry preserves and re-reads the same session. Users may explicitly choose
+New task to discard only the local attachment and open a fresh form without starting execution.
 
 `pollScenarioSession(client, scenarioSessionId, { intervalMs?, maxDurationMs?, signal? })` polls it
 on a bounded interval and stops on `completed`, `failed`, `expired`, or `waiting_for_user` (the last
