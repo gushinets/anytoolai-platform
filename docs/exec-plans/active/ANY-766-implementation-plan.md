@@ -1,6 +1,6 @@
 # ANY-766 — Portal API and Paid Execution for Product Backends
 
-Status: **STEPS 1–10 COMPLETE; Steps 11–17 pending; delivery ends at PR readiness**
+Status: **STEPS 1–11 COMPLETE; Steps 12–17 pending; delivery ends at PR readiness**
 
 Date: **2026-11-09**
 
@@ -12,7 +12,7 @@ Related requirements: [ANY-833](https://linear.app/paveldik/issue/ANY-833).
 - Owner: mixed — Portal and Kernel execution owners
 - Last updated: 2026-11-11
 - Review date: 2026-11-11
-- Next action: Step 11 technical-source ownership, only when requested.
+- Next action: Step 12 consumer-scoped snapshots and auth/access handoff, only when requested.
 - Blocker: none for the planned local work; real external-product integration is outside this plan.
 
 Portal's `docs/exec-plans/active/ANY-766-implementation-plan.md` is authoritative;
@@ -23,7 +23,7 @@ The active repositories are the two clones under
 Keep the goal, decisions, step instructions, required checks and a concise
 current status here. Add only material changes to scope, contracts, dependencies
 or execution. Keep run histories, actual commands/results and commit bookkeeping
-in execution reports or PR/issue evidence.
+in the chat or authorized PR/issue evidence; do not add separate report documents.
 
 **Kernel rebase follow-up — 2026-11-12:** preserve ANY-841 draft/accepted guest-run
 restoration while replaying ANY-766 onto main `277a97baff797c8f9ed2eb205a08c029a961c53f`.
@@ -142,6 +142,11 @@ Do not introduce quota templates, an admin API, catalog mirrors, a second meteri
 
 ### 3.2 Production declarations and immutable purchased terms
 
+This section records the completed Step 3 baseline. Step 11 advances new metered
+records to product-link-v4 / purchased-technical-terms:v3 / accepted-purchase:v4
+with source/owner identity; old formats and hash inputs remain unchanged under
+Section 3.9. The common backend guide records the current source/history rules.
+
 Add optional scenario-owned `paid_metric_key` to Kernel configuration and Core/SDK representations. The existing loader validates that the referenced metric belongs to the scenario’s product. Portal validates the purchased unit against that metric.
 
 Declare the four approved production metrics and all seven bindings. Keep ordinary product/metric commercial flags disabled until sales approval. Existing test declarations remain unchanged.
@@ -250,8 +255,8 @@ Update both canonical designs, producer schemas, positive/negative fixtures and 
 
 Steps 4/8 supply PKCE, custody and recovery; completed Step 10 generalizes
 consumer identity, routes and configured callback. This section records the
-current identity contract. Section 3.9 also specifies later snapshot/source/
-recipient work that remains pending.
+current identity contract. Section 3.9 also specifies later snapshot/recipient
+work that remains pending; Step 11 implements technical-source ownership.
 
 Use a consumer-bound one-use code with S256 PKCE and a narrow delegated token.
 
@@ -1038,7 +1043,7 @@ Cover crashes around send/apply/ack, N/N+1, lease/generation loss, outage, perma
 
 ### Step 8 — Connect browser launch and recoverable paid journeys
 
-**Status:** COMPLETE in the local Step 8 scope. REV-1 includes persisted custody epochs and PKCE binding; REV-2 checks current descriptor ownership before sends, acceptance and dismissal. Regression checks PASS; assembled browser/HTTP/PostgreSQL acceptance remains NOT_RUN (Step 16).
+**Status:** COMPLETE in the local Step 8 scope. Implemented guarantees include persisted custody epochs, PKCE binding and current descriptor ownership checks before sends, acceptance and dismissal. Regression checks PASS; assembled browser/HTTP/PostgreSQL acceptance remains NOT_RUN (Step 16).
 
 **Goal / Expected behavior:** Portal users reach Kernel products and continue the original operation across reload or reauthorization.
 
@@ -1179,7 +1184,15 @@ recovery. Snapshot V3 and complete auth/access handoff remain Step 12.
 
 ### Step 11 — Generalize technical sources without rewriting purchase history
 
-**Status:** PENDING; depends on Steps 9/10.
+**Status:** COMPLETE (2026-11-11). Configured source/owner routing and new
+v4/v3/v4 records are implemented; historical serialization, consent replay,
+terms equality and allowance identities are preserved. Focused local checks
+PASS (1020-test regression set plus 11 source-seam checks), with real disposable
+PostgreSQL and synthetic HTTP sources. Documentation/generation checks pass;
+no migration or owner transfer is introduced. New formats require the Step 11
+reader at the unchanged migration heads. Snapshot V3, recipient delivery and
+usage remain Steps 12–15; full-check, joint acceptance and installation gates
+remain open. No live or deployed acceptance is claimed.
 
 **Goal / Expected behavior:** publication/purchase and allowance derivation know
 the technical source and sole backend owner, while historical Kernel purchases
@@ -1205,6 +1218,12 @@ Compare exact old serialized documents, digests and selected-consent replay,
 and prove same-cycle renewal/recovery retains IDs and quantities after the
 refactor. Distinguish simulated/configured evidence. Verify independent source
 selection, product/metric/unit ownership refusal and unchanged commercial gates.
+
+Focused targets include `apps/api/tests/test_any766_technical_sources.py`,
+`apps/api/tests/test_any766_technical_sources_postgres.py`,
+`apps/api/tests/test_any766_purchase_terms_postgres.py` and
+`apps/api/tests/test_any766_contracts.py`, with the prepared Portal PostgreSQL
+test configuration required by the common protocol.
 
 **Expected completion:** new products can have a configured non-Kernel technical
 owner; existing subscriptions and usage identity require no conversion/reset.

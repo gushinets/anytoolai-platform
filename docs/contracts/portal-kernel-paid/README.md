@@ -1,19 +1,24 @@
 # ANY-766 paid integration target contracts
 
-**Current identity checkpoint — Step 10, 2026-11-11:** the
+**Current checkpoint — Steps 10/11, 2026-11-11:** the
 [common guide](https://github.com/gushinets/payments-portal/blob/main/docs/contracts/product-backend-api/README.md#implemented-step-10-settings-and-cutover)
 owns implemented common routes, V2 delegation, BACKEND_CONSUMERS, policy guard,
-fixed callbacks and browser migration. Kernel-named identity routes/settings and
-V1 token envelopes in the historical Step 4/8 sections are superseded. Snapshot V2,
-manifest and invalidation remain the active baseline pending their owning steps.
+fixed callbacks and browser migration. Its
+[source/history section](https://github.com/gushinets/payments-portal/blob/main/docs/contracts/product-backend-api/README.md#implemented-step-11-technical-sources-and-history)
+owns the implemented technical routing, stored-format versions and compatibility.
+Kernel-named identity routes/settings and
+V1 token envelopes in the historical Step 4/8 sections are superseded. Manifest
+V1 is reused by configured sources; snapshot remains Kernel-only V2 and delivery
+still has one Kernel recipient until Steps 12/13.
 Schemas/fixtures retain their exact historical bytes; current implementation
 status is recorded here and in the guide, not inferred from a schema description.
 
 Status: **protocol specifications and fixtures**, formalized 2026-11-09.
-Implementation through ANY-766 Step 10 includes common delegated identity V2,
+Implementation through ANY-766 Step 11 includes common delegated identity V2,
 snapshot V2, coherent paid admission/ownership/events, Portal invalidation
-delivery and recoverable browser journeys. Consumer-scoped V3 access, generic
-sources/recipients, usage/exhaustion and cabinet usage remain pending. Paired local acceptance is Step 16; remote/live acceptance and
+delivery, recoverable browser journeys and configured technical-source/owner
+routing with immutable history. Consumer-scoped V3 access, generic
+recipients, usage/exhaustion and cabinet usage remain pending. Paired local acceptance is Step 16; remote/live acceptance and
 production rollout belong to ANY-767. All quantities and
 credential-shaped strings in fixtures are synthetic. Q=1 is an isolated test
 quantity, never a commercial offer or approval.
@@ -432,8 +437,10 @@ manifest-only authority. Current/previous Portal service tokens share this
 configured permission and trusted scope. The receiver returns `204` only after
 floor/eviction commit, including repeated/lower revisions. Portal Step 7 now
 delivers invalidations through its embedded worker. The sender starts with the
-existing manifest URL/token when that worker is enabled, so configure this
-receiver permission first. The usage API and exhaustion delivery remain Step 14.
+legacy `KERNEL_BASE_URL`/`KERNEL_SERVICE_TOKEN` when that worker is enabled, so
+configure this receiver permission first. Step 11 registry-based manifest reads
+do not replace that sender; recipient routing remains Step 13. The usage API
+and exhaustion delivery remain Step 14.
 
 Focused evidence uses real disposable PostgreSQL and in-process ASGI with
 synthetic Portal responses. It does not establish real paired HTTP, browser,
