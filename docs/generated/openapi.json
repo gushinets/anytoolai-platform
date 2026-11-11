@@ -2037,6 +2037,17 @@
             "title": "Access Token",
             "type": "string"
           },
+          "consumer_id": {
+            "pattern": "^[a-z][a-z0-9-]{0,63}$",
+            "title": "Consumer Id",
+            "type": "string"
+          },
+          "consumer_policy_revision": {
+            "maximum": 9007199254740991.0,
+            "minimum": 1.0,
+            "title": "Consumer Policy Revision",
+            "type": "integer"
+          },
           "expires_at": {
             "format": "date-time",
             "title": "Expires At",
@@ -2048,7 +2059,7 @@
             "type": "string"
           },
           "schema_version": {
-            "const": 1,
+            "const": 2,
             "title": "Schema Version",
             "type": "integer"
           },
@@ -2072,6 +2083,8 @@
           "schema_version",
           "access_token",
           "token_type",
+          "consumer_id",
+          "consumer_policy_revision",
           "tenant_id",
           "region",
           "user_id",

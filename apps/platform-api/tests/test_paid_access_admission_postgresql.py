@@ -105,7 +105,12 @@ def runtime():
         )
         app.state.runtime = replace(app.state.runtime, config_registry=registry)
         owner = ExecutionOwner("anytoolai", "ru", ExecutionOwnerKind.portal_user, str(uuid4()))
-        principal = PortalUserPrincipal(owner, datetime.now(UTC) + timedelta(minutes=20))
+        principal = PortalUserPrincipal(
+            owner,
+            datetime.now(UTC) + timedelta(minutes=20),
+            consumer_id="platform-kernel",
+            consumer_policy_revision=1,
+        )
         app.dependency_overrides[optional_portal_user] = lambda: principal
         document = snapshot(owner)
 

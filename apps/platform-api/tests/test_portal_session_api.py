@@ -59,7 +59,9 @@ def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
 
 def exchange_payload() -> dict[str, object]:
     return {
-        "schema_version": 1,
+        "schema_version": 2,
+        "consumer_id": "platform-kernel",
+        "consumer_policy_revision": 1,
         "token_type": "Bearer",
         "access_token": USER_TOKEN,
         "tenant_id": "anytoolai",
@@ -71,7 +73,9 @@ def exchange_payload() -> dict[str, object]:
 
 def introspection_payload() -> dict[str, object]:
     return {
-        "schema_version": 1,
+        "schema_version": 2,
+        "consumer_id": "platform-kernel",
+        "consumer_policy_revision": 1,
         "tenant_id": "anytoolai",
         "region": "ru",
         "user_id": USER_ID,
@@ -103,7 +107,7 @@ def test_exchange_uses_directional_secret_and_only_forwards_code(
     }
     assert response.headers["cache-control"] == "no-store"
     request = opener.open.call_args.args[0]
-    assert request.full_url == "https://portal.invalid/internal/v1/kernel-sessions/exchange"
+    assert request.full_url == "https://portal.invalid/internal/v1/backend-sessions/exchange"
     assert request.get_header("Authorization") == "Bearer " + SERVICE_TOKEN
     assert json.loads(request.data) == {"code": CODE, "code_verifier": VERIFIER}
     assert opener.open.call_args.kwargs["timeout"] == portal_session.PORTAL_TIMEOUT_SECONDS
@@ -136,8 +140,12 @@ def test_canonical_principal_introspects_on_every_request_and_never_becomes_gues
     "field,value",
     [
         ("schema_version", True),
-        ("schema_version", 1.0),
-        ("schema_version", 2),
+        ("schema_version", 2.0),
+        ("schema_version", 1),
+        ("consumer_id", "synthetic-summary"),
+        ("consumer_policy_revision", True),
+        ("consumer_policy_revision", 0),
+        ("consumer_policy_revision", 1.5),
         ("tenant_id", "foreign"),
         ("region", "eu"),
         ("user_id", "not-a-uuid"),
@@ -191,7 +199,11 @@ def test_invalid_deadlines_cannot_grant_authority(
 
 @pytest.mark.parametrize(
     "code",
-    ["kernel_delegation_expired", "kernel_parent_authority_invalid", "kernel_session_code_invalid"],
+    [
+        "backend_delegation_expired",
+        "backend_parent_authority_invalid",
+        "backend_session_code_invalid",
+    ],
 )
 def test_safe_identity_refusals_remain_distinct(
     client: TestClient, monkeypatch: pytest.MonkeyPatch, code: str
@@ -313,13 +325,16 @@ def test_redirect_policy_refuses_token_forwarding() -> None:
 CONTRACT_ROOT = Path(__file__).resolve().parents[3] / "docs/contracts/portal-kernel-paid"
 RUNTIME_MODELS = {
     "exchange-request-v1": portal_session.PortalExchangeRequest,
-    "exchange-response-v1": portal_session.PortalExchangeResponse,
-    "introspection-response-v1": portal_session.PortalIntrospectionResponse,
+    "exchange-response-v2": portal_session.PortalExchangeResponse,
+    "introspection-response-v2": portal_session.PortalIntrospectionResponse,
 }
 CONTRACT_CASES = [
     (valid, case)
     for valid, filename in ((True, "valid.json"), (False, "invalid.json"))
-    for case in json.loads((CONTRACT_ROOT / "fixtures" / filename).read_text())
+    for case in (
+        json.loads((CONTRACT_ROOT / "fixtures" / filename).read_text())
+        + json.loads((CONTRACT_ROOT / "fixtures" / ("backend-" + filename)).read_text())
+    )
     if case["contract"] in RUNTIME_MODELS
 ]
 

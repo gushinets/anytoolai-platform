@@ -1,10 +1,19 @@
 # ANY-766 paid integration target contracts
 
+**Current identity checkpoint — Step 10, 2026-11-11:** the
+[common guide](https://github.com/gushinets/payments-portal/blob/main/docs/contracts/product-backend-api/README.md#implemented-step-10-settings-and-cutover)
+owns implemented common routes, V2 delegation, BACKEND_CONSUMERS, policy guard,
+fixed callbacks and browser migration. Kernel-named identity routes/settings and
+V1 token envelopes in the historical Step 4/8 sections are superseded. Snapshot V2,
+manifest and invalidation remain the active baseline pending their owning steps.
+Schemas/fixtures retain their exact historical bytes; current implementation
+status is recorded here and in the guide, not inferred from a schema description.
+
 Status: **protocol specifications and fixtures**, formalized 2026-11-09.
-Server implementation through ANY-766 Step 7 includes delegated identity,
-snapshot V2, coherent paid admission/ownership/events and Portal invalidation
-delivery. Step 8 implements recoverable paid browser journeys; usage/exhaustion
-and cabinet integration remain pending. Paired local acceptance is Step 16; remote/live acceptance and
+Implementation through ANY-766 Step 10 includes common delegated identity V2,
+snapshot V2, coherent paid admission/ownership/events, Portal invalidation
+delivery and recoverable browser journeys. Consumer-scoped V3 access, generic
+sources/recipients, usage/exhaustion and cabinet usage remain pending. Paired local acceptance is Step 16; remote/live acceptance and
 production rollout belong to ANY-767. All quantities and
 credential-shaped strings in fixtures are synthetic. Q=1 is an isolated test
 quantity, never a commercial offer or approval.
@@ -21,14 +30,18 @@ sales enablement still require their separate owner inputs.
 The [common backend guide](https://github.com/gushinets/payments-portal/blob/main/docs/contracts/product-backend-api/README.md)
 is the single target guide for Section 3.9: independent consumers, audience-bound
 delegation V2, snapshot V3/P/R, versioned source/owner metadata, recipient delivery
-and owner-directed V1 usage/exhaustion. These additions are **specified only**;
-working auth/access and accurate generated Swagger remain due at Step 12.
+and owner-directed V1 usage/exhaustion. At Step 9 completion these additions
+were specified only. Step 10 now implements common identity and its generated
+OpenAPI security; V3 access and the complete working auth/access handoff remain
+Step 12.
 Steps 13–15 implement remaining delivery/usage, Step 16 local acceptance and
 Step 17 build/install preparation. No runtime/generator change occurs in Step 9.
 
-The sections below retain the Steps 1–8 Kernel baseline and original wire meaning.
-The common target replaces their Kernel-only assumptions at synchronized cutover;
-retention is not concurrent old-route support or permission to reset history.
+The main identity section below records Step 10; the dated Step 4/8 sections
+retain the historical Kernel baseline. Step 10 replaces their identity routes,
+settings and response/storage versions. Snapshot/invalidation and their existing
+R-floor enforcement remain the active baseline until their owning later steps.
+Historical retention is not concurrent old-route support or permission to reset history.
 Original schemas and fixture payloads remain exact. New schemas are snapshot-v3,
 code-request-v2 (unversioned body adds consumer_id), exchange-response-v2 and
 introspection-response-v2 (integer version 2, consumer_id and positive P).
@@ -43,7 +56,8 @@ versions/P. backend-contextual fixtures specify scope/product/consumer refusal,
 policy/access floors, same-P/R conflict and allowed envelope refresh. The
 backend-protocol fixtures cover audience/permissions, monotonic policy/digest,
 filtered deadlines and independent recipient ACK. They are offline target
-contracts, not an implementation of future service authentication or migrations.
+contracts; the fixtures alone do not prove runtime authentication or migrations.
+Step 10 supplies focused identity and populated-delegation migration checks.
 Historical purchase serialization is checked independently against the existing
 Portal readers; populated database migration/recovery proof remains in owning
 Steps 10–13/16. Unknown/foreign usage remains unobserved with no invented counters.
@@ -53,7 +67,8 @@ Steps 10–13/16. Unknown/foreign usage remains unobserved with no invented coun
 `contract-index.json` records target routes, payload/schema owners, permissions
 and statuses. `schemas/` contains reviewed JSON Schema 2020-12 documents.
 `SHA256SUMS` covers every schema, fixture file and the index, using exact bytes.
-Both repositories retain identical copies; neither imports the other's code.
+Both repositories retain identical schema/fixture/index copies; neither imports
+the other's code. README navigation links may differ by repository.
 
 Portal owns snapshot V2, invalidation V1, delegation issuance/exchange/
 introspection responses and all identity request contracts, including the request
@@ -62,9 +77,10 @@ normalization/response and exhaustion V1. Manifest V1
 remains in its existing ANY-711 contract directory, with unchanged pins and
 TEST-ONLY history. No shared runtime package is introduced.
 
-The bundle uses `*-v1` names to identify request contracts even when their JSON
-body has no `schema_version`: code issuance, exchange and introspection requests
-and the code response have exactly the fields specified below. Every versioned
+Unversioned HTTP bodies still have named schema versions: current code issuance
+uses `code-request-v2`, while exchange/introspection requests and code response
+retain V1. `code-request-v1` and identity responses V1 are historical fixtures;
+current exchange/introspection responses use version 2. Every versioned
 document requires the exact integer schema version; bool/float versions fail.
 Unknown fields fail validation. This is a new target, not a V1 snapshot adapter.
 
@@ -74,11 +90,15 @@ The directional credentials remain independent:
 
 - Portal → Kernel sends `KERNEL_SERVICE_TOKEN`; Kernel receives current/previous
   `ANYTOOLAI_PORTAL_SERVICE_TOKEN` slots. Receiver permissions are `manifest:read`,
-  `access:invalidate` and `usage:read` for their respective operations.
-- Kernel → Portal sends `ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN`; Portal receives
-  current/previous `KERNEL_ACCESS_SERVICE_TOKEN` slots. Receiver permissions are
-  `access-snapshot:read`, `kernel-session:exchange`, `kernel-session:introspect`
-  and `allowance-exhaustion:write`.
+  `access:invalidate` for implemented operations; `usage:read` belongs to Step 14.
+- Kernel → Portal sends `ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN`; Portal matches it
+  against platform-kernel's `backend_to_portal_current_secret` or optional
+  `backend_to_portal_previous_secret` in `BACKEND_CONSUMERS`. Other consumers use
+  their own independent entries/credentials. Implemented receiver permissions
+  are `access-snapshot:read`, `backend-session:exchange` and
+  `backend-session:introspect`; `allowance-exhaustion:write` is recognized in
+  configuration but its receiver remains Step 14. Snapshot V2 is restricted to
+  platform-kernel until consumer-filtered V3 in Step 12.
 
 Possession of one permission grants none of the others. Scope comes from trusted
 receiver configuration. Requests only narrow that authority. Canonical Portal
@@ -157,37 +177,43 @@ permanent auth/schema/scope failures remain parked durably with alerts.
 
 Kernel `/portal-session/launch` creates state, S256 verifier and a validated
 local product/result/handoff return target in tab `sessionStorage`. Portal's
-localized `/[locale]/kernel/authorize` uses the existing Portal session and the
-fixed Kernel `/portal-session/callback`; no caller-selected external callback.
+localized `/[locale]/backend/authorize` uses the existing Portal session and the
+registered callback for the selected consumer (Kernel uses
+`/portal-session/callback`); no caller-selected external callback.
 
-- `POST /api/kernel-session-codes` uses the Portal bearer and
-  `code-request-v1`: `code_challenge`, `code_challenge_method="S256"`. Its
+- `POST /api/backend-session-codes` uses the Portal bearer and
+  `code-request-v2`: `consumer_id`, `code_challenge`, `code_challenge_method="S256"`. Its
   `code-response-v1` contains `code`, `expires_at`. Code is 32 random bytes
   encoded as unpadded base64url (43 characters), with a 60-second TTL.
 - The callback receives code/state only in the fragment, immediately clears it,
   validates tab state and calls Kernel `POST /v1/portal-session/exchange` with
   `exchange-request-v1`: `code`, `code_verifier` (RFC 7636, 43–128 characters).
-- Kernel calls Portal `POST /internal/v1/kernel-sessions/exchange` with that
+- Kernel calls Portal `POST /internal/v1/backend-sessions/exchange` with that
   same request under reverse-direction service authentication. Atomic exchange
-  consumes the code once and verifies PKCE. `exchange-response-v1` contains
-  `schema_version=1`, `access_token`, `token_type="Bearer"`, canonical
-  `tenant_id/region/user_id` and `expires_at`. No refresh token exists.
+  consumes the code once and verifies PKCE. `exchange-response-v2` contains
+  `schema_version=2`, `access_token`, `token_type="Bearer"`, canonical
+  `tenant_id/region/user_id`, `consumer_id`, current `consumer_policy_revision`
+  and `expires_at`. No refresh token exists.
 - Every protected Kernel request calls Portal
-  `POST /internal/v1/kernel-sessions/introspect`. `introspection-request-v1`
+  `POST /internal/v1/backend-sessions/introspect`. `introspection-request-v1`
   places `access_token` in the secret body; Authorization carries the service
-  credential. Verify token audience, active user and parent session.
-  `introspection-response-v1` contains version 1, canonical owner and UTC
-  `valid_until`, with B removed. No PII or browser-selected audience is returned.
+  credential. Verify authenticated consumer audience, current policy, active
+  user and parent session.
+  `introspection-response-v2` contains version 2, canonical owner, consumer,
+  current policy revision and UTC `valid_until`, with B removed. No PII is returned.
 
 Delegated expiry is the earlier of issuance+30 minutes and parent expiry.
 Invalid/expired/revoked identity returns `401`; distinguish safe codes
-`kernel_delegation_expired` and `kernel_parent_authority_invalid` so ordinary
+`backend_delegation_expired` and `backend_parent_authority_invalid` so ordinary
 expiry permits same-owner recovery while proven parent revocation clears private
 recovery state. Dependency failures preserve the descriptor for retry. Invalid code/PKCE uses
-`kernel_session_code_invalid`; dependency failure is `503`, never guest fallback.
-Portal stores hashes in one `kernel_session_delegations` table linked to
+`backend_session_code_invalid`; dependency failure is `503`, never guest fallback.
+Portal stores hashes in one `backend_session_delegations` table linked to
 AuthSession with cascading deletion and User → AuthSession → delegation locks.
-Internal identity reads do not commit session bookkeeping.
+Internal identity reads check the persisted policy guard and do not commit
+session bookkeeping. The version-2 browser token envelope stays under the stable
+`anytoolai.portal_session.v1` key; a version-1 envelope requires authorization
+without replacing separate same-owner pending prepared requests.
 
 Keep the delegated token/owner in tab sessionStorage and the original bearer
 only at Portal. Before a new paid send, durably store a versioned CE-kit prepared
@@ -228,6 +254,9 @@ event-id deduplication. Events remain observational: no access, finalization or
 debit authority.
 
 ## Usage, exhaustion and cabinet
+
+**Planned — Steps 14/15.** The following routes and delivery behavior are contract
+requirements; the completed Step 10 does not implement them.
 
 Kernel `GET /internal/v1/usage/{user_id}` takes tenant/region and repeated
 `allowance_id` parameters: 1–100 distinct canonical UUIDs. Repeating an ID,
@@ -317,6 +346,10 @@ to their implementation steps; assembled local HTTP/browser acceptance is
 Step 16, and remote/live acceptance belongs to ANY-767.
 
 ## Step 4 server implementation
+
+**Historical checkpoint, superseded for identity by Step 10.** The old route,
+setting and error names below describe Step 4 only. Use the current common guide
+for installation/configuration; old Portal identity routes/settings are removed.
 
 The schemas/fixtures above remain the normative protocol bundle. ANY-766 Step 4
 implements only the identity server slice: Portal code issuance, internal
@@ -408,6 +441,10 @@ clock/TLS deployment, live LBX, sales enablement or staging acceptance.
 
 
 ## Step 8 browser implementation
+
+**Historical checkpoint.** Step 10 replaces the Portal authorization path,
+code-request DTO names and delegated-token envelope. Recovery descriptors remain
+version 1; their original owner/request/key semantics below are preserved.
 
 The localized Portal authorization page reuses the existing account/session UI
 and generated `KernelCodeRequest`/`KernelCodeResponse` adapter. A confirmed

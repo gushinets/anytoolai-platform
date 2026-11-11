@@ -1,7 +1,7 @@
 # Payment Portal integration map
 
 Status: navigation, implementation snapshots and the ANY-711 service-authentication handoff.
-Last observed: 2026-11-10; local source state, not a deployment check.
+Last observed: 2026-11-11; local source state, not a deployment check.
 
 ## Ownership and sources
 
@@ -32,15 +32,18 @@ Historical Portal contracts and execution plans do not override accepted sources
 
 ## Current local implementation
 
-Sources: Kernel `729f0675` and Portal `f4f6fbf`, plus the paired Step 8
-working-tree changes.
+Sources: Kernel `5aaa0a5fc9f0fdce977dd671727cd5957c13fb39` and Portal
+`f6c5e2543a7c281bf3a0e26a0ad9af64372f651b`, plus the paired Step 10 working diff.
 The [active plan](../exec-plans/active/ANY-766-implementation-plan.md) owns the
 current scope and remaining gates.
 
 - Manifest V1 is implemented in Kernel and consumed by Portal.
-- Portal serves snapshot V2 and delegated-session exchange/introspection.
-  Kernel authenticates paid requests, installs coherent snapshots and enforces
-  allowance admission/ownership through ANY-507.
+- Portal serves common consumer-bound identity V2 with configured callbacks,
+  a persisted policy guard and documented generated security. Kernel validates
+  consumer/P on every introspection and retains Core owners/replay semantics.
+- Snapshot remains Kernel-only V2 with existing R coherence and ANY-507
+  admission. Consumer-filtered V3 and P-based admission remain Step 12;
+  generic technical sources/recipients remain Steps 11/13.
 - Kernel's durable invalidation receiver and Portal's bounded embedded sender
   are implemented. Configure matching scope/service tokens and enable
   `ANYTOOLAI_PORTAL_ACCESS_INVALIDATION_ENABLED` at Kernel before starting the updated Portal
@@ -63,8 +66,9 @@ snapshots, immutable source/owner history and recipient/usage routing. The
 [paired bundle](../contracts/portal-kernel-paid/README.md) retains exact baseline
 schemas/fixture payloads and independently checked target additions.
 
-This checkpoint does not change runtime, migrations or generated OpenAPI.
-Current servers still implement Kernel identity V1/snapshot V2. The guide records
+At this historical Step 9 checkpoint, runtime, migrations and generated OpenAPI
+were unchanged (Kernel identity V1/snapshot V2). Step 10 now implements common
+identity V2 and its generated security; snapshot remains Kernel-only V2. The guide records
 actual owning modules, minimal replacements, populated-state forward migration
 requirements and focused acceptance cases; active Kernel code is not a purge
 target. Common identity is Step 10, technical-source ownership Step 11, working
@@ -218,10 +222,12 @@ usage/exhaustion remain unimplemented.
   enabled. Possession of a manifest-only credential does not itself grant invalidation;
   requests cannot add permissions through headers, query parameters or body fields.
 - **Kernel -> Portal AccessSnapshot:** use a different secret. The Kernel sender
-  setting is `ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN`; Portal's receiver settings are
-  `KERNEL_ACCESS_SERVICE_TOKEN` and optional `KERNEL_ACCESS_SERVICE_TOKEN_PREVIOUS`.
-  Portal binds this credential to a Kernel service principal with `access-snapshot:read`.
-  These settings are implemented. The two directional secrets must
+  setting is `ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN`; Portal's platform-kernel
+  entry in `BACKEND_CONSUMERS` accepts its independent
+  `backend_to_portal_current_secret` and optional `backend_to_portal_previous_secret`.
+  The trusted consumer principal requires explicit `access-snapshot:read`.
+  Kernel-named Portal receiver settings were removed in Step 10; use the
+  [current identity guide](https://github.com/gushinets/payments-portal/blob/main/docs/contracts/product-backend-api/README.md#implemented-step-10-settings-and-cutover). The two directional secrets must
   differ, and each environment and tenant/region connection uses independent secrets.
 
 All three operations use exactly one Bearer authorization header over TLS with certificate
@@ -371,3 +377,25 @@ fallback. See [browser configuration and limits](../contracts/portal-kernel-paid
 Local component/synthetic browser evidence does not establish the real paired
 HTTP/PostgreSQL acceptance required in Step 16. Historical snapshots above are
 unchanged; usage/exhaustion and delivery/build gates retain their owning steps.
+
+
+## ANY-766 Step 10 consumer identity checkpoint — 2026-11-11
+
+Inspected peer: Portal `f6c5e2543a7c281bf3a0e26a0ad9af64372f651b`, plus this paired Step 10 working-tree change.
+Portal now serves common backend-session code/exchange/introspection endpoints
+with consumer-bound V2 identity, independent credentials/permissions, monotonic
+persisted policy guard and generated named Bearer security. Kernel validates
+consumer/P and keeps per-request introspection and the original Core owner/replay
+partition. The localized authorization page resolves configured fixed callbacks.
+Version-1 browser token envelopes require authorization while separate same-owner
+pending requests retain their exact request/key. See the
+[common configuration/cutover guide](https://github.com/gushinets/payments-portal/blob/main/docs/contracts/product-backend-api/README.md#implemented-step-10-settings-and-cutover).
+
+Portal migration 20261111_0009 preserves populated delegation parent links,
+hashes, TTLs and single-use state while binding historical audience to Kernel.
+Step 10 needs no Kernel migration or usage reset. Snapshot remains Kernel-only
+V2; another consumer cannot read that unfiltered baseline. V3/filtering/coherence
+remain Step 12, sources Step 11 and recipient delivery Step 13. Existing outgoing
+Kernel manifest/invalidation settings stay active until their owning steps.
+Local synthetic/API/component and disposable PostgreSQL checks are distinct from
+Step 16's assembled real HTTP acceptance and ANY-767 remote/live acceptance.

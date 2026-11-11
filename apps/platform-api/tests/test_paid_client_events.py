@@ -48,7 +48,10 @@ def paid_app(session_factory):
         app.state.runtime, storage=RuntimeStorageDependencies(session_factory=session_factory)
     )
     app.dependency_overrides[optional_portal_user] = lambda: PortalUserPrincipal(
-        OWNER, datetime.now(UTC) + timedelta(minutes=20)
+        OWNER,
+        datetime.now(UTC) + timedelta(minutes=20),
+        consumer_id="platform-kernel",
+        consumer_policy_revision=1,
     )
     with transaction_boundary(session_factory) as session:
         ScenarioSessionRepository(session).create(
@@ -132,7 +135,10 @@ def test_guest_and_foreign_owner_cannot_poll_or_record_paid_session(paid_app):
     for principal in (
         None,
         PortalUserPrincipal(
-            replace(OWNER, owner_id=str(uuid4())), datetime.now(UTC) + timedelta(minutes=20)
+            replace(OWNER, owner_id=str(uuid4())),
+            datetime.now(UTC) + timedelta(minutes=20),
+            consumer_id="platform-kernel",
+            consumer_policy_revision=1,
         ),
     ):
         paid_app.dependency_overrides[optional_portal_user] = constant_identity(principal)
@@ -243,7 +249,7 @@ def test_attached_identity_dependency_refuses_invalid_bearer_without_guest_fallb
     client = Mock()
     client.introspect.side_effect = ApiError(
         status_code=HTTPStatus.UNAUTHORIZED,
-        code="kernel_parent_authority_invalid",
+        code="backend_parent_authority_invalid",
         message="Portal identity is no longer valid.",
     )
     paid_app.dependency_overrides.pop(optional_portal_user)
@@ -254,7 +260,7 @@ def test_attached_identity_dependency_refuses_invalid_bearer_without_guest_fallb
         "/v1/client-events", json=payload, headers={"Authorization": "Bearer " + "u" * 50}
     )
     assert response.status_code == HTTPStatus.UNAUTHORIZED
-    assert response.json()["error"]["code"] == "kernel_parent_authority_invalid"
+    assert response.json()["error"]["code"] == "backend_parent_authority_invalid"
     client.introspect.assert_called_once()
     client.introspect.reset_mock()
     response = http.post(
