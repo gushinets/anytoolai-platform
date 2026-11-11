@@ -30,7 +30,8 @@ import { ErrorState } from "../../components/ErrorState";
 import { LanguageSwitcher, useHostT, useProductT } from "../../i18n";
 import { getClientStorage } from "./clientStorage";
 import { webBaseUrlFromProductLocation } from "../../lib/hostUrls";
-import type { AttachProps } from "./attachSession";
+import { preferSavedOwnRun, type AttachProps } from "./attachSession";
+import { productDraftKey, readProductDraft, readProductDraftScenario, saveDraftValues, saveDraftRun, saveProductDraftScenario, clearProductDraft } from "./draftStorage";
 import { callSafely } from "./callSafely";
 import { isProductEnabled } from "./enabledProducts";
 import { useLatest } from "./useLatest";
@@ -366,9 +367,10 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     input: V | null;
     // True for the attached (handoff) session's result, false for the person's own run.
     attached: boolean;
+    // Retain the session-owned identity after resumedRunRef clears on success.
+    resumed: boolean;
   } | null>(null);
-  // The person's own run replaced the attached result on screen: said at commit, like the other effects that
-  // describe what is on screen (a renderer that throws on the own result must not have forgotten the paid-for one).
+  // Opt-out runs and failed persistence keep the attachment until the replacement result commits.
   const previousDisplayedRef = useRef(displayedResult);
   useEffect(() => {
     if (previousDisplayedRef.current?.attached && displayedResult && !displayedResult.attached) {
@@ -402,10 +404,8 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     emitEvent(onEventRef.current, {
       type: "scenario_completed",
       scenarioSessionId: phase.scenarioSessionId,
-      // An attached session is its own authority: the backend derives guest and chain from it and rejects a
-      // different explicit guest, which is what the current one is after a reload without a usable
-      // localStorage (a fresh in-memory guest). Own runs started by this guest keep sending it.
-      guestId: displayedResult?.attached ? undefined : guestId,
+      // Recovered sessions own their identity; a reload may have minted a different page guest.
+      guestId: displayedResult?.attached || displayedResult?.resumed ? undefined : guestId,
       resultViewed,
     });
   }, [phase, guestId, definition, displayedResult, onEventRef]);
@@ -423,6 +423,9 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   // True while the run on screen is the attached session (no local submit since): "Try again"
   // re-polls it instead of validating an empty form or starting a second, quota-spending run.
   const attachActiveRef = useRef(false);
+  // A restored own run retries polling instead of spending quota on a new start.
+  const resumedRunRef = useRef<string | null>(null);
+  const resumeCheckedRef = useRef(false);
   // The session id this mount has started polling (see the attach effect below).
   const attachedSessionRef = useRef<string | null>(null);
   // Render-visible twin of the ref above: true once polling of the attached session has started. Both stay:
@@ -467,7 +470,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     // (`pendingStart`), an attached handoff session through the session itself. Both may still be
     // running server-side, so abandoning this mount (a mode switch) would lose the only handle.
     (phase.kind === "retryable-error" && !capacityRejectedSafely &&
-      (pendingStart !== null || attachActiveRef.current));
+      (pendingStart !== null || attachActiveRef.current || resumedRunRef.current !== null));
   // An attached (already queued and reserved) session that has not started polling yet (runtime config and
   // identity still loading): a mode switch would drop it before it could attach. A failed boot releases the
   // lock: nothing is running, and a mode switch before the attach began does not forget the persisted
@@ -492,6 +495,15 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   useIsomorphicLayoutEffect(() => () => shell?.reportBusy(false), [shell]);
 
   const productId = definition.productId;
+  const draftKey = definition.draft ? productDraftKey(productId, definition.messageScope) : null;
+  const parseStoredValues = useCallback((raw: unknown): V | null => {
+    if (!definition.draft || raw === undefined) return null;
+    try {
+      return definition.draft.parseValues(raw);
+    } catch {
+      return null;
+    }
+  }, [definition]);
   const scenarioId = definition.scenarioId;
   const refreshQuota = useCallback((
     resolvedGuestId: string,
@@ -557,6 +569,10 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
           setBoot({ kind: "boot-error" });
           return;
         }
+        if (draftKey !== null && !attachSessionId) {
+          const restored = parseStoredValues(readProductDraft(draftKey)?.values);
+          if (restored !== null) setValues(restored);
+        }
         setBoot({
           kind: "ready",
           scenarioId: scenario.scenarioId,
@@ -586,7 +602,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         }
       },
     );
-  }, [client, guestStorage, productId, scenarioId, eventScopeKey, refreshQuota, onEventRef]);
+  }, [client, guestStorage, productId, scenarioId, eventScopeKey, refreshQuota, onEventRef, draftKey, attachSessionId, parseStoredValues]);
 
   // Attach once per session id, after boot: `boot.kind` only turns "ready" once per mount, so
   // StrictMode's effect replay cannot poll twice.
@@ -602,6 +618,23 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     callSafely(onAttachBeginRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runPoll is a per-render closure over stable refs/props; the callbacks come from always-current refs
   }, [attachSessionId, boot.kind]);
+
+  useEffect(() => {
+    if (boot.kind !== "ready" || draftKey === null || attachSessionId || resumeCheckedRef.current) return;
+    resumeCheckedRef.current = true;
+    const run = readProductDraft(draftKey)?.run;
+    if (!run) return;
+    const input = parseStoredValues(run.input);
+    if (input === null) {
+      saveDraftRun(draftKey, null);
+      return;
+    }
+    activeInputRef.current = input;
+    resumedRunRef.current = run.scenarioSessionId;
+    setPhase({ kind: "running", scenarioSessionId: run.scenarioSessionId });
+    void runPoll(run.scenarioSessionId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- resume once after boot, like the attach effect above
+  }, [boot.kind]);
 
   async function runStart(prepared: PreparedScenarioStart) {
     // Snapshotted once: this call's own controller, checked consistently across every await below
@@ -678,6 +711,15 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       return;
     }
     startedSessionsRef.current.set(prepared, result.value.scenarioSessionId);
+    // shortcut: pending start keys do not survive reload; persist them when pre-acceptance recovery is required.
+    if (draftKey !== null) {
+      saveDraftRun(draftKey, { scenarioSessionId: result.value.scenarioSessionId, input: activeInputRef.current });
+      saveProductDraftScenario(productId, scenarioId);
+      if (readProductDraftScenario(productId) === scenarioId && preferSavedOwnRun(productId, draftKey, result.value.scenarioSessionId)) {
+        // Reload follows the accepted own run even while the old result remains on screen.
+        if (displayedResult?.attached) callSafely(onAttachEndRef.current);
+      }
+    }
     setPhase({ kind: "running", scenarioSessionId: result.value.scenarioSessionId });
     void runPoll(result.value.scenarioSessionId);
   }
@@ -704,9 +746,18 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     if (!polled.result.ok) {
       // A definite 404 for an attached id (stale, foreign or mistyped `?session=`) can never
       // succeed on retry: end in the run-failed state instead of offering an endless re-poll.
-      if (attachActiveRef.current && polled.result.error.type === "backend_error" && polled.result.error.status === 404) {
-        enterUnknownError();
-        return;
+      if (polled.result.error.type === "backend_error" && polled.result.error.status === 404) {
+        if (attachActiveRef.current) {
+          enterUnknownError(scenarioSessionId);
+          return;
+        }
+        if (resumedRunRef.current === scenarioSessionId) {
+          resumedRunRef.current = null;
+          activeInputRef.current = null;
+          if (draftKey !== null) saveDraftRun(draftKey, null);
+          setPhase({ kind: "idle" });
+          return;
+        }
       }
       setPhase({ kind: "retryable-error", reason: polled.reason === "timeout" ? "timeout" : "connectionLost" });
       return;
@@ -721,11 +772,11 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       // post-completion activation" shape (see `ProductDefinition`'s docstring) -- a mid-flow
       // checkpoint needing a product-chosen next action isn't handled yet, deliberately, until a
       // real product needs it.
-      enterUnknownError();
+      enterUnknownError(scenarioSessionId);
       return;
     }
     if (!session.resultArtifactId) {
-      enterUnknownError();
+      enterUnknownError(scenarioSessionId);
       return;
     }
     await fetchResult(scenarioSessionId, session.resultArtifactId, session.currentCheckpointId);
@@ -740,7 +791,12 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   // form-showing phases below (its retry isn't the only path back to the submit button), so
   // invalidating the stale start only inside one specific "Try again" handler previously left the
   // ordinary form Submit button able to silently replay it too.
-  function enterUnknownError() {
+  function enterUnknownError(scenarioSessionId: string) {
+    // A failed attachment must not remove a different saved own run.
+    if (draftKey !== null && readProductDraft(draftKey)?.run?.scenarioSessionId === scenarioSessionId) {
+      saveDraftRun(draftKey, null);
+    }
+    resumedRunRef.current = null;
     setPendingStart(null);
     if (attachActiveRef.current) {
       // A terminal failure of the attached session (failed/expired, unknown id, unusable result): the
@@ -797,7 +853,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         // result is ready". This session's own start is as dead as its result: only a fresh run
         // (a new Idempotency-Key) has any chance of a usable result.
         resultFetchSettledRef.current = true;
-        enterUnknownError();
+        enterUnknownError(scenarioSessionId);
         return;
       }
       // Transient/ambiguous: the scenario itself already completed, only this GET failed (network
@@ -817,13 +873,13 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     // config (a ref keeps its name across a version bump, and an attached session has no expiry, so an
     // older session can come back with an older version; no declared version means ref-only).
     if (
-      attachActiveRef.current &&
+      (attachActiveRef.current || resumedRunRef.current === scenarioSessionId) &&
       boot.kind === "ready" &&
       (resultResult.value.schemaRef !== boot.outputSchemaRef ||
         (boot.outputSchemaVersion !== null && resultResult.value.schemaVersion !== boot.outputSchemaVersion))
     ) {
       resultFetchSettledRef.current = true;
-      enterUnknownError();
+      enterUnknownError(scenarioSessionId);
       return;
     }
     const extracted = definition.extractResult(resultResult.value.output);
@@ -831,7 +887,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       // The backend returned a genuinely unusable/malformed result -- an unexpected terminal
       // state, not a fetch problem, so this one *does* mean starting over.
       resultFetchSettledRef.current = true;
-      enterUnknownError();
+      enterUnknownError(scenarioSessionId);
       return;
     }
     resultFetchSettledRef.current = true;
@@ -845,15 +901,18 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       result: extracted,
       input: activeInputRef.current,
       attached: attachActiveRef.current,
+      resumed: resumedRunRef.current === scenarioSessionId,
     });
     setHandoffStatus("idle");
     // A completed run must not lend its Idempotency-Key to a later regeneration.
     setPendingStart(null);
+    resumedRunRef.current = null;
     setPhase({ kind: "result", scenarioSessionId, checkpointId, result: extracted });
   }
 
   // Shared by handleSubmit/handleRetry: both begin a (new or reused) prepared start the same way.
   function beginStart(prepared: PreparedScenarioStart) {
+    resumedRunRef.current = null;
     // Not the end of the attach yet: if this start fails, the attached result is still what is on screen.
     attachActiveRef.current = false;
     setPhase({ kind: "submitting" });
@@ -913,6 +972,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     // of sending the start again, which an edge could answer with a 4xx that releases the key.
     const startedSession = startedSessionsRef.current.get(prepared);
     if (startedSession !== undefined) {
+      resumedRunRef.current = null;
       attachActiveRef.current = false;
       setPhase({ kind: "running", scenarioSessionId: startedSession });
       void runPoll(startedSession);
@@ -933,6 +993,11 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     if (attachActiveRef.current && attachedSessionRef.current) {
       setPhase({ kind: "running", scenarioSessionId: attachedSessionRef.current });
       void runPoll(attachedSessionRef.current);
+      return;
+    }
+    if (resumedRunRef.current !== null) {
+      setPhase({ kind: "running", scenarioSessionId: resumedRunRef.current });
+      void runPoll(resumedRunRef.current);
       return;
     }
     submitCurrentValues();
@@ -1055,6 +1120,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       return;
     }
     setValues(definition.emptyValues);
+    if (draftKey !== null) clearProductDraft(draftKey);
     setFieldErrors({});
     liveValidationFieldsRef.current.clear();
     setPendingStart(null);
@@ -1097,6 +1163,10 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     }
     const next = { ...values, [field]: value };
     setValues(next);
+    if (draftKey !== null) {
+      saveDraftValues(draftKey, next);
+      saveProductDraftScenario(productId, scenarioId);
+    }
     // Previously invalid fields stay live after correction, until New task resets the form.
     if (liveValidationFieldsRef.current.has(field)) {
       const error = definition.validate(next)[field];

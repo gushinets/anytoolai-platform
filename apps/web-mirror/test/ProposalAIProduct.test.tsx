@@ -10,7 +10,9 @@ import {
   errorResponse,
   guestIdentityResponse,
   idempotencyKeyOf,
+  jsonResponse,
   makeClient,
+  makeClientCapturingRequests,
   makeClientWithDeferredCalls,
   quotaResponse,
   resultResponse,
@@ -19,6 +21,8 @@ import {
   sessionResponse,
   startResponse,
 } from "./fixtures/platformResponses";
+import { getClientStorage } from "../src/products/runtime/clientStorage";
+import { createProductRunEventTracker } from "../src/products/runtime/productRunEventTracking";
 import { PROPOSAL_AI_MESSAGES } from "../src/products/proposalAi/messages";
 import { makeRender } from "./support/renderWithI18n";
 import { simulateBrowserTranslation } from "@anytoolai/shared-ui/test/support/simulateBrowserTranslation";
@@ -540,4 +544,324 @@ it.each([false, true])("restores an accepted session and reloads without another
   expect(screen.getByText(/2 of 3/)).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "New task" }));
   expect(readAttachSessionId("proposal_ai")).toBeUndefined();
+});
+
+describe("ProposalAI draft and run restore (ANY-841)", () => {
+  const key = "anytoolai.product_draft.proposal_ai.generate";
+  const values = { taskText: "Build a landing page.", freelancerPositioning: "Frontend freelancer.", tone: "firm", language: "de" };
+
+  function seedRun(input: unknown = values) {
+    window.sessionStorage.setItem(key, JSON.stringify({ v: 1, values, run: { scenarioSessionId: "session_1", input } }));
+  }
+
+  function recoveryClient(session = sessionResponse(), result = resultResponse(IDS, { output: { text: PROPOSAL_TEXT } })) {
+    return makeClient({
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
+      [ROUTES.QUOTA]: Array.from({ length: 4 }, () => quotaResponse(IDS)),
+      [ROUTES.SESSION]: [session],
+      [ROUTES.RESULT]: [result],
+    });
+  }
+
+  async function fillDraft() {
+    fireEvent.change(await screen.findByLabelText(/^Describe the task/), { target: { value: values.taskText } });
+    fireEvent.change(screen.getByLabelText(/^Your experience and strengths/), { target: { value: values.freelancerPositioning } });
+    fireEvent.click(document.getElementById("proposal-ai-tone-firm")!);
+    fireEvent.change(screen.getByLabelText("Proposal language"), { target: { value: "de" } });
+  }
+
+  async function expectDraft() {
+    expect((await screen.findByLabelText(/^Describe the task/) as HTMLTextAreaElement).value).toBe(values.taskText);
+    expect((screen.getByLabelText(/^Your experience and strengths/) as HTMLTextAreaElement).value).toBe(values.freelancerPositioning);
+    expect((document.getElementById("proposal-ai-tone-firm") as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText("Proposal language") as HTMLSelectElement).value).toBe("de");
+  }
+
+  it.each(["cleared", "unavailable"])("derives restored result-viewed identity from the session after localStorage is %s", async (storageState) => {
+    const first = makeClientWithDeferredCalls({
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse("guest_before_reload")],
+      [ROUTES.QUOTA]: [quotaResponse(IDS), quotaResponse(IDS)],
+      [ROUTES.START]: [startResponse()],
+    }, { [ROUTES.SESSION]: 1 });
+    render(<ProposalAIProduct client={first.client} />);
+    await fillDraft();
+    fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+    await waitFor(() => expect(first.calls.some((call) => call.key === ROUTES.SESSION)).toBe(true));
+    expect(JSON.parse(first.calls.find((call) => call.key === ROUTES.START)!.init.body as string)).toMatchObject({ guest_id: "guest_before_reload" });
+    cleanup();
+    const identityStorage = window.localStorage;
+    identityStorage.clear();
+    const storageSpy = storageState === "unavailable"
+      ? vi.spyOn(window, "localStorage", "get").mockImplementation(() => { throw new DOMException("blocked", "SecurityError"); })
+      : undefined;
+    const viewedKey = "anytoolai.result_viewed.session_1";
+    const eventRoute = "POST /v1/client-events";
+    const makeReloadClient = (guestId: string) => makeClientCapturingRequests({
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse(guestId)],
+      [ROUTES.QUOTA]: [quotaResponse(IDS), quotaResponse(IDS)],
+      [ROUTES.SESSION]: [sessionResponse()],
+      [ROUTES.RESULT]: [resultResponse(IDS, { output: { text: PROPOSAL_TEXT } })],
+    }, (route, init) => {
+      if (route !== eventRoute) return undefined;
+      const body = JSON.parse(init.body as string) as { event_id: string; event_type: string; guest_id?: string };
+      // Match the backend's session-owner check: the new page guest cannot claim the old run.
+      if (body.event_type === "web.result_viewed" && body.guest_id !== undefined && body.guest_id !== "guest_before_reload") {
+        return errorResponse(404, "scenario_session_not_found");
+      }
+      return jsonResponse(200, { event_id: body.event_id, event_type: body.event_type });
+    });
+    try {
+      const second = makeReloadClient("guest_after_reload");
+      render(<ProposalAIProduct client={second.client} onEvent={createProductRunEventTracker(second.client, IDS.productId, getClientStorage(second.client))} />);
+      await screen.findByText(PROPOSAL_TEXT);
+      await waitFor(() => expect(JSON.parse(window.sessionStorage.getItem(viewedKey) ?? "null")).toMatchObject({ accepted: true }));
+      const viewed = second.calls.filter((call) => call.key === eventRoute).map((call) => JSON.parse(call.init.body as string) as { event_type: string; guest_id?: string; scenario_session_id?: string });
+      expect(viewed.find((event) => event.event_type === "web.product_viewed")).toMatchObject({ guest_id: "guest_after_reload" });
+      const resultEvents = viewed.filter((event) => event.event_type === "web.result_viewed");
+      expect(resultEvents).toHaveLength(1);
+      expect(resultEvents[0]).toMatchObject({ scenario_session_id: "session_1" });
+      expect(resultEvents[0]).not.toHaveProperty("guest_id");
+      expect(second.calls.some((call) => call.key === ROUTES.START)).toBe(false);
+      cleanup();
+      identityStorage.clear();
+      const third = makeReloadClient("guest_third_load");
+      render(<ProposalAIProduct client={third.client} onEvent={createProductRunEventTracker(third.client, IDS.productId, getClientStorage(third.client))} />);
+      await screen.findByText(PROPOSAL_TEXT);
+      await waitFor(() => expect(third.calls.some((call) => call.key === eventRoute)).toBe(true));
+      const duplicateViews = third.calls.filter((call) => call.key === eventRoute).filter((call) => (JSON.parse(call.init.body as string) as { event_type: string }).event_type === "web.result_viewed");
+      expect(duplicateViews).toHaveLength(0);
+      expect(JSON.parse(window.sessionStorage.getItem(viewedKey)!)).toMatchObject({ accepted: true });
+      expect(third.calls.some((call) => call.key === ROUTES.START)).toBe(false);
+    } finally {
+      cleanup();
+      storageSpy?.mockRestore();
+      first.resolveCall(ROUTES.SESSION, 0, sessionResponse());
+    }
+  });
+
+  it("restores all four draft fields before submit", async () => {
+    renderReady();
+    await fillDraft();
+    cleanup();
+    const second = recoveryClient();
+    render(<ProposalAIProduct client={second.client} />);
+    await expectDraft();
+    expect(second.calls.some((call) => call.key === ROUTES.START || call.key === ROUTES.SESSION)).toBe(false);
+  });
+
+  it("resumes an accepted running session after remount without another start", async () => {
+    const first = makeClientWithDeferredCalls({
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
+      [ROUTES.QUOTA]: [quotaResponse(IDS), quotaResponse(IDS)],
+      [ROUTES.START]: [startResponse()],
+    }, { [ROUTES.SESSION]: 1 });
+    render(<ProposalAIProduct client={first.client} />);
+    await fillDraft();
+    fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+    await waitFor(() => expect(first.calls.some((call) => call.key === ROUTES.SESSION)).toBe(true));
+    cleanup();
+    const second = recoveryClient();
+    render(<ProposalAIProduct client={second.client} />);
+    expect(await screen.findByText(PROPOSAL_TEXT)).toBeTruthy();
+    await expectDraft();
+    expect(second.calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(1);
+    expect(second.calls.some((call) => call.key === ROUTES.START)).toBe(false);
+    first.resolveCall(ROUTES.SESSION, 0, sessionResponse());
+  });
+
+  it.each([false, true])("restores a completed result and its original input (edited: %s)", async (edited) => {
+    renderReady();
+    await fillDraft();
+    fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+    await screen.findByText(PROPOSAL_TEXT);
+    if (edited) fireEvent.change(screen.getByLabelText(/^Describe the task/), { target: { value: "A different brief" } });
+    cleanup();
+    const second = recoveryClient();
+    render(<ProposalAIProduct client={second.client} />);
+    expect(await screen.findByText(PROPOSAL_TEXT)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Regenerate proposal" })).toBeTruthy();
+    if (edited) {
+      expect((screen.getByLabelText(/^Describe the task/) as HTMLTextAreaElement).value).toBe("A different brief");
+      expect(screen.getByText(/previous details/i)).toBeTruthy();
+    } else await expectDraft();
+    expect(second.calls.some((call) => call.key === ROUTES.START)).toBe(false);
+  });
+
+  it("New task clears draft and run across remount", async () => {
+    seedRun();
+    render(<ProposalAIProduct client={recoveryClient().client} />);
+    await screen.findByText(PROPOSAL_TEXT);
+    fireEvent.click(screen.getByRole("button", { name: "New task" }));
+    expect(window.sessionStorage.getItem(key)).toBeNull();
+    cleanup();
+    const second = recoveryClient();
+    render(<ProposalAIProduct client={second.client} />);
+    expect((await screen.findByLabelText(/^Describe the task/) as HTMLTextAreaElement).value).toBe("");
+    expect(screen.queryByText(PROPOSAL_TEXT)).toBeNull();
+    expect(second.calls.some((call) => call.key === ROUTES.SESSION)).toBe(false);
+  });
+
+  it("forgets a missing session while retaining the draft without an alert", async () => {
+    seedRun();
+    const second = recoveryClient(errorResponse(404, "scenario_session_not_found"));
+    render(<ProposalAIProduct client={second.client} />);
+    await waitFor(() => expect((JSON.parse(window.sessionStorage.getItem(key)!) as { run?: unknown }).run).toBeUndefined());
+    await expectDraft();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect((screen.getByRole("button", { name: "Generate proposal" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it.each([
+    { schema_ref: "other.output_v1" },
+    { schema_version: 2 },
+    { output: { wrong: "payload" } },
+  ])("drops a run with an incompatible result %j", async (overrides) => {
+    seedRun();
+    render(<ProposalAIProduct client={recoveryClient(sessionResponse(), resultResponse(IDS, overrides)).client} />);
+    await waitFor(() => expect((JSON.parse(window.sessionStorage.getItem(key)!) as { run?: unknown }).run).toBeUndefined());
+    expect(screen.queryByText(PROPOSAL_TEXT)).toBeNull();
+  });
+
+  it("keeps polling a restored healthy run beyond 60 seconds and shows its result", async () => {
+    seedRun();
+    const second = makeClient({
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
+      [ROUTES.QUOTA]: Array.from({ length: 4 }, () => quotaResponse(IDS)),
+      [ROUTES.SESSION]: [
+        ...Array.from({ length: 32 }, () => () => sessionResponse({ status: "running" })),
+        sessionResponse(),
+      ],
+      [ROUTES.RESULT]: [resultResponse(IDS, { output: { text: PROPOSAL_TEXT } })],
+    });
+    vi.useFakeTimers();
+    try {
+      render(<ProposalAIProduct client={second.client} />);
+      await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+      await act(async () => {
+        for (let elapsed = 0; elapsed < 61_000; elapsed += 50) await vi.advanceTimersByTimeAsync(50);
+      });
+      expect((screen.getByLabelText(/^Describe the task/) as HTMLTextAreaElement).disabled).toBe(true);
+      expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+      expect(second.calls.filter((call) => call.key === ROUTES.SESSION).length).toBeGreaterThan(30);
+      expect((JSON.parse(window.sessionStorage.getItem(key)!) as { run?: unknown }).run).toBeTruthy();
+      await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+      expect(screen.getByText(PROPOSAL_TEXT)).toBeTruthy();
+      expect(second.calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(33);
+      expect(second.calls.some((call) => call.key === ROUTES.START)).toBe(false);
+    } finally {
+      cleanup();
+      vi.useRealTimers();
+    }
+  });
+
+  const attachmentFailures: Array<{ name: string; session?: () => Response; result?: () => Response }> = [
+    { name: "missing session", session: () => errorResponse(404, "scenario_session_not_found") },
+    { name: "failed session", session: () => sessionResponse({ scenario_session_id: "attached_1", status: "failed" }) },
+    { name: "expired session", session: () => sessionResponse({ scenario_session_id: "attached_1", status: "expired" }) },
+    { name: "missing artifact id", session: () => sessionResponse({ scenario_session_id: "attached_1", result_artifact_id: null }) },
+    { name: "missing result", result: () => errorResponse(404, "result_artifact_not_found") },
+    { name: "unavailable result", result: () => errorResponse(404, "result_artifact_unavailable") },
+    { name: "wrong schema ref", result: () => resultResponse(IDS, { scenario_session_id: "attached_1", schema_ref: "other.output_v1" }) },
+    { name: "wrong schema version", result: () => resultResponse(IDS, { scenario_session_id: "attached_1", schema_version: 2 }) },
+    { name: "unusable result", result: () => resultResponse(IDS, { scenario_session_id: "attached_1", output: {} }) },
+  ];
+
+  it.each(attachmentFailures)("preserves the saved own run after an unrelated attachment has $name", async ({ session = () => sessionResponse({ scenario_session_id: "attached_1" }), result }) => {
+    seedRun();
+    const stored = window.sessionStorage.getItem(key);
+    const attachedSession = "GET /v1/scenario-sessions/attached_1";
+    const first = makeClient({
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
+      [ROUTES.QUOTA]: [quotaResponse(IDS), quotaResponse(IDS)],
+      [attachedSession]: [session()],
+      [ROUTES.RESULT]: result ? [result()] : [],
+    });
+    const onAttachEnd = vi.fn();
+    render(<ProposalAIProduct client={first.client} attachSessionId="attached_1" onAttachEnd={onAttachEnd} />);
+    await waitFor(() => expect(onAttachEnd).toHaveBeenCalledOnce());
+    expect(window.sessionStorage.getItem(key)).toBe(stored);
+    expect(first.calls.filter((call) => call.key === attachedSession)).toHaveLength(1);
+    expect(first.calls.some((call) => call.key === ROUTES.START || call.key === ROUTES.SESSION)).toBe(false);
+    cleanup();
+    const second = recoveryClient();
+    render(<ProposalAIProduct client={second.client} />);
+    expect(await screen.findByText(PROPOSAL_TEXT)).toBeTruthy();
+    await expectDraft();
+    expect(second.calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(1);
+    expect(second.calls.some((call) => call.key === ROUTES.START)).toBe(false);
+  });
+
+  it("forgets a failed attachment only when it matches the saved run", async () => {
+    seedRun();
+    const first = recoveryClient(errorResponse(404, "scenario_session_not_found"));
+    const onAttachEnd = vi.fn();
+    render(<ProposalAIProduct client={first.client} attachSessionId="session_1" onAttachEnd={onAttachEnd} />);
+    await waitFor(() => expect(onAttachEnd).toHaveBeenCalledOnce());
+    expect(JSON.parse(window.sessionStorage.getItem(key)!)).toEqual({ v: 1, values });
+  });
+
+  it("keeps a restored run locked after a request timeout and retries only that session", async () => {
+    seedRun();
+    let timedOut = false;
+    const second = makeClientCapturingRequests({
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
+      [ROUTES.QUOTA]: [quotaResponse(IDS), quotaResponse(IDS)],
+      [ROUTES.SESSION]: [sessionResponse()],
+      [ROUTES.RESULT]: [resultResponse(IDS, { output: { text: PROPOSAL_TEXT } })],
+    }, (route, init) => {
+      if (route !== ROUTES.SESSION || timedOut) return undefined;
+      timedOut = true;
+      return new Promise<Response>((_resolve, reject) => {
+        init.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+      });
+    });
+    vi.useFakeTimers();
+    try {
+      render(<ProposalAIProduct client={second.client} />);
+      await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+      expect((screen.getByLabelText(/^Describe the task/) as HTMLTextAreaElement).disabled).toBe(true);
+      expect((JSON.parse(window.sessionStorage.getItem(key)!) as { run?: unknown }).run).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+      await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+      expect(screen.getByText(PROPOSAL_TEXT)).toBeTruthy();
+      expect(second.calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(2);
+      expect(second.calls.some((call) => call.key === ROUTES.START)).toBe(false);
+    } finally {
+      cleanup();
+      vi.useRealTimers();
+    }
+  });
+
+  it("still generates when storage reads and writes throw", async () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("blocked"); });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("full"); });
+    try {
+      renderReady();
+      await fillDraft();
+      fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+      expect(await screen.findByText(PROPOSAL_TEXT)).toBeTruthy();
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
+  it("defaults invalid stored fields and drops an unusable run input", async () => {
+    seedRun(null);
+    window.sessionStorage.setItem(key, JSON.stringify({ v: 1, values: { taskText: 5, tone: "loud", language: "xx" }, run: { scenarioSessionId: "session_1", input: null } }));
+    const second = recoveryClient();
+    render(<ProposalAIProduct client={second.client} />);
+    expect((await screen.findByLabelText(/^Describe the task/) as HTMLTextAreaElement).value).toBe("");
+    expect((screen.getByLabelText("Proposal language") as HTMLSelectElement).value).toBe("auto");
+    expect((document.getElementById("proposal-ai-tone-warm") as HTMLInputElement).checked).toBe(true);
+    expect(second.calls.some((call) => call.key === ROUTES.SESSION)).toBe(false);
+    expect((JSON.parse(window.sessionStorage.getItem(key)!) as { run?: unknown }).run).toBeUndefined();
+  });
 });

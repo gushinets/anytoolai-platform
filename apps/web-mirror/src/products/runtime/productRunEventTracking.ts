@@ -82,7 +82,8 @@ function writeResultViewedMark(scenarioSessionId: string, mark: ResultViewedMark
  * `ProductRunPage`'s own single resolved value, rather than this module resolving its own, is what
  * guarantees every event -- `product_viewed` included -- agrees with whatever guest id actually
  * ran the scenario, with no second, independently-resolved identity anywhere in this module to
- * diverge from it.
+ * diverge from it. Attached/resumed completions deliberately omit it and let the backend derive
+ * the owner from the scenario session instead.
  *
  * Never blocks the UI: `trackClientEvent` reports failure as `{ ok: false }` instead of throwing,
  * and this only ever fires from a UI event handler with nothing for the caller to await. The
