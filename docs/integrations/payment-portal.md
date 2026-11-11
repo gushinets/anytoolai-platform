@@ -32,8 +32,8 @@ Historical Portal contracts and execution plans do not override accepted sources
 
 ## Current local implementation
 
-Sources: Kernel `5aaa0a5fc9f0fdce977dd671727cd5957c13fb39` and Portal
-`f6c5e2543a7c281bf3a0e26a0ad9af64372f651b`, plus the paired Step 10 working diff.
+Sources: Kernel `192f4cb2ebf19a697f9fb1298147d26221a0a6a0` and Portal
+`b346f0e90c9745f942847734bc06d0d3f5b0a73d`, plus the Step 11 working diff.
 The [active plan](../exec-plans/active/ANY-766-implementation-plan.md) owns the
 current scope and remaining gates.
 
@@ -43,12 +43,14 @@ current scope and remaining gates.
   consumer/P on every introspection and retains Core owners/replay semantics.
 - Snapshot remains Kernel-only V2 with existing R coherence and ANY-507
   admission. Consumer-filtered V3 and P-based admission remain Step 12;
-  generic technical sources/recipients remain Steps 11/13.
+  Portal Step 11 now routes configured technical sources and preserves immutable
+  source/owner history; recipient delivery remains Step 13.
 - Kernel's durable invalidation receiver and Portal's bounded embedded sender
   are implemented. Configure matching scope/service tokens and enable
   `ANYTOOLAI_PORTAL_ACCESS_INVALIDATION_ENABLED` at Kernel before starting the updated Portal
-  worker: Portal reuses the configured manifest URL/token and starts delivery
-  automatically. A disabled receiver permission parks delivery with `403`;
+  worker: Portal's Step 7 sender uses legacy `KERNEL_BASE_URL`/`KERNEL_SERVICE_TOKEN`
+  and starts delivery automatically. Step 11 manifest clients use the registry;
+  keep the sender's Kernel origin/token aligned until Step 13. A disabled receiver permission parks delivery with `403`;
   operator retry is required after repair.
 - Step 8 implements recoverable browser launch, owner-bound tab custody and
   paid runtime/event/handoff continuity. Usage/exhaustion and cabinet integration
@@ -394,8 +396,23 @@ pending requests retain their exact request/key. See the
 Portal migration 20261111_0009 preserves populated delegation parent links,
 hashes, TTLs and single-use state while binding historical audience to Kernel.
 Step 10 needs no Kernel migration or usage reset. Snapshot remains Kernel-only
-V2; another consumer cannot read that unfiltered baseline. V3/filtering/coherence
-remain Step 12, sources Step 11 and recipient delivery Step 13. Existing outgoing
-Kernel manifest/invalidation settings stay active until their owning steps.
+V2; another consumer cannot read that unfiltered baseline. At this Step 10
+checkpoint, source routing and recipient delivery remained Steps 11/13.
+The Step 11 checkpoint below supersedes source selection; V3/filtering/coherence
+and recipient delivery remain Steps 12/13.
 Local synthetic/API/component and disposable PostgreSQL checks are distinct from
 Step 16's assembled real HTTP acceptance and ANY-767 remote/live acceptance.
+
+
+## ANY-766 Step 11 Portal technical-source checkpoint — 2026-11-11
+
+Inspected Portal base `b346f0e90c9745f942847734bc06d0d3f5b0a73d` and
+Kernel `192f4cb2ebf19a697f9fb1298147d26221a0a6a0`, plus the Portal Step 11 diff.
+Portal selects each configured product's manifest origin and independent
+outbound credential through the existing V1 client/validator. New metered
+links/terms/purchases bind technical source and sole backend owner; historical
+Kernel JSON/digests and allowance identities remain unchanged. The Kernel
+manifest producer, scenarios, ANY-507 execution and usage require no changes.
+See the [source/history guide](https://github.com/gushinets/payments-portal/blob/main/docs/contracts/product-backend-api/README.md#implemented-step-11-technical-sources-and-history).
+This is synthetic HTTP/disposable PostgreSQL evidence; the real external product
+is not registered or tested. Snapshot V3, recipients and usage remain later work.
