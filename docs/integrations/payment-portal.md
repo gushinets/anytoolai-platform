@@ -32,8 +32,9 @@ Historical Portal contracts and execution plans do not override accepted sources
 
 ## Current local implementation
 
-Sources: Kernel `952a6337a17136cd9d1f3c38cb32d8fa5766a41d` and Portal
-`1caa078418ffb07781467dcb4f62158f17e029a3`, plus the Step 12 working diff.
+Baseline sources: Kernel `6dc3e96c26c8ac093614394c6e87787f9f42b395` and Portal
+`126f6755cc684e4cbbb60ea1b1ece92c7575fde6` (completed Step 12). The paired Step 13 changes
+extend this baseline.
 The [active plan](../exec-plans/active/ANY-766-implementation-plan.md) owns the
 current scope and remaining gates.
 
@@ -44,13 +45,14 @@ current scope and remaining gates.
 - Step 12 serves/consumes consumer-filtered V3 with durable consumer/P/R
   coherence, populated migration `0020` and unchanged ANY-507 buckets/replay;
   Portal Step 11 now routes configured technical sources and preserves immutable
-  source/owner history; recipient delivery remains Step 13.
+  source/owner history; Step 13 now partitions Portal delivery by recipient.
 - Kernel's durable invalidation receiver and Portal's bounded embedded sender
   are implemented. Configure matching scope/service tokens and enable
   `ANYTOOLAI_PORTAL_ACCESS_INVALIDATION_ENABLED` at Kernel before starting the updated Portal
-  worker: Portal's Step 7 sender uses legacy `KERNEL_BASE_URL`/`KERNEL_SERVICE_TOKEN`
-  and starts delivery automatically. Step 11 manifest clients use the registry;
-  keep the sender's Kernel origin/token aligned until Step 13. A disabled receiver permission parks delivery with `403`;
+  worker. Portal's Step 13 sender selects each snapshot recipient's origin and
+  outgoing service key from `BACKEND_CONSUMERS`, with independent bounded lanes.
+  Stop APIs/workers before Portal migration `20261111_0010`; Kernel stays at
+  `0020`. Legacy Kernel connection settings no longer select delivery destinations. A disabled receiver permission parks delivery with `403`;
   operator retry is required after repair.
 - Step 8 implements recoverable browser launch, owner-bound tab custody and
   paid runtime/event/handoff continuity. Usage/exhaustion and cabinet integration

@@ -87,7 +87,7 @@ This directory is the system of record for agents. Keep it current. If a decisio
 
 - `exec-plans/template.md`
 - `exec-plans/active/`
-- [ANY-766 active implementation plan](exec-plans/active/ANY-766-implementation-plan.md) — synchronized copy of the authoritative Portal plan; Steps 1–9 complete, consumer-neutral runtime and local integration work remain in Steps 10–17.
+- [ANY-766 active implementation plan](exec-plans/active/ANY-766-implementation-plan.md) — synchronized copy of the authoritative Portal plan; Steps 1–13 complete, including consumer-scoped access and recipient delivery; usage and local integration/build work remain in Steps 14–17.
 - `exec-plans/completed/`
 - `exec-plans/completed/proposal-ai-vps-135-safe-cutover.md` — ProposalAI public URL, shared HAProxy access, and cutover gates that protect existing VPS services.
 
