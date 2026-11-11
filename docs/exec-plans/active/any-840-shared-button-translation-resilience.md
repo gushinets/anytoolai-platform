@@ -193,5 +193,29 @@ The suspected SSR/locale follow-up is **not filed or linked by this change**; su
 title: "SSR html lang and first render do not match the user's locale". Confirm its
 role using the device evidence before claiming that it caused the reported distortion.
 
+### Desktop Chrome mobile emulation — 2026-11-11
+
+The requested DevTools browser could not start because its graphical display was
+unavailable. The fallback used installed Google Chrome 156.0.8078.73 in headless
+mode, controlled by Playwright with its Pixel 7 device profile: 412 × 839 CSS pixels,
+DPR 2.625, touch enabled, Android 14 / Chrome 151 mobile user agent. This is desktop
+Chrome emulation, not an Android device or a manual DevTools device-menu run.
+
+Tested local Next.js development server at `http://127.0.0.1:3100`, source revision
+`804ce917265c080a80c564552cc81e5b923f9210`, with Russian UI. Local platform-api returned
+`404 product_not_found`, so browser requests used the existing response builders
+and result fixtures. Translation was the shared test helper's text-node replacement
+inside the submit button, applied before each submission; real Chrome Translate
+was not exercised.
+
+All eight cases passed: ProposalAI, Brief Decoder, Client Update Writer (Update),
+and Acceptance Builder (Draft), each with original and synthetically mutated button
+text. Each case checked Russian field labels, touch submission, disabled/busy button
+with spinner while the start response was held, result display, and regeneration.
+There were 16 completed submissions, no uncaught page errors, no console errors,
+and no unexpected API routes. Captured 32 local screenshots covering pending and
+completed states. These results support the button regression check only; backend
+execution, actual browser translation and physical Android acceptance remain open.
+
 Repository hygiene check found pre-existing local-skill references in execution
 plans for ANY-17, ANY-339, ANY-391, ANY-221 and ANY-227; unrelated files remain untouched.
