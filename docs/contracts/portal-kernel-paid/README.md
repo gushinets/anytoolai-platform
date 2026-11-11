@@ -1,6 +1,6 @@
 # ANY-766 paid integration target contracts
 
-**Current checkpoint — Steps 10–12, 2026-11-11:** the
+**Current checkpoint — Steps 10–13, 2026-11-11:** the
 [common guide](https://github.com/gushinets/payments-portal/blob/main/docs/contracts/product-backend-api/README.md#implemented-step-10-settings-and-cutover)
 owns implemented common routes, V2 delegation, BACKEND_CONSUMERS, policy guard,
 fixed callbacks and browser migration. Its
@@ -9,16 +9,22 @@ owns the implemented technical routing, stored-format versions and compatibility
 Kernel-named identity routes/settings and
 V1 token envelopes in the historical Step 4/8 sections are superseded. Manifest
 V1 is reused by configured sources. Step 12 replaces the snapshot wire with
-consumer-filtered V3 and durable consumer/P/R coherence; delivery retains one
-Kernel recipient until Step 13.
+consumer-filtered V3 and durable consumer/P/R coherence. Step 13 partitions V1
+delivery by recipient using `BACKEND_CONSUMERS`. The
+[recipient delivery section](https://github.com/gushinets/payments-portal/blob/main/docs/contracts/product-backend-api/README.md#implemented-step-13-recipient-delivery)
+owns current routing and cutover; legacy sender settings in the historical
+Step 6/7 descriptions below are superseded.
 Schemas/fixtures retain their exact historical bytes; current implementation
 status is recorded here and in the guide, not inferred from a schema description.
 
 Status: **protocol specifications and fixtures**, formalized 2026-11-09.
-Implementation through ANY-766 Step 12 includes common delegated identity V2,
-consumer-filtered snapshot V3, coherent paid admission/ownership/events, Portal invalidation
+Implementation through ANY-766 Step 13 includes common delegated identity V2,
+consumer-filtered snapshot V3, coherent paid admission/ownership/events,
+recipient-specific Portal invalidation
 delivery, recoverable browser journeys and configured technical-source/owner
-routing with immutable history. Generic recipients, usage/exhaustion and cabinet usage remain pending. Paired local acceptance is Step 16; remote/live acceptance and
+routing with immutable history.
+Usage/exhaustion and cabinet usage remain Steps 14/15. Paired local acceptance
+is Step 16; remote/live acceptance and
 production rollout belong to ANY-767. All quantities and
 credential-shaped strings in fixtures are synthetic. Q=1 is an isolated test
 quantity, never a commercial offer or approval.
@@ -39,13 +45,14 @@ and owner-directed V1 usage/exhaustion. At Step 9 completion these additions
 were specified only. Step 10 now implements common identity and its generated
 OpenAPI security; Step 12 now implements V3 access and the working auth/access
 OpenAPI handoff.
-Steps 13–15 implement remaining delivery/usage, Step 16 local acceptance and
+Step 13 implements recipient delivery; Steps 14/15 retain usage work, Step 16
+local acceptance and
 Step 17 build/install preparation. No runtime/generator change occurs in Step 9.
 
 The main identity section below records Step 10; the dated Step 4/8 sections
 retain the historical Kernel baseline. Step 10 replaces their identity routes,
 settings and response/storage versions. Step 12 supersedes the V2 snapshot/R-only baseline below with V3/P/R;
-invalidation V1 remains active and recipient partitioning is Step 13.
+invalidation V1 remains active with recipient partitioning implemented in Step 13.
 Historical retention is not concurrent old-route support or permission to reset history.
 Original schemas and fixture payloads remain exact. New schemas are snapshot-v3,
 code-request-v2 (unversioned body adds consumer_id), exchange-response-v2 and
@@ -125,7 +132,8 @@ bodies, codes, tokens and headers must never enter logs or telemetry.
 only and is not served after Step 12. The current producer/client use
 [consumer-scoped V3](#step-12-working-authaccess--2026-11-11), including consumer/P/R
 identity and filtering before completeness/deadline checks. The invalidation V1
-rules later in this section remain implemented; recipient partitioning is Step 13.
+rules later in this section remain implemented; Step 13 partitions their delivery
+without changing the V1 payload.
 
 Step 5 served `GET /internal/v1/access-snapshots/{user_id}` with exactly one
 `tenant_id` and `region` query parameter. The retained `snapshot-v2` schema requires:
@@ -572,4 +580,5 @@ changes are covered by focused PostgreSQL regressions. The local TCP checkpoint
 exercises both actual APIs and strict auth/access clients with two configured
 identities and separate disposable databases. External LBX/manifest responses
 and the second identity are synthetic. This is distinct from Step 16's assembled
-paid browser/execution acceptance; recipient delivery/usage remain Steps 13–15.
+paid browser/execution acceptance. Recipient delivery was pending at this
+checkpoint and is now implemented in Step 13; usage remains Steps 14/15.

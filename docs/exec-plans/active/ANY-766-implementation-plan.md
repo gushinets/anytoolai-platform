@@ -1,6 +1,6 @@
 # ANY-766 — Portal API and Paid Execution for Product Backends
 
-Status: **STEPS 1–12 COMPLETE; Steps 13–17 pending; delivery ends at PR readiness**
+Status: **STEPS 1–13 COMPLETE; Steps 14–17 pending; delivery ends at PR readiness**
 
 Date: **2026-11-09**
 
@@ -12,7 +12,7 @@ Related requirements: [ANY-833](https://linear.app/paveldik/issue/ANY-833).
 - Owner: mixed — Portal and Kernel execution owners
 - Last updated: 2026-11-11
 - Review date: 2026-11-11
-- Next action: Step 13 recipient-specific delivery, only when requested.
+- Next action: Step 14 generic usage/exhaustion, only when requested.
 - Blocker: none for the planned local work; real external-product integration is outside this plan.
 
 Portal's `docs/exec-plans/active/ANY-766-implementation-plan.md` is authoritative;
@@ -93,7 +93,7 @@ contacting its services or accepting its integration is not an ANY-766 gate.
 Development bases: Portal ANY-766 is based on ANY-765
 `b2ef280048ac634a60c18e820fbf702beddba19c`; Kernel is based on
 `72ff15bc0b77903c87aa39f7b10186dccc556d09` and includes ANY-507/814.
-Current migration heads are Portal `20261111_0009` and Kernel `0020`.
+Current migration heads are Portal `20261111_0010` and Kernel `0020`.
 
 Development may continue above the verified ANY-765 base while its PR is reviewed.
 After it merges, transfer only ANY-766 changes onto accepted main under a
@@ -255,8 +255,8 @@ Update both canonical designs, producer schemas, positive/negative fixtures and 
 
 Steps 4/8 supply PKCE, custody and recovery; completed Step 10 generalizes
 consumer identity, routes and configured callback. This section records the
-current identity contract. Section 3.9 also specifies later snapshot/recipient
-work that remains pending; Step 11 implements technical-source ownership.
+current identity contract. Section 3.9 records consumer-neutral snapshot/recipient rules; Steps 11–13 now
+implement technical-source ownership, scoped snapshots and recipient delivery.
 
 Use a consumer-bound one-use code with S256 PKCE and a narrow delegated token.
 
@@ -1288,7 +1288,19 @@ third-party acceptance or live financial operation is needed for this checkpoint
 
 ### Step 13 — Partition durable delivery by backend recipient
 
-**Status:** PENDING; depends on Steps 10–12.
+**Status:** COMPLETE (2026-11-11). The existing paid writer atomically fans out
+whole-user R to installed snapshot recipients. Outbox/work identity, claims,
+exact-N ACK, retry/parking, repair and CLI diagnostics are recipient-specific;
+registry-selected destinations have independent bounded HTTP/DB delivery lanes.
+Portal migration `20261111_0010` preserves queued Kernel history and retires
+pre-cutover claims while APIs/workers are stopped. Focused PostgreSQL
+migration/concurrency/capacity and affected worker/paid-state regressions PASS,
+including grant removal, N+1, rollback, restart and independent recipient failure.
+Kernel V1 receiver, contract, lint/architecture, documentation and generation
+checks PASS. Backend HTTP responses in Portal delivery tests are synthetic;
+assembled two-service/browser acceptance remains Step 16. Usage/exhaustion,
+cabinet usage and build/install work remain Steps 14–17; no live/deployed
+acceptance or Git mutation is claimed.
 
 **Goal / Expected behavior:** paid-state invalidations are delivered independently
 to each configured recipient without losing already queued Kernel work.
