@@ -136,6 +136,7 @@ function UpdateFields({ values, errors, disabled, onChange }: ProductFieldsProps
 export const updateDefinition: ProductDefinition<UpdateValues, ClientUpdateWriterResult> = {
   productId: PRODUCT_ID,
   scenarioId: "client_update_writer.update_v1",
+  outputSchema: { schemaRef: "kernel.schemas.compose_reply_output_v1", schemaVersion: 1 },
   messageScope: "update",
   emptyValues: { progressNotes: "", tone: "neutral" },
   draft: {
@@ -202,6 +203,7 @@ function ReplyDraftFields({ values, errors, disabled, onChange }: ProductFieldsP
 export const replyDraftDefinition: ProductDefinition<ReplyDraftValues, ClientUpdateWriterResult> = {
   productId: PRODUCT_ID,
   scenarioId: "client_update_writer.reply_draft_v1",
+  outputSchema: { schemaRef: "kernel.schemas.compose_reply_output_v1", schemaVersion: 1 },
   messageScope: "reply_draft",
   emptyValues: { clientMessage: "", replyGoal: "", tone: "neutral" },
   draft: {
@@ -286,6 +288,7 @@ function PrepaidRequestFields({ values, errors, disabled, onChange }: ProductFie
 export const prepaidRequestDefinition: ProductDefinition<PrepaidRequestValues, ClientUpdateWriterResult> = {
   productId: PRODUCT_ID,
   scenarioId: "client_update_writer.prepaid_request_v1",
+  outputSchema: { schemaRef: "kernel.schemas.compose_reply_output_v1", schemaVersion: 1 },
   messageScope: "prepaid_request",
   emptyValues: { billingNotes: "", billingAmount: "", billingDueDate: "", tone: "neutral" },
   draft: {

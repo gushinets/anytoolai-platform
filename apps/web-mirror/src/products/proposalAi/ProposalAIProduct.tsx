@@ -249,6 +249,7 @@ function ProposalAIFields({ values, errors, disabled, onChange }: ProductFieldsP
 export const proposalAiDefinition: ProductDefinition<ProposalAIValues, ProposalAIResult> = {
   productId: "proposal_ai",
   scenarioId: "proposal_ai.generate_v1",
+  outputSchema: { schemaRef: "proposal_ai.generate_output_v1", schemaVersion: 1 },
   messageScope: "generate",
   hasDescription: true,
   emptyValues: EMPTY_VALUES,
