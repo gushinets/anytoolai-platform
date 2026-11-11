@@ -24,7 +24,7 @@ export async function beginPortalAuthorization(target: string): Promise<string> 
   if (!returnTarget || !configured) throw new Error("portal_authorization_invalid");
   const url = new URL(configured);
   if ((url.protocol !== "https:" && !(url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))) ||
-    url.username || url.password || url.search || url.hash || !/^\/(en|fr|it|de|es|ru|pt)\/kernel\/authorize$/.test(url.pathname)) throw new Error("portal_authorization_invalid");
+    url.username || url.password || url.search || url.hash || !/^\/(en|fr|it|de|es|ru|pt)\/backend\/authorize$/.test(url.pathname)) throw new Error("portal_authorization_invalid");
   synchronizePortalIdentity();
   if (!requirePortalAuthorization()) throw new Error("portal_storage_unavailable");
   const identity = synchronizePortalIdentity();
@@ -32,6 +32,7 @@ export async function beginPortalAuthorization(target: string): Promise<string> 
   tabStorage.setItem(CONTINUATION_KEY, returnTarget);
   const { state, challenge } = await preparePortalAuthorization(tabStorage, returnTarget, identity.custodyId);
   if (synchronizePortalIdentity().generation !== identity.generation) throw new Error("portal_authorization_invalid");
+  url.searchParams.set("consumer_id", "platform-kernel");
   url.searchParams.set("state", state);
   url.searchParams.set("code_challenge", challenge);
   url.searchParams.set("code_challenge_method", "S256");

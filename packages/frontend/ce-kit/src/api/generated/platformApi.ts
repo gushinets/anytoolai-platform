@@ -1140,6 +1140,10 @@ export interface components {
         PortalExchangeResponse: {
             /** Access Token */
             access_token: string;
+            /** Consumer Id */
+            consumer_id: string;
+            /** Consumer Policy Revision */
+            consumer_policy_revision: number;
             /**
              * Expires At
              * Format: date-time
@@ -1151,7 +1155,7 @@ export interface components {
              * Schema Version
              * @constant
              */
-            schema_version: 1;
+            schema_version: 2;
             /** Tenant Id */
             tenant_id: string;
             /**

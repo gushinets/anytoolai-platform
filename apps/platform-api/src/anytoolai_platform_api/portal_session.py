@@ -19,15 +19,16 @@ from anytoolai_platform_core.quotas.models import ExecutionOwner, ExecutionOwner
 from fastapi import Depends, Request
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, ValidationError
 
+DELEGATION_SCHEMA_VERSION = 2
 PORTAL_TIMEOUT_SECONDS = 2
 PORTAL_MAX_RESPONSE_BYTES = 16 * 1024
 DELEGATION_TTL_SECONDS = 30 * 60
 PORTAL_CLOCK_BUDGET_SECONDS = 5
 IDENTITY_FAILURE_CODES = frozenset(
     {
-        "kernel_delegation_expired",
-        "kernel_parent_authority_invalid",
-        "kernel_session_code_invalid",
+        "backend_delegation_expired",
+        "backend_parent_authority_invalid",
+        "backend_session_code_invalid",
     }
 )
 
@@ -45,13 +46,23 @@ def _utc_wire_timestamp(value: object) -> object:
     return value
 
 
+def _version_two(value: object) -> object:
+    if type(value) is not int or value != DELEGATION_SCHEMA_VERSION:
+        raise ValueError("Expected integer version 2")
+    return value
+
+
+WireTimestamp = Annotated[datetime, BeforeValidator(_utc_wire_timestamp)]
+VersionTwo = Annotated[Literal[2], BeforeValidator(_version_two)]
+
+
 def _version_one(value: object) -> object:
     if type(value) is not int or value != 1:
         raise ValueError("Expected integer version 1")
     return value
 
 
-WireTimestamp = Annotated[datetime, BeforeValidator(_utc_wire_timestamp)]
+# Invalidation V1 remains active; it is independent from delegation V2.
 VersionOne = Annotated[Literal[1], BeforeValidator(_version_one)]
 WireUserId = Annotated[
     str, Field(pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
@@ -66,9 +77,11 @@ class PortalExchangeRequest(BaseModel):
 
 class PortalExchangeResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", hide_input_in_errors=True)
-    schema_version: VersionOne
+    schema_version: VersionTwo
     access_token: str = Field(min_length=43, max_length=512, repr=False)
     token_type: Literal["Bearer"]
+    consumer_id: str = Field(pattern=r"^[a-z][a-z0-9-]{0,63}$")
+    consumer_policy_revision: int = Field(strict=True, ge=1, le=2**53 - 1)
     tenant_id: str = Field(min_length=1)
     region: str = Field(min_length=1)
     user_id: WireUserId
@@ -77,7 +90,9 @@ class PortalExchangeResponse(BaseModel):
 
 class PortalIntrospectionResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", hide_input_in_errors=True)
-    schema_version: VersionOne
+    schema_version: VersionTwo
+    consumer_id: str = Field(pattern=r"^[a-z][a-z0-9-]{0,63}$")
+    consumer_policy_revision: int = Field(strict=True, ge=1, le=2**53 - 1)
     tenant_id: str = Field(min_length=1)
     region: str = Field(min_length=1)
     user_id: WireUserId
@@ -88,6 +103,8 @@ class PortalIntrospectionResponse(BaseModel):
 class PortalUserPrincipal:
     owner: ExecutionOwner
     valid_until: datetime
+    consumer_id: str
+    consumer_policy_revision: int
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -108,7 +125,7 @@ def _unavailable() -> ApiError:
 def _expired() -> ApiError:
     return ApiError(
         status_code=HTTPStatus.UNAUTHORIZED,
-        code="kernel_delegation_expired",
+        code="backend_delegation_expired",
         message="Portal delegation has expired.",
         headers={"WWW-Authenticate": "Bearer"},
     )
@@ -123,7 +140,7 @@ class PortalSessionClient:
         if not settings.portal_base_url or settings.portal_access_service_token is None:
             raise _unavailable()
         request = UrlRequest(
-            settings.portal_base_url + "/internal/v1/kernel-sessions/" + operation,
+            settings.portal_base_url + "/internal/v1/backend-sessions/" + operation,
             data=json.dumps(payload).encode("utf-8"),
             headers={
                 "Authorization": "Bearer "
@@ -167,7 +184,7 @@ class PortalSessionClient:
         allowed = (
             IDENTITY_FAILURE_CODES
             if operation == "exchange"
-            else IDENTITY_FAILURE_CODES - {"kernel_session_code_invalid"}
+            else IDENTITY_FAILURE_CODES - {"backend_session_code_invalid"}
         )
         if isinstance(code, str) and code in allowed:
             raise ApiError(
@@ -177,8 +194,12 @@ class PortalSessionClient:
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-    def _require_scope(self, tenant_id: str, region: str) -> None:
-        if (tenant_id, region) != (self.settings.default_tenant_id, self.settings.default_region):
+    def _require_scope(self, tenant_id: str, region: str, consumer_id: str) -> None:
+        if (tenant_id, region, consumer_id) != (
+            self.settings.default_tenant_id,
+            self.settings.default_region,
+            self.settings.portal_consumer_id,
+        ):
             raise _unavailable()
 
     def exchange(self, payload: PortalExchangeRequest) -> PortalExchangeResponse:
@@ -188,7 +209,7 @@ class PortalSessionClient:
             )
         except ValidationError:
             raise _unavailable() from None
-        self._require_scope(response.tenant_id, response.region)
+        self._require_scope(response.tenant_id, response.region, response.consumer_id)
         now = datetime.now(UTC)
         if response.expires_at <= now:
             raise _expired()
@@ -205,7 +226,7 @@ class PortalSessionClient:
             )
         except ValidationError:
             raise _unavailable() from None
-        self._require_scope(response.tenant_id, response.region)
+        self._require_scope(response.tenant_id, response.region, response.consumer_id)
         now = datetime.now(UTC)
         if response.valid_until <= now:
             raise _expired()
@@ -221,6 +242,8 @@ class PortalSessionClient:
                 str(UUID(response.user_id)),
             ),
             valid_until=response.valid_until,
+            consumer_id=response.consumer_id,
+            consumer_policy_revision=response.consumer_policy_revision,
         )
 
 

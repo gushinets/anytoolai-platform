@@ -16,7 +16,7 @@ export function createPlatformApiClient(): PlatformApiClient {
       defaultHeaders: { Authorization: `Bearer ${identity.session.accessToken}` },
       portalIdentity: { owner: identity.session.owner,
         isCurrent: () => isPortalGenerationCurrent(identity.generation),
-        refuse: (code: string) => requirePortalAuthorization(code !== "kernel_delegation_expired"),
+        refuse: (code: string) => requirePortalAuthorization(code !== "backend_delegation_expired"),
       },
     } : {}),
   });

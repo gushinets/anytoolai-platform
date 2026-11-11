@@ -4,7 +4,7 @@ import { requestAndParse, type PlatformApiClient, type PlatformApiResult } from 
 
 type ExchangeResponse = components["schemas"]["PortalExchangeResponse"];
 export type PortalOwner = { tenantId: string; region: string; userId: string };
-export type PortalSession = { owner: PortalOwner; accessToken: string; expiresAt: string };
+export type PortalSession = { owner: PortalOwner; consumerId: string; consumerPolicyRevision: number; accessToken: string; expiresAt: string };
 export type TabStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 export const PORTAL_SESSION_KEY = "anytoolai.portal_session.v1";
 const AUTHORIZATION_KEY = "anytoolai.portal_authorization.v1";
@@ -22,18 +22,21 @@ export function parsePortalOwner(value: unknown): PortalOwner | null {
 }
 
 export function parsePortalExchange(value: unknown): PortalSession | null {
-  if (!isRecord(value) || value.schema_version !== 1 || value.token_type !== "Bearer" ||
+  if (!isRecord(value) || value.schema_version !== 2 || value.token_type !== "Bearer" ||
     typeof value.access_token !== "string" || !/^[A-Za-z0-9_-]{43,512}$/.test(value.access_token) ||
     typeof value.expires_at !== "string" || !/Z$|[+]00:00$/.test(value.expires_at) ||
     !Number.isFinite(Date.parse(value.expires_at))) return null;
+  if (value.consumer_id !== "platform-kernel" || !Number.isSafeInteger(value.consumer_policy_revision) ||
+    typeof value.consumer_policy_revision !== "number" || value.consumer_policy_revision < 1) return null;
   const owner = parsePortalOwner({ tenantId: value.tenant_id, region: value.region, userId: value.user_id });
   if (!owner) return null;
   // Compile-time drift check against the backend-owned exchange contract.
   const wire: ExchangeResponse = {
+    consumer_id: value.consumer_id, consumer_policy_revision: value.consumer_policy_revision,
     schema_version: value.schema_version, token_type: value.token_type, access_token: value.access_token,
     tenant_id: owner.tenantId, region: owner.region, user_id: owner.userId, expires_at: value.expires_at,
   };
-  return { owner, accessToken: wire.access_token, expiresAt: wire.expires_at };
+  return { owner, consumerId: wire.consumer_id, consumerPolicyRevision: wire.consumer_policy_revision, accessToken: wire.access_token, expiresAt: wire.expires_at };
 }
 
 export function exchangePortalSession(client: PlatformApiClient, code: string, verifier: string): Promise<PlatformApiResult<PortalSession>> {
@@ -43,15 +46,15 @@ export function exchangePortalSession(client: PlatformApiClient, code: string, v
 }
 
 export function writePortalSession(storage: TabStorage, session: PortalSession): void {
-  storage.setItem(PORTAL_SESSION_KEY, JSON.stringify({ version: 1, ...session }));
+  storage.setItem(PORTAL_SESSION_KEY, JSON.stringify({ version: 2, ...session }));
 }
 
 export function readPortalSession(storage: TabStorage): PortalSession | null {
   const raw = storage.getItem(PORTAL_SESSION_KEY);
   if (!raw) return null;
   const value: unknown = JSON.parse(raw);
-  if (!isRecord(value) || value.version !== 1) throw new Error("portal_storage_invalid");
-  const session = parsePortalExchange({ schema_version: 1, token_type: "Bearer", access_token: value.accessToken,
+  if (!isRecord(value) || value.version !== 2) throw new Error("portal_storage_invalid");
+  const session = parsePortalExchange({ schema_version: 2, consumer_id: value.consumerId, consumer_policy_revision: value.consumerPolicyRevision, token_type: "Bearer", access_token: value.accessToken,
     expires_at: value.expiresAt, tenant_id: isRecord(value.owner) ? value.owner.tenantId : undefined,
     region: isRecord(value.owner) ? value.owner.region : undefined, user_id: isRecord(value.owner) ? value.owner.userId : undefined });
   if (!session) throw new Error("portal_storage_invalid");

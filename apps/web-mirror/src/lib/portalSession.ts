@@ -24,12 +24,14 @@ export function getPortalIdentity(): IdentityState {
 
 function readStoredIdentity(generation: number): IdentityState {
   try {
-    const session = readPortalSession(tabStorage);
     const mode = tabStorage.getItem(MODE_KEY);
     const saved: unknown = mode ? JSON.parse(mode) : null;
     const owner = typeof saved === "object" && saved !== null && "owner" in saved ? parsePortalOwner(saved.owner) : null;
     const custodyId = typeof saved === "object" && saved !== null && "version" in saved && saved.version === 1 &&
       "custodyId" in saved && typeof saved.custodyId === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(saved.custodyId) ? saved.custodyId : null;
+    let session: PortalSession | null;
+    try { session = readPortalSession(tabStorage); }
+    catch { return { kind: "required", owner, generation, custodyId }; }
     // Legacy custody without an epoch requires reauthorization, retaining its owner-bound recovery.
     return session && custodyId && owner && samePortalOwner(owner, session.owner) ? { kind: "authorized", session, generation, custodyId }
       : mode || session ? { kind: "required", owner: mode ? owner : session?.owner ?? null, generation, custodyId }
@@ -44,7 +46,8 @@ function sameIdentity(left: IdentityState, right: IdentityState): boolean {
   if (left.custodyId !== right.custodyId) return false;
   if (left.kind === "authorized" && right.kind === "authorized") {
     return left.session.accessToken === right.session.accessToken &&
-      left.session.expiresAt === right.session.expiresAt && samePortalOwner(left.session.owner, right.session.owner);
+      left.session.expiresAt === right.session.expiresAt && left.session.consumerId === right.session.consumerId &&
+      left.session.consumerPolicyRevision === right.session.consumerPolicyRevision && samePortalOwner(left.session.owner, right.session.owner);
   }
   if (left.kind === "required" && right.kind === "required") {
     return left.owner === right.owner || (left.owner !== null && right.owner !== null && samePortalOwner(left.owner, right.owner));

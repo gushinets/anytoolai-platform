@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { consumePortalCallback, parsePortalExchange, preparePortalAuthorization, readPortalAuthorization, readPortalSession, validatePortalReturnTarget, writePortalSession } from "../../src/identity/portalSession";
 
 import { memoryTabStorage } from "../testUtils/tabStorage";
-const session = { owner: { tenantId: "anytoolai", region: "ru", userId: "11111111-1111-1111-1111-111111111111" }, accessToken: "t".repeat(43), expiresAt: "2099-01-01T00:00:00Z" };
+const session = { consumerId: "platform-kernel", consumerPolicyRevision: 1, owner: { tenantId: "anytoolai", region: "ru", userId: "11111111-1111-1111-1111-111111111111" }, accessToken: "t".repeat(43), expiresAt: "2099-01-01T00:00:00Z" };
 
 describe("Portal tab custody", () => {
   it("keeps a newer authorization when an older PKCE digest completes late", async () => {
@@ -28,6 +28,11 @@ describe("Portal tab custody", () => {
     writePortalSession(storage, session);
     expect(readPortalSession(storage)).toEqual(session);
   });
+  it("requires reauthorization for the old token envelope", () => {
+    const storage = memoryTabStorage();
+    storage.setItem("anytoolai.portal_session.v1", JSON.stringify({ version: 1, ...session }));
+    expect(() => readPortalSession(storage)).toThrow("portal_storage_invalid");
+  });
   it("uses secure S256 PKCE, checks state and consumes a callback once", async () => {
     const storage = memoryTabStorage();
     const { challenge, state } = await preparePortalAuthorization(storage, "/products/proposal_ai", "test_custody", webcrypto as Crypto);
@@ -51,9 +56,9 @@ describe("Portal tab custody", () => {
     expect(validatePortalReturnTarget(result + "&paid=1", () => true)).toBe(result + "&paid=1");
   });
   it.each([
-    { schema_version: 2 }, { token_type: "other" }, { user_id: "foreign-not-uuid" }, { expires_at: "tomorrow" }, { access_token: "bad token" },
+    { schema_version: 1 }, { consumer_id: "synthetic-summary" }, { consumer_policy_revision: 0 }, { consumer_policy_revision: true }, { consumer_policy_revision: 1.5 }, { token_type: "other" }, { user_id: "foreign-not-uuid" }, { expires_at: "tomorrow" }, { access_token: "bad token" },
   ])("rejects malformed exchange fields %o", (override) => {
-    expect(parsePortalExchange({ schema_version: 1, token_type: "Bearer", tenant_id: "anytoolai", region: "ru", user_id: session.owner.userId,
+    expect(parsePortalExchange({ schema_version: 2, consumer_id: "platform-kernel", consumer_policy_revision: 1, token_type: "Bearer", tenant_id: "anytoolai", region: "ru", user_id: session.owner.userId,
       access_token: session.accessToken, expires_at: session.expiresAt, ...override })).toBeNull();
   });
   it("refuses authorization before navigation when storage rejects custody", async () => {

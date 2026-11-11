@@ -300,7 +300,7 @@ def eligible_allowance(
     if principal.valid_until <= now:
         raise ApiError(
             status_code=HTTPStatus.UNAUTHORIZED,
-            code="kernel_delegation_expired",
+            code="backend_delegation_expired",
             message="Portal delegation has expired.",
             headers={"WWW-Authenticate": "Bearer"},
         )

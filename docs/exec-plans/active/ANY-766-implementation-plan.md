@@ -1,6 +1,6 @@
 # ANY-766 — Portal API and Paid Execution for Product Backends
 
-Status: **STEPS 1–9 COMPLETE; Steps 10–17 pending; delivery ends at PR readiness**
+Status: **STEPS 1–10 COMPLETE; Steps 11–17 pending; delivery ends at PR readiness**
 
 Date: **2026-11-09**
 
@@ -10,9 +10,9 @@ Related requirements: [ANY-833](https://linear.app/paveldik/issue/ANY-833).
 
 - State: active
 - Owner: mixed — Portal and Kernel execution owners
-- Last updated: 2026-11-10
-- Review date: 2026-11-10
-- Next action: Step 10 consumer authentication and delegation, only when requested.
+- Last updated: 2026-11-11
+- Review date: 2026-11-11
+- Next action: Step 11 technical-source ownership, only when requested.
 - Blocker: none for the planned local work; real external-product integration is outside this plan.
 
 Portal's `docs/exec-plans/active/ANY-766-implementation-plan.md` is authoritative;
@@ -93,7 +93,7 @@ contacting its services or accepting its integration is not an ANY-766 gate.
 Development bases: Portal ANY-766 is based on ANY-765
 `b2ef280048ac634a60c18e820fbf702beddba19c`; Kernel is based on
 `72ff15bc0b77903c87aa39f7b10186dccc556d09` and includes ANY-507/814.
-Current migration heads are Portal `20261110_0008` and Kernel `0019`.
+Current migration heads are Portal `20261111_0009` and Kernel `0019`.
 
 Development may continue above the verified ANY-765 base while its PR is reviewed.
 After it merges, transfer only ANY-766 changes onto accepted main under a
@@ -248,31 +248,37 @@ Update both canonical designs, producer schemas, positive/negative fixtures and 
 
 ### 3.4 Implemented Portal-session delegation and browser recovery
 
-This is the completed Steps 4/8 baseline. Section 3.9 generalizes the audience,
-routes and configured callback while retaining PKCE, custody and recovery.
+Steps 4/8 supply PKCE, custody and recovery; completed Step 10 generalizes
+consumer identity, routes and configured callback. This section records the
+current identity contract. Section 3.9 also specifies later snapshot/source/
+recipient work that remains pending.
 
-Use the user-selected one-use code with S256 PKCE and a narrow Kernel token.
+Use a consumer-bound one-use code with S256 PKCE and a narrow delegated token.
 
 Browser routes:
 
 - Kernel `/portal-session/launch`.
 - Kernel `/portal-session/callback`.
-- Portal localized `/[locale]/kernel/authorize`, using existing locale routing.
+- Portal localized `/[locale]/backend/authorize`, using existing locale routing.
 
 The Kernel launch page stores an unpredictable state, verifier and validated local return target in tab `sessionStorage`. Allowed targets are registered product pages, result pages and handoff pages. Portal accepts no caller-selected external callback.
 
-Portal authenticates the existing session and issues a random 32-byte code, valid for 60 seconds. The fixed Kernel callback receives code/state in the fragment, clears it immediately, verifies state and exchanges through the Kernel backend.
+Portal authenticates the existing session and issues a random 32-byte code,
+valid for at most 60 seconds and no longer than the parent session. The selected
+consumer's configured callback receives code/state in the fragment, clears it
+immediately, verifies state and exchanges through that backend. Kernel uses its
+existing callback and local exchange route.
 
 Interfaces:
 
-- Portal `POST /api/kernel-session-codes` accepts `code_challenge` and `code_challenge_method: "S256"` under the existing Portal bearer. It returns the code and expiry with no-store headers.
+- Portal `POST /api/backend-session-codes` accepts explicit configured `consumer_id`, `code_challenge` and `code_challenge_method: "S256"` under the existing Portal bearer. It returns the code and expiry with no-store headers.
 - Kernel `POST /v1/portal-session/exchange` accepts `code` and `code_verifier`.
-- Portal `POST /internal/v1/kernel-sessions/exchange` accepts the code/verifier under reverse-direction service authentication.
-- Portal `POST /internal/v1/kernel-sessions/introspect` accepts the delegated token in a secret body field; its Authorization header carries the service credential.
+- Portal `POST /internal/v1/backend-sessions/exchange` accepts the code/verifier under reverse-direction service authentication.
+- Portal `POST /internal/v1/backend-sessions/introspect` accepts the delegated token in a secret body field; its Authorization header carries the service credential.
 
-Exchange returns a version-1 response containing the delegated `access_token`, `token_type: "Bearer"`, canonical scope/user and expiry. The token expires at the earlier of 30 minutes and parent-session expiry. There is no refresh token.
+Exchange returns a version-2 response containing the delegated `access_token`, `token_type: "Bearer"`, canonical scope/user, `consumer_id`, current `consumer_policy_revision` and expiry. The token expires at the earlier of 30 minutes and parent-session expiry. There is no refresh token.
 
-Introspection validates the token, audience, parent session and active user on every protected Kernel request. It returns canonical scope/user and conservative `valid_until`, with the Portal–Kernel clock budget removed. It returns no PII.
+Introspection validates the token, authenticated consumer audience, current policy, parent session and active user on every protected Kernel request. Its version-2 response returns canonical scope/user, `consumer_id`, current `consumer_policy_revision` and conservative `valid_until`, with the Portal–Kernel clock budget removed. It returns no PII.
 
 Use:
 
@@ -281,11 +287,15 @@ Use:
 - `403` for authenticated service scope/permission refusal.
 - `503` for dependency unavailability.
 
-Portal stores hashes only in one `kernel_session_delegations` table, linked to the existing AuthSession with cascading deletion. Code exchange is atomic and single-use. Use lock order User → AuthSession → delegation for the security writes. Do not add commits to internal identity reads.
+Portal stores hashes only in one `backend_session_delegations` table, linked to the existing AuthSession with cascading deletion. Code exchange is atomic and single-use. Use lock order User → AuthSession → delegation for the security writes. Do not add commits to internal identity reads.
+
+The stable tab key `anytoolai.portal_session.v1` now stores envelope version 2.
+Version-1 envelopes require reauthorization; separate owner/custody and pending
+prepared requests retain their original format and same-owner recovery.
 
 Browser custody and recovery are fixed as follows:
 
-- Store the delegated token and canonical owner in tab `sessionStorage`; never in URL queries, localStorage, telemetry or product inputs.
+- Store the version-2 delegated-token envelope and canonical owner in tab `sessionStorage`; never in URL queries, localStorage, telemetry or product inputs.
 - Keep the original Portal bearer exclusively at Portal.
 - Extend CE-kit’s existing prepared-start mechanism with a versioned recovery descriptor containing its original key and frozen request. Do not create another execution API.
 - Persist that descriptor before sending a new paid start. Bind it to canonical scope/user. If persistence fails, refuse the new paid send with a recoverable local error; existing result reads remain available.
@@ -320,9 +330,13 @@ Every protected request introspects identity. An already authenticated in-flight
 Preserve independent directional credentials:
 
 - Portal → Kernel: `KERNEL_SERVICE_TOKEN`, received as current/previous `ANYTOOLAI_PORTAL_SERVICE_TOKEN`.
-- Kernel → Portal: `ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN`, received as current/previous `KERNEL_ACCESS_SERVICE_TOKEN`.
+- Kernel → Portal: `ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN`, received by the platform-kernel entry's current/previous backend-to-Portal slots in `BACKEND_CONSUMERS`.
 
 Add receiver-owned permissions for each new operation. Internal endpoints require exactly one Bearer header, trusted scope, TLS verification, no browser Origin, no-store responses and safe errors.
+
+The implemented Step 6 coherence baseline remains snapshot V2; consumer/P
+cache partitioning and admission fencing are Step 12. Step 10 carries consumer/P
+at the identity adapter without changing Core ownership or replay.
 
 Kernel stores the revision floor and cached snapshot in one PostgreSQL coherence row per scoped user. Snapshot installation, invalidation and new-execution admission use that same row lock. Eviction removes the document, never the floor.
 
@@ -691,8 +705,9 @@ hint, never a financial command or direct grant revocation/refill.
 
 **Forward migrations and synchronized local cutover**
 
-Extend the actual migration heads, currently Portal `20261110_0008` and Kernel
-`0019`; never edit applied migrations or rebuild retained data. Quiesce both
+The amendment starts from Portal `20261110_0008` and Kernel `0019`; Step 10
+advances Portal to `20261111_0009`. Extend the actual heads recorded in Section 2;
+never edit applied migrations or rebuild retained data. Quiesce both
 local APIs/workers before the synchronized cutover and run forward migrations
 against isolated local test databases first. New and old wire contracts do not
 need concurrent support; update our Portal, Kernel and browser configuration
@@ -1062,8 +1077,9 @@ Cover all scenario modes, reload, lost start/exchange responses, expiry, differe
 
 **Status:** COMPLETE. Common guide, consumer-neutral schemas/fixtures and bounded
 refactoring/forward-migration inventory formalized; focused offline contracts,
-documentation and applicable non-fixing checks PASS. Runtime/OpenAPI remains the
-Steps 1–8 baseline; working auth/access is still Step 12.
+documentation and applicable non-fixing checks PASS. At Step 9 completion, runtime/OpenAPI retained the
+Steps 1–8 baseline. Step 10 implements common identity; complete working
+auth/access remains Step 12.
 
 **Goal / Expected behavior:** the external team and implementing agents have one
 unambiguous target contract, a bounded change inventory and an explicit local
@@ -1108,7 +1124,15 @@ at Step 12. No unresolved policy/revision or history-conversion decision remains
 
 ### Step 10 — Generalize consumer authentication and session delegation
 
-**Status:** PENDING; depends on Step 9.
+**Status:** COMPLETE. Common consumer-bound V2 identity, independent credentials,
+policy guard, fixed callbacks and paired browser/Kernel clients implemented.
+Populated-delegation forward migration, focused identity/security/contract and
+PostgreSQL checks, browser recovery, desktop/mobile accessibility, generation
+and applicable non-fixing checks PASS. Snapshot remains Kernel-only V2 until
+Step 12. Evidence is local/synthetic; assembled Portal–Kernel TCP acceptance
+remains Step 16, and the final full-check/install gates remain open.
+REV-3 is resolved: managed local startup forwards the consumer registry privately;
+dotenv/settings regressions and the real Compose configuration checks PASS.
 
 **Goal / Expected behavior:** Kernel and a synthetic second backend authenticate
 independently and can exchange/introspect only their own Portal delegations.
@@ -1140,6 +1164,8 @@ Cover policy digest/version reuse and rollback refusal, and same-owner recovery
 of an uncertain paid start after the browser contract change. Assert generated
 OpenAPI distinguishes primary Portal auth from backend service auth and the
 delegated token in the introspection body.
+Verify `.env` → private `runtime.env` → composed API/web registry propagation,
+including process environment precedence and exclusion from public configuration.
 
 **Expected completion:** the actual generic identity endpoints work locally for
 both identities; Kernel retains its paid browser journey and pending-start

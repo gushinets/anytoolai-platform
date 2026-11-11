@@ -22,7 +22,7 @@ const render = makeRender(englishForAllLocales(TEST_PRODUCT_MESSAGES_EN));
 const renderHandoff = makeRender(HANDOFF_MESSAGES);
 const owner = { tenantId: "anytoolai", region: "ru", userId: "11111111-1111-1111-1111-111111111111" };
 const token = "t".repeat(43);
-const session = { owner, accessToken: token, expiresAt: "2099-01-01T00:00:00Z" };
+const session = { consumerId: "platform-kernel", consumerPolicyRevision: 1, owner, accessToken: token, expiresAt: "2099-01-01T00:00:00Z" };
 const ids = { productId: "proposal_ai", scenarioId: "proposal_ai.generate_v1" };
 const scenarios = ["proposal_ai.generate_v1", "client_update_writer.update_v1", "client_update_writer.prepaid_request_v1", "client_update_writer.reply_draft_v1", "brief_decoder.decode_v1", "acceptance_builder.draft_v1", "acceptance_builder.check_v1"];
 const fetcher = vi.fn<typeof fetch>();
@@ -59,7 +59,7 @@ beforeEach(() => {
   events.length = 0;
   fetcher.mockReset();
   vi.stubGlobal("fetch", fetcher);
-  vi.stubEnv("NEXT_PUBLIC_PORTAL_AUTHORIZE_URL", "https://portal.invalid/ru/kernel/authorize");
+  vi.stubEnv("NEXT_PUBLIC_PORTAL_AUTHORIZE_URL", "https://portal.invalid/ru/backend/authorize");
   routerPush.mockClear();
 });
 afterEach(() => { cleanup(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
@@ -207,14 +207,14 @@ it("rebuilds clients on reauthorization, preserving same-owner recovery and clea
   expect(readPaidStartRecovery(getPaidPersistence(getPlatformApiClient())!, ids.productId)).toBeNull();
 });
 
-it.each(["kernel_delegation_expired", "kernel_parent_authority_invalid"])("handles %s without guest fallback", async (code) => {
+it.each(["backend_delegation_expired", "backend_parent_authority_invalid"])("handles %s without guest fallback", async (code) => {
   const client = createPlatformApiClient();
   const persistence = getPaidPersistence(client)!;
   persistPaidStartRecovery(persistence, { version: 1, kind: "accepted", owner, ...ids, scenarioSessionId: "session_1" });
   fetcher.mockResolvedValue(errorResponse(401, code));
   await client.request({ path: "/v1/scenario-sessions/session_1" });
   expect(getPortalIdentity().kind).toBe("required");
-  expect(readPaidStartRecovery(persistence, ids.productId)?.kind ?? null).toBe(code === "kernel_delegation_expired" ? "accepted" : null);
+  expect(readPaidStartRecovery(persistence, ids.productId)?.kind ?? null).toBe(code === "backend_delegation_expired" ? "accepted" : null);
   expect(fetcher).toHaveBeenCalledOnce();
 });
 
@@ -247,7 +247,7 @@ it("restarts a lost exchange while retaining the original frozen request/key and
   expect(readPortalContinuation()).toBe(target);
   const second = new URL(await beginPortalAuthorization(target));
   expect(second.searchParams.get("state")).not.toBe(first.searchParams.get("state"));
-  fetcher.mockResolvedValue(Response.json({ schema_version: 1, token_type: "Bearer", tenant_id: owner.tenantId, region: owner.region,
+  fetcher.mockResolvedValue(Response.json({ schema_version: 2, consumer_id: "platform-kernel", consumer_policy_revision: 1, token_type: "Bearer", tenant_id: owner.tenantId, region: owner.region,
     user_id: owner.userId, expires_at: session.expiresAt, access_token: token }));
   expect(await completePortalAuthorization(`#code=${"d".repeat(43)}&state=${second.searchParams.get("state")}`)).toBe(target);
   expect(readPaidStartRecovery(getPaidPersistence(createPlatformApiClient())!, ids.productId)).toEqual(original);
@@ -282,7 +282,7 @@ it("ignores a successful exchange completed after explicit logout", async () => 
   fetcher.mockReturnValue(new Promise<Response>((done) => { resolve = done; }));
   const result = completePortalAuthorization(`#code=${"c".repeat(43)}&state=${authorization.state}`);
   requirePortalAuthorization(true);
-  resolve(Response.json({ schema_version: 1, token_type: "Bearer", tenant_id: owner.tenantId, region: owner.region,
+  resolve(Response.json({ schema_version: 2, consumer_id: "platform-kernel", consumer_policy_revision: 1, token_type: "Bearer", tenant_id: owner.tenantId, region: owner.region,
     user_id: owner.userId, expires_at: session.expiresAt, access_token: token }));
   await expect(result).rejects.toThrow();
   expect(getPortalIdentity().kind).toBe("required");
@@ -304,7 +304,7 @@ it.each([false, true])("ignores a first-login callback after a newer document si
   if (refused) vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("quota exceeded"); });
   newer.requirePortalAuthorization(true);
   expect(getPortalIdentity()).toMatchObject({ kind: "required", owner: null, generation });
-  finish(Response.json({ schema_version: 1, token_type: "Bearer", tenant_id: owner.tenantId, region: owner.region,
+  finish(Response.json({ schema_version: 2, consumer_id: "platform-kernel", consumer_policy_revision: 1, token_type: "Bearer", tenant_id: owner.tenantId, region: owner.region,
     user_id: owner.userId, expires_at: session.expiresAt, access_token: token }));
   await expect(exchange).rejects.toThrow("portal_exchange_failed");
   expect(tabStorage.getItem("anytoolai.portal_mode.v1")).not.toBe(initialMode);
@@ -319,7 +319,7 @@ it("refuses an old authorization callback when the newer document has already si
   const newer = await import("../src/lib/portalSession");
   newer.installPortalSession(session);
   newer.requirePortalAuthorization(true);
-  fetcher.mockResolvedValue(Response.json({ schema_version: 1, token_type: "Bearer", tenant_id: owner.tenantId, region: owner.region,
+  fetcher.mockResolvedValue(Response.json({ schema_version: 2, consumer_id: "platform-kernel", consumer_policy_revision: 1, token_type: "Bearer", tenant_id: owner.tenantId, region: owner.region,
     user_id: owner.userId, expires_at: session.expiresAt, access_token: token }));
   await expect(completePortalAuthorization(`#code=${"c".repeat(43)}&state=${launch.searchParams.get("state")}`)).rejects.toThrow();
   expect(fetcher).not.toHaveBeenCalled();
@@ -396,7 +396,7 @@ it.each(["different owner", "renewed token", "logout"])("ignores late exchange a
   const recoveryKey = `anytoolai.paid_start.v1.${ids.productId}`;
   tabStorage.setItem(recoveryKey, JSON.stringify(recovery));
   expect(getPortalIdentity().generation).toBe(generation);
-  finish(Response.json({ schema_version: 1, token_type: "Bearer", tenant_id: owner.tenantId, region: owner.region,
+  finish(Response.json({ schema_version: 2, consumer_id: "platform-kernel", consumer_policy_revision: 1, token_type: "Bearer", tenant_id: owner.tenantId, region: owner.region,
     user_id: owner.userId, expires_at: session.expiresAt, access_token: token }));
   await expect(exchange).rejects.toThrow("portal_exchange_failed");
   expect(readPortalSession(tabStorage)).toEqual(change === "logout" ? null : nextSession);
@@ -420,7 +420,7 @@ it.each(["pageshow", "focus"])("callback reconciles custody on %s while its exch
   tabStorage.setItem("anytoolai.portal_mode.v1", JSON.stringify({ version: 1, owner: nextSession.owner, custodyId: "newer_document_custody" }));
   act(() => { window.dispatchEvent(event === "pageshow" ? new PageTransitionEvent(event, { persisted: true }) : new Event(event)); });
   expect(getPortalIdentity()).toMatchObject({ kind: "authorized", session: nextSession });
-  await act(async () => { finish(Response.json({ schema_version: 1, token_type: "Bearer", tenant_id: owner.tenantId, region: owner.region,
+  await act(async () => { finish(Response.json({ schema_version: 2, consumer_id: "platform-kernel", consumer_policy_revision: 1, token_type: "Bearer", tenant_id: owner.tenantId, region: owner.region,
     user_id: owner.userId, expires_at: session.expiresAt, access_token: token })); });
   expect(await screen.findByRole("alert")).toBeTruthy();
   expect(readPortalSession(tabStorage)).toEqual(nextSession);
@@ -456,4 +456,32 @@ it.each([false, true])("accepts paid handoff without a guest and preserves unres
   expect(parseBody(acceptedCall[1]?.body)).not.toHaveProperty("guest_id");
   expect(new Headers(acceptedCall[1]?.headers).get("Authorization")).toBe(`Bearer ${token}`);
   expect(readPaidStartRecovery(persistence, "freelancer_demo")).toMatchObject(hasPending ? pending : { kind: "accepted", scenarioSessionId: "target_session" });
+});
+
+it("quarantines a Step 8 token while retaining the exact uncertain start across same-owner V2 authorization", async () => {
+  const client = createPlatformApiClient();
+  const original = { request: { ...ids, frontendId: "web", input: { text: "frozen before cutover" } }, idempotencyKey: "original_cutover_key" };
+  const recovery = { version: 1, kind: "pending", owner, ...ids, idempotencyKey: original.idempotencyKey, request: original.request } as const;
+  persistPaidStartRecovery(getPaidPersistence(client)!, recovery);
+  window.sessionStorage.setItem("anytoolai.portal_session.v1", JSON.stringify({ version: 1, owner, accessToken: "old".repeat(15), expiresAt: session.expiresAt }));
+  expect(synchronizePortalIdentity()).toMatchObject({ kind: "required", owner });
+  expect(() => createPlatformApiClient()).toThrow("portal_authorization_required");
+  requirePortalAuthorization();
+  installPortalSession({ ...session, accessToken: "n".repeat(43) });
+  const restored = readPaidStartRecovery(getPaidPersistence(createPlatformApiClient())!, ids.productId);
+  expect(restored).toEqual(recovery);
+  const sends: RequestInit[] = [];
+  fetcher.mockImplementation(async (url, init) => {
+    const path = new URL(typeof url === "string" ? url : url instanceof URL ? url.href : url.url).pathname;
+    if (path.endsWith("runtime-config")) return runtimeConfigResponse(ids);
+    if (path.endsWith("/start")) { sends.push(init!); return startResponse(); }
+    if (path.startsWith("/v1/scenario-sessions/")) return sessionResponse();
+    if (path.startsWith("/v1/results/")) return resultResponse(ids);
+    throw new Error("unexpected request after cutover");
+  });
+  render(<ProductRunPage client={createPlatformApiClient()} definition={{ ...testProductDefinition, ...ids }} />);
+  await screen.findByText("Generated result text.");
+  expect(sends).toHaveLength(1);
+  expect(new Headers(sends[0].headers).get("Idempotency-Key")).toBe(original.idempotencyKey);
+  expect(parseBody(sends[0].body)).toMatchObject({ input: { text: "frozen before cutover" } });
 });

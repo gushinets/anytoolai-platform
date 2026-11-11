@@ -26,7 +26,7 @@ beforeEach(() => {
   window.sessionStorage.clear();
   window.history.replaceState(null, "", "/products/proposal_ai");
   requirePortalAuthorization(true);
-  installPortalSession({ owner, accessToken: "t".repeat(43), expiresAt: "2099-01-01T00:00:00Z" });
+  installPortalSession({ consumerId: "platform-kernel", consumerPolicyRevision: 1, owner, accessToken: "t".repeat(43), expiresAt: "2099-01-01T00:00:00Z" });
   fetched.length = 0;
   fetcher.mockReset();
   vi.stubGlobal("fetch", fetcher);
@@ -321,7 +321,7 @@ it("discards a late result from the previous owner without removing the new owne
   const pending = client.request({ path: "/v1/scenario-sessions/old_session" });
   const nextOwner = { ...owner, userId: "22222222-2222-2222-2222-222222222222" };
   // These writes belong to a newer document in the same tab; this document's module is still cached.
-  writePortalSession(tabStorage, { owner: nextOwner, accessToken: "n".repeat(43), expiresAt: "2099-01-01T00:00:00Z" });
+  writePortalSession(tabStorage, { consumerId: "platform-kernel", consumerPolicyRevision: 1, owner: nextOwner, accessToken: "n".repeat(43), expiresAt: "2099-01-01T00:00:00Z" });
   window.sessionStorage.setItem("anytoolai.portal_mode.v1", JSON.stringify({ version: 1, owner: nextOwner, custodyId: "newer_document_custody" }));
   const recovery = { version: 1, kind: "accepted", owner: nextOwner, ...ids, scenarioSessionId: "new_owner_session" };
   window.sessionStorage.setItem(`anytoolai.paid_start.v1.${ids.productId}`, JSON.stringify(recovery));
@@ -340,7 +340,7 @@ it("keeps the current client on unchanged page restoration and replaces it on sa
   persistPaidStartRecovery(persistence, { version: 1, kind: "accepted", owner, ...ids, scenarioSessionId: "session_1" });
   await act(async () => { window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true })); });
   expect(displayedClient).toBe(original);
-  writePortalSession(tabStorage, { owner, accessToken: "n".repeat(43), expiresAt: "2099-01-01T00:00:00Z" });
+  writePortalSession(tabStorage, { consumerId: "platform-kernel", consumerPolicyRevision: 1, owner, accessToken: "n".repeat(43), expiresAt: "2099-01-01T00:00:00Z" });
   await act(async () => { window.dispatchEvent(new Event("focus")); });
   expect(displayedClient).not.toBe(original);
   expect(readPaidStartRecovery(getPaidPersistence(displayedClient!)!, ids.productId)?.kind).toBe("accepted");
