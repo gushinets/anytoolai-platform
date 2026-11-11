@@ -10,7 +10,7 @@ import { MultiModeProduct } from "../src/products/shared/MultiModeProduct";
 import { PortalIdentityBoundary } from "../src/components/PortalIdentityBoundary";
 import ProductPage from "../src/app/products/[productId]/page";
 import { testProductDefinition, TEST_PRODUCT_MESSAGES_EN } from "./fixtures/testProductDefinition";
-import { resultResponse, runtimeConfigResponse, sessionResponse, startResponse } from "./fixtures/platformResponses";
+import { errorResponse, resultResponse, runtimeConfigResponse, sessionResponse, startResponse } from "./fixtures/platformResponses";
 import { englishForAllLocales, makeRender } from "./support/renderWithI18n";
 
 const render = makeRender(englishForAllLocales(TEST_PRODUCT_MESSAGES_EN));
@@ -154,11 +154,11 @@ it("an explicitly selected result chooses its scenario before a different saved 
     const path = fetchUrl(url).pathname;
     fetched.push(path);
     if (path.endsWith("runtime-config")) return runtimeConfigResponse({ productId, scenarioId });
-    if (path.endsWith("/selected_session")) return sessionResponse({ scenario_session_id: "selected_session" });
+    if (path.endsWith("/selected_session")) return sessionResponse({ scenario_id: scenarioId, scenario_session_id: "selected_session" });
     if (path.startsWith("/v1/results/")) return resultResponse({ productId, scenarioId });
     throw new Error("unexpected request");
   });
-  render(<MultiModeProduct client={client} legend="Mode" name="mode" attachFromUrl attachSessionId="selected_session" attachScenarioId={scenarioId} modes={[
+  render(<MultiModeProduct client={client} legend="Mode" name="mode" attachFromUrl attachSessionId="selected_session" attachScenarioId="acceptance_builder.draft_v1" modes={[
     { id: "draft", label: "Draft", definition: { ...testProductDefinition, productId, scenarioId: "acceptance_builder.draft_v1" } },
     { id: "check", label: "Check", definition: { ...testProductDefinition, productId, scenarioId } },
   ]} />);
@@ -176,7 +176,7 @@ it("the product route keeps an explicit result's scenario while consuming the UR
     const path = fetchUrl(url).pathname;
     fetched.push(path);
     if (path.endsWith("runtime-config")) return new Promise<Response>((resolve) => { finishRuntime = resolve; });
-    if (path.endsWith("/selected_session")) return sessionResponse({ scenario_session_id: "selected_session", status: "failed", result_artifact_id: null });
+    if (path.endsWith("/selected_session")) return sessionResponse({ scenario_id: scenarioId, scenario_session_id: "selected_session", status: "failed", result_artifact_id: null });
     if (path === "/v1/client-events") return Response.json({ event_id: "event_1", event_type: "web.product_viewed" });
     throw new Error("unexpected request");
   });
@@ -225,7 +225,7 @@ it("a historical check link preserves a pending draft before boot, after failure
     fetched.push(path);
     if (path.endsWith("runtime-config")) return finishRuntime ? productConfig()
       : new Promise<Response>((resolve) => { finishRuntime = resolve; });
-    if (path.endsWith("/historical_check")) return sessionResponse({ scenario_session_id: "historical_check", status: "failed", result_artifact_id: null });
+    if (path.endsWith("/historical_check")) return sessionResponse({ scenario_id: scenarioId, scenario_session_id: "historical_check", status: "failed", result_artifact_id: null });
     if (path.endsWith("/start")) { starts.push(init!); return startResponse({ scenario_session_id: "original_draft" }); }
     if (path.endsWith("/original_draft")) return new Promise<Response>((resolve) => { finishPoll = resolve; });
     if (path === "/v1/client-events") return Response.json({ event_id: "event_1", event_type: "web.product_viewed" });
@@ -346,4 +346,113 @@ it("keeps the current client on unchanged page restoration and replaces it on sa
   expect(readPaidStartRecovery(getPaidPersistence(displayedClient!)!, ids.productId)?.kind).toBe("accepted");
   expect(await original.request({ path: "/v1/scenario-sessions/session_1" })).toEqual({ ok: false, error: { type: "aborted" } });
   expect(fetcher).not.toHaveBeenCalled();
+});
+
+it.each(["pending", "accepted"] as const)("restores a %s non-default paid mode before a stale handoff when config is unavailable", async (kind) => {
+  const client = createPlatformApiClient();
+  const persistence = getPaidPersistence(client)!;
+  const productId = "acceptance_builder";
+  const scenarioId = "acceptance_builder.check_v1";
+  const product = { productId, scenarioId };
+  const base = { version: 1 as const, owner, ...product };
+  persistPaidStartRecovery(persistence, kind === "pending"
+    ? { ...base, kind, idempotencyKey: "original_key", request: { ...product, frontendId: "web_mirror", input: { text: "Frozen check input" } } }
+    : { ...base, kind, scenarioSessionId: "recovered_session" });
+  chooseAttachSession(productId, "old_handoff", "2026-11-10T00:00:00Z");
+  const starts: RequestInit[] = [];
+  fetcher.mockImplementation(async (url, init) => {
+    const path = fetchUrl(url).pathname;
+    fetched.push(path);
+    if (path.endsWith("runtime-config")) return errorResponse(404, "product_not_found");
+    if (path.endsWith("/start")) { starts.push(init!); return startResponse({ scenario_session_id: "recovered_session" }); }
+    if (path.endsWith("/recovered_session")) return sessionResponse({ scenario_id: scenarioId, scenario_session_id: "recovered_session" });
+    if (path.startsWith("/v1/results/")) return resultResponse(product, { scenario_session_id: "recovered_session" });
+    throw new Error("unexpected request");
+  });
+  function Attached() {
+    const attach = useAttachSession(productId, undefined);
+    return <MultiModeProduct client={client} {...attach} legend="Mode" name="recovery-mode" modes={[
+      { id: "draft", label: "Draft", definition: { ...testProductDefinition, productId, scenarioId: "acceptance_builder.draft_v1" } },
+      { id: "check", label: "Check", definition: { ...testProductDefinition, ...product, outputSchema: { schemaRef: `${productId}.output_v1`, schemaVersion: 1 } } },
+    ]} />;
+  }
+  const first = render(<Attached />);
+  await screen.findByText("Generated result text.");
+  expect((screen.getByRole("radio", { name: "Check" }) as HTMLInputElement).checked).toBe(true);
+  expect(readAttachSessionId(productId)).toBeUndefined();
+  expect(starts).toHaveLength(kind === "pending" ? 1 : 0);
+  if (kind === "pending") {
+    expect(new Headers(starts[0].headers).get("Idempotency-Key")).toBe("original_key");
+    expect(starts[0].body).toContain('"input":{"text":"Frozen check input"}');
+  }
+  first.unmount();
+  render(<Attached />);
+  await screen.findByText("Generated result text.");
+  expect(starts).toHaveLength(kind === "pending" ? 1 : 0);
+  expect(fetched.some((path) => path.endsWith("/old_handoff") || path.includes("identity/guest") || path.endsWith("/quota"))).toBe(false);
+});
+
+it.each([false, true])("explicit discard of an unavailable paid session preserves a newer pending operation (newer=%s)", async (newer) => {
+  const client = createPlatformApiClient();
+  const persistence = getPaidPersistence(client)!;
+  const productId = "acceptance_builder";
+  const scenarioId = "acceptance_builder.check_v1";
+  const product = { productId, scenarioId };
+  persistPaidStartRecovery(persistence, { version: 1, kind: "accepted", owner, ...product, scenarioSessionId: "missing_session" });
+  chooseAttachSession(productId, "other_handoff", "2026-11-10T00:00:00Z");
+  const starts: RequestInit[] = [];
+  fetcher.mockImplementation(async (url, init) => {
+    const path = fetchUrl(url).pathname;
+    fetched.push(path);
+    if (path.endsWith("runtime-config")) return runtimeConfigResponse({ ...product,
+      scenarioId: newer ? scenarioId : "acceptance_builder.draft_v1" });
+    if (path.endsWith("/missing_session")) return errorResponse(404, "scenario_session_not_found");
+    if (path.endsWith("/start")) { starts.push(init!); return startResponse(); }
+    if (path.endsWith("/session_1")) return sessionResponse({ scenario_id: scenarioId });
+    if (path.startsWith("/v1/results/")) return resultResponse(product);
+    throw new Error("unexpected request");
+  });
+  function Attached() {
+    const attach = useAttachSession(productId, undefined);
+    return <MultiModeProduct client={client} {...attach} legend="Mode" name="discard-mode" modes={[
+      { id: "draft", label: "Draft", definition: { ...testProductDefinition, productId, scenarioId: "acceptance_builder.draft_v1" } },
+      { id: "check", label: "Check", definition: { ...testProductDefinition, ...product } },
+    ]} />;
+  }
+  render(<Attached />);
+  await screen.findByRole("button", { name: "New task" });
+  expect(starts).toHaveLength(0);
+  if (newer) persistPaidStartRecovery(persistence, { version: 1, kind: "pending", owner, ...product, idempotencyKey: "newer_key",
+    request: { ...product, frontendId: "web_mirror", input: { text: "Frozen newer request" } } });
+  fireEvent.click(screen.getByRole("button", { name: "New task" }));
+  if (newer) {
+    await screen.findByText("Generated result text.");
+    expect(starts).toHaveLength(1);
+    expect(new Headers(starts[0].headers).get("Idempotency-Key")).toBe("newer_key");
+    expect(starts[0].body).toContain('"input":{"text":"Frozen newer request"}');
+  } else {
+    await screen.findByRole("form");
+    expect(readPaidStartRecovery(persistence, productId)).toBeNull();
+    expect(starts).toHaveLength(0);
+  }
+  expect(readAttachSessionId(productId)).toBe("other_handoff");
+  expect(fetched.some((path) => path.endsWith("/other_handoff"))).toBe(false);
+});
+
+it("an obsolete mode resolver leaves the current owner's pending request intact", async () => {
+  const obsoleteClient = createPlatformApiClient();
+  const nextOwner = { ...owner, userId: "22222222-2222-2222-2222-222222222222" };
+  installPortalSession({ consumerId: "platform-kernel", consumerPolicyRevision: 1, owner: nextOwner,
+    accessToken: "n".repeat(43), expiresAt: "2099-01-01T00:00:00Z" });
+  const persistence = getPaidPersistence(createPlatformApiClient())!;
+  const pending = { version: 1 as const, kind: "pending" as const, owner: nextOwner, ...ids, idempotencyKey: "new_owner_key",
+    request: { ...ids, frontendId: "web_mirror", input: { text: "Next owner's private input" } } };
+  persistPaidStartRecovery(persistence, pending);
+  render(<MultiModeProduct client={obsoleteClient} legend="Mode" name="obsolete-mode" modes={[
+    { id: "main", label: "Main", definition },
+  ]} />);
+  await act(async () => {});
+  expect(readPaidStartRecovery(persistence, ids.productId)).toEqual(pending);
+  expect(fetcher).not.toHaveBeenCalled();
+  expect(screen.queryByRole("form")).toBeNull();
 });

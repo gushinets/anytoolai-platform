@@ -43,6 +43,7 @@ function Fields({ values, errors, disabled, onChange }: ProductFieldsProps<Value
 export const taskFinderDefinition: ProductDefinition<Values, TaskFinderResult> = {
   productId: "task_finder",
   scenarioId: "task_finder.fit_v1",
+  outputSchema: { schemaRef: "task_finder.fit_output_v1", schemaVersion: 1 },
   messageScope: "fit",
   hasDescription: true,
   emptyValues: { taskText: "", positioning: "" },

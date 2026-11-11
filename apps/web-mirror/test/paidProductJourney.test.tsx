@@ -39,7 +39,7 @@ function routeFetch(scenarioId = ids.scenarioId) {
     const path = new URL(typeof url === "string" ? url : url instanceof URL ? url.href : url.url).pathname;
     if (path.endsWith("runtime-config")) return runtimeConfigResponse(product);
     if (path.endsWith("/start")) { starts.push(init!); return startResponse(); }
-    if (path.startsWith("/v1/scenario-sessions/")) return sessionResponse();
+    if (path.startsWith("/v1/scenario-sessions/")) return sessionResponse({ scenario_id: scenarioId });
     if (path.startsWith("/v1/results/")) return resultResponse(product);
     if (path === "/v1/client-events") {
       const body: unknown = parseBody(init?.body);
@@ -475,7 +475,7 @@ it("quarantines a Step 8 token while retaining the exact uncertain start across 
     const path = new URL(typeof url === "string" ? url : url instanceof URL ? url.href : url.url).pathname;
     if (path.endsWith("runtime-config")) return runtimeConfigResponse(ids);
     if (path.endsWith("/start")) { sends.push(init!); return startResponse(); }
-    if (path.startsWith("/v1/scenario-sessions/")) return sessionResponse();
+    if (path.startsWith("/v1/scenario-sessions/")) return sessionResponse({ scenario_id: ids.scenarioId });
     if (path.startsWith("/v1/results/")) return resultResponse(ids);
     throw new Error("unexpected request after cutover");
   });

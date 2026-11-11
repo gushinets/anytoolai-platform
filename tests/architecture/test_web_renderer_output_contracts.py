@@ -29,6 +29,7 @@ OUTPUT_CONTRACT = re.compile(
         ("brief_decoder", "briefDecoder/BriefDecoderProduct.tsx"),
         ("acceptance_builder", "acceptanceBuilder/AcceptanceBuilderProduct.tsx"),
         ("client_update_writer", "clientUpdateWriter/ClientUpdateWriterProduct.tsx"),
+        ("task_finder", "taskFinder/TaskFinderProduct.tsx"),
     ],
 )
 def test_renderer_output_contract_matches_backend(product: str, web_path: str) -> None:
