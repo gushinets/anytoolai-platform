@@ -13,8 +13,9 @@ versioned tags or immutable digests. API and worker require identical nonempty
 `org.opencontainers.image.revision` labels. This is necessary source evidence,
 not a universal wire or data compatibility declaration. Use the matching reviewed
 control checkout; old binaries are excluded from the ANY-766 synchronized API
-cutover. The Portal deployment runbook owns the paired migration order and
-purchased-document reader floor.
+cutover. The
+[Portal paired cutover procedure](https://github.com/gushinets/payments-portal/blob/main/docs/architecture/deployment.md#paired-compatibility-and-synchronized-cutover)
+owns the migration order and purchased-document reader floor.
 
 `.github/workflows/publish-images.yml` builds `backend` (API and worker),
 `frontend` or `all` independently. Publishing is default-off and requires separate
@@ -1148,15 +1149,18 @@ exit (including a crash) releases the lock automatically.
 
 ## ANY-766 paid authority receiver (Step 6)
 
-The API implementation requires migration `0019` before paid admission or
-invalidation is enabled. Apply it only through the environment's authorized
-migration procedure. This checkpoint has applied it only to disposable test
-bases; no running application database has been migrated.
+The historical Step 6 checkpoint introduced migration `0019` and snapshot V2;
+it was verified only against disposable test databases. Those versions are not
+the current installation target. The current pair requires Kernel `0021`,
+Portal `20261111_0011`, delegation V2 and snapshot V3. Follow
+[reviewed image installation](#reviewed-images-and-independent-updates-any-766-step-17)
+and the Portal-owned paired compatibility/cutover procedure linked there. Apply
+migrations only through the environment's authorized procedure.
 
 Set the API's existing `ANYTOOLAI_PORTAL_BASE_URL` and independent
 `ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN` to reach Portal identity/snapshot reads.
 The Portal receiver must explicitly grant session exchange/introspection and
-`access-snapshot:read`. Kernel accepts only snapshot V2; no V1 period conversion
+`access-snapshot:read`. Kernel accepts only snapshot V3; no V1/V2 wire conversion
 or local extension of expiry exists. HTTPS verification stays enabled; existing
 settings permit loopback HTTP only in dev/test.
 
@@ -1173,10 +1177,11 @@ refresh obtains a document at or above the durable floor; cache eviction does no
 remove that floor, its semantic identity or immutable usage history. Failed
 identity/snapshot dependencies return safe refusals without creating new work.
 
-Portal Step 7 implements embedded invalidation delivery using its configured
-manifest URL/token. Enable the receiver permission before starting that sender.
-Compose peer connectivity/environment forwarding, browser launch, usage/exhaustion,
-paired local acceptance and build/install preparation remain ANY-766 work.
-Remote installation, staging/live acceptance and production rollout belong to
-ANY-767. These settings describe implemented capabilities, not an already
-connected or approved deployment.
+Portal Step 13 selects the invalidation destination and outgoing key from each
+snapshot recipient's `BACKEND_CONSUMERS` entry; legacy Kernel manifest settings
+do not select delivery. Enable the receiver permission before starting that sender.
+Compose peer connectivity, browser launch and usage/exhaustion are implemented.
+Steps 16/17 supply focused paired local acceptance and build/install preparation.
+The full matrix, remote installation, staging/live acceptance and production
+rollout belong to ANY-767. Local evidence does not establish a connected or
+approved deployment.

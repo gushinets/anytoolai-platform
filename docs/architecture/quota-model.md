@@ -217,5 +217,6 @@ backoff; other non-204 responses park. Disabled delivery retains pending rows.
 Portal ACK follows its immutable hint commit, including valid historical and
 duplicate events. A hint never terminates, revokes or refills paid authority.
 The common backend guide records settings and operational recovery. Step 15
-implements independent cabinet usage composition; assembled two-service
-acceptance remains Step 16.
+implements independent cabinet usage composition; Step 16 supplies focused
+assembled local acceptance. The full matrix and remote/live acceptance remain
+ANY-767 work.

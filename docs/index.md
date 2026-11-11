@@ -16,11 +16,12 @@ This directory is the system of record for agents. Keep it current. If a decisio
 - [Kernel Capability Manifest v1](contracts/kernel-capability-manifest/v1/README.md) — generated producer schema, canonical fixtures, byte checksums and independent semantic checks.
 - [Common product backend API target](https://github.com/gushinets/payments-portal/blob/main/docs/contracts/product-backend-api/README.md) — Portal-owned Step 9 specification, bounded migration inventory and Step 12 working auth/access checkpoint.
 - [ANY-766 paid integration target contracts](contracts/portal-kernel-paid/README.md) — reviewed
-  retained snapshot V2/identity V1 and target V3/identity V2, invalidation,
+  retained historical snapshot V2/identity V1 and implemented V3/identity V2, invalidation,
   usage/exhaustion and cabinet schemas/fixtures;
   independent offline checks, implemented delegation/coherent paid admission and
   snapshot/invalidation transport, V1 usage/exhaustion and recoverable paid browser launch;
-  paired local acceptance and sales gates remain pending.
+  Steps 16/17 supply focused paired local acceptance and build/install preparation;
+  the full matrix, remote/live acceptance and sales gates remain deferred.
 
 ## Architecture
 

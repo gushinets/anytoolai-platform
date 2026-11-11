@@ -1637,13 +1637,6 @@ remote publication/deployment is outside this plan.
 
 ### PR readiness checklist
 
-Review corrections preserve the existing runtime contracts: forward the optional
-Kernel browser launch URL through every web build entrypoint, expose the existing
-invalidation recipient option through the operator wrapper, and align Kernel's
-runtime-fixture and migration-guard tests with snapshot V3 and migration `0021`.
-Rerun the affected build/configuration, CLI, contract and PostgreSQL migration
-checks under the focused testing gate below.
-
 - [ ] Inspect the final paired diff against the local DoD; resolve confirmed
   in-scope issues. Record the source revisions and evidence from Steps 16/17 and
   the accepted focused verification gate in Section 6; rerun only focused checks
