@@ -298,6 +298,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
 }: ProductRunPageProps<V, R>) {
   const { Fields, Result } = definition;
   const paid = client.portalIdentity !== undefined;
+  const draftOwner = client.portalIdentity?.owner;
   const [paidPersistence] = useState(() => getPaidPersistence(client));
   const [recoveryState] = useState(() => {
     try {
@@ -527,7 +528,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   useIsomorphicLayoutEffect(() => () => shell?.reportBusy(false), [shell]);
 
   const productId = definition.productId;
-  const draftKey = definition.draft ? productDraftKey(productId, definition.messageScope) : null;
+  const draftKey = definition.draft ? productDraftKey(productId, definition.messageScope, draftOwner) : null;
   const parseStoredValues = useCallback((raw: unknown): V | null => {
     if (!definition.draft || raw === undefined) return null;
     try {
@@ -688,7 +689,8 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   }, [attachSessionId, boot.kind]);
 
   useEffect(() => {
-    if (boot.kind !== "ready" || draftKey === null || attachSessionId || resumeCheckedRef.current) return;
+    // Paid starts have one owner-bound recovery record, including unresolved requests.
+    if (paid || boot.kind !== "ready" || draftKey === null || attachSessionId || resumeCheckedRef.current) return;
     resumeCheckedRef.current = true;
     const run = readProductDraft(draftKey)?.run;
     if (!run) return;
@@ -794,10 +796,10 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       return;
     }
     startedSessionsRef.current.set(prepared, result.value.scenarioSessionId);
-    // shortcut: pending start keys do not survive reload; persist them when pre-acceptance recovery is required.
-    if (draftKey !== null) {
+    if (draftKey !== null) saveProductDraftScenario(productId, scenarioId, draftOwner);
+    // Guest own-run recovery starts after acceptance; paid recovery already persisted the exact request/key.
+    if (!paid && draftKey !== null) {
       saveDraftRun(draftKey, { scenarioSessionId: result.value.scenarioSessionId, input: activeInputRef.current, startedAtMs });
-      saveProductDraftScenario(productId, scenarioId);
       if (readProductDraftScenario(productId) === scenarioId && preferSavedOwnRun(productId, draftKey, result.value.scenarioSessionId)) {
         // Reload follows the accepted own run even while the old result remains on screen.
         if (displayedResult?.attached) callSafely(onAttachEndRef.current);
@@ -1262,6 +1264,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   }
 
   function updateField<K extends keyof V>(field: K, value: V[K]) {
+    if (client.portalIdentity && !client.portalIdentity.isCurrent()) return;
     // Gated on a resolved guestId too, the same way submitCurrentValues() already gates
     // form_submitted: a boot-time createGuestIdentity() failure (not just the guest-identity-
     // not-found self-heal path) otherwise leaves the form fully interactive with guestId
@@ -1278,7 +1281,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     setValues(next);
     if (draftKey !== null) {
       saveDraftValues(draftKey, next);
-      saveProductDraftScenario(productId, scenarioId);
+      saveProductDraftScenario(productId, scenarioId, draftOwner);
     }
     // Previously invalid fields stay live after correction, until New task resets the form.
     if (liveValidationFieldsRef.current.has(field)) {

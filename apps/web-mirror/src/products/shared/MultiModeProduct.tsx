@@ -9,7 +9,7 @@ import { ErrorState } from "../../components/ErrorState";
 import { useHostT, useProductT } from "../../i18n";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
 import { getPaidPersistence } from "../../lib/portalSession";
-import type { AttachProps } from "../runtime/attachSession";
+import { forgetAttachSession, type AttachProps } from "../runtime/attachSession";
 import { callSafely } from "../runtime/callSafely";
 import { ProductRunPage } from "../runtime/ProductRunPage";
 import { readProductDraftScenario, saveProductDraftScenario } from "../runtime/draftStorage";
@@ -64,6 +64,7 @@ export function MultiModeProduct<Id extends string, R>({
   modes: readonly [ProductMode<Id, R>, ...ProductMode<Id, R>[]];
 }) {
   const [modeId, setModeId] = useState<Id>(modes[0].id);
+  const draftOwner = client.portalIdentity?.owner;
   const [locked, setLocked] = useState(false);
   const [attachSessionId, setAttachSessionId] = useState(initialAttachSessionId);
   // The server cannot read tab storage; both hydration renders must show the same loading view.
@@ -89,6 +90,7 @@ export function MultiModeProduct<Id extends string, R>({
     if (!attachFromUrl || !attachSessionId) {
       const persistence = getPaidPersistence(client);
       if (persistence) {
+        if (!persistence.isCurrent()) return;
         try {
           const recovery = readPaidStartRecovery(persistence, modesRef.current[0].definition.productId);
           if (recovery?.kind === "pending") {
@@ -108,7 +110,7 @@ export function MultiModeProduct<Id extends string, R>({
     if (!sessionId) {
       if (!ownModeResolvedRef.current) {
         ownModeResolvedRef.current = true;
-        const savedId = readProductDraftScenario(modesRef.current[0].definition.productId);
+        const savedId = readProductDraftScenario(modesRef.current[0].definition.productId, draftOwner);
         const savedMode = modesRef.current.find((candidate) => candidate.definition.scenarioId === savedId && candidate.definition.draft);
         if (savedMode) setModeId(savedMode.id);
       }
@@ -133,7 +135,7 @@ export function MultiModeProduct<Id extends string, R>({
       setResolution("ready");
     });
     return () => controller.abort();
-  }, [client, attachSessionId, attachFromUrl, attempt]);
+  }, [client, attachSessionId, attachFromUrl, attempt, draftOwner]);
 
   useEffect(() => {
     if (!focusFreshFormRef.current || resolution !== "ready" || locked) return;
@@ -159,9 +161,10 @@ export function MultiModeProduct<Id extends string, R>({
         value={modeId}
         disabled={locked || resolution !== "ready"}
         onChange={(id) => {
+          if (client.portalIdentity && !client.portalIdentity.isCurrent()) return;
           ownModeResolvedRef.current = true;
           const selected = modes.find((candidate) => candidate.id === id);
-          if (selected?.definition.draft) saveProductDraftScenario(selected.definition.productId, selected.definition.scenarioId);
+          if (selected?.definition.draft) saveProductDraftScenario(selected.definition.productId, selected.definition.scenarioId, draftOwner);
           if (attachSessionId) {
             // Persisted route state must forget the attached session too, or a reload restores it. Whether the
             // attach had begun is the owner's business (`useAttachSession`): a failed boot forgets nothing.
@@ -193,10 +196,15 @@ export function MultiModeProduct<Id extends string, R>({
                 return;
               }
             }
-            callSafely(onAttachDiscard);
+            if (attachSessionId === resolvedSessionIdRef.current) {
+              callSafely(onAttachDiscard);
+            } else if (resolvedSessionIdRef.current) {
+              forgetAttachSession(modes[0].definition.productId, resolvedSessionIdRef.current);
+            }
             focusFreshFormRef.current = true;
             setAttachSessionId(undefined);
             setResolution("loading");
+            setAttempt((previous) => previous + 1);
           }}>{th("workspace.newTask")}</Button>
         </Card> :
         resolution === "error" ? <ErrorState message={th("errors.connectionLost")} onRetry={retryResolution} /> : <ProductRunPage

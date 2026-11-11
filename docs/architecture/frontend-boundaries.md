@@ -179,7 +179,7 @@ The shared runtime, not a product, owns the web side of a handoff:
   from this product's scenario: its backend-owned `schemaRef` and `schemaVersion` are checked
   against the selected scenario's output schema from runtime config (a declared version must match;
   a ref keeps its name across a version bump) before the product parser sees it.
-- Products opting in through `ProductDefinition.draft` keep form values and their last accepted
+- Guest products opting in through `ProductDefinition.draft` keep form values and their last accepted
   scenario session in the tab's `sessionStorage`
   (`anytoolai.product_draft.<productId>.<messageScope>`). Reload resumes polling without a new start.
   "New task" clears both; terminal failure clears only the matching saved run and keeps the draft.
@@ -199,6 +199,14 @@ The shared runtime, not a product, owns the web side of a handoff:
   other pending attachments remain fallbacks. A late
   background Accept cannot replace the preferred own run, while an explicit attachment open can.
   Clearing or losing the referenced saved run releases its priority over remaining attachments.
+- Portal-owned forms use separate `anytoolai.paid_draft.v1.*` keys scoped by the
+  canonical tenant/region/user tuple, including selected mode. They never read guest
+  drafts. Same-owner reauthorization retains them; logout, parent revocation and
+  owner changes clear paid drafts with other private recovery state. Guest drafts
+  remain independent. Paid drafts store form values/mode only: the owner-bound
+  `paid_start` record remains the sole execution recovery source. A saved guest or
+  draft run cannot start a competing poll alongside paid replay. Explicit result
+  selection retains priority for that visit without replacing a pending paid request.
 - Paid recovery does not require current new-start availability. If runtime config is unavailable,
   or no longer lists the scenario/enabled web frontend, a saved owner-bound pending request or
   accepted/explicitly selected session opens a recovery-only view. It replays only the original
@@ -206,6 +214,18 @@ The shared runtime, not a product, owns the web side of a handoff:
   schema ref/version must match the bundled product renderer's `outputSchema` before parsing;
   the architecture contract test checks these pins against product workflows/schema versions.
   Delegated identity and backend ownership checks remain required for every protected request.
+- `MultiModeProduct` resolves an accepted session's mode from the server's `scenarioId` before
+  mounting its run page, including accepted paid recovery. URL scenario hints never choose that
+  mode. Missing identity or transient failures preserve Retry; a definite 404 or incompatible
+  scenario offers explicit discard. Discard removes only the matching attachment/accepted recovery,
+  preserving pending requests and newer sessions; it never creates a fresh logical start.
+  A pending paid request has no accepted session to resolve: its frozen scenario selects its mode.
+  On ordinary restoration that request takes precedence over an older remembered handoff; an
+  explicitly selected result takes precedence for that visit without replacing the pending request.
+- The SDK polls in bounded 600-second windows. The web runtime renews a window only after a healthy
+  `started`/`running` snapshot, continuing the same session. Every awaited window checks abort,
+  active session and current paid identity; a read failure retries the accepted session without
+  starting another execution.
 - A spent (accepted/consumed) token that still names the target session shows an explicit "Open result" on the
   consent page, for the case where the Accept response was lost and the person reloaded instead of retrying
   (a retry that gets "already accepted" redirects on its own). It never redirects automatically on load.

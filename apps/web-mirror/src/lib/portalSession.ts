@@ -81,7 +81,7 @@ export function subscribePortalIdentity(listener: () => void): () => void {
 export function clearPaidPrivateState(): void {
   // Only this feature's tab data; guest identity and unrelated storage are preserved.
   const keys = Object.keys(window.sessionStorage).filter((key) =>
-    ["anytoolai.paid_start.", "anytoolai.attach_session.", "anytoolai.result_viewed."].some((prefix) => key.startsWith(prefix)));
+    ["anytoolai.paid_start.", "anytoolai.paid_draft.", "anytoolai.attach_session.", "anytoolai.result_viewed."].some((prefix) => key.startsWith(prefix)));
   for (const key of keys) tabStorage.removeItem(key);
 }
 
