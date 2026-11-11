@@ -1,6 +1,6 @@
 # ANY-766 — Portal API and Paid Execution for Product Backends
 
-Status: **STEPS 1–15 COMPLETE; Steps 16–17 pending; delivery ends at PR readiness**
+Status: **STEPS 1–16 COMPLETE in the agreed local scope; Step 17 pending; full acceptance matrix deferred**
 
 Date: **2026-11-09**
 
@@ -12,7 +12,8 @@ Related requirements: [ANY-833](https://linear.app/paveldik/issue/ANY-833).
 - Owner: mixed — Portal and Kernel execution owners
 - Last updated: 2026-11-11
 - Review date: 2026-11-11
-- Next action: Step 16 assembled local integration acceptance, only when requested.
+- Next action: Step 17 minimal build/install preparation, only when requested.
+- Verification gate: the 18 passing focused cases are accepted for review, PR creation and merge; full testing is deferred by owner decision.
 - Blocker: none for the planned local work; real external-product integration is outside this plan.
 
 Portal's `docs/exec-plans/active/ANY-766-implementation-plan.md` is authoritative;
@@ -548,6 +549,7 @@ strategy needs no additional preliminary protocol approval.
 - **Local acceptance:** use isolated test users, known test quantities and temporary enabled product profiles. Real interservice HTTP/authentication, PostgreSQL and browser checks are mandatory; replacing LBX/AI provider responses is permitted when clearly labelled. Do not enable ordinary sales or promote simulated history.
 - **Sales/live proof:** approved quantities, exact LBX associations and an authorized supported paid test purchase are prerequisites for their later live actions, not for the local completion of ANY-766.
 - **Review before rollout:** prepare PRs for review, resolve review changes and rerun affected checks before publication/deployment. This plan's endpoint is local development and PR readiness; external PR review follows it.
+- **Accepted review/PR/merge testing gate — user decision, 2026-11-11:** the completed focused Step 16 verification is sufficient for review, PR creation and merge to main. Do not require another full suite or the deferred acceptance matrix before those actions. Full suites and remaining acceptance move to later testing; real-service testing is planned for the week of 2026-11-16 under ANY-767, parent ANY-504 stage 11. Investigate and fix failures as that testing produces evidence. Unexecuted checks remain NOT_RUN and earlier failures remain disclosed; this decision does not convert them into PASS. It changes the testing gate, not the completion status of Step 17 or authorization to perform Git/publication/deployment actions.
 - **Registry/staging — ANY-767:** after PR review/corrections, the infrastructure owner supplies the server/operator, domains/TLS, registry access, secrets, data roots, backups, SMTP, approved AI/LBX configuration and deployment authorization. Missing inputs defer those actions without blocking this plan.
 - **Production — ANY-767:** rollout follows the full billing-journey and environment acceptance.
 
@@ -837,8 +839,11 @@ are already present. Before invoking it, the implementing agent must obtain the
 user's explicit authorization for those workspace-local installations, unless
 that scope was already authorized in the current task. Readiness of the existing
 environment does not satisfy this gate. Without authorization, continue independent
-non-installing checks and record `full-check` as NOT_RUN with that reason; the
-required full-check gate remains unsatisfied and local completion cannot be claimed.
+non-installing checks and record `full-check` as NOT_RUN with that reason.
+Section 3.8's 2026-11-11 owner decision accepts the completed focused verification
+for review, PR creation and merge without a completed full-check. The deferred
+full-check is not a current readiness blocker and receives no invented PASS;
+the installation authorization rule still applies whenever it is later invoked.
 
 Portal root npm aliases need a command-scoped PATH:
 
@@ -1465,6 +1470,45 @@ item for that product. Stored documents and allowance identities remain unchange
 
 ### Step 16 — Verify the assembled integration locally
 
+**Verification scope amendment — user decision, 2026-11-11:** prioritize the main
+journeys, especially the API consumed by an independent backend, rather than
+running the complete acceptance matrix. Verify common delegation/auth/access,
+consumer/owner isolation, policy-only changes, recipient independence and
+owner-directed usage/exhaustion, plus the principal Kernel paid/replay/failure
+journey and a short desktop/mobile browser smoke. Broad suites were stopped at
+the user's request; do not treat them as passing gates or repeat them for this
+step. This narrows Step 16 verification and Section 6 for this request, without
+claiming the deferred full matrix, Step 17, live or deployed acceptance.
+
+**Status:** COMPLETE in the agreed focused scope. All 18 selected cases PASS:
+one assembled real-app HTTP/PostgreSQL journey, four desktop/mobile browser
+cases and thirteen runtime/Compose configuration checks. This includes all seven scenarios,
+PKCE single-use/verifier/audience refusals, scoped second-consumer access,
+owner-directed usage/exhaustion and deduplication, policy-only changes,
+independent recipient recovery, replay, failed-provider release, last-unit
+competition, revocation, same-cycle recovery, new cycle and retained purchase/
+usage/floor state after container recreation. Browser launch, actual result,
+reload without another start, cabinet counters and Portal accessibility PASS.
+Focused lint/type/docs checks and optional peer-network configuration PASS.
+The Portal-owned harness uses only run-owned resources and explicit external
+substitutes. Kernel dev retains a named PostgreSQL volume, a pinned 18.4 image
+and a TCP healthcheck; existing anonymous volumes require explicit operator
+backup/reattachment rather than implicit replacement.
+
+Joint HTTP and browser acceptance now use explicitly launched suites, outside
+the ordinary Portal API/browser selections; single-repository CI needs no peer
+checkout. Invalidation checks await Portal's durable ACK for the healthy
+recipient independently of Kernel's committed revision floor.
+
+The full populated historical cutover/expiry/concurrency matrix and broad suites
+remain NOT_RUN to completion under the scope amendment. Earlier broad Portal
+attempts stopped on existing formatter drift in untouched files; interrupted
+Kernel full-check supplies no passing gate. These results are not full-plan PR
+readiness by themselves: Step 17 remains pending. Under Section 3.8's subsequent
+owner decision, this focused verification satisfies the testing gate for review,
+PR creation and merge to main; deferred suites do not block those activities.
+Real external-team integration, live LBX and deployed acceptance remain unproven.
+
 **Goal / Expected behavior:** both real applications work together locally through browser and HTTP with separate PostgreSQL state. Confirm that a test user with committed paid access can execute the selected products and see correct results/usage. This is the current plan's combined integration acceptance, not parent ANY-504 stage 11.
 
 **Repositories / Read before implementation:** both Compose/runners and [metering cutover](https://github.com/gushinets/anytoolai-platform/blob/72ff15bc0b77903c87aa39f7b10186dccc556d09/infra/deployment/execution-metering-cutover.md).
@@ -1483,11 +1527,14 @@ principal overrides in the joint acceptance. No remote server is needed.
 **Verification — Portal:**
 
 ```bash
-./.venv/bin/python -m pytest -q apps/api/tests/test_any766_joint_http_postgres.py
-npm run test:e2e -- any766-kernel-launch.spec.ts any766-paid-execution.spec.ts
+./.venv/bin/python -m pytest -q tools/joint_paid_runtime/tests
+./.venv/bin/python tools/joint_paid_runtime/runtime.py --browser
 ```
 
-The new browser cases use the harness-provided Portal/Kernel origins and run existing desktop/mobile projects.
+The harness supplies the Portal/Kernel origins and private identity input to
+`npm run test:e2e:joint`, using `playwright.joint.config.ts` and the existing
+desktop/mobile projects. The ordinary browser configuration excludes the joint
+directory; the HTTP suite is outside the default API discovery roots.
 
 Verify all service directions, session launch, seven scenarios, paid events, replay, exhaustion, revocation, last-unit competition, same-cycle recovery, new cycle and process restart. Regress selected-digest/historical replay and product-scoped primary decisions while an unrelated product is incomplete; financial admission must retain its customer-wide requirements. Recreate containers and compare retained identities, purchases, floors and usage. Collect accessibility evidence for changed Portal surfaces.
 
@@ -1570,7 +1617,8 @@ remote publication/deployment is outside this plan.
 
 - [ ] Inspect the final paired diff against the local DoD; resolve confirmed
   in-scope issues. Record the source revisions and evidence from Steps 16/17 and
-  applicable Section 6 checks; rerun only checks invalidated by later changes.
+  the accepted focused verification gate in Section 6; rerun only focused checks
+  invalidated by later changes. Deferred full suites are not a PR/merge prerequisite.
 - [ ] Keep affected as-built docs, generated contracts and existing runbooks
   accurate. Document supersession of obsolete ANY-286/287 access-check direction;
   do not edit external tickets without authorization.
@@ -1584,24 +1632,32 @@ remote deployment or production readiness.
 
 ## 6. Final Verification & Review
 
-Run focused checks during implementation and the applicable broad checks on the
-assembled local pair in Step 16, plus build/install checks in Step 17. Reuse valid
-results in the PR checklist; do not repeat an unchanged full suite just for the
-handoff. After PR review corrections, rerun affected checks before rollout.
-Configure these runs for the isolated local test environment, with external
-LBX/AI responses controlled as in Step 16.
+**Current readiness gate — user decision, 2026-11-11:** the 18 passing focused
+Step 16 cases and completed lint/type/docs checks are sufficient testing for
+review, PR creation and merge to main. Full suites and the remaining acceptance
+matrix below are deferred; they must not be restarted merely to close the PR
+checklist. Keep actual PASS/FAIL/NOT_RUN evidence and limitations visible.
+Step 17 remains separate work; the testing decision does not mark it complete.
 
-**Portal:**
+After review corrections, rerun focused checks affected by those changes.
+Run the deferred full campaign later, alongside the ANY-767 / parent ANY-504
+stage 11 acceptance, and resolve defects from its actual findings. Real-service
+testing is planned for the week of 2026-11-16. Configure local suites with
+isolated databases and explicitly labelled external substitutes; real-service
+results require the installed environment and actual configured dependencies.
+
+**Deferred Portal broad checks:**
 
 ```bash
 PATH="$PWD/.venv/bin:$PATH" npm run check:fast
 PATH="$PWD/.venv/bin:$PATH" npm run check
 PATH="$PWD/.venv/bin:$PATH" npm run generate:check
 ./.venv/bin/python scripts/check_kernel_manifest_contract.py --local
-npm run test:e2e -- any766-kernel-launch.spec.ts any766-paid-execution.spec.ts session-races.spec.ts
+npm run test:e2e -- session-races.spec.ts
+./.venv/bin/python tools/joint_paid_runtime/runtime.py --browser
 ```
 
-**Kernel:**
+**Deferred Kernel broad checks:**
 
 The `full-check` command below requires the dependency-installation authorization
 gate in the common execution protocol, including for an already prepared environment.
@@ -1615,7 +1671,7 @@ gate in the common execution protocol, including for an already prepared environ
 ./.quick-check-venv/bin/python scripts/agent/runner.py manifest-conformance --portal-root /home/wstanley/www/work_unirec/runtime-research/payments-portal --portal-python /home/wstanley/www/work_unirec/runtime-research/payments-portal/.venv/bin/python
 ```
 
-Run applicable atoms/Compose smoke gates for changed runtime paths. PostgreSQL verification requires actual disposable databases; skipped tests never satisfy the gate.
+During the deferred campaign, run applicable atoms/Compose smoke checks for changed runtime paths. PostgreSQL verification requires actual disposable databases; skipped tests never supply passing evidence.
 
 The final review must cover:
 
@@ -1655,6 +1711,12 @@ registry publication and staging installation of the reviewed versions, real
 LBX/SMTP/provider wiring and the complete registration → offer/consent → test
 payment → reconciliation → paid product/result/usage journey. It also owns remaining
 natural-renewal/deployment acceptance and production rollout.
+
+The 2026-11-11 owner decision accepts the focused local testing for current
+review, PR creation and merge. Run the deferred full suites and remaining
+acceptance later; actual integration testing in parent ANY-504 stage 11 is
+planned for the week of 2026-11-16. Triage and fix defects using those results
+rather than extending the pre-PR testing campaign now.
 
 Reuse valid local and predecessor evidence; do not repeat completed research or
 the entire unchanged local matrix. Verify the actual installed configuration,
