@@ -1,0 +1,105 @@
+name: Build selected images
+on:
+  workflow_dispatch:
+    inputs:
+      component:
+        description: Component to build
+        type: choice
+        options: [backend, frontend, all]
+        default: backend
+      publish:
+        description: Publish to GHCR after review (requires separate authorization)
+        type: boolean
+        default: false
+      kernel_api_origin:
+        description: Kernel internal API origin (frontend rewrite)
+        type: string
+      enabled_products:
+        description: Enabled product IDs (frontend build)
+        type: string
+      web_base_path:
+        description: Optional frontend base path
+        type: string
+      portal_authorize_url:
+        description: Portal localized backend authorization URL (frontend build)
+        type: string
+permissions:
+  contents: read
+  packages: write
+jobs:
+  api:
+    if: inputs.component == 'all' || inputs.component == 'backend'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Build immutable selection
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLISH: ${{ inputs.publish }}
+        run: |
+          set -euo pipefail
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          image="ghcr.io/$owner/anytoolai-platform-api:${GITHUB_SHA}"
+          docker build --file infra/docker/platform-api.Dockerfile --target prod \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --tag "$image" .
+          docker image inspect --format '{{.Id}}' "$image" >> "$GITHUB_STEP_SUMMARY"
+          echo "$image" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$PUBLISH" = true ]; then
+            printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+            docker push "$image"
+          fi
+  worker:
+    if: inputs.component == 'all' || inputs.component == 'backend'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Build immutable selection
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLISH: ${{ inputs.publish }}
+        run: |
+          set -euo pipefail
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          image="ghcr.io/$owner/anytoolai-platform-worker:${GITHUB_SHA}"
+          docker build --file infra/docker/platform-worker.Dockerfile \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --tag "$image" .
+          docker image inspect --format '{{.Id}}' "$image" >> "$GITHUB_STEP_SUMMARY"
+          echo "$image" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$PUBLISH" = true ]; then
+            printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+            docker push "$image"
+          fi
+  web:
+    if: inputs.component == 'all' || inputs.component == 'frontend'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Build immutable selection
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLISH: ${{ inputs.publish }}
+          PLATFORM_API_BASE_URL: ${{ inputs.kernel_api_origin }}
+          NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS: ${{ inputs.enabled_products }}
+          ANYTOOLAI_WEB_BASE_PATH: ${{ inputs.web_base_path }}
+          NEXT_PUBLIC_PORTAL_AUTHORIZE_URL: ${{ inputs.portal_authorize_url }}
+        run: |
+          set -euo pipefail
+          test -n "$PLATFORM_API_BASE_URL"
+          test -n "$NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS"
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          image="ghcr.io/$owner/anytoolai-platform-web:${GITHUB_SHA}-${GITHUB_RUN_ID}"
+          docker build --file infra/docker/web-mirror.Dockerfile --target runtime \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --build-arg "PLATFORM_API_BASE_URL=$PLATFORM_API_BASE_URL" \
+            --build-arg "NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS=$NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS" \
+            --build-arg "ANYTOOLAI_WEB_BASE_PATH=$ANYTOOLAI_WEB_BASE_PATH" \
+            --build-arg "NEXT_PUBLIC_PORTAL_AUTHORIZE_URL=$NEXT_PUBLIC_PORTAL_AUTHORIZE_URL" \
+            --tag "$image" .
+          docker image inspect --format '{{.Id}}' "$image" >> "$GITHUB_STEP_SUMMARY"
+          echo "$image" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$PUBLISH" = true ]; then
+            printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+            docker push "$image"
+          fi

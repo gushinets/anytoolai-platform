@@ -3,6 +3,127 @@
 Covers the public product stack, the separate Atom Lab stack, and credential-free development
 and CI smoke checks. Start a VPS update with the [VPS release runbook](vps-release-runbook.md).
 
+## Reviewed images and independent updates (ANY-766 Step 17)
+
+The optional `docker-compose.images.yml` selects `ANYTOOLAI_API_IMAGE` (also the
+migration image), `ANYTOOLAI_WORKER_IMAGE` and `ANYTOOLAI_WEB_IMAGE`. It removes
+build contexts and never pulls. `prod-up` opts in when `ANYTOOLAI_API_IMAGE` is
+set, including through the existing private `.env.prod`; all three refs must be
+versioned tags or immutable digests. API and worker require identical nonempty
+`org.opencontainers.image.revision` labels. This is necessary source evidence,
+not a universal wire or data compatibility declaration. Use the matching reviewed
+control checkout; old binaries are excluded from the ANY-766 synchronized API
+cutover. The Portal deployment runbook owns the paired migration order and
+purchased-document reader floor.
+
+`.github/workflows/publish-images.yml` builds `backend` (API and worker),
+`frontend` or `all` independently. Publishing is default-off and requires separate
+post-review authorization. Frontend inputs are `PLATFORM_API_BASE_URL` (the
+build-time same-origin rewrite destination),
+`NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS`, `ANYTOOLAI_WEB_BASE_PATH` and
+`NEXT_PUBLIC_PORTAL_AUTHORIZE_URL` (localized Portal `/backend/authorize` URL).
+Changing runtime variables cannot recompile these values. Public frontend image
+tags include the run ID to distinguish builds with different origins. Backend
+credentials and provider secrets are runtime-only.
+
+For an operator-approved installation, set private `.env.prod` credentials and
+selected images plus `ANYTOOLAI_PROFILE_ROOT` to an existing operator-owned
+absolute host directory. The candidate profile is generated **inside the selected
+API image**, with only that directory mounted at `/deployment`, network disabled
+and dependency synchronization disabled. The host mount paths are derived from
+the explicit host directory, never from `/app` or `/deployment` container paths.
+Both selected backend images must match the candidate source fingerprint; existing
+profile checks verify the mounted result in running API and worker. Existing
+activation marker semantics remain unchanged: the worker waits for activation,
+API admission remains closed, and the previous profile is retained until success.
+Migration/readiness/activation failure keeps admission closed and retains volumes.
+
+```bash
+# Optional explicit selection for a disposable local rehearsal or another approved
+# installation; defaults remain infra/compose/.env.prod and anytoolai-prod.
+export ANYTOOLAI_PROD_ENV_FILE=/operator/kernel/images.env
+export ANYTOOLAI_PROD_PROJECT=anytoolai-prod
+# The env file includes ANYTOOLAI_*_IMAGE and ANYTOOLAI_PROFILE_ROOT.
+# Pull reviewed digests separately, only with registry/publication authorization.
+./.quick-check-venv/bin/python scripts/agent/runner.py prod-up
+./.quick-check-venv/bin/python scripts/agent/runner.py prod-ready
+# Replace only web; no migration, backend restart or profile generation/activation.
+./.quick-check-venv/bin/python scripts/agent/runner.py prod-web-up
+```
+
+Image `prod-up` uses the existing shared deployment lock and, for an existing
+stack, existing `prod-quiesce` (stop admission, drain all jobs, stop worker).
+It starts retained PostgreSQL, runs a fresh one-shot migration from the selected
+API image, then starts the selected API/worker/web without builds or pulls.
+All other producers and deployment automation must remain stopped throughout the
+operator's maintenance window. Failure to drain does not stop the recovering
+worker. On migration failure, do not run old code to reopen service. Follow the
+existing verified backup recovery below and the metering cutover safeguards.
+
+The concrete ANY-766 pair uses Kernel head `0021`, Portal `20261111_0011`,
+identity V2, snapshot V3 and manifest/invalidation/usage/exhaustion V1. Kernel
+source baseline is `88da001f0595a4bc8e4729423acd2340bf7b73ca`, Portal
+`0b1cbfa310c02aee182a75aaf7608fc587266a67`, plus the reviewed Step 17 diff.
+Record actual reviewed SHAs, image IDs/digests, build origins, enabled products
+and base path with the environment selection. Never infer reader compatibility
+from unchanged migration heads: Portal pre-selected-digest and pre-Step-11
+purchase readers are excluded, as are old Kernel identity/snapshot binaries.
+Keep historical usage, reservations, floors and purchased documents intact.
+
+This Linux image path does not require a remote server or registry credentials
+for local images. Use disposable databases and loopback test origins for rehearsal.
+Remote publication, installation, secrets, backups, live-service acceptance and
+remaining broad suites are deferred to ANY-767. The focused Step 16 HTTP/browser
+proof remains valid for unchanged runtime code; packaging checks do not replace
+later deployed acceptance.
+
+### Local image build inputs
+
+Linux builds on 2026-11-11 used Docker Engine 28.1.1 / Compose 2.35.1. The actual
+selected pre-review local IDs (no registry publication/digests) are:
+
+- `any766-step17/kernel-api:local` — `sha256:50b612d750e720b088ae76c71af57768f0fdfe7fed69d572367ed8d98a39a563`.
+- `any766-step17/kernel-worker:local` — `sha256:a5727020048d209d7bf7bb0bd84531e2f85d526c6b808e78f1101af2533e8a77`.
+- `any766-step17/kernel-web:install-verified` — `sha256:e8ad25d1bda7d5ade18b7fe14420daa02295b24ed9959cefe6169f8b7fcdc880`.
+
+API target: `infra/docker/platform-api.Dockerfile`, `prod`; worker uses its existing
+Dockerfile and locked project. Both revision labels use the source baseline above
+with `-step17-local`. The matching controller includes local Step 17 corrections;
+reviewed source SHAs/digests must be recorded after review. No application source,
+purchased-document or wire migration was added in this packaging step.
+Web inputs: `PLATFORM_API_BASE_URL=http://platform-api:8000`,
+`NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS=proposal_ai`,
+`ANYTOOLAI_WEB_BASE_PATH=/tools`,
+`NEXT_PUBLIC_PORTAL_AUTHORIZE_URL=https://portal.step17.example.test/ru/backend/authorize`.
+The HTTPS test name is only a build input; ingress/TLS is not installed by rehearsal.
+
+The profile directory must belong to the operator, have no group/world write
+permission (for example 0755) and contain only this installation's non-secret
+profiles. Profile generation uses the operator UID and a temporary `uv` cache
+inside the selected container, with `--no-sync` and no network. The optional
+existing `LITELLM_LOCAL_MODEL_COST_MAP` variable is passed through the image
+override for offline rehearsal; absent values preserve normal library behavior.
+Local rehearsal uses its bundled map and a loopback-only provider proxy rather
+than contacting OpenAI/metadata services. Kernel's normal network is retained
+for real loopback port publication; on the tested Engine, Docker `internal`
+networks suppress that publication and prevent the host-side readiness check. Portal's
+separate private networks and both database volumes remain independent.
+
+The disposable image rehearsal passed all nine cases across the pair: initial
+installation, production web HTTP and compiled origins, frontend-only replacement
+with unchanged backend/DB container identities and profile marker, retained
+synthetic identity/usage after backend/container recreation, both non-root
+backend users reading the activation marker, and both actual failing-migration
+recovery paths. Kernel's failed candidate left the prior profile/marker intact
+and admission closed; restoring the selected images retained data at head `0021`
+(Portal `20261111_0011`). Candidate source fingerprint was
+`c52ae82cf1dd5fa54db6c809ea0ddc652c38dea966c3517ac00eac23b7720dce`,
+profile fingerprint `ad79b2bf92ce569d241e06c42ffbbb6918cf3e6998108ae46a770f06f2cb2f6b`.
+All run-owned containers, networks and volumes were removed. The required runner
+suite retains one host-environment failure: passwordless `sudo -u nobody` is
+unavailable; actual container marker access passed. No live provider, production
+data, registry publication or remote installation was involved.
+
 ## Compose layout
 
 - `docker-compose.yml` — base, shared by dev and prod (services, ports, `depends_on`; app
