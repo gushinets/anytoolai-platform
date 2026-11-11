@@ -71,6 +71,6 @@ export function rememberPaidResult(persistence: PaidStartPersistence, recovery: 
   persistPaidStartRecovery(persistence, recovery);
 }
 
-export function clearPaidStartRecovery(storage: TabStorage, productId: string): void {
-  storage.removeItem(recoveryKey(productId));
+export function clearPaidStartRecovery(tabStorage: TabStorage, productId: string): void {
+  tabStorage.removeItem(recoveryKey(productId));
 }
