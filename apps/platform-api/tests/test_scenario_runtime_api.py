@@ -580,6 +580,7 @@ def test_get_scenario_session_returns_started_and_running_snapshots(
 
     assert queued.status_code == HTTPStatus.OK
     assert queued.json() == {
+        "scenario_id": "kernel_demo.single_action_smoke_v1",
         "scenario_session_id": started["scenario_session_id"],
         "job_id": started["job_id"],
         "status": "started",
@@ -589,6 +590,7 @@ def test_get_scenario_session_returns_started_and_running_snapshots(
     }
     assert running.status_code == HTTPStatus.OK
     assert running.json() == {
+        "scenario_id": "kernel_demo.single_action_smoke_v1",
         "scenario_session_id": started["scenario_session_id"],
         "job_id": started["job_id"],
         "status": "running",
@@ -628,6 +630,7 @@ def test_get_scenario_session_returns_completed_snapshot(
 
     assert response.status_code == HTTPStatus.OK
     assert response.json() == {
+        "scenario_id": "kernel_demo.single_action_smoke_v1",
         "scenario_session_id": started["scenario_session_id"],
         "job_id": started["job_id"],
         "status": "completed",
@@ -674,6 +677,7 @@ def test_start_then_real_worker_execution_preserves_a12_runtime_correlation(
 
     assert response.status_code == HTTPStatus.OK
     assert response.json() == {
+        "scenario_id": "kernel_demo.single_action_smoke_v1",
         "scenario_session_id": started["scenario_session_id"],
         "job_id": started["job_id"],
         "status": "completed",
@@ -795,6 +799,7 @@ def test_get_scenario_session_returns_failed_snapshot(
 
     assert response.status_code == HTTPStatus.OK
     assert response.json() == {
+        "scenario_id": "kernel_demo.single_action_smoke_v1",
         "scenario_session_id": started["scenario_session_id"],
         "job_id": started["job_id"],
         "status": "failed",
@@ -840,6 +845,7 @@ def test_get_scenario_session_returns_failed_checkpoint_for_preclaim_canceled_jo
 
     assert response.status_code == HTTPStatus.OK
     assert response.json() == {
+        "scenario_id": "kernel_demo.single_action_smoke_v1",
         "scenario_session_id": started["scenario_session_id"],
         "job_id": started["job_id"],
         "status": "failed",
@@ -897,6 +903,7 @@ def test_next_action_validates_checkpoint_and_emits_event(
 
     assert success.status_code == HTTPStatus.OK
     assert success.json() == {
+        "scenario_id": "kernel_demo.single_action_smoke_v1",
         "scenario_session_id": started["scenario_session_id"],
         "job_id": started["job_id"],
         "status": "completed",

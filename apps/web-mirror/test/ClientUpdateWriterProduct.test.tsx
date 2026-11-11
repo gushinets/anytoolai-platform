@@ -4,6 +4,8 @@
 // `append_after_blank_line`), and the mode switcher. The shared runtime behavior every mode rides
 // on (polling, retry, quota, copy-activation ordering, event callbacks) is proven once in
 // ProductRunPage.test.tsx -- not re-proven per mode here.
+import type { PlatformApiClient } from "@anytoolai/ce-kit";
+import { useAttachSession, readAttachSessionId } from "../src/products/runtime/attachSession";
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProductRunPage } from "../src/products/runtime/ProductRunPage";
@@ -49,6 +51,7 @@ const MODE_IDS = {
 afterEach(() => {
   cleanup();
   window.localStorage.clear();
+  window.sessionStorage.clear();
 });
 
 beforeEach(() => {
@@ -984,4 +987,72 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
       vi.restoreAllMocks();
     }
   });
+});
+
+function AttachedClientUpdateWriterProduct({ client, sessionId }: { client: PlatformApiClient; sessionId?: string }) {
+  const attach = useAttachSession("client_update_writer", sessionId);
+  return <ClientUpdateWriterProduct client={client} {...attach} />;
+}
+
+it.each(MODE_SCENARIOS.flatMap((scenario) => [false, true].map((recover) => ({ scenario, recover }))))(
+  "restores $scenario.mode and reloads without another start (poll recovery=$recover)", async ({ scenario, recover }) => {
+  const r = routesFor(scenario.ids);
+  const queues = {
+    ...bootAndHappyPathRoutes(scenario.ids, { text: "Restored update." }).queues,
+    [r.RESULT]: Array.from({ length: 2 }, () => resultResponse(scenario.ids, { output: { text: "Restored update." } })),
+  };
+  const { client, calls } = makeClient({
+    ...queues,
+    [r.RUNTIME_CONFIG]: Array.from({ length: 2 }, () => runtimeConfigResponse(scenario.ids)),
+    [r.QUOTA]: Array.from({ length: 4 }, () => quotaResponse(scenario.ids, { used_count: 1, remaining_count: 2 })),
+    [r.SESSION]: [
+      ...(recover ? [errorResponse(503, "internal_error")] : []),
+      sessionResponse({ scenario_id: scenario.ids.scenarioId, status: "running" }),
+    sessionResponse({ scenario_id: scenario.ids.scenarioId }),
+    sessionResponse({ scenario_id: scenario.ids.scenarioId }),
+    sessionResponse({ scenario_id: scenario.ids.scenarioId }),
+    ],
+  });
+  const first = render(<AttachedClientUpdateWriterProduct client={client} sessionId="session_1" />);
+  if (recover) {
+    fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
+  }
+  await screen.findByRole("button", { name: "New task" });
+  expect(readAttachSessionId("client_update_writer")).toBe("session_1");
+  expect((document.querySelector(`input[type="radio"][value="${scenario.mode}"]`) as HTMLInputElement).checked).toBe(true);
+  first.unmount();
+  render(<AttachedClientUpdateWriterProduct client={client} />);
+  await screen.findByRole("button", { name: "New task" });
+  expect(calls.filter((call) => call.key === r.SESSION)).toHaveLength(recover ? 5 : 4);
+  expect(calls.some((call) => call.key.endsWith("/start"))).toBe(false);
+  expect(screen.getByText(/2 of 3/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "New task" }));
+  expect(readAttachSessionId("client_update_writer")).toBeUndefined();
+});
+
+it("preserves an accepted session without identity for retry instead of guessing its mode", async () => {
+  const { routes, queues } = bootAndHappyPathRoutes(MODE_IDS.update, { text: "Not shown." });
+  const { client, calls } = makeClient({
+    ...queues,
+    [routes.SESSION]: [sessionResponse()],
+  });
+  render(<AttachedClientUpdateWriterProduct client={client} sessionId="session_1" />);
+  await screen.findByRole("button", { name: "Try again" });
+  expect(readAttachSessionId("client_update_writer")).toBe("session_1");
+  expect(screen.queryByLabelText("Progress notes")).toBeNull();
+  expect(screen.getAllByRole("radio").every((radio) => (radio as HTMLInputElement).disabled)).toBe(true);
+  expect(calls.some((call) => call.key.endsWith("/start"))).toBe(false);
+});
+
+it("blocks every mode while resolving identity and ignores a late response after unmount", async () => {
+  const { routes, queues } = bootAndHappyPathRoutes(MODE_IDS.reply_draft, { text: "Late result." });
+  const made = makeClientWithDeferredRoute(queues, routes.SESSION);
+  const view = render(<AttachedClientUpdateWriterProduct client={made.client} sessionId="session_1" />);
+  await waitFor(() => expect(made.calls.filter((call) => call.key === routes.SESSION)).toHaveLength(1));
+  expect(screen.getAllByRole("radio").every((radio) => (radio as HTMLInputElement).disabled)).toBe(true);
+  expect(screen.queryByRole("button", { name: "Write update" })).toBeNull();
+  view.unmount();
+  made.resolveDeferred(sessionResponse({ scenario_id: MODE_IDS.reply_draft.scenarioId }));
+  await waitFor(() => expect(made.calls.find((call) => call.key === routes.SESSION)!.init.signal!.aborted).toBe(true));
+  expect(made.calls.some((call) => call.key === routes.RESULT || call.key.endsWith("/start"))).toBe(false);
 });

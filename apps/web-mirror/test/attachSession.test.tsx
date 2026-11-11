@@ -48,6 +48,59 @@ describe("useAttachSession", () => {
     expect(readAttachSessionId("acceptance_builder")).toBe("s 1");
   });
 
+  it.each([false, true])("explicitly discards before begin, including in-memory state (stored=%s)", (stored) => {
+    if (stored) rememberAttachSession("acceptance_builder", "A", "2026-10-01T10:00:00Z");
+    const { result, rerender } = renderHook(() => useAttachSession("acceptance_builder", stored ? undefined : "A"));
+    act(() => result.current.onAttachDiscard?.());
+    rerender();
+    expect(result.current.attachSessionId).toBeUndefined();
+    expect(readAttachSessionId("acceptance_builder")).toBeUndefined();
+    expect(renderHook(() => useAttachSession("acceptance_builder", undefined)).result.current.attachSessionId).toBeUndefined();
+  });
+
+  it.each([false, true])("discard preserves a newer Accept arriving before the click (explicit older=%s)", (explicit) => {
+    if (explicit) chooseAttachSession("acceptance_builder", "A", "2026-10-01T10:00:00Z");
+    const { result } = renderHook(() => useAttachSession("acceptance_builder", "A"));
+    const discard = result.current.onAttachDiscard;
+    rememberAttachSession("acceptance_builder", "B", "2026-10-01T10:05:00Z");
+    act(() => discard?.());
+    expect(result.current.attachSessionId).toBeUndefined();
+    expect(readAttachSessionId("acceptance_builder")).toBe("B");
+    act(() => discard?.());
+    expect(readAttachSessionId("acceptance_builder")).toBe("B");
+  });
+
+  it("discard preserves another active session and does not assign the discarded timestamp to it", () => {
+    rememberAttachSession("acceptance_builder", "A", "2026-10-01T10:10:00Z");
+    chooseAttachSession("acceptance_builder", "B", "2026-10-01T10:00:00Z");
+    const { result } = renderHook(() => useAttachSession("acceptance_builder", "A"));
+    act(() => result.current.onAttachDiscard?.());
+    expect(readAttachSessionId("acceptance_builder")).toBe("B");
+    rememberAttachSession("acceptance_builder", "C", "2026-10-01T10:05:00Z");
+    const next = renderHook(() => useAttachSession("acceptance_builder", undefined));
+    act(() => next.result.current.onAttachBegin?.());
+    act(() => next.result.current.onAttachEnd?.());
+    expect(readAttachSessionId("acceptance_builder")).toBe("C");
+  });
+
+  it("discard ignores a different stored active/newest session and leaves other products alone", () => {
+    const { result } = renderHook(() => useAttachSession("acceptance_builder", "A"));
+    chooseAttachSession("acceptance_builder", "B", "2026-10-01T10:00:00Z");
+    rememberAttachSession("client_update_writer", "C", "2026-10-01T10:00:00Z");
+    act(() => result.current.onAttachDiscard?.());
+    expect(readAttachSessionId("acceptance_builder")).toBe("B");
+    expect(readAttachSessionId("client_update_writer")).toBe("C");
+  });
+
+  it("a bare URL and its discard preserve an explicitly chosen session with unknown order", () => {
+    chooseAttachSession("acceptance_builder", "B", "unknown");
+    const { result } = renderHook(() => useAttachSession("acceptance_builder", "A"));
+    expect(result.current.attachSessionId).toBe("A");
+    expect(readAttachSessionId("acceptance_builder")).toBe("B");
+    act(() => result.current.onAttachDiscard?.());
+    expect(readAttachSessionId("acceptance_builder")).toBe("B");
+  });
+
   it("treats an empty URL value as no id, falling back to this tab's stored one", () => {
     rememberAttachSession("acceptance_builder", "s 1", "2026-10-01T10:00:00Z");
     expect(renderHook(() => useAttachSession("acceptance_builder", "")).result.current.attachSessionId).toBe("s 1");

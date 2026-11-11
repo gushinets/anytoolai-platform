@@ -1,0 +1,129 @@
+{
+  "date": "2026-11-09",
+  "transport": "Chrome DevTools MCP 1.12.0 over stdio with graphical Chrome, isolated browser context",
+  "environment": "Updated production Next.js build on port 31777, real API/worker on port 18000, isolated SQLite and deterministic fake provider",
+  "baselineSessionsCreated": 3,
+  "restorationChecks": [
+    {
+      "productId": "proposal_ai",
+      "phase": "url",
+      "sessionId": "scenario_session_01794213201404964470_0000000002_0db987253fd247498aed74f105383e25",
+      "artifactId": "artifact_01794213201632147461_0000000030_a58c2062c6ba44c7a3218abe24c975ab",
+      "restored": true,
+      "starts": 0,
+      "quota": {
+        "used": 1,
+        "reserved": 0,
+        "available": 9
+      },
+      "persisted": "{\"id\":\"scenario_session_01794213201404964470_0000000002_0db987253fd247498aed74f105383e25\",\"rank\":0}",
+      "queryRemoved": true
+    },
+    {
+      "productId": "proposal_ai",
+      "phase": "reload",
+      "sessionId": "scenario_session_01794213201404964470_0000000002_0db987253fd247498aed74f105383e25",
+      "artifactId": "artifact_01794213201632147461_0000000030_a58c2062c6ba44c7a3218abe24c975ab",
+      "restored": true,
+      "starts": 0,
+      "quota": {
+        "used": 1,
+        "reserved": 0,
+        "available": 9
+      },
+      "persisted": "{\"id\":\"scenario_session_01794213201404964470_0000000002_0db987253fd247498aed74f105383e25\",\"rank\":0}",
+      "queryRemoved": true
+    },
+    {
+      "productId": "brief_decoder",
+      "phase": "url",
+      "sessionId": "scenario_session_01794213201755369335_0000000036_a541369ee9b342899a4e9d2ec537c3ce",
+      "artifactId": "artifact_01794213202071089053_0000000084_b0c3b3f910f04b90ba2cc053f94ea87d",
+      "restored": true,
+      "starts": 0,
+      "quota": {
+        "used": 1,
+        "reserved": 0,
+        "available": 2
+      },
+      "persisted": "{\"id\":\"scenario_session_01794213201755369335_0000000036_a541369ee9b342899a4e9d2ec537c3ce\",\"rank\":0}",
+      "queryRemoved": true
+    },
+    {
+      "productId": "brief_decoder",
+      "phase": "reload",
+      "sessionId": "scenario_session_01794213201755369335_0000000036_a541369ee9b342899a4e9d2ec537c3ce",
+      "artifactId": "artifact_01794213202071089053_0000000084_b0c3b3f910f04b90ba2cc053f94ea87d",
+      "restored": true,
+      "starts": 0,
+      "quota": {
+        "used": 1,
+        "reserved": 0,
+        "available": 2
+      },
+      "persisted": "{\"id\":\"scenario_session_01794213201755369335_0000000036_a541369ee9b342899a4e9d2ec537c3ce\",\"rank\":0}",
+      "queryRemoved": true,
+      "resultTextLength": 2339
+    },
+    {
+      "productId": "client_update_writer",
+      "phase": "url",
+      "sessionId": "scenario_session_01794213256903352983_0000000090_7c01c896e9754695a32cd756682a513a",
+      "artifactId": "artifact_01794213257038794940_0000000104_9aabe63d20f647869cd02bc5b6a6f9a3",
+      "restored": true,
+      "starts": 0,
+      "quota": null,
+      "persisted": "{\"id\":\"scenario_session_01794213256903352983_0000000090_7c01c896e9754695a32cd756682a513a\",\"rank\":0}",
+      "queryRemoved": true,
+      "resultTextLength": 224
+    },
+    {
+      "productId": "client_update_writer",
+      "phase": "reload",
+      "sessionId": "scenario_session_01794213256903352983_0000000090_7c01c896e9754695a32cd756682a513a",
+      "artifactId": "artifact_01794213257038794940_0000000104_9aabe63d20f647869cd02bc5b6a6f9a3",
+      "restored": true,
+      "starts": 0,
+      "quota": null,
+      "persisted": "{\"id\":\"scenario_session_01794213256903352983_0000000090_7c01c896e9754695a32cd756682a513a\",\"rank\":0}",
+      "queryRemoved": true,
+      "resultTextLength": 224
+    }
+  ],
+  "backendCountsAfterRestoration": [
+    {
+      "productId": "brief_decoder",
+      "sessionId": "scenario_session_01794213201755369335_0000000036_a541369ee9b342899a4e9d2ec537c3ce",
+      "jobs": 1,
+      "action_runs": 4,
+      "provider_calls": 4
+    },
+    {
+      "productId": "client_update_writer",
+      "sessionId": "scenario_session_01794213256903352983_0000000090_7c01c896e9754695a32cd756682a513a",
+      "jobs": 1,
+      "action_runs": 1,
+      "provider_calls": 1
+    },
+    {
+      "productId": "proposal_ai",
+      "sessionId": "scenario_session_01794213201404964470_0000000002_0db987253fd247498aed74f105383e25",
+      "jobs": 1,
+      "action_runs": 2,
+      "provider_calls": 2
+    }
+  ],
+  "tests": {
+    "webTests": 456,
+    "newProductRestorationTests": 6,
+    "lint": "passed",
+    "typecheck": "passed",
+    "productionBuild": "passed"
+  },
+  "limits": [
+    "Client Update Writer restores only its existing Update attach mode; arbitrary mode discovery is not introduced.",
+    "Acceptance Builder retains its existing Draft attach mode and passed existing unit regressions.",
+    "No quota policy exists for Client Update Writer; no charge assertion is made for an absent quota policy.",
+    "No paid LLM provider or PostgreSQL concurrency check in this follow-up."
+  ]
+}

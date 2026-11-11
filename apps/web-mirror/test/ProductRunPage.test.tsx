@@ -1525,32 +1525,93 @@ describe("ProductRunPage", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
   });
 
-  it("treats a poll that gives up while the session is still non-terminal as retryable, not a dead run", async () => {
-    const { client } = makeClient({
-      ...bootRoutes(),
-      [ROUTES.START]: [startResponse()],
-      // pollScenarioSession's default budget (60s / 2s interval) needs ~30 GETs before it gives
-      // up; queued generously above that so the poll -- not the mock -- is what runs out first.
-      [ROUTES.SESSION]: Array.from({ length: 40 }, () => () => sessionResponse({ status: "running" })),
+  it.each([
+    { durationMs: 70_000, status: "running", attached: false },
+    { durationMs: 1_210_000, status: "running", attached: false },
+    { durationMs: 1_210_000, status: "started", attached: true },
+  ])("keeps $status for $durationMs ms on the same session (attached=$attached)", async ({ durationMs, status, attached }) => {
+    let completed = false;
+    const { client, calls } = makeClientCapturingRequests({
+      ...happyPathRoutes(),
+      [ROUTES.SESSION]: Array.from({ length: Math.ceil(durationMs / 2_000) + 5 }, () =>
+        () => sessionResponse({ status: completed ? "completed" : status })),
     });
-
-    renderPage({ client });
-    // Real timers for boot/form (testing-library's own waitFor polling relies on them); fake
-    // timers are only switched on once the poll's 60s wait is the sole thing left to get through.
-    await waitForForm();
-    fillValidForm();
-    submit();
-
     vi.useFakeTimers();
+    const { unmount } = renderPage({ client, ...(attached ? { attachSessionId: "session_1" } : {}) });
     try {
-      await act(async () => {
-        await advance(61_000);
-      });
-
-      expect(screen.getByText("This is taking longer than expected. Please try again.")).toBeTruthy();
-      // Still recoverable, not a dead run: retry stays available and reuses the same submission.
-      expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+      await act(async () => { await advance(100); });
+      if (!attached) {
+        fillValidForm();
+        submit();
+      }
+      await act(async () => { await advance(durationMs, 2_000); });
+      expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+      expect(screen.queryByText(RESULT_TEXT)).toBeNull();
+      expect(screen.getByRole("button", { name: "Generating…" }).hasAttribute("disabled")).toBe(true);
+      completed = true;
+      await act(async () => { await advance(2_000); });
+      expect(screen.getByText(RESULT_TEXT)).toBeTruthy();
+      expect(calls.filter((call) => call.key === ROUTES.START)).toHaveLength(attached ? 0 : 1);
+      expect(calls.filter((call) => call.key.startsWith("GET /v1/scenario-sessions/"))
+        .every((call) => call.key === ROUTES.SESSION)).toBe(true);
+      expect(calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(durationMs / 2_000 + 2);
+      fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+      await act(async () => { await advance(0); });
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(RESULT_TEXT);
     } finally {
+      unmount();
+      vi.useRealTimers();
+    }
+  });
+
+  it.each(["network", "timeout"])("rechecks the accepted session after a %s failure without another start", async (failure) => {
+    let failedOnce = false;
+    const { client, calls } = makeClientCapturingRequests(happyPathRoutes(), (key, init) => {
+      if (key !== ROUTES.SESSION || failedOnce) return undefined;
+      failedOnce = true;
+      if (failure === "network") throw new TypeError("Connection lost");
+      return new Promise<Response>((_resolve, reject) => {
+        init.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+      });
+    });
+    vi.useFakeTimers();
+    const { unmount } = renderPage({ client });
+    try {
+      await act(async () => { await advance(100); });
+      fillValidForm();
+      submit();
+      await act(async () => { await advance(10_100); });
+      expect(screen.queryByText(RUN_FAILED)).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+      await act(async () => { await advance(100); });
+      expect(screen.getByText(RESULT_TEXT)).toBeTruthy();
+      expect(calls.filter((call) => call.key === ROUTES.START)).toHaveLength(1);
+      expect(calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(2);
+    } finally {
+      unmount();
+      vi.useRealTimers();
+    }
+  });
+
+  it("stops polling on unmount after renewing a healthy window", async () => {
+    const { client, calls } = makeClientCapturingRequests({
+      ...happyPathRoutes(),
+      [ROUTES.SESSION]: Array.from({ length: 310 }, () => () => sessionResponse({ status: "running" })),
+    });
+    vi.useFakeTimers();
+    const { unmount } = renderPage({ client });
+    try {
+      await act(async () => { await advance(100); });
+      fillValidForm();
+      submit();
+      await act(async () => { await advance(602_000, 2_000); });
+      expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+      unmount();
+      const callCount = calls.length;
+      await act(async () => { await advance(10_000); });
+      expect(calls).toHaveLength(callCount);
+    } finally {
+      unmount();
       vi.useRealTimers();
     }
   });

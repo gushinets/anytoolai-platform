@@ -1,6 +1,7 @@
 "use client";
 
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
+import type { AttachProps } from "../runtime/attachSession";
 import { useProductT } from "../../i18n";
 import { ProductRunPage } from "../runtime/ProductRunPage";
 import {
@@ -60,12 +61,12 @@ export const briefDecoderDefinition: ProductDefinition<BriefDecoderValues, Brief
   Result: BriefDecoderResultView,
 };
 
-export type BriefDecoderProductProps = {
+export type BriefDecoderProductProps = AttachProps & {
   client: PlatformApiClient;
   onEvent?: (event: ProductRunEvent) => void;
   visitId?: string;
 };
 
-export function BriefDecoderProduct({ client, onEvent, visitId }: BriefDecoderProductProps) {
-  return <ProductRunPage definition={briefDecoderDefinition} client={client} onEvent={onEvent} visitId={visitId} />;
+export function BriefDecoderProduct({ client, onEvent, visitId, ...attach }: BriefDecoderProductProps) {
+  return <ProductRunPage definition={briefDecoderDefinition} client={client} onEvent={onEvent} visitId={visitId} {...attach} />;
 }

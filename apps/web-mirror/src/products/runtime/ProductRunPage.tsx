@@ -727,10 +727,18 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     resultFetchSettledRef.current = false;
     activeScenarioSessionIdRef.current = scenarioSessionId;
     const controller = controllerRef.current;
-    const polled = await pollScenarioSession(client, scenarioSessionId, { signal: controller?.signal });
-    if (controller?.signal.aborted) {
-      return;
-    }
+    let polled;
+    do {
+      polled = await pollScenarioSession(client, scenarioSessionId, { signal: controller?.signal });
+      if (controller?.signal.aborted || activeScenarioSessionIdRef.current !== scenarioSessionId) {
+        return;
+      }
+      // A healthy started/running snapshot at the SDK deadline is still the same accepted run.
+      // The poller's final interval keeps successive windows spaced without a second poller.
+    } while (
+      polled.reason === "timeout" && polled.result.ok &&
+      (polled.result.value.status === "started" || polled.result.value.status === "running")
+    );
     if (!polled.result.ok) {
       // A definite 404 for an attached id (stale, foreign or mistyped `?session=`) can never
       // succeed on retry: end in the run-failed state instead of offering an endless re-poll.
@@ -748,19 +756,6 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         }
       }
       setPhase({ kind: "retryable-error", reason: polled.reason === "timeout" ? "timeout" : "connectionLost" });
-      return;
-    }
-    if (polled.reason === "timeout") {
-      // pollScenarioSession() returning `result.ok: true` together with `reason: "timeout"` means
-      // the *last* snapshot it saw was still non-terminal (started/running) when the bounded
-      // polling budget ran out -- not a backend conclusion about the run, just this poll giving
-      // up early. Treating that as enterUnknownError() (like a genuinely terminal status below)
-      // would clear pendingStart and abandon a job that may still be actively running server-side.
-      // Ambiguous, so this is retryable-error: its retry reuses the same Idempotency-Key, and the
-      // backend collapses that back onto this same session rather than starting a new one --
-      // see `busy`'s own comment below for why this stays gated on `pendingStart`, not a
-      // per-phase session id.
-      setPhase({ kind: "retryable-error", reason: "timeout" });
       return;
     }
     const session = polled.result.value;

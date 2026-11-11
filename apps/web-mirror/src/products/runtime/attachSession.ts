@@ -96,6 +96,17 @@ function activeOf(current: StoredAttach | undefined): { active?: string } {
   return current?.active === undefined ? {} : { active: current.active };
 }
 
+/** Remove only this reference; another explicitly opened or later accepted session survives. */
+function forgetAttachSession(productId: string, id: string): void {
+  const current = readEntry(productId);
+  if (current?.active === id) {
+    writeEntry(productId, current.id === id ? null : { id: current.id, rank: current.rank });
+  } else if (current?.id === id) {
+    // The rank belonged to the discarded id, not to the surviving active session.
+    writeEntry(productId, current.active === undefined ? null : { id: current.active, rank: 0, active: current.active });
+  }
+}
+
 /** What a product page needs to show an already-queued session, threaded route -> shell -> product ->
  * `ProductRunPage`. The route's `useAttachSession` is the one owner of the state behind it. */
 export type AttachProps = {
@@ -112,18 +123,21 @@ export type AttachProps = {
   /** The person moved on from the attached session: "New task", own work replacing its result, a mode
    * switch, or its terminal failure. Safe to call at any time; it only acts after the attach began. */
   onAttachEnd?: () => void;
+  /** Explicitly discard an unavailable attachment before runtime boot; never starts or cancels a run. */
+  onAttachDiscard?: () => void;
 };
 
 /**
  * The route-level owner of an attached session. The id comes from `?session=` once, is removed from the
  * address bar (so a bookmark or shared link does not carry it), and is kept in this tab's `sessionStorage`
- * so a reload still shows the result the accept already charged for. It is forgotten only by
- * `onAttachEnd`, only once `onAttachBegin` said the page really started showing it, and only if the
+ * so a reload still shows the result the accept already charged for. Normal `onAttachEnd` acts
+ * only once `onAttachBegin` said the page really started showing it, and only if the
  * stored id is still the one it attached: a failed boot, or
  * the person typing in another mode, forgets nothing, so a reload still retries the paid-for session.
+ * Explicit discard of an unavailable attachment also works before boot, without losing other sessions.
  */
 export function useAttachSession(productId: string, fromUrl: string | undefined): AttachProps {
-  const [attachSessionId] = useState(() => fromUrl || readAttachSessionId(productId));
+  const [attachSessionId, setAttachSessionId] = useState(() => fromUrl || readAttachSessionId(productId));
   // The id this route attached, once the page started showing it. `onAttachEnd` forgets only that one: a late
   // Accept may have stored another session for the product meanwhile (`rememberAttachSession`).
   const begunIdRef = useRef<string | undefined>(undefined);
@@ -134,7 +148,7 @@ export function useAttachSession(productId: string, fromUrl: string | undefined)
     // A bare link has no order of its own (rank 0): it keeps the rank of the same session the consent page
     // remembered, and never replaces a different session that has one (a newer accepted handoff).
     const current = readEntry(productId);
-    if (current === undefined || current.rank === 0) {
+    if (current === undefined || (current.rank === 0 && current.active === undefined)) {
       writeEntry(productId, { id: fromUrl, rank: 0 });
     }
     const url = new URL(window.location.href);
@@ -149,17 +163,13 @@ export function useAttachSession(productId: string, fromUrl: string | undefined)
   const onAttachEnd = useCallback(() => {
     const begunId = begunIdRef.current;
     begunIdRef.current = undefined;
-    const current = readEntry(productId);
-    if (begunId === undefined || current === undefined) {
-      return;
-    }
-    if (current.active === begunId) {
-      // The explicitly opened session ended: a newer paid-for one behind it is what a visit restores now; none
-      // (it was the newest itself), nothing is.
-      writeEntry(productId, current.id === begunId ? null : { id: current.id, rank: current.rank });
-    } else if (current.id === begunId && current.active === undefined) {
-      writeEntry(productId, null);
-    }
+    if (begunId !== undefined) forgetAttachSession(productId, begunId);
   }, [productId]);
-  return { attachSessionId, onAttachBegin, onAttachEnd };
+  const onAttachDiscard = useCallback(() => {
+    if (attachSessionId === undefined) return;
+    forgetAttachSession(productId, attachSessionId);
+    if (begunIdRef.current === attachSessionId) begunIdRef.current = undefined;
+    setAttachSessionId((current) => current === attachSessionId ? undefined : current);
+  }, [productId, attachSessionId]);
+  return { attachSessionId, onAttachBegin, onAttachEnd, onAttachDiscard };
 }

@@ -2,6 +2,7 @@
 
 import type { ChangeEvent } from "react";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
+import type { AttachProps } from "../runtime/attachSession";
 import { Input, TextArea } from "@anytoolai/shared-ui";
 import { FieldErrorMessage } from "../../components/FieldErrorMessage";
 import { ResultView } from "../../components/ResultView";
@@ -287,14 +288,14 @@ export const prepaidRequestDefinition: ProductDefinition<PrepaidRequestValues, C
   Result: ClientUpdateWriterResultView,
 };
 
-export type ClientUpdateWriterProductProps = {
+export type ClientUpdateWriterProductProps = AttachProps & {
   client: PlatformApiClient;
   onEvent?: (event: ProductRunEvent) => void;
   visitId?: string;
 };
 
 /** One `ProductDefinition` per mode; the mode selector and its run-safety rules are `MultiModeProduct`. */
-export function ClientUpdateWriterProduct({ client, onEvent, visitId }: ClientUpdateWriterProductProps) {
+export function ClientUpdateWriterProduct({ client, onEvent, visitId, ...attach }: ClientUpdateWriterProductProps) {
   const t = useProductT();
   return (
     <MultiModeProduct
@@ -302,6 +303,7 @@ export function ClientUpdateWriterProduct({ client, onEvent, visitId }: ClientUp
       onEvent={onEvent}
       visitId={visitId}
       legend={t("modes.legend")}
+      {...attach}
       name="client-update-writer-mode"
       modes={[
         { id: "update", label: t("modes.update"), definition: updateDefinition },
