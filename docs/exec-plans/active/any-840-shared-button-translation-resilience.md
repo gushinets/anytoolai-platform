@@ -1,0 +1,119 @@
+# Execution Plan: ANY-840 Shared Button Translation Resilience
+
+## Status
+
+- State: active
+- Owner: agent
+- Created: 2026-11-11
+- Last updated: 2026-11-11
+- Review date: 2026-11-11
+- Next action: user review, permission to push, and manual device QA.
+- Blocker: full gates are not green (host sudo requirement and unrelated browser timing failure); optional smoke backend lacks ProposalAI.
+
+## Goal
+
+The shared Button survives browser translation replacing its label text nodes through
+loading false → true → false, label changes, and repeated product submissions.
+
+## Scope
+
+In scope: shared Button markup, label CSS, Button/CopyButton regression tests, and
+ProposalAI, Brief Decoder and Client Update Writer submit/regenerate regression tests.
+The shared component also reaches Acceptance Builder, Task Finder and handoff controls.
+
+Out of scope: SSR locale detection, message changes, disabling browser translation,
+global error boundaries and backend changes.
+
+## Root cause
+
+A translator replaces a bare button text node with nested font elements. React still
+references the detached text node when inserting the conditional spinner before it,
+causing NotFoundError during commit. A stable label span supplies the insertion anchor;
+string label updates replace its translated content safely.
+
+## Implementation steps
+
+- [x] Reproduce the crash with the shared Button regression before changing production code.
+- [x] Wrap the label, preserving spacing, accessible names, disabled and busy states.
+- [x] Cover translation before/while loading, copy feedback and product regeneration.
+- [x] Run repository gates and record manual QA limits and failures.
+
+## Verification
+
+- Baseline HEAD and origin/main: `527dc53d674703451eed7d5c705fab3cf1c70d09`.
+- Working branch: `feature/ANY-840`.
+- System-Python doctor failed: Python 3.14 lacks pytest and pydantic.
+- Doctor with the existing managed Python 3.12.13 passed; pnpm launcher warns
+  about an inaccessible database. Use the cached pinned pnpm 10.34.1 runtime.
+- Before the fix, the shared-ui suite failed 3 tests: loading threw NotFoundError,
+  the stable wrapper was absent, and successful clipboard writes left translated
+  Copy feedback stale. After the fix, all 55 shared-ui tests passed.
+- Targeted product suites: all 79 tests passed, including translated submit and
+  regenerate in the three reported products. ProposalAI holds each start pending
+  to verify the spinner, disabled and aria-busy state, then the updated result.
+- `frontend-check`: frozen install, workspace lint and typecheck passed. The test
+  phase stopped on an unrelated Atom Lab browser test: "malformed accepted response
+  keeps the same submission available for safe replay" asserted two requests
+  immediately after a click but observed one (338 other browser tests passed).
+  That test passed unchanged on an isolated rerun. It serves the Python API's static
+  Atom Lab assets, not the shared React Button; its source is outside this change.
+  The whole frontend-check command is therefore not recorded as green.
+- Completed the remaining workspace test phase separately: web-mirror 545 tests,
+  shared-ui 55 tests and CE-kit 336 tests passed, as did the other workspace tests.
+  `pnpm -r --if-present generate-api-types:check` and `pnpm -r build` passed.
+- `validate-docs` passed after supplying the required Review date metadata.
+- `quick-check`: config, architecture, docs and generated-doc checks passed. Backend
+  tests finished with 3576 passed, 12 existing skips and 657 deselected. One unrelated
+  host-dependent test failed: `tests/test_runner.py::test_activation_marker_is_readable_by_non_root_api_user`;
+  its `sudo -n -u nobody` subprocess reports "interactive authentication is required".
+  No tests were changed or skipped to bypass this requirement.
+- Optional proposal-ai-smoke requires the dev API/worker/PostgreSQL stack.
+  The sandbox cannot access Docker, but an approved status check outside the
+  sandbox confirmed that the workspace stack is running. The smoke build succeeded,
+  but the page displayed "ProposalAI is unavailable right now" before the form.
+  A direct runtime-config GET confirmed `404 product_not_found`. Stopped the run
+  after two failures (one interrupted, seven not run); this is not smoke success.
+  No running deployment configuration was changed to enable a product.
+- Physical Honor 50 is unavailable. Device acceptance remains manual QA; DOM
+  simulation is not evidence of device verification.
+
+## Decision log
+
+| Date | Decision | Why |
+|---|---|---|
+| 2026-11-11 | Implement in existing TypeScript, confirmed by user. | The crash occurs in React DOM reconciliation; no Python change is needed. |
+| 2026-11-11 | Use a stable label span, preserving shared design tokens. | Fix the common insertion anchor and keep translation enabled. |
+| 2026-11-11 | Defer a global error boundary. | Separate fallback behavior is outside this targeted fix. |
+| 2026-11-11 | Keep the small translation simulator within each package's test tree. | No production export or cross-package test dependency is needed. |
+| 2026-11-11 | Recommend a separate issue: SSR html lang and first render do not match the user's locale. | Locale detection and translated label distortion have a different cause from the button insertion crash. |
+| 2026-11-11 | Leave unrelated gate failures and the running development stack unchanged. | Host sudo access, an Atom Lab test's asynchronous assertion and disabled product availability are outside the shared-button fix. |
+
+## Follow-up debt
+
+Verify submit/regenerate with browser translation on the reported Honor 50.
+Investigate SSR locale separately: `apps/web-mirror/src/app/layout.tsx` serves
+`lang="en"` before the client locale changes, potentially triggering unwanted translation.
+The supplied attachment analysis attributes distorted Russian labels to translation;
+attachments and browser settings have not been independently verified in this run.
+
+The supplied report compared these labels; repository Russian messages match the
+source column, so no message-file correction is indicated:
+
+| Reported on Honor 50 | Russian source |
+|---|---|
+| данные о месторождении | Ваши данные |
+| Как вачасе | Как в задаче |
+| Оставьте задачу | Опишите задачу |
+| Ваш опыт и сильная сторона | Ваш опыт и сильные стороны |
+| Нет языка интерфейса… | Не язык интерфейса… |
+| Заметки по убийствам | Заметки по оплате |
+| (мок) | Сумма |
+| надежный ответ | Цель ответа |
+| Черновик ответ | Черновик ответа |
+
+The simulator covers replacement of text nodes, not arbitrary replacement of the
+label element or all translation mutations elsewhere on the page. Other products
+and handoffs share this fix; their translated journeys were not individually tested.
+
+Repository hygiene check found pre-existing local-skill references in execution
+plans for ANY-17, ANY-339, ANY-391, ANY-221 and ANY-227; unrelated files remain untouched.

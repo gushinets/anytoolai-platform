@@ -32,6 +32,7 @@ import {
 } from "./fixtures/platformResponses";
 import { CLIENT_UPDATE_WRITER_MESSAGES } from "../src/products/clientUpdateWriter/messages";
 import { makeRender } from "./support/renderWithI18n";
+import { simulateBrowserTranslation } from "./support/simulateBrowserTranslation";
 
 const render = makeRender(CLIENT_UPDATE_WRITER_MESSAGES);
 
@@ -129,6 +130,44 @@ const MODE_SCENARIOS: ModeScenario[] = [
     resultTitle: "Prepaid request",
   },
 ];
+
+it("keeps working when the browser translates the submit button (ANY-840)", async () => {
+  const errorSpy = vi.spyOn(console, "error");
+  try {
+    const scenario = MODE_SCENARIOS[0]!;
+    const { routes, queues } = bootAndHappyPathRoutes(scenario.ids, { text: "First update." });
+    const { client, calls } = makeClient({
+      ...queues,
+      [routes.QUOTA]: Array.from({ length: 5 }, () => quotaResponse(scenario.ids)),
+      [routes.START]: [startResponse(), startResponse()],
+      [routes.SESSION]: [sessionResponse(), sessionResponse()],
+      [routes.RESULT]: [
+        resultResponse(scenario.ids, { output: { text: "First update." } }),
+        resultResponse(scenario.ids, { output: { text: "Second update." } }),
+      ],
+    });
+    render(<ClientUpdateWriterProduct client={client} />);
+    await screen.findByLabelText(scenario.fields[0]![0]);
+    for (const [label, value] of scenario.fields) {
+      fireEvent.change(screen.getByLabelText(label), { target: { value } });
+    }
+    const button = screen.getByRole("button", { name: scenario.submit });
+    simulateBrowserTranslation(button);
+    fireEvent.click(button);
+    await screen.findByText("First update.");
+    expect(screen.getByRole("heading", { name: scenario.resultTitle, level: 2 })).toBeTruthy();
+    expect(screen.getByRole("button", { name: scenario.regenerate })).toBe(button);
+
+    simulateBrowserTranslation(button);
+    fireEvent.click(button);
+    await screen.findByText("Second update.");
+    expect(screen.getByRole("button", { name: scenario.regenerate })).toBe(button);
+    expect(calls.filter((call) => call.key === routes.START)).toHaveLength(2);
+    expect(errorSpy).not.toHaveBeenCalled();
+  } finally {
+    errorSpy.mockRestore();
+  }
+});
 
 describe.each(MODE_SCENARIOS)("Client Update Writer $mode mode: one-screen workspace", (scenario) => {
   it("defaults to neutral and offers three exclusive tone radios", async () => {

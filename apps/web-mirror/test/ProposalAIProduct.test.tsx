@@ -21,6 +21,7 @@ import {
 } from "./fixtures/platformResponses";
 import { PROPOSAL_AI_MESSAGES } from "../src/products/proposalAi/messages";
 import { makeRender } from "./support/renderWithI18n";
+import { simulateBrowserTranslation } from "./support/simulateBrowserTranslation";
 
 const render = makeRender(PROPOSAL_AI_MESSAGES);
 
@@ -59,6 +60,46 @@ function renderReady() {
 }
 
 describe("ProposalAI product definition", () => {
+  it("keeps working when the browser translates the submit button (ANY-840)", async () => {
+    const errorSpy = vi.spyOn(console, "error");
+    try {
+      const routed = makeClientWithDeferredCalls({
+        [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
+        [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
+        [ROUTES.QUOTA]: Array.from({ length: 5 }, () => quotaResponse(IDS)),
+        [ROUTES.SESSION]: [sessionResponse(), sessionResponse()],
+        [ROUTES.RESULT]: [
+          resultResponse(IDS, { output: { text: PROPOSAL_TEXT } }),
+          resultResponse(IDS, { output: { text: "Updated proposal." } }),
+        ],
+      }, { [ROUTES.START]: 2 });
+      render(<ProposalAIProduct client={routed.client} />);
+      fireEvent.change(await screen.findByLabelText(/^Describe the task/), { target: { value: "Build a landing page." } });
+      fireEvent.change(screen.getByLabelText(/^Your experience and strengths/), { target: { value: "Frontend freelancer." } });
+
+      for (const [index, label, result] of [
+        [0, "Generate proposal", PROPOSAL_TEXT],
+        [1, "Regenerate proposal", "Updated proposal."],
+      ] as const) {
+        const button = screen.getByRole("button", { name: label }) as HTMLButtonElement;
+        simulateBrowserTranslation(button);
+        fireEvent.click(button);
+        await waitFor(() => expect(routed.calls.filter((call) => call.key === ROUTES.START)).toHaveLength(index + 1));
+        expect(button.disabled).toBe(true);
+        expect(button.getAttribute("aria-busy")).toBe("true");
+        expect(button.querySelector('[aria-hidden="true"]')).not.toBeNull();
+        routed.resolveCall(ROUTES.START, index, startResponse());
+        await screen.findByText(result);
+        expect(screen.getByRole("button", { name: "Regenerate proposal" })).toBe(button);
+        expect(button.disabled).toBe(false);
+        expect(button.hasAttribute("aria-busy")).toBe(false);
+      }
+      expect(errorSpy).not.toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
   it("revalidates only the edited invalid field using its current product rules", async () => {
     const { calls } = renderReady();
     const task = await screen.findByLabelText(/^Describe the task/);

@@ -34,6 +34,7 @@ import {
   startResponse,
 } from "./fixtures/platformResponses";
 import { makeRender } from "./support/renderWithI18n";
+import { simulateBrowserTranslation } from "./support/simulateBrowserTranslation";
 
 const render = makeRender(BRIEF_DECODER_MESSAGES);
 const IDS = { productId: "brief_decoder", scenarioId: "brief_decoder.decode_v1" } as const;
@@ -116,6 +117,38 @@ async function decode(queues: ReturnType<typeof routes>, events: ProductRunEvent
 const completedEvents = (events: ProductRunEvent[]) => events.filter((e) => e.type === "scenario_completed");
 
 describe("Brief Decoder definition", () => {
+  it("keeps working when the browser translates the submit button (ANY-840)", async () => {
+    const errorSpy = vi.spyOn(console, "error");
+    try {
+      const { client, calls } = makeClient({
+        ...routes(composedOutput("")),
+        [ROUTES.QUOTA]: Array.from({ length: 5 }, () => quotaResponse(IDS)),
+        [ROUTES.START]: [startResponse(), startResponse()],
+        [ROUTES.SESSION]: [sessionResponse(), sessionResponse()],
+        [ROUTES.RESULT]: [
+          resultResponse(IDS, { output: composedOutput("") }),
+          resultResponse(IDS, { output: composedOutput(".no_issues") }),
+        ],
+      });
+      render(<BriefDecoderProduct client={client} />);
+      fireEvent.change(await screen.findByLabelText("Client brief"), { target: { value: "Need a website by the holidays." } });
+      const button = screen.getByRole("button", { name: "Decode brief" });
+      simulateBrowserTranslation(button);
+      fireEvent.click(button);
+      await screen.findByRole("heading", { name: /clarifying questions/, level: 3 });
+      expect(screen.getByRole("button", { name: "Decode brief again" })).toBe(button);
+
+      simulateBrowserTranslation(button);
+      fireEvent.click(button);
+      await screen.findByText("No issues found.");
+      expect(screen.getByRole("button", { name: "Decode brief again" })).toBe(button);
+      expect(calls.filter((call) => call.key === ROUTES.START)).toHaveLength(2);
+      expect(errorSpy).not.toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
   it("declares the backend's Brief Decoder -> Acceptance Builder handoff and its button label", () => {
     const handoffs = readFileSync(
       resolve(SCHEMA_ROOT, "../handoffs.yaml"),
