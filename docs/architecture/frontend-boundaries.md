@@ -169,6 +169,11 @@ The shared runtime, not a product, owns the web side of a handoff:
   from this product's scenario: its backend-owned `schemaRef` and `schemaVersion` are checked
   against the selected scenario's output schema from runtime config (a declared version must match;
   a ref keeps its name across a version bump) before the product parser sees it.
+- Products opting in through `ProductDefinition.draft` keep form values and their last accepted
+  scenario session in the tab's `sessionStorage`
+  (`anytoolai.product_draft.<productId>.<messageScope>`). Reload resumes polling without a new start.
+  "New task" clears both; terminal failure clears the run and keeps the draft. User text stays in
+  tab storage, never events, URLs or logs. ProposalAI is the first opt-in; handoff attachment takes precedence.
 - A spent (accepted/consumed) token that still names the target session shows an explicit "Open result" on the
   consent page, for the case where the Accept response was lost and the person reloaded instead of retrying
   (a retry that gets "already accepted" redirects on its own). It never redirects automatically on load.

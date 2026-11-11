@@ -39,6 +39,27 @@ export type ProposalAIValues = {
   language: ProposalLanguage;
 };
 
+const EMPTY_VALUES: ProposalAIValues = { taskText: "", freelancerPositioning: "", tone: "warm", language: AUTO_LANGUAGE };
+
+function isTone(value: unknown): value is Tone {
+  return typeof value === "string" && (TONE_VALUES as readonly string[]).includes(value);
+}
+
+function isProposalLanguage(value: unknown): value is ProposalLanguage {
+  return value === AUTO_LANGUAGE || (typeof value === "string" && (LOCALES as readonly string[]).includes(value));
+}
+
+function parseDraftValues(raw: unknown): ProposalAIValues | null {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return null;
+  const value = raw as Record<string, unknown>;
+  return {
+    taskText: typeof value.taskText === "string" ? value.taskText : EMPTY_VALUES.taskText,
+    freelancerPositioning: typeof value.freelancerPositioning === "string" ? value.freelancerPositioning : EMPTY_VALUES.freelancerPositioning,
+    tone: isTone(value.tone) ? value.tone : EMPTY_VALUES.tone,
+    language: isProposalLanguage(value.language) ? value.language : EMPTY_VALUES.language,
+  };
+}
+
 // Mirrors `proposal_ai.generate_output_v1`: the proposal and the `experience_gap` issues.
 export type ProposalAIGap = { description: string };
 export type ProposalAIResult = { text: string; gaps: ProposalAIGap[] };
@@ -229,7 +250,8 @@ export const proposalAiDefinition: ProductDefinition<ProposalAIValues, ProposalA
   scenarioId: "proposal_ai.generate_v1",
   messageScope: "generate",
   hasDescription: true,
-  emptyValues: { taskText: "", freelancerPositioning: "", tone: "warm", language: AUTO_LANGUAGE },
+  emptyValues: EMPTY_VALUES,
+  draft: { parseValues: parseDraftValues },
   validate,
   toInput: (values) => ({
     task_text: trimBackendWhitespace(values.taskText),

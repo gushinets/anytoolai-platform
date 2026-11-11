@@ -29,6 +29,7 @@ const PROPOSAL_TEXT = "Dear client, here is my proposal.";
 afterEach(() => {
   cleanup();
   window.localStorage.clear();
+  window.sessionStorage.clear();
 });
 
 beforeEach(() => {
@@ -448,5 +449,175 @@ describe("ProposalAI product definition", () => {
 
     await waitFor(() => expect(screen.getByText(PROPOSAL_TEXT)).toBeTruthy());
     expect(screen.queryByRole("region", { name: "Not covered by your experience" })).toBeNull();
+  });
+});
+
+describe("ProposalAI draft and run restore (ANY-841)", () => {
+  const key = "anytoolai.product_draft.proposal_ai.generate";
+  const values = { taskText: "Build a landing page.", freelancerPositioning: "Frontend freelancer.", tone: "firm", language: "de" };
+
+  function seedRun(input: unknown = values) {
+    window.sessionStorage.setItem(key, JSON.stringify({ v: 1, values, run: { scenarioSessionId: "session_1", input } }));
+  }
+
+  function recoveryClient(session = sessionResponse(), result = resultResponse(IDS, { output: { text: PROPOSAL_TEXT } })) {
+    return makeClient({
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
+      [ROUTES.QUOTA]: Array.from({ length: 4 }, () => quotaResponse(IDS)),
+      [ROUTES.SESSION]: [session],
+      [ROUTES.RESULT]: [result],
+    });
+  }
+
+  async function fillDraft() {
+    fireEvent.change(await screen.findByLabelText(/^Describe the task/), { target: { value: values.taskText } });
+    fireEvent.change(screen.getByLabelText(/^Your experience and strengths/), { target: { value: values.freelancerPositioning } });
+    fireEvent.click(document.getElementById("proposal-ai-tone-firm")!);
+    fireEvent.change(screen.getByLabelText("Proposal language"), { target: { value: "de" } });
+  }
+
+  async function expectDraft() {
+    expect((await screen.findByLabelText(/^Describe the task/) as HTMLTextAreaElement).value).toBe(values.taskText);
+    expect((screen.getByLabelText(/^Your experience and strengths/) as HTMLTextAreaElement).value).toBe(values.freelancerPositioning);
+    expect((document.getElementById("proposal-ai-tone-firm") as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText("Proposal language") as HTMLSelectElement).value).toBe("de");
+  }
+
+  it("restores all four draft fields before submit", async () => {
+    renderReady();
+    await fillDraft();
+    cleanup();
+    const second = recoveryClient();
+    render(<ProposalAIProduct client={second.client} />);
+    await expectDraft();
+    expect(second.calls.some((call) => call.key === ROUTES.START || call.key === ROUTES.SESSION)).toBe(false);
+  });
+
+  it("resumes an accepted running session after remount without another start", async () => {
+    const first = makeClientWithDeferredCalls({
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
+      [ROUTES.QUOTA]: [quotaResponse(IDS), quotaResponse(IDS)],
+      [ROUTES.START]: [startResponse()],
+    }, { [ROUTES.SESSION]: 1 });
+    render(<ProposalAIProduct client={first.client} />);
+    await fillDraft();
+    fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+    await waitFor(() => expect(first.calls.some((call) => call.key === ROUTES.SESSION)).toBe(true));
+    cleanup();
+    const second = recoveryClient();
+    render(<ProposalAIProduct client={second.client} />);
+    expect(await screen.findByText(PROPOSAL_TEXT)).toBeTruthy();
+    await expectDraft();
+    expect(second.calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(1);
+    expect(second.calls.some((call) => call.key === ROUTES.START)).toBe(false);
+    first.resolveCall(ROUTES.SESSION, 0, sessionResponse());
+  });
+
+  it.each([false, true])("restores a completed result and its original input (edited: %s)", async (edited) => {
+    renderReady();
+    await fillDraft();
+    fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+    await screen.findByText(PROPOSAL_TEXT);
+    if (edited) fireEvent.change(screen.getByLabelText(/^Describe the task/), { target: { value: "A different brief" } });
+    cleanup();
+    const second = recoveryClient();
+    render(<ProposalAIProduct client={second.client} />);
+    expect(await screen.findByText(PROPOSAL_TEXT)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Regenerate proposal" })).toBeTruthy();
+    if (edited) {
+      expect((screen.getByLabelText(/^Describe the task/) as HTMLTextAreaElement).value).toBe("A different brief");
+      expect(screen.getByText(/previous details/i)).toBeTruthy();
+    } else await expectDraft();
+    expect(second.calls.some((call) => call.key === ROUTES.START)).toBe(false);
+  });
+
+  it("New task clears draft and run across remount", async () => {
+    seedRun();
+    render(<ProposalAIProduct client={recoveryClient().client} />);
+    await screen.findByText(PROPOSAL_TEXT);
+    fireEvent.click(screen.getByRole("button", { name: "New task" }));
+    expect(window.sessionStorage.getItem(key)).toBeNull();
+    cleanup();
+    const second = recoveryClient();
+    render(<ProposalAIProduct client={second.client} />);
+    expect((await screen.findByLabelText(/^Describe the task/) as HTMLTextAreaElement).value).toBe("");
+    expect(screen.queryByText(PROPOSAL_TEXT)).toBeNull();
+    expect(second.calls.some((call) => call.key === ROUTES.SESSION)).toBe(false);
+  });
+
+  it("forgets a missing session while retaining the draft without an alert", async () => {
+    seedRun();
+    const second = recoveryClient(errorResponse(404, "scenario_session_not_found"));
+    render(<ProposalAIProduct client={second.client} />);
+    await waitFor(() => expect((JSON.parse(window.sessionStorage.getItem(key)!) as { run?: unknown }).run).toBeUndefined());
+    await expectDraft();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect((screen.getByRole("button", { name: "Generate proposal" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it.each([
+    { schema_ref: "other.output_v1" },
+    { schema_version: 2 },
+    { output: { wrong: "payload" } },
+  ])("drops a run with an incompatible result %j", async (overrides) => {
+    seedRun();
+    render(<ProposalAIProduct client={recoveryClient(sessionResponse(), resultResponse(IDS, overrides)).client} />);
+    await waitFor(() => expect((JSON.parse(window.sessionStorage.getItem(key)!) as { run?: unknown }).run).toBeUndefined());
+    expect(screen.queryByText(PROPOSAL_TEXT)).toBeNull();
+  });
+
+  it("keeps a timed-out resumed run locked and retries polling it", async () => {
+    seedRun();
+    const second = makeClient({
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
+      [ROUTES.QUOTA]: Array.from({ length: 4 }, () => quotaResponse(IDS)),
+      [ROUTES.SESSION]: Array.from({ length: 40 }, () => () => sessionResponse({ status: "running" })),
+    });
+    vi.useFakeTimers();
+    try {
+      render(<ProposalAIProduct client={second.client} />);
+      await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+      await act(async () => {
+        for (let elapsed = 0; elapsed < 61_000; elapsed += 50) await vi.advanceTimersByTimeAsync(50);
+      });
+      expect((screen.getByLabelText(/^Describe the task/) as HTMLTextAreaElement).disabled).toBe(true);
+      const polls = second.calls.filter((call) => call.key === ROUTES.SESSION).length;
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+      await act(async () => { await vi.advanceTimersByTimeAsync(50); });
+      expect(second.calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(polls + 1);
+      expect(second.calls.some((call) => call.key === ROUTES.START)).toBe(false);
+      expect((JSON.parse(window.sessionStorage.getItem(key)!) as { run?: unknown }).run).toBeTruthy();
+    } finally {
+      cleanup();
+      vi.useRealTimers();
+    }
+  });
+
+  it("still generates when storage reads and writes throw", async () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("blocked"); });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("full"); });
+    try {
+      renderReady();
+      await fillDraft();
+      fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+      expect(await screen.findByText(PROPOSAL_TEXT)).toBeTruthy();
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
+  it("defaults invalid stored fields and drops an unusable run input", async () => {
+    seedRun(null);
+    window.sessionStorage.setItem(key, JSON.stringify({ v: 1, values: { taskText: 5, tone: "loud", language: "xx" }, run: { scenarioSessionId: "session_1", input: null } }));
+    const second = recoveryClient();
+    render(<ProposalAIProduct client={second.client} />);
+    expect((await screen.findByLabelText(/^Describe the task/) as HTMLTextAreaElement).value).toBe("");
+    expect((screen.getByLabelText("Proposal language") as HTMLSelectElement).value).toBe("auto");
+    expect((document.getElementById("proposal-ai-tone-warm") as HTMLInputElement).checked).toBe(true);
+    expect(second.calls.some((call) => call.key === ROUTES.SESSION)).toBe(false);
+    expect((JSON.parse(window.sessionStorage.getItem(key)!) as { run?: unknown }).run).toBeUndefined();
   });
 });

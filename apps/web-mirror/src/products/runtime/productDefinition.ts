@@ -136,6 +136,8 @@ export type ProductDefinition<V extends Record<string, unknown>, R> = {
    * backend-owned.
    */
   handoff?: ProductHandoff;
+  /** Opt in to tab-local draft/run recovery; invalid stored values fall back to emptyValues. */
+  draft?: { parseValues: (raw: unknown) => V | null };
   Fields: ComponentType<ProductFieldsProps<V>>;
   Result: ComponentType<ProductResultProps<R>>;
 };

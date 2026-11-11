@@ -39,6 +39,7 @@ const CUW_IDS = { productId: "client_update_writer", scenarioId: "client_update_
 afterEach(() => {
   cleanup();
   window.localStorage.clear();
+  window.sessionStorage.clear();
   // localeStorage.ts's write-failure fallback is module-level (see its own comment) and every
   // switchTo() below writes through it regardless of outcome, so it must be reset after every test
   // here, not just the one that deliberately makes a write fail -- otherwise a later test's
