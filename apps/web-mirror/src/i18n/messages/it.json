@@ -27,6 +27,8 @@
     "handoffFailed": "Impossibile aprire il passaggio successivo. Riprovi."
   },
   "errors": {
+    "attachmentUnrecognized": "Non è stato possibile ripristinare questa sessione salvata. Riprova oppure scegli «Nuova attività» per aprire un modulo vuoto.",
+    "attachmentUnavailable": "Questa sessione non può essere aperta in questo strumento. Scegli «Nuova attività» per aprire un modulo vuoto.",
     "quotaCapacityReserved": "La capacità è temporaneamente occupata. Riprova tra poco.",
     "startFailed": "Impossibile avviare {product}. Riprovi.",
     "timeout": "L’operazione richiede più tempo del previsto. Riprovi.",

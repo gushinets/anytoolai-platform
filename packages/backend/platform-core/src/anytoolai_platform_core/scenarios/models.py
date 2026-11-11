@@ -64,6 +64,7 @@ class ScenarioSessionRecord:
 @dataclass(frozen=True)
 class ScenarioSessionSnapshot:
     scenario_session_id: str
+    scenario_id: str
     job_id: str | None
     status: ScenarioSessionStatus
     allowed_next_actions: tuple[str, ...] = field(default_factory=tuple)

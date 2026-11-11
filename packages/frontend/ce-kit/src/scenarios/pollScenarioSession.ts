@@ -30,7 +30,13 @@ const POLL_STOP_STATUSES: ReadonlySet<ScenarioSessionStatus> = new Set(
 );
 
 const DEFAULT_INTERVAL_MS = 2_000;
-const DEFAULT_MAX_DURATION_MS = 60_000;
+// The default text policy allows 2 validation × 2 transport attempts for each of two
+// sequential steps (as in ProposalAI), capped at
+// 4 physical calls/action × 60s: 2 × min(2 × 2, 4) × 60 = 480s, plus 120s overhead.
+// Sources: configs/kernel/provider_policies.yaml and
+// packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/proposal_ai/workflows.yaml.
+// This bounds one SDK call, not server wall time (queue/recovery can take longer).
+const DEFAULT_MAX_DURATION_MS = 600_000;
 
 export type PollScenarioSessionOptions = {
   intervalMs?: number;
@@ -93,7 +99,7 @@ export async function pollScenarioSession(
       // timeout, not a generic API error -- whether it was cut off by the remaining poll budget
       // or by the client's own (possibly shorter) `timeoutMs`. `maxDurationMs` is an upper bound
       // on total poll duration, not a per-request retry budget: e.g. with the defaults, a slow
-      // GET can time out at 10s (client.timeoutMs) even with ~50s of `maxDurationMs` still left,
+      // GET can time out at 10s (client.timeoutMs) even with ~590s of `maxDurationMs` still left,
       // and this intentionally ends the entire poll rather than retrying the request.
       return { reason: result.error.type === "timeout" ? "timeout" : "error", result };
     }

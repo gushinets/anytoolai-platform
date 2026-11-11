@@ -2,6 +2,7 @@
 
 import type { ChangeEvent } from "react";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
+import type { AttachProps } from "../runtime/attachSession";
 import { Select, TextArea as CanonicalTextArea } from "@anytoolai/shared-ui";
 import { FieldErrorMessage } from "../../components/FieldErrorMessage";
 import { ResultView } from "../../components/ResultView";
@@ -243,12 +244,12 @@ export const proposalAiDefinition: ProductDefinition<ProposalAIValues, ProposalA
   Result: ProposalAIResultView,
 };
 
-export type ProposalAIProductProps = {
+export type ProposalAIProductProps = AttachProps & {
   client: PlatformApiClient;
   onEvent?: (event: ProductRunEvent) => void;
   visitId?: string;
 };
 
-export function ProposalAIProduct({ client, onEvent, visitId }: ProposalAIProductProps) {
-  return <ProductRunPage definition={proposalAiDefinition} client={client} onEvent={onEvent} visitId={visitId} />;
+export function ProposalAIProduct({ client, onEvent, visitId, ...attach }: ProposalAIProductProps) {
+  return <ProductRunPage definition={proposalAiDefinition} client={client} onEvent={onEvent} visitId={visitId} {...attach} />;
 }

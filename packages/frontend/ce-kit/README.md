@@ -300,19 +300,26 @@ session/job/quota state is created in CE-kit on this path) through the standard 
 ## Scenario session and polling
 
 `getScenarioSession(client, scenarioSessionId, { signal?, timeoutMs? })` is a single typed
-`GET /v1/scenario-sessions/{id}` read.
+`GET /v1/scenario-sessions/{id}` read. Its `scenarioId` identifies the backend scenario even
+while the session is running. Multi-mode web products use that identity to restore the correct
+mode before showing a form. Legacy API responses without this field still parse, but the mode
+is never guessed. Retry preserves and re-reads the same session. Users may explicitly choose
+New task to discard only the local attachment and open a fresh form without starting execution.
 
 `pollScenarioSession(client, scenarioSessionId, { intervalMs?, maxDurationMs?, signal? })` polls it
 on a bounded interval and stops on `completed`, `failed`, `expired`, or `waiting_for_user` (the last
 one stops polling too, since only `nextAction()` can move it forward -- continuing to poll would
 just idle until `maxDurationMs`), on a backend error, on cancellation, or once `maxDurationMs`
 elapses. It never starts, replays, or configures workflow/LLM execution -- it only reads
-backend-owned session state.
+backend-owned session state. Defaults are a 2s interval and a 600s total window: two ProposalAI
+steps × four physical provider calls × 60s = 480s, plus 120s overhead. Queue/recovery time is not
+bounded by that calculation. The web runtime continues with the same session when a window ends
+with a successful `started`/`running` snapshot; SDK callers can still choose a shorter window.
 
 Any individual request's own timeout also stops the whole poll immediately (reported as
 `reason: "timeout"`), even if it fires well before `maxDurationMs` would have elapsed -- e.g. with
 the defaults, a slow `GET` can time out at the client's 10s `timeoutMs` while `maxDurationMs` still
-has ~50s left. `maxDurationMs` is an upper bound on total poll duration, not a per-request retry
+has ~590s left. `maxDurationMs` is an upper bound on total poll duration, not a per-request retry
 budget; this is intentional fail-fast behavior, not a bug.
 
 ```ts
@@ -321,7 +328,7 @@ import { pollScenarioSession } from "@anytoolai/ce-kit";
 const controller = new AbortController();
 const outcome = await pollScenarioSession(client, scenarioSessionId, {
   intervalMs: 2_000,
-  maxDurationMs: 60_000,
+  maxDurationMs: 600_000, // default; a shorter explicit budget is also supported
   signal: controller.signal, // e.g. tied to a popup closing
 });
 

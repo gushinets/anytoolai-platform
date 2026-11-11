@@ -1,0 +1,214 @@
+{
+  "date": "2026-11-09",
+  "environment": "Local Next.js + real API/worker + isolated SQLite",
+  "provider": "Deterministic fake fixture; test-only 35s delay per step and 60s fake-call timeout",
+  "sessionId": "scenario_session_01794210169682840579_0000000002_522e5a2c9b314689b85a2bd2497cecb9",
+  "artifactId": "artifact_01794210240057240255_0000000030_aa98d155a8da41a2baae9bf74aab19f8",
+  "starts": 1,
+  "visibleAfterMs": 72293,
+  "copySucceeded": true,
+  "quotas": [
+    {
+      "used": 0,
+      "reserved": 0,
+      "available": 10
+    },
+    {
+      "used": 0,
+      "reserved": 1,
+      "available": 9
+    },
+    {
+      "used": 0,
+      "reserved": 1,
+      "available": 9
+    },
+    {
+      "used": 1,
+      "reserved": 0,
+      "available": 9
+    }
+  ],
+  "statusReads": [
+    {
+      "elapsedMs": 498,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 2544,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 4600,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 6649,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 8912,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 10984,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 13024,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 15052,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 17071,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 19083,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 21102,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 23119,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 25131,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 27150,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 29168,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 31213,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 33259,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 35274,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 37312,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 39392,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 41423,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 43445,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 45500,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 47525,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 49578,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 51592,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 53611,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 55624,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 57642,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 59663,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 61680,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 63696,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 65731,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 67784,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 69813,
+      "status": "running",
+      "httpStatus": 200
+    },
+    {
+      "elapsedMs": 71886,
+      "status": "completed",
+      "httpStatus": 200
+    }
+  ]
+}

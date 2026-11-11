@@ -51,6 +51,35 @@ describe("pollScenarioSession", () => {
     expect(result.result.ok && result.result.value.status).toBe("completed");
   });
 
+  it("returns a result after 70 seconds with the default window", async () => {
+    const startedAt = Date.now();
+    const fetchImpl = vi.fn(async () => jsonResponse(200,
+      sessionPayload(Date.now() - startedAt >= 70_000 ? "completed" : "running")));
+    const promise = pollScenarioSession(makeClient(fetchImpl as unknown as typeof fetch), "scenario_session_123");
+    await advance(70_000, 2_000);
+    const result = await promise;
+    expect(result.reason).toBe("session_status");
+    expect(result.result.ok && result.result.value.status).toBe("completed");
+  });
+
+  it("bounds the default window at 600 seconds while preserving the last healthy snapshot", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse(200, sessionPayload("running")));
+    const promise = pollScenarioSession(makeClient(fetchImpl as unknown as typeof fetch), "scenario_session_123");
+    await advance(600_000, 2_000);
+    const result = await promise;
+    expect(result.reason).toBe("timeout");
+    expect(result.result.ok && result.result.value.status).toBe("running");
+    expect(fetchImpl).toHaveBeenCalledTimes(300);
+  });
+
+  it.each(["failed", "expired"])("stops immediately on %s", async (status) => {
+    const fetchImpl = vi.fn(async () => jsonResponse(200, sessionPayload(status)));
+    const result = await pollScenarioSession(makeClient(fetchImpl as unknown as typeof fetch), "scenario_session_123");
+    expect(result.reason).toBe("session_status");
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result.result.ok && result.result.value.status).toBe(status);
+  });
+
   it("stops on waiting_for_user instead of continuing to poll", async () => {
     const fetchImpl = vi.fn(async () => jsonResponse(200, sessionPayload("waiting_for_user")));
     const client = makeClient(fetchImpl as unknown as typeof fetch);
