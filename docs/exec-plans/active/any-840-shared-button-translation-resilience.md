@@ -8,7 +8,7 @@
 - Last updated: 2026-11-11
 - Review date: 2026-11-11
 - Next action: user review, permission to push, and manual device QA.
-- Blocker: full gates are not green (host sudo requirement and unrelated browser timing failure); optional smoke backend lacks ProposalAI.
+- Blocker: physical Android acceptance evidence is still missing. Earlier local gate/smoke limitations are recorded below; SonarCloud's duplication blocker is resolved.
 
 ## Goal
 
@@ -18,7 +18,7 @@ loading false → true → false, label changes, and repeated product submission
 ## Scope
 
 In scope: shared Button markup, label CSS, Button/CopyButton regression tests, and
-ProposalAI, Brief Decoder and Client Update Writer submit/regenerate regression tests.
+ProposalAI, Brief Decoder, Client Update Writer and Acceptance Builder submit/regenerate regression tests.
 The shared component also reaches Acceptance Builder, Task Finder and handoff controls.
 
 Out of scope: SSR locale detection, message changes, disabling browser translation,
@@ -37,6 +37,7 @@ string label updates replace its translated content safely.
 - [x] Wrap the label, preserving spacing, accessible names, disabled and busy states.
 - [x] Cover translation before/while loading, copy feedback and product regeneration.
 - [x] Run repository gates and record manual QA limits and failures.
+- [x] Verify Russian submit/regenerate with simulated translation on/off across the four atom products and prepare the Android QA record.
 
 ## Verification
 
@@ -79,8 +80,23 @@ string label updates replace its translated content safely.
 - Sonar duplication follow-up: removed the web-mirror simulator copy and switched
   its three product tests to the shared-ui test helper. Lint and typecheck passed
   for both packages; all 11 Button/CopyButton tests and 79 product tests passed.
-  Full gates were not repeated for this test-only import change. SonarCloud must
-  analyze the follow-up commit after push before its updated gate is confirmed.
+  Full gates were not repeated for this test-only import change. SonarCloud on
+  `5f17c68f50a97ea6397d9c2d3de5f1aaed5e19a9` now reports a passing gate and 0.0%
+  new-code duplication. The original review's duplication blocker is resolved.
+- Review round 1: existing locale tests already cover Russian ProposalAI and all
+  Client Update Writer modes. The missing combination is Russian labels with the
+  translation mutation and regeneration. Extend the existing regression cases with
+  Russian translated/untranslated runs, preserving the English translated case;
+  include Acceptance Builder's draft mode because it shares this button path.
+  Pin the reported Russian field/mode labels with literal expectations rather than
+  deriving every expected string from the message files under test.
+- Review follow-up validation: all 156 tests in the four product suites and
+  ProductPageShell passed, including eight added Russian translation on/off cases.
+  Web-mirror lint/typecheck, documentation validation and diff checks passed.
+  Full backend/frontend gates and physical-device checks were not repeated for this
+  test/documentation-only change. The first test run exposed ambiguous result-text
+  selectors (hidden recap versus copy text, and mode radio versus labelled section);
+  queries now target the intended paragraph/radio and the full affected suites pass.
 
 ## Decision log
 
@@ -117,8 +133,65 @@ source column, so no message-file correction is indicated:
 | Черновик ответ | Черновик ответа |
 
 The simulator covers replacement of text nodes, not arbitrary replacement of the
-label element or all translation mutations elsewhere on the page. Other products
+label element or all translation mutations elsewhere on the page. Task Finder
 and handoffs share this fix; their translated journeys were not individually tested.
+
+## Android QA record — not executed
+
+This is the procedure and empty evidence record requested in review round 1.
+No physical Android result is claimed. Passing automated tests or a mobile-sized
+desktop browser does not complete this record or the device acceptance criterion.
+
+### Run metadata
+
+| Field | Recorded value |
+|---|---|
+| Operator and UTC date | Not recorded; awaiting manual QA |
+| Tested URL/environment | Not recorded |
+| Exact deployed build SHA | Not recorded; fill from the deployment, not merely local HEAD |
+| Device/model and Android version | Not recorded; Honor 50 preferred, otherwise identify comparable Android |
+| Browser name and full version | Not recorded |
+| OS/browser language and app UI locale | Not recorded; app UI must be Russian |
+| Translation engine, source/target languages, automatic-translation rule | Not recorded |
+| Console collection method and evidence links | Not recorded; use remote debugging or equivalent device console capture |
+
+### Procedure
+
+1. Confirm the recorded build contains the fix and the product form is available.
+   Use synthetic input, sufficient quota and a fresh tab for each case; clear any
+   attached run between cases. Select Russian UI and reload.
+2. With browser translation disabled for the site, record the actual field and
+   button labels. Compare the reported phrases with the canonical table above.
+   For Client Update Writer also inspect Reply Draft and Prepaid Request labels.
+3. Submit a valid task, observe disabled/busy feedback, wait for the result, then
+   regenerate from the same form. Capture console output and screenshots or video
+   showing both completed runs; record any exception, white screen or clipped label.
+4. Repeat in a fresh tab with the browser's real translation enabled. Record the
+   detected source, target language and translation indicator; reload with that
+   setting active before submission. A toggle with no actual translation applied
+   does not count as an exercised translation-on case. Repeat step 3.
+5. Record the exact observed text with translation off and on. If only translated
+   labels are distorted, keep that observation separate from the DOM-crash result.
+   Attach an existing or newly authorized follow-up issue for locale/SSR behavior;
+   do not mark distorted text as corrected by the stable button wrapper.
+
+### Results
+
+| Product | Browser translation | Labels / submit / pending / result / regenerate / console | Evidence |
+|---|---|---|---|
+| ProposalAI | Off | Not executed | None |
+| ProposalAI | On | Not executed | None |
+| Brief Decoder | Off | Not executed | None |
+| Brief Decoder | On | Not executed | None |
+| Client Update Writer | Off | Not executed | None |
+| Client Update Writer | On | Not executed | None |
+| Acceptance Builder (shared-pattern check) | Off | Not executed | None |
+| Acceptance Builder (shared-pattern check) | On | Not executed | None |
+
+Device acceptance remains **open** until the required cases have actual evidence.
+The suspected SSR/locale follow-up is **not filed or linked by this change**; suggested
+title: "SSR html lang and first render do not match the user's locale". Confirm its
+role using the device evidence before claiming that it caused the reported distortion.
 
 Repository hygiene check found pre-existing local-skill references in execution
 plans for ANY-17, ANY-339, ANY-391, ANY-221 and ANY-227; unrelated files remain untouched.

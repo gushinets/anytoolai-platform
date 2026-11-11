@@ -35,6 +35,7 @@ import {
 } from "./fixtures/platformResponses";
 import { makeRender } from "./support/renderWithI18n";
 import { simulateBrowserTranslation } from "@anytoolai/shared-ui/test/support/simulateBrowserTranslation";
+import { LOCALE_STORAGE_KEY } from "../src/i18n/localeStorage";
 
 const render = makeRender(BRIEF_DECODER_MESSAGES);
 const IDS = { productId: "brief_decoder", scenarioId: "brief_decoder.decode_v1" } as const;
@@ -117,7 +118,15 @@ async function decode(queues: ReturnType<typeof routes>, events: ProductRunEvent
 const completedEvents = (events: ProductRunEvent[]) => events.filter((e) => e.type === "scenario_completed");
 
 describe("Brief Decoder definition", () => {
-  it("keeps working when the browser translates the submit button (ANY-840)", async () => {
+  it.each([
+    { locale: "en", translated: true },
+    { locale: "ru", translated: false },
+    { locale: "ru", translated: true },
+  ] as const)("keeps decoding in $locale with translation=$translated (ANY-840)", async ({ locale, translated }) => {
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+    const labels = locale === "ru"
+      ? { brief: "Бриф клиента", submit: "Разобрать бриф", regenerate: "Разобрать бриф заново", result: "Разбор брифа", noIssues: "Проблем не найдено." }
+      : { brief: "Client brief", submit: "Decode brief", regenerate: "Decode brief again", result: "Decoded brief", noIssues: "No issues found." };
     const errorSpy = vi.spyOn(console, "error");
     try {
       const { client, calls } = makeClient({
@@ -131,17 +140,17 @@ describe("Brief Decoder definition", () => {
         ],
       });
       render(<BriefDecoderProduct client={client} />);
-      fireEvent.change(await screen.findByLabelText("Client brief"), { target: { value: "Need a website by the holidays." } });
-      const button = screen.getByRole("button", { name: "Decode brief" });
-      simulateBrowserTranslation(button);
+      fireEvent.change(await screen.findByLabelText(labels.brief), { target: { value: "Need a website by the holidays." } });
+      const button = screen.getByRole("button", { name: labels.submit });
+      if (translated) simulateBrowserTranslation(button);
       fireEvent.click(button);
-      await screen.findByRole("heading", { name: /clarifying questions/, level: 3 });
-      expect(screen.getByRole("button", { name: "Decode brief again" })).toBe(button);
+      await screen.findByRole("button", { name: labels.regenerate });
+      expect(screen.getByRole("heading", { name: labels.result, level: 2 })).toBeTruthy();
 
-      simulateBrowserTranslation(button);
+      if (translated) simulateBrowserTranslation(button);
       fireEvent.click(button);
-      await screen.findByText("No issues found.");
-      expect(screen.getByRole("button", { name: "Decode brief again" })).toBe(button);
+      await screen.findByText(labels.noIssues);
+      expect(screen.getByRole("button", { name: labels.regenerate })).toBe(button);
       expect(calls.filter((call) => call.key === ROUTES.START)).toHaveLength(2);
       expect(errorSpy).not.toHaveBeenCalled();
     } finally {

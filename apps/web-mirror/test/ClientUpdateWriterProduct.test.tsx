@@ -33,6 +33,7 @@ import {
 import { CLIENT_UPDATE_WRITER_MESSAGES } from "../src/products/clientUpdateWriter/messages";
 import { makeRender } from "./support/renderWithI18n";
 import { simulateBrowserTranslation } from "@anytoolai/shared-ui/test/support/simulateBrowserTranslation";
+import { LOCALE_STORAGE_KEY } from "../src/i18n/localeStorage";
 
 const render = makeRender(CLIENT_UPDATE_WRITER_MESSAGES);
 
@@ -131,7 +132,15 @@ const MODE_SCENARIOS: ModeScenario[] = [
   },
 ];
 
-it("keeps working when the browser translates the submit button (ANY-840)", async () => {
+it.each([
+  { locale: "en", translated: true },
+  { locale: "ru", translated: false },
+  { locale: "ru", translated: true },
+] as const)("keeps writing updates in $locale with translation=$translated (ANY-840)", async ({ locale, translated }) => {
+  window.localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+  const labels = locale === "ru"
+    ? { notes: "Заметки о ходе работы", submit: "Написать обновление", regenerate: "Переписать обновление", result: "Обновление" }
+    : { notes: "Progress notes", submit: "Write update", regenerate: "Rewrite update", result: "Update" };
   const errorSpy = vi.spyOn(console, "error");
   try {
     const scenario = MODE_SCENARIOS[0]!;
@@ -147,21 +156,18 @@ it("keeps working when the browser translates the submit button (ANY-840)", asyn
       ],
     });
     render(<ClientUpdateWriterProduct client={client} />);
-    await screen.findByLabelText(scenario.fields[0]![0]);
-    for (const [label, value] of scenario.fields) {
-      fireEvent.change(screen.getByLabelText(label), { target: { value } });
-    }
-    const button = screen.getByRole("button", { name: scenario.submit });
-    simulateBrowserTranslation(button);
+    fireEvent.change(await screen.findByLabelText(labels.notes), { target: { value: "Finished the first milestone." } });
+    const button = screen.getByRole("button", { name: labels.submit });
+    if (translated) simulateBrowserTranslation(button);
     fireEvent.click(button);
     await screen.findByText("First update.");
-    expect(screen.getByRole("heading", { name: scenario.resultTitle, level: 2 })).toBeTruthy();
-    expect(screen.getByRole("button", { name: scenario.regenerate })).toBe(button);
+    expect(screen.getByRole("heading", { name: labels.result, level: 2 })).toBeTruthy();
+    expect(screen.getByRole("button", { name: labels.regenerate })).toBe(button);
 
-    simulateBrowserTranslation(button);
+    if (translated) simulateBrowserTranslation(button);
     fireEvent.click(button);
     await screen.findByText("Second update.");
-    expect(screen.getByRole("button", { name: scenario.regenerate })).toBe(button);
+    expect(screen.getByRole("button", { name: labels.regenerate })).toBe(button);
     expect(calls.filter((call) => call.key === routes.START)).toHaveLength(2);
     expect(errorSpy).not.toHaveBeenCalled();
   } finally {

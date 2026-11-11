@@ -22,6 +22,7 @@ import {
 import { PROPOSAL_AI_MESSAGES } from "../src/products/proposalAi/messages";
 import { makeRender } from "./support/renderWithI18n";
 import { simulateBrowserTranslation } from "@anytoolai/shared-ui/test/support/simulateBrowserTranslation";
+import { LOCALE_STORAGE_KEY } from "../src/i18n/localeStorage";
 
 const render = makeRender(PROPOSAL_AI_MESSAGES);
 
@@ -60,7 +61,15 @@ function renderReady() {
 }
 
 describe("ProposalAI product definition", () => {
-  it("keeps working when the browser translates the submit button (ANY-840)", async () => {
+  it.each([
+    { locale: "en", translated: true },
+    { locale: "ru", translated: false },
+    { locale: "ru", translated: true },
+  ] as const)("keeps submitting in $locale with translation=$translated (ANY-840)", async ({ locale, translated }) => {
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+    const labels = locale === "ru"
+      ? { task: /^Опишите задачу/, experience: /^Ваш опыт и сильные стороны/, submit: "Составить предложение", regenerate: "Пересоставить предложение" }
+      : { task: /^Describe the task/, experience: /^Your experience and strengths/, submit: "Generate proposal", regenerate: "Regenerate proposal" };
     const errorSpy = vi.spyOn(console, "error");
     try {
       const routed = makeClientWithDeferredCalls({
@@ -74,23 +83,29 @@ describe("ProposalAI product definition", () => {
         ],
       }, { [ROUTES.START]: 2 });
       render(<ProposalAIProduct client={routed.client} />);
-      fireEvent.change(await screen.findByLabelText(/^Describe the task/), { target: { value: "Build a landing page." } });
-      fireEvent.change(screen.getByLabelText(/^Your experience and strengths/), { target: { value: "Frontend freelancer." } });
+      fireEvent.change(await screen.findByLabelText(labels.task), { target: { value: "Build a landing page." } });
+      fireEvent.change(screen.getByLabelText(labels.experience), { target: { value: "Frontend freelancer." } });
+      if (locale === "ru") {
+        expect(screen.getByRole("heading", { name: "Ваши данные" })).toBeTruthy();
+        expect(screen.getByRole("option", { name: "Как в задаче" })).toBeTruthy();
+        expect(screen.getByText("Не язык интерфейса. По умолчанию предложение пишется на языке задачи.")).toBeTruthy();
+      }
 
       for (const [index, label, result] of [
-        [0, "Generate proposal", PROPOSAL_TEXT],
-        [1, "Regenerate proposal", "Updated proposal."],
+        [0, labels.submit, PROPOSAL_TEXT],
+        [1, labels.regenerate, "Updated proposal."],
       ] as const) {
         const button = screen.getByRole("button", { name: label }) as HTMLButtonElement;
-        simulateBrowserTranslation(button);
+        if (translated) simulateBrowserTranslation(button);
         fireEvent.click(button);
         await waitFor(() => expect(routed.calls.filter((call) => call.key === ROUTES.START)).toHaveLength(index + 1));
         expect(button.disabled).toBe(true);
         expect(button.getAttribute("aria-busy")).toBe("true");
         expect(button.querySelector('[aria-hidden="true"]')).not.toBeNull();
+        if (locale === "ru") expect(button.textContent).toBe("Запускаем…");
         routed.resolveCall(ROUTES.START, index, startResponse());
         await screen.findByText(result);
-        expect(screen.getByRole("button", { name: "Regenerate proposal" })).toBe(button);
+        expect(screen.getByRole("button", { name: labels.regenerate })).toBe(button);
         expect(button.disabled).toBe(false);
         expect(button.hasAttribute("aria-busy")).toBe(false);
       }

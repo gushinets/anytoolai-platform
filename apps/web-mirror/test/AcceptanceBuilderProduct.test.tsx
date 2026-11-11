@@ -23,6 +23,7 @@ import {
   guestIdentityResponse,
   makeClientCapturingRequests,
   makeClientWithDeferredRoute,
+  makeClientWithDeferredCalls,
   quotaResponse,
   resultResponse,
   routesFor,
@@ -37,6 +38,7 @@ import { LOCALE_STORAGE_KEY } from "../src/i18n/localeStorage";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
 import { readAttachSessionId, useAttachSession } from "../src/products/runtime/attachSession";
 import { makeRender } from "./support/renderWithI18n";
+import { simulateBrowserTranslation } from "@anytoolai/shared-ui/test/support/simulateBrowserTranslation";
 import type { ProductRunEvent } from "../src/products/runtime/productDefinition";
 
 const render = makeRender(ACCEPTANCE_BUILDER_MESSAGES);
@@ -210,6 +212,42 @@ function bothModesRoutes(output: Record<string, unknown>): RouteQueues {
     [r.QUOTA]: [quotaResponse(IDS.draft), quotaResponse(IDS.draft), quotaResponse(IDS.draft)],
   };
 }
+
+it.each([false, true])("regenerates Russian criteria with translation=%s (ANY-840)", async (translated) => {
+  window.localStorage.setItem(LOCALE_STORAGE_KEY, "ru");
+  const errorSpy = vi.spyOn(console, "error");
+  try {
+    const r = routesFor(IDS.draft);
+    const routed = makeClientWithDeferredCalls({
+      ...routes("draft", draftOutput()),
+      [r.QUOTA]: Array.from({ length: 5 }, () => quotaResponse(IDS.draft)),
+      [r.START]: [startResponse(), startResponse()],
+    }, { [r.RESULT]: 2 });
+    render(<AcceptanceBuilderProduct client={routed.client} />);
+    fireEvent.change(await screen.findByLabelText("Бриф клиента"), { target: { value: "Create course certificates." } });
+
+    for (const [index, submit, suffix, resultText] of [
+      [0, "Составить критерии", "", "Certificate template in brand colors"],
+      [1, "Составить заново", ".weak_input", "A certificate"],
+    ] as const) {
+      const button = screen.getByRole("button", { name: submit }) as HTMLButtonElement;
+      if (translated) simulateBrowserTranslation(button);
+      fireEvent.click(button);
+      await waitFor(() => expect(routed.calls.filter((call) => call.key === r.RESULT)).toHaveLength(index + 1));
+      expect(button.disabled).toBe(true);
+      expect(button.getAttribute("aria-busy")).toBe("true");
+      routed.resolveCall(r.RESULT, index, resultResponse(IDS.draft, { output: draftOutput(suffix) }));
+      await screen.findByText(resultText, { exact: false, selector: "p" });
+      expect(screen.getByRole("button", { name: "Составить заново" })).toBe(button);
+      expect(screen.getByRole("heading", { name: "Критерии приёмки", level: 2 })).toBeTruthy();
+      expect(button.disabled).toBe(false);
+      expect(button.hasAttribute("aria-busy")).toBe(false);
+    }
+    expect(errorSpy).not.toHaveBeenCalled();
+  } finally {
+    errorSpy.mockRestore();
+  }
+});
 
 function resultText(): string {
   const paragraphs = document.querySelectorAll("main p, div p");
