@@ -264,7 +264,7 @@ def start_scenario(
                 refresh_authority(session_factory, principal, snapshot_client)
         with transaction_boundary(session_factory) as session:
             if principal is not None:
-                lock_authority(session, principal.owner)
+                lock_authority(session, principal.owner, principal.consumer_id)
 
             def admit_paid_start(product: str, scenario: str) -> PaidAllowance:
                 if principal is None:

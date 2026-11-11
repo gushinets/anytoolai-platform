@@ -1,6 +1,6 @@
 # ANY-766 paid integration target contracts
 
-**Current checkpoint — Steps 10/11, 2026-11-11:** the
+**Current checkpoint — Steps 10–12, 2026-11-11:** the
 [common guide](https://github.com/gushinets/payments-portal/blob/main/docs/contracts/product-backend-api/README.md#implemented-step-10-settings-and-cutover)
 owns implemented common routes, V2 delegation, BACKEND_CONSUMERS, policy guard,
 fixed callbacks and browser migration. Its
@@ -8,17 +8,17 @@ fixed callbacks and browser migration. Its
 owns the implemented technical routing, stored-format versions and compatibility.
 Kernel-named identity routes/settings and
 V1 token envelopes in the historical Step 4/8 sections are superseded. Manifest
-V1 is reused by configured sources; snapshot remains Kernel-only V2 and delivery
-still has one Kernel recipient until Steps 12/13.
+V1 is reused by configured sources. Step 12 replaces the snapshot wire with
+consumer-filtered V3 and durable consumer/P/R coherence; delivery retains one
+Kernel recipient until Step 13.
 Schemas/fixtures retain their exact historical bytes; current implementation
 status is recorded here and in the guide, not inferred from a schema description.
 
 Status: **protocol specifications and fixtures**, formalized 2026-11-09.
-Implementation through ANY-766 Step 11 includes common delegated identity V2,
-snapshot V2, coherent paid admission/ownership/events, Portal invalidation
+Implementation through ANY-766 Step 12 includes common delegated identity V2,
+consumer-filtered snapshot V3, coherent paid admission/ownership/events, Portal invalidation
 delivery, recoverable browser journeys and configured technical-source/owner
-routing with immutable history. Consumer-scoped V3 access, generic
-recipients, usage/exhaustion and cabinet usage remain pending. Paired local acceptance is Step 16; remote/live acceptance and
+routing with immutable history. Generic recipients, usage/exhaustion and cabinet usage remain pending. Paired local acceptance is Step 16; remote/live acceptance and
 production rollout belong to ANY-767. All quantities and
 credential-shaped strings in fixtures are synthetic. Q=1 is an isolated test
 quantity, never a commercial offer or approval.
@@ -37,15 +37,15 @@ is the single target guide for Section 3.9: independent consumers, audience-boun
 delegation V2, snapshot V3/P/R, versioned source/owner metadata, recipient delivery
 and owner-directed V1 usage/exhaustion. At Step 9 completion these additions
 were specified only. Step 10 now implements common identity and its generated
-OpenAPI security; V3 access and the complete working auth/access handoff remain
-Step 12.
+OpenAPI security; Step 12 now implements V3 access and the working auth/access
+OpenAPI handoff.
 Steps 13–15 implement remaining delivery/usage, Step 16 local acceptance and
 Step 17 build/install preparation. No runtime/generator change occurs in Step 9.
 
 The main identity section below records Step 10; the dated Step 4/8 sections
 retain the historical Kernel baseline. Step 10 replaces their identity routes,
-settings and response/storage versions. Snapshot/invalidation and their existing
-R-floor enforcement remain the active baseline until their owning later steps.
+settings and response/storage versions. Step 12 supersedes the V2 snapshot/R-only baseline below with V3/P/R;
+invalidation V1 remains active and recipient partitioning is Step 13.
 Historical retention is not concurrent old-route support or permission to reset history.
 Original schemas and fixture payloads remain exact. New schemas are snapshot-v3,
 code-request-v2 (unversioned body adds consumer_id), exchange-response-v2 and
@@ -75,7 +75,7 @@ and statuses. `schemas/` contains reviewed JSON Schema 2020-12 documents.
 Both repositories retain identical schema/fixture/index copies; neither imports
 the other's code. README navigation links may differ by repository.
 
-Portal owns snapshot V2, invalidation V1, delegation issuance/exchange/
+Portal owns snapshot V3 (with retained V2 fixtures), invalidation V1, delegation issuance/exchange/
 introspection responses and all identity request contracts, including the request
 forwarded by Kernel, and the cabinet response. Kernel owns usage request
 normalization/response and exhaustion V1. Manifest V1
@@ -102,8 +102,8 @@ The directional credentials remain independent:
   their own independent entries/credentials. Implemented receiver permissions
   are `access-snapshot:read`, `backend-session:exchange` and
   `backend-session:introspect`; `allowance-exhaustion:write` is recognized in
-  configuration but its receiver remains Step 14. Snapshot V2 is restricted to
-  platform-kernel until consumer-filtered V3 in Step 12.
+  configuration but its receiver remains Step 14. Snapshot V3 now serves each
+  configured consumer only its authorized products.
 
 Possession of one permission grants none of the others. Scope comes from trusted
 receiver configuration. Requests only narrow that authority. Canonical Portal
@@ -121,8 +121,14 @@ bodies, codes, tokens and headers must never enter logs or telemetry.
 
 ## Snapshot V2 and invalidation V1
 
-Portal serves `GET /internal/v1/access-snapshots/{user_id}` with exactly one
-`tenant_id` and `region` query parameter. `snapshot-v2` requires:
+**Historical snapshot baseline — Steps 1/5.** V2 is retained as fixture/history
+only and is not served after Step 12. The current producer/client use
+[consumer-scoped V3](#step-12-working-authaccess--2026-11-11), including consumer/P/R
+identity and filtering before completeness/deadline checks. The invalidation V1
+rules later in this section remain implemented; recipient partitioning is Step 13.
+
+Step 5 served `GET /internal/v1/access-snapshots/{user_id}` with exactly one
+`tenant_id` and `region` query parameter. The retained `snapshot-v2` schema requires:
 
 ```text
 schema_version=2, tenant_id, region, user_id, access_revision,
@@ -165,7 +171,8 @@ Kernel refreshes on requests. A valid cached document survives a refresh failure
 only within its existing expiry, durable floor and every admission predicate.
 Expired authority is never extended. Service `401/403` and unexpected `404` are
 integration failures, never empty entitlements. No fleet poller or V1 translation
-is added. Install compatible consumers before connecting the V2 producer.
+is added. The V2 producer/consumer pair was the Step 5/6 baseline. Step 12
+requires the synchronized V3 cutover and does not retain V2 wire support.
 
 Portal sends `invalidation-v1` to Kernel
 `POST /internal/v1/access-invalidations`. Kernel atomically raises its durable
@@ -237,13 +244,22 @@ targets without creating a new start or guest.
 
 ## Paid admission, ownership and client events
 
-One PostgreSQL coherence row per scoped user serializes floor/cache installation,
-invalidation and new admission. Authenticate → owner/hash replay → HTTP refresh
-outside SQL → lock coherence → repeat replay → resolve scenario-owned metric and
-exact allowance → ANY-507 in caller's Session → after bucket/reservation waits,
-resample DB wall time and recheck identity expiry, floor/revision, snapshot expiry
-and grant → atomic commit, or rollback all acceptance writes. Allowance/revision
-never enters replay meaning. Frozen tuple conflicts never reset history.
+One PostgreSQL coherence row per consumer/tenant/region/user serializes policy
+observation, snapshot installation, invalidation and new admission. Migration
+`0020` preserves the durable R floor and all usage/reservations while initializing
+legacy Kernel consumer/P1 and clearing incompatible V2 cache/digest metadata.
+After authentication and accepted owner/hash replay lookup, observe the current
+introspected P under the coherence lock and commit that observation before HTTP
+refresh outside SQL. A higher P evicts cached authority without lowering R;
+stale P cannot restore it. Installation/admission require matching current P and
+R at/above its durable floor. Eviction/restart preserve both floors.
+
+New admission then locks coherence, repeats replay lookup, resolves the
+scenario-owned metric/exact allowance and invokes ANY-507 in the caller's Session.
+After bucket/reservation waits, resample DB wall time and recheck identity expiry,
+consumer/P/R floors, snapshot expiry and grant before atomic commit or rollback
+of all acceptance writes. Consumer/P/R and allowance selection never enter replay
+meaning. Frozen tuple conflicts never reset history.
 
 Protect starts, all handoff operations, polling, next-actions, result/artifact
 reads and client events. Use reservation ownership or server-written deferred
@@ -418,7 +434,11 @@ They do not prove real paired HTTP, browser recovery, sales or deployment.
 
 ## Step 6 server implementation
 
-Kernel consumes snapshot V2 with strict version, UTC, integer and contextual
+**Historical checkpoint.** The V2/R-only implementation below was superseded by
+[Step 12 V3/P/R coherence](#step-12-working-authaccess--2026-11-11). Its original
+migration/evidence descriptions are retained; they do not prescribe today's wire.
+
+At this checkpoint Kernel consumed snapshot V2 with strict version, UTC, integer and contextual
 scope checks. Requests use the existing reverse-direction credential, verified
 TLS, a two-second timeout, a 256 KiB response bound and no redirects/environment
 proxies. Valid finite cached authority may survive refresh failure; it cannot
@@ -535,3 +555,21 @@ Step 8 evidence is local component/transport testing and synthetic browser UI
 coverage, distinct from the real two-service HTTP/PostgreSQL/browser acceptance
 required by Step 16. Usage/exhaustion and cabinet counters remain Steps 14–15;
 remote/live-service acceptance remains ANY-767.
+
+
+## Step 12 working auth/access — 2026-11-11
+
+Consumer-filtered V3 is the only current snapshot wire. The common guide owns
+working examples, Swagger/OpenAPI locations, refusal semantics and backend
+reserve/finalize/release duties. Portal filters products and supporting facts
+before completeness/expiry; the cabinet/writer retain whole-user guarantees.
+Kernel migration `0020` retains the durable R floor and all ANY-507 usage,
+reservations and replay, initializes consumer/P1 and clears incompatible V2
+cache/digest metadata. Policy observation, install, invalidation and admission
+share the consumer-scoped lock, preserving independent monotonic P/R floors and
+same-P/R semantic immutability. Old P/R, expiry after waits and policy-only
+changes are covered by focused PostgreSQL regressions. The local TCP checkpoint
+exercises both actual APIs and strict auth/access clients with two configured
+identities and separate disposable databases. External LBX/manifest responses
+and the second identity are synthetic. This is distinct from Step 16's assembled
+paid browser/execution acceptance; recipient delivery/usage remain Steps 13–15.

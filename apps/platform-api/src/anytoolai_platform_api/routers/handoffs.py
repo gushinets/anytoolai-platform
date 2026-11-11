@@ -163,7 +163,7 @@ def accept_handoff(
         with transaction_boundary(session_factory) as session:
             try:
                 if principal is not None:
-                    lock_authority(session, principal.owner)
+                    lock_authority(session, principal.owner, principal.consumer_id)
                 record = _owned_record(session, handoff_token, settings, principal)
                 replay = record.status in {HandoffStatus.accepted, HandoffStatus.consumed}
                 needs_admission = record.status in {
