@@ -201,9 +201,14 @@ pre { background: var(--lab-code-surface); border-radius: 0.55rem; color: var(--
 .field-heading > :is(strong, label) { min-width: 0; overflow-wrap: anywhere; }
 .field-heading label { cursor: pointer; font-weight: 600; }
 .field-key { color: var(--lab-text-muted); font-size: 0.75rem; font-weight: 400; margin-inline-start: 0.4rem; }
+#input-editor, #input-editor :has(> .schema-inline) { container: input-fields / inline-size; }
 .schema-inline { align-items: center; grid-template-columns: minmax(4rem, 0.4fr) minmax(0, 1fr); }
 .schema-inline > .field-description { grid-column: 1 / -1; }
 .schema-inline > select { grid-column: 2; grid-row: 1; }
+@container input-fields (max-width: 16rem) {
+  .schema-inline { grid-template-columns: minmax(0, 1fr); }
+  .schema-inline > select { grid-column: 1; grid-row: 2; padding-inline: min(0.75rem, 2vw); }
+}
 .schema-boolean { align-items: center; column-gap: 0.55rem; grid-template-columns: 1.25rem minmax(0, 1fr); }
 .schema-boolean > .field-heading { grid-column: 2; grid-row: 1; min-height: 2.75rem; }
 .schema-boolean > .field-heading label { align-content: center; min-height: 2.75rem; }
@@ -354,6 +359,7 @@ pre { background: var(--lab-code-surface); border-radius: 0.55rem; color: var(--
 }
 @media (max-width: 32rem) {
   .page-shell { padding: min(0.75rem, 3vw); }
+  #input-panel, .schema-object, .array-item-object > .schema-field { padding-inline: min(0.75rem, 3vw); }
   #atom-navigation { grid-template-columns: 1fr; }
   .run-controls { grid-template-columns: minmax(0, 1fr); }
   .run-controls, .response-body { overflow-wrap: anywhere; }

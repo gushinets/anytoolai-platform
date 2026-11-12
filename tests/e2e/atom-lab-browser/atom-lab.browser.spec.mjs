@@ -362,7 +362,31 @@ test("compact extraction controls stay aligned and preserve false versus omitted
   const required = page.getByLabel("Обязательное поле", {exact: true}).first();
   await required.selectOption("true");
   await expect(required).toHaveValue("true");
-  await page.getByLabel("Тип", {exact: true}).first().selectOption("string");
+  const type = page.getByLabel("Тип", {exact: true}).first();
+  await type.selectOption("boolean");
+  await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
+  for (const width of [390, 320]) {
+    await page.setViewportSize({width, height: 900});
+    for (const field of [required, type]) {
+      const {stacked, controlWidth, selectedWidth} = await field.evaluate(select => {
+        const control = select.getBoundingClientRect();
+        const label = select.labels[0].getBoundingClientRect();
+        const probe = select.cloneNode(false);
+        probe.removeAttribute("id");
+        probe.append(select.selectedOptions[0].cloneNode(true));
+        Object.assign(probe.style, {position: "absolute", visibility: "hidden", width: "max-content", maxWidth: "none"});
+        select.after(probe);
+        const selectedWidth = probe.getBoundingClientRect().width;
+        probe.remove();
+        return {stacked: label.bottom <= control.top, controlWidth: control.width, selectedWidth};
+      });
+      expect(stacked).toBe(true);
+      expect(controlWidth).toBeGreaterThanOrEqual(selectedWidth);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+  }
+  await page.evaluate(() => { document.documentElement.style.fontSize = ""; });
+  await type.selectOption("string");
   await page.getByLabel("Требовать все обязательные поля", {exact: true}).check();
   await expect(page.getByLabel("Требовать все обязательные поля", {exact: true})).toHaveAccessibleDescription(/отмеченные как обязательные/);
   await page.getByLabel("Требовать все обязательные поля", {exact: true}).uncheck();
@@ -1482,6 +1506,7 @@ test("the displayed run remains saveable after compatible refresh and is hidden 
   detail.snapshot.prompt.source_ref = A06.prompt_ref;
   const created = {preset_id: "result-preset", version: 1, created_at: detail.finished_at};
   let currentAtom = A06;
+  let failPromptRead = false;
   let savedBody;
   await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
     const {pathname} = new URL(route.request().url());
@@ -1495,10 +1520,13 @@ test("the displayed run remains saveable after compatible refresh and is hidden 
     }
     if (pathname === `/v1/atom-lab/runs/${detail.run_id}`) return route.fulfill({json: detail});
     if (pathname === "/v1/atom-lab/atoms/A06") return route.fulfill({json: currentAtom});
-    if (pathname === "/v1/atom-lab/atoms/A06/prompts") return route.fulfill({json: [{
-      ref: currentAtom.prompt_ref, name: "Платформа", prompt: currentAtom.prompt, group: "platform",
-      source_ref: null, source_run_id: null,
-    }]});
+    if (pathname === "/v1/atom-lab/atoms/A06/prompts") {
+      if (failPromptRead) return route.fulfill({status: 503, json: {error: {message: "Список промптов недоступен."}}});
+      return route.fulfill({json: [{
+        ref: currentAtom.prompt_ref, name: "Платформа", prompt: currentAtom.prompt, group: "platform",
+        source_ref: null, source_run_id: null,
+      }]});
+    }
     if (pathname === "/v1/atom-lab/presets") {
       if (route.request().method() !== "POST") return route.fulfill({json: {items: [], next_cursor: null}});
       savedBody = route.request().postDataJSON();
@@ -1537,10 +1565,18 @@ test("the displayed run remains saveable after compatible refresh and is hidden 
     prompt: A06.prompt, model_id: "openai/gpt-supported", reasoning_effort: "high"});
   await page.locator("#close-presets").click();
   await expect(page.getByRole("textbox", {name: "Цель", exact: true})).toHaveValue("Новая цель черновика");
+  failPromptRead = true;
+  await save.click();
+  const saveError = page.locator("#result-preset-error");
+  await expect(saveError).toBeVisible();
+  await expect(saveError).toContainText("Повторите сохранение снимка.");
+  failPromptRead = false;
   currentAtom = {...A06, prompt_ref: "prompt.a06.v2", prompt: "Новая версия платформенного промпта"};
   await page.locator("#run-button").click();
   await expect(page.locator("#run-prompt-ref")).toHaveText(currentAtom.prompt_ref);
   await expect(save).toBeHidden();
+  await expect(saveError).toBeHidden();
+  await expect(saveError).toBeEmpty();
   await expect(page.locator("#result-section")).toBeVisible();
 });
 
@@ -1931,6 +1967,52 @@ test("a rejected next submission never replaces the previously accepted run card
   await expect(page.locator("#run-status-help")).toContainText("данные предыдущего принятого запуска run-a");
   await expect(page.locator("#submitted-snapshot")).toContainText(A05.prompt);
   await expect(page.locator("#run-diagnostics")).toContainText("artifact-a");
+});
+
+test("a locally invalid launch leaves the previous accepted response intact", async ({page}) => {
+  const bodies = [];
+  await page.route("http://atom-lab.test/v1/atom-lab/runs", async route => {
+    bodies.push(route.request().postDataJSON());
+    await route.fulfill({status: 202, json: {
+      run_id: `run-${bodies.length}`, scenario_session_id: "session-library", job_id: "job-library", status: "queued",
+    }});
+  });
+  await page.route("http://atom-lab.test/v1/atom-lab/runs/run-*", async route => {
+    const runId = new URL(route.request().url()).pathname.split("/").at(-1);
+    const input = bodies[Number(runId.split("-").at(-1)) - 1].input;
+    const detail = historyDetail({runId, input, prompt: A06.prompt, reasoningEffort: null});
+    detail.result = {summary: input.objective};
+    await route.fulfill({json: detail});
+  });
+  await unlockAtom(page, "A06");
+  await page.locator("#fill-example").click();
+  const launch = page.locator("#run-button");
+  await launch.click();
+  await expect(page.locator("#launch-outcome")).toHaveAttribute("data-tone", "success");
+  await expect(page.locator("#result-readable")).toContainText(A06.example_input.objective);
+  const snapshot = await page.locator("#submitted-snapshot").textContent();
+
+  const objective = page.getByRole("textbox", {name: "Цель", exact: true});
+  await objective.fill("");
+  await launch.click();
+  await expect(page.locator("#launch-outcome")).toBeHidden();
+  await expect(page.locator("#launch-readiness")).toHaveText("Проверьте входные данные и промпт");
+  await expect(objective).toBeFocused();
+  await expect(page.locator("#run-status")).toHaveAttribute("data-tone", "success");
+  await expect(page.locator("#run-status-help")).toContainText("данные принятого запуска run-1");
+  await expect(page.locator("#response-draft-warning")).toBeVisible();
+  await expect(page.locator("#submitted-snapshot")).toHaveText(snapshot);
+  await expect(page.locator("#result-readable")).toContainText(A06.example_input.objective);
+  expect(bodies).toHaveLength(1);
+
+  await objective.fill("Новая цель");
+  await expect(page.locator("#launch-readiness")).toHaveText("Черновик готов к запуску");
+  await launch.click();
+  await expect(page.locator("#launch-outcome")).toHaveAttribute("data-tone", "success");
+  await expect(page.locator("#run-status-help")).toContainText("данные принятого запуска run-2");
+  await expect(page.locator("#response-draft-warning")).toBeHidden();
+  await expect(page.locator("#result-readable")).toContainText("Новая цель");
+  expect(bodies).toHaveLength(2);
 });
 
 for (const outcome of ["success", "invalid", "diagnostics"]) {

@@ -1746,12 +1746,14 @@ export function bootstrapAtomLab({
   const renderResultPresetAction = () => {
     const action = nodes["save-result-preset"];
     const status = nodes["result-preset-status"];
+    const error = nodes["result-preset-error"];
     const reason = resultPresetDisabledReason();
     action.setAttribute("aria-disabled", String(Boolean(reason)));
     action.setAttribute("aria-busy", String(Boolean(reason) && !presetSaveOutcomeUnknown));
     const message = action.hidden ? "" : reason;
     if (status.textContent !== message) status.textContent = message;
-    nodes["result-preset-error"].hidden = Boolean(reason);
+    if (action.hidden && error.textContent) error.textContent = "";
+    error.hidden = action.hidden || Boolean(reason);
   };
 
   const clearResultPresetCheck = () => {
@@ -3495,6 +3497,7 @@ export function bootstrapAtomLab({
       if (errors.length > 0) {
         if (nodes["input-panel"].hidden) showInputTab(true);
         renderValidation(document, nodes["validation-errors"], session, admissionErrors);
+        nodes["launch-outcome"].hidden = true;
         nodes["validation-errors"].querySelector("button")?.click();
         return;
       }
