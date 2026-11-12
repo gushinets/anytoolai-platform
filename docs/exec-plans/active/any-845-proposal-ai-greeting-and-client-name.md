@@ -8,8 +8,8 @@
 - Created: 2026-11-12
 - Last updated: 2026-11-12
 - Review date: 2026-11-19
-- Next action: review and merge, then move to `completed/`; run live acceptance when a provider stack is available.
-- Blocker: none for implementation; live provider verification is unavailable in this environment.
+- Next action: review and merge with the recorded live evidence, then move to `completed/`.
+- Blocker: none for the scoped greeting/name acceptance; the live evidence below resolves the missing-run finding.
 
 ## Goal
 
@@ -47,12 +47,13 @@ Forbidden in every tone: "Dear Sir or Madam", "Уважаемый/Уважаем
 - Without a name (brief "Нужен сайт для моего бизнеса…"): `warm` → `Здравствуйте!`, `neutral` → `Здравствуйте.`, `firm` → `Здравствуйте.`, each followed by the same type of opening paragraph.
 - Ambiguous name (brief "Ищу дизайнера. Пишите Марине, она мой менеджер."): no name, `Здравствуйте.` (Марина is a third party).
 
-## Baseline
+## Initial implementation baseline
 
 - Date: 2026-11-12; checkout: `feature/ANY-845` at
   `36d96ffd3729bc1df7826ab84c7a3c000acc4bfe`.
-- Environment: local development checkout. Docker reports no running containers; no live
-  provider stack is available. No provider-call ledger or real-model output was collected.
+- At initial implementation, no local containers were running and no live stack was started.
+  No provider-call ledger or real-model output was collected then. The later review found configured
+  credentials and cached images; inferring unavailability from absent containers was insufficient.
 - Provider/model policy: unverified at runtime; no model is inferred from the UI or fake fixtures.
 - Reproduction by prompt analysis: Structure requires the first sentence to pitch the freelancer;
   Form says "open with the point"; neutral explicitly says "no greeting by name". No rule
@@ -61,7 +62,8 @@ Forbidden in every tone: "Dear Sir or Madam", "Уважаемый/Уважаем
 - Initial system-Python doctor failed because pytest and pydantic were missing. The canonical
   quick-check uses its managed Python 3.12 environment; initial dependency fetching was blocked
   by sandbox DNS. Retried with network access; results are recorded under Verification.
-- Live baseline: not verified live. No first-line outputs are claimed.
+- Initial live baseline: not performed. This initial evidence gap is superseded by the
+  versioned live runs below; it is not retrospectively presented as a pre-edit production run.
 
 ## Scope
 
@@ -130,8 +132,8 @@ LITELLM_LOCAL_MODEL_COST_MAP=True .quick-check-venv/bin/python -m pytest \
   tests/test_proposal_ai_eval.py
 ```
 
-Live verification: **not verified live**. With a deployed provider stack containing this prompt,
-run the following with the stack URL, Compose project and scratch output path supplied by the operator:
+Live verification is now recorded below. To repeat it with a provider stack containing the tested
+prompt, use the stack URL, Compose project and new scratch output path supplied by the operator:
 
 ```bash
 .quick-check-venv/bin/python scripts/agent/proposal_ai_eval.py run \
@@ -150,4 +152,35 @@ Every tone starts with one punctuated greeting line, followed by an empty line a
 Use a client name only when the task identifies the client unambiguously; otherwise omit the name.
 Never address the freelancer, a third party, a company, brand or product as the client.
 Use the fixed RU/EN/ES formulas per tone; omit time-of-day, gendered or overly familiar greetings.
-The shared speaker-identity rule stays intact; real-model compliance remains pending live verification.
+The shared speaker-identity rule stays intact; the selected greeting/name cases now have real-model evidence.
+
+## Live acceptance after review round 1
+
+On 2026-11-12 the owner explicitly authorized live runs on `36d96ff` and `08ede358`, recording
+results and closing the acceptance finding, with results posted in PR #272 and Linear ANY-845.
+The baseline was reconstructed from the exact old commit; it is not historical production evidence.
+
+- **Baseline:** 12/12 scenarios completed, **0/12** required greeting openings. Анна/P01 was run
+  in all three tones, plus the unnamed screenshot input, three repetitions each.
+- **Fixed greeting set:** 36/36 completed and **36/36** required greeting/name openings across
+  12 RU/EN/ES cases. All use a punctuated greeting line, blank line and relevant pitch.
+- **Regression:** P01, P02, P04 and P05 each completed and passed agent assessment of their criteria.
+  No P03 exists in the existing fixture. Terms, exclusions and speaker identity were preserved.
+- The actual ledger confirms `default_text_generation_v1`, OpenAI, `gpt-6-luna`; the running worker
+  router records reasoning `medium`. There were **106 physical provider calls** across 52 scenarios,
+  with total ledger-estimated cost **USD 0.05047287**. Both local stacks used the same model policy.
+- The fixed greeting set has one non-blocking long-dash warning in the body. One short Spanish gap
+  description triggers `language_unverified`; the agent confirmed its Spanish language and retained
+  the original flag. No unusable or critical automatic finding occurred in the 40 fixed runs.
+- All required CI checks passed for implementation commit `08ede358`, including full-check and
+  frontend. This is distinct from the initial local environment failures recorded above.
+- Raw records preserve `git_dirty=true` due solely to an untracked managed-environment symlink;
+  tracked sources were unchanged and runtime prompt hashes matched the exact Git blobs.
+
+Versioned artifacts: [raw runs, ledger, provenance, first-line report and per-case assessments](../../../tests/fixtures/proposal_ai_eval/acceptance/any-845/README.md).
+
+The missing versioned reproduction/acceptance evidence is supplied. This closes the scoped evidence
+finding, with the documented non-critical caveats; it does not claim full ANY-631 human/browser
+acceptance, validate every future model output, or re-accept unrelated A04 gap-classification quality.
+No production deployment or browser run was performed. No prompt, runtime or dependency changes
+were needed to resolve this finding.

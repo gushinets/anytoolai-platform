@@ -1,0 +1,154 @@
+{
+  "description": "ANY-845 reconstructed pre-change baseline: P01 in three tones and unnamed screenshot brief",
+  "orders": [
+    {
+      "id": "P01-warm",
+      "task_text": "Анна, владелица студии йоги, ищет дизайнера для лендинга в Figma. Нужны мобильная и десктопная версии, блок расписания и кнопка записи в существующий WhatsApp. Тексты и фото предоставит студия. Разработка сайта не входит. Предложение должно объяснить подход и следующий шаг, без цены и сроков до обсуждения.",
+      "freelancer_positioning": "Я UI-дизайнер, работаю в Figma. Делал лендинги для небольших сервисных компаний, уделяю внимание читаемости и удобству записи. Портфолио могу показать на созвоне, конкретных результатов в процентах у меня нет.",
+      "tone": "warm",
+      "expect_language": "ru",
+      "expect_gap": false,
+      "must_not": [
+        "\\d\\s?(₽|руб|EUR|USD)",
+        "(EUR|USD|\\$)\\s?\\d"
+      ],
+      "criteria": [
+        {
+          "id": "no-development",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Does the answer promise no layout, coding or site development (only the Figma design)?",
+          "violation_type": "promised_excluded_work"
+        },
+        {
+          "id": "schedule-block",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Is the schedule block part of the design?"
+        },
+        {
+          "id": "no-intro-gender-retelling",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Is there no «Меня зовут …», no feminine form such as «Готова» (the masculine «Делал» comes from the positioning), and no retelling of the instructions?"
+        },
+        {
+          "id": "no-price-or-dates",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Are no price and no dates or durations named before the discussion?",
+          "violation_type": "invented_amount_or_commitment"
+        }
+      ],
+      "expect_gaps_language": "ru"
+    },
+    {
+      "id": "P01-neutral",
+      "task_text": "Анна, владелица студии йоги, ищет дизайнера для лендинга в Figma. Нужны мобильная и десктопная версии, блок расписания и кнопка записи в существующий WhatsApp. Тексты и фото предоставит студия. Разработка сайта не входит. Предложение должно объяснить подход и следующий шаг, без цены и сроков до обсуждения.",
+      "freelancer_positioning": "Я UI-дизайнер, работаю в Figma. Делал лендинги для небольших сервисных компаний, уделяю внимание читаемости и удобству записи. Портфолио могу показать на созвоне, конкретных результатов в процентах у меня нет.",
+      "tone": "neutral",
+      "expect_language": "ru",
+      "expect_gap": false,
+      "must_not": [
+        "\\d\\s?(₽|руб|EUR|USD)",
+        "(EUR|USD|\\$)\\s?\\d"
+      ],
+      "criteria": [
+        {
+          "id": "no-development",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Does the answer promise no layout, coding or site development (only the Figma design)?",
+          "violation_type": "promised_excluded_work"
+        },
+        {
+          "id": "schedule-block",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Is the schedule block part of the design?"
+        },
+        {
+          "id": "no-intro-gender-retelling",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Is there no «Меня зовут …», no feminine form such as «Готова» (the masculine «Делал» comes from the positioning), and no retelling of the instructions?"
+        },
+        {
+          "id": "no-price-or-dates",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Are no price and no dates or durations named before the discussion?",
+          "violation_type": "invented_amount_or_commitment"
+        }
+      ],
+      "expect_gaps_language": "ru"
+    },
+    {
+      "id": "P01-firm",
+      "task_text": "Анна, владелица студии йоги, ищет дизайнера для лендинга в Figma. Нужны мобильная и десктопная версии, блок расписания и кнопка записи в существующий WhatsApp. Тексты и фото предоставит студия. Разработка сайта не входит. Предложение должно объяснить подход и следующий шаг, без цены и сроков до обсуждения.",
+      "freelancer_positioning": "Я UI-дизайнер, работаю в Figma. Делал лендинги для небольших сервисных компаний, уделяю внимание читаемости и удобству записи. Портфолио могу показать на созвоне, конкретных результатов в процентах у меня нет.",
+      "tone": "firm",
+      "expect_language": "ru",
+      "expect_gap": false,
+      "must_not": [
+        "\\d\\s?(₽|руб|EUR|USD)",
+        "(EUR|USD|\\$)\\s?\\d"
+      ],
+      "criteria": [
+        {
+          "id": "no-development",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Does the answer promise no layout, coding or site development (only the Figma design)?",
+          "violation_type": "promised_excluded_work"
+        },
+        {
+          "id": "schedule-block",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Is the schedule block part of the design?"
+        },
+        {
+          "id": "no-intro-gender-retelling",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Is there no «Меня зовут …», no feminine form such as «Готова» (the masculine «Делал» comes from the positioning), and no retelling of the instructions?"
+        },
+        {
+          "id": "no-price-or-dates",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Are no price and no dates or durations named before the discussion?",
+          "violation_type": "invented_amount_or_commitment"
+        }
+      ],
+      "expect_gaps_language": "ru"
+    },
+    {
+      "id": "G02-ru-noname-neutral",
+      "task_text": "Нужен сайт для моего бизнеса. Хочется красиво и современно, чтобы клиенты шли. Пишите, кто может сделать.",
+      "freelancer_positioning": "Я дизайнер интерфейсов, 6 лет опыта. Делаю лендинги и мобильные макеты в Figma, быстро собираю структуру страницы, всегда показываю промежуточные варианты до финала. Работала с сайтами студий и небольших сервисов.",
+      "tone": "neutral",
+      "expect_language": "ru",
+      "expect_gaps_language": "ru",
+      "expect_gap": false,
+      "must": [
+        "^Здравствуйте\\.\\n\\n"
+      ],
+      "criteria": [
+        {
+          "id": "greeting-and-pitch",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "id": "client-name",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the greeting use no name because the brief gives none?"
+        }
+      ]
+    }
+  ]
+}
