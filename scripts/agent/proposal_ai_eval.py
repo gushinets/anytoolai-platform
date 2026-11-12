@@ -21,10 +21,10 @@ placeholders, meta phrases, lists or headings, length, a required literal (`must
 unclear one leaves it pending), long dashes (a warning). A number absent from the order and the
 positioning is shown to the reviewer, never decided here.
 
-Gap literals are opt-in and match descriptions only. `gap_must_not` forbids any matching literal;
-`gap_must` is a list of nonempty regex groups, one per requirement. All patterns of each group must
-match the same description; separate requirements may match separate gaps. Either violation makes
-a run unusable. These checks do not establish semantic correctness or enforce every `expect_gap: false`.
+Gap meaning, grounding and requirement fidelity belong to review criteria, not text matches.
+An empty gap list fails when `expect_gap` is true; false does not introduce an automatic empty-list
+requirement. Otherwise, gap quality remains PENDING until the relevant review criteria are confirmed.
+Retired `gap_must` and `gap_must_not` fixture fields must be migrated to `criteria`.
 
 Meaning is never decided by a regular expression. Each order lists `criteria`, questions a human
 answers yes, no or unknown for every output (see tests/fixtures/proposal_ai_eval/qa_cases.json), and
@@ -162,14 +162,6 @@ def check_proposal(
     ]
     gap_expected = order.get("expect_gaps_language")
     gap_languages = [detect_language(gap["description"], GAP_MIN_WORDS) for gap in gaps] if gap_expected else []
-    gap_texts = [gap.get("description", "") for gap in gaps]
-    required_gap_groups = order.get("gap_must", [])
-    if not isinstance(required_gap_groups, list) or any(
-        not isinstance(group, list) or not group
-        or any(not isinstance(pattern, str) or not pattern.strip() for pattern in group)
-        for group in required_gap_groups
-    ):
-        raise SuiteError("gap_must must be a list of nonempty lists of nonblank regex strings")
     return {
         "wrong_language": any(found not in (None, expected) for found in [language, *passages]),
         "wrong_gaps_language": any(found not in (None, gap_expected) for found in gap_languages),
@@ -182,11 +174,6 @@ def check_proposal(
         "long_dash": bool(LONG_DASH.search(text)),
         "too_long": len(text.split()) > MAX_WORDS,
         "missing_gap": bool(order.get("expect_gap")) and not gaps,
-        "unexpected_gap": any(re.search(p, t, re.IGNORECASE) for p in order.get("gap_must_not", []) for t in gap_texts),
-        "missing_gap_detail": any(
-            not any(all(re.search(p, t, re.IGNORECASE) for p in group) for t in gap_texts)
-            for group in required_gap_groups
-        ),
         "missing_required": any(not re.search(p, text, re.IGNORECASE) for p in order.get("must", [])),
         "forbidden_present": any(re.search(p, text, re.IGNORECASE) for p in order.get("must_not", [])),
         "words": len(text.split()),
@@ -197,7 +184,7 @@ def check_proposal(
 CRITICAL_CHECKS = ("forbidden_present",)
 UNUSABLE_CHECKS = (
     "wrong_language", "wrong_gaps_language", "placeholder", "meta_phrase", "list_or_heading", "too_long",
-    "missing_gap", "unexpected_gap", "missing_gap_detail", "missing_required",
+    "missing_gap", "missing_required",
 )
 WARNING_CHECKS = ("long_dash",)
 
@@ -261,6 +248,13 @@ DEFAULT_TONE = "warm"
 def normalized_orders(fixture: dict) -> list[dict]:
     """The orders of a fixture with its defaults applied (the shared positioning, the default tone): the
     one form the collector sends, the case hash pins and `accept` compares."""
+    for order in fixture["orders"]:
+        retired = {"gap_must", "gap_must_not"}.intersection(order)
+        if retired:
+            raise SuiteError(
+                f"case {order.get('id')}: retired gap checks {', '.join(sorted(retired))}; "
+                "move semantic requirements to review criteria"
+            )
     defaults = {"tone": DEFAULT_TONE, **({"freelancer_positioning": fixture["freelancer_positioning"]}
                                          if "freelancer_positioning" in fixture else {})}
     return [{**defaults, **order} for order in fixture["orders"]]
@@ -275,7 +269,6 @@ def case_hash(order: dict) -> str:
     """Everything the approval of a case rests on: its input, its literal checks and expected languages,
     and every question asked about it."""
     checks = {key: order.get(key) for key in ("expect_language", "expect_gaps_language", "expect_gap", "must", "must_not")}
-    checks.update({key: order[key] for key in ("gap_must", "gap_must_not") if key in order})
     return _digest({"input": case_input(order), "checks": checks,
                     "criteria": sorted(criterion_hash(c) for c in criteria_for(order))})
 
@@ -713,7 +706,10 @@ def command_review(args: argparse.Namespace) -> int:
             suggestion = row.get("suggestion") if row else None
             if shown != run["run_id"]:
                 shown = run["run_id"]
-                print(f"\n=== {run['run_id']} ({run['model']}, {run['reasoning_effort']})\n{run['output']['text']}\n")
+                print(f"\n=== {run['run_id']} ({run['model']}, {run['reasoning_effort']})")
+                print(f"Task:\n{run['input']['task_text']}\n")
+                print(f"Positioning:\n{run['input']['freelancer_positioning']}\n")
+                print(f"Proposal:\n{run['output']['text']}\n")
                 for gap in run["output"].get("gaps", []):
                     print(f"gap: {gap['description']}")
                 if formal_checks(run, order)["invented_number"]:

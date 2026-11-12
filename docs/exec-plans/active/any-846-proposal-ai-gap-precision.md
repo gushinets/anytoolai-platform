@@ -7,7 +7,7 @@
 - Created: 2026-11-12
 - Last updated: 2026-11-12
 - Review date: 2026-11-12
-- Next action: review the round 1 fixes; leave live acceptance and example confirmation pending.
+- Next action: review the completed round 2 changes; live acceptance and example confirmation remain pending.
 - Blocker: user requested local checks only, so live model acceptance remains unverified. The local
   full-check environment still lacks passwordless sudo for an existing test.
 - Implementation authorized; product confirmation and live evidence remain separate gates.
@@ -27,17 +27,23 @@ already does. The wording keeps the meaning and numbers of the requirement.
 ## Decisions
 
 - Keep the existing prompt reference, language rule, workflow and output contract.
-- Match forbidden gap literals only in descriptions; source evidence can quote routine components
-  without claiming that they are missing experience.
-- `gap_must` is a list of nonempty regex groups. Each group describes one requirement and must
-  match a single gap description in full; different groups may match different gaps. Reject the
-  obsolete flat format instead of silently interpreting its strings as groups of characters.
-- HubSpot groups bind the number to the years unit and also require experience wording and HubSpot.
-- Hash new checks only when present, preserving ANY-631 case approvals.
+- Gap meaning is decided by the existing review criteria and confirmed decisions, not regexes.
+  Remove `unexpected_gap`, `missing_gap_detail`, `gap_must` and `gap_must_not`; reject fixtures
+  containing the retired fields with an instruction to migrate the requirements to `criteria`.
+- Retain factual failure checks, including empty gaps when `expect_gap` is true. Preserve the
+  previous `expect_gap: false` behavior; it is not a newly introduced automatic empty-list gate.
+- Without confirmed semantic decisions, otherwise valid runs stay PENDING. All required decisions
+  must be yes for PASS; a confirmed no fails the relevant criterion. Suggestions and stale verdicts
+  do not count as confirmation. Review must show the task, positioning and response together.
+- Each gap case reviews the expected requirement, grounding of every reported gap, and fidelity
+  of meaning, numbers, units and relationships. Equivalent wording and spelled-out numbers are valid.
+- Preserve ANY-631 fixtures, case hashes, decisions and acceptance results. The new gap cases have
+  changed criteria and therefore require new approvals; old approvals must not silently transfer.
 - Searches across ProposalAI, Acceptance Builder, Client Update Writer and Brief Decoder found
   this experience-gap classifier only in ProposalAI; no sibling prompt requires the same change.
 - Include Spanish coverage alongside the required Russian and English cases.
-- Regex checks detect specified literal failures; human criteria still assess meaning and coverage.
+- Local regressions exercise the acceptance state transitions using explicit test review decisions;
+  they do not simulate model correctness or replace live evidence.
 
 ## Examples
 
@@ -94,6 +100,9 @@ Proposed. Needs product owner confirmation in ANY-846. Implementation does not w
 
 ## Code review round 1
 
+Historical implementation: its semantic regex approach is superseded by the approved round 2
+contract in Decisions. Prompt and mandatory-domain fixes remain applicable.
+
 All three findings are addressed locally; the user explicitly authorized fixes, regression tests
 and plan updates, with no live evaluation.
 
@@ -129,16 +138,53 @@ Validation on managed Python 3.12.13:
 Regex groups enforce literal co-occurrence and the configured units, not full semantic relations
 inside a sentence; the human criteria remain required for semantic acceptance.
 
+## Code review round 2
+
+The user approved replacing semantic gap regexes with the existing confirmed-review contract.
+The Webflow finding exposed the broader problem: literal matches cannot distinguish contextual
+mentions, negation, equivalent number wording or the relationship between a number and a tool.
+
+- Removed semantic gap regex evaluation and its failure flags. Fixtures using either retired
+  field now fail with an explicit migration message instead of silently losing their checks.
+- Migrated all 15 gap cases to explicit grounding and requirement-fidelity review criteria,
+  retaining their individual expected-gap/domain criteria and original task/profile inputs.
+- Reused existing PENDING/PASS/FAIL decisions and hash validation. Otherwise valid runs remain
+  PENDING until review is confirmed; missing mandatory gaps still fail automatically. CLI review
+  now displays the source task and positioning alongside the response.
+- Added regressions for the exact contextual Webflow description, negation, spelled-out numbers
+  in RU/EN/ES, wrong units/number associations, split requirements and unsupported extra gaps.
+  Tests supply explicit review decisions; they do not claim to judge the text semantically.
+- Covered missing, suggested, unknown, stale and agent-only decisions, latest confirmed decisions,
+  all gap cases' new criteria and the factual missing-gap failure despite positive review.
+
+Validation on managed Python 3.12.13:
+
+- Doctor passed; **147 eval tests passed** and the complete eval plus freelancer-suite run had
+  **409 passed**, including packaging. Used `UV_OFFLINE=true` with the existing uv cache and
+  `LITELLM_LOCAL_MODEL_COST_MAP=True`; no live provider requests.
+- ANY-631 fixtures and decisions were unchanged. Compared against the evaluator at `958398bb`:
+  all case hashes and the complete acceptance status/report matched exactly. Its historical FAIL
+  remains unchanged; this is compatibility evidence, not a newly passing model acceptance result.
+  SHA-256 of the JSON-encoded status/report pair:
+  `167b6db69d77884ce9c6acd823af400f425f3ba369a946aed3a397e697bc3d6c`.
+- Config, architecture and documentation validation, generated-document drift and diff whitespace
+  checks passed. No GitHub writes. Full-check and frontend-check were not repeated for this
+  evaluator/fixture-only round; their previously recorded local limitations remain applicable.
+
+Live model behavior, product examples and final acceptance remain unverified. The implementation
+deliberately requires confirmed semantic review rather than replacing it with another heuristic.
+
 ## Live results
 
 Live verification pending: automatic approval review rejected stack startup and the user then
 explicitly declined live provider requests. No live attempts or model results recorded.
 
-Proposed thresholds; needs team-lead approval:
+Proposed thresholds; needs team-lead approval. Gap quality is measured by confirmed review criteria,
+not the retired regex checks:
 
-- Routine landing reviews and yoga schedule: zero unexpected gaps in five attempts per case.
-- HubSpot, Webflow and Trustpilot: five of five required gaps, with zero missing details or
-  forbidden gap literals.
+- Routine landing reviews and yoga schedule: five of five reviewed results with no spurious gaps.
+- HubSpot, Webflow and Trustpilot: five of five reviewed results with the required gap, no
+  unsupported extra gaps, and correct meaning, numbers and units.
 - Existing orders: one attempt each; every required gap still present.
 - Run the gap set in Russian, English and Spanish. Compare model alternatives only if observed
   failures justify further iteration; keep remaining non-critical polish for a later product pass.

@@ -1,5 +1,5 @@
 {
-  "description": "ANY-846 gap precision: ordinary components, experience minimums and mandatory platforms. Russian, English and Spanish coverage; semantic criteria require human review.",
+  "description": "ANY-846 gap precision: ordinary components, experience minimums and mandatory platforms. Russian, English and Spanish coverage. Gap meaning is accepted only through confirmed review criteria.",
   "orders": [
     {
       "id": "landing-reviews-ru",
@@ -15,12 +15,19 @@
           "kind": "requirement",
           "critical": false,
           "question": "Are ordinary landing-page components covered by the stated design experience, with no experience gaps reported?"
+        },
+        {
+          "id": "gap-grounding",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every reported gap identify an explicit task requirement that the positioning does not cover, rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context?"
+        },
+        {
+          "id": "gap-fidelity",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every gap preserve its requirement's meaning and relationships, including numbers, units and named tools, allowing equivalent wording and numbers written as words?"
         }
-      ],
-      "gap_must_not": [
-        "отзыв",
-        "review",
-        "testimonial"
       ],
       "description": "Reconstructed from the 2026-11-10 result attachment; the original task text was not attached."
     },
@@ -38,11 +45,19 @@
           "kind": "requirement",
           "critical": false,
           "question": "Is the yoga schedule treated as an ordinary landing-page component, with no experience gaps reported?"
+        },
+        {
+          "id": "gap-grounding",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every reported gap identify an explicit task requirement that the positioning does not cover, rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context?"
+        },
+        {
+          "id": "gap-fidelity",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every gap preserve its requirement's meaning and relationships, including numbers, units and named tools, allowing equivalent wording and numbers written as words?"
         }
-      ],
-      "gap_must_not": [
-        "расписан",
-        "schedule"
       ]
     },
     {
@@ -59,19 +74,19 @@
           "kind": "requirement",
           "critical": false,
           "question": "Does the gap state the required minimum of 10 years of HubSpot work experience, without changing it to training or courses?"
+        },
+        {
+          "id": "gap-grounding",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every reported gap identify an explicit task requirement that the positioning does not cover, rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context?"
+        },
+        {
+          "id": "gap-fidelity",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every gap preserve its requirement's meaning and relationships, including numbers, units and named tools, allowing equivalent wording and numbers written as words?"
         }
-      ],
-      "gap_must": [
-        [
-          "\\b10\\+?[\\s-]+years?\\b",
-          "\\bexperience\\b",
-          "HubSpot"
-        ]
-      ],
-      "gap_must_not": [
-        "training",
-        "course",
-        "обучени"
       ]
     },
     {
@@ -88,18 +103,19 @@
           "kind": "requirement",
           "critical": false,
           "question": "Does the gap preserve the requirement of at least 10 years of HubSpot work experience, without describing training or courses?"
+        },
+        {
+          "id": "gap-grounding",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every reported gap identify an explicit task requirement that the positioning does not cover, rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context?"
+        },
+        {
+          "id": "gap-fidelity",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every gap preserve its requirement's meaning and relationships, including numbers, units and named tools, allowing equivalent wording and numbers written as words?"
         }
-      ],
-      "gap_must": [
-        [
-          "\\b10\\+?[\\s-]+(?:лет|летн\\w*)\\b",
-          "\\b(?:опыт\\w*|работ\\w*)\\b",
-          "HubSpot"
-        ]
-      ],
-      "gap_must_not": [
-        "обучени",
-        "курс"
       ]
     },
     {
@@ -116,17 +132,19 @@
           "kind": "requirement",
           "critical": false,
           "question": "Is mandatory Webflow experience reported as missing while ordinary landing-page sections are not gaps?"
+        },
+        {
+          "id": "gap-grounding",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every reported gap identify an explicit task requirement that the positioning does not cover, rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context?"
+        },
+        {
+          "id": "gap-fidelity",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every gap preserve its requirement's meaning and relationships, including numbers, units and named tools, allowing equivalent wording and numbers written as words?"
         }
-      ],
-      "gap_must": [
-        [
-          "Webflow"
-        ]
-      ],
-      "gap_must_not": [
-        "отзыв",
-        "первый экран",
-        "форм[ау] заявки"
       ]
     },
     {
@@ -143,12 +161,19 @@
           "kind": "requirement",
           "critical": false,
           "question": "Is the missing Trustpilot API experience reported, rather than treating the reviews block itself as an experience gap?"
+        },
+        {
+          "id": "gap-grounding",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every reported gap identify an explicit task requirement that the positioning does not cover, rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context?"
+        },
+        {
+          "id": "gap-fidelity",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every gap preserve its requirement's meaning and relationships, including numbers, units and named tools, allowing equivalent wording and numbers written as words?"
         }
-      ],
-      "gap_must": [
-        [
-          "Trustpilot"
-        ]
       ]
     },
     {
@@ -165,12 +190,19 @@
           "kind": "requirement",
           "critical": false,
           "question": "Are the ordinary landing-page sections covered by the stated design experience, with no gaps reported?"
+        },
+        {
+          "id": "gap-grounding",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every reported gap identify an explicit task requirement that the positioning does not cover, rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context?"
+        },
+        {
+          "id": "gap-fidelity",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every gap preserve its requirement's meaning and relationships, including numbers, units and named tools, allowing equivalent wording and numbers written as words?"
         }
-      ],
-      "gap_must_not": [
-        "reseñ",
-        "testimoni",
-        "review"
       ]
     },
     {
@@ -187,19 +219,19 @@
           "kind": "requirement",
           "critical": false,
           "question": "Does the gap preserve the requirement of at least 10 years of HubSpot work experience without changing it to training or courses?"
+        },
+        {
+          "id": "gap-grounding",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every reported gap identify an explicit task requirement that the positioning does not cover, rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context?"
+        },
+        {
+          "id": "gap-fidelity",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every gap preserve its requirement's meaning and relationships, including numbers, units and named tools, allowing equivalent wording and numbers written as words?"
         }
-      ],
-      "gap_must": [
-        [
-          "\\b10\\+?[\\s-]+años\\b",
-          "\\bexperiencia\\b",
-          "HubSpot"
-        ]
-      ],
-      "gap_must_not": [
-        "formación",
-        "capacitaci",
-        "curso"
       ]
     },
     {
@@ -216,12 +248,19 @@
           "kind": "requirement",
           "critical": false,
           "question": "Is the missing Trustpilot API experience reported rather than treating the reviews block itself as an experience gap?"
+        },
+        {
+          "id": "gap-grounding",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every reported gap identify an explicit task requirement that the positioning does not cover, rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context?"
+        },
+        {
+          "id": "gap-fidelity",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every gap preserve its requirement's meaning and relationships, including numbers, units and named tools, allowing equivalent wording and numbers written as words?"
         }
-      ],
-      "gap_must": [
-        [
-          "Trustpilot"
-        ]
       ]
     },
     {
@@ -238,12 +277,19 @@
           "kind": "requirement",
           "critical": false,
           "question": "Does the gap identify the explicitly mandatory prior healthcare-industry design experience missing from the retail-only positioning?"
+        },
+        {
+          "id": "gap-grounding",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every reported gap identify an explicit task requirement that the positioning does not cover, rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context?"
+        },
+        {
+          "id": "gap-fidelity",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every gap preserve its requirement's meaning and relationships, including numbers, units and named tools, allowing equivalent wording and numbers written as words?"
         }
-      ],
-      "gap_must": [
-        [
-          "\\bhealthcare\\b"
-        ]
       ]
     },
     {
@@ -260,10 +306,19 @@
           "kind": "requirement",
           "critical": false,
           "question": "Is healthcare treated as an incidental target niche covered by adjacent landing-page experience, with no experience gaps reported?"
+        },
+        {
+          "id": "gap-grounding",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every reported gap identify an explicit task requirement that the positioning does not cover, rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context?"
+        },
+        {
+          "id": "gap-fidelity",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every gap preserve its requirement's meaning and relationships, including numbers, units and named tools, allowing equivalent wording and numbers written as words?"
         }
-      ],
-      "gap_must_not": [
-        "\\bhealthcare\\b"
       ]
     },
     {
@@ -280,12 +335,19 @@
           "kind": "requirement",
           "critical": false,
           "question": "Does the gap identify the explicitly mandatory prior healthcare-industry design experience missing from the retail-only positioning?"
+        },
+        {
+          "id": "gap-grounding",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every reported gap identify an explicit task requirement that the positioning does not cover, rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context?"
+        },
+        {
+          "id": "gap-fidelity",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every gap preserve its requirement's meaning and relationships, including numbers, units and named tools, allowing equivalent wording and numbers written as words?"
         }
-      ],
-      "gap_must": [
-        [
-          "\\bмедицин\\w*\\b"
-        ]
       ]
     },
     {
@@ -302,10 +364,19 @@
           "kind": "requirement",
           "critical": false,
           "question": "Is healthcare treated as an incidental target niche covered by adjacent landing-page experience, with no experience gaps reported?"
+        },
+        {
+          "id": "gap-grounding",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every reported gap identify an explicit task requirement that the positioning does not cover, rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context?"
+        },
+        {
+          "id": "gap-fidelity",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every gap preserve its requirement's meaning and relationships, including numbers, units and named tools, allowing equivalent wording and numbers written as words?"
         }
-      ],
-      "gap_must_not": [
-        "\\bмедицин\\w*\\b"
       ]
     },
     {
@@ -322,12 +393,19 @@
           "kind": "requirement",
           "critical": false,
           "question": "Does the gap identify the explicitly mandatory prior healthcare-industry design experience missing from the retail-only positioning?"
+        },
+        {
+          "id": "gap-grounding",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every reported gap identify an explicit task requirement that the positioning does not cover, rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context?"
+        },
+        {
+          "id": "gap-fidelity",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every gap preserve its requirement's meaning and relationships, including numbers, units and named tools, allowing equivalent wording and numbers written as words?"
         }
-      ],
-      "gap_must": [
-        [
-          "\\bsanitari\\w*\\b"
-        ]
       ]
     },
     {
@@ -344,10 +422,19 @@
           "kind": "requirement",
           "critical": false,
           "question": "Is healthcare treated as an incidental target niche covered by adjacent landing-page experience, with no experience gaps reported?"
+        },
+        {
+          "id": "gap-grounding",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every reported gap identify an explicit task requirement that the positioning does not cover, rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context?"
+        },
+        {
+          "id": "gap-fidelity",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every gap preserve its requirement's meaning and relationships, including numbers, units and named tools, allowing equivalent wording and numbers written as words?"
         }
-      ],
-      "gap_must_not": [
-        "\\bsanitari\\w*\\b"
       ]
     }
   ]
