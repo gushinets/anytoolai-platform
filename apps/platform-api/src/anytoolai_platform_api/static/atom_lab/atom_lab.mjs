@@ -1637,7 +1637,8 @@ export function bootstrapAtomLab({
     "model-catalog-warning", "refresh-models", "run-button", "retry-submit", "retry-read", "run-state",
     "launch-readiness", "launch-outcome", "launch-outcome-text", "show-response", "response-title", "response-draft-warning",
     "run-status", "run-status-help", "result-caption", "run-metadata-section", "run-technical",
-    "submitted-snapshot", "result-section", "result-readable", "result-json", "save-result-preset", "result-preset-error",
+    "submitted-snapshot", "result-section", "result-readable", "result-json",
+    "save-result-preset", "result-preset-status", "result-preset-error",
     "invalid-response", "invalid-response-sample", "invalid-response-note", "invalid-response-raw", "run-metadata",
     "show-run-diagnostics", "return-to-request", "run-diagnostics-panel", "run-diagnostics-summary",
     "run-contract-guidance", "run-diagnostic-schema-link", "run-diagnostic-raw-link",
@@ -1679,6 +1680,7 @@ export function bootstrapAtomLab({
   let modelOptions = [];
   let activeSubmission = null;
   let displayedSubmission = null;
+  let resultPresetCheck = null;
   let completedPromptTrial = null;
   let restoredPromptTrial = null;
   let submitInFlight = false;
@@ -1729,8 +1731,16 @@ export function bootstrapAtomLab({
   let paused = false;
   let destroyed = false;
 
+  const clearResultPresetCheck = () => {
+    if (!resultPresetCheck) return;
+    resultPresetCheck = null;
+    nodes["save-result-preset"].removeAttribute("aria-disabled");
+    nodes["result-preset-status"].textContent = "";
+  };
+
   const showLibrary = (section = null) => {
     const view = section ?? "";
+    if (section !== null) clearResultPresetCheck();
     if ((nodes.workspace.dataset.library ?? "") !== view) nodes.status.textContent = "";
     nodes["presets-panel"].hidden = section !== "presets";
     nodes["history-panel"].hidden = section !== "history";
@@ -1776,7 +1786,9 @@ export function bootstrapAtomLab({
     ));
     nodes["run-button"].disabled = submitInFlight || !hasValidSelection || submissionBlocksNewRun
       || Boolean(session?.promptSourceNeedsValidation);
-    nodes["save-result-preset"].hidden = !currentResultPresetAtom(displayedSubmission);
+    const resultPresetAtom = currentResultPresetAtom(displayedSubmission);
+    if (resultPresetCheck && resultPresetCheck.atom !== resultPresetAtom) clearResultPresetCheck();
+    nodes["save-result-preset"].hidden = !resultPresetAtom;
     nodes["launch-readiness"].textContent = submitInFlight
       ? "Отправка запроса…"
       : submissionBlocksNewRun
@@ -3252,6 +3264,7 @@ export function bootstrapAtomLab({
   };
 
   const displayAcceptedSubmission = (submission) => {
+    clearResultPresetCheck();
     displayedSubmission = submission;
     nodes["result-preset-error"].textContent = "";
     nodes["submitted-snapshot"].textContent = JSON.stringify(submission.snapshot, null, 2);
@@ -3942,6 +3955,7 @@ export function bootstrapAtomLab({
 
   const selectAtom = (atom, {force = false, preservePreset = false} = {}) => {
     if (!force && hasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return false;
+    clearResultPresetCheck();
     if (session) clearValidationPresentation(document, nodes["validation-errors"], session);
     selectedAtomId = atom.atom_id;
     session = createDraftSession(atom);
@@ -4296,18 +4310,16 @@ export function bootstrapAtomLab({
 
   nodes["save-result-preset"].addEventListener("click", async () => {
     const submission = displayedSubmission;
-    if (!currentResultPresetAtom(submission)
+    if (resultPresetCheck || nodes["request-response"].hidden || !currentResultPresetAtom(submission)
       || presetLibraryLoading || presetOpenInFlight || presetSaveInFlight || presetSaveOutcomeUnknown) return;
     if (presetHasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return;
     const source = presetSourceFromConfiguration(submission.presetConfiguration);
     nodes["result-preset-error"].textContent = "";
     if (source.promptSourceRef !== null || promptContractChecks.get(source.atom)?.error) {
-      const ownerSession = session;
-      const generation = ++presetOpenGeneration;
-      const isCurrent = () => !destroyed && generation === presetOpenGeneration && session === ownerSession
-        && displayedSubmission === submission && currentResultPresetAtom(submission) && !nodes["request-response"].hidden;
-      presetOpenInFlight = true;
-      updatePresetEditorDisabled();
+      resultPresetCheck = source;
+      const isCurrent = () => resultPresetCheck === source && currentResultPresetAtom(submission) === source.atom;
+      nodes["save-result-preset"].setAttribute("aria-disabled", "true");
+      nodes["result-preset-status"].textContent = "Проверяем источник промпта…";
       try {
         if (!await checkRunPresetSource(source, isCurrent) || !isCurrent()) return;
       } catch (error) {
@@ -4317,15 +4329,10 @@ export function bootstrapAtomLab({
         }
         return;
       } finally {
-        if (generation === presetOpenGeneration) {
-          presetOpenInFlight = false;
-          updatePresetEditorDisabled();
-          if (isCurrent()) nodes["save-result-preset"].focus();
-        }
+        if (resultPresetCheck === source) clearResultPresetCheck();
       }
     }
-    source.atom = currentResultPresetAtom(submission);
-    if (source.atom) openSnapshotPreset(source, "Подготовлен пресет из снимка ответа.");
+    openSnapshotPreset(source, "Подготовлен пресет из снимка ответа.");
   });
   nodes["edit-preset"].addEventListener("click", () => editSelectedPreset());
   nodes["apply-preset"].addEventListener("click", () => editSelectedPreset({openWorkbench: true}));
@@ -4551,6 +4558,7 @@ export function bootstrapAtomLab({
   showInputTab(true);
   const pause = () => {
     paused = true;
+    clearResultPresetCheck();
     stopModelCatalogPolling({preserveDeadline: !destroyed});
     if (activeModelRefreshTimeoutId !== null) cancelScheduleImpl(activeModelRefreshTimeoutId);
     activeModelRefreshTimeoutId = null;

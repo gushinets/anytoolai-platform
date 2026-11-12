@@ -1529,6 +1529,76 @@ test("the displayed run remains saveable after compatible refresh and is hidden 
   await expect(page.locator("#result-section")).toBeVisible();
 });
 
+test("checking a result preset source keeps focus and leaves the workbench usable", async ({page}) => {
+  const detail = historyDetail({runId: "run-preset-check", prompt: A06.prompt});
+  detail.snapshot.prompt.source_ref = A06.prompt_ref;
+  const promptReads = [];
+  const promptOptions = {json: [{
+    ref: A06.prompt_ref, name: "Платформа", prompt: A06.prompt, group: "platform",
+    source_ref: null, source_run_id: null,
+  }]};
+  await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
+    const request = route.request();
+    const {pathname} = new URL(request.url());
+    if (pathname === "/v1/atom-lab/runs" && request.method() === "POST") {
+      return route.fulfill({status: 202, json: {run_id: detail.run_id, status: "queued",
+        scenario_session_id: detail.runtime_ids.scenario_session_id, job_id: detail.runtime_ids.job_id}});
+    }
+    if (pathname === `/v1/atom-lab/runs/${detail.run_id}`) return route.fulfill({json: detail});
+    if (pathname === "/v1/atom-lab/runs" || pathname === "/v1/atom-lab/presets") {
+      return route.fulfill({json: {items: [], next_cursor: null}});
+    }
+    if (pathname === "/v1/atom-lab/atoms/A06/prompts") {
+      const pending = Promise.withResolvers();
+      promptReads.push(pending.resolve);
+      return route.fulfill(await pending.promise);
+    }
+    return route.fallback();
+  });
+
+  await unlockAtom(page, "A06");
+  await page.locator("#fill-example").click();
+  await page.locator("#reasoning-effort").selectOption("high");
+  await page.locator("#run-button").click();
+  const result = page.getByRole("region", {name: "Результат", exact: true});
+  const save = result.getByRole("button", {name: "Сохранить снимок как пресет"});
+  const progress = result.getByRole("status");
+  const objective = page.getByRole("textbox", {name: "Цель", exact: true});
+  await expect(save).toBeVisible();
+  await save.press("Enter");
+  await expect(save).toBeFocused();
+  await expect(save).toBeDisabled();
+  await expect(progress).toHaveText("Проверяем источник промпта…");
+  await expect(progress).toBeVisible();
+  await expect(objective).toBeEditable();
+  await page.keyboard.press("Enter");
+  await expect.poll(() => promptReads.length).toBe(1);
+  promptReads[0]({status: 503, json: {error: {message: "Источник временно недоступен"}}});
+  await expect(result.getByRole("alert")).toContainText("Источник временно недоступен");
+  await expect(progress).toBeEmpty();
+  await expect(save).toBeEnabled();
+  await expect(save).toBeFocused();
+
+  await save.press("Enter");
+  await expect.poll(() => promptReads.length).toBe(2);
+  await objective.fill("Новая цель черновика");
+  await page.locator("#history-button").click();
+  await showWorkbench(page);
+  await expect(save).toBeEnabled();
+  await expect(progress).toBeEmpty();
+  const abandonedCheck = page.waitForResponse("**/atoms/A06/prompts");
+  promptReads[1](promptOptions);
+  await (await abandonedCheck).finished();
+  await expect(page.locator("#presets-panel")).toBeHidden();
+  await expect(objective).toHaveValue("Новая цель черновика");
+
+  await save.press("Enter");
+  await expect.poll(() => promptReads.length).toBe(3);
+  promptReads[2](promptOptions);
+  await expect(page.locator("#preset-name")).toBeFocused();
+  await expect(page.locator("#preset-source")).toContainText(detail.run_id);
+});
+
 test("model capabilities, stale state, and refresh are explicit", async ({page}) => {
   let refreshRequests = 0;
   await page.route("http://atom-lab.test/v1/atom-lab/models/refresh", async (route) => {
