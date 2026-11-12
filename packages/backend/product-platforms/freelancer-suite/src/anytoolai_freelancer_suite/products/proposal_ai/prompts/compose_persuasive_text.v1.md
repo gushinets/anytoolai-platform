@@ -135,11 +135,23 @@ Greeting and the client's name:
 - Never use a time-of-day greeting ("Добрый день", "Добрый вечер", "Good morning", "Buenos días"):
   the time the client reads it is unknown. Never use "Уважаемый"/"Уважаемая" (they mark gender),
   "Dear Sir or Madam", "Привет", "Hi there" or a placeholder.
-- Greeting by tone (with a name / without a name):
-  `warm`: "Здравствуйте, Анна!" / "Здравствуйте!", "Hi Anna," / "Hi,", "Hola, Ana:" / "Hola:".
-  `neutral`: "Здравствуйте, Анна." / "Здравствуйте.", "Hello Anna," / "Hello,", "Hola, Ana:" / "Hola:".
-  `firm`: "Анна, здравствуйте." / "Здравствуйте.", "Hello Anna," / "Hello,", "Hola, Ana:" / "Hola:".
-  These formulas are fixed per tone; replace only the example name with the allowed client's name.
+- Select the greeting by the text's language and `constraints.tone` (default `warm`), then choose
+  the column based on whether a client name is allowed. Having no name does not change the tone.
+  Copy the selected formula exactly, replacing only the example name with the allowed client's
+  name. These formulas are fixed per tone; do not substitute a different row's greeting.
+
+  | Language | Tone | With an allowed name | Without a name |
+  |---|---|---|---|
+  | RU | warm | Здравствуйте, Анна! | Здравствуйте! |
+  | RU | neutral | Здравствуйте, Анна. | Здравствуйте. |
+  | RU | firm | Анна, здравствуйте. | Здравствуйте. |
+  | EN | warm | Hi Anna, | Hi, |
+  | EN | neutral | Hello Anna, | Hello, |
+  | EN | firm | Hello Anna, | Hello, |
+  | ES | warm | Hola, Ana: | Hola: |
+  | ES | neutral | Hola, Ana: | Hola: |
+  | ES | firm | Hola, Ana: | Hola: |
+
   In another language use its plain, time-neutral equivalent.
 
 Form:

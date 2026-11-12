@@ -220,3 +220,15 @@ runtime parser, dependency, UI, model-policy or DSL change. Prior acceptance rec
 - The original 12 greeting inputs and all round 1 acceptance artifacts remain unchanged.
 - Expanded fixtures cover all 18 language/tone/name combinations plus six edge cases, including
   an inflected Russian first name and surname. Live verification is pending on the committed source.
+
+### Round 2 live finding and correction
+
+The first candidate, `a8630c3e`, produced `Hello,` for the English unnamed `warm` case
+(`G11-en-noname-warm`, attempt 1), where the fixed rule requires `Hi,`. The explicit inflected
+Russian case did produce `Здравствуйте, Анна Иванова!`. The failed series is retained, not accepted.
+Further candidate calls were stopped after detection; any in-flight call is accounted for separately.
+
+Correction within the authorized scope: replace the compact slash-separated formulas with one
+explicit language/tone/name table and a two-step selection instruction. Absence of a name must
+not select a different tone. Keep the existing backend model policy and all 24 inputs. Repeat the
+complete matrix and four QA cases on the new committed source, with separate evidence.
