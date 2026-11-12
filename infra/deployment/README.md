@@ -1027,8 +1027,9 @@ existing runtime rows and worker logs by technical ID instead of starting a dupl
 
 The API exposes `GET /internal/v1/capability-manifest?tenant_id=anytoolai&region=ru`.
 It reads the complete immutable registry, including disabled products and metrics, without
-storage or provider access. Ordinary configuration declares all six products and the two
-approved test metrics disabled; this endpoint does not enable commercial admission.
+storage or provider access. Ordinary configuration declares all six products and six
+metrics disabled (two TEST-ONLY and four production declarations); this endpoint does
+not enable commercial admission.
 
 `ANYTOOLAI_TENANT_ID` and `ANYTOOLAI_REGION` select the trusted API scope (defaults:
 `anytoolai` and `ru`). Both must exist in the loaded registry or startup fails. Runtime routes
@@ -1047,9 +1048,15 @@ malformed values fail startup. Tokens accept 32–256 ASCII Bearer characters (l
 validation messages redact secrets.
 
 Portal sends the secret in `Authorization: Bearer <secret>` over TLS with certificate
-verification. The credential identifies the trusted Portal caller, authorizes only manifest
-read and binds to the configured tenant/region. Missing, invalid or duplicate credentials return
-`401` with `WWW-Authenticate: Bearer`; an authenticated wrong or ambiguous scope returns `403`.
+verification. Its `platform-kernel` entry in `BACKEND_CONSUMERS` supplies
+`portal_to_backend_current_secret` for configured manifest reads, usage clients and
+recipient invalidation delivery. The legacy `KERNEL_SERVICE_TOKEN` does not select
+credentials for these clients. The credential identifies the trusted Portal caller,
+binds to the configured tenant/region and grants manifest read. Additional usage and
+invalidation permissions require `ANYTOOLAI_PORTAL_USAGE_READ_ENABLED` and
+`ANYTOOLAI_PORTAL_ACCESS_INVALIDATION_ENABLED`, respectively. Missing, invalid or
+duplicate credentials return `401` with `WWW-Authenticate: Bearer`; an authenticated
+wrong or ambiguous scope returns `403`.
 Missing required query fields return the normal safe `422` envelope. Errors preserve request
 correlation; internal responses have `Cache-Control: no-store`. All requests carrying `Origin`,
 including browser preflight, are rejected, and internal routes bypass public CORS handling.
@@ -1059,7 +1066,10 @@ For rotation, use one bounded rollout window:
 
 1. Generate a new independent secret; configure it as `ANYTOOLAI_PORTAL_SERVICE_TOKEN` and
    configure the old secret as `ANYTOOLAI_PORTAL_SERVICE_TOKEN_PREVIOUS`. Restart the API.
-2. Switch the Portal's server-side `KERNEL_SERVICE_TOKEN`, then verify the new credential.
+2. Update `portal_to_backend_current_secret` in the `platform-kernel` entry of Portal's
+   server-only `BACKEND_CONSUMERS`. Restart/recreate the Portal API and worker processes
+   that hold the outbound clients. Verify actual requests for every enabled operation
+   with the new credential before removing the receiver's old slot.
 3. Remove `ANYTOOLAI_PORTAL_SERVICE_TOKEN_PREVIOUS` and restart the API before closing the
    rollout window. Verify the removed token receives `401` and the new token still succeeds.
 
