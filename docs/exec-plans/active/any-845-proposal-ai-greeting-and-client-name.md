@@ -8,8 +8,8 @@
 - Created: 2026-11-12
 - Last updated: 2026-11-12
 - Review date: 2026-11-19
-- Next action: address review round 2, then collect separate live evidence for the expanded matrix.
-- Blocker: review round 2 requires an unambiguous name-inflection rule and complete tone/name coverage.
+- Next action: owner decision on one remaining neutral-tone punctuation failure before closing review round 2.
+- Blocker: G10 attempt 3 uses an exclamation mark instead of the required period; strict every-run acceptance is not met.
 
 ## Goal
 
@@ -232,3 +232,36 @@ Correction within the authorized scope: replace the compact slash-separated form
 explicit language/tone/name table and a two-step selection instruction. Absence of a name must
 not select a different tone. Keep the existing backend model policy and all 24 inputs. Repeat the
 complete matrix and four QA cases on the new committed source, with separate evidence.
+
+## Live verification after review round 2
+
+The owner authorized fixes, expanded live runs, separate evidence, pushing and PR/Linear updates;
+review-thread closure is conditional on successful verification. Implemented in `a8630c3e` and
+`cce65cdc`, retaining the main merge and ANY-846 changes. The first candidate exposed an English
+unnamed warm greeting mismatch; the second uses an explicit language/tone/name selection table.
+
+On `cce65cdcdff3ebc77e1ab4502386828a477081d4`:
+
+- 244 focused tests passed. Config, architecture and documentation checks passed; generated docs
+  are current. All required CI checks passed. Task Finder smoke passed an isolated retry after a
+  Copy-button timeout; the original failure is retained.
+- The complete 18-combination matrix passes **54/54**; inflected-name normalization passes **3/3**.
+- Across all 24 cases and three repetitions, exact greeting formulas pass **71/72**.
+  G10 brand-name attempt 3 produced `Здравствуйте!` instead of `Здравствуйте.` for neutral.
+  The brand was correctly excluded, but this is still a failed literal check.
+- Original QA P01/P02/P04/P05: **4/4** pass agent assessment. Five body long-dash warnings and
+  one short English gap language diagnostic are retained. No full human/browser acceptance is claimed.
+- Final-source runs: 76 completed scenarios, 152 successful physical provider calls, estimated
+  USD 0.05645566. Including the preserved rejected candidate: 108 scenarios, 216 calls, USD 0.090060685.
+- Actual backend: OpenAI gpt-6-luna, reasoning medium, default_text_generation_v1. Both runtime
+  prompt hashes match Git and the live checkout was clean. Model/runtime policy is unchanged.
+
+Strict acceptance remains pending: the plan requires every first line to match. The review fixes
+and missing coverage are delivered, but closing with the remaining punctuation exception requires
+an explicit owner decision. Further prompt-only tuning is deferred; if a stricter generation target
+is required, compare sol and terra against luna across RU/EN/ES before another wording change.
+
+The separate round 2 evidence directory preserves both candidates, their input/output and ledgers.
+Round 1 evidence and pinned inputs remain unchanged.
+
+[Round 2 evidence and remaining acceptance condition](../../../tests/fixtures/proposal_ai_eval/acceptance/any-845-round2/README.md).

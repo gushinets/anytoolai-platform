@@ -1,0 +1,274 @@
+{
+  "status": "rejected",
+  "reason": "G11-en-noname-warm attempt 1 used Hello, instead of Hi,; stopped further candidate collection after detecting this mismatch.",
+  "environment": {
+    "source_fingerprint": "e8d2953be23a13a7e6e84ac499f65c1664df010e52984392838aa4a022208057",
+    "profile_fingerprint": "97d715ccb605b6f32646c117b06d7a3d4eb3d9e0c984bf8ddd30a28a6ffd6674",
+    "enabled_products": {
+      "proposal_ai": {
+        "provider_policy_ref": "default_text_generation_v1",
+        "quota_policy_ref": null
+      }
+    },
+    "git_sha": "a8630c3e746f6e524a25266309af2cc956d420e7",
+    "git_tree": "5995f1cf8882c8236710640f1b148343c513f8da",
+    "git_status_porcelain": [],
+    "tracked_diff_paths": [],
+    "prompt_sha256_from_git": {
+      "detect_experience_gaps.v1.md": "dc23c818c04459410813584a18c811d389d702dddaac8699632a679119ab39d3",
+      "compose_persuasive_text.v1.md": "c58c689c6b45b307b383354ac15b5059552ed29d021d50d177a8874e1fb4b41d"
+    },
+    "compose_project": "anytoolai-0a4692b7",
+    "api_url": "http://127.0.0.1:18453",
+    "provider_policy_ref": "default_text_generation_v1",
+    "quota_mode": "unmetered",
+    "channel": "api",
+    "source_context": "Includes main merge 72b99dd1 and ANY-846 gap detection changes; not a controlled composer-only comparison with round 1.",
+    "python_environment": "Ignored managed-environment directory with links to existing Python 3.12 environment; git_dirty=false."
+  },
+  "planned_greeting_runs": 72,
+  "series": {
+    "greeting": {
+      "runs": 27,
+      "automatic_finding_counts": {
+        "long_dash": 2,
+        "missing_required": 1
+      },
+      "results": [
+        {
+          "run_id": "any-845-round2-G01-ru-name-warm-1-71798d46",
+          "case_id": "G01-ru-name-warm",
+          "attempt": 1,
+          "first_line": "Здравствуйте, Анна!",
+          "automatic_findings": []
+        },
+        {
+          "run_id": "any-845-round2-G01-ru-name-neutral-1-6c45a587",
+          "case_id": "G01-ru-name-neutral",
+          "attempt": 1,
+          "first_line": "Здравствуйте, Анна.",
+          "automatic_findings": [
+            "long_dash"
+          ]
+        },
+        {
+          "run_id": "any-845-round2-G01-ru-name-firm-1-593b02ac",
+          "case_id": "G01-ru-name-firm",
+          "attempt": 1,
+          "first_line": "Анна, здравствуйте.",
+          "automatic_findings": []
+        },
+        {
+          "run_id": "any-845-round2-G02-ru-noname-neutral-1-8113def0",
+          "case_id": "G02-ru-noname-neutral",
+          "attempt": 1,
+          "first_line": "Здравствуйте.",
+          "automatic_findings": []
+        },
+        {
+          "run_id": "any-845-round2-G03-ru-freelancer-name-1-5c900d4c",
+          "case_id": "G03-ru-freelancer-name",
+          "attempt": 1,
+          "first_line": "Здравствуйте.",
+          "automatic_findings": []
+        },
+        {
+          "run_id": "any-845-round2-G04-ru-third-party-1-73104fa6",
+          "case_id": "G04-ru-third-party",
+          "attempt": 1,
+          "first_line": "Здравствуйте.",
+          "automatic_findings": []
+        },
+        {
+          "run_id": "any-845-round2-G05-en-name-firm-1-b14bf1d0",
+          "case_id": "G05-en-name-firm",
+          "attempt": 1,
+          "first_line": "Hello John,",
+          "automatic_findings": []
+        },
+        {
+          "run_id": "any-845-round2-G06-es-name-warm-1-cdd78683",
+          "case_id": "G06-es-name-warm",
+          "attempt": 1,
+          "first_line": "Hola, Ana:",
+          "automatic_findings": []
+        },
+        {
+          "run_id": "any-845-round2-G07-es-noname-neutral-1-78356355",
+          "case_id": "G07-es-noname-neutral",
+          "attempt": 1,
+          "first_line": "Hola:",
+          "automatic_findings": []
+        },
+        {
+          "run_id": "any-845-round2-G08-ru-freelancer-name-in-task-1-e2b7f2d2",
+          "case_id": "G08-ru-freelancer-name-in-task",
+          "attempt": 1,
+          "first_line": "Здравствуйте.",
+          "automatic_findings": []
+        },
+        {
+          "run_id": "any-845-round2-G09-ru-ambiguous-names-1-8681fa59",
+          "case_id": "G09-ru-ambiguous-names",
+          "attempt": 1,
+          "first_line": "Здравствуйте.",
+          "automatic_findings": []
+        },
+        {
+          "run_id": "any-845-round2-G10-ru-brand-name-1-59416c58",
+          "case_id": "G10-ru-brand-name",
+          "attempt": 1,
+          "first_line": "Здравствуйте.",
+          "automatic_findings": []
+        },
+        {
+          "run_id": "any-845-round2-G02-ru-noname-warm-1-cff94d87",
+          "case_id": "G02-ru-noname-warm",
+          "attempt": 1,
+          "first_line": "Здравствуйте!",
+          "automatic_findings": []
+        },
+        {
+          "run_id": "any-845-round2-G02-ru-noname-firm-1-6a92b76e",
+          "case_id": "G02-ru-noname-firm",
+          "attempt": 1,
+          "first_line": "Здравствуйте.",
+          "automatic_findings": []
+        },
+        {
+          "run_id": "any-845-round2-G05-en-name-warm-1-1bc37eb9",
+          "case_id": "G05-en-name-warm",
+          "attempt": 1,
+          "first_line": "Hi John,",
+          "automatic_findings": []
+        },
+        {
+          "run_id": "any-845-round2-G05-en-name-neutral-1-35981035",
+          "case_id": "G05-en-name-neutral",
+          "attempt": 1,
+          "first_line": "Hello John,",
+          "automatic_findings": []
+        },
+        {
+          "run_id": "any-845-round2-G11-en-noname-warm-1-40c86c8c",
+          "case_id": "G11-en-noname-warm",
+          "attempt": 1,
+          "first_line": "Hello,",
+          "automatic_findings": [
+            "missing_required"
+          ]
+        },
+        {
+          "run_id": "any-845-round2-G11-en-noname-neutral-1-373b6761",
+          "case_id": "G11-en-noname-neutral",
+          "attempt": 1,
+          "first_line": "Hello,",
+          "automatic_findings": []
+        },
+        {
+          "run_id": "any-845-round2-G11-en-noname-firm-1-76f41cd9",
+          "case_id": "G11-en-noname-firm",
+          "attempt": 1,
+          "first_line": "Hello,",
+          "automatic_findings": []
+        },
+        {
+          "run_id": "any-845-round2-G06-es-name-neutral-1-70328eae",
+          "case_id": "G06-es-name-neutral",
+          "attempt": 1,
+          "first_line": "Hola, Ana:",
+          "automatic_findings": []
+        },
+        {
+          "run_id": "any-845-round2-G06-es-name-firm-1-74616342",
+          "case_id": "G06-es-name-firm",
+          "attempt": 1,
+          "first_line": "Hola, Ana:",
+          "automatic_findings": []
+        },
+        {
+          "run_id": "any-845-round2-G07-es-noname-warm-1-fe04a9fa",
+          "case_id": "G07-es-noname-warm",
+          "attempt": 1,
+          "first_line": "Hola:",
+          "automatic_findings": []
+        },
+        {
+          "run_id": "any-845-round2-G07-es-noname-firm-1-d6187ee3",
+          "case_id": "G07-es-noname-firm",
+          "attempt": 1,
+          "first_line": "Hola:",
+          "automatic_findings": []
+        },
+        {
+          "run_id": "any-845-round2-G12-ru-inflected-name-warm-1-8fbf1bc0",
+          "case_id": "G12-ru-inflected-name-warm",
+          "attempt": 1,
+          "first_line": "Здравствуйте, Анна Иванова!",
+          "automatic_findings": []
+        },
+        {
+          "run_id": "any-845-round2-G01-ru-name-warm-2-7cac3176",
+          "case_id": "G01-ru-name-warm",
+          "attempt": 2,
+          "first_line": "Здравствуйте, Анна!",
+          "automatic_findings": []
+        },
+        {
+          "run_id": "any-845-round2-G01-ru-name-neutral-2-33a9a8ff",
+          "case_id": "G01-ru-name-neutral",
+          "attempt": 2,
+          "first_line": "Здравствуйте, Анна.",
+          "automatic_findings": [
+            "long_dash"
+          ]
+        },
+        {
+          "run_id": "any-845-round2-G01-ru-name-firm-2-780e9866",
+          "case_id": "G01-ru-name-firm",
+          "attempt": 2,
+          "first_line": "Анна, здравствуйте.",
+          "automatic_findings": []
+        }
+      ]
+    },
+    "regression": {
+      "runs": 4,
+      "automatic_finding_counts": {},
+      "results": [
+        {
+          "run_id": "any-845-round2-regression-P01-1-a2645fab",
+          "case_id": "P01",
+          "attempt": 1,
+          "first_line": "Здравствуйте, Анна!",
+          "automatic_findings": []
+        },
+        {
+          "run_id": "any-845-round2-regression-P02-1-8e8b69ca",
+          "case_id": "P02",
+          "attempt": 1,
+          "first_line": "Hello,",
+          "automatic_findings": []
+        },
+        {
+          "run_id": "any-845-round2-regression-P04-1-5c985c38",
+          "case_id": "P04",
+          "attempt": 1,
+          "first_line": "Hello,",
+          "automatic_findings": []
+        },
+        {
+          "run_id": "any-845-round2-regression-P05-1-2d609cb0",
+          "case_id": "P05",
+          "attempt": 1,
+          "first_line": "Здравствуйте.",
+          "automatic_findings": []
+        }
+      ]
+    }
+  },
+  "total_submitted_scenarios": 32,
+  "total_provider_calls": 64,
+  "total_estimated_cost_usd": 0.033605025,
+  "inflight_scenarios": "One completed scenario was recovered after collector termination; preserved separately with its API result. It is not represented as a complete collector run record."
+}
