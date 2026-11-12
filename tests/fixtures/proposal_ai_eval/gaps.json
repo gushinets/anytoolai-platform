@@ -62,8 +62,11 @@
         }
       ],
       "gap_must": [
-        "\\b10\\b",
-        "HubSpot"
+        [
+          "\\b10\\+?[\\s-]+years?\\b",
+          "\\bexperience\\b",
+          "HubSpot"
+        ]
       ],
       "gap_must_not": [
         "training",
@@ -88,8 +91,11 @@
         }
       ],
       "gap_must": [
-        "\\b10\\b",
-        "HubSpot"
+        [
+          "\\b10\\+?[\\s-]+(?:лет|летн\\w*)\\b",
+          "\\b(?:опыт\\w*|работ\\w*)\\b",
+          "HubSpot"
+        ]
       ],
       "gap_must_not": [
         "обучени",
@@ -113,7 +119,9 @@
         }
       ],
       "gap_must": [
-        "Webflow"
+        [
+          "Webflow"
+        ]
       ],
       "gap_must_not": [
         "отзыв",
@@ -138,7 +146,9 @@
         }
       ],
       "gap_must": [
-        "Trustpilot"
+        [
+          "Trustpilot"
+        ]
       ]
     },
     {
@@ -180,8 +190,11 @@
         }
       ],
       "gap_must": [
-        "\\b10\\b",
-        "HubSpot"
+        [
+          "\\b10\\+?[\\s-]+años\\b",
+          "\\bexperiencia\\b",
+          "HubSpot"
+        ]
       ],
       "gap_must_not": [
         "formación",
@@ -206,7 +219,135 @@
         }
       ],
       "gap_must": [
-        "Trustpilot"
+        [
+          "Trustpilot"
+        ]
+      ]
+    },
+    {
+      "id": "healthcare-required-en",
+      "task_text": "Design a responsive landing page for a healthcare clinic in Figma. Prior healthcare-industry landing-page design experience is mandatory.",
+      "freelancer_positioning": "I design responsive landing pages in Figma. My portfolio consists only of retail stores.",
+      "tone": "warm",
+      "expect_language": "en",
+      "expect_gaps_language": "en",
+      "expect_gap": true,
+      "criteria": [
+        {
+          "id": "domain-prerequisite",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the gap identify the explicitly mandatory prior healthcare-industry design experience missing from the retail-only positioning?"
+        }
+      ],
+      "gap_must": [
+        [
+          "\\bhealthcare\\b"
+        ]
+      ]
+    },
+    {
+      "id": "healthcare-incidental-en",
+      "task_text": "Design a responsive landing page for a healthcare clinic in Figma.",
+      "freelancer_positioning": "I design responsive landing pages in Figma. My portfolio consists only of retail stores.",
+      "tone": "warm",
+      "expect_language": "en",
+      "expect_gaps_language": "en",
+      "expect_gap": false,
+      "criteria": [
+        {
+          "id": "domain-prerequisite",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Is healthcare treated as an incidental target niche covered by adjacent landing-page experience, with no experience gaps reported?"
+        }
+      ],
+      "gap_must_not": [
+        "\\bhealthcare\\b"
+      ]
+    },
+    {
+      "id": "healthcare-required-ru",
+      "task_text": "Нужен адаптивный дизайн лендинга медицинской клиники в Figma. Предыдущий опыт дизайна лендингов в медицинской сфере обязателен.",
+      "freelancer_positioning": "Делаю адаптивные лендинги в Figma. В портфолио только проекты розничных магазинов.",
+      "tone": "warm",
+      "expect_language": "ru",
+      "expect_gaps_language": "ru",
+      "expect_gap": true,
+      "criteria": [
+        {
+          "id": "domain-prerequisite",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the gap identify the explicitly mandatory prior healthcare-industry design experience missing from the retail-only positioning?"
+        }
+      ],
+      "gap_must": [
+        [
+          "\\bмедицин\\w*\\b"
+        ]
+      ]
+    },
+    {
+      "id": "healthcare-incidental-ru",
+      "task_text": "Нужен адаптивный дизайн лендинга медицинской клиники в Figma.",
+      "freelancer_positioning": "Делаю адаптивные лендинги в Figma. В портфолио только проекты розничных магазинов.",
+      "tone": "warm",
+      "expect_language": "ru",
+      "expect_gaps_language": "ru",
+      "expect_gap": false,
+      "criteria": [
+        {
+          "id": "domain-prerequisite",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Is healthcare treated as an incidental target niche covered by adjacent landing-page experience, with no experience gaps reported?"
+        }
+      ],
+      "gap_must_not": [
+        "\\bмедицин\\w*\\b"
+      ]
+    },
+    {
+      "id": "healthcare-required-es",
+      "task_text": "Necesitamos diseñar una landing page adaptable para una clínica sanitaria en Figma. Es obligatoria la experiencia previa diseñando landing pages para el sector sanitario.",
+      "freelancer_positioning": "Diseño landing pages adaptables en Figma. Mi portafolio contiene únicamente tiendas minoristas.",
+      "tone": "warm",
+      "expect_language": "es",
+      "expect_gaps_language": "es",
+      "expect_gap": true,
+      "criteria": [
+        {
+          "id": "domain-prerequisite",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the gap identify the explicitly mandatory prior healthcare-industry design experience missing from the retail-only positioning?"
+        }
+      ],
+      "gap_must": [
+        [
+          "\\bsanitari\\w*\\b"
+        ]
+      ]
+    },
+    {
+      "id": "healthcare-incidental-es",
+      "task_text": "Necesitamos diseñar una landing page adaptable para una clínica sanitaria en Figma.",
+      "freelancer_positioning": "Diseño landing pages adaptables en Figma. Mi portafolio contiene únicamente tiendas minoristas.",
+      "tone": "warm",
+      "expect_language": "es",
+      "expect_gaps_language": "es",
+      "expect_gap": false,
+      "criteria": [
+        {
+          "id": "domain-prerequisite",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Is healthcare treated as an incidental target niche covered by adjacent landing-page experience, with no experience gaps reported?"
+        }
+      ],
+      "gap_must_not": [
+        "\\bsanitari\\w*\\b"
       ]
     }
   ]

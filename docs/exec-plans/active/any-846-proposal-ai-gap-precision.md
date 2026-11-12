@@ -7,9 +7,9 @@
 - Created: 2026-11-12
 - Last updated: 2026-11-12
 - Review date: 2026-11-12
-- Next action: review the implementation; rerun the complete gate in a suitable CI environment.
-- Blocker: full-check requires passwordless sudo for one existing test; user requested local checks only,
-  so live model acceptance also remains unverified.
+- Next action: review the round 1 fixes; leave live acceptance and example confirmation pending.
+- Blocker: user requested local checks only, so live model acceptance remains unverified. The local
+  full-check environment still lacks passwordless sudo for an existing test.
 - Implementation authorized; product confirmation and live evidence remain separate gates.
 
 ## Goal
@@ -27,7 +27,12 @@ already does. The wording keeps the meaning and numbers of the requirement.
 ## Decisions
 
 - Keep the existing prompt reference, language rule, workflow and output contract.
-- Match forbidden gap literals in descriptions and evidence; require details in descriptions only.
+- Match forbidden gap literals only in descriptions; source evidence can quote routine components
+  without claiming that they are missing experience.
+- `gap_must` is a list of nonempty regex groups. Each group describes one requirement and must
+  match a single gap description in full; different groups may match different gaps. Reject the
+  obsolete flat format instead of silently interpreting its strings as groups of characters.
+- HubSpot groups bind the number to the years unit and also require experience wording and HubSpot.
 - Hash new checks only when present, preserving ANY-631 case approvals.
 - Searches across ProposalAI, Acceptance Builder, Client Update Writer and Brief Decoder found
   this experience-gap classifier only in ProposalAI; no sibling prompt requires the same change.
@@ -46,6 +51,9 @@ Proposed. Needs product owner confirmation in ANY-846. Implementation does not w
    A separate requirement to fetch reviews through Trustpilot API can be a Trustpilot API gap.
 3. Adjacent experience: landing pages in Figma cover an online-school landing page; responsive
    design covers a mobile version. Figma does not cover an explicitly mandatory Sketch requirement.
+   Retail landing-page experience covers a healthcare landing page when healthcare is only the
+   target niche; it does not cover an explicit prerequisite of prior healthcare-industry work.
+   Mandatory domains, protocols, certifications, skills and experience minimums override adjacency.
 
 ## Baseline
 
@@ -83,6 +91,43 @@ Proposed. Needs product owner confirmation in ANY-846. Implementation does not w
   ready for review; full-check and frontend-check are not claimed green.
 - Repository text scan found pre-existing prohibited local-skill references in plans for ANY-17,
   ANY-339, ANY-391, ANY-221 and ANY-227; none were introduced or changed in this task.
+
+## Code review round 1
+
+All three findings are addressed locally; the user explicitly authorized fixes, regression tests
+and plan updates, with no live evaluation.
+
+1. Forbidden-component checks now read only the claimed gap description. The regression uses the
+   real Webflow task as evidence, including its reviews, first-screen and form wording, and still
+   rejects a description that actually reports the reviews block as missing experience.
+2. Migrated every gap fixture and test to grouped `gap_must`. One requirement's details must occur
+   in one description; multiple independent requirements can use separate descriptions. Tests
+   cover split details, missing groups, absent evidence, invalid/empty groups, and CLI reporting
+   of the obsolete flat format. RU/EN/ES HubSpot cases bind 10 to years and require experience
+   wording, rejecting months, training and mere references to a product's age. Grouping is part
+   of the existing hash payload; approved ANY-631 case hashes remain unchanged.
+3. The prompt and product spec explicitly preserve every mandatory prerequisite over adjacency,
+   including domain, certification, skill and experience minimums. Added mandatory/incidental
+   healthcare-domain pairs in RU/EN/ES; the gap fixture now contains 15 cases. The prompt contract
+   test pins the rule and its healthcare example. These are local regression assets, not evidence
+   that a live model follows the instruction.
+
+Validation on managed Python 3.12.13:
+
+- Doctor passed.
+- Eval and freelancer-suite tests: **392 passed**, including the pinned ANY-631 matrix, prompt
+  author-direction rules and packaging. The initial sandbox run had 390 passes and one packaging
+  failure; packaging and the complete final run passed with access to the existing uv cache and
+  `UV_OFFLINE=true`. `LITELLM_LOCAL_MODEL_COST_MAP=True` prevented remote price-map fetching.
+- Config validation, architecture validation, documentation validation and generated-document
+  drift check passed; diff whitespace check passed.
+- No live provider calls or GitHub writes. Full-check/frontend-check were not repeated for this
+  product-prompt/eval-only correction; the earlier local environment limitations remain recorded
+  above. The preceding review observed green required CI checks on `101bd522`, which does not
+  validate these subsequent changes.
+
+Regex groups enforce literal co-occurrence and the configured units, not full semantic relations
+inside a sentence; the human criteria remain required for semantic acceptance.
 
 ## Live results
 

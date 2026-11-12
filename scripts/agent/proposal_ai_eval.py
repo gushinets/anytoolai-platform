@@ -21,9 +21,10 @@ placeholders, meta phrases, lists or headings, length, a required literal (`must
 unclear one leaves it pending), long dashes (a warning). A number absent from the order and the
 positioning is shown to the reviewer, never decided here.
 
-Gap literals are opt-in: `gap_must_not` matches descriptions and evidence, while every `gap_must`
-pattern must match a description (quoted evidence cannot satisfy it). Either violation makes a run
-unusable. These checks do not establish semantic correctness or enforce every `expect_gap: false`.
+Gap literals are opt-in and match descriptions only. `gap_must_not` forbids any matching literal;
+`gap_must` is a list of nonempty regex groups, one per requirement. All patterns of each group must
+match the same description; separate requirements may match separate gaps. Either violation makes
+a run unusable. These checks do not establish semantic correctness or enforce every `expect_gap: false`.
 
 Meaning is never decided by a regular expression. Each order lists `criteria`, questions a human
 answers yes, no or unknown for every output (see tests/fixtures/proposal_ai_eval/qa_cases.json), and
@@ -161,7 +162,14 @@ def check_proposal(
     ]
     gap_expected = order.get("expect_gaps_language")
     gap_languages = [detect_language(gap["description"], GAP_MIN_WORDS) for gap in gaps] if gap_expected else []
-    gap_texts = [f"{gap.get('description', '')}\n{gap.get('evidence', '')}" for gap in gaps]
+    gap_texts = [gap.get("description", "") for gap in gaps]
+    required_gap_groups = order.get("gap_must", [])
+    if not isinstance(required_gap_groups, list) or any(
+        not isinstance(group, list) or not group
+        or any(not isinstance(pattern, str) or not pattern.strip() for pattern in group)
+        for group in required_gap_groups
+    ):
+        raise SuiteError("gap_must must be a list of nonempty lists of nonblank regex strings")
     return {
         "wrong_language": any(found not in (None, expected) for found in [language, *passages]),
         "wrong_gaps_language": any(found not in (None, gap_expected) for found in gap_languages),
@@ -176,8 +184,8 @@ def check_proposal(
         "missing_gap": bool(order.get("expect_gap")) and not gaps,
         "unexpected_gap": any(re.search(p, t, re.IGNORECASE) for p in order.get("gap_must_not", []) for t in gap_texts),
         "missing_gap_detail": any(
-            not any(re.search(p, gap.get("description", ""), re.IGNORECASE) for gap in gaps)
-            for p in order.get("gap_must", [])
+            not any(all(re.search(p, t, re.IGNORECASE) for p in group) for t in gap_texts)
+            for group in required_gap_groups
         ),
         "missing_required": any(not re.search(p, text, re.IGNORECASE) for p in order.get("must", [])),
         "forbidden_present": any(re.search(p, text, re.IGNORECASE) for p in order.get("must_not", [])),

@@ -12,10 +12,15 @@ Rules:
   platform, protocol, programming language, certification or domain, an explicitly demanded skill,
   or a stated minimum of experience (years, number of projects). Do not report a requirement that
   `context` covers, even if worded differently.
-- Adjacent experience covers a requirement: experience with a close equivalent or with the same kind
-  of work in another niche counts, unless the task names that exact tool or platform as mandatory.
+- Adjacent experience covers a requirement when the task allows an equivalent. The same kind of work
+  in another niche covers an incidental target niche, not an explicit prerequisite of prior work in
+  that domain. An explicitly mandatory tool, platform, protocol, programming language, domain,
+  certification, skill or minimum of experience must itself be covered by `context`; adjacent
+  experience cannot replace it.
   For example, "landing pages in Figma" covers "a landing page for an online school", and "responsive
-  design" covers "a mobile version"; "Figma" does not cover "Sketch is required".
+  design" covers "a mobile version"; "Figma" does not cover "Sketch is required". Retail landing-page
+  design covers a healthcare landing page unless prior healthcare-industry experience is explicitly
+  required; retail experience alone does not cover that prerequisite.
 - Never report a routine part of the work: a standard section, screen, block, page element or step
   that anyone doing the kind of work stated in `context` makes as a matter of course. For a
   landing-page or website designer that includes the first screen, a program or services block, a

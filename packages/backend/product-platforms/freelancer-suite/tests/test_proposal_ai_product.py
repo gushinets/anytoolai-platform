@@ -357,7 +357,11 @@ def test_gap_prompt_is_scoped_to_experience_gaps() -> None:
     for fragment in (
         "a stated minimum of experience (years, number of projects)",
         "Adjacent experience covers a requirement",
-        "unless the task names that exact tool or platform as mandatory",
+        "in another niche covers an incidental target niche, not an explicit prerequisite",
+        "An explicitly mandatory tool, platform, protocol, programming language, domain, certification, skill or minimum of experience",
+        "adjacent experience cannot replace it",
+        "prior healthcare-industry experience is explicitly required",
+        "retail experience alone does not cover that prerequisite",
         "Never report a routine part of the work",
         "a reviews or testimonials block, a schedule block",
         "report the Trustpilot API, not the reviews block",
