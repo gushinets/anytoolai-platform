@@ -712,6 +712,7 @@ def command_review(args: argparse.Namespace) -> int:
                 print(f"Proposal:\n{run['output']['text']}\n")
                 for gap in run["output"].get("gaps", []):
                     print(f"gap: {gap['description']}")
+                    print(f"  evidence: {gap.get('evidence', '(not provided)')}")
                 if formal_checks(run, order)["invented_number"]:
                     print("Note: a number that is not in the order or the positioning.")
             print(f"\n[{criterion['id']}{', critical' if criterion['critical'] else ''}] {criterion['question']}")

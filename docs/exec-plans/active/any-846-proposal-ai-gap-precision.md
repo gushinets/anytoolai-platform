@@ -7,7 +7,7 @@
 - Created: 2026-11-12
 - Last updated: 2026-11-12
 - Review date: 2026-11-12
-- Next action: review the completed round 2 changes; live acceptance and example confirmation remain pending.
+- Next action: review the completed round 3 changes; live acceptance and example confirmation remain pending.
 - Blocker: user requested local checks only, so live model acceptance remains unverified. The local
   full-check environment still lacks passwordless sudo for an existing test.
 - Implementation authorized; product confirmation and live evidence remain separate gates.
@@ -37,6 +37,9 @@ already does. The wording keeps the meaning and numbers of the requirement.
   do not count as confirmation. Review must show the task, positioning and response together.
 - Each gap case reviews the expected requirement, grounding of every reported gap, and fidelity
   of meaning, numbers, units and relationships. Equivalent wording and spelled-out numbers are valid.
+- Grounding review also checks that each provided evidence quote accurately quotes the original task
+  and supports the identified requirement. Review displays the evidence beside its gap description,
+  explicitly marking absent optional evidence; it does not introduce automatic quote validation.
 - Preserve ANY-631 fixtures, case hashes, decisions and acceptance results. The new gap cases have
   changed criteria and therefore require new approvals; old approvals must not silently transfer.
 - Searches across ProposalAI, Acceptance Builder, Client Update Writer and Brief Decoder found
@@ -173,6 +176,40 @@ Validation on managed Python 3.12.13:
 
 Live model behavior, product examples and final acceptance remain unverified. The implementation
 deliberately requires confirmed semantic review rather than replacing it with another heuristic.
+
+## Code review round 3
+
+The user authorized the evidence-review correction, regression tests and plan updates with local
+checks only. A local reproduction showed a fabricated Photoshop quote hidden by CLI review for
+the Webflow case; simulated positive review decisions then allowed suite PASS.
+
+Completed implementation:
+
+- Display each gap description with its evidence, explicitly showing when optional evidence is absent.
+- Extend grounding review in all 15 gap cases to assess whether supplied evidence accurately quotes
+  the original task and supports the identified requirement. Preserve manual semantic decisions,
+  factual failures and the optional evidence schema; add no automatic quote matcher.
+- Test evidence visibility before decisions, accurate/mismatching quotes, absent evidence, multiple
+  gaps and invalidation of decisions made under the old grounding question.
+- Preserve ANY-631 fixtures, hashes and acceptance report. Run local eval/product tests and relevant
+  structural/documentation checks, then record results. No live-eval or GitHub writes.
+
+Validation on managed Python 3.12.13:
+
+- Doctor passed. Before implementation, the selected regressions failed on hidden evidence and
+  unchanged grounding criteria. After implementation, **165 eval tests passed**; the complete eval
+  plus freelancer-suite run had **427 passed**, including packaging.
+- CLI tests inspect the displayed evidence before answering, reject the fabricated Photoshop quote,
+  accept an accurate Webflow quote with confirmed review, and cover absent optional evidence and
+  multiple gaps. All 15 cases invalidate decisions made under the previous grounding question.
+- ANY-631 fixtures and decisions remain unchanged. Compared against `2558f08c`, all case hashes and
+  the complete acceptance status/report matched exactly, including its historical FAIL. The report
+  digest remains `167b6db69d77884ce9c6acd823af400f425f3ba369a946aed3a397e697bc3d6c`.
+- Config, architecture and documentation validation, generated-document drift and diff whitespace
+  checks passed. Tests used `UV_OFFLINE=true`, the existing uv cache and
+  `LITELLM_LOCAL_MODEL_COST_MAP=True`; no live provider requests or GitHub writes.
+- Full-check/frontend-check were not repeated for this CLI/fixture change. Previously documented
+  local limitations remain; model behavior, product examples and live acceptance remain pending.
 
 ## Live results
 

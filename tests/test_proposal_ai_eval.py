@@ -319,6 +319,8 @@ def test_gap_fixture_inputs_and_checks() -> None:
         assert order["expect_gaps_language"] == order["expect_language"]
         assert not {"gap_must", "gap_must_not"}.intersection(order)
         assert {"gap-grounding", "gap-fidelity"} <= {c["id"] for c in order["criteria"]}
+        grounding = next(c for c in order["criteria"] if c["id"] == "gap-grounding")
+        assert "evidence quote accurately quote the original task and support the identified requirement" in grounding["question"]
     p01 = next(order for order in json.loads((FIXTURES / "qa_cases.json").read_text(encoding="utf-8"))["orders"] if order["id"] == "P01")
     yoga = next(order for order in orders if order["id"] == "yoga-schedule-ru")
     assert yoga["task_text"] == p01["task_text"]
@@ -554,14 +556,79 @@ def test_gap_suite_stays_pending_until_review_and_accepts_latest_confirmed_decis
 def test_review_displays_the_task_positioning_and_gap_before_the_decision(tmp_path: Path, capsys) -> None:
     order = GAP_ORDERS["webflow-required-ru"]
     description = "Не указан опыт работы с Webflow для реализации блока отзывов."
-    run = gap_run(order["id"], [description])
+    run = gap_run(order["id"], [description, "Не указан опыт разработки на Webflow."])
+    run["output"]["gaps"][0]["evidence"] = "Клиент требует Photoshop"
+    del run["output"]["gaps"][1]["evidence"]
     suite = write_suite(tmp_path, [run], [], orders=[order])
-    with patch("builtins.input", return_value="q"):
+
+    def quit_after_reading(prompt: str) -> str:
+        out = capsys.readouterr().out
+        for value in (order["task_text"], order["freelancer_positioning"], run["output"]["text"]):
+            assert value in out
+        assert f"gap: {description}\n  evidence: Клиент требует Photoshop" in out
+        assert "gap: Не указан опыт разработки на Webflow.\n  evidence: (not provided)" in out
+        return "q"
+
+    with patch("builtins.input", side_effect=quit_after_reading):
         assert proposal_ai_eval.main(["review", "--suite", str(suite), "--reviewer", "qa"]) == 0
-    out = capsys.readouterr().out
-    for value in (order["task_text"], order["freelancer_positioning"], description):
-        assert value in out
     assert proposal_ai_eval.read_jsonl(tmp_path / "verdicts.jsonl") == []
+
+
+@pytest.mark.parametrize(
+    ("evidence", "answer", "status"),
+    [("сборка в Webflow", "y", "PASS"), ("Клиент требует Photoshop", "n", "FAIL"),
+     (None, "y", "PASS")],
+)
+def test_gap_evidence_is_reviewed_before_acceptance(
+    tmp_path: Path, capsys, evidence: str | None, answer: str, status: str,
+) -> None:
+    order = GAP_ORDERS["webflow-required-ru"]
+    run = gap_run(order["id"], ["Не указан опыт работы с Webflow."])
+    if evidence is None:
+        del run["output"]["gaps"][0]["evidence"]
+    else:
+        run["output"]["gaps"][0]["evidence"] = evidence
+    program = [{"series": "luna-medium", "cases": [order["id"]], "attempts": 1, "min_usable": 1,
+                "reasoning_effort": "medium"}]
+    suite = write_suite(tmp_path, [run], [], program=program, orders=[order])
+    assert proposal_ai_eval.accept(*proposal_ai_eval.load_suite(suite))[0] == "PENDING"
+    transcript = []
+
+    def review(prompt: str) -> str:
+        out = capsys.readouterr().out
+        transcript.append(out)
+        if prompt == "Your reason > ":
+            return "The evidence invents a Photoshop requirement absent from the task."
+        if "[gap-grounding]" in out:
+            assert "evidence quote accurately quote the original task" in out
+            assert f"evidence: {evidence or '(not provided)'}" in "".join(transcript)
+            return answer
+        return "y"
+
+    with patch("builtins.input", side_effect=review):
+        assert proposal_ai_eval.main(["review", "--suite", str(suite), "--reviewer", "qa"]) == 0
+    verdicts = proposal_ai_eval.read_jsonl(tmp_path / "verdicts.jsonl")
+    grounding = next(row for row in verdicts if row["criterion_id"] == "gap-grounding")
+    assert grounding["decision"]["answer"] == {"y": "yes", "n": "no"}[answer]
+    assert proposal_ai_eval.accept(*proposal_ai_eval.load_suite(suite))[0] == status
+
+
+@pytest.mark.parametrize("case_id", list(GAP_ORDERS))
+def test_old_grounding_approval_requires_evidence_review(case_id: str) -> None:
+    order = GAP_ORDERS[case_id]
+    old_question = (
+        "Does every reported gap identify an explicit task requirement that the positioning does not cover, "
+        "rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context?"
+    )
+    old_order = {**order, "criteria": [
+        {**c, "question": old_question} if c["id"] == "gap-grounding" else c for c in order["criteria"]
+    ]}
+    run = gap_run(case_id, [order["task_text"]] if order["expect_gap"] else [])
+    answers = {c["id"]: "yes" for c in proposal_ai_eval.criteria_for(old_order, run)}
+    verdicts = proposal_ai_eval.latest_verdicts(decide(run, answers, old_order))
+    assert proposal_ai_eval.judge_run(run, old_order, verdicts)["status"] == "PASS"
+    assert proposal_ai_eval.case_hash(order) != proposal_ai_eval.case_hash(old_order)
+    assert proposal_ai_eval.judge_run(run, order, verdicts)["status"] == "PENDING"
 
 
 GRID = [{"series": "luna-medium", "cases": [ORDER["id"]], "attempts": 5, "min_usable": 4, "reasoning_effort": "medium"}]
