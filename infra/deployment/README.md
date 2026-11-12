@@ -19,6 +19,9 @@ Covers the Proposal AI public web stack (`web-mirror`, `platform-api`, `platform
   `platform-worker` joins external `infra_prompttune`, and only `web-mirror` joins external
   `payments-portal-prod_edge`; both retain the AnytoolAI default network. Other selector values
   fail before Compose starts. Fake and dev commands never select this overlay.
+- `docker-compose.atom-lab.vps-135.yml` — Atom Lab network overlay selected by
+  `ANYTOOLAI_VPS_135_NETWORKS=1` in the Lab environment. The API joins the Caddy edge network
+  as `atom-lab-api` and the worker joins `infra_prompttune` for the provider proxy.
 
 `docker-compose.prod.yml` and `docker-compose.atom-lab.yml` use the Compose Specification's
 `!reset`/`!override` merge tags (to remove or replace inherited ports). These require a reasonably
@@ -139,10 +142,9 @@ python3 scripts/agent/runner.py dev-up
 
 Open the worktree-specific API URL reported by `dev-up` with `/atom-lab` appended. Enter the code in
 the page; the page keeps it only in tab memory and sends it as a header. Do not place it in a URL,
-committed `.env`, logs, screenshots, or browser storage. Use HTTPS and an internal network gate for
-any non-local deployment, distribute the code separately, and rotate it by changing the operator
-secret followed by an API restart. Production rollout remains operator-owned and is not performed
-by ANY-459.
+committed `.env`, logs, screenshots, or browser storage. Use the HTTPS ingress profiles below.
+Distribute the code separately and rotate it by changing the operator secret followed by an API
+restart. Production rollout remains operator-owned and is not performed by ANY-459.
 
 ### Internal Atom Lab Compose deployment
 
@@ -150,8 +152,8 @@ by ANY-459.
 `postgres`, one-shot `migrate`, `platform-api`, and `platform-worker` services from
 `docker-compose.yml` with `docker-compose.atom-lab.yml`; it adds no service, database technology,
 SSO layer, or public frontend. The API image already packages `/atom-lab` HTML/CSS/JavaScript.
-PostgreSQL and the API bind to loopback only. External access must pass through an operator-owned
-HTTPS reverse proxy restricted to the approved internal network.
+PostgreSQL and the API publish their host ports on loopback. External access passes through an
+operator-owned HTTPS reverse proxy.
 
 For a separately launched local API process or custom local stand only,
 `ANYTOOLAI_ATOM_LAB_AUTH_DISABLED=true` opens the Lab without a code. The standard Compose
@@ -174,11 +176,10 @@ configured origin.
 install -m 600 infra/compose/.env.atom-lab.example infra/compose/.env.atom-lab
 ```
 
-Before starting Compose, configure ingress. The exact proxy is operator-owned, but it must enforce
-TLS and a network/VPN allowlist before proxying `/atom-lab`, `/atom-lab/*`, and
-`/v1/atom-lab/*` to the loopback API port. Remove `Cookie` and `Authorization` request headers and
-deny these paths on every public virtual host. The Lab uses only `X-Atom-Lab-Access-Code`; a shared
-code is not an internet-facing authentication system and does not replace the network gate.
+Before starting Compose, prepare the ingress configuration. For the internal network profile, enforce
+TLS and a network/VPN allowlist before proxying `/atom-lab`, `/atom-lab/*`, and `/v1/atom-lab/*` to
+the loopback API port. Remove `Cookie` and `Authorization` request headers and deny these paths on
+public virtual hosts. For the shared-code deployment on VPS 135, use the routes and environment below.
 
 ```bash
 python3 scripts/agent/runner.py atom-lab-up
@@ -209,6 +210,53 @@ address, time, reviewed commit, and operator confirmation. Never include access/
 secrets or prompt/input/result bodies. Without an approved address, credentials, cost authority,
 and operator confirmation, the package may be reported as verified but rollout and ANY-468 remain
 incomplete.
+
+#### Atom Lab on VPS 135
+
+The entry page is `https://any-tool-ai.ru/tools/atom-lab`. Caddy uses the existing domain and
+certificate. Participants can reach the page from any network and enter the shared code to access
+the catalog, run atoms, and use the shared history and presets.
+
+Use these values in the Lab's gitignored `.env.atom-lab` with the PostgreSQL, Lab access, live
+token, and worker credentials described above.
+
+```dotenv
+ANYTOOLAI_VPS_135_NETWORKS=1
+ANYTOOLAI_ATOM_LAB_INTERNAL_URL=https://any-tool-ai.ru
+ANYTOOLAI_ATOM_LAB_API_PORT=18114
+ANYTOOLAI_ATOM_LAB_POSTGRES_PORT=15432
+ANYTOOLAI_LLM_HTTPS_PROXY=http://egress-lb:3128
+ANYTOOLAI_ATOM_LAB_RUN_DAILY_LIMIT=400
+ANYTOOLAI_ATOM_LAB_RUN_ACTIVE_LIMIT=8
+```
+
+The limits apply to the whole Lab. The daily counter uses UTC. Up to eight queued or running jobs
+can be accepted, and one worker runs them sequentially. The VPS overlay gives Caddy access to the Lab
+API on `payments-portal-prod_edge` and gives the worker access to the provider proxy on
+`infra_prompttune`. The database and migrator use the Lab's default network.
+
+In the existing Caddy site’s `route` block, replace the `@anytoolai_private` matcher and its
+`respond` line with this block. Keep it ahead of the generic `/tools/*` and `/v1/*` handlers.
+The HTML uses two root asset URLs, and its browser requests use the root Lab API prefix.
+
+```caddyfile
+@atom_lab_page path /tools/atom-lab /tools/atom-lab/
+@atom_lab_routes path /tools/atom-lab /tools/atom-lab/ /atom-lab/atom_lab.css /atom-lab/atom_lab.mjs /v1/atom-lab/*
+route @atom_lab_routes {
+	rewrite @atom_lab_page /atom-lab
+	reverse_proxy atom-lab-api:8000 {
+		header_up -Cookie
+		header_up -Authorization
+	}
+}
+
+@anytoolai_private path /atom-lab /atom-lab/* /tools/atom-lab/* /v1/atom-lab /v1/demo /v1/demo/*
+respond @anytoolai_private 404
+```
+
+Validate the Caddy config and check the external HTTPS route after starting the Lab. Verify both
+assets load, the catalog returns `401` with a missing or wrong code, a valid code unlocks the Lab,
+and the four product routes still load. Keep the previous Caddy config for Lab rollback.
 
 #### Shared data and access-code rotation
 
@@ -661,6 +709,9 @@ in this exact order without stripping `/tools`:
 	}
 }
 ```
+
+When deploying Atom Lab on this VPS, use the [Lab routes above](#atom-lab-on-vps-135) in place of
+the private matcher and its response.
 
 Validate the candidate and the mounted file before accepting traffic. The occupied VPS had a
 pre-existing stale file bind, so its reviewed cutover refreshed only Caddy with
