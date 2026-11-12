@@ -1,7 +1,7 @@
 # Payment Portal integration map
 
 Status: navigation, implementation snapshots and the ANY-711 service-authentication handoff.
-Last observed: 2026-11-11; local source state, not a deployment check.
+Last observed: 2026-11-12; local source state, not a deployment check.
 
 ## Ownership and sources
 
@@ -62,6 +62,20 @@ current scope and remaining gates.
   Portal DTOs. Steps 16/17 supply focused paired local acceptance and build/install
   preparation in the agreed scope. ANY-767 owns the full deferred matrix, remote
   deployment and live-service acceptance.
+
+### Superseded access-check direction (ANY-286/287)
+
+ANY-766 supersedes the earlier access-check direction tracked by ANY-286/287 for
+this integration. The implemented contract uses consumer-bound delegation V2
+and consumer-scoped AccessSnapshot V3 with independent policy/access revisions.
+Portal owns authenticated identity and purchased grants/allowances; Kernel owns
+execution admission and durable reserve/finalize/release through ANY-507. A
+snapshot read supplies finite authority; reserving capacity and recording usage
+belong to the backend's execution transaction. Use the
+[current contract](../contracts/portal-kernel-paid/README.md) for implementation
+and the [common backend guide](https://github.com/gushinets/payments-portal/blob/main/docs/contracts/product-backend-api/README.md)
+for consumer onboarding. The earlier access-check direction is historical, not
+an additional endpoint or metering path to implement.
 
 ## ANY-766 Step 9 common backend specification — 2026-11-10
 
@@ -216,13 +230,15 @@ This is the service-authentication convention for manifest, snapshot and
 invalidation. ANY-711 supplied manifest read; ANY-766 Steps 4–7 implement the
 reverse identity/snapshot connection and invalidation receiver/sender. The
 [contract bundle](../contracts/portal-kernel-paid/README.md#service-requests-and-identity)
-also defines the separate identity, usage and exhaustion operation inventory;
-usage/exhaustion remain unimplemented.
+also documents the implemented identity, usage and exhaustion operations.
+Steps 14/15 implement usage/exhaustion and cabinet composition; their receiver
+permissions and delivery enablement remain explicit configuration gates.
 
 ### Credentials and operation permissions
 
-- **Portal -> Kernel manifest:** Portal sends its existing server-side `KERNEL_SERVICE_TOKEN`
-  as `Authorization: Bearer <secret>`. Kernel validates against `ANYTOOLAI_PORTAL_SERVICE_TOKEN`
+- **Portal -> Kernel manifest:** Portal sends `portal_to_backend_current_secret`
+  from the `platform-kernel` entry in `BACKEND_CONSUMERS` as
+  `Authorization: Bearer <secret>`. Kernel validates against `ANYTOOLAI_PORTAL_SERVICE_TOKEN`
   and the optional `ANYTOOLAI_PORTAL_SERVICE_TOKEN_PREVIOUS` rotation slot. Its receiver-owned
   Portal principal has `PortalPermission.MANIFEST_READ` (`manifest:read`).
 - **Portal -> Kernel invalidation:** reuse that same directional credential pair; no third
@@ -238,6 +254,10 @@ usage/exhaustion remain unimplemented.
   Kernel-named Portal receiver settings were removed in Step 10; use the
   [current identity guide](https://github.com/gushinets/payments-portal/blob/main/docs/contracts/product-backend-api/README.md#implemented-step-10-settings-and-cutover). The two directional secrets must
   differ, and each environment and tenant/region connection uses independent secrets.
+
+Configured technical-source reads, usage clients and recipient invalidation
+delivery use the registry entry's outgoing key. The legacy `KERNEL_SERVICE_TOKEN`
+does not select credentials for those clients.
 
 All three operations use exactly one Bearer authorization header over TLS with certificate
 verification. Tokens stay in server-side operator environments/secret stores and must not
@@ -284,9 +304,12 @@ For each direction, use one bounded rotation window:
 1. Generate a new independent secret. Put it in the receiver's current slot, move the old
    secret to that receiver's previous slot and restart/reload the receiver. Both slots bind
    to the same principal, scope and explicitly granted permissions.
-2. Switch the corresponding sender setting (`KERNEL_SERVICE_TOKEN` at Portal, or
-   `ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN` at Kernel). Verify authorized requests with the new
-   token and refusal of wrong scopes/permissions.
+2. Switch the corresponding sender setting: Portal -> Kernel updates
+   `portal_to_backend_current_secret` in the `platform-kernel` entry of
+   `BACKEND_CONSUMERS`; Kernel -> Portal updates
+   `ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN`. Restart/recreate the API and worker
+   processes that hold the affected outbound clients. Verify actual requests
+   from each affected sender with the new token and refusal of wrong scopes/permissions.
 3. Remove the receiver's previous slot, restart/reload and verify the old token returns `401`
    while the new token still succeeds. At most two distinct tokens are accepted; an orphaned
    or equal previous token is invalid. Overlap has no automatic expiry and must be removed.
@@ -295,7 +318,7 @@ Emergency revocation removes the compromised token from every receiver slot imme
 do not retain it as a rotation overlap. Rotate each direction independently. The existing
 [manifest receiver procedure](../../infra/deployment/README.md#portal-capability-manifest-receiver-any-711)
 describes the Portal -> Kernel receiver. The
-[delegation/snapshot setup](../contracts/portal-kernel-paid/README.md#step-4-server-implementation)
+[current delegation/snapshot setup](../contracts/portal-kernel-paid/README.md#service-requests-and-identity)
 describes the independent reverse connection.
 
 ## Dependencies before real integration
