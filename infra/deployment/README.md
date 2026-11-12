@@ -21,8 +21,14 @@ owns the migration order and purchased-document reader floor.
 `frontend` or `all` independently. Publishing is default-off and requires separate
 post-review authorization. Frontend inputs are `PLATFORM_API_BASE_URL` (the
 build-time same-origin rewrite destination),
-`NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS`, `ANYTOOLAI_WEB_BASE_PATH` and
+`NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS`, `ANYTOOLAI_WEB_BASE_PATH`,
+`ANYTOOLAI_PORTAL_CONSUMER_ID` (default `platform-kernel`) and
 `NEXT_PUBLIC_PORTAL_AUTHORIZE_URL` (localized Portal `/backend/authorize` URL).
+Next configuration validates `ANYTOOLAI_PORTAL_CONSUMER_ID` at build time and
+publishes it as `NEXT_PUBLIC_PORTAL_CONSUMER_ID`; use the same ID in the API and
+Portal registry. Workflow input `portal_consumer_id` supplies the build argument.
+Launch, exchange and stored V2 sessions must match this audience exactly. Changing
+the configured ID does not transfer retained purchases, allowances or usage.
 Changing runtime variables cannot recompile these values. Public frontend image
 tags include the run ID to distinguish builds with different origins. Backend
 credentials and provider secrets are runtime-only.
@@ -52,6 +58,15 @@ export ANYTOOLAI_PROD_PROJECT=anytoolai-prod
 ./.quick-check-venv/bin/python scripts/agent/runner.py prod-web-up
 ```
 
+`prod-web-up` composes base + prod + images and, when the resolved command
+environment sets `ANYTOOLAI_VPS_135_NETWORKS=1`, also the VPS network overlay.
+Unset or empty means no extra networks; any other value is rejected before Compose. Shell
+values override the selected env-file consistently with other deployment inputs.
+It retains the ingress network and uses the deployment lock, `--no-deps`,
+`--no-build` and `--pull never`; it does not load the full live overlay or require
+live profile-generation variables. Backend containers, migrations, profile and
+volumes stay unchanged.
+
 Image `prod-up` uses the existing shared deployment lock and, for an existing
 stack, existing `prod-quiesce` (stop admission, drain all jobs, stop worker).
 It starts retained PostgreSQL, runs a fresh one-shot migration from the selected
@@ -63,13 +78,18 @@ existing verified backup recovery below and the metering cutover safeguards.
 
 The concrete ANY-766 pair uses Kernel head `0021`, Portal `20261111_0011`,
 identity V2, snapshot V3 and manifest/invalidation/usage/exhaustion V1. Kernel
-source baseline is `88da001f0595a4bc8e4729423acd2340bf7b73ca`, Portal
-`0b1cbfa310c02aee182a75aaf7608fc587266a67`, plus the reviewed Step 17 diff.
+source baseline is `82f1b155b5d9fbc9af8e5b6bd51364d640434495`, Portal
+`c41428de013e69c982386acbb9edda05e1dc9014`, plus the local PR correction diff.
 Record actual reviewed SHAs, image IDs/digests, build origins, enabled products
 and base path with the environment selection. Never infer reader compatibility
 from unchanged migration heads: Portal pre-selected-digest and pre-Step-11
 purchase readers are excluded, as are old Kernel identity/snapshot binaries.
 Keep historical usage, reservations, floors and purchased documents intact.
+The corrected Portal includes permissions and technical source in its digest: stop Portal
+API/workers and explicitly advance every configured consumer P above its stored
+value before the first corrected startup (fresh DB: P=1). No new migration is
+needed. Never edit policy rows, roll P back or infer old-binary compatibility from
+unchanged migration heads. P changes preserve R, allowance IDs and spend.
 
 This Linux image path does not require a remote server or registry credentials
 for local images. Use disposable databases and loopback test origins for rehearsal.
@@ -78,10 +98,14 @@ remaining broad suites are deferred to ANY-767. The focused Step 16 HTTP/browser
 proof remains valid for unchanged runtime code; packaging checks do not replace
 later deployed acceptance.
 
-### Local image build inputs
+### Historical Step 17 image rehearsal — 2026-11-11
 
 Linux builds on 2026-11-11 used Docker Engine 28.1.1 / Compose 2.35.1. The actual
-selected pre-review local IDs (no registry publication/digests) are:
+selected pre-review local IDs (no registry publication/digests) were as follows.
+These images predate the PR corrections and are not the corrected installation
+selection. Their source baselines were Kernel
+`88da001f0595a4bc8e4729423acd2340bf7b73ca` and Portal
+`0b1cbfa310c02aee182a75aaf7608fc587266a67`, plus the then-local Step 17 diff.
 
 - `any766-step17/kernel-api:local` — `sha256:50b612d750e720b088ae76c71af57768f0fdfe7fed69d572367ed8d98a39a563`.
 - `any766-step17/kernel-worker:local` — `sha256:a5727020048d209d7bf7bb0bd84531e2f85d526c6b808e78f1101af2533e8a77`.
@@ -96,7 +120,8 @@ Web inputs: `PLATFORM_API_BASE_URL=http://platform-api:8000`,
 `NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS=proposal_ai`,
 `ANYTOOLAI_WEB_BASE_PATH=/tools`,
 `NEXT_PUBLIC_PORTAL_AUTHORIZE_URL=https://portal.step17.example.test/ru/backend/authorize`.
-The HTTPS test name is only a build input; ingress/TLS is not installed by rehearsal.
+The HTTPS test name was only a build input; this Step 17 rehearsal did not install
+ingress/TLS. The later correction rehearsal below separately verified Caddy routing.
 
 The profile directory must belong to the operator, have no group/world write
 permission (for example 0755) and contain only this installation's non-secret
@@ -125,6 +150,28 @@ suite retains one host-environment failure: passwordless `sudo -u nobody` is
 unavailable; actual container marker access passed. No live provider, production
 data, registry publication or remote installation was involved.
 
+### PR correction web-update rehearsal — 2026-11-12
+
+The corrected web image was built with the standard Dockerfile and authorized
+locked dependency downloads, using `ANYTOOLAI_PORTAL_CONSUMER_ID=review-kernel`,
+base path `/tools` and isolated local API/Portal origins. Its local ID was
+`sha256:45dba38223d190e6d66f564732ec5c52d707dc41b76af9cece9de2f28c4573ae`;
+it contains the corrected frontend sources at the current source baseline plus
+the local diff. The actual `prod_web_up` command retained Caddy access to
+`/tools/*` and `/v1/*`, Portal authorization and an existing paid result with one
+charge. API/worker/both DB container identities and the prepared profile stayed
+unchanged. This is local synthetic acceptance, not a published deployment image.
+
+To repeat this rehearsal, use a unique Compose project, explicit synthetic env
+file and disposable networks/volumes. Copy the VPS overlay and replace only its
+physical external-network names with unique run-owned names. Override the project,
+env-file and overlay paths in a test wrapper around the actual command. Inspect
+resolved Compose configuration for collisions with existing resources before
+starting. Require a corrected-source web image and all local dependencies,
+including ingress; record source SHA/diff, image ID and frontend build inputs.
+Missing prerequisites block the rehearsal; do not implicitly pull or install.
+Remove only resources created by that run.
+
 ## Compose layout
 
 - `docker-compose.yml` — base, shared by dev and prod (services, ports, `depends_on`; app
@@ -137,12 +184,14 @@ data, registry publication or remote installation was involved.
 - `docker-compose.atom-lab.yml` — private Atom Lab overlay over the base services: durable
   PostgreSQL, loopback-only ports, required Lab/live/provider secrets, and no public web service.
 - `docker-compose.vps-135.yml` — optional occupied-host network overlay. Setting
-  `ANYTOOLAI_VPS_135_NETWORKS=1` makes live `prod-up`/`prod-ready` append it: only
+  `ANYTOOLAI_VPS_135_NETWORKS=1` makes live `prod-up`/`prod-ready` and image
+  `prod-web-up` append it: only
   `platform-worker` joins external `infra_prompttune`, and only `web-mirror` joins external
   `payments-portal-prod_edge`; both retain the AnytoolAI default network. The web build uses
   `platform-api.anytoolai-prod_default` to reach the product API even when Lab shares the edge
-  network. Run containers under the fixed `anytoolai-prod` project with this overlay. Other
-  selector values fail before Compose starts. Fake and dev commands never select this overlay.
+  network. Run containers under the fixed `anytoolai-prod` project with this overlay.
+  Unset/empty omits the overlay; other selector values fail before Compose starts.
+  `prod-web-up` replaces only web; fake and dev commands never select this overlay.
 - `docker-compose.atom-lab.vps-135.yml` — Atom Lab network overlay selected by
   `ANYTOOLAI_VPS_135_NETWORKS=1` in the Lab environment. The API joins the Caddy edge network
   as `atom-lab-api` and the worker joins `infra_prompttune` for the provider proxy.
@@ -1169,6 +1218,8 @@ migrations only through the environment's authorized procedure.
 
 Set the API's existing `ANYTOOLAI_PORTAL_BASE_URL` and independent
 `ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN` to reach Portal identity/snapshot reads.
+Set `ANYTOOLAI_PORTAL_CONSUMER_ID` consistently in the API, frontend build and
+Portal registry (default `platform-kernel`); a new ID cannot adopt old purchases.
 The Portal receiver must explicitly grant session exchange/introspection and
 `access-snapshot:read`. Kernel accepts only snapshot V3; no V1/V2 wire conversion
 or local extension of expiry exists. HTTPS verification stays enabled; existing

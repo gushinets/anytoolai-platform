@@ -1,3 +1,4 @@
+import { portalConsumerId } from "./portalConsumer";
 import { consumePortalCallback, exchangePortalSession, PlatformApiClient, preparePortalAuthorization, validatePortalReturnTarget } from "@anytoolai/ce-kit";
 import { getRegisteredProduct } from "../products/registry";
 import { installPortalSession, requirePortalAuthorization, synchronizePortalIdentity, tabStorage } from "./portalSession";
@@ -32,7 +33,7 @@ export async function beginPortalAuthorization(target: string): Promise<string> 
   tabStorage.setItem(CONTINUATION_KEY, returnTarget);
   const { state, challenge } = await preparePortalAuthorization(tabStorage, returnTarget, identity.custodyId);
   if (synchronizePortalIdentity().generation !== identity.generation) throw new Error("portal_authorization_invalid");
-  url.searchParams.set("consumer_id", "platform-kernel");
+  url.searchParams.set("consumer_id", portalConsumerId());
   url.searchParams.set("state", state);
   url.searchParams.set("code_challenge", challenge);
   url.searchParams.set("code_challenge_method", "S256");
@@ -45,7 +46,7 @@ export async function completePortalAuthorization(fragment: string): Promise<str
   const generation = identity.generation;
   const callback = consumePortalCallback(tabStorage, fragment);
   if (!callback || callback.authorization.custodyId !== identity.custodyId || !validateReturnTarget(callback.authorization.returnTarget)) throw new Error("portal_callback_invalid");
-  const result = await exchangePortalSession(new PlatformApiClient({ baseUrl: window.location.origin }), callback.code, callback.authorization.verifier);
+  const result = await exchangePortalSession(new PlatformApiClient({ baseUrl: window.location.origin }), callback.code, callback.authorization.verifier, portalConsumerId());
   // Another document in this tab may change custody while this document is suspended.
   const current = synchronizePortalIdentity();
   if (!result.ok || current.generation !== generation) throw new Error("portal_exchange_failed");

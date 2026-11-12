@@ -1,3 +1,4 @@
+import { portalConsumerId } from "./portalConsumer";
 import {
   PORTAL_SESSION_KEY, generateIdempotencyKey, parsePortalOwner, readPortalSession, samePortalOwner, writePortalSession,
   type PaidStartPersistence, type PlatformApiClient, type PortalOwner, type PortalSession, type TabStorage,
@@ -30,7 +31,7 @@ function readStoredIdentity(generation: number): IdentityState {
     const custodyId = typeof saved === "object" && saved !== null && "version" in saved && saved.version === 1 &&
       "custodyId" in saved && typeof saved.custodyId === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(saved.custodyId) ? saved.custodyId : null;
     let session: PortalSession | null;
-    try { session = readPortalSession(tabStorage); }
+    try { session = readPortalSession(tabStorage, portalConsumerId()); }
     catch { return { kind: "required", owner, generation, custodyId }; }
     // Legacy custody without an epoch requires reauthorization, retaining its owner-bound recovery.
     return session && custodyId && owner && samePortalOwner(owner, session.owner) ? { kind: "authorized", session, generation, custodyId }
@@ -115,6 +116,7 @@ export function requirePortalAuthorization(clearPrivate = false): boolean {
 }
 
 export function installPortalSession(session: PortalSession): void {
+  if (session.consumerId !== portalConsumerId()) throw new Error("portal_consumer_mismatch");
   const current = getPortalIdentity();
   const previous = current.kind === "authorized" ? current.session.owner : current.kind === "required" ? current.owner : null;
   if (!previous || !samePortalOwner(previous, session.owner)) clearPaidPrivateState();
@@ -124,7 +126,7 @@ export function installPortalSession(session: PortalSession): void {
     tabStorage.removeItem(PORTAL_SESSION_KEY);
     writeCustody(session.owner, custodyId);
     writePortalSession(tabStorage, session);
-    const stored = readPortalSession(tabStorage);
+    const stored = readPortalSession(tabStorage, portalConsumerId());
     if (!stored || stored.accessToken !== session.accessToken || stored.expiresAt !== session.expiresAt || !samePortalOwner(stored.owner, session.owner)) throw new Error("portal_storage_unavailable");
   } catch (error) {
     requirePortalAuthorization();

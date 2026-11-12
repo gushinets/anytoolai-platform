@@ -2835,10 +2835,19 @@ def prod_web_up() -> int:
     try:
         with _prod_deployment_lock():
             env = _resolved_env_file(PROD_ENV_FILE)
+            networks_enabled = _vps_135_networks_enabled(env)
             _validate_image_inputs(env)
+            files = [COMPOSE_FILE, COMPOSE_PROD_FILE, COMPOSE_IMAGES_FILE]
+            if networks_enabled:
+                files.append(COMPOSE_VPS_135_FILE)
+            compose = _docker_compose_command(
+                PROD_COMPOSE_PROJECT,
+                files,
+                env_file=PROD_ENV_FILE if PROD_ENV_FILE.is_file() else None,
+            )
             return run_with_env(
                 [
-                    *_prod_compose_command(),
+                    *compose,
                     "up",
                     "-d",
                     "--no-deps",

@@ -141,11 +141,13 @@ def test_source_fingerprint_checks_both_selected_images(
     assert "kernel-worker:reviewed" in calls[1]
 
 
+@pytest.mark.parametrize("network_selector", ["", "1", "invalid"])
 def test_frontend_update_never_generates_or_activates_profile(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, network_selector: str
 ) -> None:
     runner = load_runner_module()
     env = image_env(tmp_path)
+    env["ANYTOOLAI_VPS_135_NETWORKS"] = network_selector
     calls = []
     monkeypatch.setattr(runner, "_prod_deployment_lock", nullcontext)
     monkeypatch.setattr(runner, "_resolved_env_file", lambda path: env)
@@ -154,7 +156,13 @@ def test_frontend_update_never_generates_or_activates_profile(
     monkeypatch.setattr(
         runner, "_build_deployment_profile", lambda *args: pytest.fail("regenerated profile")
     )
+    if network_selector == "invalid":
+        assert runner.prod_web_up() == 1
+        assert calls == []
+        return
     assert runner.prod_web_up() == 0
+    assert (str(runner.COMPOSE_VPS_135_FILE) in calls[0]) is (network_selector == "1")
+    assert str(runner.COMPOSE_LIVE_FILE) not in calls[0]
     assert len(calls) == 1
     assert calls[0][-8:] == [
         "up",
@@ -222,5 +230,6 @@ def test_build_workflow_preserves_all_frontend_origins() -> None:
         "NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS",
         "ANYTOOLAI_WEB_BASE_PATH",
         "NEXT_PUBLIC_PORTAL_AUTHORIZE_URL",
+        "ANYTOOLAI_PORTAL_CONSUMER_ID",
     ):
         assert f'--build-arg "{name}=${name}"' in script

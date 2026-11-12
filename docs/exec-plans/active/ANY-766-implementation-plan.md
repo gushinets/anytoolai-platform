@@ -10,10 +10,10 @@ Related requirements: [ANY-833](https://linear.app/paveldik/issue/ANY-833).
 
 - State: active
 - Owner: mixed — Portal and Kernel execution owners
-- Last updated: 2026-11-11
-- Review date: 2026-11-11
-- Next action: complete the PR readiness checklist under the accepted focused testing gate.
-- Verification gate: the 18 passing focused cases are accepted for review, PR creation and merge; full testing is deferred by owner decision.
+- Last updated: 2026-11-12
+- Review date: 2026-11-12
+- Next action: finish the paired PR readiness checklist and review follow-up before human merge approval.
+- Verification gate: focused Step 16 checks and the five PR corrections' local regressions, joint scenarios and isolated web-update rehearsal pass. The broader acceptance matrix remains deferred by owner decision (Section 3.8).
 - Blocker: none for the planned local work; real external-product integration is outside this plan.
 
 Portal's `docs/exec-plans/active/ANY-766-implementation-plan.md` is authoritative;
@@ -35,6 +35,23 @@ recovery without new-start configuration and matching-session cleanup. Verify th
 combined guest/paid journeys, identity changes, modes and StrictMode with focused
 regressions, types and changed-file lint. Backend/wire/commercial scope is unchanged.
 
+## PR corrections — 2026-11-12
+
+Status: **COMPLETE — selected local acceptance PASS, including REV-1**. Baselines: Portal #167
+`c41428de` and Kernel #267 `82f1b155`, followed by the corrections described below.
+
+The five corrections cover the complete policy digest, grant ownership without
+allowances, inactive recipient scheduling, browser/API consumer alignment and
+web-update ingress retention. Their enduring rules are incorporated in Sections
+3.7 and 3.9 and the owning contract/deployment guides, rather than a second plan.
+Focused regressions, real joint HTTP/PostgreSQL scenarios and the isolated Caddy
+web-replacement/browser rehearsal passed. REV-1's read/replay policy observation
+and persistence-failure recovery also passed focused PostgreSQL and joint HTTP
+checks. Its enduring rule is in Section 3.9. No migration or wire version changed.
+P3 was already fixed; draft recovery, historical usage selection, web service
+credentials and email verification review findings remain outside this pass.
+The broader acceptance matrix and remote/live work remain deferred to ANY-767.
+
 ## 1. Goal & Final Expected Outcome
 
 Portal exposes one documented API for authenticated product backends. Kernel is
@@ -43,11 +60,12 @@ identity, access and purchased-limit contracts with its own service credentials
 and product permissions. Portal owns identity and purchased authority; the
 backend responsible for each product owns execution and durable usage.
 
-The 2026-11-10 requirements in ANY-766 and ANY-833 will be implemented by the narrow
-amendment in Section 3.9 and new Steps 9–13. Completed Steps 1–8 remain the
-implementation baseline. Previous Steps 9–12 become Steps 14–17. Section 3.9
-supersedes Kernel-only target assumptions in Sections 3.2–3.6; it does not claim
-that the generic contract is already implemented.
+The 2026-11-10 requirements in ANY-766 and ANY-833 were implemented through
+Section 3.9 and Steps 9–15. Steps 1–8 remain the historical implementation
+baseline; Sections 3.2–3.6 retain that checkpoint's details where not superseded
+by Section 3.9. Steps 16/17 completed focused local acceptance and installation
+preparation. Completed step instructions record the implementation sequence,
+not outstanding work; the header and PR readiness checklist track what remains.
 
 An authenticated Portal user with confirmed paid test access can launch the selected Kernel products through actual local browser and HTTP boundaries. Kernel verifies the existing Portal identity through scoped session delegation, obtains current access authority, resolves the scenario’s declared metric and passes the exact purchased allowance into ANY-507.
 
@@ -91,14 +109,14 @@ contacting its services or accepting its integration is not an ANY-766 gate.
 
 ## 2. Current State & Reusable Implementation
 
-Development bases: Portal ANY-766 is based on ANY-765
+Original development bases: Portal ANY-766 started from ANY-765
 `b2ef280048ac634a60c18e820fbf702beddba19c`; Kernel is based on
 `72ff15bc0b77903c87aa39f7b10186dccc556d09` and includes ANY-507/814.
 Current migration heads are Portal `20261111_0011` and Kernel `0021`.
 
-Development may continue above the verified ANY-765 base while its PR is reviewed.
-After it merges, transfer only ANY-766 changes onto accepted main under a
-separately authorized base refresh, preserving intervening corrections. Recheck
+These are historical bases; the current correction baselines are recorded above.
+Any further transfer onto accepted main requires a separately authorized base
+refresh that preserves intervening corrections. Recheck
 affected behavior and extend the actual migration heads without rewriting them.
 
 ### Consumed ANY-765 handoff and preservation requirements
@@ -179,7 +197,7 @@ Tests use temporary product configurations with explicitly enabled capabilities 
 
 ### 3.3 B10: implemented AccessSnapshot V2 baseline
 
-This is the completed Step 5 baseline. Section 3.9 defines the planned V3
+This is the historical Step 5 baseline. Section 3.9 defines the implemented V3
 consumer scope and compatibility cutover; retain the finite-authority rules here.
 
 Keep:
@@ -335,14 +353,14 @@ Every protected request introspects identity. An already authenticated in-flight
 
 Preserve independent directional credentials:
 
-- Portal → Kernel: `KERNEL_SERVICE_TOKEN`, received as current/previous `ANYTOOLAI_PORTAL_SERVICE_TOKEN`.
-- Kernel → Portal: `ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN`, received by the platform-kernel entry's current/previous backend-to-Portal slots in `BACKEND_CONSUMERS`.
+- Portal → Kernel: the configured consumer's `portal_to_backend_current_secret` in `BACKEND_CONSUMERS`, received as current/previous `ANYTOOLAI_PORTAL_SERVICE_TOKEN`.
+- Kernel → Portal: `ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN`, received by that consumer's current/previous backend-to-Portal slots in `BACKEND_CONSUMERS`.
 
 Add receiver-owned permissions for each new operation. Internal endpoints require exactly one Bearer header, trusted scope, TLS verification, no browser Origin, no-store responses and safe errors.
 
-The implemented Step 6 coherence baseline remains snapshot V2; consumer/P
-cache partitioning and admission fencing are Step 12. Step 10 carries consumer/P
-at the identity adapter without changing Core ownership or replay.
+The following sequence records the historical Step 6 V2/R baseline. Step 12
+extends it with V3 consumer/P cache partitioning and admission fencing as described
+in Section 3.9, without changing Core ownership or replay.
 
 Kernel stores the revision floor and cached snapshot in one PostgreSQL coherence row per scoped user. Snapshot installation, invalidation and new-execution admission use that same row lock. Eviction removes the document, never the floor.
 
@@ -505,6 +523,11 @@ worker use their existing Dockerfiles and one matching backend source revision.
 Frontend-only changes must not require rebuilding or restarting an unchanged
 compatible backend. Preserve the existing environment-specific frontend
 origins/base paths as explicit build inputs; use local test origins for rehearsal.
+Kernel's single consumer setting is `ANYTOOLAI_PORTAL_CONSUMER_ID` (default
+`platform-kernel`), passed through Dockerfile, Compose and the build workflow.
+Next validates its format and derives non-secret `NEXT_PUBLIC_PORTAL_CONSUMER_ID`.
+The frontend build, API and Portal registry must agree; runtime environment
+changes do not recompile a frontend image or transfer historical ownership.
 
 Keep version selection simple: pin the chosen image references/digests in app-owned
 Compose environment inputs and record their source revisions, migration heads,
@@ -528,6 +551,11 @@ preserve deployment locks, quiesce/drain, migration-before-start, readiness and
 activation. Migration failure keeps admission closed; recovery follows the existing
 backup procedure. Frontend-only update uses the existing Compose service with
 `--no-deps`, preserving backend, migrations, active profile and volumes.
+Kernel `prod-web-up` uses base + prod + images, with only the VPS network overlay
+added when the resolved command environment sets `ANYTOOLAI_VPS_135_NETWORKS=1`.
+Unset/empty omits it; other values fail before Compose. Preserve the deployment
+lock, image validation, `--no-build` and `--pull never`. Do not load the full
+live overlay or require profile-generation variables for this web-only update.
 
 For Kernel, generate the candidate profile inside the selected API image, bind an
 explicit operator-owned host directory and derive host mount paths from it. Do not
@@ -622,9 +650,13 @@ email matching, refresh-token subsystem or alternate identity authority.
 Kernel introspects on every protected request and supplies the resulting
 canonical principal to its existing admission/ownership boundary. Keep Core's
 `ExecutionOwner`, persisted replay meaning and the ANY-507 allowance tuple
-unchanged. Browser storage format may advance with explicit invalidation of
-old delegated tokens, while preserving an owner-bound frozen pending start
-and its original key/request across reauthorization by the same owner.
+unchanged. The browser token envelope is V2; incompatible tokens require
+reauthorization while preserving an owner-bound frozen pending start and its
+original key/request across reauthorization by the same owner. Kernel's configured
+consumer is used for launch, exchange validation, stored-session reads and session
+installation. CE-kit receives the expected consumer explicitly. Reject a foreign
+audience before storage mutation or private-state clearing. Paid-auth failure
+never selects guest.
 
 **AccessSnapshot V3 and policy revisions**
 
@@ -643,8 +675,12 @@ Snapshot contents include only that consumer's authorized products.
 
 Persist the current policy version and digest alongside existing integration
 configuration state, with initial version 1 for the migrated Kernel policy.
-A change to the authorized product/snapshot scope requires a strictly higher
-configured P; reject a changed policy at a reused version or a version rollback.
+A change to sorted product scope, the complete sorted permission set or technical
+source requires a strictly higher configured P for the same consumer/tenant/region.
+Credentials, callback and backend instance address are outside the digest. Reject
+changed digests at reused P and any rollback; identical installs are idempotent.
+Install P/digest and recipient activity in one transaction, including rollback
+on failure.
 No policy editor or background policy service is required. Introspection returns
 the current P, so permission changes do not require impersonating a paid-state
 transition. A cached snapshot must match the current introspected policy and
@@ -654,8 +690,12 @@ older policy. Changing P does not reset or lower the paid-state revision floor.
 Cache/coherence identity includes consumer and scoped user, with independent
 durable monotonic policy and access floors. The existing coherence lock
 serializes policy observation, snapshot installation, invalidation and new
-admission. Admission requires matching current P and R at/above its floor,
-including the existing post-wait expiry/floor checks. Missing or conflicting
+admission. After successful introspection, commit observed P before any runtime
+handler, including reads, usage, replay and later 404/409 responses. A higher P
+evicts only cached authority; lower in-flight P still permits identity-only
+historical access but cannot lower the floor. These reads/replays need no snapshot
+refresh or grants. New admission requires matching current P and R at/above its
+floor, including the existing post-wait expiry/floor checks. Missing or conflicting
 authority fails closed; eviction removes the cached document, not either floor.
 Do not add consumer identity to usage buckets, accepted replay or job ownership.
 
@@ -666,6 +706,13 @@ and followed only by response filtering: an unrelated consumer's overdue product
 must not make this consumer's complete snapshot unavailable. Conversely, an
 overdue fact for an included product requires `503` until the existing writer
 commits its reduction; silently dropping it at the same P/R is forbidden.
+For every included grant, including those without an allowance, prove ownership
+through primary subscription -> saved PurchaseIntent -> AcceptedPurchase.ownership
+under the existing user lock. Missing/unproven purchase evidence, including read
+refusals, becomes `503 paid_access_state_pending` at the snapshot boundary;
+a proven mismatch is `503 paid_access_owner_conflict`. Keep allowance ownership
+checks. Current product configuration cannot reassign a saved purchase; historical
+Kernel ownership is resolved only in memory, with no JSON/digest rewrite.
 Preserve whole-user writer/cabinet guarantees and the original B10 bounds:
 300-second maximum snapshot, conservative clock budget, finite source trust,
 read-only local GET, no extension of expired authority and known empty R0.
@@ -703,13 +750,21 @@ a separate explicit continuity procedure, outside this plan.
 
 Partition outbox state, coalescing/work keys, claims, retries, parking, repair
 and delivered revision by recipient plus scoped user. Fan out a committed
-whole-user R to configured in-scope snapshot consumers in the existing writer
+whole-user R to active in-scope snapshot consumers in the existing writer
 transaction, including consumers whose product grant has just been removed.
 One recipient's failure/ACK cannot affect another. Retain the V1 invalidation
 payload: the configured authenticated destination determines the recipient.
 Capture N before HTTP; an ACK advances only that recipient through N and
 cannot erase pending N+1. Policy changes are fenced by per-request introspection
 and P; do not invent a second policy-delivery protocol.
+Activity comes from `BackendConsumerPolicy.snapshot_delivery_enabled`. Both R
+changes and writer no-ops skip inactive recipients. Repair filters recipient,
+tenant/region and activity before LIMIT, then rechecks activity before scheduling.
+Retain inactive outbox/queue history, revisions, leases and diagnostics; inspection
+stays available, retry returns `409 invalidation_recipient_inactive`, and active
+backlog excludes these deliveries. Reactivation resumes saved undelivered N
+through existing repair/claim/ACK; parked errors still need explicit retry.
+Preserve User -> outbox -> queue locking without new tables or queue states.
 
 The existing Section 3.6 usage/exhaustion contracts apply to every product
 backend. Route usage reads by the persisted allowance/source owner; authenticate
@@ -731,6 +786,12 @@ against isolated local test databases first. New and old wire contracts do not
 need concurrent support; update our Portal, Kernel and browser configuration
 together, remove replaced routes/settings only when no active use remains,
 and explicitly exclude old binaries from the new installation contract.
+The completed pair's heads are Portal `20261111_0011` and Kernel `0021`.
+The PR digest correction needs no new migration: stop Portal API/workers and
+explicitly configure P above the saved value for every existing configured
+consumer before corrected startup. A fresh DB may use P=1. Never edit policy
+rows manually or lower P; unchanged migration heads do not permit old-binary
+rollback. Purchases, R, allowance IDs, usage, reservations and replay stay intact.
 
 Migration acceptance must retain existing Kernel delegation bindings; bind
 historical delegation rows to Kernel and require fresh browser delegation when
@@ -744,7 +805,7 @@ in-flight and N+1 states; do not infer safety from an empty fresh database.
 
 **Documentation and external-team handoff**
 
-Publish one common guide, planned at
+The implemented common guide is at
 `docs/contracts/product-backend-api/README.md`, alongside the Portal's generated
 OpenAPI and Swagger UI. Use the existing FastAPI schema/generation pipeline;
 no duplicate hand-maintained external API or new generator dependency. A
@@ -1151,9 +1212,10 @@ at Step 12. No unresolved policy/revision or history-conversion decision remains
 policy guard, fixed callbacks and paired browser/Kernel clients implemented.
 Populated-delegation forward migration, focused identity/security/contract and
 PostgreSQL checks, browser recovery, desktop/mobile accessibility, generation
-and applicable non-fixing checks PASS. Snapshot remains Kernel-only V2 until
-Step 12. Evidence is local/synthetic; assembled Portal–Kernel TCP acceptance
-remains Step 16, and the final full-check/install gates remain open.
+and applicable non-fixing checks PASS. At this checkpoint the snapshot was still
+Kernel-only V2; Step 12 subsequently implemented V3. This step's evidence is
+local/synthetic; Steps 16/17 later completed focused paired acceptance and local
+installation preparation. The broader campaign remains deferred.
 REV-3 is resolved: managed local startup forwards the consumer registry privately;
 dotenv/settings regressions and the real Compose configuration checks PASS.
 
@@ -1289,9 +1351,11 @@ regressions plus actual local Portal/Kernel TCP auth/access smoke checks. Use
 the synthetic second principal for product/data isolation. Cover empty R0,
 unrelated overdue product versus included overdue product, expiry/outage,
 same P/R digest conflict, policy change without R change, old-P response racing
-new P, retained owner conflicts (including legacy Kernel terms), N+1 versus stale
-install and post-lock expiry. Prove existing buckets, usage, reservations and
-replay survive migration/policy change. Check Swagger
+new P observed by read/usage/replay or a later-refused request, retained owner
+conflicts (including legacy Kernel terms), N+1 versus stale install and post-lock
+expiry. Lower-P historical reads/replay remain available after the observation.
+Prove existing buckets, usage, reservations and replay survive migration/policy
+change. Check Swagger
 operation security, examples, responses and schema/generator consistency.
 
 **Expected completion / external handoff:** the common guide, generated OpenAPI,
@@ -1641,7 +1705,7 @@ remote publication/deployment is outside this plan.
   in-scope issues. Record the source revisions and evidence from Steps 16/17 and
   the accepted focused verification gate in Section 6; rerun only focused checks
   invalidated by later changes. Deferred full suites are not a PR/merge prerequisite.
-- [ ] Keep affected as-built docs, generated contracts and existing runbooks
+- [x] Keep affected as-built docs, generated contracts and existing runbooks
   accurate. Document supersession of obsolete ANY-286/287 access-check direction;
   do not edit external tickets without authorization.
 - [ ] Prepare concise PR descriptions and the Section 7 handoff: behavior,
@@ -1669,7 +1733,11 @@ testing is planned for the week of 2026-11-16. Configure local suites with
 isolated databases and explicitly labelled external substitutes; real-service
 results require the installed environment and actual configured dependencies.
 
-**Deferred Portal broad checks:**
+The command lists below describe the deferred campaign. Individual focused,
+documentation and generated-drift checks have already passed; they are not all
+unexecuted merely because the complete campaign is deferred.
+
+**Deferred Portal broad campaign:**
 
 ```bash
 PATH="$PWD/.venv/bin:$PATH" npm run check:fast
@@ -1680,7 +1748,7 @@ npm run test:e2e -- session-races.spec.ts
 ./.venv/bin/python tools/joint_paid_runtime/runtime.py --browser
 ```
 
-**Deferred Kernel broad checks:**
+**Deferred Kernel broad campaign:**
 
 The `full-check` command below requires the dependency-installation authorization
 gate in the common execution protocol, including for an already prepared environment.

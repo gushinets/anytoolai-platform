@@ -32,9 +32,12 @@ Historical Portal contracts and execution plans do not override accepted sources
 
 ## Current local implementation
 
-Historical Steps 14/15 source inspection: Kernel `36be7fa3c3147b032b97f050a898a97423db2070`
-and Portal `9632ec4ce440fa17d8463f230b98df7cccccc934`, plus the then-uncommitted
-paired changes. These pins identify that checkpoint, not current branch tips.
+Current source baselines: Kernel `82f1b155b5d9fbc9af8e5b6bd51364d640434495`
+and Portal `c41428de013e69c982386acbb9edda05e1dc9014`, plus the local PR correction
+diff. The dated checkpoints below retain historical evidence, not current setup
+instructions. The corrected pair covers the complete policy digest, saved grant
+ownership without allowances, inactive delivery scheduling, frontend/API consumer
+alignment and web-update ingress retention; focused local acceptance passed.
 The [active plan](../exec-plans/active/ANY-766-implementation-plan.md) owns the
 current scope and remaining gates.
 
@@ -55,7 +58,10 @@ current scope and remaining gates.
   `20261111_0011` and Kernel `0021`. The historical Step 13 heads were Portal
   `20261111_0010` and Kernel `0020`. Legacy Kernel connection settings no longer
   select delivery destinations. A disabled receiver permission parks delivery with `403`;
-  operator retry is required after repair.
+  operator retry is required after repair. This differs from an inactive Portal
+  registry recipient, whose history is retained without new scheduling. The
+  [current cutover](../../infra/deployment/README.md#reviewed-images-and-independent-updates-any-766-step-17)
+  also requires a higher P when installing the expanded digest, despite unchanged heads.
 - Step 8 implements recoverable browser launch, owner-bound tab custody and
   paid runtime/event/handoff continuity. Step 14 implements usage/exhaustion;
   Step 15 implements independent current/historical cabinet usage with generated
@@ -345,8 +351,9 @@ describes the independent reverse connection.
 - **Usage and launch:** the
   [target bundle](../contracts/portal-kernel-paid/README.md) specifies usage,
   exhaustion and authenticated browser launch. Step 8 implements browser launch;
-  usage/exhaustion is implemented in Step 14; cabinet usage remains Step 15, with paired local
-  acceptance in Step 16. Kernel product handoff is not Portal login handoff;
+  usage/exhaustion and cabinet usage are implemented in Steps 14/15. Focused paired
+  local acceptance and the PR correction scenarios passed; broader and remote/live
+  acceptance remain ANY-767 work. Kernel product handoff is not Portal login handoff;
   shared product IDs do not imply shared origins/routes or sessions.
 - **Commercial meaning:** deployed product configuration, guest quota and the
   fixture's `proposal_ai.test_generations` do not approve paid metrics/quantity.

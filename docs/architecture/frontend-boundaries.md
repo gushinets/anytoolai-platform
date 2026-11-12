@@ -199,6 +199,13 @@ The shared runtime, not a product, owns the web side of a handoff:
   other pending attachments remain fallbacks. A late
   background Accept cannot replace the preferred own run, while an explicit attachment open can.
   Clearing or losing the referenced saved run releases its priority over remaining attachments.
+- The web host owns the configured Portal consumer audience. Next derives public
+  `NEXT_PUBLIC_PORTAL_CONSUMER_ID` from the single build input
+  `ANYTOOLAI_PORTAL_CONSUMER_ID` (default `platform-kernel`); CE-kit receives the
+  expected audience explicitly. Launch, exchange and V2 session reads/installations
+  must agree with the API and Portal registry. Reject a foreign audience before
+  storage mutation or private-state clearing; reauthorization preserves owner-bound
+  pending requests. Runtime environment changes cannot recompile the frontend.
 - Portal-owned forms use separate `anytoolai.paid_draft.v1.*` keys scoped by the
   canonical tenant/region/user tuple, including selected mode. They never read guest
   drafts. Same-owner reauthorization retains them; logout, parent revocation and

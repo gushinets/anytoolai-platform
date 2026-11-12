@@ -21,12 +21,12 @@ export function parsePortalOwner(value: unknown): PortalOwner | null {
   return { tenantId: value.tenantId, region: value.region, userId: value.userId };
 }
 
-export function parsePortalExchange(value: unknown): PortalSession | null {
+export function parsePortalExchange(value: unknown, expectedConsumerId: string): PortalSession | null {
   if (!isRecord(value) || value.schema_version !== 2 || value.token_type !== "Bearer" ||
     typeof value.access_token !== "string" || !/^[A-Za-z0-9_-]{43,512}$/.test(value.access_token) ||
     typeof value.expires_at !== "string" || !/Z$|[+]00:00$/.test(value.expires_at) ||
     !Number.isFinite(Date.parse(value.expires_at))) return null;
-  if (value.consumer_id !== "platform-kernel" || !Number.isSafeInteger(value.consumer_policy_revision) ||
+  if (value.consumer_id !== expectedConsumerId || !Number.isSafeInteger(value.consumer_policy_revision) ||
     typeof value.consumer_policy_revision !== "number" || value.consumer_policy_revision < 1) return null;
   const owner = parsePortalOwner({ tenantId: value.tenant_id, region: value.region, userId: value.user_id });
   if (!owner) return null;
@@ -39,24 +39,24 @@ export function parsePortalExchange(value: unknown): PortalSession | null {
   return { owner, consumerId: wire.consumer_id, consumerPolicyRevision: wire.consumer_policy_revision, accessToken: wire.access_token, expiresAt: wire.expires_at };
 }
 
-export function exchangePortalSession(client: PlatformApiClient, code: string, verifier: string): Promise<PlatformApiResult<PortalSession>> {
+export function exchangePortalSession(client: PlatformApiClient, code: string, verifier: string, expectedConsumerId: string): Promise<PlatformApiResult<PortalSession>> {
   return requestAndParse(client, {
     method: "POST", path: "/v1/portal-session/exchange", body: { code, code_verifier: verifier },
-  }, parsePortalExchange, "Portal session response was invalid.");
+  }, (value) => parsePortalExchange(value, expectedConsumerId), "Portal session response was invalid.");
 }
 
 export function writePortalSession(tabStorage: TabStorage, session: PortalSession): void {
   tabStorage.setItem(PORTAL_SESSION_KEY, JSON.stringify({ version: 2, ...session }));
 }
 
-export function readPortalSession(tabStorage: TabStorage): PortalSession | null {
+export function readPortalSession(tabStorage: TabStorage, expectedConsumerId: string): PortalSession | null {
   const raw = tabStorage.getItem(PORTAL_SESSION_KEY);
   if (!raw) return null;
   const value: unknown = JSON.parse(raw);
   if (!isRecord(value) || value.version !== 2) throw new Error("portal_storage_invalid");
   const session = parsePortalExchange({ schema_version: 2, consumer_id: value.consumerId, consumer_policy_revision: value.consumerPolicyRevision, token_type: "Bearer", access_token: value.accessToken,
     expires_at: value.expiresAt, tenant_id: isRecord(value.owner) ? value.owner.tenantId : undefined,
-    region: isRecord(value.owner) ? value.owner.region : undefined, user_id: isRecord(value.owner) ? value.owner.userId : undefined });
+    region: isRecord(value.owner) ? value.owner.region : undefined, user_id: isRecord(value.owner) ? value.owner.userId : undefined }, expectedConsumerId);
   if (!session) throw new Error("portal_storage_invalid");
   return session;
 }

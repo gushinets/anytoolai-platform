@@ -10,11 +10,10 @@ from anytoolai_platform_api.manifest_auth import (
     PortalPrincipal,
     authenticate_portal,
 )
-from anytoolai_platform_api.paid_access import PAID_RUNTIME_ERROR_RESPONSES
+from anytoolai_platform_api.paid_access import PAID_RUNTIME_ERROR_RESPONSES, require_portal_user
 from anytoolai_platform_api.portal_session import (
     PortalUserPrincipal,
     WireUserId,
-    authenticate_portal_user,
 )
 from anytoolai_platform_core.quotas.execution_repository import PaidAllowanceUsageRepository
 from anytoolai_platform_core.quotas.models import (
@@ -160,7 +159,7 @@ def internal_paid_usage(
 def public_paid_usage(
     product_id: str,
     allowance_id: AllowanceIds,
-    principal: Annotated[PortalUserPrincipal, Depends(authenticate_portal_user)],
+    principal: Annotated[PortalUserPrincipal, Depends(require_portal_user)],
     factory: Annotated[SessionFactory, Depends(get_session_factory)],
 ) -> PaidUsageResponse:
     return _read(factory, principal.owner, allowance_id, product_id=product_id)
