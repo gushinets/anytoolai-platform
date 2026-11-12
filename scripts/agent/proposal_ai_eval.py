@@ -21,6 +21,10 @@ placeholders, meta phrases, lists or headings, length, a required literal (`must
 unclear one leaves it pending), long dashes (a warning). A number absent from the order and the
 positioning is shown to the reviewer, never decided here.
 
+Gap literals are opt-in: `gap_must_not` matches descriptions and evidence, while every `gap_must`
+pattern must match a description (quoted evidence cannot satisfy it). Either violation makes a run
+unusable. These checks do not establish semantic correctness or enforce every `expect_gap: false`.
+
 Meaning is never decided by a regular expression. Each order lists `criteria`, questions a human
 answers yes, no or unknown for every output (see tests/fixtures/proposal_ai_eval/qa_cases.json), and
 every run also has `no-critical-error`. Verdicts live in a JSONL file next to the runs, one line per run
@@ -157,6 +161,7 @@ def check_proposal(
     ]
     gap_expected = order.get("expect_gaps_language")
     gap_languages = [detect_language(gap["description"], GAP_MIN_WORDS) for gap in gaps] if gap_expected else []
+    gap_texts = [f"{gap.get('description', '')}\n{gap.get('evidence', '')}" for gap in gaps]
     return {
         "wrong_language": any(found not in (None, expected) for found in [language, *passages]),
         "wrong_gaps_language": any(found not in (None, gap_expected) for found in gap_languages),
@@ -169,6 +174,11 @@ def check_proposal(
         "long_dash": bool(LONG_DASH.search(text)),
         "too_long": len(text.split()) > MAX_WORDS,
         "missing_gap": bool(order.get("expect_gap")) and not gaps,
+        "unexpected_gap": any(re.search(p, t, re.IGNORECASE) for p in order.get("gap_must_not", []) for t in gap_texts),
+        "missing_gap_detail": any(
+            not any(re.search(p, gap.get("description", ""), re.IGNORECASE) for gap in gaps)
+            for p in order.get("gap_must", [])
+        ),
         "missing_required": any(not re.search(p, text, re.IGNORECASE) for p in order.get("must", [])),
         "forbidden_present": any(re.search(p, text, re.IGNORECASE) for p in order.get("must_not", [])),
         "words": len(text.split()),
@@ -179,7 +189,7 @@ def check_proposal(
 CRITICAL_CHECKS = ("forbidden_present",)
 UNUSABLE_CHECKS = (
     "wrong_language", "wrong_gaps_language", "placeholder", "meta_phrase", "list_or_heading", "too_long",
-    "missing_gap", "missing_required",
+    "missing_gap", "unexpected_gap", "missing_gap_detail", "missing_required",
 )
 WARNING_CHECKS = ("long_dash",)
 
@@ -257,6 +267,7 @@ def case_hash(order: dict) -> str:
     """Everything the approval of a case rests on: its input, its literal checks and expected languages,
     and every question asked about it."""
     checks = {key: order.get(key) for key in ("expect_language", "expect_gaps_language", "expect_gap", "must", "must_not")}
+    checks.update({key: order[key] for key in ("gap_must", "gap_must_not") if key in order})
     return _digest({"input": case_input(order), "checks": checks,
                     "criteria": sorted(criterion_hash(c) for c in criteria_for(order))})
 

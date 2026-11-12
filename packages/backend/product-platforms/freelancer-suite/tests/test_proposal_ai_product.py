@@ -350,10 +350,23 @@ def test_terms_have_one_prioritized_rule() -> None:
         assert scattered not in prompt, scattered
 
 def test_gap_prompt_is_scoped_to_experience_gaps() -> None:
-    prompt = _load_prompt("prompts/detect_experience_gaps.v1.md")
+    """Ordinary parts and adjacent experience are covered; gaps preserve requirement details."""
+    prompt = " ".join(_load_prompt("prompts/detect_experience_gaps.v1.md").split())
     assert "`experience_gap`" in prompt
-    assert "Do not report routine steps" in " ".join(prompt.split())
     assert "empty `issues` array" in prompt
+    for fragment in (
+        "a stated minimum of experience (years, number of projects)",
+        "Adjacent experience covers a requirement",
+        "unless the task names that exact tool or platform as mandatory",
+        "Never report a routine part of the work",
+        "a reviews or testimonials block, a schedule block",
+        "report the Trustpilot API, not the reviews block",
+        "every number, unit and named tool or platform from it unchanged",
+        "never training, courses or another period",
+    ):
+        assert fragment in prompt, fragment
+    for removed in ("or kind of work the client asks for", "Do not report routine steps"):
+        assert removed not in prompt, removed
 
 
 @pytest.mark.parametrize(

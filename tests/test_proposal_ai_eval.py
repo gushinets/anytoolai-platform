@@ -98,6 +98,44 @@ def test_numbers_from_the_order_are_allowed_and_gap_is_required_when_expected() 
     assert "missing_gap" not in violations(CLEAN, [{"description": "No HubSpot."}], gap_order)
 
 
+@pytest.mark.parametrize(
+    ("gaps", "unexpected"),
+    [
+        ([{"description": "В опыте не указана работа с блоком отзывов.", "evidence": "блок отзывов"}], True),
+        ([{"description": "Не указан нужный опыт.", "evidence": "блок отзывов"}], True),
+        ([{"description": "В опыте не указана работа с блоком отзывов."}], True),
+        ([{"description": "No HubSpot experience."}], False),
+        ([], False),
+    ],
+)
+def test_forbidden_gap_literals_match_description_or_evidence(gaps: list, unexpected: bool) -> None:
+    order = {**EN_ORDER, "gap_must_not": ["ОТЗЫВ"]}
+    assert ("unexpected_gap" in violations(CLEAN, gaps, order)) is unexpected
+
+
+@pytest.mark.parametrize(
+    ("gaps", "missing"),
+    [
+        ([{"description": "В опыте не указано 10-летнее обучение."}], True),
+        ([{"description": "В опыте не указано 10 лет работы с HubSpot."}], False),
+        ([{"description": "No HubSpot experience.", "evidence": "10 years of HubSpot experience"}], True),
+        ([{"description": "No 100 years of HubSpot experience."}], True),
+        ([{"description": "Requires 10 years."}, {"description": "Requires hubspot."}], False),
+        ([], True),
+    ],
+)
+def test_required_gap_details_must_each_appear_in_a_description(gaps: list, missing: bool) -> None:
+    order = {**EN_ORDER, "gap_must": [r"\b10\b", "HubSpot"]}
+    assert ("missing_gap_detail" in violations(CLEAN, gaps, order)) is missing
+
+
+@pytest.mark.parametrize("gaps", [[], [{"description": "Missing experience.", "evidence": "reviews"}]])
+def test_orders_without_gap_checks_keep_previous_behavior(gaps: list) -> None:
+    checks = proposal_ai_eval.check_proposal(CLEAN, gaps, EN_ORDER, PROFILE)
+    assert checks["unexpected_gap"] is False
+    assert checks["missing_gap_detail"] is False
+
+
 def test_numbers_are_read_both_ways_and_ordinary_ai_phrases_pass() -> None:
     order = {**EN_ORDER, "task_text": "Need 3 500-word blog posts"}
     assert "invented_number" not in violations("I can write 3 posts of 500 words.", order=order)
@@ -282,7 +320,7 @@ def test_criteria_are_questions_and_fixture_checks_are_literal() -> None:
     """Meaning is a human question; `must_not` may only forbid amounts (code reviews #3 to #6 found
     a new wording that every semantic regular expression misread). A critical criterion names its
     violation, so no criterion mixes a critical violation with a minor one."""
-    for name in ("terms.json", "qa_cases.json"):
+    for name in ("terms.json", "qa_cases.json", "gaps.json"):
         for order in json.loads((FIXTURES / name).read_text(encoding="utf-8"))["orders"]:
             ids = [criterion["id"] for criterion in order["criteria"]]
             assert len(ids) == len(set(ids)) and "no-critical-error" not in ids, order["id"]
@@ -295,6 +333,45 @@ def test_criteria_are_questions_and_fixture_checks_are_literal() -> None:
                 re.compile(pattern)
             for pattern in order.get("must_not", []):
                 assert "\\d" in pattern, f"{order['id']}: must_not forbids amounts only: {pattern}"
+
+
+def test_gap_fixture_inputs_and_checks() -> None:
+    fixture = json.loads((FIXTURES / "gaps.json").read_text(encoding="utf-8"))
+    orders = proposal_ai_eval.normalized_orders(fixture)
+    assert len({order["id"] for order in orders}) == len(orders)
+    assert {order["expect_language"] for order in orders} == {"ru", "en", "es"}
+    for order in orders:
+        assert order["freelancer_positioning"] and order["task_text"] and order["tone"]
+        assert order["expect_gaps_language"] == order["expect_language"]
+        for pattern in order.get("gap_must", []) + order.get("gap_must_not", []):
+            re.compile(pattern)
+    p01 = next(order for order in json.loads((FIXTURES / "qa_cases.json").read_text(encoding="utf-8"))["orders"] if order["id"] == "P01")
+    yoga = next(order for order in orders if order["id"] == "yoga-schedule-ru")
+    assert yoga["task_text"] == p01["task_text"]
+    assert yoga["freelancer_positioning"] == p01["freelancer_positioning"]
+    webflow = next(order for order in orders if order["id"] == "webflow-required-ru")
+    assert "unexpected_gap" not in violations(CLEAN, [{"description": "Не указан опыт работы с платформой Webflow."}], webflow)
+
+
+def test_case_hash_preserves_orders_without_new_gap_checks() -> None:
+    for name in ("orders.json", "terms.json", "qa_cases.json"):
+        fixture = json.loads((FIXTURES / name).read_text(encoding="utf-8"))
+        for order in proposal_ai_eval.normalized_orders(fixture):
+            old_payload = {
+                "input": proposal_ai_eval.case_input(order),
+                "checks": {key: order.get(key) for key in ("expect_language", "expect_gaps_language", "expect_gap", "must", "must_not")},
+                "criteria": sorted(proposal_ai_eval.criterion_hash(c) for c in proposal_ai_eval.criteria_for(order)),
+            }
+            old_hash = "sha256:" + hashlib.sha256(json.dumps(old_payload, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+            assert proposal_ai_eval.case_hash(order) == old_hash
+
+
+@pytest.mark.parametrize("key", ["gap_must", "gap_must_not"])
+def test_case_hash_pins_optional_gap_checks(key: str) -> None:
+    order = {**EN_ORDER, "freelancer_positioning": PROFILE}
+    hashes = {proposal_ai_eval.case_hash({**order, key: patterns}) for patterns in ([], ["HubSpot"], ["Webflow"])}
+    assert len(hashes) == 3
+    assert proposal_ai_eval.case_hash(order) not in hashes
 
 
 PROFILE_EN = "I build Webflow marketing sites for small businesses and agree timelines after the content arrives."
@@ -544,6 +621,21 @@ def test_accept_fails_on_a_critical_error_a_missed_threshold_or_slow_runs(tmp_pa
         run["origin"] = {**make_run(run["run_id"])["origin"], "ui_latency_ms": 61000}
     code, out = run_accept(tmp_path, slow, confirmed(slow), capsys)
     assert code == 1 and "median latency 61.0 s above 60 s" in out
+
+
+@pytest.mark.parametrize(
+    ("checks", "gap", "reason"),
+    [
+        ({"gap_must_not": ["reviews"]}, {"description": "No reviews block experience."}, "unexpected_gap"),
+        ({"gap_must": [r"\b10\b", "HubSpot"]}, {"description": "No HubSpot experience."}, "missing_gap_detail"),
+    ],
+)
+def test_gap_check_failures_make_runs_unusable(checks: dict, gap: dict, reason: str) -> None:
+    order = {**ORDER, **checks}
+    run = make_run("r", output={"text": TEXT, "gaps": [gap]})
+    judged = proposal_ai_eval.judge_run(run, order, {})
+    assert judged["status"] == "FAIL" and judged["usable"] is False
+    assert reason in judged["reasons"]
 
 
 def test_formal_checks_leave_every_wording_of_a_term_to_the_reviewer() -> None:
