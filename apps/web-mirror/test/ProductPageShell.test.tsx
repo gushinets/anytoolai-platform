@@ -157,11 +157,19 @@ describe("ProductPageShell locale rendering", () => {
     expect(await screen.findByRole("button", { name: messages.reply_draft.submit })).toBeTruthy();
     expect(screen.getByLabelText(messages.fields.clientMessage)).toBeTruthy();
     expect(screen.getByLabelText(messages.fields.replyGoal)).toBeTruthy();
+    if (locale === "ru") {
+      expect(screen.getByRole("radio", { name: "Черновик ответа" })).toBeTruthy();
+      expect(screen.getByLabelText("Цель ответа")).toBeTruthy();
+    }
 
     fireEvent.click(screen.getByLabelText(messages.modes.prepaid_request));
     expect(await screen.findByRole("button", { name: messages.prepaid_request.submit })).toBeTruthy();
     expect(screen.getByLabelText(messages.fields.billingNotes)).toBeTruthy();
     expect(screen.getByLabelText(messages.fields.billingAmount)).toBeTruthy();
+    if (locale === "ru") {
+      expect(screen.getByLabelText("Заметки по оплате")).toBeTruthy();
+      expect(screen.getByLabelText("Сумма")).toBeTruthy();
+    }
     expect(screen.getByLabelText(messages.fields.billingDueDate)).toBeTruthy();
   });
 

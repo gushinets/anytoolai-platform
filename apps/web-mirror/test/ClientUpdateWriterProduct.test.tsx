@@ -34,6 +34,8 @@ import {
 } from "./fixtures/platformResponses";
 import { CLIENT_UPDATE_WRITER_MESSAGES } from "../src/products/clientUpdateWriter/messages";
 import { makeRender } from "./support/renderWithI18n";
+import { simulateBrowserTranslation } from "@anytoolai/shared-ui/test/support/simulateBrowserTranslation";
+import { LOCALE_STORAGE_KEY } from "../src/i18n/localeStorage";
 
 const render = makeRender(CLIENT_UPDATE_WRITER_MESSAGES);
 
@@ -131,6 +133,49 @@ const MODE_SCENARIOS: ModeScenario[] = [
     resultTitle: "Prepaid request",
   },
 ];
+
+it.each([
+  { locale: "en", translated: true },
+  { locale: "ru", translated: false },
+  { locale: "ru", translated: true },
+] as const)("keeps writing updates in $locale with translation=$translated (ANY-840)", async ({ locale, translated }) => {
+  window.localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+  const labels = locale === "ru"
+    ? { notes: "Заметки о ходе работы", submit: "Написать обновление", regenerate: "Переписать обновление", result: "Обновление" }
+    : { notes: "Progress notes", submit: "Write update", regenerate: "Rewrite update", result: "Update" };
+  const errorSpy = vi.spyOn(console, "error");
+  try {
+    const scenario = MODE_SCENARIOS[0]!;
+    const { routes, queues } = bootAndHappyPathRoutes(scenario.ids, { text: "First update." });
+    const { client, calls } = makeClient({
+      ...queues,
+      [routes.QUOTA]: Array.from({ length: 5 }, () => quotaResponse(scenario.ids)),
+      [routes.START]: [startResponse(), startResponse()],
+      [routes.SESSION]: [sessionResponse(), sessionResponse()],
+      [routes.RESULT]: [
+        resultResponse(scenario.ids, { output: { text: "First update." } }),
+        resultResponse(scenario.ids, { output: { text: "Second update." } }),
+      ],
+    });
+    render(<ClientUpdateWriterProduct client={client} />);
+    fireEvent.change(await screen.findByLabelText(labels.notes), { target: { value: "Finished the first milestone." } });
+    const button = screen.getByRole("button", { name: labels.submit });
+    if (translated) simulateBrowserTranslation(button);
+    fireEvent.click(button);
+    await screen.findByText("First update.");
+    expect(screen.getByRole("heading", { name: labels.result, level: 2 })).toBeTruthy();
+    expect(screen.getByRole("button", { name: labels.regenerate })).toBe(button);
+
+    if (translated) simulateBrowserTranslation(button);
+    fireEvent.click(button);
+    await screen.findByText("Second update.");
+    expect(screen.getByRole("button", { name: labels.regenerate })).toBe(button);
+    expect(calls.filter((call) => call.key === routes.START)).toHaveLength(2);
+    expect(errorSpy).not.toHaveBeenCalled();
+  } finally {
+    errorSpy.mockRestore();
+  }
+});
 
 describe.each(MODE_SCENARIOS)("Client Update Writer $mode mode: one-screen workspace", (scenario) => {
   it("defaults to neutral and offers three exclusive tone radios", async () => {

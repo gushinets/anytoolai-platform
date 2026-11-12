@@ -34,6 +34,8 @@ import {
   startResponse,
 } from "./fixtures/platformResponses";
 import { makeRender } from "./support/renderWithI18n";
+import { simulateBrowserTranslation } from "@anytoolai/shared-ui/test/support/simulateBrowserTranslation";
+import { LOCALE_STORAGE_KEY } from "../src/i18n/localeStorage";
 
 const render = makeRender(BRIEF_DECODER_MESSAGES);
 const IDS = { productId: "brief_decoder", scenarioId: "brief_decoder.decode_v1" } as const;
@@ -116,6 +118,46 @@ async function decode(queues: ReturnType<typeof routes>, events: ProductRunEvent
 const completedEvents = (events: ProductRunEvent[]) => events.filter((e) => e.type === "scenario_completed");
 
 describe("Brief Decoder definition", () => {
+  it.each([
+    { locale: "en", translated: true },
+    { locale: "ru", translated: false },
+    { locale: "ru", translated: true },
+  ] as const)("keeps decoding in $locale with translation=$translated (ANY-840)", async ({ locale, translated }) => {
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+    const labels = locale === "ru"
+      ? { brief: "Бриф клиента", submit: "Разобрать бриф", regenerate: "Разобрать бриф заново", result: "Разбор брифа", noIssues: "Проблем не найдено." }
+      : { brief: "Client brief", submit: "Decode brief", regenerate: "Decode brief again", result: "Decoded brief", noIssues: "No issues found." };
+    const errorSpy = vi.spyOn(console, "error");
+    try {
+      const { client, calls } = makeClient({
+        ...routes(composedOutput("")),
+        [ROUTES.QUOTA]: Array.from({ length: 5 }, () => quotaResponse(IDS)),
+        [ROUTES.START]: [startResponse(), startResponse()],
+        [ROUTES.SESSION]: [sessionResponse(), sessionResponse()],
+        [ROUTES.RESULT]: [
+          resultResponse(IDS, { output: composedOutput("") }),
+          resultResponse(IDS, { output: composedOutput(".no_issues") }),
+        ],
+      });
+      render(<BriefDecoderProduct client={client} />);
+      fireEvent.change(await screen.findByLabelText(labels.brief), { target: { value: "Need a website by the holidays." } });
+      const button = screen.getByRole("button", { name: labels.submit });
+      if (translated) simulateBrowserTranslation(button);
+      fireEvent.click(button);
+      await screen.findByRole("button", { name: labels.regenerate });
+      expect(screen.getByRole("heading", { name: labels.result, level: 2 })).toBeTruthy();
+
+      if (translated) simulateBrowserTranslation(button);
+      fireEvent.click(button);
+      await screen.findByText(labels.noIssues);
+      expect(screen.getByRole("button", { name: labels.regenerate })).toBe(button);
+      expect(calls.filter((call) => call.key === ROUTES.START)).toHaveLength(2);
+      expect(errorSpy).not.toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
   it("declares the backend's Brief Decoder -> Acceptance Builder handoff and its button label", () => {
     const handoffs = readFileSync(
       resolve(SCHEMA_ROOT, "../handoffs.yaml"),
