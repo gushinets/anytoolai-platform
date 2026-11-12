@@ -8,8 +8,8 @@
 - Created: 2026-11-12
 - Last updated: 2026-11-12
 - Review date: 2026-11-19
-- Next action: owner decision on one remaining neutral-tone punctuation failure before closing review round 2.
-- Blocker: G10 attempt 3 uses an exclamation mark instead of the required period; strict every-run acceptance is not met.
+- Next action: review and merge; the owner accepted the recorded punctuation exception and authorized closing both round 2 findings.
+- Blocker: none for this iteration; the strict 72/72 target is not met, with the 1/72 punctuation exception explicitly accepted by the owner.
 
 ## Goal
 
@@ -256,12 +256,19 @@ On `cce65cdcdff3ebc77e1ab4502386828a477081d4`:
 - Actual backend: OpenAI gpt-6-luna, reasoning medium, default_text_generation_v1. Both runtime
   prompt hashes match Git and the live checkout was clean. Model/runtime policy is unchanged.
 
-Strict acceptance remains pending: the plan requires every first line to match. The review fixes
-and missing coverage are delivered, but closing with the remaining punctuation exception requires
-an explicit owner decision. Further prompt-only tuning is deferred; if a stricter generation target
+The strict every-run target is not met. After reviewing the published 71/72 result, the owner
+explicitly accepted the single punctuation exception and authorized closing both findings on
+2026-11-12. The failed record stays failed; acceptance is scoped to this iteration with that caveat. Further prompt-only tuning is deferred; if a stricter generation target
 is required, compare sol and terra against luna across RU/EN/ES before another wording change.
 
 The separate round 2 evidence directory preserves both candidates, their input/output and ledgers.
 Round 1 evidence and pinned inputs remain unchanged.
 
 [Round 2 evidence and remaining acceptance condition](../../../tests/fixtures/proposal_ai_eval/acceptance/any-845-round2/README.md).
+
+### Owner acceptance decision
+
+On 2026-11-12 the owner selected: accept the recorded 1/72 punctuation deviation, close both
+review findings and finish this iteration, without claiming 100% success. No model comparison
+or further prompt-only tuning is required for this iteration. Raw evidence and measured results
+remain unchanged; only the acceptance decision is added to the report.

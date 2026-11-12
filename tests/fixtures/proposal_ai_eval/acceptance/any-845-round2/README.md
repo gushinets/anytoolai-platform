@@ -2,8 +2,9 @@
 
 The two review fixes are implemented on `cce65cdcdff3ebc77e1ab4502386828a477081d4`:
 unambiguous Russian name normalization and a complete RU/EN/ES × tone × named/unnamed matrix.
-Live verification on 2026-11-12 found one remaining punctuation deviation. **Strict acceptance
-is pending**: the task's plan requires every run to match the fixed greeting formula.
+Live verification on 2026-11-12 found one remaining punctuation deviation. **The owner accepted
+this iteration with that explicit exception** after reviewing the published evidence. The strict
+every-run requirement remains unmet; measured results and raw failures are unchanged.
 
 | Verification | Result |
 |---|---:|
@@ -16,8 +17,9 @@ is pending**: the task's plan requires every run to match the fixed greeting for
 
 `G10-ru-brand-name`, attempt 3, returned `Здравствуйте!` in `neutral`, where `Здравствуйте.` is
 required. It correctly omitted the brand as a personal name. This is a `missing_required` failure,
-not a pass or a suppressed warning. The other two repetitions match. Closing with this exception
-requires an explicit owner decision; no 100% success or full acceptance is claimed.
+not a pass or a suppressed warning. The other two repetitions match. The owner explicitly authorized closing both review findings with this exception on 2026-11-12.
+No 100% success or full human/browser acceptance is claimed. The decision is recorded separately
+from measured results in `owner_decision` in the report.
 
 ## Records
 

@@ -1507,8 +1507,8 @@
       "disposition": "Agent confirms English: Shopify experience is not covered. is a five-word gap below GAP_MIN_WORDS=6. The proposal and other gap are also English."
     }
   ],
-  "acceptance_status": "pending_owner_decision",
-  "acceptance_conclusion": "71/72 exact greeting formulas pass. The full 18-combination matrix passes 54/54 and inflected-name normalization passes 3/3; all four QA cases pass agent assessment. G10 brand-name attempt 3 uses warm punctuation in neutral tone. The plan requires every run to match, so strict acceptance is not met and review threads remain open pending correction or an explicit owner exception.",
+  "acceptance_status": "accepted_with_owner_exception",
+  "acceptance_conclusion": "The owner accepted this iteration with the explicitly recorded G10 punctuation exception and authorized closing both findings. Exact greetings remain 71/72, the full matrix 54/54, inflected-name normalization 3/3, and original QA agent assessments 4/4. This is not 100% generation success or full human/browser/production acceptance.",
   "remaining_caveats": [
     "Language models are probabilistic; the fixed sample and backend model policy do not guarantee every future generation.",
     "Body long-dash warnings are retained; further style tuning is deferred.",
@@ -1538,5 +1538,12 @@
     "inflected_name_runs": 3,
     "additional_edge_cases": 6,
     "repetitions_per_case": 3
+  },
+  "owner_decision": {
+    "date": "2026-11-12",
+    "source": "Explicit owner response in the task conversation after reviewing the published 71/72 result.",
+    "decision": "Accept the known 1/72 punctuation deviation and close both review findings; finish this iteration without claiming 100% success.",
+    "scope": "G10-ru-brand-name attempt 3: Здравствуйте! instead of Здравствуйте. in neutral. Preserve the failed literal check and all raw evidence.",
+    "strict_every_run_requirement_met": false
   }
 }
