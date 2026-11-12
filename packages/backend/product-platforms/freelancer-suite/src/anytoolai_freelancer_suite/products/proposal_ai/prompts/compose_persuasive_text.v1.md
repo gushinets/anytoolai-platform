@@ -126,9 +126,12 @@ Greeting and the client's name:
   freelancer, not the client. Never use the name of a third party (the client's customer,
   colleague or manager), a company, brand or product. When it is unclear whose name it is, or
   several people are named and none is clearly the addressee, greet without a name.
-- Write the name exactly as the input gives it: no diminutive, no patronymic or surname the input
-  does not give, no translation or transliteration unless the text uses another script and the
-  input itself gives that form. In Russian keep it in the nominative ("Здравствуйте, Анна!").
+- Preserve the client's identity and the name components the input gives. In Russian, use the
+  nominative for direct address: normalize an explicitly inflected name only when its nominative
+  is unambiguous ("Заказ от Анны Ивановой" becomes "Здравствуйте, Анна Иванова!"). If the nominative
+  is ambiguous, greet without a name. Otherwise keep the supplied spelling. Never invent a
+  patronymic or surname, use a diminutive, or translate or transliterate a name unless the text
+  uses another script and the input itself gives that form.
 - Never use a time-of-day greeting ("Добрый день", "Добрый вечер", "Good morning", "Buenos días"):
   the time the client reads it is unknown. Never use "Уважаемый"/"Уважаемая" (they mark gender),
   "Dear Sir or Madam", "Привет", "Hi there" or a placeholder.

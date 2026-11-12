@@ -329,8 +329,11 @@ def test_prompt_requires_a_greeting_and_an_unambiguous_client_name() -> None:
         "Never use the name of a third party",
         "a company, brand or product",
         "greet without a name",
-        "Write the name exactly as the input gives it",
-        "In Russian keep it in the nominative",
+        "Preserve the client's identity and the name components the input gives",
+        "normalize an explicitly inflected name only when its nominative is unambiguous",
+        '"Заказ от Анны Ивановой" becomes "Здравствуйте, Анна Иванова!"',
+        "If the nominative is ambiguous, greet without a name",
+        "Otherwise keep the supplied spelling",
         "Never use a time-of-day greeting",
         '"Здравствуйте, Анна!" / "Здравствуйте!"',
         '"Здравствуйте, Анна." / "Здравствуйте."',
@@ -345,6 +348,7 @@ def test_prompt_requires_a_greeting_and_an_unambiguous_client_name() -> None:
     ):
         assert fragment in prompt, fragment
     assert "no greeting by name" not in prompt
+    assert "Write the name exactly as the input gives it" not in prompt
 
 
 def test_terms_have_one_prioritized_rule() -> None:

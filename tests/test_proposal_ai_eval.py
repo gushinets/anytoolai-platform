@@ -332,6 +332,45 @@ def test_criteria_are_questions_and_fixture_checks_are_literal() -> None:
                 assert "\\d" in pattern, f"{order['id']}: must_not forbids amounts only: {pattern}"
 
 
+@pytest.mark.parametrize(
+    ("prefix", "language", "greetings"),
+    [
+        ("G01-ru-name", "ru", ("Здравствуйте, Анна!", "Здравствуйте, Анна.", "Анна, здравствуйте.")),
+        ("G02-ru-noname", "ru", ("Здравствуйте!", "Здравствуйте.", "Здравствуйте.")),
+        ("G05-en-name", "en", ("Hi John,", "Hello John,", "Hello John,")),
+        ("G11-en-noname", "en", ("Hi,", "Hello,", "Hello,")),
+        ("G06-es-name", "es", ("Hola, Ana:", "Hola, Ana:", "Hola, Ana:")),
+        ("G07-es-noname", "es", ("Hola:", "Hola:", "Hola:")),
+    ],
+)
+def test_greeting_fixture_covers_every_tone_with_and_without_names(
+    prefix: str, language: str, greetings: tuple[str, str, str]
+) -> None:
+    fixture = json.loads((FIXTURES / "greeting_cases.json").read_text(encoding="utf-8"))
+    orders = {order["id"]: order for order in fixture["orders"]}
+    assert len(orders) == len(fixture["orders"])
+    for tone, greeting in zip(("warm", "neutral", "firm"), greetings, strict=True):
+        order = orders[f"{prefix}-{tone}"]
+        assert order["tone"] == tone
+        assert order["expect_language"] == order["expect_gaps_language"] == language
+        assert order["task_text"] and order["freelancer_positioning"]
+        pattern, = order["must"]
+        assert re.search(pattern, greeting + "\n\n" + CLEAN)
+        assert not re.search(pattern, CLEAN)
+        assert not re.search(pattern, greeting + " " + CLEAN)
+
+
+def test_greeting_fixture_requires_nominative_for_an_inflected_client_name() -> None:
+    fixture = json.loads((FIXTURES / "greeting_cases.json").read_text(encoding="utf-8"))
+    order = next(o for o in fixture["orders"] if o["id"] == "G12-ru-inflected-name-warm")
+    assert "Заказ от Анны Ивановой" in order["task_text"]
+    assert "Анна Иванова" not in order["task_text"]
+    pattern, = order["must"]
+    assert re.search(pattern, "Здравствуйте, Анна Иванова!\n\n" + CLEAN)
+    assert not re.search(pattern, "Здравствуйте, Анны Ивановой!\n\n" + CLEAN)
+    assert not re.search(pattern, "Здравствуйте!\n\n" + CLEAN)
+
+
 def test_gap_fixture_inputs_and_checks() -> None:
     fixture = json.loads((FIXTURES / "gaps.json").read_text(encoding="utf-8"))
     orders = proposal_ai_eval.normalized_orders(fixture)

@@ -8,8 +8,8 @@
 - Created: 2026-11-12
 - Last updated: 2026-11-12
 - Review date: 2026-11-19
-- Next action: review and merge with the recorded live evidence, then move to `completed/`.
-- Blocker: none for the scoped greeting/name acceptance; the live evidence below resolves the missing-run finding.
+- Next action: address review round 2, then collect separate live evidence for the expanded matrix.
+- Blocker: review round 2 requires an unambiguous name-inflection rule and complete tone/name coverage.
 
 ## Goal
 
@@ -27,7 +27,12 @@ them unambiguously.
 - a company, brand or product name,
 - a name when it is unclear whose it is, or when several people are named and none is clearly the addressee.
 
-If in doubt, use the greeting without a name. Write the name exactly as the input gives it (no diminutives, no patronymic invented, no translation or transliteration unless the text language uses another script and the input itself gives that form). In Russian, the name stays in the nominative case (vocative address).
+If in doubt, use the greeting without a name. Preserve the client's identity and supplied name
+components. In Russian, normalize an explicitly inflected name to nominative only when that form
+is unambiguous: «Заказ от Анны Ивановой» → «Здравствуйте, Анна Иванова!». Otherwise omit the name
+if its nominative is ambiguous; keep the supplied spelling in other cases. Do not invent a
+patronymic or surname, use a diminutive, translate or transliterate unless the input gives that
+form for the other script. This clarification was approved in review round 2 on 2026-11-12.
 
 **R3. Greeting formulas per tone (no time-of-day greetings like "Добрый день/вечер", "Good morning": the send time is unknown).**
 
@@ -184,3 +189,34 @@ finding, with the documented non-critical caveats; it does not claim full ANY-63
 acceptance, validate every future model output, or re-accept unrelated A04 gap-classification quality.
 No production deployment or browser run was performed. No prompt, runtime or dependency changes
 were needed to resolve this finding.
+
+## Implementation plan — review round 2
+
+Owner authorized both fixes, paid live verification, separate evidence, push, PR/Linear updates
+and resolving the findings only after successful verification. Starting checkout is `72b99dd1`,
+which already merges ANY-846 gap detection changes; preserve those changes and record both prompt
+hashes in the new evidence rather than comparing results as a composer-only change.
+
+1. Preserve client identity/name components, but explicitly allow unambiguous Russian normalization
+   to nominative; use no name if the nominative cannot be determined unambiguously. Update R2 and
+   its prompt test together. Keep the shared speaker-identity bullet unchanged.
+2. Append 11 missing RU/EN/ES × tone × named/unnamed combinations and one explicit inflected-name
+   case, for 24 cases total. Keep all previous cases unchanged. Add a small matrix-coverage test
+   with the expected greeting for each of the 18 combinations.
+3. Run focused tests and repository validators. Commit the implementation so live evidence names
+   an exact source version. Run the complete 24-case fixture three times plus P01/P02/P04/P05 once
+   through the actual provider, with separate versioned evidence for this round.
+4. Assess openings and body criteria, preserving warnings and reviewer attribution. Update the
+   PR and Linear only with verified outcomes and resolve each finding when its evidence passes.
+
+Scope: ProposalAI prompt, existing Python tests, eval fixtures and acceptance documentation. No
+runtime parser, dependency, UI, model-policy or DSL change. Prior acceptance records stay intact.
+
+### Round 2 local verification
+
+- Managed Python 3.12.13 doctor passed. Focused product, speaker-identity and eval tests: **244 passed**.
+- Config, architecture and documentation validation passed. Generated-doc checking uses
+  `LITELLM_LOCAL_MODEL_COST_MAP=True` to avoid the known offline LiteLLM metadata import race.
+- The original 12 greeting inputs and all round 1 acceptance artifacts remain unchanged.
+- Expanded fixtures cover all 18 language/tone/name combinations plus six edge cases, including
+  an inflected Russian first name and surname. Live verification is pending on the committed source.
