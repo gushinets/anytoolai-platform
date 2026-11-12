@@ -5,6 +5,7 @@ const RUN_POLL_MAX_BACKOFF_MS = 4_000;
 const RUN_POLL_TIMEOUT_MS = 90_000;
 const RETRYABLE_SUBMISSION_STATUSES = new Set([408, 425, 500, 502, 503, 504]);
 const TERMINAL_RUN_STATUSES = new Set(["succeeded", "failed", "expired", "cancelled"]);
+const CONTRACT_FAILURE_CODE = "structured_output_validation_failed";
 const RUN_PRESENTATION = {
   queued: {label: "Ожидает запуска", tone: "pending", help: "Запуск принят и ожидает обработки."},
   running: {label: "Выполняется", tone: "pending", help: "Ожидаем ответ модели и проверяем результат."},
@@ -40,6 +41,22 @@ const ATOM_LABELS = {
   A11: {name: "Сравнить тексты", input: "Два текста, категории и критерии", output: "Результат сравнения"},
 };
 const ATOM_IDS = new Set(Object.keys(ATOM_LABELS));
+const INPUT_FIELD_LABELS = {
+  source_text: "Исходный текст", fields: "Извлекаемые поля", strict: "Требовать все обязательные поля",
+  text_a: "Первый текст", text_b: "Второй текст", rubric: "Критерии оценки",
+  text: "Текст", axes: "Шкалы оценки", context: "Контекст", taxonomy: "Категории проблем",
+  issues: "Найденные проблемы", target_audience: "Кому задать вопросы", max_questions: "Максимум вопросов",
+  objective: "Цель", audience: "Аудитория", angle: "Основной аргумент", constraints: "Ограничения",
+  situation: "Ситуация", intent: "Цель ответа", tone: "Тон", gap: "Что нужно исправить",
+  n: "Количество вариантов", style: "Стиль", signals: "Сигналы", options: "Варианты",
+  template_ref: "Шаблон", data: "Данные для шаблона", subject_text: "Текст для проверки",
+  reference_text: "Текст для сравнения", categories: "Категории", criteria: "Критерии",
+  name: "Название", type: "Тип", description: "Описание", required: "Обязательное поле",
+  category: "Категория", severity: "Серьёзность", evidence: "Подтверждение", weight: "Вес",
+  length: "Длина", language: "Язык", format: "Формат", max_length: "Максимальная длина",
+  output_format: "Формат ответа", label: "Название", value: "Значение",
+};
+const RESULT_FIELD_LABELS = {values: "Извлечённые значения", missing_fields: "Пропущенные поля", confidence: "Уверенность"};
 const PROMPT_GROUPS = {platform: "Платформа", product: "Продукты", lab: "Сохранённые в Lab"};
 const CONFIRMED_PRESET_PREWRITE_FAILURE_CODES = new Set([
   "atom_lab_catalog_unavailable",
@@ -123,9 +140,9 @@ function firstControlId(schema, path, value) {
     if (properties.length > 0) {
       const [key, childSchema] = properties[0];
       const childPath = [...path, key];
-      return value && Object.hasOwn(value, key)
-        ? firstControlId(childSchema, childPath, value[key])
-        : fieldControlId(childPath, "add");
+      if (value && Object.hasOwn(value, key)) return firstControlId(childSchema, childPath, value[key]);
+      return schema.required?.includes(key)
+        ? firstControlId(childSchema, childPath, undefined) : fieldControlId(childPath, "add");
     }
     return fieldControlId(path, "add-key");
   }
@@ -801,9 +818,10 @@ export function collectSchemaFeatures(schema, features = new Set()) {
   return features;
 }
 
-function validationError(errors, path, message) {
+function validationError(errors, path, message, fieldId) {
   const error = {path: pathLabel(path), message};
   Object.defineProperty(error, "key", {value: fieldKey(path)});
+  if (fieldId) Object.defineProperty(error, "fieldId", {value: fieldId});
   errors.push(error);
 }
 
@@ -835,7 +853,9 @@ function validateValue(value, schema, path, errors) {
     const properties = schema.properties ?? {};
     for (const required of schema.required ?? []) {
       if (!Object.hasOwn(value, required)) {
-        validationError(errors, [...path, required], "Обязательное поле не заполнено.");
+        const missingPath = [...path, required];
+        validationError(errors, missingPath, "Обязательное поле не заполнено.",
+          firstControlId(properties[required] ?? {}, missingPath, undefined));
       }
     }
     for (const [key, item] of Object.entries(value)) {
@@ -950,7 +970,7 @@ function renderValidation(document, container, session, admissionErrors = []) {
     item.id = errorId;
     const control = typeof document.getElementById === "function"
       ? document.getElementById(error.controlId ?? (session.mode === "json"
-        ? "json-editor" : controlIdForKey(error.key ?? error.path)))
+        ? "json-editor" : error.fieldId ?? controlIdForKey(error.key ?? error.path)))
         ?? document.getElementById(controlIdForKey(error.key ?? error.path, "type"))
         ?? document.getElementById(controlIdForKey(error.key ?? error.path, "add"))
         ?? document.getElementById(controlIdForKey(error.key ?? error.path, "add-item"))
@@ -1021,6 +1041,13 @@ function renderUntyped(context, wrapper, path, label, value) {
     string: "Строка", number: "Число", boolean: "Логическое значение",
     object: "Объект", array: "Массив", null: "null",
   };
+  if (value === undefined) {
+    const placeholder = document.createElement("option");
+    placeholder.value = "undefined";
+    placeholder.textContent = "Выберите тип значения";
+    placeholder.disabled = true;
+    select.append(placeholder);
+  }
   for (const kind of kinds) {
     const option = document.createElement("option");
     option.value = kind;
@@ -1077,7 +1104,7 @@ function renderUntyped(context, wrapper, path, label, value) {
   }
 }
 
-function renderField(context, container, schema, path, label, required) {
+function renderField(context, container, schema, path, label, required, keyHint) {
   const {document, session, rerender} = context;
   const exists = hasDraftPath(session, path);
   const wrapper = document.createElement("div");
@@ -1086,24 +1113,38 @@ function renderField(context, container, schema, path, label, required) {
   const value = valueAtPath(session.payload, path);
   const type = primaryType(schema, value);
   const compound = type === "object" || type === "array";
+  const untyped = schemaTypes(schema).length === 0 && !Array.isArray(schema.enum);
+  const allowsNull = schemaTypes(schema).includes("null");
+  const requiredField = required && typeof path.at(-1) !== "number";
+  const requiredGroup = requiredField && (compound || untyped || allowsNull);
   const heading = document.createElement("div");
   heading.className = "field-heading";
-  const title = document.createElement(exists && !compound ? "label" : "strong");
-  if (exists && !compound) title.htmlFor = firstControlId(schema, path, value);
+  const hasControl = (exists || required) && !compound;
+  const title = document.createElement(hasControl ? "label" : "strong");
+  if (hasControl) title.htmlFor = firstControlId(schema, path, value);
   title.textContent = label;
-  if (required && typeof path.at(-1) !== "number" && type !== "boolean") {
+  if (requiredField) {
     const mark = document.createElement("span");
     mark.className = "required-mark";
     mark.textContent = " *";
+    mark.setAttribute("aria-hidden", "true");
     title.append(mark);
   }
+  if (keyHint) {
+    const code = document.createElement("code");
+    code.className = "field-key";
+    code.textContent = keyHint;
+    code.setAttribute("aria-hidden", "true");
+    title.append(code);
+  }
   heading.append(title);
-  if (!exists) {
-    const addButton = button(document, `Добавить поле «${label}»`, () => {
+  if (!exists && !required) {
+    const addButton = button(document, "Добавить", () => {
       const valueToAdd = initialValue(schema);
       setDraftPath(session, path, valueToAdd);
       rerender(true, firstControlId(schema, path, valueToAdd));
     });
+    addButton.setAttribute("aria-label", `Добавить поле «${label}»`);
     addButton.id = fieldControlId(path, "add");
     heading.append(addButton);
     wrapper.append(heading);
@@ -1111,30 +1152,44 @@ function renderField(context, container, schema, path, label, required) {
     return heading;
   }
   if (!required && path.length > 0) {
-    const omitButton = button(document, `Не передавать «${label}»`, () => {
+    const omitButton = button(document, "Не передавать", () => {
       omitDraftPath(session, path);
       rerender(true, fieldControlId(path, "add"));
     });
+    omitButton.setAttribute("aria-label", `Не передавать «${label}»`);
     omitButton.id = fieldControlId(path, "omit");
     heading.append(omitButton);
   }
   wrapper.append(heading);
-  const descriptionText = session.atom.atom_id === "A01" && path.length === 1 && path[0] === "strict"
-    ? "При включении все поля с required=true должны быть найдены. Если их нет, ответ не пройдёт проверку. При выключении допустим частичный результат с missing_fields."
+  const fieldDescription = session.atom.atom_id === "A01" && path.length === 1 && path[0] === "strict"
+    ? "Если настройка включена, атом должен найти все поля, отмеченные как обязательные. При выключенной настройке допустим частичный результат."
     : schema.description;
+  const descriptionId = fieldControlId(path, "description");
+  const requiredDescription = requiredGroup && (type === "array" && schema.minItems > 0
+    ? `Обязательное поле. Минимальное число элементов — ${schema.minItems}.` : "Обязательное поле.");
+  const descriptionText = [requiredDescription, fieldDescription].filter(Boolean).join(" ");
+  if (requiredGroup) {
+    title.id = fieldControlId(path, "label");
+    wrapper.setAttribute("role", "group");
+    wrapper.setAttribute("aria-labelledby", title.id);
+    wrapper.setAttribute("aria-describedby", descriptionId);
+  }
+  const describeControl = (control) => {
+    if (requiredField) control.setAttribute("aria-required", "true");
+    if (descriptionText) control.setAttribute("aria-describedby", descriptionId);
+  };
   if (descriptionText) {
     const description = document.createElement("p");
-    description.id = fieldControlId(path, "description");
+    description.id = descriptionId;
     description.className = "field-description";
     description.textContent = descriptionText;
     wrapper.append(description);
   }
-  if (schemaTypes(schema).length === 0 && !Array.isArray(schema.enum)) {
+  if (untyped) {
     renderUntyped(context, wrapper, path, label, value);
     container.append(wrapper);
     return heading;
   }
-  const allowsNull = schemaTypes(schema).includes("null");
   if (allowsNull) {
     const nullLabel = document.createElement("label");
     const nullInput = document.createElement("input");
@@ -1155,30 +1210,40 @@ function renderField(context, container, schema, path, label, required) {
       return heading;
     }
   }
-  if (!matchesDeclaredType(value, schema)) {
+  if (exists && !matchesDeclaredType(value, schema)) {
     appendRecoverableJson(context, wrapper, path, label, value);
     container.append(wrapper);
     return heading;
   }
+  const choices = schema.enum ?? (required && type === "boolean" ? [true, false] : null);
   if (type === "object") {
-    renderObject(context, wrapper, schema, path, value);
+    renderObject(context, wrapper, schema, path, value ?? {});
   } else if (type === "array") {
-    renderArray(context, wrapper, schema, path, value);
-  } else if (Array.isArray(schema.enum)) {
+    renderArray(context, wrapper, schema, path, value ?? [], requiredGroup ? descriptionId : null);
+  } else if (Array.isArray(choices)) {
     if (required && !allowsNull) wrapper.classList.add("schema-inline");
     const select = document.createElement("select");
     select.setAttribute("aria-label", label);
-    for (const optionValue of schema.enum) {
+    describeControl(select);
+    if (!exists) {
+      const placeholder = document.createElement("option");
+      placeholder.textContent = "Выберите значение";
+      placeholder.value = "";
+      placeholder.disabled = true;
+      select.append(placeholder);
+    }
+    for (const optionValue of choices) {
       const option = document.createElement("option");
       option.value = String(optionValue);
-      option.textContent = String(optionValue);
+      option.textContent = typeof optionValue === "boolean" ? optionValue ? "Да" : "Нет" : option.value;
       option.selected = sameJson(optionValue, value);
       select.append(option);
     }
-    select.value = String(value);
+    select.value = exists ? String(value) : "";
     select.id = fieldControlId(path);
     select.addEventListener("change", () => {
-      const selected = schema.enum.find((item) => String(item) === select.value);
+      const selected = choices.find((item) => String(item) === select.value);
+      if (selected === undefined) return;
       setDraftPath(session, path, selected);
       rerender(false);
     });
@@ -1190,7 +1255,7 @@ function renderField(context, container, schema, path, label, required) {
     input.type = "checkbox";
     input.checked = value;
     input.setAttribute("aria-label", label);
-    if (descriptionText) input.setAttribute("aria-describedby", fieldControlId(path, "description"));
+    if (descriptionText) input.setAttribute("aria-describedby", descriptionId);
     input.addEventListener("change", () => {
       setDraftPath(session, path, input.checked);
       rerender(false);
@@ -1200,9 +1265,10 @@ function renderField(context, container, schema, path, label, required) {
     const input = document.createElement("input");
     input.id = fieldControlId(path);
     input.type = "number";
-    input.value = String(value);
+    input.value = exists ? String(value) : "";
     input.step = type === "integer" ? "1" : "any";
     input.setAttribute("aria-label", label);
+    describeControl(input);
     input.addEventListener("input", () => {
       const isInteger = type === "integer";
       const exactInteger = /^-?(0|[1-9]\d*)$/.test(input.value);
@@ -1227,8 +1293,9 @@ function renderField(context, container, schema, path, label, required) {
     const input = document.createElement("textarea");
     input.id = fieldControlId(path);
     input.rows = schema.pattern ? 1 : 2;
-    input.value = value;
+    input.value = value ?? "";
     input.setAttribute("aria-label", label);
+    describeControl(input);
     input.addEventListener("input", () => {
       setDraftPath(session, path, input.value);
       rerender(false);
@@ -1239,6 +1306,7 @@ function renderField(context, container, schema, path, label, required) {
     input.rows = 3;
     input.value = JSON.stringify(value, null, 2);
     input.setAttribute("aria-label", `${label}, JSON-значение`);
+    describeControl(input);
     input.addEventListener("change", () => {
       try {
         setDraftPath(session, path, JSON.parse(input.value));
@@ -1258,7 +1326,8 @@ function renderObject(context, container, schema, path, value) {
   const properties = schema.properties ?? {};
   const required = new Set(schema.required ?? []);
   for (const [key, propertySchema] of Object.entries(properties)) {
-    renderField(context, container, propertySchema, [...path, key], key, required.has(key));
+    const label = Object.hasOwn(INPUT_FIELD_LABELS, key) ? INPUT_FIELD_LABELS[key] : key;
+    renderField(context, container, propertySchema, [...path, key], label, required.has(key), label !== key ? key : null);
   }
   const allowsDynamic = schema.additionalProperties !== false;
   const dynamicSchema = typeof schema.additionalProperties === "object" ? schema.additionalProperties : {};
@@ -1291,19 +1360,17 @@ function renderObject(context, container, schema, path, value) {
     const addKeyButton = button(document, "Добавить ключ", () => {
       let index = 1;
       while (Object.hasOwn(value, `key_${index}`)) index += 1;
-      setDraftPath(session, [...path, `key_${index}`], initialValue(dynamicSchema));
-      rerender(true, firstControlId(
-        dynamicSchema,
-        [...path, `key_${index}`],
-        value[`key_${index}`],
-      ));
+      const keyPath = [...path, `key_${index}`];
+      const valueToAdd = initialValue(dynamicSchema);
+      setDraftPath(session, keyPath, valueToAdd);
+      rerender(true, firstControlId(dynamicSchema, keyPath, valueToAdd));
     });
     addKeyButton.id = fieldControlId(path, "add-key");
     container.append(addKeyButton);
   }
 }
 
-function renderArray(context, container, schema, path, value) {
+function renderArray(context, container, schema, path, value, requiredDescription = null) {
   const {document, session, rerender} = context;
   value.forEach((item, index) => {
     const itemPath = [...path, index];
@@ -1347,9 +1414,10 @@ function renderArray(context, container, schema, path, value) {
   const addItemButton = button(document, "Добавить элемент", () => {
     const index = value.length;
     const valueToAdd = initialValue(schema.items ?? {});
-    value.push(valueToAdd);
+    setDraftPath(session, [...path, index], valueToAdd);
     rerender(true, firstControlId(schema.items ?? {}, [...path, index], valueToAdd));
   });
+  if (requiredDescription) addItemButton.setAttribute("aria-describedby", requiredDescription);
   addItemButton.id = fieldControlId(path, "add-item");
   container.append(addItemButton);
 }
@@ -1416,20 +1484,44 @@ function renderContractFields(document, container, schema) {
 
 function renderReadableResult(document, container, value) {
   container.replaceChildren();
-  if (value === null || typeof value !== "object") {
-    const text = document.createElement("p");
-    text.textContent = value === null ? "null" : String(value);
-    container.append(text);
+  appendResultValue(document, container, value, true);
+}
+
+function appendResultValue(document, container, value, topLevel = false) {
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      container.textContent = "Нет элементов";
+      return;
+    }
+    const list = document.createElement("ul");
+    for (const item of value) {
+      const row = document.createElement("li");
+      appendResultValue(document, row, item);
+      list.append(row);
+    }
+    container.append(list);
+    return;
+  }
+  if (!isRecord(value)) {
+    container.textContent = value === null ? "Нет значения" : String(value);
+    return;
+  }
+  const fields = Object.entries(value);
+  if (fields.length === 0) {
+    container.textContent = "Нет полей";
     return;
   }
   const list = document.createElement("dl");
-  for (const [key, item] of Object.entries(value)) {
+  for (const [key, item] of fields) {
     const term = document.createElement("dt");
     term.className = "result-key";
-    term.textContent = key;
+    term.textContent = topLevel && Object.hasOwn(RESULT_FIELD_LABELS, key) ? RESULT_FIELD_LABELS[key] : key;
     const description = document.createElement("dd");
-    if (typeof item !== "string") description.className = "result-structured-value";
-    description.textContent = typeof item === "string" ? item : JSON.stringify(item, null, 2);
+    if (topLevel && key === "missing_fields" && Array.isArray(item) && item.length === 0) {
+      description.textContent = "Пропусков нет";
+    } else {
+      appendResultValue(document, description, item);
+    }
     list.append(term, description);
   }
   container.append(list);
@@ -1491,12 +1583,12 @@ function renderRunMetadata(document, container, diagnostics) {
 
 function modelReasonText(option) {
   if (option.reasoningMode === "unsupported") {
-    return "Эта модель не поддерживает reasoning для текущего пути.";
+    return "Для этой модели нельзя задать уровень рассуждения.";
   }
   if (option.reasoningMode === "unknown") {
-    return "Поддерживаемые уровни reasoning неизвестны; запуск будет без effort.";
+    return "Каталог не подтвердил доступные уровни. Запуск пройдёт без этой настройки.";
   }
-  return "Доступны только подтверждённые каталогом уровни reasoning.";
+  return "В списке уровни, подтверждённые каталогом для этой модели.";
 }
 
 export function bootstrapAtomLab({
@@ -1517,7 +1609,7 @@ export function bootstrapAtomLab({
     ?? `run-${Date.now()}-${Math.random().toString(16).slice(2)}`,
 }) {
   const nodes = Object.fromEntries([
-    "access-form", "access-code", "access-panel", "workspace", "status", "atom-navigation", "atom-count",
+    "access-form", "access-code", "access-panel", "workspace", "status", "atom-navigation", "atom-count", "atom-picker",
     "atom-title", "atom-action-type", "atom-description", "input-schema",
     "input-contract-label", "output-contract-label", "input-contract-fields", "output-contract-fields",
     "input-schema-ref", "output-schema-ref", "input-schema-version", "output-schema-version",
@@ -1529,10 +1621,13 @@ export function bootstrapAtomLab({
     "fill-example", "reset-prompt", "draft-state", "validation-errors", "presets-button",
     "history-button", "model-select", "reasoning-effort", "reasoning-help",
     "model-catalog-warning", "refresh-models", "run-button", "retry-submit", "retry-read", "run-state",
-    "launch-readiness", "response-draft-warning",
+    "launch-readiness", "launch-outcome", "launch-outcome-text", "show-response", "response-title", "response-draft-warning",
     "run-status", "run-status-help", "result-caption", "run-metadata-section", "run-technical",
-    "submitted-snapshot", "result-section", "result-readable", "result-json",
-    "invalid-response", "invalid-response-code", "invalid-response-raw", "run-metadata",
+    "submitted-snapshot", "result-section", "result-readable", "result-json", "save-result-preset", "result-preset-error",
+    "invalid-response", "invalid-response-sample", "invalid-response-note", "invalid-response-raw", "run-metadata",
+    "show-run-diagnostics", "return-to-request", "run-diagnostics-panel", "run-diagnostics-summary",
+    "run-contract-guidance", "run-diagnostic-schema-link", "run-diagnostic-raw-link",
+    "run-diagnostic-schema", "run-diagnostic-schema-json",
     "run-diagnostics", "presets-panel", "close-presets", "preset-list", "load-more-presets",
     "preset-name", "preset-description", "fixed-fields", "preset-version-select", "new-preset",
     "load-more-versions",
@@ -1540,7 +1635,7 @@ export function bootstrapAtomLab({
     "preset-export-download",
     "preset-conflict", "open-latest-preset", "save-as-new-preset", "history-panel",
     "preset-compatibility", "adapt-preset", "preset-readonly",
-    "close-history", "history-list", "load-more-history", "history-warning", "history-detail",
+    "close-history", "history-table", "history-list", "load-more-history", "history-warning", "history-detail",
     "restore-history", "save-history-preset", "history-error",
     "workbench-button", "atom-sidebar", "atom-passport", "run-controls", "request-response",
     "preset-empty", "preset-heading", "preset-selected-name", "preset-context",
@@ -1553,7 +1648,10 @@ export function bootstrapAtomLab({
     "history-result-tab", "history-request-tab", "history-diagnostics-tab",
     "history-result-panel", "history-request-panel", "history-diagnostics-panel",
     "history-result-readable", "history-result-message", "history-result-json",
-    "history-invalid", "history-invalid-code", "history-invalid-raw", "history-input-json",
+    "history-invalid", "history-raw-sample", "history-raw-note", "history-invalid-raw", "show-history-diagnostics", "history-input-json",
+    "history-contract-message",
+    "history-contract-guidance", "history-diagnostic-schema-link", "history-diagnostic-raw-link",
+    "history-diagnostic-schema", "history-diagnostic-schema-json",
     "history-prompt", "history-snapshot", "history-metadata", "history-diagnostics-json", "history-runtime-json",
   ].map((id) => [id, requiredNode(document, `#${id}`)]));
   const accessCodeRequired = nodes["access-panel"].dataset.autoOpen !== "true";
@@ -1618,14 +1716,16 @@ export function bootstrapAtomLab({
   let destroyed = false;
 
   const showLibrary = (section = null) => {
+    const view = section ?? "";
+    if ((nodes.workspace.dataset.library ?? "") !== view) nodes.status.textContent = "";
     nodes["presets-panel"].hidden = section !== "presets";
     nodes["history-panel"].hidden = section !== "history";
-    nodes.workspace.dataset.library = section ?? "";
+    nodes.workspace.dataset.library = view;
     for (const id of ["atom-sidebar", "atom-passport", "run-controls", "request-response"]) {
       nodes[id].hidden = section !== null;
     }
-    for (const [id, view] of [["workbench-button", null], ["presets-button", "presets"], ["history-button", "history"]]) {
-      if (section === view) nodes[id].setAttribute("aria-current", "page");
+    for (const [id, target] of [["workbench-button", null], ["presets-button", "presets"], ["history-button", "history"]]) {
+      if (section === target) nodes[id].setAttribute("aria-current", "page");
       else nodes[id].removeAttribute("aria-current");
     }
   };
@@ -1653,6 +1753,7 @@ export function bootstrapAtomLab({
     ));
     nodes["run-button"].disabled = submitInFlight || !hasValidSelection || submissionBlocksNewRun
       || Boolean(session?.promptSourceNeedsValidation);
+    nodes["save-result-preset"].hidden = !displayedSubmission?.presetConfiguration || !catalog.includes(displayedSubmission.atom);
     nodes["launch-readiness"].textContent = submitInFlight
       ? "Отправка запроса…"
       : submissionBlocksNewRun
@@ -1660,7 +1761,9 @@ export function bootstrapAtomLab({
         : session?.promptSourceNeedsValidation
           ? "Проверьте источник промпта во вкладке «Промпт»"
           : !hasValidSelection
-            ? "Выберите модель и доступный reasoning"
+            ? modelCatalog && modelOptions.length === 0
+              ? "Запуск станет доступен после загрузки моделей."
+              : "Выберите модель и уровень рассуждения."
             : session && (validateDraft(session).length > 0 || !session.prompt.trim() || admissionErrors.length > 0)
               ? "Проверьте входные данные и промпт"
               : "Черновик готов к запуску";
@@ -1684,9 +1787,11 @@ export function bootstrapAtomLab({
       : "";
     nodes["model-catalog-warning"].textContent = selectionInvalidated
       ? `Выбранная модель больше недоступна. Выберите модель заново.${lastSuccess}`
-      : modelCatalog?.stale
-        ? `Каталог моделей устарел.${lastSuccess}${modelCatalog.error ? ` ${modelCatalog.error}` : ""}`
-        : "";
+      : modelCatalog && modelOptions.length === 0
+        ? modelCatalog.error ?? "В каталоге пока нет моделей."
+        : modelCatalog?.stale
+          ? `Каталог моделей устарел.${lastSuccess}${modelCatalog.error ? ` ${modelCatalog.error}` : ""}`
+          : "";
   };
 
   const showModelCatalogFailure = (message) => {
@@ -1763,9 +1868,9 @@ export function bootstrapAtomLab({
     nodes["reasoning-effort"].value = effortRemainsAllowed || preferredEffort ? preferredEffort : "";
     nodes["reasoning-effort"].disabled = option?.reasoningMode !== "supported"
       && !(preferredEffort && !effortRemainsAllowed);
-    nodes["reasoning-help"].textContent = option ? modelReasonText(option) : "Выберите модель.";
+    nodes["reasoning-help"].textContent = option ? modelReasonText(option) : "";
     if (preferredEffort && !effortRemainsAllowed) {
-      nodes["reasoning-help"].textContent = "Выбранный reasoning effort больше не поддерживается. Выберите effort заново.";
+      nodes["reasoning-help"].textContent = "Выбранный уровень больше не поддерживается. Выберите уровень заново.";
     }
     updateRunButton();
     refreshAdmissionValidation();
@@ -1775,6 +1880,7 @@ export function bootstrapAtomLab({
     const previousModelId = nodes["model-select"].value;
     const previousReasoningEffort = nodes["reasoning-effort"].value;
     nodes["model-select"].replaceChildren();
+    const groups = new Map();
     for (const option of modelOptions) {
       const item = document.createElement("option");
       item.value = option.modelId;
@@ -1783,7 +1889,20 @@ export function bootstrapAtomLab({
           ? `${option.modelId} — совместимость неизвестна (${option.reason})`
           : `${option.modelId} — не поддерживается (${option.reason})`;
       item.disabled = !option.selectable;
-      nodes["model-select"].append(item);
+      const family = /^gpt-(3\.5|\d+)(?=[a-z.-]|$)/.exec(option.modelId);
+      const label = family ? `GPT-${family[1]}` : "Другие модели";
+      if (!groups.has(label)) groups.set(label, []);
+      groups.get(label).push(item);
+    }
+    for (const [label, options] of groups) {
+      if (groups.size === 1) {
+        nodes["model-select"].append(...options);
+      } else {
+        const group = document.createElement("optgroup");
+        group.label = label;
+        group.append(...options);
+        nodes["model-select"].append(group);
+      }
     }
     const first = modelOptions.find((option) => option.selectable);
     const previous = modelOptions.find((option) => option.modelId === previousModelId);
@@ -2041,7 +2160,8 @@ export function bootstrapAtomLab({
       input.disabled = !available;
       input.addEventListener("change", () => renderPresetState());
       const caption = document.createElement("span");
-      caption.textContent = field;
+      caption.textContent = Object.hasOwn(INPUT_FIELD_LABELS, field)
+        ? `${INPUT_FIELD_LABELS[field]} (${field})` : field;
       label.append(input, caption);
       nodes["fixed-fields"].append(label);
     }
@@ -2095,7 +2215,7 @@ export function bootstrapAtomLab({
     const selected = selectedPresetVersion;
     const editing = presetEditorActive && !presetReadOnly;
     const configuration = editing ? currentPresetPayload() : selected;
-    nodes["preset-empty"].hidden = Boolean(selected) || editing;
+    nodes["preset-empty"].hidden = Boolean(selected) || editing || presetItems.length === 0;
     nodes["preset-heading"].hidden = selected === null;
     nodes["preset-editor-form"].hidden = !editing;
     nodes["preset-view-actions"].hidden = selected === null || editing;
@@ -2161,7 +2281,7 @@ export function bootstrapAtomLab({
       nodes["preset-state"].textContent = "Открыта сохранённая версия. Только чтение. Изменения сохраняются новой версией.";
       return;
     }
-    const source = presetSourceOverride ? "Снимок истории" : selectedPresetVersion
+    const source = presetSourceOverride ? "Снимок запуска" : selectedPresetVersion
       ? `Пресет ${selectedPresetVersion.preset_id}, версия ${selectedPresetVersion.version}`
       : "Новый пресет";
     const unchanged = selectedPresetVersion ? "Открыта сохранённая версия." : "Нет несохранённых изменений.";
@@ -2225,7 +2345,7 @@ export function bootstrapAtomLab({
   const renderPresetList = () => {
     nodes["preset-list"].replaceChildren();
     for (const preset of presetItems) {
-      const item = button(document, preset.name, () => openPreset(preset));
+      const item = button(document, preset.name, () => openPreset(preset, null, {reveal: true}));
       const metadata = document.createElement("small");
       metadata.textContent = `${preset.atom_id} · ${ATOM_LABELS[preset.atom_id].name} · v${preset.latest_version}`;
       item.append(metadata);
@@ -2240,7 +2360,7 @@ export function bootstrapAtomLab({
     }
     nodes["load-more-presets"].hidden = presetCursor === null;
     nodes["preset-list-state"].textContent = presetItems.length === 0
-      ? "Сохранённых пресетов пока нет. Создайте первый из черновика в лаборатории."
+      ? "Сохранённых пресетов пока нет. Первый можно создать из заполненного черновика."
       : `Загружено пресетов: ${presetItems.length}${presetCursor ? " · есть ещё" : ""}`;
     updatePresetEditorDisabled();
   };
@@ -2274,7 +2394,6 @@ export function bootstrapAtomLab({
     presetListLoadInFlight = true;
     nodes["preset-list-state"].textContent = "Загрузка пресетов…";
     updatePresetEditorDisabled();
-    setPresetError();
     try {
       const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
       const parsed = parsePresetList(await protectedJson(`/v1/atom-lab/presets${query}`));
@@ -2301,8 +2420,8 @@ export function bootstrapAtomLab({
       return true;
     } catch (error) {
       if (generation !== presetListLoadGeneration) return false;
-      setPresetError(error instanceof Error ? error.message : "Не удалось загрузить пресеты.");
-      nodes["preset-list-state"].textContent = "Не удалось обновить библиотеку. Повторно откройте раздел «Пресеты».";
+      const message = error instanceof Error ? error.message : "Не удалось загрузить пресеты.";
+      nodes["preset-list-state"].textContent = `Список пресетов недоступен. ${message} Повторно откройте раздел «Пресеты».`;
       return false;
     } finally {
       if (generation === presetListLoadGeneration) {
@@ -2495,7 +2614,7 @@ export function bootstrapAtomLab({
   const openPreset = async (
     preset,
     preferredVersion = null,
-    {force = false, refreshVersions = true, versionsPageOverride = null, applyToEditor = false} = {},
+    {force = false, refreshVersions = true, versionsPageOverride = null, applyToEditor = false, reveal = false} = {},
   ) => {
     if (presetSaveInFlight && !force) return false;
     const unknownUpdateRecovery = !force
@@ -2512,6 +2631,7 @@ export function bootstrapAtomLab({
     if (!preservesRecoveryDraft && !force && presetHasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return false;
     const focusVersion = document.activeElement === nodes["preset-version-select"];
     const focusPresetId = document.activeElement?.dataset?.presetId;
+    let opened = false;
     const generation = ++presetOpenGeneration;
     presetVersionPageGeneration += 1;
     presetVersionPageInFlight = false;
@@ -2598,6 +2718,7 @@ export function bootstrapAtomLab({
       commitPresetVersion(version, {applyToEditor});
       renderPresetList();
       setPresetError();
+      opened = true;
       return true;
     } catch (error) {
       if (generation !== presetOpenGeneration) return false;
@@ -2609,7 +2730,13 @@ export function bootstrapAtomLab({
       if (generation === presetOpenGeneration) {
         presetOpenInFlight = false;
         updatePresetEditorDisabled();
+        const heading = nodes["preset-selected-name"];
+        const bounds = reveal && opened && !nodes["presets-panel"].hidden ? heading.getBoundingClientRect?.() : null;
         if (focusVersion) nodes["preset-version-select"].focus();
+        else if (bounds && (bounds.top < 0 || bounds.bottom > document.documentElement.clientHeight)) {
+          heading.focus({preventScroll: true});
+          nodes["preset-heading"].scrollIntoView({block: "start"});
+        }
         else if (focusPresetId) {
           for (const item of nodes["preset-list"].querySelectorAll("button")) {
             if (item.dataset.presetId === focusPresetId) item.focus();
@@ -2619,13 +2746,13 @@ export function bootstrapAtomLab({
     }
   };
 
-  const startNewPreset = ({fromHistory = null, activate = true} = {}) => {
+  const startNewPreset = ({fromRun = null, activate = true} = {}) => {
     setPresetReadOnly(false);
     presetEditorActive = activate;
     selectedPresetSummary = null;
     selectedPresetVersion = null;
-    presetSourceOverride = fromHistory;
-    nodes["preset-name"].value = fromHistory ? `Запуск ${fromHistory.sourceRunId}` : "";
+    presetSourceOverride = fromRun;
+    nodes["preset-name"].value = fromRun ? `Запуск ${fromRun.sourceRunId}` : "";
     nodes["preset-description"].value = "";
     nodes["preset-version-select"].replaceChildren();
     nodes["load-more-versions"].hidden = true;
@@ -2670,19 +2797,26 @@ export function bootstrapAtomLab({
     if (openWorkbench) {
       showLibrary();
       nodes.status.textContent = `Пресет «${version.name}», v${version.version}, открыт в лаборатории. Изменения можно сохранить новой версией в разделе «Пресеты».`;
+      focusFirstInput();
     } else nodes["preset-name"].focus();
+  };
+
+  const showInvalidPresetInput = (message) => {
+    session.validationRequested = true;
+    showInputTab(true);
+    renderValidation(document, nodes["validation-errors"], session, admissionErrors);
+    nodes.status.textContent = message;
+    const firstError = nodes["validation-errors"].querySelector("button");
+    if (firstError) firstError.click();
+    else nodes["input-tab"].focus();
   };
 
   const savePreset = async ({forceNew = false} = {}) => {
     if (!presetEditorActive || presetLibraryLoading || presetOpenInFlight || presetReadOnly || presetSaveInFlight
       || presetSaveOutcomeUnknown || (presetSourceOverride ?? session).promptSourceNeedsValidation) return;
     if (!presetSourceOverride && validateDraft(session).length > 0) {
-      session.validationRequested = true;
-      showInputTab(true);
-      renderValidation(document, nodes["validation-errors"], session, admissionErrors);
       setPresetError("Исправьте входные данные перед сохранением пресета.");
-      nodes.status.textContent = "Исправьте входные данные перед сохранением пресета. Затем вернитесь в «Пресеты»: настройки остались в черновике.";
-      nodes["validation-errors"].querySelector("button")?.click();
+      showInvalidPresetInput("Исправьте входные данные перед сохранением пресета. Затем вернитесь в «Пресеты»: настройки остались в черновике.");
       return;
     }
     presetSaveInFlight = true;
@@ -2828,33 +2962,56 @@ export function bootstrapAtomLab({
     nodes["history-record"].hidden = selectedHistoryDetail?.run_id !== selectedHistoryRunId
       || !historyItems.some(run => run.run_id === selectedHistoryRunId);
     nodes["history-panel"].append(nodes["history-record"]);
+    nodes["history-table"].hidden = historyItems.length === 0;
     nodes["history-list"].replaceChildren();
-    for (const run of historyItems) {
+    const dateCounts = new Map();
+    const rows = historyItems.map((run) => {
+      const dateText = formatLabDate(run.created_at);
+      const key = `${run.atom_id}|${run.status}|${dateText}`;
+      dateCounts.set(key, (dateCounts.get(key) ?? 0) + 1);
+      return {run, dateText, key};
+    });
+    for (const {run, dateText, key} of rows) {
       const selected = run.run_id === selectedHistoryRunId;
       const expanded = selected && !nodes["history-record"].hidden;
       const row = document.createElement("tr");
       row.dataset.selected = String(selected);
+      const atomText = `${run.atom_id} · ${ATOM_LABELS[run.atom_id].name}`;
+      const presentation = RUN_PRESENTATION[run.status];
+      const statusText = run.status === "succeeded" ? "Успешно" : presentation.label;
       const date = document.createElement("td");
       date.dataset.label = "Создан";
-      const item = button(document, formatLabDate(run.created_at), () => openHistoryRun(run.run_id));
+      date.setAttribute("headers", "history-col-date");
+      const item = button(document, dateText, () => openHistoryRun(run.run_id));
       item.className = "history-open";
       item.dataset.runId = run.run_id;
+      const duplicate = dateCounts.get(key) > 1;
+      item.setAttribute("aria-label", `Подробности запуска · ${atomText} · ${dateText} · ${statusText}${duplicate ? ` · ID ${run.run_id}` : ""}`);
       item.setAttribute("aria-expanded", String(expanded));
       item.setAttribute("aria-controls", "history-record");
       item.setAttribute("aria-current", String(selected));
       date.append(item);
+      if (duplicate) {
+        const id = document.createElement("small");
+        id.textContent = run.run_id;
+        id.setAttribute("aria-hidden", "true");
+        date.append(id);
+      }
       const atom = document.createElement("td");
       atom.dataset.label = "Атом";
-      atom.textContent = `${run.atom_id} · ${ATOM_LABELS[run.atom_id].name}`;
+      atom.setAttribute("headers", "history-col-atom");
+      atom.textContent = atomText;
       const status = document.createElement("td");
       status.dataset.label = "Статус";
+      status.setAttribute("headers", "history-col-status");
       const badge = document.createElement("span");
       badge.className = "status-badge";
-      badge.dataset.tone = RUN_PRESENTATION[run.status].tone;
-      badge.textContent = run.status === "succeeded" ? "Успешно" : RUN_PRESENTATION[run.status].label;
+      badge.dataset.tone = presentation.tone;
+      badge.textContent = statusText;
       status.append(badge);
       const model = document.createElement("td");
       model.dataset.label = "Модель";
+      model.setAttribute("headers", "history-col-model");
       model.textContent = run.model_id;
       if (run.preset_id) {
         const preset = document.createElement("small");
@@ -2876,7 +3033,7 @@ export function bootstrapAtomLab({
     nodes["load-more-history"].hidden = historyCursor === null;
     nodes["history-list-state"].textContent = historyItems.length === 0
       ? "Запусков пока нет. Выполните первый в лаборатории — его настройки и ответ появятся здесь."
-      : `Загружено запусков: ${historyItems.length}${historyCursor ? " · есть ещё" : ""}`;
+      : "Выберите дату, чтобы открыть подробности запуска.";
     updateHistoryControls();
   };
 
@@ -2888,9 +3045,33 @@ export function bootstrapAtomLab({
     }
   };
 
+  const renderContractDiagnostics = (scope, detail = null) => {
+    const diagnostics = detail?.diagnostics;
+    const schema = detail?.snapshot.schemas?.output?.content;
+    const hasSchema = isRecord(schema) || typeof schema === "boolean";
+    const sample = diagnostics?.debug_artifacts.find(({raw_output_text}) => typeof raw_output_text === "string");
+    const [rawId, noteId, outputId] = scope === "run"
+      ? ["invalid-response-sample", "invalid-response-note", "invalid-response-raw"]
+      : ["history-raw-sample", "history-raw-note", "history-invalid-raw"];
+    nodes[`${scope}-contract-guidance`].hidden = !detail;
+    nodes[`${scope}-diagnostic-schema-link`].hidden = !hasSchema;
+    nodes[`${scope}-diagnostic-schema`].hidden = !hasSchema;
+    nodes[`${scope}-diagnostic-schema`].open = false;
+    nodes[`${scope}-diagnostic-schema-json`].textContent = hasSchema ? JSON.stringify(schema, null, 2) : "";
+    nodes[`${scope}-diagnostic-raw-link`].hidden = !sample;
+    nodes[rawId].hidden = !sample;
+    nodes[rawId].open = false;
+    nodes[noteId].textContent = sample?.truncated ? "Сырой ответ обрезан."
+      : sample?.raw_output_text === "" ? "Сохранён пустой ответ модели." : "";
+    nodes[outputId].textContent = sample?.raw_output_text ?? "";
+    return Boolean(sample);
+  };
+
   const renderHistoryDetail = (detail) => {
     const diagnostics = detail.diagnostics;
     const state = RUN_PRESENTATION[detail.status];
+    const invalid = detail.status === "failed"
+      && (diagnostics.debug_artifacts.length > 0 || diagnostics.error_code === CONTRACT_FAILURE_CODE);
     nodes["history-detail-title"].textContent = `${detail.snapshot.atom_id} · ${ATOM_LABELS[detail.snapshot.atom_id].name}`;
     nodes["history-created"].textContent = formatLabDate(detail.created_at);
     nodes["history-status"].dataset.tone = state.tone;
@@ -2905,13 +3086,13 @@ export function bootstrapAtomLab({
     nodes["history-result-readable"].hidden = !succeeded;
     if (succeeded) renderReadableResult(document, nodes["history-result-readable"], detail.result);
     else nodes["history-result-readable"].replaceChildren();
-    nodes["history-result-message"].textContent = succeeded ? "" : state.help;
+    nodes["history-result-message"].textContent = succeeded || invalid ? "" : state.help;
     nodes["history-result-json"].textContent = JSON.stringify(detail.result, null, 2);
-    const debug = diagnostics.debug_artifacts[0];
-    nodes["history-invalid"].hidden = detail.status !== "failed" || !debug;
-    nodes["history-invalid-code"].textContent = debug
-      ? `${diagnostics.error_code ?? "invalid_response"}${debug.truncated ? " · Сырой ответ обрезан." : ""}` : "";
-    nodes["history-invalid-raw"].textContent = debug?.raw_output_text ?? "";
+    nodes["history-invalid"].hidden = !invalid;
+    const hasRawResponse = renderContractDiagnostics("history", invalid ? detail : null);
+    nodes["history-contract-message"].textContent = hasRawResponse
+      ? "Ответ модели не соответствует схеме атома. Сырой ответ доступен в диагностике."
+      : "Ответ модели не соответствует схеме атома. Сырой ответ недоступен.";
     nodes["history-input-json"].textContent = JSON.stringify(detail.snapshot.input, null, 2);
     nodes["history-prompt"].textContent = detail.snapshot.prompt?.content ?? "Снимок не содержит текст промпта.";
     nodes["history-snapshot"].textContent = JSON.stringify(detail.snapshot, null, 2);
@@ -3030,6 +3211,9 @@ export function bootstrapAtomLab({
   const setRunState = (message, tone = "neutral", help = "") => {
     nodes["run-state"].textContent = message;
     nodes["run-status"].dataset.tone = tone;
+    nodes["launch-outcome-text"].textContent = message;
+    nodes["launch-outcome"].dataset.tone = tone;
+    nodes["launch-outcome"].hidden = false;
     const responseSource = displayedSubmission
       ? `Ниже показаны данные ${displayedSubmission === activeSubmission ? "" : "предыдущего "}принятого запуска ${displayedSubmission.runId}.`
       : "";
@@ -3045,6 +3229,7 @@ export function bootstrapAtomLab({
 
   const displayAcceptedSubmission = (submission) => {
     displayedSubmission = submission;
+    nodes["result-preset-error"].textContent = "";
     nodes["submitted-snapshot"].textContent = JSON.stringify(submission.snapshot, null, 2);
     nodes["run-metadata"].replaceChildren();
     nodes["run-metadata-section"].hidden = true;
@@ -3059,14 +3244,15 @@ export function bootstrapAtomLab({
     nodes["result-readable"].replaceChildren();
     nodes["result-json"].textContent = "";
     nodes["invalid-response"].hidden = true;
-    nodes["invalid-response-code"].textContent = "";
-    nodes["invalid-response-raw"].textContent = "";
+    renderContractDiagnostics("run");
   };
 
   const renderRunDetail = (detail, submission) => {
     if (activeSubmission !== submission) return;
     const diagnostics = detail.diagnostics;
-    setAcceptedRunState(detail.status, diagnostics.error_code);
+    const invalid = detail.status === "failed"
+      && (diagnostics.debug_artifacts.length > 0 || diagnostics.error_code === CONTRACT_FAILURE_CODE);
+    setAcceptedRunState(detail.status, invalid ? null : diagnostics.error_code);
     renderRunMetadata(document, nodes["run-metadata"], diagnostics);
     nodes["run-metadata-section"].hidden = false;
     submission.runtimeIds = {
@@ -3082,6 +3268,7 @@ export function bootstrapAtomLab({
       error_code: diagnostics.error_code ?? null,
     }, null, 2);
     const succeeded = detail.status === "succeeded" && detail.result !== null;
+    submission.presetConfiguration = null;
     nodes["result-section"].hidden = !succeeded;
     if (succeeded) {
       nodes["result-caption"].textContent =
@@ -3090,22 +3277,14 @@ export function bootstrapAtomLab({
       nodes["result-json"].textContent = JSON.stringify(detail.result, null, 2);
       if (runContractMatchesAtom(detail, submission.atom)) {
         completedPromptTrial = {runId: submission.runId, snapshot: submission.snapshot, atom: submission.atom};
+        submission.presetConfiguration = historyPresetConfiguration(detail);
       } else {
         setRunState("Контракт результата отличается от отправленного. Проба не подтверждена.", "warning");
         if (session === submission.ownerSession && session.atom === submission.atom) session.sourceRunId = null;
       }
     }
-    const debugArtifact = (diagnostics.debug_artifacts ?? [])[0];
-    const invalid = detail.status === "failed" && Boolean(debugArtifact);
     nodes["invalid-response"].hidden = !invalid;
-    if (invalid) {
-      const truncation = debugArtifact.truncated ? "Сырой ответ обрезан." : "";
-      nodes["invalid-response-code"].textContent = [
-        diagnostics.error_code ?? "invalid_response",
-        truncation,
-      ].filter(Boolean).join(" · ");
-      nodes["invalid-response-raw"].textContent = debugArtifact.raw_output_text ?? "Сырой ответ недоступен.";
-    }
+    renderContractDiagnostics("run", invalid ? detail : null);
     submission.detailLoaded = true;
     submission.terminal = TERMINAL_RUN_STATUSES.has(detail.status);
     nodes["retry-read"].hidden = true;
@@ -3249,15 +3428,11 @@ export function bootstrapAtomLab({
       if (errors.length > 0) {
         if (nodes["input-panel"].hidden) showInputTab(true);
         renderValidation(document, nodes["validation-errors"], session, admissionErrors);
-        setRunState("Исправьте входные данные перед запуском.", "warning", "Запуск не отправлен.");
         nodes["validation-errors"].querySelector("button")?.click();
         return;
       }
       const option = selectedModelOption();
-      if (!option?.selectable) {
-        setRunState("Выберите доступную модель.", "warning", "Запуск не отправлен.");
-        return;
-      }
+      if (!option?.selectable) return;
       activeSubmission = {
         ...createRunSubmission(session, {
           modelId: option.modelId,
@@ -3269,10 +3444,11 @@ export function bootstrapAtomLab({
     }
     const submission = activeSubmission;
     submitInFlight = true;
-    updateRunButton();
     nodes["retry-submit"].hidden = true;
     nodes["retry-read"].hidden = true;
     setRunState("Отправка запуска…", "pending", "Ожидаем подтверждение приёма запуска.");
+    if (document.activeElement === nodes["run-button"]) nodes["show-response"].focus({preventScroll: true});
+    updateRunButton();
     const controller = new AbortControllerImpl();
     activeSubmissionAbortController = controller;
     const timeoutId = scheduleImpl(() => controller.abort(), submissionTimeoutMs);
@@ -3435,11 +3611,19 @@ export function bootstrapAtomLab({
   };
 
   const renderNavigation = () => {
+    const focusedAtomId = document.activeElement?.dataset?.atomId;
     nodes["atom-navigation"].replaceChildren();
     for (const atom of catalog) {
-      const item = button(document, `${atom.atom_id} · ${ATOM_LABELS[atom.atom_id].name}`, () => selectAtom(atom));
+      const item = button(document, `${atom.atom_id} · ${ATOM_LABELS[atom.atom_id].name}`, () => {
+        if (atom.atom_id !== selectedAtomId && !selectAtom(atom)) return;
+        if (nodes["atom-picker"].getAttribute("aria-expanded") !== "true") return;
+        nodes["atom-picker"].setAttribute("aria-expanded", "false");
+        nodes["atom-picker"].focus();
+      });
+      item.dataset.atomId = atom.atom_id;
       item.setAttribute("aria-current", String(atom.atom_id === selectedAtomId));
       nodes["atom-navigation"].append(item);
+      if (atom.atom_id === focusedAtomId) item.focus({preventScroll: true});
     }
   };
 
@@ -3500,6 +3684,15 @@ export function bootstrapAtomLab({
     if (draft.promptSourceDetached) draft.promptSourceRef = null;
     draft.promptSourceNeedsValidation = false;
     draft.promptContractNeedsValidation = false;
+  };
+
+  const checkRunPresetSource = async (source, isCurrent) => {
+    const {options, atom, promptContractCheck} = await fetchPromptOptions(source, isCurrent);
+    if (!isCurrent() || !isCurrentPromptContractCheck(source, promptContractCheck)) return false;
+    if (atom !== source.atom) throw new Error("Основа промпта изменилась. Заново откройте каталог и явно адаптируйте исторический снимок.");
+    if (promptContractCheck) recoverPromptContract(source.atom, options);
+    reconcilePromptSource(source, options);
+    return true;
   };
 
   const isCurrentPromptOwner = (draft) => !destroyed && catalog.includes(draft.atom)
@@ -3724,7 +3917,7 @@ export function bootstrapAtomLab({
   };
 
   const selectAtom = (atom, {force = false, preservePreset = false} = {}) => {
-    if (!force && hasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return;
+    if (!force && hasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return false;
     if (session) clearValidationPresentation(document, nodes["validation-errors"], session);
     selectedAtomId = atom.atom_id;
     session = createDraftSession(atom);
@@ -3735,6 +3928,7 @@ export function bootstrapAtomLab({
     atomCode.textContent = atom.atom_id;
     const atomName = document.createElement("span");
     atomName.textContent = ATOM_LABELS[atom.atom_id].name;
+    nodes["atom-picker"].textContent = `Выбрать атом: ${atom.atom_id} · ${atomName.textContent}`;
     nodes["atom-title"].replaceChildren(atomCode, atomName);
     nodes["atom-action-type"].textContent = atom.action_type;
     nodes["atom-description"].textContent = atom.description;
@@ -3759,7 +3953,13 @@ export function bootstrapAtomLab({
     renderNavigation();
     renderEditor();
     if (!preservePreset) startNewPreset({activate: false});
+    return true;
   };
+
+  nodes["atom-picker"].addEventListener("click", () => {
+    const picker = nodes["atom-picker"];
+    picker.setAttribute("aria-expanded", String(picker.getAttribute("aria-expanded") !== "true"));
+  });
 
   const showInputTab = (showInput) => {
     showLibrary();
@@ -3770,6 +3970,15 @@ export function bootstrapAtomLab({
     nodes["input-tab"].tabIndex = showInput ? 0 : -1;
     nodes["prompt-tab"].tabIndex = showInput ? -1 : 0;
     if (!showInput) void loadPromptOptions();
+  };
+
+  const focusFirstInput = () => {
+    showInputTab(true);
+    const first = session.mode === "json" ? nodes["json-editor"] : nodes["input-editor"].querySelector(
+      'textarea:not(:disabled), select:not([id$="-type"]):not(:disabled), input:not(.dynamic-key):not([type="hidden"]):not(:disabled)',
+    );
+    const fallback = first ?? document.getElementById(firstControlId(session.atom.input_schema, [], session.payload));
+    focusEditorControl(document, fallback ?? nodes["input-tab"]);
   };
 
   const openCatalog = async () => {
@@ -3972,6 +4181,26 @@ export function bootstrapAtomLab({
     }
   });
   nodes["run-button"].addEventListener("click", () => submitRun());
+  nodes["show-response"].addEventListener("click", () => {
+    nodes["response-title"].focus({preventScroll: true});
+    nodes["response-title"].scrollIntoView({block: "start"});
+  });
+  nodes["show-run-diagnostics"].addEventListener("click", () => {
+    nodes["run-diagnostics-panel"].open = true;
+    nodes["run-diagnostics-summary"].focus();
+  });
+  for (const scope of ["run", "history"]) {
+    for (const part of ["schema", "raw"]) {
+      const shortcut = nodes[`${scope}-diagnostic-${part}-link`];
+      shortcut.addEventListener("click", () => {
+        const target = nodes[shortcut.getAttribute("aria-controls")];
+        if (target.hidden) return;
+        target.open = true;
+        target.querySelector("summary").focus();
+      });
+    }
+  }
+  nodes["return-to-request"].addEventListener("click", focusFirstInput);
   nodes["retry-submit"].addEventListener("click", () => submitRun({retry: true}));
   nodes["retry-read"].addEventListener("click", () => {
     nodes["retry-read"].hidden = true;
@@ -4014,16 +4243,64 @@ export function bootstrapAtomLab({
     await loadHistory();
   });
   for (const id of ["close-presets", "close-history", "workbench-button"]) {
-    nodes[id].addEventListener("click", () => showLibrary());
+    nodes[id].addEventListener("click", () => {
+      showLibrary();
+      nodes["workbench-button"].focus();
+    });
   }
   nodes["load-more-presets"].addEventListener("click", () => loadPresets({append: true}));
   nodes["load-more-versions"].addEventListener("click", () => loadMorePresetVersions());
   nodes["load-more-history"].addEventListener("click", () => loadHistory({append: true}));
   nodes["new-preset"].addEventListener("click", () => {
     if (presetLibraryLoading || presetOpenInFlight || presetSaveInFlight || presetSaveOutcomeUnknown) return;
+    if (validateDraft(session).length > 0) {
+      showInvalidPresetInput("Заполните входные данные, затем выберите «Новый пресет из черновика» в разделе «Пресеты».");
+      return;
+    }
     if (presetHasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return;
     startNewPreset();
     nodes["preset-name"].focus();
+  });
+  const openSnapshotPreset = (source, message) => {
+    startNewPreset({fromRun: source});
+    showLibrary("presets");
+    setPresetError();
+    nodes.status.textContent = message;
+    nodes["preset-name"].focus();
+    if (presetItems.length === 0 && !presetListLoadInFlight) void loadPresets();
+  };
+
+  nodes["save-result-preset"].addEventListener("click", async () => {
+    const submission = displayedSubmission;
+    if (!submission?.presetConfiguration || !catalog.includes(submission.atom)
+      || presetLibraryLoading || presetOpenInFlight || presetSaveInFlight || presetSaveOutcomeUnknown) return;
+    if (presetHasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return;
+    const source = presetSourceFromConfiguration(submission.presetConfiguration);
+    nodes["result-preset-error"].textContent = "";
+    if (source.promptSourceRef !== null || promptContractChecks.get(source.atom)?.error) {
+      const ownerSession = session;
+      const generation = ++presetOpenGeneration;
+      const isCurrent = () => !destroyed && generation === presetOpenGeneration && session === ownerSession
+        && displayedSubmission === submission && catalog.includes(source.atom) && !nodes["request-response"].hidden;
+      presetOpenInFlight = true;
+      updatePresetEditorDisabled();
+      try {
+        if (!await checkRunPresetSource(source, isCurrent) || !isCurrent()) return;
+      } catch (error) {
+        if (isCurrent() && isCurrentPromptContractCheck(source, error.promptContractCheck)) {
+          if (error.promptContractNeedsValidation) rememberPromptContractFailure(source.atom, error.message);
+          nodes["result-preset-error"].textContent = `${error.message} Повторите сохранение снимка.`;
+        }
+        return;
+      } finally {
+        if (generation === presetOpenGeneration) {
+          presetOpenInFlight = false;
+          updatePresetEditorDisabled();
+          if (isCurrent()) nodes["save-result-preset"].focus();
+        }
+      }
+    }
+    openSnapshotPreset(source, "Подготовлен пресет из снимка ответа.");
   });
   nodes["edit-preset"].addEventListener("click", () => editSelectedPreset());
   nodes["apply-preset"].addEventListener("click", () => editSelectedPreset({openWorkbench: true}));
@@ -4033,6 +4310,7 @@ export function bootstrapAtomLab({
     if (selectedPresetVersion) commitPresetVersion(selectedPresetVersion);
     else startNewPreset({activate: false});
     renderPresetList();
+    nodes[selectedPresetVersion ? "edit-preset" : "new-preset"].focus();
   });
   nodes["preset-name"].addEventListener("input", renderPresetState);
   nodes["preset-description"].addEventListener("input", renderPresetState);
@@ -4174,28 +4452,18 @@ export function bootstrapAtomLab({
     nodes.status.textContent = compatible
       ? "Снимок восстановлен как черновик. Для запуска нажмите «Запустить атом»."
       : "Снимок явно адаптирован к текущему контракту без ссылки на устаревший пресет.";
+    focusFirstInput();
   });
   nodes["save-history-preset"].addEventListener("click", async () => {
     if (!selectedHistoryDetail || nodes["save-history-preset"].disabled) return;
-    if (hasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return;
+    if (presetHasUnsavedDraft() && !confirmImpl("Несохранённые изменения пресета будут потеряны. Продолжить?")) return;
     const configuration = historyConfiguration(selectedHistoryDetail);
     const atom = catalog.find((item) => item.atom_id === configuration.atom_id);
     if (!atom || !isRecord(configuration.input) || !isNonEmptyString(configuration.prompt) || !isNonEmptyString(configuration.model_id)) {
       nodes["history-error"].textContent = "Исторический снимок нельзя сохранить как пресет автоматически.";
       return;
     }
-    const source = {
-      atom,
-      base_action_config_id: configuration.base_action_config_id,
-      schema_refs: cloneJson(configuration.schema_refs),
-      input: cloneJson(configuration.input),
-      prompt: configuration.prompt,
-      prompt_ref: configuration.prompt_ref,
-      promptSourceRef: configuration.prompt_source_ref ?? null,
-      modelId: configuration.model_id,
-      reasoningEffort: configuration.reasoning_effort,
-      sourceRunId: selectedHistoryDetail.run_id,
-    };
+    const source = presetSourceFromConfiguration(configuration);
     if (source.promptSourceRef !== null || promptContractChecks.get(atom)?.error) {
       const ownerSession = session;
       const ownerDetail = selectedHistoryDetail;
@@ -4208,11 +4476,7 @@ export function bootstrapAtomLab({
       updateHistoryControls();
       nodes["history-error"].textContent = "Проверка источника промпта…";
       try {
-        const {options, atom, promptContractCheck} = await fetchPromptOptions(source, isCurrent);
-        if (!isCurrent() || !isCurrentPromptContractCheck(source, promptContractCheck)) return;
-        if (atom !== source.atom) throw new Error("Основа промпта изменилась. Заново откройте каталог и явно адаптируйте исторический снимок.");
-        if (promptContractCheck) recoverPromptContract(source.atom, options);
-        reconcilePromptSource(source, options);
+        if (!await checkRunPresetSource(source, isCurrent) || !isCurrent()) return;
         nodes["history-error"].textContent = "";
       } catch (error) {
         if (isCurrent() && isCurrentPromptContractCheck(source, error.promptContractCheck)) {
@@ -4227,9 +4491,7 @@ export function bootstrapAtomLab({
         }
       }
     }
-    startNewPreset({fromHistory: source});
-    showLibrary("presets");
-    nodes.status.textContent = "Подготовлен пресет из выбранного снимка истории.";
+    openSnapshotPreset(source, "Подготовлен пресет из выбранного снимка истории.");
   });
 
   nodes["collapse-history"].addEventListener("click", () => {
@@ -4244,6 +4506,10 @@ export function bootstrapAtomLab({
     }
   });
   const historyTabs = ["result", "request", "diagnostics"];
+  nodes["show-history-diagnostics"].addEventListener("click", () => {
+    showHistoryTab("diagnostics");
+    nodes["history-diagnostics-tab"].focus();
+  });
   for (const [index, tab] of historyTabs.entries()) {
     const control = nodes[`history-${tab}-tab`];
     control.addEventListener("click", () => showHistoryTab(tab));

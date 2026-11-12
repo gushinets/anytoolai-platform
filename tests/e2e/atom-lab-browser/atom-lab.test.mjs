@@ -117,6 +117,7 @@ class FakeElement {
   appendChild(child) { this.children.push(child); return child; }
   replaceChildren(...children) { this.children = [...children]; }
   setAttribute(name, value) { this.attributes.set(name, String(value)); }
+  getAttribute(name) { return this.attributes.get(name) ?? null; }
   removeAttribute(name) { this.attributes.delete(name); }
   focus() { this.focused = true; }
   querySelector(selector) {
@@ -156,7 +157,7 @@ class FakeLifecycleTarget {
 function createFakeDocument() {
   const ids = [
     "access-form", "access-code", "access-panel", "workspace", "status",
-    "atom-navigation", "atom-count", "atom-title", "atom-action-type", "atom-description",
+    "atom-navigation", "atom-count", "atom-picker", "atom-title", "atom-action-type", "atom-description",
     "atom-passport", "input-schema", "output-schema",
     "input-contract-label", "output-contract-label", "input-contract-fields", "output-contract-fields",
     "input-schema-ref", "output-schema-ref", "input-schema-version", "output-schema-version",
@@ -168,17 +169,20 @@ function createFakeDocument() {
     "draft-state", "validation-errors", "result-placeholder", "presets-button",
     "history-button", "model-select", "reasoning-effort", "reasoning-help",
     "model-catalog-warning", "refresh-models", "run-button", "retry-submit", "retry-read", "run-state",
-    "launch-readiness", "response-draft-warning",
+    "launch-readiness", "launch-outcome", "launch-outcome-text", "show-response", "response-title", "response-draft-warning",
     "run-status", "run-status-help", "result-caption", "run-metadata-section", "run-technical",
-    "submitted-snapshot", "result-section", "result-readable", "result-json",
-    "invalid-response", "invalid-response-code", "invalid-response-raw", "run-metadata",
+    "submitted-snapshot", "result-section", "result-readable", "result-json", "save-result-preset", "result-preset-error",
+    "invalid-response", "invalid-response-sample", "invalid-response-note", "invalid-response-raw", "run-metadata",
+    "show-run-diagnostics", "return-to-request", "run-diagnostics-panel", "run-diagnostics-summary",
+    "run-contract-guidance", "run-diagnostic-schema-link", "run-diagnostic-raw-link",
+    "run-diagnostic-schema", "run-diagnostic-schema-json",
     "run-diagnostics", "presets-panel", "close-presets", "preset-list", "load-more-presets",
     "preset-name", "preset-description", "fixed-fields", "preset-version-select", "new-preset",
     "load-more-versions",
     "save-preset", "export-preset", "preset-state", "preset-error", "preset-export",
     "preset-export-download", "preset-conflict", "open-latest-preset", "save-as-new-preset",
     "preset-compatibility", "adapt-preset", "preset-readonly",
-    "history-panel", "close-history", "history-list", "load-more-history", "history-warning",
+    "history-panel", "close-history", "history-table", "history-list", "load-more-history", "history-warning",
     "history-detail", "restore-history", "save-history-preset", "history-error",
     "workbench-button", "atom-sidebar", "run-controls", "request-response",
     "preset-empty", "preset-heading", "preset-selected-name", "preset-context",
@@ -190,7 +194,9 @@ function createFakeDocument() {
     "collapse-history", "history-status", "history-status-text", "history-status-help",
     "history-summary", "history-result-tab", "history-request-tab", "history-diagnostics-tab",
     "history-result-panel", "history-request-panel", "history-diagnostics-panel", "history-result-readable",
-    "history-result-message", "history-result-json", "history-invalid", "history-invalid-code",
+    "history-result-message", "history-result-json", "history-invalid", "history-raw-sample", "history-raw-note", "show-history-diagnostics",
+    "history-contract-message", "history-contract-guidance", "history-diagnostic-schema-link", "history-diagnostic-raw-link",
+    "history-diagnostic-schema", "history-diagnostic-schema-json",
     "history-invalid-raw", "history-input-json", "history-prompt", "history-snapshot",
     "history-metadata", "history-diagnostics-json", "history-runtime-json",
   ];
@@ -2064,7 +2070,7 @@ test("integer controls never silently truncate decimal or empty text", async () 
   await elements.get("access-form").dispatch("submit");
   await elements.get("fill-example").click();
   const maxQuestions = elements.get("input-editor").querySelectorAll("input")
-    .find((node) => node.attributes.get("aria-label") === "max_questions");
+    .find((node) => node.attributes.get("aria-label") === "Максимум вопросов");
 
   maxQuestions.value = "2.9";
   await maxQuestions.dispatch("input");

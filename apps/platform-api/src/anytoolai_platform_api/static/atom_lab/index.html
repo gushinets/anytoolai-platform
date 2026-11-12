@@ -32,6 +32,7 @@
       <section id="workspace" class="workspace" hidden>
         <aside id="atom-sidebar" class="sidebar" aria-label="Выбор атома">
           <h2>Атомы <span id="atom-count"></span></h2>
+          <button id="atom-picker" type="button" aria-expanded="false" aria-controls="atom-navigation"></button>
           <nav id="atom-navigation" aria-label="Каталог из 11 атомов"></nav>
         </aside>
         <div class="content-column">
@@ -51,9 +52,9 @@
                 <button id="load-more-presets" type="button" hidden>Показать ещё</button>
               </section>
               <section class="preset-card" aria-label="Выбранный пресет">
-                <p id="preset-empty" class="library-empty">Выберите пресет, чтобы посмотреть его состав и версии, или создайте новый из текущего черновика.</p>
+                <p id="preset-empty" class="library-empty" hidden>Выберите пресет, чтобы посмотреть его состав и версии.</p>
                 <div id="preset-heading" class="panel-heading" hidden>
-                  <div><p id="preset-context" class="help-text"></p><h3 id="preset-selected-name"></h3></div>
+                  <div><p id="preset-context" class="help-text"></p><h3 id="preset-selected-name" tabindex="-1"></h3></div>
                   <div class="preset-version-control">
                     <label for="preset-version-select">Версия</label>
                     <select id="preset-version-select"></select>
@@ -74,7 +75,11 @@
                   <input id="preset-name" maxlength="256">
                   <label for="preset-description">Описание</label>
                   <textarea id="preset-description" rows="2" maxlength="4096"></textarea>
-                  <fieldset><legend>Закреплённые поля верхнего уровня</legend><div id="fixed-fields" class="checkbox-list"></div></fieldset>
+                  <fieldset aria-describedby="fixed-fields-help">
+                    <legend>Закреплённые поля</legend>
+                    <p id="fixed-fields-help" class="help-text">Отметьте поля, значения которых входят в конфигурацию пресета. Остальные поля считаются входными данными для запуска.</p>
+                    <div id="fixed-fields" class="checkbox-list"></div>
+                  </fieldset>
                   <div class="library-actions">
                     <button id="save-preset" class="primary-action" type="button">Сохранить новый</button>
                     <button id="cancel-preset" type="button">Отмена</button>
@@ -112,9 +117,9 @@
             </div>
             <p id="history-list-state" class="help-text" role="status"></p>
             <p id="history-error" class="error" role="alert"></p>
-            <table class="history-table">
+            <table id="history-table" class="history-table" hidden>
               <caption class="visually-hidden">Сохранённые запуски всех атомов. Выберите дату, чтобы раскрыть подробности.</caption>
-              <thead><tr><th scope="col">Создан</th><th scope="col">Атом</th><th scope="col">Статус</th><th scope="col">Модель</th></tr></thead>
+              <thead><tr><th id="history-col-date" scope="col">Создан</th><th id="history-col-atom" scope="col">Атом</th><th id="history-col-status" scope="col">Статус</th><th id="history-col-model" scope="col">Модель</th></tr></thead>
               <tbody id="history-list"></tbody>
             </table>
             <button id="load-more-history" type="button" hidden>Показать ещё</button>
@@ -136,7 +141,10 @@
               <section id="history-result-panel" role="tabpanel" aria-labelledby="history-result-tab">
                 <div id="history-result-readable" class="readable-result" hidden></div>
                 <p id="history-result-message" class="help-text"></p>
-                <div id="history-invalid" class="invalid-response" hidden><p id="history-invalid-code"></p><pre id="history-invalid-raw" tabindex="0"></pre></div>
+                <div id="history-invalid" class="invalid-response" hidden>
+                  <p id="history-contract-message">Ответ модели не соответствует схеме атома.</p>
+                  <button id="show-history-diagnostics" class="primary-action" type="button">Открыть диагностику</button>
+                </div>
                 <details><summary>Полный JSON результата</summary><pre id="history-result-json" tabindex="0"></pre></details>
               </section>
               <section id="history-request-panel" role="tabpanel" aria-labelledby="history-request-tab" hidden>
@@ -145,7 +153,23 @@
                 <details><summary>Полный снимок запроса</summary><pre id="history-snapshot" tabindex="0"></pre></details>
               </section>
               <section id="history-diagnostics-panel" role="tabpanel" aria-labelledby="history-diagnostics-tab" hidden>
+                <div id="history-contract-guidance" class="contract-guidance" hidden>
+                  <p class="help-text">Точное правило проверки не указано.</p>
+                  <div class="library-actions">
+                    <button id="history-diagnostic-schema-link" class="quiet-action" type="button" aria-controls="history-diagnostic-schema" hidden>К схеме выхода</button>
+                    <button id="history-diagnostic-raw-link" class="quiet-action" type="button" aria-controls="history-raw-sample" hidden>К сырому ответу</button>
+                  </div>
+                </div>
                 <div id="history-metadata" class="library-metadata"></div>
+                <details id="history-diagnostic-schema" hidden>
+                  <summary>Схема выхода этого запуска</summary>
+                  <pre id="history-diagnostic-schema-json" tabindex="0"></pre>
+                </details>
+                <details id="history-raw-sample" hidden>
+                  <summary>Сырой ответ модели</summary>
+                  <p id="history-raw-note" class="help-text"></p>
+                  <pre id="history-invalid-raw" tabindex="0"></pre>
+                </details>
                 <details><summary>Диагностика и вызовы провайдера · JSON</summary><pre id="history-diagnostics-json" tabindex="0"></pre></details>
                 <details><summary>Идентификаторы выполнения · JSON</summary><pre id="history-runtime-json" tabindex="0"></pre></details>
               </section>
@@ -154,51 +178,43 @@
           </section>
           <section id="atom-passport" class="card passport" aria-labelledby="atom-title">
             <h2 id="atom-title"></h2>
-            <p class="atom-action"><code id="atom-action-type"></code></p>
             <p id="atom-description" class="atom-description"></p>
             <div class="passport-flow">
               <section class="contract-part" aria-labelledby="input-contract-title">
                 <h3 id="input-contract-title">Что передать</h3>
                 <p id="input-contract-label"></p>
                 <div id="input-contract-fields" class="contract-fields"></div>
-                <p class="contract-ref"><code id="input-schema-ref"></code></p>
-                <p id="input-schema-version" class="contract-version"></p>
-                <details>
-                  <summary>JSON Schema входа</summary>
-                  <pre id="input-schema" tabindex="0"></pre>
-                </details>
               </section>
-              <span class="passport-arrow" aria-hidden="true">→</span>
               <section class="contract-part" aria-labelledby="output-contract-title">
                 <h3 id="output-contract-title">Что получить</h3>
                 <p id="output-contract-label"></p>
                 <div id="output-contract-fields" class="contract-fields"></div>
-                <p class="contract-ref"><code id="output-schema-ref"></code></p>
-                <p id="output-schema-version" class="contract-version"></p>
-                <details>
-                  <summary>JSON Schema выхода</summary>
-                  <pre id="output-schema" tabindex="0"></pre>
-                </details>
               </section>
             </div>
-          </section>
-          <section id="run-controls" class="card run-controls" aria-label="Настройки запуска">
-            <div class="run-heading">
-              <h2>Запуск</h2>
-              <button id="refresh-models" class="quiet-action" type="button">Обновить каталог моделей</button>
-            </div>
-            <div>
-              <label for="model-select">Модель</label>
-              <select id="model-select"></select>
-            </div>
-            <div>
-              <label for="reasoning-effort">Reasoning effort</label>
-              <select id="reasoning-effort"></select>
-            </div>
-            <button id="run-button" class="primary-action" type="button">Запустить атом</button>
-            <p id="reasoning-help" class="help-text"></p>
-            <p id="launch-readiness" class="launch-readiness" role="status"></p>
-            <p id="model-catalog-warning" class="warning" role="status"></p>
+            <details class="passport-contract">
+              <summary>Схемы и версии</summary>
+              <p class="atom-action"><code id="atom-action-type"></code></p>
+              <div class="passport-flow">
+                <section class="contract-schema" aria-labelledby="input-schema-title">
+                  <h3 id="input-schema-title">Вход</h3>
+                  <p class="contract-ref"><code id="input-schema-ref"></code></p>
+                  <p id="input-schema-version" class="contract-version"></p>
+                  <details>
+                    <summary>JSON Schema входа</summary>
+                    <pre id="input-schema" tabindex="0"></pre>
+                  </details>
+                </section>
+                <section class="contract-schema" aria-labelledby="output-schema-title">
+                  <h3 id="output-schema-title">Выход</h3>
+                  <p class="contract-ref"><code id="output-schema-ref"></code></p>
+                  <p id="output-schema-version" class="contract-version"></p>
+                  <details>
+                    <summary>JSON Schema выхода</summary>
+                    <pre id="output-schema" tabindex="0"></pre>
+                  </details>
+                </section>
+              </div>
+            </details>
           </section>
           <section id="request-response" class="editor-grid" aria-label="Запрос и ответ">
             <section class="card editor-card" aria-labelledby="request-title">
@@ -254,40 +270,87 @@
                 <p id="save-prompt-status" class="help-text" role="status"></p>
               </section>
               <p id="draft-state" class="draft-state" aria-live="polite"></p>
+              <section id="run-controls" class="run-controls" aria-label="Настройки запуска">
+                <div class="run-heading">
+                  <h3>Запуск</h3>
+                  <button id="refresh-models" class="quiet-action" type="button">Обновить каталог моделей</button>
+                </div>
+                <div>
+                  <label for="model-select">Модель</label>
+                  <select id="model-select"></select>
+                </div>
+                <div>
+                  <label for="reasoning-effort">Уровень рассуждения</label>
+                  <select id="reasoning-effort" aria-describedby="reasoning-help"></select>
+                </div>
+                <p id="reasoning-help" class="help-text"></p>
+                <p id="model-catalog-warning" class="warning" role="status"></p>
+                <div id="launch-outcome" class="run-status" hidden>
+                  <p id="launch-outcome-text" class="run-state" aria-hidden="true"></p>
+                  <button id="show-response" class="quiet-action" type="button" aria-controls="result-placeholder">К ответу</button>
+                </div>
+                <p id="launch-readiness" class="launch-readiness" role="status"></p>
+                <button id="run-button" class="primary-action" type="button">Запустить атом</button>
+              </section>
             </section>
-            <aside id="result-placeholder" class="card result-card" aria-label="Запуск и результат">
-              <h2>Ответ</h2>
-              <div id="run-status" class="run-status" data-tone="neutral">
-                <p id="run-state" class="run-state" role="status" aria-live="polite" aria-describedby="run-status-help">Запуск ещё не создан.</p>
-                <p id="run-status-help">Заполните входные данные и запустите атом.</p>
-              </div>
-              <p id="response-draft-warning" class="warning" role="status" hidden>Черновик изменён. Ниже ответ на предыдущую конфигурацию; параметры принятого запуска сохранены.</p>
-              <button id="retry-submit" type="button" hidden>Повторить отправку</button>
-              <button id="retry-read" type="button" hidden>Повторить чтение запуска</button>
-              <section id="result-section" class="response-section" aria-labelledby="result-title" hidden>
-                <h3 id="result-title">Результат</h3>
-                <p id="result-caption" class="help-text"></p>
-                <div id="result-readable" class="readable-result"></div>
-                <details><summary>Полный JSON результата</summary><pre id="result-json" tabindex="0"></pre></details>
-              </section>
-              <section id="invalid-response" class="invalid-response" aria-labelledby="invalid-response-title" hidden>
-                <h3 id="invalid-response-title">Ответ не прошёл контракт</h3>
-                <p id="invalid-response-code"></p>
-                <pre id="invalid-response-raw"></pre>
-              </section>
-              <section id="run-metadata-section" class="response-section" aria-labelledby="run-metadata-title" hidden>
-                <h3 id="run-metadata-title">Параметры выполнения</h3>
-                <div id="run-metadata"></div>
-              </section>
-              <div id="run-technical" class="run-technical" hidden>
-                <details>
-                  <summary>Конфигурация принятого запуска</summary>
-                  <pre id="submitted-snapshot" tabindex="0">—</pre>
-                </details>
-                <details>
-                  <summary>Диагностика и ID</summary>
-                  <pre id="run-diagnostics" tabindex="0">—</pre>
-                </details>
+            <aside id="result-placeholder" class="card result-card" aria-labelledby="response-title">
+              <h2 id="response-title" class="response-heading" tabindex="-1">Ответ</h2>
+              <div class="response-body">
+                <div id="run-status" class="run-status" data-tone="neutral">
+                  <p id="run-state" class="run-state" role="status" aria-live="polite" aria-describedby="run-status-help">Запуск ещё не создан.</p>
+                  <p id="run-status-help">Заполните входные данные и запустите атом.</p>
+                </div>
+                <p id="response-draft-warning" class="warning" role="status" hidden>Черновик изменён. Ответ и снимок относятся к принятому запуску.</p>
+                <button id="retry-submit" type="button" hidden>Повторить отправку</button>
+                <button id="retry-read" type="button" hidden>Повторить чтение запуска</button>
+                <section id="result-section" class="response-section" aria-labelledby="result-title" hidden>
+                  <div class="panel-heading">
+                    <h3 id="result-title">Результат</h3>
+                    <button id="save-result-preset" class="quiet-action" type="button" hidden>Сохранить снимок как пресет</button>
+                  </div>
+                  <p id="result-preset-error" class="error" role="alert"></p>
+                  <p id="result-caption" class="help-text"></p>
+                  <div id="result-readable" class="readable-result"></div>
+                  <details><summary>Полный JSON результата</summary><pre id="result-json" tabindex="0"></pre></details>
+                </section>
+                <section id="invalid-response" class="invalid-response" aria-labelledby="invalid-response-title" hidden>
+                  <h3 id="invalid-response-title">Ответ не прошёл контракт</h3>
+                  <p>Ответ модели не соответствует схеме атома. Откройте диагностику, чтобы сверить доступные данные запуска.</p>
+                  <div class="library-actions">
+                    <button id="show-run-diagnostics" class="primary-action" type="button" aria-controls="run-diagnostics-panel">Открыть диагностику</button>
+                    <button id="return-to-request" class="quiet-action" type="button">К входным данным</button>
+                  </div>
+                </section>
+                <section id="run-metadata-section" class="response-section" aria-labelledby="run-metadata-title" hidden>
+                  <h3 id="run-metadata-title">Параметры выполнения</h3>
+                  <div id="run-metadata"></div>
+                </section>
+                <div id="run-technical" class="run-technical" hidden>
+                  <details>
+                    <summary>Конфигурация принятого запуска</summary>
+                    <pre id="submitted-snapshot" tabindex="0">—</pre>
+                  </details>
+                  <details id="run-diagnostics-panel">
+                    <summary id="run-diagnostics-summary">Диагностика и ID</summary>
+                    <div id="run-contract-guidance" class="contract-guidance" hidden>
+                      <p class="help-text">Точное правило проверки не указано.</p>
+                      <div class="library-actions">
+                        <button id="run-diagnostic-schema-link" class="quiet-action" type="button" aria-controls="run-diagnostic-schema" hidden>К схеме выхода</button>
+                        <button id="run-diagnostic-raw-link" class="quiet-action" type="button" aria-controls="invalid-response-sample" hidden>К сырому ответу</button>
+                      </div>
+                    </div>
+                    <pre id="run-diagnostics" tabindex="0">—</pre>
+                    <details id="run-diagnostic-schema" hidden>
+                      <summary>Схема выхода этого запуска</summary>
+                      <pre id="run-diagnostic-schema-json" tabindex="0"></pre>
+                    </details>
+                    <details id="invalid-response-sample" hidden>
+                      <summary>Сырой ответ модели</summary>
+                      <p id="invalid-response-note" class="help-text"></p>
+                      <pre id="invalid-response-raw" tabindex="0"></pre>
+                    </details>
+                  </details>
+                </div>
               </div>
             </aside>
           </section>
