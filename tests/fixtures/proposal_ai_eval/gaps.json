@@ -1,0 +1,441 @@
+{
+  "description": "ANY-846 gap precision: ordinary components, experience minimums and mandatory platforms. Russian, English and Spanish coverage. Gap meaning is accepted only through confirmed review criteria.",
+  "orders": [
+    {
+      "id": "landing-reviews-ru",
+      "task_text": "Нужен дизайн лендинга онлайн-школы в Figma: первый экран, программа курса, блок отзывов, форма заявки и мобильная версия.",
+      "freelancer_positioning": "4 года опыта в дизайне лендингов, работаю в Figma, делаю адаптивный дизайн. В портфолио лендинг онлайн-школы с программой курса и формой заявки.",
+      "tone": "warm",
+      "expect_language": "ru",
+      "expect_gaps_language": "ru",
+      "expect_gap": false,
+      "criteria": [
+        {
+          "id": "gap-precision",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Are ordinary landing-page components covered by the stated design experience, with no experience gaps reported?"
+        },
+        {
+          "id": "gap-grounding",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every reported gap identify an explicit task requirement that the positioning does not cover, rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context? Does each provided evidence quote accurately quote the original task and support the identified requirement?"
+        },
+        {
+          "id": "gap-fidelity",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every gap preserve its requirement's meaning and relationships, including numbers, units and named tools, allowing equivalent wording and numbers written as words?"
+        }
+      ],
+      "description": "Reconstructed from the 2026-11-10 result attachment; the original task text was not attached."
+    },
+    {
+      "id": "yoga-schedule-ru",
+      "task_text": "Анна, владелица студии йоги, ищет дизайнера для лендинга в Figma. Нужны мобильная и десктопная версии, блок расписания и кнопка записи в существующий WhatsApp. Тексты и фото предоставит студия. Разработка сайта не входит. Предложение должно объяснить подход и следующий шаг, без цены и сроков до обсуждения.",
+      "freelancer_positioning": "Я UI-дизайнер, работаю в Figma. Делал лендинги для небольших сервисных компаний, уделяю внимание читаемости и удобству записи. Портфолио могу показать на созвоне, конкретных результатов в процентах у меня нет.",
+      "tone": "warm",
+      "expect_language": "ru",
+      "expect_gaps_language": "ru",
+      "expect_gap": false,
+      "criteria": [
+        {
+          "id": "gap-precision",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Is the yoga schedule treated as an ordinary landing-page component, with no experience gaps reported?"
+        },
+        {
+          "id": "gap-grounding",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every reported gap identify an explicit task requirement that the positioning does not cover, rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context? Does each provided evidence quote accurately quote the original task and support the identified requirement?"
+        },
+        {
+          "id": "gap-fidelity",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every gap preserve its requirement's meaning and relationships, including numbers, units and named tools, allowing equivalent wording and numbers written as words?"
+        }
+      ]
+    },
+    {
+      "id": "hubspot-10y-en",
+      "task_text": "HubSpot CRM integration for our web forms and deal pipelines. 10+ years of HubSpot experience is required.",
+      "freelancer_positioning": "Make.com and n8n automation, 4 years of HubSpot workflows and API integrations.",
+      "tone": "warm",
+      "expect_language": "en",
+      "expect_gaps_language": "en",
+      "expect_gap": true,
+      "criteria": [
+        {
+          "id": "gap-precision",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the gap state the required minimum of 10 years of HubSpot work experience, without changing it to training or courses?"
+        },
+        {
+          "id": "gap-grounding",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every reported gap identify an explicit task requirement that the positioning does not cover, rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context? Does each provided evidence quote accurately quote the original task and support the identified requirement?"
+        },
+        {
+          "id": "gap-fidelity",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every gap preserve its requirement's meaning and relationships, including numbers, units and named tools, allowing equivalent wording and numbers written as words?"
+        }
+      ]
+    },
+    {
+      "id": "hubspot-10y-ru",
+      "task_text": "Нужна интеграция HubSpot CRM с нашими веб-формами и воронками сделок. Обязателен опыт работы с HubSpot от 10 лет.",
+      "freelancer_positioning": "Автоматизация на Make.com и n8n, 4 года работы с процессами HubSpot и интеграциями API.",
+      "tone": "warm",
+      "expect_language": "ru",
+      "expect_gaps_language": "ru",
+      "expect_gap": true,
+      "criteria": [
+        {
+          "id": "gap-precision",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the gap preserve the requirement of at least 10 years of HubSpot work experience, without describing training or courses?"
+        },
+        {
+          "id": "gap-grounding",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every reported gap identify an explicit task requirement that the positioning does not cover, rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context? Does each provided evidence quote accurately quote the original task and support the identified requirement?"
+        },
+        {
+          "id": "gap-fidelity",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every gap preserve its requirement's meaning and relationships, including numbers, units and named tools, allowing equivalent wording and numbers written as words?"
+        }
+      ]
+    },
+    {
+      "id": "webflow-required-ru",
+      "task_text": "Нужен дизайн лендинга в Figma и сборка в Webflow: первый экран, программа курса, блок отзывов и форма заявки. Опыт с Webflow обязателен.",
+      "freelancer_positioning": "4 года опыта в дизайне лендингов, работаю в Figma, делаю адаптивный дизайн. В портфолио лендинг онлайн-школы с программой курса и формой заявки.",
+      "tone": "warm",
+      "expect_language": "ru",
+      "expect_gaps_language": "ru",
+      "expect_gap": true,
+      "criteria": [
+        {
+          "id": "gap-precision",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Is mandatory Webflow experience reported as missing while ordinary landing-page sections are not gaps?"
+        },
+        {
+          "id": "gap-grounding",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every reported gap identify an explicit task requirement that the positioning does not cover, rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context? Does each provided evidence quote accurately quote the original task and support the identified requirement?"
+        },
+        {
+          "id": "gap-fidelity",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every gap preserve its requirement's meaning and relationships, including numbers, units and named tools, allowing equivalent wording and numbers written as words?"
+        }
+      ]
+    },
+    {
+      "id": "trustpilot-reviews-en",
+      "task_text": "Design a landing page with a reviews block; reviews must be pulled live from the Trustpilot API.",
+      "freelancer_positioning": "Landing-page designer, Figma, responsive design, 4 years.",
+      "tone": "warm",
+      "expect_language": "en",
+      "expect_gaps_language": "en",
+      "expect_gap": true,
+      "criteria": [
+        {
+          "id": "gap-precision",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Is the missing Trustpilot API experience reported, rather than treating the reviews block itself as an experience gap?"
+        },
+        {
+          "id": "gap-grounding",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every reported gap identify an explicit task requirement that the positioning does not cover, rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context? Does each provided evidence quote accurately quote the original task and support the identified requirement?"
+        },
+        {
+          "id": "gap-fidelity",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every gap preserve its requirement's meaning and relationships, including numbers, units and named tools, allowing equivalent wording and numbers written as words?"
+        }
+      ]
+    },
+    {
+      "id": "landing-reviews-es",
+      "task_text": "Necesitamos el diseño de una landing page para una escuela en línea en Figma: portada, programa del curso, bloque de reseñas, formulario de solicitud y versión móvil.",
+      "freelancer_positioning": "Tengo 4 años de experiencia en diseño de landing pages en Figma y diseño adaptable. Mi portafolio incluye una escuela en línea con el programa del curso y un formulario de solicitud.",
+      "tone": "warm",
+      "expect_language": "es",
+      "expect_gaps_language": "es",
+      "expect_gap": false,
+      "criteria": [
+        {
+          "id": "gap-precision",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Are the ordinary landing-page sections covered by the stated design experience, with no gaps reported?"
+        },
+        {
+          "id": "gap-grounding",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every reported gap identify an explicit task requirement that the positioning does not cover, rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context? Does each provided evidence quote accurately quote the original task and support the identified requirement?"
+        },
+        {
+          "id": "gap-fidelity",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every gap preserve its requirement's meaning and relationships, including numbers, units and named tools, allowing equivalent wording and numbers written as words?"
+        }
+      ]
+    },
+    {
+      "id": "hubspot-10y-es",
+      "task_text": "Necesitamos integrar HubSpot CRM con nuestros formularios web y procesos de ventas. Se requieren al menos 10 años de experiencia con HubSpot.",
+      "freelancer_positioning": "Automatización con Make.com y n8n, 4 años de experiencia con flujos de HubSpot e integraciones de API.",
+      "tone": "warm",
+      "expect_language": "es",
+      "expect_gaps_language": "es",
+      "expect_gap": true,
+      "criteria": [
+        {
+          "id": "gap-precision",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the gap preserve the requirement of at least 10 years of HubSpot work experience without changing it to training or courses?"
+        },
+        {
+          "id": "gap-grounding",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every reported gap identify an explicit task requirement that the positioning does not cover, rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context? Does each provided evidence quote accurately quote the original task and support the identified requirement?"
+        },
+        {
+          "id": "gap-fidelity",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every gap preserve its requirement's meaning and relationships, including numbers, units and named tools, allowing equivalent wording and numbers written as words?"
+        }
+      ]
+    },
+    {
+      "id": "trustpilot-reviews-es",
+      "task_text": "Necesitamos diseñar una landing page con un bloque de reseñas. Las reseñas deben obtenerse en tiempo real mediante la API de Trustpilot.",
+      "freelancer_positioning": "Diseño landing pages en Figma y hago diseño adaptable, con 4 años de experiencia.",
+      "tone": "warm",
+      "expect_language": "es",
+      "expect_gaps_language": "es",
+      "expect_gap": true,
+      "criteria": [
+        {
+          "id": "gap-precision",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Is the missing Trustpilot API experience reported rather than treating the reviews block itself as an experience gap?"
+        },
+        {
+          "id": "gap-grounding",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every reported gap identify an explicit task requirement that the positioning does not cover, rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context? Does each provided evidence quote accurately quote the original task and support the identified requirement?"
+        },
+        {
+          "id": "gap-fidelity",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every gap preserve its requirement's meaning and relationships, including numbers, units and named tools, allowing equivalent wording and numbers written as words?"
+        }
+      ]
+    },
+    {
+      "id": "healthcare-required-en",
+      "task_text": "Design a responsive landing page for a healthcare clinic in Figma. Prior healthcare-industry landing-page design experience is mandatory.",
+      "freelancer_positioning": "I design responsive landing pages in Figma. My portfolio consists only of retail stores.",
+      "tone": "warm",
+      "expect_language": "en",
+      "expect_gaps_language": "en",
+      "expect_gap": true,
+      "criteria": [
+        {
+          "id": "domain-prerequisite",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the gap identify the explicitly mandatory prior healthcare-industry design experience missing from the retail-only positioning?"
+        },
+        {
+          "id": "gap-grounding",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every reported gap identify an explicit task requirement that the positioning does not cover, rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context? Does each provided evidence quote accurately quote the original task and support the identified requirement?"
+        },
+        {
+          "id": "gap-fidelity",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every gap preserve its requirement's meaning and relationships, including numbers, units and named tools, allowing equivalent wording and numbers written as words?"
+        }
+      ]
+    },
+    {
+      "id": "healthcare-incidental-en",
+      "task_text": "Design a responsive landing page for a healthcare clinic in Figma.",
+      "freelancer_positioning": "I design responsive landing pages in Figma. My portfolio consists only of retail stores.",
+      "tone": "warm",
+      "expect_language": "en",
+      "expect_gaps_language": "en",
+      "expect_gap": false,
+      "criteria": [
+        {
+          "id": "domain-prerequisite",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Is healthcare treated as an incidental target niche covered by adjacent landing-page experience, with no experience gaps reported?"
+        },
+        {
+          "id": "gap-grounding",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every reported gap identify an explicit task requirement that the positioning does not cover, rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context? Does each provided evidence quote accurately quote the original task and support the identified requirement?"
+        },
+        {
+          "id": "gap-fidelity",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every gap preserve its requirement's meaning and relationships, including numbers, units and named tools, allowing equivalent wording and numbers written as words?"
+        }
+      ]
+    },
+    {
+      "id": "healthcare-required-ru",
+      "task_text": "Нужен адаптивный дизайн лендинга медицинской клиники в Figma. Предыдущий опыт дизайна лендингов в медицинской сфере обязателен.",
+      "freelancer_positioning": "Делаю адаптивные лендинги в Figma. В портфолио только проекты розничных магазинов.",
+      "tone": "warm",
+      "expect_language": "ru",
+      "expect_gaps_language": "ru",
+      "expect_gap": true,
+      "criteria": [
+        {
+          "id": "domain-prerequisite",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the gap identify the explicitly mandatory prior healthcare-industry design experience missing from the retail-only positioning?"
+        },
+        {
+          "id": "gap-grounding",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every reported gap identify an explicit task requirement that the positioning does not cover, rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context? Does each provided evidence quote accurately quote the original task and support the identified requirement?"
+        },
+        {
+          "id": "gap-fidelity",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every gap preserve its requirement's meaning and relationships, including numbers, units and named tools, allowing equivalent wording and numbers written as words?"
+        }
+      ]
+    },
+    {
+      "id": "healthcare-incidental-ru",
+      "task_text": "Нужен адаптивный дизайн лендинга медицинской клиники в Figma.",
+      "freelancer_positioning": "Делаю адаптивные лендинги в Figma. В портфолио только проекты розничных магазинов.",
+      "tone": "warm",
+      "expect_language": "ru",
+      "expect_gaps_language": "ru",
+      "expect_gap": false,
+      "criteria": [
+        {
+          "id": "domain-prerequisite",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Is healthcare treated as an incidental target niche covered by adjacent landing-page experience, with no experience gaps reported?"
+        },
+        {
+          "id": "gap-grounding",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every reported gap identify an explicit task requirement that the positioning does not cover, rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context? Does each provided evidence quote accurately quote the original task and support the identified requirement?"
+        },
+        {
+          "id": "gap-fidelity",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every gap preserve its requirement's meaning and relationships, including numbers, units and named tools, allowing equivalent wording and numbers written as words?"
+        }
+      ]
+    },
+    {
+      "id": "healthcare-required-es",
+      "task_text": "Necesitamos diseñar una landing page adaptable para una clínica sanitaria en Figma. Es obligatoria la experiencia previa diseñando landing pages para el sector sanitario.",
+      "freelancer_positioning": "Diseño landing pages adaptables en Figma. Mi portafolio contiene únicamente tiendas minoristas.",
+      "tone": "warm",
+      "expect_language": "es",
+      "expect_gaps_language": "es",
+      "expect_gap": true,
+      "criteria": [
+        {
+          "id": "domain-prerequisite",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the gap identify the explicitly mandatory prior healthcare-industry design experience missing from the retail-only positioning?"
+        },
+        {
+          "id": "gap-grounding",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every reported gap identify an explicit task requirement that the positioning does not cover, rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context? Does each provided evidence quote accurately quote the original task and support the identified requirement?"
+        },
+        {
+          "id": "gap-fidelity",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every gap preserve its requirement's meaning and relationships, including numbers, units and named tools, allowing equivalent wording and numbers written as words?"
+        }
+      ]
+    },
+    {
+      "id": "healthcare-incidental-es",
+      "task_text": "Necesitamos diseñar una landing page adaptable para una clínica sanitaria en Figma.",
+      "freelancer_positioning": "Diseño landing pages adaptables en Figma. Mi portafolio contiene únicamente tiendas minoristas.",
+      "tone": "warm",
+      "expect_language": "es",
+      "expect_gaps_language": "es",
+      "expect_gap": false,
+      "criteria": [
+        {
+          "id": "domain-prerequisite",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Is healthcare treated as an incidental target niche covered by adjacent landing-page experience, with no experience gaps reported?"
+        },
+        {
+          "id": "gap-grounding",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every reported gap identify an explicit task requirement that the positioning does not cover, rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context? Does each provided evidence quote accurately quote the original task and support the identified requirement?"
+        },
+        {
+          "id": "gap-fidelity",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does every gap preserve its requirement's meaning and relationships, including numbers, units and named tools, allowing equivalent wording and numbers written as words?"
+        }
+      ]
+    }
+  ]
+}
