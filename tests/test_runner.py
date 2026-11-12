@@ -1626,9 +1626,12 @@ def test_prod_up_passes_valid_policy_to_build_environment(monkeypatch, policy_ur
 def test_prod_up_fails_closed_when_policy_validator_cannot_run(monkeypatch, capsys, failure):
     runner = load_runner_module()
     monkeypatch.setattr(runner, "_resolved_env_file", lambda path: dict(PROD_LIVE_VALUES))
+    real_run = runner.subprocess.run
 
-    def fail_validation(*args, **kwargs):
-        raise failure
+    def fail_validation(command, *args, **kwargs):
+        if command[:2] == ["node", "--eval"]:
+            raise failure
+        return real_run(command, *args, **kwargs)
 
     monkeypatch.setattr(runner.subprocess, "run", fail_validation)
     monkeypatch.setattr(

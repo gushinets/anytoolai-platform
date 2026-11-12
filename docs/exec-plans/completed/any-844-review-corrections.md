@@ -55,6 +55,19 @@ shared translations so products without draft recovery do not promise tab-lifeti
 - Production code changes are confined to public-deploy preflight and seven shared translations.
   Full backend/provider suites and live production were not rerun for these corrections.
 
+## Windows CI follow-up
+
+- Windows baseline job 131120770803 failed only the two validator-unavailable test cases:
+  their global subprocess failure also intercepted PowerShell deployment-lock ACL inspection.
+- Restrict the failure stub to Node evaluation and delegate other commands to the real
+  subprocess runner. Keep production validation and lock protections unchanged.
+- The complete runner test module reaches completion locally with one unrelated environment
+  failure: the activation-marker test requires passwordless sudo to run as nobody. Native
+  Windows ACL execution remains a CI check.
+- Production/fake/maintenance regressions pass: 113 passed, 188 deselected. Documentation
+  validation and diff whitespace checks pass. Existing local-skill references in unrelated
+  execution plans were left outside this correction.
+
 ## Risks and limits
 
 The operator must still provide the approved policy URL and confirm the page is available and
