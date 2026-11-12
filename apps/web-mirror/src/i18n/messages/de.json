@@ -48,7 +48,7 @@
   },
   "dataNotice": {
     "label": "Datenverarbeitung.",
-    "text": "Ihre Eingaben werden an unseren Dienst und an einen KI-Modellanbieter gesendet, um das Ergebnis zu erstellen, und zusammen mit Ihrem Durchlauf auf unseren Servern gespeichert. Ihr Entwurf wird in diesem Browser gehalten und kann verloren gehen, wenn Sie die Seite neu laden oder verlassen. Geben Sie keine Passwörter, Zahlungskartendaten oder andere sensiblen Daten ein.",
+    "text": "Ihre Eingaben werden an unseren Dienst und an einen KI-Modellanbieter gesendet, um das Ergebnis zu erstellen, und zusammen mit Ihrem Durchlauf auf unseren Servern gespeichert. Ihr Entwurf wird in diesem Browser gehalten und kann verloren gehen, wenn Sie die Seite neu laden oder verlassen. Geben Sie keine Passwörter, Zugangscodes, API-Schlüssel oder vollständigen Zahlungskartendaten ein.",
     "policyLink": "Datenschutzerklärung",
     "opensInNewTab": "(öffnet sich in einem neuen Tab)"
   }

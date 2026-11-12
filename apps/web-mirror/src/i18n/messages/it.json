@@ -48,7 +48,7 @@
   },
   "dataNotice": {
     "label": "Trattamento dei dati.",
-    "text": "Ciò che inserisce viene inviato al nostro servizio e a un fornitore di modelli di IA per creare il risultato, e viene conservato insieme alla Sua esecuzione sui nostri server. La Sua bozza viene conservata in questo browser e potrebbe andare persa se ricarica o lascia la pagina. Non inserisca password, dati di carte di pagamento o altri dati sensibili.",
+    "text": "Ciò che inserisce viene inviato al nostro servizio e a un fornitore di modelli di IA per creare il risultato, e viene conservato insieme alla Sua esecuzione sui nostri server. La Sua bozza viene conservata in questo browser e potrebbe andare persa se ricarica o lascia la pagina. Non inserisca password, codici di accesso, chiavi API o dati completi di carte di pagamento.",
     "policyLink": "Informativa sulla privacy",
     "opensInNewTab": "(si apre in una nuova scheda)"
   }

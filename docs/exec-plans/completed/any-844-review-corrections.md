@@ -68,6 +68,16 @@ shared translations so products without draft recovery do not promise tab-lifeti
   validation and diff whitespace checks pass. Existing local-skill references in unrelated
   execution plans were left outside this correction.
 
+## Review round 2: precise input warning
+
+- The shared prohibition on all sensitive/confidential information conflicted with Client Update
+  Writer's client-message and payment-term inputs. Narrow the final sentence in all seven locales
+  to passwords, access codes, API keys and full payment-card details, as approved by the user.
+- Preserve the processing, storage, draft and policy-link text. No new runtime behavior or
+  dependencies; existing notice and product tests cover rendering and submission integration.
+- Validation: all 699 web-host tests, TypeScript, ESLint and documentation checks pass.
+  JSON comparison confirms only the final warning sentence changed in each locale.
+
 ## Risks and limits
 
 The operator must still provide the approved policy URL and confirm the page is available and
