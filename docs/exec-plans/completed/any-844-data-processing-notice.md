@@ -98,3 +98,13 @@ translation review remain operator/product-owner follow-up. No GitHub or Linear 
 
 The repository-wide prohibited-phrase scan also found pre-existing matches in unrelated execution
 plans; this ticket introduces none and leaves those plans unchanged.
+
+## SonarCloud duplication follow-up (2026-11-12)
+
+SonarCloud reported 10 duplicated new lines across the ProposalAI and Brief Decoder tests:
+4.6% against a 3% gate. The shared notice assertions now live in one test-support helper, used by
+those two product suites and all three Client Update Writer modes. Each case still checks the
+notice and configured policy link inside its product form; production code is unchanged.
+
+Validation: all 698 web-host tests pass, as do web-host TypeScript and ESLint checks and
+`git diff --check`. Remote duplication measurement will be checked after the authorized push.

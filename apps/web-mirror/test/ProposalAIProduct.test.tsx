@@ -25,6 +25,7 @@ import { getClientStorage } from "../src/products/runtime/clientStorage";
 import { createProductRunEventTracker } from "../src/products/runtime/productRunEventTracking";
 import { PROPOSAL_AI_MESSAGES } from "../src/products/proposalAi/messages";
 import { makeRender } from "./support/renderWithI18n";
+import { expectDataProcessingNotice } from "./support/expectDataProcessingNotice";
 import { simulateBrowserTranslation } from "@anytoolai/shared-ui/test/support/simulateBrowserTranslation";
 import { LOCALE_STORAGE_KEY } from "../src/i18n/localeStorage";
 
@@ -70,8 +71,7 @@ describe("ProposalAI product definition", () => {
     vi.stubEnv("NEXT_PUBLIC_ANYTOOLAI_PRIVACY_POLICY_URL", "https://example.com/privacy");
     renderReady();
     const form = await screen.findByRole("form");
-    expect(within(form).getByText("Data processing.")).toBeTruthy();
-    expect(within(form).getByRole("link", { name: /Privacy policy/ }).getAttribute("href")).toBe("https://example.com/privacy");
+    expectDataProcessingNotice(form, "https://example.com/privacy");
   });
 
   it.each([

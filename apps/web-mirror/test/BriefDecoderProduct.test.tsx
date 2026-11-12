@@ -34,6 +34,7 @@ import {
   startResponse,
 } from "./fixtures/platformResponses";
 import { makeRender } from "./support/renderWithI18n";
+import { expectDataProcessingNotice } from "./support/expectDataProcessingNotice";
 import { simulateBrowserTranslation } from "@anytoolai/shared-ui/test/support/simulateBrowserTranslation";
 import { LOCALE_STORAGE_KEY } from "../src/i18n/localeStorage";
 
@@ -124,8 +125,7 @@ describe("Brief Decoder definition", () => {
     const { client } = makeClient(routes(composedOutput("")));
     render(<BriefDecoderProduct client={client} />);
     const form = await screen.findByRole("form");
-    expect(within(form).getByText("Data processing.")).toBeTruthy();
-    expect(within(form).getByRole("link", { name: /Privacy policy/ }).getAttribute("href")).toBe("https://example.com/privacy");
+    expectDataProcessingNotice(form, "https://example.com/privacy");
   });
 
   it.each([
