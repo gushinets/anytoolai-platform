@@ -80,6 +80,29 @@ def test_clean_proposal_has_no_violations() -> None:
     assert violations(CLEAN) == set()
 
 
+@pytest.mark.parametrize(
+    ("language", "greeting"),
+    [
+        ("ru", "Здравствуйте, Анна!"),
+        ("ru", "Здравствуйте!"),
+        ("ru", "Здравствуйте, Анна."),
+        ("ru", "Здравствуйте."),
+        ("ru", "Анна, здравствуйте."),
+        ("en", "Hi Anna,"),
+        ("en", "Hi,"),
+        ("en", "Hello Anna,"),
+        ("en", "Hello,"),
+        ("es", "Hola, Ana:"),
+        ("es", "Hola:"),
+    ],
+)
+def test_punctuated_greeting_is_not_a_heading(language: str, greeting: str) -> None:
+    """ANY-845: the required greeting line must pass the existing heading check."""
+    order = {**EN_ORDER, "expect_language": language}
+    text = greeting + "\n\n" + CLEAN
+    assert proposal_ai_eval.check_proposal(text, [], order, PROFILE)["list_or_heading"] is False
+
+
 def test_each_reported_defect_is_caught() -> None:
     assert "placeholder" in violations(CLEAN + "\n\nBest, [Your Name]")
     assert "meta_phrase" in violations(CLEAN + " Based on the information I have, I fit.")
@@ -282,7 +305,7 @@ def test_criteria_are_questions_and_fixture_checks_are_literal() -> None:
     """Meaning is a human question; `must_not` may only forbid amounts (code reviews #3 to #6 found
     a new wording that every semantic regular expression misread). A critical criterion names its
     violation, so no criterion mixes a critical violation with a minor one."""
-    for name in ("terms.json", "qa_cases.json"):
+    for name in ("terms.json", "qa_cases.json", "greeting_cases.json"):
         for order in json.loads((FIXTURES / name).read_text(encoding="utf-8"))["orders"]:
             ids = [criterion["id"] for criterion in order["criteria"]]
             assert len(ids) == len(set(ids)) and "no-critical-error" not in ids, order["id"]
