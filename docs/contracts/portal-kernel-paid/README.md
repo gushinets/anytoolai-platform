@@ -1,6 +1,6 @@
 # ANY-766 paid integration target contracts
 
-**Current checkpoint — Steps 10–17, 2026-11-11:** the
+**Current checkpoint — Steps 10–17 and PR corrections, 2026-11-12:** the
 [common guide](https://github.com/gushinets/payments-portal/blob/main/docs/contracts/product-backend-api/README.md#implemented-step-10-settings-and-cutover)
 owns implemented common routes, V2 delegation, BACKEND_CONSUMERS, policy guard,
 fixed callbacks and browser migration. Its
@@ -16,6 +16,12 @@ owns current routing and cutover; legacy sender settings in the historical
 Step 6/7 descriptions below are superseded.
 Schemas/fixtures retain their exact historical bytes; current implementation
 status is recorded here and in the guide, not inferred from a schema description.
+In particular, the retained Step 9 `contract-index.json` policy digest inventory
+and `backend-protocol.json` digest vectors predate the PR correction. Their four
+fields and default Kernel ID describe that checkpoint, not today's complete
+policy or a mandatory consumer ID. The common guide owns the current digest
+(including permissions and technical source) and upgrade rules; these are checked
+by runtime policy regressions. Wire schemas and historical fixture checksums stay unchanged.
 
 Status: **protocol specifications and fixtures**, formalized 2026-11-09.
 Implementation through ANY-766 Step 15 includes common delegated identity V2,
@@ -101,18 +107,23 @@ Unknown fields fail validation. This is a new target, not a V1 snapshot adapter.
 
 The directional credentials remain independent:
 
-- Portal → Kernel sends platform-kernel's `portal_to_backend_current_secret`
+- Portal → Kernel sends the configured Kernel consumer's `portal_to_backend_current_secret`
   from `BACKEND_CONSUMERS`; Kernel receives current/previous
   `ANYTOOLAI_PORTAL_SERVICE_TOKEN` slots. Implemented receiver permissions are
   `manifest:read`, `access:invalidate` and `usage:read`.
 - Kernel → Portal sends `ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN`; Portal matches it
-  against platform-kernel's `backend_to_portal_current_secret` or optional
+  against that consumer's `backend_to_portal_current_secret` or optional
   `backend_to_portal_previous_secret` in `BACKEND_CONSUMERS`. Other consumers use
   their own independent entries/credentials. Implemented receiver permissions
   are `access-snapshot:read`, `backend-session:exchange`,
   `backend-session:introspect` and `allowance-exhaustion:write`; the exhaustion
   receiver is implemented in Step 14. Snapshot V3 now serves each
   configured consumer only its authorized products.
+
+Kernel's consumer ID defaults to `platform-kernel`. The single configuration
+input `ANYTOOLAI_PORTAL_CONSUMER_ID` must match its API, frontend build and Portal
+registry. The browser validates this audience throughout launch/exchange/storage;
+CE-kit receives it explicitly. Configuration cannot reassign historical purchases.
 
 Possession of one permission grants none of the others. Scope comes from trusted
 receiver configuration. Requests only narrow that authority. Canonical Portal
@@ -258,11 +269,15 @@ One PostgreSQL coherence row per consumer/tenant/region/user serializes policy
 observation, snapshot installation, invalidation and new admission. Migration
 `0020` preserves the durable R floor and all usage/reservations while initializing
 legacy Kernel consumer/P1 and clearing incompatible V2 cache/digest metadata.
-After authentication and accepted owner/hash replay lookup, observe the current
-introspected P under the coherence lock and commit that observation before HTTP
-refresh outside SQL. A higher P evicts cached authority without lowering R;
-stale P cannot restore it. Installation/admission require matching current P and
-R at/above its durable floor. Eviction/restart preserve both floors.
+After successful introspection, the API runtime dependency commits observed P
+under the coherence lock before entering any handler, including historical reads,
+usage, replay and requests that later return 404/409. A higher P evicts cached
+authority without lowering R or changing buckets, reservations or accepted work.
+A lower in-flight P cannot lower the floor; its still-valid identity may read or
+replay owned history without fetching a snapshot or requiring current grants.
+Only new admission requires current P: refresh rechecks the floor before using
+cached authority or fetching outside SQL, and installation/admission require
+matching P and R at/above its durable floor. Eviction/restart preserve both floors.
 
 New admission then locks coherence, repeats replay lookup, resolves the
 scenario-owned metric/exact allowance and invokes ANY-507 in the caller's Session.
@@ -597,4 +612,6 @@ exercises both actual APIs and strict auth/access clients with two configured
 identities and separate disposable databases. External LBX/manifest responses
 and the second identity are synthetic. This is distinct from Step 16's assembled
 paid browser/execution acceptance. Recipient delivery was pending at this
-checkpoint and is now implemented in Step 13; usage remains Steps 14/15.
+checkpoint and is now implemented in Step 13; backend/cabinet usage is implemented
+in Steps 14/15. Current installation heads are Portal `20261111_0011` and Kernel
+`0021`; the common guide owns the expanded-digest P upgrade requirement.

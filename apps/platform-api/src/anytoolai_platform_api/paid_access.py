@@ -14,7 +14,7 @@ from urllib.request import ProxyHandler, build_opener
 from urllib.request import Request as UrlRequest
 
 import sqlalchemy as sa
-from anytoolai_platform_api.dependencies import get_settings
+from anytoolai_platform_api.dependencies import get_runtime, get_session_factory, get_settings
 from anytoolai_platform_api.errors import ApiError
 from anytoolai_platform_api.portal_session import (
     PORTAL_TIMEOUT_SECONDS,
@@ -44,6 +44,7 @@ from anytoolai_platform_core.scenarios.repository import ScenarioSessionReposito
 from anytoolai_platform_core.storage.transactions import SessionFactory, transaction_boundary
 from fastapi import Depends, Request
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, ValidationError, model_validator
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 PAID_RUNTIME_ERROR_RESPONSES = {
@@ -136,6 +137,23 @@ def forbidden() -> ApiError:
     )
 
 
+def require_portal_user(
+    principal: Annotated[PortalUserPrincipal, Depends(authenticate_portal_user)],
+    factory: Annotated[SessionFactory, Depends(get_session_factory)],
+) -> PortalUserPrincipal:
+    """Commit observed P before any runtime read, replay or later handler refusal."""
+    try:
+        with transaction_boundary(factory) as session:
+            # A lower in-flight P cannot lower the floor, but its valid identity
+            # still permits historical access. Only new admission requires current P.
+            AccessCoherenceRepository(
+                session, principal.owner, consumer_id=principal.consumer_id
+            ).observe_policy(principal.consumer_policy_revision)
+    except SQLAlchemyError:
+        raise unavailable() from None
+    return principal
+
+
 def optional_portal_user(
     request: Request,
     client: Annotated[PortalSessionClient, Depends(get_portal_session_client)],
@@ -143,7 +161,9 @@ def optional_portal_user(
     # Supplying an invalid credential must never select the guest route.
     if not request.headers.getlist("authorization"):
         return None
-    return authenticate_portal_user(request, client)
+    principal = authenticate_portal_user(request, client)
+    # Keep guest admission and invalid credentials independent of runtime storage.
+    return require_portal_user(principal, get_session_factory(get_runtime(request)))
 
 
 def require_session_owner(

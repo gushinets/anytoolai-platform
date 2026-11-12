@@ -20,6 +20,10 @@ on:
       web_base_path:
         description: Optional frontend base path
         type: string
+      portal_consumer_id:
+        description: Portal consumer ID (must match Kernel API and Portal registry)
+        type: string
+        default: platform-kernel
       portal_authorize_url:
         description: Portal localized backend authorization URL (frontend build)
         type: string
@@ -91,6 +95,7 @@ jobs:
           PLATFORM_API_BASE_URL: ${{ inputs.kernel_api_origin }}
           NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS: ${{ inputs.enabled_products }}
           ANYTOOLAI_WEB_BASE_PATH: ${{ inputs.web_base_path }}
+          ANYTOOLAI_PORTAL_CONSUMER_ID: ${{ inputs.portal_consumer_id }}
           NEXT_PUBLIC_PORTAL_AUTHORIZE_URL: ${{ inputs.portal_authorize_url }}
         run: |
           set -euo pipefail
@@ -103,6 +108,7 @@ jobs:
             --build-arg "PLATFORM_API_BASE_URL=$PLATFORM_API_BASE_URL" \
             --build-arg "NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS=$NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS" \
             --build-arg "ANYTOOLAI_WEB_BASE_PATH=$ANYTOOLAI_WEB_BASE_PATH" \
+            --build-arg "ANYTOOLAI_PORTAL_CONSUMER_ID=$ANYTOOLAI_PORTAL_CONSUMER_ID" \
             --build-arg "NEXT_PUBLIC_PORTAL_AUTHORIZE_URL=$NEXT_PUBLIC_PORTAL_AUTHORIZE_URL" \
             --tag "$image" .
           docker image inspect --format '{{.Id}}' "$image" >> "$GITHUB_STEP_SUMMARY"

@@ -26,12 +26,24 @@ describe("Portal tab custody", () => {
   it("stores the canonical owner/token in the supplied tab storage", () => {
     const storage = memoryTabStorage();
     writePortalSession(storage, session);
-    expect(readPortalSession(storage)).toEqual(session);
+    expect(readPortalSession(storage, "platform-kernel")).toEqual(session);
   });
   it("requires reauthorization for the old token envelope", () => {
     const storage = memoryTabStorage();
     storage.setItem("anytoolai.portal_session.v1", JSON.stringify({ version: 1, ...session }));
-    expect(() => readPortalSession(storage)).toThrow("portal_storage_invalid");
+    expect(() => readPortalSession(storage, "platform-kernel")).toThrow("portal_storage_invalid");
+  });
+  it("uses the explicitly selected audience for both exchange and stored V2 sessions", () => {
+    const custom = { ...session, consumerId: "custom-kernel" };
+    const storage = memoryTabStorage();
+    writePortalSession(storage, custom);
+    expect(readPortalSession(storage, "custom-kernel")).toEqual(custom);
+    expect(() => readPortalSession(storage, "platform-kernel")).toThrow("portal_storage_invalid");
+    const response = { schema_version: 2, consumer_id: custom.consumerId, consumer_policy_revision: 1,
+      token_type: "Bearer", tenant_id: custom.owner.tenantId, region: custom.owner.region,
+      user_id: custom.owner.userId, access_token: custom.accessToken, expires_at: custom.expiresAt };
+    expect(parsePortalExchange(response, "custom-kernel")).toEqual(custom);
+    expect(parsePortalExchange(response, "platform-kernel")).toBeNull();
   });
   it("uses secure S256 PKCE, checks state and consumes a callback once", async () => {
     const storage = memoryTabStorage();
@@ -59,7 +71,7 @@ describe("Portal tab custody", () => {
     { schema_version: 1 }, { consumer_id: "synthetic-summary" }, { consumer_policy_revision: 0 }, { consumer_policy_revision: true }, { consumer_policy_revision: 1.5 }, { token_type: "other" }, { user_id: "foreign-not-uuid" }, { expires_at: "tomorrow" }, { access_token: "bad token" },
   ])("rejects malformed exchange fields %o", (override) => {
     expect(parsePortalExchange({ schema_version: 2, consumer_id: "platform-kernel", consumer_policy_revision: 1, token_type: "Bearer", tenant_id: "anytoolai", region: "ru", user_id: session.owner.userId,
-      access_token: session.accessToken, expires_at: session.expiresAt, ...override })).toBeNull();
+      access_token: session.accessToken, expires_at: session.expiresAt, ...override }, "platform-kernel")).toBeNull();
   });
   it("refuses authorization before navigation when storage rejects custody", async () => {
     const storage = memoryTabStorage();

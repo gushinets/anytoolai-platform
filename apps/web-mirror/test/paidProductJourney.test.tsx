@@ -308,7 +308,7 @@ it.each([false, true])("ignores a first-login callback after a newer document si
     user_id: owner.userId, expires_at: session.expiresAt, access_token: token }));
   await expect(exchange).rejects.toThrow("portal_exchange_failed");
   expect(tabStorage.getItem("anytoolai.portal_mode.v1")).not.toBe(initialMode);
-  expect(readPortalSession(tabStorage)).toBeNull();
+  expect(readPortalSession(tabStorage, "platform-kernel")).toBeNull();
   expect(getPortalIdentity()).toMatchObject({ kind: "required", owner: null });
 });
 
@@ -323,7 +323,7 @@ it("refuses an old authorization callback when the newer document has already si
     user_id: owner.userId, expires_at: session.expiresAt, access_token: token }));
   await expect(completePortalAuthorization(`#code=${"c".repeat(43)}&state=${launch.searchParams.get("state")}`)).rejects.toThrow();
   expect(fetcher).not.toHaveBeenCalled();
-  expect(readPortalSession(tabStorage)).toBeNull();
+  expect(readPortalSession(tabStorage, "platform-kernel")).toBeNull();
 });
 
 it("refuses a suspended launch without overwriting a newer document's authorization", async () => {
@@ -345,7 +345,7 @@ it("invalidates an old client after another document returns to the identical au
   const newer = await import("../src/lib/portalSession");
   newer.requirePortalAuthorization(true);
   newer.installPortalSession(session);
-  expect(readPortalSession(tabStorage)).toEqual(session);
+  expect(readPortalSession(tabStorage, "platform-kernel")).toEqual(session);
   expect(tabStorage.getItem("anytoolai.portal_mode.v1")).not.toBe(initial);
   expect(await client.request({ path: "/v1/scenario-sessions/session_1" })).toEqual({ ok: false, error: { type: "aborted" } });
   expect(fetcher).not.toHaveBeenCalled();
@@ -372,7 +372,7 @@ it.each(["custody", "token"])("refuses silently lost %s writes before authorizin
   });
   expect(() => installPortalSession(session)).toThrow("portal_storage_unavailable");
   expect(synchronizePortalIdentity().kind).toBe("required");
-  expect(readPortalSession(tabStorage)).toBeNull();
+  expect(readPortalSession(tabStorage, "platform-kernel")).toBeNull();
 });
 
 it.each(["different owner", "renewed token", "logout"])("ignores late exchange after another document installs %s without a browser event", async (change) => {
@@ -399,7 +399,7 @@ it.each(["different owner", "renewed token", "logout"])("ignores late exchange a
   finish(Response.json({ schema_version: 2, consumer_id: "platform-kernel", consumer_policy_revision: 1, token_type: "Bearer", tenant_id: owner.tenantId, region: owner.region,
     user_id: owner.userId, expires_at: session.expiresAt, access_token: token }));
   await expect(exchange).rejects.toThrow("portal_exchange_failed");
-  expect(readPortalSession(tabStorage)).toEqual(change === "logout" ? null : nextSession);
+  expect(readPortalSession(tabStorage, "platform-kernel")).toEqual(change === "logout" ? null : nextSession);
   expect(tabStorage.getItem(recoveryKey)).toBe(JSON.stringify(recovery));
   expect(getPortalIdentity().generation).toBeGreaterThan(generation);
 });
@@ -423,7 +423,7 @@ it.each(["pageshow", "focus"])("callback reconciles custody on %s while its exch
   await act(async () => { finish(Response.json({ schema_version: 2, consumer_id: "platform-kernel", consumer_policy_revision: 1, token_type: "Bearer", tenant_id: owner.tenantId, region: owner.region,
     user_id: owner.userId, expires_at: session.expiresAt, access_token: token })); });
   expect(await screen.findByRole("alert")).toBeTruthy();
-  expect(readPortalSession(tabStorage)).toEqual(nextSession);
+  expect(readPortalSession(tabStorage, "platform-kernel")).toEqual(nextSession);
   expect(fetcher).toHaveBeenCalledOnce();
 });
 
@@ -484,4 +484,36 @@ it("quarantines a Step 8 token while retaining the exact uncertain start across 
   expect(sends).toHaveLength(1);
   expect(new Headers(sends[0].headers).get("Idempotency-Key")).toBe(original.idempotencyKey);
   expect(parseBody(sends[0].body)).toMatchObject({ input: { text: "frozen before cutover" } });
+});
+
+
+it("uses the configured consumer throughout authorization and tab restoration", async () => {
+  vi.stubGlobal("crypto", webcrypto);
+  const originalClient = createPlatformApiClient();
+  const persistence = getPaidPersistence(originalClient)!;
+  persistPaidStartRecovery(persistence, { version: 1, kind: "pending", owner, ...ids,
+    idempotencyKey: "original_key", request: { ...ids, frontendId: "web_mirror", input: { text: "Frozen input" } } });
+  const pending = readPaidStartRecovery(persistence, ids.productId);
+  vi.stubEnv("NEXT_PUBLIC_PORTAL_CONSUMER_ID", "custom-kernel");
+  const launch = new URL(await beginPortalAuthorization("/products/proposal_ai"));
+  expect(launch.searchParams.get("consumer_id")).toBe("custom-kernel");
+  fetcher.mockResolvedValueOnce(Response.json({ schema_version: 2, consumer_id: "custom-kernel", consumer_policy_revision: 2,
+    token_type: "Bearer", tenant_id: owner.tenantId, region: owner.region, user_id: owner.userId,
+    access_token: session.accessToken, expires_at: session.expiresAt }));
+  await expect(completePortalAuthorization(`#code=${"c".repeat(43)}&state=${launch.searchParams.get("state")}`)).resolves.toBe("/products/proposal_ai");
+  expect(synchronizePortalIdentity()).toMatchObject({ kind: "authorized", session: { consumerId: "custom-kernel" } });
+  expect(readPaidStartRecovery(getPaidPersistence(createPlatformApiClient())!, ids.productId)).toEqual(pending);
+});
+
+it("rejects foreign audience before changing custody or clearing private recovery", () => {
+  const persistence = getPaidPersistence(createPlatformApiClient())!;
+  persistPaidStartRecovery(persistence, { version: 1, kind: "pending", owner, ...ids,
+    idempotencyKey: "original_key", request: { ...ids, frontendId: "web_mirror", input: { text: "Frozen input" } } });
+  const saved = JSON.stringify(window.sessionStorage);
+  expect(() => installPortalSession({ ...session, consumerId: "foreign-backend", owner: { ...owner,
+    userId: "22222222-2222-2222-2222-222222222222" } })).toThrow("portal_consumer_mismatch");
+  expect(JSON.stringify(window.sessionStorage)).toBe(saved);
+  writePortalSession(tabStorage, { ...session, consumerId: "foreign-backend" });
+  expect(synchronizePortalIdentity()).toMatchObject({ kind: "required", owner });
+  expect(readPaidStartRecovery(persistence, ids.productId)?.kind).toBe("pending");
 });
