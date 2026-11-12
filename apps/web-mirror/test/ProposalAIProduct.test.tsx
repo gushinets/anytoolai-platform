@@ -312,7 +312,7 @@ describe("ProposalAI product definition", () => {
     expect(idempotencyKeyOf(starts[0]!)).not.toBe(idempotencyKeyOf(starts[1]!));
     expect(screen.queryByText("Created from previous details")).toBeNull();
     const resultSection = screen.getByRole("heading", { name: "Proposal", level: 2 }).closest("section")!;
-    expect(within(resultSection).getByRole("status").textContent).toBe("Generating your proposal…");
+    expect(within(resultSection).getByRole("status").textContent).toContain("Generating your proposal…");
     expect(screen.getAllByRole("status")).toHaveLength(1);
     expect(screen.getByText(PROPOSAL_TEXT)).toBeTruthy();
 

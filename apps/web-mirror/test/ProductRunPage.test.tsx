@@ -111,6 +111,58 @@ class TestErrorBoundary extends Component<{ children: ReactNode }, { failed: boo
 }
 
 describe("ProductRunPage", () => {
+  it.each(["completed", "failed"])("includes submission time and removes progress on %s", async (status) => {
+    const routed = makeClientWithDeferredCalls(happyPathRoutes(), { [ROUTES.START]: 1, [ROUTES.SESSION]: 1 });
+    const view = renderPage({ client: routed.client });
+    await waitForForm();
+    fillValidForm();
+    vi.useFakeTimers();
+    try {
+      submit();
+      expect(screen.getByText("Elapsed: 0:00")).toBeTruthy();
+      await act(async () => { await advance(5_000); });
+      expect(screen.getByText("Elapsed: 0:05")).toBeTruthy();
+      await act(async () => { routed.resolveCall(ROUTES.START, 0, startResponse()); });
+      await act(async () => { await advance(2_000); });
+      expect(screen.getByText("Elapsed: 0:07")).toBeTruthy();
+      await act(async () => { routed.resolveCall(ROUTES.SESSION, 0, sessionResponse({ status })); });
+      expect(screen.queryByTestId("run-progress")).toBeNull();
+      expect(screen.getByText(status === "completed" ? RESULT_TEXT : RUN_FAILED)).toBeTruthy();
+    } finally {
+      view.unmount();
+      vi.useRealTimers();
+    }
+  });
+
+  it.each(["start", "poll", "attach"])("preserves elapsed time after a retryable %s error", async (failure) => {
+    const routes = happyPathRoutes();
+    if (failure === "start") routes[ROUTES.START] = [errorResponse(503, "internal_error"), errorResponse(503, "internal_error"), startResponse()];
+    routes[ROUTES.SESSION] = [
+      ...(failure === "start" ? [] : [() => { throw new TypeError("Connection lost"); }]),
+      ...Array.from({ length: 10 }, () => () => sessionResponse({ status: "running" })),
+    ];
+    const routed = makeClient(routes);
+    vi.useFakeTimers();
+    const view = renderPage({ client: routed.client, ...(failure === "attach" ? { attachSessionId: "session_1" } : {}) });
+    try {
+      await act(async () => { await advance(100); });
+      if (failure !== "attach") {
+        fillValidForm();
+        submit();
+      }
+      await act(async () => { await advance(5_000); });
+      expect(screen.queryByTestId("run-progress")).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+      expect(screen.getByText("Elapsed: 0:05")).toBeTruthy();
+      await act(async () => { await advance(2_000); });
+      expect(screen.getByText("Elapsed: 0:07")).toBeTruthy();
+      expect(routed.calls.filter((call) => call.key === ROUTES.START)).toHaveLength(failure === "start" ? 3 : failure === "attach" ? 0 : 1);
+    } finally {
+      view.unmount();
+      vi.useRealTimers();
+    }
+  });
+
   it.each(["Try again", "Run"])("retries occupied capacity using %s with the same key and an unlocked form", async (button) => {
     const { client, calls } = makeClientCapturingRequests({
       ...happyPathRoutes(),
@@ -895,10 +947,13 @@ describe("ProductRunPage", () => {
     expect(text.value).toBe("Edited input.");
     // The progress notice lives in the result card, next to the still-relevant "previous details" one.
     const resultCard = screen.getByRole("heading", { name: "Test result", level: 2 }).closest("section")!;
-    expect(within(resultCard).getByText("Running…")).toBeTruthy();
+    const progress = within(resultCard).getByTestId("run-progress");
+    expect(within(progress).getByRole("status").textContent).toContain("Running…");
+    expect(progress.compareDocumentPosition(screen.getByText(RESULT_TEXT)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(resultCard).getByText("Created from previous details")).toBeTruthy();
     routed.resolveCall(ROUTES.RESULT, 1, resultResponse(TEST_PRODUCT_IDS, { output: { text: "Second result." } }));
     await screen.findByText("Second result.");
+    expect(screen.queryByTestId("run-progress")).toBeNull();
     expect(screen.queryByText("Created from previous details")).toBeNull();
 
     // Copy and New task share one action group.
@@ -1526,6 +1581,7 @@ describe("ProductRunPage", () => {
   });
 
   it.each([
+    { durationMs: 20_000, status: "running", attached: false },
     { durationMs: 70_000, status: "running", attached: false },
     { durationMs: 1_210_000, status: "running", attached: false },
     { durationMs: 1_210_000, status: "started", attached: true },
@@ -1548,9 +1604,14 @@ describe("ProductRunPage", () => {
       expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
       expect(screen.queryByText(RESULT_TEXT)).toBeNull();
       expect(screen.getByRole("button", { name: "Generating…" }).hasAttribute("disabled")).toBe(true);
+      const progress = screen.getByTestId("run-progress");
+      expect(progress.dataset.stage).toBe(durationMs >= 60_000 ? "long" : "normal");
+      expect(within(progress).getByText(`Elapsed: ${Math.floor(durationMs / 60_000)}:${String(durationMs / 1_000 % 60).padStart(2, "0")}`)).toBeTruthy();
+      expect(screen.getByRole("heading", { name: "Test result" }).closest("section")!.contains(progress)).toBe(true);
       completed = true;
       await act(async () => { await advance(2_000); });
       expect(screen.getByText(RESULT_TEXT)).toBeTruthy();
+      expect(screen.queryByTestId("run-progress")).toBeNull();
       expect(calls.filter((call) => call.key === ROUTES.START)).toHaveLength(attached ? 0 : 1);
       expect(calls.filter((call) => call.key.startsWith("GET /v1/scenario-sessions/"))
         .every((call) => call.key === ROUTES.SESSION)).toBe(true);

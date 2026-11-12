@@ -37,6 +37,7 @@ import { isProductEnabled } from "./enabledProducts";
 import { useLatest } from "./useLatest";
 import type { FieldError } from "./fieldValidation";
 import { ProductShellContext } from "./ProductShellContext";
+import { RunProgress } from "./RunProgress";
 import { assertNever, type ProductDefinition, type ProductRunEvent } from "./productDefinition";
 import styles from "./ProductRunPage.module.css";
 
@@ -358,6 +359,8 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof V, FieldError>>>({});
   const liveValidationFieldsRef = useRef(new Set<keyof V>());
   const [phase, setPhase] = useState<Phase<R>>({ kind: "idle" });
+  // Retain timing across same-run retries; only new starts, resumes and attachments replace it.
+  const [runStartedAtMs, setRunStartedAtMs] = useState<number | null>(null);
   const [displayedResult, setDisplayedResult] = useState<{
     scenarioSessionId: string;
     resultArtifactId: string;
@@ -613,6 +616,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     attachedSessionRef.current = attachSessionId;
     setAttachBegun(true);
     attachActiveRef.current = true;
+    setRunStartedAtMs(Date.now());
     setPhase({ kind: "running", scenarioSessionId: attachSessionId });
     void runPoll(attachSessionId);
     callSafely(onAttachBeginRef.current);
@@ -631,12 +635,13 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     }
     activeInputRef.current = input;
     resumedRunRef.current = run.scenarioSessionId;
+    setRunStartedAtMs(run.startedAtMs ?? Date.now());
     setPhase({ kind: "running", scenarioSessionId: run.scenarioSessionId });
     void runPoll(run.scenarioSessionId);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- resume once after boot, like the attach effect above
   }, [boot.kind]);
 
-  async function runStart(prepared: PreparedScenarioStart) {
+  async function runStart(prepared: PreparedScenarioStart, startedAtMs: number) {
     // Snapshotted once: this call's own controller, checked consistently across every await below
     // regardless of which controller (if any) controllerRef points to by the time each resolves.
     const controller = controllerRef.current;
@@ -713,7 +718,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     startedSessionsRef.current.set(prepared, result.value.scenarioSessionId);
     // shortcut: pending start keys do not survive reload; persist them when pre-acceptance recovery is required.
     if (draftKey !== null) {
-      saveDraftRun(draftKey, { scenarioSessionId: result.value.scenarioSessionId, input: activeInputRef.current });
+      saveDraftRun(draftKey, { scenarioSessionId: result.value.scenarioSessionId, input: activeInputRef.current, startedAtMs });
       saveProductDraftScenario(productId, scenarioId);
       if (readProductDraftScenario(productId) === scenarioId && preferSavedOwnRun(productId, draftKey, result.value.scenarioSessionId)) {
         // Reload follows the accepted own run even while the old result remains on screen.
@@ -912,12 +917,14 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
 
   // Shared by handleSubmit/handleRetry: both begin a (new or reused) prepared start the same way.
   function beginStart(prepared: PreparedScenarioStart) {
+    const startedAtMs = pendingStart?.prepared === prepared ? runStartedAtMs ?? Date.now() : Date.now();
+    setRunStartedAtMs(startedAtMs);
     resumedRunRef.current = null;
     // Not the end of the attach yet: if this start fails, the attached result is still what is on screen.
     attachActiveRef.current = false;
     setPhase({ kind: "submitting" });
     emitEvent(onEventRef.current, { type: "form_submitted", guestId });
-    void runStart(prepared);
+    void runStart(prepared, startedAtMs);
   }
 
   // Shared by handleSubmit and handleRetry (the "Try again" button on retryable-error): always
@@ -1237,6 +1244,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   // Exhausts Phase["kind"]: a new variant must be handled here.
   const oldResult = displayedResult?.input && !shallowEqualValues(displayedResult.input, values);
   let placeholderMessage: string | null = null;
+  let placeholderNode: ReactNode = null;
   let progress: ReactNode = null;
   let error: ReactNode = null;
   let showNewTask = false;
@@ -1245,13 +1253,18 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       if (!displayedResult) placeholderMessage = tp(`${definition.messageScope}.placeholder`);
       break;
     case "submitting":
-    case "running":
+    case "running": {
+      const statusText = tp(`${definition.messageScope}.running`);
+      const indicator = runStartedAtMs !== null
+        ? <RunProgress startedAtMs={runStartedAtMs} statusText={statusText} className={styles.runProgress} />
+        : <p role="status">{statusText}</p>;
       if (displayedResult) {
-        progress = <p role="status" className={styles.resultProgress}>{tp(`${definition.messageScope}.running`)}</p>;
+        progress = <div className={styles.resultProgress}>{indicator}</div>;
       } else {
-        placeholderMessage = tp(`${definition.messageScope}.running`);
+        placeholderNode = indicator;
       }
       break;
+    }
     case "result":
       showNewTask = true;
       break;
@@ -1349,9 +1362,9 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
                   ) : undefined}
                 />
               ) : null}
-              {placeholderMessage !== null ? (
+              {placeholderMessage !== null || placeholderNode !== null ? (
                 <div className={`${styles.resultPlaceholder} ${phase.kind === "idle" ? styles.emptyPlaceholder : ""}`}>
-                  <p role="status">{placeholderMessage}</p>
+                  {placeholderNode ?? <p role="status">{placeholderMessage}</p>}
                 </div>
               ) : null}
             </Card>

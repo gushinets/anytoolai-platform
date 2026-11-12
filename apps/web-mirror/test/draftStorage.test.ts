@@ -10,6 +10,29 @@ afterEach(() => {
 });
 
 describe("tab draft storage", () => {
+  it("round trips the start time and keeps it when values change", () => {
+    const timedRun = { ...run, startedAtMs: Date.now() - 25_000 };
+    saveDraftRun(key, timedRun);
+    expect(readProductDraft(key)?.run).toEqual(timedRun);
+    saveDraftValues(key, { text: "edited" });
+    expect(readProductDraft(key)?.run).toEqual(timedRun);
+  });
+
+  it.each([undefined, "x", NaN, Infinity, null, 0, -1, Date.now() + 120_000])(
+    "keeps the run without an invalid or missing start time (%s)", (startedAtMs) => {
+      window.sessionStorage.setItem(key, JSON.stringify({ v: 1, run: { ...run, startedAtMs } }));
+      expect(readProductDraft(key)?.run).toEqual(run);
+    },
+  );
+
+  it("allows at most one minute of future clock skew", () => {
+    vi.spyOn(Date, "now").mockReturnValue(1_000_000);
+    saveDraftRun(key, { ...run, startedAtMs: 1_060_000 });
+    expect(readProductDraft(key)?.run?.startedAtMs).toBe(1_060_000);
+    saveDraftRun(key, { ...run, startedAtMs: 1_060_001 });
+    expect(readProductDraft(key)?.run).toEqual(run);
+  });
+
   it("keeps the selected scenario separate for each product", () => {
     expect(readProductDraftScenario("client_update_writer")).toBeUndefined();
     saveProductDraftScenario("client_update_writer", "client_update_writer.reply_draft_v1");

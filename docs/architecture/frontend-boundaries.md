@@ -283,6 +283,14 @@ product-owned. Code: `apps/web-mirror/src/i18n/` (library `use-intl`, imported o
   (`workspace.inputTitle|previousDetails|backToInputs|newTask|handoffFailed|handoffOpening|handoffStay`); the product owns the noun-specific
   copy under its `messageScope` (`resultTitle|placeholder|regenerate`, one set per Client Update
   Writer mode). The shared runtime still owns start, retry, quota, and copy behavior.
+- **Waiting progress (ANY-842):** the shared runtime shows elapsed time and a localized stage hint
+  throughout submission and polling, including regeneration over a previous result. Hints change at
+  30 and 60 seconds, based on observed 4.5–42-second product runs; these are expectations, not
+  deadlines. Products provide only their `<scope>.running` status and must not add their own timers.
+  The counter is outside the live status region to avoid announcements every second. Accepted own
+  runs retain their client start timestamp where draft recovery is enabled; legacy drafts and
+  attached handoff sessions time from local observation. Same-run retries retain the timestamp;
+  leaving the pending state removes the timer. Polling policy remains owned by ANY-777.
 - **Validation:** shared validators return structured `FieldError` data (`required`,
   `outer_whitespace`, `max_length`, `product`), never prose; `FieldErrorMessage` renders it in the
   current locale. Backend schema validation stays authoritative.

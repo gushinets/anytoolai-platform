@@ -14,6 +14,12 @@
   "resultFetchFailed": "Seu resultado está pronto, mas não conseguimos carregá-lo. Tente novamente.",
   "starting": "Iniciando…",
   "generating": "Gerando…",
+  "runProgress": {
+    "elapsed": "Tempo decorrido: {time}",
+    "normal": "Isso costuma levar de 10 a 40 segundos.",
+    "slow": "A geração continua. Algumas solicitações levam um pouco mais de tempo.",
+    "long": "Está demorando mais do que o habitual. A geração continua no servidor — mantenha esta página aberta."
+  },
   "identityUnavailable": "Não foi possível verificar sua identidade. Recarregue a página e tente novamente.",
   "retry": "Tentar novamente",
   "formLabel": "Formulário {product}",

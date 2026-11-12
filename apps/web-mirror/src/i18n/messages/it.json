@@ -14,6 +14,12 @@
   "resultFetchFailed": "Il risultato è pronto, ma non è stato possibile caricarlo. Riprovi.",
   "starting": "Avvio in corso…",
   "generating": "Generazione in corso…",
+  "runProgress": {
+    "elapsed": "Tempo trascorso: {time}",
+    "normal": "Di solito servono 10–40 secondi.",
+    "slow": "La generazione continua. Alcune richieste richiedono un po’ più di tempo.",
+    "long": "Sta impiegando più tempo del solito. La generazione continua sul server — tieni aperta questa pagina."
+  },
   "identityUnavailable": "Non è stato possibile verificare la sua identità. Ricarichi la pagina e riprovi.",
   "retry": "Riprovi",
   "formLabel": "Modulo {product}",

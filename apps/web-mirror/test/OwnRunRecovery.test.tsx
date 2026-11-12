@@ -79,6 +79,32 @@ describe.each(cases)("$productId/$mode: own start from an attached result", (sce
     for (const [label, value] of scenario.fields) fireEvent.change(screen.getByLabelText(label), { target: { value } });
   }
 
+  it.each([25_000, undefined])("restores elapsed time from a stored run (age=%s)", async (age) => {
+    const first = makeClientWithDeferredCalls(queues(), { [r.SESSION]: 1 });
+    await openAndFill(first.client);
+    const now = Date.now();
+    vi.spyOn(Date, "now").mockReturnValue(now);
+    fireEvent.click(screen.getByRole("button", { name: scenario.submit }));
+    await waitFor(() => expect(first.calls.filter((call) => call.key === r.SESSION)).toHaveLength(1));
+    const draft = readProductDraft(draftKey)!;
+    expect(draft.run?.startedAtMs).toBe(now);
+    window.sessionStorage.setItem(draftKey, JSON.stringify({ v: 1, ...draft, run: {
+      ...draft.run, startedAtMs: age === undefined ? undefined : now - age,
+    } }));
+    cleanup();
+    const second = makeClientWithDeferredCalls(queues(), { [r.SESSION]: 1 });
+    render(<Page client={second.client} />);
+    try {
+      await screen.findByText(age === undefined ? "Elapsed: 0:00" : "Elapsed: 0:25");
+      expect(second.calls.some((call) => call.key === r.START)).toBe(false);
+      second.resolveCall(r.SESSION, 0, sessionResponse());
+      await screen.findByText("New own result.");
+      expect(screen.queryByTestId("run-progress")).toBeNull();
+    } finally {
+      first.resolveCall(r.SESSION, 0, sessionResponse());
+    }
+  });
+
   it.each(["poll", "result"])("reload before own %s completes restores the new session without another start", async (stage) => {
     const deferred = stage === "poll" ? r.SESSION : r.RESULT;
     const first = makeClientWithDeferredCalls(queues(), { [deferred]: 1 });
