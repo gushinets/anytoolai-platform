@@ -1752,10 +1752,16 @@ for (const reasoningSupported of [false, null]) {
 }
 
 test("one accepted submission survives draft edits and renders safe result diagnostics", async ({page}) => {
+  const question = "К какому сроку необходимо согласовать и утвердить результаты работ?";
   let posts = 0;
   let reads = 0;
   const submittedBodies = [];
   await page.route("http://atom-lab.test/v1/atom-lab/runs", async (route) => {
+    if (route.request().method() === "GET") return route.fulfill({json: {items: [{
+      run_id: "run-1", status: "succeeded", atom_id: "A05", model_id: "openai/gpt-supported",
+      preset_id: null, preset_version: null, created_at: "2026-09-20T10:00:00Z",
+      started_at: "2026-09-20T10:00:00Z", finished_at: "2026-09-20T10:00:01Z",
+    }], next_cursor: null}});
     posts += 1;
     submittedBodies.push(route.request().postDataJSON());
     await new Promise((resolve) => setTimeout(resolve, 80));
@@ -1780,7 +1786,10 @@ test("one accepted submission survives draft edits and renders safe result diagn
         execution_definition_hash: "execution-hash-1",
       },
       runtime_ids: {scenario_session_id: null, job_id: null, action_run_id: terminal ? "action-1" : null, artifact_id: terminal ? "artifact-1" : null},
-      result: terminal ? {summary: "<img id=unsafe src=x onerror=alert(1)>", score: 0, accepted: false} : null,
+      result: terminal ? {questions: [{
+        question, rationale: "В задании не указана дата. <img id=unsafe src=x onerror=alert(1)>",
+        priority: "high", category: "сроки", source_issue_index: 0,
+      }]} : null,
       diagnostics: {error_code: null, duration_ms: terminal ? 1250 : null, requested_model_id: "openai/gpt-supported", requested_reasoning_effort: "high", response_model_id: terminal ? "gpt-confirmed" : null, validation_attempts: terminal ? 2 : 0, transport_attempts: terminal ? 3 : 0, physical_calls: terminal ? 3 : 0, succeeded_first_attempt: false, provider_calls: [], provider_calls_truncated: false, debug_artifacts: [], debug_artifacts_truncated: false},
       created_at: "2026-09-20T10:00:00Z", started_at: "2026-09-20T10:00:00Z", finished_at: terminal ? "2026-09-20T10:00:01Z" : null,
     })});
@@ -1813,6 +1822,27 @@ test("one accepted submission survives draft edits and renders safe result diagn
   await expect(page.locator("#run-diagnostics")).toContainText("artifact-1");
   await expect(page.locator("#run-diagnostics")).toContainText("session-1");
   await expect(page.locator("#run-diagnostics")).toContainText("job-1");
+  const resultQuestion = page.locator("#result-readable dl dl > dd").filter({hasText: question});
+  await expect(resultQuestion).toBeVisible();
+  expect(await resultQuestion.evaluate(value =>
+    value.previousElementSibling.getBoundingClientRect().right < value.getBoundingClientRect().left)).toBe(true);
+  await page.setViewportSize({width: 320, height: 844});
+  await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
+  for (const resultId of ["#result-readable", "#history-result-readable"]) {
+    if (resultId === "#history-result-readable") {
+      await page.locator("#history-button").click();
+      await page.locator('[data-run-id="run-1"]').click();
+    }
+    const value = page.locator(`${resultId} dl dl > dd`).filter({hasText: question});
+    await expect(value).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
+    const {labelBox, valueBox} = await value.evaluate(node => ({
+      labelBox: node.previousElementSibling.getBoundingClientRect().toJSON(),
+      valueBox: node.getBoundingClientRect().toJSON(),
+    }));
+    expect(labelBox.bottom).toBeLessThanOrEqual(valueBox.top);
+    expect(valueBox.width).toBe(labelBox.width);
+  }
   expect(submittedBodies).toEqual([{
     atom_id: "A05",
     input: A05.example_input,
@@ -4698,12 +4728,17 @@ test("preset browsing preserves an unrelated dirty draft until explicit applicat
     example_input: A11.example_input, source_run_id: null,
     preset_id: "preset-browse", version: 1, created_at: "2026-11-06T08:00:00Z",
   };
+  const versionPage = Promise.withResolvers();
   await page.route("http://atom-lab.test/v1/atom-lab/presets**", async (route) => {
-    const pathname = new URL(route.request().url()).pathname;
+    const {pathname, searchParams} = new URL(route.request().url());
+    if (searchParams.get("cursor") === "older") {
+      await versionPage.promise;
+      return route.fulfill({status: 503, json: {error: {message: "Страница версий недоступна."}}});
+    }
     const summary = {preset_id: stored.preset_id, name: stored.name, description: stored.description,
       atom_id: stored.atom_id, created_at: stored.created_at};
     const body = pathname.endsWith("/versions/1") ? stored : pathname.endsWith("/versions")
-      ? {items: [{...summary, version: 1}], next_cursor: null}
+      ? {items: [{...summary, version: 1}], next_cursor: "older"}
       : {items: [{...summary, latest_version: 1, updated_at: stored.created_at}], next_cursor: null};
     await route.fulfill({contentType: "application/json", body: JSON.stringify(body)});
   });
@@ -4744,6 +4779,18 @@ test("preset browsing preserves an unrelated dirty draft until explicit applicat
   await page.locator("#cancel-preset").click();
   await expect(page.locator("#preset-editor-form")).toBeHidden();
   expect(JSON.parse(await page.locator("#preset-readonly").textContent())).toEqual(stored);
+
+  const requested = page.waitForRequest("**/versions?cursor=older");
+  await page.locator("#load-more-versions").click();
+  await requested;
+  await showWorkbench(page);
+  await chooseAtom(page, "A05");
+  await page.locator("#presets-button").click();
+  await expect(page.locator("#new-preset")).toBeEnabled();
+  const response = page.waitForResponse("**/versions?cursor=older");
+  versionPage.resolve();
+  await (await response).finished();
+  await expect(page.locator("#preset-error")).toBeEmpty();
 });
 
 for (const settingsOnly of [false, true, null]) {
@@ -5328,12 +5375,16 @@ test("preset conflict disables stale recovery when the latest-version read fails
 
   await expect(page.locator("#preset-conflict")).toBeVisible();
   await expect(page.locator("#preset-error")).toContainText("Значения черновика сохранены");
+  await page.locator("#close-presets").click();
+  await page.locator("#presets-button").click();
+  await expect(page.locator("#preset-list-state")).toContainText("Загружено пресетов");
+  await expect(page.locator("#preset-error")).toContainText("Значения черновика сохранены");
   await expect(page.locator("#preset-name")).toHaveValue("Мой локальный черновик");
   await expect(page.locator("#prompt-editor")).toHaveValue("Локальный промпт не потерять");
   await expect(page.locator("#open-latest-preset")).toBeVisible();
   await expect(page.locator("#open-latest-preset")).toBeEnabled();
   await expect(page.locator("#save-as-new-preset")).toBeVisible();
-  expect(listReads).toBe(2);
+  expect(listReads).toBe(3);
 
   await page.locator("#open-latest-preset").click();
   await expect(page.locator("#open-latest-preset")).toBeDisabled();
@@ -5861,12 +5912,14 @@ test("stalled preset reads release the locked workspace at the browser deadline"
     example_input: A06.example_input, source_run_id: null,
     preset_id: "preset-deadline", version: 1, created_at: "2026-09-23T09:30:00Z",
   };
+  let listReads = 0;
   await page.route("http://atom-lab.test/v1/atom-lab/presets", async (route) => {
-    await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [{
+    listReads += 1;
+    await route.fulfill({json: {items: listReads === 1 ? [{
       preset_id: stored.preset_id, latest_version: 1, name: stored.name,
       description: stored.description, atom_id: stored.atom_id,
       created_at: stored.created_at, updated_at: stored.created_at,
-    }], next_cursor: null})});
+    }] : [], next_cursor: null}});
   });
 
   await unlockAtom(page, "A06");
@@ -5890,6 +5943,13 @@ test("stalled preset reads release the locked workspace at the browser deadline"
   await expect(page.locator("#preset-error")).toContainText("Время ожидания ответа истекло");
   await expect(page.locator("#workspace")).toHaveAttribute("aria-busy", "false");
   expect(await page.locator("#workspace").evaluate((node) => node.inert)).toBe(false);
+
+  await showWorkbench(page);
+  await chooseAtom(page, "A05");
+  await page.locator("#presets-button").click();
+  await expect(page.locator("#preset-list-state")).toContainText("Сохранённых пресетов пока нет");
+  await expect(page.locator("#preset-error")).toBeEmpty();
+  await expect(page.locator(".preset-card")).toBeHidden();
 });
 
 test("stalled preset writes report an ambiguous outcome and block blind duplicate saves", async ({page}) => {
@@ -6156,6 +6216,7 @@ test("ambiguous version recovery opens the preset normally after its owner sessi
   await page.getByRole("button", {name: /A05/}).click();
   await expect(page.locator("#atom-title")).toContainText("A05");
   await page.locator("#presets-button").click();
+  await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
   await page.getByRole("button", {name: /Пресет после смены session/}).click();
 
   await editPreset(page);

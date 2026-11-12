@@ -326,6 +326,8 @@ pre { background: var(--lab-code-surface); border-radius: 0.55rem; color: var(--
 @media (max-width: 40rem) {
   .passport-flow { grid-template-columns: 1fr; }
   .library-grid, .library-metadata { grid-template-columns: minmax(0, 1fr); }
+  .readable-result dl dl { grid-template-columns: minmax(0, 1fr); }
+  .readable-result dl dl dd:not(:last-child) { margin-bottom: 0.45rem; }
   .metadata-group { padding-inline: min(0.8rem, 4vw); }
   .metadata-group dl > div { gap: 0.15rem; grid-template-columns: minmax(0, 1fr); }
   .metadata-group dd { text-align: start; }

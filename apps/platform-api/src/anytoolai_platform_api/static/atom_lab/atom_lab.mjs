@@ -2784,6 +2784,8 @@ export function bootstrapAtomLab({
     presetEditorActive = activate;
     selectedPresetSummary = null;
     selectedPresetVersion = null;
+    presetVersionPageGeneration += 1;
+    presetVersionPageInFlight = false;
     presetSourceOverride = fromRun;
     nodes["preset-name"].value = fromRun ? `Запуск ${fromRun.sourceRunId}` : "";
     nodes["preset-description"].value = "";
@@ -2801,6 +2803,7 @@ export function bootstrapAtomLab({
       description: "",
       fixed_fields: [],
     });
+    setPresetError();
     renderPresetState();
   };
 
@@ -4302,7 +4305,6 @@ export function bootstrapAtomLab({
   const openSnapshotPreset = (source, message) => {
     startNewPreset({fromRun: source});
     showLibrary("presets");
-    setPresetError();
     nodes.status.textContent = message;
     nodes["preset-name"].focus();
     if (presetItems.length === 0 && !presetListLoadInFlight) void loadPresets();
