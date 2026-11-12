@@ -48,7 +48,7 @@
   },
   "dataNotice": {
     "label": "Tratamento de dados.",
-    "text": "O que introduz é enviado para o nosso serviço e para um fornecedor de modelos de IA para criar o resultado, e é armazenado juntamente com a sua execução nos nossos servidores. O seu rascunho permanece neste separador do navegador até o fechar. Não introduza palavras-passe, dados de cartões de pagamento ou outros dados sensíveis.",
+    "text": "O que introduz é enviado para o nosso serviço e para um fornecedor de modelos de IA para criar o resultado, e é armazenado juntamente com a sua execução nos nossos servidores. O seu rascunho é mantido neste navegador e pode perder-se se atualizar ou sair da página. Não introduza palavras-passe, dados de cartões de pagamento ou outros dados sensíveis.",
     "policyLink": "Política de privacidade",
     "opensInNewTab": "(abre num novo separador)"
   }

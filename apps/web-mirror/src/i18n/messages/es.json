@@ -48,7 +48,7 @@
   },
   "dataNotice": {
     "label": "Tratamiento de datos.",
-    "text": "Lo que introduces se envía a nuestro servicio y a un proveedor de modelos de IA para crear el resultado, y se almacena junto con tu ejecución en nuestros servidores. Tu borrador permanece en esta pestaña del navegador hasta que la cierres. No introduzcas contraseñas, datos de tarjetas de pago ni otros datos sensibles.",
+    "text": "Lo que introduces se envía a nuestro servicio y a un proveedor de modelos de IA para crear el resultado, y se almacena junto con tu ejecución en nuestros servidores. Tu borrador se mantiene en este navegador y puede perderse si recargas la página o sales de ella. No introduzcas contraseñas, datos de tarjetas de pago ni otros datos sensibles.",
     "policyLink": "Política de privacidad",
     "opensInNewTab": "(se abre en una pestaña nueva)"
   }

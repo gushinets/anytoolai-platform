@@ -143,7 +143,10 @@ and it is never rendered or copied, so it must not be added to the frontend resu
 `ProductRunPage` shows a shared data-processing notice before submit in all seven host locales.
 `NEXT_PUBLIC_ANYTOOLAI_PRIVACY_POLICY_URL` is an optional build-time absolute HTTP(S) URL for its
 privacy-policy link (new tab); missing or invalid values hide the link, not the notice. Public
-deployments must supply the approved URL and rebuild after changes.
+deployments must supply the approved URL and rebuild after changes. `prod-up` validates it before
+profile generation or Docker calls; development, fake smoke and maintenance keep it optional.
+Browser-local draft text may be lost on reload or navigation; the shared notice does not promise
+recovery, since only products opting into draft persistence attempt it.
 
 ## Cross-product handoff in the web host (ANY-244)
 

@@ -128,6 +128,21 @@ describe("Brief Decoder definition", () => {
     expectDataProcessingNotice(form, "https://example.com/privacy");
   });
 
+  it("does not promise draft recovery when unsent input is lost on remount", async () => {
+    const { client } = makeClient(routes(composedOutput("")));
+    const first = render(<BriefDecoderProduct client={client} />);
+    const field = await screen.findByLabelText("Client brief");
+    fireEvent.change(field, { target: { value: "An unsent client brief." } });
+    expect(screen.getByText(/may be lost if you reload or leave the page/)).toBeTruthy();
+    expect(screen.queryByText(/until you close it/)).toBeNull();
+    first.unmount();
+
+    const reloaded = makeClient(routes(composedOutput("")));
+    render(<BriefDecoderProduct client={reloaded.client} />);
+    expect((await screen.findByLabelText("Client brief") as HTMLTextAreaElement).value).toBe("");
+    expect(screen.getByText(/may be lost if you reload or leave the page/)).toBeTruthy();
+  });
+
   it.each([
     { locale: "en", translated: true },
     { locale: "ru", translated: false },
