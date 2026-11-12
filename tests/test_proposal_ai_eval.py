@@ -98,6 +98,13 @@ def test_numbers_from_the_order_are_allowed_and_gap_is_required_when_expected() 
     assert "missing_gap" not in violations(CLEAN, [{"description": "No HubSpot."}], gap_order)
 
 
+@pytest.mark.parametrize("key", ["gap_must", "gap_must_not"])
+@pytest.mark.parametrize("value", [[], ["HubSpot"], [["HubSpot"]], None])
+def test_retired_gap_regex_fields_require_explicit_migration(key: str, value: object) -> None:
+    with pytest.raises(proposal_ai_eval.SuiteError, match="move semantic requirements to review criteria"):
+        proposal_ai_eval.normalized_orders({"orders": [{**EN_ORDER, key: value}]})
+
+
 def test_numbers_are_read_both_ways_and_ordinary_ai_phrases_pass() -> None:
     order = {**EN_ORDER, "task_text": "Need 3 500-word blog posts"}
     assert "invented_number" not in violations("I can write 3 posts of 500 words.", order=order)
@@ -273,6 +280,11 @@ def test_identifiers_do_not_offer_their_digits_as_numbers() -> None:
 
 
 FIXTURES = proposal_ai_eval.ORDERS_PATH.parent
+GAP_ORDERS = {
+    order["id"]: order for order in proposal_ai_eval.normalized_orders(
+        json.loads((FIXTURES / "gaps.json").read_text(encoding="utf-8"))
+    )
+}
 KINDS = {"declined", "not_agreed", "agreed", "accepted", "offered", "open", "requirement"}
 CRITICAL = proposal_ai_eval.CRITICAL_VIOLATIONS
 SUITE_PATH = FIXTURES / "acceptance" / "any-631" / "suite.json"
@@ -282,7 +294,7 @@ def test_criteria_are_questions_and_fixture_checks_are_literal() -> None:
     """Meaning is a human question; `must_not` may only forbid amounts (code reviews #3 to #6 found
     a new wording that every semantic regular expression misread). A critical criterion names its
     violation, so no criterion mixes a critical violation with a minor one."""
-    for name in ("terms.json", "qa_cases.json"):
+    for name in ("terms.json", "qa_cases.json", "gaps.json"):
         for order in json.loads((FIXTURES / name).read_text(encoding="utf-8"))["orders"]:
             ids = [criterion["id"] for criterion in order["criteria"]]
             assert len(ids) == len(set(ids)) and "no-critical-error" not in ids, order["id"]
@@ -295,6 +307,37 @@ def test_criteria_are_questions_and_fixture_checks_are_literal() -> None:
                 re.compile(pattern)
             for pattern in order.get("must_not", []):
                 assert "\\d" in pattern, f"{order['id']}: must_not forbids amounts only: {pattern}"
+
+
+def test_gap_fixture_inputs_and_checks() -> None:
+    fixture = json.loads((FIXTURES / "gaps.json").read_text(encoding="utf-8"))
+    orders = proposal_ai_eval.normalized_orders(fixture)
+    assert len({order["id"] for order in orders}) == len(orders)
+    assert {order["expect_language"] for order in orders} == {"ru", "en", "es"}
+    for order in orders:
+        assert order["freelancer_positioning"] and order["task_text"] and order["tone"]
+        assert order["expect_gaps_language"] == order["expect_language"]
+        assert not {"gap_must", "gap_must_not"}.intersection(order)
+        assert {"gap-grounding", "gap-fidelity"} <= {c["id"] for c in order["criteria"]}
+        grounding = next(c for c in order["criteria"] if c["id"] == "gap-grounding")
+        assert "evidence quote accurately quote the original task and support the identified requirement" in grounding["question"]
+    p01 = next(order for order in json.loads((FIXTURES / "qa_cases.json").read_text(encoding="utf-8"))["orders"] if order["id"] == "P01")
+    yoga = next(order for order in orders if order["id"] == "yoga-schedule-ru")
+    assert yoga["task_text"] == p01["task_text"]
+    assert yoga["freelancer_positioning"] == p01["freelancer_positioning"]
+
+
+def test_case_hash_preserves_orders_without_new_gap_checks() -> None:
+    for name in ("orders.json", "terms.json", "qa_cases.json"):
+        fixture = json.loads((FIXTURES / name).read_text(encoding="utf-8"))
+        for order in proposal_ai_eval.normalized_orders(fixture):
+            old_payload = {
+                "input": proposal_ai_eval.case_input(order),
+                "checks": {key: order.get(key) for key in ("expect_language", "expect_gaps_language", "expect_gap", "must", "must_not")},
+                "criteria": sorted(proposal_ai_eval.criterion_hash(c) for c in proposal_ai_eval.criteria_for(order)),
+            }
+            old_hash = "sha256:" + hashlib.sha256(json.dumps(old_payload, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+            assert proposal_ai_eval.case_hash(order) == old_hash
 
 
 PROFILE_EN = "I build Webflow marketing sites for small businesses and agree timelines after the content arrives."
@@ -393,6 +436,199 @@ def confirmed(runs: list[dict], answers: dict[str, str] = YES) -> list[dict]:
 
 def attempts(count: int, **fields) -> list[dict]:
     return [make_run(f"r{i}", attempt=i + 1, **fields) for i in range(count)]
+
+
+GAP_PROPOSALS = {
+    "en": "I will review the requirements for your project and confirm the scope with you before "
+    "starting. We can discuss the details and agree on the next step.",
+    "ru": "Изучу требования вашего проекта и уточню детали перед началом работы. "
+    "Предлагаю обсудить необходимый результат и следующий шаг.",
+    "es": "Revisaré los requisitos de su proyecto y prepararé una propuesta con un alcance claro. "
+    "Podemos confirmar los detalles y los próximos pasos antes de comenzar.",
+}
+
+
+def gap_run(case_id: str, descriptions: list[str]) -> dict:
+    order = GAP_ORDERS[case_id]
+    return make_run(
+        "gap-review", case=case_id, input=proposal_ai_eval.case_input(order),
+        output={"text": GAP_PROPOSALS[order["expect_language"]], "gaps": [
+            {"description": text, "evidence": order["task_text"]} for text in descriptions
+        ]},
+    )
+
+
+@pytest.mark.parametrize(
+    ("case_id", "descriptions", "rejected_criterion"),
+    [
+        ("webflow-required-ru", ["Не указан опыт работы с Webflow для реализации блока отзывов."], None),
+        ("webflow-required-ru", ["Дизайн блока отзывов покрыт опытом; опыт работы с Webflow не указан."], None),
+        ("hubspot-10y-en", ["The profile lacks 10 years of HubSpot work experience; training does not replace it."], None),
+        ("hubspot-10y-en", ["The profile does not show ten years of HubSpot experience."], None),
+        ("hubspot-10y-ru", ["В профиле не указано десять лет опыта работы с HubSpot."], None),
+        ("hubspot-10y-es", ["El perfil no muestra diez años de experiencia con HubSpot."], None),
+        ("hubspot-10y-en", ["Missing 10 years of general IT experience and 2 months of HubSpot experience."], "gap-fidelity"),
+        ("hubspot-10y-ru", ["В профиле не указано 10 месяцев работы с HubSpot."], "gap-fidelity"),
+        ("hubspot-10y-es", ["El perfil no muestra 10 meses de experiencia con HubSpot."], "gap-fidelity"),
+        ("hubspot-10y-en", ["Missing 10 years of general IT experience.", "Missing HubSpot experience."], "gap-precision"),
+        ("webflow-required-ru", ["Не указан опыт работы с Webflow.", "Не указан опыт дизайна блока отзывов."], "gap-grounding"),
+        ("healthcare-incidental-ru", ["Не указан опыт работы в медицинской сфере."], "gap-grounding"),
+        ("yoga-schedule-ru", ["Не указан опыт дизайна блока расписания."], "gap-grounding"),
+        ("landing-reviews-ru", [], None),
+    ],
+)
+def test_gap_meaning_waits_for_confirmed_review(
+    case_id: str, descriptions: list[str], rejected_criterion: str | None,
+) -> None:
+    """The test supplies a review decision; the evaluator must not infer it from the words."""
+    order = GAP_ORDERS[case_id]
+    run = gap_run(case_id, descriptions)
+    checks = proposal_ai_eval.formal_checks(run, order)
+    assert not {"unexpected_gap", "missing_gap_detail"}.intersection(checks)
+    assert not any(checks[key] for key in proposal_ai_eval.UNUSABLE_CHECKS)
+    pending = proposal_ai_eval.judge_run(run, order, {})
+    assert pending["status"] == "PENDING" and pending["usable"] is None
+    assert pending["quality_failed"] is False
+
+    answers = {c["id"]: "yes" for c in proposal_ai_eval.criteria_for(order, run)}
+    if rejected_criterion:
+        answers[rejected_criterion] = "no"
+    verdicts = proposal_ai_eval.latest_verdicts(decide(run, answers, order))
+    reviewed = proposal_ai_eval.judge_run(run, order, verdicts)
+    assert reviewed["status"] == ("FAIL" if rejected_criterion else "PASS")
+    assert reviewed["usable"] is (rejected_criterion is None)
+
+
+@pytest.mark.parametrize("case_id", list(GAP_ORDERS))
+def test_every_gap_case_requires_grounding_and_fidelity_confirmation(case_id: str) -> None:
+    order = GAP_ORDERS[case_id]
+    run = gap_run(case_id, [order["task_text"]] if order["expect_gap"] else [])
+    answers = {c["id"]: "yes" for c in proposal_ai_eval.criteria_for(order, run)}
+    for undecided in ("gap-grounding", "gap-fidelity"):
+        rows = decide(run, {key: value for key, value in answers.items() if key != undecided}, order)
+        judged = proposal_ai_eval.judge_run(run, order, proposal_ai_eval.latest_verdicts(rows))
+        assert judged["status"] == "PENDING", (case_id, undecided, judged)
+
+
+@pytest.mark.parametrize("kind", ["suggestion", "unknown", "stale_output", "stale_input", "stale_criterion", "agent"])
+def test_unconfirmed_or_stale_gap_review_cannot_pass(kind: str) -> None:
+    order = GAP_ORDERS["hubspot-10y-en"]
+    run = gap_run(order["id"], ["The profile does not show ten years of HubSpot experience."])
+    answers = {c["id"]: "yes" for c in proposal_ai_eval.criteria_for(order, run)}
+    rows = decide(run, answers, order)
+    row = next(row for row in rows if row["criterion_id"] == "gap-fidelity")
+    if kind == "suggestion":
+        row.update(suggestion={"answer": "yes"}, decision=None)
+    elif kind == "unknown":
+        row["decision"]["answer"] = "unknown"
+    elif kind == "agent":
+        row["decision"]["reviewer"] = "agent"
+    else:
+        field = {"stale_output": "answer_hash", "stale_input": "input_hash", "stale_criterion": "criterion_hash"}[kind]
+        row[field] = "sha256:stale"
+    judged = proposal_ai_eval.judge_run(run, order, proposal_ai_eval.latest_verdicts(rows))
+    assert judged["status"] == "PENDING" and judged["usable"] is None
+
+
+@pytest.mark.parametrize("case_id", [key for key, order in GAP_ORDERS.items() if order["expect_gap"]])
+def test_confirmed_review_cannot_override_missing_required_gaps(case_id: str) -> None:
+    order = GAP_ORDERS[case_id]
+    run = gap_run(case_id, [])
+    answers = {c["id"]: "yes" for c in proposal_ai_eval.criteria_for(order, run)}
+    judged = proposal_ai_eval.judge_run(run, order, proposal_ai_eval.latest_verdicts(decide(run, answers, order)))
+    assert judged["status"] == "FAIL" and "missing_gap" in judged["reasons"]
+
+
+def test_gap_suite_stays_pending_until_review_and_accepts_latest_confirmed_decision(tmp_path: Path, capsys) -> None:
+    order = GAP_ORDERS["webflow-required-ru"]
+    run = gap_run(order["id"], ["Не указан опыт работы с Webflow для реализации блока отзывов."])
+    program = [{"series": "luna-medium", "cases": [order["id"]], "attempts": 1, "min_usable": 1,
+                "reasoning_effort": "medium"}]
+    answers = {c["id"]: "yes" for c in proposal_ai_eval.criteria_for(order, run)}
+    rejected = decide(run, {**answers, "gap-grounding": "no"}, order)
+    approved = decide(run, answers, order)
+    for rows, expected in (([], "PENDING"), (rejected, "FAIL"), (rejected + approved, "PASS")):
+        code, out = run_accept(tmp_path, [run], rows, capsys, program=program, orders=[order])
+        assert code == (0 if expected == "PASS" else 1)
+        assert out.startswith(f"# Suite t: {expected}")
+
+
+def test_review_displays_the_task_positioning_and_gap_before_the_decision(tmp_path: Path, capsys) -> None:
+    order = GAP_ORDERS["webflow-required-ru"]
+    description = "Не указан опыт работы с Webflow для реализации блока отзывов."
+    run = gap_run(order["id"], [description, "Не указан опыт разработки на Webflow."])
+    run["output"]["gaps"][0]["evidence"] = "Клиент требует Photoshop"
+    del run["output"]["gaps"][1]["evidence"]
+    suite = write_suite(tmp_path, [run], [], orders=[order])
+
+    def quit_after_reading(prompt: str) -> str:
+        out = capsys.readouterr().out
+        for value in (order["task_text"], order["freelancer_positioning"], run["output"]["text"]):
+            assert value in out
+        assert f"gap: {description}\n  evidence: Клиент требует Photoshop" in out
+        assert "gap: Не указан опыт разработки на Webflow.\n  evidence: (not provided)" in out
+        return "q"
+
+    with patch("builtins.input", side_effect=quit_after_reading):
+        assert proposal_ai_eval.main(["review", "--suite", str(suite), "--reviewer", "qa"]) == 0
+    assert proposal_ai_eval.read_jsonl(tmp_path / "verdicts.jsonl") == []
+
+
+@pytest.mark.parametrize(
+    ("evidence", "answer", "status"),
+    [("сборка в Webflow", "y", "PASS"), ("Клиент требует Photoshop", "n", "FAIL"),
+     (None, "y", "PASS")],
+)
+def test_gap_evidence_is_reviewed_before_acceptance(
+    tmp_path: Path, capsys, evidence: str | None, answer: str, status: str,
+) -> None:
+    order = GAP_ORDERS["webflow-required-ru"]
+    run = gap_run(order["id"], ["Не указан опыт работы с Webflow."])
+    if evidence is None:
+        del run["output"]["gaps"][0]["evidence"]
+    else:
+        run["output"]["gaps"][0]["evidence"] = evidence
+    program = [{"series": "luna-medium", "cases": [order["id"]], "attempts": 1, "min_usable": 1,
+                "reasoning_effort": "medium"}]
+    suite = write_suite(tmp_path, [run], [], program=program, orders=[order])
+    assert proposal_ai_eval.accept(*proposal_ai_eval.load_suite(suite))[0] == "PENDING"
+    transcript = []
+
+    def review(prompt: str) -> str:
+        out = capsys.readouterr().out
+        transcript.append(out)
+        if prompt == "Your reason > ":
+            return "The evidence invents a Photoshop requirement absent from the task."
+        if "[gap-grounding]" in out:
+            assert "evidence quote accurately quote the original task" in out
+            assert f"evidence: {evidence or '(not provided)'}" in "".join(transcript)
+            return answer
+        return "y"
+
+    with patch("builtins.input", side_effect=review):
+        assert proposal_ai_eval.main(["review", "--suite", str(suite), "--reviewer", "qa"]) == 0
+    verdicts = proposal_ai_eval.read_jsonl(tmp_path / "verdicts.jsonl")
+    grounding = next(row for row in verdicts if row["criterion_id"] == "gap-grounding")
+    assert grounding["decision"]["answer"] == {"y": "yes", "n": "no"}[answer]
+    assert proposal_ai_eval.accept(*proposal_ai_eval.load_suite(suite))[0] == status
+
+
+@pytest.mark.parametrize("case_id", list(GAP_ORDERS))
+def test_old_grounding_approval_requires_evidence_review(case_id: str) -> None:
+    order = GAP_ORDERS[case_id]
+    old_question = (
+        "Does every reported gap identify an explicit task requirement that the positioning does not cover, "
+        "rather than an ordinary component or covered adjacent experience, allowing routine components to be mentioned as context?"
+    )
+    old_order = {**order, "criteria": [
+        {**c, "question": old_question} if c["id"] == "gap-grounding" else c for c in order["criteria"]
+    ]}
+    run = gap_run(case_id, [order["task_text"]] if order["expect_gap"] else [])
+    answers = {c["id"]: "yes" for c in proposal_ai_eval.criteria_for(old_order, run)}
+    verdicts = proposal_ai_eval.latest_verdicts(decide(run, answers, old_order))
+    assert proposal_ai_eval.judge_run(run, old_order, verdicts)["status"] == "PASS"
+    assert proposal_ai_eval.case_hash(order) != proposal_ai_eval.case_hash(old_order)
+    assert proposal_ai_eval.judge_run(run, order, verdicts)["status"] == "PENDING"
 
 
 GRID = [{"series": "luna-medium", "cases": [ORDER["id"]], "attempts": 5, "min_usable": 4, "reasoning_effort": "medium"}]
@@ -544,6 +780,14 @@ def test_accept_fails_on_a_critical_error_a_missed_threshold_or_slow_runs(tmp_pa
         run["origin"] = {**make_run(run["run_id"])["origin"], "ui_latency_ms": 61000}
     code, out = run_accept(tmp_path, slow, confirmed(slow), capsys)
     assert code == 1 and "median latency 61.0 s above 60 s" in out
+
+
+@pytest.mark.parametrize("key", ["gap_must", "gap_must_not"])
+def test_accept_reports_retired_gap_checks_as_invalid_suite(tmp_path: Path, capsys, key: str) -> None:
+    order = {**ORDER, key: []}
+    code, out = run_accept(tmp_path, [make_run("r")], [], capsys, orders=[order])
+    assert code == 2
+    assert "retired gap checks" in out and "review criteria" in out
 
 
 def test_formal_checks_leave_every_wording_of_a_term_to_the_reviewer() -> None:
