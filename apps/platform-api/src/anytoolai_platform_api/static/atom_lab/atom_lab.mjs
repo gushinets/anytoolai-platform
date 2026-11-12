@@ -1731,11 +1731,33 @@ export function bootstrapAtomLab({
   let paused = false;
   let destroyed = false;
 
+  const presetOperationLocked = () => presetLibraryLoading || presetOpenInFlight || presetSaveInFlight;
+
+  const presetSaveOutcomeUnknownMessage = () => presetSaveOutcomeUnknown.kind === "update"
+    ? "Результат сохранения неизвестен: сервер мог создать новую версию. Не повторяйте Save; заново откройте этот пресет и проверьте список версий."
+    : "Результат создания неизвестен: сервер мог создать пресет. Не повторяйте Save; перезагрузите страницу и проверьте библиотеку.";
+
+  const resultPresetDisabledReason = () => {
+    if (presetSaveOutcomeUnknown) return presetSaveOutcomeUnknownMessage();
+    if (resultPresetCheck) return "Проверяем источник промпта…";
+    return presetOperationLocked() ? "Дождитесь завершения операции с пресетом." : "";
+  };
+
+  const renderResultPresetAction = () => {
+    const action = nodes["save-result-preset"];
+    const status = nodes["result-preset-status"];
+    const reason = resultPresetDisabledReason();
+    action.setAttribute("aria-disabled", String(Boolean(reason)));
+    action.setAttribute("aria-busy", String(Boolean(reason) && !presetSaveOutcomeUnknown));
+    const message = action.hidden ? "" : reason;
+    if (status.textContent !== message) status.textContent = message;
+    nodes["result-preset-error"].hidden = Boolean(reason);
+  };
+
   const clearResultPresetCheck = () => {
     if (!resultPresetCheck) return;
     resultPresetCheck = null;
-    nodes["save-result-preset"].removeAttribute("aria-disabled");
-    nodes["result-preset-status"].textContent = "";
+    renderResultPresetAction();
   };
 
   const showLibrary = (section = null) => {
@@ -1789,6 +1811,7 @@ export function bootstrapAtomLab({
     const resultPresetAtom = currentResultPresetAtom(displayedSubmission);
     if (resultPresetCheck && resultPresetCheck.atom !== resultPresetAtom) clearResultPresetCheck();
     nodes["save-result-preset"].hidden = !resultPresetAtom;
+    renderResultPresetAction();
     nodes["launch-readiness"].textContent = submitInFlight
       ? "Отправка запроса…"
       : submissionBlocksNewRun
@@ -2398,10 +2421,6 @@ export function bootstrapAtomLab({
     updatePresetEditorDisabled();
   };
 
-  const presetSaveOutcomeUnknownMessage = () => presetSaveOutcomeUnknown?.kind === "update"
-    ? "Результат сохранения неизвестен: сервер мог создать новую версию. Не повторяйте Save; заново откройте этот пресет и проверьте список версий."
-    : "Результат создания неизвестен: сервер мог создать пресет. Не повторяйте Save; перезагрузите страницу и проверьте библиотеку.";
-
   const setPresetError = (message = "") => {
     const source = presetSourceOverride;
     if (!message && presetEditorActive && source?.promptSourceNeedsValidation) {
@@ -2465,7 +2484,7 @@ export function bootstrapAtomLab({
   };
 
   const updatePresetEditorDisabled = () => {
-    const operationLocked = presetLibraryLoading || presetOpenInFlight || presetSaveInFlight;
+    const operationLocked = presetOperationLocked();
     const versionControlsLocked = operationLocked
       || presetVersionPageInFlight
       || presetSaveOutcomeUnknown !== null;
@@ -2495,6 +2514,7 @@ export function bootstrapAtomLab({
     for (const input of nodes["fixed-fields"].querySelectorAll("input")) {
       input.disabled = editorLocked || input.dataset.available !== "true";
     }
+    renderResultPresetAction();
   };
 
   const clearPresetExport = () => {
@@ -3317,7 +3337,14 @@ export function bootstrapAtomLab({
       nodes["result-json"].textContent = JSON.stringify(detail.result, null, 2);
       if (runContractMatchesAtom(detail, submission.atom)) {
         completedPromptTrial = {runId: submission.runId, snapshot: submission.snapshot, atom: submission.atom};
-        submission.presetConfiguration = historyPresetConfiguration(detail);
+        const configuration = historyPresetConfiguration(detail);
+        if (isRecord(configuration.example_input)
+          && isNonEmptyString(configuration.prompt) && configuration.prompt.trim()
+          && isNonEmptyString(configuration.model_id) && configuration.model_id.trim()
+          && isNullableString(configuration.prompt_source_ref)
+          && isNullableReasoningEffort(configuration.reasoning_effort)) {
+          submission.presetConfiguration = configuration;
+        }
       } else {
         setRunState("Контракт результата отличается от отправленного. Проба не подтверждена.", "warning");
         if (session === submission.ownerSession && session.atom === submission.atom) session.sourceRunId = null;
@@ -4312,16 +4339,14 @@ export function bootstrapAtomLab({
 
   nodes["save-result-preset"].addEventListener("click", async () => {
     const submission = displayedSubmission;
-    if (resultPresetCheck || nodes["request-response"].hidden || !currentResultPresetAtom(submission)
-      || presetLibraryLoading || presetOpenInFlight || presetSaveInFlight || presetSaveOutcomeUnknown) return;
+    if (resultPresetDisabledReason() || nodes["request-response"].hidden || !currentResultPresetAtom(submission)) return;
     if (presetHasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return;
     const source = presetSourceFromConfiguration(submission.presetConfiguration);
     nodes["result-preset-error"].textContent = "";
     if (source.promptSourceRef !== null || promptContractChecks.get(source.atom)?.error) {
       resultPresetCheck = source;
       const isCurrent = () => resultPresetCheck === source && currentResultPresetAtom(submission) === source.atom;
-      nodes["save-result-preset"].setAttribute("aria-disabled", "true");
-      nodes["result-preset-status"].textContent = "Проверяем источник промпта…";
+      renderResultPresetAction();
       try {
         if (!await checkRunPresetSource(source, isCurrent) || !isCurrent()) return;
       } catch (error) {

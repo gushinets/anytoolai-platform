@@ -141,6 +141,21 @@ async function showWorkbench(page) {
   if (await page.locator("#request-response").isHidden()) await page.locator("#workbench-button").click();
 }
 
+async function openCompletedResult(page, detail = historyDetail({prompt: A06.prompt})) {
+  await page.route("http://atom-lab.test/v1/atom-lab/runs", (route) => route.fulfill({status: 202, json: {
+    run_id: detail.run_id, status: "queued",
+    scenario_session_id: detail.runtime_ids.scenario_session_id, job_id: detail.runtime_ids.job_id,
+  }}));
+  await page.route(`http://atom-lab.test/v1/atom-lab/runs/${detail.run_id}`, (route) => route.fulfill({json: detail}));
+  await unlockAtom(page, "A06");
+  await page.locator("#fill-example").click();
+  await page.locator("#reasoning-effort").selectOption("high");
+  await page.locator("#run-button").click();
+  const result = page.getByRole("region", {name: "Результат", exact: true});
+  await expect(result).toBeVisible();
+  return result;
+}
+
 async function openNewPresetFromExample(page) {
   await showWorkbench(page);
   await page.locator("#fill-example").click();
@@ -1528,6 +1543,25 @@ test("the displayed run remains saveable after compatible refresh and is hidden 
   await expect(save).toBeHidden();
   await expect(page.locator("#result-section")).toBeVisible();
 });
+
+for (const [field, makeInvalid] of [
+  ["missing input", (snapshot) => { delete snapshot.input; }],
+  ["missing prompt text", (snapshot) => { delete snapshot.prompt.content; }],
+  ["missing model ID", (snapshot) => { delete snapshot.provider.model_id; }],
+  ["invalid prompt source", (snapshot) => { snapshot.prompt.source_ref = {}; }],
+  ["invalid reasoning effort", (snapshot) => { snapshot.provider.reasoning_effort = "unknown"; }],
+]) {
+  test(`result with ${field} stays readable without a preset action`, async ({page}) => {
+    const detail = historyDetail({prompt: A06.prompt});
+    makeInvalid(detail.snapshot);
+    const result = await openCompletedResult(page, detail);
+
+    await expect(result.locator("#result-readable")).toContainText("Готово");
+    await page.getByText("Диагностика и ID", {exact: true}).click();
+    await expect(page.locator("#run-diagnostics")).toContainText(detail.run_id);
+    await expect(result.locator("#save-result-preset")).toBeHidden();
+  });
+}
 
 test("checking a result preset source keeps focus and leaves the workbench usable", async ({page}) => {
   const detail = historyDetail({runId: "run-preset-check", prompt: A06.prompt});
@@ -5988,12 +6022,13 @@ test("stalled preset writes report an ambiguous outcome and block blind duplicat
 });
 
 test("transport loss after a committed preset write blocks blind duplicate saves", async ({page}) => {
+  await page.setViewportSize({width: 375, height: 812});
   await page.route("http://atom-lab.test/v1/atom-lab/presets", async (route) => {
     await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [], next_cursor: null})});
   });
 
-  await unlockAtom(page, "A06");
-  await openNewPresetFromExample(page);
+  const saveSnapshot = (await openCompletedResult(page)).locator("#save-result-preset");
+  await saveSnapshot.click();
   await page.locator("#preset-name").fill("Потерянный ответ");
   await page.evaluate(() => {
     const originalFetch = globalThis.fetch;
@@ -6013,6 +6048,13 @@ test("transport loss after a committed preset write blocks blind duplicate saves
   await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
   await expect(page.locator("#save-preset")).toBeDisabled();
   await expect(page.locator("#save-as-new-preset")).toBeDisabled();
+  await showWorkbench(page);
+  await expect(saveSnapshot).toBeDisabled();
+  await expect(saveSnapshot).toHaveAccessibleDescription(/перезагрузите страницу и проверьте библиотеку/);
+  await expect(page.locator("#result-preset-status")).toBeVisible();
+  await saveSnapshot.press("Enter");
+  await saveSnapshot.click({force: true});
+  await expect(page.locator("#presets-panel")).toBeHidden();
   await expect.poll(() => page.evaluate(() => globalThis.__presetTransportState)).toEqual({
     committed: true,
     posts: 1,
@@ -6141,7 +6183,8 @@ test("ambiguous version write with no new server version unlocks retry and keeps
     dialogs += 1;
     dialog.accept();
   });
-  await unlockAtom(page, "A06");
+  const saveSnapshot = (await openCompletedResult(page)).locator("#save-result-preset");
+  await expect(saveSnapshot).toBeEnabled();
   await page.locator("#presets-button").click();
   await page.getByRole("button", {name: /Пресет для recovery/}).click();
   await editPreset(page);
@@ -6150,13 +6193,21 @@ test("ambiguous version write with no new server version unlocks retry and keeps
   await page.locator("#save-preset").click();
   await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
 
+  const dialogsBeforeRecovery = dialogs;
+  await showWorkbench(page);
+  await expect(saveSnapshot).toBeDisabled();
+  await expect(saveSnapshot).toHaveAccessibleDescription(/заново откройте этот пресет и проверьте список версий/);
+  await page.locator("#presets-button").click();
   await page.getByRole("button", {name: /Пресет для recovery/}).click();
 
-  expect(dialogs).toBe(0);
+  expect(dialogs).toBe(dialogsBeforeRecovery);
   await expect(page.locator("#preset-version-select")).toHaveValue("1");
   await expect(page.locator("#preset-description")).toHaveValue("Локальный черновик");
   await expect(page.locator("#preset-error")).toContainText("можно повторить Save");
   await expect(page.locator("#save-preset")).toBeEnabled();
+  await showWorkbench(page);
+  await expect(saveSnapshot).toBeEnabled();
+  await expect(page.locator("#result-preset-status")).toBeEmpty();
 });
 
 test("ambiguous version recovery opens the preset normally after its owner session is replaced", async ({page}) => {

@@ -244,7 +244,8 @@ pre { background: var(--lab-code-surface); border-radius: 0.55rem; color: var(--
 #run-status-help:empty { display: none; }
 .response-section { margin-top: 1.2rem; }
 .response-section > h3, .response-section .panel-heading h3 { font-size: 1rem; margin: 0 0 0.6rem; }
-#save-result-preset[aria-disabled="true"] { color: var(--lab-text-muted); cursor: progress; }
+#save-result-preset[aria-disabled="true"] { color: var(--lab-text-muted); cursor: not-allowed; }
+#save-result-preset[aria-busy="true"] { cursor: progress; }
 #result-preset-status:empty, #result-preset-error:empty { margin: 0; }
 #result-caption { font-size: 0.85rem; margin-bottom: 0.5rem; overflow-wrap: anywhere; }
 .run-technical { border-top: 1px solid var(--lab-border); margin-top: 1rem; padding-top: 0.25rem; }
