@@ -138,6 +138,13 @@ The canonical backend output additionally contains `brief_text` (the caller's or
 as handoff material); the frontend result intentionally excludes it: the product parser drops it
 and it is never rendered or copied, so it must not be added to the frontend result model.
 
+## Data-processing notice (ANY-844)
+
+`ProductRunPage` shows a shared data-processing notice before submit in all seven host locales.
+`NEXT_PUBLIC_ANYTOOLAI_PRIVACY_POLICY_URL` is an optional build-time absolute HTTP(S) URL for its
+privacy-policy link (new tab); missing or invalid values hide the link, not the notice. Public
+deployments must supply the approved URL and rebuild after changes.
+
 ## Cross-product handoff in the web host (ANY-244)
 
 The shared runtime, not a product, owns the web side of a handoff:

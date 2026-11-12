@@ -82,6 +82,7 @@ function composedOutput(suffix: "" | ".weak_input" | ".no_issues"): Record<strin
 }
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   cleanup();
   window.localStorage.clear();
   window.sessionStorage.clear();
@@ -118,6 +119,15 @@ async function decode(queues: ReturnType<typeof routes>, events: ProductRunEvent
 const completedEvents = (events: ProductRunEvent[]) => events.filter((e) => e.type === "scenario_completed");
 
 describe("Brief Decoder definition", () => {
+  it("shows the shared processing notice and policy inside the form", async () => {
+    vi.stubEnv("NEXT_PUBLIC_ANYTOOLAI_PRIVACY_POLICY_URL", "https://example.com/privacy");
+    const { client } = makeClient(routes(composedOutput("")));
+    render(<BriefDecoderProduct client={client} />);
+    const form = await screen.findByRole("form");
+    expect(within(form).getByText("Data processing.")).toBeTruthy();
+    expect(within(form).getByRole("link", { name: /Privacy policy/ }).getAttribute("href")).toBe("https://example.com/privacy");
+  });
+
   it.each([
     { locale: "en", translated: true },
     { locale: "ru", translated: false },

@@ -45,5 +45,11 @@
   "validation": {
     "required": "{field}: erforderlich.",
     "maxLength": "{field}: höchstens {maxLength, plural, one {# Zeichen} other {# Zeichen}}."
+  },
+  "dataNotice": {
+    "label": "Datenverarbeitung.",
+    "text": "Ihre Eingaben werden an unseren Dienst und an einen KI-Modellanbieter gesendet, um das Ergebnis zu erstellen, und zusammen mit Ihrem Durchlauf auf unseren Servern gespeichert. Ihr Entwurf bleibt in diesem Browser-Tab, bis Sie ihn schließen. Geben Sie keine Passwörter, Zahlungskartendaten oder andere sensiblen Daten ein.",
+    "policyLink": "Datenschutzerklärung",
+    "opensInNewTab": "(öffnet sich in einem neuen Tab)"
   }
 }

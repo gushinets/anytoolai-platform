@@ -35,6 +35,7 @@ const ROUTES = routesFor(IDS);
 const PROPOSAL_TEXT = "Dear client, here is my proposal.";
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   cleanup();
   window.localStorage.clear();
   window.sessionStorage.clear();
@@ -65,6 +66,14 @@ function renderReady() {
 }
 
 describe("ProposalAI product definition", () => {
+  it("shows the shared processing notice and policy inside the form", async () => {
+    vi.stubEnv("NEXT_PUBLIC_ANYTOOLAI_PRIVACY_POLICY_URL", "https://example.com/privacy");
+    renderReady();
+    const form = await screen.findByRole("form");
+    expect(within(form).getByText("Data processing.")).toBeTruthy();
+    expect(within(form).getByRole("link", { name: /Privacy policy/ }).getAttribute("href")).toBe("https://example.com/privacy");
+  });
+
   it.each([
     { locale: "en", translated: true },
     { locale: "ru", translated: false },

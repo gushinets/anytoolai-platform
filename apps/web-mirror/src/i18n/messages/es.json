@@ -45,5 +45,11 @@
   "validation": {
     "required": "{field}: este campo es obligatorio.",
     "maxLength": "{field}: debe tener como máximo {maxLength, plural, one {# carácter} many {# de caracteres} other {# caracteres}}."
+  },
+  "dataNotice": {
+    "label": "Tratamiento de datos.",
+    "text": "Lo que introduces se envía a nuestro servicio y a un proveedor de modelos de IA para crear el resultado, y se almacena junto con tu ejecución en nuestros servidores. Tu borrador permanece en esta pestaña del navegador hasta que la cierres. No introduzcas contraseñas, datos de tarjetas de pago ni otros datos sensibles.",
+    "policyLink": "Política de privacidad",
+    "opensInNewTab": "(se abre en una pestaña nueva)"
   }
 }
