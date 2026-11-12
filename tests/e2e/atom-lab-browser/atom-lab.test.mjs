@@ -1998,6 +1998,34 @@ test("form mode recovers from schema-invalid object and array values", async () 
   assert.match(errorItem.textContent || errorItem.querySelector("button").textContent, /issues/);
 });
 
+test("Form can explicitly send an empty required object for A06 and A10", async () => {
+  for (const [atomId, objectField, otherField] of [
+    ["A06", "context", "objective"],
+    ["A10", "data", "template_ref"],
+  ]) {
+    const {document, elements} = createFakeDocument();
+    const atom = await catalogAtom(atomId);
+    const controller = bootstrapAtomLab({
+      document,
+      fetchImpl: async () => ({ok: true, async json() { return [atom]; }}),
+    });
+    elements.get("access-code").value = "secret";
+    await elements.get("access-form").dispatch("submit");
+    const session = controller.getSession();
+    setDraftPath(session, [otherField], atom.example_input[otherField]);
+    assert.deepEqual(validateDraft(session).map(({path}) => path), [objectField]);
+    assert.equal(hasDraftPath(session, [objectField]), false);
+
+    const emptyObject = elements.get("input-editor").querySelectorAll("button")
+      .find((node) => node.textContent === "Передать пустой объект");
+    await emptyObject.click();
+
+    assert.deepEqual(validateDraft(session), []);
+    const submission = createRunSubmission(session, {modelId: "gpt-supported", reasoningEffort: null, idempotencyKey: atomId});
+    assert.deepEqual(submission.body.input, {[otherField]: atom.example_input[otherField], [objectField]: {}});
+  }
+});
+
 test("dynamic unrestricted values can be created and changed through form controls", async () => {
   const {document, elements} = createFakeDocument();
   const atom = await catalogAtom("A06");

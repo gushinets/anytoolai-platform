@@ -142,7 +142,7 @@
                 <div id="history-result-readable" class="readable-result" hidden></div>
                 <p id="history-result-message" class="help-text"></p>
                 <div id="history-invalid" class="invalid-response" hidden>
-                  <p id="history-contract-message">Ответ модели не соответствует схеме атома.</p>
+                  <p id="history-contract-message"></p>
                   <button id="show-history-diagnostics" class="primary-action" type="button">Открыть диагностику</button>
                 </div>
                 <details><summary>Полный JSON результата</summary><pre id="history-result-json" tabindex="0"></pre></details>
@@ -314,8 +314,8 @@
                   <details><summary>Полный JSON результата</summary><pre id="result-json" tabindex="0"></pre></details>
                 </section>
                 <section id="invalid-response" class="invalid-response" aria-labelledby="invalid-response-title" hidden>
-                  <h3 id="invalid-response-title">Ответ не прошёл контракт</h3>
-                  <p>Ответ модели не соответствует схеме атома. Откройте диагностику, чтобы сверить доступные данные запуска.</p>
+                  <h3 id="invalid-response-title">Ответ не прошёл проверку по контракту атома</h3>
+                  <p>Откройте диагностику, чтобы сверить доступные данные запуска.</p>
                   <div class="library-actions">
                     <button id="show-run-diagnostics" class="primary-action" type="button" aria-controls="run-diagnostics-panel">Открыть диагностику</button>
                     <button id="return-to-request" class="quiet-action" type="button">К входным данным</button>

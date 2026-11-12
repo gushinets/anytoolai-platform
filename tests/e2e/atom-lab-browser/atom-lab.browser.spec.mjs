@@ -281,6 +281,13 @@ test("protected shell, dynamic values, invalid types, numbers, focus, and narrow
   await expect(page.locator("#validation-errors")).toContainText("issues");
 
   await chooseAtom(page, "A06");
+  await page.getByRole("textbox", {name: "Цель", exact: true}).fill("Пилот");
+  const emptyObject = page.getByRole("button", {name: "Передать пустой объект «Контекст»"});
+  await page.locator("#validation-errors").getByRole("button", {name: /^context:/}).click();
+  await expect(emptyObject).toBeFocused();
+  await emptyObject.click();
+  await expect(page.getByRole("button", {name: "Добавить ключ"})).toBeFocused();
+  await expect(page.locator("#validation-errors")).toBeEmpty();
   await page.locator("#fill-example").click();
   await page.getByRole("button", {name: "Добавить ключ"}).first().click();
   const type = page.getByLabel(/Тип значения.*key_1/);
@@ -468,7 +475,7 @@ test("request and response workspace keeps one launch action and keyboard-access
   await expect(page.locator("#input-panel")).toBeVisible();
   await page.locator("#run-button").click();
   await expect(page.locator("#validation-errors")).toContainText("Обязательное поле");
-  await expect(page.getByRole("button", {name: "Добавить ключ", exact: true})).toBeFocused();
+  await expect(page.getByRole("button", {name: "Передать пустой объект «Контекст»"})).toBeFocused();
   await page.locator("#fill-example").click();
   await expect(page.locator("#validation-errors")).toBeEmpty();
   await expect(page.locator("#launch-readiness")).toHaveText("Черновик готов к запуску");
@@ -1455,17 +1462,28 @@ test("adding a compound array item focuses its first rendered descendant control
   await expect(page.getByLabel("Категория", {exact: true})).toBeFocused();
 });
 
-test("saving the displayed response uses the completed run snapshot and preserves the edited draft", async ({page}) => {
+test("the displayed run remains saveable after compatible refresh and is hidden after contract drift", async ({page}) => {
   const detail = historyDetail({runId: "run-result-preset", prompt: A06.prompt});
+  detail.snapshot.prompt.source_ref = A06.prompt_ref;
   const created = {preset_id: "result-preset", version: 1, created_at: detail.finished_at};
+  let currentAtom = A06;
   let savedBody;
   await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
     const {pathname} = new URL(route.request().url());
     if (pathname === "/v1/atom-lab/runs" && route.request().method() === "POST") {
+      if (currentAtom !== A06) return route.fulfill({status: 422, json: {error: {
+        code: "contract_unavailable", message: currentAtom.prompt,
+        field_errors: [{path: "expected_contract", message: "Перечитайте контракт."}],
+      }, request_id: "contract-refresh"}});
       return route.fulfill({status: 202, json: {run_id: detail.run_id, status: "queued",
         scenario_session_id: detail.runtime_ids.scenario_session_id, job_id: detail.runtime_ids.job_id}});
     }
     if (pathname === `/v1/atom-lab/runs/${detail.run_id}`) return route.fulfill({json: detail});
+    if (pathname === "/v1/atom-lab/atoms/A06") return route.fulfill({json: currentAtom});
+    if (pathname === "/v1/atom-lab/atoms/A06/prompts") return route.fulfill({json: [{
+      ref: currentAtom.prompt_ref, name: "Платформа", prompt: currentAtom.prompt, group: "platform",
+      source_ref: null, source_run_id: null,
+    }]});
     if (pathname === "/v1/atom-lab/presets") {
       if (route.request().method() !== "POST") return route.fulfill({json: {items: [], next_cursor: null}});
       savedBody = route.request().postDataJSON();
@@ -1489,6 +1507,11 @@ test("saving the displayed response uses the completed run snapshot and preserve
   await expect(save).toBeVisible();
   await page.getByRole("textbox", {name: "Цель", exact: true}).fill("Новая цель черновика");
   await expect(page.locator("#response-draft-warning")).toBeVisible();
+  currentAtom = {...A06, prompt: "Обновлённый текст того же промпта"};
+  await page.locator("#run-button").click();
+  await expect(page.locator("#run-state")).toContainText(currentAtom.prompt);
+  await expect(page.locator("#run-button")).toBeEnabled();
+  await expect(save).toBeVisible();
   await save.click();
   await expect(page.locator("#preset-name")).toBeFocused();
   await expect(page.locator("#preset-source")).toContainText(detail.run_id);
@@ -1499,6 +1522,11 @@ test("saving the displayed response uses the completed run snapshot and preserve
     prompt: A06.prompt, model_id: "openai/gpt-supported", reasoning_effort: "high"});
   await page.locator("#close-presets").click();
   await expect(page.getByRole("textbox", {name: "Цель", exact: true})).toHaveValue("Новая цель черновика");
+  currentAtom = {...A06, prompt_ref: "prompt.a06.v2", prompt: "Новая версия платформенного промпта"};
+  await page.locator("#run-button").click();
+  await expect(page.locator("#run-prompt-ref")).toHaveText(currentAtom.prompt_ref);
+  await expect(save).toBeHidden();
+  await expect(page.locator("#result-section")).toBeVisible();
 });
 
 test("model capabilities, stale state, and refresh are explicit", async ({page}) => {
@@ -1828,7 +1856,7 @@ for (const outcome of ["success", "invalid", "diagnostics"]) {
       await expect(page.locator("#result-section"))[outcome === "success" ? "toBeVisible" : "toBeHidden"]();
       await expect(page.locator("#invalid-response"))[outcome === "invalid" ? "toBeVisible" : "toBeHidden"]();
       if (outcome === "invalid") {
-        await expect(page.locator("#invalid-response-note")).toHaveText("Сырой ответ обрезан.");
+        await expect(page.locator("#invalid-response-note")).toHaveText("Сырой ответ обрезан. Содержимое ответа скрыто полностью или частично.");
         await expect(page.locator("#invalid-response-raw")).toBeHidden();
       }
       await expect(page.locator("#run-metadata-section")).toBeVisible();
@@ -2162,6 +2190,7 @@ test("client validation blocks admission and the corrected draft can be submitte
 
 test("final invalid output is diagnostics, never a successful result", async ({page}) => {
   const frozenOutput = {type: "object", properties: {frozen: {type: "string"}}};
+  const rawOutput = JSON.stringify({frozen: "<script id=bad>boom()</script>"});
   await page.route("http://atom-lab.test/v1/atom-lab/runs", async (route) => {
     await route.fulfill({status: 202, contentType: "application/json", body: JSON.stringify({run_id: "run-invalid", scenario_session_id: "session-invalid", job_id: "job-invalid", status: "queued"})});
   });
@@ -2171,7 +2200,7 @@ test("final invalid output is diagnostics, never a successful result", async ({p
       snapshot: {atom_id: "A05", input: A05.example_input, prompt: A05.prompt, model_id: "openai/gpt-supported", reasoning_effort: "low",
         schemas: {output: {content: frozenOutput}}},
       runtime_ids: {scenario_session_id: "session-invalid", job_id: "job-invalid", action_run_id: "action-invalid", artifact_id: null}, result: null,
-      diagnostics: {error_code: "structured_output_validation_failed", duration_ms: 500, requested_model_id: "openai/gpt-supported", requested_reasoning_effort: "low", response_model_id: null, validation_attempts: 2, transport_attempts: 2, physical_calls: 2, succeeded_first_attempt: null, provider_calls: [], provider_calls_truncated: false, debug_artifacts: [{artifact_id: "debug-1", error_code: "structured_output_validation_failed", raw_output_text: "<script id=bad>boom()</script>", truncated: true, redacted: true}], debug_artifacts_truncated: false},
+      diagnostics: {error_code: "structured_output_validation_failed", duration_ms: 500, requested_model_id: "openai/gpt-supported", requested_reasoning_effort: "low", response_model_id: null, validation_attempts: 2, transport_attempts: 2, physical_calls: 2, succeeded_first_attempt: null, provider_calls: [], provider_calls_truncated: false, debug_artifacts: [{artifact_id: "debug-1", error_code: "structured_output_validation_failed", raw_output_text: rawOutput, truncated: false, redacted: true}], debug_artifacts_truncated: false},
       created_at: "2026-09-20T10:00:00Z", started_at: "2026-09-20T10:00:00Z", finished_at: "2026-09-20T10:00:01Z",
     })});
   });
@@ -2182,6 +2211,7 @@ test("final invalid output is diagnostics, never a successful result", async ({p
   await page.locator("#run-button").click();
 
   await expect(page.locator("#invalid-response")).toBeVisible();
+  await expect(page.locator("#invalid-response-title")).toHaveText("Ответ не прошёл проверку по контракту атома");
   await expect(page.locator("#run-status")).toHaveAttribute("data-tone", "error");
   await expect(page.locator("#show-response")).toBeFocused();
   await expect(page.locator("#invalid-response-raw")).toBeHidden();
@@ -2193,8 +2223,8 @@ test("final invalid output is diagnostics, never a successful result", async ({p
   expect(JSON.parse(await page.locator("#run-diagnostic-schema-json").textContent())).toEqual(frozenOutput);
   await page.getByRole("button", {name: "К сырому ответу"}).click();
   await expect(page.locator("#invalid-response-sample summary")).toBeFocused();
-  await expect(page.locator("#invalid-response-note")).toHaveText("Сырой ответ обрезан.");
-  await expect(page.locator("#invalid-response-raw")).toContainText("<script id=bad>");
+  await expect(page.locator("#invalid-response-note")).toHaveText("Содержимое ответа скрыто полностью или частично.");
+  await expect(page.locator("#invalid-response-raw")).toHaveText(rawOutput);
   await expect(page.locator("#result-section")).toBeHidden();
   await expect(page.locator("#bad")).toHaveCount(0);
   await page.setViewportSize({width: 320, height: 844});
@@ -4936,7 +4966,7 @@ test("a failed history run without raw text still links to its schema and can op
   await unlockAtom(page, "A06");
   await page.locator("#history-button").click();
   await page.locator(".history-open").click();
-  await expect(page.locator("#history-contract-message")).toContainText("Сырой ответ недоступен.");
+  await expect(page.locator("#history-contract-message")).toHaveText("Ответ модели не прошёл проверку по контракту атома. Сырой ответ недоступен.");
   await page.locator("#show-history-diagnostics").click();
   await expect(page.locator("#history-diagnostic-raw-link")).toBeHidden();
   await expect(page.locator("#history-raw-sample")).toBeHidden();

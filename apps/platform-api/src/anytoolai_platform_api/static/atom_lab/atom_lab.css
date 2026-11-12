@@ -350,7 +350,9 @@ pre { background: var(--lab-code-surface); border-radius: 0.55rem; color: var(--
 }
 @media (max-width: 32rem) {
   .page-shell { padding: min(0.75rem, 3vw); }
-  #atom-navigation, .run-controls { grid-template-columns: 1fr; }
+  #atom-navigation { grid-template-columns: 1fr; }
+  .run-controls { grid-template-columns: minmax(0, 1fr); }
+  .run-controls, .response-body { overflow-wrap: anywhere; }
   #run-button { justify-self: stretch; }
   .editor-toolbar { align-items: stretch; flex-direction: column; }
   .page-header { align-items: stretch; flex-direction: column; padding-inline: min(1rem, 4vw); }

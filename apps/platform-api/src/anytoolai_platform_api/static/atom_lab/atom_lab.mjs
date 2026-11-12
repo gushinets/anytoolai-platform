@@ -127,6 +127,10 @@ function controlIdForKey(key, suffix = "control") {
   return `field-${encodeURIComponent(key).replaceAll("%", "-")}-${suffix}`;
 }
 
+function allowsEmptyObject(schema) {
+  return !(schema.required?.length > 0 || schema.minProperties > 0);
+}
+
 function firstControlId(schema, path, value) {
   if (schemaTypes(schema).length === 0 && !Array.isArray(schema?.enum)) {
     return fieldControlId(path, "type");
@@ -136,6 +140,7 @@ function firstControlId(schema, path, value) {
   }
   const type = primaryType(schema, value);
   if (type === "object") {
+    if (value === undefined && allowsEmptyObject(schema)) return fieldControlId(path, "empty-object");
     const properties = Object.entries(schema.properties ?? {});
     if (properties.length > 0) {
       const [key, childSchema] = properties[0];
@@ -1160,6 +1165,15 @@ function renderField(context, container, schema, path, label, required, keyHint)
     omitButton.id = fieldControlId(path, "omit");
     heading.append(omitButton);
   }
+  if (!exists && type === "object" && allowsEmptyObject(schema)) {
+    const emptyButton = button(document, "Передать пустой объект", () => {
+      setDraftPath(session, path, {});
+      rerender(true, firstControlId(schema, path, {}));
+    });
+    emptyButton.id = fieldControlId(path, "empty-object");
+    emptyButton.setAttribute("aria-label", `Передать пустой объект «${label}»`);
+    heading.append(emptyButton);
+  }
   wrapper.append(heading);
   const fieldDescription = session.atom.atom_id === "A01" && path.length === 1 && path[0] === "strict"
     ? "Если настройка включена, атом должен найти все поля, отмеченные как обязательные. При выключенной настройке допустим частичный результат."
@@ -1743,6 +1757,15 @@ export function bootstrapAtomLab({
     || presetHasUnsavedDraft(),
   );
 
+  const matchesSubmittedContract = (submission, atom) => Object.entries(submission.body.expected_contract)
+    .every(([field, value]) => sameJsonSemantically(value, atom[field]));
+
+  const currentResultPresetAtom = (submission) => {
+    if (!submission?.presetConfiguration) return null;
+    const atom = catalog.find((item) => item.atom_id === submission.presetConfiguration.atom_id);
+    return atom && matchesSubmittedContract(submission, atom) ? atom : null;
+  };
+
   const updateRunButton = () => {
     const option = selectedModelOption();
     const effort = nodes["reasoning-effort"].value;
@@ -1753,7 +1776,7 @@ export function bootstrapAtomLab({
     ));
     nodes["run-button"].disabled = submitInFlight || !hasValidSelection || submissionBlocksNewRun
       || Boolean(session?.promptSourceNeedsValidation);
-    nodes["save-result-preset"].hidden = !displayedSubmission?.presetConfiguration || !catalog.includes(displayedSubmission.atom);
+    nodes["save-result-preset"].hidden = !currentResultPresetAtom(displayedSubmission);
     nodes["launch-readiness"].textContent = submitInFlight
       ? "Отправка запроса…"
       : submissionBlocksNewRun
@@ -1771,9 +1794,7 @@ export function bootstrapAtomLab({
       renderPromptStatus();
       nodes["response-draft-warning"].hidden = !displayedSubmission
         || (matchesDraftSnapshot(displayedSubmission.snapshot)
-          && Object.entries(displayedSubmission.body.expected_contract).every(
-            ([field, value]) => sameJsonSemantically(value, session.atom[field]),
-          ));
+          && matchesSubmittedContract(displayedSubmission, session.atom));
     }
   };
 
@@ -3061,8 +3082,11 @@ export function bootstrapAtomLab({
     nodes[`${scope}-diagnostic-raw-link`].hidden = !sample;
     nodes[rawId].hidden = !sample;
     nodes[rawId].open = false;
-    nodes[noteId].textContent = sample?.truncated ? "Сырой ответ обрезан."
-      : sample?.raw_output_text === "" ? "Сохранён пустой ответ модели." : "";
+    nodes[noteId].textContent = [
+      sample?.truncated && "Сырой ответ обрезан.",
+      sample?.redacted && "Содержимое ответа скрыто полностью или частично.",
+      sample?.raw_output_text === "" && "В сохранённом ответе нет текста.",
+    ].filter(Boolean).join(" ");
     nodes[outputId].textContent = sample?.raw_output_text ?? "";
     return Boolean(sample);
   };
@@ -3091,8 +3115,8 @@ export function bootstrapAtomLab({
     nodes["history-invalid"].hidden = !invalid;
     const hasRawResponse = renderContractDiagnostics("history", invalid ? detail : null);
     nodes["history-contract-message"].textContent = hasRawResponse
-      ? "Ответ модели не соответствует схеме атома. Сырой ответ доступен в диагностике."
-      : "Ответ модели не соответствует схеме атома. Сырой ответ недоступен.";
+      ? "Ответ модели не прошёл проверку по контракту атома. Сырой ответ доступен в диагностике."
+      : "Ответ модели не прошёл проверку по контракту атома. Сырой ответ недоступен.";
     nodes["history-input-json"].textContent = JSON.stringify(detail.snapshot.input, null, 2);
     nodes["history-prompt"].textContent = detail.snapshot.prompt?.content ?? "Снимок не содержит текст промпта.";
     nodes["history-snapshot"].textContent = JSON.stringify(detail.snapshot, null, 2);
@@ -4272,7 +4296,7 @@ export function bootstrapAtomLab({
 
   nodes["save-result-preset"].addEventListener("click", async () => {
     const submission = displayedSubmission;
-    if (!submission?.presetConfiguration || !catalog.includes(submission.atom)
+    if (!currentResultPresetAtom(submission)
       || presetLibraryLoading || presetOpenInFlight || presetSaveInFlight || presetSaveOutcomeUnknown) return;
     if (presetHasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return;
     const source = presetSourceFromConfiguration(submission.presetConfiguration);
@@ -4281,7 +4305,7 @@ export function bootstrapAtomLab({
       const ownerSession = session;
       const generation = ++presetOpenGeneration;
       const isCurrent = () => !destroyed && generation === presetOpenGeneration && session === ownerSession
-        && displayedSubmission === submission && catalog.includes(source.atom) && !nodes["request-response"].hidden;
+        && displayedSubmission === submission && currentResultPresetAtom(submission) && !nodes["request-response"].hidden;
       presetOpenInFlight = true;
       updatePresetEditorDisabled();
       try {
@@ -4300,7 +4324,8 @@ export function bootstrapAtomLab({
         }
       }
     }
-    openSnapshotPreset(source, "Подготовлен пресет из снимка ответа.");
+    source.atom = currentResultPresetAtom(submission);
+    if (source.atom) openSnapshotPreset(source, "Подготовлен пресет из снимка ответа.");
   });
   nodes["edit-preset"].addEventListener("click", () => editSelectedPreset());
   nodes["apply-preset"].addEventListener("click", () => editSelectedPreset({openWorkbench: true}));
