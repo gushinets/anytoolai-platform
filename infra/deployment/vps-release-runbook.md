@@ -98,7 +98,9 @@ The host file is `/opt/payments-portal/deploy/caddy/Caddyfile.prod`. The contain
 3. Update Lab using `atom-lab-quiesce`, its [backup procedure](README.md#backup-recovery-and-rollback),
    and `atom-lab-down` from the running checkout. Use `atom-lab-up` and `atom-lab-ready`
    from the candidate.
-   Check the Lab HTTPS page, assets, code protection, and one known synthetic run.
+   Check the Lab HTTPS page, assets, code protection, and one known live run with test
+   input. For ANY-468, verify the same saved run and preset after a controlled API and
+   worker restart. Record that readback separately from the initial browser smoke.
    [Atom Lab settings and ingress](README.md#atom-lab-on-vps-135)
 4. On a failed product cutover, keep product ingress closed and verify the actual Alembic
    revision. The migrator can succeed before the web container fails. If cleanup stopped

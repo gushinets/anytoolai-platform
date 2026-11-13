@@ -207,27 +207,31 @@ refuses to replace a running fixed project. For a reviewed update, follow the qu
 `atom-lab-down`, and `atom-lab-up` sequence below; the named PostgreSQL volume and history remain
 preserved. It does not claim that ingress is private or that a paid provider call succeeded.
 
-After the operator verifies HTTPS and the network boundary, run the paid smoke in an approved cost
-window:
+After verifying HTTPS and the approved ingress profile, run the paid smoke in an approved
+cost and maintenance window:
 
 ```bash
 python3 scripts/agent/runner.py atom-lab-smoke
 ```
 
-This reuses the existing A01-A11 Atom Lab live-canary and its cost ceiling/evidence format. After
-all runs are terminal, it restarts API and worker and requires the same recent protected history to
-remain visible. A restart does not resume an interrupted provider call; existing lease
-reconciliation remains authoritative. Keep the redacted evidence report plus the actual HTTPS
-address, time, reviewed commit, and operator confirmation. Never include access/provider/live
-secrets or prompt/input/result bodies. Without an approved address, credentials, cost authority,
-and operator confirmation, the package may be reported as verified but rollout and ANY-468 remain
-incomplete.
+This reuses the A01-A11 live canary and its cost ceiling. After the runs finish, it drains the
+queue, restarts API and worker, and checks the exact saved run IDs through the protected API.
+For a deployment with an existing recorded live smoke run, the operator can verify persistence
+using that run and its saved preset after a controlled restart. Record the live provider
+result, restart time, and successful readback of the same IDs. Record the deployed commit and
+approved HTTPS address. Keep access credentials and prompt, input, and result bodies out of
+the report. Post-restart readback is required to complete ANY-468.
 
 #### Atom Lab on VPS 135
 
-The entry page is `https://any-tool-ai.ru/tools/atom-lab`. Caddy uses the existing domain and
-certificate. Participants can reach the page from any network and enter the shared code to access
-the catalog, run atoms, and use the shared history and presets.
+The operator approved `https://any-tool-ai.ru/tools/atom-lab` as a VPS 135 exception to the
+standard VPN/network allowlist. The page and static assets are reachable from any network.
+Caddy forwards the protected Lab API routes, and the Lab API checks the shared code. Anyone
+with the code can read shared Lab data and submit paid runs within the configured limits.
+Issue the code privately to invited testers, agree what test data they may enter, and follow
+the rotation procedure if it is disclosed. The separate Lab API, worker, and database
+contain the Lab's data and jobs.
+[Access policy](../../docs/product-specs/mvp-scope-source-of-truth.md#internal-atom-lab-exception)
 
 Use these values in the Lab's gitignored `.env.atom-lab` with the PostgreSQL, Lab access, live
 token, and worker credentials described above.
