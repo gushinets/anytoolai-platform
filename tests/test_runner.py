@@ -4207,6 +4207,36 @@ def test_atom_lab_up_fails_closed_when_compose_stack_probe_fails(
     assert "daemon unavailable" in error
 
 
+@pytest.mark.parametrize("network_selector", ["", "1"])
+def test_atom_lab_up_uses_the_selected_network_overlay(
+    monkeypatch, tmp_path, network_selector
+) -> None:
+    runner = load_runner_module()
+    env_file = tmp_path / ".env.atom-lab"
+    env_file.touch()
+    monkeypatch.setattr(runner, "ATOM_LAB_ENV_FILE", env_file)
+
+    def resolved_env(path):
+        assert path == env_file
+        return ATOM_LAB_DEPLOYMENT_VALUES | {"ANYTOOLAI_VPS_135_NETWORKS": network_selector}
+
+    monkeypatch.setattr(runner, "_resolved_env_file", resolved_env)
+    monkeypatch.setattr(runner, "_atom_lab_stack_running", lambda inputs: False)
+    monkeypatch.setattr(runner, "_check_ports_available", lambda *args: True)
+    monkeypatch.setattr(runner, "_atom_lab_ready", lambda *args, **kwargs: 0)
+    commands = []
+    monkeypatch.setattr(runner, "run_with_env", lambda command, env: commands.append(command) or 0)
+
+    assert runner._atom_lab_up_locked() == 0
+    (command,) = commands
+    assert "up" in command
+    compose_files = [command[index + 1] for index, arg in enumerate(command) if arg == "-f"]
+    expected = [runner.COMPOSE_FILE, runner.COMPOSE_ATOM_LAB_FILE]
+    if network_selector == "1":
+        expected.append(runner.COMPOSE_ATOM_LAB_VPS_135_FILE)
+    assert compose_files == [str(path) for path in expected]
+
+
 def test_atom_lab_up_reports_failed_candidate_cleanup(monkeypatch, capsys) -> None:
     runner = load_runner_module()
     inputs = runner.AtomLabDeploymentInputs(

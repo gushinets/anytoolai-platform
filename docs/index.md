@@ -71,6 +71,11 @@ This directory is the system of record for agents. Keep it current. If a decisio
 - `agent/worktree-runtime.md`
 - `agent/diagnostics.md`
 
+## Deployment
+
+- [Deployment configuration and commands](../infra/deployment/README.md)
+- [VPS release runbook](../infra/deployment/vps-release-runbook.md)
+
 ## Executable plans
 
 - `exec-plans/template.md`
