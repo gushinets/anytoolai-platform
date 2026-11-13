@@ -360,7 +360,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof V, FieldError>>>({});
   const liveValidationFieldsRef = useRef(new Set<keyof V>());
   const [phase, setPhase] = useState<Phase<R>>({ kind: "idle" });
-  // Retain timing across same-run retries; only new starts, resumes and attachments replace it.
+  // Ambiguous/accepted retries retain timing; a definite rejection lets the next start reset it.
   const [runStartedAtMs, setRunStartedAtMs] = useState<number | null>(null);
   const [displayedResult, setDisplayedResult] = useState<{
     scenarioSessionId: string;
@@ -918,7 +918,9 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
 
   // Shared by handleSubmit/handleRetry: both begin a (new or reused) prepared start the same way.
   function beginStart(prepared: PreparedScenarioStart) {
-    const startedAtMs = pendingStart?.prepared === prepared ? runStartedAtMs ?? Date.now() : Date.now();
+    const startedAtMs = pendingStart?.prepared === prepared && !capacityRejectedSafely
+      ? runStartedAtMs ?? Date.now()
+      : Date.now();
     setRunStartedAtMs(startedAtMs);
     resumedRunRef.current = null;
     // Not the end of the attach yet: if this start fails, the attached result is still what is on screen.

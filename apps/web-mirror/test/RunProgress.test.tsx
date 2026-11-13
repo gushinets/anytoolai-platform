@@ -25,11 +25,15 @@ describe("RunProgress", () => {
     const view = render(<RunProgress startedAtMs={NOW} statusText="Generating…" />);
     const progress = screen.getByTestId("run-progress");
     const initialStatus = screen.getByRole("status").textContent;
-    expect(screen.getByText("Elapsed: 0:00").getAttribute("aria-hidden")).toBe("true");
+    const timer = screen.getByRole("timer");
+    expect(timer.textContent).toBe("Elapsed: 0:00");
+    expect(timer.getAttribute("aria-live")).toBe("off");
+    expect(timer.closest('[role="status"]')).toBeNull();
     expect(progress.dataset.stage).toBe("normal");
     expect(initialStatus).toContain("This usually takes 10–40 seconds.");
     await act(() => vi.advanceTimersByTime(17_000));
-    expect(screen.getByText("Elapsed: 0:17")).toBeTruthy();
+    expect(screen.getByRole("timer")).toBe(timer);
+    expect(timer.textContent).toBe("Elapsed: 0:17");
     await act(() => vi.advanceTimersByTime(12_000));
     expect(screen.getByRole("status").textContent).toBe(initialStatus);
     expect(progress.dataset.stage).toBe("normal");

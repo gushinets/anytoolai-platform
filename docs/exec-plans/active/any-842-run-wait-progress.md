@@ -5,9 +5,9 @@
 - State: active
 - Owner: agent
 - Created: 2026-11-12
-- Last updated: 2026-11-12
+- Last updated: 2026-11-13
 - Review date: 2026-11-19
-- Next action: user review and explicit permission before pushing to GitHub.
+- Next action: user review of round 1 fixes and explicit permission before pushing to GitHub.
 - Blocker: the baseline activation-marker test requires passwordless sudo, unavailable here.
 
 ## Goal
@@ -93,3 +93,49 @@ component and recovery tests, browser checks and frontend documentation.
 
 - Server-provided `started_at` on the scenario-session status would let attached handoff sessions
   show the true elapsed time. This is out of scope here.
+
+## Review round 1 implementation plan
+
+1. Merge origin/main at 7c22bf20, retaining both shared-runtime test additions in the conflict.
+2. Expose elapsed time as an accessible timer with live announcements off, outside the status
+   region; retain the existing stage-change announcements and interval cleanup.
+3. Use the existing safe-capacity-rejection predicate when choosing a start timestamp. A proved
+   rejection starts timing afresh on retry while retaining the prepared request/key. Ambiguous
+   attempts and accepted sessions keep their original timing.
+4. Reproduce the findings with tests, including delays above 60 seconds, both retry buttons,
+   and ambiguous 5xx followed by a capacity rejection. Run focused and frontend checks, the
+   merged baseline and docs validation; record limitations without weakening checks.
+
+### Review round 1 progress
+
+- 2026-11-13: Read all PR inline comments (no replies); confirmed both P2 findings. Managed
+  Python doctor passed. Merged main's data-processing-notice change, preserving both conflicting
+  test additions; 115 shared-runtime and notice tests passed before applying review fixes.
+- Merge commit: ffb1447d; includes origin/main 7c22bf20 without rewriting published history.
+- Reproduced both findings before fixing: the accessible timer query failed, and delayed clean
+  capacity retries through both buttons incorrectly entered the long stage. The final regression
+  matrix covers repeated clean rejections and repeated capacity rejections following an ambiguous
+  5xx, preserving the request key in each case. Ordinary submit remains disabled for ambiguous
+  starts, so that case exercises its reachable Try again path.
+- Changed the counter to `role="timer"` with `aria-live="off"`; the status region still excludes
+  ticking content. Timestamp selection reuses `capacityRejectedSafely`, keeping the existing
+  positive-proof boundary instead of adding another uncertainty flag.
+- Passed: 219 focused runtime/progress/recovery/handoff tests, web typecheck and lint.
+- Passed: six Chromium checks on the local development host with mocked API responses,
+  ProposalAI at Pixel 5 width in EN/RU. The browser accessibility tree includes the elapsed
+  timer; live announcements are off and status text stays unchanged across ticks. Both clean
+  capacity-retry buttons start at zero after 65 seconds, while 5xx then capacity rejection keeps
+  elapsed time. All paths preserve the idempotency key, persist the correct timestamp through
+  reload without another start, and remove the timer on completion. No browser page errors.
+  Native screen-reader audio was not tested. The first navigation exceeded 30 seconds during
+  initial dev compilation; all six checks passed after compilation completed.
+- Passed: full frontend-check after merge and fixes: 733 web tests, 336 CE-kit tests,
+  55 result-kit tests, 349 Chromium cases, all workspace lint/typechecks, generated API contracts
+  and production builds. Documentation validation and whitespace checks passed.
+- Merged quick-check: 3,678 passed, 12 skipped, 657 deselected; the only failure remains
+  `tests/test_runner.py::test_activation_marker_is_readable_by_non_root_api_user`, with sudo
+  requiring interactive authentication. No tests were weakened or excluded. Config, architecture,
+  documentation and generated-doc checks passed. Sanitized failure context collected.
+- No dependency or lockfile changes. Full-check was not repeated because its baseline gate
+  remains blocked by the same environment requirement; the complete frontend gate was run above.
+  No GitHub comments/review resolution, PR edit, push or live-provider call in this follow-up.

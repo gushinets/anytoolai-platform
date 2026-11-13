@@ -232,6 +232,48 @@ describe("ProductRunPage", () => {
     expect(JSON.parse(starts[1]!.init.body as string)).toMatchObject({ input: { text: "A different request." } });
   });
 
+  it.each([
+    { ambiguous: false, button: "Try again" },
+    { ambiguous: false, button: "Run" },
+    { ambiguous: true, button: "Try again" },
+  ])("times delayed capacity retries through $button (earlier ambiguous start=$ambiguous)", async ({ ambiguous, button }) => {
+    const { client, calls } = makeClientCapturingRequests({
+      ...happyPathRoutes(),
+      [ROUTES.START]: [
+        ...(ambiguous ? [errorResponse(503, "internal_error")] : []),
+        errorResponse(429, "quota_capacity_reserved"),
+        errorResponse(429, "quota_capacity_reserved"),
+        startResponse(),
+      ],
+      [ROUTES.SESSION]: [sessionResponse({ status: "running" })],
+    });
+    const view = renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    vi.useFakeTimers();
+    try {
+      submit();
+      for (const elapsed of ["1:05", "2:10"]) {
+        await act(async () => { await advance(100); });
+        expect(screen.getByText("Capacity is temporarily in use. Please try again shortly.")).toBeTruthy();
+        expect(screen.queryByTestId("run-progress")).toBeNull();
+        await act(async () => { await advance(65_000, 1_000); });
+        fireEvent.click(screen.getByRole("button", { name: button }));
+        expect(screen.getByTestId("run-progress").dataset.stage).toBe(ambiguous ? "long" : "normal");
+        expect(screen.getByText(`Elapsed: ${ambiguous ? elapsed : "0:00"}`)).toBeTruthy();
+      }
+      await act(async () => { await advance(100); });
+      expect(screen.getByRole("button", { name: "Generating…" })).toBeTruthy();
+      expect(screen.getByText(ambiguous ? "Elapsed: 2:10" : "Elapsed: 0:00")).toBeTruthy();
+      const starts = calls.filter((call) => call.key === ROUTES.START);
+      expect(starts).toHaveLength(ambiguous ? 4 : 3);
+      expect(new Set(starts.map(idempotencyKeyOf)).size).toBe(1);
+    } finally {
+      view.unmount();
+      vi.useRealTimers();
+    }
+  });
+
   it("keeps repeated definite capacity rejections unlocked without replacing the prepared key", async () => {
     const { client, calls } = makeClientCapturingRequests({
       ...happyPathRoutes(),

@@ -25,7 +25,7 @@ export function RunProgress({ startedAtMs, statusText, className }: Props) {
       <p role="status">
         {statusText} <span>{th(`runProgress.${stage}`)}</span>
       </p>
-      <p className={styles.runElapsed} aria-hidden="true">
+      <p className={styles.runElapsed} role="timer" aria-live="off">
         {th("runProgress.elapsed", { time: formatElapsed(elapsedS) })}
       </p>
     </div>
