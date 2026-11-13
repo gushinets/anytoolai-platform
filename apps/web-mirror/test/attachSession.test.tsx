@@ -14,9 +14,12 @@ beforeEach(() => {
 afterEach(() => window.sessionStorage.clear());
 
 describe("useAttachSession", () => {
-  it("uses the URL id, strips it from the address bar (keeping other params) and remembers it for this tab", () => {
+  it("keeps the URL until the resolved session is persisted, preserving other parameters", () => {
     const { result } = renderHook(() => useAttachSession("acceptance_builder", "s 1"));
     expect(result.current.attachSessionId).toBe("s 1");
+    expect(readAttachSessionId("acceptance_builder")).toBeUndefined();
+    expect(window.location.search).toContain("session=");
+    act(() => result.current.onAttachResolved?.("s 1"));
     expect(window.location.search).toBe("?keep=1");
     expect(readAttachSessionId("acceptance_builder")).toBe("s 1");
   });
@@ -24,6 +27,7 @@ describe("useAttachSession", () => {
   it("consumes the linked scenario with the session and keeps the explicit choice until this visit ends", () => {
     window.history.replaceState(null, "", "/products/acceptance_builder?session=s1&scenario=acceptance_builder.check_v1&paid=1");
     const linked = renderHook(({ session }) => useAttachSession("acceptance_builder", session), { initialProps: { session: "s1" as string | undefined } });
+    act(() => linked.result.current.onAttachResolved?.("s1"));
     expect(window.location.search).toBe("?paid=1");
     linked.rerender({ session: undefined });
     expect(linked.result.current.attachFromUrl).toBe(true);
@@ -159,15 +163,13 @@ describe("useAttachSession", () => {
     expect(readAttachSessionId("acceptance_builder")).toBe("s 1");
   });
 
-  it("does not let a bare ?session= link replace a different, ranked remembered session; a bare one replaces a bare one", () => {
+  it("keeps the previous selection until a bare link is verified, then makes it explicit", () => {
     rememberAttachSession("acceptance_builder", "newer", "2026-10-01T10:05:00Z");
-    renderHook(() => useAttachSession("acceptance_builder", "stale"));
+    const linked = renderHook(() => useAttachSession("acceptance_builder", "chosen"));
     expect(readAttachSessionId("acceptance_builder")).toBe("newer");
-
-    window.sessionStorage.clear();
-    renderHook(() => useAttachSession("acceptance_builder", "bare 1"));
-    renderHook(() => useAttachSession("acceptance_builder", "bare 2"));
-    expect(readAttachSessionId("acceptance_builder")).toBe("bare 2");
+    act(() => linked.result.current.onAttachResolved?.("chosen"));
+    rememberAttachSession("acceptance_builder", "latest", "2026-10-01T10:10:00Z");
+    expect(readAttachSessionId("acceptance_builder")).toBe("chosen");
   });
 
   it("a session the person opens themselves replaces a newer remembered one, and a late older Accept still cannot replace it", () => {
@@ -299,7 +301,11 @@ describe("accepted own-run selection", () => {
     saveOwnRun();
     expect(preferSavedOwnRun(productId, key, "own")).toBe(true);
     if (source === "consent") chooseAttachSession(productId, "chosen", "2026-10-01T10:00:00Z");
-    else renderHook(() => useAttachSession(productId, "chosen"));
+    else {
+      const linked = renderHook(() => useAttachSession(productId, "chosen"));
+      expect(readAttachSessionId(productId)).toBeUndefined();
+      act(() => linked.result.current.onAttachResolved?.("chosen"));
+    }
     expect(renderHook(() => useAttachSession(productId, undefined)).result.current.attachSessionId).toBe("chosen");
   });
 

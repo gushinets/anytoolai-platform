@@ -48,7 +48,7 @@ function setup(
     }
     if (path.startsWith("/v1/scenario-sessions/")) {
       if (failure === "poll" && polls++ === 0) return errorResponse(503, "temporarily_unavailable");
-      return sessionResponse();
+      return sessionResponse({ scenario_id: TEST_PRODUCT_IDS.scenarioId });
     }
     if (path.startsWith("/v1/results/")) return resultResponse(TEST_PRODUCT_IDS, output);
     throw new Error("Unexpected request: " + path);

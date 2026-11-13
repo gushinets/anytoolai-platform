@@ -10,6 +10,24 @@ const scenarios = ["proposal_ai.generate_v1", "client_update_writer.update_v1", 
 function persistence(): PaidStartPersistence { return { storage: memoryTabStorage(), owner, isCurrent: () => true }; }
 
 describe("paid prepared starts", () => {
+  it("reports persisted recovery before sending, never on late acceptance", async () => {
+    const saved = persistence();
+    const request = { productId: "proposal_ai", scenarioId: scenarios[0], frontendId: "web_mirror", input: { text: "Frozen request" } };
+    let finish!: (response: Response) => void;
+    const onRecoveryPersisted = vi.fn(() => {
+      expect(readPaidStartRecovery(saved, request.productId)).toMatchObject({ kind: "pending", request });
+    });
+    const fetchImpl = vi.fn(() => {
+      expect(onRecoveryPersisted).toHaveBeenCalledOnce();
+      return new Promise<Response>((resolve) => { finish = resolve; });
+    });
+    const client = new PlatformApiClient({ baseUrl: "https://kernel.invalid", fetchImpl });
+    const inFlight = prepareScenarioStart(request, saved).execute(client, { onRecoveryPersisted });
+    expect(onRecoveryPersisted).toHaveBeenCalledOnce();
+    finish(accepted());
+    expect((await inFlight).ok).toBe(true);
+    expect(onRecoveryPersisted).toHaveBeenCalledOnce();
+  });
   it("keeps a newer pending across late acceptance and dismissal of the older handle", async () => {
     const saved = persistence();
     let finish!: (response: Response) => void;
@@ -83,9 +101,11 @@ describe("paid prepared starts", () => {
     const request = { productId: "proposal_ai", scenarioId: scenarios[0], frontendId: "web_mirror", input: { text: "Frozen request" } };
     await prepareScenarioStart(request, saved).execute(client);
     const pending = readPaidStartRecovery(saved, request.productId)!;
-    expect(await prepareScenarioStart({ ...request, input: { text: "New request" } }, saved).execute(client)).toEqual({
+    const onRecoveryPersisted = vi.fn();
+    expect(await prepareScenarioStart({ ...request, input: { text: "New request" } }, saved).execute(client, { onRecoveryPersisted })).toEqual({
       ok: false, error: { type: "local_error", code: "paid_recovery_pending" },
     });
+    expect(onRecoveryPersisted).not.toHaveBeenCalled();
     expect(fetchImpl).toHaveBeenCalledOnce();
     expect(readPaidStartRecovery(saved, request.productId)).toEqual(pending);
     if (pending.kind !== "pending") throw new Error("pending expected");
@@ -139,9 +159,11 @@ describe("paid prepared starts", () => {
       saved.storage.setItem = setItem;
       const fetchImpl = vi.fn<typeof fetch>();
       const client = new PlatformApiClient({ baseUrl: "https://kernel.invalid", fetchImpl });
-      const result = await prepareScenarioStart({ productId: "proposal_ai", scenarioId: scenarios[0], frontendId: "web_mirror", input: {} }, saved).execute(client);
+      const onRecoveryPersisted = vi.fn();
+      const result = await prepareScenarioStart({ productId: "proposal_ai", scenarioId: scenarios[0], frontendId: "web_mirror", input: {} }, saved).execute(client, { onRecoveryPersisted });
       expect(result).toEqual({ ok: false, error: { type: "local_error", code: "paid_storage_unavailable" } });
       expect(fetchImpl).not.toHaveBeenCalled();
+      expect(onRecoveryPersisted).not.toHaveBeenCalled();
     }
   });
   it("clears a different owner's frozen input", async () => {

@@ -1098,7 +1098,7 @@ it("preserves an accepted session without identity for retry instead of guessing
   });
   render(<AttachedClientUpdateWriterProduct client={client} sessionId="session_1" />);
   await screen.findByRole("button", { name: "Try again" });
-  expect(readAttachSessionId("client_update_writer")).toBe("session_1");
+  expect(readAttachSessionId("client_update_writer")).toBeUndefined();
   expect(screen.queryByLabelText("Progress notes")).toBeNull();
   expect(screen.getAllByRole("radio").every((radio) => (radio as HTMLInputElement).disabled)).toBe(true);
   expect(calls.some((call) => call.key.endsWith("/start"))).toBe(false);

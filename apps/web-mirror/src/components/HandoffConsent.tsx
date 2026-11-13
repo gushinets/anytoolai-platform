@@ -13,6 +13,7 @@ import {
   isQuotaCapacityReserved,
   refreshGuestIdentity,
   rememberPaidResult,
+  readPaidStartRecovery,
   type AsyncStorage,
   type HandoffPreview,
   type HandoffStatus,
@@ -278,8 +279,13 @@ export function HandoffConsent({ client, handoffToken, canOpenTarget }: HandoffC
     if (sessionId !== null) {
       const persistence = getPaidPersistence(client);
       if (persistence && how === "chosen") {
-        try { rememberPaidResult(persistence, { version: 1, kind: "accepted", owner: persistence.owner,
-          productId: preview.targetProductId, scenarioId: preview.targetScenarioId, scenarioSessionId: sessionId }); }
+        try {
+          // The explicit attachment can coexist with another paid operation whose status is unknown here.
+          if (!readPaidStartRecovery(persistence, preview.targetProductId)) {
+            rememberPaidResult(persistence, { version: 1, kind: "accepted", owner: persistence.owner,
+              productId: preview.targetProductId, scenarioId: preview.targetScenarioId, scenarioSessionId: sessionId });
+          }
+        }
         catch { /* The accepted result remains reachable through the explicit session link. */ }
       }
       (how === "chosen" ? chooseAttachSession : rememberAttachSession)(preview.targetProductId, sessionId, preview.expiresAt);

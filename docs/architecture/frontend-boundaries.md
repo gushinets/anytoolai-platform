@@ -230,8 +230,9 @@ The shared runtime, not a product, owns the web side of a handoff:
   schema ref/version must match the bundled product renderer's `outputSchema` before parsing;
   the architecture contract test checks these pins against product workflows/schema versions.
   Delegated identity and backend ownership checks remain required for every protected request.
-- `MultiModeProduct` resolves an accepted session's mode from the server's `scenarioId` before
-  mounting its run page, including accepted paid recovery. Pending and nonterminal
+- Shared product selection resolves the mode and session together before mounting
+  `ProductRunPage`; multi-mode and single-mode products use the same precedence.
+  Multi-mode selection uses the server's `scenarioId`, including accepted paid recovery. Pending and nonterminal
   accepted work retain priority. After a proven completed/failed/expired status,
   ordinary restoration honors a later saved valid mode. Explicit result/selected
   handoff presentation still wins and saves its verified server mode; background
@@ -241,9 +242,22 @@ The shared runtime, not a product, owns the web side of a handoff:
   mode. Missing identity or transient failures preserve Retry; a definite 404 or incompatible
   scenario offers explicit discard. Discard removes only the matching attachment/accepted recovery,
   preserving pending requests and newer sessions; it never creates a fresh logical start.
+  A definite 404 for a different older recovery does not block a selected result;
+  retain that recovery record and resolve the selected session instead.
   A pending paid request has no accepted session to resolve: its frozen scenario selects its mode.
   On ordinary restoration that request takes precedence over an older remembered handoff; an
   explicitly selected result takes precedence for that visit without replacing the pending request.
+  A verified explicit link persists the existing attachment's `active` choice, without
+  replacing another paid recovery. Consume its session/scenario URL parameters only
+  after that write succeeds; interrupted resolution or refused storage retains the
+  URL for reload. Explicit exit/discard consumes the matching URL even if storage
+  failed. An invalid link preserves previous recovery and attachment selection.
+  A background attachment is not an explicit choice; a terminal background result
+  yields to a saved different mode. Existing `active` records retain their priority
+  until explicitly left; a new own paid submission leaves the previous choice and URL
+  after persisting pending recovery, before sending. Failed persistence keeps the old
+  result reachable; automatic replay/retry and late responses do not change the choice. Storage versions and
+  the prepared-start replay path are unchanged.
 - The SDK polls in bounded 600-second windows. The web runtime renews a window only after a healthy
   `started`/`running` snapshot, continuing the same session. Every awaited window checks abort,
   active session and current paid identity; a read failure retries the accepted session without

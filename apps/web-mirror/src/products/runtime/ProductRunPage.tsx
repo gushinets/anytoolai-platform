@@ -34,9 +34,10 @@ import { DataProcessingNotice, DATA_NOTICE_ID } from "../../components/DataProce
 import { LanguageSwitcher, useHostT, useProductT } from "../../i18n";
 import { getClientStorage } from "./clientStorage";
 import { webBaseUrlFromProductLocation } from "../../lib/hostUrls";
-import { forgetAttachSession, preferSavedOwnRun, type AttachProps } from "./attachSession";
+import { forgetChosenAttachSession, preferSavedOwnRun, type AttachProps } from "./attachSession";
 import { productDraftKey, readProductDraft, readProductDraftScenario, saveDraftValues, saveDraftRun, saveProductDraftScenario, clearProductDraft } from "./draftStorage";
 import { callSafely } from "./callSafely";
+import { ProductSelectionStatus, useProductSelection, type ProductSelection } from "./useProductSelection";
 import { isProductEnabled } from "./enabledProducts";
 import { useLatest } from "./useLatest";
 import { getPaidPersistence } from "../../lib/portalSession";
@@ -285,17 +286,23 @@ type Phase<R> =
  * were genuinely product-neutral, per ANY-453's team-lead guidance (docs/exec-plans/active/
  * any-453-shared-web-product-runtime-foundation.md) -- not designed up front.
  */
-export function ProductRunPage<V extends Record<string, unknown>, R>({
+export function ProductRunPage<V extends Record<string, unknown>, R>(props: ProductRunPageProps<V, R>) {
+  const selection = useProductSelection(props.client, [props.definition], props);
+  if (selection.state.kind !== "ready") return <ProductSelectionStatus selection={selection} />;
+  return <ResolvedProductRunPage {...props} selection={selection.state.selection} />;
+}
+
+export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
   definition,
   client,
   onEvent,
   onLockedChange,
   visitId,
-  attachSessionId,
-  attachFromUrl,
+  selection,
   onAttachBegin,
   onAttachEnd,
-}: ProductRunPageProps<V, R>) {
+}: ProductRunPageProps<V, R> & { selection: ProductSelection }) {
+  const attachSessionId = selection.kind === "session" ? selection.sessionId : undefined;
   const { Fields, Result } = definition;
   const paid = client.portalIdentity !== undefined;
   const draftOwner = client.portalIdentity?.owner;
@@ -305,20 +312,9 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       return { recovery: paidPersistence ? readPaidStartRecovery(paidPersistence, definition.productId) : null, failed: false };
     } catch { return { recovery: null, failed: true }; }
   });
-  const recovery = recoveryState.recovery?.scenarioId === definition.scenarioId ? recoveryState.recovery : null;
+  const recovery = selection.kind !== "form" && recoveryState.recovery?.scenarioId === definition.scenarioId ? recoveryState.recovery : null;
   const restoredStartRef = useRef(false);
   const paidSendingRef = useRef(false);
-  const inheritedAttachSessionId = attachSessionId;
-  // A saved new operation supersedes a previous handoff on reload; an explicit result link is a user choice.
-  if (recovery && !attachFromUrl) {
-    attachSessionId = recovery.kind === "accepted" ? recovery.scenarioSessionId : undefined;
-  }
-  useEffect(() => {
-    if (recovery && !attachFromUrl && inheritedAttachSessionId && paidPersistence?.isCurrent() &&
-      (recovery.kind === "pending" || recovery.scenarioSessionId !== inheritedAttachSessionId)) {
-      forgetAttachSession(definition.productId, inheritedAttachSessionId);
-    }
-  }, [recovery, attachFromUrl, inheritedAttachSessionId, definition.productId, paidPersistence]);
   const th = useHostT();
   const tp = useProductT();
   const title = tp("title");
@@ -340,8 +336,8 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   const onEventRef = useLatest(onEvent);
   // The attach callbacks are read from async continuations too (a terminal failure after a poll), so they
   // get the same always-current treatment.
-  const onAttachBeginRef = useLatest(onAttachBegin);
-  const onAttachEndRef = useLatest(onAttachEnd);
+  const onAttachBeginRef = useLatest(() => onAttachBegin?.(attachSessionId));
+  const onAttachEndRef = useLatest(() => onAttachEnd?.(attachSessionId));
   // Bumped by every fetchResult() call; see that function's own comment for why.
   const resultFetchGenerationRef = useRef(0);
   // True once any concurrent fetchResult() call for the current session has reached a definitive,
@@ -719,12 +715,20 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- resume once after boot, like the attach effect above
   }, [boot.kind]);
 
-  async function runStart(prepared: PreparedScenarioStart, startedAtMs: number) {
+  async function runStart(prepared: PreparedScenarioStart, startedAtMs: number, selectOwnStart: boolean) {
     // Snapshotted once: this call's own controller, checked consistently across every await below
     // regardless of which controller (if any) controllerRef points to by the time each resolves.
     const controller = controllerRef.current;
     const startOptions = { signal: controller?.signal, timeoutMs: START_TIMEOUT_MS };
-    let result = await prepared.execute(client, startOptions);
+    let result = await prepared.execute(client, {
+      ...startOptions,
+      // A failed write keeps the old URL recoverable. Only this explicit attempt changes
+      // selection; automatic replay/retry and late acceptance must not do so.
+      onRecoveryPersisted: selectOwnStart ? () => {
+        forgetChosenAttachSession(productId);
+        callSafely(onAttachEndRef.current);
+      } : undefined,
+    });
     // One automatic retry of an ambiguous failure (network, timeout, 5xx). It reuses the prepared
     // handle, so the same Idempotency-Key makes it safe: the backend returns the session it already
     // created instead of spending quota twice. A definite 4xx is not retried automatically.
@@ -1009,7 +1013,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   }
 
   // Shared by handleSubmit/handleRetry: both begin a (new or reused) prepared start the same way.
-  function beginStart(prepared: PreparedScenarioStart) {
+  function beginStart(prepared: PreparedScenarioStart, selectOwnStart = false) {
     if (paid && paidSendingRef.current) return;
     paidSendingRef.current = paid;
     activePreparedRef.current = prepared;
@@ -1022,7 +1026,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     attachActiveRef.current = false;
     setPhase({ kind: "submitting" });
     emitEvent(onEventRef.current, { type: "form_submitted", guestId });
-    void runStart(prepared, startedAtMs).finally(() => { paidSendingRef.current = false; });
+    void runStart(prepared, startedAtMs, selectOwnStart).finally(() => { paidSendingRef.current = false; });
   }
 
   // Shared by handleSubmit and handleRetry (the "Try again" button on retryable-error): always
@@ -1033,6 +1037,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   // PreparedScenarioStart/Idempotency-Key (see prepareScenarioStart()'s own ANY-150 contract).
   function submitCurrentValues() {
     if (paid && paidSendingRef.current) return;
+    if (client.portalIdentity && !client.portalIdentity.isCurrent()) return;
     // guestId undefined here means either the initial identity fetch never succeeded, or (after a
     // guest_identity_not_found self-heal) the refresh itself failed -- prepareScenarioStart() would
     // still build a request, just with a null guest_id, which the backend has no way to accept.
@@ -1097,7 +1102,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       void runPoll(startedSession);
       return;
     }
-    beginStart(prepared);
+    beginStart(prepared, paid);
   }
 
   function handleSubmit(event: FormEvent) {
@@ -1246,9 +1251,11 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   }
 
   function handleStartAnother() {
+    if (client.portalIdentity && !client.portalIdentity.isCurrent()) return;
     if (phase.kind !== "result" || isHandoffLocked()) {
       return;
     }
+    if (paid) forgetChosenAttachSession(productId);
     setValues(definition.emptyValues);
     if (draftKey !== null) clearProductDraft(draftKey);
     setFieldErrors({});

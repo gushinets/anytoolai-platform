@@ -35,6 +35,11 @@ recovery without new-start configuration and matching-session cleanup. Verify th
 combined guest/paid journeys, identity changes, modes and StrictMode with focused
 regressions, types and changed-file lint. Backend/wire/commercial scope is unchanged.
 
+**Local result-selection correction — implemented locally:** resolve mode/session together,
+verify and persist explicit links before consuming their URL, and preserve other
+paid recovery. Storage failure retains the URL until explicit exit/discard. Reuse
+existing storage/replay; focused frontend verification only, no deployment work.
+
 ## PR corrections — 2026-11-12
 
 Status: **COMPLETE — selected local acceptance PASS, including REV-1**. Baselines: Portal #167

@@ -10,7 +10,10 @@ import { samePortalOwner } from "../identity/portalSession";
 export type PreparedScenarioStartExecuteOptions = Pick<
   PlatformApiRequestOptions,
   "signal" | "timeoutMs"
->;
+> & {
+  /** Called synchronously after pending recovery is verified in storage, before this attempt sends. */
+  onRecoveryPersisted?: () => void;
+};
 
 /**
  * An opaque, retryable handle for one logical scenario-start submission (ANY-150).
@@ -75,6 +78,7 @@ function prepareWithKey(request: ScenarioStartRequest, idempotencyKey: string, p
         } catch (error) {
           return { ok: false, error: { type: "local_error", code: error instanceof PaidStartRecoveryConflict ? "paid_recovery_pending" : "paid_storage_unavailable" } };
         }
+        options?.onRecoveryPersisted?.();
       }
       const result = await requestAndParse(
         client,
