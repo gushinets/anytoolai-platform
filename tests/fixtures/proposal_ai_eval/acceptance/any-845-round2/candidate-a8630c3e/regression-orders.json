@@ -1,0 +1,183 @@
+{
+   "description": "ANY-631 live acceptance cases (QA Q-001, ANY-595): the web-form inputs of P01, P02, P04 and P05 and their acceptance criteria. `must` / `must_not` are literal checks (a forbidden amount is a critical error). Every criterion is a question a human answers yes, no or unknown for each output; `critical` marks the ANY-631 critical errors (an unagreed term accepted, an invented commitment or amount, a lost mandatory condition, a promise of excluded work). Kinds: `declined` the term is refused in so many words (calling it proposed or not agreed is not a refusal); `not_agreed` the client's term is stated as not accepted, either proposed and not agreed or refused, never accepted or as the freelancer's own; `agreed` restated and confirmed, never called proposed or not agreed; `accepted` the change is accepted; `offered` the freelancer offers the value as their own; `open` left to be agreed later, with its condition when the order gives one; `requirement` any other criterion of the case.",
+   "orders": [
+      {
+         "id": "P01",
+         "task_text": "Анна, владелица студии йоги, ищет дизайнера для лендинга в Figma. Нужны мобильная и десктопная версии, блок расписания и кнопка записи в существующий WhatsApp. Тексты и фото предоставит студия. Разработка сайта не входит. Предложение должно объяснить подход и следующий шаг, без цены и сроков до обсуждения.",
+         "freelancer_positioning": "Я UI-дизайнер, работаю в Figma. Делал лендинги для небольших сервисных компаний, уделяю внимание читаемости и удобству записи. Портфолио могу показать на созвоне, конкретных результатов в процентах у меня нет.",
+         "tone": "warm",
+         "expect_language": "ru",
+         "expect_gap": false,
+         "must_not": [
+            "\\d\\s?(₽|руб|EUR|USD)",
+            "(EUR|USD|\\$)\\s?\\d"
+         ],
+         "criteria": [
+            {
+               "id": "no-development",
+               "kind": "requirement",
+               "critical": true,
+               "question": "Does the answer promise no layout, coding or site development (only the Figma design)?",
+               "violation_type": "promised_excluded_work"
+            },
+            {
+               "id": "schedule-block",
+               "kind": "requirement",
+               "critical": false,
+               "question": "Is the schedule block part of the design?"
+            },
+            {
+               "id": "no-intro-gender-retelling",
+               "kind": "requirement",
+               "critical": false,
+               "question": "Is there no «Меня зовут …», no feminine form such as «Готова» (the masculine «Делал» comes from the positioning), and no retelling of the instructions?"
+            },
+            {
+               "id": "no-price-or-dates",
+               "kind": "requirement",
+               "critical": true,
+               "question": "Are no price and no dates or durations named before the discussion?",
+               "violation_type": "invented_amount_or_commitment"
+            }
+         ],
+         "expect_gaps_language": "ru"
+      },
+      {
+         "id": "P02",
+         "task_text": "Northlake Books needs a Shopify accessibility review, not a redesign. Audit 6 templates: home, collection, product, cart, search, contact. Deliver a prioritized issue spreadsheet with reproduction steps and a 45-minute handover. Check keyboard use, focus, labels and contrast against WCAG 2.2 AA. No certification or legal compliance guarantee. We can provide staging access on 8 October 2026; the report is needed by 16 October if access arrives on time. Theme edits, third-party checkout and app remediation are excluded. Budget ceiling USD 1,200; final fee must be agreed after inspecting the theme.",
+         "freelancer_positioning": "I am a frontend developer who has performed manual keyboard and screen-reader checks on two ecommerce projects. I use browser devtools and axe as aids, and document limitations clearly. I am not a certified accessibility auditor and have no Shopify Plus experience.",
+         "tone": "neutral",
+         "expect_language": "en",
+         "expect_gap": false,
+         "criteria": [
+            {
+               "id": "ceiling-not-agreed",
+               "kind": "not_agreed",
+               "critical": false,
+               "question": "Is the USD 1,200 ceiling stated as the client's budget that is not an agreed fee?"
+            },
+            {
+               "id": "fee-left-open",
+               "kind": "open",
+               "critical": true,
+               "violation_type": "lost_mandatory_condition",
+               "question": "Is the final fee left to be agreed, never stated as a fixed or agreed amount?"
+            },
+            {
+               "id": "fee-after-inspection",
+               "kind": "open",
+               "critical": true,
+               "violation_type": "lost_mandatory_condition",
+               "question": "Is agreeing the final fee tied to inspecting the theme (the condition may be in another sentence)?"
+            },
+            {
+               "id": "scope-not-a-term",
+               "kind": "requirement",
+               "critical": false,
+               "question": "Are the 6 templates, the issue spreadsheet and the 45-minute handover stated as the work, never called proposed or not agreed?"
+            },
+            {
+               "id": "exclusions-kept",
+               "kind": "requirement",
+               "critical": true,
+               "question": "Are redesign, theme edits, third-party checkout, app remediation, certification and a legal compliance guarantee kept out of the work?",
+               "violation_type": "promised_excluded_work"
+            },
+            {
+               "id": "unagreed-terms-not-accepted",
+               "kind": "requirement",
+               "critical": true,
+               "violation_type": "unagreed_term_accepted",
+               "question": "Is none of the client's USD 1,200 ceiling, report date or staging-access date stated as an agreed fee or promise of the freelancer's own?"
+            }
+         ],
+         "expect_gaps_language": "en"
+      },
+      {
+         "id": "P04",
+         "task_text": "A client wants a fully custom 12-page Webflow site within 48 hours for EUR 300, while also insisting every page be approved before build. Copy and images will only arrive next week. They ask for unlimited revisions and a guaranteed top-3 Google ranking. Write a respectful proposal that identifies these conflicts, declines the ranking guarantee and unlimited revisions, and offers discussion of a smaller first phase. Do not accept the stated deadline or invent a replacement budget.",
+         "freelancer_positioning": "I build Webflow marketing sites and can scope work after reviewing content. My past work includes small business sites, but I have no search-ranking case studies. I only commit to timelines once dependencies and review rounds are agreed.",
+         "tone": "firm",
+         "expect_language": "en",
+         "expect_gap": false,
+         "must": [
+            "EUR 300"
+         ],
+         "must_not": [
+            "EUR (?!300\\b)\\d"
+         ],
+         "criteria": [
+            {
+               "id": "budget-not-accepted",
+               "kind": "not_agreed",
+               "critical": false,
+               "question": "Is EUR 300 explicitly marked as not agreed (proposed and not agreed, or refused)?"
+            },
+            {
+               "id": "deadline-declined",
+               "kind": "declined",
+               "critical": false,
+               "question": "Is the 48-hour deadline refused in so many words?"
+            },
+            {
+               "id": "revisions-and-ranking-declined",
+               "kind": "declined",
+               "critical": false,
+               "question": "Are unlimited revisions and the guaranteed top-3 ranking refused in so many words?"
+            },
+            {
+               "id": "smaller-phase",
+               "kind": "requirement",
+               "critical": false,
+               "question": "Is a smaller first phase offered for discussion, with no replacement budget?"
+            },
+            {
+               "id": "unagreed-terms-not-accepted",
+               "kind": "requirement",
+               "critical": true,
+               "violation_type": "unagreed_term_accepted",
+               "question": "Is none of the client's EUR 300 budget, 48-hour deadline, unlimited revisions or guaranteed top-3 ranking stated as accepted, agreed or as the freelancer's own?"
+            }
+         ],
+         "expect_gaps_language": "en"
+      },
+      {
+         "id": "P05",
+         "task_text": "Клиент согласовал перевод ровно 8 400 слов с английского на русский: договор поставки без приложений. Цена 0,07 EUR за слово, итого 588 EUR. Передача DOCX до 17:00 UTC+3 14 октября 2026. Включён один раунд исправления ошибок перевода в течение 5 рабочих дней; изменение оригинала оплачивается отдельно. Нотариальное заверение и юридическая экспертиза не входят. Предоплата 30% = 176,40 EUR, остаток 411,60 EUR после сдачи. Сформулируйте подтверждение условий без обещания юридической точности документа.",
+         "freelancer_positioning": "Перевожу коммерческие документы EN-RU, сверяю терминологию с глоссарием клиента. Не юрист и не нотариус. Глоссарий и финальный оригинал нужно получить до начала работы.",
+         "tone": "neutral",
+         "expect_language": "ru",
+         "expect_gap": false,
+         "criteria": [
+            {
+               "id": "agreed-confirmed",
+               "kind": "agreed",
+               "critical": true,
+               "question": "Are the agreed 8 400 words, 588 EUR, DOCX by 17:00 UTC+3 on 14 October 2026 and the 176,40 + 411,60 EUR payments confirmed, never called proposed or not agreed?",
+               "violation_type": "lost_mandatory_condition"
+            },
+            {
+               "id": "conditions-kept",
+               "kind": "requirement",
+               "critical": true,
+               "question": "Are all kept: one round of corrections within 5 working days, changes to the original paid separately, «без приложений», the glossary and the final original required before the start?",
+               "violation_type": "lost_mandatory_condition"
+            },
+            {
+               "id": "no-legal-promise",
+               "kind": "requirement",
+               "critical": true,
+               "question": "Is there no promise of legal accuracy, notarisation or legal review?",
+               "violation_type": "promised_excluded_work"
+            },
+            {
+               "id": "no-gender-placeholder",
+               "kind": "requirement",
+               "critical": false,
+               "question": "Is there no «готов(а)» or other gender placeholder?"
+            }
+         ],
+         "expect_gaps_language": "ru"
+      }
+   ]
+}
