@@ -1,0 +1,629 @@
+{
+  "description": "ANY-845 greeting and client-name cases (БАГ-003PR)",
+  "orders": [
+    {
+      "id": "G11-en-noname-warm",
+      "task_text": "I run a small bakery and need a Figma landing page. Include a menu and an order enquiry button. I will supply the copy and photos; website development is excluded.",
+      "freelancer_positioning": "I design Figma landing pages for small local businesses, focusing on readable menus and clear enquiry flows.",
+      "tone": "warm",
+      "expect_language": "en",
+      "expect_gaps_language": "en",
+      "expect_gap": false,
+      "must": [
+        "^Hi,\\n\\n"
+      ],
+      "criteria": [
+        {
+          "id": "greeting-and-pitch",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "id": "client-name",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the greeting use no name because the brief gives none?"
+        }
+      ]
+    },
+    {
+      "id": "G12-ru-inflected-name-warm",
+      "task_text": "Заказ от Анны Ивановой: нужен лендинг в Figma для студии йоги. Нужны мобильная и десктопная версии, блок расписания и кнопка записи в существующий WhatsApp. Тексты и фото предоставит студия. Разработка сайта не входит. Предложение должно объяснить подход и следующий шаг, без цены и сроков до обсуждения.",
+      "freelancer_positioning": "Я UI-дизайнер, работаю в Figma. Делал лендинги для небольших сервисных компаний, уделяю внимание читаемости и удобству записи. Портфолио могу показать на созвоне, конкретных результатов в процентах у меня нет.",
+      "tone": "warm",
+      "expect_language": "ru",
+      "expect_gaps_language": "ru",
+      "expect_gap": false,
+      "must": [
+        "^Здравствуйте, Анна Иванова!\\n\\n"
+      ],
+      "criteria": [
+        {
+          "id": "greeting-and-pitch",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "id": "client-name",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the greeting address Анна Иванова in the nominative, normalizing only the grammatical case of Анны Ивановой without inventing or changing any name component?"
+        }
+      ]
+    },
+    {
+      "id": "G01-ru-name-warm",
+      "task_text": "Анна, владелица студии йоги, ищет дизайнера для лендинга в Figma. Нужны мобильная и десктопная версии, блок расписания и кнопка записи в существующий WhatsApp. Тексты и фото предоставит студия. Разработка сайта не входит. Предложение должно объяснить подход и следующий шаг, без цены и сроков до обсуждения.",
+      "freelancer_positioning": "Я UI-дизайнер, работаю в Figma. Делал лендинги для небольших сервисных компаний, уделяю внимание читаемости и удобству записи. Портфолио могу показать на созвоне, конкретных результатов в процентах у меня нет.",
+      "tone": "warm",
+      "expect_language": "ru",
+      "expect_gaps_language": "ru",
+      "expect_gap": false,
+      "must": [
+        "^Здравствуйте, Анна!\\n\\n"
+      ],
+      "criteria": [
+        {
+          "id": "greeting-and-pitch",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "id": "client-name",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the greeting address Анна exactly as given, with the punctuation required for the selected tone and an empty line before the pitch?"
+        }
+      ]
+    },
+    {
+      "id": "G01-ru-name-neutral",
+      "task_text": "Анна, владелица студии йоги, ищет дизайнера для лендинга в Figma. Нужны мобильная и десктопная версии, блок расписания и кнопка записи в существующий WhatsApp. Тексты и фото предоставит студия. Разработка сайта не входит. Предложение должно объяснить подход и следующий шаг, без цены и сроков до обсуждения.",
+      "freelancer_positioning": "Я UI-дизайнер, работаю в Figma. Делал лендинги для небольших сервисных компаний, уделяю внимание читаемости и удобству записи. Портфолио могу показать на созвоне, конкретных результатов в процентах у меня нет.",
+      "tone": "neutral",
+      "expect_language": "ru",
+      "expect_gaps_language": "ru",
+      "expect_gap": false,
+      "must": [
+        "^Здравствуйте, Анна\\.\\n\\n"
+      ],
+      "criteria": [
+        {
+          "id": "greeting-and-pitch",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "id": "client-name",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the greeting address Анна exactly as given, with the punctuation required for the selected tone and an empty line before the pitch?"
+        }
+      ]
+    },
+    {
+      "id": "G01-ru-name-firm",
+      "task_text": "Анна, владелица студии йоги, ищет дизайнера для лендинга в Figma. Нужны мобильная и десктопная версии, блок расписания и кнопка записи в существующий WhatsApp. Тексты и фото предоставит студия. Разработка сайта не входит. Предложение должно объяснить подход и следующий шаг, без цены и сроков до обсуждения.",
+      "freelancer_positioning": "Я UI-дизайнер, работаю в Figma. Делал лендинги для небольших сервисных компаний, уделяю внимание читаемости и удобству записи. Портфолио могу показать на созвоне, конкретных результатов в процентах у меня нет.",
+      "tone": "firm",
+      "expect_language": "ru",
+      "expect_gaps_language": "ru",
+      "expect_gap": false,
+      "must": [
+        "^Анна, здравствуйте\\.\\n\\n"
+      ],
+      "criteria": [
+        {
+          "id": "greeting-and-pitch",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "id": "client-name",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the greeting address Анна exactly as given, with the punctuation required for the selected tone and an empty line before the pitch?"
+        }
+      ]
+    },
+    {
+      "id": "G02-ru-noname-neutral",
+      "task_text": "Нужен сайт для моего бизнеса. Хочется красиво и современно, чтобы клиенты шли. Пишите, кто может сделать.",
+      "freelancer_positioning": "Я дизайнер интерфейсов, 6 лет опыта. Делаю лендинги и мобильные макеты в Figma, быстро собираю структуру страницы, всегда показываю промежуточные варианты до финала. Работала с сайтами студий и небольших сервисов.",
+      "tone": "neutral",
+      "expect_language": "ru",
+      "expect_gaps_language": "ru",
+      "expect_gap": false,
+      "must": [
+        "^Здравствуйте\\.\\n\\n"
+      ],
+      "criteria": [
+        {
+          "id": "greeting-and-pitch",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "id": "client-name",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the greeting use no name because the brief gives none?"
+        }
+      ]
+    },
+    {
+      "id": "G03-ru-freelancer-name",
+      "task_text": "Нужен сайт для моего бизнеса. Хочется красиво и современно, чтобы клиенты шли. Пишите, кто может сделать.",
+      "freelancer_positioning": "Меня зовут Ольга, я UI-дизайнер. Делаю лендинги в Figma для небольших сервисных компаний.",
+      "tone": "neutral",
+      "expect_language": "ru",
+      "expect_gaps_language": "ru",
+      "expect_gap": false,
+      "must": [
+        "^Здравствуйте\\.\\n\\n"
+      ],
+      "criteria": [
+        {
+          "id": "greeting-and-pitch",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "id": "client-name",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Is the greeting free of any name, and is «Ольга» not used as the client's name?"
+        }
+      ]
+    },
+    {
+      "id": "G04-ru-third-party",
+      "task_text": "Ищу дизайнера для лендинга. Вопросы пишите Марине, она мой менеджер.",
+      "freelancer_positioning": "Я UI-дизайнер, работаю в Figma. Делал лендинги для небольших сервисных компаний, уделяю внимание читаемости и удобству записи. Портфолио могу показать на созвоне, конкретных результатов в процентах у меня нет.",
+      "tone": "neutral",
+      "expect_language": "ru",
+      "expect_gaps_language": "ru",
+      "expect_gap": false,
+      "must": [
+        "^Здравствуйте\\.\\n\\n"
+      ],
+      "criteria": [
+        {
+          "id": "greeting-and-pitch",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "id": "client-name",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the greeting use no name (Марина is a third party)?"
+        }
+      ]
+    },
+    {
+      "id": "G05-en-name-firm",
+      "task_text": "Hi, I'm John, I run a small bakery and need a Figma landing page. Include a menu and an order enquiry button. I will supply the copy and photos; website development is excluded.",
+      "freelancer_positioning": "I design Figma landing pages for small local businesses, focusing on readable menus and clear enquiry flows.",
+      "tone": "firm",
+      "expect_language": "en",
+      "expect_gaps_language": "en",
+      "expect_gap": false,
+      "must": [
+        "^Hello John,\\n\\n"
+      ],
+      "criteria": [
+        {
+          "id": "greeting-and-pitch",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "id": "client-name",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the greeting address John, the client, exactly as given?"
+        }
+      ]
+    },
+    {
+      "id": "G06-es-name-warm",
+      "task_text": "Me llamo Ana y tengo una panadería. Necesito una página en Figma con el menú y un botón de consultas. Entregaré los textos y las fotos; no se incluye el desarrollo web.",
+      "freelancer_positioning": "Diseño páginas de presentación en Figma para pequeños negocios, con atención a la legibilidad y a los formularios de contacto.",
+      "tone": "warm",
+      "expect_language": "es",
+      "expect_gaps_language": "es",
+      "expect_gap": false,
+      "must": [
+        "^Hola, Ana:\\n\\n"
+      ],
+      "criteria": [
+        {
+          "id": "greeting-and-pitch",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "id": "client-name",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the greeting address Ana exactly as given and end with a colon?"
+        }
+      ]
+    },
+    {
+      "id": "G07-es-noname-neutral",
+      "task_text": "Tengo una panadería y necesito una página en Figma con el menú y un botón de consultas. Entregaré los textos y las fotos; no se incluye el desarrollo web.",
+      "freelancer_positioning": "Diseño páginas de presentación en Figma para pequeños negocios, con atención a la legibilidad y a los formularios de contacto.",
+      "tone": "neutral",
+      "expect_language": "es",
+      "expect_gaps_language": "es",
+      "expect_gap": false,
+      "must": [
+        "^Hola:\\n\\n"
+      ],
+      "criteria": [
+        {
+          "id": "greeting-and-pitch",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "id": "client-name",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the greeting use no name and end with a colon?"
+        }
+      ]
+    },
+    {
+      "id": "G08-ru-freelancer-name-in-task",
+      "task_text": "Запрос клиента: нужен лендинг в Figma для студии. Имя клиента не указано. Я, фрилансер Ольга, хочу предложить дизайн.",
+      "freelancer_positioning": "Я UI-дизайнер, работаю в Figma. Делал лендинги для небольших сервисных компаний, уделяю внимание читаемости и удобству записи. Портфолио могу показать на созвоне, конкретных результатов в процентах у меня нет.",
+      "tone": "neutral",
+      "expect_language": "ru",
+      "expect_gaps_language": "ru",
+      "expect_gap": false,
+      "must": [
+        "^Здравствуйте\\.\\n\\n"
+      ],
+      "criteria": [
+        {
+          "id": "greeting-and-pitch",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "id": "client-name",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the greeting omit Ольга because the task identifies her as the freelancer?"
+        }
+      ]
+    },
+    {
+      "id": "G09-ru-ambiguous-names",
+      "task_text": "Анна и Марина обсуждают лендинг студии. Нужен дизайн в Figma. Неизвестно, кто разместил заказ и кому будет направлено предложение.",
+      "freelancer_positioning": "Я UI-дизайнер, работаю в Figma. Делал лендинги для небольших сервисных компаний, уделяю внимание читаемости и удобству записи. Портфолио могу показать на созвоне, конкретных результатов в процентах у меня нет.",
+      "tone": "neutral",
+      "expect_language": "ru",
+      "expect_gaps_language": "ru",
+      "expect_gap": false,
+      "must": [
+        "^Здравствуйте\\.\\n\\n"
+      ],
+      "criteria": [
+        {
+          "id": "greeting-and-pitch",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "id": "client-name",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the greeting use no name because neither Анна nor Марина is clearly the client or addressee?"
+        }
+      ]
+    },
+    {
+      "id": "G10-ru-brand-name",
+      "task_text": "Студия «Анна» ищет дизайнера для лендинга в Figma. «Анна» — название бренда, имя заказчика не указано.",
+      "freelancer_positioning": "Я UI-дизайнер, работаю в Figma. Делал лендинги для небольших сервисных компаний, уделяю внимание читаемости и удобству записи. Портфолио могу показать на созвоне, конкретных результатов в процентах у меня нет.",
+      "tone": "neutral",
+      "expect_language": "ru",
+      "expect_gaps_language": "ru",
+      "expect_gap": false,
+      "must": [
+        "^Здравствуйте\\.\\n\\n"
+      ],
+      "criteria": [
+        {
+          "id": "greeting-and-pitch",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "id": "client-name",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the greeting use no name because «Анна» is a brand rather than the client?"
+        }
+      ]
+    },
+    {
+      "id": "G02-ru-noname-warm",
+      "task_text": "Нужен сайт для моего бизнеса. Хочется красиво и современно, чтобы клиенты шли. Пишите, кто может сделать.",
+      "freelancer_positioning": "Я дизайнер интерфейсов, 6 лет опыта. Делаю лендинги и мобильные макеты в Figma, быстро собираю структуру страницы, всегда показываю промежуточные варианты до финала. Работала с сайтами студий и небольших сервисов.",
+      "tone": "warm",
+      "expect_language": "ru",
+      "expect_gaps_language": "ru",
+      "expect_gap": false,
+      "must": [
+        "^Здравствуйте!\\n\\n"
+      ],
+      "criteria": [
+        {
+          "id": "greeting-and-pitch",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "id": "client-name",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the greeting use no name because the brief gives none?"
+        }
+      ]
+    },
+    {
+      "id": "G02-ru-noname-firm",
+      "task_text": "Нужен сайт для моего бизнеса. Хочется красиво и современно, чтобы клиенты шли. Пишите, кто может сделать.",
+      "freelancer_positioning": "Я дизайнер интерфейсов, 6 лет опыта. Делаю лендинги и мобильные макеты в Figma, быстро собираю структуру страницы, всегда показываю промежуточные варианты до финала. Работала с сайтами студий и небольших сервисов.",
+      "tone": "firm",
+      "expect_language": "ru",
+      "expect_gaps_language": "ru",
+      "expect_gap": false,
+      "must": [
+        "^Здравствуйте\\.\\n\\n"
+      ],
+      "criteria": [
+        {
+          "id": "greeting-and-pitch",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "id": "client-name",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the greeting use no name because the brief gives none?"
+        }
+      ]
+    },
+    {
+      "id": "G05-en-name-warm",
+      "task_text": "Hi, I'm John, I run a small bakery and need a Figma landing page. Include a menu and an order enquiry button. I will supply the copy and photos; website development is excluded.",
+      "freelancer_positioning": "I design Figma landing pages for small local businesses, focusing on readable menus and clear enquiry flows.",
+      "tone": "warm",
+      "expect_language": "en",
+      "expect_gaps_language": "en",
+      "expect_gap": false,
+      "must": [
+        "^Hi John,\\n\\n"
+      ],
+      "criteria": [
+        {
+          "id": "greeting-and-pitch",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "id": "client-name",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the greeting address John, the client, exactly as given?"
+        }
+      ]
+    },
+    {
+      "id": "G05-en-name-neutral",
+      "task_text": "Hi, I'm John, I run a small bakery and need a Figma landing page. Include a menu and an order enquiry button. I will supply the copy and photos; website development is excluded.",
+      "freelancer_positioning": "I design Figma landing pages for small local businesses, focusing on readable menus and clear enquiry flows.",
+      "tone": "neutral",
+      "expect_language": "en",
+      "expect_gaps_language": "en",
+      "expect_gap": false,
+      "must": [
+        "^Hello John,\\n\\n"
+      ],
+      "criteria": [
+        {
+          "id": "greeting-and-pitch",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "id": "client-name",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the greeting address John, the client, exactly as given?"
+        }
+      ]
+    },
+    {
+      "id": "G11-en-noname-neutral",
+      "task_text": "I run a small bakery and need a Figma landing page. Include a menu and an order enquiry button. I will supply the copy and photos; website development is excluded.",
+      "freelancer_positioning": "I design Figma landing pages for small local businesses, focusing on readable menus and clear enquiry flows.",
+      "tone": "neutral",
+      "expect_language": "en",
+      "expect_gaps_language": "en",
+      "expect_gap": false,
+      "must": [
+        "^Hello,\\n\\n"
+      ],
+      "criteria": [
+        {
+          "id": "greeting-and-pitch",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "id": "client-name",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the greeting use no name because the brief gives none?"
+        }
+      ]
+    },
+    {
+      "id": "G11-en-noname-firm",
+      "task_text": "I run a small bakery and need a Figma landing page. Include a menu and an order enquiry button. I will supply the copy and photos; website development is excluded.",
+      "freelancer_positioning": "I design Figma landing pages for small local businesses, focusing on readable menus and clear enquiry flows.",
+      "tone": "firm",
+      "expect_language": "en",
+      "expect_gaps_language": "en",
+      "expect_gap": false,
+      "must": [
+        "^Hello,\\n\\n"
+      ],
+      "criteria": [
+        {
+          "id": "greeting-and-pitch",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "id": "client-name",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the greeting use no name because the brief gives none?"
+        }
+      ]
+    },
+    {
+      "id": "G06-es-name-neutral",
+      "task_text": "Me llamo Ana y tengo una panadería. Necesito una página en Figma con el menú y un botón de consultas. Entregaré los textos y las fotos; no se incluye el desarrollo web.",
+      "freelancer_positioning": "Diseño páginas de presentación en Figma para pequeños negocios, con atención a la legibilidad y a los formularios de contacto.",
+      "tone": "neutral",
+      "expect_language": "es",
+      "expect_gaps_language": "es",
+      "expect_gap": false,
+      "must": [
+        "^Hola, Ana:\\n\\n"
+      ],
+      "criteria": [
+        {
+          "id": "greeting-and-pitch",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "id": "client-name",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the greeting address Ana exactly as given and end with a colon?"
+        }
+      ]
+    },
+    {
+      "id": "G06-es-name-firm",
+      "task_text": "Me llamo Ana y tengo una panadería. Necesito una página en Figma con el menú y un botón de consultas. Entregaré los textos y las fotos; no se incluye el desarrollo web.",
+      "freelancer_positioning": "Diseño páginas de presentación en Figma para pequeños negocios, con atención a la legibilidad y a los formularios de contacto.",
+      "tone": "firm",
+      "expect_language": "es",
+      "expect_gaps_language": "es",
+      "expect_gap": false,
+      "must": [
+        "^Hola, Ana:\\n\\n"
+      ],
+      "criteria": [
+        {
+          "id": "greeting-and-pitch",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "id": "client-name",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the greeting address Ana exactly as given and end with a colon?"
+        }
+      ]
+    },
+    {
+      "id": "G07-es-noname-warm",
+      "task_text": "Tengo una panadería y necesito una página en Figma con el menú y un botón de consultas. Entregaré los textos y las fotos; no se incluye el desarrollo web.",
+      "freelancer_positioning": "Diseño páginas de presentación en Figma para pequeños negocios, con atención a la legibilidad y a los formularios de contacto.",
+      "tone": "warm",
+      "expect_language": "es",
+      "expect_gaps_language": "es",
+      "expect_gap": false,
+      "must": [
+        "^Hola:\\n\\n"
+      ],
+      "criteria": [
+        {
+          "id": "greeting-and-pitch",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "id": "client-name",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the greeting use no name and end with a colon?"
+        }
+      ]
+    },
+    {
+      "id": "G07-es-noname-firm",
+      "task_text": "Tengo una panadería y necesito una página en Figma con el menú y un botón de consultas. Entregaré los textos y las fotos; no se incluye el desarrollo web.",
+      "freelancer_positioning": "Diseño páginas de presentación en Figma para pequeños negocios, con atención a la legibilidad y a los formularios de contacto.",
+      "tone": "firm",
+      "expect_language": "es",
+      "expect_gaps_language": "es",
+      "expect_gap": false,
+      "must": [
+        "^Hola:\\n\\n"
+      ],
+      "criteria": [
+        {
+          "id": "greeting-and-pitch",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "id": "client-name",
+          "kind": "requirement",
+          "critical": false,
+          "question": "Does the greeting use no name and end with a colon?"
+        }
+      ]
+    }
+  ]
+}

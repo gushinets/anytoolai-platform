@@ -1,0 +1,25 @@
+{
+  "source_fingerprint": "e8d2953be23a13a7e6e84ac499f65c1664df010e52984392838aa4a022208057",
+  "profile_fingerprint": "97d715ccb605b6f32646c117b06d7a3d4eb3d9e0c984bf8ddd30a28a6ffd6674",
+  "enabled_products": {
+    "proposal_ai": {
+      "provider_policy_ref": "default_text_generation_v1",
+      "quota_policy_ref": null
+    }
+  },
+  "git_sha": "a8630c3e746f6e524a25266309af2cc956d420e7",
+  "git_tree": "5995f1cf8882c8236710640f1b148343c513f8da",
+  "git_status_porcelain": [],
+  "tracked_diff_paths": [],
+  "prompt_sha256_from_git": {
+    "detect_experience_gaps.v1.md": "dc23c818c04459410813584a18c811d389d702dddaac8699632a679119ab39d3",
+    "compose_persuasive_text.v1.md": "c58c689c6b45b307b383354ac15b5059552ed29d021d50d177a8874e1fb4b41d"
+  },
+  "compose_project": "anytoolai-0a4692b7",
+  "api_url": "http://127.0.0.1:18453",
+  "provider_policy_ref": "default_text_generation_v1",
+  "quota_mode": "unmetered",
+  "channel": "api",
+  "source_context": "Includes main merge 72b99dd1 and ANY-846 gap detection changes; not a controlled composer-only comparison with round 1.",
+  "python_environment": "Ignored managed-environment directory with links to existing Python 3.12 environment; git_dirty=false."
+}
