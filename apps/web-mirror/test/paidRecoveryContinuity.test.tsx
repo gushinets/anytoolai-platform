@@ -4,7 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { persistPaidStartRecovery, readPaidStartRecovery, writePortalSession, type PlatformApiClient } from "@anytoolai/ce-kit";
 import { createPlatformApiClient } from "../src/lib/apiClient";
 import { getPaidPersistence, getPortalIdentity, installPortalSession, requirePortalAuthorization, tabStorage } from "../src/lib/portalSession";
-import { chooseAttachSession, readAttachSessionId, useAttachSession } from "../src/products/runtime/attachSession";
+import { chooseAttachSession, rememberAttachSession, readAttachSessionId, useAttachSession } from "../src/products/runtime/attachSession";
 import { ProductRunPage } from "../src/products/runtime/ProductRunPage";
 import { MultiModeProduct } from "../src/products/shared/MultiModeProduct";
 import { PortalIdentityBoundary } from "../src/components/PortalIdentityBoundary";
@@ -271,7 +271,7 @@ it.each(["same", "different"])("leaving a selected result preserves a pending op
     const path = fetchUrl(url).pathname;
     fetched.push(path);
     if (path.endsWith("runtime-config")) return runtimeConfigResponse(ids);
-    if (path.endsWith("/historical_session")) return sessionResponse({ scenario_session_id: "historical_session" });
+    if (path.endsWith("/historical_session")) return sessionResponse({ scenario_id: ids.scenarioId, scenario_session_id: "historical_session" });
     if (path.startsWith("/v1/results/")) return resultResponse(ids, { scenario_session_id: "historical_session" });
     throw new Error("unexpected request");
   });
@@ -358,7 +358,7 @@ it.each(["pending", "accepted"] as const)("restores a %s non-default paid mode b
   persistPaidStartRecovery(persistence, kind === "pending"
     ? { ...base, kind, idempotencyKey: "original_key", request: { ...product, frontendId: "web_mirror", input: { text: "Frozen check input" } } }
     : { ...base, kind, scenarioSessionId: "recovered_session" });
-  chooseAttachSession(productId, "old_handoff", "2026-11-10T00:00:00Z");
+  rememberAttachSession(productId, "old_handoff", "2026-11-10T00:00:00Z");
   const starts: RequestInit[] = [];
   fetcher.mockImplementation(async (url, init) => {
     const path = fetchUrl(url).pathname;
@@ -379,7 +379,7 @@ it.each(["pending", "accepted"] as const)("restores a %s non-default paid mode b
   const first = render(<Attached />);
   await screen.findByText("Generated result text.");
   expect((screen.getByRole("radio", { name: "Check" }) as HTMLInputElement).checked).toBe(true);
-  expect(readAttachSessionId(productId)).toBeUndefined();
+  expect(readAttachSessionId(productId)).toBe("old_handoff");
   expect(starts).toHaveLength(kind === "pending" ? 1 : 0);
   if (kind === "pending") {
     expect(new Headers(starts[0].headers).get("Idempotency-Key")).toBe("original_key");
@@ -400,6 +400,7 @@ it.each([false, true])("explicit discard of an unavailable paid session preserve
   const product = { productId, scenarioId };
   persistPaidStartRecovery(persistence, { version: 1, kind: "accepted", owner, ...product, scenarioSessionId: "missing_session" });
   chooseAttachSession(productId, "other_handoff", "2026-11-10T00:00:00Z");
+  window.history.replaceState(null, "", `/products/${productId}?session=missing_session`);
   const starts: RequestInit[] = [];
   fetcher.mockImplementation(async (url, init) => {
     const path = fetchUrl(url).pathname;
@@ -413,7 +414,7 @@ it.each([false, true])("explicit discard of an unavailable paid session preserve
     throw new Error("unexpected request");
   });
   function Attached() {
-    const attach = useAttachSession(productId, undefined);
+    const attach = useAttachSession(productId, "missing_session");
     return <MultiModeProduct client={client} {...attach} legend="Mode" name="discard-mode" modes={[
       { id: "draft", label: "Draft", definition: { ...testProductDefinition, productId, scenarioId: "acceptance_builder.draft_v1" } },
       { id: "check", label: "Check", definition: { ...testProductDefinition, ...product } },
