@@ -25,6 +25,7 @@
   "retry": "Réessayer",
   "formLabel": "Formulaire {product}",
   "workspace": {
+    "restoreDraft": "Restaurer le brouillon enregistré",
     "inputTitle": "Vos informations",
     "previousDetails": "Résultat basé sur les informations précédentes",
     "backToInputs": "Retour aux informations",

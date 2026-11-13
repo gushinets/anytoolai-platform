@@ -613,5 +613,14 @@ identities and separate disposable databases. External LBX/manifest responses
 and the second identity are synthetic. This is distinct from Step 16's assembled
 paid browser/execution acceptance. Recipient delivery was pending at this
 checkpoint and is now implemented in Step 13; backend/cabinet usage is implemented
-in Steps 14/15. Current installation heads are Portal `20261111_0011` and Kernel
+in Steps 14/15. Current installation heads are Portal `20261113_0012` and Kernel
 `0021`; the common guide owns the expanded-digest P upgrade requirement.
+
+
+The 2026-11-13 remaining-review correction requires verified email at all three
+delegation stages (`401 backend_parent_authority_invalid`). Portal web consumes
+only the public `BACKEND_CALLBACKS` projection, never the private registry.
+Portal internal activation evidence/V2 reconciliation preserve historical usage;
+these are persistence changes, with unchanged HTTP contract versions. Follow the
+[common backend guide](https://github.com/gushinets/payments-portal/blob/main/docs/contracts/product-backend-api/README.md#remaining-review-cutover-2026-11-13)
+for the stopped-writer migration and downgrade restriction.

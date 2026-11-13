@@ -88,6 +88,11 @@ export function readAttachSessionId(productId: string): string | undefined {
   return entry?.active ?? entry?.id;
 }
 
+/** Whether this session was explicitly opened, rather than retained by a late callback. */
+export function isChosenAttachSession(productId: string, sessionId: string): boolean {
+  return readEntry(productId)?.active === sessionId;
+}
+
 /** Select only a persisted own run; keep other accepted attachments as fallbacks. */
 export function preferSavedOwnRun(productId: string, key: string, scenarioSessionId: string): boolean {
   if (readProductDraft(key)?.run?.scenarioSessionId !== scenarioSessionId) return false;

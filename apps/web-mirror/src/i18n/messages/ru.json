@@ -25,6 +25,7 @@
   "retry": "Попробовать ещё раз",
   "formLabel": "Форма {product}",
   "workspace": {
+    "restoreDraft": "Восстановить сохранённый черновик",
     "inputTitle": "Ваши данные",
     "previousDetails": "Результат основан на предыдущих данных",
     "backToInputs": "К исходным данным",
