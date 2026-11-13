@@ -1,4 +1,4 @@
-FROM node:24-slim AS build
+FROM node:25-slim AS build
 WORKDIR /app
 RUN corepack enable
 COPY . .
@@ -14,7 +14,7 @@ ENV ANYTOOLAI_WEB_BASE_PATH=$ANYTOOLAI_WEB_BASE_PATH
 RUN test -n "$NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS"
 RUN pnpm --filter @anytoolai/web-mirror build
 
-FROM node:24-slim AS runtime
+FROM node:25-slim AS runtime
 WORKDIR /app/apps/web-mirror
 ARG ANYTOOLAI_WEB_BASE_PATH
 ENV NODE_ENV=production
