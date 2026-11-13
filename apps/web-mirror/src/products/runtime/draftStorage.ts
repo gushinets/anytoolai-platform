@@ -1,6 +1,7 @@
 const STORAGE_VERSION = 1;
+const MAX_CLOCK_SKEW_MS = 60_000;
 
-export type StoredRun = { scenarioSessionId: string; input: unknown };
+export type StoredRun = { scenarioSessionId: string; input: unknown; startedAtMs?: number };
 export type StoredDraft = { values?: unknown; run?: StoredRun };
 
 export function productDraftKey(productId: string, messageScope: string): string {
@@ -34,12 +35,16 @@ export function readProductDraft(key: string): StoredDraft | undefined {
       return undefined;
     }
     const { values, run } = parsed as { values?: unknown; run?: unknown };
-    const validRun =
-      typeof run === "object" && run !== null &&
-      typeof (run as StoredRun).scenarioSessionId === "string" &&
-      (run as StoredRun).scenarioSessionId.length > 0
-        ? { scenarioSessionId: (run as StoredRun).scenarioSessionId, input: (run as StoredRun).input }
-        : undefined;
+    let validRun: StoredRun | undefined;
+    if (typeof run === "object" && run !== null && "scenarioSessionId" in run &&
+        typeof run.scenarioSessionId === "string" && run.scenarioSessionId.length > 0) {
+      validRun = { scenarioSessionId: run.scenarioSessionId, input: "input" in run ? run.input : undefined };
+      if ("startedAtMs" in run && typeof run.startedAtMs === "number" &&
+          Number.isFinite(run.startedAtMs) && run.startedAtMs > 0 &&
+          run.startedAtMs <= Date.now() + MAX_CLOCK_SKEW_MS) {
+        validRun.startedAtMs = run.startedAtMs;
+      }
+    }
     return { ...(values === undefined ? {} : { values }), ...(validRun ? { run: validRun } : {}) };
   } catch {
     return undefined;
