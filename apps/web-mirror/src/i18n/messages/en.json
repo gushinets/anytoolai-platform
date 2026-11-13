@@ -45,5 +45,11 @@
   "validation": {
     "required": "{field}: required.",
     "maxLength": "{field}: {maxLength, plural, one {# character} other {# characters}} maximum."
+  },
+  "dataNotice": {
+    "label": "Data processing.",
+    "text": "What you enter is sent to our service and to an AI model provider to create the result, and is stored with your run on our servers. Your draft is kept in this browser and may be lost if you reload or leave the page. Do not enter passwords, access codes, API keys or full payment card details.",
+    "policyLink": "Privacy policy",
+    "opensInNewTab": "(opens in a new tab)"
   }
 }

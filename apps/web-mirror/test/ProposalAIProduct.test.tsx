@@ -25,6 +25,7 @@ import { getClientStorage } from "../src/products/runtime/clientStorage";
 import { createProductRunEventTracker } from "../src/products/runtime/productRunEventTracking";
 import { PROPOSAL_AI_MESSAGES } from "../src/products/proposalAi/messages";
 import { makeRender } from "./support/renderWithI18n";
+import { expectDataProcessingNotice } from "./support/expectDataProcessingNotice";
 import { simulateBrowserTranslation } from "@anytoolai/shared-ui/test/support/simulateBrowserTranslation";
 import { LOCALE_STORAGE_KEY } from "../src/i18n/localeStorage";
 
@@ -35,6 +36,7 @@ const ROUTES = routesFor(IDS);
 const PROPOSAL_TEXT = "Dear client, here is my proposal.";
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   cleanup();
   window.localStorage.clear();
   window.sessionStorage.clear();
@@ -65,6 +67,13 @@ function renderReady() {
 }
 
 describe("ProposalAI product definition", () => {
+  it("shows the shared processing notice and policy inside the form", async () => {
+    vi.stubEnv("NEXT_PUBLIC_ANYTOOLAI_PRIVACY_POLICY_URL", "https://example.com/privacy");
+    renderReady();
+    const form = await screen.findByRole("form");
+    expectDataProcessingNotice(form, "https://example.com/privacy");
+  });
+
   it.each([
     { locale: "en", translated: true },
     { locale: "ru", translated: false },

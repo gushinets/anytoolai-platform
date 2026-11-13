@@ -45,5 +45,11 @@
   "validation": {
     "required": "{field} : champ obligatoire.",
     "maxLength": "{field} : {maxLength, plural, one {# caractère} many {# de caractères} other {# caractères}} maximum."
+  },
+  "dataNotice": {
+    "label": "Traitement des données.",
+    "text": "Vos saisies sont envoyées à notre service et à un fournisseur de modèles d’IA pour créer le résultat, puis stockées avec votre exécution sur nos serveurs. Votre brouillon est conservé dans ce navigateur et peut être perdu si vous rechargez ou quittez la page. Ne saisissez pas de mots de passe, de codes d’accès, de clés API ni de coordonnées complètes de carte bancaire.",
+    "policyLink": "Politique de confidentialité",
+    "opensInNewTab": "(s’ouvre dans un nouvel onglet)"
   }
 }
