@@ -902,12 +902,13 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     const inputErrors: Partial<Record<keyof V, FieldError>> = definition.resultFieldErrors?.(extracted) ?? {};
     if (Object.keys(inputErrors).length > 0) {
       // Recovered runs can belong to an older draft; only mark fields still matching that input.
-      const submittedValues = activeInputRef.current ?? definition.emptyValues;
+      const submittedValues = normalizeValues(activeInputRef.current ?? definition.emptyValues);
       rejectedInputRef.current = { input: submittedValues, errors: inputErrors };
+      const currentValues = normalizeValues(valuesRef.current);
       const currentErrors: Partial<Record<keyof V, FieldError>> = {};
       for (const field in inputErrors) {
         liveValidationFieldsRef.current.add(field);
-        if (valuesRef.current[field] === submittedValues[field]) {
+        if (currentValues[field] === submittedValues[field]) {
           currentErrors[field] = inputErrors[field];
         }
       }
@@ -964,13 +965,18 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     void runStart(prepared, startedAtMs);
   }
 
+  function normalizeValues(next: V): V {
+    return definition.normalizeValues?.(next) ?? next;
+  }
+
   function validateFields(next: V): Partial<Record<keyof V, FieldError>> {
     const errors = definition.validate(next);
     const rejected = rejectedInputRef.current;
     if (rejected !== null) {
+      const normalized = normalizeValues(next);
       // Editing another field or submitting again cannot invalidate this field's server verdict.
       for (const field in rejected.errors) {
-        if (!errors[field] && next[field] === rejected.input[field]) {
+        if (!errors[field] && normalized[field] === rejected.input[field]) {
           errors[field] = rejected.errors[field];
         }
       }

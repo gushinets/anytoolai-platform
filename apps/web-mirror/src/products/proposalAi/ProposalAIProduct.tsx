@@ -77,6 +77,14 @@ function validate(values: ProposalAIValues): Partial<Record<keyof ProposalAIValu
   ]);
 }
 
+function normalizeValues(values: ProposalAIValues): ProposalAIValues {
+  return {
+    ...values,
+    taskText: trimBackendWhitespace(values.taskText),
+    freelancerPositioning: trimBackendWhitespace(values.freelancerPositioning),
+  };
+}
+
 const GAP_FIELDS = {
   experience_gap: null,
   missing_task_description: "taskText",
@@ -279,13 +287,17 @@ export const proposalAiDefinition: ProductDefinition<ProposalAIValues, ProposalA
   emptyValues: EMPTY_VALUES,
   draft: { parseValues: parseDraftValues },
   validate,
-  toInput: (values) => ({
-    task_text: trimBackendWhitespace(values.taskText),
-    freelancer_positioning: trimBackendWhitespace(values.freelancerPositioning),
-    tone: values.tone,
-    // Sent only when chosen: without it the backend writes in the language of the task.
-    ...(values.language === AUTO_LANGUAGE ? {} : { language: values.language }),
-  }),
+  normalizeValues,
+  toInput: (values) => {
+    const normalized = normalizeValues(values);
+    return {
+      task_text: normalized.taskText,
+      freelancer_positioning: normalized.freelancerPositioning,
+      tone: normalized.tone,
+      // Sent only when chosen: without it the backend writes in the language of the task.
+      ...(normalized.language === AUTO_LANGUAGE ? {} : { language: normalized.language }),
+    };
+  },
   extractResult,
   resultFieldErrors: (result) => result.fieldErrors ?? {},
   Fields: ProposalAIFields,

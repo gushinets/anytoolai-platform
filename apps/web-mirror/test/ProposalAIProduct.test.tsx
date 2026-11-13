@@ -912,14 +912,89 @@ describe("ProposalAI missing source information (ANY-843)", () => {
       [ROUTES.RESULT]: outputs.map((output) => resultResponse(IDS, { output })),
     };
   }
-  async function fillAndSubmit() {
+  async function fillAndSubmit(values = input) {
     await screen.findByRole("form");
-    fireEvent.change(document.getElementById("proposal-ai-task-text")!, { target: { value: input.taskText } });
-    fireEvent.change(document.getElementById("proposal-ai-positioning")!, { target: { value: input.freelancerPositioning } });
-    fireEvent.click(document.getElementById("proposal-ai-tone-firm")!);
-    fireEvent.change(document.getElementById("proposal-ai-language")!, { target: { value: input.language } });
+    fireEvent.change(document.getElementById("proposal-ai-task-text")!, { target: { value: values.taskText } });
+    fireEvent.change(document.getElementById("proposal-ai-positioning")!, { target: { value: values.freelancerPositioning } });
+    fireEvent.click(document.getElementById(`proposal-ai-tone-${values.tone}`)!);
+    fireEvent.change(document.getElementById("proposal-ai-language")!, { target: { value: values.language } });
     fireEvent.submit(screen.getByRole("form"));
   }
+
+  describe.each([
+    { field: "taskText", id: "proposal-ai-task-text", apiField: "task_text", category: "missing_task_description" },
+    { field: "freelancerPositioning", id: "proposal-ai-positioning", apiField: "freelancer_positioning", category: "missing_profile_information" },
+  ] as const)("normalized rejection for $field", ({ field, id, apiField, category }) => {
+    const initial = { ...input, taskText: "Build a landing page.", freelancerPositioning: "Frontend developer.", [field]: "hello" };
+    const output = { ...rejectedOutput, gaps: rejectedOutput.gaps.filter((gap) => gap.category === category) };
+    const hint = PROPOSAL_AI_MESSAGES.en.validation[category];
+
+    it.each([
+      ["space", "hello", "hello "],
+      ["newline", "hello", "hello\n"],
+      ["tab", "hello", "\thello"],
+      ["NBSP", "hello", "\u00a0hello\u00a0"],
+      ["next line", "hello", "hello\u0085"],
+      ["separator", "hello", "\u001chello"],
+      ["ideographic space", "hello", "hello\u3000"],
+      ["removed padding", " \nhello\t", "hello"],
+    ])("retains errors for %s and permits a corrected value", async (_label, before, after) => {
+      const routed = makeClientCapturingRequests(responses([output, { text: PROPOSAL_TEXT, gaps: [] }]));
+      const onEvent = vi.fn();
+      render(<ProposalAIProduct client={routed.client} onEvent={onEvent} />);
+      await fillAndSubmit({ ...initial, [field]: before });
+      await screen.findByText(hint);
+      const element = document.getElementById(id) as HTMLTextAreaElement;
+      fireEvent.change(element, { target: { value: after } });
+      expect(element.getAttribute("aria-invalid")).toBe("true");
+      expect(screen.getByText(hint)).toBeTruthy();
+      expect(element.value).toBe(after);
+      expect(JSON.parse(window.sessionStorage.getItem(draftKey)!)).toMatchObject({ values: { [field]: after } });
+      onEvent.mockClear();
+      fireEvent.submit(screen.getByRole("form"));
+      await act(async () => {});
+      expect(routed.calls.filter((call) => call.key === ROUTES.START)).toHaveLength(1);
+      expect(onEvent).not.toHaveBeenCalledWith(expect.objectContaining({ type: "form_submitted" }));
+      await waitFor(() => expect(document.activeElement).toBe(element));
+      fireEvent.change(element, { target: { value: "Write a recipe." } });
+      expect(element.getAttribute("aria-invalid")).toBe("false");
+      fireEvent.submit(screen.getByRole("form"));
+      await screen.findByText(PROPOSAL_TEXT);
+      const starts = routed.calls.filter((call) => call.key === ROUTES.START);
+      expect(starts).toHaveLength(2);
+      expect(JSON.parse(starts[0]!.init.body as string)).toMatchObject({ input: { [apiField]: "hello" } });
+      expect(JSON.parse(starts[1]!.init.body as string)).toMatchObject({ input: { [apiField]: "Write a recipe." } });
+      expect(idempotencyKeyOf(starts[0]!)).not.toBe(idempotencyKeyOf(starts[1]!));
+    });
+
+    it.each(["hel\nlo", "hello\uFEFF"])("permits an actual backend value change to %j", async (after) => {
+      const routed = makeClientCapturingRequests(responses([output, { text: PROPOSAL_TEXT, gaps: [] }]));
+      render(<ProposalAIProduct client={routed.client} />);
+      await fillAndSubmit(initial);
+      await screen.findByText(hint);
+      const element = document.getElementById(id)!;
+      fireEvent.change(element, { target: { value: after } });
+      expect(element.getAttribute("aria-invalid")).toBe("false");
+      fireEvent.submit(screen.getByRole("form"));
+      await screen.findByText(PROPOSAL_TEXT);
+      const starts = routed.calls.filter((call) => call.key === ROUTES.START);
+      expect(starts).toHaveLength(2);
+      expect(JSON.parse(starts[1]!.init.body as string)).toMatchObject({ input: { [apiField]: after } });
+    });
+
+    it("retains errors for equivalent values in a recovered draft", async () => {
+      const values = { ...initial, [field]: "\thello\n" };
+      window.sessionStorage.setItem(draftKey, JSON.stringify({ v: 1, values, run: { scenarioSessionId: "session_1", input: initial } }));
+      const routed = makeClient(responses([output]));
+      render(<ProposalAIProduct client={routed.client} />);
+      await screen.findByText(hint);
+      expect((document.getElementById(id) as HTMLTextAreaElement).value).toBe(values[field]);
+      fireEvent.submit(screen.getByRole("form"));
+      await act(async () => {});
+      expect(routed.calls.some((call) => call.key === ROUTES.START)).toBe(false);
+      expect(JSON.parse(window.sessionStorage.getItem(draftKey)!)).toEqual({ v: 1, values });
+    });
+  });
 
   it.each(["task", "profile", "unchanged", "tone", "language", "task-reverted", "profile-reverted"])(
     "blocks another start for unchanged rejected fields after %s edits",

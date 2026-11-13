@@ -8,7 +8,7 @@
 - Created: 2026-11-13
 - Last updated: 2026-11-13
 - Review date: 2026-11-20
-- Next action: owner review of the verified round 1 semantic-error retention fix.
+- Next action: owner review of the verified round 2 normalized-value comparison fix.
 - Blocker: local full-check cannot pass the unchanged activation-marker test without passwordless sudo.
 
 ## Goal and boundaries
@@ -190,3 +190,45 @@ Implementation and verification:
   authorized committing, pushing and updating the PR description with these results.
 - A repository text scan found pre-existing local-command wording in unrelated execution plans
   for ANY-17, ANY-221, ANY-227, ANY-339 and ANY-391; those files were left untouched.
+
+## Review round 2: compare the values sent to the backend
+
+The owner authorized this fix and regression tests for both fields after verification on
+`3fed43b6`. A formatting-only edit changes the raw textarea value but not the normalized request;
+raw equality therefore loses a known error and allows a duplicate, quota-consuming start.
+
+Implementation plan:
+
+1. Add a product-owned normalization contract preserving form keys. ProposalAI reuses the same
+   `trimBackendWhitespace` normalization for request mapping and rejection matching. Raw form and
+   draft values remain unchanged; products without the contract retain their existing behavior.
+2. Use normalized values for the rejection snapshot, submit/live validation and the existing
+   recovered-result comparison. Preserve structural error precedence, stale-session guards,
+   network retry idempotency and the approved quota policy.
+3. Add red/green regressions for both fields: adding/removing outer whitespace, Unicode whitespace,
+   true payload changes (including inner newlines and U+FEFF), preserved drafts, recovery and
+   successful correction. Keep the existing partial-correction, revert and tone/language tests.
+4. Run focused product/runtime tests, the canonical frontend gate and documentation validation.
+   No new dependency, persisted error history, prompt or backend changes are needed.
+
+Implementation and verification:
+
+- ProposalAI's `normalizeValues` uses `trimBackendWhitespace` for both text fields and is shared
+  by its request mapper and the runtime's rejection matching. The runtime snapshots normalized
+  values and compares them during submit, live validation and recovered-result handling.
+- Added 22 regression cases across both fields. Before the fix, 18 whitespace/recovery cases
+  failed while four actual-payload-change controls passed. After the fix, all 243 tests in the
+  focused ProposalAI/runtime/handoff suites passed. Cases also assert raw draft preservation,
+  blocked start/events, invalid-field focus and a fresh request after substantive correction.
+- Recovery cases exercise the existing defensive stored-draft contract; they do not establish
+  that a user can edit a locked in-flight form to produce those differing snapshots.
+- Managed Python 3.12 doctor, architecture and documentation validation passed. Canonical
+  frontend-check passed with serial workspace execution: lint, typecheck, 791 web-app tests,
+  336 CE-kit tests, 55 shared-ui tests, 349 Chromium tests, generated API-contract drift check
+  and all builds. Live model calls and backend full-check were not repeated for this frontend-only
+  change; the earlier sudo environment blocker remains. Production and CI were not checked.
+- The first frontend gate caught an unsafe JSON member access in a new draft assertion. Replaced
+  it with a structural assertion; the rerun passed the complete gate.
+- The owner subsequently authorized committing, pushing and updating the PR description.
+  Rejected-value memory still lasts only for the current mounted page; this change adds no
+  persisted validation state.
