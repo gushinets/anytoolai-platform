@@ -75,6 +75,15 @@ for the same key:
      damaged. Best for a persistent local/server setup where re-exporting every shell session
      is annoying.
 
+Public deployments must set `ANYTOOLAI_PRIVACY_POLICY_URL` to the approved absolute HTTP(S)
+privacy-policy URL. `prod-up` rejects missing or invalid URLs before generating a deployment
+profile or calling Docker, using Node.js's browser-compatible URL parser. The operator must confirm
+the policy page is current and accessible; the preflight does not fetch or approve its contents.
+Compose passes it as `NEXT_PUBLIC_ANYTOOLAI_PRIVACY_POLICY_URL` at build time;
+changing it requires rebuilding web-mirror. Every product form displays a data-processing notice
+above submit. Empty or invalid URLs hide only the policy link; no policy URL is supplied by default.
+Development, fake production smoke and maintenance commands keep the URL optional.
+
 `ANYTOOLAI_POSTGRES_PORT` / `ANYTOOLAI_API_PORT` override dev's host ports; they default to a
 value derived per git worktree (see `docs/agent/worktree-runtime.md`). **Prod uses a separate
 variable, `ANYTOOLAI_PROD_API_PORT`** (default `8000`), specifically so a leftover
@@ -628,7 +637,8 @@ user/password/database, a real `OPENAI_API_KEY`, the Squid URL in
 `ANYTOOLAI_LLM_HTTPS_PROXY`, `ANYTOOLAI_ENABLED_PRODUCT_IDS=proposal_ai`,
 `ANYTOOLAI_UNMETERED_PRODUCT_IDS=proposal_ai`, and an explicit
 `ANYTOOLAI_PROD_WORKER_MEMORY_LIMIT` chosen from available VPS RAM (the sample is `768M`, not a
-measured minimum). Keep all three public access-code variables blank. The shell overrides the
+measured minimum). Set `ANYTOOLAI_PRIVACY_POLICY_URL` to the approved policy page before `prod-up`.
+Keep all three public access-code variables blank. The shell overrides the
 file even with an empty value. An explicitly empty `ANYTOOLAI_UNMETERED_PRODUCT_IDS` selects the
 canonical quota; omitting the variable is an error. Never commit or print the completed file.
 On VPS `135.106.164.145`, also set `ANYTOOLAI_WEB_BASE_PATH=/tools` and

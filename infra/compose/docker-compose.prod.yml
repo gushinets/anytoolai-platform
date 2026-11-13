@@ -91,6 +91,7 @@ services:
       args:
         PLATFORM_API_BASE_URL: http://platform-api:8000
         NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS: ${ANYTOOLAI_ENABLED_PRODUCT_IDS:?enabled products are required}
+        NEXT_PUBLIC_ANYTOOLAI_PRIVACY_POLICY_URL: ${ANYTOOLAI_PRIVACY_POLICY_URL-}
         ANYTOOLAI_WEB_BASE_PATH: ${ANYTOOLAI_WEB_BASE_PATH-}
     depends_on:
       platform-api:

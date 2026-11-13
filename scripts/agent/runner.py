@@ -2667,6 +2667,7 @@ def prod_up() -> int:
 def _prod_up_locked() -> int:
     try:
         inputs = _deployment_inputs()
+        _validate_public_privacy_policy_url(inputs.compose_env)
         api_port = _port_override("ANYTOOLAI_PROD_API_PORT", 8000, inputs.compose_env)
         web_port = _port_override("ANYTOOLAI_PROD_WEB_PORT", 3000, inputs.compose_env)
     except ValueError as exc:
@@ -2752,6 +2753,32 @@ def _prod_up_locked() -> int:
             _stop_failed_prod_candidate()
     _announce_production_ready(api_port, web_port)
     return 0
+
+
+def _validate_public_privacy_policy_url(env: dict[str, str]) -> None:
+    name = "ANYTOOLAI_PRIVACY_POLICY_URL"
+    value = env.get(name, "")
+    if not value.strip():
+        raise ValueError(f"{name} is required for public production")
+    # Use the browser's URL grammar so deployment cannot accept a link the UI hides.
+    script = (
+        "try { const url = new URL(process.env.ANYTOOLAI_PRIVACY_POLICY_URL.trim());"
+        "process.exit(['http:', 'https:'].includes(url.protocol) ? 0 : 1);"
+        "} catch { process.exit(1); }"
+    )
+    try:
+        result = subprocess.run(
+            ["node", "--eval", script],
+            env=runner_env() | {name: value},
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            timeout=TOOL_PROBE_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise ValueError(f"{name} could not be validated with Node.js") from exc
+    if result.returncode != 0:
+        raise ValueError(f"{name} must be an absolute HTTP(S) URL for the approved privacy policy")
 
 
 def _stop_failed_prod_candidate() -> None:

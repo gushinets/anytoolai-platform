@@ -34,6 +34,7 @@ import {
   startResponse,
 } from "./fixtures/platformResponses";
 import { makeRender } from "./support/renderWithI18n";
+import { expectDataProcessingNotice } from "./support/expectDataProcessingNotice";
 import { simulateBrowserTranslation } from "@anytoolai/shared-ui/test/support/simulateBrowserTranslation";
 import { LOCALE_STORAGE_KEY } from "../src/i18n/localeStorage";
 
@@ -82,6 +83,7 @@ function composedOutput(suffix: "" | ".weak_input" | ".no_issues"): Record<strin
 }
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   cleanup();
   window.localStorage.clear();
   window.sessionStorage.clear();
@@ -118,6 +120,29 @@ async function decode(queues: ReturnType<typeof routes>, events: ProductRunEvent
 const completedEvents = (events: ProductRunEvent[]) => events.filter((e) => e.type === "scenario_completed");
 
 describe("Brief Decoder definition", () => {
+  it("shows the shared processing notice and policy inside the form", async () => {
+    vi.stubEnv("NEXT_PUBLIC_ANYTOOLAI_PRIVACY_POLICY_URL", "https://example.com/privacy");
+    const { client } = makeClient(routes(composedOutput("")));
+    render(<BriefDecoderProduct client={client} />);
+    const form = await screen.findByRole("form");
+    expectDataProcessingNotice(form, "https://example.com/privacy");
+  });
+
+  it("does not promise draft recovery when unsent input is lost on remount", async () => {
+    const { client } = makeClient(routes(composedOutput("")));
+    const first = render(<BriefDecoderProduct client={client} />);
+    const field = await screen.findByLabelText("Client brief");
+    fireEvent.change(field, { target: { value: "An unsent client brief." } });
+    expect(screen.getByText(/may be lost if you reload or leave the page/)).toBeTruthy();
+    expect(screen.queryByText(/until you close it/)).toBeNull();
+    first.unmount();
+
+    const reloaded = makeClient(routes(composedOutput("")));
+    render(<BriefDecoderProduct client={reloaded.client} />);
+    expect((await screen.findByLabelText("Client brief") as HTMLTextAreaElement).value).toBe("");
+    expect(screen.getByText(/may be lost if you reload or leave the page/)).toBeTruthy();
+  });
+
   it.each([
     { locale: "en", translated: true },
     { locale: "ru", translated: false },
