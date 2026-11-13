@@ -40,6 +40,7 @@ COMPOSE_PROD_FILE = ROOT / "infra" / "compose" / "docker-compose.prod.yml"
 COMPOSE_LIVE_FILE = ROOT / "infra" / "compose" / "docker-compose.live.yml"
 COMPOSE_VPS_135_FILE = ROOT / "infra" / "compose" / "docker-compose.vps-135.yml"
 COMPOSE_ATOM_LAB_FILE = ROOT / "infra" / "compose" / "docker-compose.atom-lab.yml"
+COMPOSE_ATOM_LAB_VPS_135_FILE = ROOT / "infra" / "compose" / "docker-compose.atom-lab.vps-135.yml"
 LIVE_ENV_FILE = ROOT / "infra" / "compose" / ".env.live"
 # Optional, gitignored (see .gitignore's `.env.*` rule) -- a local convenience so credentials
 # don't have to be re-exported in every shell. Never auto-loaded for dev; only prod commands
@@ -1620,11 +1621,16 @@ class AtomLabDeploymentInputs:
     internal_url: str
 
 
-def _atom_lab_compose_command(*args: str, include_env_file: bool = True) -> list[str]:
+def _atom_lab_compose_command(
+    *args: str, include_env_file: bool = True, env: dict[str, str] | None = None
+) -> list[str]:
     env_file = ATOM_LAB_ENV_FILE if include_env_file and ATOM_LAB_ENV_FILE.is_file() else None
+    files = [COMPOSE_FILE, COMPOSE_ATOM_LAB_FILE]
+    if env is not None and _vps_135_networks_enabled(env):
+        files.append(COMPOSE_ATOM_LAB_VPS_135_FILE)
     return _docker_compose_command(
         ATOM_LAB_COMPOSE_PROJECT,
-        (COMPOSE_FILE, COMPOSE_ATOM_LAB_FILE),
+        files,
         *args,
         env_file=env_file,
     )
@@ -1632,6 +1638,7 @@ def _atom_lab_compose_command(*args: str, include_env_file: bool = True) -> list
 
 def _atom_lab_deployment_inputs() -> AtomLabDeploymentInputs:
     env = _resolved_env_file(ATOM_LAB_ENV_FILE)
+    _vps_135_networks_enabled(env)
     required = (
         "ANYTOOLAI_POSTGRES_USER",
         "ANYTOOLAI_POSTGRES_PASSWORD",
@@ -1705,7 +1712,9 @@ def _atom_lab_deployment_inputs() -> AtomLabDeploymentInputs:
 
 
 def _atom_lab_stack_running(inputs: AtomLabDeploymentInputs) -> bool:
-    return _compose_stack_running(_atom_lab_compose_command(), inputs.compose_env)
+    return _compose_stack_running(
+        _atom_lab_compose_command(env=inputs.compose_env), inputs.compose_env
+    )
 
 
 def _atom_lab_local_identity(inputs: AtomLabDeploymentInputs) -> RuntimeIdentity:
@@ -1787,7 +1796,7 @@ def _atom_lab_ready(inputs: AtomLabDeploymentInputs, *, announce: bool = True) -
     try:
         worker_check = subprocess.run(
             [
-                *_atom_lab_compose_command(),
+                *_atom_lab_compose_command(env=inputs.compose_env),
                 "ps",
                 "--status",
                 "running",
@@ -1808,8 +1817,9 @@ def _atom_lab_ready(inputs: AtomLabDeploymentInputs, *, announce: bool = True) -
         print("LAB005: Atom Lab worker is not running", file=sys.stderr)
         return 1
     if announce:
+        page_path = "/tools/atom-lab" if _vps_135_networks_enabled(inputs.compose_env) else "/atom-lab"
         print(f"Local API: {identity.api_url}")
-        print(f"Internal URL: {inputs.internal_url}/atom-lab")
+        print(f"Internal URL: {inputs.internal_url}{page_path}")
         print(
             "Atom Lab deployment package is ready; external HTTPS/network checks remain "
             "operator-owned"
@@ -1858,7 +1868,7 @@ def _atom_lab_up_locked() -> int:
     try:
         exit_code = run_with_env(
             [
-                *_atom_lab_compose_command(),
+                *_atom_lab_compose_command(env=inputs.compose_env),
                 "up",
                 "-d",
                 "--build",
@@ -1925,7 +1935,9 @@ def _atom_lab_down_locked() -> int:
 
 
 def _atom_lab_nonterminal_job_count(inputs: AtomLabDeploymentInputs) -> int:
-    return _nonterminal_job_count(_atom_lab_compose_command(), inputs.compose_env)
+    return _nonterminal_job_count(
+        _atom_lab_compose_command(env=inputs.compose_env), inputs.compose_env
+    )
 
 
 def _nonterminal_job_count(compose_command: Sequence[str], env: dict[str, str]) -> int:
@@ -1985,7 +1997,7 @@ def _atom_lab_quiesce_locked() -> int:
         return 1
 
     exit_code = _drain_and_stop_worker(
-        _atom_lab_compose_command(),
+        _atom_lab_compose_command(env=inputs.compose_env),
         inputs.compose_env,
         lambda: _atom_lab_nonterminal_job_count(inputs),
         float(inputs.compose_env.get("ANYTOOLAI_ATOM_LAB_QUIESCE_TIMEOUT", "600")),
@@ -2063,7 +2075,7 @@ def _atom_lab_resume_locked() -> int:
         return 1
 
     exit_code = run_with_env(
-        [*_atom_lab_compose_command(), "start", "platform-api", "platform-worker"],
+        _atom_lab_compose_command("start", "platform-api", "platform-worker", env=inputs.compose_env),
         inputs.compose_env,
         timeout=COMPOSE_TEARDOWN_TIMEOUT_SECONDS,
     )
@@ -2082,7 +2094,9 @@ def atom_lab_recovery_postgres_up() -> int:
 
 
 def _atom_lab_existing_services(inputs: AtomLabDeploymentInputs) -> frozenset[str]:
-    return _existing_services(_atom_lab_compose_command(), inputs.compose_env)
+    return _existing_services(
+        _atom_lab_compose_command(env=inputs.compose_env), inputs.compose_env
+    )
 
 
 def _existing_services(compose_command: Sequence[str], env: dict[str, str]) -> frozenset[str]:
@@ -2127,7 +2141,9 @@ def _atom_lab_recovery_postgres_up_locked() -> int:
         print(f"LAB012: Atom Lab recovery PostgreSQL preflight failed: {exc}", file=sys.stderr)
         return 1
 
-    exit_code = _postgres_only_up(_atom_lab_compose_command(), inputs.compose_env)
+    exit_code = _postgres_only_up(
+        _atom_lab_compose_command(env=inputs.compose_env), inputs.compose_env
+    )
     if exit_code == 0:
         print(
             "Atom Lab recovery PostgreSQL is healthy; migrate, API, and worker remain stopped"
