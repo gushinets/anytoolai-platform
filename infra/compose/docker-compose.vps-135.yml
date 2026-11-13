@@ -5,6 +5,10 @@ services:
       - infra_prompttune
 
   web-mirror:
+    build:
+      args:
+        # Both stacks publish platform-api as a Docker DNS name.
+        PLATFORM_API_BASE_URL: http://platform-api.anytoolai-prod_default:8000
     networks:
       - default
       - payments-portal-prod_edge

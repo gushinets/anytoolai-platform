@@ -3640,6 +3640,18 @@ def test_atom_lab_deployment_requires_plain_https_origin(monkeypatch, url) -> No
         runner._atom_lab_deployment_inputs()
 
 
+def test_atom_lab_deployment_rejects_unknown_vps_135_selector(monkeypatch) -> None:
+    runner = load_runner_module()
+    monkeypatch.setattr(
+        runner,
+        "_resolved_env_file",
+        lambda path: ATOM_LAB_DEPLOYMENT_VALUES | {"ANYTOOLAI_VPS_135_NETWORKS": "yes"},
+    )
+
+    with pytest.raises(ValueError, match="ANYTOOLAI_VPS_135_NETWORKS"):
+        runner._atom_lab_deployment_inputs()
+
+
 @pytest.mark.parametrize(
     ("timeout_name", "timeout_value"),
     [
@@ -3711,10 +3723,19 @@ def test_atom_lab_compose_mode_uses_only_base_and_internal_overlay(monkeypatch, 
     assert str(runner.COMPOSE_LIVE_FILE) not in command
 
 
-def test_atom_lab_ready_checks_assets_auth_catalog_and_worker(monkeypatch) -> None:
+@pytest.mark.parametrize(
+    ("network_selector", "page_path"), [("", "/atom-lab"), ("1", "/tools/atom-lab")]
+)
+def test_atom_lab_ready_checks_assets_auth_catalog_and_worker(
+    monkeypatch, capsys, network_selector, page_path
+) -> None:
     runner = load_runner_module()
+    origin = "https://atom-lab.internal.example"
     inputs = runner.AtomLabDeploymentInputs(
-        dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
+        ATOM_LAB_DEPLOYMENT_VALUES | {"ANYTOOLAI_VPS_135_NETWORKS": network_selector},
+        18468,
+        15468,
+        origin,
     )
     monkeypatch.setattr(runner, "_wait_for_http_ok", lambda url, timeout: True)
 
@@ -3723,13 +3744,16 @@ def test_atom_lab_ready_checks_assets_auth_catalog_and_worker(monkeypatch) -> No
     )
 
     monkeypatch.setattr(runner, "_atom_lab_request", request)
-    monkeypatch.setattr(
-        runner.subprocess,
-        "run",
-        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, "container-id\n", ""),
-    )
 
-    assert runner._atom_lab_ready(inputs, announce=False) == 0
+    def worker_check(command, **_kwargs):
+        assert (str(runner.COMPOSE_ATOM_LAB_VPS_135_FILE) in command) == bool(network_selector)
+        assert str(runner.COMPOSE_VPS_135_FILE) not in command
+        return subprocess.CompletedProcess(command, 0, "container-id\n", "")
+
+    monkeypatch.setattr(runner.subprocess, "run", worker_check)
+
+    assert runner._atom_lab_ready(inputs) == 0
+    assert f"Internal URL: {origin}{page_path}" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("denial_body", [b"[]", b'{"error": []}'])
@@ -4181,6 +4205,36 @@ def test_atom_lab_up_fails_closed_when_compose_stack_probe_fails(
     error = capsys.readouterr().err
     assert "LAB002: Docker Compose preflight failed" in error
     assert "daemon unavailable" in error
+
+
+@pytest.mark.parametrize("network_selector", ["", "1"])
+def test_atom_lab_up_uses_the_selected_network_overlay(
+    monkeypatch, tmp_path, network_selector
+) -> None:
+    runner = load_runner_module()
+    env_file = tmp_path / ".env.atom-lab"
+    env_file.touch()
+    monkeypatch.setattr(runner, "ATOM_LAB_ENV_FILE", env_file)
+
+    def resolved_env(path):
+        assert path == env_file
+        return ATOM_LAB_DEPLOYMENT_VALUES | {"ANYTOOLAI_VPS_135_NETWORKS": network_selector}
+
+    monkeypatch.setattr(runner, "_resolved_env_file", resolved_env)
+    monkeypatch.setattr(runner, "_atom_lab_stack_running", lambda inputs: False)
+    monkeypatch.setattr(runner, "_check_ports_available", lambda *args: True)
+    monkeypatch.setattr(runner, "_atom_lab_ready", lambda *args, **kwargs: 0)
+    commands = []
+    monkeypatch.setattr(runner, "run_with_env", lambda command, env: commands.append(command) or 0)
+
+    assert runner._atom_lab_up_locked() == 0
+    (command,) = commands
+    assert "up" in command
+    compose_files = [command[index + 1] for index, arg in enumerate(command) if arg == "-f"]
+    expected = [runner.COMPOSE_FILE, runner.COMPOSE_ATOM_LAB_FILE]
+    if network_selector == "1":
+        expected.append(runner.COMPOSE_ATOM_LAB_VPS_135_FILE)
+    assert compose_files == [str(path) for path in expected]
 
 
 def test_atom_lab_up_reports_failed_candidate_cleanup(monkeypatch, capsys) -> None:

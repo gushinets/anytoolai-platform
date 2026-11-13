@@ -1,0 +1,20 @@
+services:
+  platform-api:
+    networks:
+      default: {}
+      payments-portal-prod_edge:
+        aliases:
+          - atom-lab-api
+
+  platform-worker:
+    networks:
+      - default
+      - infra_prompttune
+
+networks:
+  infra_prompttune:
+    external: true
+    name: infra_prompttune
+  payments-portal-prod_edge:
+    external: true
+    name: payments-portal-prod_edge
