@@ -921,6 +921,71 @@ describe("ProposalAI missing source information (ANY-843)", () => {
     fireEvent.submit(screen.getByRole("form"));
   }
 
+  it.each(["task", "profile", "unchanged", "tone", "language", "task-reverted", "profile-reverted"])(
+    "blocks another start for unchanged rejected fields after %s edits",
+    async (edited) => {
+      const routed = makeClientCapturingRequests(responses([rejectedOutput, rejectedOutput]));
+      const onEvent = vi.fn();
+      render(<ProposalAIProduct client={routed.client} onEvent={onEvent} />);
+      await fillAndSubmit();
+      await screen.findByText(PROPOSAL_AI_MESSAGES.en.validation.missing_task_description);
+      const task = document.getElementById("proposal-ai-task-text")!;
+      const profile = document.getElementById("proposal-ai-positioning")!;
+      if (edited === "task" || edited === "task-reverted") {
+        fireEvent.change(task, { target: { value: "Write a recipe." } });
+      }
+      if (edited === "profile" || edited === "profile-reverted") {
+        fireEvent.change(profile, { target: { value: "I write recipes." } });
+      }
+      if (edited === "task-reverted") fireEvent.change(task, { target: { value: input.taskText } });
+      if (edited === "profile-reverted") fireEvent.change(profile, { target: { value: input.freelancerPositioning } });
+      if (edited === "tone") fireEvent.click(document.getElementById("proposal-ai-tone-warm")!);
+      if (edited === "language") fireEvent.change(document.getElementById("proposal-ai-language")!, { target: { value: "en" } });
+      expect(task.getAttribute("aria-invalid")).toBe(String(edited !== "task"));
+      expect(profile.getAttribute("aria-invalid")).toBe(String(edited !== "profile"));
+      const invalid = edited === "task" ? profile : task;
+      const hint = edited === "task"
+        ? PROPOSAL_AI_MESSAGES.en.validation.missing_profile_information
+        : PROPOSAL_AI_MESSAGES.en.validation.missing_task_description;
+      expect(screen.getByText(hint)).toBeTruthy();
+      onEvent.mockClear();
+      for (let attempt = 0; attempt < 2; attempt++) {
+        fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+        await act(async () => {});
+        expect(routed.calls.filter((call) => call.key === ROUTES.START)).toHaveLength(1);
+        expect(invalid.getAttribute("aria-invalid")).toBe("true");
+        expect(screen.getByText(hint)).toBeTruthy();
+        await waitFor(() => expect(document.activeElement).toBe(invalid));
+      }
+      expect(onEvent).not.toHaveBeenCalledWith(expect.objectContaining({ type: "form_submitted" }));
+    },
+  );
+
+  it("retains semantic errors alongside structural errors and allows a fresh run after both are corrected", async () => {
+    const routed = makeClientCapturingRequests(responses([rejectedOutput, { text: PROPOSAL_TEXT, gaps: [] }]));
+    render(<ProposalAIProduct client={routed.client} />);
+    await fillAndSubmit();
+    await screen.findByText(PROPOSAL_AI_MESSAGES.en.validation.missing_task_description);
+    const task = document.getElementById("proposal-ai-task-text")!;
+    const profile = document.getElementById("proposal-ai-positioning")!;
+    fireEvent.change(task, { target: { value: "   " } });
+    fireEvent.submit(screen.getByRole("form"));
+    expect(screen.getByText("Task description: required.")).toBeTruthy();
+    expect(screen.getByText(PROPOSAL_AI_MESSAGES.en.validation.missing_profile_information)).toBeTruthy();
+    expect(routed.calls.filter((call) => call.key === ROUTES.START)).toHaveLength(1);
+    fireEvent.change(task, { target: { value: "Write a recipe." } });
+    fireEvent.change(profile, { target: { value: "I write recipes." } });
+    fireEvent.submit(screen.getByRole("form"));
+    await screen.findByText(PROPOSAL_TEXT);
+    const starts = routed.calls.filter((call) => call.key === ROUTES.START);
+    expect(starts).toHaveLength(2);
+    expect(idempotencyKeyOf(starts[0]!)).not.toBe(idempotencyKeyOf(starts[1]!));
+    fireEvent.change(task, { target: { value: input.taskText } });
+    fireEvent.change(profile, { target: { value: input.freelancerPositioning } });
+    expect(task.getAttribute("aria-invalid")).toBe("false");
+    expect(profile.getAttribute("aria-invalid")).toBe("false");
+  });
+
   it.each([
     ["missing_task_description", "proposal-ai-task-text", "proposal-ai-positioning"],
     ["missing_profile_information", "proposal-ai-positioning", "proposal-ai-task-text"],
@@ -989,6 +1054,14 @@ describe("ProposalAI missing source information (ANY-843)", () => {
     expect(document.getElementById("proposal-ai-positioning")!.getAttribute("aria-invalid")).toBe(String(!edited));
     expect(routed.calls.some((call) => call.key === ROUTES.START)).toBe(false);
     expect(JSON.parse(window.sessionStorage.getItem(draftKey)!)).toEqual({ v: 1, values });
+    if (edited) {
+      fireEvent.change(document.getElementById("proposal-ai-positioning")!, { target: { value: input.freelancerPositioning } });
+      expect(screen.getByText(PROPOSAL_AI_MESSAGES.en.validation.missing_profile_information)).toBeTruthy();
+    }
+    fireEvent.submit(screen.getByRole("form"));
+    await act(async () => {});
+    expect(routed.calls.some((call) => call.key === ROUTES.START)).toBe(false);
+    expect(screen.getByText(PROPOSAL_AI_MESSAGES.en.validation.missing_task_description)).toBeTruthy();
     cleanup();
     const remount = makeClient(responses());
     render(<ProposalAIProduct client={remount.client} />);

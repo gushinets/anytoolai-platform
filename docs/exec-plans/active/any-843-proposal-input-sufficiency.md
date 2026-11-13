@@ -8,7 +8,7 @@
 - Created: 2026-11-13
 - Last updated: 2026-11-13
 - Review date: 2026-11-20
-- Next action: owner review; run candidate CI after an authorized commit/push.
+- Next action: owner review of the verified round 1 semantic-error retention fix.
 - Blocker: local full-check cannot pass the unchanged activation-marker test without passwordless sudo.
 
 ## Goal and boundaries
@@ -151,3 +151,42 @@ no issue status, GitHub review, commit, push or deployment was performed. The ta
 updated with the same outcome. Test web/API/worker services started for this work were stopped
 without removing the database volume. The 48-run matrix and full-output agent review do not
 replace product-owner acceptance or production/CI verification.
+
+
+## Review round 1: retain errors for unchanged inputs
+
+The owner authorized the fix and regression tests after verification on `f1acefd6`.
+The current submit path replaces server-derived errors with required/length validation, allowing
+another quota-consuming start when a rejected field has not changed. The existing test corrected
+both fields before submitting and missed this transition.
+
+Implementation plan:
+
+1. Keep the last semantic rejection's input and per-field errors together in the shared runtime.
+   Combine matching errors with structural validation on submit and edited-field revalidation.
+   Structural errors take precedence; returning to a rejected value restores its semantic error.
+2. Retain rejection knowledge across edits and network retries; replace it on the next semantic
+   verdict and clear it on successful result/New task. Existing stale-session guards remain the
+   authority for accepting a result. Do not persist another draft format or collect error history.
+3. Add regression cases for either partially corrected field, unchanged submit, tone/language-only
+   edits, reverting a field, structural errors, successful correction and recovery/reset behavior.
+4. Run focused red/green tests, the shared runtime/product suites, frontend gate and docs checks.
+   This is a frontend state fix; prompts, provider policy and quota finalization are unchanged.
+
+Implementation and verification:
+
+- The shared runtime retains the latest rejection with its input values. Both submit and live
+  field validation merge matching semantic errors with structural errors. A successful result or
+  New task clears the rejection. Draft persistence and the existing stale-response guards are
+  unchanged; rejected-value memory lasts for the current mounted page.
+- Eight new regression cases failed before the fix and passed afterward. The three focused
+  product/runtime/handoff test files passed all 221 tests. Recovery tests additionally check
+  blocked resubmission and restored hints when an edited draft returns to rejected input.
+- Repository doctor and documentation validation passed. Canonical frontend-check passed with
+  serial workspace execution: lint, typecheck, 769 web-app tests, 336 CE-kit tests, 55 shared-ui
+  tests, 349 Chromium tests, generated API-contract drift check and all builds.
+- No live model calls, backend full-check, production or CI verification were repeated for this
+  frontend-only fix. The earlier full-check sudo blocker remains. The owner subsequently
+  authorized committing, pushing and updating the PR description with these results.
+- A repository text scan found pre-existing local-command wording in unrelated execution plans
+  for ANY-17, ANY-221, ANY-227, ANY-339 and ANY-391; those files were left untouched.
