@@ -76,20 +76,22 @@ operator's maintenance window. Failure to drain does not stop the recovering
 worker. On migration failure, do not run old code to reopen service. Follow the
 existing verified backup recovery below and the metering cutover safeguards.
 
-The concrete ANY-766 pair uses Kernel head `0021`, Portal `20261111_0011`,
+The concrete ANY-766 pair uses Kernel head `0021`, Portal `20261113_0012`,
 identity V2, snapshot V3 and manifest/invalidation/usage/exhaustion V1. Kernel
-source baseline is `82f1b155b5d9fbc9af8e5b6bd51364d640434495`, Portal
-`c41428de013e69c982386acbb9edda05e1dc9014`, plus the local PR correction diff.
+source baseline is `c8e867bfc25f4158b0bc36b76892e670a32cbb12`, Portal
+`65079f4e50867b9582a951a62a62cb6706dc0e0f`, plus the local remaining-corrections diff.
 Record actual reviewed SHAs, image IDs/digests, build origins, enabled products
 and base path with the environment selection. Never infer reader compatibility
 from unchanged migration heads: Portal pre-selected-digest and pre-Step-11
 purchase readers are excluded, as are old Kernel identity/snapshot binaries.
 Keep historical usage, reservations, floors and purchased documents intact.
-The corrected Portal includes permissions and technical source in its digest: stop Portal
-API/workers and explicitly advance every configured consumer P above its stored
-value before the first corrected startup (fresh DB: P=1). No new migration is
-needed. Never edit policy rows, roll P back or infer old-binary compatibility from
-unchanged migration heads. P changes preserve R, allowance IDs and spend.
+When crossing the earlier expanded-digest boundary, stop Portal API/workers and
+explicitly advance every configured consumer P above its stored value before the
+first corrected startup (fresh DB: P=1). That digest change needs no migration;
+the remaining activation correction requires Portal migration `20261113_0012`
+with API/workers stopped and does not itself require a P change. Never edit
+policy rows, roll P back or infer old-binary compatibility from unchanged
+migration heads. P changes preserve R, allowance IDs and spend.
 
 This Linux image path does not require a remote server or registry credentials
 for local images. Use disposable databases and loopback test origins for rehearsal.
@@ -156,8 +158,9 @@ The corrected web image was built with the standard Dockerfile and authorized
 locked dependency downloads, using `ANYTOOLAI_PORTAL_CONSUMER_ID=review-kernel`,
 base path `/tools` and isolated local API/Portal origins. Its local ID was
 `sha256:45dba38223d190e6d66f564732ec5c52d707dc41b76af9cece9de2f28c4573ae`;
-it contains the corrected frontend sources at the current source baseline plus
-the local diff. The actual `prod_web_up` command retained Caddy access to
+it contains the earlier correction sources at Kernel baseline `82f1b155` plus
+the then-local diff. It predates the 2026-11-13 remaining corrections and is not
+evidence for their image build or deployment. The actual `prod_web_up` command retained Caddy access to
 `/tools/*` and `/v1/*`, Portal authorization and an existing paid result with one
 charge. API/worker/both DB container identities and the prepared profile stayed
 unchanged. This is local synthetic acceptance, not a published deployment image.
@@ -1211,7 +1214,7 @@ exit (including a crash) releases the lock automatically.
 The historical Step 6 checkpoint introduced migration `0019` and snapshot V2;
 it was verified only against disposable test databases. Those versions are not
 the current installation target. The current pair requires Kernel `0021`,
-Portal `20261111_0011`, delegation V2 and snapshot V3. Follow
+Portal `20261113_0012`, delegation V2 and snapshot V3. Follow
 [reviewed image installation](#reviewed-images-and-independent-updates-any-766-step-17)
 and the Portal-owned paired compatibility/cutover procedure linked there. Apply
 migrations only through the environment's authorized procedure.
@@ -1246,3 +1249,14 @@ Steps 16/17 supply focused paired local acceptance and build/install preparation
 The full matrix, remote installation, staging/live acceptance and production
 rollout belong to ANY-767. Local evidence does not establish a connected or
 approved deployment.
+
+
+The 2026-11-13 Portal correction requires stopped API/workers for migration
+`20261113_0012` and consistent V2 internal-evidence readers/writers. Downgrade
+refuses retained activation/V2 facts. HTTP identity V2 and snapshot V3 stay the
+same. Configure public `BACKEND_CALLBACKS` for Portal web separately from private
+`BACKEND_CONSUMERS`; corresponding consumer IDs/callbacks must agree. Kernel's
+consumer ID is still compiled into web. Verify email before delegated authorization;
+a same-owner reauthorization keeps the existing pending request/key. The earlier
+expanded-digest higher-P cutover remains required when crossing that older
+compatibility boundary; the activation migration alone does not change P.

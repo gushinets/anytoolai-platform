@@ -25,6 +25,7 @@
   "retry": "Tentar novamente",
   "formLabel": "Formulário {product}",
   "workspace": {
+    "restoreDraft": "Restaurar rascunho salvo",
     "inputTitle": "Seus dados",
     "previousDetails": "Resultado baseado nos dados anteriores",
     "backToInputs": "Voltar aos dados",

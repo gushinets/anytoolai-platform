@@ -25,6 +25,7 @@
   "retry": "Riprovi",
   "formLabel": "Modulo {product}",
   "workspace": {
+    "restoreDraft": "Ripristina la bozza salvata",
     "inputTitle": "I suoi dati",
     "previousDetails": "Risultato basato sui dati precedenti",
     "backToInputs": "Torni ai dati",

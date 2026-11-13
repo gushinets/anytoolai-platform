@@ -537,6 +537,22 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       return null;
     }
   }, [definition]);
+  const restoredDraftRef = useRef(false);
+  const [manualDraft, setManualDraft] = useState<V | null>(null);
+  useEffect(() => {
+    if (restoredDraftRef.current || draftKey === null || (client.portalIdentity && !client.portalIdentity.isCurrent())) return;
+    restoredDraftRef.current = true;
+    const stored = readProductDraft(draftKey);
+    const restored = parseStoredValues(stored?.values);
+    if (restored === null) return;
+    if (!attachSessionId || (paid && stored?.run?.scenarioSessionId === attachSessionId)) {
+      setValues(restored);
+      if (paid && attachSessionId) activeInputRef.current = parseStoredValues(stored?.run?.input);
+    } else if (paid) {
+      // An older draft has no proof of belonging to this result. Restore only on request.
+      setManualDraft(restored);
+    }
+  }, [client, draftKey, parseStoredValues, attachSessionId, paid]);
   const scenarioId = definition.scenarioId;
   const recoverySchemaRef = definition.outputSchema.schemaRef;
   const recoverySchemaVersion = definition.outputSchema.schemaVersion;
@@ -625,10 +641,6 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         if (!scenario || !frontend) {
           unavailableBoot();
           return;
-        }
-        if (draftKey !== null && !attachSessionId) {
-          const restored = parseStoredValues(readProductDraft(draftKey)?.values);
-          if (restored !== null) setValues(restored);
         }
         setBoot({
           kind: "ready",
@@ -796,11 +808,11 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       return;
     }
     startedSessionsRef.current.set(prepared, result.value.scenarioSessionId);
-    if (draftKey !== null) saveProductDraftScenario(productId, scenarioId, draftOwner);
+    if (!paid && draftKey !== null) saveProductDraftScenario(productId, scenarioId, draftOwner);
     // Guest own-run recovery starts after acceptance; paid recovery already persisted the exact request/key.
-    if (!paid && draftKey !== null) {
+    if (draftKey !== null) {
       saveDraftRun(draftKey, { scenarioSessionId: result.value.scenarioSessionId, input: activeInputRef.current, startedAtMs });
-      if (readProductDraftScenario(productId) === scenarioId && preferSavedOwnRun(productId, draftKey, result.value.scenarioSessionId)) {
+      if (!paid && readProductDraftScenario(productId) === scenarioId && preferSavedOwnRun(productId, draftKey, result.value.scenarioSessionId)) {
         // Reload follows the accepted own run even while the old result remains on screen.
         if (displayedResult?.attached) callSafely(onAttachEndRef.current);
       }
@@ -1070,6 +1082,10 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     if (!reuseExisting) {
       setPendingStart({ prepared, input: values });
     }
+    if (paid && draftKey !== null) {
+      saveDraftValues(draftKey, values);
+      saveProductDraftScenario(productId, scenarioId, draftOwner);
+    }
     activeInputRef.current = values;
     // This start already created its session (only its polling failed): follow that session instead
     // of sending the start again, which an edge could answer with a 4xx that releases the key.
@@ -1277,6 +1293,8 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       markEventFired(client, eventScopeKey, "form_started");
       emitEvent(onEventRef.current, { type: "form_started", guestId });
     }
+    restoredDraftRef.current = true;
+    setManualDraft(null);
     const next = { ...values, [field]: value };
     setValues(next);
     if (draftKey !== null) {
@@ -1328,6 +1346,15 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         noValidate
         onSubmit={handleSubmit}
       >
+        {manualDraft !== null && !locked && !identityUnavailable && !recoveryOnly ? (
+          <Button variant="secondary" type="button" onClick={() => {
+            if (client.portalIdentity && !client.portalIdentity.isCurrent()) return;
+            setValues(manualDraft);
+            setFieldErrors({});
+            setManualDraft(null);
+            if (draftKey !== null) saveProductDraftScenario(productId, scenarioId, draftOwner);
+          }}>{th("workspace.restoreDraft")}</Button>
+        ) : null}
         <Fields values={values} errors={fieldErrors} disabled={locked || identityUnavailable || recoveryOnly} onChange={updateField} />
         <DataProcessingNotice />
         <div className={styles.footer}>

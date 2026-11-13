@@ -25,6 +25,7 @@
   "retry": "Erneut versuchen",
   "formLabel": "{product}-Formular",
   "workspace": {
+    "restoreDraft": "Gespeicherten Entwurf wiederherstellen",
     "inputTitle": "Ihre Angaben",
     "previousDetails": "Mit vorherigen Angaben erstellt",
     "backToInputs": "Zurück zu den Angaben",

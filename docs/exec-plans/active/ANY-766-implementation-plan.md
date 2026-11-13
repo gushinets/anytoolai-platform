@@ -10,10 +10,10 @@ Related requirements: [ANY-833](https://linear.app/paveldik/issue/ANY-833).
 
 - State: active
 - Owner: mixed — Portal and Kernel execution owners
-- Last updated: 2026-11-12
-- Review date: 2026-11-12
-- Next action: finish the paired PR readiness checklist and review follow-up before human merge approval.
-- Verification gate: focused Step 16 checks and the five PR corrections' local regressions, joint scenarios and isolated web-update rehearsal pass. The broader acceptance matrix remains deferred by owner decision (Section 3.8).
+- Last updated: 2026-11-13
+- Review date: 2026-11-13
+- Next action: verify paired PR checks and finish the merge handoff; owner review is complete and correction commits, branch pushes and fixed-finding replies are authorized.
+- Verification gate: focused Step 16 checks and the 2026-11-12 correction acceptance remain complete. The 2026-11-13 remaining corrections pass focused regressions and joint HTTP/browser checks. Earlier image rehearsals do not verify the new sources. The broader acceptance matrix remains deferred by owner decision (Section 3.8).
 - Blocker: none for the planned local work; real external-product integration is outside this plan.
 
 Portal's `docs/exec-plans/active/ANY-766-implementation-plan.md` is authoritative;
@@ -51,6 +51,91 @@ checks. Its enduring rule is in Section 3.9. No migration or wire version change
 P3 was already fixed; draft recovery, historical usage selection, web service
 credentials and email verification review findings remain outside this pass.
 The broader acceptance matrix and remote/live work remain deferred to ANY-767.
+
+## Remaining PR corrections — 2026-11-13
+
+Status: **COMPLETE — selected local verification PASS**. Bases: Portal #167
+`65079f4e` and Kernel #267 `c8e867bf`. Owner review is complete; committing,
+pushing these corrections and replying to fixed PR findings are authorized.
+Merge, image publication and deployment remain separate actions.
+The preceding correction pass and its evidence remain complete and distinct.
+
+Implemented five confirmed findings: web service credential exposure, unverified
+identity delegation, historical allowance activation, own paid form restoration,
+and newer mode selection after a terminal paid execution. Preserve all preceding
+P/R, saved-owner, inactive-recipient, consumer-ID, ingress and REV-1 guarantees,
+P3 and ANY-841. HTTP identity V2, snapshot V3 and other V1 contracts do not change.
+
+1. Establish failing regressions using the existing test harnesses. Web receives
+   only `BACKEND_CALLBACKS` (`consumer_id`, `callback_url`), default `[]`, with no
+   fallback to the private registry. Update production/agent Compose, runner and
+   joint browser environment; reject extra fields without logging input.
+2. Require verified email in the shared parent check for code issue, exchange and
+   introspection, retaining `401 backend_parent_authority_invalid`. Gate only the
+   delegation page, with the existing verification UI and an explicit session
+   refresh preserving its PKCE URL. Positive fixtures use verified identities.
+3. Add immutable `ALLOWANCE_ACTIVATION` observations (`allowance-activation:v1`,
+   exact allowance UUID), a partial unique index and a forward migration on the
+   existing table. The whole-user writer first retains missing activation proof
+   from the previous committed document with its R/committed_at, before replacing
+   it even on block/expiry. Then record missing facts from the final active state
+   with its resulting R/application time. Resolve historical subjects through the
+   saved allowance/subscription, not the current primary. These timestamps prove
+   membership in a committed R, not the first-ever activation time. No-op facts
+   do not bump R or add notifications; rollback is atomic and never-active future
+   issuance receives no fact. New reconciliation/selection evidence is V2, with
+   compatible V1/V2 readers. Only V1 may use conservative legacy proof with semantic
+   frozen-anchor cycle comparison. GETs never repair history. Already-lost,
+   unprovable history is not reconstructed by contacting Kernel.
+4. Reuse owner-scoped `StoredDraft.run` to bind a successful own paid start to its
+   session. Keep editable values separate from known original form input; pending
+   replay always uses its frozen request/key. Restore automatically only with a
+   matching session binding, after hydration without overwriting newer edits.
+   An unbound old draft remains available through an explicit Restore saved draft
+   action; this never invents result input, changes recovery or sends a request.
+   A failed binding write preserves result recovery and uses that same fallback.
+5. Persist the selected draft-enabled mode for explicit switches/edits, own starts
+   before sending, and chosen results/handoffs. Late acceptance/background handoff
+   must not become a newer choice. Explicit current URL selection wins presentation;
+   otherwise pending and nonterminal accepted operations win automatic recovery.
+   A confirmed terminal accepted operation permits the saved mode. Preserve the
+   existing active-attach priority for old records until explicitly changed, and
+   synchronize the selected scenario on successful explicit result resolution.
+   Recheck custody, recovery and selection after awaits; changing mode only removes
+   the matching attachment and retains accepted recovery. No second paid replay path
+   or new browser-storage version is introduced.
+
+Focused acceptance: PostgreSQL ISO-equivalence and lock-wait boundary activation,
+upgrade followed immediately by removal, never-active future issuance, no-op,
+rollback, migration/immutability and V1/V2 reads; all delegation boundaries and
+verification changes; secret-free resolved web configuration. Browser coverage
+includes own reload/reauthorization, manual legacy draft restoration, A-result to
+B-mode and B-mode to explicit A-result reloads, chosen/late handoffs, pending and
+running custody, storage failure, unavailable config, StrictMode and owner change.
+Extend the existing real joint HTTP/two-PostgreSQL/browser harness with local
+SMTP/LBX/AI substitutes; prove retained usage and single-debit replay. Run affected
+prior regressions, types/lint, architecture/docs/generated checks on installed
+dependencies. Do not resume the deferred full/live campaign automatically.
+
+Update the common guide, configuration, identity, history/data-model, frontend
+recovery and installation docs in both repositories. Stop Portal API/workers for
+migration and start compatible binaries; old binaries/downgrade are not supported
+once new evidence exists. Preserve the separate existing higher-P cutover rule
+for the expanded policy digest. Check disposable resource isolation and available
+images/dependencies before runtime checks; obtain separate authorization for any
+missing installation/download. Report PASS/FAIL/NOT_RUN/BLOCKED and the remaining
+legacy-history limitation; never count old images as proof of the new frontend.
+
+The focused Portal PostgreSQL/API/component and Kernel recovery/draft regressions
+pass, including prior ownership, policy and delivery invariants. Real paired HTTP
+checks pass for policy/replay and SMTP-backed verification. All eight selected
+desktop/mobile browser cases pass across the focused runs, including the corrected
+draft/mode selector rerun; accessibility and responsive checks pass. Types, changed
+file lint, architecture, documentation and generated drift checks pass. Plans are
+synchronized. Full/live suites and new image builds/rehearsals are **NOT_RUN** for
+this pass; no unresolved local blocker remains. Already-lost history without
+retained proof remains unavailable, as specified above. Migration `20261113_0012`
+was checked only on disposable local PostgreSQL; deployment is not performed.
 
 ## 1. Goal & Final Expected Outcome
 
@@ -112,7 +197,7 @@ contacting its services or accepting its integration is not an ANY-766 gate.
 Original development bases: Portal ANY-766 started from ANY-765
 `b2ef280048ac634a60c18e820fbf702beddba19c`; Kernel is based on
 `72ff15bc0b77903c87aa39f7b10186dccc556d09` and includes ANY-507/814.
-Current migration heads are Portal `20261111_0011` and Kernel `0021`.
+Current migration heads are Portal `20261113_0012` and Kernel `0021`.
 
 These are historical bases; the current correction baselines are recorded above.
 Any further transfer onto accepted main requires a separately authorized base
@@ -287,7 +372,7 @@ Browser routes:
 
 The Kernel launch page stores an unpredictable state, verifier and validated local return target in tab `sessionStorage`. Allowed targets are registered product pages, result pages and handoff pages. Portal accepts no caller-selected external callback.
 
-Portal authenticates the existing session and issues a random 32-byte code,
+Portal authenticates the existing verified-email session and issues a random 32-byte code,
 valid for at most 60 seconds and no longer than the parent session. The selected
 consumer's configured callback receives code/state in the fragment, clears it
 immediately, verifies state and exchanges through that backend. Kernel uses its
@@ -302,7 +387,7 @@ Interfaces:
 
 Exchange returns a version-2 response containing the delegated `access_token`, `token_type: "Bearer"`, canonical scope/user, `consumer_id`, current `consumer_policy_revision` and expiry. The token expires at the earlier of 30 minutes and parent-session expiry. There is no refresh token.
 
-Introspection validates the token, authenticated consumer audience, current policy, parent session and active user on every protected Kernel request. Its version-2 response returns canonical scope/user, `consumer_id`, current `consumer_policy_revision` and conservative `valid_until`, with the Portal–Kernel clock budget removed. It returns no PII.
+Introspection validates the token, authenticated consumer audience, current policy, parent session, active user and verified email on every protected Kernel request. Its version-2 response returns canonical scope/user, `consumer_id`, current `consumer_policy_revision` and conservative `valid_until`, with the Portal–Kernel clock budget removed. It returns no PII.
 
 Use:
 
@@ -786,10 +871,13 @@ against isolated local test databases first. New and old wire contracts do not
 need concurrent support; update our Portal, Kernel and browser configuration
 together, remove replaced routes/settings only when no active use remains,
 and explicitly exclude old binaries from the new installation contract.
-The completed pair's heads are Portal `20261111_0011` and Kernel `0021`.
-The PR digest correction needs no new migration: stop Portal API/workers and
-explicitly configure P above the saved value for every existing configured
-consumer before corrected startup. A fresh DB may use P=1. Never edit policy
+The current corrected pair's heads are Portal `20261113_0012` and Kernel `0021`.
+Portal `0012` retains activation facts and requires compatible V2 internal-evidence
+readers/writers with API/workers stopped during migration. Downgrade is refused
+once activation or V2 evidence exists. This migration alone does not change P.
+When crossing the earlier expanded-digest boundary, explicitly configure P above
+the saved value for every existing configured consumer before corrected startup,
+also with Portal API/workers stopped. A fresh DB may use P=1. Never edit policy
 rows manually or lower P; unchanged migration heads do not permit old-binary
 rollback. Purchases, R, allowance IDs, usage, reservations and replay stay intact.
 

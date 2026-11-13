@@ -25,6 +25,7 @@
   "retry": "Try again",
   "formLabel": "{product} form",
   "workspace": {
+    "restoreDraft": "Restore saved draft",
     "inputTitle": "Your details",
     "previousDetails": "Created from previous details",
     "backToInputs": "Back to details",

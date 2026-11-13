@@ -1,7 +1,7 @@
 # Payment Portal integration map
 
 Status: navigation, implementation snapshots and the ANY-711 service-authentication handoff.
-Last observed: 2026-11-12; local source state, not a deployment check.
+Last observed: 2026-11-13; local source state, not a deployment check.
 
 ## Ownership and sources
 
@@ -32,12 +32,13 @@ Historical Portal contracts and execution plans do not override accepted sources
 
 ## Current local implementation
 
-Current source baselines: Kernel `82f1b155b5d9fbc9af8e5b6bd51364d640434495`
-and Portal `c41428de013e69c982386acbb9edda05e1dc9014`, plus the local PR correction
+Current source baselines: Kernel `c8e867bfc25f4158b0bc36b76892e670a32cbb12`
+and Portal `65079f4e50867b9582a951a62a62cb6706dc0e0f`, plus the local remaining-corrections
 diff. The dated checkpoints below retain historical evidence, not current setup
-instructions. The corrected pair covers the complete policy digest, saved grant
-ownership without allowances, inactive delivery scheduling, frontend/API consumer
-alignment and web-update ingress retention; focused local acceptance passed.
+instructions. Corrections through 2026-11-13 cover policy digest, saved ownership,
+inactive delivery, consumer alignment, ingress retention, web credential isolation,
+verified delegation, historical activation and paid form/mode recovery. Focused
+local verification passed; earlier image rehearsals do not verify the new sources.
 The [active plan](../exec-plans/active/ANY-766-implementation-plan.md) owns the
 current scope and remaining gates.
 
@@ -54,8 +55,8 @@ current scope and remaining gates.
   `ANYTOOLAI_PORTAL_ACCESS_INVALIDATION_ENABLED` at Kernel before starting the updated Portal
   worker. Portal's Step 13 sender selects each snapshot recipient's origin and
   outgoing service key from `BACKEND_CONSUMERS`, with independent bounded lanes.
-  Stop affected APIs/workers before migrating the Step 14 pair to Portal
-  `20261111_0011` and Kernel `0021`. The historical Step 13 heads were Portal
+  Stop affected APIs/workers before migrating the current pair to Portal
+  `20261113_0012` and Kernel `0021`. The historical Step 13 heads were Portal
   `20261111_0010` and Kernel `0020`. Legacy Kernel connection settings no longer
   select delivery destinations. A disabled receiver permission parks delivery with `403`;
   operator retry is required after repair. This differs from an inactive Portal
@@ -507,3 +508,14 @@ parent mount and pins the same 18.4 image/digest as Portal. Existing anonymous d
 volumes require explicit backup/reattachment before recreating an old project;
 the harness touches only fresh run-owned resources. Step 17 and ANY-767 retain
 their build/install and remote/live responsibilities.
+
+
+The 2026-11-13 Portal correction requires stopped API/workers for migration
+`20261113_0012` and consistent V2 internal-evidence readers/writers. Downgrade
+refuses retained activation/V2 facts. HTTP identity V2 and snapshot V3 stay the
+same. Configure public `BACKEND_CALLBACKS` for Portal web separately from private
+`BACKEND_CONSUMERS`; corresponding consumer IDs/callbacks must agree. Kernel's
+consumer ID is still compiled into web. Verify email before delegated authorization;
+a same-owner reauthorization keeps the existing pending request/key. The earlier
+expanded-digest higher-P cutover remains required when crossing that older
+compatibility boundary; the activation migration alone does not change P.

@@ -171,11 +171,13 @@ The shared runtime, not a product, owns the web side of a handoff:
   polling the session, and the person moved on from it ("New task" on the attached result, own work
   whose result replaced it on screen, a mode switch, or its terminal failure). The owner forgets the
   persisted id only for an end that follows a begin, so a failed boot, or typing in another mode,
-  forgets nothing, and a run that failed to start leaves the attached result restorable. After consent the linked scenario session is an ordinary runtime handle:
-  the platform's session/result GETs take no guest id and the session has no expiry of its own, so
-  the id is an opaque public handle, not proof of ownership, and not the short-lived handoff bearer
-  token (which does have a TTL and redaction contract). If a bounded lifetime is ever wanted for it,
-  that is a backend lifecycle contract, not a frontend assumption. The attached result must come
+  forgets nothing, and a run that failed to start leaves the attached result restorable.
+  Guest session/result GETs retain their existing opaque public-handle behavior without a
+  guest-id parameter. Paid session/result reads require a valid delegated identity and matching
+  saved execution owner; knowing the session ID does not authorize access. The session itself
+  has no expiry, unlike the short-lived handoff bearer token, whose TTL and redaction contract
+  remain separate from result authorization. Any bounded session lifetime would be a backend
+  lifecycle contract, not a frontend assumption. The attached result must come
   from this product's scenario: its backend-owned `schemaRef` and `schemaVersion` are checked
   against the selected scenario's output schema from runtime config (a declared version must match;
   a ref keeps its name across a version bump) before the product parser sees it.
@@ -210,10 +212,17 @@ The shared runtime, not a product, owns the web side of a handoff:
   canonical tenant/region/user tuple, including selected mode. They never read guest
   drafts. Same-owner reauthorization retains them; logout, parent revocation and
   owner changes clear paid drafts with other private recovery state. Guest drafts
-  remain independent. Paid drafts store form values/mode only: the owner-bound
+  remain independent. Paid drafts store editable values, mode and an optional own-run binding
+  (accepted session ID plus original UI input, or null when unavailable): the owner-bound
   `paid_start` record remains the sole execution recovery source. A saved guest or
   draft run cannot start a competing poll alongside paid replay. Explicit result
   selection retains priority for that visit without replacing a pending paid request.
+  Automatic paid form restoration requires the exact selected session ID to match
+  the draft binding. It runs after hydration independently of runtime-config success,
+  once and without overwriting edits; latest editable values remain separate from
+  original execution input. Unbound/older drafts offer an explicit Restore saved
+  draft action when editing is allowed. This only fills fields: no replay, key
+  change, new request or invented result input. Opt-out products remain unchanged.
 - Paid recovery does not require current new-start availability. If runtime config is unavailable,
   or no longer lists the scenario/enabled web frontend, a saved owner-bound pending request or
   accepted/explicitly selected session opens a recovery-only view. It replays only the original
@@ -222,7 +231,13 @@ The shared runtime, not a product, owns the web side of a handoff:
   the architecture contract test checks these pins against product workflows/schema versions.
   Delegated identity and backend ownership checks remain required for every protected request.
 - `MultiModeProduct` resolves an accepted session's mode from the server's `scenarioId` before
-  mounting its run page, including accepted paid recovery. URL scenario hints never choose that
+  mounting its run page, including accepted paid recovery. Pending and nonterminal
+  accepted work retain priority. After a proven completed/failed/expired status,
+  ordinary restoration honors a later saved valid mode. Explicit result/selected
+  handoff presentation still wins and saves its verified server mode; background
+  restoration/late callbacks do not change user choice. Own starts persist choice
+  before sending, never on late acceptance. After async resolution, custody,
+  recovery and saved choice must still match. URL scenario hints never choose that
   mode. Missing identity or transient failures preserve Retry; a definite 404 or incompatible
   scenario offers explicit discard. Discard removes only the matching attachment/accepted recovery,
   preserving pending requests and newer sessions; it never creates a fresh logical start.

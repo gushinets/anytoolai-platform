@@ -9,7 +9,7 @@ import { ErrorState } from "../../components/ErrorState";
 import { useHostT, useProductT } from "../../i18n";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
 import { getPaidPersistence } from "../../lib/portalSession";
-import { forgetAttachSession, type AttachProps } from "../runtime/attachSession";
+import { forgetAttachSession, isChosenAttachSession, type AttachProps } from "../runtime/attachSession";
 import { callSafely } from "../runtime/callSafely";
 import { ProductRunPage } from "../runtime/ProductRunPage";
 import { readProductDraftScenario, saveProductDraftScenario } from "../runtime/draftStorage";
@@ -86,9 +86,16 @@ export function MultiModeProduct<Id extends string, R>({
   const t = useProductT();
 
   useEffect(() => {
+    if (client.portalIdentity && !client.portalIdentity.isCurrent()) return;
     let sessionId = attachSessionId;
+    const productId = modesRef.current[0].definition.productId;
+    const persistence = getPaidPersistence(client);
+    const savedChoice = readProductDraftScenario(productId, draftOwner);
+    const savedMode = modesRef.current.find((candidate) => candidate.definition.scenarioId === savedChoice && candidate.definition.draft);
+    let recoveryBasis: string | undefined;
+    try { recoveryBasis = persistence ? JSON.stringify(readPaidStartRecovery(persistence, productId)) : undefined; }
+    catch { /* ProductRunPage owns recovery refusal. */ }
     if (!attachFromUrl || !attachSessionId) {
-      const persistence = getPaidPersistence(client);
       if (persistence) {
         if (!persistence.isCurrent()) return;
         try {
@@ -121,6 +128,16 @@ export function MultiModeProduct<Id extends string, R>({
     const controller = new AbortController();
     void getScenarioSession(client, sessionId, { signal: controller.signal }).then((result) => {
       if (controller.signal.aborted || (client.portalIdentity && !client.portalIdentity.isCurrent())) return;
+      // A delayed response cannot replace a newer request or explicit mode choice.
+      if (persistence) {
+        try {
+          if (JSON.stringify(readPaidStartRecovery(persistence, productId)) !== recoveryBasis ||
+            readProductDraftScenario(productId, draftOwner) !== savedChoice) {
+            setAttempt((previous) => previous + 1);
+            return;
+          }
+        } catch { setResolution("error"); return; }
+      }
       if (!result.ok) {
         setResolution(result.error.type === "backend_error" && result.error.status === 404 ? "unavailable" : "error");
         return;
@@ -131,7 +148,16 @@ export function MultiModeProduct<Id extends string, R>({
         setResolution(result.value.scenarioId === undefined ? "identity-missing" : "unavailable");
         return;
       }
-      setModeId(target.id);
+      const terminal = ["completed", "failed", "expired"].includes(result.value.status);
+      // An inherited attachment keeps its established priority until explicitly left.
+      const selectedAttachment = sessionId === attachSessionId;
+      const selected = terminal && !selectedAttachment && savedMode ? savedMode : target;
+      if (persistence && target.definition.draft && sessionId &&
+        ((attachFromUrl && selectedAttachment) || isChosenAttachSession(productId, sessionId))) {
+        saveProductDraftScenario(productId, target.definition.scenarioId, draftOwner);
+      }
+      ownModeResolvedRef.current = true;
+      setModeId(selected.id);
       setResolution("ready");
     });
     return () => controller.abort();
