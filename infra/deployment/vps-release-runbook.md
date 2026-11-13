@@ -102,9 +102,14 @@ The host file is `/opt/payments-portal/deploy/caddy/Caddyfile.prod`. The contain
    [Atom Lab settings and ingress](README.md#atom-lab-on-vps-135)
 4. On a failed product cutover, keep product ingress closed and verify the actual Alembic
    revision. The migrator can succeed before the web container fails. If cleanup stopped
-   the candidate, use `prod-recovery-postgres-up` to inspect the schema. Restart the prior
-   checkout with its matching settings if its code supports that schema. Otherwise restore
-   the verified pre-release dump into a new database before starting the old code.
+   the candidate, use `prod-recovery-postgres-up` to inspect the schema. If the candidate
+   is accepting or processing work, quiesce it and preserve any new data before rollback.
+   Run `prod-down` from the candidate checkout before starting the prior version. If the
+   prior version requires an older schema, start PostgreSQL alone with the recovery command
+   and restore the verified pre-release dump into a new database. Stop the recovery container
+   with `prod-down`, then start the prior checkout with its matching settings and select the
+   restored database in `ANYTOOLAI_POSTGRES_DB`. Recheck product readiness before reopening
+   ingress.
    [Product database rollback](execution-metering-cutover.md#failure-and-rollback)
 5. On a Lab-only failure, restore the Caddyfile with product routes working and Lab closed.
    Quiesce Lab before stopping it and preserve its volume. Follow the Lab recovery procedure
