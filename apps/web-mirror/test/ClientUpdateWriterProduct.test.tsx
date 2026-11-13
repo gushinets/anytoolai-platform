@@ -34,6 +34,7 @@ import {
 } from "./fixtures/platformResponses";
 import { CLIENT_UPDATE_WRITER_MESSAGES } from "../src/products/clientUpdateWriter/messages";
 import { makeRender } from "./support/renderWithI18n";
+import { expectDataProcessingNotice } from "./support/expectDataProcessingNotice";
 import { simulateBrowserTranslation } from "@anytoolai/shared-ui/test/support/simulateBrowserTranslation";
 import { LOCALE_STORAGE_KEY } from "../src/i18n/localeStorage";
 
@@ -53,6 +54,7 @@ const MODE_IDS = {
 } as const;
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   cleanup();
   window.localStorage.clear();
   window.sessionStorage.clear();
@@ -178,6 +180,17 @@ it.each([
 });
 
 describe.each(MODE_SCENARIOS)("Client Update Writer $mode mode: one-screen workspace", (scenario) => {
+  it("shows the shared processing notice and policy inside the selected mode form", async () => {
+    vi.stubEnv("NEXT_PUBLIC_ANYTOOLAI_PRIVACY_POLICY_URL", "https://example.com/privacy");
+    saveProductDraftScenario("client_update_writer", scenario.ids.scenarioId);
+    const { queues } = bootAndHappyPathRoutes(scenario.ids, { text: "Draft." });
+    const { client } = makeClient(queues);
+    render(<ClientUpdateWriterProduct client={client} />);
+    const form = await screen.findByRole("form");
+    expect(within(form).getByRole("button", { name: scenario.submit })).toBeTruthy();
+    expectDataProcessingNotice(form, "https://example.com/privacy");
+  });
+
   it("defaults to neutral and offers three exclusive tone radios", async () => {
     const { queues } = bootAndHappyPathRoutes(scenario.ids, { text: "Draft." });
     const { client } = makeClient(queues);

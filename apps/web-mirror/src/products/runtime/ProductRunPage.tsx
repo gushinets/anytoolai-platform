@@ -27,6 +27,7 @@ import {
   type QuotaState,
 } from "@anytoolai/ce-kit";
 import { ErrorState } from "../../components/ErrorState";
+import { DataProcessingNotice, DATA_NOTICE_ID } from "../../components/DataProcessingNotice";
 import { LanguageSwitcher, useHostT, useProductT } from "../../i18n";
 import { getClientStorage } from "./clientStorage";
 import { webBaseUrlFromProductLocation } from "../../lib/hostUrls";
@@ -1219,9 +1220,11 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         onSubmit={handleSubmit}
       >
         <Fields values={values} errors={fieldErrors} disabled={locked || identityUnavailable} onChange={updateField} />
+        <DataProcessingNotice />
         <div className={styles.footer}>
           <Button
             type="submit"
+            aria-describedby={DATA_NOTICE_ID}
             loading={phase.kind === "submitting" || phase.kind === "running"}
             disabled={identityUnavailable || locked || phase.kind === "quota-exhausted"}
           >

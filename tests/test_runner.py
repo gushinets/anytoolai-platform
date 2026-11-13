@@ -1402,9 +1402,16 @@ def test_prod_fake_up_builds_and_removes_orphans(monkeypatch) -> None:
     assert timeouts == [None]
 
 
-def test_prod_fake_up_uses_only_base_and_prod_compose(monkeypatch) -> None:
+@pytest.mark.parametrize("policy_url", [None, "", "javascript:alert(1)"])
+def test_prod_fake_up_uses_only_base_and_prod_compose(monkeypatch, policy_url) -> None:
     runner = load_runner_module()
-    monkeypatch.setattr(runner, "_resolved_env_file", lambda path: {})
+    values = {} if policy_url is None else {"ANYTOOLAI_PRIVACY_POLICY_URL": policy_url}
+    monkeypatch.setattr(runner, "_resolved_env_file", lambda path: values)
+    monkeypatch.setattr(
+        runner,
+        "_validate_public_privacy_policy_url",
+        lambda env: pytest.fail("fake smoke validated public URL"),
+    )
     monkeypatch.setattr(runner, "_prod_fake_stack_running", lambda env: False)
     monkeypatch.setattr(runner, "port_available", lambda port: True)
     monkeypatch.setattr(runner, "_prod_fake_ready", lambda *, env: 0)
@@ -1468,6 +1475,7 @@ def test_prod_fake_down_allows_worker_stop_grace(monkeypatch):
     assert timeouts == [runner.COMPOSE_TEARDOWN_TIMEOUT_SECONDS]
 
 
+PROD_PREFLIGHT_ERROR_EXIT_CODE = 2
 PROD_LIVE_VALUES = {
     "ANYTOOLAI_POSTGRES_USER": "ci",
     "ANYTOOLAI_POSTGRES_PASSWORD": "private-db-value",
@@ -1477,6 +1485,7 @@ PROD_LIVE_VALUES = {
     "ANYTOOLAI_ENABLED_PRODUCT_IDS": "proposal_ai",
     "ANYTOOLAI_UNMETERED_PRODUCT_IDS": "proposal_ai",
     "ANYTOOLAI_PROD_WORKER_MEMORY_LIMIT": "768M",
+    "ANYTOOLAI_PRIVACY_POLICY_URL": "https://example.com/privacy",
 }
 
 
@@ -1555,6 +1564,93 @@ def test_prod_up_rejects_missing_required_value_before_compose(
 
     assert runner.prod_up() == 2
     assert missing_name in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "policy_url",
+    [
+        None, "   ", "/privacy", "//example.com/privacy", "javascript:alert(1)",
+        "data:text/html,x", "ftp://example.com/privacy", "https://", "https://[invalid]/",
+        "https://example.com:invalid/privacy", "https://example.com:65536/privacy",
+        "https://bad%host/privacy", "https://bad^host/privacy",
+        "\u0085https://example.com/privacy\u0085",
+    ],
+)
+def test_prod_up_rejects_invalid_policy_before_profile_or_compose(monkeypatch, capsys, policy_url):
+    runner = load_runner_module()
+    values = dict(PROD_LIVE_VALUES)
+    if policy_url is None:
+        values.pop("ANYTOOLAI_PRIVACY_POLICY_URL")
+    else:
+        values["ANYTOOLAI_PRIVACY_POLICY_URL"] = policy_url
+    monkeypatch.setattr(runner, "_resolved_env_file", lambda path: values)
+    monkeypatch.setattr(
+        runner,
+        "_build_deployment_profile",
+        lambda *args: pytest.fail("invalid policy built profile"),
+    )
+    monkeypatch.setattr(
+        runner, "_prod_stack_running", lambda: pytest.fail("invalid policy reached Compose")
+    )
+
+    assert runner.prod_up() == PROD_PREFLIGHT_ERROR_EXIT_CODE
+    assert "ANYTOOLAI_PRIVACY_POLICY_URL" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "policy_url",
+    [
+        "https://example.com/privacy", "http://example.com/privacy",
+        " https://example.com/privacy ",
+        "https://example.com/политика", "https://[2001:db8::1]:8443/privacy",
+        "\ufeffhttps://example.com/privacy\ufeff",
+    ],
+)
+def test_prod_up_passes_valid_policy_to_build_environment(monkeypatch, policy_url):
+    runner = load_runner_module()
+    values = PROD_LIVE_VALUES | {"ANYTOOLAI_PRIVACY_POLICY_URL": policy_url}
+    monkeypatch.setattr(runner, "_resolved_env_file", lambda path: values)
+    captured = []
+    monkeypatch.setattr(
+        runner, "_build_deployment_profile",
+        lambda project, products, unmetered, env: (captured.append(env) or 1, None),
+    )
+
+    assert runner.prod_up() == 1
+    assert captured[0]["ANYTOOLAI_PRIVACY_POLICY_URL"] == policy_url
+
+
+@pytest.mark.parametrize(
+    "failure", [FileNotFoundError("node"), subprocess.TimeoutExpired("node", 30)]
+)
+def test_prod_up_fails_closed_when_policy_validator_cannot_run(monkeypatch, capsys, failure):
+    runner = load_runner_module()
+    monkeypatch.setattr(runner, "_resolved_env_file", lambda path: dict(PROD_LIVE_VALUES))
+    real_run = runner.subprocess.run
+
+    def fail_validation(command, *args, **kwargs):
+        if command[:2] == ["node", "--eval"]:
+            raise failure
+        return real_run(command, *args, **kwargs)
+
+    monkeypatch.setattr(runner.subprocess, "run", fail_validation)
+    monkeypatch.setattr(
+        runner,
+        "_build_deployment_profile",
+        lambda *args: pytest.fail("unchecked policy built profile"),
+    )
+
+    assert runner.prod_up() == PROD_PREFLIGHT_ERROR_EXIT_CODE
+    assert "could not be validated with Node.js" in capsys.readouterr().err
+
+
+def test_prod_maintenance_inputs_allow_missing_policy_url(monkeypatch):
+    runner = load_runner_module()
+    values = dict(PROD_LIVE_VALUES)
+    values.pop("ANYTOOLAI_PRIVACY_POLICY_URL")
+    monkeypatch.setattr(runner, "_resolved_env_file", lambda path: values)
+
+    assert runner._deployment_inputs().enabled_product_ids == ("proposal_ai",)
 
 
 @pytest.mark.parametrize(

@@ -163,6 +163,25 @@ describe("ProductRunPage", () => {
     }
   });
 
+  it("keeps the notice before submit and describes the button through idle, running and result", async () => {
+    const routed = makeClientWithDeferredRoute(happyPathRoutes(), ROUTES.SESSION);
+    renderPage({ client: routed.client });
+    await waitForForm();
+    const form = screen.getByRole("form");
+    const notice = within(form).getByTestId("data-processing-notice");
+    const button = within(form).getByRole("button", { name: "Run" });
+    expect(notice.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(button.getAttribute("aria-describedby")?.split(" ")).toContain(notice.id);
+    fillValidForm();
+    submit();
+    await screen.findByRole("button", { name: "Generating…" });
+    expect(within(form).getByTestId("data-processing-notice")).toBe(notice);
+    await act(async () => routed.resolveDeferred(sessionResponse()));
+    await waitForResult();
+    expect(within(form).getByTestId("data-processing-notice")).toBe(notice);
+    expect(button.getAttribute("aria-describedby")?.split(" ")).toContain(notice.id);
+  });
+
   it.each(["Try again", "Run"])("retries occupied capacity using %s with the same key and an unlocked form", async (button) => {
     const { client, calls } = makeClientCapturingRequests({
       ...happyPathRoutes(),
