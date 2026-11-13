@@ -356,6 +356,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   }, []);
 
   const [values, setValues] = useState<V>(definition.emptyValues);
+  const valuesRef = useLatest(values);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof V, FieldError>>>({});
   const liveValidationFieldsRef = useRef(new Set<keyof V>());
   const [phase, setPhase] = useState<Phase<R>>({ kind: "idle" });
@@ -892,6 +893,36 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       return;
     }
     resultFetchSettledRef.current = true;
+    const inputErrors: Partial<Record<keyof V, FieldError>> = definition.resultFieldErrors?.(extracted) ?? {};
+    if (Object.keys(inputErrors).length > 0) {
+      // Recovered runs can belong to an older draft; only mark fields still matching that input.
+      const submittedValues = activeInputRef.current ?? definition.emptyValues;
+      const currentErrors: Partial<Record<keyof V, FieldError>> = {};
+      for (const field in inputErrors) {
+        if (valuesRef.current[field] === submittedValues[field]) {
+          currentErrors[field] = inputErrors[field];
+          liveValidationFieldsRef.current.add(field);
+        }
+      }
+      if (draftKey !== null && readProductDraft(draftKey)?.run?.scenarioSessionId === scenarioSessionId) {
+        saveDraftRun(draftKey, null);
+      }
+      if (attachActiveRef.current || displayedResult?.attached) callSafely(onAttachEndRef.current);
+      attachActiveRef.current = false;
+      resumedRunRef.current = null;
+      activeInputRef.current = null;
+      setPendingStart(null);
+      setDisplayedResult(null);
+      setHandoffStatus("idle");
+      setFieldErrors(currentErrors);
+      setPhase({ kind: "idle" });
+      requestAnimationFrame(() => {
+        if (!controller?.signal.aborted && activeScenarioSessionIdRef.current === scenarioSessionId) {
+          formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+        }
+      });
+      return;
+    }
     // `scenario_completed` is emitted by the commit-time effect on `phase` below, not here:
     // `setPhase` only queues the update, so emitting here would report a result that never
     // rendered (unmount, navigation, a renderer that throws).

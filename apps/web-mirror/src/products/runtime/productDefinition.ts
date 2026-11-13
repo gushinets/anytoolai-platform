@@ -122,6 +122,8 @@ export type ProductDefinition<V extends Record<string, unknown>, R> = {
   toInput: (values: V) => Record<string, unknown>;
   /** Frontend-safe canonical output -> the product's result; null means unusable. */
   extractResult: (output: Record<string, unknown>) => R | null;
+  /** A parsed result may request corrected input instead of a result view or copy activation. */
+  resultFieldErrors?: (result: R) => Partial<Record<keyof V, FieldError>>;
   /**
    * Whether a completed run's result counts as "viewed" (`web.result_viewed`). Optional, default
    * true. A product whose viewed-activation is narrower than "a result rendered" (Brief Decoder: a

@@ -282,14 +282,18 @@ def test_proposal_ai_weak_input_end_to_end_produces_the_checked_in_weak_fixture_
     assert result_response.json()["output"] == {"text": expected_text, "gaps": []}
 
 
+@pytest.mark.parametrize("gaps_fixture_key", [
+    "proposal_ai.detect_experience_gaps_v1.with_gaps",
+    "proposal_ai.detect_experience_gaps_v1.missing_input",
+])
 def test_proposal_ai_returns_detected_experience_gaps_next_to_the_text(
     app: Any,
     request_platform_api,
     session_factory: SessionFactory,
+    gaps_fixture_key: str,
 ) -> None:
     """The gaps step output reaches the final artifact (`gaps`) and the proposal step still
     produces `text`: two provider calls, one per step."""
-    gaps_fixture_key = "proposal_ai.detect_experience_gaps_v1.with_gaps"
     expected_gaps = json.loads(
         (FIXTURE_ROOT / f"{gaps_fixture_key}.json").read_text(encoding="utf-8")
     )["response_json"]["issues"]

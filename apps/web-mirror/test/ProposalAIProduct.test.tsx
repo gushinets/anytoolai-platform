@@ -419,14 +419,32 @@ describe("ProposalAI product definition", () => {
     expect(proposalAiDefinition.extractResult({ text: 42, gaps: [] })).toBeNull();
   });
 
-  it("keeps only gaps that carry a description and tolerates a missing gaps list", () => {
+  it("reads legacy text-only results and valid experience gaps", () => {
     expect(proposalAiDefinition.extractResult({ text: "ok" })).toEqual({ text: "ok", gaps: [] });
     expect(
       proposalAiDefinition.extractResult({
         text: "ok",
-        gaps: [{ category: "experience_gap", description: "No HubSpot." }, { description: 3 }, "x", null],
+        gaps: [{ category: "experience_gap", description: "No HubSpot.", severity: "high" }],
       }),
     ).toEqual({ text: "ok", gaps: [{ description: "No HubSpot." }] });
+  });
+
+  it.each([
+    { category: "unknown", description: "x", severity: "high" },
+    { category: "toString", description: "x", severity: "high" },
+    { category: "missing_task_description", description: 3, severity: "high" },
+    { category: "experience_gap", description: "x", severity: "urgent" },
+    { description: "Missing category" }, null, "x",
+  ])("rejects malformed or unknown issues: %j", (issue) => {
+    expect(proposalAiDefinition.extractResult({ text: "ok", gaps: [issue] })).toBeNull();
+  });
+
+  it.each(["missing_task_description", "missing_profile_information"])("maps %s only to its own field", (category) => {
+    const result = proposalAiDefinition.extractResult({ text: "Internal clarification", gaps: [{ category, description: "Missing input", severity: "high" }] });
+    expect(result?.fieldErrors).toEqual({
+      [category === "missing_task_description" ? "taskText" : "freelancerPositioning"]: { code: "product", key: `validation.${category}` },
+    });
+    expect(result?.gaps).toEqual([]);
   });
 
   it("sends the proposal language only when one is chosen, and trims pasted outer whitespace", async () => {
@@ -872,5 +890,133 @@ describe("ProposalAI draft and run restore (ANY-841)", () => {
     expect((document.getElementById("proposal-ai-tone-warm") as HTMLInputElement).checked).toBe(true);
     expect(second.calls.some((call) => call.key === ROUTES.SESSION)).toBe(false);
     expect((JSON.parse(window.sessionStorage.getItem(key)!) as { run?: unknown }).run).toBeUndefined();
+  });
+});
+
+describe("ProposalAI missing source information (ANY-843)", () => {
+  const draftKey = "anytoolai.product_draft.proposal_ai.generate";
+  const rejectedOutput = {
+    text: "Internal clarification, never a proposal.",
+    gaps: ["missing_task_description", "missing_profile_information"].map((category) => ({
+      category, description: "Internal model explanation.", severity: "high",
+    })),
+  };
+  const input = { taskText: "№№№", freelancerPositioning: "hello", tone: "firm", language: "es" };
+  function responses(outputs = [rejectedOutput]) {
+    return {
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
+      [ROUTES.QUOTA]: Array.from({ length: 8 }, () => quotaResponse(IDS)),
+      [ROUTES.START]: outputs.map(() => startResponse()),
+      [ROUTES.SESSION]: outputs.map(() => sessionResponse()),
+      [ROUTES.RESULT]: outputs.map((output) => resultResponse(IDS, { output })),
+    };
+  }
+  async function fillAndSubmit() {
+    await screen.findByRole("form");
+    fireEvent.change(document.getElementById("proposal-ai-task-text")!, { target: { value: input.taskText } });
+    fireEvent.change(document.getElementById("proposal-ai-positioning")!, { target: { value: input.freelancerPositioning } });
+    fireEvent.click(document.getElementById("proposal-ai-tone-firm")!);
+    fireEvent.change(document.getElementById("proposal-ai-language")!, { target: { value: input.language } });
+    fireEvent.submit(screen.getByRole("form"));
+  }
+
+  it.each([
+    ["missing_task_description", "proposal-ai-task-text", "proposal-ai-positioning"],
+    ["missing_profile_information", "proposal-ai-positioning", "proposal-ai-task-text"],
+  ])("focuses only the field reported by %s", async (category, invalidId, validId) => {
+    const routed = makeClient(responses([{ ...rejectedOutput, gaps: rejectedOutput.gaps.filter((gap) => gap.category === category) }]));
+    render(<ProposalAIProduct client={routed.client} />);
+    await fillAndSubmit();
+    await waitFor(() => expect(document.activeElement?.id).toBe(invalidId));
+    expect(document.getElementById(invalidId)!.getAttribute("aria-invalid")).toBe("true");
+    expect(document.getElementById(validId)!.getAttribute("aria-invalid")).toBe("false");
+  });
+
+  it.each(["en", "ru", "es", "de", "fr", "it", "pt"] as const)("shows hints in UI locale %s, preserves input and has no result activation", async (locale) => {
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+    const routed = makeClient(responses());
+    const onEvent = vi.fn();
+    render(<ProposalAIProduct client={routed.client} onEvent={onEvent} />);
+    await fillAndSubmit();
+    await screen.findByText(PROPOSAL_AI_MESSAGES[locale].validation.missing_task_description);
+    expect(screen.getByText(PROPOSAL_AI_MESSAGES[locale].validation.missing_profile_information)).toBeTruthy();
+    const task = document.getElementById("proposal-ai-task-text") as HTMLTextAreaElement;
+    await waitFor(() => expect(document.activeElement).toBe(task));
+    expect(task.value).toBe(input.taskText);
+    expect(task.disabled).toBe(false);
+    expect(task.getAttribute("aria-describedby")).toContain("proposal-ai-task-error");
+    expect((document.getElementById("proposal-ai-positioning") as HTMLTextAreaElement).value).toBe(input.freelancerPositioning);
+    expect((document.getElementById("proposal-ai-language") as HTMLSelectElement).value).toBe("es");
+    expect((document.getElementById("proposal-ai-tone-firm") as HTMLInputElement).checked).toBe(true);
+    expect(screen.queryByText(rejectedOutput.text)).toBeNull();
+    expect(screen.queryByText("Internal model explanation.")).toBeNull();
+    expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+    expect(onEvent).not.toHaveBeenCalledWith(expect.objectContaining({ type: "scenario_completed" }));
+    expect(onEvent).not.toHaveBeenCalledWith(expect.objectContaining({ type: "copy_activated" }));
+    expect(JSON.parse(window.sessionStorage.getItem(draftKey)!)).toEqual({ v: 1, values: input });
+  });
+
+  it("clears a previous result and uses a fresh request after correction", async () => {
+    const routed = makeClientCapturingRequests(responses([
+      { text: PROPOSAL_TEXT, gaps: [] }, rejectedOutput, { text: "Corrected proposal", gaps: [] },
+    ]));
+    render(<ProposalAIProduct client={routed.client} />);
+    await fillAndSubmit();
+    await screen.findByText(PROPOSAL_TEXT);
+    fireEvent.submit(screen.getByRole("form"));
+    await screen.findByText(PROPOSAL_AI_MESSAGES.en.validation.missing_task_description);
+    expect(screen.queryByText(PROPOSAL_TEXT)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Copy" })).toBeNull();
+    const task = document.getElementById("proposal-ai-task-text")!;
+    fireEvent.change(task, { target: { value: "Write a recipe." } });
+    expect(task.getAttribute("aria-invalid")).toBe("false");
+    expect(document.getElementById("proposal-ai-positioning")!.getAttribute("aria-invalid")).toBe("true");
+    fireEvent.change(document.getElementById("proposal-ai-positioning")!, { target: { value: "I write recipes." } });
+    fireEvent.submit(screen.getByRole("form"));
+    await screen.findByText("Corrected proposal");
+    const starts = routed.calls.filter((request) => request.key === ROUTES.START);
+    expect(starts).toHaveLength(3);
+    expect(new Set(starts.map(idempotencyKeyOf)).size).toBe(3);
+  });
+
+  it.each([false, true])("resumes rejection without marking corrected draft fields (edited=%s)", async (edited) => {
+    const values = edited ? { ...input, freelancerPositioning: "I write recipes." } : input;
+    window.sessionStorage.setItem(draftKey, JSON.stringify({ v: 1, values, run: { scenarioSessionId: "session_1", input } }));
+    const routed = makeClient(responses());
+    render(<ProposalAIProduct client={routed.client} />);
+    await screen.findByText(PROPOSAL_AI_MESSAGES.en.validation.missing_task_description);
+    expect(document.getElementById("proposal-ai-positioning")!.getAttribute("aria-invalid")).toBe(String(!edited));
+    expect(routed.calls.some((call) => call.key === ROUTES.START)).toBe(false);
+    expect(JSON.parse(window.sessionStorage.getItem(draftKey)!)).toEqual({ v: 1, values });
+    cleanup();
+    const remount = makeClient(responses());
+    render(<ProposalAIProduct client={remount.client} />);
+    await screen.findByRole("form");
+    expect(remount.calls.some((call) => call.key === ROUTES.SESSION || call.key === ROUTES.START)).toBe(false);
+  });
+
+  it("ends rejection of an attachment without deleting another saved run", async () => {
+    const saved = { v: 1, values: input, run: { scenarioSessionId: "other_session", input } };
+    window.sessionStorage.setItem(draftKey, JSON.stringify(saved));
+    const routed = makeClient(responses());
+    const onAttachEnd = vi.fn();
+    render(<ProposalAIProduct client={routed.client} attachSessionId="session_1" onAttachEnd={onAttachEnd} />);
+    await screen.findByText(PROPOSAL_AI_MESSAGES.en.validation.missing_task_description);
+    expect(onAttachEnd).toHaveBeenCalledOnce();
+    expect(JSON.parse(window.sessionStorage.getItem(draftKey)!)).toEqual(saved);
+    expect(screen.queryByRole("button", { name: "Copy" })).toBeNull();
+  });
+
+  it("ignores rejected output after unmount", async () => {
+    const routes = responses();
+    routes[ROUTES.RESULT] = [];
+    const routed = makeClientWithDeferredCalls(routes, { [ROUTES.RESULT]: 1 });
+    const onAttachEnd = vi.fn();
+    const view = render(<ProposalAIProduct client={routed.client} attachSessionId="session_1" onAttachEnd={onAttachEnd} />);
+    await waitFor(() => expect(routed.calls.some((call) => call.key === ROUTES.RESULT)).toBe(true));
+    view.unmount();
+    await act(async () => routed.resolveCall(ROUTES.RESULT, 0, resultResponse(IDS, { output: rejectedOutput })));
+    expect(onAttachEnd).not.toHaveBeenCalled();
   });
 });

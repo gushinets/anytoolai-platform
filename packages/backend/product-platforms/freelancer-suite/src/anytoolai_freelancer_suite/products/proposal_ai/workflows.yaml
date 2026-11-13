@@ -4,7 +4,7 @@ workflows:
     input_schema_ref: proposal_ai.generate_input_v1
     output_schema_ref: proposal_ai.generate_output_v1
     # A04 -> A06. A04 reads the client's task as `source_text` and the freelancer's experience as
-    # its own `context` (no string concatenation needed); its `experience_gap` issues are both
+    # its own `context` (no string concatenation needed); its typed issues are both
     # returned to the user as `gaps` and handed to A06 as `constraints.claims_to_avoid`
     # (a dotted `context.*` input target is not allowed by the mapping DSL).
     steps:
@@ -13,7 +13,7 @@ workflows:
         input_mapping:
           source_text: scenario.input.task_text
           context: scenario.input.freelancer_positioning
-          taxonomy: 'literal:["experience_gap"]'
+          taxonomy: 'literal:["experience_gap","missing_task_description","missing_profile_information"]'
         output_mapping:
           context.workflow_output.gaps: steps.detect_gaps.output.issues
       - step_id: compose_persuasive_text

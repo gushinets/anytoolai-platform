@@ -132,7 +132,7 @@ def test_workflow_input_mapping_uses_only_generic_mapping_dsl_syntax() -> None:
     assert detect["input_mapping"]["source_text"] == "scenario.input.task_text"
     assert detect["input_mapping"]["context"] == "scenario.input.freelancer_positioning"
     assert json.loads(detect["input_mapping"]["taxonomy"].removeprefix("literal:")) == [
-        "experience_gap"
+        "experience_gap", "missing_task_description", "missing_profile_information"
     ]
     assert detect["output_mapping"] == {"context.workflow_output.gaps": "steps.detect_gaps.output.issues"}
 
@@ -539,3 +539,22 @@ def test_generate_input_schema_matches_the_ticket_field_contract() -> None:
     trimmed_pattern = "^\\S([\\s\\S]*\\S)?(?!\\n)$"
     assert schema["properties"]["task_text"]["pattern"] == trimmed_pattern
     assert schema["properties"]["freelancer_positioning"]["pattern"] == trimmed_pattern
+
+
+def test_input_sufficiency_contract_and_eval_matrix() -> None:
+    taxonomy = json.loads(_load_yaml("workflows.yaml")["workflows"][0]["steps"][0]["input_mapping"]["taxonomy"].removeprefix("literal:"))
+    detect = _load_prompt("prompts/detect_experience_gaps.v1.md")
+    compose = _load_prompt("prompts/compose_persuasive_text.v1.md")
+    for category in taxonomy:
+        assert category in detect
+        assert category in compose
+    fixture = json.loads((FIXTURE_ROOT / "proposal_ai.detect_experience_gaps_v1.missing_input.json").read_text())
+    assert {issue["category"] for issue in fixture["response_json"]["issues"]} == set(taxonomy) - {"experience_gap"}
+    matrix = json.loads((REPO_ROOT / "tests/fixtures/proposal_ai_eval/input_sufficiency.json").read_text())
+    assert len(matrix["orders"]) == 24
+    assert len({case["id"] for case in matrix["orders"]}) == 24
+    for language in ("ru", "en", "es"):
+        cases = [case for case in matrix["orders"] if case["language"] == language]
+        assert len(cases) == 8
+        for case in cases:
+            assert set(case["expected_categories"]) <= set(taxonomy)
