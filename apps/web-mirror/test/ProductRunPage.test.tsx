@@ -111,6 +111,108 @@ class TestErrorBoundary extends Component<{ children: ReactNode }, { failed: boo
 }
 
 describe("ProductRunPage", () => {
+  it.each(["completed", "failed"])("includes submission time and removes progress on %s", async (status) => {
+    const routed = makeClientWithDeferredCalls(happyPathRoutes(), { [ROUTES.START]: 1, [ROUTES.SESSION]: 1 });
+    const view = renderPage({ client: routed.client });
+    await waitForForm();
+    fillValidForm();
+    vi.useFakeTimers();
+    try {
+      submit();
+      expect(screen.getByText("Elapsed: 0:00")).toBeTruthy();
+      expect(within(screen.getByTestId("run-progress")).getByRole("status").textContent).toBe(
+        "Starting… Waiting for confirmation that your request has started.",
+      );
+      await act(async () => { await advance(5_000); });
+      expect(screen.getByText("Elapsed: 0:05")).toBeTruthy();
+      await act(async () => { routed.resolveCall(ROUTES.START, 0, startResponse()); });
+      await act(async () => { await advance(2_000); });
+      expect(screen.getByText("Elapsed: 0:07")).toBeTruthy();
+      await act(async () => { routed.resolveCall(ROUTES.SESSION, 0, sessionResponse({ status })); });
+      expect(screen.queryByTestId("run-progress")).toBeNull();
+      expect(screen.getByText(status === "completed" ? RESULT_TEXT : RUN_FAILED)).toBeTruthy();
+    } finally {
+      view.unmount();
+      vi.useRealTimers();
+    }
+  });
+
+  it.each(["start", "poll", "attach"])("preserves elapsed time after a retryable %s error", async (failure) => {
+    const routes = happyPathRoutes();
+    if (failure === "start") routes[ROUTES.START] = [errorResponse(503, "internal_error"), errorResponse(503, "internal_error"), startResponse()];
+    routes[ROUTES.SESSION] = [
+      ...(failure === "start" ? [] : [() => { throw new TypeError("Connection lost"); }]),
+      ...Array.from({ length: 10 }, () => () => sessionResponse({ status: "running" })),
+    ];
+    const routed = makeClient(routes);
+    vi.useFakeTimers();
+    const view = renderPage({ client: routed.client, ...(failure === "attach" ? { attachSessionId: "session_1" } : {}) });
+    try {
+      await act(async () => { await advance(100); });
+      if (failure !== "attach") {
+        fillValidForm();
+        submit();
+      }
+      await act(async () => { await advance(5_000); });
+      expect(screen.queryByTestId("run-progress")).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+      expect(screen.getByText("Elapsed: 0:05")).toBeTruthy();
+      await act(async () => { await advance(2_000); });
+      expect(screen.getByText("Elapsed: 0:07")).toBeTruthy();
+      expect(routed.calls.filter((call) => call.key === ROUTES.START)).toHaveLength(failure === "start" ? 3 : failure === "attach" ? 0 : 1);
+    } finally {
+      view.unmount();
+      vi.useRealTimers();
+    }
+  });
+
+  it.each(["503", "network"])("waits for acceptance before claiming generation after ambiguous %s retries", async (failure) => {
+    let resolveStart!: (response: Response) => void;
+    const pendingStart = new Promise<Response>((resolve) => { resolveStart = resolve; });
+    let attempts = 0;
+    const { client, calls } = makeClientCapturingRequests({
+      ...happyPathRoutes(),
+      [ROUTES.SESSION]: [sessionResponse({ status: "running" })],
+    }, (key) => {
+      if (key !== ROUTES.START) return undefined;
+      attempts += 1;
+      if (attempts > 2) return pendingStart;
+      if (failure === "network") throw new TypeError("Connection lost");
+      return errorResponse(503, "internal_error");
+    });
+    const view = renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    vi.useFakeTimers();
+    try {
+      submit();
+      await act(async () => { await advance(100); });
+      expect(attempts).toBe(2);
+      expect(screen.queryByTestId("run-progress")).toBeNull();
+      await act(async () => { await advance(65_000, 1_000); });
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+      const progress = screen.getByTestId("run-progress");
+      expect(progress.dataset.stage).toBe("long");
+      expect(screen.getByRole("timer").textContent).toBe("Elapsed: 1:05");
+      expect(within(progress).getByRole("status").textContent).toBe(
+        "Starting… Waiting for confirmation that your request has started.",
+      );
+      expect(calls.some((call) => call.key === ROUTES.SESSION)).toBe(false);
+      const starts = calls.filter((call) => call.key === ROUTES.START);
+      expect(starts).toHaveLength(3);
+      expect(new Set(starts.map(idempotencyKeyOf)).size).toBe(1);
+      await act(async () => { resolveStart(startResponse()); });
+      expect(within(progress).getByRole("status").textContent).toBe(
+        "Running… Taking longer than usual. Generation continues on the server — keep this page open.",
+      );
+      expect(screen.getByRole("timer").textContent).toBe("Elapsed: 1:05");
+      expect(calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(1);
+    } finally {
+      view.unmount();
+      vi.useRealTimers();
+    }
+  });
+
   it("keeps the notice before submit and describes the button through idle, running and result", async () => {
     const routed = makeClientWithDeferredRoute(happyPathRoutes(), ROUTES.SESSION);
     renderPage({ client: routed.client });
@@ -178,6 +280,48 @@ describe("ProductRunPage", () => {
     expect(starts).toHaveLength(2);
     expect(idempotencyKeyOf(starts[0]!)).not.toBe(idempotencyKeyOf(starts[1]!));
     expect(JSON.parse(starts[1]!.init.body as string)).toMatchObject({ input: { text: "A different request." } });
+  });
+
+  it.each([
+    { ambiguous: false, button: "Try again" },
+    { ambiguous: false, button: "Run" },
+    { ambiguous: true, button: "Try again" },
+  ])("times delayed capacity retries through $button (earlier ambiguous start=$ambiguous)", async ({ ambiguous, button }) => {
+    const { client, calls } = makeClientCapturingRequests({
+      ...happyPathRoutes(),
+      [ROUTES.START]: [
+        ...(ambiguous ? [errorResponse(503, "internal_error")] : []),
+        errorResponse(429, "quota_capacity_reserved"),
+        errorResponse(429, "quota_capacity_reserved"),
+        startResponse(),
+      ],
+      [ROUTES.SESSION]: [sessionResponse({ status: "running" })],
+    });
+    const view = renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    vi.useFakeTimers();
+    try {
+      submit();
+      for (const elapsed of ["1:05", "2:10"]) {
+        await act(async () => { await advance(100); });
+        expect(screen.getByText("Capacity is temporarily in use. Please try again shortly.")).toBeTruthy();
+        expect(screen.queryByTestId("run-progress")).toBeNull();
+        await act(async () => { await advance(65_000, 1_000); });
+        fireEvent.click(screen.getByRole("button", { name: button }));
+        expect(screen.getByTestId("run-progress").dataset.stage).toBe(ambiguous ? "long" : "normal");
+        expect(screen.getByText(`Elapsed: ${ambiguous ? elapsed : "0:00"}`)).toBeTruthy();
+      }
+      await act(async () => { await advance(100); });
+      expect(screen.getByRole("button", { name: "Generating…" })).toBeTruthy();
+      expect(screen.getByText(ambiguous ? "Elapsed: 2:10" : "Elapsed: 0:00")).toBeTruthy();
+      const starts = calls.filter((call) => call.key === ROUTES.START);
+      expect(starts).toHaveLength(ambiguous ? 4 : 3);
+      expect(new Set(starts.map(idempotencyKeyOf)).size).toBe(1);
+    } finally {
+      view.unmount();
+      vi.useRealTimers();
+    }
   });
 
   it("keeps repeated definite capacity rejections unlocked without replacing the prepared key", async () => {
@@ -914,10 +1058,13 @@ describe("ProductRunPage", () => {
     expect(text.value).toBe("Edited input.");
     // The progress notice lives in the result card, next to the still-relevant "previous details" one.
     const resultCard = screen.getByRole("heading", { name: "Test result", level: 2 }).closest("section")!;
-    expect(within(resultCard).getByText("Running…")).toBeTruthy();
+    const progress = within(resultCard).getByTestId("run-progress");
+    expect(within(progress).getByRole("status").textContent).toContain("Running…");
+    expect(progress.compareDocumentPosition(screen.getByText(RESULT_TEXT)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(resultCard).getByText("Created from previous details")).toBeTruthy();
     routed.resolveCall(ROUTES.RESULT, 1, resultResponse(TEST_PRODUCT_IDS, { output: { text: "Second result." } }));
     await screen.findByText("Second result.");
+    expect(screen.queryByTestId("run-progress")).toBeNull();
     expect(screen.queryByText("Created from previous details")).toBeNull();
 
     // Copy and New task share one action group.
@@ -1545,6 +1692,7 @@ describe("ProductRunPage", () => {
   });
 
   it.each([
+    { durationMs: 20_000, status: "running", attached: false },
     { durationMs: 70_000, status: "running", attached: false },
     { durationMs: 1_210_000, status: "running", attached: false },
     { durationMs: 1_210_000, status: "started", attached: true },
@@ -1567,9 +1715,14 @@ describe("ProductRunPage", () => {
       expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
       expect(screen.queryByText(RESULT_TEXT)).toBeNull();
       expect(screen.getByRole("button", { name: "Generating…" }).hasAttribute("disabled")).toBe(true);
+      const progress = screen.getByTestId("run-progress");
+      expect(progress.dataset.stage).toBe(durationMs >= 60_000 ? "long" : "normal");
+      expect(within(progress).getByText(`Elapsed: ${Math.floor(durationMs / 60_000)}:${String(durationMs / 1_000 % 60).padStart(2, "0")}`)).toBeTruthy();
+      expect(screen.getByRole("heading", { name: "Test result" }).closest("section")!.contains(progress)).toBe(true);
       completed = true;
       await act(async () => { await advance(2_000); });
       expect(screen.getByText(RESULT_TEXT)).toBeTruthy();
+      expect(screen.queryByTestId("run-progress")).toBeNull();
       expect(calls.filter((call) => call.key === ROUTES.START)).toHaveLength(attached ? 0 : 1);
       expect(calls.filter((call) => call.key.startsWith("GET /v1/scenario-sessions/"))
         .every((call) => call.key === ROUTES.SESSION)).toBe(true);

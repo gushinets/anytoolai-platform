@@ -14,6 +14,13 @@
   "resultFetchFailed": "Your result is ready, but we couldn't load it. Please try again.",
   "starting": "Starting…",
   "generating": "Generating…",
+  "runProgress": {
+    "confirmingStart": "Waiting for confirmation that your request has started.",
+    "elapsed": "Elapsed: {time}",
+    "normal": "This usually takes 10–40 seconds.",
+    "slow": "Still working. Some requests take a bit longer.",
+    "long": "Taking longer than usual. Generation continues on the server — keep this page open."
+  },
   "identityUnavailable": "We couldn't verify your identity. Please reload the page and try again.",
   "retry": "Try again",
   "formLabel": "{product} form",

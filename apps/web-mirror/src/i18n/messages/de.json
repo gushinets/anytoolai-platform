@@ -14,6 +14,13 @@
   "resultFetchFailed": "Ihr Ergebnis ist fertig, konnte aber nicht geladen werden. Bitte versuchen Sie es erneut.",
   "starting": "Wird gestartet…",
   "generating": "Wird erstellt…",
+  "runProgress": {
+    "confirmingStart": "Wir warten auf die Bestätigung, dass deine Anfrage gestartet wurde.",
+    "elapsed": "Vergangene Zeit: {time}",
+    "normal": "Das dauert normalerweise 10–40 Sekunden.",
+    "slow": "Die Erstellung läuft weiter. Manche Anfragen dauern etwas länger.",
+    "long": "Es dauert länger als üblich. Die Erstellung läuft auf dem Server weiter — lass diese Seite geöffnet."
+  },
   "identityUnavailable": "Wir konnten Ihre Identität nicht überprüfen. Bitte laden Sie die Seite neu und versuchen Sie es erneut.",
   "retry": "Erneut versuchen",
   "formLabel": "{product}-Formular",

@@ -65,6 +65,21 @@
   color: var(--color-text-secondary);
 }
 
+.runProgress {
+  display: grid;
+  gap: 4px;
+}
+
+.runProgress p {
+  margin: 0;
+}
+
+.runElapsed {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
 .resultPlaceholder {
   display: grid;
   min-height: 260px;
