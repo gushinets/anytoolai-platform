@@ -1,7 +1,7 @@
 # Deployment
 
-Covers the Proposal AI public web stack (`web-mirror`, `platform-api`, `platform-worker`,
-`postgres`) and the separate credential-free development/CI smoke paths.
+Covers the public product stack, the separate Atom Lab stack, and credential-free development
+and CI smoke checks. Start a VPS update with the [VPS release runbook](vps-release-runbook.md).
 
 ## Compose layout
 
@@ -17,8 +17,13 @@ Covers the Proposal AI public web stack (`web-mirror`, `platform-api`, `platform
 - `docker-compose.vps-135.yml` — optional occupied-host network overlay. Setting
   `ANYTOOLAI_VPS_135_NETWORKS=1` makes live `prod-up`/`prod-ready` append it: only
   `platform-worker` joins external `infra_prompttune`, and only `web-mirror` joins external
-  `payments-portal-prod_edge`; both retain the AnytoolAI default network. Other selector values
-  fail before Compose starts. Fake and dev commands never select this overlay.
+  `payments-portal-prod_edge`; both retain the AnytoolAI default network. The web build uses
+  `platform-api.anytoolai-prod_default` to reach the product API even when Lab shares the edge
+  network. Run containers under the fixed `anytoolai-prod` project with this overlay. Other
+  selector values fail before Compose starts. Fake and dev commands never select this overlay.
+- `docker-compose.atom-lab.vps-135.yml` — Atom Lab network overlay selected by
+  `ANYTOOLAI_VPS_135_NETWORKS=1` in the Lab environment. The API joins the Caddy edge network
+  as `atom-lab-api` and the worker joins `infra_prompttune` for the provider proxy.
 
 `docker-compose.prod.yml` and `docker-compose.atom-lab.yml` use the Compose Specification's
 `!reset`/`!override` merge tags (to remove or replace inherited ports). These require a reasonably
@@ -148,10 +153,9 @@ python3 scripts/agent/runner.py dev-up
 
 Open the worktree-specific API URL reported by `dev-up` with `/atom-lab` appended. Enter the code in
 the page; the page keeps it only in tab memory and sends it as a header. Do not place it in a URL,
-committed `.env`, logs, screenshots, or browser storage. Use HTTPS and an internal network gate for
-any non-local deployment, distribute the code separately, and rotate it by changing the operator
-secret followed by an API restart. Production rollout remains operator-owned and is not performed
-by ANY-459.
+committed `.env`, logs, screenshots, or browser storage. Use the HTTPS ingress profiles below.
+Distribute the code separately and use the [rotation procedure](#shared-data-and-access-code-rotation)
+for a Compose deployment.
 
 ### Internal Atom Lab Compose deployment
 
@@ -159,8 +163,8 @@ by ANY-459.
 `postgres`, one-shot `migrate`, `platform-api`, and `platform-worker` services from
 `docker-compose.yml` with `docker-compose.atom-lab.yml`; it adds no service, database technology,
 SSO layer, or public frontend. The API image already packages `/atom-lab` HTML/CSS/JavaScript.
-PostgreSQL and the API bind to loopback only. External access must pass through an operator-owned
-HTTPS reverse proxy restricted to the approved internal network.
+PostgreSQL and the API publish their host ports on loopback. External access passes through an
+operator-owned HTTPS reverse proxy.
 
 For a separately launched local API process or custom local stand only,
 `ANYTOOLAI_ATOM_LAB_AUTH_DISABLED=true` opens the Lab without a code. The standard Compose
@@ -170,10 +174,11 @@ require Host `localhost`, `127.0.0.1`, or `[::1]` and reject any Origin that dif
 request's scheme, host, or port. Origin-free local CLI requests remain supported. The HTML
 shell rejects framing in both modes. Keep access-code protection enabled behind remote ingress.
 
-Run `python3 scripts/agent/runner.py quick-check` once, create the gitignored secret file with
-owner-only permissions, and set unique PostgreSQL credentials, a high-entropy Lab access code, a different
-server live token, the worker-only OpenAI key, the exact approved HTTPS origin, and a measured
-worker memory limit. If no egress proxy is required, keep `ANYTOOLAI_LLM_HTTPS_PROXY=` blank; do
+Bootstrap the [managed Python environment](vps-release-runbook.md#before-the-maintenance-window),
+create the gitignored secret file with owner-only permissions, and set unique PostgreSQL
+credentials, a high-entropy Lab access code, a different server live token, the worker-only
+OpenAI key, the exact approved HTTPS origin, and a measured worker memory limit.
+If no egress proxy is required, keep `ANYTOOLAI_LLM_HTTPS_PROXY=` blank; do
 not leave a sample proxy hostname. Configure a real worker proxy only when required. Do not reuse
 the Lab code as the live token or `/demo` code. Do not put any credential in a URL, command
 argument, ticket, Git, screenshot, proxy access log, or evidence file. Readiness prints only the
@@ -183,11 +188,10 @@ configured origin.
 install -m 600 infra/compose/.env.atom-lab.example infra/compose/.env.atom-lab
 ```
 
-Before starting Compose, configure ingress. The exact proxy is operator-owned, but it must enforce
-TLS and a network/VPN allowlist before proxying `/atom-lab`, `/atom-lab/*`, and
-`/v1/atom-lab/*` to the loopback API port. Remove `Cookie` and `Authorization` request headers and
-deny these paths on every public virtual host. The Lab uses only `X-Atom-Lab-Access-Code`; a shared
-code is not an internet-facing authentication system and does not replace the network gate.
+Before starting Compose, prepare the ingress configuration. For the internal network profile, enforce
+TLS and a network/VPN allowlist before proxying `/atom-lab`, `/atom-lab/*`, and `/v1/atom-lab/*` to
+the loopback API port. Remove `Cookie` and `Authorization` request headers and deny these paths on
+public virtual hosts. For the shared-code deployment on VPS 135, use the routes and environment below.
 
 ```bash
 python3 scripts/agent/runner.py atom-lab-up
@@ -203,21 +207,72 @@ refuses to replace a running fixed project. For a reviewed update, follow the qu
 `atom-lab-down`, and `atom-lab-up` sequence below; the named PostgreSQL volume and history remain
 preserved. It does not claim that ingress is private or that a paid provider call succeeded.
 
-After the operator verifies HTTPS and the network boundary, run the paid smoke in an approved cost
-window:
+After verifying HTTPS and the approved ingress profile, run the paid smoke in an approved
+cost and maintenance window:
 
 ```bash
 python3 scripts/agent/runner.py atom-lab-smoke
 ```
 
-This reuses the existing A01-A11 Atom Lab live-canary and its cost ceiling/evidence format. After
-all runs are terminal, it restarts API and worker and requires the same recent protected history to
-remain visible. A restart does not resume an interrupted provider call; existing lease
-reconciliation remains authoritative. Keep the redacted evidence report plus the actual HTTPS
-address, time, reviewed commit, and operator confirmation. Never include access/provider/live
-secrets or prompt/input/result bodies. Without an approved address, credentials, cost authority,
-and operator confirmation, the package may be reported as verified but rollout and ANY-468 remain
-incomplete.
+This reuses the A01-A11 live canary and its cost ceiling. After the runs finish, it drains the
+queue, restarts API and worker, and checks the exact saved run IDs through the protected API.
+For a deployment with an existing recorded live smoke run, the operator can verify persistence
+using that run and its saved preset after a controlled restart. Record the live provider
+result, restart time, and successful readback of the same IDs. Record the deployed commit and
+approved HTTPS address. Keep access credentials and prompt, input, and result bodies out of
+the report. Post-restart readback is required to complete ANY-468.
+
+#### Atom Lab on VPS 135
+
+The operator approved `https://any-tool-ai.ru/tools/atom-lab` as a VPS 135 exception to the
+standard VPN/network allowlist. The page and static assets are reachable from any network.
+Caddy forwards the protected Lab API routes, and the Lab API checks the shared code. Anyone
+with the code can read shared Lab data and submit paid runs within the configured limits.
+Issue the code privately to invited testers, agree what test data they may enter, and follow
+the rotation procedure if it is disclosed. The separate Lab API, worker, and database
+contain the Lab's data and jobs.
+[Access policy](../../docs/product-specs/mvp-scope-source-of-truth.md#internal-atom-lab-exception)
+
+Use these values in the Lab's gitignored `.env.atom-lab` with the PostgreSQL, Lab access, live
+token, and worker credentials described above.
+
+```dotenv
+ANYTOOLAI_VPS_135_NETWORKS=1
+ANYTOOLAI_ATOM_LAB_INTERNAL_URL=https://any-tool-ai.ru
+ANYTOOLAI_ATOM_LAB_API_PORT=18114
+ANYTOOLAI_ATOM_LAB_POSTGRES_PORT=15432
+ANYTOOLAI_LLM_HTTPS_PROXY=http://egress-lb:3128
+ANYTOOLAI_ATOM_LAB_RUN_DAILY_LIMIT=400
+ANYTOOLAI_ATOM_LAB_RUN_ACTIVE_LIMIT=8
+```
+
+The limits apply to the whole Lab. The daily counter uses UTC. Up to eight queued or running jobs
+can be accepted, and one worker runs them sequentially. The VPS overlay gives Caddy access to the Lab
+API on `payments-portal-prod_edge` and gives the worker access to the provider proxy on
+`infra_prompttune`. The database and migrator use the Lab's default network.
+
+In the existing Caddy site’s `route` block, replace the `@anytoolai_private` matcher and its
+`respond` line with this block. Keep it ahead of the generic `/tools/*` and `/v1/*` handlers.
+The HTML uses two root asset URLs, and its browser requests use the root Lab API prefix.
+
+```caddyfile
+@atom_lab_page path /tools/atom-lab /tools/atom-lab/
+@atom_lab_routes path /tools/atom-lab /tools/atom-lab/ /atom-lab/atom_lab.css /atom-lab/atom_lab.mjs /v1/atom-lab/*
+route @atom_lab_routes {
+	rewrite @atom_lab_page /atom-lab
+	reverse_proxy atom-lab-api:8000 {
+		header_up -Cookie
+		header_up -Authorization
+	}
+}
+
+@anytoolai_private path /atom-lab /atom-lab/* /tools/atom-lab/* /v1/atom-lab /v1/demo /v1/demo/*
+respond @anytoolai_private 404
+```
+
+Validate the Caddy config and check the external HTTPS route after starting the Lab. Verify both
+assets load, the catalog returns `401` with a missing or wrong code, a valid code unlocks the Lab,
+and the four product routes still load. Keep the previous Caddy config for Lab rollback.
 
 #### Shared data and access-code rotation
 
@@ -579,10 +634,9 @@ of an OpenAI call without the ledger and Squid evidence.
 ## Prod
 
 Install Docker Engine with the Compose plugin, Python 3.12, `uv`, Node.js, and npm on the VPS.
-Clone this repository at the reviewed deployment commit. Run
-`python scripts/agent/runner.py quick-check` once to bootstrap its managed Python environment,
-then `.quick-check-venv/bin/python scripts/agent/runner.py doctor`. The live profile generator
-uses that managed environment. Use `python3` wherever the host exposes Python 3 under that name.
+Prepare the reviewed checkout and bootstrap the managed Python environment using the
+[VPS release runbook](vps-release-runbook.md#before-the-maintenance-window). The live profile
+generator uses that environment. Use `python3` wherever the host exposes Python 3 under that name.
 
 Copy `infra/compose/.env.example` to gitignored `infra/compose/.env.prod`. Fill the PostgreSQL
 user/password/database, a real `OPENAI_API_KEY`, the Squid URL in
@@ -596,6 +650,9 @@ canonical quota; omitting the variable is an error. Never commit or print the co
 On VPS `135.106.164.145`, also set `ANYTOOLAI_WEB_BASE_PATH=/tools` and
 `ANYTOOLAI_VPS_135_NETWORKS=1`. The latter selects the exact external networks
 `infra_prompttune` and `payments-portal-prod_edge`; those networks must already exist.
+For the current four-product release on this VPS, use
+`proposal_ai,client_update_writer,brief_decoder,acceptance_builder` for both
+`ANYTOOLAI_ENABLED_PRODUCT_IDS` and `ANYTOOLAI_UNMETERED_PRODUCT_IDS`.
 `prod-fake-up` explicitly clears an inherited web base path and remains on base + prod only.
 Every public enabled product must also have a registered web page; the production web build
 rejects unknown product IDs before startup. The backend-only `kernel_demo` remains available
@@ -651,7 +708,7 @@ in this exact order without stripping `/tools`:
 ```caddyfile
 {$CADDY_DOMAIN} {
 	route {
-		@anytoolai_private path /tools/atom-lab /tools/atom-lab/* /v1/atom-lab /v1/atom-lab/* /v1/demo /v1/demo/*
+		@anytoolai_private path /atom-lab /atom-lab/* /tools/atom-lab /tools/atom-lab/* /v1/atom-lab /v1/atom-lab/* /v1/demo /v1/demo/*
 		respond @anytoolai_private 404
 
 		@anytoolai_tools path /tools /tools/*
@@ -672,13 +729,13 @@ in this exact order without stripping `/tools`:
 }
 ```
 
-Validate the candidate and the mounted file before accepting traffic. The occupied VPS had a
-pre-existing stale file bind, so its reviewed cutover refreshed only Caddy with
-`docker compose --project-name payments-portal-prod -f docker-compose.prod.yml up -d --no-deps
---force-recreate caddy`; do not recreate the payments API, web, or database. API and web remain
-loopback-bound and PostgreSQL has no host port. Other deployments may use their own reviewed
-ingress, but must preserve the same denies and sensitive-header removal. Keep proxy/firewall
-configuration and evidence operator-owned.
+When deploying Atom Lab on this VPS, use the [Lab routes above](#atom-lab-on-vps-135) in place of
+the private matcher and its response.
+
+Use the [Caddy procedure in the VPS runbook](vps-release-runbook.md#reload-or-restore-caddy-on-vps-135)
+to validate the candidate and check the mounted file before accepting traffic. The product API and
+web host publish ports on loopback, and product PostgreSQL has no host port. Preserve the
+applicable route denies and sensitive-header removal when using another ingress.
 
 If Squid intercepts TLS, add an operator-owned Compose override after the live overlay, for
 example:
@@ -710,19 +767,21 @@ live, then this file; preserve the same required environment and profile mount.
 
 ### Acceptance and quota switch
 
-1. Open the public product domain and run Proposal AI. Confirm another registered product is
-   absent from the home page and its direct page shows not found. Direct API runtime-config,
-   quota, and scenario-start calls for that disabled product must return safe `404`.
-2. From outside the VPS, verify API/web/PostgreSQL ports are not reachable directly. Confirm all
-   six exact/prefix pairs above are blocked by the inbound proxy and the three API access codes
-   are blank. Inspect container environment **by variable name/presence only**: worker has the
-   OpenAI key and proxy; API/web do not. Do not dump environment values into evidence.
-3. Keep the generated manifest fingerprint as the expected value and run `prod-ready`; its
-   read-only check must pass separately in API and worker. Submit more than ten unmetered runs.
-   Confirm successful `platform.provider_calls` rows use the live provider policy and that Squid
-   logs corresponding CONNECT requests. Confirm `platform.guest_quota_usage` does not gain or
-   decrement Proposal AI rows during this window. Save redacted IDs/timestamps, not prompts or
-   secrets.
+1. Open the public site and check the page and runtime-config for every enabled product. Run one
+   known scenario per product. Pick a registered product outside the enabled set and confirm
+   its page and direct runtime-config, quota, and scenario-start requests return safe `404`.
+2. From outside the VPS, verify the API, web, and PostgreSQL ports are unreachable directly.
+   Verify Demo routes return `404` and the three access credentials on the product API are blank.
+   With Lab disabled, check that its routes are blocked. With Lab enabled, check the page,
+   both assets, and catalog access with a missing, incorrect, and valid code as described in
+   [Atom Lab on VPS 135](#atom-lab-on-vps-135). Check worker-only OpenAI key and proxy wiring
+   without recording environment values.
+3. Run `prod-ready` to check the generated profile fingerprint in API and worker. Confirm
+   `platform.provider_calls` rows for the smoke runs use the live provider policy and that Squid
+   logs the corresponding CONNECT requests. Verify the smoke runs did not consume guest quota
+   for unmetered products. To verify a quota change, submit more than ten unmetered runs for
+   the affected product and compare its guest counters before and after. Save redacted run IDs
+   and timestamps as evidence.
 4. Record peak worker memory with `docker stats --no-stream` during a cold catalog refresh and
    real run. Check `docker inspect` for `RestartCount=0` and `OOMKilled=false`; retain memory
    headroom when choosing the production limit.
@@ -731,13 +790,11 @@ live, then this file; preserve the same required environment and profile mount.
    quota rows retains its count; a guest first seen unmetered begins at zero. The web image need
    not change for quota mode alone; runtime config supplies the quota summary.
 
-On VPS `135.106.164.145`, roll back ingress before stopping AnytoolAI: verify the saved Caddyfile
-checksum, write it back to the active host path, validate Compose, and recreate only Caddy with
-the same `--no-deps --force-recreate caddy` command. Validate `/etc/caddy/Caddyfile`, then confirm
-payments, PromptTune, and extensions match their recorded status baseline. Only then, if the new
-stack must stop, run `python scripts/agent/runner.py prod-down` from `/opt/anytoolai-platform`;
-the PostgreSQL volume is preserved. Other deployments should roll back to their previously
-reviewed image/Compose revision and rerun `prod-up` with its matching environment. Removing the
+On VPS `135.106.164.145`, roll back ingress before stopping the affected stack using the
+[VPS release runbook](vps-release-runbook.md#reload-or-restore-caddy-on-vps-135). For a product
+rollback, run `python scripts/agent/runner.py prod-down` from the candidate checkout and preserve
+the PostgreSQL volume. Other deployments should roll back to their previously reviewed
+image/Compose revision and rerun `prod-up` with its matching environment. Removing the
 live overlay alone is **not** a live deployment; use `prod-fake-up` only for the explicit
 credential-free smoke path.
 

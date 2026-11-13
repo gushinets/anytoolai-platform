@@ -110,6 +110,16 @@ No-code requests require a `localhost`, `127.0.0.1`, or `[::1]` Host; any suppli
 Origin must match the request scheme, host, and port. This applies to catalog, history,
 and writes. Remote ingress must retain access-code protection.
 
+Remote Lab deployments use HTTPS and an internal network or VPN allowlist by default. The
+operator approved a VPS 135 exception on November 12, 2026. On that host the HTTPS entry
+page and its static assets are reachable from any network, and protected Lab routes require
+the shared code issued to invited testers. Anyone who obtains the code can read the Lab's
+shared history and presets, change its saved workspace, and submit paid runs within its
+configured limits. The code grants group access and has no per-user revocation. Keep it private,
+rotate it on suspected disclosure, and use test data that all invited testers may see. The
+separate Lab stack stores Lab data apart from product runtime data.
+[VPS 135 profile](../../infra/deployment/README.md#atom-lab-on-vps-135)
+
 The catalog may expose the live `kernel_demo` action configuration, repository prompt, fixed input
 and output schemas, prepared Russian description, and validated example for each A01-A11 atom.
 The Laboratory workspace («Лаборатория») also lists prompts bound to compatible product actions.

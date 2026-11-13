@@ -3,16 +3,14 @@
 ## Status
 
 - State: active
-- Phase: AL10/ANY-468 deployment package implementation; operator rollout blocked
+- Phase: AL10/ANY-468 deployed on VPS 135; persistence acceptance pending
 - Owner: mixed
 - Created: 2026-09-09
-- Last updated: 2026-09-29
-- Review date: 2026-09-16
-- Next action: validate the internal Compose package, then have an authorised operator configure
-  HTTPS/internal ingress and run the credentialed deployment smoke.
-- Blocker: the current environment has no approved internal hostname/network gate, rollout
-  authority, or live OpenAI/live-canary/Atom Lab credentials. AL09, AL10, and the release remain
-  incomplete until real evidence and operator confirmation exist.
+- Last updated: 2026-11-13
+- Review date: 2026-11-13
+- Next action: verify the saved live run and preset after a Lab API/worker restart in a
+  maintenance window.
+- Blocker: AL10 post-restart evidence is outstanding.
 - Linear project: [Atom Lab](https://linear.app/paveldik/project/atom-lab-e1efc95ce888)
 - Milestone: Atom Lab v1
 
@@ -71,7 +69,8 @@
 
 - API: GET /atoms and /atoms/{id}; GET /models and POST /models/refresh; POST/GET /runs,
   GET /runs/{id}; GET/POST /presets, GET/POST version routes, version export, all under /v1/atom-lab.
-  POST /runs uses Idempotency-Key. Shared-code header is internal-only and never persisted client-side.
+  POST /runs uses Idempotency-Key. The browser sends the shared-code header only to Lab routes
+  and keeps the code in tab memory.
 - DB: minimal lab runs snapshot table, preset identity/version tables, last-good model catalog cache,
   using existing migration/repository conventions. Existing session/job/action/artifact/provider
   ledger remains authoritative. No second execution ledger.
@@ -426,32 +425,25 @@ Acceptance: 12 критериев спецификации имеют ссылк
 - [ ] Ранняя Compose/env/asset подготовка уже выполнена в ANY-459/461/464, поэтому QA не блокируется будущим ANY-468. Не закрывать приёмку при отсутствии live credentials/evidence: это blocker, а не альтернативное успешное условие.
 
 
-### AL10 — [ANY-468](https://linear.app/paveldik/issue/ANY-468/atom-lab-v1-compose-razvyortyvanie-i-vnutrennij-runbook): Atom Lab v1: Compose-развёртывание и внутренний runbook
+### AL10 — [ANY-468](https://linear.app/paveldik/issue/ANY-468/atom-lab-v1-compose-razvyortyvanie-i-vnutrennij-runbook): Atom Lab v1 Compose deployment
 
-- [ ] Implement and verify.
 - Depends on: ANY-467.
-- Files/areas: `infra/compose/docker-compose.yml, infra/compose/.env.example, infra/deployment/README.md`; `API/worker packaging`; `docs/exec-plans/active/atom-lab-v1.md`.
+- [x] Package the API, assets, migrator, worker, and durable PostgreSQL as a separate Compose
+  project. Keep the Lab code and server token in its API and the provider key in its worker.
+- [x] Document readiness, catalog refresh, admission limits, shared data, code rotation, and
+  database backup and recovery. The existing lifecycle commands include a live canary with
+  a post-restart history check.
+- [x] Deploy to the operator-approved HTTPS address on VPS 135. The approved VPS exception
+  permits any source network and restricts data access to invited testers with the shared code.
+  Keep the VPN/network allowlist for the standard internal profile.
+- [x] Verify migrations, API and worker readiness, assets, rejected missing/wrong codes,
+  and a successful API-to-worker run with a recorded live OpenAI call.
+- [ ] After a controlled API and worker restart, retrieve the exact saved live run and preset
+  through the protected API and record redacted evidence. Keep AL10 open until this passes.
 
-Проверить упаковку static assets, миграции и env wiring в существующем Compose stack. Отдельный lab access secret только API; live token server-side; OpenAI key только worker. Документировать HTTPS/internal network gate, refresh/catalog stale troubleshooting, backend limits, shared history/presets data handling, backup существующего Postgres и recover/rollback без удаления history. /demo и обычный runtime остаются работоспособны. Никаких новых сервисов/SSO/базы/публичной раздачи кода. Оператор задаёт секреты и разрешённый внутренний адрес; если их нет, остановиться на проверенном deployment package и явно не заявлять rollout.
-
-Acceptance: Compose smoke: migrations, API/worker ready, assets доступны, missing/wrong lab secret fail closed, valid access -> реальный run -> история после restart. Документирована ротация access code и ограничение совместного доступа. Для закрытия задачи в evidence есть фактический адрес и операторская проверка; при blocker задача остаётся незавершённой; код доступа не в Linear/git/logs. План отмечать completed только после приёмки.
-
-### Уточнения после аудита
-
-- [ ] Scope этого тикета — финальное внутреннее развёртывание, операторская проверка и runbook после ANY-467. Не откладывать сюда создание dev/test окружения: auth/env принадлежит ANY-459, catalog worker wiring — ANY-461, static assets/browser setup — ANY-464.
-- [ ] Повторно проверить migration/backup и безопасный rollback существующего Postgres без удаления presets/history, обновление каталога и ротацию lab code. На restart не обещать автоматический resume прерванного provider call.
-- [ ] При отсутствии согласованного внутреннего адреса, секретов или rollout authority оставить rollout blocked и явно указать что package проверен, но развёртывание не завершено. Ни эта задача, ни milestone не считаются выполненными по одному наличию blocker report.
-- [x] Добавлен отдельный internal overlay поверх существующих Postgres/migrate/API/worker без новых
-  сервисов: loopback-only порты, durable volume, обязательные раздельные секреты и worker-only
-  OpenAI key. Публичный `prod-up` и `/demo` не изменены.
-- [x] Добавлены `atom-lab-up|ready|status|quiesce|resume|recovery-postgres-up|down|smoke`:
-  preflight требует HTTPS origin/секреты,
-  readiness проверяет миграционный startup, assets, fail-closed auth, каталог и worker; paid smoke
-  переиспользует A01-A11 live-canary и сравнивает защищённую историю после restart API/worker.
-- [x] Runbook фиксирует HTTPS/internal allowlist, shared history/presets, ротацию, stale catalog,
-  backend limits, backup/restore в отдельную БД и rollback без удаления volume/history.
-- [ ] Фактический адрес, credentialed smoke и операторская проверка отсутствуют; rollout и тикет
-  намеренно остаются незавершёнными.
+[Access policy](../../product-specs/mvp-scope-source-of-truth.md#internal-atom-lab-exception) ·
+[VPS deployment profile](../../../infra/deployment/README.md#atom-lab-on-vps-135) ·
+[Release evidence](../completed/four-products-and-atom-lab-release.md)
 
 
 ## Validation
@@ -579,11 +571,9 @@ Acceptance: Compose smoke: migrations, API/worker ready, assets доступны
 
 ## Open questions
 
-No product decision blocks the first ticket. Implementation must verify current provider metadata
-and exact migration naming; the plan intentionally does not freeze model IDs. Operator secrets,
-internal hostname and rollout authority are required before actual deployment, not for local development.
-Spec and plan are currently local workspace changes; publish them as the first AL01 change before distributed dependent work.
-Any change to contract scope or production execution semantics requires a separate explicit decision.
+Use the approved ingress profile for the deployment. Operator authorization and deployment
+secrets are required for remote rollout. Changes to contract scope or production execution
+semantics require an explicit decision.
 
 ## Follow-up debt
 
