@@ -1,0 +1,31 @@
+[
+  {
+    "scenario_session_id": "scenario_session_01794503441312869107_0000000157_9d689dd746df4dd8b368ff920454b3a3",
+    "session": {
+      "scenario_session_id": "scenario_session_01794503441312869107_0000000157_9d689dd746df4dd8b368ff920454b3a3",
+      "scenario_id": "proposal_ai.generate_v1",
+      "job_id": "job_01794503441316807698_0000000159_d1f0d7b5c7ab4c30aaada44027aabf4c",
+      "status": "completed",
+      "current_checkpoint_id": "result_ready",
+      "allowed_next_actions": [
+        "copy_result"
+      ],
+      "result_artifact_id": "artifact_01794503462887967060_0000000829_865da85e7de04330bf29b83b762d9963"
+    },
+    "result": {
+      "result_artifact_id": "artifact_01794503462887967060_0000000829_865da85e7de04330bf29b83b762d9963",
+      "scenario_session_id": "scenario_session_01794503441312869107_0000000157_9d689dd746df4dd8b368ff920454b3a3",
+      "job_id": "job_01794503441316807698_0000000159_d1f0d7b5c7ab4c30aaada44027aabf4c",
+      "workflow_id": "proposal_ai.generate_v1",
+      "workflow_version": 2,
+      "schema_ref": "proposal_ai.generate_output_v1",
+      "schema_version": 1,
+      "created_at": "2026-11-12T17:11:02.887982Z",
+      "output": {
+        "gaps": [],
+        "text": "Здравствуйте.\n\nЯ дизайнер интерфейсов, 6 лет опыта; работала с сайтами студий и небольших сервисов, поэтому могу подготовить для вашего бизнеса современный и понятный дизайн сайта. Делаю лендинги и мобильные макеты в Figma.\n\nБыстро соберу структуру страницы и покажу промежуточные варианты до финала. Это поможет вам оценить направление работы по ходу проекта и выбрать подходящий вариант оформления.\n\nПришлите краткое описание бизнеса и основную задачу сайта, чтобы начать с подходящей структуры страницы."
+      }
+    },
+    "note": "Collector stopped after a failed case; this already-submitted scenario completed in the worker. Recovered separately, not a complete collector run record."
+  }
+]

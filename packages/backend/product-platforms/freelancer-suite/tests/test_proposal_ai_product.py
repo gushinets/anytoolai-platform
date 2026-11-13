@@ -314,6 +314,48 @@ def test_prompt_v2_pins_the_quality_rules_from_the_qa_report() -> None:
 
 
 
+def test_prompt_requires_a_greeting_and_an_unambiguous_client_name() -> None:
+    """ANY-845 / БАГ-003PR: every tone greets only an unambiguously named client."""
+    prompt = " ".join(_load_prompt("prompts/compose_persuasive_text.v1.md").split())
+
+    for fragment in (
+        "Start with a greeting line of its own",
+        "The greeting is required in every tone",
+        "ends with punctuation",
+        "then an empty line",
+        "Greeting and the client's name:",
+        "Never use a name from `context.freelancer_positioning`",
+        "or a name the freelancer gives as their own",
+        "Never use the name of a third party",
+        "a company, brand or product",
+        "greet without a name",
+        "Preserve the client's identity and the name components the input gives",
+        "normalize an explicitly inflected name only when its nominative is unambiguous",
+        '"Заказ от Анны Ивановой" becomes "Здравствуйте, Анна Иванова!"',
+        "If the nominative is ambiguous, greet without a name",
+        "Otherwise keep the supplied spelling",
+        "Never use a time-of-day greeting",
+        "Having no name does not change the tone",
+        "Copy the selected formula exactly",
+        "| RU | warm | Здравствуйте, Анна! | Здравствуйте! |",
+        "| RU | neutral | Здравствуйте, Анна. | Здравствуйте. |",
+        "| RU | firm | Анна, здравствуйте. | Здравствуйте. |",
+        "| EN | warm | Hi Anna, | Hi, |",
+        "| EN | neutral | Hello Anna, | Hello, |",
+        "| EN | firm | Hello Anna, | Hello, |",
+        "| ES | warm | Hola, Ana: | Hola: |",
+        "| ES | neutral | Hola, Ana: | Hola: |",
+        "| ES | firm | Hola, Ana: | Hola: |",
+        "These formulas are fixed per tone",
+        "the greeting is not courtesy filler and stays",
+        'except the greeting line required in "Structure"',
+        "Vary your opening (not the greeting)",
+    ):
+        assert fragment in prompt, fragment
+    assert "no greeting by name" not in prompt
+    assert "Write the name exactly as the input gives it" not in prompt
+
+
 def test_terms_have_one_prioritized_rule() -> None:
     """ANY-631 code reviews #1 and #2: the status of a client term was defined in five places that
     contradicted each other after every fix. One "Terms" section now decides it, first rule wins."""
