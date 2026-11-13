@@ -7,7 +7,7 @@
 - Created: 2026-11-12
 - Last updated: 2026-11-13
 - Review date: 2026-11-19
-- Next action: user review of round 1 fixes and explicit permission before pushing to GitHub.
+- Next action: review acceptance-aware messages and complete required CI before merging.
 - Blocker: the baseline activation-marker test requires passwordless sudo, unavailable here.
 
 ## Goal
@@ -61,7 +61,8 @@ component and recovery tests, browser checks and frontend documentation.
 - User confirmed TypeScript implementation because this ticket changes the existing web runtime.
 - Production measurements: ProposalAI 8–35 seconds, Brief Decoder 13–42 seconds,
   Client Update Writer 4.5–13 seconds; testers reported discomfort from about 20 seconds.
-  Show the 10–40-second expectation initially, then reassurance at 30 and 60 seconds.
+  Once the start is accepted, show the 10–40-second expectation initially, then reassurance
+  at 30 and 60 seconds. While submitting, show a neutral confirmation hint at every duration.
 - Use the client clock because scenario status has no server start timestamp. Attachment timing
   starts when locally attached; legacy saved runs start timing when resumed.
 - Keep the elapsed counter outside the polite live region; announce only status/hint changes.
@@ -139,3 +140,44 @@ component and recovery tests, browser checks and frontend documentation.
 - No dependency or lockfile changes. Full-check was not repeated because its baseline gate
   remains blocked by the same environment requirement; the complete frontend gate was run above.
   No GitHub comments/review resolution, PR edit, push or live-provider call in this follow-up.
+
+## Review round 2 implementation plan
+
+1. Fast-forward to reviewed PR head e63b9d70, retaining its main merges. Read inline comments
+   and replies; verify the pre-acceptance retry path against the shared runtime.
+2. Use the existing submitting/running phase as the message boundary, independent of elapsed
+   time. Submitting shows the host Starting status plus a neutral confirmation hint at every
+   duration; accepted running sessions retain product status and timed generation hints.
+3. Add the confirmation hint in all seven host locales. This covers both the long-stage
+   server claim and affirmative slow-stage/product status strings across all shared products.
+4. Test two ambiguous failures followed by a delayed pending retry, then acceptance without
+   resetting elapsed time or the request key. Check normal/slow/long presentation transitions.
+5. Run focused, frontend, baseline and documentation checks; distinguish mocked browser
+   evidence from live provider execution, and record limitations without weakening tests.
+
+### Review round 2 progress
+
+- Read all inline comments; no replies. Confirmed the shared renderer uses generation copy
+  before start acceptance, including product-specific status and several slow-stage translations.
+  Fast-forwarded to e63b9d70; managed Python doctor passed. No separate acceptance state needed.
+- Reproduced four failures before fixing: initial pending status in both terminal outcomes,
+  plus delayed ambiguous 503/network retries falsely claiming server-side generation.
+- The existing phase now selects the status and hint in the shared renderer/component.
+  Added one confirmation message in all seven host locales; running hints and timing remain
+  unchanged. No retry, polling, persistence, idempotency or dependency changes.
+- Passed 123 focused component/runtime tests, including pending-to-running transitions at
+  normal, slow and long thresholds; ambiguous retries preserve elapsed time and request keys.
+- Passed four Chromium journeys with mocked API responses: ambiguous 503/network failures,
+  EN/RU at Pixel 5 width, delayed pending retry, quiet accessible timer, acceptance without
+  resetting time, reload continuity and completion cleanup. No browser page errors.
+- Passed complete frontend-check: 738 web tests, 336 CE-kit tests, 55 result-kit tests,
+  349 Chromium cases, workspace lint/typechecks, generated API contracts and production builds.
+  Documentation, generated-doc and whitespace checks passed.
+- Baseline: 3,695 passed, 12 skipped, 657 deselected, two failures. The architecture source
+  scan encountered a temporary CE-kit fixture that the parallel frontend test deleted; the
+  complete provider-boundary test module passed when rerun after frontend-check. The remaining
+  activation-marker failure is unchanged: sudo requires interactive authentication. No tests
+  were weakened or excluded. Sanitized failure context collected.
+- Full-check was not repeated because its baseline still requires unavailable passwordless
+  sudo; its downstream product-suite stage remains unverified. No live provider run or native
+  screen-reader audio check. GitHub review comments and resolution remain outside this fix.

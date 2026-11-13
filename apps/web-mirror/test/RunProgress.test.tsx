@@ -22,7 +22,7 @@ describe("RunProgress", () => {
   });
 
   it("ticks without changing the live status until the 30/60-second thresholds", async () => {
-    const view = render(<RunProgress startedAtMs={NOW} statusText="Generating…" />);
+    const view = render(<RunProgress phase="running" startedAtMs={NOW} statusText="Generating…" />);
     const progress = screen.getByTestId("run-progress");
     const initialStatus = screen.getByRole("status").textContent;
     const timer = screen.getByRole("timer");
@@ -51,20 +51,40 @@ describe("RunProgress", () => {
   });
 
   it.each([
+    { elapsedS: 0, stage: "normal", time: "0:00" },
+    { elapsedS: 30, stage: "slow", time: "0:30" },
+    { elapsedS: 65, stage: "long", time: "1:05" },
+  ])("waits for acceptance at the $stage threshold without resetting time", ({ elapsedS, stage, time }) => {
+    const startedAtMs = NOW - elapsedS * 1_000;
+    const view = render(<RunProgress phase="submitting" startedAtMs={startedAtMs} statusText="Starting…" />);
+    expect(screen.getByTestId("run-progress").dataset.stage).toBe(stage);
+    expect(screen.getByRole("status").textContent).toBe(
+      "Starting… Waiting for confirmation that your request has started.",
+    );
+    expect(screen.getByRole("timer").textContent).toBe(`Elapsed: ${time}`);
+    view.rerender(<RunProgress phase="running" startedAtMs={startedAtMs} statusText="Generating…" />);
+    expect(screen.getByRole("status").textContent).not.toContain("Waiting for confirmation");
+    expect(screen.getByRole("status").textContent).toContain("Generating…");
+    expect(screen.getByTestId("run-progress").dataset.stage).toBe(stage);
+    expect(screen.getByRole("timer").textContent).toBe(`Elapsed: ${time}`);
+    expect(vi.getTimerCount()).toBe(1);
+  });
+
+  it.each([
     { start: NOW - 45_000, time: "0:45", stage: "slow" },
     { start: NOW + 30_000, time: "0:00", stage: "normal" },
   ])("handles restored or future start $start immediately", ({ start, time, stage }) => {
-    render(<RunProgress startedAtMs={start} statusText="Generating…" />);
+    render(<RunProgress phase="running" startedAtMs={start} statusText="Generating…" />);
     expect(screen.getByText(`Elapsed: ${time}`)).toBeTruthy();
     expect(screen.getByTestId("run-progress").dataset.stage).toBe(stage);
   });
 
   it("reads wall time after throttling and restarts cleanly for a new run", async () => {
-    const view = render(<RunProgress startedAtMs={NOW} statusText="Generating…" />);
+    const view = render(<RunProgress phase="running" startedAtMs={NOW} statusText="Generating…" />);
     vi.setSystemTime(NOW + 90_000);
     await act(() => vi.advanceTimersByTime(1_000));
     expect(screen.getByText("Elapsed: 1:31")).toBeTruthy();
-    view.rerender(<RunProgress startedAtMs={Date.now()} statusText="Generating…" />);
+    view.rerender(<RunProgress phase="running" startedAtMs={Date.now()} statusText="Generating…" />);
     expect(screen.getByText("Elapsed: 0:00")).toBeTruthy();
     expect(vi.getTimerCount()).toBe(1);
   });

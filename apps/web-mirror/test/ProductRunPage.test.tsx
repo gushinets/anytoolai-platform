@@ -120,6 +120,9 @@ describe("ProductRunPage", () => {
     try {
       submit();
       expect(screen.getByText("Elapsed: 0:00")).toBeTruthy();
+      expect(within(screen.getByTestId("run-progress")).getByRole("status").textContent).toBe(
+        "Starting… Waiting for confirmation that your request has started.",
+      );
       await act(async () => { await advance(5_000); });
       expect(screen.getByText("Elapsed: 0:05")).toBeTruthy();
       await act(async () => { routed.resolveCall(ROUTES.START, 0, startResponse()); });
@@ -157,6 +160,53 @@ describe("ProductRunPage", () => {
       await act(async () => { await advance(2_000); });
       expect(screen.getByText("Elapsed: 0:07")).toBeTruthy();
       expect(routed.calls.filter((call) => call.key === ROUTES.START)).toHaveLength(failure === "start" ? 3 : failure === "attach" ? 0 : 1);
+    } finally {
+      view.unmount();
+      vi.useRealTimers();
+    }
+  });
+
+  it.each(["503", "network"])("waits for acceptance before claiming generation after ambiguous %s retries", async (failure) => {
+    let resolveStart!: (response: Response) => void;
+    const pendingStart = new Promise<Response>((resolve) => { resolveStart = resolve; });
+    let attempts = 0;
+    const { client, calls } = makeClientCapturingRequests({
+      ...happyPathRoutes(),
+      [ROUTES.SESSION]: [sessionResponse({ status: "running" })],
+    }, (key) => {
+      if (key !== ROUTES.START) return undefined;
+      attempts += 1;
+      if (attempts > 2) return pendingStart;
+      if (failure === "network") throw new TypeError("Connection lost");
+      return errorResponse(503, "internal_error");
+    });
+    const view = renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    vi.useFakeTimers();
+    try {
+      submit();
+      await act(async () => { await advance(100); });
+      expect(attempts).toBe(2);
+      expect(screen.queryByTestId("run-progress")).toBeNull();
+      await act(async () => { await advance(65_000, 1_000); });
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+      const progress = screen.getByTestId("run-progress");
+      expect(progress.dataset.stage).toBe("long");
+      expect(screen.getByRole("timer").textContent).toBe("Elapsed: 1:05");
+      expect(within(progress).getByRole("status").textContent).toBe(
+        "Starting… Waiting for confirmation that your request has started.",
+      );
+      expect(calls.some((call) => call.key === ROUTES.SESSION)).toBe(false);
+      const starts = calls.filter((call) => call.key === ROUTES.START);
+      expect(starts).toHaveLength(3);
+      expect(new Set(starts.map(idempotencyKeyOf)).size).toBe(1);
+      await act(async () => { resolveStart(startResponse()); });
+      expect(within(progress).getByRole("status").textContent).toBe(
+        "Running… Taking longer than usual. Generation continues on the server — keep this page open.",
+      );
+      expect(screen.getByRole("timer").textContent).toBe("Elapsed: 1:05");
+      expect(calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(1);
     } finally {
       view.unmount();
       vi.useRealTimers();

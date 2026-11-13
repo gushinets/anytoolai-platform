@@ -7,9 +7,9 @@ export const RUN_PROGRESS_SLOW_AFTER_S = 30;
 export const RUN_PROGRESS_LONG_AFTER_S = 60;
 const TICK_MS = 1_000;
 
-type Props = { startedAtMs: number; statusText: string; className?: string };
+type Props = { phase: "submitting" | "running"; startedAtMs: number; statusText: string; className?: string };
 
-export function RunProgress({ startedAtMs, statusText, className }: Props) {
+export function RunProgress({ phase, startedAtMs, statusText, className }: Props) {
   const th = useHostT();
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
@@ -23,7 +23,7 @@ export function RunProgress({ startedAtMs, statusText, className }: Props) {
   return (
     <div className={className} data-testid="run-progress" data-stage={stage}>
       <p role="status">
-        {statusText} <span>{th(`runProgress.${stage}`)}</span>
+        {statusText} <span>{th(`runProgress.${phase === "submitting" ? "confirmingStart" : stage}`)}</span>
       </p>
       <p className={styles.runElapsed} role="timer" aria-live="off">
         {th("runProgress.elapsed", { time: formatElapsed(elapsedS) })}

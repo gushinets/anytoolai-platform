@@ -1259,9 +1259,9 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       break;
     case "submitting":
     case "running": {
-      const statusText = tp(`${definition.messageScope}.running`);
+      const statusText = phase.kind === "submitting" ? th("starting") : tp(`${definition.messageScope}.running`);
       const indicator = runStartedAtMs !== null
-        ? <RunProgress startedAtMs={runStartedAtMs} statusText={statusText} className={styles.runProgress} />
+        ? <RunProgress phase={phase.kind} startedAtMs={runStartedAtMs} statusText={statusText} className={styles.runProgress} />
         : <p role="status">{statusText}</p>;
       if (displayedResult) {
         progress = <div className={styles.resultProgress}>{indicator}</div>;

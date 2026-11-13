@@ -15,6 +15,7 @@
   "starting": "Avvio in corso…",
   "generating": "Generazione in corso…",
   "runProgress": {
+    "confirmingStart": "In attesa della conferma di avvio della richiesta.",
     "elapsed": "Tempo trascorso: {time}",
     "normal": "Di solito servono 10–40 secondi.",
     "slow": "La generazione continua. Alcune richieste richiedono un po’ più di tempo.",

@@ -15,6 +15,7 @@
   "starting": "Starting…",
   "generating": "Generating…",
   "runProgress": {
+    "confirmingStart": "Waiting for confirmation that your request has started.",
     "elapsed": "Elapsed: {time}",
     "normal": "This usually takes 10–40 seconds.",
     "slow": "Still working. Some requests take a bit longer.",

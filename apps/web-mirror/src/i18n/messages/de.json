@@ -15,6 +15,7 @@
   "starting": "Wird gestartet…",
   "generating": "Wird erstellt…",
   "runProgress": {
+    "confirmingStart": "Wir warten auf die Bestätigung, dass deine Anfrage gestartet wurde.",
     "elapsed": "Vergangene Zeit: {time}",
     "normal": "Das dauert normalerweise 10–40 Sekunden.",
     "slow": "Die Erstellung läuft weiter. Manche Anfragen dauern etwas länger.",

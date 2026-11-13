@@ -15,6 +15,7 @@
   "starting": "Iniciando…",
   "generating": "Generando…",
   "runProgress": {
+    "confirmingStart": "Esperando la confirmación de que tu solicitud se ha iniciado.",
     "elapsed": "Tiempo transcurrido: {time}",
     "normal": "Esto suele tardar entre 10 y 40 segundos.",
     "slow": "La generación continúa. Algunas solicitudes tardan un poco más.",
