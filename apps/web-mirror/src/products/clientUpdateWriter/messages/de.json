@@ -20,7 +20,8 @@
     "billingAmount": "Betrag",
     "billingDueDate": "Fälligkeitsdatum (optional)",
     "tone": "Tonalität",
-    "tonePlaceholder": "Tonalität auswählen"
+    "tonePlaceholder": "Tonalität auswählen",
+    "billingAmountHelp": "Kurz halten, zum Beispiel „50 % Anzahlung, 900 $“. Grund, Gesamtbetrag und Restzahlung gehören in die Abrechnungsnotizen."
   },
   "fieldNames": {
     "progressNotes": "Die Fortschrittsnotizen",
@@ -37,7 +38,14 @@
     "runFailed": "Beim Schreiben Ihres Updates ist etwas schiefgelaufen. Bitte versuchen Sie es erneut.",
     "resultTitle": "Update",
     "placeholder": "Ihr Update erscheint nach dem Schreiben hier.",
-    "regenerate": "Update neu schreiben"
+    "regenerate": "Update neu schreiben",
+    "example": {
+      "intro": "Einfache Notizen in beliebiger Reihenfolge reichen aus. Zum Beispiel:",
+      "inputs": {
+        "progressNotes": "Neugestaltung der Startseite fertig, warte auf Kundenprüfung bis Freitag. Danach: Unterseiten, ab Montag. Keine Hindernisse."
+      },
+      "output": "Guten Tag,\n\nEin kurzes Update zur Neugestaltung: Die Startseite ist fertig und bis Freitag bereit für Ihre Prüfung. Ab Montag arbeite ich an den Unterseiten. Bisher gibt es keine Hindernisse.\n\nBitte schicken Sie Ihre Anmerkungen zur Startseite bis Freitag, damit die Unterseiten auf der freigegebenen Version aufbauen können."
+    }
   },
   "reply_draft": {
     "submit": "Antwort schreiben",
@@ -45,7 +53,15 @@
     "runFailed": "Beim Schreiben Ihrer Antwort ist etwas schiefgelaufen. Bitte versuchen Sie es erneut.",
     "resultTitle": "Antwortentwurf",
     "placeholder": "Ihre Antwort erscheint nach dem Schreiben hier.",
-    "regenerate": "Antwort neu schreiben"
+    "regenerate": "Antwort neu schreiben",
+    "example": {
+      "intro": "Fügen Sie die Kundennachricht ein und nennen Sie das Ziel der Antwort. Zum Beispiel:",
+      "inputs": {
+        "clientMessage": "Hallo, können Sie noch einen Blogbereich hinzufügen? Und könnten wir alles eine Woche früher bekommen?",
+        "replyGoal": "Den Blog als kostenpflichtige Ergänzung zusagen, die ursprüngliche Frist beibehalten und ein kurzes Gespräch anbieten."
+      },
+      "output": "Hallo,\n\nGern ergänze ich einen Blogbereich. Er liegt außerhalb des vereinbarten Umfangs, daher schicke ich Ihnen heute eine kurze Kostenschätzung. Die gesamte Lieferung ohne Qualitätsverlust um eine Woche vorzuziehen ist nicht realistisch. Ich schlage vor, beim ursprünglichen Termin zu bleiben und die Startseite zuerst zu liefern.\n\nPasst Ihnen morgen ein 15-minütiges Gespräch, um die Details abzustimmen?"
+    }
   },
   "prepaid_request": {
     "submit": "Anfrage schreiben",
@@ -53,6 +69,15 @@
     "runFailed": "Beim Schreiben Ihrer Anfrage ist etwas schiefgelaufen. Bitte versuchen Sie es erneut.",
     "resultTitle": "Vorauszahlungsanfrage",
     "placeholder": "Ihre Anfrage erscheint nach dem Schreiben hier.",
-    "regenerate": "Anfrage neu schreiben"
+    "regenerate": "Anfrage neu schreiben",
+    "example": {
+      "intro": "Der Betrag bleibt kurz; Grund, Gesamtbetrag und Restzahlung gehören in die Notizen. Zum Beispiel:",
+      "inputs": {
+        "billingNotes": "Vereinbartes Budget für das Landingpage-Design: 1.800 $. Die Anzahlung von 50 % (900 $) reserviert die Zeit des Teams; die übrigen 900 $ sind nach Lieferung des Entwurfs fällig. Die Zahlungsdaten folgen in einer separaten Rechnung.",
+        "billingAmount": "50 % Anzahlung, 900 $",
+        "billingDueDate": "innerhalb von 4 Tagen"
+      },
+      "output": "Guten Tag,\n\nUm die Zeit des Teams für das Landingpage-Design zu reservieren, bitte ich innerhalb von 4 Tagen um die Anzahlung von 50 %, also 900 $ des vereinbarten Budgets von 1.800 $. Die übrigen 900 $ sind nach Lieferung des Entwurfs fällig. Die Zahlungsdaten folgen in einer separaten Rechnung.\n\nBitte bestätigen Sie, sobald die Zahlung veranlasst ist."
+    }
   }
 }

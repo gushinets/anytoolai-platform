@@ -16,6 +16,7 @@ import {
   type FieldError,
 } from "../runtime/fieldValidation";
 import type { ProductDefinition, ProductFieldsProps, ProductResultProps, ProductRunEvent } from "../runtime/productDefinition";
+import { ExampleDisclosure } from "../shared/ExampleDisclosure";
 import styles from "./ProposalAIProduct.module.css";
 
 // Product-owned tone UI with three visible radio choices. Values stay the untranslated wire
@@ -140,6 +141,15 @@ function ProposalAIFields({ values, errors, disabled, onChange }: ProductFieldsP
   const t = useProductT();
   return (
     <>
+      <ExampleDisclosure
+        intro={t("generate.example.intro")}
+        items={[
+          { label: t("fields.taskText"), value: t("generate.example.inputs.taskText") },
+          { label: t("fields.freelancerPositioning"), value: t("generate.example.inputs.freelancerPositioning") },
+          { label: t("fields.toneLegend"), value: t("toneOptions.warm") },
+        ]}
+        output={t("generate.example.output")}
+      />
       <div className={styles.fieldGroup}>
         <RequiredLabel htmlFor="proposal-ai-task-text">{t("fields.taskText")}</RequiredLabel>
         <CanonicalTextArea
@@ -240,7 +250,7 @@ function ProposalAIFields({ values, errors, disabled, onChange }: ProductFieldsP
 }
 
 /**
- * ProposalAI's product meaning, and nothing else: its fields and their validation, the mapping to
+ * ProposalAI's product meaning, and nothing else: its first-run example, fields and their validation, the mapping to
  * `proposal_ai.generate_input_v1`, the parts `renderer_contract.yaml` pins (`text` is the only copy target, `gaps`
  * is informational; angle/rationale/model/provider never reach the renderer), the
  * `copy_result` activation, and its message scope (the copy itself is in `messages/`). Everything

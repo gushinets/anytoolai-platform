@@ -36,6 +36,7 @@ import {
 import { makeRender } from "./support/renderWithI18n";
 import { expectDataProcessingNotice } from "./support/expectDataProcessingNotice";
 import { simulateBrowserTranslation } from "@anytoolai/shared-ui/test/support/simulateBrowserTranslation";
+import { LOCALES } from "../src/i18n";
 import { LOCALE_STORAGE_KEY } from "../src/i18n/localeStorage";
 
 const render = makeRender(BRIEF_DECODER_MESSAGES);
@@ -120,6 +121,22 @@ async function decode(queues: ReturnType<typeof routes>, events: ProductRunEvent
 const completedEvents = (events: ProductRunEvent[]) => events.filter((e) => e.type === "scenario_completed");
 
 describe("Brief Decoder definition", () => {
+  it.each(LOCALES)("example brief passes the validator in %s", (locale) => {
+    expect(briefDecoderDefinition.validate(BRIEF_DECODER_MESSAGES[locale].decode.example.inputs)).toEqual({});
+  });
+
+  it("shows an example while keeping the typed brief", async () => {
+    const { client } = makeClient(routes(composedOutput("")));
+    render(<BriefDecoderProduct client={client} />);
+    const field = await screen.findByLabelText<HTMLTextAreaElement>("Client brief");
+    fireEvent.change(field, { target: { value: "My own bakery brief." } });
+    const details = screen.getByTestId<HTMLDetailsElement>("first-run-example");
+    details.open = true;
+    fireEvent(details, new Event("toggle"));
+    expect(field.value).toBe("My own bakery brief.");
+    expect(screen.getByText(BRIEF_DECODER_MESSAGES.en.decode.example.inputs.briefText)).toBeTruthy();
+  });
+
   it("shows the shared processing notice and policy inside the form", async () => {
     vi.stubEnv("NEXT_PUBLIC_ANYTOOLAI_PRIVACY_POLICY_URL", "https://example.com/privacy");
     const { client } = makeClient(routes(composedOutput("")));
@@ -298,7 +315,7 @@ describe("Brief Decoder page", () => {
     await waitFor(() => expect(screen.getByRole("heading", { name: /clarifying questions/ })).toBeTruthy());
     // The workspace cards own the h2s; the four contract parts sit under the result card as h3s.
     expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual(["Your details", "Decoded brief"]);
-    expect(screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual([
+    expect(within(screen.getByRole("region", { name: "Decoded brief" })).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual([
       "Brief",
       "Issues",
       `${expected.questions.length} clarifying questions`,

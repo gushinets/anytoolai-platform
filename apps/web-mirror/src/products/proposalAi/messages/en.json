@@ -36,6 +36,14 @@
     "runFailed": "Something went wrong generating your proposal. Please try again.",
     "resultTitle": "Proposal",
     "placeholder": "Your proposal will appear here after you generate it.",
-    "regenerate": "Regenerate proposal"
+    "regenerate": "Regenerate proposal",
+    "example": {
+      "inputs": {
+        "taskText": "Dana, owner of a yoga studio, is looking for a designer to redesign the studio’s landing page in Figma: one page, mobile version, booking form. Deadline: 3 weeks. Budget: $600.",
+        "freelancerPositioning": "Web designer, 6 years. I design landing pages in Figma for small service businesses (a dental clinic, a fitness studio). I hand over a mobile version and a clickable prototype; two revision rounds included."
+      },
+      "intro": "A short brief plus a profile with checkable facts gives a proposal like this one:",
+      "output": "Hi Dana,\n\nA landing page for a yoga studio where booking has to be easy is right up my alley: I design landing pages in Figma for small service businesses, most recently a fitness studio and a dental clinic. For your page I would deliver the desktop and mobile layouts with the booking form and a clickable prototype within your three weeks and the $600 budget, with two revision rounds included.\n\nIf that works for you, send me your current page and brand materials and I will come back with a plan for the first week."
+    }
   }
 }

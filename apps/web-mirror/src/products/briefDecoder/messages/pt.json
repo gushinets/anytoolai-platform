@@ -14,7 +14,14 @@
     "resultTitle": "Briefing decodificado",
     "placeholder": "Seu briefing decodificado aparecerá aqui após a decodificação.",
     "regenerate": "Decodificar briefing novamente",
-    "continueToTarget": "Criar critérios de aceitação"
+    "continueToTarget": "Criar critérios de aceitação",
+    "example": {
+      "intro": "Cole o briefing exatamente como o cliente escreveu. Um briefing vago como este gera:",
+      "inputs": {
+        "briefText": "Precisamos de um site novo para nossa padaria. Algo moderno, como o dos concorrentes. Queremos colocá-lo no ar antes das festas. Envie seu preço."
+      },
+      "output": "Objetivo do projeto: um novo site para a padaria. Entregas: não informado. Prazo: “antes das festas”, sem data. Orçamento: não informado.\nProblemas: informação ausente (lista de páginas, quem fornece textos e fotos); ambiguidade (“moderno, como os concorrentes”).\nPerguntas a fazer: Quais páginas e funções são necessárias (cardápio, pedidos online, mapa)? Qual é a data exata de lançamento? Quem fornece os textos e as fotos? Qual é a faixa de orçamento prevista?"
+    }
   },
   "result": {
     "brief": "Briefing",
