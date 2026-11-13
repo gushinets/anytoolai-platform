@@ -12,9 +12,9 @@ Related requirements: [ANY-833](https://linear.app/paveldik/issue/ANY-833).
 - Owner: mixed — Portal and Kernel execution owners
 - Last updated: 2026-11-13
 - Review date: 2026-11-13
-- Next action: verify paired PR checks and finish the merge handoff; owner review is complete and correction commits, branch pushes and fixed-finding replies are authorized.
-- Verification gate: focused Step 16 checks and the 2026-11-12 correction acceptance remain complete. The 2026-11-13 remaining corrections pass focused regressions and joint HTTP/browser checks. Earlier image rehearsals do not verify the new sources. The broader acceptance matrix remains deferred by owner decision (Section 3.8).
-- Blocker: none for the planned local work; real external-product integration is outside this plan.
+- Next action: verify paired CI for the final test/documentation follow-up and finish the merge handoff. Earlier correction commits and fixed-finding replies are already published.
+- Verification gate: focused Step 16 checks and the 2026-11-12 correction acceptance remain complete. Executed 2026-11-13 correction regressions and joint HTTP/browser checks pass; the dedicated PostgreSQL lock-wait activation race is NOT_RUN. Earlier image rehearsals do not verify the new sources. The broader acceptance matrix remains deferred by owner decision (Section 3.8).
+- Blocker: final CI confirmation is pending. The preceding Portal run failed on two obsolete test expectations corrected by this follow-up; a new run must confirm a green paired gate. Real external-product integration is outside this plan.
 
 Portal's `docs/exec-plans/active/ANY-766-implementation-plan.md` is authoritative;
 Kernel keeps a byte-for-byte copy at the same repository-relative path.
@@ -54,10 +54,12 @@ The broader acceptance matrix and remote/live work remain deferred to ANY-767.
 
 ## Remaining PR corrections — 2026-11-13
 
-Status: **COMPLETE — selected local verification PASS**. Bases: Portal #167
-`65079f4e` and Kernel #267 `c8e867bf`. Owner review is complete; committing,
-pushing these corrections and replying to fixed PR findings are authorized.
-Merge, image publication and deployment remain separate actions.
+Status: **IMPLEMENTED — executed focused checks PASS; lock-wait activation race
+NOT_RUN; final CI confirmation pending**. Bases: Portal #167
+`65079f4e` and Kernel #267 `c8e867bf`. The five corrections and detailed replies
+to their PR findings are published; the final readiness review identified the
+test expectations and evidence limits below. Merge, image publication and
+deployment remain separate actions.
 The preceding correction pass and its evidence remain complete and distinct.
 
 Implemented five confirmed findings: web service credential exposure, unverified
@@ -105,7 +107,7 @@ P3 and ANY-841. HTTP identity V2, snapshot V3 and other V1 contracts do not chan
    the matching attachment and retains accepted recovery. No second paid replay path
    or new browser-storage version is introduced.
 
-Focused acceptance: PostgreSQL ISO-equivalence and lock-wait boundary activation,
+Required focused coverage: PostgreSQL ISO-equivalence and lock-wait boundary activation,
 upgrade followed immediately by removal, never-active future issuance, no-op,
 rollback, migration/immutability and V1/V2 reads; all delegation boundaries and
 verification changes; secret-free resolved web configuration. Browser coverage
@@ -126,16 +128,23 @@ images/dependencies before runtime checks; obtain separate authorization for any
 missing installation/download. Report PASS/FAIL/NOT_RUN/BLOCKED and the remaining
 legacy-history limitation; never count old images as proof of the new frontend.
 
-The focused Portal PostgreSQL/API/component and Kernel recovery/draft regressions
+Executed focused Portal PostgreSQL/API/component and Kernel recovery/draft regressions
 pass, including prior ownership, policy and delivery invariants. Real paired HTTP
 checks pass for policy/replay and SMTP-backed verification. All eight selected
 desktop/mobile browser cases pass across the focused runs, including the corrected
 draft/mode selector rerun; accessibility and responsive checks pass. Types, changed
 file lint, architecture, documentation and generated drift checks pass. Plans are
-synchronized. Full/live suites and new image builds/rehearsals are **NOT_RUN** for
-this pass; no unresolved local blocker remains. Already-lost history without
-retained proof remains unavailable, as specified above. Migration `20261113_0012`
-was checked only on disposable local PostgreSQL; deployment is not performed.
+synchronized. The dedicated concurrent PostgreSQL lock-wait activation regression
+is **NOT_RUN**; review of the receipt path is structural evidence, not a passing
+runtime race test. Full local/live suites and new image builds/rehearsals are also
+**NOT_RUN** for this pass. The final readiness follow-up corrects the public-callback
+test to reject private fields and checks the distinct `0012` activation/V2 and
+`0011` exhaustion downgrade guards separately, retaining the original no-revival
+assertions. Those focused tests pass locally. The preceding published Portal CI
+failed on those expectations; a new run must confirm the follow-up before a green
+paired gate is claimed. Already-lost history without retained proof remains unavailable, as
+specified above. Migration `20261113_0012` was checked only on disposable local
+PostgreSQL; deployment is not performed.
 
 ## 1. Goal & Final Expected Outcome
 
