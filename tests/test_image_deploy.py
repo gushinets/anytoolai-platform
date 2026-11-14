@@ -5,6 +5,7 @@ import os
 import subprocess
 from contextlib import nullcontext
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
@@ -22,6 +23,7 @@ def image_env(tmp_path: Path) -> dict[str, str]:
     }
 
 
+@pytest.mark.skipif(os.name != "posix", reason="Image installation requires a Linux host")
 def test_profile_uses_image_and_translates_only_generated_host_path(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -111,6 +113,7 @@ def test_image_profile_rejects_symlinks_without_rewriting_external_files(
     assert sentinel.read_text(encoding="utf-8") == original
 
 
+@pytest.mark.skipif(os.name != "posix", reason="Image installation requires a Linux host")
 def test_worker_revision_mismatch_is_refused(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -123,6 +126,20 @@ def test_worker_revision_mismatch_is_refused(
     )
     with pytest.raises(ValueError, match="same reviewed source"):
         runner._validate_image_inputs(image_env(tmp_path))
+
+
+def test_image_installation_refuses_windows_before_docker(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    runner = load_runner_module()
+    monkeypatch.setattr(runner, "os", SimpleNamespace(name="nt"))
+    monkeypatch.setattr(
+        runner.subprocess, "run", lambda *args, **kwargs: pytest.fail("called Docker")
+    )
+    with pytest.raises(ValueError, match="requires a Linux Docker host"):
+        runner._build_image_deployment_profile(
+            "anytoolai-prod", ["proposal_ai"], [], image_env(tmp_path)
+        )
 
 
 def test_source_fingerprint_checks_both_selected_images(
