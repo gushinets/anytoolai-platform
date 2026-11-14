@@ -14,7 +14,14 @@
     "resultTitle": "Analyse des Briefings",
     "placeholder": "Die Analyse Ihres Briefings erscheint hier, sobald sie fertig ist.",
     "regenerate": "Briefing erneut analysieren",
-    "continueToTarget": "Abnahmekriterien erstellen"
+    "continueToTarget": "Abnahmekriterien erstellen",
+    "example": {
+      "intro": "Fügen Sie das Briefing unverändert vom Kunden ein. Ein vages Briefing wie dieses ergibt:",
+      "inputs": {
+        "briefText": "Wir brauchen eine neue Website für unsere Bäckerei. Etwas Modernes, wie bei unseren Wettbewerbern. Sie soll vor den Feiertagen online sein. Bitte schicken Sie uns Ihren Preis."
+      },
+      "output": "Projektziel: eine neue Website für die Bäckerei. Liefergegenstände: nicht angegeben. Frist: „vor den Feiertagen“, ohne Datum. Budget: nicht angegeben.\nProbleme: fehlende Informationen (Seitenliste, wer Texte und Fotos liefert); Mehrdeutigkeit („modern, wie bei Wettbewerbern“).\nRückfragen: Welche Seiten und Funktionen benötigen Sie (Speisekarte, Onlinebestellungen, Karte)? Welches genaue Startdatum meinen Sie? Wer liefert Texte und Fotos? Welchen Budgetrahmen planen Sie?"
+    }
   },
   "result": {
     "brief": "Briefing",

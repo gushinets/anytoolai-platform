@@ -302,6 +302,12 @@ product-owned. Code: `apps/web-mirror/src/i18n/` (library `use-intl`, imported o
   attached handoff sessions time from local observation. Ambiguous/accepted retries retain the
   timestamp; a proved capacity rejection resets timing on retry while preserving the request key;
   leaving the pending state removes the timer. Polling policy remains owned by ANY-777.
+- **First-run example (ANY-847):** ProposalAI, Brief Decoder and each Client Update Writer mode
+  render shared `products/shared/ExampleDisclosure.tsx` first in their `Fields`: a collapsed
+  `<details>` showing inputs and a sample result. Static text never prefills the form or changes
+  typed input or tab drafts. Host messages own `example.toggle|inputs|output|note`; products own
+  `<scope>.example.intro|inputs.<field>|output` in all seven locales. Sample inputs pass their
+  product validators in tests. Prepaid Request keeps Amount short and puts context in Billing notes.
 - **Validation:** shared validators return structured `FieldError` data (`required`,
   `outer_whitespace`, `max_length`, `product`), never prose; `FieldErrorMessage` renders it in the
   current locale. Backend schema validation stays authoritative.
@@ -328,7 +334,9 @@ product-owned. Code: `apps/web-mirror/src/i18n/` (library `use-intl`, imported o
    result card heading, a noun for what the run produces), `placeholder` (shown before the first
    result) and `regenerate` (the submit label once a result is shown). Want a description under the
    title? Add `description` here and set `hasDescription: true` on the `ProductDefinition` -- the
-   shared runtime only looks it up when the flag is set.
+   shared runtime only looks it up when the flag is set. A first-run example goes under
+   `<scope>.example` (`intro`, `inputs.<field>`, `output`) and is rendered by the product’s `Fields`
+   through `ExampleDisclosure`.
 2. Add `fr it de es ru pt` JSON files with the same structure; use the typographic apostrophe `’` (a
    plain `'` before `{` starts ICU quoting); keep placeholders and plural categories. Keep
    product-owned vocabulary such as tone labels in the product's locale files. Reuse host keys

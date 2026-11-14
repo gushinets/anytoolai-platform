@@ -36,6 +36,14 @@
     "runFailed": "Algo salió mal al generar su propuesta. Inténtelo de nuevo.",
     "resultTitle": "Propuesta",
     "placeholder": "Su propuesta aparecerá aquí después de generarla.",
-    "regenerate": "Regenerar propuesta"
+    "regenerate": "Regenerar propuesta",
+    "example": {
+      "intro": "Un brief breve y un perfil con hechos verificables dan una propuesta como esta:",
+      "inputs": {
+        "taskText": "Dana, propietaria de un estudio de yoga, busca un diseñador para renovar la landing page del estudio en Figma: una página, versión móvil y formulario de reservas. Plazo: 3 semanas. Presupuesto: $600.",
+        "freelancerPositioning": "Diseñador web, 6 años de experiencia. Diseño landing pages en Figma para pequeñas empresas de servicios (una clínica dental, un gimnasio). Entrego una versión móvil y un prototipo interactivo; incluyo dos rondas de cambios."
+      },
+      "output": "Hola Dana,\n\nUna landing page para un estudio de yoga donde reservar sea fácil encaja con mi experiencia: diseño landing pages en Figma para pequeñas empresas de servicios, recientemente un gimnasio y una clínica dental. Para tu página entregaría los diseños de escritorio y móvil con el formulario de reservas y un prototipo interactivo dentro de las tres semanas y el presupuesto de $600, con dos rondas de cambios incluidas.\n\nSi te parece bien, envíame tu página actual y los materiales de marca y te propondré un plan para la primera semana."
+    }
   }
 }

@@ -20,7 +20,8 @@
     "billingAmount": "Monto",
     "billingDueDate": "Fecha de vencimiento (opcional)",
     "tone": "Tono",
-    "tonePlaceholder": "Seleccione un tono"
+    "tonePlaceholder": "Seleccione un tono",
+    "billingAmountHelp": "Sé breve, por ejemplo «anticipo del 50%, $900». Indica el motivo, el importe base y el saldo en las notas de facturación."
   },
   "fieldNames": {
     "progressNotes": "Notas de avance",
@@ -37,7 +38,14 @@
     "runFailed": "Algo salió mal al redactar su actualización. Inténtelo de nuevo.",
     "resultTitle": "Actualización",
     "placeholder": "Su actualización aparecerá aquí después de redactarla.",
-    "regenerate": "Redactar actualización de nuevo"
+    "regenerate": "Redactar actualización de nuevo",
+    "example": {
+      "intro": "Bastan notas sencillas en cualquier orden. Por ejemplo:",
+      "inputs": {
+        "progressNotes": "Rediseño de la página de inicio terminado, esperando la revisión del cliente para el viernes. Siguiente paso: páginas interiores, desde el lunes. Sin bloqueos."
+      },
+      "output": "Hola,\n\nUna breve actualización del rediseño: la página de inicio está lista para tu revisión antes del viernes. A partir del lunes pasaré a las páginas interiores. Por ahora no hay bloqueos.\n\nEnvíame tus comentarios sobre la página de inicio antes del viernes para que las páginas interiores se basen en la versión aprobada."
+    }
   },
   "reply_draft": {
     "submit": "Redactar respuesta",
@@ -45,7 +53,15 @@
     "runFailed": "Algo salió mal al redactar su respuesta. Inténtelo de nuevo.",
     "resultTitle": "Borrador de respuesta",
     "placeholder": "Su respuesta aparecerá aquí después de redactarla.",
-    "regenerate": "Redactar respuesta de nuevo"
+    "regenerate": "Redactar respuesta de nuevo",
+    "example": {
+      "intro": "Pega el mensaje del cliente e indica qué debe lograr la respuesta. Por ejemplo:",
+      "inputs": {
+        "clientMessage": "Hola, ¿puedes añadir también una sección de blog? ¿Y podríamos tenerlo todo una semana antes?",
+        "replyGoal": "Aceptar el blog como un extra de pago, mantener el plazo original y ofrecer una llamada breve."
+      },
+      "output": "Hola,\n\nCon gusto añadiré una sección de blog. Queda fuera del alcance acordado, así que hoy te enviaré una breve estimación. Adelantar toda la entrega una semana sin reducir la calidad no es realista; propongo mantener la fecha original y entregar primero la página de inicio.\n\n¿Te vendría bien una llamada de 15 minutos mañana para concretar los detalles?"
+    }
   },
   "prepaid_request": {
     "submit": "Redactar solicitud",
@@ -53,6 +69,15 @@
     "runFailed": "Algo salió mal al redactar su solicitud. Inténtelo de nuevo.",
     "resultTitle": "Solicitud de prepago",
     "placeholder": "Su solicitud aparecerá aquí después de redactarla.",
-    "regenerate": "Redactar solicitud de nuevo"
+    "regenerate": "Redactar solicitud de nuevo",
+    "example": {
+      "intro": "El importe debe ser breve; el motivo, la base y el saldo van en las notas. Por ejemplo:",
+      "inputs": {
+        "billingNotes": "Presupuesto acordado para el diseño de la landing page: $1.800. El anticipo del 50% ($900) reserva el tiempo del equipo; los $900 restantes se pagan tras entregar la maqueta. Los datos de pago llegarán en una factura aparte.",
+        "billingAmount": "anticipo del 50%, $900",
+        "billingDueDate": "en un plazo de 4 días"
+      },
+      "output": "Hola,\n\nPara reservar el tiempo del equipo para el diseño de la landing page, te pido que abones en un plazo de 4 días el anticipo del 50%, es decir, $900 del presupuesto acordado de $1.800. Los $900 restantes se pagan tras entregar la maqueta. Los datos de pago llegarán en una factura aparte.\n\nConfirma, por favor, cuando hayas enviado el pago."
+    }
   }
 }

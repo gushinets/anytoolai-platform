@@ -27,6 +27,8 @@ import { PROPOSAL_AI_MESSAGES } from "../src/products/proposalAi/messages";
 import { makeRender } from "./support/renderWithI18n";
 import { expectDataProcessingNotice } from "./support/expectDataProcessingNotice";
 import { simulateBrowserTranslation } from "@anytoolai/shared-ui/test/support/simulateBrowserTranslation";
+import type { ProductRunEvent } from "../src/products/runtime/productDefinition";
+import { LOCALES } from "../src/i18n";
 import { LOCALE_STORAGE_KEY } from "../src/i18n/localeStorage";
 
 const render = makeRender(PROPOSAL_AI_MESSAGES);
@@ -67,6 +69,47 @@ function renderReady() {
 }
 
 describe("ProposalAI product definition", () => {
+  it.each(LOCALES)("example inputs pass the product validator in %s", (locale) => {
+    const inputs = PROPOSAL_AI_MESSAGES[locale].generate.example.inputs;
+    expect(proposalAiDefinition.validate({ ...inputs, tone: "warm", language: "auto" })).toEqual({});
+  });
+
+  it("opening an example preserves typed input, draft and events, and never submits sample text", async () => {
+    const onEvent = vi.fn<(event: ProductRunEvent) => void>();
+    const routed = makeClientCapturingRequests({
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
+      [ROUTES.QUOTA]: [quotaResponse(IDS), quotaResponse(IDS)],
+      [ROUTES.START]: [startResponse()],
+      [ROUTES.SESSION]: [sessionResponse()],
+      [ROUTES.RESULT]: [resultResponse(IDS, { output: { text: PROPOSAL_TEXT } })],
+    });
+    render(<ProposalAIProduct client={routed.client} onEvent={onEvent} />);
+    const task = await screen.findByLabelText<HTMLTextAreaElement>(/^Describe the task/);
+    const profile = screen.getByLabelText<HTMLTextAreaElement>(/^Your experience and strengths/);
+    const details = screen.getByTestId<HTMLDetailsElement>("first-run-example");
+    fireEvent.change(task, { target: { value: "My own task" } });
+    fireEvent.change(profile, { target: { value: "My own experience" } });
+    const draft = { ...window.sessionStorage };
+    const events = onEvent.mock.calls.slice();
+    details.open = true;
+    fireEvent(details, new Event("toggle"));
+    expect(task.value).toBe("My own task");
+    expect(profile.value).toBe("My own experience");
+    expect({ ...window.sessionStorage }).toEqual(draft);
+    expect(onEvent.mock.calls).toEqual(events);
+    expect(onEvent.mock.calls.filter(([event]) => event.type === "form_started")).toHaveLength(1);
+    expect(onEvent.mock.calls.filter(([event]) => event.type === "form_submitted")).toHaveLength(0);
+    expect(screen.getByText(PROPOSAL_AI_MESSAGES.en.generate.example.inputs.taskText)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+    await screen.findByText(PROPOSAL_TEXT);
+    const request = routed.calls.find((call) => call.key === ROUTES.START);
+    expect((JSON.parse(request!.init.body as string) as { input: unknown }).input).toEqual({
+      task_text: "My own task", freelancer_positioning: "My own experience", tone: "warm",
+    });
+    expect(request!.init.body).not.toContain(PROPOSAL_AI_MESSAGES.en.generate.example.inputs.taskText);
+  });
+
   it("shows the shared processing notice and policy inside the form", async () => {
     vi.stubEnv("NEXT_PUBLIC_ANYTOOLAI_PRIVACY_POLICY_URL", "https://example.com/privacy");
     renderReady();

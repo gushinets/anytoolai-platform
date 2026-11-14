@@ -131,7 +131,7 @@ describe("ProductPageShell locale rendering", () => {
     expect(await screen.findByRole("button", { name: messages.generate.submit })).toBeTruthy();
     expect(screen.getByLabelText(labelStartingWith(messages.fields.taskText))).toBeTruthy();
     expect(screen.getByLabelText(labelStartingWith(messages.fields.freelancerPositioning))).toBeTruthy();
-    expect(screen.getByText(messages.fields.toneLegend)).toBeTruthy();
+    expect(screen.getByRole("radiogroup", { name: messages.fields.toneLegend })).toBeTruthy();
     expect(screen.getByLabelText(messages.toneOptions.warm)).toBeTruthy();
     expect(screen.getByLabelText(messages.toneOptions.neutral)).toBeTruthy();
     expect(screen.getByLabelText(messages.toneOptions.firm)).toBeTruthy();
