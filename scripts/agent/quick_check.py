@@ -96,6 +96,7 @@ def pytest_command() -> list[str]:
         FAST_PYTEST_MARK_EXPRESSION,
         "--basetemp",
         str(pytest_basetemp()),
+        "--durations=25",
         *PYTEST_TARGETS,
     ]
 
