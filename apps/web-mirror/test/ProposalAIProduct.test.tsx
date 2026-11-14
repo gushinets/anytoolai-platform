@@ -2,6 +2,7 @@
 // `proposal_ai.generate_input_v1`, the canonical `text` field, and the `copy_result`
 // activation. The shared runtime behavior it rides on is proven in ProductRunPage.test.tsx.
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
+import proposalInputSchema from "../../../packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/proposal_ai/schemas/generate_input.schema.json";
 import { useAttachSession, readAttachSessionId } from "../src/products/runtime/attachSession";
 import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -207,7 +208,7 @@ describe("ProposalAI product definition", () => {
     await waitFor(() => expect(screen.getByText(PROPOSAL_TEXT)).toBeTruthy());
     const startCall = calls.find((call) => call.key === ROUTES.START);
     expect(JSON.parse(startCall?.init.body as string)).toMatchObject({
-      input: { task_text: "Build a landing page.", freelancer_positioning: "Frontend freelancer.", tone: "warm" },
+      input: { result_contract: proposalInputSchema.properties.result_contract.const, task_text: "Build a landing page.", freelancer_positioning: "Frontend freelancer.", tone: "warm" },
     });
     expect(JSON.parse(startCall?.init.body as string)).not.toHaveProperty("input.language");
   });
@@ -419,14 +420,32 @@ describe("ProposalAI product definition", () => {
     expect(proposalAiDefinition.extractResult({ text: 42, gaps: [] })).toBeNull();
   });
 
-  it("keeps only gaps that carry a description and tolerates a missing gaps list", () => {
+  it("reads legacy text-only results and valid experience gaps", () => {
     expect(proposalAiDefinition.extractResult({ text: "ok" })).toEqual({ text: "ok", gaps: [] });
     expect(
       proposalAiDefinition.extractResult({
         text: "ok",
-        gaps: [{ category: "experience_gap", description: "No HubSpot." }, { description: 3 }, "x", null],
+        gaps: [{ category: "experience_gap", description: "No HubSpot.", severity: "high" }],
       }),
     ).toEqual({ text: "ok", gaps: [{ description: "No HubSpot." }] });
+  });
+
+  it.each([
+    { category: "unknown", description: "x", severity: "high" },
+    { category: "toString", description: "x", severity: "high" },
+    { category: "missing_task_description", description: 3, severity: "high" },
+    { category: "experience_gap", description: "x", severity: "urgent" },
+    { description: "Missing category" }, null, "x",
+  ])("rejects malformed or unknown issues: %j", (issue) => {
+    expect(proposalAiDefinition.extractResult({ text: "ok", gaps: [issue] })).toBeNull();
+  });
+
+  it.each(["missing_task_description", "missing_profile_information"])("maps %s only to its own field", (category) => {
+    const result = proposalAiDefinition.extractResult({ text: "Internal clarification", gaps: [{ category, description: "Missing input", severity: "high" }] });
+    expect(result?.fieldErrors).toEqual({
+      [category === "missing_task_description" ? "taskText" : "freelancerPositioning"]: { code: "product", key: `validation.${category}` },
+    });
+    expect(result?.gaps).toEqual([]);
   });
 
   it("sends the proposal language only when one is chosen, and trims pasted outer whitespace", async () => {
@@ -872,5 +891,323 @@ describe("ProposalAI draft and run restore (ANY-841)", () => {
     expect((document.getElementById("proposal-ai-tone-warm") as HTMLInputElement).checked).toBe(true);
     expect(second.calls.some((call) => call.key === ROUTES.SESSION)).toBe(false);
     expect((JSON.parse(window.sessionStorage.getItem(key)!) as { run?: unknown }).run).toBeUndefined();
+  });
+});
+
+describe("ProposalAI missing source information (ANY-843)", () => {
+  const draftKey = "anytoolai.product_draft.proposal_ai.generate";
+  const rejectedOutput = {
+    text: "Internal clarification, never a proposal.",
+    gaps: ["missing_task_description", "missing_profile_information"].map((category) => ({
+      category, description: "Internal model explanation.", severity: "high",
+    })),
+  };
+  const input = { taskText: "№№№", freelancerPositioning: "hello", tone: "firm", language: "es" };
+  function responses(outputs = [rejectedOutput]) {
+    return {
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
+      [ROUTES.QUOTA]: Array.from({ length: 8 }, () => quotaResponse(IDS)),
+      [ROUTES.START]: outputs.map(() => startResponse()),
+      [ROUTES.SESSION]: outputs.map(() => sessionResponse()),
+      [ROUTES.RESULT]: outputs.map((output) => resultResponse(IDS, { output })),
+    };
+  }
+  async function fillAndSubmit(values = input) {
+    await screen.findByRole("form");
+    fireEvent.change(document.getElementById("proposal-ai-task-text")!, { target: { value: values.taskText } });
+    fireEvent.change(document.getElementById("proposal-ai-positioning")!, { target: { value: values.freelancerPositioning } });
+    fireEvent.click(document.getElementById(`proposal-ai-tone-${values.tone}`)!);
+    fireEvent.change(document.getElementById("proposal-ai-language")!, { target: { value: values.language } });
+    fireEvent.submit(screen.getByRole("form"));
+  }
+
+  describe.each(["before-result", "after-result"] as const)("quota refresh %s", (order) => {
+    it.each(["exhausted", "available", "unavailable"] as const)("keeps rejection hints and handles %s quota", async (state) => {
+      const routes = responses([rejectedOutput, { text: PROPOSAL_TEXT, gaps: [] }]);
+      routes[ROUTES.RESULT] = [resultResponse(IDS, { output: { text: PROPOSAL_TEXT, gaps: [] } })];
+      const routed = makeClientWithDeferredCalls(routes, { [ROUTES.QUOTA]: 3, [ROUTES.RESULT]: 1 });
+      render(<ProposalAIProduct client={routed.client} />);
+      await screen.findByRole("form");
+      await waitFor(() => expect(routed.calls.filter((call) => call.key === ROUTES.QUOTA)).toHaveLength(1));
+      await act(async () => routed.resolveCall(ROUTES.QUOTA, 0, quotaResponse(IDS, {
+        used_count: state === "available" ? 1 : 2, remaining_count: state === "available" ? 2 : 1,
+      })));
+      await fillAndSubmit();
+      await waitFor(() => expect(routed.calls.filter((call) => call.key === ROUTES.QUOTA)).toHaveLength(3));
+      const settleQuota = async () => {
+        await act(async () => routed.resolveCall(ROUTES.QUOTA, 2, state === "unavailable"
+          ? errorResponse(503, "temporarily_unavailable")
+          : quotaResponse(IDS, { used_count: state === "exhausted" ? 3 : 2, remaining_count: state === "exhausted" ? 0 : 1, exhausted: state === "exhausted" })));
+        // A stale accepted-run read must not replace the newer completed-run quota.
+        await act(async () => routed.resolveCall(ROUTES.QUOTA, 1, quotaResponse(IDS, {
+          used_count: state === "exhausted" ? 0 : 3, remaining_count: state === "exhausted" ? 3 : 0, exhausted: state !== "exhausted",
+        })));
+      };
+      if (order === "before-result") await settleQuota();
+      await act(async () => routed.resolveCall(ROUTES.RESULT, 0, resultResponse(IDS, { output: rejectedOutput })));
+      await screen.findByText(PROPOSAL_AI_MESSAGES.en.validation.missing_task_description);
+      if (order === "after-result") await settleQuota();
+      expect(screen.getByText(PROPOSAL_AI_MESSAGES.en.validation.missing_profile_information)).toBeTruthy();
+      const button = screen.getByRole("button", { name: "Generate proposal" }) as HTMLButtonElement;
+      expect(button.disabled).toBe(state === "exhausted");
+      if (state === "exhausted") {
+        expect(screen.getByText("0 of 3 proposals remaining.")).toBeTruthy();
+        expect(screen.getByText("You've used all your ProposalAI runs for now.")).toBeTruthy();
+      }
+      fireEvent.change(document.getElementById("proposal-ai-task-text")!, { target: { value: "Write a recipe." } });
+      fireEvent.change(document.getElementById("proposal-ai-positioning")!, { target: { value: "I write recipes." } });
+      fireEvent.submit(screen.getByRole("form"));
+      await act(async () => {});
+      expect(routed.calls.filter((call) => call.key === ROUTES.START)).toHaveLength(state === "exhausted" ? 1 : 2);
+      if (state !== "exhausted") await screen.findByText(PROPOSAL_TEXT);
+    });
+  });
+
+  describe.each([
+    { field: "taskText", id: "proposal-ai-task-text", apiField: "task_text", category: "missing_task_description" },
+    { field: "freelancerPositioning", id: "proposal-ai-positioning", apiField: "freelancer_positioning", category: "missing_profile_information" },
+  ] as const)("normalized rejection for $field", ({ field, id, apiField, category }) => {
+    const initial = { ...input, taskText: "Build a landing page.", freelancerPositioning: "Frontend developer.", [field]: "hello" };
+    const output = { ...rejectedOutput, gaps: rejectedOutput.gaps.filter((gap) => gap.category === category) };
+    const hint = PROPOSAL_AI_MESSAGES.en.validation[category];
+
+    it.each([
+      ["space", "hello", "hello "],
+      ["newline", "hello", "hello\n"],
+      ["tab", "hello", "\thello"],
+      ["NBSP", "hello", "\u00a0hello\u00a0"],
+      ["next line", "hello", "hello\u0085"],
+      ["separator", "hello", "\u001chello"],
+      ["ideographic space", "hello", "hello\u3000"],
+      ["removed padding", " \nhello\t", "hello"],
+    ])("retains errors for %s and permits a corrected value", async (_label, before, after) => {
+      const routed = makeClientCapturingRequests(responses([output, { text: PROPOSAL_TEXT, gaps: [] }]));
+      const onEvent = vi.fn();
+      render(<ProposalAIProduct client={routed.client} onEvent={onEvent} />);
+      await fillAndSubmit({ ...initial, [field]: before });
+      await screen.findByText(hint);
+      const element = document.getElementById(id) as HTMLTextAreaElement;
+      fireEvent.change(element, { target: { value: after } });
+      expect(element.getAttribute("aria-invalid")).toBe("true");
+      expect(screen.getByText(hint)).toBeTruthy();
+      expect(element.value).toBe(after);
+      expect(JSON.parse(window.sessionStorage.getItem(draftKey)!)).toMatchObject({ values: { [field]: after } });
+      onEvent.mockClear();
+      fireEvent.submit(screen.getByRole("form"));
+      await act(async () => {});
+      expect(routed.calls.filter((call) => call.key === ROUTES.START)).toHaveLength(1);
+      expect(onEvent).not.toHaveBeenCalledWith(expect.objectContaining({ type: "form_submitted" }));
+      await waitFor(() => expect(document.activeElement).toBe(element));
+      fireEvent.change(element, { target: { value: "Write a recipe." } });
+      expect(element.getAttribute("aria-invalid")).toBe("false");
+      fireEvent.submit(screen.getByRole("form"));
+      await screen.findByText(PROPOSAL_TEXT);
+      const starts = routed.calls.filter((call) => call.key === ROUTES.START);
+      expect(starts).toHaveLength(2);
+      expect(JSON.parse(starts[0]!.init.body as string)).toMatchObject({ input: { [apiField]: "hello" } });
+      expect(JSON.parse(starts[1]!.init.body as string)).toMatchObject({ input: { [apiField]: "Write a recipe." } });
+      expect(idempotencyKeyOf(starts[0]!)).not.toBe(idempotencyKeyOf(starts[1]!));
+    });
+
+    it.each(["hel\nlo", "hello\uFEFF"])("permits an actual backend value change to %j", async (after) => {
+      const routed = makeClientCapturingRequests(responses([output, { text: PROPOSAL_TEXT, gaps: [] }]));
+      render(<ProposalAIProduct client={routed.client} />);
+      await fillAndSubmit(initial);
+      await screen.findByText(hint);
+      const element = document.getElementById(id)!;
+      fireEvent.change(element, { target: { value: after } });
+      expect(element.getAttribute("aria-invalid")).toBe("false");
+      fireEvent.submit(screen.getByRole("form"));
+      await screen.findByText(PROPOSAL_TEXT);
+      const starts = routed.calls.filter((call) => call.key === ROUTES.START);
+      expect(starts).toHaveLength(2);
+      expect(JSON.parse(starts[1]!.init.body as string)).toMatchObject({ input: { [apiField]: after } });
+    });
+
+    it("retains errors for equivalent values in a recovered draft", async () => {
+      const values = { ...initial, [field]: "\thello\n" };
+      window.sessionStorage.setItem(draftKey, JSON.stringify({ v: 1, values, run: { scenarioSessionId: "session_1", input: initial } }));
+      const routed = makeClient(responses([output]));
+      render(<ProposalAIProduct client={routed.client} />);
+      await screen.findByText(hint);
+      expect((document.getElementById(id) as HTMLTextAreaElement).value).toBe(values[field]);
+      fireEvent.submit(screen.getByRole("form"));
+      await act(async () => {});
+      expect(routed.calls.some((call) => call.key === ROUTES.START)).toBe(false);
+      expect(JSON.parse(window.sessionStorage.getItem(draftKey)!)).toEqual({ v: 1, values });
+    });
+  });
+
+  it.each(["task", "profile", "unchanged", "tone", "language", "task-reverted", "profile-reverted"])(
+    "blocks another start for unchanged rejected fields after %s edits",
+    async (edited) => {
+      const routed = makeClientCapturingRequests(responses([rejectedOutput, rejectedOutput]));
+      const onEvent = vi.fn();
+      render(<ProposalAIProduct client={routed.client} onEvent={onEvent} />);
+      await fillAndSubmit();
+      await screen.findByText(PROPOSAL_AI_MESSAGES.en.validation.missing_task_description);
+      const task = document.getElementById("proposal-ai-task-text")!;
+      const profile = document.getElementById("proposal-ai-positioning")!;
+      if (edited === "task" || edited === "task-reverted") {
+        fireEvent.change(task, { target: { value: "Write a recipe." } });
+      }
+      if (edited === "profile" || edited === "profile-reverted") {
+        fireEvent.change(profile, { target: { value: "I write recipes." } });
+      }
+      if (edited === "task-reverted") fireEvent.change(task, { target: { value: input.taskText } });
+      if (edited === "profile-reverted") fireEvent.change(profile, { target: { value: input.freelancerPositioning } });
+      if (edited === "tone") fireEvent.click(document.getElementById("proposal-ai-tone-warm")!);
+      if (edited === "language") fireEvent.change(document.getElementById("proposal-ai-language")!, { target: { value: "en" } });
+      expect(task.getAttribute("aria-invalid")).toBe(String(edited !== "task"));
+      expect(profile.getAttribute("aria-invalid")).toBe(String(edited !== "profile"));
+      const invalid = edited === "task" ? profile : task;
+      const hint = edited === "task"
+        ? PROPOSAL_AI_MESSAGES.en.validation.missing_profile_information
+        : PROPOSAL_AI_MESSAGES.en.validation.missing_task_description;
+      expect(screen.getByText(hint)).toBeTruthy();
+      onEvent.mockClear();
+      for (let attempt = 0; attempt < 2; attempt++) {
+        fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+        await act(async () => {});
+        expect(routed.calls.filter((call) => call.key === ROUTES.START)).toHaveLength(1);
+        expect(invalid.getAttribute("aria-invalid")).toBe("true");
+        expect(screen.getByText(hint)).toBeTruthy();
+        await waitFor(() => expect(document.activeElement).toBe(invalid));
+      }
+      expect(onEvent).not.toHaveBeenCalledWith(expect.objectContaining({ type: "form_submitted" }));
+    },
+  );
+
+  it("retains semantic errors alongside structural errors and allows a fresh run after both are corrected", async () => {
+    const routed = makeClientCapturingRequests(responses([rejectedOutput, { text: PROPOSAL_TEXT, gaps: [] }]));
+    render(<ProposalAIProduct client={routed.client} />);
+    await fillAndSubmit();
+    await screen.findByText(PROPOSAL_AI_MESSAGES.en.validation.missing_task_description);
+    const task = document.getElementById("proposal-ai-task-text")!;
+    const profile = document.getElementById("proposal-ai-positioning")!;
+    fireEvent.change(task, { target: { value: "   " } });
+    fireEvent.submit(screen.getByRole("form"));
+    expect(screen.getByText("Task description: required.")).toBeTruthy();
+    expect(screen.getByText(PROPOSAL_AI_MESSAGES.en.validation.missing_profile_information)).toBeTruthy();
+    expect(routed.calls.filter((call) => call.key === ROUTES.START)).toHaveLength(1);
+    fireEvent.change(task, { target: { value: "Write a recipe." } });
+    fireEvent.change(profile, { target: { value: "I write recipes." } });
+    fireEvent.submit(screen.getByRole("form"));
+    await screen.findByText(PROPOSAL_TEXT);
+    const starts = routed.calls.filter((call) => call.key === ROUTES.START);
+    expect(starts).toHaveLength(2);
+    expect(idempotencyKeyOf(starts[0]!)).not.toBe(idempotencyKeyOf(starts[1]!));
+    fireEvent.change(task, { target: { value: input.taskText } });
+    fireEvent.change(profile, { target: { value: input.freelancerPositioning } });
+    expect(task.getAttribute("aria-invalid")).toBe("false");
+    expect(profile.getAttribute("aria-invalid")).toBe("false");
+  });
+
+  it.each([
+    ["missing_task_description", "proposal-ai-task-text", "proposal-ai-positioning"],
+    ["missing_profile_information", "proposal-ai-positioning", "proposal-ai-task-text"],
+  ])("focuses only the field reported by %s", async (category, invalidId, validId) => {
+    const routed = makeClient(responses([{ ...rejectedOutput, gaps: rejectedOutput.gaps.filter((gap) => gap.category === category) }]));
+    render(<ProposalAIProduct client={routed.client} />);
+    await fillAndSubmit();
+    await waitFor(() => expect(document.activeElement?.id).toBe(invalidId));
+    expect(document.getElementById(invalidId)!.getAttribute("aria-invalid")).toBe("true");
+    expect(document.getElementById(validId)!.getAttribute("aria-invalid")).toBe("false");
+  });
+
+  it.each(["en", "ru", "es", "de", "fr", "it", "pt"] as const)("shows hints in UI locale %s, preserves input and has no result activation", async (locale) => {
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+    const routed = makeClient(responses());
+    const onEvent = vi.fn();
+    render(<ProposalAIProduct client={routed.client} onEvent={onEvent} />);
+    await fillAndSubmit();
+    await screen.findByText(PROPOSAL_AI_MESSAGES[locale].validation.missing_task_description);
+    expect(screen.getByText(PROPOSAL_AI_MESSAGES[locale].validation.missing_profile_information)).toBeTruthy();
+    const task = document.getElementById("proposal-ai-task-text") as HTMLTextAreaElement;
+    await waitFor(() => expect(document.activeElement).toBe(task));
+    expect(task.value).toBe(input.taskText);
+    expect(task.disabled).toBe(false);
+    expect(task.getAttribute("aria-describedby")).toContain("proposal-ai-task-error");
+    expect((document.getElementById("proposal-ai-positioning") as HTMLTextAreaElement).value).toBe(input.freelancerPositioning);
+    expect((document.getElementById("proposal-ai-language") as HTMLSelectElement).value).toBe("es");
+    expect((document.getElementById("proposal-ai-tone-firm") as HTMLInputElement).checked).toBe(true);
+    expect(screen.queryByText(rejectedOutput.text)).toBeNull();
+    expect(screen.queryByText("Internal model explanation.")).toBeNull();
+    expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+    expect(onEvent).not.toHaveBeenCalledWith(expect.objectContaining({ type: "scenario_completed" }));
+    expect(onEvent).not.toHaveBeenCalledWith(expect.objectContaining({ type: "copy_activated" }));
+    expect(JSON.parse(window.sessionStorage.getItem(draftKey)!)).toEqual({ v: 1, values: input });
+  });
+
+  it("clears a previous result and uses a fresh request after correction", async () => {
+    const routed = makeClientCapturingRequests(responses([
+      { text: PROPOSAL_TEXT, gaps: [] }, rejectedOutput, { text: "Corrected proposal", gaps: [] },
+    ]));
+    render(<ProposalAIProduct client={routed.client} />);
+    await fillAndSubmit();
+    await screen.findByText(PROPOSAL_TEXT);
+    fireEvent.submit(screen.getByRole("form"));
+    await screen.findByText(PROPOSAL_AI_MESSAGES.en.validation.missing_task_description);
+    expect(screen.queryByText(PROPOSAL_TEXT)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Copy" })).toBeNull();
+    const task = document.getElementById("proposal-ai-task-text")!;
+    fireEvent.change(task, { target: { value: "Write a recipe." } });
+    expect(task.getAttribute("aria-invalid")).toBe("false");
+    expect(document.getElementById("proposal-ai-positioning")!.getAttribute("aria-invalid")).toBe("true");
+    fireEvent.change(document.getElementById("proposal-ai-positioning")!, { target: { value: "I write recipes." } });
+    fireEvent.submit(screen.getByRole("form"));
+    await screen.findByText("Corrected proposal");
+    const starts = routed.calls.filter((request) => request.key === ROUTES.START);
+    expect(starts).toHaveLength(3);
+    expect(new Set(starts.map(idempotencyKeyOf)).size).toBe(3);
+  });
+
+  it.each([false, true])("resumes rejection without marking corrected draft fields (edited=%s)", async (edited) => {
+    const values = edited ? { ...input, freelancerPositioning: "I write recipes." } : input;
+    window.sessionStorage.setItem(draftKey, JSON.stringify({ v: 1, values, run: { scenarioSessionId: "session_1", input } }));
+    const routed = makeClient(responses());
+    render(<ProposalAIProduct client={routed.client} />);
+    await screen.findByText(PROPOSAL_AI_MESSAGES.en.validation.missing_task_description);
+    expect(document.getElementById("proposal-ai-positioning")!.getAttribute("aria-invalid")).toBe(String(!edited));
+    expect(routed.calls.some((call) => call.key === ROUTES.START)).toBe(false);
+    expect(JSON.parse(window.sessionStorage.getItem(draftKey)!)).toEqual({ v: 1, values });
+    if (edited) {
+      fireEvent.change(document.getElementById("proposal-ai-positioning")!, { target: { value: input.freelancerPositioning } });
+      expect(screen.getByText(PROPOSAL_AI_MESSAGES.en.validation.missing_profile_information)).toBeTruthy();
+    }
+    fireEvent.submit(screen.getByRole("form"));
+    await act(async () => {});
+    expect(routed.calls.some((call) => call.key === ROUTES.START)).toBe(false);
+    expect(screen.getByText(PROPOSAL_AI_MESSAGES.en.validation.missing_task_description)).toBeTruthy();
+    cleanup();
+    const remount = makeClient(responses());
+    render(<ProposalAIProduct client={remount.client} />);
+    await screen.findByRole("form");
+    expect(remount.calls.some((call) => call.key === ROUTES.SESSION || call.key === ROUTES.START)).toBe(false);
+  });
+
+  it("ends rejection of an attachment without deleting another saved run", async () => {
+    const saved = { v: 1, values: input, run: { scenarioSessionId: "other_session", input } };
+    window.sessionStorage.setItem(draftKey, JSON.stringify(saved));
+    const routed = makeClient(responses());
+    const onAttachEnd = vi.fn();
+    render(<ProposalAIProduct client={routed.client} attachSessionId="session_1" onAttachEnd={onAttachEnd} />);
+    await screen.findByText(PROPOSAL_AI_MESSAGES.en.validation.missing_task_description);
+    expect(onAttachEnd).toHaveBeenCalledOnce();
+    expect(JSON.parse(window.sessionStorage.getItem(draftKey)!)).toEqual(saved);
+    expect(screen.queryByRole("button", { name: "Copy" })).toBeNull();
+  });
+
+  it("ignores rejected output after unmount", async () => {
+    const routes = responses();
+    routes[ROUTES.RESULT] = [];
+    const routed = makeClientWithDeferredCalls(routes, { [ROUTES.RESULT]: 1 });
+    const onAttachEnd = vi.fn();
+    const view = render(<ProposalAIProduct client={routed.client} attachSessionId="session_1" onAttachEnd={onAttachEnd} />);
+    await waitFor(() => expect(routed.calls.some((call) => call.key === ROUTES.RESULT)).toBe(true));
+    view.unmount();
+    await act(async () => routed.resolveCall(ROUTES.RESULT, 0, resultResponse(IDS, { output: rejectedOutput })));
+    expect(onAttachEnd).not.toHaveBeenCalled();
   });
 });

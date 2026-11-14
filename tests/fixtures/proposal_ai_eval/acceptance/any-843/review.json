@@ -1,0 +1,439 @@
+{
+  "scope": "Agent review of every full output for ANY-843 input sufficiency and selected proposal language. Not human acceptance or an overall proposal-quality certification.",
+  "runs": [
+    {
+      "run_id": "any843-candidate-missing-task-ru-1-43c28186",
+      "input_sufficiency": "PASS",
+      "proposal_language": null,
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-missing-profile-ru-1-b8e9c563",
+      "input_sufficiency": "PASS",
+      "proposal_language": null,
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-both-ru-1-1d36e428",
+      "input_sufficiency": "PASS",
+      "proposal_language": null,
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-short-ru-1-a9c76926",
+      "input_sufficiency": "PASS",
+      "proposal_language": "ru",
+      "full_category_match": false,
+      "note": "Unnecessary logo-design experience gap; input remained accepted.",
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-recipe-ru-1-09258b61",
+      "input_sufficiency": "PASS",
+      "proposal_language": "ru",
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-beginner-ru-1-66688154",
+      "input_sufficiency": "PASS",
+      "proposal_language": "ru",
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-skill-gap-ru-1-3e593dfc",
+      "input_sufficiency": "PASS",
+      "proposal_language": "ru",
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-language-ru-1-93ec007f",
+      "input_sufficiency": "PASS",
+      "proposal_language": "ru",
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-missing-task-en-1-2bd44e5e",
+      "input_sufficiency": "PASS",
+      "proposal_language": null,
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-missing-profile-en-1-6f273256",
+      "input_sufficiency": "PASS",
+      "proposal_language": null,
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-both-en-1-2eeab2db",
+      "input_sufficiency": "PASS",
+      "proposal_language": null,
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-short-en-1-a34bc899",
+      "input_sufficiency": "PASS",
+      "proposal_language": "en",
+      "full_category_match": false,
+      "note": "Unnecessary logo-design experience gap; input remained accepted.",
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-recipe-en-1-c674fdd6",
+      "input_sufficiency": "PASS",
+      "proposal_language": "en",
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-beginner-en-1-9038dc76",
+      "input_sufficiency": "PASS",
+      "proposal_language": "en",
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-skill-gap-en-1-3c0a8ff5",
+      "input_sufficiency": "PASS",
+      "proposal_language": "en",
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-language-en-1-334afc48",
+      "input_sufficiency": "PASS",
+      "proposal_language": "en",
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-missing-task-es-1-cffdd47e",
+      "input_sufficiency": "PASS",
+      "proposal_language": null,
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-missing-profile-es-1-9fa214ec",
+      "input_sufficiency": "PASS",
+      "proposal_language": null,
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-both-es-1-ded1b1a2",
+      "input_sufficiency": "PASS",
+      "proposal_language": null,
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-short-es-1-b2730e74",
+      "input_sufficiency": "PASS",
+      "proposal_language": "es",
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-recipe-es-1-d617bfe0",
+      "input_sufficiency": "PASS",
+      "proposal_language": "es",
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-beginner-es-1-98990266",
+      "input_sufficiency": "PASS",
+      "proposal_language": "es",
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-skill-gap-es-1-453817b3",
+      "input_sufficiency": "PASS",
+      "proposal_language": "es",
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-language-es-1-5fdba8d4",
+      "input_sufficiency": "PASS",
+      "proposal_language": "es",
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-missing-task-ru-2-267638fb",
+      "input_sufficiency": "PASS",
+      "proposal_language": null,
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-missing-profile-ru-2-03614401",
+      "input_sufficiency": "PASS",
+      "proposal_language": null,
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-both-ru-2-5177545b",
+      "input_sufficiency": "PASS",
+      "proposal_language": null,
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-short-ru-2-3ae72fee",
+      "input_sufficiency": "PASS",
+      "proposal_language": "ru",
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-recipe-ru-2-2435803b",
+      "input_sufficiency": "PASS",
+      "proposal_language": "ru",
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-beginner-ru-2-352979b0",
+      "input_sufficiency": "PASS",
+      "proposal_language": "ru",
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-skill-gap-ru-2-caf93f52",
+      "input_sufficiency": "PASS",
+      "proposal_language": "ru",
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-language-ru-2-0886365b",
+      "input_sufficiency": "PASS",
+      "proposal_language": "ru",
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-missing-task-en-2-56239b35",
+      "input_sufficiency": "PASS",
+      "proposal_language": null,
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-missing-profile-en-2-bc044d47",
+      "input_sufficiency": "PASS",
+      "proposal_language": null,
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-both-en-2-8edae30d",
+      "input_sufficiency": "PASS",
+      "proposal_language": null,
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-short-en-2-635b0983",
+      "input_sufficiency": "PASS",
+      "proposal_language": "en",
+      "full_category_match": false,
+      "note": "Unnecessary logo-design experience gap; input remained accepted.",
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-recipe-en-2-3b914c85",
+      "input_sufficiency": "PASS",
+      "proposal_language": "en",
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-beginner-en-2-de4c8b17",
+      "input_sufficiency": "PASS",
+      "proposal_language": "en",
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-skill-gap-en-2-1b7c7fc4",
+      "input_sufficiency": "PASS",
+      "proposal_language": "en",
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-language-en-2-d2ca045f",
+      "input_sufficiency": "PASS",
+      "proposal_language": "en",
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-missing-task-es-2-970fc97a",
+      "input_sufficiency": "PASS",
+      "proposal_language": null,
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-missing-profile-es-2-67887eac",
+      "input_sufficiency": "PASS",
+      "proposal_language": null,
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-both-es-2-262136af",
+      "input_sufficiency": "PASS",
+      "proposal_language": null,
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-short-es-2-e2b7aeea",
+      "input_sufficiency": "PASS",
+      "proposal_language": "es",
+      "full_category_match": false,
+      "note": "Unnecessary logo-design experience gap; input remained accepted.",
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-recipe-es-2-58d3c6b5",
+      "input_sufficiency": "PASS",
+      "proposal_language": "es",
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-beginner-es-2-04068cad",
+      "input_sufficiency": "PASS",
+      "proposal_language": "es",
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-skill-gap-es-2-43aefc4d",
+      "input_sufficiency": "PASS",
+      "proposal_language": "es",
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    },
+    {
+      "run_id": "any843-candidate-language-es-2-d46455cc",
+      "input_sufficiency": "PASS",
+      "proposal_language": "es",
+      "full_category_match": true,
+      "note": null,
+      "reviewer": "agent",
+      "human_acceptance": null
+    }
+  ],
+  "provider_calls": 96,
+  "estimated_cost_usd": 0.03470666
+}

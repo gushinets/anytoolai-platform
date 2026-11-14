@@ -17,11 +17,18 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
+import httpx
 import pytest
 import sqlalchemy as sa
 from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
 from anytoolai_platform_core.providers.models import ProviderResponse, ResolvedProviderRequest
-from anytoolai_platform_core.storage.db import provider_calls_table
+from anytoolai_platform_core.storage.db import (
+    execution_reservations_table,
+    guest_quota_usage_table,
+    jobs_table,
+    provider_calls_table,
+    scenario_sessions_table,
+)
 from anytoolai_platform_core.storage.transactions import SessionFactory, transaction_boundary
 from anytoolai_platform_core.workflows.models import JobStatus
 from anytoolai_platform_worker.composition import build_worker
@@ -30,6 +37,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "provider" / "fake_provider_outputs"
 GUEST_ID = "guest_proposal_ai_test"
+RESULT_CONTRACT = "proposal_ai.field_errors_v1"
 
 # `session_factory`/`platform_api_app_factory`/`request_platform_api` (SQLite-backed) come from
 # apps/platform-api/tests/conftest.py -- shared with test_demo_api.py and
@@ -53,7 +61,7 @@ def _start(
             json={
                 "frontend_id": "web_mirror",
                 "guest_id": GUEST_ID,
-                "input": input_payload,
+                "input": {"result_contract": RESULT_CONTRACT, **input_payload},
             },
             request_id=request_id,
         )
@@ -100,6 +108,83 @@ def _provider_call_count(session_factory: SessionFactory, *, job_id: str) -> int
             .select_from(provider_calls_table)
             .where(provider_calls_table.c.job_id == job_id)
         ).scalar_one()
+
+
+@pytest.mark.parametrize("marker", [{}, {"result_contract": "unknown"}, {"result_contract": None}])
+def test_incompatible_client_is_rejected_before_execution_or_quota(
+    app, request_platform_api, session_factory: SessionFactory, marker: dict[str, Any],
+) -> None:
+    response = asyncio.run(request_platform_api(
+        app, "POST", "/v1/products/proposal_ai/scenarios/proposal_ai.generate_v1/start",
+        json={"frontend_id": "web_mirror", "guest_id": GUEST_ID, "input": {
+            "task_text": "№№№", "freelancer_positioning": "привет", **marker,
+        }}, request_id="req_old_client",
+    ))
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY, response.text
+    assert response.json()["error"]["code"] == "scenario_input_invalid"
+    with transaction_boundary(session_factory) as session:
+        for table in (scenario_sessions_table, jobs_table, execution_reservations_table,
+                      guest_quota_usage_table, provider_calls_table):
+            assert session.scalar(sa.select(sa.func.count()).select_from(table)) == 0
+
+
+@pytest.mark.parametrize("completed", [False, True])
+def test_legacy_replay_and_results_survive_while_unmarked_queued_work_fails_safely(
+    app, session_factory: SessionFactory, completed: bool,
+) -> None:
+    registry = app.state.runtime.config_registry
+    schema = registry.schemas["proposal_ai.generate_input_v1"]
+    legacy_schema = replace(schema, version=1, schema={
+        **schema.schema,
+        "properties": {key: value for key, value in schema.schema["properties"].items() if key != "result_contract"},
+        "required": [key for key in schema.schema["required"] if key != "result_contract"],
+    })
+    app.state.runtime = replace(app.state.runtime, config_registry=replace(
+        registry, schemas={**registry.schemas, schema.schema_ref: legacy_schema},
+    ))
+    payload = {"frontend_id": "web_mirror", "guest_id": GUEST_ID, "input": {
+        "task_text": "Build a bakery website.", "freelancer_positioning": "I build websites.",
+    }}
+    path = "/v1/products/proposal_ai/scenarios/proposal_ai.generate_v1/start"
+
+    async def request(method: str, url: str, body=None):
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+            return await client.request(method, url, json=body, headers={"Idempotency-Key": "legacy-start"})
+
+    first = asyncio.run(request("POST", path, payload))
+    assert first.status_code == HTTPStatus.OK, first.text
+    started = first.json()
+    if completed:
+        worker = _build_worker(app, session_factory)
+        processed = asyncio.run(worker.process_next_job())
+        worker.dispose()
+        assert processed is not None and processed.status is JobStatus.succeeded
+
+    app.state.runtime = replace(app.state.runtime, config_registry=registry)
+    replay = asyncio.run(request("POST", path, payload))
+    assert replay.status_code == HTTPStatus.OK, replay.text
+    assert replay.json()["scenario_session_id"] == started["scenario_session_id"]
+    assert replay.json()["job_id"] == started["job_id"]
+    if completed:
+        result = asyncio.run(request("GET", f"/v1/results/{processed.result_artifact_id}"))
+        assert result.status_code == HTTPStatus.OK, result.text
+        assert result.json()["output"]["text"]
+        copy = asyncio.run(request("POST", f"/v1/scenario-sessions/{started['scenario_session_id']}/next-actions/copy_result",
+                                   {"checkpoint_id": "result_ready"}))
+        assert copy.status_code == HTTPStatus.OK, copy.text
+    else:
+        worker = _build_worker(app, session_factory)
+        processed = asyncio.run(worker.process_next_job())
+        worker.dispose()
+        assert processed is not None and processed.status is JobStatus.failed
+        assert processed.result_artifact_id is None
+    assert _provider_call_count(session_factory, job_id=started["job_id"]) == (2 if completed else 0)
+    with transaction_boundary(session_factory) as session:
+        for table in (scenario_sessions_table, jobs_table, execution_reservations_table):
+            assert session.scalar(sa.select(sa.func.count()).select_from(table)) == 1
+        quota = session.execute(sa.select(guest_quota_usage_table)).mappings().one()
+        assert quota["reserved_count"] == 0
+        assert quota["used_count"] == (1 if completed else 0)
 
 
 def test_proposal_ai_happy_path_invokes_a06_once_and_produces_canonical_artifact(
@@ -282,14 +367,18 @@ def test_proposal_ai_weak_input_end_to_end_produces_the_checked_in_weak_fixture_
     assert result_response.json()["output"] == {"text": expected_text, "gaps": []}
 
 
+@pytest.mark.parametrize("gaps_fixture_key", [
+    "proposal_ai.detect_experience_gaps_v1.with_gaps",
+    "proposal_ai.detect_experience_gaps_v1.missing_input",
+])
 def test_proposal_ai_returns_detected_experience_gaps_next_to_the_text(
     app: Any,
     request_platform_api,
     session_factory: SessionFactory,
+    gaps_fixture_key: str,
 ) -> None:
     """The gaps step output reaches the final artifact (`gaps`) and the proposal step still
     produces `text`: two provider calls, one per step."""
-    gaps_fixture_key = "proposal_ai.detect_experience_gaps_v1.with_gaps"
     expected_gaps = json.loads(
         (FIXTURE_ROOT / f"{gaps_fixture_key}.json").read_text(encoding="utf-8")
     )["response_json"]["issues"]
@@ -361,7 +450,8 @@ def test_proposal_ai_rejects_invalid_required_field_values_at_start(
             app,
             "POST",
             "/v1/products/proposal_ai/scenarios/proposal_ai.generate_v1/start",
-            json={"frontend_id": "web_mirror", "guest_id": GUEST_ID, "input": invalid_input},
+            json={"frontend_id": "web_mirror", "guest_id": GUEST_ID,
+                  "input": {"result_contract": RESULT_CONTRACT, **invalid_input}},
             request_id="req_start_invalid",
         )
     )

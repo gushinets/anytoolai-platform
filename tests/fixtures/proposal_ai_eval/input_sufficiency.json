@@ -1,0 +1,416 @@
+{
+  "description": "ANY-843: eight input families in RU/EN/ES. Two attempts each; expected_categories is reviewed against full outputs, not inferred from proposal text.",
+  "orders": [
+    {
+      "id": "missing-task-ru",
+      "task_text": "№№№",
+      "freelancer_positioning": "Я копирайтер, пишу рецепты.",
+      "language": "ru",
+      "expect_language": "ru",
+      "expected_categories": [
+        "missing_task_description"
+      ],
+      "criteria": [
+        {
+          "id": "input-sufficiency",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Are missing-input categories exactly as expected, with valid short inputs accepted and specific skill gaps kept separate?"
+        }
+      ]
+    },
+    {
+      "id": "missing-profile-ru",
+      "task_text": "Напиши рецепт борща",
+      "freelancer_positioning": "привет",
+      "language": "ru",
+      "expect_language": "ru",
+      "expected_categories": [
+        "missing_profile_information"
+      ],
+      "criteria": [
+        {
+          "id": "input-sufficiency",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Are missing-input categories exactly as expected, with valid short inputs accepted and specific skill gaps kept separate?"
+        }
+      ]
+    },
+    {
+      "id": "both-ru",
+      "task_text": "привет",
+      "freelancer_positioning": "1234",
+      "language": "ru",
+      "expect_language": "ru",
+      "expected_categories": [
+        "missing_task_description",
+        "missing_profile_information"
+      ],
+      "criteria": [
+        {
+          "id": "input-sufficiency",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Are missing-input categories exactly as expected, with valid short inputs accepted and specific skill gaps kept separate?"
+        }
+      ]
+    },
+    {
+      "id": "short-ru",
+      "task_text": "Нарисуй логотип",
+      "freelancer_positioning": "Я дизайнер",
+      "language": "ru",
+      "expect_language": "ru",
+      "expected_categories": [],
+      "criteria": [
+        {
+          "id": "input-sufficiency",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Are missing-input categories exactly as expected, with valid short inputs accepted and specific skill gaps kept separate?"
+        }
+      ]
+    },
+    {
+      "id": "recipe-ru",
+      "task_text": "Напиши рецепт борща",
+      "freelancer_positioning": "Я копирайтер, пишу рецепты.",
+      "language": "ru",
+      "expect_language": "ru",
+      "expected_categories": [],
+      "criteria": [
+        {
+          "id": "input-sufficiency",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Are missing-input categories exactly as expected, with valid short inputs accepted and specific skill gaps kept separate?"
+        }
+      ]
+    },
+    {
+      "id": "beginner-ru",
+      "task_text": "Напиши текст для сайта",
+      "freelancer_positioning": "Я начинающий копирайтер, пишу учебные тексты.",
+      "language": "ru",
+      "expect_language": "ru",
+      "expected_categories": [],
+      "criteria": [
+        {
+          "id": "input-sufficiency",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Are missing-input categories exactly as expected, with valid short inputs accepted and specific skill gaps kept separate?"
+        }
+      ]
+    },
+    {
+      "id": "skill-gap-ru",
+      "task_text": "Создай сайт. Обязателен опыт React.",
+      "freelancer_positioning": "Я дизайнер, работаю в Figma.",
+      "language": "ru",
+      "expect_language": "ru",
+      "expected_categories": [
+        "experience_gap"
+      ],
+      "criteria": [
+        {
+          "id": "input-sufficiency",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Are missing-input categories exactly as expected, with valid short inputs accepted and specific skill gaps kept separate?"
+        }
+      ]
+    },
+    {
+      "id": "language-ru",
+      "task_text": "Write a recipe for a food blog.",
+      "freelancer_positioning": "Я копирайтер, пишу рецепты.",
+      "language": "ru",
+      "expect_language": "ru",
+      "expected_categories": [],
+      "criteria": [
+        {
+          "id": "input-sufficiency",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Are missing-input categories exactly as expected, with valid short inputs accepted and specific skill gaps kept separate?"
+        }
+      ]
+    },
+    {
+      "id": "missing-task-en",
+      "task_text": "###",
+      "freelancer_positioning": "I write recipes.",
+      "language": "en",
+      "expect_language": "en",
+      "expected_categories": [
+        "missing_task_description"
+      ],
+      "criteria": [
+        {
+          "id": "input-sufficiency",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Are missing-input categories exactly as expected, with valid short inputs accepted and specific skill gaps kept separate?"
+        }
+      ]
+    },
+    {
+      "id": "missing-profile-en",
+      "task_text": "Write a borscht recipe.",
+      "freelancer_positioning": "Hello",
+      "language": "en",
+      "expect_language": "en",
+      "expected_categories": [
+        "missing_profile_information"
+      ],
+      "criteria": [
+        {
+          "id": "input-sufficiency",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Are missing-input categories exactly as expected, with valid short inputs accepted and specific skill gaps kept separate?"
+        }
+      ]
+    },
+    {
+      "id": "both-en",
+      "task_text": "Hello",
+      "freelancer_positioning": "1234",
+      "language": "en",
+      "expect_language": "en",
+      "expected_categories": [
+        "missing_task_description",
+        "missing_profile_information"
+      ],
+      "criteria": [
+        {
+          "id": "input-sufficiency",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Are missing-input categories exactly as expected, with valid short inputs accepted and specific skill gaps kept separate?"
+        }
+      ]
+    },
+    {
+      "id": "short-en",
+      "task_text": "Design a logo.",
+      "freelancer_positioning": "I am a designer.",
+      "language": "en",
+      "expect_language": "en",
+      "expected_categories": [],
+      "criteria": [
+        {
+          "id": "input-sufficiency",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Are missing-input categories exactly as expected, with valid short inputs accepted and specific skill gaps kept separate?"
+        }
+      ]
+    },
+    {
+      "id": "recipe-en",
+      "task_text": "Write a borscht recipe.",
+      "freelancer_positioning": "I am a copywriter who writes recipes.",
+      "language": "en",
+      "expect_language": "en",
+      "expected_categories": [],
+      "criteria": [
+        {
+          "id": "input-sufficiency",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Are missing-input categories exactly as expected, with valid short inputs accepted and specific skill gaps kept separate?"
+        }
+      ]
+    },
+    {
+      "id": "beginner-en",
+      "task_text": "Write website copy.",
+      "freelancer_positioning": "I am a beginner copywriter writing practice texts.",
+      "language": "en",
+      "expect_language": "en",
+      "expected_categories": [],
+      "criteria": [
+        {
+          "id": "input-sufficiency",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Are missing-input categories exactly as expected, with valid short inputs accepted and specific skill gaps kept separate?"
+        }
+      ]
+    },
+    {
+      "id": "skill-gap-en",
+      "task_text": "Build a website. React experience is mandatory.",
+      "freelancer_positioning": "I am a designer using Figma.",
+      "language": "en",
+      "expect_language": "en",
+      "expected_categories": [
+        "experience_gap"
+      ],
+      "criteria": [
+        {
+          "id": "input-sufficiency",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Are missing-input categories exactly as expected, with valid short inputs accepted and specific skill gaps kept separate?"
+        }
+      ]
+    },
+    {
+      "id": "language-en",
+      "task_text": "Напиши рецепт для кулинарного блога.",
+      "freelancer_positioning": "I am a copywriter who writes recipes.",
+      "language": "en",
+      "expect_language": "en",
+      "expected_categories": [],
+      "criteria": [
+        {
+          "id": "input-sufficiency",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Are missing-input categories exactly as expected, with valid short inputs accepted and specific skill gaps kept separate?"
+        }
+      ]
+    },
+    {
+      "id": "missing-task-es",
+      "task_text": "###",
+      "freelancer_positioning": "Soy redactor de recetas.",
+      "language": "es",
+      "expect_language": "es",
+      "expected_categories": [
+        "missing_task_description"
+      ],
+      "criteria": [
+        {
+          "id": "input-sufficiency",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Are missing-input categories exactly as expected, with valid short inputs accepted and specific skill gaps kept separate?"
+        }
+      ]
+    },
+    {
+      "id": "missing-profile-es",
+      "task_text": "Escribe una receta de borsch.",
+      "freelancer_positioning": "Hola",
+      "language": "es",
+      "expect_language": "es",
+      "expected_categories": [
+        "missing_profile_information"
+      ],
+      "criteria": [
+        {
+          "id": "input-sufficiency",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Are missing-input categories exactly as expected, with valid short inputs accepted and specific skill gaps kept separate?"
+        }
+      ]
+    },
+    {
+      "id": "both-es",
+      "task_text": "Hola",
+      "freelancer_positioning": "1234",
+      "language": "es",
+      "expect_language": "es",
+      "expected_categories": [
+        "missing_task_description",
+        "missing_profile_information"
+      ],
+      "criteria": [
+        {
+          "id": "input-sufficiency",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Are missing-input categories exactly as expected, with valid short inputs accepted and specific skill gaps kept separate?"
+        }
+      ]
+    },
+    {
+      "id": "short-es",
+      "task_text": "Diseña un logotipo.",
+      "freelancer_positioning": "Soy diseñador.",
+      "language": "es",
+      "expect_language": "es",
+      "expected_categories": [],
+      "criteria": [
+        {
+          "id": "input-sufficiency",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Are missing-input categories exactly as expected, with valid short inputs accepted and specific skill gaps kept separate?"
+        }
+      ]
+    },
+    {
+      "id": "recipe-es",
+      "task_text": "Escribe una receta de borsch.",
+      "freelancer_positioning": "Soy redactor y escribo recetas.",
+      "language": "es",
+      "expect_language": "es",
+      "expected_categories": [],
+      "criteria": [
+        {
+          "id": "input-sufficiency",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Are missing-input categories exactly as expected, with valid short inputs accepted and specific skill gaps kept separate?"
+        }
+      ]
+    },
+    {
+      "id": "beginner-es",
+      "task_text": "Escribe un texto para una web.",
+      "freelancer_positioning": "Soy redactor principiante y escribo textos de práctica.",
+      "language": "es",
+      "expect_language": "es",
+      "expected_categories": [],
+      "criteria": [
+        {
+          "id": "input-sufficiency",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Are missing-input categories exactly as expected, with valid short inputs accepted and specific skill gaps kept separate?"
+        }
+      ]
+    },
+    {
+      "id": "skill-gap-es",
+      "task_text": "Crea una web. Es obligatorio tener experiencia con React.",
+      "freelancer_positioning": "Soy diseñador y trabajo con Figma.",
+      "language": "es",
+      "expect_language": "es",
+      "expected_categories": [
+        "experience_gap"
+      ],
+      "criteria": [
+        {
+          "id": "input-sufficiency",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Are missing-input categories exactly as expected, with valid short inputs accepted and specific skill gaps kept separate?"
+        }
+      ]
+    },
+    {
+      "id": "language-es",
+      "task_text": "Write a recipe for a food blog.",
+      "freelancer_positioning": "Soy redactor y escribo recetas.",
+      "language": "es",
+      "expect_language": "es",
+      "expected_categories": [],
+      "criteria": [
+        {
+          "id": "input-sufficiency",
+          "kind": "requirement",
+          "critical": true,
+          "question": "Are missing-input categories exactly as expected, with valid short inputs accepted and specific skill gaps kept separate?"
+        }
+      ]
+    }
+  ]
+}

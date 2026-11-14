@@ -1,0 +1,703 @@
+[
+  {
+    "locale": "ru",
+    "rejected": {
+      "body": "‹\nВсе инструменты\nProposalAI\nЯзык\nEnglish\nFrançais\nItaliano\nDeutsch\nEspañol\nРусский\nPortuguês\n\nОпишите задачу клиента и свои сильные стороны — мы подготовим предложение, которое можно сразу отправить.\n\nОсталось 9 предложений из 10.\n\nВаши данные\nОпишите задачу (обязательно)\n\nЕсли известны, укажите цель, ожидаемые результаты, ограничения и сроки.\n\nОпишите, что нужно сделать для клиента.\n\nВаш опыт и сильные стороны (обязательно)\n\nТекст строится только на том, что здесь написано. Указывайте проверяемые факты: инструменты, кейсы, результаты.\n\nДобавьте сведения о своих навыках или опыте.\n\nЯзык предложения\nКак в задаче\nEnglish\nFrançais\nItaliano\nDeutsch\nEspañol\nРусский\nPortuguês\n\nНе язык интерфейса. По умолчанию предложение пишется на языке задачи.\n\nТон предложения\nДружелюбный\nЯсный и деловой\nУверенный и по делу\n\nОбработка данных. Введённый текст отправляется в наш сервис и провайдеру ИИ-модели, чтобы создать результат, и хранится вместе с запуском на наших серверах. Черновик хранится в этом браузере и может быть потерян при обновлении страницы или переходе с неё. Не вводите пароли, коды доступа, API-ключи и полные реквизиты банковских карт.\n\nСоставить предложение\nПредложение\n\nПосле составления предложение появится здесь.",
+      "output": {
+        "result_artifact_id": "artifact_01794567273858311990_0000001317_ffdb5973e36a4aadacfe3e8bebca094f",
+        "scenario_session_id": "scenario_session_01794567265282146399_0000000431_21fac413ec7241398481954fcd835022",
+        "job_id": "job_01794567265291212977_0000000433_339e6f0059624b2ba2bac3df3d266d95",
+        "workflow_id": "proposal_ai.generate_v1",
+        "workflow_version": 2,
+        "schema_ref": "proposal_ai.generate_output_v1",
+        "schema_version": 1,
+        "created_at": "2026-11-13T10:54:33.858357Z",
+        "output": {
+          "gaps": [
+            {
+              "category": "missing_task_description",
+              "severity": "high",
+              "description": "The task description is missing."
+            },
+            {
+              "category": "missing_profile_information",
+              "severity": "high",
+              "description": "Freelancer profile information is missing."
+            }
+          ],
+          "text": "Añade una descripción de la tarea y la información sobre el perfil del profesional independiente."
+        }
+      },
+      "calls": [
+        {
+          "url": "http://localhost:3000/v1/products/proposal_ai/runtime-config",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/identity/guest",
+          "method": "POST",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/products/proposal_ai/quota?guest_id=guest_01794567263196501969_0000000429_9525b7a4e42047ffb1268795a2357cbf&scenario_id=proposal_ai.generate_v1",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/client-events",
+          "method": "POST",
+          "body": {
+            "event_id": "ca55ba63-394e-449e-81b8-5b6abd229807",
+            "event_type": "web.product_viewed",
+            "product_id": "proposal_ai",
+            "frontend_id": "web_mirror",
+            "web_session_id": "46805443-ab7f-4c04-bea6-2bd98c934a66",
+            "guest_id": "guest_01794567263196501969_0000000429_9525b7a4e42047ffb1268795a2357cbf"
+          }
+        },
+        {
+          "url": "http://localhost:3000/v1/client-events",
+          "method": "POST",
+          "body": {
+            "event_id": "6f60fedd-fd61-4c60-8097-7bd4534083c0",
+            "event_type": "web.form_started",
+            "product_id": "proposal_ai",
+            "frontend_id": "web_mirror",
+            "web_session_id": "46805443-ab7f-4c04-bea6-2bd98c934a66",
+            "guest_id": "guest_01794567263196501969_0000000429_9525b7a4e42047ffb1268795a2357cbf"
+          }
+        },
+        {
+          "url": "http://localhost:3000/v1/products/proposal_ai/scenarios/proposal_ai.generate_v1/start",
+          "method": "POST",
+          "body": {
+            "frontend_id": "web_mirror",
+            "input": {
+              "task_text": "hello",
+              "freelancer_positioning": "1234",
+              "tone": "warm",
+              "language": "es"
+            },
+            "guest_id": "guest_01794567263196501969_0000000429_9525b7a4e42047ffb1268795a2357cbf",
+            "user_id": null,
+            "source_frontend_instance_id": null
+          }
+        },
+        {
+          "url": "http://localhost:3000/v1/client-events",
+          "method": "POST",
+          "body": {
+            "event_id": "e3e596f3-e313-426b-a158-99ea87be7896",
+            "event_type": "web.form_submitted",
+            "product_id": "proposal_ai",
+            "frontend_id": "web_mirror",
+            "web_session_id": "46805443-ab7f-4c04-bea6-2bd98c934a66",
+            "guest_id": "guest_01794567263196501969_0000000429_9525b7a4e42047ffb1268795a2357cbf"
+          }
+        },
+        {
+          "url": "http://localhost:3000/v1/products/proposal_ai/quota?guest_id=guest_01794567263196501969_0000000429_9525b7a4e42047ffb1268795a2357cbf&scenario_id=proposal_ai.generate_v1",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/scenario-sessions/scenario_session_01794567265282146399_0000000431_21fac413ec7241398481954fcd835022",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/scenario-sessions/scenario_session_01794567265282146399_0000000431_21fac413ec7241398481954fcd835022",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/scenario-sessions/scenario_session_01794567265282146399_0000000431_21fac413ec7241398481954fcd835022",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/scenario-sessions/scenario_session_01794567265282146399_0000000431_21fac413ec7241398481954fcd835022",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/scenario-sessions/scenario_session_01794567265282146399_0000000431_21fac413ec7241398481954fcd835022",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/products/proposal_ai/quota?guest_id=guest_01794567263196501969_0000000429_9525b7a4e42047ffb1268795a2357cbf&scenario_id=proposal_ai.generate_v1",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/results/artifact_01794567273858311990_0000001317_ffdb5973e36a4aadacfe3e8bebca094f",
+          "method": "GET",
+          "body": null
+        }
+      ]
+    },
+    "corrected": {
+      "body": "‹\nВсе инструменты\nProposalAI\nЯзык\nEnglish\nFrançais\nItaliano\nDeutsch\nEspañol\nРусский\nPortuguês\n\nОпишите задачу клиента и свои сильные стороны — мы подготовим предложение, которое можно сразу отправить.\n\nОсталось 8 предложений из 10.\n\nВаши данные\nОпишите задачу (обязательно)\n\nЕсли известны, укажите цель, ожидаемые результаты, ограничения и сроки.\n\nВаш опыт и сильные стороны (обязательно)\n\nТекст строится только на том, что здесь написано. Указывайте проверяемые факты: инструменты, кейсы, результаты.\n\nЯзык предложения\nКак в задаче\nEnglish\nFrançais\nItaliano\nDeutsch\nEspañol\nРусский\nPortuguês\n\nНе язык интерфейса. По умолчанию предложение пишется на языке задачи.\n\nТон предложения\nДружелюбный\nЯсный и деловой\nУверенный и по делу\n\nОбработка данных. Введённый текст отправляется в наш сервис и провайдеру ИИ-модели, чтобы создать результат, и хранится вместе с запуском на наших серверах. Черновик хранится в этом браузере и может быть потерян при обновлении страницы или переходе с неё. Не вводите пароли, коды доступа, API-ключи и полные реквизиты банковских карт.\n\nПересоставить предложение\nПредложение\n\nЗдравствуйте!\n\nМоя специализация как копирайтера, который пишет рецепты, подходит для этой работы. Мне интересно подготовить рецепт борща и передать вам готовый текст.\n\nПередайте заказ в работу, и я подготовлю рецепт.\n\nСкопировать\nНовая задача",
+      "output": {
+        "result_artifact_id": "artifact_01794567293553189039_0000001371_5eae34b2e6db4f27b9c2f273bd1c7e22",
+        "scenario_session_id": "scenario_session_01794567277562160950_0000000447_7d59595d34754f678209e836f40f3df8",
+        "job_id": "job_01794567277571276611_0000000449_be1fb78a706840ca823dbc052e393c9e",
+        "workflow_id": "proposal_ai.generate_v1",
+        "workflow_version": 2,
+        "schema_ref": "proposal_ai.generate_output_v1",
+        "schema_version": 1,
+        "created_at": "2026-11-13T10:54:53.553241Z",
+        "output": {
+          "gaps": [],
+          "text": "Здравствуйте!\n\nМоя специализация как копирайтера, который пишет рецепты, подходит для этой работы. Мне интересно подготовить рецепт борща и передать вам готовый текст.\n\nПередайте заказ в работу, и я подготовлю рецепт."
+        }
+      },
+      "calls": [
+        {
+          "url": "http://localhost:3000/v1/products/proposal_ai/runtime-config",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/identity/guest",
+          "method": "POST",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/products/proposal_ai/quota?guest_id=guest_01794567263196501969_0000000429_9525b7a4e42047ffb1268795a2357cbf&scenario_id=proposal_ai.generate_v1",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/client-events",
+          "method": "POST",
+          "body": {
+            "event_id": "ca55ba63-394e-449e-81b8-5b6abd229807",
+            "event_type": "web.product_viewed",
+            "product_id": "proposal_ai",
+            "frontend_id": "web_mirror",
+            "web_session_id": "46805443-ab7f-4c04-bea6-2bd98c934a66",
+            "guest_id": "guest_01794567263196501969_0000000429_9525b7a4e42047ffb1268795a2357cbf"
+          }
+        },
+        {
+          "url": "http://localhost:3000/v1/client-events",
+          "method": "POST",
+          "body": {
+            "event_id": "6f60fedd-fd61-4c60-8097-7bd4534083c0",
+            "event_type": "web.form_started",
+            "product_id": "proposal_ai",
+            "frontend_id": "web_mirror",
+            "web_session_id": "46805443-ab7f-4c04-bea6-2bd98c934a66",
+            "guest_id": "guest_01794567263196501969_0000000429_9525b7a4e42047ffb1268795a2357cbf"
+          }
+        },
+        {
+          "url": "http://localhost:3000/v1/products/proposal_ai/scenarios/proposal_ai.generate_v1/start",
+          "method": "POST",
+          "body": {
+            "frontend_id": "web_mirror",
+            "input": {
+              "task_text": "hello",
+              "freelancer_positioning": "1234",
+              "tone": "warm",
+              "language": "es"
+            },
+            "guest_id": "guest_01794567263196501969_0000000429_9525b7a4e42047ffb1268795a2357cbf",
+            "user_id": null,
+            "source_frontend_instance_id": null
+          }
+        },
+        {
+          "url": "http://localhost:3000/v1/client-events",
+          "method": "POST",
+          "body": {
+            "event_id": "e3e596f3-e313-426b-a158-99ea87be7896",
+            "event_type": "web.form_submitted",
+            "product_id": "proposal_ai",
+            "frontend_id": "web_mirror",
+            "web_session_id": "46805443-ab7f-4c04-bea6-2bd98c934a66",
+            "guest_id": "guest_01794567263196501969_0000000429_9525b7a4e42047ffb1268795a2357cbf"
+          }
+        },
+        {
+          "url": "http://localhost:3000/v1/products/proposal_ai/quota?guest_id=guest_01794567263196501969_0000000429_9525b7a4e42047ffb1268795a2357cbf&scenario_id=proposal_ai.generate_v1",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/scenario-sessions/scenario_session_01794567265282146399_0000000431_21fac413ec7241398481954fcd835022",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/scenario-sessions/scenario_session_01794567265282146399_0000000431_21fac413ec7241398481954fcd835022",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/scenario-sessions/scenario_session_01794567265282146399_0000000431_21fac413ec7241398481954fcd835022",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/scenario-sessions/scenario_session_01794567265282146399_0000000431_21fac413ec7241398481954fcd835022",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/scenario-sessions/scenario_session_01794567265282146399_0000000431_21fac413ec7241398481954fcd835022",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/products/proposal_ai/quota?guest_id=guest_01794567263196501969_0000000429_9525b7a4e42047ffb1268795a2357cbf&scenario_id=proposal_ai.generate_v1",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/results/artifact_01794567273858311990_0000001317_ffdb5973e36a4aadacfe3e8bebca094f",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/products/proposal_ai/scenarios/proposal_ai.generate_v1/start",
+          "method": "POST",
+          "body": {
+            "frontend_id": "web_mirror",
+            "input": {
+              "task_text": "Напиши рецепт борща",
+              "freelancer_positioning": "Я копирайтер, пишу рецепты.",
+              "tone": "warm",
+              "language": "ru"
+            },
+            "guest_id": "guest_01794567263196501969_0000000429_9525b7a4e42047ffb1268795a2357cbf",
+            "user_id": null,
+            "source_frontend_instance_id": null
+          }
+        },
+        {
+          "url": "http://localhost:3000/v1/client-events",
+          "method": "POST",
+          "body": {
+            "event_id": "59ef3287-932b-4051-bf38-a7953e563c04",
+            "event_type": "web.form_submitted",
+            "product_id": "proposal_ai",
+            "frontend_id": "web_mirror",
+            "web_session_id": "46805443-ab7f-4c04-bea6-2bd98c934a66",
+            "guest_id": "guest_01794567263196501969_0000000429_9525b7a4e42047ffb1268795a2357cbf"
+          }
+        },
+        {
+          "url": "http://localhost:3000/v1/products/proposal_ai/quota?guest_id=guest_01794567263196501969_0000000429_9525b7a4e42047ffb1268795a2357cbf&scenario_id=proposal_ai.generate_v1",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/scenario-sessions/scenario_session_01794567277562160950_0000000447_7d59595d34754f678209e836f40f3df8",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/scenario-sessions/scenario_session_01794567277562160950_0000000447_7d59595d34754f678209e836f40f3df8",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/scenario-sessions/scenario_session_01794567277562160950_0000000447_7d59595d34754f678209e836f40f3df8",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/scenario-sessions/scenario_session_01794567277562160950_0000000447_7d59595d34754f678209e836f40f3df8",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/scenario-sessions/scenario_session_01794567277562160950_0000000447_7d59595d34754f678209e836f40f3df8",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/scenario-sessions/scenario_session_01794567277562160950_0000000447_7d59595d34754f678209e836f40f3df8",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/scenario-sessions/scenario_session_01794567277562160950_0000000447_7d59595d34754f678209e836f40f3df8",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/scenario-sessions/scenario_session_01794567277562160950_0000000447_7d59595d34754f678209e836f40f3df8",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/scenario-sessions/scenario_session_01794567277562160950_0000000447_7d59595d34754f678209e836f40f3df8",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/products/proposal_ai/quota?guest_id=guest_01794567263196501969_0000000429_9525b7a4e42047ffb1268795a2357cbf&scenario_id=proposal_ai.generate_v1",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/results/artifact_01794567293553189039_0000001371_5eae34b2e6db4f27b9c2f273bd1c7e22",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/client-events",
+          "method": "POST",
+          "body": {
+            "event_id": "5e9c5fb1-db26-420b-a29a-601dadcbaf30",
+            "event_type": "web.result_viewed",
+            "product_id": "proposal_ai",
+            "frontend_id": "web_mirror",
+            "web_session_id": "46805443-ab7f-4c04-bea6-2bd98c934a66",
+            "guest_id": "guest_01794567263196501969_0000000429_9525b7a4e42047ffb1268795a2357cbf",
+            "scenario_session_id": "scenario_session_01794567277562160950_0000000447_7d59595d34754f678209e836f40f3df8"
+          }
+        }
+      ]
+    },
+    "errors": []
+  },
+  {
+    "locale": "en",
+    "rejected": {
+      "body": "‹\nAll tools\nProposalAI\nLanguage\nEnglish\nFrançais\nItaliano\nDeutsch\nEspañol\nРусский\nPortuguês\n\nTurn a client brief and your relevant strengths into a proposal ready to send.\n\n9 of 10 proposals remaining.\n\nYour details\nDescribe the task (required)\n\nInclude the goal, deliverables, constraints, and timeline when available.\n\nDescribe what needs to be done for the client.\n\nYour experience and strengths (required)\n\nThe proposal is built only from what you write here. Give checkable facts: tools, cases, results.\n\nAdd information about your skills or experience.\n\nProposal language\nSame as the task\nEnglish\nFrançais\nItaliano\nDeutsch\nEspañol\nРусский\nPortuguês\n\nNot the interface language. By default the proposal is written in the language of the task.\n\nProposal style\nWarm & personable\nClear & professional\nConfident & direct\n\nData processing. What you enter is sent to our service and to an AI model provider to create the result, and is stored with your run on our servers. Your draft is kept in this browser and may be lost if you reload or leave the page. Do not enter passwords, access codes, API keys or full payment card details.\n\nGenerate proposal\nProposal\n\nYour proposal will appear here after you generate it.",
+      "output": {
+        "result_artifact_id": "artifact_01794567306603456189_0000001425_cc41841cf3b749fdab285219bc25e052",
+        "scenario_session_id": "scenario_session_01794567302447480760_0000000464_594efa077ed44910b4a6e90338696b0e",
+        "job_id": "job_01794567302455687519_0000000466_674255f9ea1c47659e69cb767554ab83",
+        "workflow_id": "proposal_ai.generate_v1",
+        "workflow_version": 2,
+        "schema_ref": "proposal_ai.generate_output_v1",
+        "schema_version": 1,
+        "created_at": "2026-11-13T10:55:06.603491Z",
+        "output": {
+          "gaps": [
+            {
+              "category": "missing_task_description",
+              "severity": "high",
+              "description": "No task description is provided."
+            },
+            {
+              "category": "missing_profile_information",
+              "severity": "high",
+              "description": "No freelancer profile information is provided."
+            }
+          ],
+          "text": "Añade una descripción de la tarea y la información sobre tu perfil como freelancer."
+        }
+      },
+      "calls": [
+        {
+          "url": "http://localhost:3000/v1/products/proposal_ai/runtime-config",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/identity/guest",
+          "method": "POST",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/products/proposal_ai/quota?guest_id=guest_01794567300317422391_0000000462_bcb17ccd7b9f4deb953f4f7fa40077c2&scenario_id=proposal_ai.generate_v1",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/client-events",
+          "method": "POST",
+          "body": {
+            "event_id": "3a40f7e1-6aba-4559-9c62-362edf255451",
+            "event_type": "web.product_viewed",
+            "product_id": "proposal_ai",
+            "frontend_id": "web_mirror",
+            "web_session_id": "342dae8b-2367-4485-aa62-806dc9134f93",
+            "guest_id": "guest_01794567300317422391_0000000462_bcb17ccd7b9f4deb953f4f7fa40077c2"
+          }
+        },
+        {
+          "url": "http://localhost:3000/v1/client-events",
+          "method": "POST",
+          "body": {
+            "event_id": "82b2d7d5-81aa-419a-8d53-6e1b225729ce",
+            "event_type": "web.form_started",
+            "product_id": "proposal_ai",
+            "frontend_id": "web_mirror",
+            "web_session_id": "342dae8b-2367-4485-aa62-806dc9134f93",
+            "guest_id": "guest_01794567300317422391_0000000462_bcb17ccd7b9f4deb953f4f7fa40077c2"
+          }
+        },
+        {
+          "url": "http://localhost:3000/v1/products/proposal_ai/scenarios/proposal_ai.generate_v1/start",
+          "method": "POST",
+          "body": {
+            "frontend_id": "web_mirror",
+            "input": {
+              "task_text": "привет",
+              "freelancer_positioning": "1234",
+              "tone": "warm",
+              "language": "es"
+            },
+            "guest_id": "guest_01794567300317422391_0000000462_bcb17ccd7b9f4deb953f4f7fa40077c2",
+            "user_id": null,
+            "source_frontend_instance_id": null
+          }
+        },
+        {
+          "url": "http://localhost:3000/v1/client-events",
+          "method": "POST",
+          "body": {
+            "event_id": "4e3a12ea-9eca-424e-9f5e-4bb3a66092d8",
+            "event_type": "web.form_submitted",
+            "product_id": "proposal_ai",
+            "frontend_id": "web_mirror",
+            "web_session_id": "342dae8b-2367-4485-aa62-806dc9134f93",
+            "guest_id": "guest_01794567300317422391_0000000462_bcb17ccd7b9f4deb953f4f7fa40077c2"
+          }
+        },
+        {
+          "url": "http://localhost:3000/v1/products/proposal_ai/quota?guest_id=guest_01794567300317422391_0000000462_bcb17ccd7b9f4deb953f4f7fa40077c2&scenario_id=proposal_ai.generate_v1",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/scenario-sessions/scenario_session_01794567302447480760_0000000464_594efa077ed44910b4a6e90338696b0e",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/scenario-sessions/scenario_session_01794567302447480760_0000000464_594efa077ed44910b4a6e90338696b0e",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/scenario-sessions/scenario_session_01794567302447480760_0000000464_594efa077ed44910b4a6e90338696b0e",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/products/proposal_ai/quota?guest_id=guest_01794567300317422391_0000000462_bcb17ccd7b9f4deb953f4f7fa40077c2&scenario_id=proposal_ai.generate_v1",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/results/artifact_01794567306603456189_0000001425_cc41841cf3b749fdab285219bc25e052",
+          "method": "GET",
+          "body": null
+        }
+      ]
+    },
+    "corrected": {
+      "body": "‹\nAll tools\nProposalAI\nLanguage\nEnglish\nFrançais\nItaliano\nDeutsch\nEspañol\nРусский\nPortuguês\n\nTurn a client brief and your relevant strengths into a proposal ready to send.\n\n8 of 10 proposals remaining.\n\nYour details\nDescribe the task (required)\n\nInclude the goal, deliverables, constraints, and timeline when available.\n\nYour experience and strengths (required)\n\nThe proposal is built only from what you write here. Give checkable facts: tools, cases, results.\n\nProposal language\nSame as the task\nEnglish\nFrançais\nItaliano\nDeutsch\nEspañol\nРусский\nPortuguês\n\nNot the interface language. By default the proposal is written in the language of the task.\n\nProposal style\nWarm & personable\nClear & professional\nConfident & direct\n\nData processing. What you enter is sent to our service and to an AI model provider to create the result, and is stored with your run on our servers. Your draft is kept in this browser and may be lost if you reload or leave the page. Do not enter passwords, access codes, API keys or full payment card details.\n\nRegenerate proposal\nProposal\n\nHi,\n\nI write recipes as a copywriter, so my experience is relevant to creating your borscht recipe. Borscht is a lovely subject to bring to the page, and I’d be glad to write it in clear, inviting language.\n\nI can shape the recipe around the version you have in mind, with ingredients and straightforward preparation steps. Let me know if you have a preferred style or variation, and I’ll draft it accordingly.\n\nCopy\nNew task",
+      "output": {
+        "result_artifact_id": "artifact_01794567320383154564_0000001452_4ee26bf94187435a811b3393cc9fbfa3",
+        "scenario_session_id": "scenario_session_01794567309229451427_0000000471_4900ccf3818d4f9f9c41fb63b60ff259",
+        "job_id": "job_01794567309236463290_0000000473_aa15d78671424e81ab0f7b994a773a4f",
+        "workflow_id": "proposal_ai.generate_v1",
+        "workflow_version": 2,
+        "schema_ref": "proposal_ai.generate_output_v1",
+        "schema_version": 1,
+        "created_at": "2026-11-13T10:55:20.383179Z",
+        "output": {
+          "gaps": [],
+          "text": "Hi,\n\nI write recipes as a copywriter, so my experience is relevant to creating your borscht recipe. Borscht is a lovely subject to bring to the page, and I’d be glad to write it in clear, inviting language.\n\nI can shape the recipe around the version you have in mind, with ingredients and straightforward preparation steps. Let me know if you have a preferred style or variation, and I’ll draft it accordingly."
+        }
+      },
+      "calls": [
+        {
+          "url": "http://localhost:3000/v1/products/proposal_ai/runtime-config",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/identity/guest",
+          "method": "POST",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/products/proposal_ai/quota?guest_id=guest_01794567300317422391_0000000462_bcb17ccd7b9f4deb953f4f7fa40077c2&scenario_id=proposal_ai.generate_v1",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/client-events",
+          "method": "POST",
+          "body": {
+            "event_id": "3a40f7e1-6aba-4559-9c62-362edf255451",
+            "event_type": "web.product_viewed",
+            "product_id": "proposal_ai",
+            "frontend_id": "web_mirror",
+            "web_session_id": "342dae8b-2367-4485-aa62-806dc9134f93",
+            "guest_id": "guest_01794567300317422391_0000000462_bcb17ccd7b9f4deb953f4f7fa40077c2"
+          }
+        },
+        {
+          "url": "http://localhost:3000/v1/client-events",
+          "method": "POST",
+          "body": {
+            "event_id": "82b2d7d5-81aa-419a-8d53-6e1b225729ce",
+            "event_type": "web.form_started",
+            "product_id": "proposal_ai",
+            "frontend_id": "web_mirror",
+            "web_session_id": "342dae8b-2367-4485-aa62-806dc9134f93",
+            "guest_id": "guest_01794567300317422391_0000000462_bcb17ccd7b9f4deb953f4f7fa40077c2"
+          }
+        },
+        {
+          "url": "http://localhost:3000/v1/products/proposal_ai/scenarios/proposal_ai.generate_v1/start",
+          "method": "POST",
+          "body": {
+            "frontend_id": "web_mirror",
+            "input": {
+              "task_text": "привет",
+              "freelancer_positioning": "1234",
+              "tone": "warm",
+              "language": "es"
+            },
+            "guest_id": "guest_01794567300317422391_0000000462_bcb17ccd7b9f4deb953f4f7fa40077c2",
+            "user_id": null,
+            "source_frontend_instance_id": null
+          }
+        },
+        {
+          "url": "http://localhost:3000/v1/client-events",
+          "method": "POST",
+          "body": {
+            "event_id": "4e3a12ea-9eca-424e-9f5e-4bb3a66092d8",
+            "event_type": "web.form_submitted",
+            "product_id": "proposal_ai",
+            "frontend_id": "web_mirror",
+            "web_session_id": "342dae8b-2367-4485-aa62-806dc9134f93",
+            "guest_id": "guest_01794567300317422391_0000000462_bcb17ccd7b9f4deb953f4f7fa40077c2"
+          }
+        },
+        {
+          "url": "http://localhost:3000/v1/products/proposal_ai/quota?guest_id=guest_01794567300317422391_0000000462_bcb17ccd7b9f4deb953f4f7fa40077c2&scenario_id=proposal_ai.generate_v1",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/scenario-sessions/scenario_session_01794567302447480760_0000000464_594efa077ed44910b4a6e90338696b0e",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/scenario-sessions/scenario_session_01794567302447480760_0000000464_594efa077ed44910b4a6e90338696b0e",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/scenario-sessions/scenario_session_01794567302447480760_0000000464_594efa077ed44910b4a6e90338696b0e",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/products/proposal_ai/quota?guest_id=guest_01794567300317422391_0000000462_bcb17ccd7b9f4deb953f4f7fa40077c2&scenario_id=proposal_ai.generate_v1",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/results/artifact_01794567306603456189_0000001425_cc41841cf3b749fdab285219bc25e052",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/products/proposal_ai/scenarios/proposal_ai.generate_v1/start",
+          "method": "POST",
+          "body": {
+            "frontend_id": "web_mirror",
+            "input": {
+              "task_text": "Write a borscht recipe.",
+              "freelancer_positioning": "I am a copywriter who writes recipes.",
+              "tone": "warm",
+              "language": "en"
+            },
+            "guest_id": "guest_01794567300317422391_0000000462_bcb17ccd7b9f4deb953f4f7fa40077c2",
+            "user_id": null,
+            "source_frontend_instance_id": null
+          }
+        },
+        {
+          "url": "http://localhost:3000/v1/client-events",
+          "method": "POST",
+          "body": {
+            "event_id": "4b1e40b2-7912-4af2-a495-12c2632aaf87",
+            "event_type": "web.form_submitted",
+            "product_id": "proposal_ai",
+            "frontend_id": "web_mirror",
+            "web_session_id": "342dae8b-2367-4485-aa62-806dc9134f93",
+            "guest_id": "guest_01794567300317422391_0000000462_bcb17ccd7b9f4deb953f4f7fa40077c2"
+          }
+        },
+        {
+          "url": "http://localhost:3000/v1/products/proposal_ai/quota?guest_id=guest_01794567300317422391_0000000462_bcb17ccd7b9f4deb953f4f7fa40077c2&scenario_id=proposal_ai.generate_v1",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/scenario-sessions/scenario_session_01794567309229451427_0000000471_4900ccf3818d4f9f9c41fb63b60ff259",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/scenario-sessions/scenario_session_01794567309229451427_0000000471_4900ccf3818d4f9f9c41fb63b60ff259",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/scenario-sessions/scenario_session_01794567309229451427_0000000471_4900ccf3818d4f9f9c41fb63b60ff259",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/scenario-sessions/scenario_session_01794567309229451427_0000000471_4900ccf3818d4f9f9c41fb63b60ff259",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/scenario-sessions/scenario_session_01794567309229451427_0000000471_4900ccf3818d4f9f9c41fb63b60ff259",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/scenario-sessions/scenario_session_01794567309229451427_0000000471_4900ccf3818d4f9f9c41fb63b60ff259",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/products/proposal_ai/quota?guest_id=guest_01794567300317422391_0000000462_bcb17ccd7b9f4deb953f4f7fa40077c2&scenario_id=proposal_ai.generate_v1",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/results/artifact_01794567320383154564_0000001452_4ee26bf94187435a811b3393cc9fbfa3",
+          "method": "GET",
+          "body": null
+        },
+        {
+          "url": "http://localhost:3000/v1/client-events",
+          "method": "POST",
+          "body": {
+            "event_id": "985a4639-e996-4357-bb11-4726cbb22325",
+            "event_type": "web.result_viewed",
+            "product_id": "proposal_ai",
+            "frontend_id": "web_mirror",
+            "web_session_id": "342dae8b-2367-4485-aa62-806dc9134f93",
+            "guest_id": "guest_01794567300317422391_0000000462_bcb17ccd7b9f4deb953f4f7fa40077c2",
+            "scenario_session_id": "scenario_session_01794567309229451427_0000000471_4900ccf3818d4f9f9c41fb63b60ff259"
+          }
+        }
+      ]
+    },
+    "errors": []
+  }
+]

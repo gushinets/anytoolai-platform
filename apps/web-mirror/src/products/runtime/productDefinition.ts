@@ -120,8 +120,13 @@ export type ProductDefinition<V extends Record<string, unknown>, R> = {
   validate: (values: V) => Partial<Record<keyof V, FieldError>>;
   /** Form values -> the scenario-start `input` payload (the product's own input schema shape). */
   toInput: (values: V) => Record<string, unknown>;
+  /** Canonical per-field values for matching server rejections; must share toInput's normalization.
+   * Form keys are preserved, while displayed and stored draft values remain raw. */
+  normalizeValues?: (values: V) => V;
   /** Frontend-safe canonical output -> the product's result; null means unusable. */
   extractResult: (output: Record<string, unknown>) => R | null;
+  /** A parsed result may request corrected input instead of a result view or copy activation. */
+  resultFieldErrors?: (result: R) => Partial<Record<keyof V, FieldError>>;
   /**
    * Whether a completed run's result counts as "viewed" (`web.result_viewed`). Optional, default
    * true. A product whose viewed-activation is narrower than "a result rendered" (Brief Decoder: a

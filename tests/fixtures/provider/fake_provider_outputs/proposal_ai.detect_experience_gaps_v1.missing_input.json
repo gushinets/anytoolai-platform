@@ -1,0 +1,23 @@
+{
+  "response_json": {
+    "issues": [
+      {
+        "category": "missing_task_description",
+        "description": "Add a task description.",
+        "severity": "high"
+      },
+      {
+        "category": "missing_profile_information",
+        "description": "Add information about your skills or experience.",
+        "severity": "high"
+      }
+    ]
+  },
+  "input_tokens": 140,
+  "output_tokens": 48,
+  "latency_ms": 8,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "proposal_ai.detect_experience_gaps_v1.missing_input"
+  }
+}

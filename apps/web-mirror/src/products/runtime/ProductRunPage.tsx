@@ -357,9 +357,13 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   }, []);
 
   const [values, setValues] = useState<V>(definition.emptyValues);
+  const valuesRef = useLatest(values);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof V, FieldError>>>({});
+  const rejectedInputRef = useRef<{ input: V; errors: Partial<Record<keyof V, FieldError>> } | null>(null);
   const liveValidationFieldsRef = useRef(new Set<keyof V>());
   const [phase, setPhase] = useState<Phase<R>>({ kind: "idle" });
+  // Quota and result reads can settle in either order when a rejected result reopens the form.
+  const quotaExhausted = phase.kind === "quota-exhausted" || (phase.kind === "idle" && quota?.exhausted === true);
   // Ambiguous/accepted retries retain timing; a definite rejection lets the next start reset it.
   const [runStartedAtMs, setRunStartedAtMs] = useState<number | null>(null);
   const [displayedResult, setDisplayedResult] = useState<{
@@ -897,6 +901,39 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       return;
     }
     resultFetchSettledRef.current = true;
+    const inputErrors: Partial<Record<keyof V, FieldError>> = definition.resultFieldErrors?.(extracted) ?? {};
+    if (Object.keys(inputErrors).length > 0) {
+      // Recovered runs can belong to an older draft; only mark fields still matching that input.
+      const submittedValues = normalizeValues(activeInputRef.current ?? definition.emptyValues);
+      rejectedInputRef.current = { input: submittedValues, errors: inputErrors };
+      const currentValues = normalizeValues(valuesRef.current);
+      const currentErrors: Partial<Record<keyof V, FieldError>> = {};
+      for (const field in inputErrors) {
+        liveValidationFieldsRef.current.add(field);
+        if (currentValues[field] === submittedValues[field]) {
+          currentErrors[field] = inputErrors[field];
+        }
+      }
+      if (draftKey !== null && readProductDraft(draftKey)?.run?.scenarioSessionId === scenarioSessionId) {
+        saveDraftRun(draftKey, null);
+      }
+      if (attachActiveRef.current || displayedResult?.attached) callSafely(onAttachEndRef.current);
+      attachActiveRef.current = false;
+      resumedRunRef.current = null;
+      activeInputRef.current = null;
+      setPendingStart(null);
+      setDisplayedResult(null);
+      setHandoffStatus("idle");
+      setFieldErrors(currentErrors);
+      setPhase({ kind: "idle" });
+      requestAnimationFrame(() => {
+        if (!controller?.signal.aborted && activeScenarioSessionIdRef.current === scenarioSessionId) {
+          formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+        }
+      });
+      return;
+    }
+    rejectedInputRef.current = null;
     // `scenario_completed` is emitted by the commit-time effect on `phase` below, not here:
     // `setPhase` only queues the update, so emitting here would report a result that never
     // rendered (unmount, navigation, a renderer that throws).
@@ -930,6 +967,25 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     void runStart(prepared, startedAtMs);
   }
 
+  function normalizeValues(next: V): V {
+    return definition.normalizeValues?.(next) ?? next;
+  }
+
+  function validateFields(next: V): Partial<Record<keyof V, FieldError>> {
+    const errors = definition.validate(next);
+    const rejected = rejectedInputRef.current;
+    if (rejected !== null) {
+      const normalized = normalizeValues(next);
+      // Editing another field or submitting again cannot invalidate this field's server verdict.
+      for (const field in rejected.errors) {
+        if (!errors[field] && normalized[field] === rejected.input[field]) {
+          errors[field] = rejected.errors[field];
+        }
+      }
+    }
+    return errors;
+  }
+
   // Shared by handleSubmit and handleRetry (the "Try again" button on retryable-error): always
   // validates and reuses-or-rebuilds against the *current* values, never blindly replays whatever
   // was captured at the original submit. A field edited after a retryable failure (the form stays
@@ -947,13 +1003,14 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       boot.kind !== "ready" ||
       phase.kind === "submitting" ||
       phase.kind === "running" ||
+      quotaExhausted ||
       guestId === undefined ||
       isHandoffLocked() ||
       attachBooting
     ) {
       return;
     }
-    const errors = definition.validate(values);
+    const errors = validateFields(values);
     for (const field in errors) {
       liveValidationFieldsRef.current.add(field);
     }
@@ -1132,6 +1189,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     setValues(definition.emptyValues);
     if (draftKey !== null) clearProductDraft(draftKey);
     setFieldErrors({});
+    rejectedInputRef.current = null;
     liveValidationFieldsRef.current.clear();
     setPendingStart(null);
     activeScenarioSessionIdRef.current = null;
@@ -1179,7 +1237,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     }
     // Previously invalid fields stay live after correction, until New task resets the form.
     if (liveValidationFieldsRef.current.has(field)) {
-      const error = definition.validate(next)[field];
+      const error = validateFields(next)[field];
       setFieldErrors((previous) => {
         const errors = { ...previous };
         if (error) errors[field] = error;
@@ -1228,7 +1286,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
             type="submit"
             aria-describedby={DATA_NOTICE_ID}
             loading={phase.kind === "submitting" || phase.kind === "running"}
-            disabled={identityUnavailable || locked || phase.kind === "quota-exhausted"}
+            disabled={identityUnavailable || locked || quotaExhausted}
           >
             {phase.kind === "submitting"
               ? th("starting")
@@ -1255,7 +1313,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   let showNewTask = false;
   switch (phase.kind) {
     case "idle":
-      if (!displayedResult) placeholderMessage = tp(`${definition.messageScope}.placeholder`);
+      if (!displayedResult && !quotaExhausted) placeholderMessage = tp(`${definition.messageScope}.placeholder`);
       break;
     case "submitting":
     case "running": {
@@ -1277,7 +1335,6 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       error = <ErrorState message={th("resultFetchFailed")} onRetry={handleRetryResult} embedded />;
       break;
     case "quota-exhausted":
-      error = <ErrorState message={th("quotaExhausted", { product: title })} embedded />;
       break;
     case "retryable-error":
       error = <ErrorState message={th(`errors.${phase.reason}`, { product: title })} onRetry={identityUnavailable && !attachActiveRef.current ? undefined : handleRetry} embedded />;
@@ -1288,6 +1345,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     default:
       return assertNever(phase);
   }
+  if (quotaExhausted) error = <ErrorState message={th("quotaExhausted", { product: title })} embedded />;
 
   return (
     <Root className={inProductShell ? undefined : "page-container"}>
