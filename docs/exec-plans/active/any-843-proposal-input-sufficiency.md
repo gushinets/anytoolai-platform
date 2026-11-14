@@ -6,10 +6,11 @@
 - Owner: agent
 - Linear: ANY-843
 - Created: 2026-11-13
-- Last updated: 2026-11-13
+- Last updated: 2026-11-14
 - Review date: 2026-11-20
-- Next action: owner review of the verified round 2 normalized-value comparison fix.
-- Blocker: local full-check cannot pass the unchanged activation-marker test without passwordless sudo.
+- Next action: owner review of the implemented round-3 fixes; repeat live smoke with a valid provider key.
+- Blocker: local baseline requires passwordless sudo for the unchanged activation-marker test;
+  round-3 live model smoke is blocked by an expired provider API key.
 
 ## Goal and boundaries
 
@@ -232,3 +233,63 @@ Implementation and verification:
 - The owner subsequently authorized committing, pushing and updating the PR description.
   Rejected-value memory still lasts only for the current mounted page; this change adds no
   persisted validation state.
+
+## Review round 3: exhausted corrections and old-client admission
+
+The owner authorized both fixes and regression tests, including a mandatory request contract
+marker. Review reproduced an extra START after last-unit semantic rejection in both quota/result
+response orders, and old frontend modules rendered/copied a saved missing-input clarification.
+
+Implementation plan:
+
+1. Derive exhausted idle-form availability from the latest accepted quota snapshot, preserving
+   inline hints. Use the same condition in button/submit guards and quota feedback. Leave active
+   runs, accepted retries and completed-result visibility intact; reservations are not exhaustion.
+2. Require `result_contract: proposal_ai.field_errors_v1` in ProposalAI's input schema and send it
+   from the web product and eval collector. Bump the input schema version; retain scenario/workflow
+   and output identities so existing completed results remain readable. Reuse current schema
+   validation before admission/reservation and before worker steps, without a generic gate or DSL.
+3. Test missing/unknown markers before any job/reservation/provider call, valid new requests,
+   historical results and exact idempotent replay. Exercise an old queued request under the new
+   schema: it must fail before a provider call and release its reservation. Old browser tabs must
+   reload before creating any new run; their existing generic error UI cannot show new reload copy.
+4. Cover both quota/result response orders, positive/failed/stale quota reads, preserved hints,
+   correction and handler-level submit blocking. Add current-client marker and old-client rejection
+   regressions; update affected schema assertions and eval input contracts, preserving old evidence.
+5. Run targeted backend/frontend red-green tests, product/eval suites, config/architecture/docs
+   checks and frontend-check. Check the marker's effect on A06 context before deciding the live
+   validation scope. No commit, push or GitHub writes are part of this authorization.
+
+Implementation and verification:
+
+- Idle-form exhaustion is derived from the accepted quota snapshot, shared by button state,
+  submit guard and quota feedback. Field hints remain visible regardless of whether quota or
+  result resolves first. Completed-result regeneration and accepted network retries are unchanged.
+- Input schema version 2 requires `result_contract: proposal_ai.field_errors_v1`. The web mapper
+  and eval collector send it; drift assertions compare both with the backend schema. Existing
+  admission validation rejects missing/unknown/null markers before any execution or reservation.
+  Historical eval suites retain their original inputs and hashes; new suites declare the marker.
+- Legacy replay returns the existing job. Completed historical results and Copy remain available.
+  An unmarked queued job fails before provider calls and releases its reservation under the new
+  worker. Scenario, workflow and output identities remain unchanged to preserve those results.
+- Before the fix, both exhausted-quota response-order regressions failed while four control
+  cases passed; unmarked input was admitted. After the fix, 249 focused frontend tests and 74
+  focused API/product tests passed, followed by 533 broader product/eval/API-contract tests.
+- Config, architecture and documentation checks passed. Generated documentation was current in
+  quick-check; a separate sandboxed invocation failed during LiteLLM import. The first frontend
+  gate hit an existing CE-kit ESLint test's five-second timeout; its isolated repeat passed.
+- Six live smoke attempts (both fields missing and valid recipe input, each in RU/EN/ES) reached
+  the new contract but produced no model output: the provider reported an expired API key at A04,
+  followed by deployment cooldown. This is blocked evidence, not a semantic pass. No prompt/model
+  change was made. A live unmarked request returned 422 with unchanged session/job/reservation/
+  provider-row counts. The local stack was stopped and its database volume preserved.
+- Final frontend stages passed: lint/typecheck, 336 CE-kit tests, 55 shared-ui tests, 349 Chromium
+  tests, 797 web tests, generated API-contract drift check and all builds. The broad web run first
+  caught a locale test's outdated exact request assertion; adding the mandatory marker fixed it.
+  Repeated all web tests and completed the remaining canonical stages separately, without
+  repeating the already-passing browser suite for a test-only assertion change.
+- Canonical quick-check: 3,707 passed, 12 skipped, 657 deselected; the sole failure remains
+  `test_activation_marker_is_readable_by_non_root_api_user` (`sudo: interactive authentication
+  is required`). No suppression or test skip was added. The final eval-only repeat passed all
+  184 tests after the schema-drift assertion was added. No production or CI verification was
+  performed. The owner subsequently authorized committing, pushing and updating the PR description.

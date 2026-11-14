@@ -20,6 +20,9 @@ renderer_contract:
   next_action: copy_result
   excluded_fields: [angle, rationale, model, provider]
   description: >-
+    New starts require input.result_contract="proposal_ai.field_errors_v1" (input schema version 2)
+    so clients that cannot handle field errors are rejected before execution and quota reservation.
+    Old browser tabs must reload; existing completed results retain their output contract.
     ProposalAI never exposes angle, rationale, model, provider or other hidden product fields in the
     rendered result. `gaps` carries typed A04 issues and is not part of the proposal
     text. Before rendering, `missing_task_description` maps to the task field and

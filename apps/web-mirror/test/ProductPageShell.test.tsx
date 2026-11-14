@@ -373,6 +373,7 @@ describe("UI locale is independent of scenario input and state", () => {
     fireEvent.click(screen.getByRole("button", { name: PROPOSAL_AI_MESSAGES.en.generate.submit }));
     await waitFor(() => expect(screen.getByText("Generated.")).toBeTruthy());
     expect(startInput(calls)).toEqual({
+      result_contract: "proposal_ai.field_errors_v1",
       task_text: "Build a landing page.",
       freelancer_positioning: "Frontend freelancer.",
       tone: "warm",

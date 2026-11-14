@@ -533,7 +533,11 @@ def test_generate_input_schema_matches_the_ticket_field_contract() -> None:
         (PRODUCT_DIR / "schemas" / "generate_input.schema.json").read_text(encoding="utf-8")
     )
     assert schema["additionalProperties"] is False
-    assert set(schema["required"]) == {"task_text", "freelancer_positioning"}
+    assert set(schema["required"]) == {"result_contract", "task_text", "freelancer_positioning"}
+    assert schema["properties"]["result_contract"] == {
+        "type": "string", "const": "proposal_ai.field_errors_v1",
+    }
+    assert _load_yaml("schemas.yaml")["schemas"][0]["version"] == 2
     assert schema["properties"]["tone"]["enum"] == ["neutral", "warm", "firm"]
     assert schema["properties"]["language"]["pattern"] == "^[a-z]{2}(-[A-Z]{2})?(?!\\n)$"
     trimmed_pattern = "^\\S([\\s\\S]*\\S)?(?!\\n)$"

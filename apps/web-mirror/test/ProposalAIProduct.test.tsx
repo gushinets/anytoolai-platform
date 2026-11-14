@@ -2,6 +2,7 @@
 // `proposal_ai.generate_input_v1`, the canonical `text` field, and the `copy_result`
 // activation. The shared runtime behavior it rides on is proven in ProductRunPage.test.tsx.
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
+import proposalInputSchema from "../../../packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/proposal_ai/schemas/generate_input.schema.json";
 import { useAttachSession, readAttachSessionId } from "../src/products/runtime/attachSession";
 import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -207,7 +208,7 @@ describe("ProposalAI product definition", () => {
     await waitFor(() => expect(screen.getByText(PROPOSAL_TEXT)).toBeTruthy());
     const startCall = calls.find((call) => call.key === ROUTES.START);
     expect(JSON.parse(startCall?.init.body as string)).toMatchObject({
-      input: { task_text: "Build a landing page.", freelancer_positioning: "Frontend freelancer.", tone: "warm" },
+      input: { result_contract: proposalInputSchema.properties.result_contract.const, task_text: "Build a landing page.", freelancer_positioning: "Frontend freelancer.", tone: "warm" },
     });
     expect(JSON.parse(startCall?.init.body as string)).not.toHaveProperty("input.language");
   });
@@ -920,6 +921,48 @@ describe("ProposalAI missing source information (ANY-843)", () => {
     fireEvent.change(document.getElementById("proposal-ai-language")!, { target: { value: values.language } });
     fireEvent.submit(screen.getByRole("form"));
   }
+
+  describe.each(["before-result", "after-result"] as const)("quota refresh %s", (order) => {
+    it.each(["exhausted", "available", "unavailable"] as const)("keeps rejection hints and handles %s quota", async (state) => {
+      const routes = responses([rejectedOutput, { text: PROPOSAL_TEXT, gaps: [] }]);
+      routes[ROUTES.RESULT] = [resultResponse(IDS, { output: { text: PROPOSAL_TEXT, gaps: [] } })];
+      const routed = makeClientWithDeferredCalls(routes, { [ROUTES.QUOTA]: 3, [ROUTES.RESULT]: 1 });
+      render(<ProposalAIProduct client={routed.client} />);
+      await screen.findByRole("form");
+      await waitFor(() => expect(routed.calls.filter((call) => call.key === ROUTES.QUOTA)).toHaveLength(1));
+      await act(async () => routed.resolveCall(ROUTES.QUOTA, 0, quotaResponse(IDS, {
+        used_count: state === "available" ? 1 : 2, remaining_count: state === "available" ? 2 : 1,
+      })));
+      await fillAndSubmit();
+      await waitFor(() => expect(routed.calls.filter((call) => call.key === ROUTES.QUOTA)).toHaveLength(3));
+      const settleQuota = async () => {
+        await act(async () => routed.resolveCall(ROUTES.QUOTA, 2, state === "unavailable"
+          ? errorResponse(503, "temporarily_unavailable")
+          : quotaResponse(IDS, { used_count: state === "exhausted" ? 3 : 2, remaining_count: state === "exhausted" ? 0 : 1, exhausted: state === "exhausted" })));
+        // A stale accepted-run read must not replace the newer completed-run quota.
+        await act(async () => routed.resolveCall(ROUTES.QUOTA, 1, quotaResponse(IDS, {
+          used_count: state === "exhausted" ? 0 : 3, remaining_count: state === "exhausted" ? 3 : 0, exhausted: state !== "exhausted",
+        })));
+      };
+      if (order === "before-result") await settleQuota();
+      await act(async () => routed.resolveCall(ROUTES.RESULT, 0, resultResponse(IDS, { output: rejectedOutput })));
+      await screen.findByText(PROPOSAL_AI_MESSAGES.en.validation.missing_task_description);
+      if (order === "after-result") await settleQuota();
+      expect(screen.getByText(PROPOSAL_AI_MESSAGES.en.validation.missing_profile_information)).toBeTruthy();
+      const button = screen.getByRole("button", { name: "Generate proposal" }) as HTMLButtonElement;
+      expect(button.disabled).toBe(state === "exhausted");
+      if (state === "exhausted") {
+        expect(screen.getByText("0 of 3 proposals remaining.")).toBeTruthy();
+        expect(screen.getByText("You've used all your ProposalAI runs for now.")).toBeTruthy();
+      }
+      fireEvent.change(document.getElementById("proposal-ai-task-text")!, { target: { value: "Write a recipe." } });
+      fireEvent.change(document.getElementById("proposal-ai-positioning")!, { target: { value: "I write recipes." } });
+      fireEvent.submit(screen.getByRole("form"));
+      await act(async () => {});
+      expect(routed.calls.filter((call) => call.key === ROUTES.START)).toHaveLength(state === "exhausted" ? 1 : 2);
+      if (state !== "exhausted") await screen.findByText(PROPOSAL_TEXT);
+    });
+  });
 
   describe.each([
     { field: "taskText", id: "proposal-ai-task-text", apiField: "task_text", category: "missing_task_description" },

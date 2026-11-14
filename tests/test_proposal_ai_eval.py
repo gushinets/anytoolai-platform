@@ -1113,12 +1113,38 @@ def test_the_collector_sends_exactly_the_input_accept_expects(tmp_path: Path, mo
     out = tmp_path / "runs.jsonl"
     assert proposal_ai_eval.main(["run", "--api-url", "http://api", "--series", "s", "--out", str(out)]) == 0
     fixture = json.loads(proposal_ai_eval.ORDERS_PATH.read_text(encoding="utf-8"))
-    orders = {order["id"]: order for order in proposal_ai_eval.normalized_orders(fixture)}
+    orders = {order["id"]: order for order in proposal_ai_eval.normalized_orders(
+        fixture, result_contract=proposal_ai_eval.RESULT_CONTRACT,
+    )}
     records = proposal_ai_eval.read_jsonl(out)
     assert len(records) == len(orders) and all(r["input"] == proposal_ai_eval.case_input(orders[r["case_id"]]) for r in records)
     assert records[0]["input"]["tone"] == "warm" and records[0]["input"]["freelancer_positioning"] == fixture["freelancer_positioning"]
+    schema_path = REPO_ROOT / (
+        "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/"
+        "products/proposal_ai/schemas/generate_input.schema.json"
+    )
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    assert records[0]["input"]["result_contract"] == schema["properties"]["result_contract"]["const"]
     groups = {("s", case): {"attempts": 1} for case in orders}
     proposal_ai_eval.check_runs(records, groups, orders)
+
+
+def test_new_suite_declares_contract_without_rewriting_historical_inputs(tmp_path: Path) -> None:
+    (tmp_path / "orders.json").write_text(json.dumps({"orders": [{"id": "one", **EN_ORDER}]}))
+    (tmp_path / "runs.jsonl").write_text("")
+    (tmp_path / "verdicts.jsonl").write_text("")
+    path = tmp_path / "suite.json"
+    suite = {"orders": ["orders.json"], "runs": "runs.jsonl", "verdicts": "verdicts.jsonl"}
+    path.write_text(json.dumps(suite))
+    _, old, _, _ = proposal_ai_eval.load_suite(path)
+    assert "result_contract" not in proposal_ai_eval.case_input(old["one"])
+    path.write_text(json.dumps({**suite, "result_contract": proposal_ai_eval.RESULT_CONTRACT}))
+    _, new, _, _ = proposal_ai_eval.load_suite(path)
+    assert proposal_ai_eval.case_input(new["one"])["result_contract"] == "proposal_ai.field_errors_v1"
+    assert proposal_ai_eval.case_hash(new["one"]) != proposal_ai_eval.case_hash(old["one"])
+    path.write_text(json.dumps({**suite, "result_contract": "unknown"}))
+    with pytest.raises(proposal_ai_eval.SuiteError, match="unsupported result contract"):
+        proposal_ai_eval.load_suite(path)
 
 
 def _zip(members: dict[str, str]) -> bytes:

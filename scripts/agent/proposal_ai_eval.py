@@ -41,6 +41,10 @@ browser trace in `origin`) is evidence that is not there, never a pass; a web fo
 an error is a failure whatever the server produced later. A verdict counts only for the answer, the
 input and the criterion it was made for (their hashes); change one and the question is open again.
 
+New collections send `result_contract="proposal_ai.field_errors_v1"` and record it in `input`.
+Suites for those runs declare the same `result_contract` at the top level. Historical suites omit
+it and retain their original input and case hashes; their evidence is not upgraded implicitly.
+
 `accept` is offline and deterministic. A run is PASS (usable), FAIL (unusable: runtime error, formal
 violation or a criterion confirmed "no") or PENDING; a confirmed "no" on a critical criterion or a
 forbidden amount is a critical error, and a critical "no" next to a "yes" on `no-critical-error` is
@@ -243,9 +247,10 @@ def criterion_hash(criterion: dict) -> str:
 
 
 DEFAULT_TONE = "warm"
+RESULT_CONTRACT = "proposal_ai.field_errors_v1"
 
 
-def normalized_orders(fixture: dict) -> list[dict]:
+def normalized_orders(fixture: dict, *, result_contract: str | None = None) -> list[dict]:
     """The orders of a fixture with its defaults applied (the shared positioning, the default tone): the
     one form the collector sends, the case hash pins and `accept` compares."""
     for order in fixture["orders"]:
@@ -257,12 +262,16 @@ def normalized_orders(fixture: dict) -> list[dict]:
             )
     defaults = {"tone": DEFAULT_TONE, **({"freelancer_positioning": fixture["freelancer_positioning"]}
                                          if "freelancer_positioning" in fixture else {})}
+    if result_contract is not None:
+        if result_contract != RESULT_CONTRACT:
+            raise SuiteError(f"unsupported result contract: {result_contract}")
+        defaults["result_contract"] = result_contract
     return [{**defaults, **order} for order in fixture["orders"]]
 
 
 def case_input(order: dict) -> dict:
     """The whole input a run of this case must carry: no key more, no key less."""
-    return {key: order[key] for key in ("task_text", "freelancer_positioning", "tone", "language") if key in order}
+    return {key: order[key] for key in ("task_text", "freelancer_positioning", "tone", "language", "result_contract") if key in order}
 
 
 def case_hash(order: dict) -> str:
@@ -441,7 +450,8 @@ def load_suite(path: Path) -> tuple[dict, dict[str, dict], list[dict], dict[tupl
     orders = {}
     for orders_path in suite["orders"]:
         fixture = json.loads((path.parent / orders_path).read_text(encoding="utf-8"))
-        for order in normalized_orders(fixture):
+        # Old suites keep their exact historical inputs/hashes; new suites declare their contract.
+        for order in normalized_orders(fixture, result_contract=suite.get("result_contract")):
             orders[order["id"]] = order
     runs = read_jsonl(path.parent / suite["runs"])
     suite["_dir"] = path.parent
@@ -675,7 +685,7 @@ def command_run(args: argparse.Namespace) -> int:
     try:
         with args.out.open("a", encoding="utf-8") as out:
             for attempt in range(1, args.repeats + 1):
-                for order in normalized_orders(fixture):
+                for order in normalized_orders(fixture, result_contract=RESULT_CONTRACT):
                     record = run_once(args, order, attempt, stack)
                     out.write(json.dumps(record, ensure_ascii=False) + "\n")
                     out.flush()

@@ -362,6 +362,8 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   const rejectedInputRef = useRef<{ input: V; errors: Partial<Record<keyof V, FieldError>> } | null>(null);
   const liveValidationFieldsRef = useRef(new Set<keyof V>());
   const [phase, setPhase] = useState<Phase<R>>({ kind: "idle" });
+  // Quota and result reads can settle in either order when a rejected result reopens the form.
+  const quotaExhausted = phase.kind === "quota-exhausted" || (phase.kind === "idle" && quota?.exhausted === true);
   // Ambiguous/accepted retries retain timing; a definite rejection lets the next start reset it.
   const [runStartedAtMs, setRunStartedAtMs] = useState<number | null>(null);
   const [displayedResult, setDisplayedResult] = useState<{
@@ -1001,6 +1003,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       boot.kind !== "ready" ||
       phase.kind === "submitting" ||
       phase.kind === "running" ||
+      quotaExhausted ||
       guestId === undefined ||
       isHandoffLocked() ||
       attachBooting
@@ -1283,7 +1286,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
             type="submit"
             aria-describedby={DATA_NOTICE_ID}
             loading={phase.kind === "submitting" || phase.kind === "running"}
-            disabled={identityUnavailable || locked || phase.kind === "quota-exhausted"}
+            disabled={identityUnavailable || locked || quotaExhausted}
           >
             {phase.kind === "submitting"
               ? th("starting")
@@ -1310,7 +1313,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   let showNewTask = false;
   switch (phase.kind) {
     case "idle":
-      if (!displayedResult) placeholderMessage = tp(`${definition.messageScope}.placeholder`);
+      if (!displayedResult && !quotaExhausted) placeholderMessage = tp(`${definition.messageScope}.placeholder`);
       break;
     case "submitting":
     case "running": {
@@ -1332,7 +1335,6 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       error = <ErrorState message={th("resultFetchFailed")} onRetry={handleRetryResult} embedded />;
       break;
     case "quota-exhausted":
-      error = <ErrorState message={th("quotaExhausted", { product: title })} embedded />;
       break;
     case "retryable-error":
       error = <ErrorState message={th(`errors.${phase.reason}`, { product: title })} onRetry={identityUnavailable && !attachActiveRef.current ? undefined : handleRetry} embedded />;
@@ -1343,6 +1345,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     default:
       return assertNever(phase);
   }
+  if (quotaExhausted) error = <ErrorState message={th("quotaExhausted", { product: title })} embedded />;
 
   return (
     <Root className={inProductShell ? undefined : "page-container"}>

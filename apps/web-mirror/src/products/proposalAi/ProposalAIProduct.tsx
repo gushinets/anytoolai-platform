@@ -291,6 +291,7 @@ export const proposalAiDefinition: ProductDefinition<ProposalAIValues, ProposalA
   toInput: (values) => {
     const normalized = normalizeValues(values);
     return {
+      result_contract: "proposal_ai.field_errors_v1",
       task_text: normalized.taskText,
       freelancer_positioning: normalized.freelancerPositioning,
       tone: normalized.tone,
