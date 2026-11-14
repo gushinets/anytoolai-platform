@@ -4969,6 +4969,12 @@
             "description": "Service Unavailable"
           }
         },
+        "security": [
+          {
+            "PortalDelegatedBearer": []
+          },
+          {}
+        ],
         "summary": "Record an allowlisted client analytics event",
         "tags": [
           "client-events"
@@ -5159,6 +5165,12 @@
             "description": "Service Unavailable"
           }
         },
+        "security": [
+          {
+            "PortalDelegatedBearer": []
+          },
+          {}
+        ],
         "summary": "Create Handoff",
         "tags": [
           "handoffs"
@@ -5241,6 +5253,12 @@
             "description": "Service Unavailable"
           }
         },
+        "security": [
+          {
+            "PortalDelegatedBearer": []
+          },
+          {}
+        ],
         "summary": "Get Handoff",
         "tags": [
           "handoffs"
@@ -5370,6 +5388,12 @@
             "description": "Service Unavailable"
           }
         },
+        "security": [
+          {
+            "PortalDelegatedBearer": []
+          },
+          {}
+        ],
         "summary": "Accept Handoff",
         "tags": [
           "handoffs"
@@ -5472,6 +5496,12 @@
             "description": "Service Unavailable"
           }
         },
+        "security": [
+          {
+            "PortalDelegatedBearer": []
+          },
+          {}
+        ],
         "summary": "Decline Handoff",
         "tags": [
           "handoffs"
@@ -6196,6 +6226,12 @@
             "description": "Service Unavailable"
           }
         },
+        "security": [
+          {
+            "PortalDelegatedBearer": []
+          },
+          {}
+        ],
         "summary": "Create a scenario session and queue workflow execution",
         "tags": [
           "scenario-runtime"
@@ -6318,6 +6354,12 @@
             "description": "Service Unavailable"
           }
         },
+        "security": [
+          {
+            "PortalDelegatedBearer": []
+          },
+          {}
+        ],
         "summary": "Get a frontend-safe normalized workflow result artifact",
         "tags": [
           "results"
@@ -6419,6 +6461,12 @@
             "description": "Service Unavailable"
           }
         },
+        "security": [
+          {
+            "PortalDelegatedBearer": []
+          },
+          {}
+        ],
         "summary": "Get frontend-safe scenario session state",
         "tags": [
           "scenario-runtime"
@@ -6556,6 +6604,12 @@
             "description": "Service Unavailable"
           }
         },
+        "security": [
+          {
+            "PortalDelegatedBearer": []
+          },
+          {}
+        ],
         "summary": "Validate and record a frontend next-action click",
         "tags": [
           "scenario-runtime"

@@ -9,7 +9,11 @@ from anytoolai_platform_api.dependencies import (
     get_settings,
 )
 from anytoolai_platform_api.errors import ApiError, platform_error_to_api_error
-from anytoolai_platform_api.paid_access import PAID_RUNTIME_ERROR_RESPONSES, optional_portal_user
+from anytoolai_platform_api.paid_access import (
+    OPTIONAL_PAID_SECURITY,
+    PAID_RUNTIME_ERROR_RESPONSES,
+    optional_portal_user,
+)
 from anytoolai_platform_api.portal_session import PortalUserPrincipal
 from anytoolai_platform_api.schemas import ClientEventRequest, ClientEventResponse, ErrorResponse
 from anytoolai_platform_api.settings import Settings
@@ -92,6 +96,7 @@ SAFE_409_EXAMPLE = {
             "content": {"application/json": {"example": SAFE_422_EXAMPLE}},
         },
     },
+    openapi_extra=OPTIONAL_PAID_SECURITY,
 )
 def post_client_event(
     request: Annotated[ClientEventRequest, Body()],

@@ -3,18 +3,25 @@
 from http import HTTPStatus
 from typing import Annotated, Literal
 
-from anytoolai_platform_api.dependencies import get_session_factory
+from anytoolai_platform_api.dependencies import get_session_factory, get_settings
 from anytoolai_platform_api.errors import ApiError
 from anytoolai_platform_api.manifest_auth import (
     PortalPermission,
     PortalPrincipal,
     authenticate_portal,
 )
-from anytoolai_platform_api.paid_access import PAID_RUNTIME_ERROR_RESPONSES, require_portal_user
+from anytoolai_platform_api.paid_access import (
+    PAID_RUNTIME_ERROR_RESPONSES,
+    bind_paid_consumer,
+    portal_delegated_bearer,
+    require_portal_user,
+    unavailable,
+)
 from anytoolai_platform_api.portal_session import (
     PortalUserPrincipal,
     WireUserId,
 )
+from anytoolai_platform_api.settings import Settings
 from anytoolai_platform_core.quotas.execution_repository import PaidAllowanceUsageRepository
 from anytoolai_platform_core.quotas.models import (
     MAX_ALLOWANCE_QUANTITY,
@@ -22,9 +29,8 @@ from anytoolai_platform_core.quotas.models import (
     ExecutionOwnerKind,
 )
 from anytoolai_platform_core.quotas.readback import consumption_from_bucket
-from anytoolai_platform_core.storage.transactions import SessionFactory
+from anytoolai_platform_core.storage.transactions import SessionFactory, transaction_boundary
 from fastapi import APIRouter, Depends, Query, Request
-from fastapi.security import HTTPBearer
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -131,6 +137,7 @@ def internal_paid_usage(
     request: Request,
     principal: Annotated[PortalPrincipal, Depends(authenticate_portal)],
     factory: Annotated[SessionFactory, Depends(get_session_factory)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> PaidUsageResponse:
     if (
         PortalPermission.USAGE_READ not in principal.permissions
@@ -143,6 +150,11 @@ def internal_paid_usage(
             code="paid_usage_forbidden",
             message="Usage access is forbidden.",
         )
+    try:
+        with transaction_boundary(factory) as session:
+            bind_paid_consumer(session, settings.portal_consumer_id)
+    except SQLAlchemyError:
+        raise unavailable() from None
     return _read(
         factory,
         ExecutionOwner(tenant_id, region, ExecutionOwnerKind.portal_user, user_id),
@@ -154,7 +166,7 @@ def internal_paid_usage(
     "/v1/products/{product_id}/paid-usage",
     response_model=PaidUsageResponse,
     summary="Read owned current or historical paid usage",
-    dependencies=[Depends(HTTPBearer(scheme_name="PortalDelegatedBearer", auto_error=False))],
+    dependencies=[Depends(portal_delegated_bearer)],
 )
 def public_paid_usage(
     product_id: str,

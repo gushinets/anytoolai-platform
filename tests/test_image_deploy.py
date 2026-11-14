@@ -18,6 +18,7 @@ def image_env(tmp_path: Path) -> dict[str, str]:
         "ANYTOOLAI_WORKER_IMAGE": "kernel-worker:reviewed",
         "ANYTOOLAI_WEB_IMAGE": "kernel-web:origins-v1",
         "ANYTOOLAI_PROFILE_ROOT": str(tmp_path),
+        "ANYTOOLAI_PRIVACY_POLICY_URL": "https://example.invalid/privacy",
     }
 
 
@@ -231,5 +232,45 @@ def test_build_workflow_preserves_all_frontend_origins() -> None:
         "ANYTOOLAI_WEB_BASE_PATH",
         "NEXT_PUBLIC_PORTAL_AUTHORIZE_URL",
         "ANYTOOLAI_PORTAL_CONSUMER_ID",
+        "NEXT_PUBLIC_ANYTOOLAI_PRIVACY_POLICY_URL",
     ):
         assert f'--build-arg "{name}=${name}"' in script
+
+
+@pytest.mark.skipif(os.name != "posix", reason="GitHub image builds run in bash on Linux")
+@pytest.mark.parametrize("policy_url", ["", "/privacy", "javascript:alert(1)",
+                                        "https://example.invalid/privacy"])
+def test_web_image_validates_and_embeds_privacy_url(tmp_path: Path, policy_url: str) -> None:
+    workflow = yaml.safe_load(
+        (load_runner_module().ROOT / ".github/workflows/publish-images.yml").read_text()
+    )
+    step = workflow["jobs"]["web"]["steps"][-1]
+    assert step["env"]["NEXT_PUBLIC_ANYTOOLAI_PRIVACY_POLICY_URL"] == (
+        "${{ inputs.privacy_policy_url }}"
+    )
+    calls = tmp_path / "docker-calls"
+    stub = tmp_path / "docker"
+    stub.write_text('#!/bin/sh\nprintf "%s\\n" "$@" >> "$DOCKER_CALLS"\n')
+    stub.chmod(0o700)
+    result = subprocess.run(
+        ["bash", "-c", step["run"]],
+        env=os.environ | {
+            "PATH": str(tmp_path) + os.pathsep + os.environ["PATH"],
+            "DOCKER_CALLS": str(calls),
+            "GITHUB_REPOSITORY_OWNER": "example",
+            "GITHUB_SHA": "reviewed", "GITHUB_RUN_ID": "1",
+            "GITHUB_STEP_SUMMARY": str(tmp_path / "summary"), "PUBLISH": "false",
+            "PLATFORM_API_BASE_URL": "http://platform-api:8000",
+            "NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS": "kernel_demo",
+            "ANYTOOLAI_WEB_BASE_PATH": "", "ANYTOOLAI_PORTAL_CONSUMER_ID": "platform-kernel",
+            "NEXT_PUBLIC_PORTAL_AUTHORIZE_URL": "https://example.invalid/authorize",
+            "NEXT_PUBLIC_ANYTOOLAI_PRIVACY_POLICY_URL": policy_url,
+        },
+        capture_output=True, text=True, check=False,
+    )
+    if policy_url.startswith("https:"):
+        assert result.returncode == 0, result.stderr
+        assert f"NEXT_PUBLIC_ANYTOOLAI_PRIVACY_POLICY_URL={policy_url}" in calls.read_text()
+    else:
+        assert result.returncode != 0
+        assert not calls.exists()

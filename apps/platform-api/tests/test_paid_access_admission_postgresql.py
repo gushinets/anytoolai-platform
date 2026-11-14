@@ -255,7 +255,8 @@ def test_old_policy_install_waiting_for_new_policy_is_refused_and_consumers_are_
 
 @pytest.mark.parametrize(
     "upgrade_target,downgrade_error",
-    [("0020", "synchronized V3 reader"), ("0021", "Exhaustion delivery history")],
+    [("0020", "synchronized V3 reader"), ("0021", "Exhaustion delivery history"),
+     ("0022", "Paid consumer ownership")],
 )
 def test_populated_v2_forward_migration_retains_floor_usage_reservation_and_replay(
     runtime, upgrade_target: str, downgrade_error: str,

@@ -22,6 +22,7 @@ from anytoolai_platform_api.portal_session import PortalUserPrincipal, authentic
 from anytoolai_platform_api.settings import Settings
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.config.registry import ConfigRegistry
+from anytoolai_platform_core.quotas.consumer_binding import require_consumer_binding
 from anytoolai_platform_core.quotas.execution_repository import PaidAllowanceUsageRepository
 from anytoolai_platform_core.quotas.exhaustion import (
     claim_exhaustion,
@@ -302,6 +303,7 @@ def receiver() -> Iterator[tuple[str, list, list[int], Event]]:
 def exhausted(runtime: tuple[SessionFactory, FastAPI, ConfigRegistry]) -> ExecutionAcceptance:
     factory, _, registry = runtime
     with transaction_boundary(factory) as session:
+        require_consumer_binding(session, "platform-kernel")
         accepted = start(session, registry, allowance())
     worker = worker_for(runtime)
     try:

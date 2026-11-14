@@ -922,6 +922,15 @@ atom_lab_prompts_table = sa.Table(
 )
 
 
+paid_consumer_binding_table = sa.Table(
+    "paid_consumer_binding",
+    runtime_metadata,
+    sa.Column("id", sa.Integer(), primary_key=True, autoincrement=False),
+    sa.Column("consumer_id", sa.String(64), nullable=False),
+    sa.CheckConstraint("id = 1", name="ck_paid_consumer_singleton"),
+)
+
+
 paid_access_coherence_table = sa.Table(
     "paid_access_coherence",
     runtime_metadata,
@@ -991,6 +1000,7 @@ runtime_tables = {
     "paid_allowance_usage": paid_allowance_usage_table,
     "execution_reservations": execution_reservations_table,
     "paid_access_coherence": paid_access_coherence_table,
+    "paid_consumer_binding": paid_consumer_binding_table,
     "allowance_exhaustion_outbox": allowance_exhaustion_outbox_table,
     "product_handoffs": product_handoffs_table,
     "event_log": event_log_table,

@@ -23,6 +23,11 @@ def test_exhaustion_delivery_defaults_off_and_requires_complete_opt_in(
     monkeypatch.setenv("ANYTOOLAI_PORTAL_BASE_URL", "https://portal.example.test")
     monkeypatch.setenv("ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN", TOKEN)
     assert ExhaustionSettings.from_env().service_token.get_secret_value() == TOKEN
+    monkeypatch.setenv("ANYTOOLAI_PORTAL_CONSUMER_ID", "custom-kernel")
+    assert ExhaustionSettings.from_env().consumer_id == "custom-kernel"
+    monkeypatch.setenv("ANYTOOLAI_PORTAL_CONSUMER_ID", "invalid_consumer")
+    with pytest.raises(ValidationError):
+        ExhaustionSettings.from_env()
     monkeypatch.setenv("ANYTOOLAI_PORTAL_EXHAUSTION_DELIVERY_ENABLED", "maybe")
     with pytest.raises(ValueError):
         ExhaustionSettings.from_env()

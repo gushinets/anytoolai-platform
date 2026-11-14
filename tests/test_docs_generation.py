@@ -94,6 +94,28 @@ def test_openapi_json_is_valid_and_matches_the_live_schema() -> None:
     assert schema == build_openapi_schema()
 
 
+def test_optional_paid_routes_document_both_guest_and_delegated_authentication() -> None:
+    routes = (
+        ("post", "/v1/handoffs"),
+        ("get", "/v1/handoffs/{handoff_token}"),
+        ("post", "/v1/handoffs/{handoff_token}/accept"),
+        ("post", "/v1/handoffs/{handoff_token}/decline"),
+        ("post", "/v1/products/{product_id}/scenarios/{scenario_id}/start"),
+        ("get", "/v1/scenario-sessions/{scenario_session_id}"),
+        ("post", "/v1/scenario-sessions/{scenario_session_id}/next-actions/{next_action_id}"),
+        ("get", "/v1/results/{result_artifact_id}"),
+        ("post", "/v1/client-events"),
+    )
+    for schema in (create_app().openapi(), build_openapi_schema()):
+        for method, path in routes:
+            assert schema["paths"][path][method]["security"] == [
+                {"PortalDelegatedBearer": []}, {},
+            ]
+        assert schema["paths"]["/v1/products/{product_id}/paid-usage"]["get"]["security"] == [
+            {"PortalDelegatedBearer": []},
+        ]
+
+
 def test_atom_not_found_response_is_shared_without_changing_the_live_contract() -> None:
     schema = build_openapi_schema()
     live = create_app().openapi()

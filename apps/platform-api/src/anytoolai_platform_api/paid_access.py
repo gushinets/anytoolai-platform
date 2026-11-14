@@ -33,6 +33,10 @@ from anytoolai_platform_core.quotas.access_coherence import (
     AccessCoherenceRepository,
     database_wall_time,
 )
+from anytoolai_platform_core.quotas.consumer_binding import (
+    ConsumerBindingMismatch,
+    require_consumer_binding,
+)
 from anytoolai_platform_core.quotas.execution_repository import PaidAllowanceUsageRepository
 from anytoolai_platform_core.quotas.models import (
     MAX_ALLOWANCE_QUANTITY,
@@ -43,6 +47,7 @@ from anytoolai_platform_core.scenarios.ownership import session_owner_matches
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
 from anytoolai_platform_core.storage.transactions import SessionFactory, transaction_boundary
 from fastapi import Depends, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, ValidationError, model_validator
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -55,6 +60,11 @@ PAID_RUNTIME_ERROR_RESPONSES = {
 SNAPSHOT_SCHEMA_VERSION = 3
 SNAPSHOT_MAX_BYTES = 256 * 1024
 SNAPSHOT_MAX_AGE_SECONDS = 300
+
+# FastAPI adds the bearer alternative from the dependency. An empty requirement
+# explicitly permits guest requests on routes using optional_portal_user.
+OPTIONAL_PAID_SECURITY = {"security": [{}]}
+portal_delegated_bearer = HTTPBearer(scheme_name="PortalDelegatedBearer", auto_error=False)
 
 
 def _version_three(value: object) -> object:
@@ -137,6 +147,17 @@ def forbidden() -> ApiError:
     )
 
 
+def bind_paid_consumer(session: Session, consumer_id: str) -> None:
+    try:
+        require_consumer_binding(session, consumer_id)
+    except ConsumerBindingMismatch:
+        raise ApiError(
+            status_code=HTTPStatus.SERVICE_UNAVAILABLE,
+            code="paid_consumer_mismatch",
+            message="Configured Portal consumer does not own this database.",
+        ) from None
+
+
 def require_portal_user(
     principal: Annotated[PortalUserPrincipal, Depends(authenticate_portal_user)],
     factory: Annotated[SessionFactory, Depends(get_session_factory)],
@@ -144,6 +165,7 @@ def require_portal_user(
     """Commit observed P before any runtime read, replay or later handler refusal."""
     try:
         with transaction_boundary(factory) as session:
+            bind_paid_consumer(session, principal.consumer_id)
             # A lower in-flight P cannot lower the floor, but its valid identity
             # still permits historical access. Only new admission requires current P.
             AccessCoherenceRepository(
@@ -157,6 +179,7 @@ def require_portal_user(
 def optional_portal_user(
     request: Request,
     client: Annotated[PortalSessionClient, Depends(get_portal_session_client)],
+    _bearer: Annotated[HTTPAuthorizationCredentials | None, Depends(portal_delegated_bearer)],
 ) -> PortalUserPrincipal | None:
     # Supplying an invalid credential must never select the guest route.
     if not request.headers.getlist("authorization"):

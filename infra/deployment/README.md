@@ -22,16 +22,25 @@ owns the migration order and purchased-document reader floor.
 post-review authorization. Frontend inputs are `PLATFORM_API_BASE_URL` (the
 build-time same-origin rewrite destination),
 `NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS`, `ANYTOOLAI_WEB_BASE_PATH`,
-`ANYTOOLAI_PORTAL_CONSUMER_ID` (default `platform-kernel`) and
-`NEXT_PUBLIC_PORTAL_AUTHORIZE_URL` (localized Portal `/backend/authorize` URL).
+`ANYTOOLAI_PORTAL_CONSUMER_ID` (default `platform-kernel`),
+`NEXT_PUBLIC_PORTAL_AUTHORIZE_URL` (localized Portal `/backend/authorize` URL) and
+`NEXT_PUBLIC_ANYTOOLAI_PRIVACY_POLICY_URL` (absolute HTTP(S) policy URL).
+Workflow input `privacy_policy_url` is required and validated for frontend builds;
+backend-only builds do not require it.
 Next configuration validates `ANYTOOLAI_PORTAL_CONSUMER_ID` at build time and
-publishes it as `NEXT_PUBLIC_PORTAL_CONSUMER_ID`; use the same ID in the API and
+publishes it as `NEXT_PUBLIC_PORTAL_CONSUMER_ID`; use the same ID in the API, worker and
 Portal registry. Workflow input `portal_consumer_id` supplies the build argument.
 Launch, exchange and stored V2 sessions must match this audience exactly. Changing
 the configured ID does not transfer retained purchases, allowances or usage.
 Changing runtime variables cannot recompile these values. Public frontend image
 tags include the run ID to distinguish builds with different origins. Backend
 credentials and provider secrets are runtime-only.
+
+Kernel `0022` requires stopped API/workers and binds retained paid history to one
+consumer. It refuses ambiguous history; do not clear it or change the binding to
+force an upgrade. A configuration mismatch blocks paid access and exhaustion
+delivery; restore the saved consumer to resume. See the
+[binding and migration rules](../../docs/contracts/portal-kernel-paid/README.md#service-requests-and-identity).
 
 For an operator-approved installation, set private `.env.prod` credentials and
 selected images plus `ANYTOOLAI_PROFILE_ROOT` to an existing operator-owned
@@ -76,10 +85,9 @@ operator's maintenance window. Failure to drain does not stop the recovering
 worker. On migration failure, do not run old code to reopen service. Follow the
 existing verified backup recovery below and the metering cutover safeguards.
 
-The concrete ANY-766 pair uses Kernel head `0021`, Portal `20261113_0012`,
-identity V2, snapshot V3 and manifest/invalidation/usage/exhaustion V1. Kernel
-source baseline is `c8e867bfc25f4158b0bc36b76892e670a32cbb12`, Portal
-`65079f4e50867b9582a951a62a62cb6706dc0e0f`, plus the local remaining-corrections diff.
+The Portal-owned [paired compatibility and cutover procedure](https://github.com/gushinets/payments-portal/blob/main/docs/architecture/deployment.md#paired-compatibility-and-synchronized-cutover)
+records the current local source pair, migration heads and wire versions.
+Historical image rehearsals do not verify the latest corrections.
 Record actual reviewed SHAs, image IDs/digests, build origins, enabled products
 and base path with the environment selection. Never infer reader compatibility
 from unchanged migration heads: Portal pre-selected-digest and pre-Step-11
@@ -1213,15 +1221,14 @@ exit (including a crash) releases the lock automatically.
 
 The historical Step 6 checkpoint introduced migration `0019` and snapshot V2;
 it was verified only against disposable test databases. Those versions are not
-the current installation target. The current pair requires Kernel `0021`,
-Portal `20261113_0012`, delegation V2 and snapshot V3. Follow
+the current installation target. Follow
 [reviewed image installation](#reviewed-images-and-independent-updates-any-766-step-17)
 and the Portal-owned paired compatibility/cutover procedure linked there. Apply
 migrations only through the environment's authorized procedure.
 
 Set the API's existing `ANYTOOLAI_PORTAL_BASE_URL` and independent
 `ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN` to reach Portal identity/snapshot reads.
-Set `ANYTOOLAI_PORTAL_CONSUMER_ID` consistently in the API, frontend build and
+Set `ANYTOOLAI_PORTAL_CONSUMER_ID` consistently in the API, worker, frontend build and
 Portal registry (default `platform-kernel`); a new ID cannot adopt old purchases.
 The Portal receiver must explicitly grant session exchange/introspection and
 `access-snapshot:read`. Kernel accepts only snapshot V3; no V1/V2 wire conversion

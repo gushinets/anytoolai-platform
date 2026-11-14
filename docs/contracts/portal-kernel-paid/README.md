@@ -121,9 +121,25 @@ The directional credentials remain independent:
   configured consumer only its authorized products.
 
 Kernel's consumer ID defaults to `platform-kernel`. The single configuration
-input `ANYTOOLAI_PORTAL_CONSUMER_ID` must match its API, frontend build and Portal
+input `ANYTOOLAI_PORTAL_CONSUMER_ID` must match its API, worker, frontend build and Portal
 registry. The browser validates this audience throughout launch/exchange/storage;
 CE-kit receives it explicitly. Configuration cannot reassign historical purchases.
+
+Kernel migration `0022` binds the database to its retained consumer, without
+changing ANY-507 owners, replay keys or counters. Stop API and workers before
+migration and restart only compatible binaries. Multiple coherence consumers
+stop the migration. Retained paid history has no consumer identity, so a
+non-default coherence consumer cannot prove its ownership, even for the same
+user; that combination also stops for separately reviewed ownership reconciliation.
+Legacy paid history binds to `platform-kernel`. Without paid history, one retained
+coherence consumer is preserved; a database with neither binds atomically on its
+first paid authenticated request.
+Thereafter a mismatched consumer receives `503 paid_consumer_mismatch` before
+paid reads, replay, usage or invalidation. Exhaustion delivery checks the same
+binding before claiming/sending; accepted jobs can still finish on their original
+reservations. Restoring the configured consumer resumes access and delivery.
+Changing consumer requires a separate database or a separately reviewed data
+migration, not an environment edit. Downgrade requires a compatible backup.
 
 Possession of one permission grants none of the others. Scope comes from trusted
 receiver configuration. Requests only narrow that authority. Canonical Portal
@@ -317,8 +333,9 @@ order, one per requested ID. Observed items contain the complete allowance tuple
 status, successful_used, reserved, remaining, available and UTC read_at.
 Unobserved items contain only allowance_id/status. Unknown and foreign buckets
 are indistinguishable. Rows come from a single existing repository/readback row
-snapshot; errors are `503`, never manufactured zeros. Reads create no rows;
-snapshot ingestion establishes zero-use buckets via existing `ensure_usage`.
+snapshot; errors are `503`, never manufactured zeros. Reads create no usage buckets
+and change no spend or reservations; authentication may persist consumer binding
+and policy observations. Snapshot ingestion establishes zero-use buckets via existing `ensure_usage`.
 
 ```text
 remaining = max(quantity - successful_used, 0)
@@ -613,8 +630,8 @@ identities and separate disposable databases. External LBX/manifest responses
 and the second identity are synthetic. This is distinct from Step 16's assembled
 paid browser/execution acceptance. Recipient delivery was pending at this
 checkpoint and is now implemented in Step 13; backend/cabinet usage is implemented
-in Steps 14/15. Current installation heads are Portal `20261113_0012` and Kernel
-`0021`; the common guide owns the expanded-digest P upgrade requirement.
+in Steps 14/15. The [paired installation procedure](https://github.com/gushinets/payments-portal/blob/main/docs/architecture/deployment.md#paired-compatibility-and-synchronized-cutover)
+owns the current migration heads and expanded-digest P upgrade requirement.
 
 
 The 2026-11-13 remaining-review correction requires verified email at all three

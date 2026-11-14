@@ -353,6 +353,13 @@ Definitions remain in repository configuration; these tables store runtime state
 | created_at | DATETIME | no |
 | updated_at | DATETIME | no |
 
+## platform.paid_consumer_binding
+
+| Column | Type | Nullable |
+|---|---|---|
+| id | INTEGER | no |
+| consumer_id | VARCHAR(64) | no |
+
 ## platform.product_handoffs
 
 | Column | Type | Nullable |

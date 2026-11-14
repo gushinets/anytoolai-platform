@@ -8,7 +8,11 @@ from anytoolai_platform_api.manifest_auth import (
     PortalPrincipal,
     authenticate_portal,
 )
-from anytoolai_platform_api.paid_access import PAID_RUNTIME_ERROR_RESPONSES, invalidate
+from anytoolai_platform_api.paid_access import (
+    PAID_RUNTIME_ERROR_RESPONSES,
+    bind_paid_consumer,
+    invalidate,
+)
 from anytoolai_platform_api.portal_session import VersionOne, WireUserId
 from anytoolai_platform_api.settings import Settings
 from anytoolai_platform_core.quotas.models import ExecutionOwner, ExecutionOwnerKind
@@ -52,5 +56,6 @@ def post_access_invalidation(
         payload.tenant_id, payload.region, ExecutionOwnerKind.portal_user, payload.user_id
     )
     with transaction_boundary(factory) as session:
+        bind_paid_consumer(session, settings.portal_consumer_id)
         invalidate(session, owner, payload.access_revision, settings.portal_consumer_id)
     return Response(status_code=HTTPStatus.NO_CONTENT)
