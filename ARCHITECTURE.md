@@ -56,11 +56,15 @@ apps/web-mirror -> web-result-kit
 ## Payment Portal boundary
 
 The separate Portal owns identity, legal acceptance, discovery and the cabinet;
-its target also owns commercial mappings and paid-access decisions. Kernel owns
-execution, artifacts and runtime usage/quota enforcement. Current Kernel runs
-guest quotas; authenticated paid integration is future work. The
+it also owns commercial mappings and paid-access decisions. Kernel owns
+execution, artifacts and runtime usage/quota enforcement. Kernel supports guest
+quotas and Portal-delegated paid admission. ANY-766 Step 8 implements recoverable
+paid browser launch. ANY-766 Step 14 supplies usage reads and transactional exhaustion delivery.
+Cabinet composition is implemented in Step 15. Steps 16/17 supply focused paired
+local acceptance and build/install preparation; the full matrix and remote/live
+acceptance belong to ANY-767. The
 [integration map](docs/integrations/payment-portal.md) records both repositories'
-actual state, the three target request directions and enablement dependencies.
+actual state, implemented service directions and enablement dependencies.
 
 ## Runtime principle
 

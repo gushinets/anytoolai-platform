@@ -11,16 +11,20 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from http import HTTPStatus
+from typing import Literal
 
 import anytoolai_platform_core.quotas.service as quota_module
 import anytoolai_platform_core.workflows.runner as runner_module
 import pytest
 import sqlalchemy as sa
+from anytoolai_platform_api.paid_access import optional_portal_user
+from anytoolai_platform_api.portal_session import PortalUserPrincipal
 from anytoolai_platform_api.routers.handoffs import _service as handoff_service
 from anytoolai_platform_core.artifacts.canonical import CanonicalArtifactError
 from anytoolai_platform_core.artifacts.models import ArtifactRecord, ArtifactStatus
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.common.time import utc_now
+from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.handoffs.models import AcceptHandoffCommand
@@ -53,6 +57,7 @@ from anytoolai_platform_core.storage.db import (
     scenario_sessions_table,
 )
 from anytoolai_platform_core.storage.transactions import (
+    SessionFactory,
     engine_from_session_factory,
     transaction_boundary,
 )
@@ -67,6 +72,7 @@ from anytoolai_platform_core.workflows.runner import (
 )
 from anytoolai_platform_worker.composition import build_worker
 from anytoolai_platform_worker.lease import AdvisoryJobLease
+from fastapi import FastAPI
 from test_execution_admission_postgresql import allowance, rows, start, without_scenario_config
 from test_execution_admission_postgresql import runtime as runtime_fixture
 from test_handoffs_api import _create, _request, _seed_source
@@ -159,8 +165,12 @@ def assert_meter(runtime, acceptance, state, used, reserved):
 @pytest.mark.parametrize("completed", [True, False])
 @pytest.mark.parametrize("removal", ["scenario", "association", "product"])
 def test_replay_and_poll_survive_config_removal_without_new_consumption(
-    runtime, paid, completed, removal
-):
+    runtime: tuple[SessionFactory, FastAPI, ConfigRegistry],
+    paid: bool,
+    completed: bool,
+    removal: Literal["scenario", "association", "product"],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     factory, app, registry = runtime
     grant = allowance() if paid else None
     with transaction_boundary(factory) as session:
@@ -196,6 +206,19 @@ def test_replay_and_poll_survive_config_removal_without_new_consumption(
     # The client polls immediately after replay, even if the returned execution is already done.
     app.state.runtime = replace(app.state.runtime, config_registry=drifted)
     path = f"/v1/scenario-sessions/{first.scenario_session_id}"
+    if grant is not None:
+        # This Core/replay test supplies the trusted owner for protected reads.
+        # Delegation and guest/foreign refusals have separate API coverage.
+        monkeypatch.setitem(
+            app.dependency_overrides,
+            optional_portal_user,
+            lambda: PortalUserPrincipal(
+                owner=grant.owner,
+                valid_until=datetime.now(UTC) + timedelta(minutes=20),
+                consumer_id=app.state.settings.portal_consumer_id,
+                consumer_policy_revision=1,
+            ),
+        )
     polled = asyncio.run(_request(app, "GET", path))
     assert polled.status_code == HTTPStatus.OK
     assert polled.json()["job_id"] == first.job_id

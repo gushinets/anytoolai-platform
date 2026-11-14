@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 import secrets
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import asdict, replace
 from typing import Any
 
@@ -141,6 +141,7 @@ class ScenarioRuntimeService:
         job_repository: JobRepository,
         event_emitter: EventEmitter,
         quota_service: GuestQuotaService | None = None,
+        paid_admission: Callable[[str, str], PaidAllowance] | None = None,
     ) -> None:
         self._config_registry = config_registry
         self._session_repository = session_repository
@@ -148,6 +149,7 @@ class ScenarioRuntimeService:
         self._job_repository = job_repository
         self._event_emitter = event_emitter
         self._quota_service = quota_service
+        self._paid_admission = paid_admission
         self._reservations = ExecutionReservationService(config_registry, quota_service)
 
     def start_session(
@@ -222,6 +224,9 @@ class ScenarioRuntimeService:
             )
             if replay is not None:
                 return replay
+
+        if paid and self._paid_admission is not None:
+            paid_allowance = self._paid_admission(product_id, scenario_id)
 
         scenario = self._require_product_scenario(product_id, scenario_id)
         # New internal-only admission may incur provider spend. Reject it without a valid token
@@ -454,20 +459,6 @@ class ScenarioRuntimeService:
         execution_owner: ExecutionOwner | None = None,
         paid_allowance: PaidAllowance | None = None,
     ) -> LinkedScenarioSessionResult:
-        scenario = self._require_product_scenario(product_id, scenario_id)
-        # ANY-221: no legitimate handoff ever targets an internal_only (live-canary) scenario --
-        # unlike start_session(), there's no live_canary_token to check here at all, since
-        # live_canary.py never creates linked/handoff sessions; this path is always rejected.
-        if scenario.internal_only:
-            raise ScenarioNotFoundError()
-        self._require_enabled_frontend(product_id, frontend_id)
-        if not isinstance(input_payload, Mapping):
-            raise ScenarioInputInvalidError()
-        workflow = self._config_registry.get_workflow(scenario.workflow_id)
-        if workflow is None:
-            raise LookupError(f"workflow not found: {scenario.workflow_id}")
-        self._require_valid_workflow_input(workflow, input_payload)
-
         owner = self._execution_owner(tenant_id, region, guest_id, execution_owner)
         paid = owner is not None and owner.owner_kind is ExecutionOwnerKind.portal_user
         if paid:
@@ -501,6 +492,23 @@ class ScenarioRuntimeService:
                 return LinkedScenarioSessionResult(
                     session=stored, job=self._job_repository.get(replay.job_id), acceptance=replay
                 )
+        if paid and self._paid_admission is not None:
+            paid_allowance = self._paid_admission(product_id, scenario_id)
+
+        scenario = self._require_product_scenario(product_id, scenario_id)
+        # ANY-221: no legitimate handoff ever targets an internal_only (live-canary) scenario --
+        # unlike start_session(), there's no live_canary_token to check here at all, since
+        # live_canary.py never creates linked/handoff sessions; this path is always rejected.
+        if scenario.internal_only:
+            raise ScenarioNotFoundError()
+        self._require_enabled_frontend(product_id, frontend_id)
+        if not isinstance(input_payload, Mapping):
+            raise ScenarioInputInvalidError()
+        workflow = self._config_registry.get_workflow(scenario.workflow_id)
+        if workflow is None:
+            raise LookupError(f"workflow not found: {scenario.workflow_id}")
+        self._require_valid_workflow_input(workflow, input_payload)
+
         quota_input = (
             None
             if not queue_workflow

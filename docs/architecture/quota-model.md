@@ -1,8 +1,9 @@
 # Quota Model
 
-MVP-A exposes guest quota. ANY-507 also provides typed paid metering internally; paid
-HTTP authentication, AccessSnapshot, scenario metric selection and interservice usage remain
-ANY-766 responsibilities. See the [shared contract and execution plan](../exec-plans/completed/ANY-507-implementation-plan.md).
+MVP-A exposes guest quota. ANY-507 supplies typed paid metering. ANY-766
+connects Portal delegation, finite consumer-scoped AccessSnapshot V3 and scenario-owned metric
+selection to that same admission path. ANY-766 Step 14 adds authenticated usage
+readback and transactional exhaustion delivery. See the [shared contract and execution plan](../exec-plans/completed/ANY-507-implementation-plan.md).
 
 ## Admission and replay
 
@@ -60,7 +61,8 @@ changes. Legacy jobs retain their earlier debit history and are never charged ag
 
 `ConsumptionTransition(applied, reservation, became_exhausted)` exposes an exhaustion edge only on
 an applied consumption. ANY-766 attaches its explicit outbox write before the same outer commit,
-including recovery; this stage introduces no outbox or Portal wire.
+including recovery. Step 14 persists that edge in `allowance_exhaustion_outbox`;
+repeated finalization and guest work create no paid delivery event.
 
 ## Readback and guest HTTP
 
@@ -158,3 +160,67 @@ Before a product YAML switches from `lifetime` to a calendar period: (1) Core/SD
 value, (2) CE-kit and all supported web/extension clients understand it, (3) those clients are
 deployed, (4) only then switch the YAML. Never switch a product before every supported client version
 understands the new `QuotaPeriod` values.
+
+
+## ANY-766 coherent paid admission
+
+`platform.paid_access_coherence` (migration `0020`) retains one row per
+consumer/tenant/region/user, independent monotonic policy/access floors and the
+last snapshot P/R/digest plus nullable document. Core's repository owns locking
+and writes. The HTTP composition validates Portal V3 consumer/scope/P/R and
+performs bounded refresh outside SQL. After successful introspection, the runtime
+identity dependency commits observed P before any handler, including historical
+reads, usage, replay and subsequent 404/409 refusals. A higher P evicts the document
+without lowering R or changing buckets/reservations. An older in-flight P retains
+its identity-only read/replay rights but cannot lower the floor or authorize a new
+start. These reads/replays never fetch a snapshot or require grants. Installation,
+policy observation, invalidation and new admission share the same row lock. Snapshot
+installation/admission require the current introspected P; stale P/R installs
+cannot restore authority. Same-P/R semantic immutability survives eviction.
+The forward migration preserves R and all ANY-507 buckets/reservations/usage,
+initializes legacy Kernel rows at P1 and clears only incompatible V2 cache/digest
+metadata. Consumer/P never changes execution ownership or replay identity.
+
+The paid start adapter first attempts owner/hash-matched replay without mutable
+configuration or a snapshot dependency. New admission refreshes outside SQL,
+locks coherence, repeats replay, resolves the scenario metric and exactly one
+eligible allowance, and invokes ANY-507 in the caller's Session. After bucket
+waits, it resamples PostgreSQL wall time and rechecks principal, revision, snapshot
+and grant before commit. No local expiry extension or second reservation path
+exists. Conflicting immutable tuples and ambiguous metric allowances refuse only
+their dependent admission.
+
+Paid polling, next-actions, canonical results, all handoff operations and client
+events use reservation ownership or server-written deferred ownership. Historical
+body `user_id` never proves ownership. Authenticated historical reads and replay
+do not require a current grant. Paid events may precede a scenario; their trusted
+user correlation is derived from authentication and remains observational.
+
+Handoff late authority refusal escapes the acceptance transaction and rolls back
+consent, target linkage, jobs, reservations and events. It does not turn a
+retryable authority/dependency refusal into terminal handoff failure. Existing
+expiry, decline, busy-capacity and terminal execution behavior remains in place.
+
+
+## ANY-766 Step 14 paid usage and exhaustion
+
+Internal `/internal/v1/usage/{user_id}` requires scoped Portal service identity
+and opt-in `usage:read`; public `/v1/products/{product_id}/paid-usage` introspects
+the Portal owner and restricts the product. Both accept 1–100 distinct allowance
+UUIDs, preserve request order, return unobserved for unknown/foreign IDs, and
+create no bucket. Established zero, reserved capacity and successful exhaustion
+remain distinct. Historical reads need no current grant or commercial flag.
+
+The runner and success recovery insert the immutable paid exhaustion tuple in
+the same transaction as result/debit. Migration `0021` adds the durable outbox,
+without backfilling historical edges or touching ANY-507 buckets/replay. The
+worker's opt-in reverse lane owns one bounded connection/task independent of
+workflow duration. Claims last 30 seconds; HTTP is outside SQL and ACK checks
+lease ownership/expiry after the row lock. Transport/429/5xx retry with bounded
+backoff; other non-204 responses park. Disabled delivery retains pending rows.
+Portal ACK follows its immutable hint commit, including valid historical and
+duplicate events. A hint never terminates, revokes or refills paid authority.
+The common backend guide records settings and operational recovery. Step 15
+implements independent cabinet usage composition; Step 16 supplies focused
+assembled local acceptance. The full matrix and remote/live acceptance remain
+ANY-767 work.

@@ -25,6 +25,7 @@
   "retry": "Réessayer",
   "formLabel": "Formulaire {product}",
   "workspace": {
+    "restoreDraft": "Restaurer le brouillon enregistré",
     "inputTitle": "Vos informations",
     "previousDetails": "Résultat basé sur les informations précédentes",
     "backToInputs": "Retour aux informations",
@@ -40,7 +41,9 @@
     "startFailed": "Impossible de démarrer {product}. Veuillez réessayer.",
     "timeout": "Cela prend plus de temps que prévu. Veuillez réessayer.",
     "connectionLost": "Connexion perdue pendant l’attente de votre résultat. Veuillez réessayer.",
-    "tryAgain": "Veuillez réessayer."
+    "tryAgain": "Veuillez réessayer.",
+    "savedOperationPending": "Une opération inachevée est enregistrée. Choisissez «Réessayer» pour recharger la page et la poursuivre.",
+    "storageUnavailable": "Stockage du navigateur indisponible. Activez-le et réessayez la même demande."
   },
   "result": {
     "copy": "Copier",
@@ -58,5 +61,14 @@
     "text": "Vos saisies sont envoyées à notre service et à un fournisseur de modèles d’IA pour créer le résultat, puis stockées avec votre exécution sur nos serveurs. Votre brouillon est conservé dans ce navigateur et peut être perdu si vous rechargez ou quittez la page. Ne saisissez pas de mots de passe, de codes d’accès, de clés API ni de coordonnées complètes de carte bancaire.",
     "policyLink": "Politique de confidentialité",
     "opensInNewTab": "(s’ouvre dans un nouvel onglet)"
+  },
+  "portalSession": {
+    "title": "Session Portail",
+    "required": "Reconnectez-vous pour poursuivre la même opération.",
+    "continue": "Continuer avec le Portail",
+    "loading": "Connexion…",
+    "failed": "Autorisation impossible. Vérifiez le stockage du navigateur et réessayez.",
+    "retry": "Réessayer l’autorisation",
+    "signOut": "Déconnecter cet onglet"
   }
 }

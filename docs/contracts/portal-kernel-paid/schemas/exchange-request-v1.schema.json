@@ -1,0 +1,21 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "code",
+    "code_verifier"
+  ],
+  "properties": {
+    "code": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{43}$"
+    },
+    "code_verifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._~-]{43,128}$"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ANY-766 target exchange-request-v1",
+  "description": "Target contract only; not an implemented route or commercial approval. Semantic checks are specified in README.md."
+}

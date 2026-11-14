@@ -48,6 +48,7 @@ function BriefDecoderFields({ values, errors, disabled, onChange }: ProductField
 export const briefDecoderDefinition: ProductDefinition<BriefDecoderValues, BriefDecoderResult> = {
   productId: "brief_decoder",
   scenarioId: "brief_decoder.decode_v1",
+  outputSchema: { schemaRef: "brief_decoder.decode_output_v1", schemaVersion: 2 },
   messageScope: "decode",
   hasDescription: true,
   emptyValues: { briefText: "" },

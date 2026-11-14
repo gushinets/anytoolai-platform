@@ -332,7 +332,11 @@ def automated(peer: tuple[Path, Path]) -> None:
     print("AUTH_SCOPE_ROTATION_RECOVERY_RESTART_CONCURRENCY=PASS SIDE_EFFECT_CALLS=0", flush=True)
     consumer(peer, token, mode="regressions")
     print("REAL_LOCAL_KERNEL_PORTAL_HTTP=PASS", flush=True)
-    print("VOCABULARY=TEST_ONLY CORRUPT_PAYLOADS=INJECTED_CONSUMER_REGRESSIONS", flush=True)
+    print(
+        "VOCABULARY=CURRENT_INVENTORY ENABLED_METRICS=TEST_ONLY "
+        "CORRUPT_PAYLOADS=INJECTED_CONSUMER_REGRESSIONS",
+        flush=True,
+    )
     print("DEPLOYED_TLS=NOT_RUN PRODUCTION_COMMERCIAL_APPROVAL=NOT_ESTABLISHED", flush=True)
 
 
@@ -354,7 +358,7 @@ def safe_failure_check(url: str, token: str) -> None:
 def serve_test(token: str) -> None:
     with Producer("test", token) as producer:
         print(json.dumps(producer.ready, sort_keys=True), flush=True)
-        print(f"PRODUCER_SHA={sha(ROOT)} VOCABULARY=TEST_ONLY", flush=True)
+        print(f"PRODUCER_SHA={sha(ROOT)} VOCABULARY=CURRENT_INVENTORY", flush=True)
         while producer.process.poll() is None:
             threading.Event().wait(REQUEST_TIMEOUT_SECONDS)
 
@@ -394,7 +398,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
                 print(f"CONSUMER_SHA={sha(peer[0])}", flush=True)
                 print(json.dumps(result, sort_keys=True), flush=True)
-                print("REAL_LOCAL_KERNEL_PORTAL_HTTP=PASS VOCABULARY=TEST_ONLY", flush=True)
+                print(
+                    "REAL_LOCAL_KERNEL_PORTAL_HTTP=PASS VOCABULARY=CURRENT_INVENTORY "
+                    "ENABLED_METRICS=TEST_ONLY",
+                    flush=True,
+                )
     except KeyboardInterrupt:
         return 130
     except (ValueError, OSError, RuntimeError, AssertionError, subprocess.SubprocessError) as error:

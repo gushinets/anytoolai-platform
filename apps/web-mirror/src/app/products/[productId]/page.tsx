@@ -1,10 +1,10 @@
 "use client";
 
-import { generateIdempotencyKey } from "@anytoolai/ce-kit";
+import { generateIdempotencyKey, type PlatformApiClient } from "@anytoolai/ce-kit";
 import { notFound } from "next/navigation";
-import { use, useMemo } from "react";
+import { use, useMemo, useState } from "react";
 import { ATTACH_SESSION_PARAM } from "../../../lib/hostUrls";
-import { getPlatformApiClient } from "../../../lib/apiClient";
+import { PortalIdentityBoundary } from "../../../components/PortalIdentityBoundary";
 import { ProductPageShell } from "../../../products/ProductPageShell";
 import { getRegisteredProduct } from "../../../products/registry";
 import { getClientStorage } from "../../../products/runtime/clientStorage";
@@ -19,11 +19,20 @@ type ProductPageProps = {
 export default function ProductPage({ params, searchParams }: ProductPageProps) {
   const { productId } = use(params);
   const product = getRegisteredProduct(productId);
-  const client = getPlatformApiClient();
+  const query = use(searchParams);
+  const sessionParam = query[ATTACH_SESSION_PARAM];
+  const scenarioId = typeof query.scenario === "string" ? query.scenario : undefined;
+  if (!product) notFound();
+  return <PortalIdentityBoundary requirePaid={query.paid === "1"}>{(client) => <ConnectedProductPage productId={productId} client={client} sessionParam={sessionParam} scenarioId={scenarioId} />}</PortalIdentityBoundary>;
+}
+
+function ConnectedProductPage({ productId, client, sessionParam, scenarioId }: { productId: string; client: PlatformApiClient; sessionParam: string | string[] | undefined; scenarioId?: string }) {
+  const product = getRegisteredProduct(productId);
+  // The URL is consumed after mount; keep its scenario with this visit's explicit attachment.
+  const [attachScenarioId] = useState(() => typeof sessionParam === "string" ? scenarioId : undefined);
   // `?session=` is the target session an accepted handoff already queued. Read from the page's
   // `searchParams` prop (not `useSearchParams`, whose Suspense boundary would turn the unknown-product
   // 404 into a 200); see `useAttachSession` for how the id is kept and removed from the URL.
-  const sessionParam = use(searchParams)[ATTACH_SESSION_PARAM];
   const attach = useAttachSession(productId, typeof sessionParam === "string" ? sessionParam : undefined);
   const onEvent = useMemo(
     // The same per-client storage ProductRunPage uses for the guest id -- code review finding: a
@@ -46,7 +55,7 @@ export default function ProductPage({ params, searchParams }: ProductPageProps) 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const visitId = useMemo(() => generateIdempotencyKey(), [productId]);
 
-  if (!product) {
+  if (!product || (scenarioId !== undefined && !product.scenarioIds.includes(scenarioId))) {
     notFound();
   }
 
@@ -57,7 +66,7 @@ export default function ProductPage({ params, searchParams }: ProductPageProps) 
       client={client}
       onEvent={onEvent}
       visitId={visitId}
-      attach={attach}
+      attach={{ ...attach, attachScenarioId }}
     />
   );
 }

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Annotated
 
-from pydantic import Field
+from pydantic import Field, StringConstraints
 
 from anytoolai_platform_sdk.contracts.base import ContractModel
 
@@ -25,3 +26,4 @@ class ScenarioDefinition(ContractModel):
     # -- see its own docstring. Kept in the SDK contract (not core-only) so any consumer holding a
     # ScenarioDefinition can tell an internal-only (live-canary) scenario apart from a normal one.
     internal_only: bool = False
+    paid_metric_key: Annotated[str, StringConstraints(strict=True, pattern=r"\S")] | None = None

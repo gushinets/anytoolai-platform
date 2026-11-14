@@ -1,0 +1,58 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "access_token",
+    "token_type",
+    "tenant_id",
+    "region",
+    "user_id",
+    "expires_at",
+    "consumer_id",
+    "consumer_policy_revision"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 2
+    },
+    "access_token": {
+      "type": "string",
+      "minLength": 43,
+      "maxLength": 512
+    },
+    "token_type": {
+      "type": "string",
+      "const": "Bearer"
+    },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "region": {
+      "type": "string",
+      "minLength": 1
+    },
+    "user_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$"
+    },
+    "consumer_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "consumer_policy_revision": {
+      "type": "integer",
+      "minimum": 1
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ANY-766 target exchange-response-v2",
+  "description": "Consumer-neutral target only; Step 8 runtime baseline remains unchanged. Contextual authority rules are in the common backend guide."
+}

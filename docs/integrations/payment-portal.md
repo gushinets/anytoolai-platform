@@ -1,14 +1,14 @@
 # Payment Portal integration map
 
 Status: navigation, implementation snapshots and the ANY-711 service-authentication handoff.
-Last observed: 2026-10-30.
+Last observed: 2026-11-13; local source state, not a deployment check.
 
 ## Ownership and sources
 
 This repository is Platform Kernel: product/scenario execution, artifacts,
 technical product/metric vocabulary and runtime usage/quota enforcement.
 [Payment Portal](https://github.com/gushinets/payments-portal) owns identity,
-sessions, legal acceptance, public discovery and the cabinet. Its target also
+sessions, legal acceptance, public discovery and the cabinet. It also
 owns commercial-to-technical mappings, paid grants/allowances, access revisions
 and delivery. External Billing owns commercial billing truth and lifecycle.
 
@@ -30,11 +30,90 @@ these contracts. Payload semantics and MVP scope remain owned by the sources abo
 [frontend boundaries](../architecture/frontend-boundaries.md).
 Historical Portal contracts and execution plans do not override accepted sources.
 
+## Current local implementation
+
+Current source baselines: Kernel `c8e867bfc25f4158b0bc36b76892e670a32cbb12`
+and Portal `65079f4e50867b9582a951a62a62cb6706dc0e0f`, plus the local remaining-corrections
+diff. The dated checkpoints below retain historical evidence, not current setup
+instructions. Corrections through 2026-11-13 cover policy digest, saved ownership,
+inactive delivery, consumer alignment, ingress retention, web credential isolation,
+verified delegation, historical activation and paid form/mode recovery. Focused
+local verification passed; earlier image rehearsals do not verify the new sources.
+The [active plan](../exec-plans/active/ANY-766-implementation-plan.md) owns the
+current scope and remaining gates.
+
+- Manifest V1 is implemented in Kernel and consumed by Portal.
+- Portal serves common consumer-bound identity V2 with configured callbacks,
+  a persisted policy guard and documented generated security. Kernel validates
+  consumer/P on every introspection and retains Core owners/replay semantics.
+- Step 12 serves/consumes consumer-filtered V3 with durable consumer/P/R
+  coherence, populated migration `0020` and unchanged ANY-507 buckets/replay;
+  Portal Step 11 now routes configured technical sources and preserves immutable
+  source/owner history; Step 13 now partitions Portal delivery by recipient.
+- Kernel's durable invalidation receiver and Portal's bounded embedded sender
+  are implemented. Configure matching scope/service tokens and enable
+  `ANYTOOLAI_PORTAL_ACCESS_INVALIDATION_ENABLED` at Kernel before starting the updated Portal
+  worker. Portal's Step 13 sender selects each snapshot recipient's origin and
+  outgoing service key from `BACKEND_CONSUMERS`, with independent bounded lanes.
+  Stop affected APIs/workers and use the current paired cutover linked below.
+  The historical Step 13 heads were Portal
+  `20261111_0010` and Kernel `0020`. Legacy Kernel connection settings no longer
+  select delivery destinations. A disabled receiver permission parks delivery with `403`;
+  operator retry is required after repair. This differs from an inactive Portal
+  registry recipient, whose history is retained without new scheduling. The
+  [current cutover](../../infra/deployment/README.md#reviewed-images-and-independent-updates-any-766-step-17)
+  also requires a higher P when installing the expanded digest, despite unchanged heads.
+- Step 8 implements recoverable browser launch, owner-bound tab custody and
+  paid runtime/event/handoff continuity. Step 14 implements usage/exhaustion;
+  Step 15 implements independent current/historical cabinet usage with generated
+  Portal DTOs. Steps 16/17 supply focused paired local acceptance and build/install
+  preparation in the agreed scope. ANY-767 owns the full deferred matrix, remote
+  deployment and live-service acceptance.
+
+### Superseded access-check direction (ANY-286/287)
+
+ANY-766 supersedes the earlier access-check direction tracked by ANY-286/287 for
+this integration. The implemented contract uses consumer-bound delegation V2
+and consumer-scoped AccessSnapshot V3 with independent policy/access revisions.
+Portal owns authenticated identity and purchased grants/allowances; Kernel owns
+execution admission and durable reserve/finalize/release through ANY-507. A
+snapshot read supplies finite authority; reserving capacity and recording usage
+belong to the backend's execution transaction. Use the
+[current contract](../contracts/portal-kernel-paid/README.md) for implementation
+and the [common backend guide](https://github.com/gushinets/payments-portal/blob/main/docs/contracts/product-backend-api/README.md)
+for consumer onboarding. The earlier access-check direction is historical, not
+an additional endpoint or metering path to implement.
+
+## ANY-766 Step 9 common backend specification — 2026-11-10
+
+Inspected local sources: Portal `119d3d86175f35006d2ef90259bb43e19a9ef82f`
+and Kernel `6697b9f5c271eb1c77f507e037661fd92a048b74`, plus the Step 9
+documentation/test-only diff. The
+[Portal-owned common guide](https://github.com/gushinets/payments-portal/blob/main/docs/contracts/product-backend-api/README.md)
+now specifies independent consumers, audience-bound V2 delegation, V3/P/R
+snapshots, immutable source/owner history and recipient/usage routing. The
+[paired bundle](../contracts/portal-kernel-paid/README.md) retains exact baseline
+schemas/fixture payloads and independently checked target additions.
+
+At this historical Step 9 checkpoint, runtime, migrations and generated OpenAPI
+were unchanged (Kernel identity V1/snapshot V2). Step 10 subsequently implemented
+common identity V2/security while retaining the then-current Kernel-only V2
+snapshot. Step 12 now supersedes that wire with consumer-filtered V3/P/R. The guide records
+actual owning modules, minimal replacements, populated-state forward migration
+requirements and focused acceptance cases; active Kernel code is not a purge
+target. Common identity is Step 10, technical-source ownership Step 11, working
+auth/access with documented generated Swagger Step 12 (2026-11-13 priority),
+recipient delivery Step 13, usage/cabinet Steps 14/15, assembled local acceptance
+Step 16 and build/install preparation Step 17. Real external backend adoption
+belongs to its owning team; remote/live acceptance remains ANY-767.
+
 ## Observed implementation
 
 Historical snapshot (2026-10-23). Evidence baselines: Platform `79a2ada5b790f959a40b3e08451ef9ed8d97da5b`;
 Portal `79dc3f4d204aec4ac9552e3d1da3481553cc8aef`.
 These are inspected source snapshots, not deployment or conformance claims.
+This and the dated checkpoints below retain their historical scope; the current
+local summary above supersedes their statements about unimplemented work.
 
 | Operation / request direction | Payload producer | Payload consumer / receiver | Verification status |
 | --- | --- | --- | --- |
@@ -107,32 +186,85 @@ Its canonical snapshot specification remains V1 with calendar bounds. Proposed V
 integration remain ANY-766 work; this observation is not a final ANY-715/765 handoff or deployment
 readiness claim. No peer source or producer/consumer artifact changed.
 
+## ANY-766 target contract checkpoint — 2026-11-09
+
+At Kernel `72ff15bc0b77903c87aa39f7b10186dccc556d09` and Portal
+`7f985031034f45fde0203f710eb64283cd086e86`, Step 1 adds only the
+[paired target schemas/fixtures](../contracts/portal-kernel-paid/README.md) and
+updates the peer's two canonical designs. Snapshot V2 removes calendar interval
+fields and freezes owner/allowance/product/metric/unit/quantity; manifest and
+invalidation stay V1. Delegation/recovery, coherent paid admission/events and
+usage/exhaustion/cabinet delivery are specified, not implemented. The historical
+observations above are unchanged. Internal ANY-507 readback is not paid HTTP.
+
+ANY-766 owns selected production vocabulary/scenario bindings under the
+[dated scope clarification](https://linear.app/paveldik/issue/ANY-766); ANY-711
+remains Done for manifest/TEST-ONLY delivery. Quantities, LBX associations and
+sales approval remain separate. The target extends the credentials/receiver
+permissions below without enabling routes: Portal → Kernel adds usage:read;
+Kernel → Portal adds kernel-session:exchange, kernel-session:introspect and
+allowance-exhaustion:write. Tests independently validate the retained copies
+without a shared runtime dependency. Compatible consumers precede V2 connection.
+
+Step 2 implements the four disabled production metric declarations and seven
+product-owned `paid_metric_key` bindings described in the
+[config model](../architecture/config-model.md). Core/SDK and loader reference
+checks agree; current manifest inventory fixtures include all six metrics.
+Historical two-metric TEST-ONLY fixtures retain their bytes and identity. The
+Portal consumer retains independent current fixture copies. Sales, paid HTTP
+identity/admission, usage delivery and purchased quantities remain separate work.
+
+## ANY-766 Step 4 identity checkpoint — 2026-11-10
+
+Peer Portal `4a34948eb02d034b46871d739bbf066ffc67d48a` and local Kernel
+`89296ddce3c7b187881cb1730bf7fbacf3ffd302` were inspected, plus the paired
+uncommitted Step 4 change. Portal implements one-use S256 codes, atomic exchange
+and parent-bound introspection; Kernel implements public code exchange and the
+reusable `authenticate_portal_user` dependency. It creates the existing Core
+Portal-user `ExecutionOwner` directly from validated scope/UUID and introspects
+on each invocation. It never falls back to a guest or matches a local user.
+
+See [identity configuration and limits](../contracts/portal-kernel-paid/README.md#step-4-server-implementation).
+At this checkpoint the reverse connection implemented exchange/introspection.
+The current local summary above records the subsequent snapshot/admission/delivery
+implementation. Local evidence here uses disposable Portal PostgreSQL and
+intercepted Kernel HTTP; real paired HTTP remains Step 16. Browser custody/recovery
+remains Step 8. The historical snapshots above remain historical evidence.
+
 ## Service authentication and scope convention (ANY-711 handoff)
 
-This is the normative service-authentication handoff for all three operations. ANY-711
-implements only manifest read. ANY-766 must implement the snapshot/invalidation rules below;
-the future settings and permissions named here are not enabled or accepted by current code.
-Peer settings and the accepted access-contract design were rechecked read-only at Portal
-`2bb07d778edc5ea56011b0034ba24b0702ede81f` on 2026-10-30. This documentation change requires
-no Portal source/artifact change or mutual SHA bump.
+This is the service-authentication convention for manifest, snapshot and
+invalidation. ANY-711 supplied manifest read; ANY-766 Steps 4–7 implement the
+reverse identity/snapshot connection and invalidation receiver/sender. The
+[contract bundle](../contracts/portal-kernel-paid/README.md#service-requests-and-identity)
+also documents the implemented identity, usage and exhaustion operations.
+Steps 14/15 implement usage/exhaustion and cabinet composition; their receiver
+permissions and delivery enablement remain explicit configuration gates.
 
 ### Credentials and operation permissions
 
-- **Portal -> Kernel manifest:** Portal sends its existing server-side `KERNEL_SERVICE_TOKEN`
-  as `Authorization: Bearer <secret>`. Kernel validates against `ANYTOOLAI_PORTAL_SERVICE_TOKEN`
+- **Portal -> Kernel manifest:** Portal sends `portal_to_backend_current_secret`
+  from the `platform-kernel` entry in `BACKEND_CONSUMERS` as
+  `Authorization: Bearer <secret>`. Kernel validates against `ANYTOOLAI_PORTAL_SERVICE_TOKEN`
   and the optional `ANYTOOLAI_PORTAL_SERVICE_TOKEN_PREVIOUS` rotation slot. Its receiver-owned
   Portal principal has `PortalPermission.MANIFEST_READ` (`manifest:read`).
 - **Portal -> Kernel invalidation:** reuse that same directional credential pair; no third
-  secret is introduced. ANY-766 adds `PortalPermission.ACCESS_INVALIDATE` (`access:invalidate`)
+  secret is introduced. ANY-766 implements `PortalPermission.ACCESS_INVALIDATE` (`access:invalidate`)
   and explicitly grants it through Kernel's trusted receiver policy when invalidation is
   enabled. Possession of a manifest-only credential does not itself grant invalidation;
   requests cannot add permissions through headers, query parameters or body fields.
-- **Kernel -> Portal AccessSnapshot:** use a different secret. The future Kernel sender
-  setting is `ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN`; Portal's receiver settings are
-  `KERNEL_ACCESS_SERVICE_TOKEN` and optional `KERNEL_ACCESS_SERVICE_TOKEN_PREVIOUS`.
-  Portal binds this credential to a Kernel service principal with `access-snapshot:read`.
-  These names are reserved for ANY-766 implementation. The two directional secrets must
+- **Kernel -> Portal AccessSnapshot:** use a different secret. The Kernel sender
+  setting is `ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN`; Portal's platform-kernel
+  entry in `BACKEND_CONSUMERS` accepts its independent
+  `backend_to_portal_current_secret` and optional `backend_to_portal_previous_secret`.
+  The trusted consumer principal requires explicit `access-snapshot:read`.
+  Kernel-named Portal receiver settings were removed in Step 10; use the
+  [current identity guide](https://github.com/gushinets/payments-portal/blob/main/docs/contracts/product-backend-api/README.md#implemented-step-10-settings-and-cutover). The two directional secrets must
   differ, and each environment and tenant/region connection uses independent secrets.
+
+Configured technical-source reads, usage clients and recipient invalidation
+delivery use the registry entry's outgoing key. The legacy `KERNEL_SERVICE_TOKEN`
+does not select credentials for those clients.
 
 All three operations use exactly one Bearer authorization header over TLS with certificate
 verification. Tokens stay in server-side operator environments/secret stores and must not
@@ -179,9 +311,12 @@ For each direction, use one bounded rotation window:
 1. Generate a new independent secret. Put it in the receiver's current slot, move the old
    secret to that receiver's previous slot and restart/reload the receiver. Both slots bind
    to the same principal, scope and explicitly granted permissions.
-2. Switch the corresponding sender setting (`KERNEL_SERVICE_TOKEN` at Portal, or future
-   `ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN` at Kernel). Verify authorized requests with the new
-   token and refusal of wrong scopes/permissions.
+2. Switch the corresponding sender setting: Portal -> Kernel updates
+   `portal_to_backend_current_secret` in the `platform-kernel` entry of
+   `BACKEND_CONSUMERS`; Kernel -> Portal updates
+   `ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN`. Restart/recreate the API and worker
+   processes that hold the affected outbound clients. Verify actual requests
+   from each affected sender with the new token and refusal of wrong scopes/permissions.
 3. Remove the receiver's previous slot, restart/reload and verify the old token returns `401`
    while the new token still succeeds. At most two distinct tokens are accepted; an orphaned
    or equal previous token is invalid. Overlap has no automatic expiry and must be removed.
@@ -189,32 +324,37 @@ For each direction, use one bounded rotation window:
 Emergency revocation removes the compromised token from every receiver slot immediately;
 do not retain it as a rotation overlap. Rotate each direction independently. The existing
 [manifest receiver procedure](../../infra/deployment/README.md#portal-capability-manifest-receiver-any-711)
-implements the Portal -> Kernel half; reverse-direction support remains ANY-766 work.
+describes the Portal -> Kernel receiver. The
+[current delegation/snapshot setup](../contracts/portal-kernel-paid/README.md#service-requests-and-identity)
+describes the independent reverse connection.
 
 ## Dependencies before real integration
 
 - **Identity:** canonical paid-access identity is Portal's authenticated UUID
-  scoped by `(tenant_id, region, user_id)`. Current scenario `user_id` is
-  client-supplied and unverified ([TD-013](../tech-debt-tracker.md)); it is not a
-  Portal principal. Guest identity/quota remains separate from paid allowances.
+  scoped by `(tenant_id, region, user_id)` and derived by delegated-token
+  introspection on every protected request. A body `user_id` never establishes
+  paid ownership. Guest identity/quota remains separate from paid allowances.
 - **Scope:** [Kernel Settings](../../apps/platform-api/src/anytoolai_platform_api/settings.py)
   and [region config](../../configs/kernel/regions.yaml) now default to `anytoolai/ru`,
   matching the inspected [Portal Settings](https://github.com/gushinets/payments-portal/blob/2bb07d778edc5ea56011b0034ba24b0702ede81f/apps/api/app/core/settings.py).
   Deployment must explicitly configure matching trusted scopes under the convention above;
   the historical `anytoolai/default` snapshot does not describe current defaults. Do not
   rename existing data scopes or infer region from UI locale.
-- **Producer delivery:** Kernel API owners must supply implemented endpoint,
-  producer-owned schema/positive and negative fixtures, paid metric/unit/release
-  approvals and authenticated tenant/region deployment. Portal integration
-  owners reconcile and test their consumer against that producer. No shared
+- **Producer compatibility:** each API owner supplies its implemented endpoint,
+  producer-owned schema and positive/negative fixtures. Integration owners
+  verify the actual local pair; deployed scope/TLS and commercial approval
+  retain separate gates. No shared
   Portal/Kernel runtime package is required; platform-sdk serves product bundles.
 - **Enablement:** the inspected Portal settings support a configured Kernel URL/token.
   Production enablement still requires deployed TLS/private-network verification and
   commercial approval after real conformance; a URL change is insufficient. Historical
   fixture pins and SIMULATED mapping history must not be relabelled as real.
-- **Usage and launch:** the three operations above do not define the cabinet's
-  actual usage/remaining API. Its contract and authenticated cross-app launch
-  are separate future work. Kernel product handoff is not Portal login handoff;
+- **Usage and launch:** the
+  [target bundle](../contracts/portal-kernel-paid/README.md) specifies usage,
+  exhaustion and authenticated browser launch. Step 8 implements browser launch;
+  usage/exhaustion and cabinet usage are implemented in Steps 14/15. Focused paired
+  local acceptance and the PR correction scenarios passed; broader and remote/live
+  acceptance remain ANY-767 work. Kernel product handoff is not Portal login handoff;
   shared product IDs do not imply shared origins/routes or sessions.
 - **Commercial meaning:** deployed product configuration, guest quota and the
   fixture's `proposal_ai.test_generations` do not approve paid metrics/quantity.
@@ -239,6 +379,143 @@ relative links within this repository; no developer-specific checkout paths.
 Run `python scripts/agent/runner.py validate-docs` and the docs tests for this
 map. Navigation checks do not prove semantic or runtime compatibility. Portal's
 local checker remains its own CI gate. External source monitoring was removed
-by the owner on 2026-10-19; real producer conformance is a later enablement gate.
+by the owner on 2026-10-19; paired paid-runtime and deployed acceptance retain
+their current plan gates.
 Read [ANY-727](https://linear.app/paveldik/issue/ANY-727) and companion
 [ANY-728](https://linear.app/paveldik/issue/ANY-728) for this map's delivery work.
+
+
+## ANY-766 Step 6 runtime checkpoint — 2026-11-10
+
+The local paired Step 6 change consumes Portal's Step 5 snapshot V2 and reuses
+Step 4's per-request principal introspection. Kernel migration `0019` adds durable
+coherence. Installation, invalidation and new admission share its scoped-user row
+lock; post-bucket-wait checks use PostgreSQL wall time. Accepted replay and owned
+historical results remain independent of current grants/configuration.
+
+The existing start/handoff/reservation path now receives the exact scenario-bound
+allowance. Polling, next-actions, results, all handoff operations and existing
+client events verify reservation/deferred ownership. Paid pre-scenario events
+require no guest and retain event-id deduplication. A late handoff authority
+refusal rolls back all acceptance effects and leaves consent retryable.
+
+The invalidation receiver is available behind the explicit receiver permission
+in the [server contract checkpoint](../contracts/portal-kernel-paid/README.md#step-6-server-implementation).
+Portal Step 7 now supplies the sender. Browser integration, usage/exhaustion,
+local connection/acceptance and build preparation remain Steps 8–12; remote
+installation/live acceptance belong to ANY-767. Local PostgreSQL/ASGI
+synthetic evidence does not supersede earlier historical or live-provider gates.
+
+
+## ANY-766 Step 8 browser checkpoint — 2026-11-10
+
+At Portal `f4f6fbf` and Kernel `729f0675` plus the paired Step 8 changes,
+CE-kit and the existing web host implement fixed PKCE launch, canonical-owner
+tab custody, frozen same-key replay, accepted-session/mode restoration and
+identity-generation guards for paid events/results/handoffs without guest
+fallback. See [browser configuration and limits](../contracts/portal-kernel-paid/README.md#step-8-browser-implementation).
+Local component/synthetic browser evidence does not establish the real paired
+HTTP/PostgreSQL acceptance required in Step 16. Historical snapshots above are
+unchanged; usage/exhaustion and delivery/build gates retain their owning steps.
+
+
+## ANY-766 Step 10 consumer identity checkpoint — 2026-11-11
+
+Inspected peer: Portal `f6c5e2543a7c281bf3a0e26a0ad9af64372f651b`, plus this paired Step 10 working-tree change.
+Portal now serves common backend-session code/exchange/introspection endpoints
+with consumer-bound V2 identity, independent credentials/permissions, monotonic
+persisted policy guard and generated named Bearer security. Kernel validates
+consumer/P and keeps per-request introspection and the original Core owner/replay
+partition. The localized authorization page resolves configured fixed callbacks.
+Version-1 browser token envelopes require authorization while separate same-owner
+pending requests retain their exact request/key. See the
+[common configuration/cutover guide](https://github.com/gushinets/payments-portal/blob/main/docs/contracts/product-backend-api/README.md#implemented-step-10-settings-and-cutover).
+
+Portal migration 20261111_0009 preserves populated delegation parent links,
+hashes, TTLs and single-use state while binding historical audience to Kernel.
+Step 10 needs no Kernel migration or usage reset. Snapshot remains Kernel-only
+V2; another consumer cannot read that unfiltered baseline. At this Step 10
+checkpoint, source routing and recipient delivery remained Steps 11/13.
+The Step 11 checkpoint below supersedes source selection; V3/filtering/coherence
+and recipient delivery remain Steps 12/13.
+Local synthetic/API/component and disposable PostgreSQL checks are distinct from
+Step 16's assembled real HTTP acceptance and ANY-767 remote/live acceptance.
+
+
+## ANY-766 Step 11 Portal technical-source checkpoint — 2026-11-11
+
+Inspected Portal base `b346f0e90c9745f942847734bc06d0d3f5b0a73d` and
+Kernel `192f4cb2ebf19a697f9fb1298147d26221a0a6a0`, plus the Portal Step 11 diff.
+Portal selects each configured product's manifest origin and independent
+outbound credential through the existing V1 client/validator. New metered
+links/terms/purchases bind technical source and sole backend owner; historical
+Kernel JSON/digests and allowance identities remain unchanged. The Kernel
+manifest producer, scenarios, ANY-507 execution and usage require no changes.
+See the [source/history guide](https://github.com/gushinets/payments-portal/blob/main/docs/contracts/product-backend-api/README.md#implemented-step-11-technical-sources-and-history).
+This is synthetic HTTP/disposable PostgreSQL evidence; the real external product
+is not registered or tested. Snapshot V3, recipients and usage remain later work.
+
+
+## ANY-766 Step 12 auth/access checkpoint — 2026-11-11
+
+Peer inspected: Portal `1caa078418ffb07781467dcb4f62158f17e029a3`, plus the paired Step 12 working diff.
+Portal now serves consumer-filtered V3, selecting products before provenance and
+deadline/completeness checks; its cabinet/writer retain whole-user rules. Kernel
+migration `0020` preserves R, usage, active reservations and replay while binding
+old coherence rows to platform-kernel/P1 and evicting incompatible V2 cache
+metadata. Independent durable policy/access floors fence stale response/admission;
+P changes do not require a paid R transition. The Portal-owned common API guide
+and generated OpenAPI/Swagger document actual identity V2/access V3 security,
+schemas, examples, errors, cutover and backend enforcement duties.
+Focused real PostgreSQL and local TCP auth/access evidence is separate from the
+Step 16 assembled browser/execution journey. The second identity and external
+LBX/manifest sources are synthetic; generic recipients/usage remain Steps 13–15.
+No real third-party, live payment or deployed acceptance is claimed.
+
+
+## ANY-766 Step 14 — usage and exhaustion
+
+Kernel now serves authenticated internal and delegated-user product usage V1,
+using actual ANY-507 counters and indistinguishable unknown/foreign results.
+The API permission `ANYTOOLAI_PORTAL_USAGE_READ_ENABLED` defaults off. Successful
+normal/recovery finalization writes one immutable exhaustion edge in the same
+transaction. A separately bounded worker task delivers with live-lease ACK,
+retry/parking and crash redelivery. Portal validates consumer/product, saved
+source/backend owner and full tuple before durably acknowledging one immutable
+hint; current hints schedule GET-only reconciliation, historical hints are inert.
+Portal's V1 client and retained-owner resolver supply Step 15 cabinet
+composition. Kernel `0021` and Portal `20261111_0011` extend previous heads without
+resetting usage, purchases or queue history. V1 wire/fixture bytes are unchanged.
+See the common backend guide's implemented Step 14 section for settings, errors,
+lease/recovery and enablement. Local PostgreSQL and synthetic reverse transport
+are covered. Step 16 below supplies focused paired local browser/HTTP acceptance;
+the full matrix and live/deployed acceptance remain deferred to ANY-767.
+
+## ANY-766 Step 16 — focused local acceptance
+
+Portal's `tools/joint_paid_runtime/` composes the real APIs/workers with separate
+PostgreSQL databases, TCP service authentication and ordinary Portal sessions.
+Only external LBX/AI responses and the second backend are synthetic. Temporary
+enabled product copies preserve disabled commercial defaults in this repository.
+The main HTTP journey covers all seven selected scenarios, truthful usage,
+replay/failure/recovery and retained state after recreating its own containers.
+
+The user reduced the 2026-11-11 verification scope to the common backend API and
+main journeys. The synchronized plan records actual results and the deferred full
+matrix. Optional peer transport lives in `infra/compose/docker-compose.peer.yml`;
+PostgreSQL remains private. Dev now retains `postgres18-data` at PostgreSQL 18's
+parent mount and pins the same 18.4 image/digest as Portal. Existing anonymous dev
+volumes require explicit backup/reattachment before recreating an old project;
+the harness touches only fresh run-owned resources. Step 17 and ANY-767 retain
+their build/install and remote/live responsibilities.
+
+
+The 2026-11-13 Portal correction requires stopped API/workers for migration
+`20261113_0012` and consistent V2 internal-evidence readers/writers. Downgrade
+refuses retained activation/V2 facts. HTTP identity V2 and snapshot V3 stay the
+same. Configure public `BACKEND_CALLBACKS` for Portal web separately from private
+`BACKEND_CONSUMERS`; corresponding consumer IDs/callbacks must agree. Kernel's
+consumer ID is still compiled into web. Verify email before delegated authorization;
+a same-owner reauthorization keeps the existing pending request/key. The earlier
+expanded-digest higher-P cutover remains required when crossing that older
+compatibility boundary; the activation migration alone does not change P.

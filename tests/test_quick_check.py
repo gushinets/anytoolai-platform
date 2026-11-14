@@ -364,6 +364,7 @@ def test_pytest_command_uses_repo_managed_basetemp(monkeypatch, tmp_path) -> Non
         "not slow",
         "--basetemp",
         str(tmp_root / "pytest-runs" / "run-4321"),
+        "--durations=25",
         *quick_check.PYTEST_TARGETS,
     ]
 
@@ -398,7 +399,7 @@ def test_main_excludes_slow_tests_from_fast_pytest_path(monkeypatch) -> None:
         "--basetemp",
         str(Path("/tmp/repo/.quick-check-tmp/pytest-runs/run-1234")),
     ]
-    assert pytest_command[7:] == quick_check.PYTEST_TARGETS
+    assert pytest_command[7:] == ["--durations=25", *quick_check.PYTEST_TARGETS]
 
 
 @pytest.mark.slow

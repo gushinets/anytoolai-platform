@@ -21,6 +21,9 @@ from anytoolai_platform_api.errors import (
     request_validation_error_handler,
     unhandled_exception_handler,
 )
+from anytoolai_platform_api.routers.access_invalidations import (
+    router as access_invalidations_router,
+)
 from anytoolai_platform_api.routers.atom_lab import router as atom_lab_router
 from anytoolai_platform_api.routers.capability_manifest import router as capability_manifest_router
 from anytoolai_platform_api.routers.client_events import router as client_events_router
@@ -28,6 +31,8 @@ from anytoolai_platform_api.routers.demo import router as demo_router
 from anytoolai_platform_api.routers.handoffs import router as handoffs_router
 from anytoolai_platform_api.routers.health import router as health_router
 from anytoolai_platform_api.routers.identity_quota import router as identity_quota_router
+from anytoolai_platform_api.routers.paid_usage import router as paid_usage_router
+from anytoolai_platform_api.routers.portal_session import router as portal_session_router
 from anytoolai_platform_api.routers.results import router as results_router
 from anytoolai_platform_api.routers.runtime_config import router as runtime_config_router
 from anytoolai_platform_api.routers.scenario_runtime import (
@@ -87,8 +92,11 @@ def create_app(
     _install_request_context(app)
     _install_error_handlers(app)
 
+    app.include_router(access_invalidations_router)
+    app.include_router(paid_usage_router)
     app.include_router(health_router)
     app.include_router(capability_manifest_router)
+    app.include_router(portal_session_router)
     app.include_router(atom_lab_router)
     app.include_router(demo_router)
     app.include_router(identity_quota_router)
@@ -111,6 +119,7 @@ def _install_cors(app: FastAPI) -> None:
             REQUEST_ID_HEADER,
             "X-Demo-Access-Code",
             "X-Atom-Lab-Access-Code",
+            "Authorization",
         ],
         expose_headers=[REQUEST_ID_HEADER],
     )
@@ -179,7 +188,11 @@ def _install_request_context(app: FastAPI) -> None:
             if media_type == "text/html":
                 # Separate policies preserve route CSP directives while refusing every ancestor.
                 response.headers.append("Content-Security-Policy", "frame-ancestors 'none'")
-            if request.url.path.startswith("/internal/"):
+            if (
+                request.url.path.startswith(("/internal/", "/v1/portal-session/"))
+                or request.url.path.endswith("/paid-usage")
+                or "authorization" in request.headers
+            ):
                 response.headers["Cache-Control"] = "no-store"
             apply_atom_lab_cache_policy(request, response)
             log_event(

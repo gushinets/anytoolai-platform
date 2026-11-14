@@ -3,14 +3,18 @@ from __future__ import annotations
 from http import HTTPStatus
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Body, Depends
-
 from anytoolai_platform_api.dependencies import (
     get_config_registry,
     get_session_factory,
     get_settings,
 )
 from anytoolai_platform_api.errors import ApiError, platform_error_to_api_error
+from anytoolai_platform_api.paid_access import (
+    OPTIONAL_PAID_SECURITY,
+    PAID_RUNTIME_ERROR_RESPONSES,
+    optional_portal_user,
+)
+from anytoolai_platform_api.portal_session import PortalUserPrincipal
 from anytoolai_platform_api.schemas import ClientEventRequest, ClientEventResponse, ErrorResponse
 from anytoolai_platform_api.settings import Settings
 from anytoolai_platform_core.common.errors import PlatformError
@@ -21,6 +25,7 @@ from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
 from anytoolai_platform_core.storage.transactions import transaction_boundary
+from fastapi import APIRouter, Body, Depends
 
 router = APIRouter(tags=["client-events"])
 
@@ -59,6 +64,7 @@ SAFE_409_EXAMPLE = {
     response_model=ClientEventResponse,
     summary="Record an allowlisted client analytics event",
     responses={
+        **PAID_RUNTIME_ERROR_RESPONSES,
         200: {
             "description": (
                 "Event was durably recorded (or already existed for this event_id -- "
@@ -68,7 +74,9 @@ SAFE_409_EXAMPLE = {
         },
         404: {
             "model": ErrorResponse,
-            "description": "Safe response when the supplied guest identity or scenario session is unknown.",
+            "description": (
+                "Safe response when the supplied guest identity or scenario session is unknown."
+            ),
             "content": {"application/json": {"example": SAFE_404_EXAMPLE}},
         },
         409: {
@@ -88,12 +96,14 @@ SAFE_409_EXAMPLE = {
             "content": {"application/json": {"example": SAFE_422_EXAMPLE}},
         },
     },
+    openapi_extra=OPTIONAL_PAID_SECURITY,
 )
 def post_client_event(
     request: Annotated[ClientEventRequest, Body()],
     registry: Annotated[ConfigRegistry, Depends(get_config_registry)],
     session_factory: Annotated[Any, Depends(get_session_factory)],
     settings: Annotated[Settings, Depends(get_settings)],
+    principal: Annotated[PortalUserPrincipal | None, Depends(optional_portal_user)],
 ) -> ClientEventResponse:
     with transaction_boundary(session_factory) as session:
         try:
@@ -109,6 +119,7 @@ def post_client_event(
                 user_id=request.user_id,
                 scenario_session_id=request.scenario_session_id,
                 properties=request.properties,
+                paid_owner=None if principal is None else principal.owner,
             )
         except PlatformError as exc:
             raise _to_api_error(exc) from exc
@@ -154,6 +165,4 @@ def _status_code_for_platform_error(error: PlatformError) -> int:
 
 
 def _to_api_error(error: PlatformError) -> ApiError:
-    return platform_error_to_api_error(
-        error, status_code=_status_code_for_platform_error(error)
-    )
+    return platform_error_to_api_error(error, status_code=_status_code_for_platform_error(error))

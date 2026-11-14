@@ -96,11 +96,30 @@ prevent registry construction with structured file/field diagnostics. Core/SDK m
 typed declarations; the Core registry freezes the metric list and nested definitions.
 
 The ordinary six-product configuration keeps commercial admission disabled for every product.
-Only ProposalAI (`proposal_ai.test_generations`, unit `generation`) and Brief Decoder
-(`brief_decoder.test_analyses`, unit `analysis`) declare test metrics, also disabled. These
-declarations do not approve production charging, quantities, failure or refund semantics.
+ProposalAI (`proposal_ai.test_generations`, unit `generation`) and Brief Decoder
+(`brief_decoder.test_analyses`, unit `analysis`) retain their disabled TEST-ONLY metrics.
+ANY-766 also declares four disabled production metrics: `proposal_ai.generations`
+(`generation`), `client_update_writer.messages` (`message`), `brief_decoder.analyses`
+(`analysis`) and `acceptance_builder.results` (`result`). These declarations do not
+enable sales or approve commercial quantities or LBX associations.
 Guest quota, frontend enablement, scenarios and deployment product allowlists do not imply
 commercial admission or metrics. Deployment-profile copying preserves the declarations.
+
+`scenarios.yaml` owns the optional `paid_metric_key` on Core/SDK `ScenarioDefinition`.
+When present, it must be a nonblank string referencing a metric declared by that
+scenario's product; missing and foreign metric references fail registry loading even
+when commercial flags are disabled. Unbound scenarios retain `None` and their existing
+guest behavior. The binding itself does not enable paid HTTP admission.
+
+ProposalAI's `generate_v1` binds to `proposal_ai.generations`; Client Update Writer's
+`update_v1`, `prepaid_request_v1` and `reply_draft_v1` share
+`client_update_writer.messages`; Brief Decoder's `decode_v1` binds to
+`brief_decoder.analyses`; Acceptance Builder's `draft_v1` and `check_v1` share
+`acceptance_builder.results`. One successful final scenario result is one declared
+unit; internal workflow steps, provider calls and retries add no units. ANY-766
+Step 6 connects these bindings to the existing paid admission and finalization
+path. Client Update Writer's absent guest quota policy and Task Finder's existing
+surfaces are unchanged.
 
 `products.capabilities.project_capability_manifest` is a pure Core projection of all registered
 products and declared metrics, including disabled entries. It takes an explicit scope and
@@ -113,7 +132,8 @@ through its authenticated internal manifest route in the validated trusted tenan
 [receiver configuration](../../infra/deployment/README.md#portal-capability-manifest-receiver-any-711).
 The [producer contract](../contracts/kernel-capability-manifest/v1/README.md) publishes the generated
 serialization schema, canonical positive/negative fixtures, byte checksums and independent digest
-checks. Real Portal TCP HTTP conformance remains ANY-711 Step 4.
+checks. The same contract documents the isolated real Portal TCP HTTP harness
+and current inventory fixtures.
 
 ## Provider policy ownership
 

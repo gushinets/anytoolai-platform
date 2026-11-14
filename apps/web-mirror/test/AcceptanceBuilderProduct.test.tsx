@@ -417,7 +417,7 @@ describe("Acceptance Builder page", () => {
     render(<Harness client={client} />);
     const checkMode = screen.getByRole("radio", { name: "Check deliverable" }) as HTMLInputElement;
     expect(checkMode.disabled).toBe(true); // booting
-    expect(readAttachSessionId("acceptance_builder")).toBe("session_1");
+    await waitFor(() => expect(readAttachSessionId("acceptance_builder")).toBe("session_1"));
 
     resolveDeferred(errorResponse(500, "internal_error"));
     await waitFor(() => expect(screen.getByText(/unavailable right now/i)).toBeTruthy());

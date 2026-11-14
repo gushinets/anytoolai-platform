@@ -25,6 +25,7 @@
   "retry": "Tentar novamente",
   "formLabel": "Formulário {product}",
   "workspace": {
+    "restoreDraft": "Restaurar rascunho salvo",
     "inputTitle": "Seus dados",
     "previousDetails": "Resultado baseado nos dados anteriores",
     "backToInputs": "Voltar aos dados",
@@ -40,7 +41,9 @@
     "startFailed": "Não foi possível iniciar {product}. Tente novamente.",
     "timeout": "Está demorando mais do que o esperado. Tente novamente.",
     "connectionLost": "A conexão foi perdida enquanto aguardávamos seu resultado. Tente novamente.",
-    "tryAgain": "Tente novamente."
+    "tryAgain": "Tente novamente.",
+    "savedOperationPending": "Há uma operação inacabada guardada. Selecione «Tentar novamente» para recarregar a página e continuá-la.",
+    "storageUnavailable": "Armazenamento do navegador indisponível. Ative-o e tente a mesma solicitação."
   },
   "result": {
     "copy": "Copiar",
@@ -58,5 +61,14 @@
     "text": "O que introduz é enviado para o nosso serviço e para um fornecedor de modelos de IA para criar o resultado, e é armazenado juntamente com a sua execução nos nossos servidores. O seu rascunho é mantido neste navegador e pode perder-se se atualizar ou sair da página. Não introduza palavras-passe, códigos de acesso, chaves de API ou dados completos de cartões de pagamento.",
     "policyLink": "Política de privacidade",
     "opensInNewTab": "(abre num novo separador)"
+  },
+  "portalSession": {
+    "title": "Sessão do Portal",
+    "required": "Entre novamente para continuar a mesma operação.",
+    "continue": "Continuar com o Portal",
+    "loading": "Entrando…",
+    "failed": "Não foi possível autorizar a aba. Confira o armazenamento do navegador e tente novamente.",
+    "retry": "Tentar autorização novamente",
+    "signOut": "Sair desta aba"
   }
 }

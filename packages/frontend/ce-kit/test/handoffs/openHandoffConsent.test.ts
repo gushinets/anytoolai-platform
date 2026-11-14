@@ -5,6 +5,11 @@ import { openHandoffConsent } from "../../src/handoffs/openHandoffConsent";
 import { createWindowNavigator } from "../../src/handoffs/windowNavigator";
 
 describe("openHandoffConsent", () => {
+  it("marks paid consent links for fresh-tab authorization without putting the token in a query", async () => {
+    const navigate = vi.fn();
+    await openHandoffConsent({ webConsentBaseUrl: "https://web.example.com", handoffToken: "token_abc", navigate, paid: true });
+    expect(navigate).toHaveBeenCalledWith("https://web.example.com/handoff/token_abc?paid=1");
+  });
   it("joins the base URL and token into a consent URL and navigates exactly once", async () => {
     const navigate = vi.fn();
 

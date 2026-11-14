@@ -1,0 +1,2895 @@
+[
+  {
+    "name": "snapshot-current-unsupported-version",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 99,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "snapshot-current-boolean-version",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": true,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "snapshot-current-float-version",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 2.0,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "snapshot-initial-empty-unsupported-version",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 99,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 0,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [],
+      "allowances": []
+    }
+  },
+  {
+    "name": "snapshot-initial-empty-boolean-version",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": true,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 0,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [],
+      "allowances": []
+    }
+  },
+  {
+    "name": "snapshot-initial-empty-float-version",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 2.0,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 0,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [],
+      "allowances": []
+    }
+  },
+  {
+    "name": "snapshot-committed-empty-unsupported-version",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 99,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 8,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [],
+      "allowances": []
+    }
+  },
+  {
+    "name": "snapshot-committed-empty-boolean-version",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": true,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 8,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [],
+      "allowances": []
+    }
+  },
+  {
+    "name": "snapshot-committed-empty-float-version",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 2.0,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 8,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [],
+      "allowances": []
+    }
+  },
+  {
+    "name": "snapshot-zero-unsupported-version",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 99,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "snapshot-zero-boolean-version",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": true,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "snapshot-zero-float-version",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 2.0,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "snapshot-maximum-unsupported-version",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 99,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 9007199254740991
+        }
+      ]
+    }
+  },
+  {
+    "name": "snapshot-maximum-boolean-version",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": true,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 9007199254740991
+        }
+      ]
+    }
+  },
+  {
+    "name": "snapshot-maximum-float-version",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 2.0,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 9007199254740991
+        }
+      ]
+    }
+  },
+  {
+    "name": "snapshot-metric-local-conflict-unsupported-version",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 99,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        },
+        {
+          "product_id": "brief_decoder",
+          "valid_until": "2026-11-09T05:00:00Z"
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        },
+        {
+          "allowance_id": "33333333-3333-4333-8333-333333333333",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        },
+        {
+          "allowance_id": "44444444-4444-4444-8444-444444444444",
+          "product_id": "brief_decoder",
+          "metric_key": "brief_decoder.analyses",
+          "unit": "analysis",
+          "quantity": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "snapshot-metric-local-conflict-boolean-version",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": true,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        },
+        {
+          "product_id": "brief_decoder",
+          "valid_until": "2026-11-09T05:00:00Z"
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        },
+        {
+          "allowance_id": "33333333-3333-4333-8333-333333333333",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        },
+        {
+          "allowance_id": "44444444-4444-4444-8444-444444444444",
+          "product_id": "brief_decoder",
+          "metric_key": "brief_decoder.analyses",
+          "unit": "analysis",
+          "quantity": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "snapshot-metric-local-conflict-float-version",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 2.0,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        },
+        {
+          "product_id": "brief_decoder",
+          "valid_until": "2026-11-09T05:00:00Z"
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        },
+        {
+          "allowance_id": "33333333-3333-4333-8333-333333333333",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        },
+        {
+          "allowance_id": "44444444-4444-4444-8444-444444444444",
+          "product_id": "brief_decoder",
+          "metric_key": "brief_decoder.analyses",
+          "unit": "analysis",
+          "quantity": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "invalidation-unsupported-version",
+    "contract": "invalidation-v1",
+    "payload": {
+      "schema_version": 99,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 8
+    }
+  },
+  {
+    "name": "invalidation-boolean-version",
+    "contract": "invalidation-v1",
+    "payload": {
+      "schema_version": true,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 8
+    }
+  },
+  {
+    "name": "invalidation-float-version",
+    "contract": "invalidation-v1",
+    "payload": {
+      "schema_version": 1.0,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 8
+    }
+  },
+  {
+    "name": "exchange-response-unsupported-version",
+    "contract": "exchange-response-v1",
+    "payload": {
+      "schema_version": 99,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_token": "synthetic-never-a-credential-DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+      "token_type": "Bearer",
+      "expires_at": "2026-11-09T04:30:00Z"
+    }
+  },
+  {
+    "name": "exchange-response-boolean-version",
+    "contract": "exchange-response-v1",
+    "payload": {
+      "schema_version": true,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_token": "synthetic-never-a-credential-DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+      "token_type": "Bearer",
+      "expires_at": "2026-11-09T04:30:00Z"
+    }
+  },
+  {
+    "name": "exchange-response-float-version",
+    "contract": "exchange-response-v1",
+    "payload": {
+      "schema_version": 1.0,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_token": "synthetic-never-a-credential-DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+      "token_type": "Bearer",
+      "expires_at": "2026-11-09T04:30:00Z"
+    }
+  },
+  {
+    "name": "introspection-response-unsupported-version",
+    "contract": "introspection-response-v1",
+    "payload": {
+      "schema_version": 99,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "valid_until": "2026-11-09T04:29:55Z"
+    }
+  },
+  {
+    "name": "introspection-response-boolean-version",
+    "contract": "introspection-response-v1",
+    "payload": {
+      "schema_version": true,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "valid_until": "2026-11-09T04:29:55Z"
+    }
+  },
+  {
+    "name": "introspection-response-float-version",
+    "contract": "introspection-response-v1",
+    "payload": {
+      "schema_version": 1.0,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "valid_until": "2026-11-09T04:29:55Z"
+    }
+  },
+  {
+    "name": "usage-observed-zero-unsupported-version",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": 99,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "observed",
+          "successful_used": 0,
+          "reserved": 0,
+          "remaining": 1,
+          "available": 1,
+          "read_at": "2026-11-09T04:00:00Z"
+        }
+      ]
+    }
+  },
+  {
+    "name": "usage-observed-zero-boolean-version",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": true,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "observed",
+          "successful_used": 0,
+          "reserved": 0,
+          "remaining": 1,
+          "available": 1,
+          "read_at": "2026-11-09T04:00:00Z"
+        }
+      ]
+    }
+  },
+  {
+    "name": "usage-observed-zero-float-version",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": 1.0,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "observed",
+          "successful_used": 0,
+          "reserved": 0,
+          "remaining": 1,
+          "available": 1,
+          "read_at": "2026-11-09T04:00:00Z"
+        }
+      ]
+    }
+  },
+  {
+    "name": "usage-busy-unsupported-version",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": 99,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "observed",
+          "successful_used": 0,
+          "reserved": 1,
+          "remaining": 1,
+          "available": 0,
+          "read_at": "2026-11-09T04:00:00Z"
+        }
+      ]
+    }
+  },
+  {
+    "name": "usage-busy-boolean-version",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": true,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "observed",
+          "successful_used": 0,
+          "reserved": 1,
+          "remaining": 1,
+          "available": 0,
+          "read_at": "2026-11-09T04:00:00Z"
+        }
+      ]
+    }
+  },
+  {
+    "name": "usage-busy-float-version",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": 1.0,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "observed",
+          "successful_used": 0,
+          "reserved": 1,
+          "remaining": 1,
+          "available": 0,
+          "read_at": "2026-11-09T04:00:00Z"
+        }
+      ]
+    }
+  },
+  {
+    "name": "usage-exhausted-unsupported-version",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": 99,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "observed",
+          "successful_used": 1,
+          "reserved": 0,
+          "remaining": 0,
+          "available": 0,
+          "read_at": "2026-11-09T04:00:00Z"
+        }
+      ]
+    }
+  },
+  {
+    "name": "usage-exhausted-boolean-version",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": true,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "observed",
+          "successful_used": 1,
+          "reserved": 0,
+          "remaining": 0,
+          "available": 0,
+          "read_at": "2026-11-09T04:00:00Z"
+        }
+      ]
+    }
+  },
+  {
+    "name": "usage-exhausted-float-version",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": 1.0,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "observed",
+          "successful_used": 1,
+          "reserved": 0,
+          "remaining": 0,
+          "available": 0,
+          "read_at": "2026-11-09T04:00:00Z"
+        }
+      ]
+    }
+  },
+  {
+    "name": "usage-unknown-unsupported-version",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": 99,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": [
+        {
+          "allowance_id": "33333333-3333-4333-8333-333333333333",
+          "status": "unobserved"
+        }
+      ]
+    }
+  },
+  {
+    "name": "usage-unknown-boolean-version",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": true,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": [
+        {
+          "allowance_id": "33333333-3333-4333-8333-333333333333",
+          "status": "unobserved"
+        }
+      ]
+    }
+  },
+  {
+    "name": "usage-unknown-float-version",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": 1.0,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": [
+        {
+          "allowance_id": "33333333-3333-4333-8333-333333333333",
+          "status": "unobserved"
+        }
+      ]
+    }
+  },
+  {
+    "name": "usage-foreign-unsupported-version",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": 99,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": [
+        {
+          "allowance_id": "33333333-3333-4333-8333-333333333333",
+          "status": "unobserved"
+        }
+      ]
+    }
+  },
+  {
+    "name": "usage-foreign-boolean-version",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": true,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": [
+        {
+          "allowance_id": "33333333-3333-4333-8333-333333333333",
+          "status": "unobserved"
+        }
+      ]
+    }
+  },
+  {
+    "name": "usage-foreign-float-version",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": 1.0,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": [
+        {
+          "allowance_id": "33333333-3333-4333-8333-333333333333",
+          "status": "unobserved"
+        }
+      ]
+    }
+  },
+  {
+    "name": "usage-mixed-unsupported-version",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": 99,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "observed",
+          "successful_used": 0,
+          "reserved": 1,
+          "remaining": 1,
+          "available": 0,
+          "read_at": "2026-11-09T04:00:00Z"
+        },
+        {
+          "allowance_id": "33333333-3333-4333-8333-333333333333",
+          "status": "unobserved"
+        }
+      ]
+    }
+  },
+  {
+    "name": "usage-mixed-boolean-version",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": true,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "observed",
+          "successful_used": 0,
+          "reserved": 1,
+          "remaining": 1,
+          "available": 0,
+          "read_at": "2026-11-09T04:00:00Z"
+        },
+        {
+          "allowance_id": "33333333-3333-4333-8333-333333333333",
+          "status": "unobserved"
+        }
+      ]
+    }
+  },
+  {
+    "name": "usage-mixed-float-version",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": 1.0,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "observed",
+          "successful_used": 0,
+          "reserved": 1,
+          "remaining": 1,
+          "available": 0,
+          "read_at": "2026-11-09T04:00:00Z"
+        },
+        {
+          "allowance_id": "33333333-3333-4333-8333-333333333333",
+          "status": "unobserved"
+        }
+      ]
+    }
+  },
+  {
+    "name": "exhaustion-unsupported-version",
+    "contract": "exhaustion-v1",
+    "payload": {
+      "schema_version": 99,
+      "event_type": "allowance_exhausted",
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "allowance_id": "22222222-2222-4222-8222-222222222222",
+      "product_id": "proposal_ai",
+      "metric_key": "proposal_ai.generations",
+      "unit": "generation",
+      "quantity": 1,
+      "occurred_at": "2026-11-09T04:00:00Z"
+    }
+  },
+  {
+    "name": "exhaustion-boolean-version",
+    "contract": "exhaustion-v1",
+    "payload": {
+      "schema_version": true,
+      "event_type": "allowance_exhausted",
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "allowance_id": "22222222-2222-4222-8222-222222222222",
+      "product_id": "proposal_ai",
+      "metric_key": "proposal_ai.generations",
+      "unit": "generation",
+      "quantity": 1,
+      "occurred_at": "2026-11-09T04:00:00Z"
+    }
+  },
+  {
+    "name": "exhaustion-float-version",
+    "contract": "exhaustion-v1",
+    "payload": {
+      "schema_version": 1.0,
+      "event_type": "allowance_exhausted",
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "allowance_id": "22222222-2222-4222-8222-222222222222",
+      "product_id": "proposal_ai",
+      "metric_key": "proposal_ai.generations",
+      "unit": "generation",
+      "quantity": 1,
+      "occurred_at": "2026-11-09T04:00:00Z"
+    }
+  },
+  {
+    "name": "exhaustion-duplicate-unsupported-version",
+    "contract": "exhaustion-v1",
+    "payload": {
+      "schema_version": 99,
+      "event_type": "allowance_exhausted",
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "allowance_id": "22222222-2222-4222-8222-222222222222",
+      "product_id": "proposal_ai",
+      "metric_key": "proposal_ai.generations",
+      "unit": "generation",
+      "quantity": 1,
+      "occurred_at": "2026-11-09T04:00:00Z"
+    }
+  },
+  {
+    "name": "exhaustion-duplicate-boolean-version",
+    "contract": "exhaustion-v1",
+    "payload": {
+      "schema_version": true,
+      "event_type": "allowance_exhausted",
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "allowance_id": "22222222-2222-4222-8222-222222222222",
+      "product_id": "proposal_ai",
+      "metric_key": "proposal_ai.generations",
+      "unit": "generation",
+      "quantity": 1,
+      "occurred_at": "2026-11-09T04:00:00Z"
+    }
+  },
+  {
+    "name": "exhaustion-duplicate-float-version",
+    "contract": "exhaustion-v1",
+    "payload": {
+      "schema_version": 1.0,
+      "event_type": "allowance_exhausted",
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "allowance_id": "22222222-2222-4222-8222-222222222222",
+      "product_id": "proposal_ai",
+      "metric_key": "proposal_ai.generations",
+      "unit": "generation",
+      "quantity": 1,
+      "occurred_at": "2026-11-09T04:00:00Z"
+    }
+  },
+  {
+    "name": "cabinet-mixed-unsupported-version",
+    "contract": "cabinet-usage-v1",
+    "payload": {
+      "schema_version": 99,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "items": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "observed",
+          "successful_used": 0,
+          "reserved": 1,
+          "remaining": 1,
+          "available": 0,
+          "read_at": "2026-11-09T04:00:00Z",
+          "classification": "current"
+        },
+        {
+          "allowance_id": "33333333-3333-4333-8333-333333333333",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "classification": "historical",
+          "status": "unobserved"
+        },
+        {
+          "allowance_id": "44444444-4444-4444-8444-444444444444",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "classification": "historical",
+          "status": "unavailable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "cabinet-mixed-boolean-version",
+    "contract": "cabinet-usage-v1",
+    "payload": {
+      "schema_version": true,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "items": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "observed",
+          "successful_used": 0,
+          "reserved": 1,
+          "remaining": 1,
+          "available": 0,
+          "read_at": "2026-11-09T04:00:00Z",
+          "classification": "current"
+        },
+        {
+          "allowance_id": "33333333-3333-4333-8333-333333333333",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "classification": "historical",
+          "status": "unobserved"
+        },
+        {
+          "allowance_id": "44444444-4444-4444-8444-444444444444",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "classification": "historical",
+          "status": "unavailable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "cabinet-mixed-float-version",
+    "contract": "cabinet-usage-v1",
+    "payload": {
+      "schema_version": 1.0,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "items": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "observed",
+          "successful_used": 0,
+          "reserved": 1,
+          "remaining": 1,
+          "available": 0,
+          "read_at": "2026-11-09T04:00:00Z",
+          "classification": "current"
+        },
+        {
+          "allowance_id": "33333333-3333-4333-8333-333333333333",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "classification": "historical",
+          "status": "unobserved"
+        },
+        {
+          "allowance_id": "44444444-4444-4444-8444-444444444444",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "classification": "historical",
+          "status": "unavailable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "cabinet-empty-unsupported-version",
+    "contract": "cabinet-usage-v1",
+    "payload": {
+      "schema_version": 99,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "items": []
+    }
+  },
+  {
+    "name": "cabinet-empty-boolean-version",
+    "contract": "cabinet-usage-v1",
+    "payload": {
+      "schema_version": true,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "items": []
+    }
+  },
+  {
+    "name": "cabinet-empty-float-version",
+    "contract": "cabinet-usage-v1",
+    "payload": {
+      "schema_version": 1.0,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "items": []
+    }
+  },
+  {
+    "name": "old-snapshot-v1",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 1,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "quantity-boolean",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": true
+        }
+      ]
+    }
+  },
+  {
+    "name": "counter-boolean",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": 1,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "observed",
+          "successful_used": 0,
+          "reserved": true,
+          "remaining": 1,
+          "available": 0,
+          "read_at": "2026-11-09T04:00:00Z"
+        }
+      ]
+    }
+  },
+  {
+    "name": "exhaustion-quantity-boolean",
+    "contract": "exhaustion-v1",
+    "payload": {
+      "schema_version": 1,
+      "event_type": "allowance_exhausted",
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "allowance_id": "22222222-2222-4222-8222-222222222222",
+      "product_id": "proposal_ai",
+      "metric_key": "proposal_ai.generations",
+      "unit": "generation",
+      "quantity": true,
+      "occurred_at": "2026-11-09T04:00:00Z"
+    }
+  },
+  {
+    "name": "quantity-float",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1.0
+        }
+      ]
+    }
+  },
+  {
+    "name": "counter-float",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": 1,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "observed",
+          "successful_used": 0,
+          "reserved": 1.0,
+          "remaining": 1,
+          "available": 0,
+          "read_at": "2026-11-09T04:00:00Z"
+        }
+      ]
+    }
+  },
+  {
+    "name": "exhaustion-quantity-float",
+    "contract": "exhaustion-v1",
+    "payload": {
+      "schema_version": 1,
+      "event_type": "allowance_exhausted",
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "allowance_id": "22222222-2222-4222-8222-222222222222",
+      "product_id": "proposal_ai",
+      "metric_key": "proposal_ai.generations",
+      "unit": "generation",
+      "quantity": 1.0,
+      "occurred_at": "2026-11-09T04:00:00Z"
+    }
+  },
+  {
+    "name": "quantity-negative",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": -1
+        }
+      ]
+    }
+  },
+  {
+    "name": "counter-negative",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": 1,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "observed",
+          "successful_used": 0,
+          "reserved": -1,
+          "remaining": 1,
+          "available": 0,
+          "read_at": "2026-11-09T04:00:00Z"
+        }
+      ]
+    }
+  },
+  {
+    "name": "exhaustion-quantity-negative",
+    "contract": "exhaustion-v1",
+    "payload": {
+      "schema_version": 1,
+      "event_type": "allowance_exhausted",
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "allowance_id": "22222222-2222-4222-8222-222222222222",
+      "product_id": "proposal_ai",
+      "metric_key": "proposal_ai.generations",
+      "unit": "generation",
+      "quantity": -1,
+      "occurred_at": "2026-11-09T04:00:00Z"
+    }
+  },
+  {
+    "name": "quantity-overflow",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 9007199254740992
+        }
+      ]
+    }
+  },
+  {
+    "name": "counter-overflow",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": 1,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "observed",
+          "successful_used": 0,
+          "reserved": 9007199254740992,
+          "remaining": 1,
+          "available": 0,
+          "read_at": "2026-11-09T04:00:00Z"
+        }
+      ]
+    }
+  },
+  {
+    "name": "exhaustion-quantity-overflow",
+    "contract": "exhaustion-v1",
+    "payload": {
+      "schema_version": 1,
+      "event_type": "allowance_exhausted",
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "allowance_id": "22222222-2222-4222-8222-222222222222",
+      "product_id": "proposal_ai",
+      "metric_key": "proposal_ai.generations",
+      "unit": "generation",
+      "quantity": 9007199254740992,
+      "occurred_at": "2026-11-09T04:00:00Z"
+    }
+  },
+  {
+    "name": "quantity-string",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": "1"
+        }
+      ]
+    }
+  },
+  {
+    "name": "counter-string",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": 1,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "observed",
+          "successful_used": 0,
+          "reserved": "1",
+          "remaining": 1,
+          "available": 0,
+          "read_at": "2026-11-09T04:00:00Z"
+        }
+      ]
+    }
+  },
+  {
+    "name": "exhaustion-quantity-string",
+    "contract": "exhaustion-v1",
+    "payload": {
+      "schema_version": 1,
+      "event_type": "allowance_exhausted",
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "allowance_id": "22222222-2222-4222-8222-222222222222",
+      "product_id": "proposal_ai",
+      "metric_key": "proposal_ai.generations",
+      "unit": "generation",
+      "quantity": "1",
+      "occurred_at": "2026-11-09T04:00:00Z"
+    }
+  },
+  {
+    "name": "missing-unit",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "quantity": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "legacy-period-start",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "period_start": "2026-11-09T04:00:00Z"
+        }
+      ]
+    }
+  },
+  {
+    "name": "legacy-period-end",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "period_end": "2026-11-09T04:00:00Z"
+        }
+      ]
+    }
+  },
+  {
+    "name": "refresh-after-expiry",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T05:00:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "nonempty-zero-revision",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 0,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "boolean-revision",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": true,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "duplicate-grant",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        },
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "duplicate-allowance-id",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        },
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "allowance-without-grant",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "grant-deadline-before-expiry",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": "2026-11-09T04:00:00Z"
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "timestamp-naive",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:00:00",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "timestamp-date-only",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "timestamp-invalid-date",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-02-30T04:00:00Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "timestamp-nonutc",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:00:00+08:00",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "provider-field",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "provider_customer_id": "synthetic-lbx-id"
+    }
+  },
+  {
+    "name": "identity-pii",
+    "contract": "introspection-response-v1",
+    "payload": {
+      "schema_version": 1,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "valid_until": "2026-11-09T04:29:55Z",
+      "email": "synthetic@example.invalid"
+    }
+  },
+  {
+    "name": "identity-audience-claim",
+    "contract": "introspection-response-v1",
+    "payload": {
+      "schema_version": 1,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "valid_until": "2026-11-09T04:29:55Z",
+      "audience": "browser-selected"
+    }
+  },
+  {
+    "name": "plain-pkce",
+    "contract": "code-request-v1",
+    "payload": {
+      "code_challenge": "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+      "code_challenge_method": "plain"
+    }
+  },
+  {
+    "name": "selected-callback",
+    "contract": "code-request-v1",
+    "payload": {
+      "code_challenge": "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+      "code_challenge_method": "S256",
+      "redirect_uri": "https://example.invalid/callback"
+    }
+  },
+  {
+    "name": "short-challenge",
+    "contract": "code-request-v1",
+    "payload": {
+      "code_challenge": "short",
+      "code_challenge_method": "S256"
+    }
+  },
+  {
+    "name": "short-issued-code",
+    "contract": "code-response-v1",
+    "payload": {
+      "code": "short",
+      "expires_at": "2026-11-09T04:01:00Z"
+    }
+  },
+  {
+    "name": "short-code",
+    "contract": "exchange-request-v1",
+    "payload": {
+      "code": "short",
+      "code_verifier": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+    }
+  },
+  {
+    "name": "short-verifier",
+    "contract": "exchange-request-v1",
+    "payload": {
+      "code": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+      "code_verifier": "short"
+    }
+  },
+  {
+    "name": "refresh-token",
+    "contract": "exchange-response-v1",
+    "payload": {
+      "schema_version": 1,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_token": "synthetic-never-a-credential-DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+      "token_type": "Bearer",
+      "expires_at": "2026-11-09T04:30:00Z",
+      "refresh_token": "synthetic"
+    }
+  },
+  {
+    "name": "wrong-token-type",
+    "contract": "exchange-response-v1",
+    "payload": {
+      "schema_version": 1,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_token": "synthetic-never-a-credential-DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+      "token_type": "Basic",
+      "expires_at": "2026-11-09T04:30:00Z"
+    }
+  },
+  {
+    "name": "short-token",
+    "contract": "introspection-request-v1",
+    "payload": {
+      "access_token": "short"
+    }
+  },
+  {
+    "name": "empty-query",
+    "contract": "usage-query-v1",
+    "payload": {
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "allowance_ids": []
+    }
+  },
+  {
+    "name": "repeated-query",
+    "contract": "usage-query-v1",
+    "payload": {
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "allowance_ids": [
+        "22222222-2222-4222-8222-222222222222",
+        "22222222-2222-4222-8222-222222222222"
+      ]
+    }
+  },
+  {
+    "name": "excessive-query",
+    "contract": "usage-query-v1",
+    "payload": {
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "allowance_ids": [
+        "00000000-0000-4000-8000-000000000000",
+        "00000001-0000-4000-8000-000000000000",
+        "00000002-0000-4000-8000-000000000000",
+        "00000003-0000-4000-8000-000000000000",
+        "00000004-0000-4000-8000-000000000000",
+        "00000005-0000-4000-8000-000000000000",
+        "00000006-0000-4000-8000-000000000000",
+        "00000007-0000-4000-8000-000000000000",
+        "00000008-0000-4000-8000-000000000000",
+        "00000009-0000-4000-8000-000000000000",
+        "0000000a-0000-4000-8000-000000000000",
+        "0000000b-0000-4000-8000-000000000000",
+        "0000000c-0000-4000-8000-000000000000",
+        "0000000d-0000-4000-8000-000000000000",
+        "0000000e-0000-4000-8000-000000000000",
+        "0000000f-0000-4000-8000-000000000000",
+        "00000010-0000-4000-8000-000000000000",
+        "00000011-0000-4000-8000-000000000000",
+        "00000012-0000-4000-8000-000000000000",
+        "00000013-0000-4000-8000-000000000000",
+        "00000014-0000-4000-8000-000000000000",
+        "00000015-0000-4000-8000-000000000000",
+        "00000016-0000-4000-8000-000000000000",
+        "00000017-0000-4000-8000-000000000000",
+        "00000018-0000-4000-8000-000000000000",
+        "00000019-0000-4000-8000-000000000000",
+        "0000001a-0000-4000-8000-000000000000",
+        "0000001b-0000-4000-8000-000000000000",
+        "0000001c-0000-4000-8000-000000000000",
+        "0000001d-0000-4000-8000-000000000000",
+        "0000001e-0000-4000-8000-000000000000",
+        "0000001f-0000-4000-8000-000000000000",
+        "00000020-0000-4000-8000-000000000000",
+        "00000021-0000-4000-8000-000000000000",
+        "00000022-0000-4000-8000-000000000000",
+        "00000023-0000-4000-8000-000000000000",
+        "00000024-0000-4000-8000-000000000000",
+        "00000025-0000-4000-8000-000000000000",
+        "00000026-0000-4000-8000-000000000000",
+        "00000027-0000-4000-8000-000000000000",
+        "00000028-0000-4000-8000-000000000000",
+        "00000029-0000-4000-8000-000000000000",
+        "0000002a-0000-4000-8000-000000000000",
+        "0000002b-0000-4000-8000-000000000000",
+        "0000002c-0000-4000-8000-000000000000",
+        "0000002d-0000-4000-8000-000000000000",
+        "0000002e-0000-4000-8000-000000000000",
+        "0000002f-0000-4000-8000-000000000000",
+        "00000030-0000-4000-8000-000000000000",
+        "00000031-0000-4000-8000-000000000000",
+        "00000032-0000-4000-8000-000000000000",
+        "00000033-0000-4000-8000-000000000000",
+        "00000034-0000-4000-8000-000000000000",
+        "00000035-0000-4000-8000-000000000000",
+        "00000036-0000-4000-8000-000000000000",
+        "00000037-0000-4000-8000-000000000000",
+        "00000038-0000-4000-8000-000000000000",
+        "00000039-0000-4000-8000-000000000000",
+        "0000003a-0000-4000-8000-000000000000",
+        "0000003b-0000-4000-8000-000000000000",
+        "0000003c-0000-4000-8000-000000000000",
+        "0000003d-0000-4000-8000-000000000000",
+        "0000003e-0000-4000-8000-000000000000",
+        "0000003f-0000-4000-8000-000000000000",
+        "00000040-0000-4000-8000-000000000000",
+        "00000041-0000-4000-8000-000000000000",
+        "00000042-0000-4000-8000-000000000000",
+        "00000043-0000-4000-8000-000000000000",
+        "00000044-0000-4000-8000-000000000000",
+        "00000045-0000-4000-8000-000000000000",
+        "00000046-0000-4000-8000-000000000000",
+        "00000047-0000-4000-8000-000000000000",
+        "00000048-0000-4000-8000-000000000000",
+        "00000049-0000-4000-8000-000000000000",
+        "0000004a-0000-4000-8000-000000000000",
+        "0000004b-0000-4000-8000-000000000000",
+        "0000004c-0000-4000-8000-000000000000",
+        "0000004d-0000-4000-8000-000000000000",
+        "0000004e-0000-4000-8000-000000000000",
+        "0000004f-0000-4000-8000-000000000000",
+        "00000050-0000-4000-8000-000000000000",
+        "00000051-0000-4000-8000-000000000000",
+        "00000052-0000-4000-8000-000000000000",
+        "00000053-0000-4000-8000-000000000000",
+        "00000054-0000-4000-8000-000000000000",
+        "00000055-0000-4000-8000-000000000000",
+        "00000056-0000-4000-8000-000000000000",
+        "00000057-0000-4000-8000-000000000000",
+        "00000058-0000-4000-8000-000000000000",
+        "00000059-0000-4000-8000-000000000000",
+        "0000005a-0000-4000-8000-000000000000",
+        "0000005b-0000-4000-8000-000000000000",
+        "0000005c-0000-4000-8000-000000000000",
+        "0000005d-0000-4000-8000-000000000000",
+        "0000005e-0000-4000-8000-000000000000",
+        "0000005f-0000-4000-8000-000000000000",
+        "00000060-0000-4000-8000-000000000000",
+        "00000061-0000-4000-8000-000000000000",
+        "00000062-0000-4000-8000-000000000000",
+        "00000063-0000-4000-8000-000000000000",
+        "00000064-0000-4000-8000-000000000000"
+      ]
+    }
+  },
+  {
+    "name": "malformed-query-id",
+    "contract": "usage-query-v1",
+    "payload": {
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "allowance_ids": [
+        "not-a-uuid"
+      ]
+    }
+  },
+  {
+    "name": "foreign-query-field",
+    "contract": "usage-query-v1",
+    "payload": {
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "allowance_ids": [
+        "22222222-2222-4222-8222-222222222222",
+        "33333333-3333-4333-8333-333333333333"
+      ],
+      "quantity": 100
+    }
+  },
+  {
+    "name": "wrong-remaining",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": 1,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "observed",
+          "successful_used": 0,
+          "reserved": 1,
+          "remaining": 0,
+          "available": 0,
+          "read_at": "2026-11-09T04:00:00Z"
+        }
+      ]
+    }
+  },
+  {
+    "name": "wrong-available",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": 1,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "observed",
+          "successful_used": 0,
+          "reserved": 1,
+          "remaining": 1,
+          "available": 1,
+          "read_at": "2026-11-09T04:00:00Z"
+        }
+      ]
+    }
+  },
+  {
+    "name": "overdrawn",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": 1,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "observed",
+          "successful_used": 0,
+          "reserved": 2,
+          "remaining": 1,
+          "available": 0,
+          "read_at": "2026-11-09T04:00:00Z"
+        }
+      ]
+    }
+  },
+  {
+    "name": "unknown-counter",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": 1,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": [
+        {
+          "allowance_id": "33333333-3333-4333-8333-333333333333",
+          "status": "unobserved",
+          "successful_used": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "unknown-tuple",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": 1,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": [
+        {
+          "allowance_id": "33333333-3333-4333-8333-333333333333",
+          "status": "unobserved",
+          "quantity": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "duplicate-usage-id",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": 1,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "observed",
+          "successful_used": 0,
+          "reserved": 1,
+          "remaining": 1,
+          "available": 0,
+          "read_at": "2026-11-09T04:00:00Z"
+        },
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "observed",
+          "successful_used": 0,
+          "reserved": 1,
+          "remaining": 1,
+          "available": 0,
+          "read_at": "2026-11-09T04:00:00Z"
+        }
+      ]
+    }
+  },
+  {
+    "name": "unknown-usage-status",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": 1,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "missing",
+          "successful_used": 0,
+          "reserved": 1,
+          "remaining": 1,
+          "available": 0,
+          "read_at": "2026-11-09T04:00:00Z"
+        }
+      ]
+    }
+  },
+  {
+    "name": "empty-usage-response",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": 1,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": []
+    }
+  },
+  {
+    "name": "unknown-event",
+    "contract": "exhaustion-v1",
+    "payload": {
+      "schema_version": 1,
+      "event_type": "capacity_busy",
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "allowance_id": "22222222-2222-4222-8222-222222222222",
+      "product_id": "proposal_ai",
+      "metric_key": "proposal_ai.generations",
+      "unit": "generation",
+      "quantity": 1,
+      "occurred_at": "2026-11-09T04:00:00Z"
+    }
+  },
+  {
+    "name": "exhaustion-counter",
+    "contract": "exhaustion-v1",
+    "payload": {
+      "schema_version": 1,
+      "event_type": "allowance_exhausted",
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "allowance_id": "22222222-2222-4222-8222-222222222222",
+      "product_id": "proposal_ai",
+      "metric_key": "proposal_ai.generations",
+      "unit": "generation",
+      "quantity": 1,
+      "occurred_at": "2026-11-09T04:00:00Z",
+      "successful_used": 1
+    }
+  },
+  {
+    "name": "unknown-classification",
+    "contract": "cabinet-usage-v1",
+    "payload": {
+      "schema_version": 1,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "items": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "observed",
+          "successful_used": 0,
+          "reserved": 1,
+          "remaining": 1,
+          "available": 0,
+          "read_at": "2026-11-09T04:00:00Z",
+          "classification": "future"
+        },
+        {
+          "allowance_id": "33333333-3333-4333-8333-333333333333",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "classification": "historical",
+          "status": "unobserved"
+        },
+        {
+          "allowance_id": "44444444-4444-4444-8444-444444444444",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "classification": "historical",
+          "status": "unavailable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "unavailable-counter",
+    "contract": "cabinet-usage-v1",
+    "payload": {
+      "schema_version": 1,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "items": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "observed",
+          "successful_used": 0,
+          "reserved": 1,
+          "remaining": 1,
+          "available": 0,
+          "read_at": "2026-11-09T04:00:00Z",
+          "classification": "current"
+        },
+        {
+          "allowance_id": "33333333-3333-4333-8333-333333333333",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "classification": "historical",
+          "status": "unobserved"
+        },
+        {
+          "allowance_id": "44444444-4444-4444-8444-444444444444",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "classification": "historical",
+          "status": "unavailable",
+          "available": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "duplicate-cabinet-id",
+    "contract": "cabinet-usage-v1",
+    "payload": {
+      "schema_version": 1,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "items": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "observed",
+          "successful_used": 0,
+          "reserved": 1,
+          "remaining": 1,
+          "available": 0,
+          "read_at": "2026-11-09T04:00:00Z",
+          "classification": "current"
+        },
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "observed",
+          "successful_used": 0,
+          "reserved": 1,
+          "remaining": 1,
+          "available": 0,
+          "read_at": "2026-11-09T04:00:00Z",
+          "classification": "current"
+        }
+      ]
+    }
+  },
+  {
+    "name": "epoch-string-refresh-after",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "1794196800",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "epoch-string-snapshot-expiry",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "1794197100",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "epoch-string-grant-deadline",
+    "contract": "snapshot-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": "1794200400"
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "epoch-string-code-expiry",
+    "contract": "code-response-v1",
+    "payload": {
+      "code": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+      "expires_at": "1794196860"
+    }
+  },
+  {
+    "name": "epoch-string-delegation-expiry",
+    "contract": "exchange-response-v1",
+    "payload": {
+      "schema_version": 1,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_token": "synthetic-never-a-credential-DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+      "token_type": "Bearer",
+      "expires_at": "1794198600"
+    }
+  },
+  {
+    "name": "epoch-string-identity-deadline",
+    "contract": "introspection-response-v1",
+    "payload": {
+      "schema_version": 1,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "valid_until": "1794196800"
+    }
+  },
+  {
+    "name": "epoch-string-usage-read-time",
+    "contract": "usage-response-v1",
+    "payload": {
+      "schema_version": 1,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "items": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "observed",
+          "successful_used": 0,
+          "reserved": 1,
+          "remaining": 1,
+          "available": 0,
+          "read_at": "1794196800"
+        }
+      ]
+    }
+  },
+  {
+    "name": "epoch-string-exhaustion-time",
+    "contract": "exhaustion-v1",
+    "payload": {
+      "schema_version": 1,
+      "event_type": "allowance_exhausted",
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "allowance_id": "22222222-2222-4222-8222-222222222222",
+      "product_id": "proposal_ai",
+      "metric_key": "proposal_ai.generations",
+      "unit": "generation",
+      "quantity": 1,
+      "occurred_at": "1794196800"
+    }
+  },
+  {
+    "name": "epoch-string-cabinet-read-time",
+    "contract": "cabinet-usage-v1",
+    "payload": {
+      "schema_version": 1,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "items": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "status": "observed",
+          "successful_used": 0,
+          "reserved": 1,
+          "remaining": 1,
+          "available": 0,
+          "read_at": "1794196800",
+          "classification": "current"
+        },
+        {
+          "allowance_id": "33333333-3333-4333-8333-333333333333",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "classification": "historical",
+          "status": "unobserved"
+        },
+        {
+          "allowance_id": "44444444-4444-4444-8444-444444444444",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1,
+          "classification": "historical",
+          "status": "unavailable"
+        }
+      ]
+    }
+  }
+]

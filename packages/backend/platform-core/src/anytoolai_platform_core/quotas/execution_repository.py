@@ -130,6 +130,19 @@ class PaidAllowanceUsageRepository:
         )
         return None if row is None else _paid_record(row)
 
+    def get_owned_allowance(
+        self, owner: ExecutionOwner, allowance_id: str
+    ) -> PaidAllowanceUsageRecord | None:
+        row = self._session.execute(
+            sa.select(paid_allowance_usage_table).where(
+                paid_allowance_usage_table.c.tenant_id == owner.tenant_id,
+                paid_allowance_usage_table.c.region == owner.region,
+                paid_allowance_usage_table.c.owner_id == owner.owner_id,
+                paid_allowance_usage_table.c.allowance_id == allowance_id,
+            )
+        ).mappings().one_or_none()
+        return None if row is None else _paid_record(row)
+
     def ensure_usage(self, allowance: PaidAllowance) -> PaidAllowanceUsageRecord:
         record = PaidAllowanceUsageRecord(allowance=allowance)
         values = asdict(record)

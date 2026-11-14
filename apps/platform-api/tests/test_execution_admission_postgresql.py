@@ -69,9 +69,11 @@ METRIC = "kernel_demo.test_runs"
 
 
 @pytest.fixture
-def runtime():
+def runtime(request: pytest.FixtureRequest):
     with provision_database(
-        database_name_prefix="any507_admission", skip_reason="execution reservation admission"
+        database_name_prefix="any507_admission",
+        upgrade_target=getattr(request, "param", "head"),
+        skip_reason="execution reservation admission",
     ) as (engine, _, _):
         factory = build_session_factory(engine)
         app = _create_test_app(factory)

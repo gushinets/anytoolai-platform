@@ -159,27 +159,24 @@ The shared runtime, not a product, owns the web side of a handoff:
 - `HandoffConsent` sends the user to `/products/{targetProductId}?session={id}` right after a
   successful Accept; later preview GETs redact the ids after TTL, while an owner-checked accept
   replay can still return the existing target linkage.
-- `/products/{id}?session=` reaches the product as `attachSessionId`; `ProductRunPage` polls that
-  already-queued session and renders its result without a new start or reservation; its backend
-  success consumes the existing reservation. "Try again" re-polls that session, and an unknown session id (404) ends in the run-failed state. The
-  route reads `?session=` from its `searchParams` prop (not `useSearchParams`, whose Suspense
-  boundary would turn the unknown-product 404 into a 200), removes it from the address bar so a
-  bookmark or shared link does not carry it, and keeps it in the tab's `sessionStorage` so a reload
-  still shows the result the accept already queued. `useAttachSession` is the one owner of that
-  state (`AttachProps`: `attachSessionId`, `onAttachBegin`, `onAttachEnd`, threaded route -> shell ->
-  product -> `ProductRunPage`; no analytics event is involved). The page reports two facts: it started
-  polling the session, and the person moved on from it ("New task" on the attached result, own work
-  whose result replaced it on screen, a mode switch, or its terminal failure). The owner forgets the
-  persisted id only for an end that follows a begin, so a failed boot, or typing in another mode,
-  forgets nothing, and a run that failed to start leaves the attached result restorable. After consent the linked scenario session is an ordinary runtime handle:
-  the platform's session/result GETs take no guest id and the session has no expiry of its own, so
-  the id is an opaque public handle, not proof of ownership, and not the short-lived handoff bearer
-  token (which does have a TTL and redaction contract). If a bounded lifetime is ever wanted for it,
-  that is a backend lifecycle contract, not a frontend assumption. The attached result must come
+- `/products/{id}?session=` reaches shared product selection before `ProductRunPage` mounts.
+  The route reads `?session=` from its `searchParams` prop (not `useSearchParams`, whose Suspense
+  boundary would turn the unknown-product 404 into a 200). Selection verifies the session and mode;
+  `useAttachSession` owns attachment persistence and URL consumption through `AttachProps`.
+  The selection, retry/discard and storage-failure rules below govern restoration.
+  Once selected, `ProductRunPage` polls the already-queued session without a new start or
+  reservation; backend success consumes the existing reservation. A normal end clears only
+  the matching attachment whose polling began; explicit discard also works before polling.
+  Guest session/result GETs retain their existing opaque public-handle behavior without a
+  guest-id parameter. Paid session/result reads require a valid delegated identity and matching
+  saved execution owner; knowing the session ID does not authorize access. The session itself
+  has no expiry, unlike the short-lived handoff bearer token, whose TTL and redaction contract
+  remain separate from result authorization. Any bounded session lifetime would be a backend
+  lifecycle contract, not a frontend assumption. The attached result must come
   from this product's scenario: its backend-owned `schemaRef` and `schemaVersion` are checked
   against the selected scenario's output schema from runtime config (a declared version must match;
   a ref keeps its name across a version bump) before the product parser sees it.
-- Products opting in through `ProductDefinition.draft` keep form values and their last accepted
+- Guest products opting in through `ProductDefinition.draft` keep form values and their last accepted
   scenario session in the tab's `sessionStorage`
   (`anytoolai.product_draft.<productId>.<messageScope>`). Reload resumes polling without a new start.
   "New task" clears both; terminal failure clears only the matching saved run and keeps the draft.
@@ -188,8 +185,8 @@ The shared runtime, not a product, owns the web side of a handoff:
   handoff attachment takes precedence. The last selected draft scenario is stored separately under
   `anytoolai.product_draft_scenario.<productId>`. Multi-mode pages resolve it against their current
   opt-in definitions before mounting a form, so reload opens the correct mode without briefly
-  polling another mode's saved run. Explicit mode selection, field edits and accepted own starts
-  remember that scenario; merely viewing an attached result does not replace it. New task clears
+  polling another mode's saved run. Explicit mode selection, field edits, own starts and verified
+  result links remember that scenario; background restoration does not replace it. New task clears
   the current mode's fields/run and retains the mode selection; other modes keep separate drafts.
 - Once an own start and its scenario selection are confirmed saved, the per-product attachment
   entry records a preferred own-run reference (draft key and session id). The route lets draft
@@ -199,6 +196,67 @@ The shared runtime, not a product, owns the web side of a handoff:
   other pending attachments remain fallbacks. A late
   background Accept cannot replace the preferred own run, while an explicit attachment open can.
   Clearing or losing the referenced saved run releases its priority over remaining attachments.
+- The web host owns the configured Portal consumer audience. Next derives public
+  `NEXT_PUBLIC_PORTAL_CONSUMER_ID` from the single build input
+  `ANYTOOLAI_PORTAL_CONSUMER_ID` (default `platform-kernel`); CE-kit receives the
+  expected audience explicitly. Launch, exchange and V2 session reads/installations
+  must agree with the API and Portal registry. Reject a foreign audience before
+  storage mutation or private-state clearing; reauthorization preserves owner-bound
+  pending requests. Runtime environment changes cannot recompile the frontend.
+- Portal-owned forms use separate `anytoolai.paid_draft.v1.*` keys scoped by the
+  canonical tenant/region/user tuple, including selected mode. They never read guest
+  drafts. Same-owner reauthorization retains them; logout, parent revocation and
+  owner changes clear paid drafts with other private recovery state. Guest drafts
+  remain independent. Paid drafts store editable values, mode and an optional own-run binding
+  (accepted session ID plus original UI input, or null when unavailable): the owner-bound
+  `paid_start` record remains the sole execution recovery source. A saved guest or
+  draft run cannot start a competing poll alongside paid replay. Explicit result
+  selection retains priority for that visit without replacing a pending paid request.
+  Automatic paid form restoration requires the exact selected session ID to match
+  the draft binding. It runs after hydration independently of runtime-config success,
+  once and without overwriting edits; latest editable values remain separate from
+  original execution input. Unbound/older drafts offer an explicit Restore saved
+  draft action when editing is allowed. This only fills fields: no replay, key
+  change, new request or invented result input. Opt-out products remain unchanged.
+- Paid recovery does not require current new-start availability. If runtime config is unavailable,
+  or no longer lists the scenario/enabled web frontend, a saved owner-bound pending request or
+  accepted/explicitly selected session opens a recovery-only view. It replays only the original
+  frozen key/request or reads that session; new submissions and "New task" stay disabled. Result
+  schema ref/version must match the bundled product renderer's `outputSchema` before parsing;
+  the architecture contract test checks these pins against product workflows/schema versions.
+  Delegated identity and backend ownership checks remain required for every protected request.
+- Shared product selection resolves the mode and session together before mounting
+  `ProductRunPage`; multi-mode and single-mode products use the same precedence.
+  Multi-mode selection uses the server's `scenarioId`, including accepted paid recovery. Pending and nonterminal
+  accepted work retain priority. After a proven completed/failed/expired status,
+  ordinary restoration honors a later saved valid mode. Explicit result/selected
+  handoff presentation still wins and saves its verified server mode; background
+  restoration/late callbacks do not change user choice. Own starts persist choice
+  before sending, never on late acceptance. After async resolution, custody,
+  recovery and saved choice must still match. URL scenario hints never choose that
+  mode. Missing identity or transient failures preserve Retry; a definite 404 or incompatible
+  scenario offers explicit discard. Discard removes only the matching attachment/accepted recovery,
+  preserving pending requests and newer sessions; it never creates a fresh logical start.
+  A definite 404 for a different older recovery does not block a selected result;
+  retain that recovery record and resolve the selected session instead.
+  A pending paid request has no accepted session to resolve: its frozen scenario selects its mode.
+  On ordinary restoration that request takes precedence over an older remembered handoff; an
+  explicitly selected result takes precedence for that visit without replacing the pending request.
+  A verified explicit link persists the existing attachment's `active` choice, without
+  replacing another paid recovery. Consume its session/scenario URL parameters only
+  after that write succeeds; interrupted resolution or refused storage retains the
+  URL for reload. Explicit exit/discard consumes the matching URL even if storage
+  failed. An invalid link preserves previous recovery and attachment selection.
+  A background attachment is not an explicit choice; a terminal background result
+  yields to a saved different mode. Existing `active` records retain their priority
+  until explicitly left; a new own paid submission leaves the previous choice and URL
+  after persisting pending recovery, before sending. Failed persistence keeps the old
+  result reachable; automatic replay/retry and late responses do not change the choice. Storage versions and
+  the prepared-start replay path are unchanged.
+- The SDK polls in bounded 600-second windows. The web runtime renews a window only after a healthy
+  `started`/`running` snapshot, continuing the same session. Every awaited window checks abort,
+  active session and current paid identity; a read failure retries the accepted session without
+  starting another execution.
 - A spent (accepted/consumed) token that still names the target session shows an explicit "Open result" on the
   consent page, for the case where the Accept response was lost and the person reloaded instead of retrying
   (a retry that gets "already accepted" redirects on its own). It never redirects automatically on load.

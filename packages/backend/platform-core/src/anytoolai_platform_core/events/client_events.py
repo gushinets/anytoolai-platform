@@ -18,6 +18,8 @@ from anytoolai_platform_core.events.envelope import EventEnvelope
 from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.identity.service import GuestIdentityNotFoundError
 from anytoolai_platform_core.products.models import ProductDefinition
+from anytoolai_platform_core.quotas.models import ExecutionOwner, ExecutionOwnerKind
+from anytoolai_platform_core.scenarios.ownership import session_owner_matches
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
 from anytoolai_platform_core.scenarios.runtime_scope import is_public_runtime_session
 from anytoolai_platform_core.scenarios.service import ScenarioSessionNotFoundError
@@ -230,7 +232,11 @@ class ClientEventService:
         user_id: str | None = None,
         scenario_session_id: str | None = None,
         properties: Mapping[str, Any] | None = None,
+        paid_owner: ExecutionOwner | None = None,
     ) -> EventEnvelope:
+        if paid_owner is not None:
+            _validate_paid_identity(paid_owner, tenant_id, region, user_id)
+            guest_id, user_id = None, paid_owner.owner_id
         if event_type not in CLIENT_EVENT_TYPES:
             raise ClientEventTypeNotAllowedError()
         # event_id/web_session_id are opaque client-minted identifiers, not arbitrary text: ce-kit
@@ -239,16 +245,22 @@ class ClientEventService:
         # and (b) makes it structurally impossible for a client id to collide with the backend's
         # own reserved "event_<...>" / "event_replay_<...>" id namespaces (see common/ids.py,
         # events/replay.py), which a client must never be able to impersonate.
-        event_id = _trim_or_raise(event_id, max_length=MAX_CLIENT_EVENT_ID_LENGTH, error=ClientEventIdInvalidError)
+        event_id = _trim_or_raise(
+            event_id, max_length=MAX_CLIENT_EVENT_ID_LENGTH, error=ClientEventIdInvalidError
+        )
         if not _is_canonical_uuid(event_id):
             raise ClientEventIdInvalidError()
         web_session_id = _trim_or_raise(
-            web_session_id, max_length=MAX_WEB_SESSION_ID_LENGTH, error=ClientEventWebSessionIdInvalidError
+            web_session_id,
+            max_length=MAX_WEB_SESSION_ID_LENGTH,
+            error=ClientEventWebSessionIdInvalidError,
         )
         if not _is_canonical_uuid(web_session_id):
             raise ClientEventWebSessionIdInvalidError()
         if user_id is not None:
-            user_id = _trim_or_raise(user_id, max_length=MAX_USER_ID_LENGTH, error=ClientEventUserIdInvalidError)
+            user_id = _trim_or_raise(
+                user_id, max_length=MAX_USER_ID_LENGTH, error=ClientEventUserIdInvalidError
+            )
         if guest_id is not None:
             guest_id = _trim_or_raise(
                 guest_id, max_length=MAX_LOOKUP_ID_LENGTH, error=ClientEventGuestIdInvalidError
@@ -275,60 +287,16 @@ class ClientEventService:
         ):
             raise ClientEventFrontendInvalidError()
 
-        scenario_chain_id: str | None = None
-        if scenario_session_id is not None:
-            session = self._scenario_session_repository.get(
-                scenario_session_id,
-                tenant_id=tenant_id,
-                region=region,
-                product_id=product_id,
-                frontend_id=frontend_id,
-            )
-            # A non-public runtime scope is indistinguishable from a missing session at this
-            # public boundary. An explicitly supplied guest_id/user_id that contradicts a public
-            # session's real owner is rejected the same way; one that's simply omitted is not a
-            # mismatch, since the session becomes the source of truth for identity below.
-            if session is None or not is_public_runtime_session(session) or (
-                (guest_id is not None and session.guest_id != guest_id)
-                or (user_id is not None and session.user_id != user_id)
-            ):
-                raise ScenarioSessionNotFoundError()
-            # The resolved session is authoritative for correlation from here on -- derived, not
-            # merely validated, so a caller never has to (and cannot incorrectly) re-assert
-            # guest_id once scenario_session_id already carries that information, and
-            # scenario_chain_id (which a standalone client request has no way to know or claim on
-            # its own) is populated instead of silently dropped.
-            #
-            # `session.user_id` traces back to an unverified client-supplied field on
-            # scenario-start -- no authenticated-user system exists yet in MVP-A (TD-013,
-            # `docs/tech-debt-tracker.md`). Every other event already emitted for this session
-            # trusts it at that same level, but this endpoint's own contract is
-            # "authenticated-or-guest" with server-*derived*, trusted identity, so unlike the rest
-            # of the platform it must not elevate an unverified user_id to that trust level. Only
-            # `session.guest_id`, re-verified here against a real minted `GuestIdentityRecord`
-            # (the same check the standalone guest_id path below already does), counts as identity
-            # for a client event -- `session.user_id` is read for the owner-check above but never
-            # propagated. A session with no verified guest (anonymous, or user-only because a
-            # product with no quota_policy_ref never required guest_id at scenario-start) has no
-            # identity this endpoint can trust, and is rejected the same as a fully anonymous one.
-            scenario_chain_id = session.scenario_chain_id
-            guest_id = session.guest_id
-            user_id = None
-            if guest_id is None:
-                raise ClientEventIdentityRequiredError()
-            guest = self._guest_repository.get(guest_id, tenant_id=tenant_id, region=region)
-            if guest is None:
-                raise GuestIdentityNotFoundError()
-        elif user_id is not None:
-            # No session to derive/verify user_id against, and MVP-A has no authenticated-user
-            # lookup at all -- unlike guest_id (itself unauthenticated, but at least checked
-            # against a real minted identity below), a standalone user_id claim is entirely
-            # unverifiable and must not be trusted.
-            raise ClientEventUserIdRequiresSessionError()
-        elif guest_id is not None:
-            guest = self._guest_repository.get(guest_id, tenant_id=tenant_id, region=region)
-            if guest is None:
-                raise GuestIdentityNotFoundError()
+        guest_id, user_id, scenario_chain_id = self._resolve_identity(
+            tenant_id=tenant_id,
+            region=region,
+            product_id=product_id,
+            frontend_id=frontend_id,
+            scenario_session_id=scenario_session_id,
+            guest_id=guest_id,
+            user_id=user_id,
+            paid_owner=paid_owner,
+        )
 
         event_properties = self._validate_properties(properties or {}, product=product)
         event_properties["web_session_id"] = web_session_id
@@ -381,6 +349,73 @@ class ClientEventService:
             raise ClientEventIdConflictError()
         return envelope
 
+    def _resolve_identity(
+        self,
+        *,
+        tenant_id: str,
+        region: str,
+        product_id: str,
+        frontend_id: str,
+        scenario_session_id: str | None,
+        guest_id: str | None,
+        user_id: str | None,
+        paid_owner: ExecutionOwner | None,
+    ) -> tuple[str | None, str | None, str | None]:
+        scenario_chain_id: str | None = None
+        if scenario_session_id is not None:
+            session = self._scenario_session_repository.get(
+                scenario_session_id,
+                tenant_id=tenant_id,
+                region=region,
+                product_id=product_id,
+                frontend_id=frontend_id,
+            )
+            # A non-public runtime scope is indistinguishable from a missing session at this
+            # public boundary. An explicitly supplied guest_id/user_id that contradicts a public
+            # session's real owner is rejected the same way; one that's simply omitted is not a
+            # mismatch, since the session becomes the source of truth for identity below.
+            if (
+                session is None
+                or not is_public_runtime_session(session)
+                or not session_owner_matches(
+                    self._scenario_session_repository.session, session, paid_owner
+                )
+                or (
+                    (guest_id is not None and session.guest_id != guest_id)
+                    or (user_id is not None and session.user_id != user_id)
+                )
+            ):
+                raise ScenarioSessionNotFoundError()
+            # The resolved session is authoritative for correlation from here on -- derived, not
+            # merely validated, so a caller never has to (and cannot incorrectly) re-assert
+            # guest_id once scenario_session_id already carries that information, and
+            # scenario_chain_id (which a standalone client request has no way to know or claim on
+            # its own) is populated instead of silently dropped.
+            #
+            # Historical body user_id is observational only. Paid identity instead comes
+            # from HTTP authentication and reservation/deferred ownership checked above.
+            scenario_chain_id = session.scenario_chain_id
+            guest_id = session.guest_id
+            user_id = None if paid_owner is None else paid_owner.owner_id
+            if guest_id is None and paid_owner is None:
+                raise ClientEventIdentityRequiredError()
+            if paid_owner is None:
+                guest = self._guest_repository.get(guest_id, tenant_id=tenant_id, region=region)
+                if guest is None:
+                    raise GuestIdentityNotFoundError()
+        elif user_id is not None and paid_owner is None:
+            # No session to derive/verify user_id against, and MVP-A has no authenticated-user
+            # lookup at all -- unlike guest_id (itself unauthenticated, but at least checked
+            # against a real minted identity below), a standalone user_id claim is entirely
+            # unverifiable and must not be trusted.
+            raise ClientEventUserIdRequiresSessionError()
+        elif guest_id is not None:
+            guest = self._guest_repository.get(guest_id, tenant_id=tenant_id, region=region)
+            if guest is None:
+                raise GuestIdentityNotFoundError()
+
+        return guest_id, user_id, scenario_chain_id
+
     @staticmethod
     def _validate_properties(
         properties: Mapping[str, Any], *, product: ProductDefinition
@@ -392,6 +427,18 @@ class ClientEventService:
                 raise ClientEventPropertyInvalidError(key)
             validated[key] = value
         return validated
+
+
+def _validate_paid_identity(
+    owner: ExecutionOwner, tenant_id: str, region: str, claimed_user_id: str | None
+) -> None:
+    if owner.owner_kind is not ExecutionOwnerKind.portal_user or (
+        owner.tenant_id,
+        owner.region,
+    ) != (tenant_id, region):
+        raise ClientEventIdentityRequiredError()
+    if claimed_user_id is not None and claimed_user_id != owner.owner_id:
+        raise ClientEventUserIdInvalidError()
 
 
 def _trim_or_raise(value: str, *, max_length: int, error: type[PlatformError]) -> str:

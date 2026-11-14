@@ -26,6 +26,10 @@ EXPECTED_PRODUCTS = {
     "task_finder",
 }
 EXPECTED_METRICS = {
+    ("proposal_ai.generations", "proposal_ai", "generation"),
+    ("client_update_writer.messages", "client_update_writer", "message"),
+    ("brief_decoder.analyses", "brief_decoder", "analysis"),
+    ("acceptance_builder.results", "acceptance_builder", "result"),
     ("proposal_ai.test_generations", "proposal_ai", "generation"),
     ("brief_decoder.test_analyses", "brief_decoder", "analysis"),
 }
@@ -52,7 +56,7 @@ def test_complete_ordinary_vocabulary_is_disabled(registry: ConfigRegistry) -> N
     assert manifest.manifest_version != APPROVED_EXAMPLE_DIGEST
     for product in registry.products.values():
         assert isinstance(product.usage_metrics, tuple)
-        if product.product_id not in {"proposal_ai", "brief_decoder"}:
+        if product.product_id in {"kernel_demo", "task_finder"}:
             assert product.usage_metrics == ()
 
 
@@ -66,6 +70,9 @@ def test_enabled_example_preserves_independent_accepted_digest(registry: ConfigR
                 commercial_admission_enabled=product_id in enabled,
                 usage_metrics=tuple(
                     replace(metric, enabled=True) for metric in product.usage_metrics
+                    if metric.metric_key in {
+                        "proposal_ai.test_generations", "brief_decoder.test_analyses"
+                    }
                 ),
             )
             for product_id, product in registry.products.items()
@@ -186,6 +193,9 @@ def test_hash_changes_with_every_semantic_dimension(registry: ConfigRegistry, ch
     before = project_capability_manifest(registry, tenant_id="anytoolai", region="ru")
     product, *other_products = before.products
     metric, *other_metrics = before.usage_metrics
+    other_owner = next(
+        item.product_id for item in before.products if item.product_id != metric.product_id
+    )
     variants = {
         "tenant": replace(before, tenant_id="other"),
         "region": replace(before, region="other"),
@@ -200,7 +210,7 @@ def test_hash_changes_with_every_semantic_dimension(registry: ConfigRegistry, ch
             before, usage_metrics=(replace(metric, metric_key="other"), *other_metrics)
         ),
         "metric_owner": replace(
-            before, usage_metrics=(replace(metric, product_id=product.product_id), *other_metrics)
+            before, usage_metrics=(replace(metric, product_id=other_owner), *other_metrics)
         ),
         "metric_unit": replace(
             before, usage_metrics=(replace(metric, unit="other"), *other_metrics)

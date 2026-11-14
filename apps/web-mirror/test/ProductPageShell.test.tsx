@@ -486,6 +486,7 @@ describe("UI locale is independent of scenario input and state", () => {
 describe("a newly registered product gets the language selector without implementing it", () => {
   const fakeProduct: RegisteredProduct = {
     productId: TEST_PRODUCT_IDS.productId,
+    scenarioIds: [TEST_PRODUCT_IDS.scenarioId],
     enabled: true,
     messages: englishForAllLocales(TEST_PRODUCT_MESSAGES_EN),
     Component: ({ client, onEvent, visitId }) => (

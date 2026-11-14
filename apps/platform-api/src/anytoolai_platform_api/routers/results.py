@@ -8,6 +8,13 @@ from anytoolai_platform_api.dependencies import (
     get_settings,
 )
 from anytoolai_platform_api.errors import ApiError, platform_error_to_api_error
+from anytoolai_platform_api.paid_access import (
+    OPTIONAL_PAID_SECURITY,
+    PAID_RUNTIME_ERROR_RESPONSES,
+    optional_portal_user,
+    require_session_owner,
+)
+from anytoolai_platform_api.portal_session import PortalUserPrincipal
 from anytoolai_platform_api.schemas import ErrorResponse, ResultArtifactResponse
 from anytoolai_platform_api.settings import Settings
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
@@ -59,6 +66,7 @@ SAFE_UNAVAILABLE_404_EXAMPLE = {
     response_model=ResultArtifactResponse,
     summary="Get a frontend-safe normalized workflow result artifact",
     responses={
+        **PAID_RUNTIME_ERROR_RESPONSES,
         200: {
             "description": "Frontend-safe normalized canonical workflow result.",
             "content": {"application/json": {"example": RESULT_RESPONSE_EXAMPLE}},
@@ -86,12 +94,14 @@ SAFE_UNAVAILABLE_404_EXAMPLE = {
             },
         },
     },
+    openapi_extra=OPTIONAL_PAID_SECURITY,
 )
 def get_result_artifact(
     result_artifact_id: str,
     registry: Annotated[ConfigRegistry, Depends(get_config_registry)],
     session_factory: Annotated[Any, Depends(get_session_factory)],
     settings: Annotated[Settings, Depends(get_settings)],
+    principal: Annotated[PortalUserPrincipal | None, Depends(optional_portal_user)],
 ) -> ResultArtifactResponse:
     with transaction_boundary(session_factory) as session:
         artifact_repository = ArtifactRepository(session)
@@ -101,6 +111,13 @@ def get_result_artifact(
             region=settings.default_region,
         )
         if artifact is not None:
+            require_session_owner(
+                session,
+                artifact.scenario_session_id,
+                settings,
+                principal,
+                code="result_artifact_not_found",
+            )
             source_session = ScenarioSessionRepository(session).get_in_scope(
                 artifact.scenario_session_id,
                 tenant_id=settings.default_tenant_id,

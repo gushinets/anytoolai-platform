@@ -156,7 +156,7 @@ def _error_response(
         },
     )
     response.headers[REQUEST_ID_HEADER] = request_id
-    if request.url.path.startswith("/internal/"):
+    if request.url.path.startswith(("/internal/", "/v1/portal-session/")):
         response.headers["Cache-Control"] = "no-store"
     return response
 

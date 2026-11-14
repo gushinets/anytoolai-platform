@@ -536,7 +536,7 @@ it.each([false, true])("restores an accepted session and reloads without another
     [ROUTES.QUOTA]: Array.from({ length: 4 }, () => quotaResponse(IDS, { used_count: 1, remaining_count: 2 })),
     [ROUTES.SESSION]: [
       ...(recover ? [errorResponse(503, "internal_error")] : []),
-      sessionResponse(), sessionResponse(),
+      sessionResponse({ scenario_id: IDS.scenarioId }), sessionResponse({ scenario_id: IDS.scenarioId }), sessionResponse({ scenario_id: IDS.scenarioId }),
     ],
   });
   const first = render(<AttachedProposalAIProduct client={client} sessionId="session_1" />);
@@ -548,7 +548,7 @@ it.each([false, true])("restores an accepted session and reloads without another
   first.unmount();
   render(<AttachedProposalAIProduct client={client} />);
   await screen.findByRole("button", { name: "New task" });
-  expect(calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(recover ? 3 : 2);
+  expect(calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(recover ? 4 : 3);
   expect(calls.some((call) => call.key.endsWith("/start"))).toBe(false);
   expect(screen.getByText(/2 of 3/)).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "New task" }));

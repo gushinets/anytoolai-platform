@@ -13,6 +13,45 @@
       }
     },
     "schemas": {
+      "AccessInvalidation": {
+        "additionalProperties": false,
+        "properties": {
+          "access_revision": {
+            "minimum": 0.0,
+            "title": "Access Revision",
+            "type": "integer"
+          },
+          "region": {
+            "minLength": 1,
+            "title": "Region",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "tenant_id": {
+            "minLength": 1,
+            "title": "Tenant Id",
+            "type": "string"
+          },
+          "user_id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "tenant_id",
+          "region",
+          "user_id",
+          "access_revision"
+        ],
+        "title": "AccessInvalidation",
+        "type": "object"
+      },
       "AtomLabAtomId": {
         "enum": [
           "A01",
@@ -1968,6 +2007,229 @@
         "title": "ModelCatalogRefreshStatus",
         "type": "string"
       },
+      "ObservedUsage": {
+        "additionalProperties": false,
+        "properties": {
+          "allowance_id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Allowance Id",
+            "type": "string"
+          },
+          "available": {
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
+            "title": "Available",
+            "type": "integer"
+          },
+          "metric_key": {
+            "minLength": 1,
+            "title": "Metric Key",
+            "type": "string"
+          },
+          "product_id": {
+            "minLength": 1,
+            "title": "Product Id",
+            "type": "string"
+          },
+          "quantity": {
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "read_at": {
+            "format": "date-time",
+            "title": "Read At",
+            "type": "string"
+          },
+          "remaining": {
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
+            "title": "Remaining",
+            "type": "integer"
+          },
+          "reserved": {
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
+            "title": "Reserved",
+            "type": "integer"
+          },
+          "status": {
+            "const": "observed",
+            "default": "observed",
+            "title": "Status",
+            "type": "string"
+          },
+          "successful_used": {
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
+            "title": "Successful Used",
+            "type": "integer"
+          },
+          "unit": {
+            "minLength": 1,
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "allowance_id",
+          "product_id",
+          "metric_key",
+          "unit",
+          "quantity",
+          "successful_used",
+          "reserved",
+          "remaining",
+          "available",
+          "read_at"
+        ],
+        "title": "ObservedUsage",
+        "type": "object"
+      },
+      "PaidUsageResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "observed": "#/components/schemas/ObservedUsage",
+                  "unobserved": "#/components/schemas/UnobservedUsage"
+                },
+                "propertyName": "status"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/ObservedUsage"
+                },
+                {
+                  "$ref": "#/components/schemas/UnobservedUsage"
+                }
+              ]
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          },
+          "region": {
+            "minLength": 1,
+            "title": "Region",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": 1,
+            "default": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "tenant_id": {
+            "minLength": 1,
+            "title": "Tenant Id",
+            "type": "string"
+          },
+          "user_id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "region",
+          "user_id",
+          "items"
+        ],
+        "title": "PaidUsageResponse",
+        "type": "object"
+      },
+      "PortalExchangeRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "title": "Code",
+            "type": "string"
+          },
+          "code_verifier": {
+            "pattern": "^[A-Za-z0-9._~-]{43,128}$",
+            "title": "Code Verifier",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "code_verifier"
+        ],
+        "title": "PortalExchangeRequest",
+        "type": "object"
+      },
+      "PortalExchangeResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "access_token": {
+            "maxLength": 512,
+            "minLength": 43,
+            "title": "Access Token",
+            "type": "string"
+          },
+          "consumer_id": {
+            "pattern": "^[a-z][a-z0-9-]{0,63}$",
+            "title": "Consumer Id",
+            "type": "string"
+          },
+          "consumer_policy_revision": {
+            "maximum": 9007199254740991.0,
+            "minimum": 1.0,
+            "title": "Consumer Policy Revision",
+            "type": "integer"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "region": {
+            "minLength": 1,
+            "title": "Region",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": 2,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "tenant_id": {
+            "minLength": 1,
+            "title": "Tenant Id",
+            "type": "string"
+          },
+          "token_type": {
+            "const": "Bearer",
+            "title": "Token Type",
+            "type": "string"
+          },
+          "user_id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "access_token",
+          "token_type",
+          "consumer_id",
+          "consumer_policy_revision",
+          "tenant_id",
+          "region",
+          "user_id",
+          "expires_at"
+        ],
+        "title": "PortalExchangeResponse",
+        "type": "object"
+      },
       "ProviderCallStatus": {
         "enum": [
           "created",
@@ -2549,6 +2811,27 @@
         "title": "ScenarioStartResponse",
         "type": "object"
       },
+      "UnobservedUsage": {
+        "additionalProperties": false,
+        "properties": {
+          "allowance_id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Allowance Id",
+            "type": "string"
+          },
+          "status": {
+            "const": "unobserved",
+            "default": "unobserved",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "allowance_id"
+        ],
+        "title": "UnobservedUsage",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -2606,6 +2889,10 @@
       }
     },
     "securitySchemes": {
+      "PortalDelegatedBearer": {
+        "scheme": "bearer",
+        "type": "http"
+      },
       "PortalServiceBearer": {
         "scheme": "bearer",
         "type": "http"
@@ -2640,6 +2927,75 @@
         "summary": "Health",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/internal/v1/access-invalidations": {
+      "post": {
+        "operationId": "post_access_invalidation_internal_v1_access_invalidations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccessInvalidation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "PortalServiceBearer": []
+          }
+        ],
+        "summary": "Post Access Invalidation",
+        "tags": [
+          "paid-access"
         ]
       }
     },
@@ -2736,6 +3092,119 @@
         "summary": "Get Capability Manifest",
         "tags": [
           "capability-manifest"
+        ]
+      }
+    },
+    "/internal/v1/usage/{user_id}": {
+      "get": {
+        "operationId": "internal_paid_usage_internal_v1_usage__user_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "title": "User Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Tenant Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "region",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Region",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "allowance_id",
+            "required": true,
+            "schema": {
+              "items": {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              "maxItems": 100,
+              "minItems": 1,
+              "title": "Allowance Id",
+              "type": "array"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaidUsageResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "PortalServiceBearer": []
+          }
+        ],
+        "summary": "Read actual usage for 1\u2013100 distinct allowances",
+        "tags": [
+          "paid-usage"
         ]
       }
     },
@@ -4418,6 +4887,26 @@
             },
             "description": "Event was durably recorded (or already existed for this event_id -- duplicate delivery is idempotent)."
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -4468,8 +4957,24 @@
               }
             },
             "description": "Safe response for an unknown event type, an invalid product/frontend combination, a disallowed property, or a missing/oversized identifier."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           }
         },
+        "security": [
+          {
+            "PortalDelegatedBearer": []
+          },
+          {}
+        ],
         "summary": "Record an allowlisted client analytics event",
         "tags": [
           "client-events"
@@ -4599,6 +5104,26 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -4628,8 +5153,24 @@
               }
             },
             "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           }
         },
+        "security": [
+          {
+            "PortalDelegatedBearer": []
+          },
+          {}
+        ],
         "summary": "Create Handoff",
         "tags": [
           "handoffs"
@@ -4661,6 +5202,26 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -4680,8 +5241,24 @@
               }
             },
             "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           }
         },
+        "security": [
+          {
+            "PortalDelegatedBearer": []
+          },
+          {}
+        ],
         "summary": "Get Handoff",
         "tags": [
           "handoffs"
@@ -4729,6 +5306,26 @@
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "404": {
             "content": {
@@ -4779,8 +5376,24 @@
               }
             },
             "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           }
         },
+        "security": [
+          {
+            "PortalDelegatedBearer": []
+          },
+          {}
+        ],
         "summary": "Accept Handoff",
         "tags": [
           "handoffs"
@@ -4811,6 +5424,26 @@
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "404": {
             "content": {
@@ -4851,8 +5484,24 @@
               }
             },
             "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           }
         },
+        "security": [
+          {
+            "PortalDelegatedBearer": []
+          },
+          {}
+        ],
         "summary": "Decline Handoff",
         "tags": [
           "handoffs"
@@ -4880,6 +5529,159 @@
         "summary": "Create an opaque guest identity",
         "tags": [
           "access-lite"
+        ]
+      }
+    },
+    "/v1/portal-session/exchange": {
+      "post": {
+        "operationId": "exchange_portal_session_v1_portal_session_exchange_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortalExchangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortalExchangeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Exchange Portal Session",
+        "tags": [
+          "portal-session"
+        ]
+      }
+    },
+    "/v1/products/{product_id}/paid-usage": {
+      "get": {
+        "operationId": "public_paid_usage_v1_products__product_id__paid_usage_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "product_id",
+            "required": true,
+            "schema": {
+              "title": "Product Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "allowance_id",
+            "required": true,
+            "schema": {
+              "items": {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              "maxItems": 100,
+              "minItems": 1,
+              "title": "Allowance Id",
+              "type": "array"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaidUsageResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "PortalDelegatedBearer": []
+          }
+        ],
+        "summary": "Read owned current or historical paid usage",
+        "tags": [
+          "paid-usage"
         ]
       }
     },
@@ -5196,19 +5998,19 @@
         "parameters": [
           {
             "in": "path",
-            "name": "scenario_id",
+            "name": "product_id",
             "required": true,
             "schema": {
-              "title": "Scenario Id",
+              "title": "Product Id",
               "type": "string"
             }
           },
           {
             "in": "path",
-            "name": "product_id",
+            "name": "scenario_id",
             "required": true,
             "schema": {
-              "title": "Product Id",
+              "title": "Scenario Id",
               "type": "string"
             }
           },
@@ -5271,6 +6073,26 @@
               }
             },
             "description": "Stable queue-and-return response for CE polling."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "404": {
             "content": {
@@ -5392,8 +6214,24 @@
               }
             },
             "description": "Quota exhausted or capacity temporarily reserved. The rejected start leaves no scenario session, job or reservation. A temporary reserve does not mean the allowance is exhausted."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           }
         },
+        "security": [
+          {
+            "PortalDelegatedBearer": []
+          },
+          {}
+        ],
         "summary": "Create a scenario session and queue workflow execution",
         "tags": [
           "scenario-runtime"
@@ -5443,6 +6281,26 @@
             },
             "description": "Frontend-safe normalized canonical workflow result."
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -5484,8 +6342,24 @@
               }
             },
             "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           }
         },
+        "security": [
+          {
+            "PortalDelegatedBearer": []
+          },
+          {}
+        ],
         "summary": "Get a frontend-safe normalized workflow result artifact",
         "tags": [
           "results"
@@ -5529,6 +6403,26 @@
             },
             "description": "Frontend-safe session snapshot for polling."
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -5555,8 +6449,24 @@
               }
             },
             "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           }
         },
+        "security": [
+          {
+            "PortalDelegatedBearer": []
+          },
+          {}
+        ],
         "summary": "Get frontend-safe scenario session state",
         "tags": [
           "scenario-runtime"
@@ -5619,6 +6529,26 @@
             },
             "description": "Validated next action with the current safe session snapshot."
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -5662,8 +6592,24 @@
               }
             },
             "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           }
         },
+        "security": [
+          {
+            "PortalDelegatedBearer": []
+          },
+          {}
+        ],
         "summary": "Validate and record a frontend next-action click",
         "tags": [
           "scenario-runtime"

@@ -20,6 +20,9 @@ import {
   openHandoffConsent,
   pollScenarioSession,
   prepareScenarioStart,
+  readPaidStartRecovery,
+  restorePaidScenarioStart,
+  clearPaidStartRecovery,
   refreshGuestIdentity,
   type AsyncStorage,
   type PlatformApiClient,
@@ -31,11 +34,13 @@ import { DataProcessingNotice, DATA_NOTICE_ID } from "../../components/DataProce
 import { LanguageSwitcher, useHostT, useProductT } from "../../i18n";
 import { getClientStorage } from "./clientStorage";
 import { webBaseUrlFromProductLocation } from "../../lib/hostUrls";
-import { preferSavedOwnRun, type AttachProps } from "./attachSession";
+import { forgetChosenAttachSession, preferSavedOwnRun, type AttachProps } from "./attachSession";
 import { productDraftKey, readProductDraft, readProductDraftScenario, saveDraftValues, saveDraftRun, saveProductDraftScenario, clearProductDraft } from "./draftStorage";
 import { callSafely } from "./callSafely";
+import { ProductSelectionStatus, useProductSelection, type ProductSelection } from "./useProductSelection";
 import { isProductEnabled } from "./enabledProducts";
 import { useLatest } from "./useLatest";
+import { getPaidPersistence } from "../../lib/portalSession";
 import type { FieldError } from "./fieldValidation";
 import { ProductShellContext } from "./ProductShellContext";
 import { RunProgress } from "./RunProgress";
@@ -247,11 +252,12 @@ function shallowEqualValues<V extends Record<string, unknown>>(a: V, b: V): bool
 type BootState =
   | { kind: "loading" }
   | { kind: "boot-error" }
+  | { kind: "recovery"; outputSchemaRef: string; outputSchemaVersion: number }
   | { kind: "ready"; scenarioId: string; frontendId: string; hasQuota: boolean; outputSchemaRef: string; outputSchemaVersion: number | null };
 
 /** Why a run is retryable. A closed reason -- not finished English prose -- so an error already on
  * screen re-renders in the new language when the UI locale changes (`host.errors.<reason>`). */
-type RetryReason = "startFailed" | "timeout" | "connectionLost" | "tryAgain" | "quotaCapacityReserved";
+type RetryReason = "startFailed" | "timeout" | "connectionLost" | "tryAgain" | "quotaCapacityReserved" | "storageUnavailable" | "savedOperationPending";
 
 type Phase<R> =
   | { kind: "idle" }
@@ -280,17 +286,35 @@ type Phase<R> =
  * were genuinely product-neutral, per ANY-453's team-lead guidance (docs/exec-plans/active/
  * any-453-shared-web-product-runtime-foundation.md) -- not designed up front.
  */
-export function ProductRunPage<V extends Record<string, unknown>, R>({
+export function ProductRunPage<V extends Record<string, unknown>, R>(props: ProductRunPageProps<V, R>) {
+  const selection = useProductSelection(props.client, [props.definition], props);
+  if (selection.state.kind !== "ready") return <ProductSelectionStatus selection={selection} />;
+  return <ResolvedProductRunPage {...props} selection={selection.state.selection} />;
+}
+
+export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
   definition,
   client,
   onEvent,
   onLockedChange,
   visitId,
-  attachSessionId,
+  selection,
   onAttachBegin,
   onAttachEnd,
-}: ProductRunPageProps<V, R>) {
+}: ProductRunPageProps<V, R> & { selection: ProductSelection }) {
+  const attachSessionId = selection.kind === "session" ? selection.sessionId : undefined;
   const { Fields, Result } = definition;
+  const paid = client.portalIdentity !== undefined;
+  const draftOwner = client.portalIdentity?.owner;
+  const [paidPersistence] = useState(() => getPaidPersistence(client));
+  const [recoveryState] = useState(() => {
+    try {
+      return { recovery: paidPersistence ? readPaidStartRecovery(paidPersistence, definition.productId) : null, failed: false };
+    } catch { return { recovery: null, failed: true }; }
+  });
+  const recovery = selection.kind !== "form" && recoveryState.recovery?.scenarioId === definition.scenarioId ? recoveryState.recovery : null;
+  const restoredStartRef = useRef(false);
+  const paidSendingRef = useRef(false);
   const th = useHostT();
   const tp = useProductT();
   const title = tp("title");
@@ -312,8 +336,8 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   const onEventRef = useLatest(onEvent);
   // The attach callbacks are read from async continuations too (a terminal failure after a poll), so they
   // get the same always-current treatment.
-  const onAttachBeginRef = useLatest(onAttachBegin);
-  const onAttachEndRef = useLatest(onAttachEnd);
+  const onAttachBeginRef = useLatest(() => onAttachBegin?.(attachSessionId));
+  const onAttachEndRef = useLatest(() => onAttachEnd?.(attachSessionId));
   // Bumped by every fetchResult() call; see that function's own comment for why.
   const resultFetchGenerationRef = useRef(0);
   // True once any concurrent fetchResult() call for the current session has reached a definitive,
@@ -419,6 +443,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   // Editing after a definite rejection makes the next submit build a new handle instead.
   // Declared before `busy` below, which reads it.
   const [pendingStart, setPendingStart] = useState<{ prepared: PreparedScenarioStart; input: V } | null>(null);
+  const activePreparedRef = useRef<PreparedScenarioStart | null>(null);
   // A later rejection settles only that attempt. Earlier unresolved sends of the same key may
   // still accept, so keep their lock and recovery handle across automatic and manual retries.
   const uncertainStartsRef = useRef(new WeakSet<PreparedScenarioStart>());
@@ -499,7 +524,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   useIsomorphicLayoutEffect(() => () => shell?.reportBusy(false), [shell]);
 
   const productId = definition.productId;
-  const draftKey = definition.draft ? productDraftKey(productId, definition.messageScope) : null;
+  const draftKey = definition.draft ? productDraftKey(productId, definition.messageScope, draftOwner) : null;
   const parseStoredValues = useCallback((raw: unknown): V | null => {
     if (!definition.draft || raw === undefined) return null;
     try {
@@ -508,16 +533,49 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       return null;
     }
   }, [definition]);
+  const restoredDraftRef = useRef(false);
+  const [manualDraft, setManualDraft] = useState<V | null>(null);
+  useEffect(() => {
+    if (restoredDraftRef.current || draftKey === null || (client.portalIdentity && !client.portalIdentity.isCurrent())) return;
+    restoredDraftRef.current = true;
+    const stored = readProductDraft(draftKey);
+    const restored = parseStoredValues(stored?.values);
+    if (restored === null) return;
+    if (!attachSessionId || (paid && stored?.run?.scenarioSessionId === attachSessionId)) {
+      setValues(restored);
+      if (paid && attachSessionId) activeInputRef.current = parseStoredValues(stored?.run?.input);
+    } else if (paid) {
+      // An older draft has no proof of belonging to this result. Restore only on request.
+      setManualDraft(restored);
+    }
+  }, [client, draftKey, parseStoredValues, attachSessionId, paid]);
   const scenarioId = definition.scenarioId;
+  const recoverySchemaRef = definition.outputSchema.schemaRef;
+  const recoverySchemaVersion = definition.outputSchema.schemaVersion;
+  function forgetPaidRecovery() {
+    if (!paidPersistence || !paidPersistence.isCurrent()) return;
+    try {
+      if (activePreparedRef.current) {
+        activePreparedRef.current.forgetRecovery();
+        activePreparedRef.current = null;
+        return;
+      }
+      const saved = readPaidStartRecovery(paidPersistence, productId);
+      // Ending a selected historical result only forgets that result, never another operation.
+      if (!attachActiveRef.current || saved?.kind !== "accepted" || saved.scenarioSessionId !== attachedSessionRef.current) return;
+      clearPaidStartRecovery(paidPersistence.storage, productId);
+    } catch { /* Retain recovery if tab storage cannot safely read or remove it. */ }
+  }
   const refreshQuota = useCallback((
     resolvedGuestId: string,
     resolvedScenarioId: string,
     controller: AbortController | null,
     onExhausted?: () => void,
   ) => {
+    if (client.portalIdentity) return;
     const generation = ++quotaRequestGenerationRef.current;
     getQuota(client, { productId, guestId: resolvedGuestId, scenarioId: resolvedScenarioId }).then((quotaResult) => {
-      if (controller?.signal.aborted || generation !== quotaRequestGenerationRef.current || !quotaResult.ok) {
+      if (controller?.signal.aborted || (client.portalIdentity && !client.portalIdentity.isCurrent()) || generation !== quotaRequestGenerationRef.current || !quotaResult.ok) {
         return;
       }
       setQuota(quotaResult.value);
@@ -547,16 +605,23 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       markEventFired(client, eventScopeKey, "product_viewed");
       emitEvent(onEventRef.current, { type: "product_viewed", guestId: resolvedGuestId });
     }
-    Promise.all([getCachedRuntimeConfig(client, productId), client.createGuestIdentity({ storage: guestStorage })]).then(
+    function unavailableBoot() {
+      // Current admission metadata cannot revoke an existing paid operation. The bundled
+      // renderer pins its own compatible output; this state never enables a fresh start.
+      setBoot(paid && (recovery || attachSessionId)
+        ? { kind: "recovery", outputSchemaRef: recoverySchemaRef, outputSchemaVersion: recoverySchemaVersion }
+        : { kind: "boot-error" });
+    }
+    Promise.all([getCachedRuntimeConfig(client, productId), paid ? Promise.resolve(null) : client.createGuestIdentity({ storage: guestStorage })]).then(
       ([runtimeResult, guestResult]) => {
-        if (controller?.signal.aborted) {
+        if (controller?.signal.aborted || (client.portalIdentity && !client.portalIdentity.isCurrent())) {
           return;
         }
-        const resolvedGuestId = guestResult.ok ? guestResult.value.guestId : undefined;
+        const resolvedGuestId = guestResult?.ok ? guestResult.value.guestId : undefined;
         setGuestId(resolvedGuestId);
         emitProductViewed(resolvedGuestId);
         if (!runtimeResult.ok) {
-          setBoot({ kind: "boot-error" });
+          unavailableBoot();
           return;
         }
         // Resolved by id, not position: runtime config's `scenarios` array isn't guaranteed to be
@@ -570,18 +635,14 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
           (candidate) => candidate.type === "web" && candidate.enabled,
         );
         if (!scenario || !frontend) {
-          setBoot({ kind: "boot-error" });
+          unavailableBoot();
           return;
-        }
-        if (draftKey !== null && !attachSessionId) {
-          const restored = parseStoredValues(readProductDraft(draftKey)?.values);
-          if (restored !== null) setValues(restored);
         }
         setBoot({
           kind: "ready",
           scenarioId: scenario.scenarioId,
           frontendId: frontend.frontendId,
-          hasQuota: runtimeResult.value.quotaSummary !== null,
+          hasQuota: !paid && runtimeResult.value.quotaSummary !== null,
           outputSchemaRef: scenario.outputRendererHint.schemaRef,
           outputSchemaVersion: scenario.outputRendererHint.schemaVersion,
         });
@@ -600,18 +661,29 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         }
       },
       () => {
-        if (!controller?.signal.aborted) {
-          setBoot({ kind: "boot-error" });
+        if (!controller?.signal.aborted && (!client.portalIdentity || client.portalIdentity.isCurrent())) {
+          unavailableBoot();
           emitProductViewed(undefined);
         }
       },
     );
-  }, [client, guestStorage, productId, scenarioId, eventScopeKey, refreshQuota, onEventRef, draftKey, attachSessionId, parseStoredValues]);
+  }, [client, guestStorage, productId, scenarioId, eventScopeKey, refreshQuota, onEventRef, paid, recovery, attachSessionId, recoverySchemaRef, recoverySchemaVersion, draftKey, parseStoredValues]);
 
-  // Attach once per session id, after boot: `boot.kind` only turns "ready" once per mount, so
+  useEffect(() => {
+    if (!paidPersistence || recovery?.kind !== "pending" || (boot.kind !== "ready" && boot.kind !== "recovery") || restoredStartRef.current || attachSessionId) return;
+    restoredStartRef.current = true;
+    const prepared = restorePaidScenarioStart(recovery, paidPersistence);
+    uncertainStartsRef.current.add(prepared);
+    setPendingStart({ prepared, input: values });
+    beginStart(prepared);
+    // The stored wire request is authoritative; empty UI values must never replace it on recovery.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boot.kind, recovery, paidPersistence, attachSessionId]);
+
+  // Attach once per session id, after boot (including recovery without new admission), so
   // StrictMode's effect replay cannot poll twice.
   useEffect(() => {
-    if (!attachSessionId || boot.kind !== "ready" || attachedSessionRef.current === attachSessionId) {
+    if (!attachSessionId || (boot.kind !== "ready" && boot.kind !== "recovery") || attachedSessionRef.current === attachSessionId) {
       return;
     }
     attachedSessionRef.current = attachSessionId;
@@ -625,7 +697,8 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   }, [attachSessionId, boot.kind]);
 
   useEffect(() => {
-    if (boot.kind !== "ready" || draftKey === null || attachSessionId || resumeCheckedRef.current) return;
+    // Paid starts have one owner-bound recovery record, including unresolved requests.
+    if (paid || boot.kind !== "ready" || draftKey === null || attachSessionId || resumeCheckedRef.current) return;
     resumeCheckedRef.current = true;
     const run = readProductDraft(draftKey)?.run;
     if (!run) return;
@@ -642,12 +715,20 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- resume once after boot, like the attach effect above
   }, [boot.kind]);
 
-  async function runStart(prepared: PreparedScenarioStart, startedAtMs: number) {
+  async function runStart(prepared: PreparedScenarioStart, startedAtMs: number, selectOwnStart: boolean) {
     // Snapshotted once: this call's own controller, checked consistently across every await below
     // regardless of which controller (if any) controllerRef points to by the time each resolves.
     const controller = controllerRef.current;
     const startOptions = { signal: controller?.signal, timeoutMs: START_TIMEOUT_MS };
-    let result = await prepared.execute(client, startOptions);
+    let result = await prepared.execute(client, {
+      ...startOptions,
+      // A failed write keeps the old URL recoverable. Only this explicit attempt changes
+      // selection; automatic replay/retry and late acceptance must not do so.
+      onRecoveryPersisted: selectOwnStart ? () => {
+        forgetChosenAttachSession(productId);
+        callSafely(onAttachEndRef.current);
+      } : undefined,
+    });
     // One automatic retry of an ambiguous failure (network, timeout, 5xx). It reuses the prepared
     // handle, so the same Idempotency-Key makes it safe: the backend returns the session it already
     // created instead of spending quota twice. A definite 4xx is not retried automatically.
@@ -655,7 +736,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       uncertainStartsRef.current.add(prepared);
       result = await prepared.execute(client, startOptions);
     }
-    if (controller?.signal.aborted) {
+    if (controller?.signal.aborted || (client.portalIdentity && !client.portalIdentity.isCurrent())) {
       return;
     }
     const quotaRejected = !result.ok && isQuotaExhausted(result.error);
@@ -665,9 +746,20 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       refreshQuota(guestId, scenarioId, controller);
     }
     if (!result.ok) {
+      if (result.error.type === "local_error") {
+        if (result.error.code === "paid_recovery_pending") {
+          setPendingStart(null);
+          setPhase({ kind: "retryable-error", reason: "savedOperationPending" });
+        } else {
+          setPhase({ kind: "retryable-error", reason: "storageUnavailable" });
+        }
+        return;
+      }
       if (capacityReserved) {
         // This attempt created no execution. Earlier uncertain sends of this key may still
         // accept; busy retains their lock while the same-key retry remains available.
+        // Otherwise release the tab slot for mode changes; the handle retains its retry key.
+        if (!uncertainStartsRef.current.has(prepared)) forgetPaidRecovery();
         setPhase({ kind: "retryable-error", reason: "quotaCapacityReserved" });
         return;
       }
@@ -679,10 +771,11 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         return;
       }
       if (quotaRejected) {
+        forgetPaidRecovery();
         setPhase({ kind: "quota-exhausted" });
         return;
       }
-      if (isGuestIdentityNotFound(result.error)) {
+      if (!paid && isGuestIdentityNotFound(result.error)) {
         // Deterministic and permanent for the stale guest id -- self-heal so a plain resubmit
         // (not a special "retry" action) can succeed. The stale handle's request body carries the
         // old guest_id, so it can't be reused: clearing it forces a fresh prepareScenarioStart().
@@ -692,6 +785,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         }
         setGuestId(fresh.ok ? fresh.value.guestId : undefined);
         setPendingStart(null);
+        forgetPaidRecovery();
         setPhase({ kind: "retryable-error", reason: "tryAgain" });
         return;
       }
@@ -704,6 +798,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         // and a fresh key are safe, including after a sequence of definite capacity rejections.
         setPendingStart(null);
         setPhase({ kind: "retryable-error", reason: "startFailed" });
+        forgetPaidRecovery();
         return;
       }
       // Ambiguous, not necessarily a clean rejection: a network failure/timeout/5xx on the start
@@ -717,11 +812,11 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       return;
     }
     startedSessionsRef.current.set(prepared, result.value.scenarioSessionId);
-    // shortcut: pending start keys do not survive reload; persist them when pre-acceptance recovery is required.
+    if (!paid && draftKey !== null) saveProductDraftScenario(productId, scenarioId, draftOwner);
+    // Guest own-run recovery starts after acceptance; paid recovery already persisted the exact request/key.
     if (draftKey !== null) {
       saveDraftRun(draftKey, { scenarioSessionId: result.value.scenarioSessionId, input: activeInputRef.current, startedAtMs });
-      saveProductDraftScenario(productId, scenarioId);
-      if (readProductDraftScenario(productId) === scenarioId && preferSavedOwnRun(productId, draftKey, result.value.scenarioSessionId)) {
+      if (!paid && readProductDraftScenario(productId) === scenarioId && preferSavedOwnRun(productId, draftKey, result.value.scenarioSessionId)) {
         // Reload follows the accepted own run even while the old result remains on screen.
         if (displayedResult?.attached) callSafely(onAttachEndRef.current);
       }
@@ -740,7 +835,8 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     let polled;
     do {
       polled = await pollScenarioSession(client, scenarioSessionId, { signal: controller?.signal });
-      if (controller?.signal.aborted || activeScenarioSessionIdRef.current !== scenarioSessionId) {
+      if (controller?.signal.aborted || activeScenarioSessionIdRef.current !== scenarioSessionId ||
+        (client.portalIdentity && !client.portalIdentity.isCurrent())) {
         return;
       }
       // A healthy started/running snapshot at the SDK deadline is still the same accepted run.
@@ -804,6 +900,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     }
     resumedRunRef.current = null;
     setPendingStart(null);
+    forgetPaidRecovery();
     if (attachActiveRef.current) {
       // A terminal failure of the attached session (failed/expired, unknown id, unusable result): the
       // route must stop restoring it, or every reload would just show the same error again.
@@ -837,7 +934,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     const controller = controllerRef.current;
     const resultResult = await getResult(client, resultArtifactId, { signal: controller?.signal });
     if (
-      controller?.signal.aborted ||
+      controller?.signal.aborted || (client.portalIdentity && !client.portalIdentity.isCurrent()) ||
       // `controllerRef`'s controller lives for the whole component, not per logical run, so it
       // never aborts a call like this one on its own just because a *newer* session has since
       // started -- a call belonging to any session other than the currently active one is stale
@@ -875,12 +972,11 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     }
     // An attached id comes from an editable URL, so the backend-owned identity of what it yields must
     // match this product's scenario before the product parser (which only checks payload shape) sees it:
-    // the result's schema ref and version against the selected scenario's output schema from runtime
-    // config (a ref keeps its name across a version bump, and an attached session has no expiry, so an
-    // older session can come back with an older version; no declared version means ref-only).
+    // the result's schema ref and version against runtime config, or the bundled renderer's pinned
+    // contract when only paid recovery is available. Pending replay needs the same check in that mode.
     if (
-      (attachActiveRef.current || resumedRunRef.current === scenarioSessionId) &&
-      boot.kind === "ready" &&
+      (attachActiveRef.current || resumedRunRef.current === scenarioSessionId || boot.kind === "recovery") &&
+      (boot.kind === "ready" || boot.kind === "recovery") &&
       (resultResult.value.schemaRef !== boot.outputSchemaRef ||
         (boot.outputSchemaVersion !== null && resultResult.value.schemaVersion !== boot.outputSchemaVersion))
     ) {
@@ -917,7 +1013,10 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   }
 
   // Shared by handleSubmit/handleRetry: both begin a (new or reused) prepared start the same way.
-  function beginStart(prepared: PreparedScenarioStart) {
+  function beginStart(prepared: PreparedScenarioStart, selectOwnStart = false) {
+    if (paid && paidSendingRef.current) return;
+    paidSendingRef.current = paid;
+    activePreparedRef.current = prepared;
     const startedAtMs = pendingStart?.prepared === prepared && !capacityRejectedSafely
       ? runStartedAtMs ?? Date.now()
       : Date.now();
@@ -927,7 +1026,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     attachActiveRef.current = false;
     setPhase({ kind: "submitting" });
     emitEvent(onEventRef.current, { type: "form_submitted", guestId });
-    void runStart(prepared, startedAtMs);
+    void runStart(prepared, startedAtMs, selectOwnStart).finally(() => { paidSendingRef.current = false; });
   }
 
   // Shared by handleSubmit and handleRetry (the "Try again" button on retryable-error): always
@@ -937,6 +1036,8 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   // that reused the stale prepared request; only truly unchanged values reuse the same
   // PreparedScenarioStart/Idempotency-Key (see prepareScenarioStart()'s own ANY-150 contract).
   function submitCurrentValues() {
+    if (paid && paidSendingRef.current) return;
+    if (client.portalIdentity && !client.portalIdentity.isCurrent()) return;
     // guestId undefined here means either the initial identity fetch never succeeded, or (after a
     // guest_identity_not_found self-heal) the refresh itself failed -- prepareScenarioStart() would
     // still build a request, just with a null guest_id, which the backend has no way to accept.
@@ -947,10 +1048,14 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       boot.kind !== "ready" ||
       phase.kind === "submitting" ||
       phase.kind === "running" ||
-      guestId === undefined ||
+      (!paid && guestId === undefined) ||
       isHandoffLocked() ||
       attachBooting
     ) {
+      return;
+    }
+    if (recoveryState.failed) {
+      setPhase({ kind: "retryable-error", reason: "storageUnavailable" });
       return;
     }
     const errors = definition.validate(values);
@@ -965,6 +1070,11 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       return;
     }
     const reuseExisting = pendingStart !== null && shallowEqualValues(pendingStart.input, values);
+    if (!reuseExisting && pendingStart) {
+      if (uncertainStartsRef.current.has(pendingStart.prepared) || startedSessionsRef.current.has(pendingStart.prepared)) return;
+      try { pendingStart.prepared.forgetRecovery(); }
+      catch { setPhase({ kind: "retryable-error", reason: "storageUnavailable" }); return; }
+    }
     const prepared = reuseExisting
       ? pendingStart.prepared
       : prepareScenarioStart({
@@ -972,10 +1082,14 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
           scenarioId: boot.scenarioId,
           frontendId: boot.frontendId,
           input: definition.toInput(values),
-          guestId,
-        });
+          ...(paid ? {} : { guestId }),
+        }, paidPersistence);
     if (!reuseExisting) {
       setPendingStart({ prepared, input: values });
+    }
+    if (paid && draftKey !== null) {
+      saveDraftValues(draftKey, values);
+      saveProductDraftScenario(productId, scenarioId, draftOwner);
     }
     activeInputRef.current = values;
     // This start already created its session (only its polling failed): follow that session instead
@@ -988,7 +1102,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       void runPoll(startedSession);
       return;
     }
-    beginStart(prepared);
+    beginStart(prepared, paid);
   }
 
   function handleSubmit(event: FormEvent) {
@@ -1000,9 +1114,19 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     if (phase.kind !== "retryable-error") {
       return;
     }
+    if (recoveryState.failed || phase.reason === "savedOperationPending") {
+      window.location.reload();
+      return;
+    }
     if (attachActiveRef.current && attachedSessionRef.current) {
       setPhase({ kind: "running", scenarioSessionId: attachedSessionRef.current });
       void runPoll(attachedSessionRef.current);
+      return;
+    }
+    if (paid && pendingStart && restoredStartRef.current) {
+      // A reload restored the frozen wire request, not editable product form values.
+      // Validating the empty form here would strand the original paid operation.
+      beginStart(pendingStart.prepared);
       return;
     }
     if (resumedRunRef.current !== null) {
@@ -1103,7 +1227,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         { signal: controller?.signal },
       );
       // Left the page (the mount's controller aborts on unmount) while the POST was in flight: do not navigate.
-      if (controller?.signal.aborted) {
+      if (controller?.signal.aborted || (client.portalIdentity && !client.portalIdentity.isCurrent())) {
         return;
       }
       if (!created.ok) {
@@ -1117,6 +1241,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       await openHandoffConsent({
         webConsentBaseUrl: webBaseUrlFromProductLocation(window.location),
         handoffToken: created.value.handoffToken,
+        paid,
         navigate: createWindowNavigator(window),
       });
     } catch {
@@ -1126,14 +1251,17 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   }
 
   function handleStartAnother() {
+    if (client.portalIdentity && !client.portalIdentity.isCurrent()) return;
     if (phase.kind !== "result" || isHandoffLocked()) {
       return;
     }
+    if (paid) forgetChosenAttachSession(productId);
     setValues(definition.emptyValues);
     if (draftKey !== null) clearProductDraft(draftKey);
     setFieldErrors({});
     liveValidationFieldsRef.current.clear();
     setPendingStart(null);
+    forgetPaidRecovery();
     activeScenarioSessionIdRef.current = null;
     activeInputRef.current = null;
     attachActiveRef.current = false;
@@ -1159,6 +1287,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   }
 
   function updateField<K extends keyof V>(field: K, value: V[K]) {
+    if (client.portalIdentity && !client.portalIdentity.isCurrent()) return;
     // Gated on a resolved guestId too, the same way submitCurrentValues() already gates
     // form_submitted: a boot-time createGuestIdentity() failure (not just the guest-identity-
     // not-found self-heal path) otherwise leaves the form fully interactive with guestId
@@ -1167,15 +1296,17 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     // identity-required check with no chance to recover it later. Leaving it unmarked-fired while
     // guestId is undefined lets a still-unresolved identity emit on a later keystroke instead of
     // losing the event outright.
-    if (!hasEventFired(client, eventScopeKey, "form_started") && guestId !== undefined) {
+    if (!hasEventFired(client, eventScopeKey, "form_started") && (paid || guestId !== undefined)) {
       markEventFired(client, eventScopeKey, "form_started");
       emitEvent(onEventRef.current, { type: "form_started", guestId });
     }
+    restoredDraftRef.current = true;
+    setManualDraft(null);
     const next = { ...values, [field]: value };
     setValues(next);
     if (draftKey !== null) {
       saveDraftValues(draftKey, next);
-      saveProductDraftScenario(productId, scenarioId);
+      saveProductDraftScenario(productId, scenarioId, draftOwner);
     }
     // Previously invalid fields stay live after correction, until New task resets the form.
     if (liveValidationFieldsRef.current.has(field)) {
@@ -1210,7 +1341,8 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     );
   }
 
-  const identityUnavailable = guestId === undefined;
+  const identityUnavailable = !paid && guestId === undefined;
+  const recoveryOnly = boot.kind === "recovery";
   const formCard = (
     <Card className={styles.formCard}>
       <h2 id="product-input-heading" className={styles.workspaceHeading}>{th("workspace.inputTitle")}</h2>
@@ -1221,14 +1353,23 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         noValidate
         onSubmit={handleSubmit}
       >
-        <Fields values={values} errors={fieldErrors} disabled={locked || identityUnavailable} onChange={updateField} />
+        {manualDraft !== null && !locked && !identityUnavailable && !recoveryOnly ? (
+          <Button variant="secondary" type="button" onClick={() => {
+            if (client.portalIdentity && !client.portalIdentity.isCurrent()) return;
+            setValues(manualDraft);
+            setFieldErrors({});
+            setManualDraft(null);
+            if (draftKey !== null) saveProductDraftScenario(productId, scenarioId, draftOwner);
+          }}>{th("workspace.restoreDraft")}</Button>
+        ) : null}
+        <Fields values={values} errors={fieldErrors} disabled={locked || identityUnavailable || recoveryOnly} onChange={updateField} />
         <DataProcessingNotice />
         <div className={styles.footer}>
           <Button
             type="submit"
             aria-describedby={DATA_NOTICE_ID}
             loading={phase.kind === "submitting" || phase.kind === "running"}
-            disabled={identityUnavailable || locked || phase.kind === "quota-exhausted"}
+            disabled={identityUnavailable || locked || recoveryOnly || phase.kind === "quota-exhausted"}
           >
             {phase.kind === "submitting"
               ? th("starting")
@@ -1240,6 +1381,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
           </Button>
           <div className={styles.statusRegion}>
             {identityUnavailable ? <p role="alert">{th("identityUnavailable")}</p> : null}
+            {recoveryOnly ? <p role="status">{th("unavailable", { product: title })}</p> : null}
           </div>
         </div>
       </form>
@@ -1355,7 +1497,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
                   onCopy={handleCopy}
                   secondaryAction={showNewTask ? (
                     <>
-                      <Button variant="secondary" onClick={handleStartAnother} disabled={handoffLocked}>
+                      <Button variant="secondary" onClick={handleStartAnother} disabled={handoffLocked || recoveryOnly}>
                         {th("workspace.newTask")}
                       </Button>
                       {handoff ? (

@@ -1,0 +1,988 @@
+[
+  {
+    "name": "platform-kernel-accepted",
+    "principal": {
+      "consumer_id": "platform-kernel",
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "allowed_products": [
+        "proposal_ai"
+      ],
+      "consumer_policy_revision": 1,
+      "permissions": [
+        "backend-session:exchange",
+        "backend-session:introspect",
+        "access-snapshot:read",
+        "allowance-exhaustion:write"
+      ]
+    },
+    "requested_user_id": "11111111-1111-4111-8111-111111111111",
+    "access_floor": 0,
+    "policy_floor": 1,
+    "snapshot": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    },
+    "accepted": null,
+    "result": "ACCEPT"
+  },
+  {
+    "name": "synthetic-summary-accepted",
+    "principal": {
+      "consumer_id": "synthetic-summary",
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "allowed_products": [
+        "synthetic_summary"
+      ],
+      "consumer_policy_revision": 1,
+      "permissions": [
+        "backend-session:exchange",
+        "backend-session:introspect",
+        "access-snapshot:read",
+        "allowance-exhaustion:write"
+      ]
+    },
+    "requested_user_id": "11111111-1111-4111-8111-111111111111",
+    "access_floor": 0,
+    "policy_floor": 1,
+    "snapshot": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "synthetic_summary",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "synthetic_summary",
+          "metric_key": "synthetic_summary.results",
+          "unit": "result",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 1,
+      "consumer_id": "synthetic-summary"
+    },
+    "accepted": null,
+    "result": "ACCEPT"
+  },
+  {
+    "name": "wrong-consumer_id",
+    "principal": {
+      "consumer_id": "platform-kernel",
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "allowed_products": [
+        "proposal_ai"
+      ],
+      "consumer_policy_revision": 1,
+      "permissions": [
+        "backend-session:exchange",
+        "backend-session:introspect",
+        "access-snapshot:read",
+        "allowance-exhaustion:write"
+      ]
+    },
+    "requested_user_id": "11111111-1111-4111-8111-111111111111",
+    "access_floor": 0,
+    "policy_floor": 1,
+    "snapshot": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 1,
+      "consumer_id": "synthetic-summary"
+    },
+    "accepted": null,
+    "result": "REFUSE"
+  },
+  {
+    "name": "wrong-tenant_id",
+    "principal": {
+      "consumer_id": "platform-kernel",
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "allowed_products": [
+        "proposal_ai"
+      ],
+      "consumer_policy_revision": 1,
+      "permissions": [
+        "backend-session:exchange",
+        "backend-session:introspect",
+        "access-snapshot:read",
+        "allowance-exhaustion:write"
+      ]
+    },
+    "requested_user_id": "11111111-1111-4111-8111-111111111111",
+    "access_floor": 0,
+    "policy_floor": 1,
+    "snapshot": {
+      "schema_version": 3,
+      "tenant_id": "foreign",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    },
+    "accepted": null,
+    "result": "REFUSE"
+  },
+  {
+    "name": "wrong-region",
+    "principal": {
+      "consumer_id": "platform-kernel",
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "allowed_products": [
+        "proposal_ai"
+      ],
+      "consumer_policy_revision": 1,
+      "permissions": [
+        "backend-session:exchange",
+        "backend-session:introspect",
+        "access-snapshot:read",
+        "allowance-exhaustion:write"
+      ]
+    },
+    "requested_user_id": "11111111-1111-4111-8111-111111111111",
+    "access_floor": 0,
+    "policy_floor": 1,
+    "snapshot": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "eu",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    },
+    "accepted": null,
+    "result": "REFUSE"
+  },
+  {
+    "name": "wrong-user_id",
+    "principal": {
+      "consumer_id": "platform-kernel",
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "allowed_products": [
+        "proposal_ai"
+      ],
+      "consumer_policy_revision": 1,
+      "permissions": [
+        "backend-session:exchange",
+        "backend-session:introspect",
+        "access-snapshot:read",
+        "allowance-exhaustion:write"
+      ]
+    },
+    "requested_user_id": "11111111-1111-4111-8111-111111111111",
+    "access_floor": 0,
+    "policy_floor": 1,
+    "snapshot": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "00000000-0000-0000-0000-000000000099",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    },
+    "accepted": null,
+    "result": "REFUSE"
+  },
+  {
+    "name": "wrong-product-with-valid-shape",
+    "principal": {
+      "consumer_id": "platform-kernel",
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "allowed_products": [
+        "proposal_ai"
+      ],
+      "consumer_policy_revision": 1,
+      "permissions": [
+        "backend-session:exchange",
+        "backend-session:introspect",
+        "access-snapshot:read",
+        "allowance-exhaustion:write"
+      ]
+    },
+    "requested_user_id": "11111111-1111-4111-8111-111111111111",
+    "access_floor": 0,
+    "policy_floor": 1,
+    "snapshot": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "synthetic_summary",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "synthetic_summary",
+          "metric_key": "synthetic_summary.results",
+          "unit": "result",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    },
+    "accepted": null,
+    "result": "REFUSE"
+  },
+  {
+    "name": "below-paid-floor",
+    "principal": {
+      "consumer_id": "platform-kernel",
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "allowed_products": [
+        "proposal_ai"
+      ],
+      "consumer_policy_revision": 1,
+      "permissions": [
+        "backend-session:exchange",
+        "backend-session:introspect",
+        "access-snapshot:read",
+        "allowance-exhaustion:write"
+      ]
+    },
+    "requested_user_id": "11111111-1111-4111-8111-111111111111",
+    "access_floor": 8,
+    "policy_floor": 1,
+    "snapshot": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    },
+    "accepted": null,
+    "result": "REFUSE"
+  },
+  {
+    "name": "old-policy-racing-new-observation",
+    "principal": {
+      "consumer_id": "platform-kernel",
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "allowed_products": [
+        "proposal_ai"
+      ],
+      "consumer_policy_revision": 1,
+      "permissions": [
+        "backend-session:exchange",
+        "backend-session:introspect",
+        "access-snapshot:read",
+        "allowance-exhaustion:write"
+      ]
+    },
+    "requested_user_id": "11111111-1111-4111-8111-111111111111",
+    "access_floor": 0,
+    "policy_floor": 2,
+    "snapshot": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    },
+    "accepted": null,
+    "result": "REFUSE"
+  },
+  {
+    "name": "unexpected-policy",
+    "principal": {
+      "consumer_id": "platform-kernel",
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "allowed_products": [
+        "proposal_ai"
+      ],
+      "consumer_policy_revision": 1,
+      "permissions": [
+        "backend-session:exchange",
+        "backend-session:introspect",
+        "access-snapshot:read",
+        "allowance-exhaustion:write"
+      ]
+    },
+    "requested_user_id": "11111111-1111-4111-8111-111111111111",
+    "access_floor": 0,
+    "policy_floor": 1,
+    "snapshot": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 2,
+      "consumer_id": "platform-kernel"
+    },
+    "accepted": null,
+    "result": "REFUSE"
+  },
+  {
+    "name": "same-p-r-different-content",
+    "principal": {
+      "consumer_id": "platform-kernel",
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "allowed_products": [
+        "proposal_ai"
+      ],
+      "consumer_policy_revision": 1,
+      "permissions": [
+        "backend-session:exchange",
+        "backend-session:introspect",
+        "access-snapshot:read",
+        "allowance-exhaustion:write"
+      ]
+    },
+    "requested_user_id": "11111111-1111-4111-8111-111111111111",
+    "access_floor": 0,
+    "policy_floor": 1,
+    "snapshot": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 2
+        }
+      ],
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    },
+    "accepted": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    },
+    "result": "REFUSE"
+  },
+  {
+    "name": "same-p-r-refreshed-envelope",
+    "principal": {
+      "consumer_id": "platform-kernel",
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "allowed_products": [
+        "proposal_ai"
+      ],
+      "consumer_policy_revision": 1,
+      "permissions": [
+        "backend-session:exchange",
+        "backend-session:introspect",
+        "access-snapshot:read",
+        "allowance-exhaustion:write"
+      ]
+    },
+    "requested_user_id": "11111111-1111-4111-8111-111111111111",
+    "access_floor": 0,
+    "policy_floor": 1,
+    "snapshot": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:01Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    },
+    "accepted": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    },
+    "result": "ACCEPT"
+  },
+  {
+    "name": "policy-change-without-paid-transition",
+    "principal": {
+      "consumer_id": "platform-kernel",
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "allowed_products": [],
+      "consumer_policy_revision": 2,
+      "permissions": [
+        "backend-session:exchange",
+        "backend-session:introspect",
+        "access-snapshot:read",
+        "allowance-exhaustion:write"
+      ]
+    },
+    "requested_user_id": "11111111-1111-4111-8111-111111111111",
+    "access_floor": 0,
+    "policy_floor": 2,
+    "snapshot": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [],
+      "allowances": [],
+      "consumer_policy_revision": 2,
+      "consumer_id": "platform-kernel"
+    },
+    "accepted": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    },
+    "result": "ACCEPT"
+  },
+  {
+    "name": "permission-is-not-implied-by-key",
+    "principal": {
+      "consumer_id": "platform-kernel",
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "allowed_products": [
+        "proposal_ai"
+      ],
+      "consumer_policy_revision": 1,
+      "permissions": []
+    },
+    "requested_user_id": "11111111-1111-4111-8111-111111111111",
+    "access_floor": 0,
+    "policy_floor": 1,
+    "snapshot": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    },
+    "accepted": null,
+    "result": "REFUSE"
+  },
+  {
+    "name": "same-p-r-reordered-set",
+    "principal": {
+      "consumer_id": "platform-kernel",
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "allowed_products": [
+        "proposal_ai",
+        "brief_decoder"
+      ],
+      "consumer_policy_revision": 1,
+      "permissions": [
+        "backend-session:exchange",
+        "backend-session:introspect",
+        "access-snapshot:read",
+        "allowance-exhaustion:write"
+      ]
+    },
+    "requested_user_id": "11111111-1111-4111-8111-111111111111",
+    "access_floor": 0,
+    "policy_floor": 1,
+    "snapshot": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "brief_decoder",
+          "valid_until": null
+        },
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "33333333-3333-4333-8333-333333333333",
+          "product_id": "brief_decoder",
+          "metric_key": "brief_decoder.analyses",
+          "unit": "analysis",
+          "quantity": 1
+        },
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    },
+    "accepted": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        },
+        {
+          "product_id": "brief_decoder",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        },
+        {
+          "allowance_id": "33333333-3333-4333-8333-333333333333",
+          "product_id": "brief_decoder",
+          "metric_key": "brief_decoder.analyses",
+          "unit": "analysis",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    },
+    "result": "ACCEPT"
+  },
+  {
+    "name": "same-p-r-grant-bound-conflict",
+    "principal": {
+      "consumer_id": "platform-kernel",
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "allowed_products": [
+        "proposal_ai"
+      ],
+      "consumer_policy_revision": 1,
+      "permissions": [
+        "backend-session:exchange",
+        "backend-session:introspect",
+        "access-snapshot:read",
+        "allowance-exhaustion:write"
+      ]
+    },
+    "requested_user_id": "11111111-1111-4111-8111-111111111111",
+    "access_floor": 0,
+    "policy_floor": 1,
+    "snapshot": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": "2026-11-09T04:10:00Z"
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    },
+    "accepted": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    },
+    "result": "REFUSE"
+  },
+  {
+    "name": "same-p-r-unit-conflict",
+    "principal": {
+      "consumer_id": "platform-kernel",
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "allowed_products": [
+        "proposal_ai"
+      ],
+      "consumer_policy_revision": 1,
+      "permissions": [
+        "backend-session:exchange",
+        "backend-session:introspect",
+        "access-snapshot:read",
+        "allowance-exhaustion:write"
+      ]
+    },
+    "requested_user_id": "11111111-1111-4111-8111-111111111111",
+    "access_floor": 0,
+    "policy_floor": 1,
+    "snapshot": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "different-unit",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    },
+    "accepted": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    },
+    "result": "REFUSE"
+  }
+]

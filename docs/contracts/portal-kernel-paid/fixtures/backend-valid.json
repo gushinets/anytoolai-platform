@@ -1,0 +1,170 @@
+[
+  {
+    "name": "platform-kernel-snapshot-v3",
+    "contract": "snapshot-v3",
+    "payload": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "proposal_ai",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "proposal_ai",
+          "metric_key": "proposal_ai.generations",
+          "unit": "generation",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "platform-kernel-code-request-v2",
+    "contract": "code-request-v2",
+    "payload": {
+      "code_challenge": "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+      "code_challenge_method": "S256",
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "platform-kernel-exchange-response-v2",
+    "contract": "exchange-response-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_token": "synthetic-never-a-credential-DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+      "token_type": "Bearer",
+      "expires_at": "2026-11-09T04:30:00Z",
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "platform-kernel-introspection-response-v2",
+    "contract": "introspection-response-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "valid_until": "2026-11-09T04:29:55Z",
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "synthetic-summary-snapshot-v3",
+    "contract": "snapshot-v3",
+    "payload": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 7,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [
+        {
+          "product_id": "synthetic_summary",
+          "valid_until": null
+        }
+      ],
+      "allowances": [
+        {
+          "allowance_id": "22222222-2222-4222-8222-222222222222",
+          "product_id": "synthetic_summary",
+          "metric_key": "synthetic_summary.results",
+          "unit": "result",
+          "quantity": 1
+        }
+      ],
+      "consumer_policy_revision": 1,
+      "consumer_id": "synthetic-summary"
+    }
+  },
+  {
+    "name": "synthetic-summary-code-request-v2",
+    "contract": "code-request-v2",
+    "payload": {
+      "code_challenge": "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+      "code_challenge_method": "S256",
+      "consumer_id": "synthetic-summary"
+    }
+  },
+  {
+    "name": "synthetic-summary-exchange-response-v2",
+    "contract": "exchange-response-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_token": "synthetic-never-a-credential-DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+      "token_type": "Bearer",
+      "expires_at": "2026-11-09T04:30:00Z",
+      "consumer_policy_revision": 1,
+      "consumer_id": "synthetic-summary"
+    }
+  },
+  {
+    "name": "synthetic-summary-introspection-response-v2",
+    "contract": "introspection-response-v2",
+    "payload": {
+      "schema_version": 2,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "valid_until": "2026-11-09T04:29:55Z",
+      "consumer_policy_revision": 1,
+      "consumer_id": "synthetic-summary"
+    }
+  },
+  {
+    "name": "backend-empty-r0",
+    "contract": "snapshot-v3",
+    "payload": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 0,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [],
+      "allowances": [],
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    }
+  },
+  {
+    "name": "backend-empty-r9",
+    "contract": "snapshot-v3",
+    "payload": {
+      "schema_version": 3,
+      "tenant_id": "anytoolai",
+      "region": "ru",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "access_revision": 9,
+      "refresh_after": "2026-11-09T04:01:00Z",
+      "expires_at": "2026-11-09T04:04:55Z",
+      "grants": [],
+      "allowances": [],
+      "consumer_policy_revision": 1,
+      "consumer_id": "platform-kernel"
+    }
+  }
+]

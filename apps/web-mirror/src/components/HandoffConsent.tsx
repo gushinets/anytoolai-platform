@@ -12,6 +12,8 @@ import {
   isHandoffNotFound,
   isQuotaCapacityReserved,
   refreshGuestIdentity,
+  rememberPaidResult,
+  readPaidStartRecovery,
   type AsyncStorage,
   type HandoffPreview,
   type HandoffStatus,
@@ -20,6 +22,7 @@ import {
   type PlatformApiResult,
 } from "@anytoolai/ce-kit";
 import { productAttachPath } from "../lib/hostUrls";
+import { getPaidPersistence } from "../lib/portalSession";
 import { chooseAttachSession, rememberAttachSession } from "../products/runtime/attachSession";
 import { getClientStorage } from "../products/runtime/clientStorage";
 import { useIsomorphicLayoutEffect } from "../lib/useIsomorphicLayoutEffect";
@@ -136,6 +139,8 @@ function formatPreviewValue(value: unknown): string {
  * always rendered as opaque key/value pairs, never by assuming specific keys.
  */
 export function HandoffConsent({ client, handoffToken, canOpenTarget }: HandoffConsentProps) {
+  const paid = client.portalIdentity !== undefined;
+  const identityCurrent = () => !client.portalIdentity || client.portalIdentity.isCurrent();
   const t = useProductT();
   const th = useHostT();
   const { locale } = useLocale();
@@ -178,13 +183,13 @@ export function HandoffConsent({ client, handoffToken, canOpenTarget }: HandoffC
       // caller on this client instance, so one caller cancelling could not cancel the others) --
       // a fast unmount/token change leaves this POST running in the background for a discarded
       // result, same as any other fire-and-forget identity call in ce-kit today.
-      client.createGuestIdentity({ storage: guestStorage }),
+      paid ? Promise.resolve(null) : client.createGuestIdentity({ storage: guestStorage }),
     ]).then(
       ([previewResult, guestResult]) => {
-        if (controller.signal.aborted) {
+        if (controller.signal.aborted || !identityCurrent()) {
           return;
         }
-        setGuestId(guestResult.ok ? guestResult.value.guestId : undefined);
+        setGuestId(guestResult?.ok ? guestResult.value.guestId : undefined);
         setState(viewStateFromResult(previewResult));
       },
       () => {
@@ -199,7 +204,8 @@ export function HandoffConsent({ client, handoffToken, canOpenTarget }: HandoffC
     return () => {
       controller.abort();
     };
-  }, [client, handoffToken, guestStorage, retryToken]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- identityCurrent reads this client generation only.
+  }, [client, handoffToken, guestStorage, retryToken, paid]);
 
   // A stale accept/decline can race an already-terminal token (expired, already accepted/declined,
   // or a failed target execution). Rather than retry the mutation, refetch the authoritative
@@ -221,7 +227,7 @@ export function HandoffConsent({ client, handoffToken, canOpenTarget }: HandoffC
         ? { ...prev, pending: null, actionError: "capacityReserved" } : prev);
       return;
     }
-    if (kind === "accept" && isHandoffGuestIdentityInvalid(error)) {
+    if (!paid && kind === "accept" && isHandoffGuestIdentityInvalid(error)) {
       // Deterministic and permanent for the current guestId (the record stays non-terminal, so
       // refetching would just return the same actionable preview) -- refreshGuestIdentity() clears
       // the stale persisted id and resolves a fresh one so a retry can actually succeed instead of
@@ -240,6 +246,7 @@ export function HandoffConsent({ client, handoffToken, canOpenTarget }: HandoffC
       return;
     }
     const refetched = await getHandoff(client, handoffToken);
+    if (!identityCurrent()) return;
     if (!mountedRef.current) {
       // Left while the refetch was in flight: its answer still names the queued session, so keep it.
       if (kind === "accept" && refetched.ok) {
@@ -267,8 +274,20 @@ export function HandoffConsent({ client, handoffToken, canOpenTarget }: HandoffC
   // what the tab restores from here on, even over a newer one; "late": an Accept settled after they left, so
   // only a newer session than the remembered one may replace it.
   function keepAcceptedTarget(preview: HandoffPreview, how: "chosen" | "late"): void {
+    if (!identityCurrent()) return;
     const sessionId = acceptedTargetSessionId(preview, canOpenTarget);
     if (sessionId !== null) {
+      const persistence = getPaidPersistence(client);
+      if (persistence && how === "chosen") {
+        try {
+          // The explicit attachment can coexist with another paid operation whose status is unknown here.
+          if (!readPaidStartRecovery(persistence, preview.targetProductId)) {
+            rememberPaidResult(persistence, { version: 1, kind: "accepted", owner: persistence.owner,
+              productId: preview.targetProductId, scenarioId: preview.targetScenarioId, scenarioSessionId: sessionId });
+          }
+        }
+        catch { /* The accepted result remains reachable through the explicit session link. */ }
+      }
       (how === "chosen" ? chooseAttachSession : rememberAttachSession)(preview.targetProductId, sessionId, preview.expiresAt);
     }
   }
@@ -278,12 +297,13 @@ export function HandoffConsent({ client, handoffToken, canOpenTarget }: HandoffC
   // attach it (other targets, e.g. an extension, stay on this page's terminal status). Also the explicit
   // "Open result" action.
   function redirectToAcceptedTarget(preview: HandoffPreview): void {
+    if (!identityCurrent()) return;
     const sessionId = acceptedTargetSessionId(preview, canOpenTarget);
     if (sessionId !== null) {
       // Chosen before leaving: a reload of the target shows this one, and a late response of an OLDER Accept
       // cannot replace it.
       keepAcceptedTarget(preview, "chosen");
-      router.push(productAttachPath(preview.targetProductId, sessionId));
+      router.push(productAttachPath(preview.targetProductId, sessionId, paid ? preview.targetScenarioId : undefined, paid));
     }
   }
 
@@ -294,6 +314,7 @@ export function HandoffConsent({ client, handoffToken, canOpenTarget }: HandoffC
     setState((prev) => (prev.kind === "consent" ? { ...prev, pending: kind, actionError: null } : prev));
     try {
       const result = await mutate();
+      if (!identityCurrent()) return;
       if (!mountedRef.current) {
         // The Accept already happened server-side (and reserved capacity) though the person has left this
         // page: keep the session it queued for the target product's next visit, and do not navigate over
@@ -398,7 +419,7 @@ export function HandoffConsent({ client, handoffToken, canOpenTarget }: HandoffC
             <Button
               onClick={handleAccept}
               loading={state.pending === "accept"}
-              disabled={state.pending !== null || guestId === undefined}
+              disabled={state.pending !== null || (!paid && guestId === undefined)}
             >
               {t("accept")}
             </Button>
@@ -418,7 +439,7 @@ export function HandoffConsent({ client, handoffToken, canOpenTarget }: HandoffC
             </p>
           ) : null}
           {/* Decline stays available: it needs no guest attribution, unlike Accept. */}
-          {guestId === undefined ? (
+          {!paid && guestId === undefined ? (
             <Toast variant="error">{th("identityUnavailable")}</Toast>
           ) : null}
           {state.actionError ? (

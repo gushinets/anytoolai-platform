@@ -1,0 +1,23 @@
+# Explicit opt-in: base + prod + images (+ live for profile mounts).
+services:
+  migrate:
+    build: !reset null
+    image: ${ANYTOOLAI_API_IMAGE:?select the reviewed Kernel API image}
+    pull_policy: never
+  platform-api:
+    build: !reset null
+    image: ${ANYTOOLAI_API_IMAGE:?select the reviewed Kernel API image}
+    pull_policy: never
+    # Optional existing LiteLLM switch for offline local image rehearsal.
+    environment:
+      LITELLM_LOCAL_MODEL_COST_MAP:
+  platform-worker:
+    build: !reset null
+    image: ${ANYTOOLAI_WORKER_IMAGE:?select the matching Kernel worker image}
+    pull_policy: never
+    environment:
+      LITELLM_LOCAL_MODEL_COST_MAP:
+  web-mirror:
+    build: !reset null
+    image: ${ANYTOOLAI_WEB_IMAGE:?select the reviewed Kernel web image}
+    pull_policy: never

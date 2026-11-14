@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { DEFAULT_PORTAL_CONSUMER_ID } from "./src/lib/portalConsumer";
 
 // HandoffConsent.tsx/HandoffPage build their PlatformApiClient with `window.location.origin` and
 // call paths like `/v1/handoffs/{token}` -- this rewrite is what makes those same-origin requests
@@ -7,7 +8,11 @@ import type { NextConfig } from "next";
 const platformApiBaseUrl = process.env.PLATFORM_API_BASE_URL ?? "http://localhost:18000";
 const webBasePath = process.env.ANYTOOLAI_WEB_BASE_PATH;
 
+const portalConsumerId = process.env.ANYTOOLAI_PORTAL_CONSUMER_ID ?? DEFAULT_PORTAL_CONSUMER_ID;
+if (!/^[a-z][a-z0-9-]{0,63}$/.test(portalConsumerId)) throw new Error("Invalid ANYTOOLAI_PORTAL_CONSUMER_ID");
+
 const nextConfig: NextConfig = {
+  env: { NEXT_PUBLIC_ANYTOOLAI_WEB_BASE_PATH: webBasePath ?? "", NEXT_PUBLIC_PORTAL_CONSUMER_ID: portalConsumerId },
   ...(webBasePath ? { basePath: webBasePath } : {}),
   rewrites() {
     return Promise.resolve([

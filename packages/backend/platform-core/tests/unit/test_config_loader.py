@@ -144,6 +144,48 @@ def test_loader_requires_explicit_capability_fields(tmp_path: Path, field: str) 
     )
 
 
+@pytest.mark.parametrize("metric_key", ["", " \n ", 1, False, [], {}, b"demo.runs"])
+def test_loader_rejects_incompatible_paid_metric_binding(
+    tmp_path: Path, metric_key: object
+) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products/kernel_demo/scenarios.yaml"
+    data = _load_yaml(path)
+    scenario = data["scenarios"][0]
+    scenario["paid_metric_key"] = metric_key
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    assert any(
+        isinstance(error, InvalidConfigShapeError)
+        and error.file_path == path
+        and error.config_id == scenario["scenario_id"]
+        and error.ref_type == "paid_metric_key"
+        for error in exc_info.value.errors
+    )
+
+
+def test_loader_rejects_missing_paid_metric_reference(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products/kernel_demo/scenarios.yaml"
+    data = _load_yaml(path)
+    scenario = data["scenarios"][0]
+    scenario["paid_metric_key"] = "demo.missing"
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_broken_reference(
+        exc_info.value.errors,
+        config_id=scenario["scenario_id"],
+        ref_type="paid_metric_key",
+        ref_value="demo.missing",
+    )
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [

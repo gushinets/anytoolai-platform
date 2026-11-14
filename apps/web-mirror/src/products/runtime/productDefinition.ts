@@ -102,6 +102,9 @@ export type ProductDefinition<V extends Record<string, unknown>, R> = {
    * product actually means to run.
    */
   scenarioId: string;
+  /** The output contract this bundled renderer supports when current runtime config is
+   * unavailable. It permits existing paid recovery, never a new scenario start. */
+  outputSchema: { schemaRef: string; schemaVersion: number };
   /**
    * Where this definition's run copy lives in the product's own message namespace: the runtime
    * reads `<messageScope>.submit|running|runFailed|resultTitle|placeholder|regenerate` (the result
