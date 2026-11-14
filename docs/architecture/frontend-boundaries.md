@@ -159,19 +159,14 @@ The shared runtime, not a product, owns the web side of a handoff:
 - `HandoffConsent` sends the user to `/products/{targetProductId}?session={id}` right after a
   successful Accept; later preview GETs redact the ids after TTL, while an owner-checked accept
   replay can still return the existing target linkage.
-- `/products/{id}?session=` reaches the product as `attachSessionId`; `ProductRunPage` polls that
-  already-queued session and renders its result without a new start or reservation; its backend
-  success consumes the existing reservation. "Try again" re-polls that session, and an unknown session id (404) ends in the run-failed state. The
-  route reads `?session=` from its `searchParams` prop (not `useSearchParams`, whose Suspense
-  boundary would turn the unknown-product 404 into a 200), removes it from the address bar so a
-  bookmark or shared link does not carry it, and keeps it in the tab's `sessionStorage` so a reload
-  still shows the result the accept already queued. `useAttachSession` is the one owner of that
-  state (`AttachProps`: `attachSessionId`, `onAttachBegin`, `onAttachEnd`, threaded route -> shell ->
-  product -> `ProductRunPage`; no analytics event is involved). The page reports two facts: it started
-  polling the session, and the person moved on from it ("New task" on the attached result, own work
-  whose result replaced it on screen, a mode switch, or its terminal failure). The owner forgets the
-  persisted id only for an end that follows a begin, so a failed boot, or typing in another mode,
-  forgets nothing, and a run that failed to start leaves the attached result restorable.
+- `/products/{id}?session=` reaches shared product selection before `ProductRunPage` mounts.
+  The route reads `?session=` from its `searchParams` prop (not `useSearchParams`, whose Suspense
+  boundary would turn the unknown-product 404 into a 200). Selection verifies the session and mode;
+  `useAttachSession` owns attachment persistence and URL consumption through `AttachProps`.
+  The selection, retry/discard and storage-failure rules below govern restoration.
+  Once selected, `ProductRunPage` polls the already-queued session without a new start or
+  reservation; backend success consumes the existing reservation. A normal end clears only
+  the matching attachment whose polling began; explicit discard also works before polling.
   Guest session/result GETs retain their existing opaque public-handle behavior without a
   guest-id parameter. Paid session/result reads require a valid delegated identity and matching
   saved execution owner; knowing the session ID does not authorize access. The session itself
@@ -190,8 +185,8 @@ The shared runtime, not a product, owns the web side of a handoff:
   handoff attachment takes precedence. The last selected draft scenario is stored separately under
   `anytoolai.product_draft_scenario.<productId>`. Multi-mode pages resolve it against their current
   opt-in definitions before mounting a form, so reload opens the correct mode without briefly
-  polling another mode's saved run. Explicit mode selection, field edits and accepted own starts
-  remember that scenario; merely viewing an attached result does not replace it. New task clears
+  polling another mode's saved run. Explicit mode selection, field edits, own starts and verified
+  result links remember that scenario; background restoration does not replace it. New task clears
   the current mode's fields/run and retains the mode selection; other modes keep separate drafts.
 - Once an own start and its scenario selection are confirmed saved, the per-product attachment
   entry records a preferred own-run reference (draft key and session id). The route lets draft

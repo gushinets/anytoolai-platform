@@ -11,6 +11,7 @@ from anytoolai_platform_api.dependencies import (
 )
 from anytoolai_platform_api.errors import ApiError, platform_error_to_api_error
 from anytoolai_platform_api.paid_access import (
+    OPTIONAL_PAID_SECURITY,
     PAID_RUNTIME_ERROR_RESPONSES,
     AccessSnapshotClient,
     eligible_allowance,
@@ -235,6 +236,7 @@ def _require_start_product(
             },
         },
     },
+    openapi_extra=OPTIONAL_PAID_SECURITY,
 )
 def start_scenario(
     product_id: str,
@@ -332,6 +334,7 @@ def _needs_refresh(product_id: str, scenario_id: str) -> PaidAllowance:
             },
         },
     },
+    openapi_extra=OPTIONAL_PAID_SECURITY,
 )
 def get_scenario_session(
     scenario_session_id: str,
@@ -386,6 +389,7 @@ def get_scenario_session(
             "content": {"application/json": {"example": SAFE_409_EXAMPLE}},
         },
     },
+    openapi_extra=OPTIONAL_PAID_SECURITY,
 )
 def post_next_action(
     scenario_session_id: str,

@@ -10,6 +10,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
+from anytoolai_platform_core.quotas.consumer_binding import check_consumer_binding
 from anytoolai_platform_core.quotas.exhaustion import (
     DeliveryError,
     claim_exhaustion,
@@ -32,6 +33,7 @@ class ExhaustionSettings(BaseModel):
     service_token: SecretStr = Field(repr=False)
     tenant_id: str = Field(min_length=1)
     region: str = Field(min_length=1)
+    consumer_id: str = Field(default="platform-kernel", pattern=r"^[a-z][a-z0-9-]{0,63}$")
     app_env: str = "dev"
 
     @model_validator(mode="after")
@@ -79,6 +81,7 @@ class ExhaustionSettings(BaseModel):
             service_token=SecretStr(os.getenv("ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN", "")),
             tenant_id=os.getenv("ANYTOOLAI_TENANT_ID", "anytoolai"),
             region=os.getenv("ANYTOOLAI_REGION", "ru"),
+            consumer_id=os.getenv("ANYTOOLAI_PORTAL_CONSUMER_ID", "platform-kernel"),
             app_env=os.getenv("ANYTOOLAI_APP_ENV", "dev"),
         )
 
@@ -101,6 +104,11 @@ class ExhaustionDelivery:
         self.factory, self.settings, self.owned_engine = factory, settings, owned_engine
 
     def deliver_once(self) -> bool:
+        with self.factory() as session:
+            # Never claim or send another consumer's history. Missing bindings
+            # precede first paid use; recheck next tick instead of binding here.
+            if not check_consumer_binding(session, self.settings.consumer_id):
+                return False
         claim = claim_exhaustion(self.factory, self.settings.tenant_id, self.settings.region)
         if claim is None:
             return False

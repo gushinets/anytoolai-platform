@@ -9,6 +9,7 @@ from anytoolai_platform_api.dependencies import (
 )
 from anytoolai_platform_api.errors import ApiError, platform_error_to_api_error
 from anytoolai_platform_api.paid_access import (
+    OPTIONAL_PAID_SECURITY,
     PAID_RUNTIME_ERROR_RESPONSES,
     optional_portal_user,
     require_session_owner,
@@ -93,6 +94,7 @@ SAFE_UNAVAILABLE_404_EXAMPLE = {
             },
         },
     },
+    openapi_extra=OPTIONAL_PAID_SECURITY,
 )
 def get_result_artifact(
     result_artifact_id: str,

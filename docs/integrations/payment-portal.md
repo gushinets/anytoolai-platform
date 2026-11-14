@@ -55,8 +55,8 @@ current scope and remaining gates.
   `ANYTOOLAI_PORTAL_ACCESS_INVALIDATION_ENABLED` at Kernel before starting the updated Portal
   worker. Portal's Step 13 sender selects each snapshot recipient's origin and
   outgoing service key from `BACKEND_CONSUMERS`, with independent bounded lanes.
-  Stop affected APIs/workers before migrating the current pair to Portal
-  `20261113_0012` and Kernel `0021`. The historical Step 13 heads were Portal
+  Stop affected APIs/workers and use the current paired cutover linked below.
+  The historical Step 13 heads were Portal
   `20261111_0010` and Kernel `0020`. Legacy Kernel connection settings no longer
   select delivery destinations. A disabled receiver permission parks delivery with `403`;
   operator retry is required after repair. This differs from an inactive Portal

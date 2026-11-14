@@ -13,6 +13,7 @@ from anytoolai_platform_api.dependencies import (
 )
 from anytoolai_platform_api.errors import ApiError, platform_error_to_api_error
 from anytoolai_platform_api.paid_access import (
+    OPTIONAL_PAID_SECURITY,
     PAID_RUNTIME_ERROR_RESPONSES,
     AccessSnapshotClient,
     db_now,
@@ -69,6 +70,7 @@ router = APIRouter(prefix="/v1/handoffs", tags=["handoffs"])
         404: {"model": ErrorResponse},
         409: {"model": ErrorResponse},
     },
+    openapi_extra=OPTIONAL_PAID_SECURITY,
 )
 def create_handoff(
     request: Annotated[HandoffCreateRequest, Body()],
@@ -109,6 +111,7 @@ def create_handoff(
     "/{handoff_token}",
     response_model=HandoffPreviewResponse,
     responses={**PAID_RUNTIME_ERROR_RESPONSES, 404: {"model": ErrorResponse}},
+    openapi_extra=OPTIONAL_PAID_SECURITY,
 )
 def get_handoff(
     handoff_token: str,
@@ -140,6 +143,7 @@ def get_handoff(
         410: {"model": ErrorResponse},
         429: {"model": ErrorResponse},
     },
+    openapi_extra=OPTIONAL_PAID_SECURITY,
 )
 def accept_handoff(
     handoff_token: str,
@@ -252,6 +256,7 @@ def accept_handoff(
         409: {"model": ErrorResponse},
         410: {"model": ErrorResponse},
     },
+    openapi_extra=OPTIONAL_PAID_SECURITY,
 )
 def decline_handoff(
     handoff_token: str,

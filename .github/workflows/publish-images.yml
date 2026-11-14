@@ -27,6 +27,9 @@ on:
       portal_authorize_url:
         description: Portal localized backend authorization URL (frontend build)
         type: string
+      privacy_policy_url:
+        description: Public privacy-policy URL (required for frontend builds)
+        type: string
 permissions:
   contents: read
 jobs:
@@ -97,10 +100,20 @@ jobs:
           ANYTOOLAI_WEB_BASE_PATH: ${{ inputs.web_base_path }}
           ANYTOOLAI_PORTAL_CONSUMER_ID: ${{ inputs.portal_consumer_id }}
           NEXT_PUBLIC_PORTAL_AUTHORIZE_URL: ${{ inputs.portal_authorize_url }}
+          NEXT_PUBLIC_ANYTOOLAI_PRIVACY_POLICY_URL: ${{ inputs.privacy_policy_url }}
         run: |
           set -euo pipefail
           test -n "$PLATFORM_API_BASE_URL"
           test -n "$NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS"
+          node --eval '
+            try {
+              const url = new URL(process.env.NEXT_PUBLIC_ANYTOOLAI_PRIVACY_POLICY_URL.trim());
+              if (!["http:", "https:"].includes(url.protocol)) throw new Error("Unsupported protocol");
+            } catch {
+              console.error("privacy_policy_url must be an absolute HTTP(S) URL for frontend builds.");
+              process.exit(1);
+            }
+          '
           owner="${GITHUB_REPOSITORY_OWNER,,}"
           image="ghcr.io/$owner/anytoolai-platform-web:${GITHUB_SHA}-${GITHUB_RUN_ID}"
           docker build --file infra/docker/web-mirror.Dockerfile --target runtime \
@@ -110,6 +123,7 @@ jobs:
             --build-arg "ANYTOOLAI_WEB_BASE_PATH=$ANYTOOLAI_WEB_BASE_PATH" \
             --build-arg "ANYTOOLAI_PORTAL_CONSUMER_ID=$ANYTOOLAI_PORTAL_CONSUMER_ID" \
             --build-arg "NEXT_PUBLIC_PORTAL_AUTHORIZE_URL=$NEXT_PUBLIC_PORTAL_AUTHORIZE_URL" \
+            --build-arg "NEXT_PUBLIC_ANYTOOLAI_PRIVACY_POLICY_URL=$NEXT_PUBLIC_ANYTOOLAI_PRIVACY_POLICY_URL" \
             --tag "$image" .
           docker image inspect --format '{{.Id}}' "$image" >> "$GITHUB_STEP_SUMMARY"
           echo "$image" >> "$GITHUB_STEP_SUMMARY"

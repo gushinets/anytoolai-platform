@@ -10,11 +10,11 @@ Related requirements: [ANY-833](https://linear.app/paveldik/issue/ANY-833).
 
 - State: active
 - Owner: mixed — Portal and Kernel execution owners
-- Last updated: 2026-11-13
-- Review date: 2026-11-13
-- Next action: verify paired CI for the final test/documentation follow-up and finish the merge handoff. Earlier correction commits and fixed-finding replies are already published.
-- Verification gate: focused Step 16 checks and the 2026-11-12 correction acceptance remain complete. Executed 2026-11-13 correction regressions and joint HTTP/browser checks pass; the dedicated PostgreSQL lock-wait activation race is NOT_RUN. Earlier image rehearsals do not verify the new sources. The broader acceptance matrix remains deferred by owner decision (Section 3.8).
-- Blocker: final CI confirmation is pending. The preceding Portal run failed on two obsolete test expectations corrected by this follow-up; a new run must confirm a green paired gate. Real external-product integration is outside this plan.
+- Last updated: 2026-11-14
+- Review date: 2026-11-14
+- Next action: complete the paired PR handoff and verify CI on the submitted revisions.
+- Verification gate: focused checks pass for the respective local corrections (Kernel migration/binding, recovery and deployment; Portal issuance/cleanup and local HTTP checkpoints). Earlier broad/browser/image evidence covers the preceding sources, not the latest pair. The dedicated PostgreSQL lock-wait activation race remains NOT_RUN; the broader matrix remains deferred under Section 3.8.
+- Blocker: no known local implementation blocker; CI has not yet verified the latest corrections in both repositories. Registry publication and deployed acceptance remain separate actions.
 
 Portal's `docs/exec-plans/active/ANY-766-implementation-plan.md` is authoritative;
 Kernel keeps a byte-for-byte copy at the same repository-relative path.
@@ -26,19 +26,27 @@ current status here. Add only material changes to scope, contracts, dependencies
 or execution. Keep run histories, actual commands/results and commit bookkeeping
 in the chat or authorized PR/issue evidence; do not add separate report documents.
 
-**Kernel rebase follow-up — 2026-11-12:** preserve ANY-841 draft/accepted guest-run
-restoration while replaying ANY-766 onto main `277a97baff797c8f9ed2eb205a08c029a961c53f`.
-Paid execution recovery remains owned by the existing owner-bound pending/accepted
-record; form drafts and mode selection must not cross Portal owners or start a
-second recovery path. Preserve explicit-result selection, exact-key replay,
-recovery without new-start configuration and matching-session cleanup. Verify the
-combined guest/paid journeys, identity changes, modes and StrictMode with focused
-regressions, types and changed-file lint. Backend/wire/commercial scope is unchanged.
+**Latest local review corrections — 2026-11-14:**
 
-**Local result-selection correction — implemented locally:** resolve mode/session together,
-verify and persist explicit links before consuming their URL, and preserve other
-paid recovery. Storage failure retains the URL until explicit exit/discard. Reuse
-existing storage/replay; focused frontend verification only, no deployment work.
+- Portal: require web health on full image installation and persisted P/digest
+  validation before exhaustion commit/ACK. Bound code issuance to 60 per fixed
+  hour per scoped user/consumer across parent sessions, with atomic budget/code
+  commit and retryable `429`. Independent cleanup is the sole retention path;
+  preserve expired-token proof until parent invalidity and keep authorization
+  state for retry. Issuance locks only the selected parent session. Bounds,
+  migration/downgrade and cleanup rules are in the
+  [common identity guide](https://github.com/gushinets/payments-portal/blob/main/docs/contracts/product-backend-api/README.md#implemented-step-10-settings-and-cutover).
+- Kernel: validate the frontend privacy-policy build input, restore deployment
+  tests to the canonical gate and describe optional Bearer authentication in
+  OpenAPI. Bind retained paid history to one consumer; refuse ambiguous ownership
+  and mismatched paid access/delivery while accepted jobs can finish. Preserve
+  ANY-507 owner/replay/bucket keys; the [binding rules](https://github.com/gushinets/anytoolai-platform/blob/main/docs/contracts/portal-kernel-paid/README.md#service-requests-and-identity)
+  own migration and recovery details.
+- Browser: preserve ANY-841 guest drafts/runs and owner-bound paid recovery after
+  rebase. Resolve mode/session together, persist verified explicit links before
+  consuming their URL, and retain the URL on storage failure until explicit exit.
+  Preserve exact-key replay, matching-session cleanup, recovery without new-start
+  configuration and owner isolation; use existing storage and one recovery path.
 
 ## PR corrections — 2026-11-12
 
@@ -59,13 +67,9 @@ The broader acceptance matrix and remote/live work remain deferred to ANY-767.
 
 ## Remaining PR corrections — 2026-11-13
 
-Status: **IMPLEMENTED — executed focused checks PASS; lock-wait activation race
-NOT_RUN; final CI confirmation pending**. Bases: Portal #167
-`65079f4e` and Kernel #267 `c8e867bf`. The five corrections and detailed replies
-to their PR findings are published; the final readiness review identified the
-test expectations and evidence limits below. Merge, image publication and
-deployment remain separate actions.
-The preceding correction pass and its evidence remain complete and distinct.
+Historical checkpoint: **IMPLEMENTED and published; executed focused checks PASS;
+lock-wait activation race NOT_RUN**. Bases: Portal #167 `65079f4e` and Kernel #267
+`c8e867bf`. The header records the latest local corrections and readiness.
 
 Implemented five confirmed findings: web service credential exposure, unverified
 identity delegation, historical allowance activation, own paid form restoration,
@@ -138,17 +142,14 @@ pass, including prior ownership, policy and delivery invariants. Real paired HTT
 checks pass for policy/replay and SMTP-backed verification. All eight selected
 desktop/mobile browser cases pass across the focused runs, including the corrected
 draft/mode selector rerun; accessibility and responsive checks pass. Types, changed
-file lint, architecture, documentation and generated drift checks pass. Plans are
-synchronized. The dedicated concurrent PostgreSQL lock-wait activation regression
+file lint, architecture, documentation and generated drift checks pass.
+The dedicated concurrent PostgreSQL lock-wait activation regression
 is **NOT_RUN**; review of the receipt path is structural evidence, not a passing
 runtime race test. Full local/live suites and new image builds/rehearsals are also
-**NOT_RUN** for this pass. The final readiness follow-up corrects the public-callback
-test to reject private fields and checks the distinct `0012` activation/V2 and
-`0011` exhaustion downgrade guards separately, retaining the original no-revival
-assertions. Those focused tests pass locally. The preceding published Portal CI
-failed on those expectations; a new run must confirm the follow-up before a green
-paired gate is claimed. Already-lost history without retained proof remains unavailable, as
-specified above. Migration `20261113_0012` was checked only on disposable local
+**NOT_RUN** for this pass. Corrected public-callback and distinct activation/V2
+versus exhaustion downgrade tests pass locally, retaining no-revival assertions.
+Already-lost history without retained proof remains unavailable, as specified
+above. Migration `20261113_0012` was checked only on disposable local
 PostgreSQL; deployment is not performed.
 
 ## 1. Goal & Final Expected Outcome
@@ -211,7 +212,8 @@ contacting its services or accepting its integration is not an ANY-766 gate.
 Original development bases: Portal ANY-766 started from ANY-765
 `b2ef280048ac634a60c18e820fbf702beddba19c`; Kernel is based on
 `72ff15bc0b77903c87aa39f7b10186dccc556d09` and includes ANY-507/814.
-Current migration heads are Portal `20261113_0012` and Kernel `0021`.
+The [paired installation procedure](https://github.com/gushinets/payments-portal/blob/main/docs/architecture/deployment.md#paired-compatibility-and-synchronized-cutover)
+records current source revisions and migration heads.
 
 These are historical bases; the current correction baselines are recorded above.
 Any further transfer onto accepted main requires a separately authorized base
@@ -535,7 +537,7 @@ GET /v1/products/{product_id}/paid-usage?allowance_id=...
 
 It derives the owner from introspection, restricts rows to that product and uses the same response semantics. Historical reads do not require current sales enablement.
 
-Usage reads create no rows. Valid snapshot ingestion establishes zero-use buckets through existing `ensure_usage`; later reads report actual zero only for an established bucket.
+Usage reads create no usage buckets and change no spend or reservations; authentication may persist consumer binding and policy observations. Valid snapshot ingestion establishes zero-use buckets through existing `ensure_usage`; later reads report actual zero only for an established bucket.
 
 **Exhaustion**
 
@@ -625,7 +627,7 @@ origins/base paths as explicit build inputs; use local test origins for rehearsa
 Kernel's single consumer setting is `ANYTOOLAI_PORTAL_CONSUMER_ID` (default
 `platform-kernel`), passed through Dockerfile, Compose and the build workflow.
 Next validates its format and derives non-secret `NEXT_PUBLIC_PORTAL_CONSUMER_ID`.
-The frontend build, API and Portal registry must agree; runtime environment
+The frontend build, API, worker and Portal registry must agree; runtime environment
 changes do not recompile a frontend image or transfer historical ownership.
 
 Keep version selection simple: pin the chosen image references/digests in app-owned
@@ -885,7 +887,7 @@ against isolated local test databases first. New and old wire contracts do not
 need concurrent support; update our Portal, Kernel and browser configuration
 together, remove replaced routes/settings only when no active use remains,
 and explicitly exclude old binaries from the new installation contract.
-The current corrected pair's heads are Portal `20261113_0012` and Kernel `0021`.
+Use the current paired installation procedure linked in Section 2.
 Portal `0012` retains activation facts and requires compatible V2 internal-evidence
 readers/writers with API/workers stopped during migration. Downgrade is refused
 once activation or V2 evidence exists. This migration alone does not change P.
@@ -979,9 +981,9 @@ Shared execution rules for both repositories:
 4. Run the step's focused checks and applicable non-fixing checks, fix failures introduced by the step, and record actual commands and evidence. Broader suites belong to the assembled result or a separately requested verification.
 5. Report **PASS / FAIL / NOT_RUN / BLOCKED** for each relevant check or acceptance item. PASS requires actual passing evidence; FAIL records an executed failure; NOT_RUN records an unexecuted check and reason; BLOCKED identifies the missing prerequisite or decision. Synthetic evidence never counts as live acceptance.
 6. Apply Section 3.8 and other applicable commercial/operational conditions only to the actions they govern. Do not perform unapproved live LBX, financial, publication, staging or production operations.
-7. Do not stage, commit, push, merge, rebase or switch branches during execution. Do not reset, stash, discard or overwrite existing work. Proposed commit messages below grant no authorization.
+7. Do not stage, commit, push, merge, rebase or switch branches during execution. Do not reset, stash, discard or overwrite existing work.
 8. Escalate only a concrete departure from the accepted strategy or a genuinely unresolved material decision, with evidence. Do not request another approval of the already selected strategy or an approval record for Sections 3.3–3.6. Continue independent authorized work when a commercial/operational condition blocks another action; record its precise scope without guessing or bypassing it.
-9. Portal remains the authoritative plan. Update only concise status, necessary decisions or step instructions here; keep detailed execution evidence outside the plan. Synchronize the entire file byte-for-byte to Kernel after each plan change and verify equality before handoff.
+9. Portal remains the authoritative plan. Update only concise status, necessary decisions or step instructions here; keep detailed execution evidence outside the plan. Reconcile local additions from both copies without discarding work, then synchronize them byte-for-byte and verify equality before handoff.
 10. Keep affected as-built documentation and runbooks current within their owning steps. Step 16 supplies the combined local acceptance; the final PR checklist adds no implementation stage or repeated full test campaign.
 
 Repository roots:
@@ -989,7 +991,7 @@ Repository roots:
 - Portal: `/home/wstanley/www/work_unirec/runtime-research/payments-portal`.
 - Kernel: `/home/wstanley/www/work_unirec/runtime-research/anytoolai-platform`.
 
-Commands below run from the indicated root. New test targets are planned additions and must be created by their step.
+Commands below run from the indicated root and retain completed-step verification targets.
 
 Use Portal’s root `.venv` and Kernel’s `.quick-check-venv`. If dependencies are
 missing, record the exact missing prerequisite; installation/bootstrap, including
@@ -1052,8 +1054,6 @@ PATH="$PWD/.venv/bin:$PATH" npm run docs:check
 
 > Read /home/wstanley/www/work_unirec/runtime-research/payments-portal/docs/exec-plans/active/ANY-766-implementation-plan.md and complete only Step 1. Communicate in Russian. Follow both repositories’ instructions and the common protocol. Formalize Sections 3.3–3.6 in the canonical designs, schemas, fixtures and focused contract tests using existing ANY-507/711 tooling; verify consistency as part of this work. No additional preliminary contract approval is required. Synchronize the Kernel plan copy, run the specified checks, fix introduced failures and report PASS/FAIL/NOT_RUN/BLOCKED. Preserve Git state and commercial/operational gates. Escalate only a concrete strategy departure or unresolved material contradiction with evidence.
 
-**Proposed commit:** `ANY-766 - Define Portal Kernel paid contracts`
-
 ### Step 2 — Declare production metrics and scenario bindings
 
 **Goal / Expected behavior:** all seven scenarios resolve their approved metric through product-owned configuration.
@@ -1078,8 +1078,6 @@ PATH="$PWD/.venv/bin:$PATH" npm run docs:check
 **AI execution prompt:**
 
 > Read /home/wstanley/www/work_unirec/runtime-research/payments-portal/docs/exec-plans/active/ANY-766-implementation-plan.md and complete only Step 2. Follow applicable repository instructions and its common execution protocol. Reuse Kernel configuration validation and preserve guest policies, TEST-ONLY history and disabled sales. Update required consumer fixtures. Run the step’s focused checks, fix introduced failures and report PASS/FAIL/NOT_RUN/BLOCKED. Do not stage, commit, push, merge, rebase or switch branches. Do not perform unapproved live LBX or production operations. Stop only for an irresolvable material decision.
-
-**Proposed commit:** `ANY-766 - Declare production metrics and scenario bindings`
 
 ### Step 3 — Publish and accept purchased quantities
 
@@ -1107,8 +1105,6 @@ Cover Q changes, immutable renewal quantity, CAS/replay, unsupported metric/unit
 **AI execution prompt:**
 
 > Read /home/wstanley/www/work_unirec/runtime-research/payments-portal/docs/exec-plans/active/ANY-766-implementation-plan.md and complete only Step 3. Follow Portal root/API/web instructions and the common protocol. Reuse the protected CLI, source clients, immutable acceptance and transaction guards. Preserve historical and SIMULATED documents. Run the specified focused checks and generation, fix introduced failures and report PASS/FAIL/NOT_RUN/BLOCKED. Do not stage, commit, push, merge, rebase or switch branches. Do not publish real associations, enable sales or operate live LBX/production without authorization. Stop only for an irresolvable material decision.
-
-**Proposed commit:** `ANY-766 - Publish immutable production allowance terms`
 
 ### Step 4 — Implement scoped session delegation
 
@@ -1140,8 +1136,6 @@ Cover single-use races, wrong verifier/audience/scope, expiry, logout/reset/deac
 
 > Read /home/wstanley/www/work_unirec/runtime-research/payments-portal/docs/exec-plans/active/ANY-766-implementation-plan.md and complete only Step 4. Follow both repositories’ authoritative instructions and common protocol. Reuse Portal sessions and directional authentication; implement the specified delegation and parent-session checks without another identity authority. Run focused security/PostgreSQL checks, fix introduced failures and report PASS/FAIL/NOT_RUN/BLOCKED. Do not stage, commit, push, merge, rebase or switch branches. Do not perform unapproved live LBX or production operations. Stop only for an irresolvable material decision.
 
-**Proposed commit:** `ANY-766 - Delegate Portal sessions to Kernel`
-
 ### Step 5 — Derive production allowances and serve snapshots
 
 **Goal / Expected behavior:** accepted production terms produce complete, finite V2 authority.
@@ -1168,8 +1162,6 @@ Cover revision zero/N, no-op, rollback, source/UTC deadlines, future starts, sim
 
 > Read /home/wstanley/www/work_unirec/runtime-research/payments-portal/docs/exec-plans/active/ANY-766-implementation-plan.md and complete only Step 5. Follow authoritative billing instructions and the common protocol. Extend existing paid derivation, issuance, deadlines and bounded reads; preserve historical terms and same-cycle IDs. Run focused API/PostgreSQL/capacity checks and generation, fix introduced failures and report PASS/FAIL/NOT_RUN/BLOCKED. Do not stage, commit, push, merge, rebase or switch branches. Do not perform unapproved live financial or production operations. Stop only for an irresolvable material decision.
 
-**Proposed commit:** `ANY-766 - Serve production paid access snapshots`
-
 ### Step 6 — Enforce paid admission, ownership and events
 
 **Goal / Expected behavior:** paid actions use current authority and observational events work under trusted identity.
@@ -1194,8 +1186,6 @@ Use PostgreSQL barriers for stale N after N+1, install races, restart/eviction, 
 
 > Read /home/wstanley/www/work_unirec/runtime-research/payments-portal/docs/exec-plans/active/ANY-766-implementation-plan.md and complete only Step 6. Follow Kernel instructions and the common protocol. Reuse ANY-507/814 admission, replay and ownership; extend existing client events. Implement durable coherence, post-wait checks and handoff rollback without another meter. Run focused API/PostgreSQL races, fix introduced failures and report PASS/FAIL/NOT_RUN/BLOCKED. Do not stage, commit, push, merge, rebase or switch branches. Do not perform unapproved live LBX or production operations. Stop only for an irresolvable material decision.
 
-**Proposed commit:** `ANY-766 - Enforce coherent paid execution and ownership`
-
 ### Step 7 — Deliver Portal invalidations durably
 
 **Goal / Expected behavior:** pending revisions reach Kernel without lost acknowledgements or deadline starvation.
@@ -1219,8 +1209,6 @@ Cover crashes around send/apply/ack, N/N+1, lease/generation loss, outage, perma
 **AI execution prompt:**
 
 > Read /home/wstanley/www/work_unirec/runtime-research/payments-portal/docs/exec-plans/active/ANY-766-implementation-plan.md and complete only Step 7. Follow Portal instructions and the common protocol. Reuse outbox, claims, generations and embedded worker; implement bounded delivery and exact sent-revision acknowledgement. Run focused delivery/concurrency/capacity checks, fix introduced failures and report PASS/FAIL/NOT_RUN/BLOCKED. Do not stage, commit, push, merge, rebase or switch branches. Do not perform unapproved live LBX or production operations. Stop only for an irresolvable material decision.
-
-**Proposed commit:** `ANY-766 - Deliver durable access invalidations`
 
 ### Step 8 — Connect browser launch and recoverable paid journeys
 
@@ -1256,8 +1244,6 @@ Cover all scenario modes, reload, lost start/exchange responses, expiry, differe
 **AI execution prompt:**
 
 > Read /home/wstanley/www/work_unirec/runtime-research/payments-portal/docs/exec-plans/active/ANY-766-implementation-plan.md and complete only Step 8. Follow both frontend instruction sets and the common protocol. Reuse shared transport, prepared starts, attach sessions, events and handoff consent. Implement the specified tab custody and same-owner recovery without guest fallback. Run focused checks, fix introduced failures and report PASS/FAIL/NOT_RUN/BLOCKED. Do not stage, commit, push, merge, rebase or switch branches. Do not perform unapproved live LBX or production operations. Stop only for an irresolvable material decision.
-
-**Proposed commit:** `ANY-766 - Connect recoverable paid browser journeys`
 
 ### Step 9 — Formalize the common backend API and bounded refactoring
 
@@ -1305,8 +1291,6 @@ at Step 12. No unresolved policy/revision or history-conversion decision remains
 **AI execution prompt:**
 
 > Read the authoritative plan and complete only Step 9. Follow both repositories' instructions and the common protocol. Formalize Section 3.9 in the owning designs, schemas/fixtures and common guide; document the bounded refactoring/migration inventory and auth/access handoff. Reuse the existing pipeline and preserve historical contracts as explicit baselines. Do not implement later runtime steps, create another API, or remove active Kernel behavior. Run focused contract/documentation checks, synchronize the plan and report actual PASS/FAIL/NOT_RUN/BLOCKED evidence. No third-party services, dependency installation or Git mutation is authorized.
-
-**Proposed commit:** `ANY-766 - Specify the common product backend API`
 
 ### Step 10 — Generalize consumer authentication and session delegation
 
@@ -1362,8 +1346,6 @@ recovery. Snapshot V3 and complete auth/access handoff remain Step 12.
 
 > Read the authoritative plan and complete only Step 10. Generalize the existing auth/delegation and callback composition per Section 3.9, update Kernel and generated documentation together, and add forward migration coverage from populated Step 8 state. Preserve primary-session secrecy, parent revocation, consumer isolation, prepared-start recovery and unchanged execution ownership. Run focused local checks, synchronize the plan and report actual results. Do not implement an admin/registration platform, contact an external backend, install dependencies or mutate Git.
 
-**Proposed commit:** `ANY-766 - Bind backend authentication and delegation to consumers`
-
 ### Step 11 — Generalize technical sources without rewriting purchase history
 
 **Status:** COMPLETE (2026-11-11). Configured source/owner routing and new
@@ -1414,8 +1396,6 @@ No automatic backend-owner transfer or bulk data rewrite is introduced.
 **AI execution prompt:**
 
 > Read the authoritative plan and complete only Step 11. Replace the unconditional Kernel source assumption with the explicit configured source/owner seam, preserving live admission and exact historical serialization, digest replay and allowance identities. Use synthetic local source evidence and the existing manifest contract. Run focused history/publication/purchase/derivation checks, synchronize the plan and report actual results. Do not rewrite old JSON, infer quantities, enable sales, integrate the real external product, add another meter or mutate Git.
-
-**Proposed commit:** `ANY-766 - Support backend-owned technical sources without changing history`
 
 ### Step 12 — Serve consumer-scoped snapshots and hand off auth/access API
 
@@ -1470,8 +1450,6 @@ third-party acceptance or live financial operation is needed for this checkpoint
 
 > Read the authoritative plan and complete only Step 12, including the prioritized auth/access documentation handoff. Implement Section 3.9 V3 snapshot filtering/deadlines and policy/access coherence using existing mechanisms, with populated-state migration tests and local real HTTP. Preserve historical buckets/replay and the durable R floor. Complete the common guide and accurately generated security-documented OpenAPI/Swagger. Verify two configured identities locally; do not use the real external backend or represent pending delivery/usage as complete. Synchronize the plan and report actual results; no installation, publication, deployment or Git mutation is authorized.
 
-**Proposed commit:** `ANY-766 - Serve documented consumer-scoped access snapshots`
-
 ### Step 13 — Partition durable delivery by backend recipient
 
 **Status:** COMPLETE (2026-11-11). The existing paid writer atomically fans out
@@ -1521,8 +1499,6 @@ read routing in Step 15; complete assembled local acceptance in Step 16.
 **AI execution prompt:**
 
 > Read the authoritative plan and complete only Step 13. Generalize the existing outbox/work/delivery mechanism by recipient with atomic fan-out and exact-N ACK. Preserve queued Kernel work through populated-state forward migrations and worker quiescence; use Kernel plus a synthetic local recipient to prove failure and ACK isolation. Keep V1 wire payloads, existing bounds, repair, parking and CLI. Run focused local checks, synchronize the plan and report actual results. No external services, new worker platform, data reset or Git mutation is authorized.
-
-**Proposed commit:** `ANY-766 - Isolate access invalidation delivery by backend`
 
 ### Step 14 — Expose usage and deliver exhaustion
 
@@ -1581,8 +1557,6 @@ Cover result/debit/outbox rollback, duplicate finalization/delivery, crash befor
 
 > Read /home/wstanley/www/work_unirec/runtime-research/payments-portal/docs/exec-plans/active/ANY-766-implementation-plan.md and complete only Step 14. Follow both repositories’ instructions and the common protocol. Implement the exact usage/exhaustion contracts using ANY-507 readback/finalization and existing workers/work storage. Preserve durable-commit acknowledgement and immutable deduplication. Run focused PostgreSQL/contract/recovery checks, fix introduced failures and report PASS/FAIL/NOT_RUN/BLOCKED. Do not stage, commit, push, merge, rebase or switch branches. Do not perform unapproved live LBX or production operations. Stop only for an irresolvable material decision.
 
-**Proposed commit:** `ANY-766 - Expose usage and deliver exhaustion`
-
 ### Step 15 — Display actual usage in the cabinet
 
 **Status:** COMPLETE (2026-11-11) in the local Step 15 scope. Independent bounded
@@ -1631,8 +1605,6 @@ item for that product. Stored documents and allowance identities remain unchange
 **AI execution prompt:**
 
 > Read /home/wstanley/www/work_unirec/runtime-research/payments-portal/docs/exec-plans/active/ANY-766-implementation-plan.md and complete only Step 15. Follow Portal API/web instructions and the common protocol. Reuse generated contracts, bounded resources, session guards and Bundle 3. Implement separate truthful usage reads and presentation. Run focused checks and generation, fix introduced failures and report PASS/FAIL/NOT_RUN/BLOCKED. Do not stage, commit, push, merge, rebase or switch branches. Do not perform unapproved live LBX or production operations. Stop only for an irresolvable material decision.
-
-**Proposed commit:** `ANY-766 - Display actual Kernel usage in the cabinet`
 
 ### Step 16 — Verify the assembled integration locally
 
@@ -1721,8 +1693,6 @@ consumer demonstrates our protocol, not the real Document Summary implementation
 
 > Read /home/wstanley/www/work_unirec/runtime-research/payments-portal/docs/exec-plans/active/ANY-766-implementation-plan.md and complete only Step 16, the assembled local integration acceptance. Follow both runtime instruction sets and the common protocol. Reuse existing runners and independent Compose projects; add the bounded joint harness and required storage/network corrections. Exercise real Portal/Kernel APIs, sessions, service authentication, PostgreSQL and browser journeys from committed test purchase/access state; only external LBX/AI responses may be substituted. Run the stated checks, fix introduced failures and report evidence by source. No remote host or live purchase is needed. Do not stage, commit, push, merge, rebase, switch branches, publish or deploy. Preserve unrelated volumes. Escalate only an unresolved material decision.
 
-**Proposed commit:** `ANY-766 - Prove durable joint Portal Kernel execution`
-
 ### Step 17 — Prepare minimal builds and installation instructions
 
 **Status:** COMPLETE in the agreed local scope (2026-11-11). Component-selectable
@@ -1799,8 +1769,6 @@ remote publication/deployment is outside this plan.
 
 > Read /home/wstanley/www/work_unirec/runtime-research/payments-portal/docs/exec-plans/active/ANY-766-implementation-plan.md and complete only Step 17. Follow both delivery instruction sets, Section 3.7 and the common protocol. Reuse Dockerfiles, Compose, runners and existing deployment safeguards; implement only minimal component builds, image inputs and installation commands/runbooks. Preserve frontend/backend independence, purchased-document reader compatibility, Kernel profile activation and data. Validate and rehearse locally, rerun affected integration checks and report actual results. Do not create a portable release manager or require remote server/registry inputs. Do not stage, commit, push, merge, rebase, switch branches, publish or deploy remotely. Keep remaining external acceptance in the Section 7 handoff.
 
-**Proposed commit:** `ANY-766 - Prepare minimal image builds and installation`
-
 ### PR readiness checklist
 
 - [ ] Inspect the final paired diff against the local DoD; resolve confirmed
@@ -1820,20 +1788,11 @@ remote deployment or production readiness.
 
 ## 6. Final Verification & Review
 
-**Current readiness gate — user decision, 2026-11-11:** the 18 passing focused
-Step 16 cases and completed lint/type/docs checks are sufficient testing for
-review, PR creation and merge to main. Full suites and the remaining acceptance
-matrix below are deferred; they must not be restarted merely to close the PR
-checklist. Keep actual PASS/FAIL/NOT_RUN evidence and limitations visible.
-Step 17's separate local build/install checks are complete as recorded above;
-the testing decision does not convert deferred checks into PASS.
-
-After review corrections, rerun focused checks affected by those changes.
-Run the deferred full campaign later, alongside the ANY-767 / parent ANY-504
-stage 11 acceptance, and resolve defects from its actual findings. Real-service
-testing is planned for the week of 2026-11-16. Configure local suites with
-isolated databases and explicitly labelled external substitutes; real-service
-results require the installed environment and actual configured dependencies.
+Apply the accepted review/merge gate in Section 3.8 and the current evidence
+limits in the header. Steps 16/17 retain their completed checkpoint scope;
+review corrections require only affected checks. Deferred suites do not acquire
+a PASS or become a new pre-PR campaign. ANY-767 owns the remaining real-service
+and deployment acceptance with actual configured dependencies.
 
 The command lists below describe the deferred campaign. Individual focused,
 documentation and generated-drift checks have already passed; they are not all
@@ -1905,11 +1864,8 @@ LBX/SMTP/provider wiring and the complete registration → offer/consent → tes
 payment → reconciliation → paid product/result/usage journey. It also owns remaining
 natural-renewal/deployment acceptance and production rollout.
 
-The 2026-11-11 owner decision accepts the focused local testing for current
-review, PR creation and merge. Run the deferred full suites and remaining
-acceptance later; actual integration testing in parent ANY-504 stage 11 is
-planned for the week of 2026-11-16. Triage and fix defects using those results
-rather than extending the pre-PR testing campaign now.
+Section 3.8 owns the accepted review/merge gate and the later testing schedule.
+Use that gate for this handoff; do not add another pre-PR acceptance campaign.
 
 Reuse valid local and predecessor evidence; do not repeat completed research or
 the entire unchanged local matrix. Verify the actual installed configuration,
