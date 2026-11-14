@@ -51,6 +51,8 @@ function composeCopyText(output: Output): string {
 async function submitFit(page: Page): Promise<void> {
   await page.locator("#task-finder-task-text").fill(TASK);
   await page.locator("#task-finder-positioning").fill(PROFILE);
+  await expect(page.locator("#task-finder-task-text")).toHaveValue(TASK);
+  await expect(page.locator("#task-finder-positioning")).toHaveValue(PROFILE);
   await page.getByRole("button", { name: "Check fit" }).click();
 }
 
@@ -140,6 +142,7 @@ test.describe("Task Finder web product", () => {
       await expect(page.getByRole("button", { name: "Copy" })).toBeVisible({ timeout: 60_000 });
       await page.getByRole("button", { name: "New task" }).click();
       await expect(page.locator("#task-finder-task-text")).toHaveValue("");
+      await expect(page.locator("#task-finder-task-text")).toBeFocused();
     }
     await submitFit(page);
     await expect(page.getByText(/used all your/)).toBeVisible({ timeout: 30_000 });
