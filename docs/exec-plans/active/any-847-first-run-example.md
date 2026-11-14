@@ -6,10 +6,10 @@
 - Owner: agent
 - Linear: ANY-847
 - Created: 2026-11-13
-- Last updated: 2026-11-13
-- Review date: 2026-11-13
-- Next action: review the retrospective baseline evidence, rerun the permission test on a host with passwordless sudo, and perform the new-user comprehension check
-- Blocker: the local baseline permission test requires passwordless sudo as nobody; this machine requires interactive authentication. New-user comprehension remains pending manual acceptance.
+- Last updated: 2026-11-14
+- Review date: 2026-11-14
+- Next action: review the recorded acceptance evidence and rerun the permission test on a host with passwordless sudo
+- Blocker: the local baseline permission test requires passwordless sudo as nobody; this machine requires interactive authentication. New-user comprehension was confirmed in the user-provided manual acceptance report on 2026-11-14.
 
 ## Goal
 
@@ -115,8 +115,9 @@ Amount error were visually inspected.
 **Disposition:** the missing browser-baseline evidence is now supplied by this explicitly
 retrospective reconstruction. The implementation checks below describe the changes committed as
 `0384047e` and provide the after-change evidence; those suites were not rerun during this
-documentation-only pass. The short check with a new user on a deployed/preview build remains open
-for manual acceptance; this reconstruction neither performs nor waives that criterion.
+documentation-only pass. At the time of this reconstruction, the short check with a new user
+remained open. It was subsequently confirmed by the manual acceptance report below, not by this
+automated reconstruction.
 
 ## Implementation steps
 
@@ -143,6 +144,23 @@ The initial unit run exposed whole-page assertions that now also matched example
 
 Repository scan found pre-existing local-command-name references in execution plans for ANY-17, ANY-339, ANY-391, ANY-221 and ANY-227. None are introduced or edited by this ticket.
 
+### Manual acceptance — 2026-11-14
+
+Source: the user supplied the following result from a new user’s test; the agent did not observe
+the session or infer its outcome from automated checks.
+
+- Date: 2026-11-14.
+- Build/reference supplied: [PR #278](https://github.com/gushinets/anytoolai-platform/pull/278).
+  The report did not specify an exact deployed SHA or deployment URL.
+- Coverage: ProposalAI, Brief Decoder, and all three Client Update Writer modes.
+- Reported observation: the new user understood without assistance what to enter and what result
+  they would receive. The examples were clear, and no difficulties were reported.
+- Result: the new-user comprehension criterion is confirmed by the reported manual test;
+  the second acceptance finding is addressed in this plan.
+
+This report covers comprehension. It does not claim an additional manual check of draft
+preservation, which remains supported by the previously recorded automated/browser evidence.
+
 ## Decision log
 
 | Date | Decision | Why |
@@ -158,10 +176,13 @@ Repository scan found pre-existing local-command-name references in execution pl
 | 2026-11-13 | Implemented disclosure, three product integrations, seven locales, Amount help and tests. | Run broader checks and browser verification. |
 | 2026-11-13 | Frontend check, product smoke, 35 mobile cases and documentation checks passed. Recorded the baseline sudo limitation; stopped temporary verification services. | Review, validate on a compatible host and perform manual acceptance. |
 | 2026-11-13 | Rebuilt `2d237817` in isolation and reproduced the missing first-run examples across five forms, two locales and two viewport sizes. Recorded the long-Amount validation and exact reconstruction environment above. | Baseline-evidence gap addressed; new-user comprehension remains a manual acceptance step. |
+| 2026-11-14 | Recorded the user-provided manual acceptance report for all five forms; comprehension was confirmed without assistance or reported difficulties. | Review the acceptance evidence; the local sudo-dependent baseline limitation remains separate. |
 
 ## Open questions
 
-None for implementation. New-user comprehension requires a manual check on the deployed build. GitHub push and ticket updates remain subject to explicit user approval.
+None for implementation. New-user comprehension is confirmed by the report above; its build
+reference is PR #278, without an exact deployment SHA/URL. GitHub push and ticket updates remain
+subject to explicit user approval.
 
 ## Follow-up debt
 
