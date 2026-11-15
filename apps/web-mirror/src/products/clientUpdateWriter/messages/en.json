@@ -20,7 +20,8 @@
     "billingAmount": "Amount",
     "billingDueDate": "Due date (optional)",
     "tone": "Tone",
-    "tonePlaceholder": "Select a tone"
+    "tonePlaceholder": "Select a tone",
+    "billingAmountHelp": "Keep it short, for example “50% prepayment, $900”. Put the reason, the base amount and the remainder in the billing notes."
   },
   "fieldNames": {
     "progressNotes": "Progress notes",
@@ -37,7 +38,14 @@
     "runFailed": "Something went wrong writing your update. Please try again.",
     "resultTitle": "Update",
     "placeholder": "Your update will appear here after you write it.",
-    "regenerate": "Rewrite update"
+    "regenerate": "Rewrite update",
+    "example": {
+      "inputs": {
+        "progressNotes": "Homepage redesign done, waiting for the client’s review by Friday. Next: inner pages, starting Monday. No blockers."
+      },
+      "intro": "Plain notes in any order are enough. For example:",
+      "output": "Hello,\n\nQuick update on the redesign: the homepage is done and ready for your review by Friday. From Monday I move on to the inner pages. No blockers so far.\n\nPlease send your comments on the homepage by Friday so the inner pages can build on the approved version."
+    }
   },
   "reply_draft": {
     "submit": "Write reply",
@@ -45,7 +53,15 @@
     "runFailed": "Something went wrong writing your reply. Please try again.",
     "resultTitle": "Reply draft",
     "placeholder": "Your reply will appear here after you write it.",
-    "regenerate": "Rewrite reply"
+    "regenerate": "Rewrite reply",
+    "example": {
+      "inputs": {
+        "clientMessage": "Hi, can you also add a blog section? And could we have everything a week earlier?",
+        "replyGoal": "Agree to the blog as a paid add-on, keep the original deadline, offer a short call."
+      },
+      "intro": "Paste the client’s message and say what the reply should achieve. For example:",
+      "output": "Hi,\n\nHappy to add a blog section. It is outside the agreed scope, so I will send you a short estimate for it today. Moving the whole delivery a week earlier is not realistic without cutting quality, so I suggest keeping the original date and delivering the homepage first.\n\nWould a 15-minute call tomorrow work to agree on the details?"
+    }
   },
   "prepaid_request": {
     "submit": "Write request",
@@ -53,6 +69,15 @@
     "runFailed": "Something went wrong writing your request. Please try again.",
     "resultTitle": "Prepaid request",
     "placeholder": "Your request will appear here after you write it.",
-    "regenerate": "Rewrite request"
+    "regenerate": "Rewrite request",
+    "example": {
+      "inputs": {
+        "billingNotes": "Agreed budget for the landing page design: $1,800. The 50% prepayment ($900) books the team’s time; the remaining $900 is due after the mockup is delivered. Payment details will come in a separate invoice.",
+        "billingAmount": "50% prepayment, $900",
+        "billingDueDate": "within 4 days"
+      },
+      "intro": "The amount stays short; the reason, the base and the remainder go to the notes. For example:",
+      "output": "Hello,\n\nTo book the team’s time for the landing page design, please make the 50% prepayment of $900 of the agreed $1,800 budget within 4 days. The remaining $900 is due after the mockup is delivered. The payment details will follow in a separate invoice.\n\nPlease confirm once the payment is on its way."
+    }
   }
 }

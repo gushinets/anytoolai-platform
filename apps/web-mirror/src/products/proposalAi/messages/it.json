@@ -36,6 +36,14 @@
     "runFailed": "Si è verificato un problema durante la generazione della proposta. Riprovi.",
     "resultTitle": "Proposta",
     "placeholder": "La proposta apparirà qui dopo la generazione.",
-    "regenerate": "Rigeneri la proposta"
+    "regenerate": "Rigeneri la proposta",
+    "example": {
+      "intro": "Un breve brief e un profilo con fatti verificabili producono una proposta come questa:",
+      "inputs": {
+        "taskText": "Dana, proprietaria di uno studio di yoga, cerca un designer per rinnovare la landing page dello studio in Figma: una pagina, versione mobile e modulo di prenotazione. Scadenza: 3 settimane. Budget: $600.",
+        "freelancerPositioning": "Web designer da 6 anni. Progetto landing page in Figma per piccole attività di servizi (uno studio dentistico, una palestra). Consegno una versione mobile e un prototipo cliccabile; due cicli di revisioni inclusi."
+      },
+      "output": "Ciao Dana,\n\nUna landing page per uno studio di yoga dove prenotare deve essere semplice è in linea con la mia esperienza: progetto landing page in Figma per piccole attività di servizi, di recente una palestra e uno studio dentistico. Per la tua pagina realizzerei i layout desktop e mobile con il modulo di prenotazione e un prototipo cliccabile entro le tre settimane e il budget di $600, con due cicli di revisioni inclusi.\n\nSe ti va bene, inviami la pagina attuale e i materiali del brand e ti proporrò un piano per la prima settimana."
+    }
   }
 }

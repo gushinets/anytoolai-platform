@@ -36,6 +36,14 @@
     "runFailed": "Une erreur s’est produite lors de la génération de votre proposition. Veuillez réessayer.",
     "resultTitle": "Proposition",
     "placeholder": "Votre proposition apparaîtra ici après sa génération.",
-    "regenerate": "Régénérer la proposition"
+    "regenerate": "Régénérer la proposition",
+    "example": {
+      "intro": "Un bref descriptif et un profil avec des faits vérifiables donnent une proposition comme celle-ci :",
+      "inputs": {
+        "taskText": "Dana, propriétaire d’un studio de yoga, cherche un designer pour refaire la page de présentation du studio dans Figma : une page, une version mobile et un formulaire de réservation. Délai : 3 semaines. Budget : 600 $.",
+        "freelancerPositioning": "Web designer depuis 6 ans. Je conçois dans Figma des pages de présentation pour de petites entreprises de services (cabinet dentaire, salle de sport). Je livre une version mobile et un prototype cliquable ; deux séries de retouches sont incluses."
+      },
+      "output": "Bonjour Dana,\n\nUne page de studio de yoga où réserver doit être simple correspond bien à mon expérience : je conçois dans Figma des pages pour de petites entreprises de services, récemment une salle de sport et un cabinet dentaire. Pour votre page, je livrerais les maquettes pour ordinateur et mobile, le formulaire de réservation et un prototype cliquable dans vos trois semaines et votre budget de 600 $, avec deux séries de retouches incluses.\n\nSi cela vous convient, envoyez-moi votre page actuelle et vos éléments de marque ; je vous proposerai un plan pour la première semaine."
+    }
   }
 }

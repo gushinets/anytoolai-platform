@@ -18,6 +18,7 @@ import type { ProductDefinition, ProductFieldsProps, ProductResultProps, Product
 import { MultiModeProduct } from "../shared/MultiModeProduct";
 import { isRecord } from "../shared/resultGuards";
 import { isTone, TONE_OPTIONS, type Tone } from "../shared/tone";
+import { ExampleDisclosure } from "../shared/ExampleDisclosure";
 import styles from "./ClientUpdateWriterProduct.module.css";
 
 const PRODUCT_ID = "client_update_writer";
@@ -115,6 +116,14 @@ function UpdateFields({ values, errors, disabled, onChange }: ProductFieldsProps
   const t = useProductT();
   return (
     <>
+      <ExampleDisclosure
+        intro={t("update.example.intro")}
+        items={[
+          { label: t("fields.progressNotes"), value: t("update.example.inputs.progressNotes") },
+          { label: t("fields.tone"), value: t("tone.neutral") },
+        ]}
+        output={t("update.example.output")}
+      />
       <div className={styles.fieldGroup}>
         <label htmlFor="client-update-writer-progress-notes">{t("fields.progressNotes")}</label>
         <TextArea
@@ -167,6 +176,15 @@ function ReplyDraftFields({ values, errors, disabled, onChange }: ProductFieldsP
   const t = useProductT();
   return (
     <>
+      <ExampleDisclosure
+        intro={t("reply_draft.example.intro")}
+        items={[
+          { label: t("fields.clientMessage"), value: t("reply_draft.example.inputs.clientMessage") },
+          { label: t("fields.replyGoal"), value: t("reply_draft.example.inputs.replyGoal") },
+          { label: t("fields.tone"), value: t("tone.warm") },
+        ]}
+        output={t("reply_draft.example.output")}
+      />
       <div className={styles.fieldGroup}>
         <label htmlFor="client-update-writer-client-message">{t("fields.clientMessage")}</label>
         <TextArea
@@ -239,6 +257,16 @@ function PrepaidRequestFields({ values, errors, disabled, onChange }: ProductFie
   const t = useProductT();
   return (
     <>
+      <ExampleDisclosure
+        intro={t("prepaid_request.example.intro")}
+        items={[
+          { label: t("fields.billingNotes"), value: t("prepaid_request.example.inputs.billingNotes") },
+          { label: t("fields.billingAmount"), value: t("prepaid_request.example.inputs.billingAmount") },
+          { label: t("fields.billingDueDate"), value: t("prepaid_request.example.inputs.billingDueDate") },
+          { label: t("fields.tone"), value: t("tone.neutral") },
+        ]}
+        output={t("prepaid_request.example.output")}
+      />
       <div className={styles.fieldGroup}>
         <label htmlFor="client-update-writer-billing-notes">{t("fields.billingNotes")}</label>
         <TextArea
@@ -261,8 +289,9 @@ function PrepaidRequestFields({ values, errors, disabled, onChange }: ProductFie
           onChange={(event: ChangeEvent<HTMLInputElement>) => onChange("billingAmount", event.target.value)}
           disabled={disabled}
           aria-invalid={Boolean(errors.billingAmount)}
-          aria-describedby={errors.billingAmount ? "client-update-writer-billing-amount-error" : undefined}
+          aria-describedby={`client-update-writer-billing-amount-help${errors.billingAmount ? " client-update-writer-billing-amount-error" : ""}`}
         />
+        <p id="client-update-writer-billing-amount-help" className={styles.help}>{t("fields.billingAmountHelp")}</p>
         <FieldErrorMessage id="client-update-writer-billing-amount-error" className={styles.error} error={errors.billingAmount} label={t("fieldNames.billingAmount")} />
       </div>
 

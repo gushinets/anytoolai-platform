@@ -36,6 +36,14 @@
     "runFailed": "Algo deu errado ao gerar sua proposta. Tente novamente.",
     "resultTitle": "Proposta",
     "placeholder": "Sua proposta aparecerá aqui após a geração.",
-    "regenerate": "Gerar proposta novamente"
+    "regenerate": "Gerar proposta novamente",
+    "example": {
+      "intro": "Um briefing curto e um perfil com fatos verificáveis geram uma proposta como esta:",
+      "inputs": {
+        "taskText": "Dana, dona de um estúdio de ioga, procura um designer para reformular a landing page do estúdio no Figma: uma página, versão móvel e formulário de agendamento. Prazo: 3 semanas. Orçamento: $600.",
+        "freelancerPositioning": "Web designer há 6 anos. Crio landing pages no Figma para pequenas empresas de serviços (uma clínica odontológica, uma academia). Entrego uma versão móvel e um protótipo clicável; duas rodadas de ajustes incluídas."
+      },
+      "output": "Olá, Dana,\n\nUma landing page para um estúdio de ioga onde agendar seja fácil combina com minha experiência: crio landing pages no Figma para pequenas empresas de serviços, recentemente uma academia e uma clínica odontológica. Para sua página, entregaria os layouts para computador e celular com o formulário de agendamento e um protótipo clicável dentro das três semanas e do orçamento de $600, com duas rodadas de ajustes incluídas.\n\nSe estiver de acordo, envie a página atual e os materiais da marca e eu apresentarei um plano para a primeira semana."
+    }
   }
 }

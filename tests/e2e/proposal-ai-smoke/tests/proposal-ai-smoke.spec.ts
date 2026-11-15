@@ -70,6 +70,8 @@ test.describe("ProposalAI web product", () => {
   }) => {
     await page.goto(PRODUCT_URL);
     await expect(page.locator("h1")).toHaveText("ProposalAI");
+    const example = page.getByTestId("first-run-example");
+    await expect(example.getByText("Show an example")).toBeVisible();
     await expect(
       page.getByText("Turn a client brief and your relevant strengths into a proposal ready to send."),
     ).toBeVisible();
@@ -86,6 +88,10 @@ test.describe("ProposalAI web product", () => {
     const run = trackRun(page, START_ROUTE_PATTERN);
 
     await fillValidForm(page);
+    await example.locator("summary").click();
+    await expect(example.getByText("What you get")).toBeVisible();
+    await expect(page.locator("#proposal-ai-task-text")).toHaveValue("Write a landing page hero section for a bakery.");
+    await expect(page.locator("#proposal-ai-positioning")).toHaveValue("Experienced copywriter for small businesses.");
     await page.getByRole("button", { name: "Generate proposal" }).click();
     await expect(page.getByRole("status")).toHaveText(/Generating your proposal/);
     const copyButton = page.getByRole("button", { name: "Copy" });

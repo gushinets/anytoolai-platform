@@ -36,6 +36,14 @@
     "runFailed": "Beim Erstellen Ihres Angebots ist etwas schiefgelaufen. Bitte versuchen Sie es erneut.",
     "resultTitle": "Angebot",
     "placeholder": "Ihr Angebot erscheint nach dem Erstellen hier.",
-    "regenerate": "Angebot erneut erstellen"
+    "regenerate": "Angebot erneut erstellen",
+    "example": {
+      "intro": "Ein kurzes Briefing und ein Profil mit überprüfbaren Fakten ergeben ein Angebot wie dieses:",
+      "inputs": {
+        "taskText": "Dana, Inhaberin eines Yogastudios, sucht jemanden für die Neugestaltung der Studio-Landingpage in Figma: eine Seite, mobile Version, Buchungsformular. Frist: 3 Wochen. Budget: 600 $.",
+        "freelancerPositioning": "Webdesigner, 6 Jahre Erfahrung. Ich gestalte Landingpages in Figma für kleine Dienstleistungsunternehmen (Zahnarztpraxis, Fitnessstudio). Ich liefere eine mobile Version und einen klickbaren Prototyp; zwei Korrekturrunden sind enthalten."
+      },
+      "output": "Hallo Dana,\n\nEine Landingpage für ein Yogastudio, auf der die Buchung einfach sein soll, passt gut zu meiner Erfahrung: Ich gestalte Landingpages in Figma für kleine Dienstleistungsunternehmen, zuletzt ein Fitnessstudio und eine Zahnarztpraxis. Für Ihre Seite würde ich Desktop- und Mobilansichten mit Buchungsformular sowie einen klickbaren Prototyp innerhalb Ihrer drei Wochen und des Budgets von 600 $ liefern, einschließlich zweier Korrekturrunden.\n\nWenn das für Sie passt, schicken Sie mir Ihre aktuelle Seite und Markenmaterialien. Dann melde ich mich mit einem Plan für die erste Woche."
+    }
   }
 }

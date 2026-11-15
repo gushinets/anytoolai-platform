@@ -58,5 +58,11 @@
     "text": "Vos saisies sont envoyées à notre service et à un fournisseur de modèles d’IA pour créer le résultat, puis stockées avec votre exécution sur nos serveurs. Votre brouillon est conservé dans ce navigateur et peut être perdu si vous rechargez ou quittez la page. Ne saisissez pas de mots de passe, de codes d’accès, de clés API ni de coordonnées complètes de carte bancaire.",
     "policyLink": "Politique de confidentialité",
     "opensInNewTab": "(s’ouvre dans un nouvel onglet)"
+  },
+  "example": {
+    "toggle": "Voir un exemple",
+    "inputs": "Quoi saisir",
+    "output": "Ce que vous obtenez",
+    "note": "À titre d’exemple seulement. Votre texte reste inchangé."
   }
 }

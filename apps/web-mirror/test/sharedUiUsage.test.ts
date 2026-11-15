@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 // one exception -- shared-ui has no radio component.
 const here = dirname(fileURLToPath(import.meta.url));
 const FILES = [
+  "../src/products/shared/ExampleDisclosure.tsx",
   "../src/products/taskFinder/TaskFinderProduct.tsx",
   "../src/products/taskFinder/TaskFinderResult.tsx",
   "../src/components/ResultView.tsx",
