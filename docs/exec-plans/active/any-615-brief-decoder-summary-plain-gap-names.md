@@ -7,8 +7,8 @@
 - Created: 2026-11-16
 - Last updated: 2026-11-16
 - Review date: 2026-11-16
-- Next action: review the round 2 syntax contract, then CI and live acceptance on B02/B04/B05
-  and `asdf ::: 12345 !!!` in Russian, English and Spanish.
+- Next action: review the round 3 fix; CI and live acceptance on B02/B04/B05 and
+  `asdf ::: 12345 !!!` remain pending.
 - Blocker: prior local full-check environment failures and pending live acceptance; see Validation.
 
 ## Goal
@@ -37,10 +37,13 @@ Prompt-text and fake-provider fixture tests do not prove live model behavior. QA
 B02 (missing audience), B04 (missing deliverables), B05 (Russian missing audience), and the input
 `asdf ::: 12345 !!!`. Live evals should cover Russian, English and Spanish.
 The leak guard is a fixture regression check, not a runtime filter or a general language detector.
-The test-only syntax contract recognizes known keys, identifier literals and adjacent field
-markers in English, Russian and Spanish. It does not parse arbitrary Markdown or infer the
-semantic use of an exact copied literal; live acceptance owns those checks. Literal exemptions
-must be exact, per occurrence, and never inferred from the presence of an unquoted source key.
+The test contract distinguishes complete source facts from newly generated narration. Only a
+complete extracted value copied verbatim within standalone assertion boundaries can establish
+source provenance. Identifiers, quote spans and partial text matches alone cannot. Text/line
+boundaries and sentence-ending punctuation (`.`, `!`, `?`) delimit assertions; colons and
+semicolons do not detach a source match from a changed surrounding claim. Arbitrary paraphrases,
+fragments, added quotation wrappers and semantic interpretation beyond that closed contract
+remain live-acceptance concerns. It may conservatively flag such valid rewrites for review.
 
 ## Implementation steps
 
@@ -54,6 +57,9 @@ must be exact, per occurrence, and never inferred from the presence of an unquot
 - [x] Check all configured keys in technical notation and preserve ordinary prose.
 - [x] Exempt exact source literal occurrences only; remove the document-wide key whitelist.
 - [x] Add the full syntax/source-boundary matrix and fixture mutations; record validation.
+- [x] Replace quote-based exemptions with complete copied-fact provenance.
+- [x] Verify bare client facts, genuine source claims about missing database fields, and new gap claims.
+- [x] Run regression checks and record the round 3 evidence and remaining limits.
 
 ## Decision log
 
@@ -77,6 +83,12 @@ must be exact, per occurrence, and never inferred from the presence of an unquot
   are source facts too. Check raw extracted values, avoiding artificial quote characters
   introduced by JSON encoding. Mask verified spans with a non-whitespace barrier, so checking
   the rest cannot accidentally join words into a new technical label.
+  This quote-based exemption is superseded by review round 3.
+- 2026-11-16, review round 3: formatting cannot determine whether text represents a client fact
+  or a brief gap. Keep extracted values separate and require a complete verbatim source fact
+  within standalone assertion boundaries before exempting it. Inspect all remaining narration.
+  A copied database-field fact stays valid with or without quotes; a different assertion about
+  a missing brief field cannot inherit that source proof.
 
 ## Validation
 
@@ -160,3 +172,28 @@ must be exact, per occurrence, and never inferred from the presence of an unquot
 - Boundary remains explicit: this is a bounded single-line literal/adjacent-label syntax check,
   not a Markdown parser or semantic judge of an exact quote's use. Live B02/B04/B05 and noisy-input
   acceptance must still verify actual generated language and meaning.
+
+### Review round 3
+
+- Read the inline thread replies and reproduced both findings. The first expanded regression
+  matrix against the previous implementation had **111 failed, 171 passed**; four failures were
+  an overly strict test precondition for ordinary single-word names, corrected in the final tests.
+- Replaced token provenance with whole-fact provenance. Extracted string values and individual
+  list items remain separate. Only a complete, verbatim value in standalone statement boundaries
+  is excluded from the internal-notation scan; bare and quoted identifiers use the same rule.
+  An identifier taken from a rename request cannot authorize a new missing-field claim.
+- Genuine client facts describing missing database fields remain valid, including EN/RU/ES;
+  the presence of words like "field" or "missing" does not override verified source provenance.
+  Changed prefixes/suffixes, partial names, separate source fragments and new gap assertions
+  remain checked. Repeated facts and adjacent fact/gap statements are covered.
+- Fixture mutations exercise both reported cases through the actual summary assertion, including
+  complete facts from scalar values and list items while `target_audience` is still missing.
+  Existing checks of every copied title, content and summary remain active.
+- **307 Brief Decoder tests and 537 full Freelancer product tests passed**, including packaging;
+  43 cases added since round 2. Config, architecture and documentation validation passed;
+  `git diff --check` is clean.
+- Ruff found pre-existing findings in the unchanged schema-version test (E501, PLR2004), also
+  reproduced against HEAD. The long ANY-615 test string was wrapped; no lint suppressions added.
+- Only tests and plans change in this round. API/full-check were not repeated: the prior API
+  slice passed, and full-check's existing environment blockers remain documented above.
+  No live provider evaluation, GitHub write or push was performed.

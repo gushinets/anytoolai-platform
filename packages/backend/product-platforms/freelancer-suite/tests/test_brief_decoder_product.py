@@ -298,22 +298,43 @@ _FIELD_LABEL_WORD = r"(?:fields?|поле|поля|полей|campos?)"
 _FIELD_LABEL_BEFORE = re.compile(rf"\b{_FIELD_LABEL_WORD}$", re.IGNORECASE)
 _FIELD_LABEL_AFTER = re.compile(rf"^{_FIELD_LABEL_WORD}\b", re.IGNORECASE)
 _KEY_LABELS = re.compile(r"missing fields?\s*:|fields? by name|пропущено поле", re.IGNORECASE)
+_FACT_START = re.compile(r"(?:^|[.!?]\s+|\n)[ \t]*$")
+_FACT_END = re.compile(r"^[ \t]*(?:$|[.!?](?:\s|$)|\n)")
 _TECHNICAL_GAP_SENTENCES = (
     "The {key} field is not present.",
     "Поле {key} не указано.",
     "No se ha indicado el campo {key}.",
 )
+_CLIENT_FACTS_WITH_COLLIDING_IDENTIFIERS = (
+    "Rename target_audience to intended_audience.",
+    "Переименовать target_audience в intended_audience.",
+    "Renombrar target_audience a intended_audience.",
+    "The target_audience database field is missing; restore it.",
+    "В базе данных отсутствует поле target_audience; восстановить его.",
+    "Falta el campo target_audience en la base de datos; hay que restaurarlo.",
+)
 
 
-def _field_key_leaks(text: str, *, source_text: str = "") -> list[str]:
-    """Check known-key notation per occurrence, preserving exact single-line source literals."""
-    # shortcut: copied literals are checked syntactically; use live evals for their meaning.
-    source_literals = {match.group() for match in _LITERAL_SPAN.finditer(source_text)}
-    # A non-whitespace barrier prevents the remaining words from becoming adjacent field labels.
-    untrusted = _LITERAL_SPAN.sub(
-        lambda match: "~" if match.group() in source_literals else match.group(),
-        text,
-    )
+def _without_copied_source_facts(text: str, source_facts: tuple[str, ...]) -> str:
+    """Exclude complete verbatim source assertions, never identifiers taken out of their context."""
+    remaining = list(text)
+    for source in source_facts:
+        fact = source.strip()
+        if not fact:
+            continue
+        for copied in re.finditer(re.escape(fact), text):
+            before, after = text[: copied.start()], text[copied.end() :]
+            source_ends_assertion = fact[-1] in ".!?" and (not after or after[0].isspace())
+            if _FACT_START.search(before) and (_FACT_END.match(after) or source_ends_assertion):
+                # Keep a barrier so adjacent narration cannot inherit words from the copied fact.
+                remaining[copied.start() : copied.end()] = ["~"] * len(fact)
+    return "".join(remaining)
+
+
+def _field_key_leaks(text: str, *, source_facts: tuple[str, ...] = ()) -> list[str]:
+    """Check internal notation in narration, separately from complete copied client facts."""
+    # shortcut: only complete verbatim assertions establish provenance; review paraphrases live.
+    untrusted = _without_copied_source_facts(text, source_facts)
     literal_keys = {
         (literal.start() + key.start(), literal.start() + key.end())
         for literal in _LITERAL_SPAN.finditer(untrusted)
@@ -354,7 +375,8 @@ def test_field_key_leak_guard_catches_the_qa_strings(leaky: str) -> None:
 @pytest.mark.parametrize(
     "text",
     [
-        "Project goal, deliverables, deadline, budget, target audience and constraints are missing.",
+        "Project goal, deliverables, deadline, budget, target audience "
+        "and constraints are missing.",
         "Клиенту нужно уточнить цель проекта, результаты, срок, бюджет, аудиторию и ограничения.",
         "El cliente debe confirmar el objetivo, los entregables, el plazo, el presupuesto, "
         "el público objetivo y las restricciones.",
@@ -367,15 +389,14 @@ def test_field_key_leak_guard_accepts_plain_words(text: str) -> None:
 
 
 @pytest.mark.parametrize("identifier", [*_GAPS_KEYWORD, "missing_fields", "PROJECT_GOAL"])
-@pytest.mark.parametrize("delimiter", ["`", "``", '"', "'"])
+@pytest.mark.parametrize("delimiter", ["", "`", "``", '"', "'"])
 def test_field_key_leak_guard_preserves_source_identifiers(
     identifier: str, delimiter: str
 ) -> None:
     source = f"Preserve the {delimiter}{identifier}{delimiter} database column."
-    assert _field_key_leaks(source)
-    assert not _field_key_leaks(source, source_text=source)
-    assert _field_key_leaks(f"Missing field: {identifier}", source_text=source)
-    assert _field_key_leaks(f"The {identifier} field is missing.", source_text=source)
+    assert not _field_key_leaks(source, source_facts=(source,))
+    assert _field_key_leaks(f"Missing field: {identifier}", source_facts=(source,))
+    assert _field_key_leaks(f"The {identifier} field is missing.", source_facts=(source,))
 
 
 @pytest.mark.parametrize("key", [*_GAPS_KEYWORD, "missing_fields"])
@@ -384,7 +405,20 @@ def test_field_key_leak_guard_preserves_source_identifiers(
 def test_all_internal_keys_are_rejected_in_technical_contexts(
     key: str, template: str, delimiter: str
 ) -> None:
-    assert _field_key_leaks(template.format(key=f"{delimiter}{key}{delimiter}"))
+    gap = template.format(key=f"{delimiter}{key}{delimiter}")
+    source = f"Rename the {delimiter}{key}{delimiter} database field."
+    assert _field_key_leaks(gap)
+    assert _field_key_leaks(gap, source_facts=(source,))
+    assert len(_field_key_leaks(f"{source} {gap}", source_facts=(source,))) == 1
+
+
+@pytest.mark.parametrize("source", _CLIENT_FACTS_WITH_COLLIDING_IDENTIFIERS)
+def test_complete_client_facts_are_allowed_even_when_they_describe_a_missing_field(
+    source: str,
+) -> None:
+    assert _field_key_leaks(source)
+    assert not _field_key_leaks(source, source_facts=(source,))
+    assert _field_key_leaks("The target_audience field is missing.", source_facts=(source,))
 
 
 @pytest.mark.parametrize("key", [key for key in _GAPS_KEYWORD if "_" not in key])
@@ -393,31 +427,74 @@ def test_single_word_keys_remain_valid_unformatted_prose(key: str) -> None:
 
 
 @pytest.mark.parametrize("key", [*_GAPS_KEYWORD, "missing_fields"])
-def test_unquoted_source_values_cannot_authorize_quoted_keys(key: str) -> None:
-    assert _field_key_leaks(f'"{key}"', source_text=key)
+def test_source_values_cannot_authorize_new_missing_field_claims(key: str) -> None:
+    assert _field_key_leaks(f'The "{key}" field is missing.', source_facts=(key,))
 
 
 @pytest.mark.parametrize("delimiter", ["`", '"'])
-def test_literal_exemption_cannot_span_separate_source_values(delimiter: str) -> None:
+def test_copied_fact_cannot_span_separate_source_values(delimiter: str) -> None:
     assert _field_key_leaks(
-        f"{delimiter}budget{delimiter}", source_text=f"{delimiter}budget\n{delimiter}"
+        f"{delimiter}budget{delimiter}", source_facts=(f"{delimiter}budget", delimiter)
     )
+
+
+def test_source_values_cannot_combine_into_a_new_client_fact() -> None:
+    assert _field_key_leaks(
+        "Rename target_audience to intended_audience.",
+        source_facts=("Rename target_audience", "to intended_audience."),
+    )
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Rename target_audience",
+        "  Rename target_audience  ",
+        "Rename target_audience.",
+        "Project facts. Rename target_audience. Confirm the budget.",
+        "Project facts\nRename target_audience\nConfirm the budget.",
+    ],
+)
+def test_complete_source_facts_use_standalone_statement_boundaries(text: str) -> None:
+    assert not _field_key_leaks(text, source_facts=("Rename target_audience",))
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Do not Rename target_audience.",
+        "Missing: Rename target_audience.",
+        "Not requested; Rename target_audience.",
+        "Rename target_audience is not requested.",
+        "Rename target_audience.id",
+        "RENAME target_audience.",
+    ],
+)
+def test_changed_context_is_not_a_copied_source_fact(text: str) -> None:
+    assert _field_key_leaks(text, source_facts=("Rename target_audience",))
+
+
+def test_multiple_facts_and_repeated_copies_do_not_authorize_gap_narration() -> None:
+    first = "Rename target_audience."
+    second = "Restore the `budget` database column."
+    text = f"{first} {second}\n{first} The `budget` field is missing."
+    assert _field_key_leaks(text, source_facts=(first, second)) == ["budget"]
 
 
 @pytest.mark.parametrize(
     "leak",
     ["target_audience", '"target_audience"', "`TARGET_AUDIENCE`", "``target_audience``"],
 )
-def test_literal_exemption_preserves_case_delimiters_and_occurrence(leak: str) -> None:
+def test_copied_fact_does_not_authorize_another_assertion(leak: str) -> None:
     source = "Preserve the `target_audience` database column."
-    assert len(_field_key_leaks(f"{source} {leak} is missing.", source_text=source)) == 1
+    assert len(_field_key_leaks(f"{source} {leak} is missing.", source_facts=(source,))) == 1
 
 
 @pytest.mark.parametrize("literal", ["` budget `", "``\tbudget\t``", '"budget"', "'budget'"])
-def test_source_literal_whitespace_is_preserved_exactly(literal: str) -> None:
+def test_copied_source_fact_preserves_its_internal_whitespace(literal: str) -> None:
     source = f"Preserve {literal}."
-    assert not _field_key_leaks(source, source_text=source)
-    assert _field_key_leaks(source, source_text="Preserve budget.")
+    assert not _field_key_leaks(source, source_facts=(source,))
+    assert _field_key_leaks(source, source_facts=("Preserve budget.",))
 
 
 @pytest.mark.parametrize(
@@ -430,15 +507,15 @@ def test_source_literal_whitespace_is_preserved_exactly(literal: str) -> None:
         "``target_audience = `legacy` ``",
     ],
 )
-def test_complete_source_literals_preserve_expressions_and_quoted_messages(literal: str) -> None:
+def test_complete_source_facts_preserve_expressions_and_quoted_messages(literal: str) -> None:
     source = f"Preserve {literal}."
     assert _field_key_leaks(source)
-    assert not _field_key_leaks(source, source_text=source)
-    assert _field_key_leaks(f"{source} target_audience is missing.", source_text=source)
+    assert not _field_key_leaks(source, source_facts=(source,))
+    assert _field_key_leaks(f"{source} target_audience is missing.", source_facts=(source,))
 
 
-def test_preserved_literal_does_not_join_unrelated_words_into_a_field_label() -> None:
-    assert not _field_key_leaks("field `source_id` budget", source_text="Keep `source_id`.")
+def test_uncopied_source_fact_cannot_change_field_context() -> None:
+    assert not _field_key_leaks("field `source_id` budget", source_facts=("Keep `source_id`.",))
 
 
 @pytest.mark.parametrize(
@@ -448,7 +525,7 @@ def test_preserved_literal_does_not_join_unrelated_words_into_a_field_label() ->
 def test_source_identifier_exemption_only_covers_the_same_whole_key(
     source_identifier: str, leaked_key: str
 ) -> None:
-    assert _field_key_leaks(leaked_key, source_text=f"Preserve `{source_identifier}`.")
+    assert _field_key_leaks(leaked_key, source_facts=(f"Preserve `{source_identifier}`.",))
 
 
 def test_summary_prompt_names_gaps_in_words_not_field_keys() -> None:
@@ -505,8 +582,8 @@ def test_summary_fixtures_obey_the_a10_prompt(summary_suffix: str, extract_suffi
     document = _fixture_response("brief_decoder.generate_summary_v1" + summary_suffix)
     sections = {s["id"]: s["content"] for s in document["sections"]}
 
-    # JSON encoding would invent quotes around bare values and escape the client's real quotes.
-    source_text = "\n".join(
+    # Keep complete values separate: joining them could invent a statement the client never made.
+    source_facts = tuple(
         item
         for value in brief["values"].values()
         for item in ([value] if isinstance(value, str) else value)
@@ -517,7 +594,7 @@ def test_summary_fixtures_obey_the_a10_prompt(summary_suffix: str, extract_suffi
         for field in ("title", "content")
     ]
     for where, text in [*texts, ("summary", document["summary"])]:
-        leaks = _field_key_leaks(text, source_text=source_text)
+        leaks = _field_key_leaks(text, source_facts=source_facts)
         assert not leaks, f"{where}: field key leaks {leaks}"
 
     for section_id, allowed in _NON_FACT_WORDS.items():
@@ -547,7 +624,7 @@ def test_summary_fixture_guard_rejects_leaks_in_every_copied_field(
         test_summary_fixtures_obey_the_a10_prompt(suffix, _SUMMARY_FIXTURES[suffix])
 
 
-@pytest.mark.parametrize("delimiter", ["`", "``", '"', "'"])
+@pytest.mark.parametrize("delimiter", ["", "`", "``", '"', "'"])
 def test_summary_fixture_guard_preserves_identifiers_from_extracted_values(
     monkeypatch: pytest.MonkeyPatch, delimiter: str
 ) -> None:
@@ -561,6 +638,29 @@ def test_summary_fixture_guard_preserves_identifiers_from_extracted_values(
         response = original(name)
         if name == "brief_decoder.extract_brief_v1":
             response["values"]["project_goal"] = source
+        elif name == "brief_decoder.generate_summary_v1":
+            response["sections"][0]["content"] = source
+        return response
+
+    monkeypatch.setitem(globals(), "_fixture_response", fixture_response)
+    test_summary_fixtures_obey_the_a10_prompt("", "")
+
+
+@pytest.mark.parametrize("source", _CLIENT_FACTS_WITH_COLLIDING_IDENTIFIERS)
+@pytest.mark.parametrize("source_field", ["project_goal", "deliverables"])
+def test_summary_fixture_guard_preserves_complete_client_facts(
+    monkeypatch: pytest.MonkeyPatch, source: str, source_field: str
+) -> None:
+    original = _fixture_response
+
+    def fixture_response(name: str) -> dict[str, Any]:
+        response = original(name)
+        if name == "brief_decoder.extract_brief_v1":
+            assert "target_audience" in response["missing_fields"]
+            if source_field == "deliverables":
+                response["values"][source_field].append(source)
+            else:
+                response["values"][source_field] = source
         elif name == "brief_decoder.generate_summary_v1":
             response["sections"][0]["content"] = source
         return response
@@ -586,7 +686,15 @@ def test_summary_fixture_guard_rejects_code_formatted_single_word_fields(
 
 
 @pytest.mark.parametrize(
-    "leak", ["target_audience is missing.", "target_audience не указан.", "Falta target_audience."]
+    "leak",
+    [
+        "target_audience is missing.",
+        "target_audience не указан.",
+        "Falta target_audience.",
+        "The `target_audience` field is missing.",
+        "Поле `target_audience` не указано.",
+        "No se ha indicado el campo `target_audience`.",
+    ],
 )
 def test_source_identifier_does_not_hide_a_still_missing_brief_field(
     monkeypatch: pytest.MonkeyPatch, leak: str
