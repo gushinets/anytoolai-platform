@@ -284,6 +284,55 @@ _GAPS_KEYWORD = {
     "target_audience": "audience",
     "constraints": "constraint",
 }
+_SNAKE_CASE_KEY = re.compile(r"\b[a-z]+(?:_[a-z0-9]+)+\b")
+_KEY_LABELS = re.compile(r"missing fields?\s*:|fields? by name|пропущено поле", re.IGNORECASE)
+
+
+def _field_key_leaks(text: str) -> list[str]:
+    """Find machine keys and technical labels in client-facing summary fixtures."""
+    return _SNAKE_CASE_KEY.findall(text) + _KEY_LABELS.findall(text)
+
+
+@pytest.mark.parametrize(
+    "leaky",
+    [
+        "Missing field: target_audience",
+        "Missing fields by name: deliverables",
+        "Пропущено поле: target_audience",
+        "Missing: project_goal, deliverables, deadline, budget, target_audience, constraints",
+        "missing_fields",
+        "Missing fields: deliverables",
+    ],
+)
+def test_field_key_leak_guard_catches_the_qa_strings(leaky: str) -> None:
+    assert _field_key_leaks(leaky)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Project goal, deliverables, deadline, budget, target audience and constraints are missing.",
+        "Клиенту нужно уточнить цель проекта, результаты, срок, бюджет, аудиторию и ограничения.",
+        "El cliente debe confirmar el objetivo, los entregables, el plazo, el presupuesto, "
+        "el público objetivo y las restricciones.",
+    ],
+)
+def test_field_key_leak_guard_accepts_plain_words(text: str) -> None:
+    assert not _field_key_leaks(text)
+
+
+def test_summary_prompt_names_gaps_in_words_not_field_keys() -> None:
+    """ANY-615: requesting missing fields by name made the model copy raw keys to the reader."""
+    prompt = (PRODUCT_DIR / "prompts" / "generate_summary.v1.md").read_text(encoding="utf-8")
+    assert "by name" not in prompt
+    for key in _GAPS_KEYWORD:
+        readable = key.replace("_", " ")
+        assert f'`{key}` as "{readable}"' in prompt, key
+    assert "Never show a field key" in prompt
+    assert "language the document is written in" in prompt
+    assert "every section and to `summary`" in prompt
+
+
 # Words a section may use that carry no project fact. Deliberately per-section: `overview` is
 # only allowed to state present facts (generate_summary.v1.md: "do not mention absent ones
 # here"), so it gets no words for talking about the brief or missing details -- allowing them
@@ -313,21 +362,22 @@ def test_summary_fixtures_obey_the_a10_prompt(summary_suffix: str, extract_suffi
     `data.brief.missing_fields` entry. The fixtures are the deterministic evidence for those
     rules, so they are checked against the A01 fixture that feeds the same run (code review:
     the overview named a "bakery" and "new website" that no A01 value carried, and the weak
-    fixture never reported `constraints` missing)."""
+    fixture never reported `constraints` missing). ANY-615 forbids field keys and technical
+    labels in every section and the summary."""
     assert set(_GAPS_KEYWORD) == {
         f["name"] for f in _literal(_steps()["extract"]["input_mapping"]["fields"])
     }
     brief = _fixture_response("brief_decoder.extract_brief_v1" + extract_suffix)
-    sections = {
-        s["id"]: s["content"]
-        for s in _fixture_response("brief_decoder.generate_summary_v1" + summary_suffix)["sections"]
-    }
+    document = _fixture_response("brief_decoder.generate_summary_v1" + summary_suffix)
+    sections = {s["id"]: s["content"] for s in document["sections"]}
 
     for section_id, allowed in _NON_FACT_WORDS.items():
         ungrounded = _stems(sections[section_id]) - _stems(json.dumps(brief["values"])) - allowed
         assert not ungrounded, (section_id, sorted(ungrounded))
     for name in brief["missing_fields"]:
         assert _GAPS_KEYWORD[name] in sections["gaps"].lower(), name
+    for where, text in [*sections.items(), ("summary", document["summary"])]:
+        assert not _field_key_leaks(text), (where, _field_key_leaks(text))
 
 
 def test_schemas_are_closed() -> None:

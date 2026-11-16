@@ -14,8 +14,12 @@ Produce exactly these `sections`, in this order, with these `id`s:
    Write only facts that are present; do not mention absent ones here.
 2. `key-details` ("Key details"): deliverables, deadline, budget and constraints that were found,
    as a list (`metadata.kind` = `list`). If none were found, say so in one sentence.
-3. `gaps` ("Gaps and risks"): the `data.issues` in plain sentences, plus the `data.brief.missing_fields`
-   by name. If there are no issues and nothing is missing, say the brief is clear and complete.
+3. `gaps` ("Gaps and risks"): the `data.issues` in plain sentences, plus every entry of
+   `data.brief.missing_fields` named in ordinary words: `project_goal` as "project goal",
+   `deliverables` as "deliverables", `deadline` as "deadline", `budget` as "budget",
+   `target_audience` as "target audience", `constraints` as "constraints" -- translated into
+   the language the document is written in. Say the client should confirm them. If there are
+   no issues and nothing is missing, say the brief is clear and complete.
 4. `next-steps` ("Questions to ask"): the `data.questions` as a list (`metadata.kind` = `list`).
    If there are none, say that no clarifying questions were generated -- do not claim work can
    start here; an empty question list only means nothing needed asking, not that the brief is
@@ -30,5 +34,9 @@ does. It is not a list of section titles.
 Rules:
 
 - Never invent facts, figures or dates that are not in `data`.
+- Never show a field key from `data` to the reader: no snake_case identifiers such as
+  `target_audience` or `project_goal`, no code formatting, and no technical field labels like
+  "Missing field:". This applies to every section and to `summary`. Name the information in
+  ordinary words in the language of the document.
 - Write in full sentences; no placeholders, meta-commentary or chain-of-thought.
 - Honor `style` when supplied (`professional`, `concise`, `detailed`; default `professional`).
