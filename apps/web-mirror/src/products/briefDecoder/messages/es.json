@@ -14,7 +14,14 @@
     "resultTitle": "Brief analizado",
     "placeholder": "Su brief analizado aparecerá aquí después del análisis.",
     "regenerate": "Analizar brief de nuevo",
-    "continueToTarget": "Crear criterios de aceptación"
+    "continueToTarget": "Crear criterios de aceptación",
+    "example": {
+      "intro": "Pega el brief tal como lo escribió el cliente. Un brief vago como este da:",
+      "inputs": {
+        "briefText": "Necesitamos una web nueva para nuestra panadería. Algo moderno, como lo que tienen nuestros competidores. Queremos publicarla antes de las fiestas. Envíanos tu precio."
+      },
+      "output": "Objetivo del proyecto: una web nueva para la panadería. Entregables: no indicado. Fecha límite: «antes de las fiestas», sin fecha. Presupuesto: no indicado.\nProblemas: información faltante (lista de páginas, quién aporta textos y fotos); ambigüedad («moderno, como los competidores»).\nPreguntas para el cliente: ¿Qué páginas y funciones necesitas (menú, pedidos en línea, mapa)? ¿Cuál es la fecha exacta de lanzamiento? ¿Quién aporta los textos y las fotos? ¿Qué rango de presupuesto tienes previsto?"
+    }
   },
   "result": {
     "brief": "Brief",

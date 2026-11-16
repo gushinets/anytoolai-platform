@@ -36,6 +36,7 @@ import { CLIENT_UPDATE_WRITER_MESSAGES } from "../src/products/clientUpdateWrite
 import { makeRender } from "./support/renderWithI18n";
 import { expectDataProcessingNotice } from "./support/expectDataProcessingNotice";
 import { simulateBrowserTranslation } from "@anytoolai/shared-ui/test/support/simulateBrowserTranslation";
+import { LOCALES } from "../src/i18n";
 import { LOCALE_STORAGE_KEY } from "../src/i18n/localeStorage";
 
 const render = makeRender(CLIENT_UPDATE_WRITER_MESSAGES);
@@ -1342,4 +1343,51 @@ it("resolves the saved mode before mounting any other mode's saved run", async (
   await screen.findByText("Saved reply.");
   expect(made.calls.filter((call) => call.key.includes("/scenario-sessions/")).map((call) => call.key)).toEqual([r.SESSION]);
   expect(made.calls.some((call) => call.key.endsWith("/start"))).toBe(false);
+});
+
+
+describe("first-run examples", () => {
+  it.each(LOCALES)("all mode samples pass validation and short fields fit in %s", (locale) => {
+    const messages = CLIENT_UPDATE_WRITER_MESSAGES[locale];
+    expect(updateDefinition.validate({ ...messages.update.example.inputs, tone: "neutral" })).toEqual({});
+    expect(replyDraftDefinition.validate({ ...messages.reply_draft.example.inputs, tone: "warm" })).toEqual({});
+    const prepaid = messages.prepaid_request.example.inputs;
+    expect(prepaid.billingAmount.length).toBeLessThanOrEqual(40);
+    expect(prepaid.billingDueDate.length).toBeLessThanOrEqual(40);
+    expect(prepaidRequestDefinition.validate({ ...prepaid, tone: "neutral" })).toEqual({});
+  });
+
+  it("each mode shows only its own example and opening it preserves typed fields", async () => {
+    const routes = routesFor(MODE_IDS.update);
+    const { client } = makeClient({
+      [routes.RUNTIME_CONFIG]: [fullRuntimeConfigResponse(MODE_IDS.update)],
+      [routes.GUEST_IDENTITY]: [guestIdentityResponse()],
+      [routes.QUOTA]: Object.values(MODE_IDS).map((ids) => quotaResponse(ids)),
+    });
+    render(<ClientUpdateWriterProduct client={client} />);
+    await screen.findByLabelText("Progress notes");
+    for (const [index, scenario] of MODE_SCENARIOS.entries()) {
+      if (index > 0) fireEvent.click(screen.getByRole("radio", { name: CLIENT_UPDATE_WRITER_MESSAGES.en.modes[scenario.mode as keyof typeof MODE_IDS] }));
+      const example = CLIENT_UPDATE_WRITER_MESSAGES.en[scenario.mode as keyof typeof MODE_IDS].example;
+      await screen.findByText(example.intro);
+      for (const other of MODE_SCENARIOS.filter((item) => item !== scenario)) {
+        expect(screen.queryByText(CLIENT_UPDATE_WRITER_MESSAGES.en[other.mode as keyof typeof MODE_IDS].example.intro)).toBeNull();
+      }
+      for (const [label, value] of scenario.fields) {
+        fireEvent.change(screen.getByLabelText(label), { target: { value } });
+      }
+      const details = screen.getByTestId<HTMLDetailsElement>("first-run-example");
+      details.open = true;
+      fireEvent(details, new Event("toggle"));
+      for (const [label, value] of scenario.fields) {
+        expect(screen.getByLabelText<HTMLInputElement | HTMLTextAreaElement>(label).value).toBe(value);
+      }
+    }
+    const amount = screen.getByLabelText("Amount");
+    expect(amount.getAttribute("aria-describedby")).toContain("client-update-writer-billing-amount-help");
+    expect(screen.getByText(CLIENT_UPDATE_WRITER_MESSAGES.en.fields.billingAmountHelp)).toBeTruthy();
+    fireEvent.change(amount, { target: { value: "x".repeat(41) } });
+    fireEvent.click(screen.getByRole("button", { name: "Write request" }));
+    expect(amount.getAttribute("aria-describedby")).toBe("client-update-writer-billing-amount-help client-update-writer-billing-amount-error");
+  });
 });

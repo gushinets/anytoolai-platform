@@ -14,7 +14,14 @@
     "resultTitle": "Decoded brief",
     "placeholder": "Your decoded brief will appear here after you decode it.",
     "regenerate": "Decode brief again",
-    "continueToTarget": "Create acceptance criteria"
+    "continueToTarget": "Create acceptance criteria",
+    "example": {
+      "inputs": {
+        "briefText": "We need a new website for our bakery. Something modern, like our competitors have. We want it live before the holiday season. Please send your price."
+      },
+      "intro": "Paste the brief exactly as the client wrote it. A vague brief like this one gives:",
+      "output": "Project goal: a new bakery website. Deliverables: not provided. Deadline: “before the holiday season”, no date. Budget: not provided.\nIssues: missing information (page list, who supplies texts and photos); ambiguity (“modern, like competitors”).\nQuestions to ask: Which pages and features do you need (menu, online orders, map)? What exact launch date do you mean? Who provides the texts and photos? What budget range are you working with?"
+    }
   },
   "result": {
     "brief": "Brief",

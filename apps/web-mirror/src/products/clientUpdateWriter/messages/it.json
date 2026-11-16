@@ -20,7 +20,8 @@
     "billingAmount": "Importo",
     "billingDueDate": "Scadenza (facoltativa)",
     "tone": "Tono",
-    "tonePlaceholder": "Selezioni un tono"
+    "tonePlaceholder": "Selezioni un tono",
+    "billingAmountHelp": "Sii breve, ad esempio «acconto del 50%, $900». Inserisci il motivo, l’importo di base e il saldo nelle note di fatturazione."
   },
   "fieldNames": {
     "progressNotes": "Note sull’avanzamento",
@@ -37,7 +38,14 @@
     "runFailed": "Si è verificato un problema durante la scrittura dell’aggiornamento. Riprovi.",
     "resultTitle": "Aggiornamento",
     "placeholder": "L’aggiornamento apparirà qui dopo la scrittura.",
-    "regenerate": "Riscriva l’aggiornamento"
+    "regenerate": "Riscriva l’aggiornamento",
+    "example": {
+      "intro": "Bastano semplici appunti in qualsiasi ordine. Per esempio:",
+      "inputs": {
+        "progressNotes": "Restyling della homepage completato, in attesa della revisione del cliente entro venerdì. Prossimo passo: pagine interne, da lunedì. Nessun blocco."
+      },
+      "output": "Buongiorno,\n\nUn rapido aggiornamento sul restyling: la homepage è pronta per la vostra revisione entro venerdì. Da lunedì passerò alle pagine interne. Al momento non ci sono blocchi.\n\nInviatemi i commenti sulla homepage entro venerdì, così le pagine interne potranno basarsi sulla versione approvata."
+    }
   },
   "reply_draft": {
     "submit": "Scriva la risposta",
@@ -45,7 +53,15 @@
     "runFailed": "Si è verificato un problema durante la scrittura della risposta. Riprovi.",
     "resultTitle": "Bozza di risposta",
     "placeholder": "La risposta apparirà qui dopo la scrittura.",
-    "regenerate": "Riscriva la risposta"
+    "regenerate": "Riscriva la risposta",
+    "example": {
+      "intro": "Incolla il messaggio del cliente e indica l’obiettivo della risposta. Per esempio:",
+      "inputs": {
+        "clientMessage": "Ciao, puoi aggiungere anche una sezione blog? E potremmo avere tutto una settimana prima?",
+        "replyGoal": "Accettare il blog come extra a pagamento, mantenere la scadenza originale e proporre una breve chiamata."
+      },
+      "output": "Ciao,\n\nAggiungo volentieri una sezione blog. È fuori dall’ambito concordato, quindi oggi ti invierò una breve stima. Anticipare l’intera consegna di una settimana senza ridurre la qualità non è realistico; propongo di mantenere la data originale e consegnare prima la homepage.\n\nTi andrebbe una chiamata di 15 minuti domani per concordare i dettagli?"
+    }
   },
   "prepaid_request": {
     "submit": "Scriva la richiesta",
@@ -53,6 +69,15 @@
     "runFailed": "Si è verificato un problema durante la scrittura della richiesta. Riprovi.",
     "resultTitle": "Richiesta di pagamento anticipato",
     "placeholder": "La richiesta apparirà qui dopo la scrittura.",
-    "regenerate": "Riscriva la richiesta"
+    "regenerate": "Riscriva la richiesta",
+    "example": {
+      "intro": "L’importo resta breve; motivo, base di calcolo e saldo vanno nelle note. Per esempio:",
+      "inputs": {
+        "billingNotes": "Budget concordato per il design della landing page: $1.800. L’acconto del 50% ($900) riserva il tempo del team; i restanti $900 sono dovuti dopo la consegna del mockup. I dati di pagamento arriveranno in una fattura separata.",
+        "billingAmount": "acconto del 50%, $900",
+        "billingDueDate": "entro 4 giorni"
+      },
+      "output": "Buongiorno,\n\nPer riservare il tempo del team per il design della landing page, vi chiedo di versare entro 4 giorni l’acconto del 50%, pari a $900 sul budget concordato di $1.800. I restanti $900 saranno dovuti dopo la consegna del mockup. I dati di pagamento seguiranno in una fattura separata.\n\nVi prego di confermare quando il pagamento sarà stato inviato."
+    }
   }
 }

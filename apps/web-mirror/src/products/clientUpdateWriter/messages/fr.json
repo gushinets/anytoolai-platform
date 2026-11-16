@@ -20,7 +20,8 @@
     "billingAmount": "Montant",
     "billingDueDate": "Date d’échéance (facultatif)",
     "tone": "Ton",
-    "tonePlaceholder": "Sélectionnez un ton"
+    "tonePlaceholder": "Sélectionnez un ton",
+    "billingAmountHelp": "Restez bref, par exemple « acompte de 50 %, 900 $ ». Indiquez le motif, le montant de base et le solde dans les notes de facturation."
   },
   "fieldNames": {
     "progressNotes": "Les notes d’avancement",
@@ -37,7 +38,14 @@
     "runFailed": "Une erreur s’est produite lors de la rédaction de votre point d’avancement. Veuillez réessayer.",
     "resultTitle": "Point d’avancement",
     "placeholder": "Votre point d’avancement apparaîtra ici après sa rédaction.",
-    "regenerate": "Rédiger à nouveau le point d’avancement"
+    "regenerate": "Rédiger à nouveau le point d’avancement",
+    "example": {
+      "intro": "De simples notes, dans n’importe quel ordre, suffisent. Par exemple :",
+      "inputs": {
+        "progressNotes": "Refonte de la page d’accueil terminée, en attente du retour du client d’ici vendredi. Ensuite : pages intérieures, à partir de lundi. Aucun blocage."
+      },
+      "output": "Bonjour,\n\nUn point rapide sur la refonte : la page d’accueil est prête pour votre relecture d’ici vendredi. Dès lundi, je passe aux pages intérieures. Aucun blocage pour le moment.\n\nMerci de m’envoyer vos remarques sur la page d’accueil d’ici vendredi pour que les pages intérieures s’appuient sur la version validée."
+    }
   },
   "reply_draft": {
     "submit": "Rédiger la réponse",
@@ -45,7 +53,15 @@
     "runFailed": "Une erreur s’est produite lors de la rédaction de votre réponse. Veuillez réessayer.",
     "resultTitle": "Brouillon de réponse",
     "placeholder": "Votre réponse apparaîtra ici après sa rédaction.",
-    "regenerate": "Rédiger à nouveau la réponse"
+    "regenerate": "Rédiger à nouveau la réponse",
+    "example": {
+      "intro": "Collez le message du client et précisez le but de votre réponse. Par exemple :",
+      "inputs": {
+        "clientMessage": "Bonjour, pouvez-vous aussi ajouter une rubrique blog ? Et pourrions-nous tout avoir une semaine plus tôt ?",
+        "replyGoal": "Accepter le blog en supplément payant, maintenir le délai initial et proposer un bref appel."
+      },
+      "output": "Bonjour,\n\nJ’ajouterai volontiers une rubrique blog. Elle dépasse le périmètre convenu, je vous enverrai donc une courte estimation aujourd’hui. Avancer toute la livraison d’une semaine sans réduire la qualité n’est pas réaliste ; je propose de garder la date initiale et de livrer la page d’accueil en premier.\n\nUn appel de 15 minutes demain vous conviendrait-il pour fixer les détails ?"
+    }
   },
   "prepaid_request": {
     "submit": "Rédiger la demande",
@@ -53,6 +69,15 @@
     "runFailed": "Une erreur s’est produite lors de la rédaction de votre demande. Veuillez réessayer.",
     "resultTitle": "Demande de paiement d’avance",
     "placeholder": "Votre demande apparaîtra ici après sa rédaction.",
-    "regenerate": "Rédiger à nouveau la demande"
+    "regenerate": "Rédiger à nouveau la demande",
+    "example": {
+      "intro": "Le montant reste court ; le motif, la base et le solde vont dans les notes. Par exemple :",
+      "inputs": {
+        "billingNotes": "Budget convenu pour la conception de la page : 1 800 $. L’acompte de 50 % (900 $) réserve le temps de l’équipe ; le solde de 900 $ est dû après livraison de la maquette. Les coordonnées de paiement seront sur une facture séparée.",
+        "billingAmount": "acompte de 50 %, 900 $",
+        "billingDueDate": "sous 4 jours"
+      },
+      "output": "Bonjour,\n\nPour réserver le temps de l’équipe pour la conception de la page, merci de verser sous 4 jours l’acompte de 50 %, soit 900 $ sur le budget convenu de 1 800 $. Le solde de 900 $ sera dû après livraison de la maquette. Les coordonnées de paiement suivront sur une facture séparée.\n\nMerci de me confirmer l’envoi du paiement."
+    }
   }
 }

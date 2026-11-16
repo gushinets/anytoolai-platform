@@ -8,7 +8,7 @@
 - Created: 2026-11-13
 - Last updated: 2026-11-16
 - Review date: 2026-11-20
-- Next action: owner review of the verified quota-smoke correction; live model smoke still needs a valid provider key.
+- Next action: owner review/commit of the verified main integration; live model smoke still needs a valid provider key.
 - Blocker: local baseline requires passwordless sudo for the unchanged activation-marker test;
   round-3 live model smoke is blocked by an expired provider API key.
 
@@ -334,3 +334,32 @@ Implementation and verification:
   production and remote CI were not rerun for this test-only correction. The local dev stack was
   stopped after verification. The owner subsequently authorized committing, pushing and updating
   the PR description.
+
+## Main integration: example input assertion (2026-11-16)
+
+Frontend CI run 43821077293 tested merge `29904cdd` (feature `585d28bc` plus main `9f9d6ebc`),
+not the feature checkout alone. ANY-847 added a first-run example test whose exact request
+expectation omits ANY-843's required result-contract marker: 823 web tests passed and one failed.
+The separate ProposalAI smoke run 43821077233 passed on the same feature head.
+
+The owner authorized integrating main and correcting the expectation, with a complete frontend
+gate on the combined code. Plan: merge main into the existing branch without committing, retain
+both features, add the marker from the already-imported backend schema to the exact input
+assertion, check other ProposalAI input assertions, and run frontend-check. Preserve the example
+test's own-input/draft/event checks and keep the marker requirement unchanged. Record validation
+before a separate commit/push request; the reopened result-before-quota review is outside this fix.
+
+Implementation and verification:
+
+- Merged current main `9f9d6ebc` into `feature/ANY-843` without conflicts, retaining ANY-847's
+  examples and ANY-843's contract. The merge is prepared locally without a commit.
+- Added `result_contract: proposalInputSchema.properties.result_contract.const` to the example
+  test's exact input expectation. Other ProposalAI request assertions were checked; no additional
+  mismatch was found. User input, draft/event and sample-text exclusion assertions remain intact.
+- All 115 ProposalAI tests passed first. Complete canonical frontend-check then passed with serial
+  workspace execution: lint, typecheck, 824 web tests, 336 CE-kit tests, 55 shared-ui tests,
+  349 Chromium tests, generated API-contract drift check and all builds. Doctor, documentation
+  validation and staged/unstaged whitespace checks passed.
+- Backend gates, dedicated product smokes, live model calls, production and remote CI were not
+  repeated for this integration. No push or GitHub update was performed; the separately reopened
+  delayed-quota finding remains outside this verification.

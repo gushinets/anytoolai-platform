@@ -14,7 +14,14 @@
     "resultTitle": "Brief décodé",
     "placeholder": "Votre brief décodé apparaîtra ici après le décodage.",
     "regenerate": "Décoder à nouveau le brief",
-    "continueToTarget": "Créer les critères d’acceptation"
+    "continueToTarget": "Créer les critères d’acceptation",
+    "example": {
+      "intro": "Collez le brief tel que le client l’a écrit. Voici ce que donne un brief aussi vague :",
+      "inputs": {
+        "briefText": "Il nous faut un nouveau site pour notre boulangerie. Quelque chose de moderne, comme chez nos concurrents. Nous voulons le lancer avant les fêtes. Envoyez-nous votre tarif."
+      },
+      "output": "Objectif du projet : un nouveau site de boulangerie. Livrables : non indiqué. Échéance : « avant les fêtes », sans date. Budget : non indiqué.\nProblèmes : information manquante (liste des pages, qui fournit les textes et photos) ; ambiguïté (« moderne, comme chez les concurrents »).\nQuestions à poser : Quelles pages et fonctionnalités faut-il (menu, commandes en ligne, carte) ? Quelle est la date exacte de lancement ? Qui fournit les textes et photos ? Quelle fourchette de budget prévoyez-vous ?"
+    }
   },
   "result": {
     "brief": "Brief",
