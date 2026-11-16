@@ -6,9 +6,9 @@
 - Owner: agent
 - Linear: ANY-843
 - Created: 2026-11-13
-- Last updated: 2026-11-14
+- Last updated: 2026-11-16
 - Review date: 2026-11-20
-- Next action: owner review of the implemented round-3 fixes; repeat live smoke with a valid provider key.
+- Next action: owner review of the verified quota-smoke correction; live model smoke still needs a valid provider key.
 - Blocker: local baseline requires passwordless sudo for the unchanged activation-marker test;
   round-3 live model smoke is blocked by an expired provider API key.
 
@@ -293,3 +293,44 @@ Implementation and verification:
   is required`). No suppression or test skip was added. The final eval-only repeat passed all
   184 tests after the schema-drift assertion was added. No production or CI verification was
   performed. The owner subsequently authorized committing, pushing and updating the PR description.
+
+## Quota smoke correction (2026-11-16)
+
+Review on `fb83faf7` confirmed the dedicated ProposalAI smoke expects an extra START after the
+browser has already observed exhausted quota. CI attempt 2 of run 43606935725 reported nine
+passes and one 240-second timeout on the disabled Generate button. The owner authorized fixing
+the smoke while retaining the real backend 429 assertion and running the complete product smoke.
+
+Implementation plan:
+
+1. Observe zero remaining before aborting further quota reads. After New task, verify that a
+   failed refresh and a filled form preserve disabled Generate, the quota notice and no extra
+   START, progress or result. Preserve the runtime guard.
+2. Reload the same guest with quota reads still unavailable, clearing only the component's quota
+   snapshot. Submit from that unknown-quota state and assert one real backend START returning
+   429 with the quota notice and no fake progress/result. Reuse the same exhausted guest instead
+   of repeating ten successful runs; do not mock START or increase the test timeout.
+3. Run smoke-package lint/typecheck and the canonical `proposal-ai-smoke` against dev-up's
+   deterministic fake provider, then stop the stack started for this verification. This smoke
+   has its own script and CI job; it is not part of frontend-check's `pnpm -r test` stages.
+
+The Brief Decoder, Acceptance Builder and Task Finder quota smokes block quota reads before
+their first navigation and therefore never observe an exhausted snapshot. No matching quota
+smoke exists for Client Update Writer. No product-code change is needed for this finding.
+
+Implementation and verification:
+
+- The smoke waits for the observed zero balance, aborts the next quota refresh and waits for
+  that request to fail. Generate and its quota notice remain consistent after New task and form
+  filling. Dispatching submit directly also leaves the START count at ten, with no progress/Copy.
+- Reload retains the same nonempty guest ID but clears the component's quota snapshot. With
+  quota reads still unavailable, a real eleventh START returns HTTP 429; the quota notice is
+  visible and progress/Copy remain absent. Neither START nor its response is substituted.
+- `doctor`, smoke-package lint/typecheck and documentation validation passed. Canonical
+  `python scripts/agent/runner.py proposal-ai-smoke` built the web app and passed all ten tests
+  against the local API/PostgreSQL/worker with the deterministic fake provider: 1.2 minutes total,
+  31.7 seconds for the quota scenario. The existing 240-second test timeout was not increased.
+- Only the smoke and this execution plan changed. Backend/full frontend gates, live model calls,
+  production and remote CI were not rerun for this test-only correction. The local dev stack was
+  stopped after verification. The owner subsequently authorized committing, pushing and updating
+  the PR description.

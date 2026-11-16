@@ -305,14 +305,16 @@ test.describe("ProposalAI web product", () => {
     await expect(page.getByRole("button", { name: "Generate proposal" })).toHaveCount(0);
   });
 
-  test("quota: advisory display reflects consumption, and the next genuinely new start is authoritatively rejected", async ({
+  test("quota: known exhaustion blocks submit, and unavailable quota after reload still receives a real 429", async ({
     page,
   }) => {
-    // 10 full submit-and-wait cycles plus an 11th submit, each against a real
-    // fake-provider-backed job/worker round trip.
+    // Ten real worker runs exhaust quota; the eleventh START must be rejected before a job.
     test.setTimeout(240_000);
+    const starts = trackScenarioStarts(page, START_ROUTE_PATTERN);
     await page.goto(PRODUCT_URL);
     await expect(page.getByText("10 of 10 proposals remaining.")).toBeVisible();
+    const guestId = await page.evaluate(() => window.localStorage.getItem("anytoolai.guest_id"));
+    expect(guestId).toBeTruthy();
 
     for (const remainingAfter of [9, 8, 7, 6, 5, 4, 3, 2, 1, 0]) {
       await fillValidForm(page);
@@ -328,23 +330,41 @@ test.describe("ProposalAI web product", () => {
       }
     }
 
-    // The refresh would short-circuit into quota-exhausted before any submit, which is correct but
-    // wouldn't prove the authoritative 429 path, so block that advisory call for the final attempt.
+    // A failed refresh must retain the exhausted snapshot already accepted by this mount.
+    await expect(page.getByText("0 of 10 proposals remaining.")).toBeVisible();
     await page.route("**/v1/products/proposal_ai/quota**", (route) => route.abort());
+    const quotaRefreshFailed = page.waitForEvent("requestfailed", (request) =>
+      new URL(request.url()).pathname === "/v1/products/proposal_ai/quota",
+    );
     await page.getByRole("button", { name: "New task" }).click();
+    await quotaRefreshFailed;
     await expect(page.locator("#proposal-ai-task-text")).toBeFocused();
     await expect(page.locator("#proposal-ai-task-text")).toBeEmpty();
     await expect(page.locator("#proposal-ai-positioning")).toBeEmpty();
+    const generate = page.getByRole("button", { name: "Generate proposal" });
+    // Next.js also has an empty route-announcer alert; select the app's quota message.
+    const quotaAlert = page.getByRole("alert").filter({ hasText: "used all your" });
+    await expect(generate).toBeDisabled();
+    await expect(quotaAlert).toHaveText("You've used all your ProposalAI runs for now.");
+    await fillValidForm(page);
+    await expect(generate).toBeDisabled();
+    await page.locator("form").dispatchEvent("submit");
+    expect(starts).toHaveLength(10);
+    await expect(page.getByRole("status")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Copy" })).toHaveCount(0);
+
+    // Reload keeps the exhausted guest but drops the snapshot; unavailable quota permits a real START.
+    await page.reload();
+    await expect(generate).toBeEnabled();
+    expect(await page.evaluate(() => window.localStorage.getItem("anytoolai.guest_id"))).toBe(guestId);
     await fillValidForm(page);
     const rejectedStart = page.waitForResponse((response) =>
       response.request().method() === "POST" && START_ROUTE_PATTERN.test(response.url()),
     );
-    await page.getByRole("button", { name: "Generate proposal" }).click();
+    await generate.click();
     expect((await rejectedStart).status()).toBe(429);
+    expect(starts).toHaveLength(11);
 
-    // Next.js's own route-announcer div also carries role="alert" (empty text) -- scope to the
-    // one this app renders.
-    const quotaAlert = page.getByRole("alert").filter({ hasText: "used all your" });
     await expect(quotaAlert).toHaveText("You've used all your ProposalAI runs for now.", { timeout: 10_000 });
     // No fake progress, scenario session, or job for the rejected attempt.
     await expect(page.getByRole("status")).toHaveCount(0);
