@@ -1,0 +1,80 @@
+{
+  "language": {
+    "label": "Idioma"
+  },
+  "nav": {
+    "label": "Herramientas",
+    "allTools": "Todas las herramientas",
+    "runInProgress": "Hay una ejecución en curso. Si sales, continuará; un resultado correcto consume una ejecución."
+  },
+  "loading": "Cargando {product}…",
+  "unavailable": "{product} no está disponible en este momento. Recargue la página.",
+  "quotaReserved": "Disponibles ahora: {available}. En curso: {reserved}.",
+  "quotaExhausted": "Ha agotado todas sus ejecuciones de {product} por ahora.",
+  "resultFetchFailed": "Su resultado está listo, pero no pudimos cargarlo. Inténtelo de nuevo.",
+  "starting": "Iniciando…",
+  "generating": "Generando…",
+  "runProgress": {
+    "confirmingStart": "Esperando la confirmación de que tu solicitud se ha iniciado.",
+    "elapsed": "Tiempo transcurrido: {time}",
+    "normal": "Esto suele tardar entre 10 y 40 segundos.",
+    "slow": "La generación continúa. Algunas solicitudes tardan un poco más.",
+    "long": "Está tardando más de lo habitual. La generación continúa en el servidor — mantén esta página abierta."
+  },
+  "identityUnavailable": "No pudimos verificar su identidad. Recargue la página e inténtelo de nuevo.",
+  "retry": "Reintentar",
+  "formLabel": "Formulario de {product}",
+  "workspace": {
+    "restoreDraft": "Restaurar borrador guardado",
+    "inputTitle": "Sus datos",
+    "previousDetails": "Resultado basado en los datos anteriores",
+    "backToInputs": "Volver a los datos",
+    "newTask": "Nueva tarea",
+    "handoffOpening": "Abriendo el siguiente paso…",
+    "handoffStay": "Quedarse en esta página",
+    "handoffFailed": "No se pudo abrir el siguiente paso. Inténtelo de nuevo."
+  },
+  "errors": {
+    "attachmentUnrecognized": "No se pudo restaurar esta sesión guardada. Inténtalo de nuevo o selecciona «Nueva tarea» para abrir un formulario vacío.",
+    "attachmentUnavailable": "No se puede abrir esta sesión en esta herramienta. Selecciona «Nueva tarea» para abrir un formulario vacío.",
+    "quotaCapacityReserved": "La capacidad está ocupada temporalmente. Inténtalo de nuevo en un momento.",
+    "startFailed": "No se pudo iniciar {product}. Inténtelo de nuevo.",
+    "timeout": "Esto está tardando más de lo esperado. Inténtelo de nuevo.",
+    "connectionLost": "Se perdió la conexión mientras esperaba su resultado. Inténtelo de nuevo.",
+    "tryAgain": "Inténtelo de nuevo.",
+    "savedOperationPending": "Hay una operación pendiente guardada. Pulsa «Intentar de nuevo» para recargar la página y continuarla.",
+    "storageUnavailable": "Almacenamiento del navegador no disponible. Actívalo y reintenta la misma solicitud."
+  },
+  "result": {
+    "copy": "Copiar",
+    "copying": "Copiando…",
+    "copied": "Copiado",
+    "copyFailed": "No se pudo copiar al portapapeles. Copie el texto de arriba manualmente.",
+    "selectText": "Seleccionar texto"
+  },
+  "validation": {
+    "required": "{field}: este campo es obligatorio.",
+    "maxLength": "{field}: debe tener como máximo {maxLength, plural, one {# carácter} many {# de caracteres} other {# caracteres}}."
+  },
+  "dataNotice": {
+    "label": "Tratamiento de datos.",
+    "text": "Lo que introduces se envía a nuestro servicio y a un proveedor de modelos de IA para crear el resultado, y se almacena junto con tu ejecución en nuestros servidores. Tu borrador se mantiene en este navegador y puede perderse si recargas la página o sales de ella. No introduzcas contraseñas, códigos de acceso, claves de API ni datos completos de tarjetas de pago.",
+    "policyLink": "Política de privacidad",
+    "opensInNewTab": "(se abre en una pestaña nueva)"
+  },
+  "portalSession": {
+    "title": "Sesión del Portal",
+    "required": "Inicia sesión de nuevo para continuar la misma operación.",
+    "continue": "Continuar con el Portal",
+    "loading": "Iniciando sesión…",
+    "failed": "No se pudo autorizar la pestaña. Revisa el almacenamiento del navegador y reinténtalo.",
+    "retry": "Reintentar autorización",
+    "signOut": "Cerrar sesión en esta pestaña"
+  },
+  "example": {
+    "toggle": "Ver un ejemplo",
+    "inputs": "Qué introducir",
+    "output": "Qué obtienes",
+    "note": "Solo como referencia. Tu texto se mantiene tal cual."
+  }
+}

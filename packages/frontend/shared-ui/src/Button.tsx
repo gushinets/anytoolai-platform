@@ -20,7 +20,8 @@ export function Button({ variant = "primary", loading = false, disabled, classNa
       className={[styles.button, variantClass, className].filter(Boolean).join(" ")}
     >
       {loading ? <Spinner /> : null}
-      {children}
+      {/* Keep React's spinner anchor attached when browser translation replaces label text (ANY-840). */}
+      <span className={styles.label}>{children}</span>
     </button>
   );
 }

@@ -1,0 +1,1549 @@
+{
+  "issue": "ANY-845",
+  "review_round": 2,
+  "scope": "RU/EN/ES greeting, tone, client identity and unambiguous Russian name normalization; local API with real provider calls.",
+  "reviewer": "Codex agent; semantic assessments are not human verdicts or full ANY-631 acceptance.",
+  "environment": {
+    "source_fingerprint": "6d159b035a0db437b7f51ea7b14e5f44049b178180578b762233df322cc64561",
+    "profile_fingerprint": "c734513b0fd6ef7945ba4e7a96426c779f52957cfb3ad36f66a55e42f8f8da10",
+    "enabled_products": {
+      "proposal_ai": {
+        "provider_policy_ref": "default_text_generation_v1",
+        "quota_policy_ref": null
+      }
+    },
+    "git_sha": "cce65cdcdff3ebc77e1ab4502386828a477081d4",
+    "git_tree": "f05cb9d7bee6e5f6bf3e536a4da2e92c89107dcf",
+    "git_status_porcelain": [],
+    "tracked_diff_paths": [],
+    "prompt_sha256_from_git": {
+      "compose_persuasive_text.v1.md": "e9462bbfb7b1508e4eb25b317006f3c4bbf19e785570bd3217f27d1400f96660",
+      "detect_experience_gaps.v1.md": "dc23c818c04459410813584a18c811d389d702dddaac8699632a679119ab39d3"
+    },
+    "compose_project": "anytoolai-0a4692b7",
+    "api_url": "http://127.0.0.1:18453",
+    "provider_policy_ref": "default_text_generation_v1",
+    "quota_mode": "unmetered",
+    "channel": "api",
+    "source_context": "Includes main merge 72b99dd1 and ANY-846 gap detection changes; not a controlled composer-only comparison with round 1.",
+    "input_order": "The same 24 committed greeting cases, with G11-en-noname-warm and G12-ru-inflected-name-warm first to check the reviewed branches early. No input values changed.",
+    "python_environment": "Ignored managed-environment directory linking to existing Python 3.12 environment; git_dirty=false."
+  },
+  "series": {
+    "greeting": {
+      "runs": 72,
+      "greeting_passes": 71,
+      "provider_calls": 144,
+      "provider_call_statuses": {
+        "succeeded": 144
+      },
+      "estimated_cost_usd": 0.05079365,
+      "started_at": "2026-11-12T17:14:49+00:00",
+      "completed_at": "2026-11-12T17:31:15.183132+00:00",
+      "automatic_finding_counts": {
+        "long_dash": 5,
+        "missing_required": 1
+      },
+      "results": [
+        {
+          "run_id": "any-845-round2-final-G11-en-noname-warm-1-f319ee21",
+          "case_id": "G11-en-noname-warm",
+          "attempt": 1,
+          "first_line": "Hi,",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:cae779753176618fb57648cd9f1544fbfcb7251c4cfe4224ecb81574985a5919"
+        },
+        {
+          "run_id": "any-845-round2-final-G12-ru-inflected-name-warm-1-8b876a96",
+          "case_id": "G12-ru-inflected-name-warm",
+          "attempt": 1,
+          "first_line": "Здравствуйте, Анна Иванова!",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [
+            "long_dash"
+          ],
+          "answer_sha256": "sha256:dda61338290a0f6d4f49b7eb58e0c7e176ee9c9d8ee3dd2e763efedf77c3ba0e"
+        },
+        {
+          "run_id": "any-845-round2-final-G01-ru-name-warm-1-41fa7581",
+          "case_id": "G01-ru-name-warm",
+          "attempt": 1,
+          "first_line": "Здравствуйте, Анна!",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [
+            "long_dash"
+          ],
+          "answer_sha256": "sha256:fa9886d7734162a372a148a7e94a60b646cc81ac8c7bc3863e8c89933822f141"
+        },
+        {
+          "run_id": "any-845-round2-final-G01-ru-name-neutral-1-c89693df",
+          "case_id": "G01-ru-name-neutral",
+          "attempt": 1,
+          "first_line": "Здравствуйте, Анна.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:cc7b317ae19829aa78f802427fc6da62a7025f59595f35135e8d89871c6d7eb4"
+        },
+        {
+          "run_id": "any-845-round2-final-G01-ru-name-firm-1-9945db41",
+          "case_id": "G01-ru-name-firm",
+          "attempt": 1,
+          "first_line": "Анна, здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:2ea8cc7ad9c960d33b6a8e043d29b88158fc84c12803df3c050eac8939283970"
+        },
+        {
+          "run_id": "any-845-round2-final-G02-ru-noname-neutral-1-4aeefb00",
+          "case_id": "G02-ru-noname-neutral",
+          "attempt": 1,
+          "first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:a702aeaa28512ac3ec5da57c221a81d1e91db15f8e6bba345f4307c4dc99b202"
+        },
+        {
+          "run_id": "any-845-round2-final-G03-ru-freelancer-name-1-a5fd8e83",
+          "case_id": "G03-ru-freelancer-name",
+          "attempt": 1,
+          "first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:656fc9c90e37a68c7a05f8c438139d040a5e3d0ef31e0307dfa26a1f45544d19"
+        },
+        {
+          "run_id": "any-845-round2-final-G04-ru-third-party-1-5c899ea8",
+          "case_id": "G04-ru-third-party",
+          "attempt": 1,
+          "first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:32e78d0f03b5f9f4d083bea9f265178a79295f2ade4cb2b6711e852ef765603b"
+        },
+        {
+          "run_id": "any-845-round2-final-G05-en-name-firm-1-474ea4fb",
+          "case_id": "G05-en-name-firm",
+          "attempt": 1,
+          "first_line": "Hello John,",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:7dc193eff53bffa3d8d9b6d01f4672c83782bea0b767b177c389a396a40b82b4"
+        },
+        {
+          "run_id": "any-845-round2-final-G06-es-name-warm-1-ae1af1c2",
+          "case_id": "G06-es-name-warm",
+          "attempt": 1,
+          "first_line": "Hola, Ana:",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:fe9894c1faa8cc54c8e4be9ecb9d2e3a3351ce913351c51f05afe5e6a9180551"
+        },
+        {
+          "run_id": "any-845-round2-final-G07-es-noname-neutral-1-de338783",
+          "case_id": "G07-es-noname-neutral",
+          "attempt": 1,
+          "first_line": "Hola:",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:61018ecd8e375815b2f14f8c2cc9e76e7625c866d750aaf3176517d4d186e943"
+        },
+        {
+          "run_id": "any-845-round2-final-G08-ru-freelancer-name-in-task-1-076fa66d",
+          "case_id": "G08-ru-freelancer-name-in-task",
+          "attempt": 1,
+          "first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:d890bf571baa61aa4a9af4d6c9b4abd7d12a07bb5e2bed73518a10829213f279"
+        },
+        {
+          "run_id": "any-845-round2-final-G09-ru-ambiguous-names-1-1e282483",
+          "case_id": "G09-ru-ambiguous-names",
+          "attempt": 1,
+          "first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:3d2d88c745e80167c5bcdaf6b5a9bb1ebdd9a28807d85758f13882af7acd5c13"
+        },
+        {
+          "run_id": "any-845-round2-final-G10-ru-brand-name-1-d023b1f2",
+          "case_id": "G10-ru-brand-name",
+          "attempt": 1,
+          "first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:b1877d9ed586cf26d3f44a56d03fe2a57207e69c66aba2276d2279861b43a1cb"
+        },
+        {
+          "run_id": "any-845-round2-final-G02-ru-noname-warm-1-096c27c5",
+          "case_id": "G02-ru-noname-warm",
+          "attempt": 1,
+          "first_line": "Здравствуйте!",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:63a9e20879789e1ba8a68991a54e22fb5b6c45c72f3b753d80647f2410e88fde"
+        },
+        {
+          "run_id": "any-845-round2-final-G02-ru-noname-firm-1-2a773d77",
+          "case_id": "G02-ru-noname-firm",
+          "attempt": 1,
+          "first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:70c1f4f204a4d44e602c37ab0cd502b803fc2ecc6485c81e18d5b91278eb6acc"
+        },
+        {
+          "run_id": "any-845-round2-final-G05-en-name-warm-1-0b36ddc8",
+          "case_id": "G05-en-name-warm",
+          "attempt": 1,
+          "first_line": "Hi John,",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:1ecd996ad2cb26af370847b8a5c5cdb66a6207f5f3a52852065b22996259b32a"
+        },
+        {
+          "run_id": "any-845-round2-final-G05-en-name-neutral-1-fedea431",
+          "case_id": "G05-en-name-neutral",
+          "attempt": 1,
+          "first_line": "Hello John,",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:80058de2aadf54898064160ac2cd636b4dac10e180239cda2320b5e249fbc815"
+        },
+        {
+          "run_id": "any-845-round2-final-G11-en-noname-neutral-1-367fa731",
+          "case_id": "G11-en-noname-neutral",
+          "attempt": 1,
+          "first_line": "Hello,",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:22eb1ff1ac5ef83238589f71fc00a678bbf3278f1ea5145249e391bb534c8fc3"
+        },
+        {
+          "run_id": "any-845-round2-final-G11-en-noname-firm-1-8901eb27",
+          "case_id": "G11-en-noname-firm",
+          "attempt": 1,
+          "first_line": "Hello,",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:202e8814b5d5796bdecea7183e53b654a64f10514e8190703dfe91303e16d26f"
+        },
+        {
+          "run_id": "any-845-round2-final-G06-es-name-neutral-1-baf23a38",
+          "case_id": "G06-es-name-neutral",
+          "attempt": 1,
+          "first_line": "Hola, Ana:",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:7b220a4de186e94d0dd8acf9d0c37435570fe821180cd19fc7bac9ae51b75eb0"
+        },
+        {
+          "run_id": "any-845-round2-final-G06-es-name-firm-1-03226128",
+          "case_id": "G06-es-name-firm",
+          "attempt": 1,
+          "first_line": "Hola, Ana:",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:d6aebeffd35c581c9a7bf58c98f6f1381b192153f6035880b696a340254404d9"
+        },
+        {
+          "run_id": "any-845-round2-final-G07-es-noname-warm-1-2b7f0cf5",
+          "case_id": "G07-es-noname-warm",
+          "attempt": 1,
+          "first_line": "Hola:",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:b4442a390ee8b06d20ad25d1639527ebea4289cffd275c0d1ef390a0f1f5bd8c"
+        },
+        {
+          "run_id": "any-845-round2-final-G07-es-noname-firm-1-be1b2dd1",
+          "case_id": "G07-es-noname-firm",
+          "attempt": 1,
+          "first_line": "Hola:",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:d5123894421c88f37acb461a4209b43793447d8b342e68d63f71a7bc479f3fed"
+        },
+        {
+          "run_id": "any-845-round2-final-G11-en-noname-warm-2-1a8b621f",
+          "case_id": "G11-en-noname-warm",
+          "attempt": 2,
+          "first_line": "Hi,",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:da9b3fa08845239e40220965649aef9f134ac9f13ae248dba37b5e56d77df44c"
+        },
+        {
+          "run_id": "any-845-round2-final-G12-ru-inflected-name-warm-2-a591bc5b",
+          "case_id": "G12-ru-inflected-name-warm",
+          "attempt": 2,
+          "first_line": "Здравствуйте, Анна Иванова!",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:18e9177670650a8534ed34fd36bd45140956695b5b0a8f92e769a82a61b2dba0"
+        },
+        {
+          "run_id": "any-845-round2-final-G01-ru-name-warm-2-fa1bdda4",
+          "case_id": "G01-ru-name-warm",
+          "attempt": 2,
+          "first_line": "Здравствуйте, Анна!",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [
+            "long_dash"
+          ],
+          "answer_sha256": "sha256:31cbfd248a462ba151fc00f4a5cef81e7aab3ef54199833131913f8dfcd25158"
+        },
+        {
+          "run_id": "any-845-round2-final-G01-ru-name-neutral-2-ad9f6fb6",
+          "case_id": "G01-ru-name-neutral",
+          "attempt": 2,
+          "first_line": "Здравствуйте, Анна.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [
+            "long_dash"
+          ],
+          "answer_sha256": "sha256:50b99ee44c815a2b703e915ce8f61ce69b52ad01748e87b5254129e03b3c1c2b"
+        },
+        {
+          "run_id": "any-845-round2-final-G01-ru-name-firm-2-461c2d94",
+          "case_id": "G01-ru-name-firm",
+          "attempt": 2,
+          "first_line": "Анна, здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:20a0dd14bae0bbb633678671f5e33989a4b58b1f6e8b78f9203fc92e7ff16d06"
+        },
+        {
+          "run_id": "any-845-round2-final-G02-ru-noname-neutral-2-fac3a046",
+          "case_id": "G02-ru-noname-neutral",
+          "attempt": 2,
+          "first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:0cafbecc068c2c4a8695fc00f3c68e8973e50cb5fc0b44cbc08e4a91f71006e6"
+        },
+        {
+          "run_id": "any-845-round2-final-G03-ru-freelancer-name-2-03087ec7",
+          "case_id": "G03-ru-freelancer-name",
+          "attempt": 2,
+          "first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:0aae714f7a3221c5f0343fce0c8a6ce3e6eec89818fc9bf52d52a2094e7b82b0"
+        },
+        {
+          "run_id": "any-845-round2-final-G04-ru-third-party-2-98049999",
+          "case_id": "G04-ru-third-party",
+          "attempt": 2,
+          "first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:6656baa03c2500240679085c7320f3d62fc3f01456302dbbed2492ca6c9d4baf"
+        },
+        {
+          "run_id": "any-845-round2-final-G05-en-name-firm-2-bae4cce9",
+          "case_id": "G05-en-name-firm",
+          "attempt": 2,
+          "first_line": "Hello John,",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:afd3db87d3e141f7985e721e1d04c4eada285d0275cd153ba5cdfbad4168267e"
+        },
+        {
+          "run_id": "any-845-round2-final-G06-es-name-warm-2-44da93b1",
+          "case_id": "G06-es-name-warm",
+          "attempt": 2,
+          "first_line": "Hola, Ana:",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:cf6d7de17a3241138261f121ee3db27cc01af84494029a881c78b313bdd103f8"
+        },
+        {
+          "run_id": "any-845-round2-final-G07-es-noname-neutral-2-77ce1028",
+          "case_id": "G07-es-noname-neutral",
+          "attempt": 2,
+          "first_line": "Hola:",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:6532d7f134027270fa3c55cd22f67d41f7b269e901942e8a1bb37379a5c49822"
+        },
+        {
+          "run_id": "any-845-round2-final-G08-ru-freelancer-name-in-task-2-a88c3b3f",
+          "case_id": "G08-ru-freelancer-name-in-task",
+          "attempt": 2,
+          "first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:3f45ff334e1b2619a02a2df605dc1bf6da0969bcd3bbefce0770428bf59427a4"
+        },
+        {
+          "run_id": "any-845-round2-final-G09-ru-ambiguous-names-2-5d07dc46",
+          "case_id": "G09-ru-ambiguous-names",
+          "attempt": 2,
+          "first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:71bfcb36fe820dd58d849396e7336de59c972c2bfaf189aaeb37e0ad94285414"
+        },
+        {
+          "run_id": "any-845-round2-final-G10-ru-brand-name-2-14b71eee",
+          "case_id": "G10-ru-brand-name",
+          "attempt": 2,
+          "first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:e65445c7e929cfc4389eb4283b3b71f19f6e068ab9704e25a90d10ed14f29aae"
+        },
+        {
+          "run_id": "any-845-round2-final-G02-ru-noname-warm-2-0d655508",
+          "case_id": "G02-ru-noname-warm",
+          "attempt": 2,
+          "first_line": "Здравствуйте!",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:a9b60764b0584bdce67784f99e839f511cca20b4e4c07749ff63a8b49f0b895d"
+        },
+        {
+          "run_id": "any-845-round2-final-G02-ru-noname-firm-2-1a7c2ec2",
+          "case_id": "G02-ru-noname-firm",
+          "attempt": 2,
+          "first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:bce3b0e14aefb6ef1f7a2c9ebc52b15e5ad26b8f28b5c89a146bca5e48faf1f6"
+        },
+        {
+          "run_id": "any-845-round2-final-G05-en-name-warm-2-a753d50a",
+          "case_id": "G05-en-name-warm",
+          "attempt": 2,
+          "first_line": "Hi John,",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:e56950f68978e71d2754ca990c3f8ac97a36042552eede4d06e1e37aac1fcc56"
+        },
+        {
+          "run_id": "any-845-round2-final-G05-en-name-neutral-2-ffa04ff0",
+          "case_id": "G05-en-name-neutral",
+          "attempt": 2,
+          "first_line": "Hello John,",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:8f14fa80a562b8a71087668b6f80260e1f99747911c24bd342d19f9e22b0a6cf"
+        },
+        {
+          "run_id": "any-845-round2-final-G11-en-noname-neutral-2-cc2f853b",
+          "case_id": "G11-en-noname-neutral",
+          "attempt": 2,
+          "first_line": "Hello,",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:13f0941296adfdf48ffa41972e35842aa804027a3b88028f46cd11da1ac5214a"
+        },
+        {
+          "run_id": "any-845-round2-final-G11-en-noname-firm-2-8d4a4cde",
+          "case_id": "G11-en-noname-firm",
+          "attempt": 2,
+          "first_line": "Hello,",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:54908ec15f2c6e48855115d2daf71363cd77170daf549c358367e4dde3cdcbea"
+        },
+        {
+          "run_id": "any-845-round2-final-G06-es-name-neutral-2-d08e7dd0",
+          "case_id": "G06-es-name-neutral",
+          "attempt": 2,
+          "first_line": "Hola, Ana:",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:2e6c02b7b1fb11e0165a73b9b1a890e2c1633deac475cf73bb4718792b9bc194"
+        },
+        {
+          "run_id": "any-845-round2-final-G06-es-name-firm-2-ba4b9dd0",
+          "case_id": "G06-es-name-firm",
+          "attempt": 2,
+          "first_line": "Hola, Ana:",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:417787e78a6c3586325d871b382ae91f083653dcd67ccca862b8076cf6d212bb"
+        },
+        {
+          "run_id": "any-845-round2-final-G07-es-noname-warm-2-bf7b245a",
+          "case_id": "G07-es-noname-warm",
+          "attempt": 2,
+          "first_line": "Hola:",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:4d63e43ed55eebe8a74c11aaa1a2f5b10118ad60a16b9d9d17368ff708a7be1f"
+        },
+        {
+          "run_id": "any-845-round2-final-G07-es-noname-firm-2-9c7c37b1",
+          "case_id": "G07-es-noname-firm",
+          "attempt": 2,
+          "first_line": "Hola:",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:308daa31df23dac7a67bc035a2c798498d58f2720ac6c0f746f21affd7fa98bb"
+        },
+        {
+          "run_id": "any-845-round2-final-G11-en-noname-warm-3-3a078bc1",
+          "case_id": "G11-en-noname-warm",
+          "attempt": 3,
+          "first_line": "Hi,",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:41971c47b01fdd270cb9453936e201cc4b4fcd7ec37b5a1cea8931de2f799aa0"
+        },
+        {
+          "run_id": "any-845-round2-final-G12-ru-inflected-name-warm-3-e31b1043",
+          "case_id": "G12-ru-inflected-name-warm",
+          "attempt": 3,
+          "first_line": "Здравствуйте, Анна Иванова!",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [
+            "long_dash"
+          ],
+          "answer_sha256": "sha256:e30f6a238d1d46d8154543122da90b46238deebb7c5100d5aa04f8d02864ebe0"
+        },
+        {
+          "run_id": "any-845-round2-final-G01-ru-name-warm-3-15c6a7ed",
+          "case_id": "G01-ru-name-warm",
+          "attempt": 3,
+          "first_line": "Здравствуйте, Анна!",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:dd9fc391d1882a9e645e42bc24b0589a593a54add1cbd0d465181e983ba23405"
+        },
+        {
+          "run_id": "any-845-round2-final-G01-ru-name-neutral-3-8df6a8b0",
+          "case_id": "G01-ru-name-neutral",
+          "attempt": 3,
+          "first_line": "Здравствуйте, Анна.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:c0368e5beb6879f15d0a5bcc9a87936d837124b98794d62c29238fba75861c94"
+        },
+        {
+          "run_id": "any-845-round2-final-G01-ru-name-firm-3-5e727a06",
+          "case_id": "G01-ru-name-firm",
+          "attempt": 3,
+          "first_line": "Анна, здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:202d232c39b1100cb8fcb75eca26841535aa3821fda728b570ada88b6b7f7d3d"
+        },
+        {
+          "run_id": "any-845-round2-final-G02-ru-noname-neutral-3-26a1723c",
+          "case_id": "G02-ru-noname-neutral",
+          "attempt": 3,
+          "first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:0c0bedd5dbb4bf0f12713423b54573735bde32b555f09e1d1494dbf957283877"
+        },
+        {
+          "run_id": "any-845-round2-final-G03-ru-freelancer-name-3-3212e484",
+          "case_id": "G03-ru-freelancer-name",
+          "attempt": 3,
+          "first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:215a0858ee8b4e6cb31f2c2cf6779f804c944bcc72cffcc57353f6d6e38b179b"
+        },
+        {
+          "run_id": "any-845-round2-final-G04-ru-third-party-3-3f94ad68",
+          "case_id": "G04-ru-third-party",
+          "attempt": 3,
+          "first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:31278b8fba35076704aa429e520dbb895d8f47e179b562b57b6e5dfccacd6253"
+        },
+        {
+          "run_id": "any-845-round2-final-G05-en-name-firm-3-a46d07c4",
+          "case_id": "G05-en-name-firm",
+          "attempt": 3,
+          "first_line": "Hello John,",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:a97ccb105cdd71a764980d108e4c658f4faa28e90522dcda713e2e5177f5135f"
+        },
+        {
+          "run_id": "any-845-round2-final-G06-es-name-warm-3-2849840f",
+          "case_id": "G06-es-name-warm",
+          "attempt": 3,
+          "first_line": "Hola, Ana:",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:2329c3d7159e66a7a77fe874bbfb20cfe7b9c178aff6c0f72e228fd985603e08"
+        },
+        {
+          "run_id": "any-845-round2-final-G07-es-noname-neutral-3-4aeefaa2",
+          "case_id": "G07-es-noname-neutral",
+          "attempt": 3,
+          "first_line": "Hola:",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:88587d69c6496599b5e834ce65419aad37a2f7962dbaac55650054464884b1f0"
+        },
+        {
+          "run_id": "any-845-round2-final-G08-ru-freelancer-name-in-task-3-97e941f6",
+          "case_id": "G08-ru-freelancer-name-in-task",
+          "attempt": 3,
+          "first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:b521782ac3a18338b07f575bae66d8ebf730ff4224477a0bd2cd95ccbd1c66f8"
+        },
+        {
+          "run_id": "any-845-round2-final-G09-ru-ambiguous-names-3-a62a9a5f",
+          "case_id": "G09-ru-ambiguous-names",
+          "attempt": 3,
+          "first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:57112d4e283a41a23522e590a156bb2bfa7b384644b7f9b2848d2240f695273f"
+        },
+        {
+          "run_id": "any-845-round2-final-G10-ru-brand-name-3-233a1d10",
+          "case_id": "G10-ru-brand-name",
+          "attempt": 3,
+          "first_line": "Здравствуйте!",
+          "required_greeting_and_blank_line": false,
+          "automatic_findings": [
+            "missing_required"
+          ],
+          "answer_sha256": "sha256:84a11ad38fcbf84423ae0257f7e4e4fe102a94e35bda224858cc97795f5ef836"
+        },
+        {
+          "run_id": "any-845-round2-final-G02-ru-noname-warm-3-4fc5ab06",
+          "case_id": "G02-ru-noname-warm",
+          "attempt": 3,
+          "first_line": "Здравствуйте!",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:5cfdab1ef436f7079c83147fd63567cc2a339efd8c1ab1126646242adbf84a9b"
+        },
+        {
+          "run_id": "any-845-round2-final-G02-ru-noname-firm-3-a4244823",
+          "case_id": "G02-ru-noname-firm",
+          "attempt": 3,
+          "first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:d3f1043ef5af487704b65ef5f73f9386fa85322222dc3988e5ec19c8c66306bf"
+        },
+        {
+          "run_id": "any-845-round2-final-G05-en-name-warm-3-428759f6",
+          "case_id": "G05-en-name-warm",
+          "attempt": 3,
+          "first_line": "Hi John,",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:0a428fd586a6afb26a83cd81d4be73e6a6a2bdeb85f95109bd90e0cec25bd1bc"
+        },
+        {
+          "run_id": "any-845-round2-final-G05-en-name-neutral-3-12a1a826",
+          "case_id": "G05-en-name-neutral",
+          "attempt": 3,
+          "first_line": "Hello John,",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:cb7c0d2fe8f7336fc99306666219b80d47062d415acda27378b6d2bebf3b0c5f"
+        },
+        {
+          "run_id": "any-845-round2-final-G11-en-noname-neutral-3-2dfcb64c",
+          "case_id": "G11-en-noname-neutral",
+          "attempt": 3,
+          "first_line": "Hello,",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:e4eac57033c7e332752ba1f64d08e7cec20e95fc7824309889a20fd77bae28ba"
+        },
+        {
+          "run_id": "any-845-round2-final-G11-en-noname-firm-3-3c521c9a",
+          "case_id": "G11-en-noname-firm",
+          "attempt": 3,
+          "first_line": "Hello,",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:ec10dd6c1687679c1449aebcc951bddde3683d45d090a93bed431623b8776422"
+        },
+        {
+          "run_id": "any-845-round2-final-G06-es-name-neutral-3-ea2659af",
+          "case_id": "G06-es-name-neutral",
+          "attempt": 3,
+          "first_line": "Hola, Ana:",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:210e602e8d187ac518e9cbe7b1ab88c0cb07a674cb6fab653484ae897fc0dd7e"
+        },
+        {
+          "run_id": "any-845-round2-final-G06-es-name-firm-3-0c26dee0",
+          "case_id": "G06-es-name-firm",
+          "attempt": 3,
+          "first_line": "Hola, Ana:",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:57338f714d3d0f5e2c2a7fb318849de59bd9e49c1f28e5d9aaced0b10677d565"
+        },
+        {
+          "run_id": "any-845-round2-final-G07-es-noname-warm-3-6c6a60e9",
+          "case_id": "G07-es-noname-warm",
+          "attempt": 3,
+          "first_line": "Hola:",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:612d87239591676b00974743889ddc6d378ecab7173bfaf76aeb50b03444a800"
+        },
+        {
+          "run_id": "any-845-round2-final-G07-es-noname-firm-3-b0066377",
+          "case_id": "G07-es-noname-firm",
+          "attempt": 3,
+          "first_line": "Hola:",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:6b356be4d4e348e24c4e97b50d862937eb6c50da4d9880c3a7dee0f8900b7824"
+        }
+      ]
+    },
+    "regression": {
+      "runs": 4,
+      "greeting_passes": 4,
+      "provider_calls": 8,
+      "provider_call_statuses": {
+        "succeeded": 8
+      },
+      "estimated_cost_usd": 0.00566201,
+      "started_at": "2026-11-12T17:14:52+00:00",
+      "completed_at": "2026-11-12T17:17:23.88459+00:00",
+      "automatic_finding_counts": {
+        "language_unverified": 1
+      },
+      "results": [
+        {
+          "run_id": "any-845-round2-final-regression-P01-1-afe1c377",
+          "case_id": "P01",
+          "attempt": 1,
+          "first_line": "Здравствуйте, Анна!",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:70d560f2ceb16288c658b7055d1fbbcb41d2f0fcb41d49be071ffdb449679673"
+        },
+        {
+          "run_id": "any-845-round2-final-regression-P02-1-c39b5eba",
+          "case_id": "P02",
+          "attempt": 1,
+          "first_line": "Hello,",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [
+            "language_unverified"
+          ],
+          "answer_sha256": "sha256:ce0227f5902cd0665674815ddbb6f67346b5f061c0cd6e51db8eaecf75bf69e7"
+        },
+        {
+          "run_id": "any-845-round2-final-regression-P04-1-873bb14d",
+          "case_id": "P04",
+          "attempt": 1,
+          "first_line": "Hello,",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:1b28c2fccebba7287552a1855125060966021e5bbe5ab38aeab5da3fa32aebbe"
+        },
+        {
+          "run_id": "any-845-round2-final-regression-P05-1-9eb9f9d6",
+          "case_id": "P05",
+          "attempt": 1,
+          "first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:de44cc231b3b4bcc67b2f86d0302596117c318938f7cb2a0bc49c31a572e60e8"
+        }
+      ]
+    }
+  },
+  "total_runs": 76,
+  "total_provider_calls": 152,
+  "total_estimated_cost_usd": 0.05645566,
+  "agent_semantic_reviews": [
+    {
+      "series": "greeting",
+      "case_id": "G11-en-noname-warm",
+      "run_ids": [
+        "any-845-round2-final-G11-en-noname-warm-1-f319ee21",
+        "any-845-round2-final-G11-en-noname-warm-2-1a8b621f",
+        "any-845-round2-final-G11-en-noname-warm-3-3a078bc1"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?",
+          "agent_assessment": "pass",
+          "rationale": "All three texts have the required single greeting line, blank line and experience-based pitch. No time-of-day, gendered/familiar greeting or named self-introduction."
+        },
+        {
+          "criterion_id": "client-name",
+          "question": "Does the greeting use no name because the brief gives none?",
+          "agent_assessment": "pass",
+          "rationale": "Omits a name in every English tone: Hi, for warm and Hello, for neutral/firm."
+        }
+      ]
+    },
+    {
+      "series": "greeting",
+      "case_id": "G12-ru-inflected-name-warm",
+      "run_ids": [
+        "any-845-round2-final-G12-ru-inflected-name-warm-1-8b876a96",
+        "any-845-round2-final-G12-ru-inflected-name-warm-2-a591bc5b",
+        "any-845-round2-final-G12-ru-inflected-name-warm-3-e31b1043"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?",
+          "agent_assessment": "pass",
+          "rationale": "All three texts have the required single greeting line, blank line and experience-based pitch. No time-of-day, gendered/familiar greeting or named self-introduction."
+        },
+        {
+          "criterion_id": "client-name",
+          "question": "Does the greeting address Анна Иванова in the nominative, normalizing only the grammatical case of Анны Ивановой without inventing or changing any name component?",
+          "agent_assessment": "pass",
+          "rationale": "Normalizes both supplied components Анны Ивановой to Анна Иванова; no component is invented or dropped."
+        }
+      ]
+    },
+    {
+      "series": "greeting",
+      "case_id": "G01-ru-name-warm",
+      "run_ids": [
+        "any-845-round2-final-G01-ru-name-warm-1-41fa7581",
+        "any-845-round2-final-G01-ru-name-warm-2-fa1bdda4",
+        "any-845-round2-final-G01-ru-name-warm-3-15c6a7ed"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?",
+          "agent_assessment": "pass",
+          "rationale": "All three texts have the required single greeting line, blank line and experience-based pitch. No time-of-day, gendered/familiar greeting or named self-introduction."
+        },
+        {
+          "criterion_id": "client-name",
+          "question": "Does the greeting address Анна exactly as given, with the punctuation required for the selected tone and an empty line before the pitch?",
+          "agent_assessment": "pass",
+          "rationale": "Uses the explicitly identified client Анна and the selected tone punctuation."
+        }
+      ]
+    },
+    {
+      "series": "greeting",
+      "case_id": "G01-ru-name-neutral",
+      "run_ids": [
+        "any-845-round2-final-G01-ru-name-neutral-1-c89693df",
+        "any-845-round2-final-G01-ru-name-neutral-2-ad9f6fb6",
+        "any-845-round2-final-G01-ru-name-neutral-3-8df6a8b0"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?",
+          "agent_assessment": "pass",
+          "rationale": "All three texts have the required single greeting line, blank line and experience-based pitch. No time-of-day, gendered/familiar greeting or named self-introduction."
+        },
+        {
+          "criterion_id": "client-name",
+          "question": "Does the greeting address Анна exactly as given, with the punctuation required for the selected tone and an empty line before the pitch?",
+          "agent_assessment": "pass",
+          "rationale": "Uses the explicitly identified client Анна and the selected tone punctuation."
+        }
+      ]
+    },
+    {
+      "series": "greeting",
+      "case_id": "G01-ru-name-firm",
+      "run_ids": [
+        "any-845-round2-final-G01-ru-name-firm-1-9945db41",
+        "any-845-round2-final-G01-ru-name-firm-2-461c2d94",
+        "any-845-round2-final-G01-ru-name-firm-3-5e727a06"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?",
+          "agent_assessment": "pass",
+          "rationale": "All three texts have the required single greeting line, blank line and experience-based pitch. No time-of-day, gendered/familiar greeting or named self-introduction."
+        },
+        {
+          "criterion_id": "client-name",
+          "question": "Does the greeting address Анна exactly as given, with the punctuation required for the selected tone and an empty line before the pitch?",
+          "agent_assessment": "pass",
+          "rationale": "Uses the explicitly identified client Анна and the selected tone punctuation."
+        }
+      ]
+    },
+    {
+      "series": "greeting",
+      "case_id": "G02-ru-noname-neutral",
+      "run_ids": [
+        "any-845-round2-final-G02-ru-noname-neutral-1-4aeefb00",
+        "any-845-round2-final-G02-ru-noname-neutral-2-fac3a046",
+        "any-845-round2-final-G02-ru-noname-neutral-3-26a1723c"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?",
+          "agent_assessment": "pass",
+          "rationale": "All three texts have the required single greeting line, blank line and experience-based pitch. No time-of-day, gendered/familiar greeting or named self-introduction."
+        },
+        {
+          "criterion_id": "client-name",
+          "question": "Does the greeting use no name because the brief gives none?",
+          "agent_assessment": "pass",
+          "rationale": "Omits a name because no client name is supplied; retains the selected tone."
+        }
+      ]
+    },
+    {
+      "series": "greeting",
+      "case_id": "G03-ru-freelancer-name",
+      "run_ids": [
+        "any-845-round2-final-G03-ru-freelancer-name-1-a5fd8e83",
+        "any-845-round2-final-G03-ru-freelancer-name-2-03087ec7",
+        "any-845-round2-final-G03-ru-freelancer-name-3-3212e484"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?",
+          "agent_assessment": "pass",
+          "rationale": "All three texts have the required single greeting line, blank line and experience-based pitch. No time-of-day, gendered/familiar greeting or named self-introduction."
+        },
+        {
+          "criterion_id": "client-name",
+          "question": "Is the greeting free of any name, and is «Ольга» not used as the client's name?",
+          "agent_assessment": "pass",
+          "rationale": "Does not treat Ольга from freelancer_positioning as the client."
+        }
+      ]
+    },
+    {
+      "series": "greeting",
+      "case_id": "G04-ru-third-party",
+      "run_ids": [
+        "any-845-round2-final-G04-ru-third-party-1-5c899ea8",
+        "any-845-round2-final-G04-ru-third-party-2-98049999",
+        "any-845-round2-final-G04-ru-third-party-3-3f94ad68"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?",
+          "agent_assessment": "pass",
+          "rationale": "All three texts have the required single greeting line, blank line and experience-based pitch. No time-of-day, gendered/familiar greeting or named self-introduction."
+        },
+        {
+          "criterion_id": "client-name",
+          "question": "Does the greeting use no name (Марина is a third party)?",
+          "agent_assessment": "pass",
+          "rationale": "Does not address Марина as the client; she is identified as the manager."
+        }
+      ]
+    },
+    {
+      "series": "greeting",
+      "case_id": "G05-en-name-firm",
+      "run_ids": [
+        "any-845-round2-final-G05-en-name-firm-1-474ea4fb",
+        "any-845-round2-final-G05-en-name-firm-2-bae4cce9",
+        "any-845-round2-final-G05-en-name-firm-3-a46d07c4"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?",
+          "agent_assessment": "pass",
+          "rationale": "All three texts have the required single greeting line, blank line and experience-based pitch. No time-of-day, gendered/familiar greeting or named self-introduction."
+        },
+        {
+          "criterion_id": "client-name",
+          "question": "Does the greeting address John, the client, exactly as given?",
+          "agent_assessment": "pass",
+          "rationale": "Addresses the explicitly identified client John using the selected tone."
+        }
+      ]
+    },
+    {
+      "series": "greeting",
+      "case_id": "G06-es-name-warm",
+      "run_ids": [
+        "any-845-round2-final-G06-es-name-warm-1-ae1af1c2",
+        "any-845-round2-final-G06-es-name-warm-2-44da93b1",
+        "any-845-round2-final-G06-es-name-warm-3-2849840f"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?",
+          "agent_assessment": "pass",
+          "rationale": "All three texts have the required single greeting line, blank line and experience-based pitch. No time-of-day, gendered/familiar greeting or named self-introduction."
+        },
+        {
+          "criterion_id": "client-name",
+          "question": "Does the greeting address Ana exactly as given and end with a colon?",
+          "agent_assessment": "pass",
+          "rationale": "Addresses Ana with the required Spanish colon punctuation."
+        }
+      ]
+    },
+    {
+      "series": "greeting",
+      "case_id": "G07-es-noname-neutral",
+      "run_ids": [
+        "any-845-round2-final-G07-es-noname-neutral-1-de338783",
+        "any-845-round2-final-G07-es-noname-neutral-2-77ce1028",
+        "any-845-round2-final-G07-es-noname-neutral-3-4aeefaa2"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?",
+          "agent_assessment": "pass",
+          "rationale": "All three texts have the required single greeting line, blank line and experience-based pitch. No time-of-day, gendered/familiar greeting or named self-introduction."
+        },
+        {
+          "criterion_id": "client-name",
+          "question": "Does the greeting use no name and end with a colon?",
+          "agent_assessment": "pass",
+          "rationale": "Uses Hola: without inventing a client name in any tone."
+        }
+      ]
+    },
+    {
+      "series": "greeting",
+      "case_id": "G08-ru-freelancer-name-in-task",
+      "run_ids": [
+        "any-845-round2-final-G08-ru-freelancer-name-in-task-1-076fa66d",
+        "any-845-round2-final-G08-ru-freelancer-name-in-task-2-a88c3b3f",
+        "any-845-round2-final-G08-ru-freelancer-name-in-task-3-97e941f6"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?",
+          "agent_assessment": "pass",
+          "rationale": "All three texts have the required single greeting line, blank line and experience-based pitch. No time-of-day, gendered/familiar greeting or named self-introduction."
+        },
+        {
+          "criterion_id": "client-name",
+          "question": "Does the greeting omit Ольга because the task identifies her as the freelancer?",
+          "agent_assessment": "pass",
+          "rationale": "Does not address Ольга, explicitly identified as the freelancer in task_text."
+        }
+      ]
+    },
+    {
+      "series": "greeting",
+      "case_id": "G09-ru-ambiguous-names",
+      "run_ids": [
+        "any-845-round2-final-G09-ru-ambiguous-names-1-1e282483",
+        "any-845-round2-final-G09-ru-ambiguous-names-2-5d07dc46",
+        "any-845-round2-final-G09-ru-ambiguous-names-3-a62a9a5f"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?",
+          "agent_assessment": "pass",
+          "rationale": "All three texts have the required single greeting line, blank line and experience-based pitch. No time-of-day, gendered/familiar greeting or named self-introduction."
+        },
+        {
+          "criterion_id": "client-name",
+          "question": "Does the greeting use no name because neither Анна nor Марина is clearly the client or addressee?",
+          "agent_assessment": "pass",
+          "rationale": "Omits both Анна and Марина because neither is clearly the addressee."
+        }
+      ]
+    },
+    {
+      "series": "greeting",
+      "case_id": "G10-ru-brand-name",
+      "run_ids": [
+        "any-845-round2-final-G10-ru-brand-name-1-d023b1f2",
+        "any-845-round2-final-G10-ru-brand-name-2-14b71eee",
+        "any-845-round2-final-G10-ru-brand-name-3-233a1d10"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?",
+          "agent_assessment": "pass",
+          "rationale": "All three texts have the required single greeting line, blank line and experience-based pitch. No time-of-day, gendered/familiar greeting or named self-introduction."
+        },
+        {
+          "criterion_id": "client-name",
+          "question": "Does the greeting use no name because «Анна» is a brand rather than the client?",
+          "agent_assessment": "pass",
+          "rationale": "Does not use the studio brand Анна as a personal name."
+        }
+      ]
+    },
+    {
+      "series": "greeting",
+      "case_id": "G02-ru-noname-warm",
+      "run_ids": [
+        "any-845-round2-final-G02-ru-noname-warm-1-096c27c5",
+        "any-845-round2-final-G02-ru-noname-warm-2-0d655508",
+        "any-845-round2-final-G02-ru-noname-warm-3-4fc5ab06"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?",
+          "agent_assessment": "pass",
+          "rationale": "All three texts have the required single greeting line, blank line and experience-based pitch. No time-of-day, gendered/familiar greeting or named self-introduction."
+        },
+        {
+          "criterion_id": "client-name",
+          "question": "Does the greeting use no name because the brief gives none?",
+          "agent_assessment": "pass",
+          "rationale": "Omits a name because no client name is supplied; retains the selected tone."
+        }
+      ]
+    },
+    {
+      "series": "greeting",
+      "case_id": "G02-ru-noname-firm",
+      "run_ids": [
+        "any-845-round2-final-G02-ru-noname-firm-1-2a773d77",
+        "any-845-round2-final-G02-ru-noname-firm-2-1a7c2ec2",
+        "any-845-round2-final-G02-ru-noname-firm-3-a4244823"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?",
+          "agent_assessment": "pass",
+          "rationale": "All three texts have the required single greeting line, blank line and experience-based pitch. No time-of-day, gendered/familiar greeting or named self-introduction."
+        },
+        {
+          "criterion_id": "client-name",
+          "question": "Does the greeting use no name because the brief gives none?",
+          "agent_assessment": "pass",
+          "rationale": "Omits a name because no client name is supplied; retains the selected tone."
+        }
+      ]
+    },
+    {
+      "series": "greeting",
+      "case_id": "G05-en-name-warm",
+      "run_ids": [
+        "any-845-round2-final-G05-en-name-warm-1-0b36ddc8",
+        "any-845-round2-final-G05-en-name-warm-2-a753d50a",
+        "any-845-round2-final-G05-en-name-warm-3-428759f6"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?",
+          "agent_assessment": "pass",
+          "rationale": "All three texts have the required single greeting line, blank line and experience-based pitch. No time-of-day, gendered/familiar greeting or named self-introduction."
+        },
+        {
+          "criterion_id": "client-name",
+          "question": "Does the greeting address John, the client, exactly as given?",
+          "agent_assessment": "pass",
+          "rationale": "Addresses the explicitly identified client John using the selected tone."
+        }
+      ]
+    },
+    {
+      "series": "greeting",
+      "case_id": "G05-en-name-neutral",
+      "run_ids": [
+        "any-845-round2-final-G05-en-name-neutral-1-fedea431",
+        "any-845-round2-final-G05-en-name-neutral-2-ffa04ff0",
+        "any-845-round2-final-G05-en-name-neutral-3-12a1a826"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?",
+          "agent_assessment": "pass",
+          "rationale": "All three texts have the required single greeting line, blank line and experience-based pitch. No time-of-day, gendered/familiar greeting or named self-introduction."
+        },
+        {
+          "criterion_id": "client-name",
+          "question": "Does the greeting address John, the client, exactly as given?",
+          "agent_assessment": "pass",
+          "rationale": "Addresses the explicitly identified client John using the selected tone."
+        }
+      ]
+    },
+    {
+      "series": "greeting",
+      "case_id": "G11-en-noname-neutral",
+      "run_ids": [
+        "any-845-round2-final-G11-en-noname-neutral-1-367fa731",
+        "any-845-round2-final-G11-en-noname-neutral-2-cc2f853b",
+        "any-845-round2-final-G11-en-noname-neutral-3-2dfcb64c"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?",
+          "agent_assessment": "pass",
+          "rationale": "All three texts have the required single greeting line, blank line and experience-based pitch. No time-of-day, gendered/familiar greeting or named self-introduction."
+        },
+        {
+          "criterion_id": "client-name",
+          "question": "Does the greeting use no name because the brief gives none?",
+          "agent_assessment": "pass",
+          "rationale": "Omits a name in every English tone: Hi, for warm and Hello, for neutral/firm."
+        }
+      ]
+    },
+    {
+      "series": "greeting",
+      "case_id": "G11-en-noname-firm",
+      "run_ids": [
+        "any-845-round2-final-G11-en-noname-firm-1-8901eb27",
+        "any-845-round2-final-G11-en-noname-firm-2-8d4a4cde",
+        "any-845-round2-final-G11-en-noname-firm-3-3c521c9a"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?",
+          "agent_assessment": "pass",
+          "rationale": "All three texts have the required single greeting line, blank line and experience-based pitch. No time-of-day, gendered/familiar greeting or named self-introduction."
+        },
+        {
+          "criterion_id": "client-name",
+          "question": "Does the greeting use no name because the brief gives none?",
+          "agent_assessment": "pass",
+          "rationale": "Omits a name in every English tone: Hi, for warm and Hello, for neutral/firm."
+        }
+      ]
+    },
+    {
+      "series": "greeting",
+      "case_id": "G06-es-name-neutral",
+      "run_ids": [
+        "any-845-round2-final-G06-es-name-neutral-1-baf23a38",
+        "any-845-round2-final-G06-es-name-neutral-2-d08e7dd0",
+        "any-845-round2-final-G06-es-name-neutral-3-ea2659af"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?",
+          "agent_assessment": "pass",
+          "rationale": "All three texts have the required single greeting line, blank line and experience-based pitch. No time-of-day, gendered/familiar greeting or named self-introduction."
+        },
+        {
+          "criterion_id": "client-name",
+          "question": "Does the greeting address Ana exactly as given and end with a colon?",
+          "agent_assessment": "pass",
+          "rationale": "Addresses Ana with the required Spanish colon punctuation."
+        }
+      ]
+    },
+    {
+      "series": "greeting",
+      "case_id": "G06-es-name-firm",
+      "run_ids": [
+        "any-845-round2-final-G06-es-name-firm-1-03226128",
+        "any-845-round2-final-G06-es-name-firm-2-ba4b9dd0",
+        "any-845-round2-final-G06-es-name-firm-3-0c26dee0"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?",
+          "agent_assessment": "pass",
+          "rationale": "All three texts have the required single greeting line, blank line and experience-based pitch. No time-of-day, gendered/familiar greeting or named self-introduction."
+        },
+        {
+          "criterion_id": "client-name",
+          "question": "Does the greeting address Ana exactly as given and end with a colon?",
+          "agent_assessment": "pass",
+          "rationale": "Addresses Ana with the required Spanish colon punctuation."
+        }
+      ]
+    },
+    {
+      "series": "greeting",
+      "case_id": "G07-es-noname-warm",
+      "run_ids": [
+        "any-845-round2-final-G07-es-noname-warm-1-2b7f0cf5",
+        "any-845-round2-final-G07-es-noname-warm-2-bf7b245a",
+        "any-845-round2-final-G07-es-noname-warm-3-6c6a60e9"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?",
+          "agent_assessment": "pass",
+          "rationale": "All three texts have the required single greeting line, blank line and experience-based pitch. No time-of-day, gendered/familiar greeting or named self-introduction."
+        },
+        {
+          "criterion_id": "client-name",
+          "question": "Does the greeting use no name and end with a colon?",
+          "agent_assessment": "pass",
+          "rationale": "Uses Hola: without inventing a client name in any tone."
+        }
+      ]
+    },
+    {
+      "series": "greeting",
+      "case_id": "G07-es-noname-firm",
+      "run_ids": [
+        "any-845-round2-final-G07-es-noname-firm-1-be1b2dd1",
+        "any-845-round2-final-G07-es-noname-firm-2-9c7c37b1",
+        "any-845-round2-final-G07-es-noname-firm-3-b0066377"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?",
+          "agent_assessment": "pass",
+          "rationale": "All three texts have the required single greeting line, blank line and experience-based pitch. No time-of-day, gendered/familiar greeting or named self-introduction."
+        },
+        {
+          "criterion_id": "client-name",
+          "question": "Does the greeting use no name and end with a colon?",
+          "agent_assessment": "pass",
+          "rationale": "Uses Hola: without inventing a client name in any tone."
+        }
+      ]
+    },
+    {
+      "series": "regression",
+      "case_id": "P01",
+      "run_ids": [
+        "any-845-round2-final-regression-P01-1-afe1c377"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "no-development",
+          "question": "Does the answer promise no layout, coding or site development (only the Figma design)?",
+          "agent_assessment": "pass",
+          "rationale": "Only Figma design is offered; development is explicitly outside the work."
+        },
+        {
+          "criterion_id": "schedule-block",
+          "question": "Is the schedule block part of the design?",
+          "agent_assessment": "pass",
+          "rationale": "Mobile and desktop versions, schedule block and existing WhatsApp booking button are included."
+        },
+        {
+          "criterion_id": "no-intro-gender-retelling",
+          "question": "Is there no «Меня зовут …», no feminine form such as «Готова» (the masculine «Делал» comes from the positioning), and no retelling of the instructions?",
+          "agent_assessment": "pass",
+          "rationale": "The opening explains supplied experience; no named self-introduction, unsupported gender or quoted editorial directions."
+        },
+        {
+          "criterion_id": "no-price-or-dates",
+          "question": "Are no price and no dates or durations named before the discussion?",
+          "agent_assessment": "pass",
+          "rationale": "No price, deadline or duration is invented."
+        }
+      ]
+    },
+    {
+      "series": "regression",
+      "case_id": "P02",
+      "run_ids": [
+        "any-845-round2-final-regression-P02-1-c39b5eba"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "ceiling-not-agreed",
+          "question": "Is the USD 1,200 ceiling stated as the client's budget that is not an agreed fee?",
+          "agent_assessment": "pass",
+          "rationale": "USD 1,200 is explicitly the client proposal, not an agreed fee."
+        },
+        {
+          "criterion_id": "fee-left-open",
+          "question": "Is the final fee left to be agreed, never stated as a fixed or agreed amount?",
+          "agent_assessment": "pass",
+          "rationale": "The final fee remains to be agreed."
+        },
+        {
+          "criterion_id": "fee-after-inspection",
+          "question": "Is agreeing the final fee tied to inspecting the theme (the condition may be in another sentence)?",
+          "agent_assessment": "pass",
+          "rationale": "The fee remains to be agreed after inspecting the theme."
+        },
+        {
+          "criterion_id": "scope-not-a-term",
+          "question": "Are the 6 templates, the issue spreadsheet and the 45-minute handover stated as the work, never called proposed or not agreed?",
+          "agent_assessment": "pass",
+          "rationale": "All six named templates, spreadsheet with reproduction steps and 45-minute handover are deliverables."
+        },
+        {
+          "criterion_id": "exclusions-kept",
+          "question": "Are redesign, theme edits, third-party checkout, app remediation, certification and a legal compliance guarantee kept out of the work?",
+          "agent_assessment": "pass",
+          "rationale": "The offer is limited to a review, with no redesign offered; theme edits, third-party checkout, app remediation, certification and legal compliance guarantee are explicitly excluded."
+        },
+        {
+          "criterion_id": "unagreed-terms-not-accepted",
+          "question": "Is none of the client's USD 1,200 ceiling, report date or staging-access date stated as an agreed fee or promise of the freelancer's own?",
+          "agent_assessment": "pass",
+          "rationale": "Budget and report deadline are explicitly proposed, not agreed. Access on 8 October is a client prerequisite, not a promise of the freelancer."
+        }
+      ]
+    },
+    {
+      "series": "regression",
+      "case_id": "P04",
+      "run_ids": [
+        "any-845-round2-final-regression-P04-1-873bb14d"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "budget-not-accepted",
+          "question": "Is EUR 300 explicitly marked as not agreed (proposed and not agreed, or refused)?",
+          "agent_assessment": "pass",
+          "rationale": "EUR 300 is explicitly proposed, not an agreed price."
+        },
+        {
+          "criterion_id": "deadline-declined",
+          "question": "Is the 48-hour deadline refused in so many words?",
+          "agent_assessment": "pass",
+          "rationale": "The 48-hour deadline is explicitly refused."
+        },
+        {
+          "criterion_id": "revisions-and-ranking-declined",
+          "question": "Are unlimited revisions and the guaranteed top-3 ranking refused in so many words?",
+          "agent_assessment": "pass",
+          "rationale": "Unlimited revisions and the ranking guarantee are explicitly refused."
+        },
+        {
+          "criterion_id": "smaller-phase",
+          "question": "Is a smaller first phase offered for discussion, with no replacement budget?",
+          "agent_assessment": "pass",
+          "rationale": "A smaller first phase is offered for discussion without a replacement budget."
+        },
+        {
+          "criterion_id": "unagreed-terms-not-accepted",
+          "question": "Is none of the client's EUR 300 budget, 48-hour deadline, unlimited revisions or guaranteed top-3 ranking stated as accepted, agreed or as the freelancer's own?",
+          "agent_assessment": "pass",
+          "rationale": "No problematic term is accepted; a timeline depends on agreed dependencies and review rounds."
+        }
+      ]
+    },
+    {
+      "series": "regression",
+      "case_id": "P05",
+      "run_ids": [
+        "any-845-round2-final-regression-P05-1-9eb9f9d6"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "agreed-confirmed",
+          "question": "Are the agreed 8 400 words, 588 EUR, DOCX by 17:00 UTC+3 on 14 October 2026 and the 176,40 + 411,60 EUR payments confirmed, never called proposed or not agreed?",
+          "agent_assessment": "pass",
+          "rationale": "Confirms exactly 8 400 words, 0,07 EUR/word, 588 EUR, 176,40 EUR advance and 411,60 EUR remainder, DOCX by 17:00 UTC+3 on 14 October 2026."
+        },
+        {
+          "criterion_id": "conditions-kept",
+          "question": "Are all kept: one round of corrections within 5 working days, changes to the original paid separately, «без приложений», the glossary and the final original required before the start?",
+          "agent_assessment": "pass",
+          "rationale": "Keeps no appendices, one correction round within 5 working days, separately paid source changes, glossary and final original required before starting."
+        },
+        {
+          "criterion_id": "no-legal-promise",
+          "question": "Is there no promise of legal accuracy, notarisation or legal review?",
+          "agent_assessment": "pass",
+          "rationale": "Notarisation and legal expertise are excluded."
+        },
+        {
+          "criterion_id": "no-gender-placeholder",
+          "question": "Is there no «готов(а)» or other gender placeholder?",
+          "agent_assessment": "pass",
+          "rationale": "No gender placeholder or unsupported speaker-gender form appears."
+        }
+      ]
+    }
+  ],
+  "semantic_review_boundary": "Semantic greeting/name criteria are assessed separately from the literal formula check. G10 attempt 3 has an ordinary unnamed greeting and correct identity handling, but fails the fixed neutral punctuation; semantic passes do not override that failure.",
+  "diagnostic_dispositions": [
+    {
+      "run_id": "any-845-round2-final-G12-ru-inflected-name-warm-1-8b876a96",
+      "automatic_finding": "long_dash",
+      "disposition": "Retained non-blocking body style warning; no effect on greeting/name acceptance."
+    },
+    {
+      "run_id": "any-845-round2-final-G01-ru-name-warm-1-41fa7581",
+      "automatic_finding": "long_dash",
+      "disposition": "Retained non-blocking body style warning; no effect on greeting/name acceptance."
+    },
+    {
+      "run_id": "any-845-round2-final-G01-ru-name-warm-2-fa1bdda4",
+      "automatic_finding": "long_dash",
+      "disposition": "Retained non-blocking body style warning; no effect on greeting/name acceptance."
+    },
+    {
+      "run_id": "any-845-round2-final-G01-ru-name-neutral-2-ad9f6fb6",
+      "automatic_finding": "long_dash",
+      "disposition": "Retained non-blocking body style warning; no effect on greeting/name acceptance."
+    },
+    {
+      "run_id": "any-845-round2-final-G12-ru-inflected-name-warm-3-e31b1043",
+      "automatic_finding": "long_dash",
+      "disposition": "Retained non-blocking body style warning; no effect on greeting/name acceptance."
+    },
+    {
+      "run_id": "any-845-round2-final-G10-ru-brand-name-3-233a1d10",
+      "automatic_finding": "missing_required",
+      "disposition": "Fails the fixed neutral formula: Здравствуйте! instead of Здравствуйте. The brand is correctly omitted; this run is not accepted."
+    },
+    {
+      "run_id": "any-845-round2-final-regression-P02-1-c39b5eba",
+      "automatic_finding": "language_unverified",
+      "disposition": "Agent confirms English: Shopify experience is not covered. is a five-word gap below GAP_MIN_WORDS=6. The proposal and other gap are also English."
+    }
+  ],
+  "acceptance_status": "accepted_with_owner_exception",
+  "acceptance_conclusion": "The owner accepted this iteration with the explicitly recorded G10 punctuation exception and authorized closing both findings. Exact greetings remain 71/72, the full matrix 54/54, inflected-name normalization 3/3, and original QA agent assessments 4/4. This is not 100% generation success or full human/browser/production acceptance.",
+  "remaining_caveats": [
+    "Language models are probabilistic; the fixed sample and backend model policy do not guarantee every future generation.",
+    "Body long-dash warnings are retained; further style tuning is deferred.",
+    "Experience-gap classification quality is outside this greeting-focused acceptance; raw gaps are retained, including WhatsApp-related findings.",
+    "Both composer and gap prompts differ from round 1 because main/ANY-846 was merged. No composer-only comparison with round 1 is claimed.",
+    "The rejected a8630c3e candidate is preserved separately, including its failed English warm greeting and recovered in-flight scenario."
+  ],
+  "coverage": {
+    "languages": [
+      "ru",
+      "en",
+      "es"
+    ],
+    "tones": [
+      "warm",
+      "neutral",
+      "firm"
+    ],
+    "name_states": [
+      "named",
+      "unnamed"
+    ],
+    "matrix_combinations": 18,
+    "matrix_exact_greeting_passes": 54,
+    "matrix_runs": 54,
+    "inflected_name_passes": 3,
+    "inflected_name_runs": 3,
+    "additional_edge_cases": 6,
+    "repetitions_per_case": 3
+  },
+  "owner_decision": {
+    "date": "2026-11-12",
+    "source": "Explicit owner response in the task conversation after reviewing the published 71/72 result.",
+    "decision": "Accept the known 1/72 punctuation deviation and close both review findings; finish this iteration without claiming 100% success.",
+    "scope": "G10-ru-brand-name attempt 3: Здравствуйте! instead of Здравствуйте. in neutral. Preserve the failed literal check and all raw evidence.",
+    "strict_every_run_requirement_met": false
+  }
+}

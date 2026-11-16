@@ -85,12 +85,19 @@ export function parseScenarioSession(payload: unknown): ScenarioSession | null {
     return null;
   }
 
-  const { current_checkpoint_id: currentCheckpointId } = payload;
+  const { current_checkpoint_id: currentCheckpointId, scenario_id: scenarioId } = payload;
+  if (scenarioId !== undefined && (typeof scenarioId !== "string" || !scenarioId.trim())) {
+    return null;
+  }
   if (!isNullableString(currentCheckpointId)) {
     return null;
   }
 
-  return { ...snapshot, currentCheckpointId: currentCheckpointId ?? null };
+  return {
+    ...snapshot,
+    currentCheckpointId: currentCheckpointId ?? null,
+    ...(scenarioId === undefined ? {} : { scenarioId }),
+  };
 }
 
 // Compile-time drift checks: fail typecheck if either backend response schema grows, loses,
@@ -100,6 +107,7 @@ type _ScenarioSessionResponseShapeCheck = AssertExactSchemaShape<
   {
     allowed_next_actions?: string[];
     current_checkpoint_id?: string | null;
+    scenario_id: string;
     job_id: string | null;
     result_artifact_id?: string | null;
     scenario_session_id: string;

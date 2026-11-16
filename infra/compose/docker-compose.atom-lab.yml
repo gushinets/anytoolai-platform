@@ -2,8 +2,7 @@
 #
 # This reuses the existing postgres/migrate/platform-api/platform-worker services. It deliberately
 # does not add web-mirror: the Lab shell and assets are packaged and served by platform-api.
-# Keep the API and PostgreSQL bound to loopback; an operator-owned HTTPS reverse proxy and internal
-# network allowlist are the only supported ingress path.
+# Keep host ports bound to loopback and use the HTTPS ingress profiles in infra/deployment/README.md.
 
 x-atom-lab-postgres-credentials: &atom-lab-postgres-credentials
   ANYTOOLAI_POSTGRES_USER: ${ANYTOOLAI_POSTGRES_USER:?Atom Lab PostgreSQL user is required}

@@ -156,18 +156,15 @@ importers:
 
   tests/e2e/acceptance-builder-smoke:
     devDependencies:
+      '@anytoolai/smoke-support':
+        specifier: workspace:*
+        version: link:../smoke-support
       '@playwright/test':
         specifier: ^1.48.0
         version: 1.62.1
       '@types/node':
         specifier: ^26.3.0
         version: 26.3.0
-      '@types/pg':
-        specifier: ^8.11.0
-        version: 8.23.1
-      pg:
-        specifier: ^8.13.0
-        version: 8.23.0
       typescript:
         specifier: ^5.6.0
         version: 5.9.3
@@ -180,18 +177,15 @@ importers:
 
   tests/e2e/brief-decoder-smoke:
     devDependencies:
+      '@anytoolai/smoke-support':
+        specifier: workspace:*
+        version: link:../smoke-support
       '@playwright/test':
         specifier: ^1.48.0
         version: 1.62.1
       '@types/node':
         specifier: ^26.3.0
         version: 26.3.0
-      '@types/pg':
-        specifier: ^8.11.0
-        version: 8.23.1
-      pg:
-        specifier: ^8.13.0
-        version: 8.23.0
       typescript:
         specifier: ^5.6.0
         version: 5.9.3
@@ -210,23 +204,35 @@ importers:
 
   tests/e2e/client-update-writer-smoke:
     devDependencies:
+      '@anytoolai/smoke-support':
+        specifier: workspace:*
+        version: link:../smoke-support
       '@playwright/test':
         specifier: ^1.48.0
         version: 1.62.1
       '@types/node':
         specifier: ^26.3.0
         version: 26.3.0
-      '@types/pg':
-        specifier: ^8.11.0
-        version: 8.23.1
-      pg:
-        specifier: ^8.13.0
-        version: 8.23.0
       typescript:
         specifier: ^5.6.0
         version: 5.9.3
 
   tests/e2e/proposal-ai-smoke:
+    devDependencies:
+      '@anytoolai/smoke-support':
+        specifier: workspace:*
+        version: link:../smoke-support
+      '@playwright/test':
+        specifier: ^1.48.0
+        version: 1.62.1
+      '@types/node':
+        specifier: ^26.3.0
+        version: 26.3.0
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+
+  tests/e2e/smoke-support:
     devDependencies:
       '@playwright/test':
         specifier: ^1.48.0
@@ -245,6 +251,21 @@ importers:
         version: 5.9.3
 
   tests/e2e/stakeholder-demo-browser: {}
+
+  tests/e2e/task-finder-smoke:
+    devDependencies:
+      '@anytoolai/smoke-support':
+        specifier: workspace:*
+        version: link:../smoke-support
+      '@playwright/test':
+        specifier: ^1.48.0
+        version: 1.62.1
+      '@types/node':
+        specifier: ^26.3.0
+        version: 26.3.0
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
 
 packages:
 

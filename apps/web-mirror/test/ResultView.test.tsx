@@ -90,3 +90,22 @@ describe("ResultView localization", () => {
     window.localStorage.clear();
   });
 });
+
+
+it("hides structured copy text, copies it, and reveals selectable text after clipboard failure", async () => {
+  const onCopy = vi.fn(() => Promise.resolve(false));
+  render(<ResultView text="Structured copy text" onCopy={onCopy} hideText />);
+  expect(screen.queryByText("Structured copy text")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+  await waitFor(() => expect(screen.getByText("Structured copy text")).toBeTruthy());
+  expect(onCopy).toHaveBeenCalledWith("Structured copy text");
+  fireEvent.click(screen.getByRole("button", { name: "Select text" }));
+  expect(window.getSelection()?.toString()).toBe("Structured copy text");
+});
+
+it("keeps structured copy text hidden after a successful copy", async () => {
+  render(<ResultView text="Structured copy text" onCopy={() => Promise.resolve(true)} hideText />);
+  fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
+  expect(screen.queryByText("Structured copy text")).toBeNull();
+});

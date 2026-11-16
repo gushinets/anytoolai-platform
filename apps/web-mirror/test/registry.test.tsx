@@ -11,6 +11,9 @@ afterEach(() => {
 });
 
 describe("getRegisteredProduct", () => {
+  it("returns the enabled Task Finder product", () => {
+    expect(getRegisteredProduct("task_finder")?.productId).toBe("task_finder");
+  });
   it("returns the enabled ProposalAI product", () => {
     expect(getRegisteredProduct("proposal_ai")?.productId).toBe("proposal_ai");
   });

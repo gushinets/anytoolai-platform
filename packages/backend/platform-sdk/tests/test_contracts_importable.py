@@ -74,6 +74,26 @@ def test_prompt_ref_contract_is_validatable() -> None:
     assert prompt.prompt_ref == "kernel_demo.extract_structured_fields.v1"
 
 
+@pytest.mark.parametrize("value", ["", " \n ", 1, False, [], {}, b"demo.runs"])
+def test_scenario_rejects_incompatible_paid_metric_key(value: object) -> None:
+    with pytest.raises(ValidationError):
+        ScenarioDefinition.model_validate(
+            {
+                "scenario_id": "demo.run_v1",
+                "version": 1,
+                "workflow_id": "demo.run_v1",
+                "paid_metric_key": value,
+            }
+        )
+
+
+def test_scenario_without_paid_binding_retains_guest_contract() -> None:
+    scenario = ScenarioDefinition.model_validate(
+        {"scenario_id": "demo.run_v1", "version": 1, "workflow_id": "demo.run_v1"}
+    )
+    assert scenario.paid_metric_key is None
+
+
 def test_missing_required_fields_fail_validation() -> None:
     with pytest.raises(ValidationError):
         ActionDefinition.model_validate({"action_type": "text.extract_structured_fields"})

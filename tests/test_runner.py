@@ -11,6 +11,7 @@ import sys
 import tempfile
 import time
 import urllib.parse
+from functools import partial
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -1401,9 +1402,16 @@ def test_prod_fake_up_builds_and_removes_orphans(monkeypatch) -> None:
     assert timeouts == [None]
 
 
-def test_prod_fake_up_uses_only_base_and_prod_compose(monkeypatch) -> None:
+@pytest.mark.parametrize("policy_url", [None, "", "javascript:alert(1)"])
+def test_prod_fake_up_uses_only_base_and_prod_compose(monkeypatch, policy_url) -> None:
     runner = load_runner_module()
-    monkeypatch.setattr(runner, "_resolved_env_file", lambda path: {})
+    values = {} if policy_url is None else {"ANYTOOLAI_PRIVACY_POLICY_URL": policy_url}
+    monkeypatch.setattr(runner, "_resolved_env_file", lambda path: values)
+    monkeypatch.setattr(
+        runner,
+        "_validate_public_privacy_policy_url",
+        lambda env: pytest.fail("fake smoke validated public URL"),
+    )
     monkeypatch.setattr(runner, "_prod_fake_stack_running", lambda env: False)
     monkeypatch.setattr(runner, "port_available", lambda port: True)
     monkeypatch.setattr(runner, "_prod_fake_ready", lambda *, env: 0)
@@ -1467,6 +1475,7 @@ def test_prod_fake_down_allows_worker_stop_grace(monkeypatch):
     assert timeouts == [runner.COMPOSE_TEARDOWN_TIMEOUT_SECONDS]
 
 
+PROD_PREFLIGHT_ERROR_EXIT_CODE = 2
 PROD_LIVE_VALUES = {
     "ANYTOOLAI_POSTGRES_USER": "ci",
     "ANYTOOLAI_POSTGRES_PASSWORD": "private-db-value",
@@ -1476,6 +1485,7 @@ PROD_LIVE_VALUES = {
     "ANYTOOLAI_ENABLED_PRODUCT_IDS": "proposal_ai",
     "ANYTOOLAI_UNMETERED_PRODUCT_IDS": "proposal_ai",
     "ANYTOOLAI_PROD_WORKER_MEMORY_LIMIT": "768M",
+    "ANYTOOLAI_PRIVACY_POLICY_URL": "https://example.com/privacy",
 }
 
 
@@ -1554,6 +1564,93 @@ def test_prod_up_rejects_missing_required_value_before_compose(
 
     assert runner.prod_up() == 2
     assert missing_name in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "policy_url",
+    [
+        None, "   ", "/privacy", "//example.com/privacy", "javascript:alert(1)",
+        "data:text/html,x", "ftp://example.com/privacy", "https://", "https://[invalid]/",
+        "https://example.com:invalid/privacy", "https://example.com:65536/privacy",
+        "https://bad%host/privacy", "https://bad^host/privacy",
+        "\u0085https://example.com/privacy\u0085",
+    ],
+)
+def test_prod_up_rejects_invalid_policy_before_profile_or_compose(monkeypatch, capsys, policy_url):
+    runner = load_runner_module()
+    values = dict(PROD_LIVE_VALUES)
+    if policy_url is None:
+        values.pop("ANYTOOLAI_PRIVACY_POLICY_URL")
+    else:
+        values["ANYTOOLAI_PRIVACY_POLICY_URL"] = policy_url
+    monkeypatch.setattr(runner, "_resolved_env_file", lambda path: values)
+    monkeypatch.setattr(
+        runner,
+        "_build_deployment_profile",
+        lambda *args: pytest.fail("invalid policy built profile"),
+    )
+    monkeypatch.setattr(
+        runner, "_prod_stack_running", lambda: pytest.fail("invalid policy reached Compose")
+    )
+
+    assert runner.prod_up() == PROD_PREFLIGHT_ERROR_EXIT_CODE
+    assert "ANYTOOLAI_PRIVACY_POLICY_URL" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "policy_url",
+    [
+        "https://example.com/privacy", "http://example.com/privacy",
+        " https://example.com/privacy ",
+        "https://example.com/политика", "https://[2001:db8::1]:8443/privacy",
+        "\ufeffhttps://example.com/privacy\ufeff",
+    ],
+)
+def test_prod_up_passes_valid_policy_to_build_environment(monkeypatch, policy_url):
+    runner = load_runner_module()
+    values = PROD_LIVE_VALUES | {"ANYTOOLAI_PRIVACY_POLICY_URL": policy_url}
+    monkeypatch.setattr(runner, "_resolved_env_file", lambda path: values)
+    captured = []
+    monkeypatch.setattr(
+        runner, "_build_deployment_profile",
+        lambda project, products, unmetered, env: (captured.append(env) or 1, None),
+    )
+
+    assert runner.prod_up() == 1
+    assert captured[0]["ANYTOOLAI_PRIVACY_POLICY_URL"] == policy_url
+
+
+@pytest.mark.parametrize(
+    "failure", [FileNotFoundError("node"), subprocess.TimeoutExpired("node", 30)]
+)
+def test_prod_up_fails_closed_when_policy_validator_cannot_run(monkeypatch, capsys, failure):
+    runner = load_runner_module()
+    monkeypatch.setattr(runner, "_resolved_env_file", lambda path: dict(PROD_LIVE_VALUES))
+    real_run = runner.subprocess.run
+
+    def fail_validation(command, *args, **kwargs):
+        if command[:2] == ["node", "--eval"]:
+            raise failure
+        return real_run(command, *args, **kwargs)
+
+    monkeypatch.setattr(runner.subprocess, "run", fail_validation)
+    monkeypatch.setattr(
+        runner,
+        "_build_deployment_profile",
+        lambda *args: pytest.fail("unchecked policy built profile"),
+    )
+
+    assert runner.prod_up() == PROD_PREFLIGHT_ERROR_EXIT_CODE
+    assert "could not be validated with Node.js" in capsys.readouterr().err
+
+
+def test_prod_maintenance_inputs_allow_missing_policy_url(monkeypatch):
+    runner = load_runner_module()
+    values = dict(PROD_LIVE_VALUES)
+    values.pop("ANYTOOLAI_PRIVACY_POLICY_URL")
+    monkeypatch.setattr(runner, "_resolved_env_file", lambda path: values)
+
+    assert runner._deployment_inputs().enabled_product_ids == ("proposal_ai",)
 
 
 @pytest.mark.parametrize(
@@ -1937,27 +2034,8 @@ def test_prod_ready_checks_web_and_identical_container_profiles(monkeypatch, cap
     inputs = runner.DeploymentInputs(
         ("proposal_ai",), frozenset(), PROD_LIVE_VALUES | {"ANYTOOLAI_UNMETERED_PRODUCT_IDS": ""}
     )
-    manifest = {
-        "generated_products_root": "C:/generated/products",
-        "container_products_root": "/app/products",
-        "profile_fingerprint": "fingerprint",
-        "unmetered_product_ids": [],
-        "source_products_root": "C:/source/products",
-        "source_fingerprint": "source-fingerprint",
-        "enabled_products": {
-            "proposal_ai": {
-                "provider_policy_ref": "default_text_generation_v1",
-                "quota_policy_ref": "proposal_ai.guest_quota_v1",
-            }
-        },
-    }
-    urls: list[str] = []
-    commands: list[list[str]] = []
-    monkeypatch.setattr(runner, "_wait_for_http_ok", lambda url, timeout: urls.append(url) or True)
-    monkeypatch.setattr(runner, "_check_source_fingerprint", lambda manifest, env: 0)
-    monkeypatch.setattr(
-        runner, "run_with_env", lambda command, env: commands.append(list(command)) or 0
-    )
+    manifest = _production_manifest()
+    urls, commands = _record_readiness_checks(monkeypatch, runner)
 
     assert runner.prod_ready(inputs=inputs, manifest=manifest) == 0
     assert urls == [
@@ -1991,27 +2069,8 @@ def test_prod_ready_uses_web_base_path_and_vps_overlay(monkeypatch) -> None:
             "ANYTOOLAI_VPS_135_NETWORKS": "1",
         },
     )
-    manifest = {
-        "generated_products_root": "C:/generated/products",
-        "container_products_root": "/app/products",
-        "profile_fingerprint": "fingerprint",
-        "unmetered_product_ids": [],
-        "source_products_root": "C:/source/products",
-        "source_fingerprint": "source-fingerprint",
-        "enabled_products": {
-            "proposal_ai": {
-                "provider_policy_ref": "default_text_generation_v1",
-                "quota_policy_ref": "proposal_ai.guest_quota_v1",
-            }
-        },
-    }
-    urls: list[str] = []
-    commands: list[list[str]] = []
-    monkeypatch.setattr(runner, "_wait_for_http_ok", lambda url, timeout: urls.append(url) or True)
-    monkeypatch.setattr(runner, "_check_source_fingerprint", lambda manifest, env: 0)
-    monkeypatch.setattr(
-        runner, "run_with_env", lambda command, env: commands.append(list(command)) or 0
-    )
+    manifest = _production_manifest()
+    urls, commands = _record_readiness_checks(monkeypatch, runner)
 
     assert runner.prod_ready(inputs=inputs, manifest=manifest) == 0
     assert urls[1] == "http://127.0.0.1:3000/tools"
@@ -3581,6 +3640,18 @@ def test_atom_lab_deployment_requires_plain_https_origin(monkeypatch, url) -> No
         runner._atom_lab_deployment_inputs()
 
 
+def test_atom_lab_deployment_rejects_unknown_vps_135_selector(monkeypatch) -> None:
+    runner = load_runner_module()
+    monkeypatch.setattr(
+        runner,
+        "_resolved_env_file",
+        lambda path: ATOM_LAB_DEPLOYMENT_VALUES | {"ANYTOOLAI_VPS_135_NETWORKS": "yes"},
+    )
+
+    with pytest.raises(ValueError, match="ANYTOOLAI_VPS_135_NETWORKS"):
+        runner._atom_lab_deployment_inputs()
+
+
 @pytest.mark.parametrize(
     ("timeout_name", "timeout_value"),
     [
@@ -3652,34 +3723,37 @@ def test_atom_lab_compose_mode_uses_only_base_and_internal_overlay(monkeypatch, 
     assert str(runner.COMPOSE_LIVE_FILE) not in command
 
 
-def test_atom_lab_ready_checks_assets_auth_catalog_and_worker(monkeypatch) -> None:
+@pytest.mark.parametrize(
+    ("network_selector", "page_path"), [("", "/atom-lab"), ("1", "/tools/atom-lab")]
+)
+def test_atom_lab_ready_checks_assets_auth_catalog_and_worker(
+    monkeypatch, capsys, network_selector, page_path
+) -> None:
     runner = load_runner_module()
+    origin = "https://atom-lab.internal.example"
     inputs = runner.AtomLabDeploymentInputs(
-        dict(ATOM_LAB_DEPLOYMENT_VALUES), 18468, 15468, "https://atom-lab.internal.example"
+        ATOM_LAB_DEPLOYMENT_VALUES | {"ANYTOOLAI_VPS_135_NETWORKS": network_selector},
+        18468,
+        15468,
+        origin,
     )
     monkeypatch.setattr(runner, "_wait_for_http_ok", lambda url, timeout: True)
 
-    def request(url, *, access_code=None):
-        if url.endswith("/atom-lab"):
-            return 200, b"html", "text/html"
-        if url.endswith(".css"):
-            return 200, b"css", "text/css"
-        if url.endswith(".mjs"):
-            return 200, b"js", "application/javascript"
-        if access_code == "lab-access":
-            catalog = [{"atom_id": f"A{index:02d}"} for index in range(1, 12)]
-            return 200, json.dumps(catalog).encode(), "application/json"
-        denied = {"error": {"code": "atom_lab_access_denied"}}
-        return 401, json.dumps(denied).encode(), "application/json"
-
-    monkeypatch.setattr(runner, "_atom_lab_request", request)
-    monkeypatch.setattr(
-        runner.subprocess,
-        "run",
-        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, "container-id\n", ""),
+    request = partial(
+        _atom_lab_http_response, denial_body=b'{"error": {"code": "atom_lab_access_denied"}}'
     )
 
-    assert runner._atom_lab_ready(inputs, announce=False) == 0
+    monkeypatch.setattr(runner, "_atom_lab_request", request)
+
+    def worker_check(command, **_kwargs):
+        assert (str(runner.COMPOSE_ATOM_LAB_VPS_135_FILE) in command) == bool(network_selector)
+        assert str(runner.COMPOSE_VPS_135_FILE) not in command
+        return subprocess.CompletedProcess(command, 0, "container-id\n", "")
+
+    monkeypatch.setattr(runner.subprocess, "run", worker_check)
+
+    assert runner._atom_lab_ready(inputs) == 0
+    assert f"Internal URL: {origin}{page_path}" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("denial_body", [b"[]", b'{"error": []}'])
@@ -3692,17 +3766,7 @@ def test_atom_lab_ready_rejects_malformed_denial_envelope(
     )
     monkeypatch.setattr(runner, "_wait_for_http_ok", lambda url, timeout: True)
 
-    def request(url, *, access_code=None):
-        if url.endswith("/atom-lab"):
-            return 200, b"html", "text/html"
-        if url.endswith(".css"):
-            return 200, b"css", "text/css"
-        if url.endswith(".mjs"):
-            return 200, b"js", "application/javascript"
-        if access_code == "lab-access":
-            catalog = [{"atom_id": f"A{index:02d}"} for index in range(1, 12)]
-            return 200, json.dumps(catalog).encode(), "application/json"
-        return 401, denial_body, "application/json"
+    request = partial(_atom_lab_http_response, denial_body=denial_body)
 
     monkeypatch.setattr(runner, "_atom_lab_request", request)
     monkeypatch.setattr(
@@ -4141,6 +4205,36 @@ def test_atom_lab_up_fails_closed_when_compose_stack_probe_fails(
     error = capsys.readouterr().err
     assert "LAB002: Docker Compose preflight failed" in error
     assert "daemon unavailable" in error
+
+
+@pytest.mark.parametrize("network_selector", ["", "1"])
+def test_atom_lab_up_uses_the_selected_network_overlay(
+    monkeypatch, tmp_path, network_selector
+) -> None:
+    runner = load_runner_module()
+    env_file = tmp_path / ".env.atom-lab"
+    env_file.touch()
+    monkeypatch.setattr(runner, "ATOM_LAB_ENV_FILE", env_file)
+
+    def resolved_env(path):
+        assert path == env_file
+        return ATOM_LAB_DEPLOYMENT_VALUES | {"ANYTOOLAI_VPS_135_NETWORKS": network_selector}
+
+    monkeypatch.setattr(runner, "_resolved_env_file", resolved_env)
+    monkeypatch.setattr(runner, "_atom_lab_stack_running", lambda inputs: False)
+    monkeypatch.setattr(runner, "_check_ports_available", lambda *args: True)
+    monkeypatch.setattr(runner, "_atom_lab_ready", lambda *args, **kwargs: 0)
+    commands = []
+    monkeypatch.setattr(runner, "run_with_env", lambda command, env: commands.append(command) or 0)
+
+    assert runner._atom_lab_up_locked() == 0
+    (command,) = commands
+    assert "up" in command
+    compose_files = [command[index + 1] for index, arg in enumerate(command) if arg == "-f"]
+    expected = [runner.COMPOSE_FILE, runner.COMPOSE_ATOM_LAB_FILE]
+    if network_selector == "1":
+        expected.append(runner.COMPOSE_ATOM_LAB_VPS_135_FILE)
+    assert compose_files == [str(path) for path in expected]
 
 
 def test_atom_lab_up_reports_failed_candidate_cleanup(monkeypatch, capsys) -> None:
@@ -4942,3 +5036,75 @@ def test_profile_check_args_accepts_selected_ab_policy_and_rejects_default():
     )
     with pytest.raises(ValueError, match="non-live provider policy"):
         runner._profile_check_args(manifest)
+
+
+@pytest.mark.parametrize(
+    ("command", "port", "code"),
+    [("proposal_ai", 3100, "PAS"), ("client_update_writer", 3200, "CUS"),
+     ("brief_decoder", 3300, "BDS"), ("acceptance_builder", 3400, "ABS"),
+     ("task_finder", 3500, "TFS")],
+)
+def test_product_smoke_preserves_command_configuration(monkeypatch, command, port, code):
+    runner = load_runner_module()
+    calls = []
+    monkeypatch.setattr(runner, "runtime_identity", lambda: SimpleNamespace(api_url="http://api", database_url="postgresql://test"))
+    monkeypatch.setattr(runner, "_check_ports_available", lambda *args: True)
+    monkeypatch.setattr(runner, "run_with_env", lambda *args: 0)
+    monkeypatch.setattr(runner, "_serve_web_mirror_and_run_smoke", lambda **kwargs: calls.append(kwargs) or 0)
+    assert getattr(runner, f"{command}_smoke")() == 0
+    assert calls[0]["web_mirror_port"] == port
+    assert calls[0]["readiness_error_code"] == f"{code}002"
+    assert calls[0]["smoke_pnpm_filter"] == f"@anytoolai/{command.replace('_', '-')}-smoke"
+    assert calls[0]["env"]["PLATFORM_API_BASE_URL"] == "http://api"
+    assert calls[0]["smoke_extra_env"]["DATABASE_URL"] == "postgresql://test"
+
+
+@pytest.mark.parametrize("failure", ["port", "build"])
+def test_product_smoke_does_not_launch_after_preflight_failure(monkeypatch, failure):
+    runner = load_runner_module()
+    monkeypatch.setattr(runner, "runtime_identity", lambda: SimpleNamespace(api_url="http://api"))
+    monkeypatch.setattr(runner, "_check_ports_available", lambda *args: failure != "port")
+    monkeypatch.setattr(runner, "run_with_env", lambda *args: 7)
+    monkeypatch.setattr(runner, "_serve_web_mirror_and_run_smoke", lambda **kwargs: pytest.fail("must not serve"))
+    assert runner.proposal_ai_smoke() == (1 if failure == "port" else 7)
+
+
+def _production_manifest():
+    return {
+        "generated_products_root": "C:/generated/products",
+        "container_products_root": "/app/products",
+        "profile_fingerprint": "fingerprint",
+        "unmetered_product_ids": [],
+        "source_products_root": "C:/source/products",
+        "source_fingerprint": "source-fingerprint",
+        "enabled_products": {
+            "proposal_ai": {
+                "provider_policy_ref": "default_text_generation_v1",
+                "quota_policy_ref": "proposal_ai.guest_quota_v1",
+            }
+        },
+    }
+
+
+def _record_readiness_checks(monkeypatch, runner):
+    urls: list[str] = []
+    commands: list[list[str]] = []
+    monkeypatch.setattr(runner, "_wait_for_http_ok", lambda url, timeout: urls.append(url) or True)
+    monkeypatch.setattr(runner, "_check_source_fingerprint", lambda manifest, env: 0)
+    monkeypatch.setattr(
+        runner, "run_with_env", lambda command, env: commands.append(list(command)) or 0
+    )
+    return urls, commands
+
+
+def _atom_lab_http_response(url, *, access_code=None, denial_body):
+    if url.endswith("/atom-lab"):
+        return 200, b"html", "text/html"
+    if url.endswith(".css"):
+        return 200, b"css", "text/css"
+    if url.endswith(".mjs"):
+        return 200, b"js", "application/javascript"
+    if access_code == "lab-access":
+        catalog = [{"atom_id": f"A{index:02d}"} for index in range(1, 12)]
+        return 200, json.dumps(catalog).encode(), "application/json"
+    return 401, denial_body, "application/json"

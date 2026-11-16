@@ -40,6 +40,7 @@ const RUN_FAILED = TEST_PRODUCT_MESSAGES_EN.run.runFailed;
 afterEach(() => {
   cleanup();
   window.localStorage.clear();
+  window.sessionStorage.clear();
 });
 
 beforeEach(() => {
@@ -110,6 +111,127 @@ class TestErrorBoundary extends Component<{ children: ReactNode }, { failed: boo
 }
 
 describe("ProductRunPage", () => {
+  it.each(["completed", "failed"])("includes submission time and removes progress on %s", async (status) => {
+    const routed = makeClientWithDeferredCalls(happyPathRoutes(), { [ROUTES.START]: 1, [ROUTES.SESSION]: 1 });
+    const view = renderPage({ client: routed.client });
+    await waitForForm();
+    fillValidForm();
+    vi.useFakeTimers();
+    try {
+      submit();
+      expect(screen.getByText("Elapsed: 0:00")).toBeTruthy();
+      expect(within(screen.getByTestId("run-progress")).getByRole("status").textContent).toBe(
+        "Starting… Waiting for confirmation that your request has started.",
+      );
+      await act(async () => { await advance(5_000); });
+      expect(screen.getByText("Elapsed: 0:05")).toBeTruthy();
+      await act(async () => { routed.resolveCall(ROUTES.START, 0, startResponse()); });
+      await act(async () => { await advance(2_000); });
+      expect(screen.getByText("Elapsed: 0:07")).toBeTruthy();
+      await act(async () => { routed.resolveCall(ROUTES.SESSION, 0, sessionResponse({ status })); });
+      expect(screen.queryByTestId("run-progress")).toBeNull();
+      expect(screen.getByText(status === "completed" ? RESULT_TEXT : RUN_FAILED)).toBeTruthy();
+    } finally {
+      view.unmount();
+      vi.useRealTimers();
+    }
+  });
+
+  it.each(["start", "poll", "attach"])("preserves elapsed time after a retryable %s error", async (failure) => {
+    const routes = happyPathRoutes();
+    if (failure === "start") routes[ROUTES.START] = [errorResponse(503, "internal_error"), errorResponse(503, "internal_error"), startResponse()];
+    routes[ROUTES.SESSION] = [
+      ...(failure === "start" ? [] : [() => { throw new TypeError("Connection lost"); }]),
+      ...Array.from({ length: 10 }, () => () => sessionResponse({ status: "running" })),
+    ];
+    const routed = makeClient(routes);
+    vi.useFakeTimers();
+    const view = renderPage({ client: routed.client, ...(failure === "attach" ? { attachSessionId: "session_1" } : {}) });
+    try {
+      await act(async () => { await advance(100); });
+      if (failure !== "attach") {
+        fillValidForm();
+        submit();
+      }
+      await act(async () => { await advance(5_000); });
+      expect(screen.queryByTestId("run-progress")).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+      expect(screen.getByText("Elapsed: 0:05")).toBeTruthy();
+      await act(async () => { await advance(2_000); });
+      expect(screen.getByText("Elapsed: 0:07")).toBeTruthy();
+      expect(routed.calls.filter((call) => call.key === ROUTES.START)).toHaveLength(failure === "start" ? 3 : failure === "attach" ? 0 : 1);
+    } finally {
+      view.unmount();
+      vi.useRealTimers();
+    }
+  });
+
+  it.each(["503", "network"])("waits for acceptance before claiming generation after ambiguous %s retries", async (failure) => {
+    let resolveStart!: (response: Response) => void;
+    const pendingStart = new Promise<Response>((resolve) => { resolveStart = resolve; });
+    let attempts = 0;
+    const { client, calls } = makeClientCapturingRequests({
+      ...happyPathRoutes(),
+      [ROUTES.SESSION]: [sessionResponse({ status: "running" })],
+    }, (key) => {
+      if (key !== ROUTES.START) return undefined;
+      attempts += 1;
+      if (attempts > 2) return pendingStart;
+      if (failure === "network") throw new TypeError("Connection lost");
+      return errorResponse(503, "internal_error");
+    });
+    const view = renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    vi.useFakeTimers();
+    try {
+      submit();
+      await act(async () => { await advance(100); });
+      expect(attempts).toBe(2);
+      expect(screen.queryByTestId("run-progress")).toBeNull();
+      await act(async () => { await advance(65_000, 1_000); });
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+      const progress = screen.getByTestId("run-progress");
+      expect(progress.dataset.stage).toBe("long");
+      expect(screen.getByRole("timer").textContent).toBe("Elapsed: 1:05");
+      expect(within(progress).getByRole("status").textContent).toBe(
+        "Starting… Waiting for confirmation that your request has started.",
+      );
+      expect(calls.some((call) => call.key === ROUTES.SESSION)).toBe(false);
+      const starts = calls.filter((call) => call.key === ROUTES.START);
+      expect(starts).toHaveLength(3);
+      expect(new Set(starts.map(idempotencyKeyOf)).size).toBe(1);
+      await act(async () => { resolveStart(startResponse()); });
+      expect(within(progress).getByRole("status").textContent).toBe(
+        "Running… Taking longer than usual. Generation continues on the server — keep this page open.",
+      );
+      expect(screen.getByRole("timer").textContent).toBe("Elapsed: 1:05");
+      expect(calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(1);
+    } finally {
+      view.unmount();
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps the notice before submit and describes the button through idle, running and result", async () => {
+    const routed = makeClientWithDeferredRoute(happyPathRoutes(), ROUTES.SESSION);
+    renderPage({ client: routed.client });
+    await waitForForm();
+    const form = screen.getByRole("form");
+    const notice = within(form).getByTestId("data-processing-notice");
+    const button = within(form).getByRole("button", { name: "Run" });
+    expect(notice.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(button.getAttribute("aria-describedby")?.split(" ")).toContain(notice.id);
+    fillValidForm();
+    submit();
+    await screen.findByRole("button", { name: "Generating…" });
+    expect(within(form).getByTestId("data-processing-notice")).toBe(notice);
+    await act(async () => routed.resolveDeferred(sessionResponse()));
+    await waitForResult();
+    expect(within(form).getByTestId("data-processing-notice")).toBe(notice);
+    expect(button.getAttribute("aria-describedby")?.split(" ")).toContain(notice.id);
+  });
+
   it.each(["Try again", "Run"])("retries occupied capacity using %s with the same key and an unlocked form", async (button) => {
     const { client, calls } = makeClientCapturingRequests({
       ...happyPathRoutes(),
@@ -158,6 +280,48 @@ describe("ProductRunPage", () => {
     expect(starts).toHaveLength(2);
     expect(idempotencyKeyOf(starts[0]!)).not.toBe(idempotencyKeyOf(starts[1]!));
     expect(JSON.parse(starts[1]!.init.body as string)).toMatchObject({ input: { text: "A different request." } });
+  });
+
+  it.each([
+    { ambiguous: false, button: "Try again" },
+    { ambiguous: false, button: "Run" },
+    { ambiguous: true, button: "Try again" },
+  ])("times delayed capacity retries through $button (earlier ambiguous start=$ambiguous)", async ({ ambiguous, button }) => {
+    const { client, calls } = makeClientCapturingRequests({
+      ...happyPathRoutes(),
+      [ROUTES.START]: [
+        ...(ambiguous ? [errorResponse(503, "internal_error")] : []),
+        errorResponse(429, "quota_capacity_reserved"),
+        errorResponse(429, "quota_capacity_reserved"),
+        startResponse(),
+      ],
+      [ROUTES.SESSION]: [sessionResponse({ status: "running" })],
+    });
+    const view = renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    vi.useFakeTimers();
+    try {
+      submit();
+      for (const elapsed of ["1:05", "2:10"]) {
+        await act(async () => { await advance(100); });
+        expect(screen.getByText("Capacity is temporarily in use. Please try again shortly.")).toBeTruthy();
+        expect(screen.queryByTestId("run-progress")).toBeNull();
+        await act(async () => { await advance(65_000, 1_000); });
+        fireEvent.click(screen.getByRole("button", { name: button }));
+        expect(screen.getByTestId("run-progress").dataset.stage).toBe(ambiguous ? "long" : "normal");
+        expect(screen.getByText(`Elapsed: ${ambiguous ? elapsed : "0:00"}`)).toBeTruthy();
+      }
+      await act(async () => { await advance(100); });
+      expect(screen.getByRole("button", { name: "Generating…" })).toBeTruthy();
+      expect(screen.getByText(ambiguous ? "Elapsed: 2:10" : "Elapsed: 0:00")).toBeTruthy();
+      const starts = calls.filter((call) => call.key === ROUTES.START);
+      expect(starts).toHaveLength(ambiguous ? 4 : 3);
+      expect(new Set(starts.map(idempotencyKeyOf)).size).toBe(1);
+    } finally {
+      view.unmount();
+      vi.useRealTimers();
+    }
   });
 
   it("keeps repeated definite capacity rejections unlocked without replacing the prepared key", async () => {
@@ -894,10 +1058,13 @@ describe("ProductRunPage", () => {
     expect(text.value).toBe("Edited input.");
     // The progress notice lives in the result card, next to the still-relevant "previous details" one.
     const resultCard = screen.getByRole("heading", { name: "Test result", level: 2 }).closest("section")!;
-    expect(within(resultCard).getByText("Running…")).toBeTruthy();
+    const progress = within(resultCard).getByTestId("run-progress");
+    expect(within(progress).getByRole("status").textContent).toContain("Running…");
+    expect(progress.compareDocumentPosition(screen.getByText(RESULT_TEXT)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(resultCard).getByText("Created from previous details")).toBeTruthy();
     routed.resolveCall(ROUTES.RESULT, 1, resultResponse(TEST_PRODUCT_IDS, { output: { text: "Second result." } }));
     await screen.findByText("Second result.");
+    expect(screen.queryByTestId("run-progress")).toBeNull();
     expect(screen.queryByText("Created from previous details")).toBeNull();
 
     // Copy and New task share one action group.
@@ -1524,32 +1691,99 @@ describe("ProductRunPage", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
   });
 
-  it("treats a poll that gives up while the session is still non-terminal as retryable, not a dead run", async () => {
-    const { client } = makeClient({
-      ...bootRoutes(),
-      [ROUTES.START]: [startResponse()],
-      // pollScenarioSession's default budget (60s / 2s interval) needs ~30 GETs before it gives
-      // up; queued generously above that so the poll -- not the mock -- is what runs out first.
-      [ROUTES.SESSION]: Array.from({ length: 40 }, () => () => sessionResponse({ status: "running" })),
+  it.each([
+    { durationMs: 20_000, status: "running", attached: false },
+    { durationMs: 70_000, status: "running", attached: false },
+    { durationMs: 1_210_000, status: "running", attached: false },
+    { durationMs: 1_210_000, status: "started", attached: true },
+  ])("keeps $status for $durationMs ms on the same session (attached=$attached)", async ({ durationMs, status, attached }) => {
+    let completed = false;
+    const { client, calls } = makeClientCapturingRequests({
+      ...happyPathRoutes(),
+      [ROUTES.SESSION]: Array.from({ length: Math.ceil(durationMs / 2_000) + 5 }, () =>
+        () => sessionResponse({ status: completed ? "completed" : status })),
     });
-
-    renderPage({ client });
-    // Real timers for boot/form (testing-library's own waitFor polling relies on them); fake
-    // timers are only switched on once the poll's 60s wait is the sole thing left to get through.
-    await waitForForm();
-    fillValidForm();
-    submit();
-
     vi.useFakeTimers();
+    const { unmount } = renderPage({ client, ...(attached ? { attachSessionId: "session_1" } : {}) });
     try {
-      await act(async () => {
-        await advance(61_000);
-      });
-
-      expect(screen.getByText("This is taking longer than expected. Please try again.")).toBeTruthy();
-      // Still recoverable, not a dead run: retry stays available and reuses the same submission.
-      expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+      await act(async () => { await advance(100); });
+      if (!attached) {
+        fillValidForm();
+        submit();
+      }
+      await act(async () => { await advance(durationMs, 2_000); });
+      expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+      expect(screen.queryByText(RESULT_TEXT)).toBeNull();
+      expect(screen.getByRole("button", { name: "Generating…" }).hasAttribute("disabled")).toBe(true);
+      const progress = screen.getByTestId("run-progress");
+      expect(progress.dataset.stage).toBe(durationMs >= 60_000 ? "long" : "normal");
+      expect(within(progress).getByText(`Elapsed: ${Math.floor(durationMs / 60_000)}:${String(durationMs / 1_000 % 60).padStart(2, "0")}`)).toBeTruthy();
+      expect(screen.getByRole("heading", { name: "Test result" }).closest("section")!.contains(progress)).toBe(true);
+      completed = true;
+      await act(async () => { await advance(2_000); });
+      expect(screen.getByText(RESULT_TEXT)).toBeTruthy();
+      expect(screen.queryByTestId("run-progress")).toBeNull();
+      expect(calls.filter((call) => call.key === ROUTES.START)).toHaveLength(attached ? 0 : 1);
+      expect(calls.filter((call) => call.key.startsWith("GET /v1/scenario-sessions/"))
+        .every((call) => call.key === ROUTES.SESSION)).toBe(true);
+      expect(calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(durationMs / 2_000 + 2);
+      fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+      await act(async () => { await advance(0); });
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(RESULT_TEXT);
     } finally {
+      unmount();
+      vi.useRealTimers();
+    }
+  });
+
+  it.each(["network", "timeout"])("rechecks the accepted session after a %s failure without another start", async (failure) => {
+    let failedOnce = false;
+    const { client, calls } = makeClientCapturingRequests(happyPathRoutes(), (key, init) => {
+      if (key !== ROUTES.SESSION || failedOnce) return undefined;
+      failedOnce = true;
+      if (failure === "network") throw new TypeError("Connection lost");
+      return new Promise<Response>((_resolve, reject) => {
+        init.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+      });
+    });
+    vi.useFakeTimers();
+    const { unmount } = renderPage({ client });
+    try {
+      await act(async () => { await advance(100); });
+      fillValidForm();
+      submit();
+      await act(async () => { await advance(10_100); });
+      expect(screen.queryByText(RUN_FAILED)).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+      await act(async () => { await advance(100); });
+      expect(screen.getByText(RESULT_TEXT)).toBeTruthy();
+      expect(calls.filter((call) => call.key === ROUTES.START)).toHaveLength(1);
+      expect(calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(2);
+    } finally {
+      unmount();
+      vi.useRealTimers();
+    }
+  });
+
+  it("stops polling on unmount after renewing a healthy window", async () => {
+    const { client, calls } = makeClientCapturingRequests({
+      ...happyPathRoutes(),
+      [ROUTES.SESSION]: Array.from({ length: 310 }, () => () => sessionResponse({ status: "running" })),
+    });
+    vi.useFakeTimers();
+    const { unmount } = renderPage({ client });
+    try {
+      await act(async () => { await advance(100); });
+      fillValidForm();
+      submit();
+      await act(async () => { await advance(602_000, 2_000); });
+      expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+      unmount();
+      const callCount = calls.length;
+      await act(async () => { await advance(10_000); });
+      expect(calls).toHaveLength(callCount);
+    } finally {
+      unmount();
       vi.useRealTimers();
     }
   });
@@ -2016,5 +2250,94 @@ describe("ProductRunPage", () => {
     await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/could not start test product/i));
     expect(deterministicBusyStates.at(-1)).toBe(false);
     expect((screen.getByLabelText("Text") as HTMLInputElement).disabled).toBe(false);
+  });
+});
+
+describe("opt-in draft recovery", () => {
+  const key = "anytoolai.product_draft.test_product.run";
+  const definition = {
+    ...testProductDefinition,
+    draft: {
+      parseValues(raw: unknown): TestProductValues | null {
+        return typeof raw === "object" && raw !== null && "text" in raw && typeof raw.text === "string"
+          ? { text: raw.text }
+          : null;
+      },
+    },
+  };
+
+  function seed() {
+    window.sessionStorage.setItem(key, JSON.stringify({
+      v: 1, values: { text: "Stored draft" }, run: { scenarioSessionId: "session_1", input: { text: "Original input" } },
+    }));
+  }
+
+  it("keeps products without opt-in free of draft restore and writes", async () => {
+    seed();
+    const stored = window.sessionStorage.getItem(key);
+    const routed = makeClient(happyPathRoutes());
+    renderPage({ client: routed.client });
+    await waitForForm();
+    expect((screen.getByLabelText("Text") as HTMLTextAreaElement).value).toBe("");
+    fillValidForm();
+    submit();
+    await waitForResult();
+    expect(window.sessionStorage.getItem(key)).toBe(stored);
+  });
+
+  it("resumes only once under StrictMode and derives completion identity from the session", async () => {
+    seed();
+    const routed = makeClient(happyPathRoutes());
+    const onEvent = vi.fn();
+    render(<StrictMode><ProductRunPage definition={definition} client={routed.client} onEvent={onEvent} /></StrictMode>);
+    await waitForResult();
+    expect(routed.calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(1);
+    expect(routed.calls.some((call) => call.key === ROUTES.START)).toBe(false);
+    expect(onEvent).toHaveBeenCalledWith({ type: "scenario_completed", scenarioSessionId: "session_1", guestId: undefined, resultViewed: true });
+  });
+
+  it("gives handoff attachment precedence over a saved draft and run", async () => {
+    seed();
+    const routed = makeClient(happyPathRoutes());
+    const onAttachBegin = vi.fn();
+    render(<ProductRunPage definition={definition} client={routed.client} attachSessionId="session_1" onAttachBegin={onAttachBegin} />);
+    await waitForResult();
+    expect((screen.getByLabelText("Text") as HTMLTextAreaElement).value).toBe("");
+    expect(routed.calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(1);
+    expect(routed.calls.some((call) => call.key === ROUTES.START)).toBe(false);
+    expect(onAttachBegin).toHaveBeenCalledOnce();
+  });
+
+  it("survives a throwing product parser and removes its unusable saved run", async () => {
+    seed();
+    const routed = makeClient(bootRoutes());
+    render(<ProductRunPage definition={{ ...definition, draft: { parseValues: () => { throw new Error("stale parser"); } } }} client={routed.client} />);
+    await waitForForm();
+    expect((screen.getByLabelText("Text") as HTMLTextAreaElement).value).toBe("");
+    await waitFor(() => expect(window.sessionStorage.getItem(key)).not.toContain('"run"'));
+    expect(routed.calls.some((call) => call.key === ROUTES.SESSION)).toBe(false);
+  });
+
+  it.each(["failed", "expired"])("forgets a terminal %s run and keeps the draft", async (status) => {
+    seed();
+    const routed = makeClient({ ...bootRoutes(), [ROUTES.SESSION]: [sessionResponse({ status })] });
+    render(<ProductRunPage definition={definition} client={routed.client} />);
+    expect(await screen.findByText(RUN_FAILED)).toBeTruthy();
+    expect(JSON.parse(window.sessionStorage.getItem(key)!)).toEqual({ v: 1, values: { text: "Stored draft" } });
+  });
+
+  it("retains the accepted run across a transient result fetch failure and retries only that artifact", async () => {
+    seed();
+    const routed = makeClient({
+      ...happyPathRoutes(),
+      [ROUTES.RESULT]: [errorResponse(503, "temporarily_unavailable"), resultResponse(TEST_PRODUCT_IDS)],
+    });
+    render(<ProductRunPage definition={definition} client={routed.client} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
+    await waitForResult();
+    expect(routed.calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(1);
+    expect(routed.calls.filter((call) => call.key === ROUTES.RESULT)).toHaveLength(2);
+    expect(routed.calls.some((call) => call.key === ROUTES.START)).toBe(false);
+    expect(window.sessionStorage.getItem(key)).toContain('"run"');
   });
 });

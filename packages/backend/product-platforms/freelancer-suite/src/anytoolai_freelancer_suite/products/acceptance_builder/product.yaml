@@ -6,4 +6,7 @@ scenarios:
   - acceptance_builder.check_v1
 quota_policy_ref: acceptance_builder.guest_quota_v1
 commercial_admission_enabled: false
-usage_metrics: []
+usage_metrics:
+  - metric_key: acceptance_builder.results
+    unit: result
+    enabled: false

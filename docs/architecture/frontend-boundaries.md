@@ -138,6 +138,16 @@ The canonical backend output additionally contains `brief_text` (the caller's or
 as handoff material); the frontend result intentionally excludes it: the product parser drops it
 and it is never rendered or copied, so it must not be added to the frontend result model.
 
+## Data-processing notice (ANY-844)
+
+`ProductRunPage` shows a shared data-processing notice before submit in all seven host locales.
+`NEXT_PUBLIC_ANYTOOLAI_PRIVACY_POLICY_URL` is an optional build-time absolute HTTP(S) URL for its
+privacy-policy link (new tab); missing or invalid values hide the link, not the notice. Public
+deployments must supply the approved URL and rebuild after changes. `prod-up` validates it before
+profile generation or Docker calls; development, fake smoke and maintenance keep it optional.
+Browser-local draft text may be lost on reload or navigation; the shared notice does not promise
+recovery, since only products opting into draft persistence attempt it.
+
 ## Cross-product handoff in the web host (ANY-244)
 
 The shared runtime, not a product, owns the web side of a handoff:
@@ -149,33 +159,111 @@ The shared runtime, not a product, owns the web side of a handoff:
 - `HandoffConsent` sends the user to `/products/{targetProductId}?session={id}` right after a
   successful Accept; later preview GETs redact the ids after TTL, while an owner-checked accept
   replay can still return the existing target linkage.
-- `/products/{id}?session=` reaches the product as `attachSessionId`; `ProductRunPage` polls that
-  already-queued session and renders its result without a new start or reservation; its backend
-  success consumes the existing reservation. "Try again" re-polls that session, and an unknown session id (404) ends in the run-failed state. The
-  route reads `?session=` from its `searchParams` prop (not `useSearchParams`, whose Suspense
-  boundary would turn the unknown-product 404 into a 200), removes it from the address bar so a
-  bookmark or shared link does not carry it, and keeps it in the tab's `sessionStorage` so a reload
-  still shows the result the accept already queued. `useAttachSession` is the one owner of that
-  state (`AttachProps`: `attachSessionId`, `onAttachBegin`, `onAttachEnd`, threaded route -> shell ->
-  product -> `ProductRunPage`; no analytics event is involved). The page reports two facts: it started
-  polling the session, and the person moved on from it ("New task" on the attached result, own work
-  whose result replaced it on screen, a mode switch, or its terminal failure). The owner forgets the
-  persisted id only for an end that follows a begin, so a failed boot, or typing in another mode,
-  forgets nothing, and a run that failed to start leaves the attached result restorable. After consent the linked scenario session is an ordinary runtime handle:
-  the platform's session/result GETs take no guest id and the session has no expiry of its own, so
-  the id is an opaque public handle, not proof of ownership, and not the short-lived handoff bearer
-  token (which does have a TTL and redaction contract). If a bounded lifetime is ever wanted for it,
-  that is a backend lifecycle contract, not a frontend assumption. The attached result must come
+- `/products/{id}?session=` reaches shared product selection before `ProductRunPage` mounts.
+  The route reads `?session=` from its `searchParams` prop (not `useSearchParams`, whose Suspense
+  boundary would turn the unknown-product 404 into a 200). Selection verifies the session and mode;
+  `useAttachSession` owns attachment persistence and URL consumption through `AttachProps`.
+  The selection, retry/discard and storage-failure rules below govern restoration.
+  Once selected, `ProductRunPage` polls the already-queued session without a new start or
+  reservation; backend success consumes the existing reservation. A normal end clears only
+  the matching attachment whose polling began; explicit discard also works before polling.
+  Guest session/result GETs retain their existing opaque public-handle behavior without a
+  guest-id parameter. Paid session/result reads require a valid delegated identity and matching
+  saved execution owner; knowing the session ID does not authorize access. The session itself
+  has no expiry, unlike the short-lived handoff bearer token, whose TTL and redaction contract
+  remain separate from result authorization. Any bounded session lifetime would be a backend
+  lifecycle contract, not a frontend assumption. The attached result must come
   from this product's scenario: its backend-owned `schemaRef` and `schemaVersion` are checked
   against the selected scenario's output schema from runtime config (a declared version must match;
   a ref keeps its name across a version bump) before the product parser sees it.
+- Guest products opting in through `ProductDefinition.draft` keep form values and their last accepted
+  scenario session in the tab's `sessionStorage`
+  (`anytoolai.product_draft.<productId>.<messageScope>`). Reload resumes polling without a new start.
+  "New task" clears both; terminal failure clears only the matching saved run and keeps the draft.
+  A failed attachment preserves a different saved own run. User text stays in
+  tab storage, never events, URLs or logs. ProposalAI and all three Client Update Writer modes opt in;
+  handoff attachment takes precedence. The last selected draft scenario is stored separately under
+  `anytoolai.product_draft_scenario.<productId>`. Multi-mode pages resolve it against their current
+  opt-in definitions before mounting a form, so reload opens the correct mode without briefly
+  polling another mode's saved run. Explicit mode selection, field edits, own starts and verified
+  result links remember that scenario; background restoration does not replace it. New task clears
+  the current mode's fields/run and retains the mode selection; other modes keep separate drafts.
+- Once an own start and its scenario selection are confirmed saved, the per-product attachment
+  entry records a preferred own-run reference (draft key and session id). The route lets draft
+  recovery resume that run immediately, including while an old attached result is still displayed.
+  Rejected/ambiguous starts retain the previous attachment; failed persistence delays its
+  retirement until the new result commits. Only the replaced attachment reference is retired;
+  other pending attachments remain fallbacks. A late
+  background Accept cannot replace the preferred own run, while an explicit attachment open can.
+  Clearing or losing the referenced saved run releases its priority over remaining attachments.
+- The web host owns the configured Portal consumer audience. Next derives public
+  `NEXT_PUBLIC_PORTAL_CONSUMER_ID` from the single build input
+  `ANYTOOLAI_PORTAL_CONSUMER_ID` (default `platform-kernel`); CE-kit receives the
+  expected audience explicitly. Launch, exchange and V2 session reads/installations
+  must agree with the API and Portal registry. Reject a foreign audience before
+  storage mutation or private-state clearing; reauthorization preserves owner-bound
+  pending requests. Runtime environment changes cannot recompile the frontend.
+- Portal-owned forms use separate `anytoolai.paid_draft.v1.*` keys scoped by the
+  canonical tenant/region/user tuple, including selected mode. They never read guest
+  drafts. Same-owner reauthorization retains them; logout, parent revocation and
+  owner changes clear paid drafts with other private recovery state. Guest drafts
+  remain independent. Paid drafts store editable values, mode and an optional own-run binding
+  (accepted session ID plus original UI input, or null when unavailable): the owner-bound
+  `paid_start` record remains the sole execution recovery source. A saved guest or
+  draft run cannot start a competing poll alongside paid replay. Explicit result
+  selection retains priority for that visit without replacing a pending paid request.
+  Automatic paid form restoration requires the exact selected session ID to match
+  the draft binding. It runs after hydration independently of runtime-config success,
+  once and without overwriting edits; latest editable values remain separate from
+  original execution input. Unbound/older drafts offer an explicit Restore saved
+  draft action when editing is allowed. This only fills fields: no replay, key
+  change, new request or invented result input. Opt-out products remain unchanged.
+- Paid recovery does not require current new-start availability. If runtime config is unavailable,
+  or no longer lists the scenario/enabled web frontend, a saved owner-bound pending request or
+  accepted/explicitly selected session opens a recovery-only view. It replays only the original
+  frozen key/request or reads that session; new submissions and "New task" stay disabled. Result
+  schema ref/version must match the bundled product renderer's `outputSchema` before parsing;
+  the architecture contract test checks these pins against product workflows/schema versions.
+  Delegated identity and backend ownership checks remain required for every protected request.
+- Shared product selection resolves the mode and session together before mounting
+  `ProductRunPage`; multi-mode and single-mode products use the same precedence.
+  Multi-mode selection uses the server's `scenarioId`, including accepted paid recovery. Pending and nonterminal
+  accepted work retain priority. After a proven completed/failed/expired status,
+  ordinary restoration honors a later saved valid mode. Explicit result/selected
+  handoff presentation still wins and saves its verified server mode; background
+  restoration/late callbacks do not change user choice. Own starts persist choice
+  before sending, never on late acceptance. After async resolution, custody,
+  recovery and saved choice must still match. URL scenario hints never choose that
+  mode. Missing identity or transient failures preserve Retry; a definite 404 or incompatible
+  scenario offers explicit discard. Discard removes only the matching attachment/accepted recovery,
+  preserving pending requests and newer sessions; it never creates a fresh logical start.
+  A definite 404 for a different older recovery does not block a selected result;
+  retain that recovery record and resolve the selected session instead.
+  A pending paid request has no accepted session to resolve: its frozen scenario selects its mode.
+  On ordinary restoration that request takes precedence over an older remembered handoff; an
+  explicitly selected result takes precedence for that visit without replacing the pending request.
+  A verified explicit link persists the existing attachment's `active` choice, without
+  replacing another paid recovery. Consume its session/scenario URL parameters only
+  after that write succeeds; interrupted resolution or refused storage retains the
+  URL for reload. Explicit exit/discard consumes the matching URL even if storage
+  failed. An invalid link preserves previous recovery and attachment selection.
+  A background attachment is not an explicit choice; a terminal background result
+  yields to a saved different mode. Existing `active` records retain their priority
+  until explicitly left; a new own paid submission leaves the previous choice and URL
+  after persisting pending recovery, before sending. Failed persistence keeps the old
+  result reachable; automatic replay/retry and late responses do not change the choice. Storage versions and
+  the prepared-start replay path are unchanged.
+- The SDK polls in bounded 600-second windows. The web runtime renews a window only after a healthy
+  `started`/`running` snapshot, continuing the same session. Every awaited window checks abort,
+  active session and current paid identity; a read failure retries the accepted session without
+  starting another execution.
 - A spent (accepted/consumed) token that still names the target session shows an explicit "Open result" on the
   consent page, for the case where the Accept response was lost and the person reloaded instead of retrying
   (a retry that gets "already accepted" redirects on its own). It never redirects automatically on load.
 - The redirect happens only when `products/attachTargets.ts` lists the accepted target scenario
   (a registered, enabled product page that can attach it); otherwise the consent page keeps showing
   the terminal status. The consent route injects that check, so it does not bundle every product.
-- `web.result_viewed` for an attached session is sent with the session alone, without a guest: the backend
+- `web.result_viewed` for an attached or draft-restored session is sent with the session alone, without a guest: the backend
   derives guest and chain from the session and rejects a different explicit guest, which is what the
   current one is after a reload without a usable `localStorage` (a fresh in-memory guest). The tab keeps, per
   session, the event id, the web session id it was sent under, and whether the backend accepted it:
@@ -250,12 +338,9 @@ product-owned. Code: `apps/web-mirror/src/i18n/` (library `use-intl`, imported o
   English literals -- one optional flag, `hasDescription`, tells the shared runtime whether to look
   up a product's own `description` message, without the definition itself holding any text. `neutral|warm|firm` tone labels are product
   vocabulary (a product-owned wire enum's visible labels), never host's: Client Update Writer's
-  native tone radios read them from `products/shared/toneMessages/` (one translation per locale,
-  spread into its own `product` namespace so a product with a differently-meaning `tone`-shaped enum
-  needs no host change); ProposalAI instead defines its own descriptive `toneOptions` labels
-  ("Warm & personable" etc.) in its own messages for its radio choices -- the shared
-  bundle is an opt-in convenience for products that want the same plain wording, not a contract every
-  `tone`-shaped product must join.
+  native tone radios read the plain labels from its own `tone` messages; ProposalAI defines
+  descriptive `toneOptions` labels ("Warm & personable" etc.) in its own messages. Each product
+  owns its wording even when the wire enum is the same.
 - **One-screen workspace (ANY-528, ANY-530):** `ProductRunPage` renders every product as an input
   card beside a result card (stacked below 860px; `ProductPageShell` always uses the wide shell).
   The runtime keeps the form and the latest successful result together, with the result tied to the
@@ -267,6 +352,22 @@ product-owned. Code: `apps/web-mirror/src/i18n/` (library `use-intl`, imported o
   (`workspace.inputTitle|previousDetails|backToInputs|newTask|handoffFailed|handoffOpening|handoffStay`); the product owns the noun-specific
   copy under its `messageScope` (`resultTitle|placeholder|regenerate`, one set per Client Update
   Writer mode). The shared runtime still owns start, retry, quota, and copy behavior.
+- **Waiting progress (ANY-842):** the shared runtime shows elapsed time and a localized stage hint
+  throughout submission and polling, including regeneration over a previous result. Hints change at
+  30 and 60 seconds, based on observed 4.5–42-second product runs; these are expectations, not
+  deadlines. Products provide only their `<scope>.running` status and must not add their own timers.
+  The accessible timer has live announcements off and sits outside the status region. Accepted own
+  runs retain their client start timestamp where draft recovery is enabled, including paid
+  recovery through an attachment matching the current owner's saved run session. Legacy drafts and
+  attached handoff sessions time from local observation. Ambiguous/accepted retries retain the
+  timestamp; a proved capacity rejection resets timing on retry while preserving the request key;
+  leaving the pending state removes the timer. Polling policy remains owned by ANY-777.
+- **First-run example (ANY-847):** ProposalAI, Brief Decoder and each Client Update Writer mode
+  render shared `products/shared/ExampleDisclosure.tsx` first in their `Fields`: a collapsed
+  `<details>` showing inputs and a sample result. Static text never prefills the form or changes
+  typed input or tab drafts. Host messages own `example.toggle|inputs|output|note`; products own
+  `<scope>.example.intro|inputs.<field>|output` in all seven locales. Sample inputs pass their
+  product validators in tests. Prepaid Request keeps Amount short and puts context in Billing notes.
 - **Validation:** shared validators return structured `FieldError` data (`required`,
   `outer_whitespace`, `max_length`, `product`), never prose; `FieldErrorMessage` renders it in the
   current locale. Backend schema validation stays authoritative.
@@ -287,17 +388,19 @@ product-owned. Code: `apps/web-mirror/src/i18n/` (library `use-intl`, imported o
 
 ### Recipe: translations for a new web product
 
-1. Create `products/<name>/messages/en.ts` (English is the semantic source: `title`,
+1. Create `products/<name>/messages/en.json` (English is the semantic source: `title`,
    `quotaRemaining` with `{remaining}`/`{limit}`, per-scope `submit`/`running`/`runFailed`, `fields`,
    `fieldNames`, and any product validation keys). Every scope also needs `resultTitle` (the
    result card heading, a noun for what the run produces), `placeholder` (shown before the first
    result) and `regenerate` (the submit label once a result is shown). Want a description under the
    title? Add `description` here and set `hasDescription: true` on the `ProductDefinition` -- the
-   shared runtime only looks it up when the flag is set.
-2. Add `fr it de es ru pt` files typed `Shape<typeof en>`; use the typographic apostrophe `’` (a
-   plain `'` before `{` starts ICU quoting); keep placeholders and plural categories. Reusing
-   the plain tone labels? Spread `TONE_MESSAGES[locale]` from `products/shared/toneMessages/` under a `tone`
-   key in each locale file instead of retranslating `neutral|warm|firm`.
+   shared runtime only looks it up when the flag is set. A first-run example goes under
+   `<scope>.example` (`intro`, `inputs.<field>`, `output`) and is rendered by the product’s `Fields`
+   through `ExampleDisclosure`.
+2. Add `fr it de es ru pt` JSON files with the same structure; use the typographic apostrophe `’` (a
+   plain `'` before `{` starts ICU quoting); keep placeholders and plural categories. Keep
+   product-owned vocabulary such as tone labels in the product's locale files. Reuse host keys
+   for shared runtime conditions; handoff uses `errors.quotaCapacityReserved` for occupied capacity.
 3. Export `Record<Locale, Shape<typeof en>>` from `messages/index.ts`.
 4. Register the product with `messages` in `products/registry.ts`; every locale must include a
    nonempty `title` for the page shell. The shell supplies the provider and language selector;
@@ -311,9 +414,11 @@ product-owned. Code: `apps/web-mirror/src/i18n/` (library `use-intl`, imported o
 ### Recipe: add a locale
 
 1. Add it to `LOCALE_NAMES` in `i18n/locales.ts` (endonym).
-2. TypeScript then requires an entry in `HOST_MESSAGES`, `TONE_MESSAGES` and every product's
-   messages record: add `i18n/messages/<code>.ts`, `products/shared/toneMessages/<code>.ts` and
-   `products/*/messages/<code>.ts`, typed `Shape<typeof en>`.
+2. TypeScript then requires an entry in every locale record: add `i18n/messages/<code>.json`,
+   `app/homeMessages/<code>.json`, `components/handoffMessages/<code>.json` and
+   `products/*/messages/<code>.json` and register each in its typed bundle index.
+   TypeScript checks required keys and value types; i18n tests compare exact structure and inspect
+   raw JSON for strict syntax and duplicate keys.
 3. Run `pnpm --filter @anytoolai/web-mirror test`; the parity, placeholder and ICU-syntax checks
    fail on any gap. No product runtime change is needed.
 
@@ -557,3 +662,19 @@ after acceptance and terminal success/release. `quota_capacity_reserved`
 is retryable with the same prepared key or handoff token/guest, without exhausted/paywall UI.
 `quota_exhausted` remains final used exhaustion. Advisory reads and result-fetch retries create no
 logical execution; an active/completed result is never replaced by a quota refresh.
+
+## Structured fit results (ANY-247)
+
+Task Finder uses the shared `ProductRunPage` with two product-owned fields and a typed result.
+Its parser orders comparison deltas and criterion scores by criterion id (skills, experience,
+scope, constraints), rejecting missing, duplicate or unknown ids. Array position is not a backend
+contract. Score and verdict are independent indicators; the renderer shows both without reconciling
+them and keeps comparison statuses separate from criterion scores. The numeric score has a native
+meter as a decorative supplement; text carries the accessible meaning.
+
+`ResultView hideText` supplies shared copy states without duplicating the structured display.
+If copying fails, it reveals the copy text so the existing Select text fallback remains usable.
+The default still displays text. Task Finder's copy composition is fixed English under every UI
+locale, as required by its renderer contract. Empty strengths/gaps say “Not specified.” Echoed
+inputs and comparison confidence never enter the frontend result model, display, copy or events.
+The product has no handoff definition; Task Finder to ProposalAI remains an optional later journey.

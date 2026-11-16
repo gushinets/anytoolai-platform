@@ -17,7 +17,11 @@ CONTRACT = ROOT / "docs/contracts/kernel-capability-manifest/v1"
 SCHEMA = ROOT / "docs/generated/capability-manifest-v1.schema.json"
 POSITIVE_BYTE_SHA256 = "25f39800090615eeba04cb27ab020332d0cf7cf7250fac6d2e5c38754c89b354"
 POSITIVE_VERSION = "sha256:a39bac9f210a6ac67e97e117f8481a5954dc3f36bdaab2fd54c7522b27d6ec29"
-DISABLED_VERSION = "sha256:478761c681d02330ed052aabe5e1b472dc1c2ee56d79a568a8009f4b4503a694"
+HISTORICAL_DISABLED_VERSION = (
+    "sha256:478761c681d02330ed052aabe5e1b472dc1c2ee56d79a568a8009f4b4503a694"
+)
+DISABLED_VERSION = "sha256:359cc0ff7c7bbacb69ba8e0de0444738b46032c846b10a962298bfb8e0d9cf85"
+CURRENT_TEST_VERSION = "sha256:5a743b1eb5e50ebed25259fb745e6b2dda743f01bd0def1cae77d12e9697aa62"
 NEGATIVE_CASES = {
     "missing-field": "wire",
     "unknown-field": "wire",
@@ -142,7 +146,9 @@ def check_fixtures() -> None:
     Draft202012Validator.check_schema(schema)
     for name, version in (
         ("valid-manifest.json", POSITIVE_VERSION),
+        ("historical-disabled-manifest.json", HISTORICAL_DISABLED_VERSION),
         ("default-disabled-manifest.json", DISABLED_VERSION),
+        ("current-test-enabled-manifest.json", CURRENT_TEST_VERSION),
     ):
         payload = json.loads((fixtures / name).read_text(encoding="utf-8"))
         validate_manifest(payload, schema)
@@ -160,7 +166,12 @@ def check_fixtures() -> None:
 
 def check_portal_copy(portal_root: Path) -> None:
     peer = portal_root / "docs/contracts/kernel-capability-manifest/v1"
-    for name in ("valid-manifest.json", "valid-manifest.digest"):
+    for name in (
+        "valid-manifest.json",
+        "valid-manifest.digest",
+        "default-disabled-manifest.json",
+        "current-test-enabled-manifest.json",
+    ):
         require(
             (peer / "fixtures" / name).read_bytes() == (CONTRACT / "fixtures" / name).read_bytes(),
             "portal_fixture_drift",

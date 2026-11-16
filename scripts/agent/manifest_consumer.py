@@ -27,16 +27,14 @@ LBX_FIELDS = (
     "lbx_server_password",
     "lbx_widget_signing_secret",
     "lbx_seller_organization_id",
-    "lbx_webhook_auth_header",
-    "lbx_webhook_auth_value",
 )
 CONCURRENT_READS = 8
-DEFAULT_DISABLED_DIGEST = "sha256:478761c681d02330ed052aabe5e1b472dc1c2ee56d79a568a8009f4b4503a694"
+DEFAULT_DISABLED_DIGEST = "sha256:359cc0ff7c7bbacb69ba8e0de0444738b46032c846b10a962298bfb8e0d9cf85"
+CURRENT_TEST_DIGEST = "sha256:5a743b1eb5e50ebed25259fb745e6b2dda743f01bd0def1cae77d12e9697aa62"
 
 
 def assert_safe_settings(configuration: Any) -> None:
     assert configuration.billing_worker_enabled is False
-    assert configuration.lbx_webhook_enabled is False
     for field in LBX_FIELDS:
         value = getattr(configuration, field)
         assert (value.get_secret_value() if hasattr(value, "get_secret_value") else value) == ""
@@ -66,7 +64,6 @@ def isolated_portal(portal_root: Path) -> Iterator[dict[str, Any]]:
     overrides = {field.upper(): "" for field in LBX_FIELDS}
     overrides.update(
         BILLING_WORKER_ENABLED="false",
-        LBX_WEBHOOK_ENABLED="false",
         KERNEL_BASE_URL="",
         KERNEL_SERVICE_TOKEN="",
         KERNEL_MOCK_ENABLED="false",
@@ -126,7 +123,7 @@ def isolation_regression(portal_root: Path) -> None:
         root = Path(directory)
         poison = root / ".env"
         poison.write_text(
-            "BILLING_WORKER_ENABLED=true\nLBX_WEBHOOK_ENABLED=true\n"
+            "BILLING_WORKER_ENABLED=true\n"
             "LBX_BASE_URL=https://poison.invalid\nLBX_SERVER_USERNAME=poison\n"
             "LBX_SERVER_PASSWORD=poison\nSMTP_HOST=poison.invalid\n"
             "SENTRY_RELEASE=poison\n",
@@ -189,10 +186,9 @@ async def probe(base_url: str, scenario: str, expected_error: str | None) -> dic
     from app.domains.catalog.contracts import SourceProvenance
     from app.integrations.kernel.client import KernelError
     from apps.api.tests.support.kernel import (
-        EXPECTED_DIGEST,
+        CONTRACT,
         independent_digest,
         kernel_settings,
-        manifest_fixture,
     )
 
     configuration = kernel_settings(
@@ -202,10 +198,13 @@ async def probe(base_url: str, scenario: str, expected_error: str | None) -> dic
         kernel_max_retries=1,
     )
     assert_safe_settings(configuration)
-    expected = manifest_fixture()
+    fixture_name = (
+        "default-disabled-manifest.json"
+        if scenario == "ordinary"
+        else "current-test-enabled-manifest.json"
+    )
+    expected = json.loads((CONTRACT / "fixtures" / fixture_name).read_text(encoding="utf-8"))
     if scenario == "ordinary":
-        for item in (*expected["products"], *expected["usage_metrics"]):
-            item["enabled"] = False
         assert independent_digest(expected) == DEFAULT_DISABLED_DIGEST
     elif scenario == "material":
         next(
@@ -214,7 +213,7 @@ async def probe(base_url: str, scenario: str, expected_error: str | None) -> dic
             if item["metric_key"] == "proposal_ai.test_generations"
         )["enabled"] = False
     else:
-        assert independent_digest(expected) == EXPECTED_DIGEST
+        assert independent_digest(expected) == CURRENT_TEST_DIGEST
     digest = independent_digest(expected)
 
     async with source_resources(configuration) as sources:

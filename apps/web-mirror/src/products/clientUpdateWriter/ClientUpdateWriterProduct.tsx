@@ -2,6 +2,7 @@
 
 import type { ChangeEvent } from "react";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
+import type { AttachProps } from "../runtime/attachSession";
 import { Input, TextArea } from "@anytoolai/shared-ui";
 import { FieldErrorMessage } from "../../components/FieldErrorMessage";
 import { ResultView } from "../../components/ResultView";
@@ -15,7 +16,9 @@ import {
 } from "../runtime/fieldValidation";
 import type { ProductDefinition, ProductFieldsProps, ProductResultProps, ProductRunEvent } from "../runtime/productDefinition";
 import { MultiModeProduct } from "../shared/MultiModeProduct";
-import { TONE_OPTIONS, type Tone } from "../shared/tone";
+import { isRecord } from "../shared/resultGuards";
+import { isTone, TONE_OPTIONS, type Tone } from "../shared/tone";
+import { ExampleDisclosure } from "../shared/ExampleDisclosure";
 import styles from "./ClientUpdateWriterProduct.module.css";
 
 const PRODUCT_ID = "client_update_writer";
@@ -113,6 +116,14 @@ function UpdateFields({ values, errors, disabled, onChange }: ProductFieldsProps
   const t = useProductT();
   return (
     <>
+      <ExampleDisclosure
+        intro={t("update.example.intro")}
+        items={[
+          { label: t("fields.progressNotes"), value: t("update.example.inputs.progressNotes") },
+          { label: t("fields.tone"), value: t("tone.neutral") },
+        ]}
+        output={t("update.example.output")}
+      />
       <div className={styles.fieldGroup}>
         <label htmlFor="client-update-writer-progress-notes">{t("fields.progressNotes")}</label>
         <TextArea
@@ -134,8 +145,15 @@ function UpdateFields({ values, errors, disabled, onChange }: ProductFieldsProps
 export const updateDefinition: ProductDefinition<UpdateValues, ClientUpdateWriterResult> = {
   productId: PRODUCT_ID,
   scenarioId: "client_update_writer.update_v1",
+  outputSchema: { schemaRef: "kernel.schemas.compose_reply_output_v1", schemaVersion: 1 },
   messageScope: "update",
   emptyValues: { progressNotes: "", tone: "neutral" },
+  draft: {
+    parseValues: (raw) => isRecord(raw) ? {
+      progressNotes: typeof raw.progressNotes === "string" ? raw.progressNotes : "",
+      tone: typeof raw.tone === "string" && isTone(raw.tone) ? raw.tone : "neutral",
+    } : null,
+  },
   validate: validateUpdate,
   toInput: (values) => ({ progress_notes: trimBackendWhitespace(values.progressNotes), tone: values.tone }),
   extractResult: extractComposeReplyResult,
@@ -159,6 +177,15 @@ function ReplyDraftFields({ values, errors, disabled, onChange }: ProductFieldsP
   const t = useProductT();
   return (
     <>
+      <ExampleDisclosure
+        intro={t("reply_draft.example.intro")}
+        items={[
+          { label: t("fields.clientMessage"), value: t("reply_draft.example.inputs.clientMessage") },
+          { label: t("fields.replyGoal"), value: t("reply_draft.example.inputs.replyGoal") },
+          { label: t("fields.tone"), value: t("tone.warm") },
+        ]}
+        output={t("reply_draft.example.output")}
+      />
       <div className={styles.fieldGroup}>
         <label htmlFor="client-update-writer-client-message">{t("fields.clientMessage")}</label>
         <TextArea
@@ -194,8 +221,16 @@ function ReplyDraftFields({ values, errors, disabled, onChange }: ProductFieldsP
 export const replyDraftDefinition: ProductDefinition<ReplyDraftValues, ClientUpdateWriterResult> = {
   productId: PRODUCT_ID,
   scenarioId: "client_update_writer.reply_draft_v1",
+  outputSchema: { schemaRef: "kernel.schemas.compose_reply_output_v1", schemaVersion: 1 },
   messageScope: "reply_draft",
   emptyValues: { clientMessage: "", replyGoal: "", tone: "neutral" },
+  draft: {
+    parseValues: (raw) => isRecord(raw) ? {
+      clientMessage: typeof raw.clientMessage === "string" ? raw.clientMessage : "",
+      replyGoal: typeof raw.replyGoal === "string" ? raw.replyGoal : "",
+      tone: typeof raw.tone === "string" && isTone(raw.tone) ? raw.tone : "neutral",
+    } : null,
+  },
   validate: validateReplyDraft,
   toInput: (values) => ({
     client_message: trimBackendWhitespace(values.clientMessage),
@@ -224,6 +259,16 @@ function PrepaidRequestFields({ values, errors, disabled, onChange }: ProductFie
   const t = useProductT();
   return (
     <>
+      <ExampleDisclosure
+        intro={t("prepaid_request.example.intro")}
+        items={[
+          { label: t("fields.billingNotes"), value: t("prepaid_request.example.inputs.billingNotes") },
+          { label: t("fields.billingAmount"), value: t("prepaid_request.example.inputs.billingAmount") },
+          { label: t("fields.billingDueDate"), value: t("prepaid_request.example.inputs.billingDueDate") },
+          { label: t("fields.tone"), value: t("tone.neutral") },
+        ]}
+        output={t("prepaid_request.example.output")}
+      />
       <div className={styles.fieldGroup}>
         <label htmlFor="client-update-writer-billing-notes">{t("fields.billingNotes")}</label>
         <TextArea
@@ -246,8 +291,9 @@ function PrepaidRequestFields({ values, errors, disabled, onChange }: ProductFie
           onChange={(event: ChangeEvent<HTMLInputElement>) => onChange("billingAmount", event.target.value)}
           disabled={disabled}
           aria-invalid={Boolean(errors.billingAmount)}
-          aria-describedby={errors.billingAmount ? "client-update-writer-billing-amount-error" : undefined}
+          aria-describedby={`client-update-writer-billing-amount-help${errors.billingAmount ? " client-update-writer-billing-amount-error" : ""}`}
         />
+        <p id="client-update-writer-billing-amount-help" className={styles.help}>{t("fields.billingAmountHelp")}</p>
         <FieldErrorMessage id="client-update-writer-billing-amount-error" className={styles.error} error={errors.billingAmount} label={t("fieldNames.billingAmount")} />
       </div>
 
@@ -271,8 +317,17 @@ function PrepaidRequestFields({ values, errors, disabled, onChange }: ProductFie
 export const prepaidRequestDefinition: ProductDefinition<PrepaidRequestValues, ClientUpdateWriterResult> = {
   productId: PRODUCT_ID,
   scenarioId: "client_update_writer.prepaid_request_v1",
+  outputSchema: { schemaRef: "kernel.schemas.compose_reply_output_v1", schemaVersion: 1 },
   messageScope: "prepaid_request",
   emptyValues: { billingNotes: "", billingAmount: "", billingDueDate: "", tone: "neutral" },
+  draft: {
+    parseValues: (raw) => isRecord(raw) ? {
+      billingNotes: typeof raw.billingNotes === "string" ? raw.billingNotes : "",
+      billingAmount: typeof raw.billingAmount === "string" ? raw.billingAmount : "",
+      billingDueDate: typeof raw.billingDueDate === "string" ? raw.billingDueDate : "",
+      tone: typeof raw.tone === "string" && isTone(raw.tone) ? raw.tone : "neutral",
+    } : null,
+  },
   validate: validatePrepaidRequest,
   toInput: (values) => ({
     billing_context: {
@@ -287,14 +342,14 @@ export const prepaidRequestDefinition: ProductDefinition<PrepaidRequestValues, C
   Result: ClientUpdateWriterResultView,
 };
 
-export type ClientUpdateWriterProductProps = {
+export type ClientUpdateWriterProductProps = AttachProps & {
   client: PlatformApiClient;
   onEvent?: (event: ProductRunEvent) => void;
   visitId?: string;
 };
 
 /** One `ProductDefinition` per mode; the mode selector and its run-safety rules are `MultiModeProduct`. */
-export function ClientUpdateWriterProduct({ client, onEvent, visitId }: ClientUpdateWriterProductProps) {
+export function ClientUpdateWriterProduct({ client, onEvent, visitId, ...attach }: ClientUpdateWriterProductProps) {
   const t = useProductT();
   return (
     <MultiModeProduct
@@ -302,6 +357,7 @@ export function ClientUpdateWriterProduct({ client, onEvent, visitId }: ClientUp
       onEvent={onEvent}
       visitId={visitId}
       legend={t("modes.legend")}
+      {...attach}
       name="client-update-writer-mode"
       modes={[
         { id: "update", label: t("modes.update"), definition: updateDefinition },

@@ -1,6 +1,7 @@
 "use client";
 
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
+import type { AttachProps } from "../runtime/attachSession";
 import { useProductT } from "../../i18n";
 import { ProductRunPage } from "../runtime/ProductRunPage";
 import {
@@ -10,6 +11,7 @@ import {
   type FieldError,
 } from "../runtime/fieldValidation";
 import type { ProductDefinition, ProductFieldsProps, ProductRunEvent } from "../runtime/productDefinition";
+import { ExampleDisclosure } from "../shared/ExampleDisclosure";
 import { TextAreaField } from "../shared/TextAreaField";
 import { BriefDecoderResultView } from "./BriefDecoderResult";
 import { extractBriefDecoderResult, hasQuestions, type BriefDecoderResult } from "./parseBriefDecoder";
@@ -26,17 +28,26 @@ function validate(values: BriefDecoderValues): Partial<Record<keyof BriefDecoder
 function BriefDecoderFields({ values, errors, disabled, onChange }: ProductFieldsProps<BriefDecoderValues>) {
   const t = useProductT();
   return (
-    <TextAreaField
-      id="brief-decoder-brief-text"
-      label={t("fields.briefText")}
-      placeholder={t("fields.briefTextPlaceholder")}
-      help={t("fields.briefTextHelp")}
-      value={values.briefText}
-      error={errors.briefText}
-      disabled={disabled}
-      minHeight={200}
-      onChange={(value) => onChange("briefText", value)}
-    />
+    <>
+      <ExampleDisclosure
+        intro={t("decode.example.intro")}
+        items={[
+          { label: t("fields.briefText"), value: t("decode.example.inputs.briefText") },
+        ]}
+        output={t("decode.example.output")}
+      />
+      <TextAreaField
+        id="brief-decoder-brief-text"
+        label={t("fields.briefText")}
+        placeholder={t("fields.briefTextPlaceholder")}
+        help={t("fields.briefTextHelp")}
+        value={values.briefText}
+        error={errors.briefText}
+        disabled={disabled}
+        minHeight={200}
+        onChange={(value) => onChange("briefText", value)}
+      />
+    </>
   );
 }
 
@@ -47,6 +58,7 @@ function BriefDecoderFields({ values, errors, disabled, onChange }: ProductField
 export const briefDecoderDefinition: ProductDefinition<BriefDecoderValues, BriefDecoderResult> = {
   productId: "brief_decoder",
   scenarioId: "brief_decoder.decode_v1",
+  outputSchema: { schemaRef: "brief_decoder.decode_output_v1", schemaVersion: 2 },
   messageScope: "decode",
   hasDescription: true,
   emptyValues: { briefText: "" },
@@ -60,12 +72,12 @@ export const briefDecoderDefinition: ProductDefinition<BriefDecoderValues, Brief
   Result: BriefDecoderResultView,
 };
 
-export type BriefDecoderProductProps = {
+export type BriefDecoderProductProps = AttachProps & {
   client: PlatformApiClient;
   onEvent?: (event: ProductRunEvent) => void;
   visitId?: string;
 };
 
-export function BriefDecoderProduct({ client, onEvent, visitId }: BriefDecoderProductProps) {
-  return <ProductRunPage definition={briefDecoderDefinition} client={client} onEvent={onEvent} visitId={visitId} />;
+export function BriefDecoderProduct({ client, onEvent, visitId, ...attach }: BriefDecoderProductProps) {
+  return <ProductRunPage definition={briefDecoderDefinition} client={client} onEvent={onEvent} visitId={visitId} {...attach} />;
 }

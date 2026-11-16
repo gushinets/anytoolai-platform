@@ -1,12 +1,24 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CopyButton } from "../src/CopyButton";
+import { simulateBrowserTranslation } from "./support/simulateBrowserTranslation";
 
 afterEach(() => {
   cleanup();
 });
 
 describe("CopyButton", () => {
+  it("updates copy feedback after browser translation (ANY-840)", async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    render(<CopyButton text="Dear client, ..." />);
+    const button = screen.getByRole("button", { name: "Copy" });
+    simulateBrowserTranslation(button);
+    expect(() => fireEvent.click(button)).not.toThrow();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBe(button));
+    expect(writeText).toHaveBeenCalledWith("Dear client, ...");
+  });
+
   it("copies the text and calls onCopied on a successful clipboard write", async () => {
     const writeText = vi.fn(() => Promise.resolve());
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });

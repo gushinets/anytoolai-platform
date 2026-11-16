@@ -2,6 +2,7 @@
 
 import type { ChangeEvent } from "react";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
+import type { AttachProps } from "../runtime/attachSession";
 import { Select, TextArea as CanonicalTextArea } from "@anytoolai/shared-ui";
 import { FieldErrorMessage } from "../../components/FieldErrorMessage";
 import { ResultView } from "../../components/ResultView";
@@ -15,6 +16,7 @@ import {
   type FieldError,
 } from "../runtime/fieldValidation";
 import type { ProductDefinition, ProductFieldsProps, ProductResultProps, ProductRunEvent } from "../runtime/productDefinition";
+import { ExampleDisclosure } from "../shared/ExampleDisclosure";
 import styles from "./ProposalAIProduct.module.css";
 
 // Product-owned tone UI with three visible radio choices. Values stay the untranslated wire
@@ -38,6 +40,27 @@ export type ProposalAIValues = {
   tone: Tone;
   language: ProposalLanguage;
 };
+
+const EMPTY_VALUES: ProposalAIValues = { taskText: "", freelancerPositioning: "", tone: "warm", language: AUTO_LANGUAGE };
+
+function isTone(value: unknown): value is Tone {
+  return typeof value === "string" && (TONE_VALUES as readonly string[]).includes(value);
+}
+
+function isProposalLanguage(value: unknown): value is ProposalLanguage {
+  return value === AUTO_LANGUAGE || (typeof value === "string" && (LOCALES as readonly string[]).includes(value));
+}
+
+function parseDraftValues(raw: unknown): ProposalAIValues | null {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return null;
+  const value = raw as Record<string, unknown>;
+  return {
+    taskText: typeof value.taskText === "string" ? value.taskText : EMPTY_VALUES.taskText,
+    freelancerPositioning: typeof value.freelancerPositioning === "string" ? value.freelancerPositioning : EMPTY_VALUES.freelancerPositioning,
+    tone: isTone(value.tone) ? value.tone : EMPTY_VALUES.tone,
+    language: isProposalLanguage(value.language) ? value.language : EMPTY_VALUES.language,
+  };
+}
 
 // Mirrors `proposal_ai.generate_output_v1`: the proposal and the `experience_gap` issues.
 export type ProposalAIGap = { description: string };
@@ -118,6 +141,15 @@ function ProposalAIFields({ values, errors, disabled, onChange }: ProductFieldsP
   const t = useProductT();
   return (
     <>
+      <ExampleDisclosure
+        intro={t("generate.example.intro")}
+        items={[
+          { label: t("fields.taskText"), value: t("generate.example.inputs.taskText") },
+          { label: t("fields.freelancerPositioning"), value: t("generate.example.inputs.freelancerPositioning") },
+          { label: t("fields.toneLegend"), value: t("toneOptions.warm") },
+        ]}
+        output={t("generate.example.output")}
+      />
       <div className={styles.fieldGroup}>
         <RequiredLabel htmlFor="proposal-ai-task-text">{t("fields.taskText")}</RequiredLabel>
         <CanonicalTextArea
@@ -218,7 +250,7 @@ function ProposalAIFields({ values, errors, disabled, onChange }: ProductFieldsP
 }
 
 /**
- * ProposalAI's product meaning, and nothing else: its fields and their validation, the mapping to
+ * ProposalAI's product meaning, and nothing else: its first-run example, fields and their validation, the mapping to
  * `proposal_ai.generate_input_v1`, the parts `renderer_contract.yaml` pins (`text` is the only copy target, `gaps`
  * is informational; angle/rationale/model/provider never reach the renderer), the
  * `copy_result` activation, and its message scope (the copy itself is in `messages/`). Everything
@@ -227,9 +259,11 @@ function ProposalAIFields({ values, errors, disabled, onChange }: ProductFieldsP
 export const proposalAiDefinition: ProductDefinition<ProposalAIValues, ProposalAIResult> = {
   productId: "proposal_ai",
   scenarioId: "proposal_ai.generate_v1",
+  outputSchema: { schemaRef: "proposal_ai.generate_output_v1", schemaVersion: 1 },
   messageScope: "generate",
   hasDescription: true,
-  emptyValues: { taskText: "", freelancerPositioning: "", tone: "warm", language: AUTO_LANGUAGE },
+  emptyValues: EMPTY_VALUES,
+  draft: { parseValues: parseDraftValues },
   validate,
   toInput: (values) => ({
     task_text: trimBackendWhitespace(values.taskText),
@@ -243,12 +277,12 @@ export const proposalAiDefinition: ProductDefinition<ProposalAIValues, ProposalA
   Result: ProposalAIResultView,
 };
 
-export type ProposalAIProductProps = {
+export type ProposalAIProductProps = AttachProps & {
   client: PlatformApiClient;
   onEvent?: (event: ProductRunEvent) => void;
   visitId?: string;
 };
 
-export function ProposalAIProduct({ client, onEvent, visitId }: ProposalAIProductProps) {
-  return <ProductRunPage definition={proposalAiDefinition} client={client} onEvent={onEvent} visitId={visitId} />;
+export function ProposalAIProduct({ client, onEvent, visitId, ...attach }: ProposalAIProductProps) {
+  return <ProductRunPage definition={proposalAiDefinition} client={client} onEvent={onEvent} visitId={visitId} {...attach} />;
 }

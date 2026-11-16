@@ -23,6 +23,9 @@ on:
       - "tests/e2e/client-update-writer-smoke/**"
       - "scripts/agent/runner.py"
       - ".github/workflows/client-update-writer-smoke.yml"
+      - "tests/e2e/smoke-support/**"
+      - ".github/workflows/product-smoke.yml"
+      - "pnpm-lock.yaml"
   workflow_dispatch:
   schedule:
     # Weekly baseline run against main, independent of any particular PR's paths.
@@ -31,51 +34,6 @@ permissions:
   contents: read
 jobs:
   client-update-writer-smoke:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
-        with:
-          python-version: '3.12'
-      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
-        with:
-          version: 10.34.1
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .nvmrc
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @anytoolai/client-update-writer-smoke exec playwright install --with-deps chromium
-      - name: Boot dev Compose stack (waits for platform-api healthy)
-        run: python scripts/agent/runner.py dev-up
-        env:
-          ANYTOOLAI_READY_TIMEOUT: "120"
-      - name: Run Client Update Writer browser-evidence smoke
-        run: python scripts/agent/runner.py client-update-writer-smoke
-      - name: Dump Docker Compose logs on failure
-        if: failure()
-        run: |
-          PROJECT=$(python -c "import sys; sys.path.insert(0, 'scripts/agent'); from runner import runtime_identity; print(runtime_identity().compose_project)")
-          docker compose --project-name "$PROJECT" \
-            -f infra/compose/docker-compose.yml \
-            -f infra/compose/docker-compose.override.yml \
-            logs --no-color
-      - name: Tear down dev stack
-        if: always()
-        run: python scripts/agent/runner.py dev-down
-      - name: Upload evidence report
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: client-update-writer-smoke-evidence
-          path: .agent/client-update-writer-smoke/
-          if-no-files-found: ignore
-      - name: Upload Playwright failure traces
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: client-update-writer-smoke-traces
-          path: tests/e2e/client-update-writer-smoke/test-results/
-          if-no-files-found: ignore
+    uses: ./.github/workflows/product-smoke.yml
+    with:
+      command: client-update-writer-smoke

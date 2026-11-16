@@ -1,0 +1,48 @@
+[
+  {
+    "git_sha": "36d96ffd3729bc1df7826ab84c7a3c000acc4bfe",
+    "compose_project": "anytoolai-831bc552",
+    "api_url": "http://127.0.0.1:18451",
+    "source_fingerprint": "3724fe153d2027775f13ed88777f6d343d9e5e59df4f1bb5735c1c383f886590",
+    "profile_fingerprint": "fdfd7ab56bdecdb6a7436181938b51e454bf759af805f14965e1edab2359e765",
+    "enabled_products": {
+      "proposal_ai": {
+        "provider_policy_ref": "default_text_generation_v1",
+        "quota_policy_ref": null
+      }
+    },
+    "git_status_porcelain": [
+      "?? .quick-check-venv"
+    ],
+    "tracked_diff_paths": [],
+    "git_dirty_explanation": "Only an untracked symlink to the existing managed Python environment; no tracked source/config edits.",
+    "compose_prompt_sha256_from_git": "8ff01adfd3e9858f2fea32050cff9fb3ee92423fabb8c968ed39aaad3c4157f9",
+    "git_tree": "7075a1af0550c1d12671c72795806a0e7463af95",
+    "provider_policy_ref": "default_text_generation_v1",
+    "quota_mode": "unmetered",
+    "channel": "api"
+  },
+  {
+    "git_sha": "08ede3581ffe60cf465d3ffe4a7adf37f1b6d690",
+    "compose_project": "anytoolai-b8ff6a47",
+    "api_url": "http://127.0.0.1:18452",
+    "source_fingerprint": "89881bc71858af982dfadb05bbaf49f4570f53390c7e60828d4dc6eb4f68d572",
+    "profile_fingerprint": "b51a1c8a0beba884d128f0c6ba4e993e6909a2def41417b19b0b7aa8bbc99de2",
+    "enabled_products": {
+      "proposal_ai": {
+        "provider_policy_ref": "default_text_generation_v1",
+        "quota_policy_ref": null
+      }
+    },
+    "git_status_porcelain": [
+      "?? .quick-check-venv"
+    ],
+    "tracked_diff_paths": [],
+    "git_dirty_explanation": "Only an untracked symlink to the existing managed Python environment; no tracked source/config edits.",
+    "compose_prompt_sha256_from_git": "023916bbb59468e11cd83e9b2a18836c34b70b84f8b2a76b5846cdf84526a2dd",
+    "git_tree": "c11e2dd9926ae02191cd30b0575bafcab658f56b",
+    "provider_policy_ref": "default_text_generation_v1",
+    "quota_mode": "unmetered",
+    "channel": "api"
+  }
+]

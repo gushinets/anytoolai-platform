@@ -1,0 +1,137 @@
+{
+  "date": "2026-11-09",
+  "transport": "Chrome DevTools MCP 1.12.0 over stdio; graphical isolated Chrome",
+  "environment": "Final production Next.js on 31777, real API/worker on 18000, isolated SQLite, deterministic fake provider",
+  "selection": "Backend-owned scenario_id, available before completion; no fixed attach mode",
+  "baseline": [
+    {
+      "productId": "client_update_writer",
+      "modeId": "update",
+      "scenarioId": "client_update_writer.update_v1",
+      "sessionId": "scenario_session_01794215136947895155_0000000002_bcfbdf0018e0403096330885f06f0efd",
+      "artifactId": "artifact_01794215137067704881_0000000016_9219e85b9ec849c78dcccffddd11430d",
+      "guestId": "guest_01794215100799981287_0000000000_4b3d17dc416e44929f204da481fe22b1"
+    },
+    {
+      "productId": "client_update_writer",
+      "modeId": "reply_draft",
+      "scenarioId": "client_update_writer.reply_draft_v1",
+      "sessionId": "scenario_session_01794215137102520896_0000000021_a9b0511acbe047f4b787bfbb93d7c763",
+      "artifactId": "artifact_01794215137211273885_0000000035_5979ac28fb2047ea9d1311899a7cb99f",
+      "guestId": "guest_01794215100799981287_0000000000_4b3d17dc416e44929f204da481fe22b1"
+    },
+    {
+      "productId": "client_update_writer",
+      "modeId": "prepaid_request",
+      "scenarioId": "client_update_writer.prepaid_request_v1",
+      "sessionId": "scenario_session_01794215137237051969_0000000040_24fde63d7d594d2bb6393894e4208ce5",
+      "artifactId": "artifact_01794215137372255773_0000000054_e7b921ac217f40d88a939abf6b6e16ea",
+      "guestId": "guest_01794215100799981287_0000000000_4b3d17dc416e44929f204da481fe22b1"
+    }
+  ],
+  "finalBrowserChecks": [
+    {
+      "modeId": "update",
+      "phase": "url",
+      "sessionId": "scenario_session_01794215136947895155_0000000002_bcfbdf0018e0403096330885f06f0efd",
+      "artifactId": "artifact_01794215137067704881_0000000016_9219e85b9ec849c78dcccffddd11430d",
+      "restored": true,
+      "selected": "update",
+      "starts": 0,
+      "sessionReads": 2,
+      "persistedId": "scenario_session_01794215136947895155_0000000002_bcfbdf0018e0403096330885f06f0efd",
+      "resultTextLength": 224
+    },
+    {
+      "modeId": "update",
+      "phase": "reload",
+      "sessionId": "scenario_session_01794215136947895155_0000000002_bcfbdf0018e0403096330885f06f0efd",
+      "artifactId": "artifact_01794215137067704881_0000000016_9219e85b9ec849c78dcccffddd11430d",
+      "restored": true,
+      "selected": "update",
+      "starts": 0,
+      "sessionReads": 2,
+      "persistedId": "scenario_session_01794215136947895155_0000000002_bcfbdf0018e0403096330885f06f0efd",
+      "resultTextLength": 224
+    },
+    {
+      "modeId": "reply_draft",
+      "phase": "url",
+      "sessionId": "scenario_session_01794215137102520896_0000000021_a9b0511acbe047f4b787bfbb93d7c763",
+      "artifactId": "artifact_01794215137211273885_0000000035_5979ac28fb2047ea9d1311899a7cb99f",
+      "restored": true,
+      "selected": "reply_draft",
+      "starts": 0,
+      "sessionReads": 2,
+      "persistedId": "scenario_session_01794215137102520896_0000000021_a9b0511acbe047f4b787bfbb93d7c763",
+      "resultTextLength": 191
+    },
+    {
+      "modeId": "reply_draft",
+      "phase": "reload",
+      "sessionId": "scenario_session_01794215137102520896_0000000021_a9b0511acbe047f4b787bfbb93d7c763",
+      "artifactId": "artifact_01794215137211273885_0000000035_5979ac28fb2047ea9d1311899a7cb99f",
+      "restored": true,
+      "selected": "reply_draft",
+      "starts": 0,
+      "sessionReads": 2,
+      "persistedId": "scenario_session_01794215137102520896_0000000021_a9b0511acbe047f4b787bfbb93d7c763",
+      "resultTextLength": 191
+    },
+    {
+      "modeId": "prepaid_request",
+      "phase": "url",
+      "sessionId": "scenario_session_01794215137237051969_0000000040_24fde63d7d594d2bb6393894e4208ce5",
+      "artifactId": "artifact_01794215137372255773_0000000054_e7b921ac217f40d88a939abf6b6e16ea",
+      "restored": true,
+      "selected": "prepaid_request",
+      "starts": 0,
+      "sessionReads": 2,
+      "persistedId": "scenario_session_01794215137237051969_0000000040_24fde63d7d594d2bb6393894e4208ce5",
+      "resultTextLength": 238
+    },
+    {
+      "modeId": "prepaid_request",
+      "phase": "reload",
+      "sessionId": "scenario_session_01794215137237051969_0000000040_24fde63d7d594d2bb6393894e4208ce5",
+      "artifactId": "artifact_01794215137372255773_0000000054_e7b921ac217f40d88a939abf6b6e16ea",
+      "restored": true,
+      "selected": "prepaid_request",
+      "starts": 0,
+      "sessionReads": 2,
+      "persistedId": "scenario_session_01794215137237051969_0000000040_24fde63d7d594d2bb6393894e4208ce5",
+      "resultTextLength": 238
+    }
+  ],
+  "consoleWarningsAndErrors": 0,
+  "backendCountsBefore": {
+    "jobs": 3,
+    "action_runs": 3,
+    "provider_calls": 3,
+    "sessions": 3,
+    "quotaRows": 0
+  },
+  "backendCountsAfter": {
+    "jobs": 3,
+    "action_runs": 3,
+    "provider_calls": 3,
+    "sessions": 3,
+    "quotaRows": 0
+  },
+  "checks": {
+    "webTests": 465,
+    "sdkTests": 336,
+    "correctedApiRegressionTests": 20,
+    "scenarioIdentityBeforeAndAfterCompletionApiTests": 3,
+    "lint": "passed",
+    "typecheck": "passed",
+    "productionBuild": "passed",
+    "generatedContractDrift": "passed"
+  },
+  "quickCheck": "Initial run: 3549 passed, 21 failed, 12 skipped, 655 deselected. The 20 API failures from the inherited ExecutionAcceptance constructor were fixed and passed a targeted rerun. Remaining unrelated test requires passwordless sudo as nobody; full quick-check is not claimed green.",
+  "limits": [
+    "Client Update Writer has no configured guest quota policy; quotaRows stayed zero. Repeated execution and provider calls are independently excluded by unchanged DB counts.",
+    "No paid provider or PostgreSQL concurrency run.",
+    "The new API identity must be deployed for multi-mode restoration; legacy SDK parsing stays compatible but missing identity never guesses a mode."
+  ]
+}

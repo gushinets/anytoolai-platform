@@ -233,6 +233,9 @@ def test_alembic_offline_cli_generates_sql_from_non_repo_cwd(tmp_path: Path) -> 
 
     assert result.returncode == 0, combined_output
     assert "CREATE TABLE platform.product_handoffs" in result.stdout
+    assert "CREATE TABLE platform.paid_consumer_binding" in result.stdout
+    assert "Paid history has multiple consumers" in result.stdout
+    assert "Paid history has unproven consumer ownership" in result.stdout
     assert "DROP INDEX IF EXISTS platform.ix_product_handoffs_target_session" in result.stdout
     assert "CREATE INDEX IF NOT EXISTS ix_product_handoffs_status_expiry" in result.stdout
     assert "CREATE INDEX IF NOT EXISTS platform." not in result.stdout

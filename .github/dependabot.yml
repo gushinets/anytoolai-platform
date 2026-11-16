@@ -1,6 +1,7 @@
 version: 2
 updates:
   - package-ecosystem: uv
+    open-pull-requests-limit: 0
     directories:
       - /
       - /apps/platform-api
@@ -20,6 +21,7 @@ updates:
         group-by: dependency-name
 
   - package-ecosystem: npm
+    open-pull-requests-limit: 0
     directories:
       - /
       - /scripts/agent
@@ -33,6 +35,7 @@ updates:
         group-by: dependency-name
 
   - package-ecosystem: github-actions
+    open-pull-requests-limit: 0
     directories:
       - /
       - /.github/actions/compose-stack-check
@@ -42,6 +45,7 @@ updates:
       default-days: 7
 
   - package-ecosystem: docker
+    open-pull-requests-limit: 0
     directory: /infra/docker
     schedule:
       interval: weekly
@@ -49,6 +53,7 @@ updates:
       default-days: 7
 
   - package-ecosystem: docker-compose
+    open-pull-requests-limit: 0
     directory: /infra/compose
     schedule:
       interval: weekly

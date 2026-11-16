@@ -272,21 +272,13 @@ function ctxAt(atPos) {
   return { atPos, bindPos: atPos, refDepth: 0 };
 }
 
-/** Every statically-known value of `path` read off `decl` in context `ctx` (or, with
- * `containers`, every container literal node it could be): the binding's own writes and every
- * member write on a prefix of `path`, replayed in source order up to `ctx.atPos`. A write that's
- * a direct sibling statement in the binding's own scope is deterministic (replaces the reachable
- * set); one nested inside anything conditional — an `if`/loop/`try` body, a short-circuit RHS, a
- * ternary branch — or one whose member key is only ambiguously known, is only conditionally
- * reached (adds to the set without discarding what came before). `excludeWrite` is the one write
- * a self-referential RHS must not see (see `selfReferenceContext`). */
-function replayPath(analysis, decl, path, ctx, excludeWrite = null, containers = false) {
+/** Writes that reach a captured reference, preserving conditional rebinding and source order. */
+function* replayWrites(analysis, decl, path, ctx, excludeWrite) {
   const events = decl.writes.map((write) => ({ write, depth: 0 }));
   for (const write of decl.memberWrites || []) {
     if (write.chain.length <= path.length) events.push({ write, depth: write.chain.length });
   }
   events.sort((a, b) => a.write.pos - b.write.pos);
-  let reachable = new Set();
   let detached = false; // a captured slot was *conditionally* overwritten after `bindPos`
   for (const { write, depth } of events) {
     if (write === excludeWrite) continue;
@@ -318,6 +310,21 @@ function replayPath(analysis, decl, path, ctx, excludeWrite = null, containers =
       }
       if (detached) deterministic = false;
     }
+    yield { write, depth, deterministic };
+  }
+}
+
+/** Every statically-known value of `path` read off `decl` in context `ctx` (or, with
+ * `containers`, every container literal node it could be): the binding's own writes and every
+ * member write on a prefix of `path`, replayed in source order up to `ctx.atPos`. A write that's
+ * a direct sibling statement in the binding's own scope is deterministic (replaces the reachable
+ * set); one nested inside anything conditional — an `if`/loop/`try` body, a short-circuit RHS, a
+ * ternary branch — or one whose member key is only ambiguously known, is only conditionally
+ * reached (adds to the set without discarding what came before). `excludeWrite` is the one write
+ * a self-referential RHS must not see (see `selfReferenceContext`). */
+function replayPath(analysis, decl, path, ctx, excludeWrite = null, containers = false) {
+  let reachable = new Set();
+  for (const { write, depth, deterministic } of replayWrites(analysis, decl, path, ctx, excludeWrite)) {
     const values = writeValues(analysis, decl, write, path.slice(0, depth), path.slice(depth), ctx, containers);
     if (deterministic) {
       reachable = new Set(values || []);
@@ -693,37 +700,8 @@ function definitelyHasPathInner(analysis, expr, path, ctx) {
  * exactly where `replayPath` would stop looking too, without asserting anything from the rebind's
  * own new value there, a fresh, separately-asked question. */
 function replayPathDefinitelyHas(analysis, decl, path, ctx, excludeWrite = null) {
-  const events = decl.writes.map((write) => ({ write, depth: 0 }));
-  for (const write of decl.memberWrites || []) {
-    if (write.chain.length <= path.length) events.push({ write, depth: write.chain.length });
-  }
-  events.sort((a, b) => a.write.pos - b.write.pos);
   let certain = false;
-  let detached = false;
-  for (const { write, depth } of events) {
-    if (write === excludeWrite) continue;
-    if (write.pos > ctx.atPos) break;
-    let deterministic = write.own || (!write.forceConditional && isDeterministicWrite(write.node, decl.scope));
-    if (depth > 0) {
-      let matches = true;
-      for (let i = 0; i < depth; i++) {
-        const keys = memberKeys(analysis, write.chain[i]);
-        if (keys && !keys.includes(path[i])) {
-          matches = false;
-          break;
-        }
-        if (!keys || keys.length > 1) deterministic = false;
-      }
-      if (!matches) continue;
-    }
-    if (write.pos > ctx.bindPos) {
-      if (depth <= ctx.refDepth) {
-        if (deterministic) break;
-        detached = true;
-        continue;
-      }
-      if (detached) deterministic = false;
-    }
+  for (const { write, depth, deterministic } of replayWrites(analysis, decl, path, ctx, excludeWrite)) {
     const contributes = writeDefinitelyHas(analysis, write, path.slice(depth), ctx);
     certain = deterministic ? contributes : certain && contributes;
   }

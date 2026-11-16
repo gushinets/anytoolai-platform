@@ -1,7 +1,9 @@
 // The host-level locale behavior a user sees on `/products/{productId}`: one selector for every
 // registered product, locale resolution/persistence, and -- the point of the ticket -- UI locale
 // staying independent of scenario input (incl. the output-language field) and of form/run state.
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { hydrateRoot, type Root } from "react-dom/client";
+import { renderToString } from "react-dom/server";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LOCALES, type Locale } from "../src/i18n";
 import { LOCALE_STORAGE_KEY, resetUnpersistedLocaleForTests } from "../src/i18n/localeStorage";
@@ -39,6 +41,7 @@ const CUW_IDS = { productId: "client_update_writer", scenarioId: "client_update_
 afterEach(() => {
   cleanup();
   window.localStorage.clear();
+  window.sessionStorage.clear();
   // localeStorage.ts's write-failure fallback is module-level (see its own comment) and every
   // switchTo() below writes through it regardless of outcome, so it must be reset after every test
   // here, not just the one that deliberately makes a write fail -- otherwise a later test's
@@ -128,7 +131,7 @@ describe("ProductPageShell locale rendering", () => {
     expect(await screen.findByRole("button", { name: messages.generate.submit })).toBeTruthy();
     expect(screen.getByLabelText(labelStartingWith(messages.fields.taskText))).toBeTruthy();
     expect(screen.getByLabelText(labelStartingWith(messages.fields.freelancerPositioning))).toBeTruthy();
-    expect(screen.getByText(messages.fields.toneLegend)).toBeTruthy();
+    expect(screen.getByRole("radiogroup", { name: messages.fields.toneLegend })).toBeTruthy();
     expect(screen.getByLabelText(messages.toneOptions.warm)).toBeTruthy();
     expect(screen.getByLabelText(messages.toneOptions.neutral)).toBeTruthy();
     expect(screen.getByLabelText(messages.toneOptions.firm)).toBeTruthy();
@@ -154,11 +157,19 @@ describe("ProductPageShell locale rendering", () => {
     expect(await screen.findByRole("button", { name: messages.reply_draft.submit })).toBeTruthy();
     expect(screen.getByLabelText(messages.fields.clientMessage)).toBeTruthy();
     expect(screen.getByLabelText(messages.fields.replyGoal)).toBeTruthy();
+    if (locale === "ru") {
+      expect(screen.getByRole("radio", { name: "Черновик ответа" })).toBeTruthy();
+      expect(screen.getByLabelText("Цель ответа")).toBeTruthy();
+    }
 
     fireEvent.click(screen.getByLabelText(messages.modes.prepaid_request));
     expect(await screen.findByRole("button", { name: messages.prepaid_request.submit })).toBeTruthy();
     expect(screen.getByLabelText(messages.fields.billingNotes)).toBeTruthy();
     expect(screen.getByLabelText(messages.fields.billingAmount)).toBeTruthy();
+    if (locale === "ru") {
+      expect(screen.getByLabelText("Заметки по оплате")).toBeTruthy();
+      expect(screen.getByLabelText("Сумма")).toBeTruthy();
+    }
     expect(screen.getByLabelText(messages.fields.billingDueDate)).toBeTruthy();
   });
 
@@ -475,6 +486,7 @@ describe("UI locale is independent of scenario input and state", () => {
 describe("a newly registered product gets the language selector without implementing it", () => {
   const fakeProduct: RegisteredProduct = {
     productId: TEST_PRODUCT_IDS.productId,
+    scenarioIds: [TEST_PRODUCT_IDS.scenarioId],
     enabled: true,
     messages: englishForAllLocales(TEST_PRODUCT_MESSAGES_EN),
     Component: ({ client, onEvent, visitId }) => (
@@ -665,7 +677,7 @@ describe("attach props through the shell and the registry", () => {
       [ids.RUNTIME_CONFIG]: [runtimeConfigResponse(AB_IDS)],
       [ids.GUEST_IDENTITY]: [guestIdentityResponse()],
       [ids.QUOTA]: [quotaResponse(AB_IDS)],
-      [ids.SESSION]: [sessionResponse()],
+      [ids.SESSION]: Array.from({ length: 2 }, () => sessionResponse({ scenario_id: AB_IDS.scenarioId })),
       [ids.RESULT]: [resultResponse(AB_IDS, { output })],
     });
     const onAttachBegin = vi.fn();
@@ -687,4 +699,37 @@ describe("attach props through the shell and the registry", () => {
     fireEvent.click(screen.getByRole("button", { name: "New task" }));
     expect(onAttachEnd).toHaveBeenCalledTimes(1); // the callbacks got all the way down, and back up
   });
+});
+
+it("hydrates a tab-restored non-default mode without differing from the server loading view", async () => {
+  const ids = { productId: "client_update_writer", scenarioId: "client_update_writer.reply_draft_v1" };
+  const routes = routesFor(ids);
+  const { client, calls } = makeClientCapturingRequests({
+    [routes.RUNTIME_CONFIG]: [runtimeConfigResponse(ids)],
+    [routes.GUEST_IDENTITY]: [guestIdentityResponse()],
+    [routes.QUOTA]: [quotaResponse(ids)],
+    [routes.SESSION]: Array.from({ length: 2 }, () => sessionResponse({ scenario_id: ids.scenarioId })),
+    [routes.RESULT]: [resultResponse(ids, { output: { text: "Restored reply." } })],
+  });
+  const product = getRegisteredProduct(ids.productId)!;
+  const container = document.createElement("div");
+  // Server rendering has no tab storage; the first browser render already knows the session id.
+  container.innerHTML = renderToString(<ProductPageShell product={product} client={client} />);
+  document.body.appendChild(container);
+  const onRecoverableError = vi.fn();
+  let root: Root | undefined;
+  try {
+    await act(async () => {
+      root = hydrateRoot(container,
+        <ProductPageShell product={product} client={client} attach={{ attachSessionId: "session_1" }} />,
+        { onRecoverableError });
+    });
+    await screen.findByText("Restored reply.");
+    expect(onRecoverableError).not.toHaveBeenCalled();
+    expect((screen.getByRole("radio", { name: "Reply Draft" }) as HTMLInputElement).checked).toBe(true);
+    expect(calls.some((call) => call.key.endsWith("/start"))).toBe(false);
+  } finally {
+    await act(async () => root?.unmount());
+    container.remove();
+  }
 });

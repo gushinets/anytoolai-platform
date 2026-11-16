@@ -1,0 +1,30 @@
+{
+  "title": "Verifica il trasferimento",
+  "loading": "Caricamento del trasferimento…",
+  "notFound": "Questo link di trasferimento non è valido.",
+  "loadFailed": "Si è verificato un problema durante il caricamento di questo trasferimento. Riprovi.",
+  "retry": "Riprova",
+  "actionFailed": "Non è stato possibile completare l’azione. Riprovi.",
+  "fields": {
+    "from": "Da",
+    "to": "A",
+    "expires": "Scade il",
+    "status": "Stato"
+  },
+  "openResult": "Apri il risultato",
+  "accept": "Accetta",
+  "decline": "Rifiuta",
+  "accepting": "Accettazione…",
+  "declining": "Rifiuto…",
+  "status": {
+    "waiting": "In attesa della sua decisione",
+    "accepted": "Accettato",
+    "declined": "Rifiutato",
+    "expired": "Scaduto",
+    "failed": "Non riuscito"
+  },
+  "previewFields": {
+    "summary": "Riepilogo",
+    "missing_fields": "Informazioni mancanti"
+  }
+}

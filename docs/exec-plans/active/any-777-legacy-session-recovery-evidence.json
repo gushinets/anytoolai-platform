@@ -1,0 +1,154 @@
+{
+  "date": "2026-11-09",
+  "baseCommit": "b2fa371740874636aa674d585fdbbbf5ff330dd0",
+  "transport": "Chrome DevTools MCP 1.12.0 over stdio with graphical isolated Chrome",
+  "environment": "Production Next.js; real local API/worker; isolated SQLite and fake provider",
+  "legacySimulation": "Isolated test middleware removes only scenario_id from real successful GET snapshots until explicitly disabled. No DB/session state is altered by the simulation.",
+  "checks": [
+    {
+      "product": "client_update_writer",
+      "legacy200": true,
+      "retries": 2,
+      "preserved": true,
+      "modeSelectionBlocked": true,
+      "starts": 0
+    },
+    {
+      "product": "acceptance_builder",
+      "legacy200": true,
+      "retries": 2,
+      "preserved": true,
+      "modeSelectionBlocked": true,
+      "starts": 0
+    },
+    {
+      "product": "client_update_writer",
+      "reloadedLegacy": true,
+      "explicitExit": true,
+      "focused": true,
+      "allModesUsable": true,
+      "starts": 0
+    },
+    {
+      "product": "acceptance_builder",
+      "reloadedLegacy": true,
+      "explicitExit": true,
+      "focused": true,
+      "allModesUsable": true,
+      "starts": 0
+    },
+    {
+      "product": "client_update_writer",
+      "freshReload": true,
+      "starts": 0
+    },
+    {
+      "product": "client_update_writer",
+      "identityRestored": true,
+      "retriedOriginal": true
+    },
+    {
+      "product": "client_update_writer",
+      "mode": "prepaid_request",
+      "session": "scenario_session_01794215137237051969_0000000040_24fde63d7d594d2bb6393894e4208ce5",
+      "artifact": "artifact_01794215137372255773_0000000054_e7b921ac217f40d88a939abf6b6e16ea",
+      "starts": 0,
+      "sessionReads": 3,
+      "resultTextLength": 238
+    },
+    {
+      "product": "client_update_writer",
+      "mode": "prepaid_request",
+      "session": "scenario_session_01794215137237051969_0000000040_24fde63d7d594d2bb6393894e4208ce5",
+      "artifact": "artifact_01794215137372255773_0000000054_e7b921ac217f40d88a939abf6b6e16ea",
+      "starts": 0,
+      "sessionReads": 2,
+      "resultTextLength": 238
+    },
+    {
+      "product": "acceptance_builder",
+      "freshReload": true,
+      "starts": 0
+    },
+    {
+      "product": "acceptance_builder",
+      "identityRestored": true,
+      "retriedOriginal": true
+    },
+    {
+      "product": "acceptance_builder",
+      "mode": "check",
+      "session": "scenario_session_01794223047877681547_0000000036_1aabf61164fc4fff92049f96fcd1505f",
+      "artifact": "artifact_01794223048889075175_0000000073_559801199f444d8ca5da54da9a663b14",
+      "starts": 0,
+      "sessionReads": 3,
+      "resultTextLength": 1306
+    },
+    {
+      "product": "acceptance_builder",
+      "mode": "check",
+      "session": "scenario_session_01794223047877681547_0000000036_1aabf61164fc4fff92049f96fcd1505f",
+      "artifact": "artifact_01794223048889075175_0000000073_559801199f444d8ca5da54da9a663b14",
+      "starts": 0,
+      "sessionReads": 2,
+      "resultTextLength": 1306
+    },
+    {
+      "product": "acceptance_builder",
+      "used": 2,
+      "reserved": 0,
+      "available": 1
+    }
+  ],
+  "backendCountsBefore": {
+    "scenario_sessions": 10,
+    "jobs": 10,
+    "action_runs": 19,
+    "provider_calls": 19,
+    "execution_reservations": 6
+  },
+  "backendCountsAfter": {
+    "scenario_sessions": 10,
+    "jobs": 10,
+    "action_runs": 19,
+    "provider_calls": 19,
+    "execution_reservations": 6
+  },
+  "allQuotaRowsUnchanged": true,
+  "acceptanceBuilderQuota": {
+    "before": {
+      "used": 2,
+      "reserved": 0,
+      "available": 1
+    },
+    "after": {
+      "used": 2,
+      "reserved": 0,
+      "available": 1
+    }
+  },
+  "validation": {
+    "beforeFix": "Six legacy UI cases failed; the narrowed API error assertion exposed the missing scenario_id fixture error.",
+    "affectedFrontendTests": 76,
+    "apiSchemaTests": 9,
+    "mutationProof": "Widening ScenarioSessionResponse.status to str in an isolated process makes the corrected test fail with DID NOT RAISE. No source changes.",
+    "frontendCheck": "passed with npm_config_workspace_concurrency=1; initial parallel run hit the existing SDK ESLint test timeout without any test/timeout changes",
+    "pythonLint": "Five pre-existing Ruff findings in the API test file, unchanged from HEAD; formatter differences are confined to pre-existing lines.",
+    "webTests": 507,
+    "sdkTests": 336,
+    "sharedUiTests": 52,
+    "atomLabBrowserTests": 339,
+    "atomLabNodeTests": 57,
+    "stakeholderDemoNodeTests": 6,
+    "workspaceLint": "passed",
+    "workspaceTypecheck": "passed",
+    "workspaceBuilds": "passed",
+    "generatedApiTypes": "current",
+    "documentationValidation": "passed",
+    "generatedDocs": "current using the supported local LiteLLM cost-map option"
+  },
+  "limits": [
+    "Client Update Writer has no configured quota policy; unchanged execution/provider counts prove no regeneration.",
+    "No paid providers or PostgreSQL concurrency check."
+  ]
+}

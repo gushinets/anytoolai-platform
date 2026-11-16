@@ -21,6 +21,11 @@ placeholders, meta phrases, lists or headings, length, a required literal (`must
 unclear one leaves it pending), long dashes (a warning). A number absent from the order and the
 positioning is shown to the reviewer, never decided here.
 
+Gap meaning, grounding and requirement fidelity belong to review criteria, not text matches.
+An empty gap list fails when `expect_gap` is true; false does not introduce an automatic empty-list
+requirement. Otherwise, gap quality remains PENDING until the relevant review criteria are confirmed.
+Retired `gap_must` and `gap_must_not` fixture fields must be migrated to `criteria`.
+
 Meaning is never decided by a regular expression. Each order lists `criteria`, questions a human
 answers yes, no or unknown for every output (see tests/fixtures/proposal_ai_eval/qa_cases.json), and
 every run also has `no-critical-error`. Verdicts live in a JSONL file next to the runs, one line per run
@@ -243,6 +248,13 @@ DEFAULT_TONE = "warm"
 def normalized_orders(fixture: dict) -> list[dict]:
     """The orders of a fixture with its defaults applied (the shared positioning, the default tone): the
     one form the collector sends, the case hash pins and `accept` compares."""
+    for order in fixture["orders"]:
+        retired = {"gap_must", "gap_must_not"}.intersection(order)
+        if retired:
+            raise SuiteError(
+                f"case {order.get('id')}: retired gap checks {', '.join(sorted(retired))}; "
+                "move semantic requirements to review criteria"
+            )
     defaults = {"tone": DEFAULT_TONE, **({"freelancer_positioning": fixture["freelancer_positioning"]}
                                          if "freelancer_positioning" in fixture else {})}
     return [{**defaults, **order} for order in fixture["orders"]]
@@ -694,9 +706,13 @@ def command_review(args: argparse.Namespace) -> int:
             suggestion = row.get("suggestion") if row else None
             if shown != run["run_id"]:
                 shown = run["run_id"]
-                print(f"\n=== {run['run_id']} ({run['model']}, {run['reasoning_effort']})\n{run['output']['text']}\n")
+                print(f"\n=== {run['run_id']} ({run['model']}, {run['reasoning_effort']})")
+                print(f"Task:\n{run['input']['task_text']}\n")
+                print(f"Positioning:\n{run['input']['freelancer_positioning']}\n")
+                print(f"Proposal:\n{run['output']['text']}\n")
                 for gap in run["output"].get("gaps", []):
                     print(f"gap: {gap['description']}")
+                    print(f"  evidence: {gap.get('evidence', '(not provided)')}")
                 if formal_checks(run, order)["invented_number"]:
                     print("Note: a number that is not in the order or the positioning.")
             print(f"\n[{criterion['id']}{', critical' if criterion['critical'] else ''}] {criterion['question']}")

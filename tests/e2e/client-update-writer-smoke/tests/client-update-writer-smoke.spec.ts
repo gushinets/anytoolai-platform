@@ -1,7 +1,14 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { Client as PgClient } from "pg";
+import {
+  trackScenarioStarts,
+  trackRun,
+  expectCopyActivation,
+  expectMobileTaskReset,
+  expectWorkspaceLayout,
+  overrideResult,
+} from "@anytoolai/smoke-support";
 
 /**
  * ANY-414 browser-evidence smoke: proves the Client Update Writer web vertical end to end against
@@ -25,7 +32,6 @@ const WEB_MIRROR_BASE_URL = process.env.WEB_MIRROR_BASE_URL ?? "http://localhost
 const PRODUCT_URL = `${WEB_MIRROR_BASE_URL}/products/client_update_writer`;
 
 const START_ROUTE_PATTERN = /\/scenarios\/[^/]+\/start$/;
-const COPY_NEXT_ACTION_PATTERN = /\/scenario-sessions\/([^/]+)\/next-actions\/copy_result$/;
 
 // Same reasoning as proposal-ai-smoke's own WEAK_INPUT_FIXTURE_PATH: the real fake-provider
 // adapter resolves its fixture strictly from the action config id, never from request content, so
@@ -41,51 +47,11 @@ const WEAK_INPUT_FIXTURE_PATH = join(
   "../../../../tests/fixtures/provider/fake_provider_outputs/client_update_writer.update_compose_reply_v1.weak_input.json",
 );
 
-/** Wide screens: the result card sits right of the inputs card on the same top line; narrow screens:
- * the two cards are stacked. Either way nothing overflows horizontally. */
-async function expectWorkspaceLayout(page: Page, layout: "side-by-side" | "stacked"): Promise<void> {
-  const inputs = await page.locator("#product-inputs").boundingBox();
-  const result = await page.locator('section[aria-labelledby="product-result-heading"]').boundingBox();
-  expect(inputs).not.toBeNull();
-  expect(result).not.toBeNull();
-  if (layout === "side-by-side") {
-    expect(result!.x).toBeGreaterThanOrEqual(inputs!.x + inputs!.width - 1);
-    expect(Math.abs(result!.y - inputs!.y)).toBeLessThanOrEqual(2);
-    // Two equal cards: same width (height follows content and may differ).
-    expect(Math.abs(result!.width - inputs!.width)).toBeLessThanOrEqual(2);
-  } else {
-    expect(result!.y).toBeGreaterThanOrEqual(inputs!.y + inputs!.height - 1);
-    expect(Math.abs(result!.x - inputs!.x)).toBeLessThanOrEqual(2);
-  }
-  const { scrollWidth, clientWidth } = await page.evaluate(() => ({
-    scrollWidth: document.documentElement.scrollWidth,
-    clientWidth: document.documentElement.clientWidth,
-  }));
-  expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
-}
-
 async function fillValidForm(page: Page): Promise<void> {
   await page
     .locator("#client-update-writer-progress-notes")
     .fill("Homepage redesign is done and ready for review by Friday.");
   await page.locator('label[for="client-update-writer-tone-warm"]').click();
-}
-
-/** Queries the real `event_log` table directly -- the acceptance criterion is that the backend,
- * not just the browser, recorded this event for this specific run. `DATABASE_URL` is dev-up's own
- * Postgres, host-reachable via its published compose port. */
-async function countBackendEvents(eventType: string, scenarioSessionId: string): Promise<number> {
-  const client = new PgClient({ connectionString: process.env.DATABASE_URL });
-  await client.connect();
-  try {
-    const result = await client.query<{ count: number }>(
-      "SELECT count(*)::int AS count FROM platform.event_log WHERE event_type = $1 AND scenario_session_id = $2",
-      [eventType, scenarioSessionId],
-    );
-    return result.rows[0]!.count;
-  } finally {
-    await client.end();
-  }
 }
 
 test.describe("Client Update Writer web product (Update mode)", () => {
@@ -99,12 +65,7 @@ test.describe("Client Update Writer web product (Update mode)", () => {
     await page.goto(PRODUCT_URL);
     await expect(page.locator("h1")).toHaveText("Client Update Writer");
 
-    const nextActionRequests: string[] = [];
-    page.on("request", (request) => {
-      if (request.method() === "POST" && COPY_NEXT_ACTION_PATTERN.test(request.url())) {
-        nextActionRequests.push(request.url());
-      }
-    });
+    const run = trackRun(page, START_ROUTE_PATTERN);
 
     await fillValidForm(page);
     await page.getByRole("button", { name: "Write update" }).click();
@@ -119,21 +80,7 @@ test.describe("Client Update Writer web product (Update mode)", () => {
       .innerText();
     expect(resultText.trim().length).toBeGreaterThan(0);
 
-    await copyButton.click();
-    await expect(page.getByRole("button", { name: "Copied" })).toBeVisible();
-    const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
-    expect(clipboardText).toBe(resultText);
-
-    // Exactly one copy_result next-action call from the browser's own single click.
-    await expect.poll(() => nextActionRequests.length, { timeout: 5_000 }).toBe(1);
-    const scenarioSessionId = COPY_NEXT_ACTION_PATTERN.exec(nextActionRequests[0]!)?.[1];
-    expect(scenarioSessionId).toBeTruthy();
-
-    // And the backend actually persisted it for *this* run's session -- not just that the browser
-    // sent the request -- exactly once.
-    await expect
-      .poll(() => countBackendEvents("client.next_action_clicked", scenarioSessionId!), { timeout: 5_000 })
-      .toBe(1);
+    await expectCopyActivation(page, run.sessionId(), resultText);
   });
 
   test("workspace: inputs and result side by side on wide screens, stacked on narrow, repeat and new task reset", async ({
@@ -159,38 +106,27 @@ test.describe("Client Update Writer web product (Update mode)", () => {
     await expect(page.getByRole("button", { name: "Copy" })).toBeVisible();
     await expect(page.getByRole("status")).toHaveCount(0, { timeout: 30_000 });
 
-    await page.setViewportSize({ width: 390, height: 844 });
-    await expectWorkspaceLayout(page, "stacked");
-
-    await page.getByRole("button", { name: "New task" }).click();
-    await expect(page.locator("#client-update-writer-progress-notes")).toBeEmpty();
+    await expectMobileTaskReset(page, "#client-update-writer-progress-notes");
     await expect(page.locator("#client-update-writer-tone-neutral")).toBeChecked();
-    await expect(page.locator("#client-update-writer-progress-notes")).toBeFocused();
-    await expect(page.getByRole("button", { name: "Copy" })).toHaveCount(0);
   });
 
   test("validation: empty required fields show validation errors and never start a scenario", async ({ page }) => {
     await page.goto(PRODUCT_URL);
     await expect(page.locator("h1")).toHaveText("Client Update Writer");
 
-    let startRequested = false;
-    page.on("request", (request) => {
-      if (request.method() === "POST" && START_ROUTE_PATTERN.test(request.url())) {
-        startRequested = true;
-      }
-    });
+    const starts = trackScenarioStarts(page, START_ROUTE_PATTERN);
 
     await page.getByRole("button", { name: "Write update" }).click();
     await expect(page.getByText("Progress notes: required.")).toBeVisible();
     await expect(page.locator("#client-update-writer-tone-neutral")).toBeChecked();
     await expect(page.getByText("Tone: required.")).toHaveCount(0);
-    expect(startRequested).toBe(false);
+    expect(starts).toEqual([]);
     const toneGroup = page.getByRole("radiogroup", { name: "Tone" });
     await expect(toneGroup.getByRole("radio")).toHaveCount(3);
     await page.locator('label[for="client-update-writer-tone-warm"]').click();
     await expect(page.locator("#client-update-writer-tone-warm")).toBeChecked();
     await expect(page.getByText("Tone: required.")).toHaveCount(0);
-    expect(startRequested).toBe(false);
+    expect(starts).toEqual([]);
   });
 
   test("weak input: a vague-but-schema-valid update reaches the real backend and renders the documented safe result", async ({
@@ -209,12 +145,7 @@ test.describe("Client Update Writer web product (Update mode)", () => {
     await page.locator("#client-update-writer-progress-notes").fill("Still working on it.");
     await page.locator('label[for="client-update-writer-tone-neutral"]').click();
 
-    await page.route("**/v1/results/**", async (route) => {
-      const response = await route.fetch();
-      const body = (await response.json()) as { output: { text: string } };
-      body.output = { text: weakInputText };
-      await route.fulfill({ response, json: body });
-    });
+    await overrideResult(page, { text: weakInputText });
 
     await page.getByRole("button", { name: "Write update" }).click();
     await expect(page.getByRole("button", { name: "Copy" })).toBeVisible({ timeout: 30_000 });

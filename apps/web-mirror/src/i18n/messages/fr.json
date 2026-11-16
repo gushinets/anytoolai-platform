@@ -1,0 +1,80 @@
+{
+  "language": {
+    "label": "Langue"
+  },
+  "nav": {
+    "label": "Outils",
+    "allTools": "Tous les outils",
+    "runInProgress": "Une exécution est en cours. Si vous partez, elle continuera ; un résultat réussi utilise une exécution."
+  },
+  "loading": "Chargement de {product}…",
+  "unavailable": "{product} est indisponible pour le moment. Veuillez recharger la page.",
+  "quotaReserved": "Disponibles maintenant : {available}. En cours : {reserved}.",
+  "quotaExhausted": "Vous avez utilisé toutes vos exécutions de {product} pour le moment.",
+  "resultFetchFailed": "Votre résultat est prêt, mais nous n’avons pas pu le charger. Veuillez réessayer.",
+  "starting": "Démarrage…",
+  "generating": "Génération en cours…",
+  "runProgress": {
+    "confirmingStart": "En attente de confirmation du démarrage de votre demande.",
+    "elapsed": "Temps écoulé : {time}",
+    "normal": "Cela prend généralement 10 à 40 secondes.",
+    "slow": "La génération continue. Certaines demandes prennent un peu plus de temps.",
+    "long": "Cela prend plus de temps que prévu. La génération continue sur le serveur — gardez cette page ouverte."
+  },
+  "identityUnavailable": "Nous n’avons pas pu vérifier votre identité. Veuillez recharger la page et réessayer.",
+  "retry": "Réessayer",
+  "formLabel": "Formulaire {product}",
+  "workspace": {
+    "restoreDraft": "Restaurer le brouillon enregistré",
+    "inputTitle": "Vos informations",
+    "previousDetails": "Résultat basé sur les informations précédentes",
+    "backToInputs": "Retour aux informations",
+    "newTask": "Nouvelle tâche",
+    "handoffOpening": "Ouverture de l’étape suivante…",
+    "handoffStay": "Rester sur cette page",
+    "handoffFailed": "Impossible d’ouvrir l’étape suivante. Veuillez réessayer."
+  },
+  "errors": {
+    "attachmentUnrecognized": "Impossible de restaurer cette session enregistrée. Réessayez ou choisissez « Nouvelle tâche » pour ouvrir un formulaire vide.",
+    "attachmentUnavailable": "Cette session ne peut pas être ouverte dans cet outil. Choisissez « Nouvelle tâche » pour ouvrir un formulaire vide.",
+    "quotaCapacityReserved": "La capacité est temporairement occupée. Réessayez dans un instant.",
+    "startFailed": "Impossible de démarrer {product}. Veuillez réessayer.",
+    "timeout": "Cela prend plus de temps que prévu. Veuillez réessayer.",
+    "connectionLost": "Connexion perdue pendant l’attente de votre résultat. Veuillez réessayer.",
+    "tryAgain": "Veuillez réessayer.",
+    "savedOperationPending": "Une opération inachevée est enregistrée. Choisissez «Réessayer» pour recharger la page et la poursuivre.",
+    "storageUnavailable": "Stockage du navigateur indisponible. Activez-le et réessayez la même demande."
+  },
+  "result": {
+    "copy": "Copier",
+    "copying": "Copie en cours…",
+    "copied": "Copié",
+    "copyFailed": "Impossible de copier dans le presse-papiers. Veuillez copier le texte ci-dessus manuellement.",
+    "selectText": "Sélectionner le texte"
+  },
+  "validation": {
+    "required": "{field} : champ obligatoire.",
+    "maxLength": "{field} : {maxLength, plural, one {# caractère} many {# de caractères} other {# caractères}} maximum."
+  },
+  "dataNotice": {
+    "label": "Traitement des données.",
+    "text": "Vos saisies sont envoyées à notre service et à un fournisseur de modèles d’IA pour créer le résultat, puis stockées avec votre exécution sur nos serveurs. Votre brouillon est conservé dans ce navigateur et peut être perdu si vous rechargez ou quittez la page. Ne saisissez pas de mots de passe, de codes d’accès, de clés API ni de coordonnées complètes de carte bancaire.",
+    "policyLink": "Politique de confidentialité",
+    "opensInNewTab": "(s’ouvre dans un nouvel onglet)"
+  },
+  "portalSession": {
+    "title": "Session Portail",
+    "required": "Reconnectez-vous pour poursuivre la même opération.",
+    "continue": "Continuer avec le Portail",
+    "loading": "Connexion…",
+    "failed": "Autorisation impossible. Vérifiez le stockage du navigateur et réessayez.",
+    "retry": "Réessayer l’autorisation",
+    "signOut": "Déconnecter cet onglet"
+  },
+  "example": {
+    "toggle": "Voir un exemple",
+    "inputs": "Quoi saisir",
+    "output": "Ce que vous obtenez",
+    "note": "À titre d’exemple seulement. Votre texte reste inchangé."
+  }
+}

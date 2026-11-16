@@ -1,15 +1,22 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { ATTACH_SESSION_PARAM } from "../../lib/hostUrls";
+import { readProductDraft } from "./draftStorage";
 
 const storageKey = (productId: string) => `anytoolai.attach_session.${productId}`;
 
-/** One remembered entry per product per tab. `id` is the NEWEST accepted session this tab has seen for the
+/** One recovery selection per product per tab. `id` is the NEWEST accepted attachment this tab has seen for the
  * product and `rank` its order (see `rememberAttachSession`): a timestamp in MICROseconds, compared as a number
  * (as strings, "...:00Z" would sort after "...:00.5Z", which is later); a session that arrived without one (a
  * `?session=` link) has the lowest rank, 0. `active` is the session the person explicitly opened
  * (`chooseAttachSession`), whatever its order, the newest included: a visit restores it until it ends, then
- * `id` (if that is another, newer paid-for session). Absent, nothing was explicitly opened. */
-type StoredAttach = { id: string; rank: number; active?: string };
+ * `id` (if that is another, newer paid-for session). A valid `draft` selects an accepted own run instead;
+ * attachments remain fallbacks until that saved run is cleared or an attachment is explicitly opened. */
+type StoredAttach = {
+  id?: string;
+  rank: number;
+  active?: string;
+  draft?: { key: string; scenarioSessionId: string };
+};
 
 /**
  * An ISO timestamp as a rank in microseconds; anything unparseable ranks lowest. The backend stamps
@@ -34,32 +41,63 @@ function readEntry(productId: string): StoredAttach | undefined {
       return undefined;
     }
     const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== "object" || parsed === null || typeof (parsed as StoredAttach).id !== "string") {
+    if (typeof parsed !== "object" || parsed === null) {
       return undefined;
     }
-    const { id, rank, active } = parsed as StoredAttach;
-    return { id, rank: typeof rank === "number" ? rank : 0, ...(typeof active === "string" ? { active } : {}) };
+    const { id, rank, active, draft } = parsed as { id?: unknown; rank?: unknown; active?: unknown; draft?: unknown };
+    let ownRun: StoredAttach["draft"];
+    if (typeof draft === "object" && draft !== null) {
+      const value = draft as { key?: unknown; scenarioSessionId?: unknown };
+      if (typeof value.key === "string" && value.key.startsWith(`anytoolai.product_draft.${productId}.`) &&
+        typeof value.scenarioSessionId === "string" && value.scenarioSessionId.length > 0) {
+        ownRun = { key: value.key, scenarioSessionId: value.scenarioSessionId };
+      }
+    }
+    if (typeof id !== "string" && ownRun === undefined) return undefined;
+    return {
+      id: typeof id === "string" ? id : undefined,
+      rank: typeof rank === "number" ? rank : 0,
+      active: typeof active === "string" ? active : undefined,
+      draft: ownRun,
+    };
   } catch {
     return undefined;
   }
 }
 
-function writeEntry(productId: string, entry: StoredAttach | null): void {
+function writeEntry(productId: string, entry: StoredAttach | null): boolean {
   try {
-    if (entry === null) {
+    if (entry === null || (entry.id === undefined && entry.active === undefined && entry.draft === undefined)) {
       window.sessionStorage.removeItem(storageKey(productId));
     } else {
       window.sessionStorage.setItem(storageKey(productId), JSON.stringify(entry));
     }
+    return true;
   } catch {
     // Storage unavailable: the id then simply does not survive a reload.
+    return false;
   }
 }
 
-/** The remembered session id for `productId`, if any (what a visit would restore). */
+/** The attachment to restore; undefined while a saved own run has recovery priority. */
 export function readAttachSessionId(productId: string): string | undefined {
   const entry = readEntry(productId);
+  if (entry?.draft && readProductDraft(entry.draft.key)?.run?.scenarioSessionId === entry.draft.scenarioSessionId) {
+    return undefined;
+  }
   return entry?.active ?? entry?.id;
+}
+
+/** Whether this session was explicitly opened, rather than retained by a late callback. */
+export function isChosenAttachSession(productId: string, sessionId: string): boolean {
+  return readEntry(productId)?.active === sessionId;
+}
+
+/** Select only a persisted own run; keep other accepted attachments as fallbacks. */
+export function preferSavedOwnRun(productId: string, key: string, scenarioSessionId: string): boolean {
+  if (readProductDraft(key)?.run?.scenarioSessionId !== scenarioSessionId) return false;
+  const current = readEntry(productId);
+  return writeEntry(productId, { ...current, rank: current?.rank ?? 0, draft: { key, scenarioSessionId } });
 }
 
 /**
@@ -73,8 +111,8 @@ export function readAttachSessionId(productId: string): string | undefined {
 export function rememberAttachSession(productId: string, scenarioSessionId: string, timestamp: string): void {
   const rank = toRank(timestamp);
   const current = readEntry(productId);
-  if (current === undefined || rank > current.rank) {
-    writeEntry(productId, { id: scenarioSessionId, rank, ...activeOf(current) });
+  if (current?.id === undefined || rank > current.rank) {
+    writeEntry(productId, { id: scenarioSessionId, rank, ...selectionOf(current) });
   }
 }
 
@@ -84,21 +122,43 @@ export function rememberAttachSession(productId: string, scenarioSessionId: stri
  * (`useAttachSession`'s `onAttachEnd`). It also becomes the newest when it is newer than the remembered one;
  * either way a newer Accept that settles late only becomes the fallback behind it, never the restored one.
  */
-export function chooseAttachSession(productId: string, scenarioSessionId: string, timestamp: string): void {
+export function chooseAttachSession(productId: string, scenarioSessionId: string, timestamp: string): boolean {
   const rank = toRank(timestamp);
   const current = readEntry(productId);
-  const newest = current === undefined || rank > current.rank ? { id: scenarioSessionId, rank } : { id: current.id, rank: current.rank };
-  writeEntry(productId, { ...newest, active: scenarioSessionId });
+  const newest = current?.id === undefined || rank > current.rank ? { id: scenarioSessionId, rank } : { id: current.id, rank: current.rank };
+  return writeEntry(productId, { ...newest, active: scenarioSessionId }) &&
+    readEntry(productId)?.active === scenarioSessionId;
 }
 
-/** `current`'s explicitly opened session, carried over unchanged. */
-function activeOf(current: StoredAttach | undefined): { active?: string } {
-  return current?.active === undefined ? {} : { active: current.active };
+/** A background Accept cannot replace the person's attached or own selection. */
+function selectionOf(current: StoredAttach | undefined): Pick<StoredAttach, "active" | "draft"> {
+  return { active: current?.active, draft: current?.draft };
+}
+
+/** Remove only this reference; another explicitly opened or later accepted session survives. */
+export function forgetAttachSession(productId: string, id: string): void {
+  const current = readEntry(productId);
+  if (current?.active === id) {
+    writeEntry(productId, { ...current, active: undefined, ...(current.id === id ? { id: undefined, rank: 0 } : {}) });
+  } else if (current?.id === id) {
+    // The rank belonged to the discarded id, not to the surviving active session.
+    writeEntry(productId, { ...current, id: current.active, rank: 0 });
+  }
+}
+
+/** A new explicit form/start leaves the previous result choice, retaining background fallbacks. */
+export function forgetChosenAttachSession(productId: string): void {
+  const id = readEntry(productId)?.active;
+  if (id !== undefined) forgetAttachSession(productId, id);
 }
 
 /** What a product page needs to show an already-queued session, threaded route -> shell -> product ->
  * `ProductRunPage`. The route's `useAttachSession` is the one owner of the state behind it. */
 export type AttachProps = {
+  /** This visit explicitly selected a session, rather than restoring an older remembered handoff. */
+  attachFromUrl?: boolean;
+  /** Explicit scenario of a result deep link; the product selects its own matching mode. */
+  attachScenarioId?: string;
   /**
    * The queued session to show (an accepted handoff's target); undefined for an ordinary visit. The page
    * polls it and renders its result with no start request and no quota charge (the accept already charged
@@ -107,59 +167,64 @@ export type AttachProps = {
    * state (and ends the attach); an ambiguous failure keeps it locked and "Try again" polls the same session.
    */
   attachSessionId?: string;
+  /** The server verified this session and its product scenario; persist before consuming its URL. */
+  onAttachResolved?: (sessionId: string) => void;
   /** The page started polling the session (it is now on its way to the screen). */
-  onAttachBegin?: () => void;
-  /** The person moved on from the attached session: "New task", own work replacing its result, a mode
-   * switch, or its terminal failure. Safe to call at any time; it only acts after the attach began. */
-  onAttachEnd?: () => void;
+  onAttachBegin?: (sessionId?: string) => void;
+  /** The person moved on: "New task", a persisted own start, a replacement result, a mode switch,
+   * or terminal failure. Safe to call at any time; it only acts after the attach began. */
+  onAttachEnd?: (sessionId?: string) => void;
+  /** Explicitly discard an unavailable attachment before runtime boot; never starts or cancels a run. */
+  onAttachDiscard?: (sessionId?: string) => void;
 };
 
 /**
  * The route-level owner of an attached session. The id comes from `?session=` once, is removed from the
- * address bar (so a bookmark or shared link does not carry it), and is kept in this tab's `sessionStorage`
- * so a reload still shows the result the accept already charged for. It is forgotten only by
- * `onAttachEnd`, only once `onAttachBegin` said the page really started showing it, and only if the
+ * address bar after verification and persistence, and is kept in this tab's `sessionStorage`
+ * so a reload still shows the result the accept already charged for. Normal `onAttachEnd` acts
+ * only once `onAttachBegin` said the page really started showing it, and only if the
  * stored id is still the one it attached: a failed boot, or
  * the person typing in another mode, forgets nothing, so a reload still retries the paid-for session.
+ * Explicit discard of an unavailable attachment also works before boot, without losing other sessions.
  */
 export function useAttachSession(productId: string, fromUrl: string | undefined): AttachProps {
-  const [attachSessionId] = useState(() => fromUrl || readAttachSessionId(productId));
+  const [attachSessionId, setAttachSessionId] = useState(() => fromUrl || readAttachSessionId(productId));
+  const [attachFromUrl] = useState(() => Boolean(fromUrl));
   // The id this route attached, once the page started showing it. `onAttachEnd` forgets only that one: a late
   // Accept may have stored another session for the product meanwhile (`rememberAttachSession`).
   const begunIdRef = useRef<string | undefined>(undefined);
-  useEffect(() => {
-    if (!fromUrl) {
-      return;
-    }
-    // A bare link has no order of its own (rank 0): it keeps the rank of the same session the consent page
-    // remembered, and never replaces a different session that has one (a newer accepted handoff).
-    const current = readEntry(productId);
-    if (current === undefined || current.rank === 0) {
-      writeEntry(productId, { id: fromUrl, rank: 0 });
-    }
+  const consumeUrl = useCallback((sessionId: string) => {
     const url = new URL(window.location.href);
+    if (url.searchParams.get(ATTACH_SESSION_PARAM) !== sessionId) return;
     url.searchParams.delete(ATTACH_SESSION_PARAM);
+    url.searchParams.delete("scenario");
     // `null` state: Next then copies its own history internals into it and syncs `useSearchParams`;
     // passing `history.state` (which carries Next's `__NA` marker) would make it skip that sync.
     window.history.replaceState(null, "", url);
-  }, [productId, fromUrl]);
-  const onAttachBegin = useCallback(() => {
-    begunIdRef.current = attachSessionId;
+  }, []);
+  const onAttachResolved = useCallback((sessionId: string) => {
+    if (sessionId !== fromUrl) return;
+    // Keep the URL as the reload handle when storage refuses the confirmed choice.
+    if (chooseAttachSession(productId, sessionId, "")) consumeUrl(sessionId);
+  }, [productId, fromUrl, consumeUrl]);
+  const onAttachBegin = useCallback((sessionId = attachSessionId) => {
+    begunIdRef.current = sessionId;
   }, [attachSessionId]);
-  const onAttachEnd = useCallback(() => {
+  const onAttachEnd = useCallback((sessionId?: string) => {
     const begunId = begunIdRef.current;
-    begunIdRef.current = undefined;
-    const current = readEntry(productId);
-    if (begunId === undefined || current === undefined) {
-      return;
+    const endedId = sessionId ?? begunId;
+    if (begunId === endedId) begunIdRef.current = undefined;
+    if (endedId !== undefined) {
+      if (begunId === endedId) forgetAttachSession(productId, endedId);
+      consumeUrl(endedId);
     }
-    if (current.active === begunId) {
-      // The explicitly opened session ended: a newer paid-for one behind it is what a visit restores now; none
-      // (it was the newest itself), nothing is.
-      writeEntry(productId, current.id === begunId ? null : { id: current.id, rank: current.rank });
-    } else if (current.id === begunId && current.active === undefined) {
-      writeEntry(productId, null);
-    }
-  }, [productId]);
-  return { attachSessionId, onAttachBegin, onAttachEnd };
+  }, [productId, consumeUrl]);
+  const onAttachDiscard = useCallback((sessionId = attachSessionId) => {
+    if (sessionId === undefined) return;
+    forgetAttachSession(productId, sessionId);
+    consumeUrl(sessionId);
+    if (begunIdRef.current === sessionId) begunIdRef.current = undefined;
+    setAttachSessionId((current) => current === sessionId ? undefined : current);
+  }, [productId, attachSessionId, consumeUrl]);
+  return { attachSessionId, attachFromUrl, onAttachResolved, onAttachBegin, onAttachEnd, onAttachDiscard };
 }

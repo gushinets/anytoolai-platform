@@ -77,11 +77,9 @@ trivy fs --scanners vuln --include-dev-deps --severity HIGH,CRITICAL --exit-code
 The scan does not build or scan production images; secret scanning and push protection remain
 separate. A fresh vulnerability database requires network access.
 
-`.github/dependabot.yml` enables weekly updates for all Python manifests through `uv`, the root
-pnpm workspace and standalone agent-script npm project, GitHub Actions, Dockerfiles and Compose
-images. Version updates wait seven days after release; security updates bypass this cooldown.
-Python and JavaScript version updates group the same dependency across directories, keeping each
-dependency (including LiteLLM) in its own PR. Dependabot does not auto-merge. Its PRs must still be
+`.github/dependabot.yml` disables scheduled version-update PRs for Python (`uv`), JavaScript
+(`npm`), GitHub Actions, Docker and Docker Compose. Dependabot security updates remain enabled
+in GitHub. Dependabot does not auto-merge. Its PRs must still be
 triaged by a human: assign a real Linear issue, set the title to `ANY-<number> - <summary>`, and add
 the matching URL under `## Linear issue` before the metadata check can pass. Review all affected
 manifests/locks and preserve cross-file runtime-version constraints before merging.

@@ -1,8 +1,7 @@
 /** Any nested ICU message tree; what `use-intl` accepts as `messages`. */
 export type MessageTree = { [key: string]: string | MessageTree };
 
-/** Same key structure as `T`, every leaf a string: a non-English file typed `Shape<typeof en>`
- * fails typecheck on a missing or extra key. */
+/** Same required keys as `T`, every leaf a string; tests also reject extra JSON keys. */
 export type Shape<T> = T extends string ? string : { [K in keyof T]: Shape<T[K]> };
 
 /** `overrides` on top of `base`, recursively: how a locale falls back to English key by key. */

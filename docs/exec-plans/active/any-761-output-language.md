@@ -98,3 +98,18 @@ Chromium against the isolated fake-provider stack, with no skips/retries. The lo
 checked page width with recap collapsed and expanded and confirmed expanded token visibility.
 Smoke-package lint/typecheck and web production build passed. Stack stopped with volumes
 retained; no paid model calls or product styling changes. Commit/push authorized.
+
+
+## Implementation plan — merge main
+
+Merge origin/main into the existing feature branch without rewriting history. Preserve main's
+JSON/ICU message catalogs and shared parser guards while retaining ANY-761 recap labels and
+analysis-language validation. Keep both runner test additions. Verify web tests, lint/typecheck,
+runner/evidence regressions and config/architecture checks before committing and pushing.
+
+Merge verification:922 web tests and49 focused runner/evidence tests passed; web lint/typecheck,
+config/architecture/docs/generated checks passed. The broader runner/evidence run had332 passes,
+12 environment skips and3 failures: two prod-stack tests consumed the local prod env file and
+passed when rerun with an isolated env path; the non-root activation-marker test requires
+passwordless sudo unavailable here. The affected helper/test bodies are unchanged from main.
+No suppression or unrelated test fix; full CI, browser smoke and paid live evals were not rerun.

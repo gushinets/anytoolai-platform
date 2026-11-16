@@ -193,6 +193,7 @@ class ExecutionReservationService:
         emit_execution_quota_event(session, ExecutionQuotaEvent.reserved, reservation, context)
         return ExecutionAcceptance(
             scenario_session_id=scenario.id,
+            scenario_id=scenario.scenario_id,
             job_id=job.id,
             status=scenario.status,
             reservation=reservation,

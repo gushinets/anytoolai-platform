@@ -9,3 +9,6 @@ usage_metrics:
   - metric_key: proposal_ai.test_generations
     unit: generation
     enabled: false
+  - metric_key: proposal_ai.generations
+    unit: generation
+    enabled: false

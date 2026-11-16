@@ -17,6 +17,7 @@ from anytoolai_platform_core.quotas.models import (
     MAX_ALLOWANCE_QUANTITY,
     ExecutionOwnerKind,
     ExecutionReplayNamespace,
+    ExhaustionDeliveryState,
     ReservationState,
 )
 from anytoolai_platform_core.scenarios.models import ScenarioSessionStatus
@@ -675,7 +676,10 @@ paid_allowance_usage_table = sa.Table(
     sa.Column("created_at", utc_datetime, nullable=False),
     sa.Column("updated_at", utc_datetime, nullable=False),
     sa.UniqueConstraint(
-        "tenant_id", "region", "allowance_id", name="uq_paid_allowance_usage_scope_allowance",
+        "tenant_id",
+        "region",
+        "allowance_id",
+        name="uq_paid_allowance_usage_scope_allowance",
     ),
     sa.CheckConstraint(
         f"quantity BETWEEN 0 AND {MAX_ALLOWANCE_QUANTITY}",
@@ -704,7 +708,8 @@ execution_reservations_table = sa.Table(
     sa.Column("guest_quota_usage_id", sa.String(128)),
     sa.Column("paid_allowance_usage_id", sa.String(128)),
     sa.Column(
-        "replay_namespace", _enum_type(ExecutionReplayNamespace, "execution_replay_namespace"),
+        "replay_namespace",
+        _enum_type(ExecutionReplayNamespace, "execution_replay_namespace"),
     ),
     sa.Column("replay_key", sa.String(256)),
     sa.Column("request_hash", sa.String(64)),
@@ -717,8 +722,15 @@ execution_reservations_table = sa.Table(
     sa.UniqueConstraint("scenario_session_id", name="uq_execution_reservations_session"),
     sa.UniqueConstraint("job_id", name="uq_execution_reservations_job"),
     sa.UniqueConstraint(
-        "tenant_id", "region", "owner_kind", "owner_id", "product_id", "scenario_id",
-        "replay_namespace", "replay_key", name="uq_execution_reservations_owner_replay",
+        "tenant_id",
+        "region",
+        "owner_kind",
+        "owner_id",
+        "product_id",
+        "scenario_id",
+        "replay_namespace",
+        "replay_key",
+        name="uq_execution_reservations_owner_replay",
     ),
     sa.CheckConstraint(
         "(owner_kind = 'guest' AND guest_quota_usage_id IS NOT NULL "
@@ -746,7 +758,9 @@ execution_reservations_table = sa.Table(
     ),
     *(
         sa.ForeignKeyConstraint(
-            [column], [f"{PLATFORM_SCHEMA}.{table}.id"], name=f"fk_execution_reservations_{name}",
+            [column],
+            [f"{PLATFORM_SCHEMA}.{table}.id"],
+            name=f"fk_execution_reservations_{name}",
         )
         for column, table, name in (
             ("scenario_session_id", "scenario_sessions", "session"),
@@ -907,6 +921,68 @@ atom_lab_prompts_table = sa.Table(
     sa.Index("ix_atom_lab_prompts_scope", "tenant_id", "region", "atom_id"),
 )
 
+
+paid_consumer_binding_table = sa.Table(
+    "paid_consumer_binding",
+    runtime_metadata,
+    sa.Column("id", sa.Integer(), primary_key=True, autoincrement=False),
+    sa.Column("consumer_id", sa.String(64), nullable=False),
+    sa.CheckConstraint("id = 1", name="ck_paid_consumer_singleton"),
+)
+
+
+paid_access_coherence_table = sa.Table(
+    "paid_access_coherence",
+    runtime_metadata,
+    sa.Column("consumer_id", sa.String(64), primary_key=True),
+    sa.Column("tenant_id", sa.String(128), primary_key=True),
+    sa.Column("region", sa.String(64), primary_key=True),
+    sa.Column("user_id", sa.String(128), primary_key=True),
+    sa.Column("revision_floor", sa.BigInteger(), nullable=False, server_default="0"),
+    sa.Column("policy_floor", sa.BigInteger(), nullable=False, server_default="1"),
+    sa.Column("snapshot_policy_revision", sa.BigInteger()),
+    sa.Column("snapshot_revision", sa.BigInteger()),
+    sa.Column("semantic_digest", sa.String(64)),
+    sa.Column("snapshot", _json_document_type()),
+    sa.CheckConstraint("revision_floor >= 0", name="ck_paid_access_floor_nonnegative"),
+    sa.CheckConstraint("policy_floor >= 1", name="ck_paid_policy_floor_positive"),
+)
+
+
+allowance_exhaustion_outbox_table = sa.Table(
+    "allowance_exhaustion_outbox", runtime_metadata,
+    sa.Column("id", sa.String(64), primary_key=True),
+    sa.Column("tenant_id", sa.String(128), nullable=False),
+    sa.Column("region", sa.String(64), nullable=False),
+    sa.Column("user_id", sa.String(128), nullable=False),
+    sa.Column("allowance_id", sa.String(128), nullable=False),
+    sa.Column("event_type", sa.String(64), nullable=False),
+    sa.Column("product_id", sa.String(128), nullable=False),
+    sa.Column("metric_key", sa.String(255), nullable=False),
+    sa.Column("unit", sa.String(128), nullable=False),
+    sa.Column("quantity", sa.BigInteger(), nullable=False),
+    sa.Column("occurred_at", UtcDateTime(), nullable=False),
+    sa.Column("state", sa.String(32), nullable=False),
+    sa.Column("next_attempt_at", UtcDateTime(), nullable=False),
+    sa.Column("attempt_count", sa.Integer(), nullable=False, server_default="0"),
+    sa.Column("lease_owner", sa.String(64)),
+    sa.Column("lease_expires_at", UtcDateTime()),
+    sa.Column("last_error", sa.String(64)),
+    sa.UniqueConstraint("tenant_id", "region", "user_id", "allowance_id", "event_type",
+                        name="uq_allowance_exhaustion_identity"),
+    sa.CheckConstraint("event_type = 'allowance_exhausted'", name="ck_allowance_exhaustion_event"),
+    sa.CheckConstraint("quantity >= 0 AND quantity <= 9007199254740991 AND attempt_count >= 0",
+                       name="ck_allowance_exhaustion_counts"),
+    sa.CheckConstraint("(lease_owner IS NULL) = (lease_expires_at IS NULL)",
+                       name="ck_allowance_exhaustion_lease"),
+    sa.CheckConstraint(
+        "state IN (" + ", ".join(repr(state.value) for state in ExhaustionDeliveryState) + ")",
+        name="ck_allowance_exhaustion_state",
+    ),
+    sa.Index("ix_allowance_exhaustion_due", "state", "next_attempt_at"),
+)
+
+
 runtime_tables = {
     "scenario_sessions": scenario_sessions_table,
     "jobs": jobs_table,
@@ -923,6 +999,9 @@ runtime_tables = {
     "guest_quota_usage": guest_quota_usage_table,
     "paid_allowance_usage": paid_allowance_usage_table,
     "execution_reservations": execution_reservations_table,
+    "paid_access_coherence": paid_access_coherence_table,
+    "paid_consumer_binding": paid_consumer_binding_table,
+    "allowance_exhaustion_outbox": allowance_exhaustion_outbox_table,
     "product_handoffs": product_handoffs_table,
     "event_log": event_log_table,
 }

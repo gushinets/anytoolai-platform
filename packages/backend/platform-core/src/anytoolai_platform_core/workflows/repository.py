@@ -136,34 +136,31 @@ class JobRepository:
 
     def mark_succeeded(self, record: JobRecord) -> JobRecord:
         self._require_valid_success_record(record)
-        return self._transition_from_running(record, expected_status=JobStatus.succeeded)
-
-    def mark_failed(self, record: JobRecord) -> JobRecord:
-        return self._transition_from_running(
-            replace(
-                record,
-                status=JobStatus.failed,
-                error_code=record.error_code or "workflow_execution_failed",
-                error_message_safe=(
-                    record.error_message_safe or "Workflow execution failed."
-                ),
-                completed_at=record.completed_at or utc_now(),
-            ),
-            expected_status=JobStatus.failed,
+        return self._transition(
+            record,
+            from_status=JobStatus.running,
+            expected_status=JobStatus.succeeded,
         )
 
+    def mark_failed(self, record: JobRecord) -> JobRecord:
+        return self._mark_failed(record, from_status=JobStatus.running)
+
     def mark_canceled(self, record: JobRecord) -> JobRecord:
-        return self._transition_from_running(
+        return self._transition(
             replace(
                 record,
                 status=JobStatus.canceled,
                 completed_at=record.completed_at or utc_now(),
             ),
+            from_status=JobStatus.running,
             expected_status=JobStatus.canceled,
         )
 
     def mark_failed_from_created(self, record: JobRecord) -> JobRecord:
-        return self._transition_from_created(
+        return self._mark_failed(record, from_status=JobStatus.created)
+
+    def _mark_failed(self, record: JobRecord, *, from_status: JobStatus) -> JobRecord:
+        return self._transition(
             replace(
                 record,
                 status=JobStatus.failed,
@@ -173,13 +170,15 @@ class JobRepository:
                 ),
                 completed_at=record.completed_at or utc_now(),
             ),
+            from_status=from_status,
             expected_status=JobStatus.failed,
         )
 
-    def _transition_from_running(
+    def _transition(
         self,
         record: JobRecord,
         *,
+        from_status: JobStatus,
         expected_status: JobStatus,
     ) -> JobRecord:
         if record.status is not expected_status:
@@ -191,47 +190,7 @@ class JobRepository:
             sa.update(jobs_table)
             .where(
                 jobs_table.c.id == record.id,
-                jobs_table.c.status == JobStatus.running,
-            )
-            .values(
-                status=record.status,
-                result_artifact_id=record.result_artifact_id,
-                error_code=record.error_code,
-                error_message_safe=record.error_message_safe,
-                started_at=record.started_at,
-                completed_at=record.completed_at,
-                metadata=record.metadata,
-            )
-        )
-        if result.rowcount == 0:
-            existing = self.get(record.id)
-            if existing is None:
-                raise LookupError(f"job not found: {record.id}")
-            if existing.status is expected_status:
-                return existing
-            raise RuntimeError(
-                f"job {record.id} cannot transition from {existing.status.value} "
-                f"to {expected_status.value}"
-            )
-        self._session.flush()
-        return _require_stored_job(self.get(record.id), record.id, "transition")
-
-    def _transition_from_created(
-        self,
-        record: JobRecord,
-        *,
-        expected_status: JobStatus,
-    ) -> JobRecord:
-        if record.status is not expected_status:
-            raise ValueError(
-                f"job {record.id} transition requires status={expected_status.value}"
-            )
-
-        result = self._session.execute(
-            sa.update(jobs_table)
-            .where(
-                jobs_table.c.id == record.id,
-                jobs_table.c.status == JobStatus.created,
+                jobs_table.c.status == from_status,
             )
             .values(
                 status=record.status,

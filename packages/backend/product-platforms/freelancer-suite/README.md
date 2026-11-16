@@ -35,3 +35,8 @@ A product only appears in `config_roots()` once its own issue lands a real produ
 map it needs) under `src/anytoolai_freelancer_suite/products/<name>/`.
 
 Product meaning stays in this package, not in Platform Core.
+
+ANY-247 adds Task Finder's web surface at `/products/task_finder` in `apps/web-mirror`, using the
+shared product runtime and the existing A11 + A02 bundle. `python scripts/agent/runner.py task-finder-smoke` proves its fake-provider web journey against `dev-up`; it does not change the
+committed release order. Deployment allowlists must include `task_finder` to expose that surface.
+Task Finder to ProposalAI is still a later optional handoff.

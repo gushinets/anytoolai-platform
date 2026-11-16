@@ -1,0 +1,1073 @@
+{
+  "issue": "ANY-845",
+  "scope": "Greeting/client-name acceptance for the selected RU/EN/ES fixtures; API workflow with real provider calls, not historical production or browser acceptance.",
+  "reviewer": "Codex agent; semantic criteria assessed by the agent, not represented as human verdicts in the ANY-631 acceptance protocol.",
+  "baseline_kind": "Reconstructed pre-change checkout, explicitly requested by the owner after the implementation; not a historical pre-edit production run.",
+  "environments": [
+    {
+      "git_sha": "36d96ffd3729bc1df7826ab84c7a3c000acc4bfe",
+      "compose_project": "anytoolai-831bc552",
+      "api_url": "http://127.0.0.1:18451",
+      "source_fingerprint": "3724fe153d2027775f13ed88777f6d343d9e5e59df4f1bb5735c1c383f886590",
+      "profile_fingerprint": "fdfd7ab56bdecdb6a7436181938b51e454bf759af805f14965e1edab2359e765",
+      "enabled_products": {
+        "proposal_ai": {
+          "provider_policy_ref": "default_text_generation_v1",
+          "quota_policy_ref": null
+        }
+      },
+      "git_status_porcelain": [
+        "?? .quick-check-venv"
+      ],
+      "tracked_diff_paths": [],
+      "git_dirty_explanation": "Only an untracked symlink to the existing managed Python environment; no tracked source/config edits.",
+      "compose_prompt_sha256_from_git": "8ff01adfd3e9858f2fea32050cff9fb3ee92423fabb8c968ed39aaad3c4157f9",
+      "git_tree": "7075a1af0550c1d12671c72795806a0e7463af95",
+      "provider_policy_ref": "default_text_generation_v1",
+      "quota_mode": "unmetered",
+      "channel": "api"
+    },
+    {
+      "git_sha": "08ede3581ffe60cf465d3ffe4a7adf37f1b6d690",
+      "compose_project": "anytoolai-b8ff6a47",
+      "api_url": "http://127.0.0.1:18452",
+      "source_fingerprint": "89881bc71858af982dfadb05bbaf49f4570f53390c7e60828d4dc6eb4f68d572",
+      "profile_fingerprint": "b51a1c8a0beba884d128f0c6ba4e993e6909a2def41417b19b0b7aa8bbc99de2",
+      "enabled_products": {
+        "proposal_ai": {
+          "provider_policy_ref": "default_text_generation_v1",
+          "quota_policy_ref": null
+        }
+      },
+      "git_status_porcelain": [
+        "?? .quick-check-venv"
+      ],
+      "tracked_diff_paths": [],
+      "git_dirty_explanation": "Only an untracked symlink to the existing managed Python environment; no tracked source/config edits.",
+      "compose_prompt_sha256_from_git": "023916bbb59468e11cd83e9b2a18836c34b70b84f8b2a76b5846cdf84526a2dd",
+      "git_tree": "c11e2dd9926ae02191cd30b0575bafcab658f56b",
+      "provider_policy_ref": "default_text_generation_v1",
+      "quota_mode": "unmetered",
+      "channel": "api"
+    }
+  ],
+  "reasoning_effort": "medium",
+  "reasoning_effort_source": "Running worker LiteLLM router read by proposal_ai_eval.read_stack; model and policy corroborated by provider-call ledger.",
+  "series": {
+    "baseline": {
+      "runs": 12,
+      "greeting_passes": 0,
+      "provider_calls": 26,
+      "provider_call_statuses": {
+        "succeeded": 26
+      },
+      "estimated_cost_usd": 0.014529035,
+      "started_at": "2026-11-12T15:48:33+00:00",
+      "completed_at": "2026-11-12T15:52:57.800263+00:00",
+      "automatic_finding_counts": {
+        "long_dash": 3,
+        "missing_required": 3
+      },
+      "results": [
+        {
+          "run_id": "any-845-baseline-P01-warm-1-1dddd972",
+          "case_id": "P01-warm",
+          "attempt": 1,
+          "first_line": "Анна, мой опыт UI-дизайнера включает работу в Figma и лендинги для небольших сервисных компаний с акцентом на читаемость и удобство записи. Особенно интересно сделать путь от знакомства со студией до выбора занятия и записи понятным для посетителя.",
+          "expected_first_line": "Здравствуйте, Анна!",
+          "required_greeting_and_blank_line": false,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:5c322722f658d35c7f2510cafead9997f9fa153bc83194385831381701485d87"
+        },
+        {
+          "run_id": "any-845-baseline-P01-neutral-1-e89df9d2",
+          "case_id": "P01-neutral",
+          "attempt": 1,
+          "first_line": "Релевантный опыт — лендинги для небольших сервисных компаний. В работе в Figma уделяю внимание читаемости и удобству записи, что поможет выстроить понятный путь от знакомства со студией до выбора занятия.",
+          "expected_first_line": "Здравствуйте, Анна.",
+          "required_greeting_and_blank_line": false,
+          "automatic_findings": [
+            "long_dash"
+          ],
+          "answer_sha256": "sha256:d1d40d3c398f45f981942434a4520990811b086bc1b4548445f435cf17e3eb93"
+        },
+        {
+          "run_id": "any-845-baseline-P01-firm-1-5b83ad92",
+          "case_id": "P01-firm",
+          "attempt": 1,
+          "first_line": "Мой опыт работы в Figma и создания лендингов для небольших сервисных компаний подходит для дизайна лендинга студии йоги. В работе уделяю внимание читаемости и удобству записи.",
+          "expected_first_line": "Анна, здравствуйте.",
+          "required_greeting_and_blank_line": false,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:bc301fdc3e922fda7d58124e788eecf2ab32afa342b266d13595f5bc40be6174"
+        },
+        {
+          "run_id": "any-845-baseline-G02-ru-noname-neutral-1-77102b42",
+          "case_id": "G02-ru-noname-neutral",
+          "attempt": 1,
+          "first_line": "Опыт работы с сайтами студий и небольших сервисов подходит для задачи вашего бизнеса. У меня 6 лет опыта в дизайне интерфейсов, и я могу подготовить структуру и макет сайта в Figma.",
+          "expected_first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": false,
+          "automatic_findings": [
+            "missing_required"
+          ],
+          "answer_sha256": "sha256:4be091d66e8ab34e10569d4f6b7998fbb6a1d87395f753476a51f21f3a548179"
+        },
+        {
+          "run_id": "any-845-baseline-P01-warm-2-7dd877f1",
+          "case_id": "P01-warm",
+          "attempt": 2,
+          "first_line": "Я UI-дизайнер, работаю в Figma и делал лендинги для небольших сервисных компаний. В работе уделяю внимание читаемости и удобству записи. Мне интересен проект студии йоги, где расписание и простой путь к записи важны для посетителей.",
+          "expected_first_line": "Здравствуйте, Анна!",
+          "required_greeting_and_blank_line": false,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:6e463aa1254bcab759a757efea7a80ed18af99b22c256a7fefe1aca9ab7a4855"
+        },
+        {
+          "run_id": "any-845-baseline-P01-neutral-2-6861b638",
+          "case_id": "P01-neutral",
+          "attempt": 2,
+          "first_line": "Я UI-дизайнер, работаю в Figma и делал лендинги для небольших сервисных компаний, уделяя внимание читаемости и удобству записи. Этот подход поможет сделать страницу студии понятной и простой для посетителей.",
+          "expected_first_line": "Здравствуйте, Анна.",
+          "required_greeting_and_blank_line": false,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:fd86ce07ae43d72e1eec49eacebebc7bd87c257d7c7e73285ecf2f67a6eb4c67"
+        },
+        {
+          "run_id": "any-845-baseline-P01-firm-2-a4e1bd6f",
+          "case_id": "P01-firm",
+          "attempt": 2,
+          "first_line": "Лендинги для небольших сервисных компаний входят в мой опыт; в дизайне уделяю внимание читаемости и удобству записи. Для студии йоги подготовлю в Figma мобильную и десктопную версии, предусмотрю блок расписания и кнопку записи в существующий WhatsApp, используя тексты и фото студии. Разработка сайта в работу не входит.",
+          "expected_first_line": "Анна, здравствуйте.",
+          "required_greeting_and_blank_line": false,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:ebf878ff454afe9288dceedfbd2d0f9996c6a9f817d5c915e317f801f2bb0524"
+        },
+        {
+          "run_id": "any-845-baseline-G02-ru-noname-neutral-2-611a5da4",
+          "case_id": "G02-ru-noname-neutral",
+          "attempt": 2,
+          "first_line": "Опыт работы с сайтами студий и небольших сервисов подходит для задачи, где важны ясная подача бизнеса и современный интерфейс. Я дизайнер интерфейсов с 6-летним опытом: делаю лендинги и макеты в Figma, быстро собираю структуру страницы и показываю промежуточные варианты до финала.",
+          "expected_first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": false,
+          "automatic_findings": [
+            "missing_required"
+          ],
+          "answer_sha256": "sha256:8b05ebeea4393a1bd2aafebcd42412fcdc09c9971fea6c3782a5301222149dc1"
+        },
+        {
+          "run_id": "any-845-baseline-P01-warm-3-d3a981da",
+          "case_id": "P01-warm",
+          "attempt": 3,
+          "first_line": "Для лендинга вашей студии подойдет мой опыт: я работаю в Figma и создавал лендинги для небольших сервисных компаний, уделяя внимание читаемости и удобству записи. Анна, задача интересна тем, что важно сделать расписание заметным, а запись в WhatsApp простой для посетителей.",
+          "expected_first_line": "Здравствуйте, Анна!",
+          "required_greeting_and_blank_line": false,
+          "automatic_findings": [
+            "long_dash"
+          ],
+          "answer_sha256": "sha256:fb0a567381ea964fa4f33e8f8c1bd34ef5a6c236405ec2b961cb0032689d2af1"
+        },
+        {
+          "run_id": "any-845-baseline-P01-neutral-3-07839804",
+          "case_id": "P01-neutral",
+          "attempt": 3,
+          "first_line": "Для лендинга студии йоги подходит мой опыт работы в Figma и создания лендингов для небольших сервисных компаний. В таких проектах уделяю внимание читаемости и удобству записи.",
+          "expected_first_line": "Здравствуйте, Анна.",
+          "required_greeting_and_blank_line": false,
+          "automatic_findings": [
+            "long_dash"
+          ],
+          "answer_sha256": "sha256:36a56203d1b46839befe4727ed293d3ac7c506c71570e457afbfd191ef4ba6e4"
+        },
+        {
+          "run_id": "any-845-baseline-P01-firm-3-ddff9028",
+          "case_id": "P01-firm",
+          "attempt": 3,
+          "first_line": "Опыт лендингов для небольших сервисных компаний и работа в Figma подходят для задачи студии йоги. В макете уделю внимание читаемости и удобству записи.",
+          "expected_first_line": "Анна, здравствуйте.",
+          "required_greeting_and_blank_line": false,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:3c48d8e190bd69638495850f64da402549506765cc2d4853d245d82673c45e8a"
+        },
+        {
+          "run_id": "any-845-baseline-G02-ru-noname-neutral-3-f22420fd",
+          "case_id": "G02-ru-noname-neutral",
+          "attempt": 3,
+          "first_line": "Мой опыт работы с сайтами студий и небольших сервисов подходит для этой задачи. Есть 6 лет опыта в дизайне интерфейсов; делаю лендинги и мобильные макеты в Figma.",
+          "expected_first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": false,
+          "automatic_findings": [
+            "missing_required"
+          ],
+          "answer_sha256": "sha256:d5a88c95d5341eeb8749c67d1bff6a4d44ea8709208736555d9ffc21c06e0f8f"
+        }
+      ]
+    },
+    "fixed": {
+      "runs": 36,
+      "greeting_passes": 36,
+      "provider_calls": 72,
+      "provider_call_statuses": {
+        "succeeded": 72
+      },
+      "estimated_cost_usd": 0.030524135,
+      "started_at": "2026-11-12T15:49:45+00:00",
+      "completed_at": "2026-11-12T15:59:43.464573+00:00",
+      "automatic_finding_counts": {
+        "long_dash": 1,
+        "language_unverified": 1
+      },
+      "results": [
+        {
+          "run_id": "any-845-fixed-G01-ru-name-warm-1-a34d626f",
+          "case_id": "G01-ru-name-warm",
+          "attempt": 1,
+          "first_line": "Здравствуйте, Анна!",
+          "expected_first_line": "Здравствуйте, Анна!",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:fdf85ef17c275cdf5c2596f419d20f777706e527be8d42d8699214f34e5f0d26"
+        },
+        {
+          "run_id": "any-845-fixed-G01-ru-name-neutral-1-28733c1d",
+          "case_id": "G01-ru-name-neutral",
+          "attempt": 1,
+          "first_line": "Здравствуйте, Анна.",
+          "expected_first_line": "Здравствуйте, Анна.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:43daf783e0d3db57b28276c30ecbe8d808a452bd0b83301784d3c4a9e8261e3d"
+        },
+        {
+          "run_id": "any-845-fixed-G01-ru-name-firm-1-f10a1e25",
+          "case_id": "G01-ru-name-firm",
+          "attempt": 1,
+          "first_line": "Анна, здравствуйте.",
+          "expected_first_line": "Анна, здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:1ae3d2529422e491af69c69aa9afead52649d5b66cafc94b98b8eb69b991d097"
+        },
+        {
+          "run_id": "any-845-fixed-G02-ru-noname-neutral-1-318f98db",
+          "case_id": "G02-ru-noname-neutral",
+          "attempt": 1,
+          "first_line": "Здравствуйте.",
+          "expected_first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:1a7f668b2ca825f9cfd57111302ccf34b7f3f64edcbf1ef0b7c4617559d3edcb"
+        },
+        {
+          "run_id": "any-845-fixed-G03-ru-freelancer-name-1-3c04c015",
+          "case_id": "G03-ru-freelancer-name",
+          "attempt": 1,
+          "first_line": "Здравствуйте.",
+          "expected_first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:f2ad9e801059bcd5707395fb4e5783aa35778d471944e3c9b982ce67cc327b9d"
+        },
+        {
+          "run_id": "any-845-fixed-G04-ru-third-party-1-40fb9bac",
+          "case_id": "G04-ru-third-party",
+          "attempt": 1,
+          "first_line": "Здравствуйте.",
+          "expected_first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:49fa9a212d162b52884fb5ce3e616531b8a6da189af6871831f10c84c4a73f45"
+        },
+        {
+          "run_id": "any-845-fixed-G05-en-name-firm-1-31cc84eb",
+          "case_id": "G05-en-name-firm",
+          "attempt": 1,
+          "first_line": "Hello John,",
+          "expected_first_line": "Hello John,",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:c63054bdfbae9e4edb1d14062082b1bc9cf19be94983046c0c71084449e69fce"
+        },
+        {
+          "run_id": "any-845-fixed-G06-es-name-warm-1-684483a0",
+          "case_id": "G06-es-name-warm",
+          "attempt": 1,
+          "first_line": "Hola, Ana:",
+          "expected_first_line": "Hola, Ana:",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:98a509b22b73e2b1e9a08633a1cd5484462785eb0084d2283cef64a120b0a023"
+        },
+        {
+          "run_id": "any-845-fixed-G07-es-noname-neutral-1-bacab4fb",
+          "case_id": "G07-es-noname-neutral",
+          "attempt": 1,
+          "first_line": "Hola:",
+          "expected_first_line": "Hola:",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:3cfafa5f92a5cdde1ad0e06c98e1c55f6318636455013b698dd7785422e804ee"
+        },
+        {
+          "run_id": "any-845-fixed-G08-ru-freelancer-name-in-task-1-9c354e43",
+          "case_id": "G08-ru-freelancer-name-in-task",
+          "attempt": 1,
+          "first_line": "Здравствуйте.",
+          "expected_first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:5fdf103640c10558b2f979a5021a76a4d1600211e99a1f52404f8abd13f358d0"
+        },
+        {
+          "run_id": "any-845-fixed-G09-ru-ambiguous-names-1-bcc11f3f",
+          "case_id": "G09-ru-ambiguous-names",
+          "attempt": 1,
+          "first_line": "Здравствуйте.",
+          "expected_first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:85276952c882f2598f346153c7d3558c07a0dda32b2e6fc02e7d4980071786b4"
+        },
+        {
+          "run_id": "any-845-fixed-G10-ru-brand-name-1-9c2e8ffc",
+          "case_id": "G10-ru-brand-name",
+          "attempt": 1,
+          "first_line": "Здравствуйте.",
+          "expected_first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:86696b0585464c34058372035c92a7beb898a677aaa5bac3e85b8d66d309555e"
+        },
+        {
+          "run_id": "any-845-fixed-G01-ru-name-warm-2-d10cfdcf",
+          "case_id": "G01-ru-name-warm",
+          "attempt": 2,
+          "first_line": "Здравствуйте, Анна!",
+          "expected_first_line": "Здравствуйте, Анна!",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:f9f6dd0c841c8b80682508cc7bbeedbcd654fc1876c36c29755ad99c34ce7a72"
+        },
+        {
+          "run_id": "any-845-fixed-G01-ru-name-neutral-2-7114916a",
+          "case_id": "G01-ru-name-neutral",
+          "attempt": 2,
+          "first_line": "Здравствуйте, Анна.",
+          "expected_first_line": "Здравствуйте, Анна.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:7b00d2b52062bcce1db019ec3499c12bc16ff12f0fb81fe82136e460a6029878"
+        },
+        {
+          "run_id": "any-845-fixed-G01-ru-name-firm-2-de1d52d5",
+          "case_id": "G01-ru-name-firm",
+          "attempt": 2,
+          "first_line": "Анна, здравствуйте.",
+          "expected_first_line": "Анна, здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:f057037a696b692577a547cb66453658c789f1891db44fe1eaed128d1de7f11f"
+        },
+        {
+          "run_id": "any-845-fixed-G02-ru-noname-neutral-2-43dd9fb4",
+          "case_id": "G02-ru-noname-neutral",
+          "attempt": 2,
+          "first_line": "Здравствуйте.",
+          "expected_first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:557806837b51563e5f26931f565784beeecafc26562e1ed9a4746d18bf00f547"
+        },
+        {
+          "run_id": "any-845-fixed-G03-ru-freelancer-name-2-c23a6c07",
+          "case_id": "G03-ru-freelancer-name",
+          "attempt": 2,
+          "first_line": "Здравствуйте.",
+          "expected_first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:4cc2203cdf53cbebf301b33f4c817cefcc2c88dfdf8e62585bdc0dc4e9697602"
+        },
+        {
+          "run_id": "any-845-fixed-G04-ru-third-party-2-811ce52d",
+          "case_id": "G04-ru-third-party",
+          "attempt": 2,
+          "first_line": "Здравствуйте.",
+          "expected_first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:812b15af366a7f6d2351d8ae89f1636eb029ff74c59374f23105a1660c3c2deb"
+        },
+        {
+          "run_id": "any-845-fixed-G05-en-name-firm-2-d8e3f259",
+          "case_id": "G05-en-name-firm",
+          "attempt": 2,
+          "first_line": "Hello John,",
+          "expected_first_line": "Hello John,",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:8726816367fbf099f769251dc07638a5bc8b1a514a2326b1446ff337b8a91803"
+        },
+        {
+          "run_id": "any-845-fixed-G06-es-name-warm-2-572d1d3a",
+          "case_id": "G06-es-name-warm",
+          "attempt": 2,
+          "first_line": "Hola, Ana:",
+          "expected_first_line": "Hola, Ana:",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:a9aa4a0b72ef2ca64064deea6e153c8814ef7a039428a480bdcdf186e0b841f5"
+        },
+        {
+          "run_id": "any-845-fixed-G07-es-noname-neutral-2-fe28b192",
+          "case_id": "G07-es-noname-neutral",
+          "attempt": 2,
+          "first_line": "Hola:",
+          "expected_first_line": "Hola:",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:19ad18373439f794a72a19705921f2ed4333dc95b1cf48a29914f1db9f53690a"
+        },
+        {
+          "run_id": "any-845-fixed-G08-ru-freelancer-name-in-task-2-df10de10",
+          "case_id": "G08-ru-freelancer-name-in-task",
+          "attempt": 2,
+          "first_line": "Здравствуйте.",
+          "expected_first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:9788adf5208267b85b5dcea9bb7da1e73739dd3865d63ec2e22be5d60ce67226"
+        },
+        {
+          "run_id": "any-845-fixed-G09-ru-ambiguous-names-2-069ace75",
+          "case_id": "G09-ru-ambiguous-names",
+          "attempt": 2,
+          "first_line": "Здравствуйте.",
+          "expected_first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:9150fb631172b3646da00cb328efcfcc6ad76dbe3e59e7e4136362475e77c16f"
+        },
+        {
+          "run_id": "any-845-fixed-G10-ru-brand-name-2-3e47bcaa",
+          "case_id": "G10-ru-brand-name",
+          "attempt": 2,
+          "first_line": "Здравствуйте.",
+          "expected_first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:d489cd4e3d6292047d2e25e419302ccd74c2ba5b16244fa4fdf45a222ee64eb6"
+        },
+        {
+          "run_id": "any-845-fixed-G01-ru-name-warm-3-f8000f8f",
+          "case_id": "G01-ru-name-warm",
+          "attempt": 3,
+          "first_line": "Здравствуйте, Анна!",
+          "expected_first_line": "Здравствуйте, Анна!",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:5bed447d7fb47b078df674020b86cd1b63a6dfb60aa99b46ee6cbb07c1a04a23"
+        },
+        {
+          "run_id": "any-845-fixed-G01-ru-name-neutral-3-8852874a",
+          "case_id": "G01-ru-name-neutral",
+          "attempt": 3,
+          "first_line": "Здравствуйте, Анна.",
+          "expected_first_line": "Здравствуйте, Анна.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:bb3d310941b570bed5cdf9ffe4894f044ed0a08ce5a233397fa2b15cd46aee05"
+        },
+        {
+          "run_id": "any-845-fixed-G01-ru-name-firm-3-43e19014",
+          "case_id": "G01-ru-name-firm",
+          "attempt": 3,
+          "first_line": "Анна, здравствуйте.",
+          "expected_first_line": "Анна, здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [
+            "long_dash"
+          ],
+          "answer_sha256": "sha256:858ac0d862fb984eaa0683b6fef724a39e0ae607e23e5f9bae12ad63c5995be5"
+        },
+        {
+          "run_id": "any-845-fixed-G02-ru-noname-neutral-3-7c8d54f7",
+          "case_id": "G02-ru-noname-neutral",
+          "attempt": 3,
+          "first_line": "Здравствуйте.",
+          "expected_first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:a692140c89b6fde05c042092f5e6d00e9cd4cf7037933f39c6d1161d568875e2"
+        },
+        {
+          "run_id": "any-845-fixed-G03-ru-freelancer-name-3-2c9c1378",
+          "case_id": "G03-ru-freelancer-name",
+          "attempt": 3,
+          "first_line": "Здравствуйте.",
+          "expected_first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:20f7015b6a1b235d300cb91d6771a38ef32d41718e1866f3ebc9b23c3d1be656"
+        },
+        {
+          "run_id": "any-845-fixed-G04-ru-third-party-3-07c1a1f4",
+          "case_id": "G04-ru-third-party",
+          "attempt": 3,
+          "first_line": "Здравствуйте.",
+          "expected_first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:9a0f81dee7b927c5c71465fd4c67882e8f5a9b378451320e40a8a8f075ec0161"
+        },
+        {
+          "run_id": "any-845-fixed-G05-en-name-firm-3-3e9d48f2",
+          "case_id": "G05-en-name-firm",
+          "attempt": 3,
+          "first_line": "Hello John,",
+          "expected_first_line": "Hello John,",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:2346fc567b02546670d566a4cd07080aed4005959f77fccfec2fffee49c52dc7"
+        },
+        {
+          "run_id": "any-845-fixed-G06-es-name-warm-3-ba2f2fa0",
+          "case_id": "G06-es-name-warm",
+          "attempt": 3,
+          "first_line": "Hola, Ana:",
+          "expected_first_line": "Hola, Ana:",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [
+            "language_unverified"
+          ],
+          "answer_sha256": "sha256:125ab6b34c8d11001a1cc07d7d2937ca613f1ccbc4ec7a6091e64234b80ecc45"
+        },
+        {
+          "run_id": "any-845-fixed-G07-es-noname-neutral-3-a637bac1",
+          "case_id": "G07-es-noname-neutral",
+          "attempt": 3,
+          "first_line": "Hola:",
+          "expected_first_line": "Hola:",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:83e0bfc1b0763eb54807b8c7329c099d7a158c13337d2c0699e662a2428c504b"
+        },
+        {
+          "run_id": "any-845-fixed-G08-ru-freelancer-name-in-task-3-c1f0d6fe",
+          "case_id": "G08-ru-freelancer-name-in-task",
+          "attempt": 3,
+          "first_line": "Здравствуйте.",
+          "expected_first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:a820dcff193b8f75f527394cb3405108d19b28d1d60b758d3ff21980dd836b6c"
+        },
+        {
+          "run_id": "any-845-fixed-G09-ru-ambiguous-names-3-0b4449bc",
+          "case_id": "G09-ru-ambiguous-names",
+          "attempt": 3,
+          "first_line": "Здравствуйте.",
+          "expected_first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:12e3bd2527d87441681acbc243a7db298eaf448ea014dc40ad4f7deb2cfe82dc"
+        },
+        {
+          "run_id": "any-845-fixed-G10-ru-brand-name-3-9869dc83",
+          "case_id": "G10-ru-brand-name",
+          "attempt": 3,
+          "first_line": "Здравствуйте.",
+          "expected_first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:814afaf16b7007941f129299b03261918ad79e8185786640f37d627db0169be9"
+        }
+      ]
+    },
+    "regression": {
+      "runs": 4,
+      "greeting_passes": 4,
+      "provider_calls": 8,
+      "provider_call_statuses": {
+        "succeeded": 8
+      },
+      "estimated_cost_usd": 0.0054197,
+      "started_at": "2026-11-12T16:00:00+00:00",
+      "completed_at": "2026-11-12T16:01:53.594932+00:00",
+      "automatic_finding_counts": {},
+      "results": [
+        {
+          "run_id": "any-845-regression-P01-1-80cb4bd9",
+          "case_id": "P01",
+          "attempt": 1,
+          "first_line": "Здравствуйте, Анна!",
+          "expected_first_line": "Здравствуйте, Анна!",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:69618f0ef94e093a830a82c03b4938838630f67f9eed57a1eb7e6101e38afda9"
+        },
+        {
+          "run_id": "any-845-regression-P02-1-46b4ff24",
+          "case_id": "P02",
+          "attempt": 1,
+          "first_line": "Hello,",
+          "expected_first_line": "Hello,",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:83f24de4f1d832b41c63e2b7c9fc0338d75781b6c63e0e5913432b1ef8572f14"
+        },
+        {
+          "run_id": "any-845-regression-P04-1-f5ba98eb",
+          "case_id": "P04",
+          "attempt": 1,
+          "first_line": "Hello,",
+          "expected_first_line": "Hello,",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:7ae86f3cf523cd616822167f0ed8a5e3a832f79d35fdc0123115c2c178ca9a9e"
+        },
+        {
+          "run_id": "any-845-regression-P05-1-5e582178",
+          "case_id": "P05",
+          "attempt": 1,
+          "first_line": "Здравствуйте.",
+          "expected_first_line": "Здравствуйте.",
+          "required_greeting_and_blank_line": true,
+          "automatic_findings": [],
+          "answer_sha256": "sha256:9897e94ef665f9cba6856089d11a8bd307500b0cdb5c295d27e5c272ab16303c"
+        }
+      ]
+    }
+  },
+  "total_runs": 52,
+  "total_estimated_cost_usd": 0.05047287,
+  "agent_semantic_reviews": [
+    {
+      "series": "fixed",
+      "case_id": "G01-ru-name-warm",
+      "run_ids": [
+        "any-845-fixed-G01-ru-name-warm-1-a34d626f",
+        "any-845-fixed-G01-ru-name-warm-2-d10cfdcf",
+        "any-845-fixed-G01-ru-name-warm-3-f8000f8f"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "agent_assessment": "pass",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "criterion_id": "client-name",
+          "agent_assessment": "pass",
+          "question": "Does the greeting address Анна exactly as given, with the punctuation required for the selected tone and an empty line before the pitch?"
+        }
+      ],
+      "rationale": "All three openings use Здравствуйте, Анна! and a blank line; the pitch uses the supplied Figma/small-service-business experience. No time-of-day, gendered/familiar greeting or named self-introduction was observed."
+    },
+    {
+      "series": "fixed",
+      "case_id": "G01-ru-name-neutral",
+      "run_ids": [
+        "any-845-fixed-G01-ru-name-neutral-1-28733c1d",
+        "any-845-fixed-G01-ru-name-neutral-2-7114916a",
+        "any-845-fixed-G01-ru-name-neutral-3-8852874a"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "agent_assessment": "pass",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "criterion_id": "client-name",
+          "agent_assessment": "pass",
+          "question": "Does the greeting address Анна exactly as given, with the punctuation required for the selected tone and an empty line before the pitch?"
+        }
+      ],
+      "rationale": "All three openings use Здравствуйте, Анна. and a blank line; the following paragraph explains relevant Figma experience. No time-of-day, gendered/familiar greeting or named self-introduction was observed."
+    },
+    {
+      "series": "fixed",
+      "case_id": "G01-ru-name-firm",
+      "run_ids": [
+        "any-845-fixed-G01-ru-name-firm-1-f10a1e25",
+        "any-845-fixed-G01-ru-name-firm-2-de1d52d5",
+        "any-845-fixed-G01-ru-name-firm-3-43e19014"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "agent_assessment": "pass",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "criterion_id": "client-name",
+          "agent_assessment": "pass",
+          "question": "Does the greeting address Анна exactly as given, with the punctuation required for the selected tone and an empty line before the pitch?"
+        }
+      ],
+      "rationale": "All three openings use Анна, здравствуйте. and a blank line; the following paragraph gives the matching experience. Attempt 3 retains a non-blocking long-dash warning in the body. No time-of-day, gendered/familiar greeting or named self-introduction was observed."
+    },
+    {
+      "series": "fixed",
+      "case_id": "G02-ru-noname-neutral",
+      "run_ids": [
+        "any-845-fixed-G02-ru-noname-neutral-1-318f98db",
+        "any-845-fixed-G02-ru-noname-neutral-2-43dd9fb4",
+        "any-845-fixed-G02-ru-noname-neutral-3-7c8d54f7"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "agent_assessment": "pass",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "criterion_id": "client-name",
+          "agent_assessment": "pass",
+          "question": "Does the greeting use no name because the brief gives none?"
+        }
+      ],
+      "rationale": "All three greetings omit a name; no client name is available. Each body starts with the supplied design experience. No time-of-day, gendered/familiar greeting or named self-introduction was observed."
+    },
+    {
+      "series": "fixed",
+      "case_id": "G03-ru-freelancer-name",
+      "run_ids": [
+        "any-845-fixed-G03-ru-freelancer-name-1-3c04c015",
+        "any-845-fixed-G03-ru-freelancer-name-2-c23a6c07",
+        "any-845-fixed-G03-ru-freelancer-name-3-2c9c1378"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "agent_assessment": "pass",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "criterion_id": "client-name",
+          "agent_assessment": "pass",
+          "question": "Is the greeting free of any name, and is «Ольга» not used as the client's name?"
+        }
+      ],
+      "rationale": "All three greetings omit a name. Ольга from the freelancer positioning is never treated as the client or used in a named self-introduction. No time-of-day, gendered/familiar greeting or named self-introduction was observed."
+    },
+    {
+      "series": "fixed",
+      "case_id": "G04-ru-third-party",
+      "run_ids": [
+        "any-845-fixed-G04-ru-third-party-1-40fb9bac",
+        "any-845-fixed-G04-ru-third-party-2-811ce52d",
+        "any-845-fixed-G04-ru-third-party-3-07c1a1f4"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "agent_assessment": "pass",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "criterion_id": "client-name",
+          "agent_assessment": "pass",
+          "question": "Does the greeting use no name (Марина is a third party)?"
+        }
+      ],
+      "rationale": "All three greetings omit a name. Attempt 2 mentions arranging a call through Марина in the body, consistent with her manager role; it does not address her as the client. No time-of-day, gendered/familiar greeting or named self-introduction was observed."
+    },
+    {
+      "series": "fixed",
+      "case_id": "G05-en-name-firm",
+      "run_ids": [
+        "any-845-fixed-G05-en-name-firm-1-31cc84eb",
+        "any-845-fixed-G05-en-name-firm-2-d8e3f259",
+        "any-845-fixed-G05-en-name-firm-3-3e9d48f2"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "agent_assessment": "pass",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "criterion_id": "client-name",
+          "agent_assessment": "pass",
+          "question": "Does the greeting address John, the client, exactly as given?"
+        }
+      ],
+      "rationale": "All three greetings address John exactly as given with Hello John, and a blank line; the pitch uses the supplied small-business Figma experience. No time-of-day, gendered/familiar greeting or named self-introduction was observed."
+    },
+    {
+      "series": "fixed",
+      "case_id": "G06-es-name-warm",
+      "run_ids": [
+        "any-845-fixed-G06-es-name-warm-1-684483a0",
+        "any-845-fixed-G06-es-name-warm-2-572d1d3a",
+        "any-845-fixed-G06-es-name-warm-3-ba2f2fa0"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "agent_assessment": "pass",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "criterion_id": "client-name",
+          "agent_assessment": "pass",
+          "question": "Does the greeting address Ana exactly as given and end with a colon?"
+        }
+      ],
+      "rationale": "All three greetings use Hola, Ana: and a blank line; the name and Spanish punctuation are preserved and the pitch uses the supplied experience. No time-of-day, gendered/familiar greeting or named self-introduction was observed."
+    },
+    {
+      "series": "fixed",
+      "case_id": "G07-es-noname-neutral",
+      "run_ids": [
+        "any-845-fixed-G07-es-noname-neutral-1-bacab4fb",
+        "any-845-fixed-G07-es-noname-neutral-2-fe28b192",
+        "any-845-fixed-G07-es-noname-neutral-3-a637bac1"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "agent_assessment": "pass",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "criterion_id": "client-name",
+          "agent_assessment": "pass",
+          "question": "Does the greeting use no name and end with a colon?"
+        }
+      ],
+      "rationale": "All three greetings use Hola: and a blank line with no invented name; the pitch uses the supplied Figma experience. No time-of-day, gendered/familiar greeting or named self-introduction was observed."
+    },
+    {
+      "series": "fixed",
+      "case_id": "G08-ru-freelancer-name-in-task",
+      "run_ids": [
+        "any-845-fixed-G08-ru-freelancer-name-in-task-1-9c354e43",
+        "any-845-fixed-G08-ru-freelancer-name-in-task-2-df10de10",
+        "any-845-fixed-G08-ru-freelancer-name-in-task-3-c1f0d6fe"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "agent_assessment": "pass",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "criterion_id": "client-name",
+          "agent_assessment": "pass",
+          "question": "Does the greeting omit Ольга because the task identifies her as the freelancer?"
+        }
+      ],
+      "rationale": "All three greetings omit a name; Ольга explicitly identified as the freelancer in task_text is not treated as the client. No time-of-day, gendered/familiar greeting or named self-introduction was observed."
+    },
+    {
+      "series": "fixed",
+      "case_id": "G09-ru-ambiguous-names",
+      "run_ids": [
+        "any-845-fixed-G09-ru-ambiguous-names-1-bcc11f3f",
+        "any-845-fixed-G09-ru-ambiguous-names-2-069ace75",
+        "any-845-fixed-G09-ru-ambiguous-names-3-0b4449bc"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "agent_assessment": "pass",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "criterion_id": "client-name",
+          "agent_assessment": "pass",
+          "question": "Does the greeting use no name because neither Анна nor Марина is clearly the client or addressee?"
+        }
+      ],
+      "rationale": "All three greetings omit a name because neither Анна nor Марина is identified unambiguously as the addressee. No time-of-day, gendered/familiar greeting or named self-introduction was observed."
+    },
+    {
+      "series": "fixed",
+      "case_id": "G10-ru-brand-name",
+      "run_ids": [
+        "any-845-fixed-G10-ru-brand-name-1-9c2e8ffc",
+        "any-845-fixed-G10-ru-brand-name-2-3e47bcaa",
+        "any-845-fixed-G10-ru-brand-name-3-9869dc83"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "greeting-and-pitch",
+          "agent_assessment": "pass",
+          "question": "Does the text start with a single greeting line followed by the pitch (why the freelancer fits), with no time-of-day greeting, no «Уважаемый/Уважаемая» and no self-introduction?"
+        },
+        {
+          "criterion_id": "client-name",
+          "agent_assessment": "pass",
+          "question": "Does the greeting use no name because «Анна» is a brand rather than the client?"
+        }
+      ],
+      "rationale": "All three greetings omit a name because Анна is explicitly a brand, not a named person placing the order. No time-of-day, gendered/familiar greeting or named self-introduction was observed."
+    },
+    {
+      "series": "regression",
+      "case_id": "P01",
+      "run_ids": [
+        "any-845-regression-P01-1-80cb4bd9"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "no-development",
+          "agent_assessment": "pass",
+          "question": "Does the answer promise no layout, coding or site development (only the Figma design)?",
+          "rationale": "Only Figma design is offered; website development is explicitly excluded."
+        },
+        {
+          "criterion_id": "schedule-block",
+          "agent_assessment": "pass",
+          "question": "Is the schedule block part of the design?",
+          "rationale": "The schedule block and WhatsApp booking button are included in mobile and desktop designs."
+        },
+        {
+          "criterion_id": "no-intro-gender-retelling",
+          "agent_assessment": "pass",
+          "question": "Is there no «Меня зовут …», no feminine form such as «Готова» (the masculine «Делал» comes from the positioning), and no retelling of the instructions?",
+          "rationale": "No named self-introduction, unsupported speaker-gender form or repetition of editorial instructions."
+        },
+        {
+          "criterion_id": "no-price-or-dates",
+          "agent_assessment": "pass",
+          "question": "Are no price and no dates or durations named before the discussion?",
+          "rationale": "Price and timing remain for discussion; no price, date or duration is invented."
+        }
+      ]
+    },
+    {
+      "series": "regression",
+      "case_id": "P02",
+      "run_ids": [
+        "any-845-regression-P02-1-46b4ff24"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "ceiling-not-agreed",
+          "agent_assessment": "pass",
+          "question": "Is the USD 1,200 ceiling stated as the client's budget that is not an agreed fee?",
+          "rationale": "USD 1,200 is explicitly a proposed client budget ceiling, not an agreed fee."
+        },
+        {
+          "criterion_id": "fee-left-open",
+          "agent_assessment": "pass",
+          "question": "Is the final fee left to be agreed, never stated as a fixed or agreed amount?",
+          "rationale": "The final fee must still be agreed."
+        },
+        {
+          "criterion_id": "fee-after-inspection",
+          "agent_assessment": "pass",
+          "question": "Is agreeing the final fee tied to inspecting the theme (the condition may be in another sentence)?",
+          "rationale": "Fee agreement is explicitly after inspecting the theme."
+        },
+        {
+          "criterion_id": "scope-not-a-term",
+          "agent_assessment": "pass",
+          "question": "Are the 6 templates, the issue spreadsheet and the 45-minute handover stated as the work, never called proposed or not agreed?",
+          "rationale": "All six templates, the prioritized issue spreadsheet, reproduction steps and 45-minute handover are deliverables."
+        },
+        {
+          "criterion_id": "exclusions-kept",
+          "agent_assessment": "pass",
+          "question": "Are redesign, theme edits, third-party checkout, app remediation, certification and a legal compliance guarantee kept out of the work?",
+          "rationale": "Redesign, theme edits, third-party checkout, app remediation, certification and legal compliance guarantee are excluded."
+        },
+        {
+          "criterion_id": "unagreed-terms-not-accepted",
+          "agent_assessment": "pass",
+          "question": "Is none of the client's USD 1,200 ceiling, report date or staging-access date stated as an agreed fee or promise of the freelancer's own?",
+          "rationale": "The report date is conditional and explicitly proposed/not agreed; the budget is not accepted. Staging access is the client's prerequisite, not the freelancer's promise."
+        }
+      ]
+    },
+    {
+      "series": "regression",
+      "case_id": "P04",
+      "run_ids": [
+        "any-845-regression-P04-1-f5ba98eb"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "budget-not-accepted",
+          "agent_assessment": "pass",
+          "question": "Is EUR 300 explicitly marked as not agreed (proposed and not agreed, or refused)?",
+          "rationale": "The text explicitly refuses EUR 300 for the requested 12-page site."
+        },
+        {
+          "criterion_id": "deadline-declined",
+          "agent_assessment": "pass",
+          "question": "Is the 48-hour deadline refused in so many words?",
+          "rationale": "I do not accept the 48-hour deadline is explicit."
+        },
+        {
+          "criterion_id": "revisions-and-ranking-declined",
+          "agent_assessment": "pass",
+          "question": "Are unlimited revisions and the guaranteed top-3 ranking refused in so many words?",
+          "rationale": "The same explicit refusal covers unlimited revisions and a guaranteed top-3 Google ranking."
+        },
+        {
+          "criterion_id": "smaller-phase",
+          "agent_assessment": "pass",
+          "question": "Is a smaller first phase offered for discussion, with no replacement budget?",
+          "rationale": "A focused smaller first phase is offered for discussion with no replacement budget."
+        },
+        {
+          "criterion_id": "unagreed-terms-not-accepted",
+          "agent_assessment": "pass",
+          "question": "Is none of the client's EUR 300 budget, 48-hour deadline, unlimited revisions or guaranteed top-3 ranking stated as accepted, agreed or as the freelancer's own?",
+          "rationale": "All four problematic terms are refused; timing remains dependent on agreed prerequisites and review rounds."
+        }
+      ]
+    },
+    {
+      "series": "regression",
+      "case_id": "P05",
+      "run_ids": [
+        "any-845-regression-P05-1-5e582178"
+      ],
+      "criteria": [
+        {
+          "criterion_id": "agreed-confirmed",
+          "agent_assessment": "pass",
+          "question": "Are the agreed 8 400 words, 588 EUR, DOCX by 17:00 UTC+3 on 14 October 2026 and the 176,40 + 411,60 EUR payments confirmed, never called proposed or not agreed?",
+          "rationale": "Confirms 8 400 words, 0,07 EUR/word, 588 EUR total, 176,40 EUR advance and 411,60 EUR remainder, DOCX by 17:00 UTC+3 on 14 October 2026."
+        },
+        {
+          "criterion_id": "conditions-kept",
+          "agent_assessment": "pass",
+          "question": "Are all kept: one round of corrections within 5 working days, changes to the original paid separately, «без приложений», the glossary and the final original required before the start?",
+          "rationale": "Keeps без приложений, one correction round within 5 working days, separately paid source changes, and glossary/final original required before starting."
+        },
+        {
+          "criterion_id": "no-legal-promise",
+          "agent_assessment": "pass",
+          "question": "Is there no promise of legal accuracy, notarisation or legal review?",
+          "rationale": "Notarisation and legal expertise are excluded; no legal-accuracy promise is made."
+        },
+        {
+          "criterion_id": "no-gender-placeholder",
+          "agent_assessment": "pass",
+          "question": "Is there no «готов(а)» or other gender placeholder?",
+          "rationale": "No gender placeholder or unsupported speaker-gender form appears."
+        }
+      ]
+    }
+  ],
+  "language_confirmation": {
+    "run_id": "any-845-fixed-G06-es-name-warm-3-ba2f2fa0",
+    "automatic_finding": "language_unverified",
+    "agent_assessment": "Spanish confirmed in both proposal and gap description.",
+    "rationale": "The gap description No mencionas experiencia diseñando menús. has five words, below GAP_MIN_WORDS=6; it is plainly Spanish. The original flag is preserved."
+  },
+  "acceptance_conclusion": "The missing versioned reproduction/acceptance evidence is supplied. The scoped greeting/name rule passes 36/36 fixed runs and all 4 existing regression cases pass agent review. This does not claim full ANY-631 human/browser acceptance.",
+  "remaining_caveats": [
+    "One long dash in fixed G01-ru-name-firm attempt 3 remains a non-blocking body-style warning; baseline had three such warnings.",
+    "API-level local Compose evidence with a real provider; no production deployment or browser interaction was performed.",
+    "The sample covers the fixed fixtures and one backend model/reasoning policy; it is not a guarantee for every future generation.",
+    "A04 experience-gap classification quality was not re-accepted by this greeting-focused task; outputs are retained for review."
+  ]
+}

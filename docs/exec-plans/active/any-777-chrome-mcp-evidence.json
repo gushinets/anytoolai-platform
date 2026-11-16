@@ -1,0 +1,120 @@
+{
+  "date": "2026-11-09",
+  "transport": "Chrome DevTools MCP 1.12.0 over stdio, isolated graphical Chrome, DISPLAY=:0",
+  "app": "Production Next.js build at http://127.0.0.1:31777",
+  "backend": "Real API/worker on port 18000; isolated SQLite; fake provider with 35s artificial delay per step, test-only 60s fake-call timeout",
+  "sourceChangedDuringReview": false,
+  "startCount": 1,
+  "sessionId": "scenario_session_01794211009946865866_0000000002_6c435132300b429db147d078f1540dad",
+  "artifactId": "artifact_01794211080456473955_0000000030_2e1c9d2721fc4af182272fe56c2ef920",
+  "after61s": {
+    "elapsedMs": 61000.60000000149,
+    "submitDisabled": true,
+    "generating": true,
+    "error": false
+  },
+  "runningAfter60s": {
+    "scenario_session_id": "scenario_session_01794211009946865866_0000000002_6c435132300b429db147d078f1540dad",
+    "job_id": "job_01794211009955764262_0000000004_1b6ea909787e4edd9ea7d1b89133697c",
+    "status": "running",
+    "current_checkpoint_id": "processing",
+    "allowed_next_actions": [],
+    "result_artifact_id": null
+  },
+  "completed": {
+    "scenario_session_id": "scenario_session_01794211009946865866_0000000002_6c435132300b429db147d078f1540dad",
+    "job_id": "job_01794211009955764262_0000000004_1b6ea909787e4edd9ea7d1b89133697c",
+    "status": "completed",
+    "current_checkpoint_id": "result_ready",
+    "allowed_next_actions": [
+      "copy_result"
+    ],
+    "result_artifact_id": "artifact_01794211080456473955_0000000030_2e1c9d2721fc4af182272fe56c2ef920"
+  },
+  "artifactReceivedAfterMs": 71264.80000000075,
+  "resultUiConfirmedByMs": 85589.90000000224,
+  "copyUiConfirmed": true,
+  "copyNextActionHttpStatus": 200,
+  "quota": {
+    "guest_id": "guest_01794210973678559812_0000000000_e6484ebbdf4c45f7a6e42ae97bec0148",
+    "product_id": "proposal_ai",
+    "quota_policy_id": "proposal_ai.guest_quota_v1",
+    "quota_dimension": "product",
+    "dimension_key": "proposal_ai",
+    "scenario_id": null,
+    "unit": "scenario_run",
+    "period": "lifetime",
+    "limit_count": 10,
+    "used_count": 1,
+    "successful_used_count": 1,
+    "legacy_used_count": 0,
+    "reserved_count": 0,
+    "available_count": 9,
+    "remaining_count": 9,
+    "exhausted": false,
+    "resets_at": null,
+    "read_at": "2026-11-09T07:58:01.130754Z"
+  },
+  "consoleErrors": 0,
+  "otherProductBootChecks": [
+    {
+      "url": "http://127.0.0.1:31777/products/brief_decoder",
+      "title": "Brief Decoder",
+      "textareas": [
+        {
+          "id": "brief-decoder-brief-text",
+          "disabled": false
+        }
+      ],
+      "buttons": [
+        "Разобрать бриф"
+      ],
+      "alerts": [],
+      "overflow": false
+    },
+    {
+      "url": "http://127.0.0.1:31777/products/client_update_writer",
+      "title": "Client Update Writer",
+      "textareas": [
+        {
+          "id": "client-update-writer-progress-notes",
+          "disabled": false
+        }
+      ],
+      "buttons": [
+        "Написать обновление"
+      ],
+      "alerts": [],
+      "overflow": false
+    },
+    {
+      "url": "http://127.0.0.1:31777/products/acceptance_builder",
+      "title": "Acceptance Builder",
+      "textareas": [
+        {
+          "id": "acceptance-builder-brief-text",
+          "disabled": false
+        }
+      ],
+      "buttons": [
+        "Составить критерии"
+      ],
+      "alerts": [],
+      "overflow": false
+    }
+  ],
+  "tests": {
+    "poller": 16,
+    "runtime": 94
+  },
+  "ac": {
+    "budgetDocumented": true,
+    "lateRunningCompletionTests": true,
+    "browserLongRunningResult": true
+  },
+  "limits": [
+    "Artificial delay, not a live paid model.",
+    "SQLite, not PostgreSQL production concurrency.",
+    "The optional raw ?session= URL for ProposalAI did not resume; its wrapper omits attach props, pre-existing and no configured inbound handoff targets ProposalAI."
+  ]
+}

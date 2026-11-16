@@ -1,0 +1,1 @@
+{"extends":"@anytoolai/smoke-support/tsconfig.json","include":["tests","playwright.config.ts"]}

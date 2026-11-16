@@ -1,0 +1,355 @@
+{
+  "date": "2026-11-09",
+  "transport": "Chrome DevTools MCP 1.12.0 over stdio, graphical isolated Chrome",
+  "environment": "Production Next.js on 31777; real API/worker on 18000; isolated SQLite; fake provider",
+  "baseline": "Reused three existing Client Update Writer sessions; created one original Acceptance Builder session per mode before recording counters.",
+  "failureInjection": "404 and foreign identity use real backend responses. One 503 per product was explicitly injected in the isolated API middleware; Retry and subsequent reads use the real API.",
+  "browserChecks": [
+    {
+      "product": "client_update_writer",
+      "case": "404→New task→all modes",
+      "removed": true,
+      "focused": true,
+      "modes": [
+        "update",
+        "reply_draft",
+        "prepaid_request"
+      ],
+      "starts": 0,
+      "quotaText": "Заметки по оплате\nСумма\nСрок оплаты (необязательно)\nТон\nнейтральный\nтёплый\nтвёрдый\nНаписат"
+    },
+    {
+      "product": "acceptance_builder",
+      "case": "404→New task→all modes",
+      "removed": true,
+      "focused": true,
+      "modes": [
+        "draft",
+        "check"
+      ],
+      "starts": 0,
+      "quotaText": "Бриф клиента\n\nВставьте бриф как есть.\n\nГотовая работа\n\nВставьте текст, который вы собирает"
+    },
+    {
+      "product": "client_update_writer",
+      "afterExitReload": true,
+      "starts": 0
+    },
+    {
+      "product": "client_update_writer",
+      "foreignDiscard": true,
+      "starts": 0
+    },
+    {
+      "product": "acceptance_builder",
+      "afterExitReload": true,
+      "starts": 0
+    },
+    {
+      "product": "acceptance_builder",
+      "foreignDiscard": true,
+      "starts": 0
+    },
+    {
+      "product": "client_update_writer",
+      "mode": "update",
+      "retrySameSession": true
+    },
+    {
+      "product": "acceptance_builder",
+      "mode": "draft",
+      "retrySameSession": true
+    },
+    {
+      "exit": {
+        "product": "client_update_writer",
+        "case": "404→New task→all modes",
+        "removed": true,
+        "focused": true,
+        "modes": [
+          "update",
+          "reply_draft",
+          "prepaid_request"
+        ],
+        "starts": 0,
+        "quotaText": "Заметки по оплате\nСумма\nСрок оплаты (необязательно)\nТон\nнейтральный\nтёплый\nтвёрдый\nНаписат"
+      },
+      "restorations": [
+        {
+          "product": "client_update_writer",
+          "mode": "update",
+          "session": "scenario_session_01794215136947895155_0000000002_bcfbdf0018e0403096330885f06f0efd",
+          "artifact": "artifact_01794215137067704881_0000000016_9219e85b9ec849c78dcccffddd11430d",
+          "starts": 0,
+          "sessionReads": 3,
+          "resultTextLength": 224
+        },
+        {
+          "product": "client_update_writer",
+          "mode": "update",
+          "session": "scenario_session_01794215136947895155_0000000002_bcfbdf0018e0403096330885f06f0efd",
+          "artifact": "artifact_01794215137067704881_0000000016_9219e85b9ec849c78dcccffddd11430d",
+          "starts": 0,
+          "sessionReads": 2,
+          "resultTextLength": 224
+        },
+        {
+          "product": "client_update_writer",
+          "mode": "reply_draft",
+          "session": "scenario_session_01794215137102520896_0000000021_a9b0511acbe047f4b787bfbb93d7c763",
+          "artifact": "artifact_01794215137211273885_0000000035_5979ac28fb2047ea9d1311899a7cb99f",
+          "starts": 0,
+          "sessionReads": 2,
+          "resultTextLength": 191
+        },
+        {
+          "product": "client_update_writer",
+          "mode": "reply_draft",
+          "session": "scenario_session_01794215137102520896_0000000021_a9b0511acbe047f4b787bfbb93d7c763",
+          "artifact": "artifact_01794215137211273885_0000000035_5979ac28fb2047ea9d1311899a7cb99f",
+          "starts": 0,
+          "sessionReads": 2,
+          "resultTextLength": 191
+        },
+        {
+          "product": "client_update_writer",
+          "mode": "prepaid_request",
+          "session": "scenario_session_01794215137237051969_0000000040_24fde63d7d594d2bb6393894e4208ce5",
+          "artifact": "artifact_01794215137372255773_0000000054_e7b921ac217f40d88a939abf6b6e16ea",
+          "starts": 0,
+          "sessionReads": 2,
+          "resultTextLength": 238
+        },
+        {
+          "product": "client_update_writer",
+          "mode": "prepaid_request",
+          "session": "scenario_session_01794215137237051969_0000000040_24fde63d7d594d2bb6393894e4208ce5",
+          "artifact": "artifact_01794215137372255773_0000000054_e7b921ac217f40d88a939abf6b6e16ea",
+          "starts": 0,
+          "sessionReads": 2,
+          "resultTextLength": 238
+        }
+      ]
+    },
+    {
+      "exit": {
+        "product": "acceptance_builder",
+        "case": "404→New task→all modes",
+        "removed": true,
+        "focused": true,
+        "modes": [
+          "draft",
+          "check"
+        ],
+        "starts": 0,
+        "quotaText": "Бриф клиента\n\nВставьте бриф как есть.\n\nГотовая работа\n\nВставьте текст, который вы собирает"
+      },
+      "restorations": [
+        {
+          "product": "acceptance_builder",
+          "mode": "draft",
+          "session": "scenario_session_01794223045912502727_0000000002_04418312921e4f3b85c4224ee1270c7c",
+          "artifact": "artifact_01794223047209214973_0000000030_0bddc0f4156a40faa0b91db1093bf4c2",
+          "starts": 0,
+          "sessionReads": 3,
+          "resultTextLength": 519
+        },
+        {
+          "product": "acceptance_builder",
+          "mode": "draft",
+          "session": "scenario_session_01794223045912502727_0000000002_04418312921e4f3b85c4224ee1270c7c",
+          "artifact": "artifact_01794223047209214973_0000000030_0bddc0f4156a40faa0b91db1093bf4c2",
+          "starts": 0,
+          "sessionReads": 2,
+          "resultTextLength": 519
+        },
+        {
+          "product": "acceptance_builder",
+          "mode": "check",
+          "session": "scenario_session_01794223047877681547_0000000036_1aabf61164fc4fff92049f96fcd1505f",
+          "artifact": "artifact_01794223048889075175_0000000073_559801199f444d8ca5da54da9a663b14",
+          "starts": 0,
+          "sessionReads": 2,
+          "resultTextLength": 1306
+        },
+        {
+          "product": "acceptance_builder",
+          "mode": "check",
+          "session": "scenario_session_01794223047877681547_0000000036_1aabf61164fc4fff92049f96fcd1505f",
+          "artifact": "artifact_01794223048889075175_0000000073_559801199f444d8ca5da54da9a663b14",
+          "starts": 0,
+          "sessionReads": 2,
+          "resultTextLength": 1306
+        }
+      ]
+    }
+  ],
+  "backendBefore": {
+    "counts": {
+      "scenario_sessions": 10,
+      "jobs": 10,
+      "action_runs": 19,
+      "provider_calls": 19,
+      "execution_reservations": 6
+    },
+    "quotas": [
+      {
+        "guest_id": "guest_01794210168744265288_0000000000_f3380f0d38404c60a92311da385e86fd",
+        "product_id": "proposal_ai",
+        "used_count": 1,
+        "reserved_count": 0,
+        "legacy_used_count": 0
+      },
+      {
+        "guest_id": "guest_01794210973678559812_0000000000_e6484ebbdf4c45f7a6e42ae97bec0148",
+        "product_id": "proposal_ai",
+        "used_count": 1,
+        "reserved_count": 0,
+        "legacy_used_count": 0
+      },
+      {
+        "guest_id": "guest_01794213154353292088_0000000000_f700af134e3f4cfdb71d732fe45585be",
+        "product_id": "proposal_ai",
+        "used_count": 1,
+        "reserved_count": 0,
+        "legacy_used_count": 0
+      },
+      {
+        "guest_id": "guest_01794213154353292088_0000000000_f700af134e3f4cfdb71d732fe45585be",
+        "product_id": "brief_decoder",
+        "used_count": 1,
+        "reserved_count": 0,
+        "legacy_used_count": 0
+      },
+      {
+        "guest_id": "guest_01794223045703929386_0000000000_a8deb753f2814fc386dfabc364233343",
+        "product_id": "acceptance_builder",
+        "used_count": 2,
+        "reserved_count": 0,
+        "legacy_used_count": 0
+      }
+    ]
+  },
+  "backendAfter": {
+    "counts": {
+      "scenario_sessions": 10,
+      "jobs": 10,
+      "action_runs": 19,
+      "provider_calls": 19,
+      "execution_reservations": 6
+    },
+    "quotas": [
+      {
+        "guest_id": "guest_01794210168744265288_0000000000_f3380f0d38404c60a92311da385e86fd",
+        "product_id": "proposal_ai",
+        "used_count": 1,
+        "reserved_count": 0,
+        "legacy_used_count": 0
+      },
+      {
+        "guest_id": "guest_01794210973678559812_0000000000_e6484ebbdf4c45f7a6e42ae97bec0148",
+        "product_id": "proposal_ai",
+        "used_count": 1,
+        "reserved_count": 0,
+        "legacy_used_count": 0
+      },
+      {
+        "guest_id": "guest_01794213154353292088_0000000000_f700af134e3f4cfdb71d732fe45585be",
+        "product_id": "proposal_ai",
+        "used_count": 1,
+        "reserved_count": 0,
+        "legacy_used_count": 0
+      },
+      {
+        "guest_id": "guest_01794213154353292088_0000000000_f700af134e3f4cfdb71d732fe45585be",
+        "product_id": "brief_decoder",
+        "used_count": 1,
+        "reserved_count": 0,
+        "legacy_used_count": 0
+      },
+      {
+        "guest_id": "guest_01794223045703929386_0000000000_a8deb753f2814fc386dfabc364233343",
+        "product_id": "acceptance_builder",
+        "used_count": 2,
+        "reserved_count": 0,
+        "legacy_used_count": 0
+      }
+    ]
+  },
+  "acceptanceBuilderQuota": {
+    "usedBefore": 2,
+    "usedAfter": 2,
+    "reservedBefore": 0,
+    "reservedAfter": 0,
+    "availableBefore": 1,
+    "availableAfter": 1
+  },
+  "consoleWarningsAndErrorsAfterFinalReload": 0,
+  "limits": [
+    "Client Update Writer has no configured quota policy; unchanged session/job/action/provider counts independently exclude regeneration.",
+    "No live provider or PostgreSQL concurrency run."
+  ],
+  "finalBuildStorageRoleChecks": [
+    {
+      "product": "client_update_writer",
+      "finalBuild": true,
+      "attempt": 0,
+      "unrelatedActivePreserved": true,
+      "starts": 0
+    },
+    {
+      "product": "client_update_writer",
+      "finalBuild": true,
+      "attempt": 1,
+      "unrelatedActivePreserved": true,
+      "starts": 0
+    },
+    {
+      "product": "client_update_writer",
+      "mode": "prepaid_request",
+      "session": "scenario_session_01794215137237051969_0000000040_24fde63d7d594d2bb6393894e4208ce5",
+      "artifact": "artifact_01794215137372255773_0000000054_e7b921ac217f40d88a939abf6b6e16ea",
+      "starts": 0,
+      "sessionReads": 2,
+      "resultTextLength": 238
+    },
+    {
+      "product": "acceptance_builder",
+      "finalBuild": true,
+      "attempt": 0,
+      "unrelatedActivePreserved": true,
+      "starts": 0
+    },
+    {
+      "product": "acceptance_builder",
+      "finalBuild": true,
+      "attempt": 1,
+      "unrelatedActivePreserved": true,
+      "starts": 0
+    },
+    {
+      "product": "acceptance_builder",
+      "mode": "check",
+      "session": "scenario_session_01794223047877681547_0000000036_1aabf61164fc4fff92049f96fcd1505f",
+      "artifact": "artifact_01794223048889075175_0000000073_559801199f444d8ca5da54da9a663b14",
+      "starts": 0,
+      "sessionReads": 2,
+      "resultTextLength": 1306
+    }
+  ],
+  "validation": {
+    "canonicalFrontendCheck": "passed outside sandbox after esbuild postinstall EPERM in sandbox",
+    "webTests": 501,
+    "sdkTests": 336,
+    "sharedUiTests": 52,
+    "atomLabBrowserTests": 339,
+    "atomLabNodeTests": 57,
+    "stakeholderDemoNodeTests": 6,
+    "workspaceLint": "passed",
+    "workspaceTypecheck": "passed",
+    "generatedContractDrift": "passed",
+    "workspaceBuilds": "passed",
+    "docsValidation": "passed",
+    "generatedDocs": "passed with LITELLM_LOCAL_MODEL_COST_MAP=True"
+  }
+}

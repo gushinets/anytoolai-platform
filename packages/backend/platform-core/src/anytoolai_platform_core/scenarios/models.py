@@ -32,6 +32,7 @@ class ScenarioDefinition:
     metadata: dict[str, Any] = field(default_factory=dict)
     # ScenarioRuntimeService requires the live-canary token for new admission, not accepted replay.
     internal_only: bool = False
+    paid_metric_key: str | None = None
 
 
 @dataclass(frozen=True)
@@ -64,6 +65,7 @@ class ScenarioSessionRecord:
 @dataclass(frozen=True)
 class ScenarioSessionSnapshot:
     scenario_session_id: str
+    scenario_id: str
     job_id: str | None
     status: ScenarioSessionStatus
     allowed_next_actions: tuple[str, ...] = field(default_factory=tuple)

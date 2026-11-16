@@ -38,15 +38,19 @@ COMPOSE_FILE = ROOT / "infra" / "compose" / "docker-compose.yml"
 COMPOSE_OVERRIDE_FILE = ROOT / "infra" / "compose" / "docker-compose.override.yml"
 COMPOSE_PROD_FILE = ROOT / "infra" / "compose" / "docker-compose.prod.yml"
 COMPOSE_LIVE_FILE = ROOT / "infra" / "compose" / "docker-compose.live.yml"
+COMPOSE_IMAGES_FILE = ROOT / "infra" / "compose" / "docker-compose.images.yml"
 COMPOSE_VPS_135_FILE = ROOT / "infra" / "compose" / "docker-compose.vps-135.yml"
 COMPOSE_ATOM_LAB_FILE = ROOT / "infra" / "compose" / "docker-compose.atom-lab.yml"
+COMPOSE_ATOM_LAB_VPS_135_FILE = ROOT / "infra" / "compose" / "docker-compose.atom-lab.vps-135.yml"
 LIVE_ENV_FILE = ROOT / "infra" / "compose" / ".env.live"
 # Optional, gitignored (see .gitignore's `.env.*` rule) -- a local convenience so credentials
 # don't have to be re-exported in every shell. Never auto-loaded for dev; only prod commands
 # pass it to `docker compose` via --env-file, and only if it actually exists on disk.
-PROD_ENV_FILE = ROOT / "infra" / "compose" / ".env.prod"
+PROD_ENV_FILE = Path(
+    os.environ.get("ANYTOOLAI_PROD_ENV_FILE", str(ROOT / "infra" / "compose" / ".env.prod"))
+)
 ATOM_LAB_ENV_FILE = ROOT / "infra" / "compose" / ".env.atom-lab"
-PROD_COMPOSE_PROJECT = "anytoolai-prod"
+PROD_COMPOSE_PROJECT = os.environ.get("ANYTOOLAI_PROD_PROJECT", "anytoolai-prod")
 PROD_FAKE_COMPOSE_PROJECT = "anytoolai-prod-fake"
 ATOM_LAB_COMPOSE_PROJECT = "anytoolai-atom-lab"
 PROFILE_VERSION_HEX_LENGTH = 32
@@ -785,6 +789,12 @@ def _resolved_env_file(path: Path) -> dict[str, str]:
 
 
 def _deployment_profile_dir(compose_project: str) -> Path:
+    env = _resolved_env_file(PROD_ENV_FILE) if compose_project == PROD_COMPOSE_PROJECT else {}
+    if env.get("ANYTOOLAI_API_IMAGE"):
+        root = Path(env.get("ANYTOOLAI_PROFILE_ROOT", ""))
+        if not root.is_absolute():
+            raise ValueError("ANYTOOLAI_PROFILE_ROOT must be an explicit absolute host directory")
+        return root / "freelancer-suite"
     return ROOT / ".agent" / "deployment-profiles" / compose_project / "freelancer-suite"
 
 
@@ -859,6 +869,38 @@ def _activate_deployment_profile(
 
 
 def _check_source_fingerprint(manifest: dict[str, object], env: dict[str, str]) -> int:
+    if env.get("ANYTOOLAI_API_IMAGE"):
+        for image, project in (
+            (env["ANYTOOLAI_API_IMAGE"], "apps/platform-api"),
+            (env["ANYTOOLAI_WORKER_IMAGE"], "apps/platform-worker"),
+        ):
+            code = run_with_env(
+                [
+                    "docker",
+                    "run",
+                    "--rm",
+                    "--pull=never",
+                    "--network=none",
+                    "--entrypoint",
+                    "uv",
+                    image,
+                    "run",
+                    "--project",
+                    project,
+                    "--no-sync",
+                    "python",
+                    "scripts/agent/validate_configs.py",
+                    "check-source-fingerprint",
+                    "--products-root",
+                    str(manifest["source_products_root"]),
+                    "--expected-fingerprint",
+                    str(manifest["source_fingerprint"]),
+                ],
+                env,
+            )
+            if code != 0:
+                return code
+        return 0
     managed_python = quick_check_venv_python()
     if not quick_check_venv_ready(managed_python):
         print("LIVE001: run python scripts/agent/runner.py quick-check first", file=sys.stderr)
@@ -963,6 +1005,10 @@ def _build_deployment_profile(
     unmetered_products: Sequence[str],
     env: dict[str, str],
 ) -> tuple[int, dict[str, object] | None]:
+    if env.get("ANYTOOLAI_API_IMAGE"):
+        return _build_image_deployment_profile(
+            compose_project, enabled_products, unmetered_products, env
+        )
     base_dir = _deployment_profile_dir(compose_project)
     profile_dir = base_dir.with_name(f"{base_dir.name}.{uuid.uuid4().hex}")
     managed_python = quick_check_venv_python()
@@ -1332,50 +1378,18 @@ CLIENT_HANDOFF_SMOKE_REPORT_PATH = (
 )
 
 PROPOSAL_AI_SMOKE_WEB_MIRROR_PORT_ENV = "ANYTOOLAI_PROPOSAL_AI_SMOKE_WEB_MIRROR_PORT"
-PROPOSAL_AI_SMOKE_EVIDENCE_ROOT = ROOT / ".agent" / "proposal-ai-smoke"
-PROPOSAL_AI_SMOKE_REPORT_PATH = (
-    ROOT / "tests" / "e2e" / "proposal-ai-smoke" / "playwright-report.json"
-)
 
 CLIENT_UPDATE_WRITER_SMOKE_WEB_MIRROR_PORT_ENV = (
     "ANYTOOLAI_CLIENT_UPDATE_WRITER_SMOKE_WEB_MIRROR_PORT"
 )
-CLIENT_UPDATE_WRITER_SMOKE_EVIDENCE_ROOT = ROOT / ".agent" / "client-update-writer-smoke"
-CLIENT_UPDATE_WRITER_SMOKE_REPORT_PATH = (
-    ROOT / "tests" / "e2e" / "client-update-writer-smoke" / "playwright-report.json"
-)
 
 BRIEF_DECODER_SMOKE_WEB_MIRROR_PORT_ENV = "ANYTOOLAI_BRIEF_DECODER_SMOKE_WEB_MIRROR_PORT"
-BRIEF_DECODER_SMOKE_EVIDENCE_ROOT = ROOT / ".agent" / "brief-decoder-smoke"
-BRIEF_DECODER_SMOKE_REPORT_PATH = (
-    ROOT / "tests" / "e2e" / "brief-decoder-smoke" / "playwright-report.json"
-)
 
 ACCEPTANCE_BUILDER_SMOKE_WEB_MIRROR_PORT_ENV = "ANYTOOLAI_ACCEPTANCE_BUILDER_SMOKE_WEB_MIRROR_PORT"
-ACCEPTANCE_BUILDER_SMOKE_EVIDENCE_ROOT = ROOT / ".agent" / "acceptance-builder-smoke"
-ACCEPTANCE_BUILDER_SMOKE_REPORT_PATH = (
-    ROOT / "tests" / "e2e" / "acceptance-builder-smoke" / "playwright-report.json"
-)
 
 
 def _client_handoff_smoke_web_mirror_port() -> int:
     return _port_override(CLIENT_HANDOFF_SMOKE_WEB_MIRROR_PORT_ENV, 3000)
-
-
-def _proposal_ai_smoke_web_mirror_port() -> int:
-    return _port_override(PROPOSAL_AI_SMOKE_WEB_MIRROR_PORT_ENV, 3100)
-
-
-def _client_update_writer_smoke_web_mirror_port() -> int:
-    return _port_override(CLIENT_UPDATE_WRITER_SMOKE_WEB_MIRROR_PORT_ENV, 3200)
-
-
-def _brief_decoder_smoke_web_mirror_port() -> int:
-    return _port_override(BRIEF_DECODER_SMOKE_WEB_MIRROR_PORT_ENV, 3300)
-
-
-def _acceptance_builder_smoke_web_mirror_port() -> int:
-    return _port_override(ACCEPTANCE_BUILDER_SMOKE_WEB_MIRROR_PORT_ENV, 3400)
 
 
 def _terminate_process_group(process: subprocess.Popen) -> None:
@@ -1579,201 +1593,79 @@ def client_handoff_smoke() -> int:
     )
 
 
-def proposal_ai_smoke() -> int:
-    """ANY-243: builds and serves web-mirror against the running dev-up platform-api, then runs
-    the Playwright browser-evidence smoke (tests/e2e/proposal-ai-smoke) that proves the ProposalAI
-    web vertical end to end in a real (headless, no extension involved) Chromium -- product page ->
-    shared client -> scenario session -> job/worker -> deterministic fake-provider workflow (ANY-227)
-    -> canonical result -> copy activation, plus weak-input, guest-identity-reuse, and
-    quota-exhaustion coverage.
-
-    Requires `dev-up` already running first (same precedent as atoms-proof/client-handoff-smoke:
-    this command only resolves runtime_identity() for the API URL, it never starts Docker itself)
-    and Playwright's Chromium already installed (`pnpm --filter @anytoolai/proposal-ai-smoke exec
-    playwright install chromium`). Unlike client-handoff-smoke, this needs no extension and no
-    visible display -- ordinary web pages run fine in Playwright's default headless Chromium.
-
-    web-mirror's next.config.ts rewrites() destination is baked in at `next build` time (see
-    client_handoff_smoke()'s own docstring), so PLATFORM_API_BASE_URL must be set for that build
-    step too, not just for the later `next start`.
-    """
+def _run_product_smoke(*, command: str, port_env: str, default_port: int, error_prefix: str) -> int:
+    """Build against dev-up, then run a product's browser suite and retain its evidence."""
     try:
         identity = runtime_identity()
-    except ValueError as exc:
-        print(f"DEV001: {exc}", file=sys.stderr)
-        return 2
-
-    try:
-        web_mirror_port = _proposal_ai_smoke_web_mirror_port()
+        web_mirror_port = _port_override(port_env, default_port)
     except ValueError as exc:
         print(f"DEV001: {exc}", file=sys.stderr)
         return 2
     if not _check_ports_available(
-        "PAS001",
-        [("web-mirror", web_mirror_port, PROPOSAL_AI_SMOKE_WEB_MIRROR_PORT_ENV, None)],
+        f"{error_prefix}001", [("web-mirror", web_mirror_port, port_env, None)]
     ):
         return 1
-    web_mirror_url = f"http://localhost:{web_mirror_port}"
-
     env = runner_env()
     env["PLATFORM_API_BASE_URL"] = identity.api_url
-
-    build_command = ["pnpm", "--filter", "@anytoolai/web-mirror", "build"]
-    build_exit = run_with_env(build_command, env)
+    build_exit = run_with_env(["pnpm", "--filter", "@anytoolai/web-mirror", "build"], env)
     if build_exit != 0:
         return build_exit
-
     return _serve_web_mirror_and_run_smoke(
         web_mirror_port=web_mirror_port,
         env=env,
-        readiness_error_code="PAS002",
-        # DATABASE_URL: the happy-path spec asserts the backend actually persisted
-        # `client.next_action_clicked` for its own run (not just that the browser sent the
-        # request) -- host-reachable since postgres's compose port is published, per the same
-        # precedent as identity.api_url above.
+        readiness_error_code=f"{error_prefix}002",
         smoke_extra_env={
-            "WEB_MIRROR_BASE_URL": web_mirror_url,
+            "WEB_MIRROR_BASE_URL": f"http://localhost:{web_mirror_port}",
             "DATABASE_URL": identity.database_url,
         },
-        smoke_pnpm_filter="@anytoolai/proposal-ai-smoke",
-        report_path=PROPOSAL_AI_SMOKE_REPORT_PATH,
-        evidence_root=PROPOSAL_AI_SMOKE_EVIDENCE_ROOT,
+        smoke_pnpm_filter=f"@anytoolai/{command}",
+        report_path=ROOT / "tests" / "e2e" / command / "playwright-report.json",
+        evidence_root=ROOT / ".agent" / command,
+    )
+
+
+def proposal_ai_smoke() -> int:
+    return _run_product_smoke(
+        command="proposal-ai-smoke",
+        port_env=PROPOSAL_AI_SMOKE_WEB_MIRROR_PORT_ENV,
+        default_port=3100,
+        error_prefix="PAS",
     )
 
 
 def client_update_writer_smoke() -> int:
-    """ANY-414 (code review finding): builds and serves web-mirror against the running dev-up
-    platform-api, then runs the Playwright browser-evidence smoke (tests/e2e/client-update-writer-
-    smoke) that proves the Client Update Writer web vertical end to end in a real (headless, no
-    extension involved) Chromium -- product page -> shared client -> scenario session -> job/worker
-    -> deterministic fake-provider workflow (ANY-227) -> canonical result -> copy activation, plus
-    client-side validation and weak-input coverage. Same shape as proposal_ai_smoke() (its own
-    docstring covers the shared requirements/rationale in full); Update mode is this product's one
-    representative mode here, mirroring proposal-ai-smoke's own single-scenario scope -- the other
-    two modes' meaning is already proven end to end at the backend-pipeline level by
-    apps/platform-api/tests/test_client_update_writer_bundle.py.
-    """
-    try:
-        identity = runtime_identity()
-    except ValueError as exc:
-        print(f"DEV001: {exc}", file=sys.stderr)
-        return 2
-
-    try:
-        web_mirror_port = _client_update_writer_smoke_web_mirror_port()
-    except ValueError as exc:
-        print(f"DEV001: {exc}", file=sys.stderr)
-        return 2
-    if not _check_ports_available(
-        "CUS001",
-        [("web-mirror", web_mirror_port, CLIENT_UPDATE_WRITER_SMOKE_WEB_MIRROR_PORT_ENV, None)],
-    ):
-        return 1
-    web_mirror_url = f"http://localhost:{web_mirror_port}"
-
-    env = runner_env()
-    env["PLATFORM_API_BASE_URL"] = identity.api_url
-
-    build_command = ["pnpm", "--filter", "@anytoolai/web-mirror", "build"]
-    build_exit = run_with_env(build_command, env)
-    if build_exit != 0:
-        return build_exit
-
-    return _serve_web_mirror_and_run_smoke(
-        web_mirror_port=web_mirror_port,
-        env=env,
-        readiness_error_code="CUS002",
-        smoke_extra_env={
-            "WEB_MIRROR_BASE_URL": web_mirror_url,
-            "DATABASE_URL": identity.database_url,
-        },
-        smoke_pnpm_filter="@anytoolai/client-update-writer-smoke",
-        report_path=CLIENT_UPDATE_WRITER_SMOKE_REPORT_PATH,
-        evidence_root=CLIENT_UPDATE_WRITER_SMOKE_EVIDENCE_ROOT,
+    return _run_product_smoke(
+        command="client-update-writer-smoke",
+        port_env=CLIENT_UPDATE_WRITER_SMOKE_WEB_MIRROR_PORT_ENV,
+        default_port=3200,
+        error_prefix="CUS",
     )
 
 
 def brief_decoder_smoke() -> int:
-    """ANY-248: builds and serves web-mirror against the running dev-up platform-api, then runs the
-    Playwright browser-evidence smoke (tests/e2e/brief-decoder-smoke) for the Brief Decoder web
-    vertical: happy-path runtime correlation, validation, weak input, zero-question result,
-    terminal error and quota. Same shape as client_update_writer_smoke().
-    """
-    try:
-        identity = runtime_identity()
-    except ValueError as exc:
-        print(f"DEV001: {exc}", file=sys.stderr)
-        return 2
-
-    try:
-        web_mirror_port = _brief_decoder_smoke_web_mirror_port()
-    except ValueError as exc:
-        print(f"DEV001: {exc}", file=sys.stderr)
-        return 2
-    if not _check_ports_available(
-        "BDS001",
-        [("web-mirror", web_mirror_port, BRIEF_DECODER_SMOKE_WEB_MIRROR_PORT_ENV, None)],
-    ):
-        return 1
-    web_mirror_url = f"http://localhost:{web_mirror_port}"
-
-    env = runner_env()
-    env["PLATFORM_API_BASE_URL"] = identity.api_url
-
-    build_exit = run_with_env(["pnpm", "--filter", "@anytoolai/web-mirror", "build"], env)
-    if build_exit != 0:
-        return build_exit
-
-    return _serve_web_mirror_and_run_smoke(
-        web_mirror_port=web_mirror_port,
-        env=env,
-        readiness_error_code="BDS002",
-        smoke_extra_env={"WEB_MIRROR_BASE_URL": web_mirror_url, "DATABASE_URL": identity.database_url},
-        smoke_pnpm_filter="@anytoolai/brief-decoder-smoke",
-        report_path=BRIEF_DECODER_SMOKE_REPORT_PATH,
-        evidence_root=BRIEF_DECODER_SMOKE_EVIDENCE_ROOT,
+    return _run_product_smoke(
+        command="brief-decoder-smoke",
+        port_env=BRIEF_DECODER_SMOKE_WEB_MIRROR_PORT_ENV,
+        default_port=3300,
+        error_prefix="BDS",
     )
 
 
 def acceptance_builder_smoke() -> int:
-    """ANY-244: builds and serves web-mirror against the running dev-up platform-api, then runs the
-    Playwright browser-evidence smoke (tests/e2e/acceptance-builder-smoke) for the Acceptance Builder
-    web vertical: draft and check runtime correlation, validation, weak input, terminal error, quota,
-    and the accepted Brief Decoder -> Acceptance Builder handoff. Same shape as brief_decoder_smoke().
-    """
-    try:
-        identity = runtime_identity()
-    except ValueError as exc:
-        print(f"DEV001: {exc}", file=sys.stderr)
-        return 2
+    return _run_product_smoke(
+        command="acceptance-builder-smoke",
+        port_env=ACCEPTANCE_BUILDER_SMOKE_WEB_MIRROR_PORT_ENV,
+        default_port=3400,
+        error_prefix="ABS",
+    )
 
-    try:
-        web_mirror_port = _acceptance_builder_smoke_web_mirror_port()
-    except ValueError as exc:
-        print(f"DEV001: {exc}", file=sys.stderr)
-        return 2
-    if not _check_ports_available(
-        "ABS001",
-        [("web-mirror", web_mirror_port, ACCEPTANCE_BUILDER_SMOKE_WEB_MIRROR_PORT_ENV, None)],
-    ):
-        return 1
-    web_mirror_url = f"http://localhost:{web_mirror_port}"
 
-    env = runner_env()
-    env["PLATFORM_API_BASE_URL"] = identity.api_url
-
-    build_exit = run_with_env(["pnpm", "--filter", "@anytoolai/web-mirror", "build"], env)
-    if build_exit != 0:
-        return build_exit
-
-    return _serve_web_mirror_and_run_smoke(
-        web_mirror_port=web_mirror_port,
-        env=env,
-        readiness_error_code="ABS002",
-        smoke_extra_env={"WEB_MIRROR_BASE_URL": web_mirror_url, "DATABASE_URL": identity.database_url},
-        smoke_pnpm_filter="@anytoolai/acceptance-builder-smoke",
-        report_path=ACCEPTANCE_BUILDER_SMOKE_REPORT_PATH,
-        evidence_root=ACCEPTANCE_BUILDER_SMOKE_EVIDENCE_ROOT,
+def task_finder_smoke() -> int:
+    return _run_product_smoke(
+        command="task-finder-smoke",
+        port_env="ANYTOOLAI_TASK_FINDER_SMOKE_WEB_MIRROR_PORT",
+        default_port=3500,
+        error_prefix="TFS",
     )
 
 
@@ -1785,11 +1677,16 @@ class AtomLabDeploymentInputs:
     internal_url: str
 
 
-def _atom_lab_compose_command(*args: str, include_env_file: bool = True) -> list[str]:
+def _atom_lab_compose_command(
+    *args: str, include_env_file: bool = True, env: dict[str, str] | None = None
+) -> list[str]:
     env_file = ATOM_LAB_ENV_FILE if include_env_file and ATOM_LAB_ENV_FILE.is_file() else None
+    files = [COMPOSE_FILE, COMPOSE_ATOM_LAB_FILE]
+    if env is not None and _vps_135_networks_enabled(env):
+        files.append(COMPOSE_ATOM_LAB_VPS_135_FILE)
     return _docker_compose_command(
         ATOM_LAB_COMPOSE_PROJECT,
-        (COMPOSE_FILE, COMPOSE_ATOM_LAB_FILE),
+        files,
         *args,
         env_file=env_file,
     )
@@ -1797,6 +1694,7 @@ def _atom_lab_compose_command(*args: str, include_env_file: bool = True) -> list
 
 def _atom_lab_deployment_inputs() -> AtomLabDeploymentInputs:
     env = _resolved_env_file(ATOM_LAB_ENV_FILE)
+    _vps_135_networks_enabled(env)
     required = (
         "ANYTOOLAI_POSTGRES_USER",
         "ANYTOOLAI_POSTGRES_PASSWORD",
@@ -1870,7 +1768,9 @@ def _atom_lab_deployment_inputs() -> AtomLabDeploymentInputs:
 
 
 def _atom_lab_stack_running(inputs: AtomLabDeploymentInputs) -> bool:
-    return _compose_stack_running(_atom_lab_compose_command(), inputs.compose_env)
+    return _compose_stack_running(
+        _atom_lab_compose_command(env=inputs.compose_env), inputs.compose_env
+    )
 
 
 def _atom_lab_local_identity(inputs: AtomLabDeploymentInputs) -> RuntimeIdentity:
@@ -1952,7 +1852,7 @@ def _atom_lab_ready(inputs: AtomLabDeploymentInputs, *, announce: bool = True) -
     try:
         worker_check = subprocess.run(
             [
-                *_atom_lab_compose_command(),
+                *_atom_lab_compose_command(env=inputs.compose_env),
                 "ps",
                 "--status",
                 "running",
@@ -1973,8 +1873,9 @@ def _atom_lab_ready(inputs: AtomLabDeploymentInputs, *, announce: bool = True) -
         print("LAB005: Atom Lab worker is not running", file=sys.stderr)
         return 1
     if announce:
+        page_path = "/tools/atom-lab" if _vps_135_networks_enabled(inputs.compose_env) else "/atom-lab"
         print(f"Local API: {identity.api_url}")
-        print(f"Internal URL: {inputs.internal_url}/atom-lab")
+        print(f"Internal URL: {inputs.internal_url}{page_path}")
         print(
             "Atom Lab deployment package is ready; external HTTPS/network checks remain "
             "operator-owned"
@@ -2023,7 +1924,7 @@ def _atom_lab_up_locked() -> int:
     try:
         exit_code = run_with_env(
             [
-                *_atom_lab_compose_command(),
+                *_atom_lab_compose_command(env=inputs.compose_env),
                 "up",
                 "-d",
                 "--build",
@@ -2090,7 +1991,9 @@ def _atom_lab_down_locked() -> int:
 
 
 def _atom_lab_nonterminal_job_count(inputs: AtomLabDeploymentInputs) -> int:
-    return _nonterminal_job_count(_atom_lab_compose_command(), inputs.compose_env)
+    return _nonterminal_job_count(
+        _atom_lab_compose_command(env=inputs.compose_env), inputs.compose_env
+    )
 
 
 def _nonterminal_job_count(compose_command: Sequence[str], env: dict[str, str]) -> int:
@@ -2150,7 +2053,7 @@ def _atom_lab_quiesce_locked() -> int:
         return 1
 
     exit_code = _drain_and_stop_worker(
-        _atom_lab_compose_command(),
+        _atom_lab_compose_command(env=inputs.compose_env),
         inputs.compose_env,
         lambda: _atom_lab_nonterminal_job_count(inputs),
         float(inputs.compose_env.get("ANYTOOLAI_ATOM_LAB_QUIESCE_TIMEOUT", "600")),
@@ -2228,7 +2131,7 @@ def _atom_lab_resume_locked() -> int:
         return 1
 
     exit_code = run_with_env(
-        [*_atom_lab_compose_command(), "start", "platform-api", "platform-worker"],
+        _atom_lab_compose_command("start", "platform-api", "platform-worker", env=inputs.compose_env),
         inputs.compose_env,
         timeout=COMPOSE_TEARDOWN_TIMEOUT_SECONDS,
     )
@@ -2247,7 +2150,9 @@ def atom_lab_recovery_postgres_up() -> int:
 
 
 def _atom_lab_existing_services(inputs: AtomLabDeploymentInputs) -> frozenset[str]:
-    return _existing_services(_atom_lab_compose_command(), inputs.compose_env)
+    return _existing_services(
+        _atom_lab_compose_command(env=inputs.compose_env), inputs.compose_env
+    )
 
 
 def _existing_services(compose_command: Sequence[str], env: dict[str, str]) -> frozenset[str]:
@@ -2292,7 +2197,9 @@ def _atom_lab_recovery_postgres_up_locked() -> int:
         print(f"LAB012: Atom Lab recovery PostgreSQL preflight failed: {exc}", file=sys.stderr)
         return 1
 
-    exit_code = _postgres_only_up(_atom_lab_compose_command(), inputs.compose_env)
+    exit_code = _postgres_only_up(
+        _atom_lab_compose_command(env=inputs.compose_env), inputs.compose_env
+    )
     if exit_code == 0:
         print(
             "Atom Lab recovery PostgreSQL is healthy; migrate, API, and worker remain stopped"
@@ -2473,8 +2380,11 @@ def _atom_lab_smoke_locked() -> int:  # noqa: PLR0911
 
 def _prod_compose_command(*args: str, include_env_file: bool = True) -> list[str]:
     env_file = PROD_ENV_FILE if include_env_file and PROD_ENV_FILE.is_file() else None
+    files = [COMPOSE_FILE, COMPOSE_PROD_FILE]
+    if include_env_file and _resolved_env_file(PROD_ENV_FILE).get("ANYTOOLAI_API_IMAGE"):
+        files.append(COMPOSE_IMAGES_FILE)
     return _docker_compose_command(
-        PROD_COMPOSE_PROJECT, (COMPOSE_FILE, COMPOSE_PROD_FILE), *args, env_file=env_file
+        PROD_COMPOSE_PROJECT, files, *args, env_file=env_file
     )
 
 
@@ -2496,6 +2406,8 @@ def _vps_135_networks_enabled(env: dict[str, str]) -> bool:
 def _prod_live_compose_command(*args: str, env: dict[str, str] | None = None) -> list[str]:
     env_file = PROD_ENV_FILE if PROD_ENV_FILE.is_file() else None
     files = [COMPOSE_FILE, COMPOSE_PROD_FILE, COMPOSE_LIVE_FILE]
+    if (env if env is not None else _resolved_env_file(PROD_ENV_FILE)).get("ANYTOOLAI_API_IMAGE"):
+        files.append(COMPOSE_IMAGES_FILE)
     if _vps_135_networks_enabled(env if env is not None else runner_env()):
         files.append(COMPOSE_VPS_135_FILE)
     return _docker_compose_command(
@@ -2813,9 +2725,211 @@ def prod_up() -> int:
         return 1
 
 
+def _validate_image_inputs(env: dict[str, str]) -> None:
+    if os.name != "posix":
+        raise ValueError("image installation currently requires a Linux Docker host")
+    for name in ("ANYTOOLAI_API_IMAGE", "ANYTOOLAI_WORKER_IMAGE", "ANYTOOLAI_WEB_IMAGE"):
+        ref = env.get(name, "")
+        if not ref or (
+            "@sha256:" not in ref and (":" not in ref.rsplit("/", 1)[-1] or ref.endswith(":latest"))
+        ):
+            raise ValueError(f"{name} must select a version tag or digest")
+    root = Path(env.get("ANYTOOLAI_PROFILE_ROOT", ""))
+    if not root.is_absolute() or root.is_symlink() or not root.is_dir():
+        raise ValueError(
+            "ANYTOOLAI_PROFILE_ROOT must be an existing operator-owned absolute directory"
+        )
+    info = root.stat()
+    if info.st_uid != os.getuid() or info.st_mode & 0o022:
+        raise ValueError(
+            "ANYTOOLAI_PROFILE_ROOT must be owned by the operator and not shared-writable"
+        )
+    revisions = []
+    for name in ("ANYTOOLAI_API_IMAGE", "ANYTOOLAI_WORKER_IMAGE"):
+        result = subprocess.run(
+            [
+                "docker",
+                "image",
+                "inspect",
+                "--format",
+                '{{index .Config.Labels "org.opencontainers.image.revision"}}',
+                env[name],
+            ],
+            cwd=ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
+        )
+        revisions.append(result.stdout.strip())
+    if not revisions[0] or revisions[0] == "<no value>" or revisions[0] != revisions[1]:
+        raise ValueError("Kernel API/worker images must declare the same reviewed source revision")
+    web = subprocess.run(
+        [
+            "docker",
+            "image",
+            "inspect",
+            "--format",
+            '{{index .Config.Labels "io.anytoolai.portal-consumer-id"}}',
+            env["ANYTOOLAI_WEB_IMAGE"],
+        ],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
+    )
+    compiled_consumer = web.stdout.strip()
+    expected_consumer = env.get("ANYTOOLAI_PORTAL_CONSUMER_ID") or "platform-kernel"
+    if compiled_consumer in {"", "<no value>"} or compiled_consumer != expected_consumer:
+        raise ValueError(
+            "Kernel web image must declare the configured Portal consumer ID; "
+            "rebuild incompatible images"
+        )
+
+
+def _build_image_deployment_profile(
+    compose_project: str,
+    enabled_products: Sequence[str],
+    unmetered_products: Sequence[str],
+    env: dict[str, str],
+) -> tuple[int, dict[str, object] | None]:
+    _validate_image_inputs(env)
+    root = Path(env["ANYTOOLAI_PROFILE_ROOT"])
+    name = f"freelancer-suite.{uuid.uuid4().hex}"
+    command = [
+        "docker",
+        "run",
+        "--rm",
+        "--pull=never",
+        "--network=none",
+        "--user",
+        f"{os.getuid()}:{os.getgid()}",
+        "--env",
+        "UV_CACHE_DIR=/tmp/uv-cache",
+        "--mount",
+        f"type=bind,source={root},target=/deployment",
+        "--entrypoint",
+        "uv",
+        env["ANYTOOLAI_API_IMAGE"],
+        "run",
+        "--project",
+        "apps/platform-api",
+        "--no-sync",
+        "python",
+        "scripts/agent/validate_configs.py",
+        "build-deployment-profile",
+        "--output-dir",
+        f"/deployment/{name}",
+    ]
+    for product in enabled_products:
+        command.extend(["--enabled-product", product])
+    for product in unmetered_products:
+        command.extend(["--unmetered-product", product])
+    code = run_with_env(command, env)
+    if code:
+        return code, None
+    profile_dir = root / name
+    path = profile_dir / "manifest.json"
+    products = profile_dir / "products"
+    if (
+        profile_dir.is_symlink()
+        or profile_dir.resolve().parent != root.resolve()
+        or path.is_symlink()
+        or not path.is_file()
+        or products.is_symlink()
+        or not products.is_dir()
+    ):
+        raise ValueError("unsafe generated profile paths")
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    # Container paths identify image sources; only the generated mount path is host-owned.
+    manifest["generated_products_root"] = str(products)
+    _profile_check_args(manifest)
+    # Replace a newly created file instead of following an image-created link on write.
+    staged_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=profile_dir, prefix=".manifest-", delete=False
+        ) as staged:
+            staged_path = Path(staged.name)
+            staged.write(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+        if os.name == "posix":
+            staged_path.chmod(ACTIVATION_MARKER_FILE_MODE)
+        staged_path.replace(path)
+    finally:
+        if staged_path is not None:
+            staged_path.unlink(missing_ok=True)
+    return _check_source_fingerprint(manifest, env), manifest
+
+
+def prod_web_up() -> int:
+    """Replace only web; backend, migration, profile and volume identities stay intact."""
+    try:
+        with _prod_deployment_lock():
+            env = _resolved_env_file(PROD_ENV_FILE)
+            networks_enabled = _vps_135_networks_enabled(env)
+            _validate_image_inputs(env)
+            files = [COMPOSE_FILE, COMPOSE_PROD_FILE, COMPOSE_IMAGES_FILE]
+            if networks_enabled:
+                files.append(COMPOSE_VPS_135_FILE)
+            compose = _docker_compose_command(
+                PROD_COMPOSE_PROJECT,
+                files,
+                env_file=PROD_ENV_FILE if PROD_ENV_FILE.is_file() else None,
+            )
+            return run_with_env(
+                [
+                    *compose,
+                    "up",
+                    "-d",
+                    "--no-deps",
+                    "--no-build",
+                    "--pull",
+                    "never",
+                    "--wait",
+                    "web-mirror",
+                ],
+                env,
+            )
+    except (DeploymentLockError, ValueError, OSError, subprocess.SubprocessError) as exc:
+        print(f"PROD010: image web update failed: {exc}", file=sys.stderr)
+        return 1
+
+
+def _start_prod_candidate(env: dict[str, str]) -> int:
+    compose = _prod_live_compose_command(env=env)
+    if not env.get("ANYTOOLAI_API_IMAGE"):
+        return run_with_env(
+            [*compose, "up", "-d", "--build", "--force-recreate", "--remove-orphans"], env
+        )
+    for args in (
+        ("stop", "platform-api", "platform-worker", "web-mirror"),
+        ("up", "-d", "--no-build", "--pull", "never", "--wait", "postgres"),
+        ("run", "--rm", "--no-deps", "migrate"),
+        (
+            "up",
+            "-d",
+            "--no-deps",
+            "--no-build",
+            "--pull",
+            "never",
+            "platform-api",
+            "platform-worker",
+            "web-mirror",
+        ),
+    ):
+        code = run_with_env([*compose, *args], env)
+        if code:
+            return code
+    return 0
+
+
 def _prod_up_locked() -> int:
     try:
         inputs = _deployment_inputs()
+        _validate_public_privacy_policy_url(inputs.compose_env)
         api_port = _port_override("ANYTOOLAI_PROD_API_PORT", 8000, inputs.compose_env)
         web_port = _port_override("ANYTOOLAI_PROD_WEB_PORT", 3000, inputs.compose_env)
     except ValueError as exc:
@@ -2872,6 +2986,8 @@ def _prod_up_locked() -> int:
     # No timeout: `--build` can legitimately take minutes on a cold image build.
     # finally, not `except Exception`: Ctrl+C is BaseException and must stop the
     # candidate until active-profile is replaced. After that commit, leave the stack up.
+    if env.get("ANYTOOLAI_API_IMAGE") and stack_running and _prod_quiesce_locked() != 0:
+        return 1
     committed = False
 
     def note_committed() -> None:
@@ -2879,12 +2995,7 @@ def _prod_up_locked() -> int:
         committed = True
 
     try:
-        exit_code = run_with_env(
-            _prod_live_compose_command(
-                "up", "-d", "--build", "--force-recreate", "--remove-orphans", env=env
-            ),
-            env,
-        )
+        exit_code = _start_prod_candidate(env)
         if exit_code != 0:
             return exit_code
         exit_code = prod_ready(inputs=inputs, manifest=manifest, announce=False)
@@ -2901,6 +3012,32 @@ def _prod_up_locked() -> int:
             _stop_failed_prod_candidate()
     _announce_production_ready(api_port, web_port)
     return 0
+
+
+def _validate_public_privacy_policy_url(env: dict[str, str]) -> None:
+    name = "ANYTOOLAI_PRIVACY_POLICY_URL"
+    value = env.get(name, "")
+    if not value.strip():
+        raise ValueError(f"{name} is required for public production")
+    # Use the browser's URL grammar so deployment cannot accept a link the UI hides.
+    script = (
+        "try { const url = new URL(process.env.ANYTOOLAI_PRIVACY_POLICY_URL.trim());"
+        "process.exit(['http:', 'https:'].includes(url.protocol) ? 0 : 1);"
+        "} catch { process.exit(1); }"
+    )
+    try:
+        result = subprocess.run(
+            ["node", "--eval", script],
+            env=runner_env() | {name: value},
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            timeout=TOOL_PROBE_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise ValueError(f"{name} could not be validated with Node.js") from exc
+    if result.returncode != 0:
+        raise ValueError(f"{name} must be an absolute HTTP(S) URL for the approved privacy policy")
 
 
 def _stop_failed_prod_candidate() -> None:
@@ -3261,6 +3398,7 @@ COMMANDS = {
     "client-update-writer-smoke": client_update_writer_smoke,
     "brief-decoder-smoke": brief_decoder_smoke,
     "acceptance-builder-smoke": acceptance_builder_smoke,
+    "task-finder-smoke": task_finder_smoke,
     "atom-lab-up": atom_lab_up,
     "atom-lab-ready": atom_lab_ready,
     "atom-lab-status": atom_lab_status,
@@ -3270,6 +3408,7 @@ COMMANDS = {
     "atom-lab-down": atom_lab_down,
     "atom-lab-smoke": atom_lab_smoke,
     "prod-up": prod_up,
+    "prod-web-up": prod_web_up,
     "prod-fake-up": prod_fake_up,
     "prod-fake-down": prod_fake_down,
     "prod-ready": prod_ready,

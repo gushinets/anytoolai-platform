@@ -57,33 +57,13 @@ from anytoolai_platform_worker.queues import DatabaseJobQueue, WorkflowJobMessag
 from anytoolai_platform_worker.reconciliation import OrphanedRunningJobReconciler
 from anytoolai_platform_worker.worker import Worker
 
+from tests.action_inputs import extract_input
 from tests.db_support import provision_database
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "provider" / "fake_provider_outputs"
 pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
-
-_EXTRACT_FIELDS = [
-    {
-        "name": "deadline",
-        "type": "string",
-        "description": "Project deadline mentioned in the text.",
-        "required": True,
-    },
-    {
-        "name": "budget",
-        "type": "string",
-        "description": "Budget mentioned in the text.",
-        "required": False,
-    },
-    {
-        "name": "deliverables",
-        "type": "array_of_strings",
-        "description": "Deliverables mentioned in the text.",
-        "required": False,
-    },
-]
 
 
 @pytest.fixture
@@ -351,20 +331,7 @@ def _seed_running_job(
         input_payload={"source_text": "deadline budget deliverables"},
     )
     with transaction_boundary(session_factory) as session:
-        repository = JobRepository(session)
-        emitter = EventEmitter(EventLogRepository(session))
-        claimed = WorkflowJobService(repository, emitter).claim_created(job.id)
-        assert claimed is not None
-        scenario_repository = ScenarioSessionRepository(session)
-        scenario = scenario_repository.get(
-            job.scenario_session_id,
-            tenant_id=job.tenant_id,
-            region=job.region,
-            product_id=job.product_id,
-            frontend_id=job.frontend_id,
-        )
-        assert scenario is not None
-        ScenarioSessionService(scenario_repository, emitter).mark_running(scenario)
+        claimed, repository, emitter = _claim_running_scenario_job(session, job)
         return claimed
 
 
@@ -404,23 +371,7 @@ def test_worker_boot_processes_a_claimed_job_from_scenario_session_input(
     assert runners[0].observed_scenarios[0].current_checkpoint_id == PROCESSING_CHECKPOINT_ID
 
     with transaction_boundary(session_factory) as session:
-        scenario = ScenarioSessionRepository(session).get(
-            job.scenario_session_id,
-            tenant_id=job.tenant_id,
-            region=job.region,
-            product_id=job.product_id,
-            frontend_id=job.frontend_id,
-        )
-        scenario_completed = (
-            session.execute(
-                sa.select(event_log_table).where(
-                    event_log_table.c.scenario_session_id == job.scenario_session_id,
-                    event_log_table.c.event_type == "scenario.completed",
-                )
-            )
-            .mappings()
-            .one()
-        )
+        scenario, scenario_completed = _read_scenario_completion(session, job)
     assert scenario is not None
     assert scenario.status is ScenarioSessionStatus.completed
     assert scenario.current_checkpoint_id == RESULT_READY_CHECKPOINT_ID
@@ -494,20 +445,7 @@ def test_worker_failure_uses_persisted_job_error_code_for_scenario_failure(
     )
 
     with transaction_boundary(session_factory) as session:
-        repository = JobRepository(session)
-        emitter = EventEmitter(EventLogRepository(session))
-        claimed = WorkflowJobService(repository, emitter).claim_created(job.id)
-        assert claimed is not None
-        scenario_repository = ScenarioSessionRepository(session)
-        scenario = scenario_repository.get(
-            job.scenario_session_id,
-            tenant_id=job.tenant_id,
-            region=job.region,
-            product_id=job.product_id,
-            frontend_id=job.frontend_id,
-        )
-        assert scenario is not None
-        ScenarioSessionService(scenario_repository, emitter).mark_running(scenario)
+        claimed, repository, emitter = _claim_running_scenario_job(session, job)
         WorkflowJobService(repository, emitter).mark_failed(
             replace(
                 claimed,
@@ -698,15 +636,34 @@ def test_claim_and_workflow_started_roll_back_together_when_event_persistence_fa
     assert scenario.current_checkpoint_id is None
 
 
-def test_cancel_created_job_preserves_guest_scenario_identity(
+@pytest.mark.parametrize(
+    ("guest_id", "user_id", "chain_id", "source_text"),
+    [
+        pytest.param(
+            "guest_cancel", None, "scenario_chain_cancel_guest", "cancel guest", id="guest"
+        ),
+        pytest.param(
+            None,
+            "user_cancel",
+            "scenario_chain_cancel_user",
+            "cancel authenticated",
+            id="authenticated",
+        ),
+    ],
+)
+def test_cancel_created_job_preserves_scenario_identity(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    guest_id: str | None,
+    user_id: str | None,
+    chain_id: str,
+    source_text: str,
 ) -> None:
     job = _seed_job(
         session_factory,
-        input_payload={"source_text": "cancel guest"},
-        guest_id="guest_cancel",
-        user_id=None,
-        scenario_chain_id="scenario_chain_cancel_guest",
+        input_payload={"source_text": source_text},
+        guest_id=guest_id,
+        user_id=user_id,
+        scenario_chain_id=chain_id,
         job_metadata={"preexisting": "kept"},
     )
     runners: list[RecordingRunner] = []
@@ -743,60 +700,9 @@ def test_cancel_created_job_preserves_guest_scenario_identity(
     assert scenario is not None
     assert stored.status is JobStatus.canceled
     assert stored.metadata["preexisting"] == "kept"
-    assert stored.metadata["guest_id"] == "guest_cancel"
-    assert stored.metadata["scenario_chain_id"] == "scenario_chain_cancel_guest"
-    assert stored.metadata["user_id"] is None
-    assert len(events) == 1
-    _assert_cancel_event_dimensions(events[0], job=job, scenario=scenario)
-
-
-def test_cancel_created_job_preserves_authenticated_scenario_identity(
-    session_factory: sa.orm.sessionmaker[sa.orm.Session],
-) -> None:
-    job = _seed_job(
-        session_factory,
-        input_payload={"source_text": "cancel authenticated"},
-        guest_id=None,
-        user_id="user_cancel",
-        scenario_chain_id="scenario_chain_cancel_user",
-        job_metadata={"preexisting": "kept"},
-    )
-    runners: list[RecordingRunner] = []
-
-    def runner_factory(session: sa.orm.Session) -> RecordingRunner:
-        runner = RecordingRunner(session)
-        runners.append(runner)
-        return runner
-
-    worker = Worker(
-        RunWorkflowHandler(
-            session_factory=session_factory,
-            runner_factory=runner_factory,
-        )
-    )
-
-    canceled = worker.cancel_job(job.id)
-
-    assert canceled is not None
-    assert canceled.status is JobStatus.canceled
-    assert runners == []
-    with transaction_boundary(session_factory) as session:
-        stored = JobRepository(session).get(job.id)
-        scenario = ScenarioSessionRepository(session).get(
-            job.scenario_session_id,
-            tenant_id=job.tenant_id,
-            region=job.region,
-            product_id=job.product_id,
-            frontend_id=job.frontend_id,
-        )
-        events = _event_rows_for_job(session, job.id)
-
-    assert stored is not None
-    assert scenario is not None
-    assert stored.metadata["preexisting"] == "kept"
-    assert stored.metadata["user_id"] == "user_cancel"
-    assert stored.metadata["scenario_chain_id"] == "scenario_chain_cancel_user"
-    assert stored.metadata["guest_id"] is None
+    assert stored.metadata["guest_id"] == guest_id
+    assert stored.metadata["scenario_chain_id"] == chain_id
+    assert stored.metadata["user_id"] == user_id
     assert len(events) == 1
     _assert_cancel_event_dimensions(events[0], job=job, scenario=scenario)
 
@@ -811,29 +717,7 @@ def test_cancel_created_job_terminalizes_missing_scenario_session_as_failed(
             metadata={"preexisting": "kept"},
         ),
     )
-    worker = Worker(
-        RunWorkflowHandler(
-            session_factory=session_factory,
-            runner_factory=RecordingRunner,
-        )
-    )
-
-    result = worker.cancel_job(job.id)
-
-    assert result is not None
-    assert result.status is JobStatus.failed
-    assert result.error_code == "job_scenario_session_invalid"
-
-    with transaction_boundary(session_factory) as session:
-        stored = JobRepository(session).get(job.id)
-        events = _event_rows_for_job(session, job.id)
-
-    assert stored is not None
-    assert stored.status is JobStatus.failed
-    assert stored.completed_at is not None
-    assert stored.metadata == {"preexisting": "kept"}
-    assert [event["event_type"] for event in events] == ["workflow.failed"]
-    assert events[0]["error_code"] == "job_scenario_session_invalid"
+    _assert_invalid_scenario_cancellation(session_factory, job)
 
 
 def test_cancel_created_job_terminalizes_missing_scenario_session_linkage_as_failed(
@@ -846,29 +730,7 @@ def test_cancel_created_job_terminalizes_missing_scenario_session_linkage_as_fai
             metadata={"preexisting": "kept"},
         ),
     )
-    worker = Worker(
-        RunWorkflowHandler(
-            session_factory=session_factory,
-            runner_factory=RecordingRunner,
-        )
-    )
-
-    result = worker.cancel_job(job.id)
-
-    assert result is not None
-    assert result.status is JobStatus.failed
-    assert result.error_code == "job_scenario_session_invalid"
-
-    with transaction_boundary(session_factory) as session:
-        stored = JobRepository(session).get(job.id)
-        events = _event_rows_for_job(session, job.id)
-
-    assert stored is not None
-    assert stored.status is JobStatus.failed
-    assert stored.completed_at is not None
-    assert stored.metadata == {"preexisting": "kept"}
-    assert [event["event_type"] for event in events] == ["workflow.failed"]
-    assert events[0]["error_code"] == "job_scenario_session_invalid"
+    _assert_invalid_scenario_cancellation(session_factory, job)
 
 
 def test_cancel_created_job_terminalizes_mismatched_scenario_session_as_failed(
@@ -884,29 +746,7 @@ def test_cancel_created_job_terminalizes_mismatched_scenario_session_as_failed(
             metadata={"preexisting": "kept"},
         ),
     )
-    worker = Worker(
-        RunWorkflowHandler(
-            session_factory=session_factory,
-            runner_factory=RecordingRunner,
-        )
-    )
-
-    result = worker.cancel_job(job.id)
-
-    assert result is not None
-    assert result.status is JobStatus.failed
-    assert result.error_code == "job_scenario_session_invalid"
-
-    with transaction_boundary(session_factory) as session:
-        stored = JobRepository(session).get(job.id)
-        events = _event_rows_for_job(session, job.id)
-
-    assert stored is not None
-    assert stored.status is JobStatus.failed
-    assert stored.completed_at is not None
-    assert stored.metadata == {"preexisting": "kept"}
-    assert [event["event_type"] for event in events] == ["workflow.failed"]
-    assert events[0]["error_code"] == "job_scenario_session_invalid"
+    _assert_invalid_scenario_cancellation(session_factory, job)
 
 
 @pytest.mark.parametrize(
@@ -1310,11 +1150,7 @@ def test_production_composed_worker_processes_real_runtime_path_end_to_end(
 ) -> None:
     job = _seed_job(
         session_factory,
-        input_payload={
-            "source_text": "deadline budget deliverables",
-            "fields": _EXTRACT_FIELDS,
-            "strict": False,
-        },
+        input_payload=extract_input(strict=False),
     )
     worker = build_worker(
         session_factory=session_factory,
@@ -1332,42 +1168,15 @@ def test_production_composed_worker_processes_real_runtime_path_end_to_end(
     assert result.result_artifact_id is not None
 
     with transaction_boundary(session_factory) as session:
-        stored_job = (
-            session.execute(sa.select(jobs_table).where(jobs_table.c.id == job.id)).mappings().one()
-        )
-        scenario = ScenarioSessionRepository(session).get(
-            job.scenario_session_id,
-            tenant_id=job.tenant_id,
-            region=job.region,
-            product_id=job.product_id,
-            frontend_id=job.frontend_id,
-        )
-        action_run = (
-            session.execute(
-                sa.select(action_runs_table).where(action_runs_table.c.job_id == job.id)
-            )
-            .mappings()
-            .one()
-        )
-        provider_call = (
-            session.execute(
-                sa.select(provider_calls_table).where(provider_calls_table.c.job_id == job.id)
-            )
-            .mappings()
-            .one()
+        stored_job, scenario, action_run, provider_call = _read_single_action_execution(
+            session, job
         )
         artifacts = list(
             session.execute(
                 sa.select(artifacts_table).where(artifacts_table.c.job_id == job.id)
             ).mappings()
         )
-        events = list(
-            session.execute(
-                sa.select(event_log_table)
-                .where(event_log_table.c.job_id == job.id)
-                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
-            ).mappings()
-        )
+        events = _event_rows_for_job(session, job.id)
 
     event_types = [event_row["event_type"] for event_row in events]
 
@@ -1409,11 +1218,7 @@ def test_production_worker_recovers_scenario_completion_after_mark_completed_fai
 ) -> None:
     job = _seed_job(
         session_factory,
-        input_payload={
-            "source_text": "deadline budget deliverables",
-            "fields": _EXTRACT_FIELDS,
-            "strict": False,
-        },
+        input_payload=extract_input(strict=False),
     )
     worker = build_worker(
         session_factory=session_factory,
@@ -1450,23 +1255,7 @@ def test_production_worker_recovers_scenario_completion_after_mark_completed_fai
     assert call_count["count"] == 2
 
     with transaction_boundary(session_factory) as session:
-        scenario = ScenarioSessionRepository(session).get(
-            job.scenario_session_id,
-            tenant_id=job.tenant_id,
-            region=job.region,
-            product_id=job.product_id,
-            frontend_id=job.frontend_id,
-        )
-        scenario_completed = (
-            session.execute(
-                sa.select(event_log_table).where(
-                    event_log_table.c.scenario_session_id == job.scenario_session_id,
-                    event_log_table.c.event_type == "scenario.completed",
-                )
-            )
-            .mappings()
-            .one()
-        )
+        scenario, scenario_completed = _read_scenario_completion(session, job)
 
     assert scenario is not None
     assert scenario.status is ScenarioSessionStatus.completed
@@ -1569,11 +1358,7 @@ def test_production_worker_retries_scenario_reconciliation_on_subsequent_handle_
 ) -> None:
     job = _seed_job(
         session_factory,
-        input_payload={
-            "source_text": "deadline budget deliverables",
-            "fields": _EXTRACT_FIELDS,
-            "strict": False,
-        },
+        input_payload=extract_input(strict=False),
     )
     worker = build_worker(
         session_factory=session_factory,
@@ -1642,11 +1427,7 @@ def test_production_worker_cancellation_recovers_inflight_action_and_provider_le
 ) -> None:
     job = _seed_job(
         session_factory,
-        input_payload={
-            "source_text": "deadline budget deliverables",
-            "fields": _EXTRACT_FIELDS,
-            "strict": False,
-        },
+        input_payload=extract_input(strict=False),
     )
     worker = build_worker(
         session_factory=session_factory,
@@ -1659,37 +1440,10 @@ def test_production_worker_cancellation_recovers_inflight_action_and_provider_le
     worker.dispose()
 
     with transaction_boundary(session_factory) as session:
-        stored_job = (
-            session.execute(sa.select(jobs_table).where(jobs_table.c.id == job.id)).mappings().one()
+        stored_job, scenario, action_run, provider_call = _read_single_action_execution(
+            session, job
         )
-        scenario = ScenarioSessionRepository(session).get(
-            job.scenario_session_id,
-            tenant_id=job.tenant_id,
-            region=job.region,
-            product_id=job.product_id,
-            frontend_id=job.frontend_id,
-        )
-        action_run = (
-            session.execute(
-                sa.select(action_runs_table).where(action_runs_table.c.job_id == job.id)
-            )
-            .mappings()
-            .one()
-        )
-        provider_call = (
-            session.execute(
-                sa.select(provider_calls_table).where(provider_calls_table.c.job_id == job.id)
-            )
-            .mappings()
-            .one()
-        )
-        events = list(
-            session.execute(
-                sa.select(event_log_table)
-                .where(event_log_table.c.job_id == job.id)
-                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
-            ).mappings()
-        )
+        events = _event_rows_for_job(session, job.id)
 
     assert stored_job["status"] is JobStatus.canceled
     assert stored_job["completed_at"] is not None
@@ -1749,11 +1503,7 @@ def test_production_worker_provider_failure_uses_generic_safe_message(
 ) -> None:
     job = _seed_job(
         session_factory,
-        input_payload={
-            "source_text": "deadline budget deliverables",
-            "fields": _EXTRACT_FIELDS,
-            "strict": False,
-        },
+        input_payload=extract_input(strict=False),
     )
     worker = build_worker(
         session_factory=session_factory,
@@ -1803,12 +1553,7 @@ def test_production_worker_provider_failure_preserves_claimed_job_recovery_state
     adapter = FailOnSecondCallProviderAdapter()
     job = _seed_job(
         session_factory,
-        input_payload={
-            "source_text": "deadline budget deliverables",
-            "fields": _EXTRACT_FIELDS,
-            "strict": False,
-            "taxonomy": ["timeline", "scope"],
-        },
+        input_payload=extract_input(strict=False, taxonomy=["timeline", "scope"]),
         workflow_id="kernel_demo.extract_detect_report_v1",
     )
     worker = build_worker(
@@ -1857,13 +1602,7 @@ def test_production_worker_provider_failure_preserves_claimed_job_recovery_state
                 .order_by(artifacts_table.c.created_at, artifacts_table.c.id)
             ).mappings()
         )
-        events = list(
-            session.execute(
-                sa.select(event_log_table)
-                .where(event_log_table.c.job_id == job.id)
-                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
-            ).mappings()
-        )
+        events = _event_rows_for_job(session, job.id)
 
     assert adapter.call_count == 2
     assert scenario is not None
@@ -2399,3 +2138,98 @@ def test_legacy_terminal_recovery_preserves_independently_expired_scenario(
         )
     assert terminal.status is (JobStatus.canceled if cancel else JobStatus.failed)
     assert scenario.status is ScenarioSessionStatus.expired
+
+
+def _assert_invalid_scenario_cancellation(session_factory: Any, job: JobRecord) -> None:
+    worker = Worker(
+        RunWorkflowHandler(
+            session_factory=session_factory,
+            runner_factory=RecordingRunner,
+        )
+    )
+
+    result = worker.cancel_job(job.id)
+
+    assert result is not None
+    assert result.status is JobStatus.failed
+    assert result.error_code == "job_scenario_session_invalid"
+
+    with transaction_boundary(session_factory) as session:
+        stored = JobRepository(session).get(job.id)
+        events = _event_rows_for_job(session, job.id)
+
+    assert stored is not None
+    assert stored.status is JobStatus.failed
+    assert stored.completed_at is not None
+    assert stored.metadata == {"preexisting": "kept"}
+    assert [event["event_type"] for event in events] == ["workflow.failed"]
+    assert events[0]["error_code"] == "job_scenario_session_invalid"
+
+
+def _claim_running_scenario_job(
+    session: sa.orm.Session, job: JobRecord
+) -> tuple[JobRecord, JobRepository, EventEmitter]:
+    repository = JobRepository(session)
+    emitter = EventEmitter(EventLogRepository(session))
+    claimed = WorkflowJobService(repository, emitter).claim_created(job.id)
+    assert claimed is not None
+    scenario_repository = ScenarioSessionRepository(session)
+    scenario = scenario_repository.get(
+        job.scenario_session_id,
+        tenant_id=job.tenant_id,
+        region=job.region,
+        product_id=job.product_id,
+        frontend_id=job.frontend_id,
+    )
+    assert scenario is not None
+    ScenarioSessionService(scenario_repository, emitter).mark_running(scenario)
+    return claimed, repository, emitter
+
+
+def _read_single_action_execution(
+    session: sa.orm.Session, job: JobRecord
+) -> tuple[Any, Any, Any, Any]:
+    stored_job = (
+        session.execute(sa.select(jobs_table).where(jobs_table.c.id == job.id)).mappings().one()
+    )
+    scenario = ScenarioSessionRepository(session).get(
+        job.scenario_session_id,
+        tenant_id=job.tenant_id,
+        region=job.region,
+        product_id=job.product_id,
+        frontend_id=job.frontend_id,
+    )
+    action_run = (
+        session.execute(sa.select(action_runs_table).where(action_runs_table.c.job_id == job.id))
+        .mappings()
+        .one()
+    )
+    provider_call = (
+        session.execute(
+            sa.select(provider_calls_table).where(provider_calls_table.c.job_id == job.id)
+        )
+        .mappings()
+        .one()
+    )
+    return stored_job, scenario, action_run, provider_call
+
+
+def _read_scenario_completion(session: sa.orm.Session, job: JobRecord) -> tuple[Any, Any]:
+    scenario = ScenarioSessionRepository(session).get(
+        job.scenario_session_id,
+        tenant_id=job.tenant_id,
+        region=job.region,
+        product_id=job.product_id,
+        frontend_id=job.frontend_id,
+    )
+    scenario_completed = (
+        session.execute(
+            sa.select(event_log_table).where(
+                event_log_table.c.scenario_session_id == job.scenario_session_id,
+                event_log_table.c.event_type == "scenario.completed",
+            )
+        )
+        .mappings()
+        .one()
+    )
+    return scenario, scenario_completed

@@ -298,3 +298,7 @@ Rules:
 
 Never store secrets, raw credentials, bearer tokens, cookies, or large raw provider payloads in
 event properties.
+
+Task Finder (ANY-247) activates on the first rendered fit score. Every valid result contains the
+score, so it uses the default `emitsResultViewed` behavior without a product hook. Copying records
+`copy_result` independently and does not emit another `web.result_viewed` for the same result.

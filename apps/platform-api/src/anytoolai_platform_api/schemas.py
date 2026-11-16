@@ -486,6 +486,7 @@ class ScenarioSessionResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     scenario_session_id: str
+    scenario_id: str
     job_id: str | None
     status: ScenarioSessionStatus
     current_checkpoint_id: str | None = None

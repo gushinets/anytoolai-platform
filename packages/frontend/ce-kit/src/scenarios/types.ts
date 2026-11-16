@@ -24,5 +24,7 @@ export type ScenarioSessionSnapshot = {
  * frontend must echo back on `nextAction()`.
  */
 export type ScenarioSession = ScenarioSessionSnapshot & {
+  /** Absent only on older API deployments; mode restoration requires a server identity. */
+  scenarioId?: string;
   currentCheckpointId: string | null;
 };

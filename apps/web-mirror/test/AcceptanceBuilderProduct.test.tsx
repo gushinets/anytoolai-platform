@@ -23,6 +23,7 @@ import {
   guestIdentityResponse,
   makeClientCapturingRequests,
   makeClientWithDeferredRoute,
+  makeClientWithDeferredCalls,
   quotaResponse,
   resultResponse,
   routesFor,
@@ -37,6 +38,7 @@ import { LOCALE_STORAGE_KEY } from "../src/i18n/localeStorage";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
 import { readAttachSessionId, useAttachSession } from "../src/products/runtime/attachSession";
 import { makeRender } from "./support/renderWithI18n";
+import { simulateBrowserTranslation } from "@anytoolai/shared-ui/test/support/simulateBrowserTranslation";
 import type { ProductRunEvent } from "../src/products/runtime/productDefinition";
 
 const render = makeRender(ACCEPTANCE_BUILDER_MESSAGES);
@@ -180,7 +182,7 @@ function routes(mode: "draft" | "check", output: Record<string, unknown>): Route
     [r.GUEST_IDENTITY]: [guestIdentityResponse()],
     [r.QUOTA]: [quotaResponse(IDS[mode])],
     [r.START]: [startResponse()],
-    [r.SESSION]: [sessionResponse()],
+    [r.SESSION]: Array.from({ length: 2 }, () => sessionResponse({ scenario_id: IDS[mode].scenarioId })),
     [r.RESULT]: [resultResponse(IDS[mode], { output })],
     [r.NEXT_ACTION]: [sessionResponse({ status: "completed" })],
   };
@@ -208,6 +210,42 @@ function bothModesRoutes(output: Record<string, unknown>): RouteQueues {
     [r.QUOTA]: [quotaResponse(IDS.draft), quotaResponse(IDS.draft), quotaResponse(IDS.draft)],
   };
 }
+
+it.each([false, true])("regenerates Russian criteria with translation=%s (ANY-840)", async (translated) => {
+  window.localStorage.setItem(LOCALE_STORAGE_KEY, "ru");
+  const errorSpy = vi.spyOn(console, "error");
+  try {
+    const r = routesFor(IDS.draft);
+    const routed = makeClientWithDeferredCalls({
+      ...routes("draft", draftOutput()),
+      [r.QUOTA]: Array.from({ length: 5 }, () => quotaResponse(IDS.draft)),
+      [r.START]: [startResponse(), startResponse()],
+    }, { [r.RESULT]: 2 });
+    render(<AcceptanceBuilderProduct client={routed.client} />);
+    fireEvent.change(await screen.findByLabelText("Бриф клиента"), { target: { value: "Create course certificates." } });
+
+    for (const [index, submit, suffix, resultText] of [
+      [0, "Составить критерии", "", "Certificate template in brand colors"],
+      [1, "Составить заново", ".weak_input", "A certificate"],
+    ] as const) {
+      const button = screen.getByRole("button", { name: submit }) as HTMLButtonElement;
+      if (translated) simulateBrowserTranslation(button);
+      fireEvent.click(button);
+      await waitFor(() => expect(routed.calls.filter((call) => call.key === r.RESULT)).toHaveLength(index + 1));
+      expect(button.disabled).toBe(true);
+      expect(button.getAttribute("aria-busy")).toBe("true");
+      routed.resolveCall(r.RESULT, index, resultResponse(IDS.draft, { output: draftOutput(suffix) }));
+      await screen.findByText(resultText, { exact: false, selector: "p" });
+      expect(screen.getByRole("button", { name: "Составить заново" })).toBe(button);
+      expect(screen.getByRole("heading", { name: "Критерии приёмки", level: 2 })).toBeTruthy();
+      expect(button.disabled).toBe(false);
+      expect(button.hasAttribute("aria-busy")).toBe(false);
+    }
+    expect(errorSpy).not.toHaveBeenCalled();
+  } finally {
+    errorSpy.mockRestore();
+  }
+});
 
 function resultText(): string {
   const paragraphs = document.querySelectorAll("main p, div p");
@@ -317,7 +355,7 @@ describe("Acceptance Builder page", () => {
     expect(screen.queryByRole("button", { name: "New task" })).toBeNull();
     // Leaving the attached result is reported once, so the route stops restoring it on reload.
     expect(ended).toHaveBeenCalledTimes(1);
-    expect(made.calls.filter((c) => c.key === "GET /v1/scenario-sessions/session_1")).toHaveLength(1);
+    expect(made.calls.filter((c) => c.key === "GET /v1/scenario-sessions/session_1")).toHaveLength(2);
     expect(events.filter((e) => e.type === "scenario_completed")).toHaveLength(1);
   });
 
@@ -325,7 +363,7 @@ describe("Acceptance Builder page", () => {
     const r = routesFor(IDS.draft);
     const made = makeClientCapturingRequests({
       ...routes("draft", draftOutput()),
-      [r.SESSION]: [errorResponse(500, "internal_error"), sessionResponse()],
+      [r.SESSION]: [errorResponse(500, "internal_error"), sessionResponse({ scenario_id: IDS.draft.scenarioId }), sessionResponse({ scenario_id: IDS.draft.scenarioId })],
     });
     render(<AcceptanceBuilderProduct client={made.client} attachSessionId="session_1" />);
     await waitFor(() => expect(screen.getByRole("button", { name: /try again/i })).toBeTruthy());
@@ -334,7 +372,7 @@ describe("Acceptance Builder page", () => {
     fireEvent.click(screen.getByRole("button", { name: /try again/i }));
     await waitFor(() => expect(screen.getByRole("button", { name: "New task" })).toBeTruthy());
     expect((screen.getByRole("radio", { name: "Check deliverable" }) as HTMLInputElement).disabled).toBe(false);
-    expect(made.calls.filter((c) => c.key === "GET /v1/scenario-sessions/session_1")).toHaveLength(2);
+    expect(made.calls.filter((c) => c.key === "GET /v1/scenario-sessions/session_1")).toHaveLength(3);
     expect(made.calls.some((c) => c.key.endsWith("/start"))).toBe(false);
   });
 
@@ -377,7 +415,7 @@ describe("Acceptance Builder page", () => {
     render(<Harness client={client} />);
     const checkMode = screen.getByRole("radio", { name: "Check deliverable" }) as HTMLInputElement;
     expect(checkMode.disabled).toBe(true); // booting
-    expect(readAttachSessionId("acceptance_builder")).toBe("session_1");
+    await waitFor(() => expect(readAttachSessionId("acceptance_builder")).toBe("session_1"));
 
     resolveDeferred(errorResponse(500, "internal_error"));
     await waitFor(() => expect(screen.getByText(/unavailable right now/i)).toBeTruthy());
@@ -394,7 +432,7 @@ describe("Acceptance Builder page", () => {
     const made = makeClientCapturingRequests({
       ...bothModesRoutes(output),
       [r.START]: [startResponse()],
-      [r.SESSION]: [sessionResponse(), sessionResponse()],
+      [r.SESSION]: Array.from({ length: 3 }, () => sessionResponse({ scenario_id: IDS.draft.scenarioId })),
       [r.RESULT]: [resultResponse(IDS.draft, { output }), resultResponse(IDS.draft, { output })],
     });
     render(<Harness client={made.client} />);
@@ -426,14 +464,12 @@ describe("Acceptance Builder page", () => {
     await waitFor(() => expect(screen.getByText(/went wrong drafting/i)).toBeTruthy());
   });
 
-  it("forwards an attached session to the draft mode only", async () => {
-    const made = makeClientCapturingRequests({
-      ...routes("draft", draftOutput()),
-    });
+  it.each(["draft", "check"] as const)("restores an attached %s session in its own mode", async (mode) => {
+    const made = makeClientCapturingRequests(routes(mode, mode === "draft" ? draftOutput() : checkOutput()));
     render(<AcceptanceBuilderProduct client={made.client} attachSessionId="session_1" />);
-    await waitFor(() => expect(screen.getByRole("button", { name: "New task" })).toBeTruthy());
+    await screen.findByRole("button", { name: "New task" });
+    expect((screen.getByRole("radio", { name: mode === "draft" ? "Draft criteria" : "Check deliverable" }) as HTMLInputElement).checked).toBe(true);
     expect(made.calls.some((c) => c.key.endsWith("/start"))).toBe(false);
-    expect(made.calls.filter((c) => c.key === "GET /v1/scenario-sessions/session_1")).toHaveLength(1);
   });
 
   it("switches mode, and disables the switch while a run is active", async () => {

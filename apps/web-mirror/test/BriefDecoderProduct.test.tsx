@@ -2,6 +2,8 @@
 // contract's copy composition, and the activation rule (`web.result_viewed` only for a non-empty
 // question list). Shared runtime behavior is proven once in ProductRunPage.test.tsx. Results are
 // composed from the on-disk fake-provider fixtures exactly as the backend bundle test composes them.
+import type { PlatformApiClient } from "@anytoolai/ce-kit";
+import { useAttachSession, readAttachSessionId } from "../src/products/runtime/attachSession";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -32,6 +34,10 @@ import {
   startResponse,
 } from "./fixtures/platformResponses";
 import { makeRender } from "./support/renderWithI18n";
+import { expectDataProcessingNotice } from "./support/expectDataProcessingNotice";
+import { simulateBrowserTranslation } from "@anytoolai/shared-ui/test/support/simulateBrowserTranslation";
+import { LOCALES } from "../src/i18n";
+import { LOCALE_STORAGE_KEY } from "../src/i18n/localeStorage";
 
 const render = makeRender(BRIEF_DECODER_MESSAGES);
 const IDS = { productId: "brief_decoder", scenarioId: "brief_decoder.decode_v1" } as const;
@@ -78,8 +84,10 @@ function composedOutput(suffix: "" | ".weak_input" | ".no_issues"): Record<strin
 }
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   cleanup();
   window.localStorage.clear();
+  window.sessionStorage.clear();
 });
 
 beforeEach(() => {
@@ -113,6 +121,85 @@ async function decode(queues: ReturnType<typeof routes>, events: ProductRunEvent
 const completedEvents = (events: ProductRunEvent[]) => events.filter((e) => e.type === "scenario_completed");
 
 describe("Brief Decoder definition", () => {
+  it.each(LOCALES)("example brief passes the validator in %s", (locale) => {
+    expect(briefDecoderDefinition.validate(BRIEF_DECODER_MESSAGES[locale].decode.example.inputs)).toEqual({});
+  });
+
+  it("shows an example while keeping the typed brief", async () => {
+    const { client } = makeClient(routes(composedOutput("")));
+    render(<BriefDecoderProduct client={client} />);
+    const field = await screen.findByLabelText<HTMLTextAreaElement>("Client brief");
+    fireEvent.change(field, { target: { value: "My own bakery brief." } });
+    const details = screen.getByTestId<HTMLDetailsElement>("first-run-example");
+    details.open = true;
+    fireEvent(details, new Event("toggle"));
+    expect(field.value).toBe("My own bakery brief.");
+    expect(screen.getByText(BRIEF_DECODER_MESSAGES.en.decode.example.inputs.briefText)).toBeTruthy();
+  });
+
+  it("shows the shared processing notice and policy inside the form", async () => {
+    vi.stubEnv("NEXT_PUBLIC_ANYTOOLAI_PRIVACY_POLICY_URL", "https://example.com/privacy");
+    const { client } = makeClient(routes(composedOutput("")));
+    render(<BriefDecoderProduct client={client} />);
+    const form = await screen.findByRole("form");
+    expectDataProcessingNotice(form, "https://example.com/privacy");
+  });
+
+  it("does not promise draft recovery when unsent input is lost on remount", async () => {
+    const { client } = makeClient(routes(composedOutput("")));
+    const first = render(<BriefDecoderProduct client={client} />);
+    const field = await screen.findByLabelText("Client brief");
+    fireEvent.change(field, { target: { value: "An unsent client brief." } });
+    expect(screen.getByText(/may be lost if you reload or leave the page/)).toBeTruthy();
+    expect(screen.queryByText(/until you close it/)).toBeNull();
+    first.unmount();
+
+    const reloaded = makeClient(routes(composedOutput("")));
+    render(<BriefDecoderProduct client={reloaded.client} />);
+    expect((await screen.findByLabelText("Client brief") as HTMLTextAreaElement).value).toBe("");
+    expect(screen.getByText(/may be lost if you reload or leave the page/)).toBeTruthy();
+  });
+
+  it.each([
+    { locale: "en", translated: true },
+    { locale: "ru", translated: false },
+    { locale: "ru", translated: true },
+  ] as const)("keeps decoding in $locale with translation=$translated (ANY-840)", async ({ locale, translated }) => {
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+    const labels = locale === "ru"
+      ? { brief: "Бриф клиента", submit: "Разобрать бриф", regenerate: "Разобрать бриф заново", result: "Разбор брифа", noIssues: "Проблем не найдено." }
+      : { brief: "Client brief", submit: "Decode brief", regenerate: "Decode brief again", result: "Decoded brief", noIssues: "No issues found." };
+    const errorSpy = vi.spyOn(console, "error");
+    try {
+      const { client, calls } = makeClient({
+        ...routes(composedOutput("")),
+        [ROUTES.QUOTA]: Array.from({ length: 5 }, () => quotaResponse(IDS)),
+        [ROUTES.START]: [startResponse(), startResponse()],
+        [ROUTES.SESSION]: [sessionResponse(), sessionResponse()],
+        [ROUTES.RESULT]: [
+          resultResponse(IDS, { output: composedOutput("") }),
+          resultResponse(IDS, { output: composedOutput(".no_issues") }),
+        ],
+      });
+      render(<BriefDecoderProduct client={client} />);
+      fireEvent.change(await screen.findByLabelText(labels.brief), { target: { value: "Need a website by the holidays." } });
+      const button = screen.getByRole("button", { name: labels.submit });
+      if (translated) simulateBrowserTranslation(button);
+      fireEvent.click(button);
+      await screen.findByRole("button", { name: labels.regenerate });
+      expect(screen.getByRole("heading", { name: labels.result, level: 2 })).toBeTruthy();
+
+      if (translated) simulateBrowserTranslation(button);
+      fireEvent.click(button);
+      await screen.findByText(labels.noIssues);
+      expect(screen.getByRole("button", { name: labels.regenerate })).toBe(button);
+      expect(calls.filter((call) => call.key === ROUTES.START)).toHaveLength(2);
+      expect(errorSpy).not.toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
   it("declares the backend's Brief Decoder -> Acceptance Builder handoff and its button label", () => {
     const handoffs = readFileSync(
       resolve(SCHEMA_ROOT, "../handoffs.yaml"),
@@ -228,7 +315,7 @@ describe("Brief Decoder page", () => {
     await waitFor(() => expect(screen.getByRole("heading", { name: /clarifying questions/ })).toBeTruthy());
     // The workspace cards own the h2s; the four contract parts sit under the result card as h3s.
     expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual(["Your details", "Decoded brief"]);
-    expect(screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual([
+    expect(within(screen.getByRole("region", { name: "Decoded brief" })).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual([
       "Brief",
       "Issues",
       `${expected.questions.length} clarifying questions`,
@@ -381,4 +468,39 @@ describe("Brief Decoder page", () => {
     await decode({ ...routes(composedOutput("")), [ROUTES.START]: [errorResponse(429, "quota_exhausted")] });
     expect(await screen.findByText(/used all your/)).toBeTruthy();
   });
+});
+
+function AttachedBriefDecoderProduct({ client, sessionId }: { client: PlatformApiClient; sessionId?: string }) {
+  const attach = useAttachSession("brief_decoder", sessionId);
+  return <BriefDecoderProduct client={client} {...attach} />;
+}
+
+it.each([false, true])("restores an accepted session and reloads without another start (poll recovery=%s)", async (recover) => {
+  const queues = {
+    ...routes(composedOutput(".no_issues")),
+    [ROUTES.RESULT]: Array.from({ length: 2 }, () => resultResponse(IDS, { output: composedOutput(".no_issues") })),
+  };
+  const { client, calls } = makeClient({
+    ...queues,
+    [ROUTES.RUNTIME_CONFIG]: Array.from({ length: 2 }, () => runtimeConfigResponse(IDS)),
+    [ROUTES.QUOTA]: Array.from({ length: 4 }, () => quotaResponse(IDS, { used_count: 1, remaining_count: 2 })),
+    [ROUTES.SESSION]: [
+      ...(recover ? [errorResponse(503, "internal_error")] : []),
+      sessionResponse({ scenario_id: IDS.scenarioId }), sessionResponse({ scenario_id: IDS.scenarioId }), sessionResponse({ scenario_id: IDS.scenarioId }),
+    ],
+  });
+  const first = render(<AttachedBriefDecoderProduct client={client} sessionId="session_1" />);
+  if (recover) {
+    fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
+  }
+  await screen.findByRole("button", { name: "New task" });
+  expect(readAttachSessionId("brief_decoder")).toBe("session_1");
+  first.unmount();
+  render(<AttachedBriefDecoderProduct client={client} />);
+  await screen.findByRole("button", { name: "New task" });
+  expect(calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(recover ? 4 : 3);
+  expect(calls.some((call) => call.key.endsWith("/start"))).toBe(false);
+  expect(screen.getByText(/2 of 3/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "New task" }));
+  expect(readAttachSessionId("brief_decoder")).toBeUndefined();
 });

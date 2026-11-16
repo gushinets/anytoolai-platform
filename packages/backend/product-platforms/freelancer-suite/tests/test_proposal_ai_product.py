@@ -314,6 +314,48 @@ def test_prompt_v2_pins_the_quality_rules_from_the_qa_report() -> None:
 
 
 
+def test_prompt_requires_a_greeting_and_an_unambiguous_client_name() -> None:
+    """ANY-845 / БАГ-003PR: every tone greets only an unambiguously named client."""
+    prompt = " ".join(_load_prompt("prompts/compose_persuasive_text.v1.md").split())
+
+    for fragment in (
+        "Start with a greeting line of its own",
+        "The greeting is required in every tone",
+        "ends with punctuation",
+        "then an empty line",
+        "Greeting and the client's name:",
+        "Never use a name from `context.freelancer_positioning`",
+        "or a name the freelancer gives as their own",
+        "Never use the name of a third party",
+        "a company, brand or product",
+        "greet without a name",
+        "Preserve the client's identity and the name components the input gives",
+        "normalize an explicitly inflected name only when its nominative is unambiguous",
+        '"Заказ от Анны Ивановой" becomes "Здравствуйте, Анна Иванова!"',
+        "If the nominative is ambiguous, greet without a name",
+        "Otherwise keep the supplied spelling",
+        "Never use a time-of-day greeting",
+        "Having no name does not change the tone",
+        "Copy the selected formula exactly",
+        "| RU | warm | Здравствуйте, Анна! | Здравствуйте! |",
+        "| RU | neutral | Здравствуйте, Анна. | Здравствуйте. |",
+        "| RU | firm | Анна, здравствуйте. | Здравствуйте. |",
+        "| EN | warm | Hi Anna, | Hi, |",
+        "| EN | neutral | Hello Anna, | Hello, |",
+        "| EN | firm | Hello Anna, | Hello, |",
+        "| ES | warm | Hola, Ana: | Hola: |",
+        "| ES | neutral | Hola, Ana: | Hola: |",
+        "| ES | firm | Hola, Ana: | Hola: |",
+        "These formulas are fixed per tone",
+        "the greeting is not courtesy filler and stays",
+        'except the greeting line required in "Structure"',
+        "Vary your opening (not the greeting)",
+    ):
+        assert fragment in prompt, fragment
+    assert "no greeting by name" not in prompt
+    assert "Write the name exactly as the input gives it" not in prompt
+
+
 def test_terms_have_one_prioritized_rule() -> None:
     """ANY-631 code reviews #1 and #2: the status of a client term was defined in five places that
     contradicted each other after every fix. One "Terms" section now decides it, first rule wins."""
@@ -350,10 +392,27 @@ def test_terms_have_one_prioritized_rule() -> None:
         assert scattered not in prompt, scattered
 
 def test_gap_prompt_is_scoped_to_experience_gaps() -> None:
-    prompt = _load_prompt("prompts/detect_experience_gaps.v1.md")
+    """Ordinary parts and adjacent experience are covered; gaps preserve requirement details."""
+    prompt = " ".join(_load_prompt("prompts/detect_experience_gaps.v1.md").split())
     assert "`experience_gap`" in prompt
-    assert "Do not report routine steps" in " ".join(prompt.split())
     assert "empty `issues` array" in prompt
+    for fragment in (
+        "a stated minimum of experience (years, number of projects)",
+        "Adjacent experience covers a requirement",
+        "in another niche covers an incidental target niche, not an explicit prerequisite",
+        "An explicitly mandatory tool, platform, protocol, programming language, domain, certification, skill or minimum of experience",
+        "adjacent experience cannot replace it",
+        "prior healthcare-industry experience is explicitly required",
+        "retail experience alone does not cover that prerequisite",
+        "Never report a routine part of the work",
+        "a reviews or testimonials block, a schedule block",
+        "report the Trustpilot API, not the reviews block",
+        "every number, unit and named tool or platform from it unchanged",
+        "never training, courses or another period",
+    ):
+        assert fragment in prompt, fragment
+    for removed in ("or kind of work the client asks for", "Do not report routine steps"):
+        assert removed not in prompt, removed
 
 
 @pytest.mark.parametrize(

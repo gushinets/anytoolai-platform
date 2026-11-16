@@ -310,6 +310,10 @@ PydanticAI остаётся в structured executor. Продуктовые па�
 не использовать секрет публичной демки как неявное разрешение к лаборатории. При отсутствии
 настройки доступ закрыт. Для доступа через сеть требуется HTTPS.
 
+The standard remote deployment also requires a network or VPN allowlist. For the
+operator-approved VPS 135 exception and its shared-code access rules, see the
+[current scope](../../product-specs/mvp-scope-source-of-truth.md#internal-atom-lab-exception).
+
 Нет регистрации, ролей и SSO в первой версии. Secrets не хранятся в пресетах/истории и не
 передаются браузеру. Модельный текст отображается безопасно, без выполнения HTML/скриптов.
 

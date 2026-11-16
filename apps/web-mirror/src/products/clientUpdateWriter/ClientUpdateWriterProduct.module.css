@@ -97,3 +97,10 @@
     grid-template-columns: 1fr;
   }
 }
+
+.help {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}

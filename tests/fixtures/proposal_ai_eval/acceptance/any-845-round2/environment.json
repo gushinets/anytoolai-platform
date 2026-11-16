@@ -1,0 +1,26 @@
+{
+  "source_fingerprint": "6d159b035a0db437b7f51ea7b14e5f44049b178180578b762233df322cc64561",
+  "profile_fingerprint": "c734513b0fd6ef7945ba4e7a96426c779f52957cfb3ad36f66a55e42f8f8da10",
+  "enabled_products": {
+    "proposal_ai": {
+      "provider_policy_ref": "default_text_generation_v1",
+      "quota_policy_ref": null
+    }
+  },
+  "git_sha": "cce65cdcdff3ebc77e1ab4502386828a477081d4",
+  "git_tree": "f05cb9d7bee6e5f6bf3e536a4da2e92c89107dcf",
+  "git_status_porcelain": [],
+  "tracked_diff_paths": [],
+  "prompt_sha256_from_git": {
+    "compose_persuasive_text.v1.md": "e9462bbfb7b1508e4eb25b317006f3c4bbf19e785570bd3217f27d1400f96660",
+    "detect_experience_gaps.v1.md": "dc23c818c04459410813584a18c811d389d702dddaac8699632a679119ab39d3"
+  },
+  "compose_project": "anytoolai-0a4692b7",
+  "api_url": "http://127.0.0.1:18453",
+  "provider_policy_ref": "default_text_generation_v1",
+  "quota_mode": "unmetered",
+  "channel": "api",
+  "source_context": "Includes main merge 72b99dd1 and ANY-846 gap detection changes; not a controlled composer-only comparison with round 1.",
+  "input_order": "The same 24 committed greeting cases, with G11-en-noname-warm and G12-ru-inflected-name-warm first to check the reviewed branches early. No input values changed.",
+  "python_environment": "Ignored managed-environment directory linking to existing Python 3.12 environment; git_dirty=false."
+}

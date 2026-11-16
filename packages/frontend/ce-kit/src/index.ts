@@ -43,7 +43,12 @@ export { isQuotaDimension, isQuotaPeriod, isQuotaUnit } from "./quota/quotaEnums
 export type { QuotaDimension, QuotaPeriod, QuotaUnit } from "./quota/quotaEnums";
 export { generateIdempotencyKey } from "./scenarios/idempotencyKey";
 export { startScenario } from "./scenarios/startScenario";
-export { prepareScenarioStart } from "./scenarios/prepareScenarioStart";
+export { prepareScenarioStart, restorePaidScenarioStart } from "./scenarios/prepareScenarioStart";
+export { readPaidStartRecovery, clearPaidStartRecovery, persistPaidStartRecovery, rememberPaidResult, parsePaidStartRecovery } from "./scenarios/paidStartRecovery";
+export type { PaidStartRecovery, PaidStartPersistence } from "./scenarios/paidStartRecovery";
+export { samePortalOwner, parsePortalOwner, parsePortalExchange, exchangePortalSession, readPortalSession, writePortalSession,
+  validatePortalReturnTarget, preparePortalAuthorization, readPortalAuthorization, consumePortalCallback, PORTAL_SESSION_KEY } from "./identity/portalSession";
+export type { PortalOwner, PortalSession, TabStorage } from "./identity/portalSession";
 export type {
   PreparedScenarioStart,
   PreparedScenarioStartExecuteOptions,

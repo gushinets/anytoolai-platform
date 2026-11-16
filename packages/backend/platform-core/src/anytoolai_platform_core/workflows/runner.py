@@ -34,6 +34,7 @@ from anytoolai_platform_core.events.replay import (
 from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.providers.gateway import ProviderGatewayExecutionError
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
+from anytoolai_platform_core.quotas.exhaustion import enqueue_exhaustion
 from anytoolai_platform_core.quotas.finalization import finalize_success, release_execution
 from anytoolai_platform_core.quotas.models import FinalExecutionResult, ReservationState
 from anytoolai_platform_core.results.validation import resolve_available_workflow_result
@@ -419,9 +420,10 @@ class SequentialWorkflowRunner:
                 final_result = deepcopy(FinalExecutionResult(candidate, final_artifact))
                 self._register_success_recovery(final_result.job, final_result=final_result)
                 success_recovery_registered = True
-                finalize_success(
+                transition = finalize_success(
                     self._session, job.id, final_result, config_registry=self._config_registry
                 )
+                enqueue_exhaustion(self._session, transition)
                 job = self._job_repository.get(job.id)
                 assert job is not None
             else:
@@ -1202,6 +1204,19 @@ _SECRET_KEYS = frozenset(
 )
 
 
+def _release_terminal_recovery_reservation(
+    session: Session, record: JobRecord, existing: JobRecord | None,
+) -> bool:
+    if (
+        record.consumption_mode is JobConsumptionMode.reserved
+        and existing is not None
+        and existing.status in {JobStatus.succeeded, JobStatus.failed, JobStatus.canceled}
+    ):
+        release_execution(session, record.id)
+        return True
+    return False
+
+
 def _recover_failed_workflow_row_after_rollback(
     recovery_session_factory: Any,
     record: JobRecord,
@@ -1214,12 +1229,7 @@ def _recover_failed_workflow_row_after_rollback(
         artifact_repository = ArtifactRepository(recovery_session)
 
         existing = repository.get(record.id, for_update=True)
-        if (
-            record.consumption_mode is JobConsumptionMode.reserved
-            and existing is not None
-            and existing.status in {JobStatus.succeeded, JobStatus.failed, JobStatus.canceled}
-        ):
-            release_execution(recovery_session, record.id)
+        if _release_terminal_recovery_reservation(recovery_session, record, existing):
             return
         recovered_record = _rebuild_failed_workflow_record_for_recovery(
             record,
@@ -1254,12 +1264,7 @@ def _recover_canceled_workflow_row_after_rollback(
         artifact_repository = ArtifactRepository(recovery_session)
 
         existing = repository.get(record.id, for_update=True)
-        if (
-            record.consumption_mode is JobConsumptionMode.reserved
-            and existing is not None
-            and existing.status in {JobStatus.succeeded, JobStatus.failed, JobStatus.canceled}
-        ):
-            release_execution(recovery_session, record.id)
+        if _release_terminal_recovery_reservation(recovery_session, record, existing):
             return
         if existing is None or existing.status not in {JobStatus.running, JobStatus.canceled}:
             return
@@ -1315,6 +1320,7 @@ def _recover_succeeded_workflow_row_after_rollback(
                 transition = finalize_success(
                     recovery_session, record.id, final_result, config_registry=config_registry
                 )
+                enqueue_exhaustion(recovery_session, transition)
                 if transition.applied and transition.reservation.state is ReservationState.released:
                     # Expiry can win after execution rollback. Retain only recovered child
                     # links for causal backfill; preserve the winning terminal decision.

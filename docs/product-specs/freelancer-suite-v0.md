@@ -19,6 +19,7 @@ committed release order. PrepaidRequest and ReplyDraft remain modes of the later
 ## Recommended Build Order
 
 1. ProposalAI: `A04 -> A06` (A04 finds experience gaps the proposal must not claim and returns them as a separate block); `A09 -> A06` remains a later option.
+   A gap is an explicit requirement that the positioning does not cover, including a mandatory tool, platform, protocol, language, domain, certification, skill or experience minimum. Standard parts of the stated kind of work and an incidental target niche are covered by adjacent experience, but adjacency cannot replace an explicit prerequisite. Gap wording keeps the requirement's meaning, numbers and units (ANY-846).
 2. Client Message Decoder: `A01 -> A07`, with `A04` optional.
 3. Scope Creep Guard: `A11 -> A07`; comparison results and request data to `A10`.
 4. Send-Ready: `A04 + A03`, then a user-selected gap to `A08` in a second scenario run.

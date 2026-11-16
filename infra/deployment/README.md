@@ -1,7 +1,194 @@
 # Deployment
 
-Covers the Proposal AI public web stack (`web-mirror`, `platform-api`, `platform-worker`,
-`postgres`) and the separate credential-free development/CI smoke paths.
+Covers the public product stack, the separate Atom Lab stack, and credential-free development
+and CI smoke checks. Start a VPS update with the [VPS release runbook](vps-release-runbook.md).
+
+## Reviewed images and independent updates (ANY-766 Step 17)
+
+The optional `docker-compose.images.yml` selects `ANYTOOLAI_API_IMAGE` (also the
+migration image), `ANYTOOLAI_WORKER_IMAGE` and `ANYTOOLAI_WEB_IMAGE`. It removes
+build contexts and never pulls. `prod-up` opts in when `ANYTOOLAI_API_IMAGE` is
+set, including through the existing private `.env.prod`; all three refs must be
+versioned tags or immutable digests. API and worker require identical nonempty
+`org.opencontainers.image.revision` labels. This is necessary source evidence,
+not a universal wire or data compatibility declaration. Use the matching reviewed
+control checkout; old binaries are excluded from the ANY-766 synchronized API
+cutover. The
+[Portal paired cutover procedure](https://github.com/gushinets/payments-portal/blob/main/docs/architecture/deployment.md#paired-compatibility-and-synchronized-cutover)
+owns the migration order and purchased-document reader floor.
+
+`.github/workflows/publish-images.yml` builds `backend` (API and worker),
+`frontend` or `all` independently. Publishing is default-off and requires separate
+post-review authorization. Frontend inputs are `PLATFORM_API_BASE_URL` (the
+build-time same-origin rewrite destination),
+`NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS`, `ANYTOOLAI_WEB_BASE_PATH`,
+`ANYTOOLAI_PORTAL_CONSUMER_ID` (default `platform-kernel`),
+`NEXT_PUBLIC_PORTAL_AUTHORIZE_URL` (localized Portal `/backend/authorize` URL) and
+`NEXT_PUBLIC_ANYTOOLAI_PRIVACY_POLICY_URL` (absolute HTTP(S) policy URL).
+Workflow input `privacy_policy_url` is required and validated for frontend builds;
+backend-only builds do not require it.
+Next configuration validates `ANYTOOLAI_PORTAL_CONSUMER_ID` at build time and
+publishes it as `NEXT_PUBLIC_PORTAL_CONSUMER_ID`; use the same ID in the API, worker and
+Portal registry. Workflow input `portal_consumer_id` supplies the build argument.
+Launch, exchange and stored V2 sessions must match this audience exactly. Changing
+the configured ID does not transfer retained purchases, allowances or usage.
+The runtime web image records that build argument in the non-secret
+`io.anytoolai.portal-consumer-id` label. Image installation and frontend-only
+updates compare it with the resolved `ANYTOOLAI_PORTAL_CONSUMER_ID` before replacing
+services. An unset or empty value uses `platform-kernel`, matching Compose.
+A missing or mismatching label requires rebuilding/selecting a compatible web
+image; older unlabelled images are refused. Frontend and backend source revisions
+may still differ.
+Changing runtime variables cannot recompile these values. Public frontend image
+tags include the run ID to distinguish builds with different origins. Backend
+credentials and provider secrets are runtime-only.
+
+Kernel `0022` requires stopped API/workers and binds retained paid history to one
+consumer. It refuses ambiguous history; do not clear it or change the binding to
+force an upgrade. A configuration mismatch blocks paid access and exhaustion
+delivery; restore the saved consumer to resume. See the
+[binding and migration rules](../../docs/contracts/portal-kernel-paid/README.md#service-requests-and-identity).
+
+For an operator-approved installation, set private `.env.prod` credentials and
+selected images plus `ANYTOOLAI_PROFILE_ROOT` to an existing operator-owned
+absolute host directory. The candidate profile is generated **inside the selected
+API image**, with only that directory mounted at `/deployment`, network disabled
+and dependency synchronization disabled. The host mount paths are derived from
+the explicit host directory, never from `/app` or `/deployment` container paths.
+Both selected backend images must match the candidate source fingerprint; existing
+profile checks verify the mounted result in running API and worker. Existing
+activation marker semantics remain unchanged: the worker waits for activation,
+API admission remains closed, and the previous profile is retained until success.
+Migration/readiness/activation failure keeps admission closed and retains volumes.
+
+```bash
+# Optional explicit selection for a disposable local rehearsal or another approved
+# installation; defaults remain infra/compose/.env.prod and anytoolai-prod.
+export ANYTOOLAI_PROD_ENV_FILE=/operator/kernel/images.env
+export ANYTOOLAI_PROD_PROJECT=anytoolai-prod
+# The env file includes ANYTOOLAI_*_IMAGE and ANYTOOLAI_PROFILE_ROOT.
+# Pull reviewed digests separately, only with registry/publication authorization.
+./.quick-check-venv/bin/python scripts/agent/runner.py prod-up
+./.quick-check-venv/bin/python scripts/agent/runner.py prod-ready
+# Replace only web; no migration, backend restart or profile generation/activation.
+./.quick-check-venv/bin/python scripts/agent/runner.py prod-web-up
+```
+
+`prod-web-up` composes base + prod + images and, when the resolved command
+environment sets `ANYTOOLAI_VPS_135_NETWORKS=1`, also the VPS network overlay.
+Unset or empty means no extra networks; any other value is rejected before Compose. Shell
+values override the selected env-file consistently with other deployment inputs.
+It retains the ingress network and uses the deployment lock, `--no-deps`,
+`--no-build` and `--pull never`; it does not load the full live overlay or require
+live profile-generation variables. Backend containers, migrations, profile and
+volumes stay unchanged.
+
+Image `prod-up` uses the existing shared deployment lock and, for an existing
+stack, existing `prod-quiesce` (stop admission, drain all jobs, stop worker).
+It starts retained PostgreSQL, runs a fresh one-shot migration from the selected
+API image, then starts the selected API/worker/web without builds or pulls.
+All other producers and deployment automation must remain stopped throughout the
+operator's maintenance window. Failure to drain does not stop the recovering
+worker. On migration failure, do not run old code to reopen service. Follow the
+existing verified backup recovery below and the metering cutover safeguards.
+
+The Portal-owned [paired compatibility and cutover procedure](https://github.com/gushinets/payments-portal/blob/main/docs/architecture/deployment.md#paired-compatibility-and-synchronized-cutover)
+records the current local source pair, migration heads and wire versions.
+Historical image rehearsals do not verify the latest corrections.
+Record actual reviewed SHAs, image IDs/digests, build origins, enabled products
+and base path with the environment selection. Never infer reader compatibility
+from unchanged migration heads: Portal pre-selected-digest and pre-Step-11
+purchase readers are excluded, as are old Kernel identity/snapshot binaries.
+Keep historical usage, reservations, floors and purchased documents intact.
+When crossing the earlier expanded-digest boundary, stop Portal API/workers and
+explicitly advance every configured consumer P above its stored value before the
+first corrected startup (fresh DB: P=1). That digest change needs no migration;
+the remaining activation correction requires Portal migration `20261113_0012`
+with API/workers stopped and does not itself require a P change. Never edit
+policy rows, roll P back or infer old-binary compatibility from unchanged
+migration heads. P changes preserve R, allowance IDs and spend.
+
+This Linux image path does not require a remote server or registry credentials
+for local images. Use disposable databases and loopback test origins for rehearsal.
+Remote publication, installation, secrets, backups, live-service acceptance and
+remaining broad suites are deferred to ANY-767. The focused Step 16 HTTP/browser
+proof remains valid for unchanged runtime code; packaging checks do not replace
+later deployed acceptance.
+
+### Historical Step 17 image rehearsal — 2026-11-11
+
+Linux builds on 2026-11-11 used Docker Engine 28.1.1 / Compose 2.35.1. The actual
+selected pre-review local IDs (no registry publication/digests) were as follows.
+These images predate the PR corrections and are not the corrected installation
+selection. Their source baselines were Kernel
+`88da001f0595a4bc8e4729423acd2340bf7b73ca` and Portal
+`0b1cbfa310c02aee182a75aaf7608fc587266a67`, plus the then-local Step 17 diff.
+
+- `any766-step17/kernel-api:local` — `sha256:50b612d750e720b088ae76c71af57768f0fdfe7fed69d572367ed8d98a39a563`.
+- `any766-step17/kernel-worker:local` — `sha256:a5727020048d209d7bf7bb0bd84531e2f85d526c6b808e78f1101af2533e8a77`.
+- `any766-step17/kernel-web:install-verified` — `sha256:e8ad25d1bda7d5ade18b7fe14420daa02295b24ed9959cefe6169f8b7fcdc880`.
+
+API target: `infra/docker/platform-api.Dockerfile`, `prod`; worker uses its existing
+Dockerfile and locked project. Both revision labels use the source baseline above
+with `-step17-local`. The matching controller includes local Step 17 corrections;
+reviewed source SHAs/digests must be recorded after review. No application source,
+purchased-document or wire migration was added in this packaging step.
+Web inputs: `PLATFORM_API_BASE_URL=http://platform-api:8000`,
+`NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS=proposal_ai`,
+`ANYTOOLAI_WEB_BASE_PATH=/tools`,
+`NEXT_PUBLIC_PORTAL_AUTHORIZE_URL=https://portal.step17.example.test/ru/backend/authorize`.
+The HTTPS test name was only a build input; this Step 17 rehearsal did not install
+ingress/TLS. The later correction rehearsal below separately verified Caddy routing.
+
+The profile directory must belong to the operator, have no group/world write
+permission (for example 0755) and contain only this installation's non-secret
+profiles. Profile generation uses the operator UID and a temporary `uv` cache
+inside the selected container, with `--no-sync` and no network. The optional
+existing `LITELLM_LOCAL_MODEL_COST_MAP` variable is passed through the image
+override for offline rehearsal; absent values preserve normal library behavior.
+Local rehearsal uses its bundled map and a loopback-only provider proxy rather
+than contacting OpenAI/metadata services. Kernel's normal network is retained
+for real loopback port publication; on the tested Engine, Docker `internal`
+networks suppress that publication and prevent the host-side readiness check. Portal's
+separate private networks and both database volumes remain independent.
+
+The disposable image rehearsal passed all nine cases across the pair: initial
+installation, production web HTTP and compiled origins, frontend-only replacement
+with unchanged backend/DB container identities and profile marker, retained
+synthetic identity/usage after backend/container recreation, both non-root
+backend users reading the activation marker, and both actual failing-migration
+recovery paths. Kernel's failed candidate left the prior profile/marker intact
+and admission closed; restoring the selected images retained data at head `0021`
+(Portal `20261111_0011`). Candidate source fingerprint was
+`c52ae82cf1dd5fa54db6c809ea0ddc652c38dea966c3517ac00eac23b7720dce`,
+profile fingerprint `ad79b2bf92ce569d241e06c42ffbbb6918cf3e6998108ae46a770f06f2cb2f6b`.
+All run-owned containers, networks and volumes were removed. The required runner
+suite retains one host-environment failure: passwordless `sudo -u nobody` is
+unavailable; actual container marker access passed. No live provider, production
+data, registry publication or remote installation was involved.
+
+### PR correction web-update rehearsal — 2026-11-12
+
+The corrected web image was built with the standard Dockerfile and authorized
+locked dependency downloads, using `ANYTOOLAI_PORTAL_CONSUMER_ID=review-kernel`,
+base path `/tools` and isolated local API/Portal origins. Its local ID was
+`sha256:45dba38223d190e6d66f564732ec5c52d707dc41b76af9cece9de2f28c4573ae`;
+it contains the earlier correction sources at Kernel baseline `82f1b155` plus
+the then-local diff. It predates the 2026-11-13 remaining corrections and is not
+evidence for their image build or deployment. The actual `prod_web_up` command retained Caddy access to
+`/tools/*` and `/v1/*`, Portal authorization and an existing paid result with one
+charge. API/worker/both DB container identities and the prepared profile stayed
+unchanged. This is local synthetic acceptance, not a published deployment image.
+
+To repeat this rehearsal, use a unique Compose project, explicit synthetic env
+file and disposable networks/volumes. Copy the VPS overlay and replace only its
+physical external-network names with unique run-owned names. Override the project,
+env-file and overlay paths in a test wrapper around the actual command. Inspect
+resolved Compose configuration for collisions with existing resources before
+starting. Require a corrected-source web image and all local dependencies,
+including ingress; record source SHA/diff, image ID and frontend build inputs.
+Missing prerequisites block the rehearsal; do not implicitly pull or install.
+Remove only resources created by that run.
 
 ## Compose layout
 
@@ -15,10 +202,17 @@ Covers the Proposal AI public web stack (`web-mirror`, `platform-api`, `platform
 - `docker-compose.atom-lab.yml` — private Atom Lab overlay over the base services: durable
   PostgreSQL, loopback-only ports, required Lab/live/provider secrets, and no public web service.
 - `docker-compose.vps-135.yml` — optional occupied-host network overlay. Setting
-  `ANYTOOLAI_VPS_135_NETWORKS=1` makes live `prod-up`/`prod-ready` append it: only
+  `ANYTOOLAI_VPS_135_NETWORKS=1` makes live `prod-up`/`prod-ready` and image
+  `prod-web-up` append it: only
   `platform-worker` joins external `infra_prompttune`, and only `web-mirror` joins external
-  `payments-portal-prod_edge`; both retain the AnytoolAI default network. Other selector values
-  fail before Compose starts. Fake and dev commands never select this overlay.
+  `payments-portal-prod_edge`; both retain the AnytoolAI default network. The web build uses
+  `platform-api.anytoolai-prod_default` to reach the product API even when Lab shares the edge
+  network. Run containers under the fixed `anytoolai-prod` project with this overlay.
+  Unset/empty omits the overlay; other selector values fail before Compose starts.
+  `prod-web-up` replaces only web; fake and dev commands never select this overlay.
+- `docker-compose.atom-lab.vps-135.yml` — Atom Lab network overlay selected by
+  `ANYTOOLAI_VPS_135_NETWORKS=1` in the Lab environment. The API joins the Caddy edge network
+  as `atom-lab-api` and the worker joins `infra_prompttune` for the provider proxy.
 
 `docker-compose.prod.yml` and `docker-compose.atom-lab.yml` use the Compose Specification's
 `!reset`/`!override` merge tags (to remove or replace inherited ports). These require a reasonably
@@ -71,6 +265,15 @@ for the same key:
      `prod-down` use safe render-only values so they still work if `.env.prod` is missing or
      damaged. Best for a persistent local/server setup where re-exporting every shell session
      is annoying.
+
+Public deployments must set `ANYTOOLAI_PRIVACY_POLICY_URL` to the approved absolute HTTP(S)
+privacy-policy URL. `prod-up` rejects missing or invalid URLs before generating a deployment
+profile or calling Docker, using Node.js's browser-compatible URL parser. The operator must confirm
+the policy page is current and accessible; the preflight does not fetch or approve its contents.
+Compose passes it as `NEXT_PUBLIC_ANYTOOLAI_PRIVACY_POLICY_URL` at build time;
+changing it requires rebuilding web-mirror. Every product form displays a data-processing notice
+above submit. Empty or invalid URLs hide only the policy link; no policy URL is supplied by default.
+Development, fake production smoke and maintenance commands keep the URL optional.
 
 `ANYTOOLAI_POSTGRES_PORT` / `ANYTOOLAI_API_PORT` override dev's host ports; they default to a
 value derived per git worktree (see `docs/agent/worktree-runtime.md`). **Prod uses a separate
@@ -139,10 +342,9 @@ python3 scripts/agent/runner.py dev-up
 
 Open the worktree-specific API URL reported by `dev-up` with `/atom-lab` appended. Enter the code in
 the page; the page keeps it only in tab memory and sends it as a header. Do not place it in a URL,
-committed `.env`, logs, screenshots, or browser storage. Use HTTPS and an internal network gate for
-any non-local deployment, distribute the code separately, and rotate it by changing the operator
-secret followed by an API restart. Production rollout remains operator-owned and is not performed
-by ANY-459.
+committed `.env`, logs, screenshots, or browser storage. Use the HTTPS ingress profiles below.
+Distribute the code separately and use the [rotation procedure](#shared-data-and-access-code-rotation)
+for a Compose deployment.
 
 ### Internal Atom Lab Compose deployment
 
@@ -150,8 +352,8 @@ by ANY-459.
 `postgres`, one-shot `migrate`, `platform-api`, and `platform-worker` services from
 `docker-compose.yml` with `docker-compose.atom-lab.yml`; it adds no service, database technology,
 SSO layer, or public frontend. The API image already packages `/atom-lab` HTML/CSS/JavaScript.
-PostgreSQL and the API bind to loopback only. External access must pass through an operator-owned
-HTTPS reverse proxy restricted to the approved internal network.
+PostgreSQL and the API publish their host ports on loopback. External access passes through an
+operator-owned HTTPS reverse proxy.
 
 For a separately launched local API process or custom local stand only,
 `ANYTOOLAI_ATOM_LAB_AUTH_DISABLED=true` opens the Lab without a code. The standard Compose
@@ -161,10 +363,11 @@ require Host `localhost`, `127.0.0.1`, or `[::1]` and reject any Origin that dif
 request's scheme, host, or port. Origin-free local CLI requests remain supported. The HTML
 shell rejects framing in both modes. Keep access-code protection enabled behind remote ingress.
 
-Run `python3 scripts/agent/runner.py quick-check` once, create the gitignored secret file with
-owner-only permissions, and set unique PostgreSQL credentials, a high-entropy Lab access code, a different
-server live token, the worker-only OpenAI key, the exact approved HTTPS origin, and a measured
-worker memory limit. If no egress proxy is required, keep `ANYTOOLAI_LLM_HTTPS_PROXY=` blank; do
+Bootstrap the [managed Python environment](vps-release-runbook.md#before-the-maintenance-window),
+create the gitignored secret file with owner-only permissions, and set unique PostgreSQL
+credentials, a high-entropy Lab access code, a different server live token, the worker-only
+OpenAI key, the exact approved HTTPS origin, and a measured worker memory limit.
+If no egress proxy is required, keep `ANYTOOLAI_LLM_HTTPS_PROXY=` blank; do
 not leave a sample proxy hostname. Configure a real worker proxy only when required. Do not reuse
 the Lab code as the live token or `/demo` code. Do not put any credential in a URL, command
 argument, ticket, Git, screenshot, proxy access log, or evidence file. Readiness prints only the
@@ -174,11 +377,10 @@ configured origin.
 install -m 600 infra/compose/.env.atom-lab.example infra/compose/.env.atom-lab
 ```
 
-Before starting Compose, configure ingress. The exact proxy is operator-owned, but it must enforce
-TLS and a network/VPN allowlist before proxying `/atom-lab`, `/atom-lab/*`, and
-`/v1/atom-lab/*` to the loopback API port. Remove `Cookie` and `Authorization` request headers and
-deny these paths on every public virtual host. The Lab uses only `X-Atom-Lab-Access-Code`; a shared
-code is not an internet-facing authentication system and does not replace the network gate.
+Before starting Compose, prepare the ingress configuration. For the internal network profile, enforce
+TLS and a network/VPN allowlist before proxying `/atom-lab`, `/atom-lab/*`, and `/v1/atom-lab/*` to
+the loopback API port. Remove `Cookie` and `Authorization` request headers and deny these paths on
+public virtual hosts. For the shared-code deployment on VPS 135, use the routes and environment below.
 
 ```bash
 python3 scripts/agent/runner.py atom-lab-up
@@ -194,21 +396,72 @@ refuses to replace a running fixed project. For a reviewed update, follow the qu
 `atom-lab-down`, and `atom-lab-up` sequence below; the named PostgreSQL volume and history remain
 preserved. It does not claim that ingress is private or that a paid provider call succeeded.
 
-After the operator verifies HTTPS and the network boundary, run the paid smoke in an approved cost
-window:
+After verifying HTTPS and the approved ingress profile, run the paid smoke in an approved
+cost and maintenance window:
 
 ```bash
 python3 scripts/agent/runner.py atom-lab-smoke
 ```
 
-This reuses the existing A01-A11 Atom Lab live-canary and its cost ceiling/evidence format. After
-all runs are terminal, it restarts API and worker and requires the same recent protected history to
-remain visible. A restart does not resume an interrupted provider call; existing lease
-reconciliation remains authoritative. Keep the redacted evidence report plus the actual HTTPS
-address, time, reviewed commit, and operator confirmation. Never include access/provider/live
-secrets or prompt/input/result bodies. Without an approved address, credentials, cost authority,
-and operator confirmation, the package may be reported as verified but rollout and ANY-468 remain
-incomplete.
+This reuses the A01-A11 live canary and its cost ceiling. After the runs finish, it drains the
+queue, restarts API and worker, and checks the exact saved run IDs through the protected API.
+For a deployment with an existing recorded live smoke run, the operator can verify persistence
+using that run and its saved preset after a controlled restart. Record the live provider
+result, restart time, and successful readback of the same IDs. Record the deployed commit and
+approved HTTPS address. Keep access credentials and prompt, input, and result bodies out of
+the report. Post-restart readback is required to complete ANY-468.
+
+#### Atom Lab on VPS 135
+
+The operator approved `https://any-tool-ai.ru/tools/atom-lab` as a VPS 135 exception to the
+standard VPN/network allowlist. The page and static assets are reachable from any network.
+Caddy forwards the protected Lab API routes, and the Lab API checks the shared code. Anyone
+with the code can read shared Lab data and submit paid runs within the configured limits.
+Issue the code privately to invited testers, agree what test data they may enter, and follow
+the rotation procedure if it is disclosed. The separate Lab API, worker, and database
+contain the Lab's data and jobs.
+[Access policy](../../docs/product-specs/mvp-scope-source-of-truth.md#internal-atom-lab-exception)
+
+Use these values in the Lab's gitignored `.env.atom-lab` with the PostgreSQL, Lab access, live
+token, and worker credentials described above.
+
+```dotenv
+ANYTOOLAI_VPS_135_NETWORKS=1
+ANYTOOLAI_ATOM_LAB_INTERNAL_URL=https://any-tool-ai.ru
+ANYTOOLAI_ATOM_LAB_API_PORT=18114
+ANYTOOLAI_ATOM_LAB_POSTGRES_PORT=15432
+ANYTOOLAI_LLM_HTTPS_PROXY=http://egress-lb:3128
+ANYTOOLAI_ATOM_LAB_RUN_DAILY_LIMIT=400
+ANYTOOLAI_ATOM_LAB_RUN_ACTIVE_LIMIT=8
+```
+
+The limits apply to the whole Lab. The daily counter uses UTC. Up to eight queued or running jobs
+can be accepted, and one worker runs them sequentially. The VPS overlay gives Caddy access to the Lab
+API on `payments-portal-prod_edge` and gives the worker access to the provider proxy on
+`infra_prompttune`. The database and migrator use the Lab's default network.
+
+In the existing Caddy site’s `route` block, replace the `@anytoolai_private` matcher and its
+`respond` line with this block. Keep it ahead of the generic `/tools/*` and `/v1/*` handlers.
+The HTML uses two root asset URLs, and its browser requests use the root Lab API prefix.
+
+```caddyfile
+@atom_lab_page path /tools/atom-lab /tools/atom-lab/
+@atom_lab_routes path /tools/atom-lab /tools/atom-lab/ /atom-lab/atom_lab.css /atom-lab/atom_lab.mjs /v1/atom-lab/*
+route @atom_lab_routes {
+	rewrite @atom_lab_page /atom-lab
+	reverse_proxy atom-lab-api:8000 {
+		header_up -Cookie
+		header_up -Authorization
+	}
+}
+
+@anytoolai_private path /atom-lab /atom-lab/* /tools/atom-lab/* /v1/atom-lab /v1/demo /v1/demo/*
+respond @anytoolai_private 404
+```
+
+Validate the Caddy config and check the external HTTPS route after starting the Lab. Verify both
+assets load, the catalog returns `401` with a missing or wrong code, a valid code unlocks the Lab,
+and the four product routes still load. Keep the previous Caddy config for Lab rollback.
 
 #### Shared data and access-code rotation
 
@@ -570,22 +823,25 @@ of an OpenAI call without the ledger and Squid evidence.
 ## Prod
 
 Install Docker Engine with the Compose plugin, Python 3.12, `uv`, Node.js, and npm on the VPS.
-Clone this repository at the reviewed deployment commit. Run
-`python scripts/agent/runner.py quick-check` once to bootstrap its managed Python environment,
-then `.quick-check-venv/bin/python scripts/agent/runner.py doctor`. The live profile generator
-uses that managed environment. Use `python3` wherever the host exposes Python 3 under that name.
+Prepare the reviewed checkout and bootstrap the managed Python environment using the
+[VPS release runbook](vps-release-runbook.md#before-the-maintenance-window). The live profile
+generator uses that environment. Use `python3` wherever the host exposes Python 3 under that name.
 
 Copy `infra/compose/.env.example` to gitignored `infra/compose/.env.prod`. Fill the PostgreSQL
 user/password/database, a real `OPENAI_API_KEY`, the Squid URL in
 `ANYTOOLAI_LLM_HTTPS_PROXY`, `ANYTOOLAI_ENABLED_PRODUCT_IDS=proposal_ai`,
 `ANYTOOLAI_UNMETERED_PRODUCT_IDS=proposal_ai`, and an explicit
 `ANYTOOLAI_PROD_WORKER_MEMORY_LIMIT` chosen from available VPS RAM (the sample is `768M`, not a
-measured minimum). Keep all three public access-code variables blank. The shell overrides the
+measured minimum). Set `ANYTOOLAI_PRIVACY_POLICY_URL` to the approved policy page before `prod-up`.
+Keep all three public access-code variables blank. The shell overrides the
 file even with an empty value. An explicitly empty `ANYTOOLAI_UNMETERED_PRODUCT_IDS` selects the
 canonical quota; omitting the variable is an error. Never commit or print the completed file.
 On VPS `135.106.164.145`, also set `ANYTOOLAI_WEB_BASE_PATH=/tools` and
 `ANYTOOLAI_VPS_135_NETWORKS=1`. The latter selects the exact external networks
 `infra_prompttune` and `payments-portal-prod_edge`; those networks must already exist.
+For the current four-product release on this VPS, use
+`proposal_ai,client_update_writer,brief_decoder,acceptance_builder` for both
+`ANYTOOLAI_ENABLED_PRODUCT_IDS` and `ANYTOOLAI_UNMETERED_PRODUCT_IDS`.
 `prod-fake-up` explicitly clears an inherited web base path and remains on base + prod only.
 Every public enabled product must also have a registered web page; the production web build
 rejects unknown product IDs before startup. The backend-only `kernel_demo` remains available
@@ -641,7 +897,7 @@ in this exact order without stripping `/tools`:
 ```caddyfile
 {$CADDY_DOMAIN} {
 	route {
-		@anytoolai_private path /tools/atom-lab /tools/atom-lab/* /v1/atom-lab /v1/atom-lab/* /v1/demo /v1/demo/*
+		@anytoolai_private path /atom-lab /atom-lab/* /tools/atom-lab /tools/atom-lab/* /v1/atom-lab /v1/atom-lab/* /v1/demo /v1/demo/*
 		respond @anytoolai_private 404
 
 		@anytoolai_tools path /tools /tools/*
@@ -662,13 +918,13 @@ in this exact order without stripping `/tools`:
 }
 ```
 
-Validate the candidate and the mounted file before accepting traffic. The occupied VPS had a
-pre-existing stale file bind, so its reviewed cutover refreshed only Caddy with
-`docker compose --project-name payments-portal-prod -f docker-compose.prod.yml up -d --no-deps
---force-recreate caddy`; do not recreate the payments API, web, or database. API and web remain
-loopback-bound and PostgreSQL has no host port. Other deployments may use their own reviewed
-ingress, but must preserve the same denies and sensitive-header removal. Keep proxy/firewall
-configuration and evidence operator-owned.
+When deploying Atom Lab on this VPS, use the [Lab routes above](#atom-lab-on-vps-135) in place of
+the private matcher and its response.
+
+Use the [Caddy procedure in the VPS runbook](vps-release-runbook.md#reload-or-restore-caddy-on-vps-135)
+to validate the candidate and check the mounted file before accepting traffic. The product API and
+web host publish ports on loopback, and product PostgreSQL has no host port. Preserve the
+applicable route denies and sensitive-header removal when using another ingress.
 
 If Squid intercepts TLS, add an operator-owned Compose override after the live overlay, for
 example:
@@ -700,19 +956,21 @@ live, then this file; preserve the same required environment and profile mount.
 
 ### Acceptance and quota switch
 
-1. Open the public product domain and run Proposal AI. Confirm another registered product is
-   absent from the home page and its direct page shows not found. Direct API runtime-config,
-   quota, and scenario-start calls for that disabled product must return safe `404`.
-2. From outside the VPS, verify API/web/PostgreSQL ports are not reachable directly. Confirm all
-   six exact/prefix pairs above are blocked by the inbound proxy and the three API access codes
-   are blank. Inspect container environment **by variable name/presence only**: worker has the
-   OpenAI key and proxy; API/web do not. Do not dump environment values into evidence.
-3. Keep the generated manifest fingerprint as the expected value and run `prod-ready`; its
-   read-only check must pass separately in API and worker. Submit more than ten unmetered runs.
-   Confirm successful `platform.provider_calls` rows use the live provider policy and that Squid
-   logs corresponding CONNECT requests. Confirm `platform.guest_quota_usage` does not gain or
-   decrement Proposal AI rows during this window. Save redacted IDs/timestamps, not prompts or
-   secrets.
+1. Open the public site and check the page and runtime-config for every enabled product. Run one
+   known scenario per product. Pick a registered product outside the enabled set and confirm
+   its page and direct runtime-config, quota, and scenario-start requests return safe `404`.
+2. From outside the VPS, verify the API, web, and PostgreSQL ports are unreachable directly.
+   Verify Demo routes return `404` and the three access credentials on the product API are blank.
+   With Lab disabled, check that its routes are blocked. With Lab enabled, check the page,
+   both assets, and catalog access with a missing, incorrect, and valid code as described in
+   [Atom Lab on VPS 135](#atom-lab-on-vps-135). Check worker-only OpenAI key and proxy wiring
+   without recording environment values.
+3. Run `prod-ready` to check the generated profile fingerprint in API and worker. Confirm
+   `platform.provider_calls` rows for the smoke runs use the live provider policy and that Squid
+   logs the corresponding CONNECT requests. Verify the smoke runs did not consume guest quota
+   for unmetered products. To verify a quota change, submit more than ten unmetered runs for
+   the affected product and compare its guest counters before and after. Save redacted run IDs
+   and timestamps as evidence.
 4. Record peak worker memory with `docker stats --no-stream` during a cold catalog refresh and
    real run. Check `docker inspect` for `RestartCount=0` and `OOMKilled=false`; retain memory
    headroom when choosing the production limit.
@@ -721,13 +979,11 @@ live, then this file; preserve the same required environment and profile mount.
    quota rows retains its count; a guest first seen unmetered begins at zero. The web image need
    not change for quota mode alone; runtime config supplies the quota summary.
 
-On VPS `135.106.164.145`, roll back ingress before stopping AnytoolAI: verify the saved Caddyfile
-checksum, write it back to the active host path, validate Compose, and recreate only Caddy with
-the same `--no-deps --force-recreate caddy` command. Validate `/etc/caddy/Caddyfile`, then confirm
-payments, PromptTune, and extensions match their recorded status baseline. Only then, if the new
-stack must stop, run `python scripts/agent/runner.py prod-down` from `/opt/anytoolai-platform`;
-the PostgreSQL volume is preserved. Other deployments should roll back to their previously
-reviewed image/Compose revision and rerun `prod-up` with its matching environment. Removing the
+On VPS `135.106.164.145`, roll back ingress before stopping the affected stack using the
+[VPS release runbook](vps-release-runbook.md#reload-or-restore-caddy-on-vps-135). For a product
+rollback, run `python scripts/agent/runner.py prod-down` from the candidate checkout and preserve
+the PostgreSQL volume. Other deployments should roll back to their previously reviewed
+image/Compose revision and rerun `prod-up` with its matching environment. Removing the
 live overlay alone is **not** a live deployment; use `prod-fake-up` only for the explicit
 credential-free smoke path.
 
@@ -838,8 +1094,9 @@ existing runtime rows and worker logs by technical ID instead of starting a dupl
 
 The API exposes `GET /internal/v1/capability-manifest?tenant_id=anytoolai&region=ru`.
 It reads the complete immutable registry, including disabled products and metrics, without
-storage or provider access. Ordinary configuration declares all six products and the two
-approved test metrics disabled; this endpoint does not enable commercial admission.
+storage or provider access. Ordinary configuration declares all six products and six
+metrics disabled (two TEST-ONLY and four production declarations); this endpoint does
+not enable commercial admission.
 
 `ANYTOOLAI_TENANT_ID` and `ANYTOOLAI_REGION` select the trusted API scope (defaults:
 `anytoolai` and `ru`). Both must exist in the loaded registry or startup fails. Runtime routes
@@ -858,9 +1115,15 @@ malformed values fail startup. Tokens accept 32–256 ASCII Bearer characters (l
 validation messages redact secrets.
 
 Portal sends the secret in `Authorization: Bearer <secret>` over TLS with certificate
-verification. The credential identifies the trusted Portal caller, authorizes only manifest
-read and binds to the configured tenant/region. Missing, invalid or duplicate credentials return
-`401` with `WWW-Authenticate: Bearer`; an authenticated wrong or ambiguous scope returns `403`.
+verification. Its `platform-kernel` entry in `BACKEND_CONSUMERS` supplies
+`portal_to_backend_current_secret` for configured manifest reads, usage clients and
+recipient invalidation delivery. The legacy `KERNEL_SERVICE_TOKEN` does not select
+credentials for these clients. The credential identifies the trusted Portal caller,
+binds to the configured tenant/region and grants manifest read. Additional usage and
+invalidation permissions require `ANYTOOLAI_PORTAL_USAGE_READ_ENABLED` and
+`ANYTOOLAI_PORTAL_ACCESS_INVALIDATION_ENABLED`, respectively. Missing, invalid or
+duplicate credentials return `401` with `WWW-Authenticate: Bearer`; an authenticated
+wrong or ambiguous scope returns `403`.
 Missing required query fields return the normal safe `422` envelope. Errors preserve request
 correlation; internal responses have `Cache-Control: no-store`. All requests carrying `Origin`,
 including browser preflight, are rejected, and internal routes bypass public CORS handling.
@@ -870,7 +1133,10 @@ For rotation, use one bounded rollout window:
 
 1. Generate a new independent secret; configure it as `ANYTOOLAI_PORTAL_SERVICE_TOKEN` and
    configure the old secret as `ANYTOOLAI_PORTAL_SERVICE_TOKEN_PREVIOUS`. Restart the API.
-2. Switch the Portal's server-side `KERNEL_SERVICE_TOKEN`, then verify the new credential.
+2. Update `portal_to_backend_current_secret` in the `platform-kernel` entry of Portal's
+   server-only `BACKEND_CONSUMERS`. Restart/recreate the Portal API and worker processes
+   that hold the outbound clients. Verify actual requests for every enabled operation
+   with the new credential before removing the receiver's old slot.
 3. Remove `ANYTOOLAI_PORTAL_SERVICE_TOKEN_PREVIOUS` and restart the API before closing the
    rollout window. Verify the removed token receives `401` and the new token still succeeds.
 
@@ -956,3 +1222,55 @@ the canonical system-profile location. Once no old runner is
 active, old `/tmp/anytoolai-prod.deployment.lock` and `/tmp/anytoolai-atom-lab.deployment.lock`
 markers can be removed. Never delete the new persistent lock files during operation; process
 exit (including a crash) releases the lock automatically.
+
+
+## ANY-766 paid authority receiver (Step 6)
+
+The historical Step 6 checkpoint introduced migration `0019` and snapshot V2;
+it was verified only against disposable test databases. Those versions are not
+the current installation target. Follow
+[reviewed image installation](#reviewed-images-and-independent-updates-any-766-step-17)
+and the Portal-owned paired compatibility/cutover procedure linked there. Apply
+migrations only through the environment's authorized procedure.
+
+Set the API's existing `ANYTOOLAI_PORTAL_BASE_URL` and independent
+`ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN` to reach Portal identity/snapshot reads.
+Set `ANYTOOLAI_PORTAL_CONSUMER_ID` consistently in the API, worker, frontend build and
+Portal registry (default `platform-kernel`); a new ID cannot adopt old purchases.
+The Portal receiver must explicitly grant session exchange/introspection and
+`access-snapshot:read`. Kernel accepts only snapshot V3; no V1/V2 wire conversion
+or local extension of expiry exists. HTTPS verification stays enabled; existing
+settings permit loopback HTTP only in dev/test.
+
+To grant Portal invalidation permission, explicitly set
+`ANYTOOLAI_PORTAL_ACCESS_INVALIDATION_ENABLED=true` in the API receiver environment.
+It defaults false. Existing current/previous `ANYTOOLAI_PORTAL_SERVICE_TOKEN`
+slots then bind to the same trusted scope and `access:invalidate` permission.
+Manifest-only credentials do not acquire it from any request field. Keep the
+existing token rotation procedure and no-browser/no-store internal boundary.
+
+Inspect `platform.paid_access_coherence` read-only when diagnosing revision or
+snapshot refusal. Never delete or lower a floor to repair access. Request-driven
+refresh obtains a document at or above the durable floor; cache eviction does not
+remove that floor, its semantic identity or immutable usage history. Failed
+identity/snapshot dependencies return safe refusals without creating new work.
+
+Portal Step 13 selects the invalidation destination and outgoing key from each
+snapshot recipient's `BACKEND_CONSUMERS` entry; legacy Kernel manifest settings
+do not select delivery. Enable the receiver permission before starting that sender.
+Compose peer connectivity, browser launch and usage/exhaustion are implemented.
+Steps 16/17 supply focused paired local acceptance and build/install preparation.
+The full matrix, remote installation, staging/live acceptance and production
+rollout belong to ANY-767. Local evidence does not establish a connected or
+approved deployment.
+
+
+The 2026-11-13 Portal correction requires stopped API/workers for migration
+`20261113_0012` and consistent V2 internal-evidence readers/writers. Downgrade
+refuses retained activation/V2 facts. HTTP identity V2 and snapshot V3 stay the
+same. Configure public `BACKEND_CALLBACKS` for Portal web separately from private
+`BACKEND_CONSUMERS`; corresponding consumer IDs/callbacks must agree. Kernel's
+consumer ID is still compiled into web. Verify email before delegated authorization;
+a same-owner reauthorization keeps the existing pending request/key. The earlier
+expanded-digest higher-P cutover remains required when crossing that older
+compatibility boundary; the activation migration alone does not change P.

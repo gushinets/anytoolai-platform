@@ -1,0 +1,80 @@
+{
+  "language": {
+    "label": "Lingua"
+  },
+  "nav": {
+    "label": "Strumenti",
+    "allTools": "Tutti gli strumenti",
+    "runInProgress": "È in corso un’esecuzione. Se esci, continuerà; un risultato riuscito utilizza un’esecuzione."
+  },
+  "loading": "Caricamento di {product}…",
+  "unavailable": "{product} non è disponibile al momento. Ricarichi la pagina.",
+  "quotaReserved": "Disponibili ora: {available}. In corso: {reserved}.",
+  "quotaExhausted": "Le esecuzioni di {product} a disposizione sono esaurite per ora.",
+  "resultFetchFailed": "Il risultato è pronto, ma non è stato possibile caricarlo. Riprovi.",
+  "starting": "Avvio in corso…",
+  "generating": "Generazione in corso…",
+  "runProgress": {
+    "confirmingStart": "In attesa della conferma di avvio della richiesta.",
+    "elapsed": "Tempo trascorso: {time}",
+    "normal": "Di solito servono 10–40 secondi.",
+    "slow": "La generazione continua. Alcune richieste richiedono un po’ più di tempo.",
+    "long": "Sta impiegando più tempo del solito. La generazione continua sul server — tieni aperta questa pagina."
+  },
+  "identityUnavailable": "Non è stato possibile verificare la sua identità. Ricarichi la pagina e riprovi.",
+  "retry": "Riprovi",
+  "formLabel": "Modulo {product}",
+  "workspace": {
+    "restoreDraft": "Ripristina la bozza salvata",
+    "inputTitle": "I suoi dati",
+    "previousDetails": "Risultato basato sui dati precedenti",
+    "backToInputs": "Torni ai dati",
+    "newTask": "Nuova attività",
+    "handoffOpening": "Apertura del passaggio successivo…",
+    "handoffStay": "Resti su questa pagina",
+    "handoffFailed": "Impossibile aprire il passaggio successivo. Riprovi."
+  },
+  "errors": {
+    "attachmentUnrecognized": "Non è stato possibile ripristinare questa sessione salvata. Riprova oppure scegli «Nuova attività» per aprire un modulo vuoto.",
+    "attachmentUnavailable": "Questa sessione non può essere aperta in questo strumento. Scegli «Nuova attività» per aprire un modulo vuoto.",
+    "quotaCapacityReserved": "La capacità è temporaneamente occupata. Riprova tra poco.",
+    "startFailed": "Impossibile avviare {product}. Riprovi.",
+    "timeout": "L’operazione richiede più tempo del previsto. Riprovi.",
+    "connectionLost": "Connessione persa durante l’attesa del risultato. Riprovi.",
+    "tryAgain": "Riprovi.",
+    "savedOperationPending": "È salvata un’operazione non completata. Scegli «Riprova» per ricaricare la pagina e continuarla.",
+    "storageUnavailable": "Spazio del browser non disponibile. Abilitalo e riprova la stessa richiesta."
+  },
+  "result": {
+    "copy": "Copi",
+    "copying": "Copia in corso…",
+    "copied": "Copiato",
+    "copyFailed": "Impossibile copiare negli appunti. Copi manualmente il testo qui sopra.",
+    "selectText": "Selezioni il testo"
+  },
+  "validation": {
+    "required": "{field}: campo obbligatorio.",
+    "maxLength": "{field}: massimo {maxLength, plural, one {# carattere} many {# di caratteri} other {# caratteri}}."
+  },
+  "dataNotice": {
+    "label": "Trattamento dei dati.",
+    "text": "Ciò che inserisce viene inviato al nostro servizio e a un fornitore di modelli di IA per creare il risultato, e viene conservato insieme alla Sua esecuzione sui nostri server. La Sua bozza viene conservata in questo browser e potrebbe andare persa se ricarica o lascia la pagina. Non inserisca password, codici di accesso, chiavi API o dati completi di carte di pagamento.",
+    "policyLink": "Informativa sulla privacy",
+    "opensInNewTab": "(si apre in una nuova scheda)"
+  },
+  "portalSession": {
+    "title": "Sessione del Portale",
+    "required": "Accedi di nuovo per continuare la stessa operazione.",
+    "continue": "Continua con il Portale",
+    "loading": "Accesso…",
+    "failed": "Impossibile autorizzare la scheda. Controlla lo spazio del browser e riprova.",
+    "retry": "Riprova l’autorizzazione",
+    "signOut": "Esci da questa scheda"
+  },
+  "example": {
+    "toggle": "Mostra un esempio",
+    "inputs": "Cosa inserire",
+    "output": "Cosa ottieni",
+    "note": "Solo a titolo di esempio. Il tuo testo resta invariato."
+  }
+}

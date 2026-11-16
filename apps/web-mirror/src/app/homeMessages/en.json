@@ -1,0 +1,36 @@
+{
+  "title": "AnytoolAI",
+  "lead": "Small tools for freelancers. Describe the job, get text you can send to the client.",
+  "open": "Open tool",
+  "cards": {
+    "task_finder": {
+      "blurb": "Compare a task with your profile to see strengths, gaps, and a fit score.",
+      "sample": "Fit score: 64/100. Weak fit: the mobile app is outside your offered scope."
+    },
+    "proposal_ai": {
+      "blurb": "Turn a client brief and your strengths into a proposal ready to send.",
+      "sample": "Hi Dana, I'd love to help with your landing page redesign. Two revision rounds, delivered in three weeks. Let's set up a quick call to confirm scope."
+    },
+    "client_update_writer": {
+      "blurb": "Write a progress update, reply to a client message, or ask for a prepayment, in the tone you choose.",
+      "sample": "Quick update: the homepage redesign is done and ready for review by Friday. No blockers so far.",
+      "tags": {
+        "update": "Update",
+        "replyDraft": "Reply draft",
+        "prepaidRequest": "Prepaid request"
+      }
+    },
+    "brief_decoder": {
+      "blurb": "Turn a client brief into structured details, risks, and the questions to ask before you start.",
+      "sample": "Missing: deadline and budget. Ask the client: what is the exact launch date, and who signs off on the design?"
+    },
+    "acceptance_builder": {
+      "blurb": "Turn a client brief into acceptance criteria, or check finished work against the brief.",
+      "sample": "Acceptance criteria: the homepage loads in under two seconds; the client approves two design rounds.",
+      "tags": {
+        "draft": "Draft criteria",
+        "check": "Check deliverable"
+      }
+    }
+  }
+}

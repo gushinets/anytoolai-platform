@@ -52,32 +52,14 @@ from anytoolai_platform_worker.queues import DatabaseJobQueue
 from anytoolai_platform_worker.worker import Worker
 from sqlalchemy.engine import URL
 from sqlalchemy.orm import Session, sessionmaker
+
+from tests.action_inputs import extract_input
 from tests.db_support import provision_database
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "provider" / "fake_provider_outputs"
 _UNSAFE_PROVIDER_TEXT = "unsafe internal provider text secret_token=should-not-persist"
-_EXTRACT_FIELDS = [
-    {
-        "name": "deadline",
-        "type": "string",
-        "description": "Project deadline mentioned in the text.",
-        "required": True,
-    },
-    {
-        "name": "budget",
-        "type": "string",
-        "description": "Budget mentioned in the text.",
-        "required": False,
-    },
-    {
-        "name": "deliverables",
-        "type": "array_of_strings",
-        "description": "Deliverables mentioned in the text.",
-        "required": False,
-    },
-]
 
 pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
 
@@ -591,64 +573,17 @@ def test_two_postgresql_workers_claim_one_job_success_once(
         seed_factory = build_session_factory(seed_engine)
         job = _seed_job(
             seed_factory,
-            input_payload={
-            "source_text": "deadline budget deliverables",
-            "fields": _EXTRACT_FIELDS,
-            "strict": False,
-        },
-        )
-        (
-            poll_attempts,
-            lease_attempts,
-            claim_attempts,
-            runner_invocations,
-            lease_barrier,
-            loser_attempted,
-            spy_lock,
-        ) = _install_contention_spies(
-            monkeypatch,
-            job_id=job.id,
+            input_payload=extract_input(strict=False),
         )
         adapter = RecordingProviderAdapter()
-        engine_a, engine_b, worker_a, worker_b = _build_independent_workers(
-            database_url,
-            adapter,
+        rows, winner = _exercise_worker_contention(
+            monkeypatch,
+            database_url=database_url,
+            seed_factory=seed_factory,
+            job=job,
+            adapter=adapter,
+            expected_terminal_status=JobStatus.succeeded,
         )
-        _wrap_worker_lease(
-            worker_a,
-            job_id=job.id,
-            barrier=lease_barrier,
-            loser_attempted=loser_attempted,
-            attempts=lease_attempts,
-            lock=spy_lock,
-        )
-        _wrap_worker_lease(
-            worker_b,
-            job_id=job.id,
-            barrier=lease_barrier,
-            loser_attempted=loser_attempted,
-            attempts=lease_attempts,
-            lock=spy_lock,
-        )
-
-        try:
-            process_results = _process_workers_concurrently(worker_a, worker_b)
-            winner = _assert_single_claim_execution(
-                job=job,
-                expected_terminal_status=JobStatus.succeeded,
-                process_results=process_results,
-                poll_attempts=poll_attempts,
-                lease_attempts=lease_attempts,
-                claim_attempts=claim_attempts,
-                runner_invocations=runner_invocations,
-                provider_calls=adapter.calls,
-            )
-            rows = _runtime_rows(seed_factory, job_id=job.id)
-        finally:
-            worker_a.dispose()
-            worker_b.dispose()
-            engine_a.dispose()
-            engine_b.dispose()
 
     stored_job = rows["job"]
     scenario = rows["scenario"]
@@ -716,64 +651,17 @@ def test_two_postgresql_workers_claim_one_job_failure_once(
         seed_factory = build_session_factory(seed_engine)
         job = _seed_job(
             seed_factory,
-            input_payload={
-            "source_text": "deadline budget deliverables",
-            "fields": _EXTRACT_FIELDS,
-            "strict": False,
-        },
-        )
-        (
-            poll_attempts,
-            lease_attempts,
-            claim_attempts,
-            runner_invocations,
-            lease_barrier,
-            loser_attempted,
-            spy_lock,
-        ) = _install_contention_spies(
-            monkeypatch,
-            job_id=job.id,
+            input_payload=extract_input(strict=False),
         )
         adapter = FailingProviderAdapter()
-        engine_a, engine_b, worker_a, worker_b = _build_independent_workers(
-            database_url,
-            adapter,
+        rows, winner = _exercise_worker_contention(
+            monkeypatch,
+            database_url=database_url,
+            seed_factory=seed_factory,
+            job=job,
+            adapter=adapter,
+            expected_terminal_status=JobStatus.failed,
         )
-        _wrap_worker_lease(
-            worker_a,
-            job_id=job.id,
-            barrier=lease_barrier,
-            loser_attempted=loser_attempted,
-            attempts=lease_attempts,
-            lock=spy_lock,
-        )
-        _wrap_worker_lease(
-            worker_b,
-            job_id=job.id,
-            barrier=lease_barrier,
-            loser_attempted=loser_attempted,
-            attempts=lease_attempts,
-            lock=spy_lock,
-        )
-
-        try:
-            process_results = _process_workers_concurrently(worker_a, worker_b)
-            winner = _assert_single_claim_execution(
-                job=job,
-                expected_terminal_status=JobStatus.failed,
-                process_results=process_results,
-                poll_attempts=poll_attempts,
-                lease_attempts=lease_attempts,
-                claim_attempts=claim_attempts,
-                runner_invocations=runner_invocations,
-                provider_calls=adapter.calls,
-            )
-            rows = _runtime_rows(seed_factory, job_id=job.id)
-        finally:
-            worker_a.dispose()
-            worker_b.dispose()
-            engine_a.dispose()
-            engine_b.dispose()
 
     stored_job = rows["job"]
     scenario = rows["scenario"]
@@ -842,3 +730,66 @@ def test_two_postgresql_workers_claim_one_job_failure_once(
     )
 
     assert adapter.calls[0].worker_name == winner
+
+
+def _exercise_worker_contention(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    database_url: URL,
+    seed_factory: Any,
+    job: JobRecord,
+    adapter: Any,
+    expected_terminal_status: JobStatus,
+) -> tuple[dict[str, Any], str]:
+    (
+        poll_attempts,
+        lease_attempts,
+        claim_attempts,
+        runner_invocations,
+        lease_barrier,
+        loser_attempted,
+        spy_lock,
+    ) = _install_contention_spies(
+        monkeypatch,
+        job_id=job.id,
+    )
+    engine_a, engine_b, worker_a, worker_b = _build_independent_workers(
+        database_url,
+        adapter,
+    )
+    _wrap_worker_lease(
+        worker_a,
+        job_id=job.id,
+        barrier=lease_barrier,
+        loser_attempted=loser_attempted,
+        attempts=lease_attempts,
+        lock=spy_lock,
+    )
+    _wrap_worker_lease(
+        worker_b,
+        job_id=job.id,
+        barrier=lease_barrier,
+        loser_attempted=loser_attempted,
+        attempts=lease_attempts,
+        lock=spy_lock,
+    )
+
+    try:
+        process_results = _process_workers_concurrently(worker_a, worker_b)
+        winner = _assert_single_claim_execution(
+            job=job,
+            expected_terminal_status=expected_terminal_status,
+            process_results=process_results,
+            poll_attempts=poll_attempts,
+            lease_attempts=lease_attempts,
+            claim_attempts=claim_attempts,
+            runner_invocations=runner_invocations,
+            provider_calls=adapter.calls,
+        )
+        rows = _runtime_rows(seed_factory, job_id=job.id)
+    finally:
+        worker_a.dispose()
+        worker_b.dispose()
+        engine_a.dispose()
+        engine_b.dispose()
+    return rows, winner

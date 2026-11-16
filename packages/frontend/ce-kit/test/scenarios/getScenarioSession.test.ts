@@ -47,6 +47,22 @@ describe("getScenarioSession", () => {
     );
   });
 
+  it("reads the server scenario identity before a result exists", async () => {
+    const client = makeClient(vi.fn(async () => jsonResponse(200, {
+      ...SESSION_PAYLOAD, scenario_id: "client_update_writer.reply_draft_v1", status: "running", result_artifact_id: null,
+    })) as unknown as typeof fetch);
+    const result = await getScenarioSession(client, "scenario_session_123");
+    expect(result.ok && result.value.scenarioId).toBe("client_update_writer.reply_draft_v1");
+  });
+
+  it.each([null, 7, "", "   "])("rejects invalid supplied scenario identity %s", async (scenarioId) => {
+    const client = makeClient(vi.fn(async () => jsonResponse(200, {
+      ...SESSION_PAYLOAD, scenario_id: scenarioId,
+    })) as unknown as typeof fetch);
+    const result = await getScenarioSession(client, "scenario_session_123");
+    expect(result).toMatchObject({ ok: false, error: { type: "invalid_response" } });
+  });
+
   it("percent-encodes the scenario session id in the URL", async () => {
     const fetchImpl = vi.fn(async () => jsonResponse(200, SESSION_PAYLOAD));
     const client = makeClient(fetchImpl as unknown as typeof fetch);
