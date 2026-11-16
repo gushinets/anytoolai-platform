@@ -2754,6 +2754,29 @@ def _validate_image_inputs(env: dict[str, str]) -> None:
         revisions.append(result.stdout.strip())
     if not revisions[0] or revisions[0] == "<no value>" or revisions[0] != revisions[1]:
         raise ValueError("Kernel API/worker images must declare the same reviewed source revision")
+    web = subprocess.run(
+        [
+            "docker",
+            "image",
+            "inspect",
+            "--format",
+            '{{index .Config.Labels "io.anytoolai.portal-consumer-id"}}',
+            env["ANYTOOLAI_WEB_IMAGE"],
+        ],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
+    )
+    compiled_consumer = web.stdout.strip()
+    expected_consumer = env.get("ANYTOOLAI_PORTAL_CONSUMER_ID") or "platform-kernel"
+    if compiled_consumer in {"", "<no value>"} or compiled_consumer != expected_consumer:
+        raise ValueError(
+            "Kernel web image must declare the configured Portal consumer ID; "
+            "rebuild incompatible images"
+        )
 
 
 def _build_image_deployment_profile(

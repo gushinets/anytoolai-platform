@@ -128,6 +128,59 @@ def test_worker_revision_mismatch_is_refused(
         runner._validate_image_inputs(image_env(tmp_path))
 
 
+@pytest.mark.skipif(os.name != "posix", reason="Image installation requires a Linux host")
+@pytest.mark.parametrize("consumer", [None, "", "review-kernel"])
+def test_image_validation_checks_compiled_web_consumer(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, consumer: str | None
+) -> None:
+    runner = load_runner_module()
+    env = image_env(tmp_path)
+    if consumer is not None:
+        env["ANYTOOLAI_PORTAL_CONSUMER_ID"] = consumer
+    calls = []
+
+    def inspect(command: list[str], **kwargs) -> subprocess.CompletedProcess:
+        calls.append(command)
+        value = (
+            consumer or "platform-kernel"
+            if command[-1] == env["ANYTOOLAI_WEB_IMAGE"]
+            else "backend-source"
+        )
+        return subprocess.CompletedProcess(command, 0, value)
+
+    monkeypatch.setattr(runner.subprocess, "run", inspect)
+    runner._validate_image_inputs(env)
+    assert calls[-1][-1] == env["ANYTOOLAI_WEB_IMAGE"]
+    assert "io.anytoolai.portal-consumer-id" in calls[-1][-2]
+
+
+@pytest.mark.skipif(os.name != "posix", reason="Image installation requires a Linux host")
+@pytest.mark.parametrize("compiled_consumer", ["", "<no value>", "foreign-kernel"])
+@pytest.mark.parametrize("consumer", [None, ""])
+def test_frontend_update_refuses_missing_or_foreign_consumer_before_compose(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, compiled_consumer: str, consumer: str | None
+) -> None:
+    runner = load_runner_module()
+    env = image_env(tmp_path)
+    if consumer is not None:
+        env["ANYTOOLAI_PORTAL_CONSUMER_ID"] = consumer
+    monkeypatch.setattr(runner, "_prod_deployment_lock", nullcontext)
+    monkeypatch.setattr(runner, "_resolved_env_file", lambda path: env)
+    monkeypatch.setattr(
+        runner, "run_with_env", lambda *args: pytest.fail("replaced incompatible web")
+    )
+    monkeypatch.setattr(
+        runner.subprocess,
+        "run",
+        lambda command, **kwargs: subprocess.CompletedProcess(
+            command,
+            0,
+            compiled_consumer if command[-1] == env["ANYTOOLAI_WEB_IMAGE"] else "backend-source",
+        ),
+    )
+    assert runner.prod_web_up() == 1
+
+
 def test_image_installation_refuses_windows_before_docker(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

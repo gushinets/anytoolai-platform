@@ -135,6 +135,43 @@ def test_canonical_principal_introspects_on_every_request_and_never_becomes_gues
     assert opener.open.call_count == READ_COUNT
 
 
+@pytest.mark.parametrize(
+    "length,padding",
+    [(43, ""), (42, "="), (41, "=="), (40, "==="), (512, ""), (511, "="), (510, "==")],
+)
+def test_token_length_includes_padding_through_exchange_and_introspection(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, length: int, padding: str
+) -> None:
+    token = "a" * length + padding
+    payload = exchange_payload() | {"access_token": token}
+    opener = intercept(monkeypatch, payload)
+    exchanged = client.post(EXCHANGE_PATH, json={"code": CODE, "code_verifier": VERIFIER})
+    assert exchanged.status_code == HTTPStatus.OK
+    assert exchanged.json()["access_token"] == token
+    opener.open.side_effect = lambda *args, **kwargs: PortalResponse(
+        json.dumps(introspection_payload()).encode()
+    )
+    response = client.get("/test/principal", headers={"Authorization": "Bearer " + token})
+    assert response.status_code == HTTPStatus.OK
+    assert response.json() == {"user_id": USER_ID, "kind": "portal_user"}
+    assert json.loads(opener.open.call_args.args[0].data) == {"access_token": token}
+
+
+@pytest.mark.parametrize(
+    "token",
+    ["a" * 42, "a" * 40 + "==", "a" * 513, "a" * 511 + "==", "a" * 42 + " ", "a" * 43 + "\n"],
+    ids=["short", "short-padded", "long", "long-padded", "whitespace", "newline"],
+)
+def test_invalid_token_is_rejected_before_introspection(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, token: str
+) -> None:
+    opener = intercept(monkeypatch, introspection_payload())
+    response = client.get("/test/principal", headers={"Authorization": "Bearer " + token})
+    assert response.status_code == HTTPStatus.UNAUTHORIZED
+    assert response.json()["error"]["code"] == "portal_identity_required"
+    opener.open.assert_not_called()
+
+
 @pytest.mark.parametrize("operation", ["exchange", "introspect"])
 @pytest.mark.parametrize(
     "field,value",

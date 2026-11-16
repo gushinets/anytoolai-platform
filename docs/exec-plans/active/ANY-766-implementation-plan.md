@@ -10,8 +10,8 @@ Related requirements: [ANY-833](https://linear.app/paveldik/issue/ANY-833).
 
 - State: active
 - Owner: mixed — Portal and Kernel execution owners
-- Last updated: 2026-11-14
-- Review date: 2026-11-14
+- Last updated: 2026-11-16
+- Review date: 2026-11-16
 - Next action: complete the paired PR handoff and verify CI on the submitted revisions.
 - Verification gate: focused checks pass for the respective local corrections (Kernel migration/binding, recovery and deployment; Portal issuance/cleanup and local HTTP checkpoints). Earlier broad/browser/image evidence covers the preceding sources, not the latest pair. The dedicated PostgreSQL lock-wait activation race remains NOT_RUN; the broader matrix remains deferred under Section 3.8.
 - Blocker: no known local implementation blocker; CI has not yet verified the latest corrections in both repositories. Registry publication and deployed acceptance remain separate actions.
@@ -26,131 +26,53 @@ current status here. Add only material changes to scope, contracts, dependencies
 or execution. Keep run histories, actual commands/results and commit bookkeeping
 in the chat or authorized PR/issue evidence; do not add separate report documents.
 
-**Latest local review corrections — 2026-11-14:**
+## Current PR corrections
 
-- Portal: require web health on full image installation and persisted P/digest
-  validation before exhaustion commit/ACK. Bound code issuance to 60 per fixed
-  hour per scoped user/consumer across parent sessions, with atomic budget/code
-  commit and retryable `429`. Independent cleanup is the sole retention path;
-  preserve expired-token proof until parent invalidity and keep authorization
-  state for retry. Issuance locks only the selected parent session. Bounds,
-  migration/downgrade and cleanup rules are in the
-  [common identity guide](https://github.com/gushinets/payments-portal/blob/main/docs/contracts/product-backend-api/README.md#implemented-step-10-settings-and-cutover).
-- Kernel: validate the frontend privacy-policy build input, restore deployment
-  tests to the canonical gate and describe optional Bearer authentication in
-  OpenAPI. Bind retained paid history to one consumer; refuse ambiguous ownership
-  and mismatched paid access/delivery while accepted jobs can finish. Preserve
-  ANY-507 owner/replay/bucket keys; the [binding rules](https://github.com/gushinets/anytoolai-platform/blob/main/docs/contracts/portal-kernel-paid/README.md#service-requests-and-identity)
-  own migration and recovery details.
-- Browser: preserve ANY-841 guest drafts/runs and owner-bound paid recovery after
-  rebase. Resolve mode/session together, persist verified explicit links before
-  consuming their URL, and retain the URL on storage failure until explicit exit.
-  Preserve exact-key replay, matching-session cleanup, recovery without new-start
-  configuration and owner isolation; use existing storage and one recovery path.
+**COMPLETE locally — 2026-11-16.** The latest focused corrections preserve
+wire/storage versions and the metering path. Enduring rules from the completed
+review passes are owned by the following guides:
 
-## PR corrections — 2026-11-12
+- Portal's [common backend guide](https://github.com/gushinets/payments-portal/blob/main/docs/contracts/product-backend-api/README.md)
+  owns verified delegation, bounded code issuance and recovery-evidence retention,
+  complete policy digests, source/owner routing and recipient delivery. Discovery
+  skips empty scopes under one configured aggregate budget; unknown products are
+  distinguished from ownership failures, and overdrawn usage is refused.
+- The [data model](https://github.com/gushinets/payments-portal/blob/main/docs/architecture/payment-portal-data-model.md) owns immutable
+  activation and V2 evidence. Already-lost history without retained proof remains
+  unavailable; GETs never reconstruct it or contact Kernel to invent proof.
+- Kernel's [binding rules](https://github.com/gushinets/anytoolai-platform/blob/main/docs/contracts/portal-kernel-paid/README.md#service-requests-and-identity)
+  preserve retained consumer ownership and let accepted jobs finish on their
+  original reservations. Its [deployment guide](https://github.com/gushinets/anytoolai-platform/blob/main/infra/deployment/README.md#reviewed-images-and-independent-updates-any-766-step-17)
+  owns frontend privacy/consumer build inputs and pre-install image-label checks.
+  Older unlabelled web images require rebuilding. Unset or empty deployment
+  consumer IDs use Compose's `platform-kernel` default. Browser and protected API
+  accept opaque Bearer credentials with a total length of 43–512, including padding.
+- The [frontend boundaries](https://github.com/gushinets/anytoolai-platform/blob/main/docs/architecture/frontend-boundaries.md)
+  own guest/paid isolation, exact-key replay, form/mode recovery, verified explicit
+  links and storage-failure custody. Recovery uses the existing single path,
+  survives unavailable new-start configuration and restores own-run elapsed time
+  only for the current owner's matching saved session.
 
-Status: **COMPLETE — selected local acceptance PASS, including REV-1**. Baselines: Portal #167
-`c41428de` and Kernel #267 `82f1b155`, followed by the corrections described below.
+Use the [paired cutover](https://github.com/gushinets/payments-portal/blob/main/docs/architecture/deployment.md#paired-compatibility-and-synchronized-cutover)
+for current migration heads and stopped API/worker requirements. Preserve the
+higher-P rule when crossing the earlier expanded-digest boundary, retained
+purchases/usage and reader compatibility; configuration never transfers ownership.
 
-The five corrections cover the complete policy digest, grant ownership without
-allowances, inactive recipient scheduling, browser/API consumer alignment and
-web-update ingress retention. Their enduring rules are incorporated in Sections
-3.7 and 3.9 and the owning contract/deployment guides, rather than a second plan.
-Focused regressions, real joint HTTP/PostgreSQL scenarios and the isolated Caddy
-web-replacement/browser rehearsal passed. REV-1's read/replay policy observation
-and persistence-failure recovery also passed focused PostgreSQL and joint HTTP
-checks. Its enduring rule is in Section 3.9. No migration or wire version changed.
-P3 was already fixed; draft recovery, historical usage selection, web service
-credentials and email verification review findings remain outside this pass.
-The broader acceptance matrix and remote/live work remain deferred to ANY-767.
+Required focused coverage includes identity boundaries and secret-free web
+configuration; PostgreSQL activation with equivalent frozen anchors, upgrade then
+removal, never-active issuance, no-op/rollback, immutability and V1/V2 reads;
+browser reload/reauthorization, legacy draft restoration, mode/result/handoff
+selection, pending/running custody, storage failure, unavailable configuration,
+StrictMode and owner change; paired retained usage and single-debit replay.
 
-## Remaining PR corrections — 2026-11-13
-
-Historical checkpoint: **IMPLEMENTED and published; executed focused checks PASS;
-lock-wait activation race NOT_RUN**. Bases: Portal #167 `65079f4e` and Kernel #267
-`c8e867bf`. The header records the latest local corrections and readiness.
-
-Implemented five confirmed findings: web service credential exposure, unverified
-identity delegation, historical allowance activation, own paid form restoration,
-and newer mode selection after a terminal paid execution. Preserve all preceding
-P/R, saved-owner, inactive-recipient, consumer-ID, ingress and REV-1 guarantees,
-P3 and ANY-841. HTTP identity V2, snapshot V3 and other V1 contracts do not change.
-
-1. Establish failing regressions using the existing test harnesses. Web receives
-   only `BACKEND_CALLBACKS` (`consumer_id`, `callback_url`), default `[]`, with no
-   fallback to the private registry. Update production/agent Compose, runner and
-   joint browser environment; reject extra fields without logging input.
-2. Require verified email in the shared parent check for code issue, exchange and
-   introspection, retaining `401 backend_parent_authority_invalid`. Gate only the
-   delegation page, with the existing verification UI and an explicit session
-   refresh preserving its PKCE URL. Positive fixtures use verified identities.
-3. Add immutable `ALLOWANCE_ACTIVATION` observations (`allowance-activation:v1`,
-   exact allowance UUID), a partial unique index and a forward migration on the
-   existing table. The whole-user writer first retains missing activation proof
-   from the previous committed document with its R/committed_at, before replacing
-   it even on block/expiry. Then record missing facts from the final active state
-   with its resulting R/application time. Resolve historical subjects through the
-   saved allowance/subscription, not the current primary. These timestamps prove
-   membership in a committed R, not the first-ever activation time. No-op facts
-   do not bump R or add notifications; rollback is atomic and never-active future
-   issuance receives no fact. New reconciliation/selection evidence is V2, with
-   compatible V1/V2 readers. Only V1 may use conservative legacy proof with semantic
-   frozen-anchor cycle comparison. GETs never repair history. Already-lost,
-   unprovable history is not reconstructed by contacting Kernel.
-4. Reuse owner-scoped `StoredDraft.run` to bind a successful own paid start to its
-   session. Keep editable values separate from known original form input; pending
-   replay always uses its frozen request/key. Restore automatically only with a
-   matching session binding, after hydration without overwriting newer edits.
-   An unbound old draft remains available through an explicit Restore saved draft
-   action; this never invents result input, changes recovery or sends a request.
-   A failed binding write preserves result recovery and uses that same fallback.
-5. Persist the selected draft-enabled mode for explicit switches/edits, own starts
-   before sending, and chosen results/handoffs. Late acceptance/background handoff
-   must not become a newer choice. Explicit current URL selection wins presentation;
-   otherwise pending and nonterminal accepted operations win automatic recovery.
-   A confirmed terminal accepted operation permits the saved mode. Preserve the
-   existing active-attach priority for old records until explicitly changed, and
-   synchronize the selected scenario on successful explicit result resolution.
-   Recheck custody, recovery and selection after awaits; changing mode only removes
-   the matching attachment and retains accepted recovery. No second paid replay path
-   or new browser-storage version is introduced.
-
-Required focused coverage: PostgreSQL ISO-equivalence and lock-wait boundary activation,
-upgrade followed immediately by removal, never-active future issuance, no-op,
-rollback, migration/immutability and V1/V2 reads; all delegation boundaries and
-verification changes; secret-free resolved web configuration. Browser coverage
-includes own reload/reauthorization, manual legacy draft restoration, A-result to
-B-mode and B-mode to explicit A-result reloads, chosen/late handoffs, pending and
-running custody, storage failure, unavailable config, StrictMode and owner change.
-Extend the existing real joint HTTP/two-PostgreSQL/browser harness with local
-SMTP/LBX/AI substitutes; prove retained usage and single-debit replay. Run affected
-prior regressions, types/lint, architecture/docs/generated checks on installed
-dependencies. Do not resume the deferred full/live campaign automatically.
-
-Update the common guide, configuration, identity, history/data-model, frontend
-recovery and installation docs in both repositories. Stop Portal API/workers for
-migration and start compatible binaries; old binaries/downgrade are not supported
-once new evidence exists. Preserve the separate existing higher-P cutover rule
-for the expanded policy digest. Check disposable resource isolation and available
-images/dependencies before runtime checks; obtain separate authorization for any
-missing installation/download. Report PASS/FAIL/NOT_RUN/BLOCKED and the remaining
-legacy-history limitation; never count old images as proof of the new frontend.
-
-Executed focused Portal PostgreSQL/API/component and Kernel recovery/draft regressions
-pass, including prior ownership, policy and delivery invariants. Real paired HTTP
-checks pass for policy/replay and SMTP-backed verification. All eight selected
-desktop/mobile browser cases pass across the focused runs, including the corrected
-draft/mode selector rerun; accessibility and responsive checks pass. Types, changed
-file lint, architecture, documentation and generated drift checks pass.
-The dedicated concurrent PostgreSQL lock-wait activation regression
-is **NOT_RUN**; review of the receipt path is structural evidence, not a passing
-runtime race test. Full local/live suites and new image builds/rehearsals are also
-**NOT_RUN** for this pass. Corrected public-callback and distinct activation/V2
-versus exhaustion downgrade tests pass locally, retaining no-revival assertions.
-Already-lost history without retained proof remains unavailable, as specified
-above. Migration `20261113_0012` was checked only on disposable local
-PostgreSQL; deployment is not performed.
+Focused regressions, types, changed-code lint and documentation/architecture checks
+pass; the existing runner lint baseline is unchanged. Earlier paired HTTP/browser
+and image evidence covers preceding sources, not the latest complete pair. The
+latest image probes verify Docker metadata only. The dedicated PostgreSQL
+lock-wait activation race, full application image rebuilds, fresh assembled-pair
+acceptance, publication and deployment remain **NOT_RUN** for the latest
+corrections. The broader local/live matrix remains deferred under Section 3.8;
+do not resume it automatically. CI has not verified the latest local corrections.
 
 ## 1. Goal & Final Expected Outcome
 

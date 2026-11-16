@@ -689,7 +689,8 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
     attachedSessionRef.current = attachSessionId;
     setAttachBegun(true);
     attachActiveRef.current = true;
-    setRunStartedAtMs(Date.now());
+    const ownRun = paid && draftKey !== null ? readProductDraft(draftKey)?.run : undefined;
+    setRunStartedAtMs(ownRun?.scenarioSessionId === attachSessionId ? ownRun.startedAtMs ?? Date.now() : Date.now());
     setPhase({ kind: "running", scenarioSessionId: attachSessionId });
     void runPoll(attachSessionId);
     callSafely(onAttachBeginRef.current);

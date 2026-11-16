@@ -9,6 +9,8 @@ export type TabStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 export const PORTAL_SESSION_KEY = "anytoolai.portal_session.v1";
 const AUTHORIZATION_KEY = "anytoolai.portal_authorization.v1";
 const RANDOM_BYTES = 32;
+const MIN_ACCESS_TOKEN_LENGTH = 43;
+const MAX_ACCESS_TOKEN_LENGTH = 512;
 
 export function samePortalOwner(a: PortalOwner, b: PortalOwner): boolean {
   return a.tenantId === b.tenantId && a.region === b.region && a.userId === b.userId;
@@ -23,7 +25,8 @@ export function parsePortalOwner(value: unknown): PortalOwner | null {
 
 export function parsePortalExchange(value: unknown, expectedConsumerId: string): PortalSession | null {
   if (!isRecord(value) || value.schema_version !== 2 || value.token_type !== "Bearer" ||
-    typeof value.access_token !== "string" || !/^[A-Za-z0-9_-]{43,512}$/.test(value.access_token) ||
+    typeof value.access_token !== "string" || value.access_token.length < MIN_ACCESS_TOKEN_LENGTH ||
+    value.access_token.length > MAX_ACCESS_TOKEN_LENGTH || !/^[A-Za-z0-9._~+/-]+=*$/.test(value.access_token) ||
     typeof value.expires_at !== "string" || !/Z$|[+]00:00$/.test(value.expires_at) ||
     !Number.isFinite(Date.parse(value.expires_at))) return null;
   if (value.consumer_id !== expectedConsumerId || !Number.isSafeInteger(value.consumer_policy_revision) ||

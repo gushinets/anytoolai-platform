@@ -1,7 +1,7 @@
 # Payment Portal integration map
 
 Status: navigation, implementation snapshots and the ANY-711 service-authentication handoff.
-Last observed: 2026-11-13; local source state, not a deployment check.
+Last observed: 2026-11-16; local source state, not a deployment check.
 
 ## Ownership and sources
 
@@ -32,15 +32,12 @@ Historical Portal contracts and execution plans do not override accepted sources
 
 ## Current local implementation
 
-Current source baselines: Kernel `c8e867bfc25f4158b0bc36b76892e670a32cbb12`
-and Portal `65079f4e50867b9582a951a62a62cb6706dc0e0f`, plus the local remaining-corrections
-diff. The dated checkpoints below retain historical evidence, not current setup
-instructions. Corrections through 2026-11-13 cover policy digest, saved ownership,
-inactive delivery, consumer alignment, ingress retention, web credential isolation,
-verified delegation, historical activation and paid form/mode recovery. Focused
-local verification passed; earlier image rehearsals do not verify the new sources.
-The [active plan](../exec-plans/active/ANY-766-implementation-plan.md) owns the
-current scope and remaining gates.
+Implementation and local PR corrections are complete through 2026-11-16 in the
+agreed scope. The [active plan](../exec-plans/active/ANY-766-implementation-plan.md#current-pr-corrections)
+owns current readiness and remaining verification gates. Focused checks cover the
+latest local corrections; earlier paired HTTP/browser/image evidence does not
+verify the latest complete pair. The dated checkpoints below retain historical
+evidence, not current setup instructions.
 
 - Manifest V1 is implemented in Kernel and consumed by Portal.
 - Portal serves common consumer-bound identity V2 with configured callbacks,

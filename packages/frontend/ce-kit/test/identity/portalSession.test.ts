@@ -28,6 +28,23 @@ describe("Portal tab custody", () => {
     writePortalSession(storage, session);
     expect(readPortalSession(storage, "platform-kernel")).toEqual(session);
   });
+  it.each([".", "~", "+", "/", "=", "=="])("preserves an opaque Bearer-safe token with %s", (suffix) => {
+    const storage = memoryTabStorage();
+    const next = { ...session, accessToken: "a".repeat(43) + suffix };
+    writePortalSession(storage, next);
+    expect(readPortalSession(storage, "platform-kernel")).toEqual(next);
+  });
+  it.each([[43, ""], [42, "="], [41, "=="], [40, "==="], [512, ""], [511, "="], [510, "=="]] as const)("counts padding in the total token length: core=%s padding=%s", (length, padding) => {
+    const storage = memoryTabStorage();
+    const next = { ...session, accessToken: "a".repeat(length) + padding };
+    writePortalSession(storage, next);
+    expect(readPortalSession(storage, "platform-kernel")).toEqual(next);
+  });
+  it.each(["a".repeat(42), "a".repeat(511) + "==", "a".repeat(43) + "\n", "a".repeat(43) + "\r\n", "a".repeat(43) + " ", "a".repeat(43) + "é"])("rejects unsafe or out-of-contract token %s", (accessToken) => {
+    const storage = memoryTabStorage();
+    writePortalSession(storage, { ...session, accessToken });
+    expect(() => readPortalSession(storage, "platform-kernel")).toThrow("portal_storage_invalid");
+  });
   it("requires reauthorization for the old token envelope", () => {
     const storage = memoryTabStorage();
     storage.setItem("anytoolai.portal_session.v1", JSON.stringify({ version: 1, ...session }));

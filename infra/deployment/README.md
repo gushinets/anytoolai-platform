@@ -32,6 +32,13 @@ publishes it as `NEXT_PUBLIC_PORTAL_CONSUMER_ID`; use the same ID in the API, wo
 Portal registry. Workflow input `portal_consumer_id` supplies the build argument.
 Launch, exchange and stored V2 sessions must match this audience exactly. Changing
 the configured ID does not transfer retained purchases, allowances or usage.
+The runtime web image records that build argument in the non-secret
+`io.anytoolai.portal-consumer-id` label. Image installation and frontend-only
+updates compare it with the resolved `ANYTOOLAI_PORTAL_CONSUMER_ID` before replacing
+services. An unset or empty value uses `platform-kernel`, matching Compose.
+A missing or mismatching label requires rebuilding/selecting a compatible web
+image; older unlabelled images are refused. Frontend and backend source revisions
+may still differ.
 Changing runtime variables cannot recompile these values. Public frontend image
 tags include the run ID to distinguish builds with different origins. Backend
 credentials and provider secrets are runtime-only.

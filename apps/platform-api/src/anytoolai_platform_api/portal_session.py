@@ -23,6 +23,8 @@ DELEGATION_SCHEMA_VERSION = 2
 PORTAL_TIMEOUT_SECONDS = 2
 PORTAL_MAX_RESPONSE_BYTES = 16 * 1024
 DELEGATION_TTL_SECONDS = 30 * 60
+DELEGATION_TOKEN_MIN_LENGTH = 43
+DELEGATION_TOKEN_MAX_LENGTH = 512
 PORTAL_CLOCK_BUDGET_SECONDS = 5
 IDENTITY_FAILURE_CODES = frozenset(
     {
@@ -78,7 +80,9 @@ class PortalExchangeRequest(BaseModel):
 class PortalExchangeResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", hide_input_in_errors=True)
     schema_version: VersionTwo
-    access_token: str = Field(min_length=43, max_length=512, repr=False)
+    access_token: str = Field(
+        min_length=DELEGATION_TOKEN_MIN_LENGTH, max_length=DELEGATION_TOKEN_MAX_LENGTH, repr=False
+    )
     token_type: Literal["Bearer"]
     consumer_id: str = Field(pattern=r"^[a-z][a-z0-9-]{0,63}$")
     consumer_policy_revision: int = Field(strict=True, ge=1, le=2**53 - 1)
@@ -260,7 +264,8 @@ def authenticate_portal_user(
     scheme, _, token = (headers[0] if len(headers) == 1 else "").partition(" ")
     if (
         scheme.lower() != "bearer"
-        or re.fullmatch(r"[A-Za-z0-9._~+/-]{43,512}={0,2}", token) is None
+        or not DELEGATION_TOKEN_MIN_LENGTH <= len(token) <= DELEGATION_TOKEN_MAX_LENGTH
+        or re.fullmatch(r"[A-Za-z0-9._~+/-]+=*", token) is None
     ):
         raise ApiError(
             status_code=HTTPStatus.UNAUTHORIZED,

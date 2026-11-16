@@ -159,6 +159,58 @@ it("restores own form after completed paid run and reload", async () => {
   expect(textField().value).toBe("Original paid task");
 });
 
+it("preserves elapsed time across own paid start, acceptance and reload", async () => {
+  const now = Date.now();
+  const clock = vi.spyOn(Date, "now").mockReturnValue(now);
+  const respond = fetcher.getMockImplementation()!;
+  fetcher.mockImplementation((url, init) => {
+    const path = new URL(typeof url === "string" ? url : url instanceof URL ? url.href : url.url).pathname;
+    if (path.startsWith("/v1/scenario-sessions/")) {
+      return Promise.resolve(sessionResponse({ scenario_id: TEST_PRODUCT_IDS.scenarioId, status: "running", result_artifact_id: null }));
+    }
+    return respond(url, init);
+  });
+  try {
+    const page = open();
+    await screen.findByLabelText("Text");
+    fireEvent.change(textField(), { target: { value: "Original paid task" } });
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
+    const persistence = getPaidPersistence(createPlatformApiClient())!;
+    await waitFor(() => expect(readPaidStartRecovery(persistence, TEST_PRODUCT_IDS.productId)?.kind).toBe("accepted"));
+    const key = productDraftKey(TEST_PRODUCT_IDS.productId, definition.messageScope, owner);
+    expect(readProductDraft(key)?.run?.startedAtMs).toBe(now);
+    page.unmount();
+    clock.mockReturnValue(now + 65_000);
+    open();
+    await screen.findByText("Elapsed: 1:05");
+    expect(screen.getByTestId("run-progress").getAttribute("data-stage")).toBe("long");
+    expect(textField().value).toBe("Original paid task");
+    expect(starts).toHaveLength(1);
+  } finally { clock.mockRestore(); }
+});
+
+it.each(["missing-time", "other-session", "other-owner"])("times an attachment locally with %s draft", async (change) => {
+  const now = Date.now();
+  const clock = vi.spyOn(Date, "now").mockReturnValue(now);
+  const key = productDraftKey(TEST_PRODUCT_IDS.productId, definition.messageScope, change === "other-owner" ? otherOwner : owner);
+  saveDraftValues(key, { text: "Saved input" });
+  saveDraftRun(key, { scenarioSessionId: change === "other-session" ? "different_session" : "session_1", input: { text: "Saved input" },
+    ...(change === "missing-time" ? {} : { startedAtMs: now - 65_000 }) });
+  persistPaidStartRecovery(getPaidPersistence(createPlatformApiClient())!, { version: 1, kind: "accepted", owner, ...TEST_PRODUCT_IDS, scenarioSessionId: "session_1" });
+  const respond = fetcher.getMockImplementation()!;
+  fetcher.mockImplementation((url, init) => {
+    const path = new URL(typeof url === "string" ? url : url instanceof URL ? url.href : url.url).pathname;
+    return path.startsWith("/v1/scenario-sessions/")
+      ? Promise.resolve(sessionResponse({ scenario_id: TEST_PRODUCT_IDS.scenarioId, status: "running", result_artifact_id: null })) : respond(url, init);
+  });
+  try {
+    open();
+    await screen.findByText("Elapsed: 0:00");
+    expect(screen.queryByText("Elapsed: 1:05")).toBeNull();
+    expect(starts).toHaveLength(0);
+  } finally { clock.mockRestore(); }
+});
+
 it("preserves a later selected mode after completed paid run", async () => {
   const modes = [
     { id: "first", label: "First", definition },
