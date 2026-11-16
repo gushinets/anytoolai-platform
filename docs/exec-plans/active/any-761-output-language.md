@@ -113,3 +113,35 @@ config/architecture/docs/generated checks passed. The broader runner/evidence ru
 passed when rerun with an isolated env path; the non-root activation-marker test requires
 passwordless sudo unavailable here. The affected helper/test bodies are unchanged from main.
 No suppression or unrelated test fix; full CI, browser smoke and paid live evals were not rerun.
+
+
+## Implementation plan — review round 2 language metadata
+
+Validate AB analysis_language against the case expected_language before a report can PASS.
+Use the current contract tag syntax and compare primary language subtags, so es-MX matches es.
+Keep authored-prose decisions mandatory. Retained legacy outputs with a document and the
+validated generate_document ledger step remain historical evidence; do not retrofit metadata.
+Test RU/EN/ES Draft/Check, missing/invalid/wrong tags, regional tags, empty extraction and the
+report exit code. Re-evaluate saved captures read-only, compare old/new statuses, preserve
+original files and reviews, and record aggregate results here without raw evidence directories.
+Run focused checks, commit and push; no live provider calls.
+
+Review round2 verification:73 collector/regression tests and Ruff passed. Doctor, documentation,
+generated-documentation and whitespace checks passed. No provider calls or product changes.
+
+Read-only offline recheck found255 saved AB captures:75 current-contract outputs all have valid
+metadata matching the case's expected analysis language;180 legacy document outputs retain
+their historical ledger/prose evaluation and are not counted as metadata passes. Replayed
+original agent reviews and blank independent-human templates against both the pre-fix and
+corrected evaluator: all statuses are unchanged. The current-contract agent results remain
+73 PASS /2 FAIL: Draft24/24, initial Check22/24, corrected Check24/24, browser3/3. The two
+initial Check failures remain failures; this does not supersede the original experiment.
+The selected final subset remains Draft24 + corrected Check24 + browser3 PASS.
+
+For72 numbered current-contract API captures, also replayed the complete report command using
+temporary copies: agent reviews yielded70 PASS (exit0) /2 FAIL (exit1); all72 blank human
+templates remained PENDING (exit1). Three browser records use a nonnumeric attempt identifier,
+so their metadata and review_status were checked directly, not through the numbered-run CLI.
+SHA-256 comparison confirms all1043 files in the saved evidence tree are unchanged, including
+original captures, reviews and reports. No raw evidence was added to git. This is a metadata
+and evaluator replay, not a new human prose review or live experiment; full CI is pending.

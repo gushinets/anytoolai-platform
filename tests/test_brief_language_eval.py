@@ -210,6 +210,110 @@ def cli_args(command, out):
     return arguments
 
 
+def ab_record(case_id):
+    run = record()
+    run["case"] = next(case for case in CASES if case["id"] == case_id)
+    run["output"] = deepcopy(CANONICAL[case_id])
+    if run["case"]["scenario_id"] == "acceptance_builder.draft_v1":
+        run["ledger"]["actions"] = run["ledger"]["actions"][:1]
+        run["ledger"]["calls"] = run["ledger"]["calls"][:1]
+    run["ledger"]["artifacts"][0]["content_json"] = run["output"]
+    return run
+
+
+@pytest.mark.parametrize("mode", ["D", "C"])
+@pytest.mark.parametrize("language", ["RU", "EN", "ES"])
+@pytest.mark.parametrize("family", ["basic", "weak"])
+def test_ab_metadata_must_match_expected_analysis_language(mode, language, family):
+    run = ab_record(f"ANY761-AB-{mode}-{language}-{family}")
+    expected = run["case"]["expected_language"]
+    values = run["output"]["extracted"]["values"]
+    for tag in (expected, expected + "-MX"):
+        values["analysis_language"] = tag
+        assert evaluation.review_status(run, completed_review(run)) == "PASS"
+    values["analysis_language"] = "en" if expected != "en" else "ru"
+    assert evaluation.review_status(run, completed_review(run)) == "FAIL"
+
+
+def test_explicit_analysis_language_override_takes_precedence_over_source_language():
+    run = ab_record("ANY761-AB-D-RU-weak")
+    run["case"] = next(case for case in CASES if case["id"] == "ANY761-AB-D-RU-override")
+    assert run["case"]["source_language"] != run["case"]["expected_language"]
+    values = run["output"]["extracted"]["values"]
+    values["analysis_language"] = run["case"]["source_language"]
+    assert evaluation.review_status(run, completed_review(run)) == "FAIL"
+    values["analysis_language"] = run["case"]["expected_language"]
+    assert evaluation.review_status(run, completed_review(run)) == "PASS"
+
+
+@pytest.mark.parametrize("tag", [None, "", "RU", "ru_XX", "ru-", "ru-!", "ru\n", 1, [], {}])
+def test_ab_invalid_language_tag_cannot_pass(tag):
+    run = ab_record("ANY761-AB-D-RU-weak")
+    run["output"]["extracted"]["values"]["analysis_language"] = tag
+    assert evaluation.review_status(run, completed_review(run)) == "FAIL"
+
+
+def test_ab_missing_language_tag_cannot_pass():
+    run = ab_record("ANY761-AB-D-RU-weak")
+    del run["output"]["extracted"]["values"]["analysis_language"]
+    assert evaluation.review_status(run, completed_review(run)) == "FAIL"
+
+
+@pytest.mark.parametrize("expected", [None, "", "ru_XX"])
+def test_ab_missing_or_invalid_expected_language_cannot_pass(expected):
+    run = ab_record("ANY761-AB-D-RU-weak")
+    run["case"] = {**run["case"], "expected_language": expected}
+    assert evaluation.review_status(run, completed_review(run)) == "FAIL"
+
+
+def test_ab_regional_expected_language_matches_primary_tag():
+    run = ab_record("ANY761-AB-D-ES-weak")
+    run["case"] = {**run["case"], "expected_language": "es-MX"}
+    assert evaluation.review_status(run, completed_review(run)) == "PASS"
+
+
+def test_legacy_document_requires_its_historical_ledger_step():
+    run = ab_record("ANY761-AB-D-RU-weak")
+    del run["output"]["extracted"]["values"]["analysis_language"]
+    run["output"]["document"] = {"summary": "Уточните требования.", "sections": []}
+    assert evaluation.review_status(run, completed_review(run)) == "PENDING"
+    run["ledger"]["actions"].append({
+        **run["ledger"]["actions"][0], "id": "document", "step_id": "generate_document",
+    })
+    run["ledger"]["calls"].append({
+        **run["ledger"]["calls"][0], "id": "document-call", "action_run_id": "document",
+    })
+    assert evaluation.review_status(run, completed_review(run)) == "PASS"
+    run["output"]["extracted"]["values"]["analysis_language"] = "en"
+    assert evaluation.review_status(run, completed_review(run)) == "FAIL"
+
+
+@pytest.mark.parametrize(
+    ("tag", "status", "exit_code"),
+    [("en", "FAIL", 1), ("ru", "PASS", 0), ("ru-RU", "PASS", 0)],
+)
+def test_weak_draft_report_checks_metadata_without_modifying_evidence(
+    monkeypatch, tmp_path, capsys, tag, status, exit_code,
+):
+    run = ab_record("ANY761-AB-D-RU-weak")
+    run["output"]["extracted"]["values"]["analysis_language"] = tag
+    run.update(attempt=1, snapshot={})
+    assert evaluation.authored_fields(run["output"]) == {}
+    key = run["case"]["id"] + "--1"
+    files = {
+        "manifest.json": {"runs": [key], "cases": [run["case"]], "snapshot": {}},
+        f"{key}.json": run,
+        f"{key}.review.json": completed_review(run),
+    }
+    for name, content in files.items():
+        evaluation.write_json(tmp_path / name, content)
+    before = {path.name: path.read_bytes() for path in tmp_path.iterdir()}
+    monkeypatch.setattr(sys, "argv", cli_args("report", tmp_path))
+    assert evaluation.main() == exit_code
+    assert capsys.readouterr().out == f"{key}: {status}\n"
+    assert {path.name: path.read_bytes() for path in tmp_path.iterdir()} == before
+
+
 @pytest.mark.parametrize("case_id", UNSAFE_KEYS)
 def test_run_rejects_all_unsafe_case_ids_before_any_collection(monkeypatch, tmp_path, case_id):
     valid = deepcopy(record()["case"])

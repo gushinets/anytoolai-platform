@@ -139,6 +139,26 @@ def review_template(record: dict) -> dict:
     }
 
 
+def primary_language(tag: object) -> str | None:
+    """Accept the AB contract's language tags, matching the presenter's primary subtag."""
+    if not isinstance(tag, str) or not re.fullmatch(r"[a-z]{2,3}(-[A-Za-z0-9]{2,8})*", tag):
+        return None
+    return tag.split("-")[0]
+
+
+def analysis_language_matches(record: dict) -> bool:
+    output = record.get("output")
+    if not output or not record["case"]["scenario_id"].startswith("acceptance_builder."):
+        return True
+    values = output.get("extracted", {}).get("values", {})
+    # Historical document outputs must also pass the generate_document ledger check below.
+    if "document" in output and "analysis_language" not in values:
+        return True
+    actual = primary_language(values.get("analysis_language"))
+    expected = primary_language(record["case"].get("expected_language"))
+    return actual is not None and expected is not None and actual == expected
+
+
 def review_status(record: dict, review: dict) -> str:
     expected = review_template(record)
     if review.get("evidence_sha256") != expected["evidence_sha256"]:
@@ -150,7 +170,10 @@ def review_status(record: dict, review: dict) -> str:
         decisions += list(review[group].values())
     if any(value is not None and type(value) is not bool for value in decisions):
         raise ValueError("review decisions must be true, false or null")
-    if record.get("error") or record.get("evidence_error") or False in decisions:
+    if (
+        record.get("error") or record.get("evidence_error") or False in decisions
+        or not analysis_language_matches(record)
+    ):
         return "FAIL"
     ledger = record.get("ledger") or {}
     if not record.get("output") or not ledger.get("calls"):
