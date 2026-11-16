@@ -286,20 +286,51 @@ _GAPS_KEYWORD = {
 }
 _INTERNAL_FIELD_KEY = re.compile(
     r"\b(?:"
-    + "|".join(re.escape(key) for key in (*_GAPS_KEYWORD, "missing_fields") if "_" in key)
+    + "|".join(re.escape(key) for key in (*_GAPS_KEYWORD, "missing_fields"))
     + r")\b",
     re.IGNORECASE,
 )
+_LITERAL_SPAN = re.compile(
+    r"(?<!`)(?P<code>`+)[^\r\n]*?(?<!`)(?P=code)(?!`)"
+    r"|(?<!\w)(?P<quote>[\"'])[^\r\n]*?(?P=quote)"
+)
+_FIELD_LABEL_WORD = r"(?:fields?|поле|поля|полей|campos?)"
+_FIELD_LABEL_BEFORE = re.compile(rf"\b{_FIELD_LABEL_WORD}$", re.IGNORECASE)
+_FIELD_LABEL_AFTER = re.compile(rf"^{_FIELD_LABEL_WORD}\b", re.IGNORECASE)
 _KEY_LABELS = re.compile(r"missing fields?\s*:|fields? by name|пропущено поле", re.IGNORECASE)
+_TECHNICAL_GAP_SENTENCES = (
+    "The {key} field is not present.",
+    "Поле {key} не указано.",
+    "No se ha indicado el campo {key}.",
+)
 
 
 def _field_key_leaks(text: str, *, source_text: str = "") -> list[str]:
-    """Find internal notation, allowing literal identifiers from client facts."""
-    # shortcut: source/key collisions need live review; add semantic evals if they recur.
-    source_keys = {key.casefold() for key in _INTERNAL_FIELD_KEY.findall(source_text)}
-    return [
-        key for key in _INTERNAL_FIELD_KEY.findall(text) if key.casefold() not in source_keys
-    ] + _KEY_LABELS.findall(text)
+    """Check known-key notation per occurrence, preserving exact single-line source literals."""
+    # shortcut: copied literals are checked syntactically; use live evals for their meaning.
+    source_literals = {match.group() for match in _LITERAL_SPAN.finditer(source_text)}
+    # A non-whitespace barrier prevents the remaining words from becoming adjacent field labels.
+    untrusted = _LITERAL_SPAN.sub(
+        lambda match: "~" if match.group() in source_literals else match.group(),
+        text,
+    )
+    literal_keys = {
+        (literal.start() + key.start(), literal.start() + key.end())
+        for literal in _LITERAL_SPAN.finditer(untrusted)
+        for key in _INTERNAL_FIELD_KEY.finditer(literal.group())
+    }
+    leaks = _KEY_LABELS.findall(untrusted)
+    for match in _INTERNAL_FIELD_KEY.finditer(untrusted):
+        before = untrusted[:match.start()].rstrip(" \t:`'\"")
+        after = untrusted[match.end():].lstrip(" \t:`'\"")
+        if (
+            "_" in match.group()
+            or match.span() in literal_keys
+            or _FIELD_LABEL_BEFORE.search(before)
+            or _FIELD_LABEL_AFTER.match(after)
+        ):
+            leaks.append(match.group())
+    return leaks
 
 
 @pytest.mark.parametrize(
@@ -328,18 +359,86 @@ def test_field_key_leak_guard_catches_the_qa_strings(leaky: str) -> None:
         "El cliente debe confirmar el objetivo, los entregables, el plazo, el presupuesto, "
         "el público objetivo y las restricciones.",
         "Fix the `reset_password` handler and preserve the `api_v2` route.",
+        "The budget's size is unclear.",
     ],
 )
 def test_field_key_leak_guard_accepts_plain_words(text: str) -> None:
     assert not _field_key_leaks(text)
 
 
-@pytest.mark.parametrize("identifier", ["target_audience", "PROJECT_GOAL", "missing_fields"])
-def test_field_key_leak_guard_preserves_source_identifiers(identifier: str) -> None:
-    source = f"Preserve the `{identifier}` database column."
+@pytest.mark.parametrize("identifier", [*_GAPS_KEYWORD, "missing_fields", "PROJECT_GOAL"])
+@pytest.mark.parametrize("delimiter", ["`", "``", '"', "'"])
+def test_field_key_leak_guard_preserves_source_identifiers(
+    identifier: str, delimiter: str
+) -> None:
+    source = f"Preserve the {delimiter}{identifier}{delimiter} database column."
     assert _field_key_leaks(source)
     assert not _field_key_leaks(source, source_text=source)
     assert _field_key_leaks(f"Missing field: {identifier}", source_text=source)
+    assert _field_key_leaks(f"The {identifier} field is missing.", source_text=source)
+
+
+@pytest.mark.parametrize("key", [*_GAPS_KEYWORD, "missing_fields"])
+@pytest.mark.parametrize("template", _TECHNICAL_GAP_SENTENCES)
+@pytest.mark.parametrize("delimiter", ["", "`", "``", '"', "'"])
+def test_all_internal_keys_are_rejected_in_technical_contexts(
+    key: str, template: str, delimiter: str
+) -> None:
+    assert _field_key_leaks(template.format(key=f"{delimiter}{key}{delimiter}"))
+
+
+@pytest.mark.parametrize("key", [key for key in _GAPS_KEYWORD if "_" not in key])
+def test_single_word_keys_remain_valid_unformatted_prose(key: str) -> None:
+    assert not _field_key_leaks(f"Confirm the {key} with the client.")
+
+
+@pytest.mark.parametrize("key", [*_GAPS_KEYWORD, "missing_fields"])
+def test_unquoted_source_values_cannot_authorize_quoted_keys(key: str) -> None:
+    assert _field_key_leaks(f'"{key}"', source_text=key)
+
+
+@pytest.mark.parametrize("delimiter", ["`", '"'])
+def test_literal_exemption_cannot_span_separate_source_values(delimiter: str) -> None:
+    assert _field_key_leaks(
+        f"{delimiter}budget{delimiter}", source_text=f"{delimiter}budget\n{delimiter}"
+    )
+
+
+@pytest.mark.parametrize(
+    "leak",
+    ["target_audience", '"target_audience"', "`TARGET_AUDIENCE`", "``target_audience``"],
+)
+def test_literal_exemption_preserves_case_delimiters_and_occurrence(leak: str) -> None:
+    source = "Preserve the `target_audience` database column."
+    assert len(_field_key_leaks(f"{source} {leak} is missing.", source_text=source)) == 1
+
+
+@pytest.mark.parametrize("literal", ["` budget `", "``\tbudget\t``", '"budget"', "'budget'"])
+def test_source_literal_whitespace_is_preserved_exactly(literal: str) -> None:
+    source = f"Preserve {literal}."
+    assert not _field_key_leaks(source, source_text=source)
+    assert _field_key_leaks(source, source_text="Preserve budget.")
+
+
+@pytest.mark.parametrize(
+    "literal",
+    [
+        "`target_audience.id`",
+        "`data['budget']`",
+        "`data.budget`",
+        '"Missing field: budget"',
+        "``target_audience = `legacy` ``",
+    ],
+)
+def test_complete_source_literals_preserve_expressions_and_quoted_messages(literal: str) -> None:
+    source = f"Preserve {literal}."
+    assert _field_key_leaks(source)
+    assert not _field_key_leaks(source, source_text=source)
+    assert _field_key_leaks(f"{source} target_audience is missing.", source_text=source)
+
+
+def test_preserved_literal_does_not_join_unrelated_words_into_a_field_label() -> None:
+    assert not _field_key_leaks("field `source_id` budget", source_text="Keep `source_id`.")
 
 
 @pytest.mark.parametrize(
@@ -406,8 +505,12 @@ def test_summary_fixtures_obey_the_a10_prompt(summary_suffix: str, extract_suffi
     document = _fixture_response("brief_decoder.generate_summary_v1" + summary_suffix)
     sections = {s["id"]: s["content"] for s in document["sections"]}
 
-    # Only values carry client facts; schema keys and missing_fields cannot grant an exemption.
-    source_text = json.dumps(list(brief["values"].values()), ensure_ascii=False)
+    # JSON encoding would invent quotes around bare values and escape the client's real quotes.
+    source_text = "\n".join(
+        item
+        for value in brief["values"].values()
+        for item in ([value] if isinstance(value, str) else value)
+    )
     texts = [
         (f"{section['id']}.{field}", section[field])
         for section in document["sections"]
@@ -444,11 +547,15 @@ def test_summary_fixture_guard_rejects_leaks_in_every_copied_field(
         test_summary_fixtures_obey_the_a10_prompt(suffix, _SUMMARY_FIXTURES[suffix])
 
 
+@pytest.mark.parametrize("delimiter", ["`", "``", '"', "'"])
 def test_summary_fixture_guard_preserves_identifiers_from_extracted_values(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, delimiter: str
 ) -> None:
     original = _fixture_response
-    source = "Fix the `reset_password` handler and preserve the `api_v2` and `target_audience` routes."
+    source = (
+        f"Fix the {delimiter}reset_password{delimiter} handler and preserve the "
+        f"{delimiter}api_v2{delimiter} and {delimiter}target_audience{delimiter} routes."
+    )
 
     def fixture_response(name: str) -> dict[str, Any]:
         response = original(name)
@@ -460,6 +567,63 @@ def test_summary_fixture_guard_preserves_identifiers_from_extracted_values(
 
     monkeypatch.setitem(globals(), "_fixture_response", fixture_response)
     test_summary_fixtures_obey_the_a10_prompt("", "")
+
+
+@pytest.mark.parametrize("key", [key for key in _GAPS_KEYWORD if "_" not in key])
+@pytest.mark.parametrize("template", _TECHNICAL_GAP_SENTENCES)
+def test_summary_fixture_guard_rejects_code_formatted_single_word_fields(
+    monkeypatch: pytest.MonkeyPatch, key: str, template: str
+) -> None:
+    original = _fixture_response
+    stem = "brief_decoder.generate_summary_v1.weak_input"
+    document = original(stem)
+    document["sections"][2]["content"] += " " + template.format(key=f"`{key}`")
+    monkeypatch.setitem(
+        globals(), "_fixture_response", lambda name: document if name == stem else original(name)
+    )
+    with pytest.raises(AssertionError, match="field key leaks"):
+        test_summary_fixtures_obey_the_a10_prompt(".weak_input", ".weak_input")
+
+
+@pytest.mark.parametrize(
+    "leak", ["target_audience is missing.", "target_audience не указан.", "Falta target_audience."]
+)
+def test_source_identifier_does_not_hide_a_still_missing_brief_field(
+    monkeypatch: pytest.MonkeyPatch, leak: str
+) -> None:
+    original = _fixture_response
+
+    def fixture_response(name: str) -> dict[str, Any]:
+        response = original(name)
+        if name == "brief_decoder.extract_brief_v1":
+            assert "target_audience" in response["missing_fields"]
+            response["values"]["project_goal"] += " Preserve the `target_audience` database column."
+        elif name == "brief_decoder.generate_summary_v1":
+            response["sections"][2]["content"] += " " + leak
+        return response
+
+    monkeypatch.setitem(globals(), "_fixture_response", fixture_response)
+    with pytest.raises(AssertionError, match="field key leaks"):
+        test_summary_fixtures_obey_the_a10_prompt("", "")
+
+
+@pytest.mark.parametrize("key", [key for key in _GAPS_KEYWORD if "_" not in key])
+def test_json_quoting_of_extracted_values_cannot_authorize_a_literal(
+    monkeypatch: pytest.MonkeyPatch, key: str
+) -> None:
+    original = _fixture_response
+
+    def fixture_response(name: str) -> dict[str, Any]:
+        response = original(name)
+        if name == "brief_decoder.extract_brief_v1":
+            response["values"]["deliverables"].append(key)
+        elif name == "brief_decoder.generate_summary_v1":
+            response["sections"][2]["content"] += f' The "{key}" field is not present.'
+        return response
+
+    monkeypatch.setitem(globals(), "_fixture_response", fixture_response)
+    with pytest.raises(AssertionError, match="field key leaks"):
+        test_summary_fixtures_obey_the_a10_prompt("", "")
 
 
 def test_schemas_are_closed() -> None:

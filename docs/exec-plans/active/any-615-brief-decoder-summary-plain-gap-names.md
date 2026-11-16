@@ -7,9 +7,9 @@
 - Created: 2026-11-16
 - Last updated: 2026-11-16
 - Review date: 2026-11-16
-- Next action: review the three fixes and run live acceptance on B02/B04/B05 and
-  `asdf ::: 12345 !!!` in Russian, English and Spanish.
-- Blocker: three unrelated deployment-runner baseline failures; see Validation.
+- Next action: review the round 2 syntax contract, then CI and live acceptance on B02/B04/B05
+  and `asdf ::: 12345 !!!` in Russian, English and Spanish.
+- Blocker: prior local full-check environment failures and pending live acceptance; see Validation.
 
 ## Goal
 
@@ -37,8 +37,10 @@ Prompt-text and fake-provider fixture tests do not prove live model behavior. QA
 B02 (missing audience), B04 (missing deliverables), B05 (Russian missing audience), and the input
 `asdf ::: 12345 !!!`. Live evals should cover Russian, English and Spanish.
 The leak guard is a fixture regression check, not a runtime filter or a general language detector.
-An internal key also present literally in client facts is ambiguous to a lexical check; the
-guard permits that spelling and live acceptance must check how it is used in context.
+The test-only syntax contract recognizes known keys, identifier literals and adjacent field
+markers in English, Russian and Spanish. It does not parse arbitrary Markdown or infer the
+semantic use of an exact copied literal; live acceptance owns those checks. Literal exemptions
+must be exact, per occurrence, and never inferred from the presence of an unquoted source key.
 
 ## Implementation steps
 
@@ -49,6 +51,9 @@ guard permits that spelling and live acceptance must check how it is used in con
 - [x] Narrow the prompt prohibition and preserve source-provided identifiers.
 - [x] Match known internal keys case-insensitively and check every copied text field.
 - [x] Add source-identifier and document-location regressions; run focused validation.
+- [x] Check all configured keys in technical notation and preserve ordinary prose.
+- [x] Exempt exact source literal occurrences only; remove the document-wide key whitelist.
+- [x] Add the full syntax/source-boundary matrix and fixture mutations; record validation.
 
 ## Decision log
 
@@ -60,8 +65,18 @@ guard permits that spelling and live acceptance must check how it is used in con
 - 2026-11-16, review round 1: replace the overly broad snake-case ban with a closed set of
   internal keys, allowing literal occurrences from extracted values. Ordinary field names such
   as "budget" stay valid prose. Explicit technical missing-field labels remain forbidden.
+  The source-key whitelist used here is superseded by review round 2 below.
 - 2026-11-16, review round 1: the real copy function includes section titles as well as content
   and summary. All of those fields need fixture checks; frontend behavior stays unchanged.
+- 2026-11-16, review round 2: replace the source-key whitelist with a per-occurrence syntax
+  contract. Scan every configured key. Bare underscore keys, quoted/code identifiers and keys
+  adjacent to a technical field marker are checked; ordinary single-word names remain prose.
+- 2026-11-16, review round 2: source exemptions require an identical single-line literal span
+  (matching backtick runs or ASCII single/double quotes). Preserve case, whitespace and delimiters;
+  the exemption cannot authorize other occurrences. Whole code expressions and quoted messages
+  are source facts too. Check raw extracted values, avoiding artificial quote characters
+  introduced by JSON encoding. Mask verified spans with a non-whitespace barrier, so checking
+  the rest cannot accidentally join words into a new technical label.
 
 ## Validation
 
@@ -121,3 +136,27 @@ guard permits that spelling and live acceptance must check how it is used in con
   frontend and product stages were not reached. Product tests were run separately in full.
 - Live model acceptance remains pending. No schema, workflow, runtime, frontend or fixture JSON
   changes were needed.
+
+### Review round 2
+
+- Confirmed both findings through the actual fixture assertion: all four single-word keys in
+  code-formatted technical sentences passed in EN/RU/ES, and a source column named
+  `target_audience` hid the bare missing-field use while the field remained in `missing_fields`.
+- Replaced the model, not just the examples: every configured key is scanned per occurrence;
+  single-word names remain ordinary prose unless used in a literal or adjacent to a field marker.
+  Exact source literal spans are masked independently before inspecting the remaining text.
+  A copied identifier cannot authorize a bare or differently quoted/cased occurrence elsewhere.
+- Raw extracted string values supply source evidence. JSON-created quotation marks, keys of
+  dictionaries, `missing_fields`, and quote fragments in separate values cannot grant permission.
+- Regression matrix covers all keys, EN/RU/ES technical contexts, delimiters, case, whitespace,
+  ordinary prose, code expressions, quoted error messages, mixed allowed/forbidden occurrences,
+  and mutations of real summary fixtures. All copied titles/content/summary checks remain active.
+- Before implementation, the first expanded matrix had **118 failed, 137 passed** against the old
+  guard. Final full Freelancer product suite: **494 passed**, including packaging; the suite grew
+  by 184 cases. Managed Python 3.12 doctor, config, architecture and documentation validators pass.
+- This round changes tests and plans only. API/full-check were not repeated: the prior API slice
+  passed and the unchanged local full-check blockers are recorded above. No live provider run,
+  GitHub comment, review-thread resolution or push was performed.
+- Boundary remains explicit: this is a bounded single-line literal/adjacent-label syntax check,
+  not a Markdown parser or semantic judge of an exact quote's use. Live B02/B04/B05 and noisy-input
+  acceptance must still verify actual generated language and meaning.
