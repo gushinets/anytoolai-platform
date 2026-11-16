@@ -603,6 +603,18 @@ is retryable with the same prepared key or handoff token/guest, without exhauste
 `quota_exhausted` remains final used exhaustion. Advisory reads and result-fetch retries create no
 logical execution; an active/completed result is never replaced by a quota refresh.
 
+The web page owns quota admission independently of the form/result phase. Its scope is client,
+guest, product and policy, with scenario included only for scenario-dimension policies. Product
+quota survives mode-form remounts, including pending reads; it does not survive a page reload.
+After acceptance and terminal outcomes, an old positive snapshot cannot authorize a new execution
+until the latest bounded quota read settles. Both submit controls and handlers enforce this rule
+for corrected input, regeneration, New task and recovery into a fresh execution. Fields, existing
+results, Copy, same-key retries and accepted-session/result-fetch recovery remain available.
+Older reads cannot override a newer execution read, and a failed read cannot erase known
+exhaustion. Initial unknown quota and failed reads without known exhaustion remain advisory:
+backend admission is authoritative, including HTTP 429 after reload or concurrent use elsewhere.
+Unmetered products do not acquire this barrier.
+
 ## Structured fit results (ANY-247)
 
 Task Finder uses the shared `ProductRunPage` with two product-owned fields and a typed result.

@@ -365,3 +365,68 @@ Implementation and verification:
   repeated for this integration. The owner subsequently authorized committing, pushing and
   updating the PR description; the separately reopened delayed-quota finding remains outside
   this verification.
+
+## Shared quota admission lifecycle (2026-11-16)
+
+The owner authorized fixing the repeated result-before-quota finding across the shared runtime.
+A terminal result currently reopens submission before its quota read settles, and mode remounts
+discard even known exhausted product quota. Seven diagnostic cases reproduced these gaps.
+
+Implementation plan:
+
+1. Separate new-run admission (unknown/checking/available/exhausted) from execution/result phase.
+   Own quota state above keyed mode forms, scoped by client, guest, product, policy and dimension.
+2. Invalidate old permission after acceptance and terminal outcomes; guard both button and submit.
+   Preserve input/result/Copy and same-key or accepted-session recovery. Bounded failed reads remain
+   advisory but never erase known exhaustion. Unmetered products do not wait for quota.
+3. Add delayed-response regressions for rejected fields, regeneration, New task, terminal failure,
+   invalid result, mode remount, stale responses and identity/scope isolation; preserve retry controls.
+4. Keep the smoke's real backend 429 after reload with unavailable quota, add a delayed final-quota
+   case, run frontend-check and proposal-ai-smoke, and document results. No billing/DSL changes.
+
+Doctor passed with the repository-managed Python 3.12 interpreter. System Python 3.14 lacks the
+required modules and is not used for validation.
+
+Implementation:
+
+- Added a page-owned quota store and scoped admission state. ProductPageShell owns it on real
+  routes; standalone multi-mode products retain it above their keyed forms. Terminal reads survive
+  mode remounts and older boot/reservation answers cannot replace them.
+- The submit button and handler use the same admission decision. A prepared key after a definite
+  capacity rejection still needs admission because it can create its first execution. Only an
+  uncertain send or an already accepted session bypasses the gate for recovery; reserved capacity
+  remains distinct from exhausted quota. Guest self-heal selects a new quota scope.
+- Results and field hints render immediately; fields remain editable while quota is checked.
+  Added the checking status in all seven host locales. Unmetered Client Update Writer requests no
+  quota. A request-in-flight guard prevents duplicate same-tick form submissions.
+- Added regressions for both rejected fields, normal result/regeneration/New task, failed/expired
+  sessions, missing/invalid/unavailable artifacts, positive/zero/failed/timed-out quota reads,
+  request ordering, mode changes, scope isolation, guest self-heal and recovery exceptions.
+- Extended browser smoke with delayed terminal quota after a real last allowed run, plus corrected
+  semantic input with a delayed real quota read. Only the latter's artifact output is substituted
+  at the browser boundary because the deterministic worker selects a fixed provider fixture.
+  START/session/quota calls stay real. The reload case still exercises a real HTTP 429.
+
+Final verification: canonical frontend-check passed lint, typecheck, **858 web tests** (34 new
+regressions), **336 CE-kit tests**, **55 shared-ui tests**, **349 Chromium tests**, generated
+API-contract drift checking and all builds. The shared-runtime suite includes 133 tests. Smoke
+lint/typecheck, documentation and architecture validation also passed. Existing local-skill
+references in unrelated tracked plans were observed and left outside this ticket's changes.
+
+
+Dedicated ProposalAI smoke passed **11/11** against local API/PostgreSQL/worker with the
+repository's deterministic fake provider (1.3 minutes; real quota scenario 37.3 seconds). It
+confirmed no extra START before the delayed terminal zero, retained exhaustion after a failed
+refresh, and a real HTTP 429 for the same guest after reload with quota reads unavailable.
+
+The first complete frontend attempt reached Chromium and had one unrelated Atom Lab timing
+failure: `malformed accepted response keeps the same submission available for safe replay`
+asserted the second request synchronously after clicking Retry (one request observed instead of
+two). The other 348 Chromium tests passed. That unchanged test then passed three isolated repeats;
+no Atom Lab code/test or retry policy was modified. The subsequent complete frontend-check passed,
+including that test and all 349 Chromium cases (6.4 minutes for the browser suite).
+
+The smoke dev stack was stopped after verification. Backend full-check, live model calls,
+production and remote CI were not rerun. Billing policy and the required result-contract marker
+remain unchanged. The owner subsequently authorized committing, pushing and updating the PR
+description with this implementation and its verification results.

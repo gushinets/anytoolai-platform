@@ -10,6 +10,7 @@
   "loading": "Loading {product}…",
   "unavailable": "{product} is unavailable right now. Please reload the page.",
   "quotaReserved": "Available now: {available}. In progress: {reserved}.",
+  "quotaChecking": "Checking remaining runs…",
   "quotaExhausted": "You've used all your {product} runs for now.",
   "resultFetchFailed": "Your result is ready, but we couldn't load it. Please try again.",
   "starting": "Starting…",

@@ -1,7 +1,9 @@
 import { createContext } from "react";
+import type { ProductQuotaStore } from "./quotaAdmission";
 
-/** What a product's run page reports up to the page shell that hosts it. */
+/** Shared page lifetime state and run-page reporting. */
 export type ProductShell = {
+  quotaStore?: ProductQuotaStore;
   /** True while a run is in flight (see `busy` in `ProductRunPage`); the shell warns before leaving. */
   reportBusy: (busy: boolean) => void;
 };

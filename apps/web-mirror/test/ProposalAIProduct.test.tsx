@@ -396,7 +396,7 @@ describe("ProposalAI product definition", () => {
     expect(previousResult.isConnected).toBe(true);
   });
 
-  it("refreshes advisory quota after consecutive regenerations and an authoritative rejection", async () => {
+  it("refreshes quota after consecutive regenerations and blocks another run at known exhaustion", async () => {
     const routed = makeClient({
       [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
       [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
@@ -432,10 +432,12 @@ describe("ProposalAI product definition", () => {
       await screen.findByText(`${remaining} of 3 proposals remaining.`);
     }
 
-    fireEvent.click(screen.getByRole("button", { name: "Regenerate proposal" }));
-    await screen.findByText("You've used all your ProposalAI runs for now.");
+    expect((screen.getByRole("button", { name: "Regenerate proposal" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.submit(screen.getByRole("form"));
     expect(screen.getByText("0 of 3 proposals remaining.")).toBeTruthy();
-    await waitFor(() => expect(routed.calls.filter((call) => call.key === ROUTES.QUOTA)).toHaveLength(8));
+    expect(screen.getByText("Proposal 3")).toBeTruthy();
+    expect(routed.calls.filter((call) => call.key === ROUTES.START)).toHaveLength(3);
+    expect(routed.calls.filter((call) => call.key === ROUTES.QUOTA)).toHaveLength(7);
   });
 
   it("ignores an older quota response that arrives after the accepted run's refresh", async () => {
@@ -991,8 +993,18 @@ describe("ProposalAI missing source information (ANY-843)", () => {
       if (order === "before-result") await settleQuota();
       await act(async () => routed.resolveCall(ROUTES.RESULT, 0, resultResponse(IDS, { output: rejectedOutput })));
       await screen.findByText(PROPOSAL_AI_MESSAGES.en.validation.missing_task_description);
-      if (order === "after-result") await settleQuota();
       expect(screen.getByText(PROPOSAL_AI_MESSAGES.en.validation.missing_profile_information)).toBeTruthy();
+      if (order === "after-result") {
+        const button = screen.getByRole("button", { name: "Generate proposal" }) as HTMLButtonElement;
+        expect(button.disabled).toBe(true);
+        expect(screen.getByText("Checking remaining runs…")).toBeTruthy();
+        fireEvent.change(document.getElementById("proposal-ai-task-text")!, { target: { value: "Write a recipe." } });
+        fireEvent.change(document.getElementById("proposal-ai-positioning")!, { target: { value: "I write recipes." } });
+        fireEvent.submit(screen.getByRole("form"));
+        await act(async () => {});
+        expect(routed.calls.filter((call) => call.key === ROUTES.START)).toHaveLength(1);
+        await settleQuota();
+      }
       const button = screen.getByRole("button", { name: "Generate proposal" }) as HTMLButtonElement;
       expect(button.disabled).toBe(state === "exhausted");
       if (state === "exhausted") {
@@ -1006,6 +1018,30 @@ describe("ProposalAI missing source information (ANY-843)", () => {
       expect(routed.calls.filter((call) => call.key === ROUTES.START)).toHaveLength(state === "exhausted" ? 1 : 2);
       if (state !== "exhausted") await screen.findByText(PROPOSAL_TEXT);
     });
+  });
+
+  it.each([
+    ["missing_task_description", "proposal-ai-task-text", "Write a recipe."],
+    ["missing_profile_information", "proposal-ai-positioning", "I write recipes."],
+  ] as const)("keeps a corrected %s blocked until terminal quota settles", async (category, fieldId, corrected) => {
+    const output = { ...rejectedOutput, gaps: rejectedOutput.gaps.filter((gap) => gap.category === category) };
+    const routed = makeClientWithDeferredCalls(responses([output]), { [ROUTES.QUOTA]: 3 });
+    render(<ProposalAIProduct client={routed.client} />);
+    await fillAndSubmit();
+    await screen.findByText(PROPOSAL_AI_MESSAGES.en.validation[category]);
+    const field = document.getElementById(fieldId) as HTMLTextAreaElement;
+    expect(field.disabled).toBe(false);
+    fireEvent.change(field, { target: { value: corrected } });
+    fireEvent.submit(screen.getByRole("form"));
+    await act(async () => {});
+    expect(routed.calls.filter((call) => call.key === ROUTES.START)).toHaveLength(1);
+    await act(async () => routed.resolveCall(ROUTES.QUOTA, 2, quotaResponse(IDS, {
+      used_count: 3, remaining_count: 0, exhausted: true,
+    })));
+    expect((screen.getByRole("button", { name: "Generate proposal" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(field.value).toBe(corrected);
+    fireEvent.submit(screen.getByRole("form"));
+    expect(routed.calls.filter((call) => call.key === ROUTES.START)).toHaveLength(1);
   });
 
   describe.each([

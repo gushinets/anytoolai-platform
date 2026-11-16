@@ -10,6 +10,7 @@ import { useHostT, useProductT } from "../../i18n";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
 import type { AttachProps } from "../runtime/attachSession";
 import { callSafely } from "../runtime/callSafely";
+import { ProductQuotaStore } from "../runtime/quotaAdmission";
 import { ProductRunPage } from "../runtime/ProductRunPage";
 import { readProductDraftScenario, saveProductDraftScenario } from "../runtime/draftStorage";
 import type { ProductDefinition, ProductRunEvent } from "../runtime/productDefinition";
@@ -73,6 +74,7 @@ export function MultiModeProduct<Id extends string, R>({
   const modesRef = useRef(modes);
   modesRef.current = modes;
   const shell = useContext(ProductShellContext);
+  const [quotaStore] = useState(() => new ProductQuotaStore());
   useIsomorphicLayoutEffect(() => {
     if (resolution === "ready" || !attachSessionId) return;
     shell?.reportBusy(true);
@@ -165,6 +167,7 @@ export function MultiModeProduct<Id extends string, R>({
         key={mode.id}
         definition={mode.definition}
         client={client}
+        quotaStore={quotaStore}
         onEvent={onEvent}
         onLockedChange={setLocked}
         visitId={visitId}
