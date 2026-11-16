@@ -1,0 +1,17 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "access_token"
+  ],
+  "properties": {
+    "access_token": {
+      "type": "string",
+      "minLength": 43,
+      "maxLength": 512
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ANY-766 target introspection-request-v1",
+  "description": "Target contract only; not an implemented route or commercial approval. Semantic checks are specified in README.md."
+}

@@ -1,0 +1,26 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "code_challenge",
+    "code_challenge_method",
+    "consumer_id"
+  ],
+  "properties": {
+    "code_challenge": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{43}$"
+    },
+    "code_challenge_method": {
+      "type": "string",
+      "const": "S256"
+    },
+    "consumer_id": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ANY-766 target code-request-v2",
+  "description": "Consumer-neutral target only; Step 8 runtime baseline remains unchanged. Contextual authority rules are in the common backend guide."
+}

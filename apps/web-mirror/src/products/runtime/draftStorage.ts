@@ -1,25 +1,36 @@
+import type { PortalOwner } from "@anytoolai/ce-kit";
+
 const STORAGE_VERSION = 1;
 const MAX_CLOCK_SKEW_MS = 60_000;
 
 export type StoredRun = { scenarioSessionId: string; input: unknown; startedAtMs?: number };
 export type StoredDraft = { values?: unknown; run?: StoredRun };
 
-export function productDraftKey(productId: string, messageScope: string): string {
-  return `anytoolai.product_draft.${productId}.${messageScope}`;
+function paidDraftScope(owner: PortalOwner): string {
+  return `anytoolai.paid_draft.v1.${JSON.stringify([owner.tenantId, owner.region, owner.userId])}`;
+}
+
+export function productDraftKey(productId: string, messageScope: string, owner?: PortalOwner): string {
+  const scope = owner ? paidDraftScope(owner) : "anytoolai.product_draft";
+  return `${scope}.${productId}.${messageScope}`;
+}
+
+function scenarioKey(productId: string, owner?: PortalOwner): string {
+  return owner ? `${paidDraftScope(owner)}.scenario.${productId}` : `anytoolai.product_draft_scenario.${productId}`;
 }
 
 /** The caller validates the saved scenario against its current opt-in definitions. */
-export function readProductDraftScenario(productId: string): string | undefined {
+export function readProductDraftScenario(productId: string, owner?: PortalOwner): string | undefined {
   try {
-    return window.sessionStorage.getItem(`anytoolai.product_draft_scenario.${productId}`) ?? undefined;
+    return window.sessionStorage.getItem(scenarioKey(productId, owner)) ?? undefined;
   } catch {
     return undefined;
   }
 }
 
-export function saveProductDraftScenario(productId: string, scenarioId: string): void {
+export function saveProductDraftScenario(productId: string, scenarioId: string, owner?: PortalOwner): void {
   try {
-    window.sessionStorage.setItem(`anytoolai.product_draft_scenario.${productId}`, scenarioId);
+    window.sessionStorage.setItem(scenarioKey(productId, owner), scenarioId);
   } catch {
     // Storage unavailable or full: the selected mode does not survive a reload.
   }

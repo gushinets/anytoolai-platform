@@ -71,6 +71,14 @@ def test_dockerfile_node_major_matches_nvmrc() -> None:
 
 
 def test_postgres_major_matches_base_compose() -> None:
+    base = yaml.safe_load(BASE_COMPOSE.read_text())
+    postgres = base["services"]["postgres"]
+    assert re.fullmatch(r"postgres:18\.\d+-[^@]+@sha256:[a-f0-9]{64}", postgres["image"])
+    assert "postgres18-data:/var/lib/postgresql" in postgres["volumes"]
+    assert "postgres18-data" in base["volumes"]
+    assert "pg_isready -h 127.0.0.1" in postgres["healthcheck"]["test"][1]
+    agent = yaml.safe_load((COMPOSE_DIR / "docker-compose.agent.yml").read_text())
+    assert agent["services"]["postgres"]["image"] == postgres["image"]
     base_tags = POSTGRES_IMAGE.findall(BASE_COMPOSE.read_text())
     expected = tag_major(base_tags[0]) if base_tags else None
     assert expected == POSTGRES_TARGET_MAJOR, (

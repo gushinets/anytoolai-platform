@@ -75,7 +75,8 @@ const storageByClient = new WeakMap<PlatformApiClient, AsyncStorage>();
 export function getClientStorage(client: PlatformApiClient): AsyncStorage {
   let storage = storageByClient.get(client);
   if (!storage) {
-    storage = createResilientStorage(createWindowLocalStorageAdapter(), createInMemoryAsyncStorage());
+    storage = client.portalIdentity ? createInMemoryAsyncStorage()
+      : createResilientStorage(createWindowLocalStorageAdapter(), createInMemoryAsyncStorage());
     storageByClient.set(client, storage);
   }
   return storage;

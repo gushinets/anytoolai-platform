@@ -9,3 +9,6 @@ usage_metrics:
   - metric_key: brief_decoder.test_analyses
     unit: analysis
     enabled: false
+  - metric_key: brief_decoder.analyses
+    unit: analysis
+    enabled: false
