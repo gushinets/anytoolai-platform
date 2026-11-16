@@ -8,7 +8,7 @@
 - Created: 2026-11-13
 - Last updated: 2026-11-16
 - Review date: 2026-11-20
-- Next action: owner review/commit of the verified main integration; live model smoke still needs a valid provider key.
+- Next action: review the separately reopened delayed-quota finding; live model smoke still needs a valid provider key.
 - Blocker: local baseline requires passwordless sudo for the unchanged activation-marker test;
   round-3 live model smoke is blocked by an expired provider API key.
 
@@ -352,7 +352,8 @@ before a separate commit/push request; the reopened result-before-quota review i
 Implementation and verification:
 
 - Merged current main `9f9d6ebc` into `feature/ANY-843` without conflicts, retaining ANY-847's
-  examples and ANY-843's contract. The merge is prepared locally without a commit.
+  examples and ANY-843's contract. The verified merge and assertion correction were committed
+  locally as `32679418` before the subsequent push request.
 - Added `result_contract: proposalInputSchema.properties.result_contract.const` to the example
   test's exact input expectation. Other ProposalAI request assertions were checked; no additional
   mismatch was found. User input, draft/event and sample-text exclusion assertions remain intact.
@@ -361,5 +362,6 @@ Implementation and verification:
   349 Chromium tests, generated API-contract drift check and all builds. Doctor, documentation
   validation and staged/unstaged whitespace checks passed.
 - Backend gates, dedicated product smokes, live model calls, production and remote CI were not
-  repeated for this integration. No push or GitHub update was performed; the separately reopened
-  delayed-quota finding remains outside this verification.
+  repeated for this integration. The owner subsequently authorized committing, pushing and
+  updating the PR description; the separately reopened delayed-quota finding remains outside
+  this verification.
