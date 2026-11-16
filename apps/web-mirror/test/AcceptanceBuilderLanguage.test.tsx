@@ -73,6 +73,23 @@ it.each([undefined, "", "RU", 42])("rejects missing or invalid analysis language
   expect(extractDraftResult(output)).toBeNull();
 });
 
+const languageTags = JSON.parse(readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../../../tests/fixtures/brief_language_eval/language_tags.json"), "utf8")) as { accepted: string[]; rejected: string[] };
+for (const [mode, parse] of [["D", extractDraftResult], ["C", extractCheckResult]] as const) {
+  for (const family of ["basic", "weak"]) {
+    it(`${mode} ${family}: accepts regional tags and rejects all trailing line endings`, () => {
+      const output = structuredClone(fixtures[`ANY761-AB-${mode}-RU-${family}`]!) as { extracted: { values: Record<string, unknown> } };
+      for (const tag of languageTags.accepted) {
+        output.extracted.values.analysis_language = tag;
+        expect(parse(output)?.analysisLanguage, JSON.stringify(tag)).toBe(tag);
+      }
+      for (const tag of languageTags.rejected) {
+        output.extracted.values.analysis_language = tag;
+        expect(parse(output), JSON.stringify(tag)).toBeNull();
+      }
+    });
+  }
+}
+
 it("rejects contradictory structured verdict/status and missing-list partitions", () => {
   const output = structuredClone(fixtures["ANY761-AB-C-RU-basic"]!) as { comparison: { verdict: string }; extracted: { missing_fields: string[] } };
   output.comparison.verdict = "meets_expectations";

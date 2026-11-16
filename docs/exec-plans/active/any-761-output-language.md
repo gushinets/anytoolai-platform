@@ -220,3 +220,23 @@ tests. Initial broad web run had924 passes and one new-test selector error; the 
 corrected to the existing Russian button label and all33 targeted tests then passed. Web
 lint/typecheck, Ruff, doctor, docs/generated and whitespace checks passed. Full CI is not
 claimed. The live stack and web server were stopped; database volumes retained.
+
+
+## Implementation plan — language tag string boundary
+
+Replace the permissive Python dollar end anchor in both AB v1 output schemas with a
+Python/ECMAScript-compatible absolute end check. Keep the existing supported tag syntax and
+the frontend parser's rejection behavior. Share accepted primary/regional/script tags and
+rejected LF/CR/CRLF, Unicode line separators, embedded newlines and whitespace between
+backend canonical-validator tests and frontend Draft/Check parser tests, with basic and
+weak extraction fixtures. Run targeted checks and config/architecture/docs validation, then
+commit/push on the existing branch. No live calls, prose constraints, schema version bump,
+model/prompt change or Spanish follow-up work.
+
+Verification: the new backend test failed on the original schema accepting ru followed by LF.
+After the two schema edits,218 Python tests and57 frontend tests passed. The shared22-vector
+matrix covers Draft/Check with basic/weak outputs in the real canonical validator and actual
+frontend parsers. Both schema patterns also passed the matrix in Node's ECMAScript engine.
+The strict end assertion `(?![\s\S])` rejects any remaining character, including a final LF,
+without Python-only regex anchors. Ruff, web lint/typecheck, doctor, config/architecture and
+docs/generated/whitespace checks passed. No live runs; current-revision CI remains pending.

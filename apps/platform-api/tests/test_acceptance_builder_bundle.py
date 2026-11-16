@@ -30,7 +30,9 @@ from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
 from anytoolai_platform_core.scenarios.checkpoints import RESULT_READY_CHECKPOINT_ID
 from anytoolai_platform_core.storage.db import event_log_table, provider_calls_table
 from anytoolai_platform_core.storage.transactions import SessionFactory, transaction_boundary
+from anytoolai_platform_core.structured_output.errors import StructuredOutputSchemaMismatchError
 from anytoolai_platform_core.structured_output.schemas import normalize_schema_mapping
+from anytoolai_platform_core.structured_output.validator import validate_structured_output_value
 from anytoolai_platform_core.workflows.models import JobStatus
 from anytoolai_platform_worker.composition import build_worker
 
@@ -99,6 +101,26 @@ def _schema(schema_ref: str) -> dict[str, Any]:
     definition = build_runtime(config_root=CONFIG_ROOT).config_registry.get_schema(schema_ref)
     assert definition is not None
     return normalize_schema_mapping(definition.schema)
+
+
+@pytest.mark.parametrize("scenario_id", [DRAFT, CHECK])
+@pytest.mark.parametrize("suffix", ["", ".weak_input"])
+def test_canonical_language_tags_match_the_client_contract(scenario_id: str, suffix: str) -> None:
+    tags = json.loads(
+        (REPO_ROOT / "tests/fixtures/brief_language_eval/language_tags.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    schema = _schema(OUTPUT_SCHEMA_REFS[scenario_id])
+    output = _expected_output(scenario_id, suffix)
+    for tag in tags["accepted"]:
+        output["extracted"]["values"]["analysis_language"] = tag
+        validated = validate_structured_output_value(output, schema=schema)
+        assert validated.normalized_output == output
+    for tag in tags["rejected"]:
+        output["extracted"]["values"]["analysis_language"] = tag
+        with pytest.raises(StructuredOutputSchemaMismatchError):
+            validate_structured_output_value(output, schema=schema)
 
 
 def test_acceptance_builder_loads_through_the_real_default_bundle_set() -> None:

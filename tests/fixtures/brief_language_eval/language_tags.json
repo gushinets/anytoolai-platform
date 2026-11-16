@@ -1,0 +1,28 @@
+{
+  "accepted": [
+    "ru",
+    "en",
+    "es",
+    "ru-RU",
+    "en-US",
+    "es-MX",
+    "zh-Hant-TW"
+  ],
+  "rejected": [
+    "ru\n",
+    "ru\r",
+    "ru\r\n",
+    "ru\n\n",
+    "ru\u2028",
+    "ru\u2029",
+    "ru\nRU",
+    "es-MX\n",
+    "es-MX\r\n",
+    " ru",
+    "ru ",
+    "ru\t",
+    "RU",
+    "es_MX",
+    "es-"
+  ]
+}
