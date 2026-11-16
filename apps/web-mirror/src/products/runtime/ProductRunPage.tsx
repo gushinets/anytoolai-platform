@@ -672,8 +672,10 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
     restoredStartRef.current = true;
     const prepared = restorePaidScenarioStart(recovery, paidPersistence);
     const storedValues = draftKey === null ? null : parseStoredValues(readProductDraft(draftKey)?.values);
-    // Bind field errors only when the saved form reproduces the frozen wire input.
-    if (storedValues !== null && shallowEqualValues(definition.toInput(storedValues), recovery.request.input)) {
+    // The submitted baseline must survive edits to the current draft and accepted-session reload.
+    if (definition.parseInputValues) {
+      activeInputRef.current = definition.parseInputValues(recovery.request.input);
+    } else if (storedValues !== null && shallowEqualValues(definition.toInput(storedValues), recovery.request.input)) {
       activeInputRef.current = storedValues;
     }
     uncertainStartsRef.current.add(prepared);
@@ -1008,7 +1010,8 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
     if (Object.keys(inputErrors).length > 0) {
       // Recovered runs can belong to an older draft; only mark fields still matching that input.
       const submittedValues = normalizeValues(activeInputRef.current ?? definition.emptyValues);
-      rejectedInputRef.current = { input: submittedValues, errors: inputErrors };
+      // Unknown attachment inputs may explain empty fields, but cannot establish rejection identity.
+      rejectedInputRef.current = activeInputRef.current === null ? null : { input: submittedValues, errors: inputErrors };
       const currentValues = normalizeValues(valuesRef.current);
       const currentErrors: Partial<Record<keyof V, FieldError>> = {};
       for (const field in inputErrors) {

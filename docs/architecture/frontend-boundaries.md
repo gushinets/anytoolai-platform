@@ -218,6 +218,12 @@ The shared runtime, not a product, owns the web side of a handoff:
   original execution input. Unbound/older drafts offer an explicit Restore saved
   draft action when editing is allowed. This only fills fields: no replay, key
   change, new request or invented result input. Opt-out products remain unchanged.
+  Products may supply `parseInputValues` to recover submitted form values from a frozen pending
+  wire request independently of the editable draft. ProposalAI uses this validated baseline for
+  normalized per-field rejection matching and retains it in the accepted run binding across reload.
+  Tone/language changes or a correction to one field cannot erase another field's rejection;
+  current raw draft values are never replaced. Unsupported input yields no rejection identity.
+  Products without the decoder retain the existing exact-request draft matching behavior.
 - Paid recovery does not require current new-start availability. If runtime config is unavailable,
   or no longer lists the scenario/enabled web frontend, a saved owner-bound pending request or
   accepted/explicitly selected session opens a recovery-only view. It replays only the original

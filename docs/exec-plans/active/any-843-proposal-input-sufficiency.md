@@ -475,3 +475,55 @@ read and a genuine backend 429 after reload. The test stack was stopped after ve
 This update is a local merge of de7c1cd9 into feature/ANY-843; no push or GitHub write was requested
 for this step. Backend full-check, live LLM calls, an actual peer Portal deployment and remote CI
 were not rerun. Existing billing policy and the required input marker remain unchanged.
+
+## Paid replay field identity: review round 5 (2026-11-16)
+
+The owner approved restoring submitted values from the frozen pending request, regression tests,
+frontend-check and proposal-ai-smoke with the real backend 429 preserved. The complete-request
+comparison introduced during integration loses both field bindings after a tone/language change
+or a correction to only one text field. A temporary diagnostic reproduced all four cases while
+all 997 existing web tests passed. A historical result can be opened while another start remains
+pending; restoring/editing its draft and returning to recovery makes this state reachable.
+
+Plan: add an optional product-owned wire-input decoder to ProductDefinition and implement it for
+ProposalAI, the only current resultFieldErrors consumer. Restore the submitted baseline independently
+of the editable draft and retain it when replay becomes an accepted StoredRun. Reuse normalized
+per-field rejection matching; retain existing behavior for products without the decoder. Do not
+change the frozen request/key, owner guards, recovery cleanup, guest quota admission or billing.
+Test partial edits, controls, whitespace, reverting rejected values, missing/malformed data,
+accepted reload, recovery-only boot and identity changes. Include the historical-result UI path.
+Run focused regressions first, then frontend-check, followed by the dedicated smoke without
+parallel Docker build load. Unknown historical source values cannot be reconstructed from a newer
+draft; do not invent their identity. No persistence migration or backend endpoint is introduced.
+
+Implemented the optional parseInputValues contract and ProposalAI decoder for the current web
+request shape. It validates the required marker, text fields, supported tone/language, lengths
+and closed keys, and reuses submission normalization. Pending recovery now derives its baseline
+from that frozen input even when the editable draft differs or is absent; accepted StoredRun
+retains the baseline across reload. Unknown attachment inputs can still explain empty fields,
+but do not create a fabricated rejection identity. Other products retain their existing fallback.
+
+Added 47 regressions: 19 paid journey cases and 28 decoder/normalization cases. The initial
+13 journey cases produced 11 expected failures before the implementation, including the actual
+historical-result/restore-draft interaction and lost input at accepted reload. All final cases
+pass, including each partial edit, tone/language, backend whitespace, editing back, missing or
+malformed drafts/input, recovery-only boot and late replies after logout/owner change.
+
+Verification on the final source:
+- Complete canonical frontend-check passed in one uninterrupted final run: lint/typecheck,
+  1,044 web tests, 408 CE-kit tests, 55 shared-ui tests, 349 Chromium tests (6.6 minutes),
+  generated API-type drift and all production builds.
+- Canonical proposal-ai-smoke passed 11/11 (1.3 minutes) on local API/worker/PostgreSQL with the
+  deterministic fake provider. The delayed terminal-quota scenario and a real backend HTTP 429
+  after reload both passed; quota case 34.7 seconds. No smoke assertion, timeout or provider
+  substitution policy was changed. The semantic-hints smoke retains its existing artifact-only
+  substitution; this is not live-model classification evidence.
+- Managed Python 3.12 doctor, documentation/architecture validation and whitespace checks passed.
+  Smoke used a disposable isolated PostgreSQL volume; the pre-existing database was preserved.
+
+No source or test change was made after the final frontend gate began. The temporary review
+harness was removed from the workspace before that gate. Backend full-check, live LLM calls,
+production, an actual peer Portal deployment and remote CI were not rerun. Already accepted
+historical records with missing original input cannot be reconstructed from a newer draft.
+After verification, the owner explicitly authorized committing, pushing and updating PR #277.
+The disposable smoke stack and volume were removed; the original database was preserved.

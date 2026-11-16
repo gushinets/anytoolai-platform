@@ -27,6 +27,7 @@ type Tone = (typeof TONE_VALUES)[number];
 
 // Mirrors `proposal_ai.generate_input_v1` maxLength for both text fields.
 const TEXT_MAX_LENGTH = 4000;
+const RESULT_CONTRACT = "proposal_ai.field_errors_v1";
 // The counter appears only when the limit is near, so it stays quiet for ordinary input.
 const COUNTER_THRESHOLD = 3500;
 
@@ -84,6 +85,23 @@ function normalizeValues(values: ProposalAIValues): ProposalAIValues {
     taskText: trimBackendWhitespace(values.taskText),
     freelancerPositioning: trimBackendWhitespace(values.freelancerPositioning),
   };
+}
+
+function parseInputValues(input: unknown): ProposalAIValues | null {
+  // Decode requests this form can produce, without defaulting missing submitted source values.
+  if (
+    !isRecord(input) || input.result_contract !== RESULT_CONTRACT ||
+    typeof input.task_text !== "string" || typeof input.freelancer_positioning !== "string" ||
+    !isTone(input.tone) || (input.language !== undefined && (!isProposalLanguage(input.language) || input.language === AUTO_LANGUAGE)) ||
+    Object.keys(input).some(key => !["result_contract", "task_text", "freelancer_positioning", "tone", "language"].includes(key))
+  ) return null;
+  const values = normalizeValues({
+    taskText: input.task_text,
+    freelancerPositioning: input.freelancer_positioning,
+    tone: input.tone,
+    language: input.language ?? AUTO_LANGUAGE,
+  });
+  return Object.keys(validate(values)).length === 0 ? values : null;
 }
 
 const GAP_FIELDS = {
@@ -299,10 +317,11 @@ export const proposalAiDefinition: ProductDefinition<ProposalAIValues, ProposalA
   draft: { parseValues: parseDraftValues },
   validate,
   normalizeValues,
+  parseInputValues,
   toInput: (values) => {
     const normalized = normalizeValues(values);
     return {
-      result_contract: "proposal_ai.field_errors_v1",
+      result_contract: RESULT_CONTRACT,
       task_text: normalized.taskText,
       freelancer_positioning: normalized.freelancerPositioning,
       tone: normalized.tone,
