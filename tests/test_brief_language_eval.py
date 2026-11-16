@@ -148,7 +148,7 @@ def test_failed_attempt_keeps_input_and_error_without_retry(monkeypatch):
 def test_suite_has_twelve_families_in_three_languages_and_honest_provenance():
     assert len(CASES) == len(evaluation.SCENARIOS) * len(("ru", "en", "es")) * len(
         ("basic", "weak", "mixed", "override")
-    )
+    ) + 3  # Recipe regressions supplement, rather than replace, the original matrix.
     assert len({case["id"] for case in CASES}) == len(CASES)
     for scenario in evaluation.SCENARIOS:
         for language in ("ru", "en", "es"):
@@ -163,6 +163,36 @@ def test_suite_has_twelve_families_in_three_languages_and_honest_provenance():
         assert case["input"]["brief_text"]
     assert not {"BD-RU-10", "AB-D-RU-03", "AB-C-RU-01"} & {case["id"] for case in CASES}
     json.dumps(CASES, ensure_ascii=False)
+
+
+def test_recipe_regression_preserves_the_report_and_reviews_every_prose_field():
+    cases = [case for case in CASES if case["id"].endswith("-borscht")]
+    assert {case["source_language"] for case in cases} == {"ru", "en", "es"}
+    russian = next(case for case in cases if case["source_language"] == "ru")
+    assert russian["input"]["brief_text"] == (
+        "Рецепт борща: свёкла, капуста, говядина. Варить два часа."
+    )
+    for case in cases:
+        assert "2026-11-11" in case["historical_failure_report"]
+
+    output = CANONICAL[russian["id"]]
+    fields = evaluation.authored_fields(output)
+    for name, value in output["brief"]["values"].items():
+        if isinstance(value, str):
+            assert fields[f"/brief/values/{name}"] == value
+        else:
+            for index, item in enumerate(value):
+                assert fields[f"/brief/values/{name}/{index}"] == item
+    for index, issue in enumerate(output["issues"]):
+        assert fields[f"/issues/{index}/description"] == issue["description"]
+        if "evidence" in issue:
+            assert fields[f"/issues/{index}/evidence"] == issue["evidence"]
+    for index, question in enumerate(output["questions"]):
+        for field in ("question", "rationale"):
+            assert fields[f"/questions/{index}/{field}"] == question[field]
+    assert fields["/document/summary"] == output["document"]["summary"]
+    for index, section in enumerate(output["document"]["sections"]):
+        assert fields[f"/document/sections/{index}/content"] == section["content"]
 
 
 def test_machine_only_weak_draft_has_no_prose_to_review():

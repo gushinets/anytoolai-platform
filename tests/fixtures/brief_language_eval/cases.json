@@ -618,6 +618,60 @@
         "No invented facts, hidden findings, changed verdicts or unsupported readiness claims.",
         "The explicit analysis-language request is honored and is not extracted as a project requirement."
       ]
+    },
+    {
+      "id": "ANY761-BD-RU-borscht",
+      "scenario_id": "brief_decoder.decode_v1",
+      "source_language": "ru",
+      "expected_language": "ru",
+      "family": "weak",
+      "provenance": "Exact Russian input reported in ANY-761 on 2026-11-11; production SHA unknown. A new passing run does not invalidate the original report. Canonical fixture records a separately reviewed live response.",
+      "input": {
+        "brief_text": "Рецепт борща: свёкла, капуста, говядина. Варить два часа."
+      },
+      "criteria": [
+        "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.",
+        "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.",
+        "The copied document keeps authored prose in the expected language, including rephrased questions; fixed section headings and JSON identifiers are exempt.",
+        "Preserve beetroot, cabbage, beef and two hours when restating recipe facts; cooking duration is not a client delivery deadline. Input sufficiency/UX belongs to ANY-849 and is not scored here."
+      ],
+      "historical_failure_report": "2026-11-11: Russian recipe reportedly produced English project goal and risks; standalone questions were Russian, but the final document rephrased them in English. Production SHA and original canonical JSON are unknown; this is the reported observation, not a fabricated verbatim output."
+    },
+    {
+      "id": "ANY761-BD-EN-borscht",
+      "scenario_id": "brief_decoder.decode_v1",
+      "source_language": "en",
+      "expected_language": "en",
+      "family": "weak",
+      "provenance": "Synthetic translation of the Russian recipe reported in ANY-761 on 2026-11-11. A new passing run does not invalidate the original report. Live observations are reported separately; no successful canonical language fixture is claimed for this translation.",
+      "input": {
+        "brief_text": "Borscht recipe: beetroot, cabbage, beef. Cook for two hours."
+      },
+      "criteria": [
+        "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.",
+        "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.",
+        "The copied document keeps authored prose in the expected language, including rephrased questions; fixed section headings and JSON identifiers are exempt.",
+        "Preserve beetroot, cabbage, beef and two hours when restating recipe facts; cooking duration is not a client delivery deadline. Input sufficiency/UX belongs to ANY-849 and is not scored here."
+      ],
+      "historical_failure_report": "2026-11-11: Russian recipe reportedly produced English project goal and risks; standalone questions were Russian, but the final document rephrased them in English. Production SHA and original canonical JSON are unknown; this is the reported observation, not a fabricated verbatim output."
+    },
+    {
+      "id": "ANY761-BD-ES-borscht",
+      "scenario_id": "brief_decoder.decode_v1",
+      "source_language": "es",
+      "expected_language": "es",
+      "family": "weak",
+      "provenance": "Synthetic translation of the Russian recipe reported in ANY-761 on 2026-11-11. A new passing run does not invalidate the original report. Live observations are reported separately; no successful canonical language fixture is claimed for this translation.",
+      "input": {
+        "brief_text": "Receta de borsch: remolacha, col, carne de res. Cocinar durante dos horas."
+      },
+      "criteria": [
+        "Every authored canonical field follows the expected analysis language, including summaries and evidence explanations.",
+        "Quotations, brands, technical identifiers, source dates and amounts stay faithful; identifiers and enums are unchanged.",
+        "The copied document keeps authored prose in the expected language, including rephrased questions; fixed section headings and JSON identifiers are exempt.",
+        "Preserve beetroot, cabbage, beef and two hours when restating recipe facts; cooking duration is not a client delivery deadline. Input sufficiency/UX belongs to ANY-849 and is not scored here."
+      ],
+      "historical_failure_report": "2026-11-11: Russian recipe reportedly produced English project goal and risks; standalone questions were Russian, but the final document rephrased them in English. Production SHA and original canonical JSON are unknown; this is the reported observation, not a fabricated verbatim output."
     }
   ]
 }

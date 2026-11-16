@@ -145,3 +145,78 @@ so their metadata and review_status were checked directly, not through the numbe
 SHA-256 comparison confirms all1043 files in the saved evidence tree are unchanged, including
 original captures, reviews and reports. No raw evidence was added to git. This is a metadata
 and evaluator replay, not a new human prose review or live experiment; full CI is pending.
+
+
+## Implementation plan — recipe language regression
+
+Preserve the November11 Russian recipe report and its unknown production SHA in the case
+provenance. Add the exact RU input plus EN/ES translations as distinct weak-family regressions.
+Run three attempts per language on the unchanged selected BD Luna/medium deployment, recording
+source SHA, dirty diff and effective worker prompt/config hashes. Review every canonical prose
+field, including hidden summary and rephrased document questions; verify actual browser Copy
+against the complete document. Retain all outcomes and the original negative report. Add
+reviewed canonical fixtures and offline backend/Copy regressions. Do not implement ANY-849,
+change prompts/models, or commit raw logs. Summarize results here, verify, commit and push.
+
+### Recipe verification — 2026-11-16
+
+Original November11 report retained in the regression case: Russian input
+`Рецепт борща: свёкла, капуста, говядина. Варить два часа.` reportedly produced English
+goal/risks and English rephrased questions in the final document. That production SHA is
+unknown. These new results do not invalidate the original report. English and Spanish controls
+use `Borscht recipe: beetroot, cabbage, beef. Cook for two hours.` and
+`Receta de borsch: remolacha, col, carne de res. Cocinar durante dos horas.`
+
+Evaluated runtime source: `bbf3c0d5e6b219afe2be133b634d88dce03c7eea`; working tree changes
+were tests/fixtures/this report only. No prompt, provider, schema or application changes.
+Isolated profile: brief_decoder, default_text_generation_v1, unmetered; configured alias
+anytoolai.default_text selects openai/gpt-6-luna with reasoning_effort=medium. Both API and
+worker verified effective deployment fingerprint
+`0c3b33970bf9d771bc3d6b48558f332aa2c27dbfdbc5b3e37c43dfc01def65fd`.
+Worker configuration/prompt snapshot digest:
+`f4270c645d17a52c83216fca01532bb36a6bfa01f9c6ef57f5a283be510dc490`.
+Router SHA-256: `dede022d99bc94440ea14f212cc669d939a39b51dbb73e8d0ef83ef5510aa1d2`.
+All nine before/after worker snapshots matched. The ledger records gpt-6-luna on every call;
+medium is verified configuration, not an independently echoed provider reasoning measurement.
+
+| Source language | Attempts | Full canonical language review | Actual browser Copy |
+| --- | --- | --- | --- |
+| Russian original | 3 | 3 PASS | 3 exact matches |
+| English translation | 3 | 3 PASS | 3 exact matches |
+| Spanish translation | 3 | 3 FAIL under strict language review | 3 exact matches |
+
+All nine workflows completed and outputs validate against the current canonical schema.
+Reviewed145 authored fields: extraction, issues/evidence, questions/rationale, every document
+section and hidden summary. Nine real Chromium journeys used English UI, real local API and
+real clipboard permissions; the actual Copy text matched all canonical document sections and
+summary byte-for-byte. No responses were mocked. The Russian standalone and document-rephrased
+questions remained Russian in all three attempts. Recipe ingredients and cooking duration were
+preserved; Russian outputs did not mistake cooking duration for a client deadline.
+
+Preserved supplementary findings: every Spanish summary uses `El brief ...`; attempt1 also
+uses `La brief ...` in issue evidence. These authored occurrences are marked FAIL, including
+the corresponding Copy criterion. Attempt1 additionally puts `durante dos horas` in deadline.
+Do not fold these into a claim of9/9 language success. No prompt/model iteration was attempted;
+the authorized Russian regression is covered, and input sufficiency/recipe-as-project UX
+remains outside this work in ANY-849.
+
+Nine completed runs made37 successful physical provider calls (one A04 validation retry on
+English attempt1), estimated USD0.010665795. A separate initial Russian attempt failed with
+HTTP401 before output/Copy; its two failed ledger calls were preserved. After the owner
+renewed the local key, the nine-run series used a separate capture location. No failed result
+was overwritten. Agent decisions are separate from the original blank human review templates;
+full report replay yields6 PASS /3 FAIL, while independent human reviews remain pending.
+SHA-256 checks preserved all46 original files in the completed series. Raw capture/ledger/
+clipboard/trace files remain local, outside git.
+
+The checked-in Russian canonical fixture is the exact reviewed first live output, not an
+authored substitute. It now participates in schema and full fake-provider workflow regressions.
+Copy regression verifies that this Russian document is unchanged under RU/EN/ES UI. Translated
+inputs are retained for future evals, but no passing Spanish canonical fixture is claimed.
+
+Verification completed:140 Python tests passed (133 collector/product-schema regressions and
+7 multilingual API workflows, including the new Russian capture), plus33 targeted BD/Copy web
+tests. Initial broad web run had924 passes and one new-test selector error; the selector was
+corrected to the existing Russian button label and all33 targeted tests then passed. Web
+lint/typecheck, Ruff, doctor, docs/generated and whitespace checks passed. Full CI is not
+claimed. The live stack and web server were stopped; database volumes retained.
