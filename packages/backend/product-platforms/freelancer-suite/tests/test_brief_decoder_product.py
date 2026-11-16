@@ -284,13 +284,22 @@ _GAPS_KEYWORD = {
     "target_audience": "audience",
     "constraints": "constraint",
 }
-_SNAKE_CASE_KEY = re.compile(r"\b[a-z]+(?:_[a-z0-9]+)+\b")
+_INTERNAL_FIELD_KEY = re.compile(
+    r"\b(?:"
+    + "|".join(re.escape(key) for key in (*_GAPS_KEYWORD, "missing_fields") if "_" in key)
+    + r")\b",
+    re.IGNORECASE,
+)
 _KEY_LABELS = re.compile(r"missing fields?\s*:|fields? by name|пропущено поле", re.IGNORECASE)
 
 
-def _field_key_leaks(text: str) -> list[str]:
-    """Find machine keys and technical labels in client-facing summary fixtures."""
-    return _SNAKE_CASE_KEY.findall(text) + _KEY_LABELS.findall(text)
+def _field_key_leaks(text: str, *, source_text: str = "") -> list[str]:
+    """Find internal notation, allowing literal identifiers from client facts."""
+    # shortcut: source/key collisions need live review; add semantic evals if they recur.
+    source_keys = {key.casefold() for key in _INTERNAL_FIELD_KEY.findall(source_text)}
+    return [
+        key for key in _INTERNAL_FIELD_KEY.findall(text) if key.casefold() not in source_keys
+    ] + _KEY_LABELS.findall(text)
 
 
 @pytest.mark.parametrize(
@@ -302,6 +311,9 @@ def _field_key_leaks(text: str) -> list[str]:
         "Missing: project_goal, deliverables, deadline, budget, target_audience, constraints",
         "missing_fields",
         "Missing fields: deliverables",
+        "Target_Audience is unspecified",
+        "PROJECT_GOAL is missing",
+        "MISSING_FIELDS is empty",
     ],
 )
 def test_field_key_leak_guard_catches_the_qa_strings(leaky: str) -> None:
@@ -315,10 +327,29 @@ def test_field_key_leak_guard_catches_the_qa_strings(leaky: str) -> None:
         "Клиенту нужно уточнить цель проекта, результаты, срок, бюджет, аудиторию и ограничения.",
         "El cliente debe confirmar el objetivo, los entregables, el plazo, el presupuesto, "
         "el público objetivo y las restricciones.",
+        "Fix the `reset_password` handler and preserve the `api_v2` route.",
     ],
 )
 def test_field_key_leak_guard_accepts_plain_words(text: str) -> None:
     assert not _field_key_leaks(text)
+
+
+@pytest.mark.parametrize("identifier", ["target_audience", "PROJECT_GOAL", "missing_fields"])
+def test_field_key_leak_guard_preserves_source_identifiers(identifier: str) -> None:
+    source = f"Preserve the `{identifier}` database column."
+    assert _field_key_leaks(source)
+    assert not _field_key_leaks(source, source_text=source)
+    assert _field_key_leaks(f"Missing field: {identifier}", source_text=source)
+
+
+@pytest.mark.parametrize(
+    ("source_identifier", "leaked_key"),
+    [("target_audience_cache", "target_audience"), ("target_audience", "project_goal")],
+)
+def test_source_identifier_exemption_only_covers_the_same_whole_key(
+    source_identifier: str, leaked_key: str
+) -> None:
+    assert _field_key_leaks(leaked_key, source_text=f"Preserve `{source_identifier}`.")
 
 
 def test_summary_prompt_names_gaps_in_words_not_field_keys() -> None:
@@ -328,9 +359,13 @@ def test_summary_prompt_names_gaps_in_words_not_field_keys() -> None:
     for key in _GAPS_KEYWORD:
         readable = key.replace("_", " ")
         assert f'`{key}` as "{readable}"' in prompt, key
-    assert "Never show a field key" in prompt
+    assert "internal field keys" in prompt
     assert "language the document is written in" in prompt
-    assert "every section and to `summary`" in prompt
+    assert "section titles, section content and `summary`" in prompt
+    assert "Preserve literal identifiers and code formatting" in prompt
+    assert "even when an identifier matches an internal field key" in prompt
+    assert "no snake_case identifiers" not in prompt
+    assert "no code formatting" not in prompt
 
 
 # Words a section may use that carry no project fact. Deliberately per-section: `overview` is
@@ -362,8 +397,8 @@ def test_summary_fixtures_obey_the_a10_prompt(summary_suffix: str, extract_suffi
     `data.brief.missing_fields` entry. The fixtures are the deterministic evidence for those
     rules, so they are checked against the A01 fixture that feeds the same run (code review:
     the overview named a "bakery" and "new website" that no A01 value carried, and the weak
-    fixture never reported `constraints` missing). ANY-615 forbids field keys and technical
-    labels in every section and the summary."""
+    fixture never reported `constraints` missing). ANY-615 forbids internal missing-field
+    notation in titles, content and summary while preserving identifiers from client facts."""
     assert set(_GAPS_KEYWORD) == {
         f["name"] for f in _literal(_steps()["extract"]["input_mapping"]["fields"])
     }
@@ -371,13 +406,60 @@ def test_summary_fixtures_obey_the_a10_prompt(summary_suffix: str, extract_suffi
     document = _fixture_response("brief_decoder.generate_summary_v1" + summary_suffix)
     sections = {s["id"]: s["content"] for s in document["sections"]}
 
+    # Only values carry client facts; schema keys and missing_fields cannot grant an exemption.
+    source_text = json.dumps(list(brief["values"].values()), ensure_ascii=False)
+    texts = [
+        (f"{section['id']}.{field}", section[field])
+        for section in document["sections"]
+        for field in ("title", "content")
+    ]
+    for where, text in [*texts, ("summary", document["summary"])]:
+        leaks = _field_key_leaks(text, source_text=source_text)
+        assert not leaks, f"{where}: field key leaks {leaks}"
+
     for section_id, allowed in _NON_FACT_WORDS.items():
         ungrounded = _stems(sections[section_id]) - _stems(json.dumps(brief["values"])) - allowed
         assert not ungrounded, (section_id, sorted(ungrounded))
     for name in brief["missing_fields"]:
         assert _GAPS_KEYWORD[name] in sections["gaps"].lower(), name
-    for where, text in [*sections.items(), ("summary", document["summary"])]:
-        assert not _field_key_leaks(text), (where, _field_key_leaks(text))
+
+
+@pytest.mark.parametrize("suffix", _SUMMARY_FIXTURES)
+@pytest.mark.parametrize(
+    ("section_index", "field"),
+    [(None, "summary"), *[(i, field) for i in range(4) for field in ("title", "content")]],
+)
+def test_summary_fixture_guard_rejects_leaks_in_every_copied_field(
+    monkeypatch: pytest.MonkeyPatch, suffix: str, section_index: int | None, field: str
+) -> None:
+    original = _fixture_response
+    stem = "brief_decoder.generate_summary_v1" + suffix
+    document = original(stem)
+    target = document if section_index is None else document["sections"][section_index]
+    target[field] = "Missing field: target_audience"
+    monkeypatch.setitem(
+        globals(), "_fixture_response", lambda name: document if name == stem else original(name)
+    )
+    with pytest.raises(AssertionError, match="field key leaks"):
+        test_summary_fixtures_obey_the_a10_prompt(suffix, _SUMMARY_FIXTURES[suffix])
+
+
+def test_summary_fixture_guard_preserves_identifiers_from_extracted_values(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original = _fixture_response
+    source = "Fix the `reset_password` handler and preserve the `api_v2` and `target_audience` routes."
+
+    def fixture_response(name: str) -> dict[str, Any]:
+        response = original(name)
+        if name == "brief_decoder.extract_brief_v1":
+            response["values"]["project_goal"] = source
+        elif name == "brief_decoder.generate_summary_v1":
+            response["sections"][0]["content"] = source
+        return response
+
+    monkeypatch.setitem(globals(), "_fixture_response", fixture_response)
+    test_summary_fixtures_obey_the_a10_prompt("", "")
 
 
 def test_schemas_are_closed() -> None:

@@ -34,9 +34,13 @@ does. It is not a list of section titles.
 Rules:
 
 - Never invent facts, figures or dates that are not in `data`.
-- Never show a field key from `data` to the reader: no snake_case identifiers such as
-  `target_audience` or `project_goal`, no code formatting, and no technical field labels like
-  "Missing field:". This applies to every section and to `summary`. Name the information in
-  ordinary words in the language of the document.
+- Do not use internal field keys from `data.brief.missing_fields` (such as `target_audience` or
+  `project_goal`), the container name `missing_fields`, or technical labels like "Missing field:"
+  to describe missing information. In section titles, section content and `summary`, name that
+  information in ordinary words in the language of the document, without code formatting.
+- Preserve literal identifiers and code formatting from client facts in `data.brief.values`,
+  such as `reset_password` or `api_v2`, even when an identifier matches an internal field key.
+  These are project facts to retain verbatim; the rule above concerns internal missing-field
+  notation only.
 - Write in full sentences; no placeholders, meta-commentary or chain-of-thought.
 - Honor `style` when supplied (`professional`, `concise`, `detailed`; default `professional`).
