@@ -56,6 +56,7 @@ function TestProductFields({ values, errors, disabled, onChange }: ProductFields
 export const testProductDefinition: ProductDefinition<TestProductValues, string> = {
   productId: TEST_PRODUCT_IDS.productId,
   scenarioId: TEST_PRODUCT_IDS.scenarioId,
+  outputSchema: { schemaRef: "test_product.output_v1", schemaVersion: 1 },
   messageScope: "run",
   hasDescription: true,
   emptyValues: { text: "" },

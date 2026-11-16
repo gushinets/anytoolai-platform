@@ -25,6 +25,7 @@ export class PlatformApiClient {
    */
   readonly timeoutMs: number;
   private readonly defaultHeaders: Record<string, string>;
+  readonly portalIdentity: PlatformApiClientOptions["portalIdentity"];
   /** Single-flight guard for createGuestIdentity(), scoped to this client instance only. */
   private inFlightGuestIdentity: Promise<GuestIdentityResult> | null = null;
   /**
@@ -41,6 +42,7 @@ export class PlatformApiClient {
     this.fetchImpl = options.fetchImpl ?? globalThis.fetch.bind(globalThis);
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.defaultHeaders = options.defaultHeaders ?? {};
+    this.portalIdentity = options.portalIdentity;
   }
 
   async request<T>(options: PlatformApiRequestOptions): Promise<PlatformApiResult<T>> {
@@ -68,6 +70,7 @@ export class PlatformApiClient {
     method: PlatformApiMethod,
     options: PlatformApiRequestOptions,
   ): Promise<PlatformApiResult<T>> {
+    if (this.portalIdentity && !this.portalIdentity.isCurrent()) return { ok: false, error: abortedError() };
     const url = joinUrl(this.baseUrl, options.path);
     const headers = buildHeaders(
       this.defaultHeaders,
@@ -102,7 +105,12 @@ export class PlatformApiClient {
         body: options.body === undefined ? undefined : JSON.stringify(options.body),
         signal: controller.signal,
       });
-      return await toResult<T>(response);
+      const result = await toResult<T>(response);
+      if (this.portalIdentity && !this.portalIdentity.isCurrent()) return { ok: false, error: abortedError() };
+      if (this.portalIdentity && !result.ok && result.error.type === "backend_error" && result.error.status === 401) {
+        this.portalIdentity.refuse(result.error.code);
+      }
+      return result;
     } catch (cause) {
       if (controller.signal.aborted) {
         return { ok: false, error: abortReason === "timeout" ? timeoutError() : abortedError() };
@@ -132,6 +140,7 @@ export class PlatformApiClient {
    * `storage`/`storageKey`, not just whichever call happened to trigger the backend request.
    */
   async createGuestIdentity(options: GuestIdentityOptions): Promise<GuestIdentityResult> {
+    if (this.portalIdentity) return { ok: false, error: abortedError() };
     this.activeGuestIdentityCalls += 1;
     try {
       const storageKey = options.storageKey ?? DEFAULT_GUEST_STORAGE_KEY;

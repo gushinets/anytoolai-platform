@@ -47,7 +47,8 @@ def test_saved_prompts_upgrade_after_execution_metering_and_preserve_scope_on_re
     ) as (engine, config, _database_url):
         with engine.begin() as connection:
             config.attributes["connection"] = connection
-            command.upgrade(config, "head")
+            # Replay only the additive Lab revision before applying later paid migrations.
+            command.upgrade(config, "0018")
         factory = build_session_factory(engine)
         saved = AtomLabSavedPrompt(
             ref="atom_lab_prompt_migration", tenant_id="tenant_demo", region="eu-central",

@@ -90,7 +90,7 @@ describe.each(products)("$productId attachment recovery", (product) => {
       } else {
         expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
       }
-      expect(readAttachSessionId(productId)).toBe("session_1");
+      expect(readAttachSessionId(productId)).toBe(stored ? "session_1" : undefined);
       expect(screen.queryByRole("form")).toBeNull();
       expect(screen.getAllByRole("radio").every((node) => (node as HTMLInputElement).disabled)).toBe(true);
       fireEvent.click(screen.getByRole("button", { name: "New task" }));
@@ -128,7 +128,7 @@ describe.each(products)("$productId attachment recovery", (product) => {
     if (!failure) vi.spyOn(made.client, "request").mockResolvedValueOnce({ ok: false, error: { type: "timeout" } });
     render(<Attached client={made.client} sessionId="session_1" />);
     const retry = await screen.findByRole("button", { name: "Try again" });
-    expect(readAttachSessionId(productId)).toBe("session_1");
+    expect(readAttachSessionId(productId)).toBeUndefined();
     expect(screen.queryByRole("button", { name: "New task" }) !== null).toBe(_label === "missing identity");
     fireEvent.click(retry);
     await screen.findByRole("button", { name: "Copy" });

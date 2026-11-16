@@ -37,17 +37,17 @@ def snapshot(connection, metadata):
     }
 
 
+@pytest.mark.parametrize("runtime", ["0016"], indirect=True)
 def test_0017_preserves_results_paid_usage_and_all_reservation_states(runtime):
     factory, app, registry = runtime
     engine = engine_from_session_factory(factory)
     config = build_alembic_config(engine.url.render_as_string(hide_password=False))
     with engine.begin() as connection:
-        config.attributes["connection"] = connection
-        command.downgrade(config, "0016")
         historical_metadata = sa.MetaData(schema="platform")
         historical_metadata.reflect(connection, schema="platform")
 
-    grant = allowance()
+    # Historical ANY-507 workers predate the exhaustion outbox; this case tests retained usage.
+    grant = allowance(quantity=2)
     with transaction_boundary(factory) as session:
         success = start(session, registry, key="success")
         canceled = start(session, registry, key="canceled")

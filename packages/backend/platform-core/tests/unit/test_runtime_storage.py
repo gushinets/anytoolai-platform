@@ -417,7 +417,7 @@ def test_quota_dimension_downgrade_to_0006_preserves_current_0003_schema() -> No
     with _provision_runtime_database(upgrade_target=None) as (engine, alembic_config):
         with engine.begin() as connection:
             alembic_config.attributes["connection"] = connection
-            command.upgrade(alembic_config, "head")
+            command.upgrade(alembic_config, "0007")
             command.downgrade(alembic_config, "0006")
             quota_columns = {
                 column["name"]
@@ -603,7 +603,7 @@ def test_handoff_index_compatibility_revision_replaces_legacy_target_session_ind
 
         with engine.begin() as connection:
             alembic_config.attributes["connection"] = connection
-            command.upgrade(alembic_config, "head")
+            command.upgrade(alembic_config, "0010")
             upgraded_indexes = {
                 index["name"]
                 for index in sa.inspect(connection).get_indexes(

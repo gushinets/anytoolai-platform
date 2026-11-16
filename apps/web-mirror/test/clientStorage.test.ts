@@ -261,7 +261,9 @@ describe("getClientStorage", () => {
     const source = readFileSync(resolve(here, "../src/app/products/[productId]/page.tsx"), "utf8");
 
     expect(source).toContain("createProductRunEventTracker(client, productId, getClientStorage(client))");
-    expect(source).toContain("const client = getPlatformApiClient();");
+    expect(source).toContain("<PortalIdentityBoundary requirePaid={query.paid === \"1\"}>{(client) =>");
+    const boundary = readFileSync(resolve(here, "../src/components/PortalIdentityBoundary.tsx"), "utf8");
+    expect(boundary).toContain("children(getPlatformApiClient())");
     expect(source).not.toContain("createInMemoryAsyncStorage");
     expect(source).not.toContain("createPlatformApiClient");
   });
@@ -270,7 +272,9 @@ describe("getClientStorage", () => {
     const here = dirname(fileURLToPath(import.meta.url));
     const source = readFileSync(resolve(here, "../src/app/handoff/[handoffToken]/page.tsx"), "utf8");
 
-    expect(source).toContain("const client = getPlatformApiClient();");
+    expect(source).toContain("<PortalIdentityBoundary requirePaid={query.paid === \"1\"}>{(client) =>");
+    const boundary = readFileSync(resolve(here, "../src/components/PortalIdentityBoundary.tsx"), "utf8");
+    expect(boundary).toContain("children(getPlatformApiClient())");
     expect(source).not.toContain("createPlatformApiClient");
   });
 });

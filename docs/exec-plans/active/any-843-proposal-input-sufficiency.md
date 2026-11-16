@@ -430,3 +430,48 @@ The smoke dev stack was stopped after verification. Backend full-check, live mod
 production and remote CI were not rerun. Billing policy and the required result-contract marker
 remain unchanged. The owner subsequently authorized committing, pushing and updating the PR
 description with this implementation and its verification results.
+
+
+## Main integration: Portal identity and paid recovery (2026-11-16)
+
+The owner requested updating the current branch from main, now de7c1cd9 (ANY-766).
+The overlapping changes are ProductRunPage's new resolved-selection wrapper, paid persistence
+and recovery-only boot, plus MultiModeProduct's shared mode/session selection.
+
+Integration plan: preserve the Portal/paid paths and identity-generation guards from main,
+keep page-owned guest quota admission and normalized field rejection from ANY-843, and clear
+completed paid recovery when a semantic rejection returns the form to editing. Retain the
+required result marker, shared mode quota lifetime and unmetered behavior. Validate the merged
+web/CE-kit suites including paid recovery and guest quota regressions, then frontend-check.
+No backend billing or Portal contract redesign is part of this merge.
+
+Conflict resolution retains the new ResolvedProductRunPage/useProductSelection path, recovery-only
+boot and owner-bound paid persistence. Guest admission remains above mode remounts; paid clients
+never create a guest quota scope. The common in-flight guard covers both paid and guest sends.
+Semantic rejection clears only its completed paid recovery. A restored pending request binds
+field hints to a saved form only if that form reproduces the frozen request input; a newer draft
+keeps its values without inheriting the older request's errors.
+
+Added four integration regressions for fresh paid submission, accepted-session recovery, pending
+replay, and pending replay with a newer draft. The pending case reproduced the lost hints before
+the merge correction. All four now pass, together with 410 focused paid/guest/product tests.
+Final web suite: 997 tests passed. CE-kit: 408 passed; shared-ui: 55 passed; Chromium: 349
+passed. All five backend/frontend renderer-pin contract tests passed, as did documentation and
+architecture validation. The canonical frontend-check exposed a typed-input guard error and
+then an architecture-boundary violation in its helper import; both were corrected in the existing
+runtime comparison helper. After that final correction, the complete affected web suite and
+web lint/typecheck passed, and generated API types were confirmed current. Previously passing
+unaffected browser/package suites were not repeated. This is staged frontend verification, not
+a claim that an uninterrupted final frontend-check command passed.
+
+An unchanged ESLint harness test exceeded its five-second limit while Docker images were being
+built; after the build it passed independently and in the next full CE-kit run. No timeout,
+assertion, test selection or retry policy was relaxed. The existing dev PostgreSQL volume rejected
+configured credentials; smoke uses a separate temporary database volume, preserving the existing
+data. All workspace production builds passed. Dedicated proposal-ai-smoke passed 11/11 against
+the rebuilt API/worker and isolated PostgreSQL database, including the delayed terminal-quota
+read and a genuine backend 429 after reload. The test stack was stopped after verification.
+
+This update is a local merge of de7c1cd9 into feature/ANY-843; no push or GitHub write was requested
+for this step. Backend full-check, live LLM calls, an actual peer Portal deployment and remote CI
+were not rerun. Existing billing policy and the required input marker remain unchanged.

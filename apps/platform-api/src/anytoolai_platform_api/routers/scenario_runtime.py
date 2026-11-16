@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Annotated, Any
 
 from anytoolai_platform_api.dependencies import (
@@ -9,6 +10,18 @@ from anytoolai_platform_api.dependencies import (
     require_enabled_product,
 )
 from anytoolai_platform_api.errors import ApiError, platform_error_to_api_error
+from anytoolai_platform_api.paid_access import (
+    OPTIONAL_PAID_SECURITY,
+    PAID_RUNTIME_ERROR_RESPONSES,
+    AccessSnapshotClient,
+    eligible_allowance,
+    get_snapshot_client,
+    lock_authority,
+    optional_portal_user,
+    refresh_authority,
+    require_session_owner,
+)
+from anytoolai_platform_api.portal_session import PortalUserPrincipal
 from anytoolai_platform_api.schemas import (
     ErrorResponse,
     ScenarioNextActionRequest,
@@ -22,6 +35,7 @@ from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.identity.repository import GuestIdentityRepository
+from anytoolai_platform_core.quotas.models import PaidAllowance
 from anytoolai_platform_core.quotas.repository import QuotaUsageRepository
 from anytoolai_platform_core.quotas.service import QUOTA_CAPACITY_RESERVED, GuestQuotaService
 from anytoolai_platform_core.scenarios.models import ScenarioSessionSnapshot
@@ -34,6 +48,7 @@ from anytoolai_platform_core.scenarios.service import ScenarioRuntimeService, Sc
 from anytoolai_platform_core.storage.transactions import transaction_boundary
 from anytoolai_platform_core.workflows.repository import JobRepository
 from fastapi import APIRouter, Body, Depends, Header
+from sqlalchemy.orm import Session
 
 router = APIRouter(tags=["scenario-runtime"])
 
@@ -128,11 +143,23 @@ SAFE_IDEMPOTENCY_CONFLICT_409_EXAMPLE = {
 }
 
 
+def _require_start_product(
+    product_id: str,
+    settings: Annotated[Settings, Depends(get_settings)],
+    principal: Annotated[PortalUserPrincipal | None, Depends(optional_portal_user)],
+) -> None:
+    # Guests fail before runtime/storage resolution; paid owners may replay a disabled product.
+    if principal is None:
+        require_enabled_product(product_id, settings)
+
+
 @router.post(
     "/v1/products/{product_id}/scenarios/{scenario_id}/start",
     response_model=ScenarioStartResponse,
+    dependencies=[Depends(_require_start_product)],
     summary="Create a scenario session and queue workflow execution",
     responses={
+        **PAID_RUNTIME_ERROR_RESPONSES,
         200: {
             "description": "Stable queue-and-return response for CE polling.",
             "content": {"application/json": {"example": START_RESPONSE_EXAMPLE}},
@@ -209,43 +236,76 @@ SAFE_IDEMPOTENCY_CONFLICT_409_EXAMPLE = {
             },
         },
     },
+    openapi_extra=OPTIONAL_PAID_SECURITY,
 )
 def start_scenario(
-    product_id: Annotated[str, Depends(require_enabled_product)],
+    product_id: str,
     scenario_id: str,
     request: Annotated[ScenarioStartRequest, Body()],
     registry: Annotated[ConfigRegistry, Depends(get_config_registry)],
     session_factory: Annotated[Any, Depends(get_session_factory)],
     settings: Annotated[Settings, Depends(get_settings)],
+    principal: Annotated[PortalUserPrincipal | None, Depends(optional_portal_user)],
+    snapshot_client: Annotated[AccessSnapshotClient, Depends(get_snapshot_client)],
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
     live_canary_token: Annotated[str | None, Header(alias="X-Live-Canary-Token")] = None,
 ) -> ScenarioStartResponse:
-    # PlatformError (including quota_exhausted) is caught only after the `with` block
-    # exits, so any failure -- not just the classic pre-insert quota_exhausted -- rolls
-    # back everything written in this transaction (e.g. a scenario_sessions row an
-    # idempotent insert-or-select already committed to before quota ran out). Quota
-    # bookkeeping still survives: GuestQuotaService registers a rollback-recovery
-    # callback before raising quota_exhausted, and transaction_boundary runs it in an
-    # independent transaction after the rollback (see quotas/service.py, ADR in
-    # docs/architecture/quota-model.md).
+    values = dict(
+        tenant_id=settings.default_tenant_id,
+        region=settings.default_region,
+        product_id=product_id,
+        scenario_id=scenario_id,
+        frontend_id=request.frontend_id,
+        input_payload=request.input,
+        guest_id=request.guest_id,
+        user_id=request.user_id,
+        source_frontend_instance_id=request.source_frontend_instance_id,
+        idempotency_key=idempotency_key,
+        live_canary_token=live_canary_token,
+        execution_owner=None if principal is None else principal.owner,
+    )
     try:
+        if principal is not None:
+            # Replay precedes refresh, sales flags and all mutable admission configuration.
+            try:
+                with transaction_boundary(session_factory) as session:
+                    runtime = _runtime_service(
+                        session=session, registry=registry, paid_admission=_needs_refresh
+                    )
+                    snapshot = runtime.start_session(**values)
+                return ScenarioStartResponse.model_validate(_start_response_payload(snapshot))
+            except _RefreshRequired:
+                refresh_authority(session_factory, principal, snapshot_client)
         with transaction_boundary(session_factory) as session:
-            snapshot = _runtime_service(session=session, registry=registry).start_session(
-                tenant_id=settings.default_tenant_id,
-                region=settings.default_region,
-                product_id=product_id,
-                scenario_id=scenario_id,
-                frontend_id=request.frontend_id,
-                input_payload=request.input,
-                guest_id=request.guest_id,
-                user_id=request.user_id,
-                source_frontend_instance_id=request.source_frontend_instance_id,
-                idempotency_key=idempotency_key,
-                live_canary_token=live_canary_token,
+            if principal is not None:
+                lock_authority(session, principal.owner, principal.consumer_id)
+
+            def admit_paid_start(product: str, scenario: str) -> PaidAllowance:
+                if principal is None:
+                    raise RuntimeError("Paid admission requires a trusted principal")
+                require_enabled_product(product, settings)
+                return eligible_allowance(session, principal, registry, product, scenario)
+
+            runtime = _runtime_service(
+                session=session,
+                registry=registry,
+                paid_admission=None if principal is None else admit_paid_start,
             )
+            snapshot = runtime.start_session(**values)
+            if not snapshot.is_replay and principal is not None:
+                # Resample database wall time after every bucket/reservation wait.
+                eligible_allowance(session, principal, registry, product_id, scenario_id)
     except PlatformError as exc:
         raise _to_api_error(exc) from exc
     return ScenarioStartResponse.model_validate(_start_response_payload(snapshot))
+
+
+class _RefreshRequired(Exception):
+    pass
+
+
+def _needs_refresh(product_id: str, scenario_id: str) -> PaidAllowance:
+    raise _RefreshRequired()
 
 
 @router.get(
@@ -253,6 +313,7 @@ def start_scenario(
     response_model=ScenarioSessionResponse,
     summary="Get frontend-safe scenario session state",
     responses={
+        **PAID_RUNTIME_ERROR_RESPONSES,
         200: {
             "description": "Frontend-safe session snapshot for polling.",
             "content": {"application/json": {"example": SESSION_RESPONSE_EXAMPLE}},
@@ -273,20 +334,17 @@ def start_scenario(
             },
         },
     },
+    openapi_extra=OPTIONAL_PAID_SECURITY,
 )
 def get_scenario_session(
     scenario_session_id: str,
     registry: Annotated[ConfigRegistry, Depends(get_config_registry)],
     session_factory: Annotated[Any, Depends(get_session_factory)],
     settings: Annotated[Settings, Depends(get_settings)],
+    principal: Annotated[PortalUserPrincipal | None, Depends(optional_portal_user)],
 ) -> ScenarioSessionResponse:
     with transaction_boundary(session_factory) as session:
-        _require_public_session(
-            ScenarioSessionRepository(session),
-            scenario_session_id,
-            tenant_id=settings.default_tenant_id,
-            region=settings.default_region,
-        )
+        _require_visible_session(session, scenario_session_id, settings, principal)
         snapshot = _wrap_platform_errors(
             lambda: _runtime_service(
                 session=session,
@@ -305,6 +363,7 @@ def get_scenario_session(
     response_model=ScenarioSessionResponse,
     summary="Validate and record a frontend next-action click",
     responses={
+        **PAID_RUNTIME_ERROR_RESPONSES,
         200: {
             "description": "Validated next action with the current safe session snapshot.",
             "content": {"application/json": {"example": SESSION_RESPONSE_EXAMPLE}},
@@ -330,6 +389,7 @@ def get_scenario_session(
             "content": {"application/json": {"example": SAFE_409_EXAMPLE}},
         },
     },
+    openapi_extra=OPTIONAL_PAID_SECURITY,
 )
 def post_next_action(
     scenario_session_id: str,
@@ -338,14 +398,10 @@ def post_next_action(
     registry: Annotated[ConfigRegistry, Depends(get_config_registry)],
     session_factory: Annotated[Any, Depends(get_session_factory)],
     settings: Annotated[Settings, Depends(get_settings)],
+    principal: Annotated[PortalUserPrincipal | None, Depends(optional_portal_user)],
 ) -> ScenarioSessionResponse:
     with transaction_boundary(session_factory) as session:
-        _require_public_session(
-            ScenarioSessionRepository(session),
-            scenario_session_id,
-            tenant_id=settings.default_tenant_id,
-            region=settings.default_region,
-        )
+        _require_visible_session(session, scenario_session_id, settings, principal)
         snapshot = _wrap_platform_errors(
             lambda: _runtime_service(
                 session=session,
@@ -365,11 +421,13 @@ def _runtime_service(
     *,
     session,
     registry: ConfigRegistry,
+    paid_admission: Callable[[str, str], PaidAllowance] | None = None,
 ) -> ScenarioRuntimeService:
     event_emitter = EventEmitter(EventLogRepository(session))
     session_repository = ScenarioSessionRepository(session)
     return ScenarioRuntimeService(
         config_registry=registry,
+        paid_admission=paid_admission,
         session_repository=session_repository,
         session_service=ScenarioSessionService(session_repository, event_emitter),
         job_repository=JobRepository(session),
@@ -441,17 +499,17 @@ def _wrap_platform_errors(callable_):
         raise _to_api_error(exc) from exc
 
 
-def _require_public_session(
-    repository: ScenarioSessionRepository,
+def _require_visible_session(
+    session: Session,
     scenario_session_id: str,
-    *,
-    tenant_id: str,
-    region: str,
+    settings: Settings,
+    principal: PortalUserPrincipal | None,
 ) -> None:
-    record = repository.get_in_scope(
+    require_session_owner(session, scenario_session_id, settings, principal)
+    record = ScenarioSessionRepository(session).get_in_scope(
         scenario_session_id,
-        tenant_id=tenant_id,
-        region=region,
+        tenant_id=settings.default_tenant_id,
+        region=settings.default_region,
     )
     if record is not None and not is_public_runtime_session(record):
         raise ApiError(

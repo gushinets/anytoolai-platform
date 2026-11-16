@@ -63,6 +63,7 @@ const briefError = (values: DraftValues) => requiredBackendTrimmedFieldError(val
 export const draftDefinition: ProductDefinition<DraftValues, AcceptanceBuilderResult> = {
   productId: "acceptance_builder",
   scenarioId: "acceptance_builder.draft_v1",
+  outputSchema: { schemaRef: "acceptance_builder.draft_output_v1", schemaVersion: 1 },
   messageScope: "draft",
   hasDescription: true,
   emptyValues: { briefText: "" },
@@ -77,6 +78,7 @@ export const draftDefinition: ProductDefinition<DraftValues, AcceptanceBuilderRe
 export const checkDefinition: ProductDefinition<CheckValues, AcceptanceBuilderResult> = {
   productId: "acceptance_builder",
   scenarioId: "acceptance_builder.check_v1",
+  outputSchema: { schemaRef: "acceptance_builder.check_output_v1", schemaVersion: 1 },
   messageScope: "check",
   hasDescription: true,
   emptyValues: { briefText: "", deliverableText: "" },

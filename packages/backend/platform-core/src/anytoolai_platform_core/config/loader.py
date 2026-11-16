@@ -1927,10 +1927,20 @@ class ConfigLoader:
                     recursive=True,
                 )
 
+                paid_metric_key = scenario_data.get("paid_metric_key")
+                if paid_metric_key is not None:
+                    paid_metric_key = _parse_nonblank_string_field(
+                        paid_metric_key,
+                        field_name="paid_metric_key",
+                        file_path=path,
+                        config_id=scenario_id,
+                    )
+
                 self.scenarios[scenario_id] = ScenarioDefinition(
                     scenario_id=scenario_id,
                     version=version,
                     workflow_id=workflow_id,
+                    paid_metric_key=paid_metric_key,
                     allowed_next_actions=scenario_data.get("allowed_next_actions", []),
                     metadata={"_file_path": str(path)},
                     internal_only=_parse_optional_bool_field(
@@ -2300,8 +2310,24 @@ class ConfigLoader:
                 else:
                     metric_sources[metric.metric_key] = path
 
+    def _validate_paid_metric_bindings(self) -> None:
+        for product_id, product in self.products.items():
+            owned_metrics = {metric.metric_key: metric for metric in product.usage_metrics}
+            for scenario_id in product.scenarios:
+                scenario = self.scenarios.get(scenario_id)
+                if scenario is not None and scenario.paid_metric_key is not None:
+                    self._validate_reference(
+                        config_id=scenario_id,
+                        file_path=self._source_for("scenario", scenario_id, self.config_root),
+                        ref_type="paid_metric_key",
+                        ref_value=scenario.paid_metric_key,
+                        target_registry=owned_metrics,
+                        target_type=f"product {product_id} usage metric",
+                    )
+
     def _validate_cross_references(self) -> None:
         self._validate_usage_metric_uniqueness()
+        self._validate_paid_metric_bindings()
         for action_type, action_def in self.action_definitions.items():
             source_path = self._source_for(
                 "action_definition",

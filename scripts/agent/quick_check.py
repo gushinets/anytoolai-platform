@@ -31,6 +31,7 @@ PYTEST_TARGETS = [
     "tests/architecture",
     "tests/test_quick_check.py",
     "tests/test_runner.py",
+    "tests/test_image_deploy.py",
     "tests/test_manifest_conformance.py",
     "tests/test_validate_configs.py",
     "tests/test_docs_generation.py",
@@ -95,6 +96,7 @@ def pytest_command() -> list[str]:
         FAST_PYTEST_MARK_EXPRESSION,
         "--basetemp",
         str(pytest_basetemp()),
+        "--durations=25",
         *PYTEST_TARGETS,
     ]
 

@@ -59,6 +59,7 @@ from anytoolai_platform_core.workflows.runner import (
 from anytoolai_platform_sdk import ProductBundle
 from sqlalchemy.orm import Session, sessionmaker
 
+from anytoolai_platform_worker.exhaustion import ExhaustionSettings, build_exhaustion_delivery
 from anytoolai_platform_worker.handlers.run_workflow import RunWorkflowHandler
 from anytoolai_platform_worker.lease import build_job_lease
 from anytoolai_platform_worker.queues import DatabaseJobQueue
@@ -84,6 +85,7 @@ def build_worker(
     enabled_product_ids: frozenset[str] | None = None,
     model_catalog_source: ModelCatalogSource | None = None,
     model_catalog_settings: ModelCatalogSettings | None = None,
+    exhaustion_settings: ExhaustionSettings | None = None,
 ) -> Worker:
     """Build the production graph, with explicit test seams for DB and provider adapters.
 
@@ -208,4 +210,7 @@ def build_worker(
         poll_interval_seconds=poll_interval_seconds,
         reconciler=reconciler,
         catalog_refresh_hook=catalog_refresh_hook,
+        exhaustion_delivery=build_exhaustion_delivery(engine, delivery_settings)
+        if (delivery_settings := exhaustion_settings or ExhaustionSettings.from_env()) is not None
+        else None,
     )
