@@ -3,12 +3,12 @@
     "sections": [
       {
         "id": "overview",
-        "title": "Обзор проекта",
+        "title": "Project overview",
         "content": "Создать сайт пекарни."
       },
       {
         "id": "key-details",
-        "title": "Основные детали",
+        "title": "Key details",
         "content": "- Страница меню.",
         "metadata": {
           "kind": "list"
@@ -16,12 +16,12 @@
       },
       {
         "id": "gaps",
-        "title": "Пробелы и риски",
+        "title": "Gaps and risks",
         "content": "Клиенту нужно уточнить срок, бюджет, целевую аудиторию и ограничения."
       },
       {
         "id": "next-steps",
-        "title": "Вопросы клиенту",
+        "title": "Questions to ask",
         "content": "- Когда нужен сайт?\n- Кто будет пользоваться сайтом?",
         "metadata": {
           "kind": "list"

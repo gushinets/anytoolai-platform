@@ -317,8 +317,14 @@ _LITERAL_SPAN = re.compile(
 _FIELD_LABEL_WORD = r"(?:fields?|поле|поля|полей|campos?)"
 # Punctuation separates words; sentences, lines and masked source facts separate assertions.
 _FIELD_SEPARATOR = r"[^\w.!?\r\n\0]*"
-_FIELD_LABEL_BEFORE = re.compile(rf"\b{_FIELD_LABEL_WORD}{_FIELD_SEPARATOR}\Z", re.IGNORECASE)
-_FIELD_LABEL_AFTER = re.compile(rf"^{_FIELD_SEPARATOR}{_FIELD_LABEL_WORD}\b", re.IGNORECASE)
+# shortcut: a finite label grammar, not arbitrary paraphrases; review other wording live.
+_FIELD_LABEL_PHRASE = (
+    rf"(?:{_FIELD_LABEL_WORD}\b"
+    rf"(?:{_FIELD_SEPARATOR}(?:names?|identifiers?|labels?|keys?)\b)?"
+    rf"|(?:schema|internal)\b{_FIELD_SEPARATOR}keys?\b)"
+)
+_FIELD_LABEL_BEFORE = re.compile(rf"\b{_FIELD_LABEL_PHRASE}{_FIELD_SEPARATOR}\Z", re.IGNORECASE)
+_FIELD_LABEL_AFTER = re.compile(rf"^{_FIELD_SEPARATOR}{_FIELD_LABEL_PHRASE}", re.IGNORECASE)
 _KEY_LABELS = re.compile(r"missing fields?\s*:|fields? by name|пропущено поле", re.IGNORECASE)
 _FACT_START = re.compile(r"(?:^|\n)[ \t]*(?:(?:[-+*•]|\d+[.)])[ \t]+)?\Z|[.!?][ \t]+\Z")
 _FACT_END = re.compile(r"^[ \t]*(?:\Z|[.!?](?:\s|\Z)|\r?\n)")
@@ -643,6 +649,27 @@ def test_summary_fixtures_obey_the_a10_prompt(
     for name in brief["missing_fields"]:
         assert gap_keywords[name] in sections["gaps"].casefold(), name
 
+    schema = _load_schema("brief_decoder.decode_output_v1")
+    document_schema = {"$defs": schema["$defs"], **schema["properties"]["document"]}
+    jsonschema.validators.validator_for(schema)(document_schema).validate(document)
+
+
+@pytest.mark.parametrize("suffix", _SUMMARY_FIXTURES)
+@pytest.mark.parametrize("section_index", range(4))
+@pytest.mark.parametrize("title", ["Переведённый заголовок", "Título traducido"])
+def test_summary_fixture_rejects_changed_fixed_titles(
+    monkeypatch: pytest.MonkeyPatch, suffix: str, section_index: int, title: str
+) -> None:
+    original = _fixture_response
+    stem = "brief_decoder.generate_summary_v1" + suffix
+    document = original(stem)
+    document["sections"][section_index]["title"] = title
+    monkeypatch.setitem(
+        globals(), "_fixture_response", lambda name: document if name == stem else original(name)
+    )
+    with pytest.raises(jsonschema.ValidationError, match="was expected"):
+        test_summary_fixtures_obey_the_a10_prompt(suffix, *_SUMMARY_FIXTURES[suffix])
+
 
 @pytest.mark.parametrize("suffix", _SUMMARY_FIXTURES)
 @pytest.mark.parametrize(
@@ -835,7 +862,9 @@ def test_list_items_without_terminal_punctuation_keep_source_provenance(line_end
     )
 
 
-@pytest.mark.parametrize("marker", ["field", "поле", "campo"])
+@pytest.mark.parametrize(
+    "marker", ["field", "поле", "campo", "field name", "field identifier", "schema key"]
+)
 @pytest.mark.parametrize("separator", [" (", " [", " = ", " - ", " — ", " «", " / ", " ~ "])
 def test_field_marker_punctuation_is_checked_in_both_directions(
     marker: str, separator: str
@@ -847,9 +876,62 @@ def test_field_marker_punctuation_is_checked_in_both_directions(
 
 
 @pytest.mark.parametrize("separator", [". ", "! ", "? ", "\n", "\r\n", " unrelated "])
-def test_field_labels_cannot_cross_sentences_lines_or_other_words(separator: str) -> None:
-    assert not _field_key_leaks("field" + separator + "budget")
-    assert not _field_key_leaks("budget" + separator + "field")
+@pytest.mark.parametrize("marker", ["field", "field name", "field identifier", "schema key"])
+def test_field_labels_cannot_cross_sentences_lines_or_other_words(
+    separator: str, marker: str
+) -> None:
+    assert not _field_key_leaks(marker + separator + "budget")
+    assert not _field_key_leaks("budget" + separator + marker)
+
+
+@pytest.mark.parametrize("suffix", [".weak_input", ".ru", ".es"])
+@pytest.mark.parametrize("key", [key for key in _GAPS_KEYWORD if "_" not in key])
+@pytest.mark.parametrize(
+    "label",
+    [
+        "field name",
+        "field identifier",
+        "field label",
+        "field key",
+        "fields' names",
+        "FIELD IDENTIFIERS",
+        "schema key",
+        "internal keys",
+    ],
+)
+def test_summary_fixture_distinguishes_technical_label_phrases_from_client_facts(
+    monkeypatch: pytest.MonkeyPatch, suffix: str, key: str, label: str
+) -> None:
+    extract_suffix, language = _SUMMARY_FIXTURES[suffix]
+    extract_stem = "brief_decoder.extract_brief_v1" + extract_suffix
+    summary_stem = "brief_decoder.generate_summary_v1" + suffix
+    brief, document = _fixture_response(extract_stem), _fixture_response(summary_stem)
+    source = f"The {label} {key} is missing from the database; restore it."
+    brief["values"]["project_goal"] = source
+    document["sections"][0]["content"] = source
+    responses = {extract_stem: brief, summary_stem: document}
+    monkeypatch.setitem(globals(), "_fixture_response", responses.__getitem__)
+    test_summary_fixtures_obey_the_a10_prompt(suffix, extract_suffix, language)
+
+    document["sections"][2]["content"] += f" Missing {label}: {key}."
+    with pytest.raises(AssertionError, match="field key leaks"):
+        test_summary_fixtures_obey_the_a10_prompt(suffix, extract_suffix, language)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Confirm the budget with the client.",
+        "The name of the project is missing; confirm the budget.",
+        "Choose a field name after confirming the budget.",
+        "The field name is unknown. Budget needs confirmation.",
+        "fieldname budget",
+        "field namesake budget",
+        "schema keyboard budget",
+    ],
+)
+def test_technical_label_phrases_do_not_reject_ordinary_english(text: str) -> None:
+    assert not _field_key_leaks(text)
 
 
 @pytest.mark.parametrize("key", [key for key in _GAPS_KEYWORD if "_" not in key])

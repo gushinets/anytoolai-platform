@@ -7,9 +7,9 @@
 - Created: 2026-11-16
 - Last updated: 2026-11-17
 - Review date: 2026-11-17
-- Next action: review the recorded live findings and decide follow-up scope; collection is complete.
-- Blocker: live acceptance is not fully green. Noise attempt 3 failed final output validation
-  (`key-details.metadata.kind = paragraph`, schema requires `list`); 29/30 API results completed.
+- Next action: review the completed round 5 fixture/test corrections; no push performed.
+- Blocker: none for round 5. User accepted ANY-615's live wording result; the separate runtime
+  and extraction findings are tracked in ANY-884 and ANY-885.
 
 ## Goal
 
@@ -53,6 +53,11 @@ remain live-acceptance concerns. It may conservatively flag such valid rewrites 
 
 ## Implementation steps
 
+- [x] Round 5: validate every summary fixture against the product document schema and restore
+  fixed English titles in RU/ES fixtures, with title mutation regressions.
+- [x] Round 5: recognize bounded technical label phrases, preserving complete source facts;
+  cover single-word keys, ordinary prose, assertion boundaries and fixture mutations.
+- [x] Round 5: run Brief Decoder/Freelancer tests and documentation checks; record evidence.
 - [x] Run doctor and validate this plan.
 - [x] Add and exercise the regression tests, then update the prompt.
 - [x] Run quick-check, validate-configs, validate-docs and full-check (baseline blockers below).
@@ -72,10 +77,17 @@ remain live-acceptance concerns. It may conservatively flag such valid rewrites 
 - [x] Record round 4 regression and validation results.
 - [x] Run all 30 authorized live scenarios, preserve outputs/failures and inspect generated text.
 - [x] Record the failed noise scenario and separate extraction-completeness observation.
-- [ ] Obtain user acceptance/follow-up decision; do not claim 30/30 end-to-end PASS.
+- [x] Obtain user acceptance/follow-up decision; separate findings tracked as ANY-884/ANY-885,
+  without claiming 30/30 end-to-end PASS.
 
 ## Decision log
 
+- 2026-11-17, user acceptance: ANY-615 accepted for gap wording; live findings moved to
+  [ANY-884](https://linear.app/paveldik/issue/ANY-884) (section metadata) and
+  [ANY-885](https://linear.app/paveldik/issue/ANY-885) (source language requirement extraction).
+- 2026-11-17, review round 5: both regression gaps reproduced and fixes authorized. Reuse the
+  product document schema as the structural contract. Expand the finite technical-label grammar
+  instead of matching arbitrary intervening words; copied-fact provenance remains unchanged.
 - 2026-11-16: use "technical field labels" in the prohibition so the obsolete raw-name
   instruction is absent even from negative examples.
 - 2026-11-16: sibling scan found no matching raw-key instruction in ProposalAI or Client Update
@@ -333,3 +345,33 @@ changes; older validation records below are historical, not current CI status.
 - Changes are limited to tests, deterministic fixture data and plans. API/full-check were not
   repeated for this test-only change; historical results remain above. No live model run,
   GitHub write or push was performed. Live acceptance remains required before closure.
+
+### Review round 5
+
+- Read all PR inline comments and replies and reproduced both findings at `ffa82ef9`. All five
+  summary fixtures passed the old fixture assertion, but the product document schema rejected
+  four fixed titles in each RU/ES fixture. Eight added gap sentences (`field name` and
+  `field identifier` for the four single-word keys) also passed the actual weak-fixture assertion.
+- Restored the fixed English titles in RU/ES, retaining localized contents and summaries. Every
+  summary fixture now validates against the existing product document schema with its `$defs`;
+  title values/order and metadata rules are not duplicated in the test. Forty title mutations
+  exercise rejection across all five fixture variants and every section.
+- Extended the bounded label grammar: existing field nouns may be followed by `name`,
+  `identifier`, `label` or `key`; `schema key` and `internal key` are also recognized. Plurals,
+  case and punctuation are covered. Sentence/line boundaries, unrelated words and masked facts
+  cannot be crossed. This is not a general semantic classifier for arbitrary paraphrases.
+- Complete copied facts are still masked before label recognition. EN/RU/ES fixture mutations
+  first accept a real client database-field fact, then reject an independently appended brief-gap
+  assertion using the same identifier. Ordinary English, substring boundaries and existing list
+  and provenance regressions remain green.
+- The initial expanded selection had **96 failing regressions** against the previous guard.
+  Final: **717 Brief Decoder tests and 1001 full Freelancer product tests passed**, including
+  wheel packaging; 185 cases added. The first sandbox suite had 1000 passed and a wheel-build
+  subprocess failure; the full rerun outside the sandbox passed with no skips or suppressions.
+- Managed Python 3.12 doctor, documentation and whitespace checks passed. Ruff still reports
+  the same pre-existing E501/PLR2004 in the unchanged schema-version test, reproduced on HEAD;
+  its formatting suggestions are also confined to unchanged lines. No new lint finding.
+- Changes are limited to tests, two summary fixtures and plans. No prompt/schema/runtime/UI
+  changes, paid live calls, GitHub/Linear writes, commit or push. API/full-check were not repeated
+  for this fixture/test-only change. The accepted live evidence is retained unchanged; separate
+  production findings remain in ANY-884 and ANY-885.

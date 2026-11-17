@@ -3,12 +3,12 @@
     "sections": [
       {
         "id": "overview",
-        "title": "Resumen del proyecto",
+        "title": "Project overview",
         "content": "Crear un sitio web para una panadería."
       },
       {
         "id": "key-details",
-        "title": "Detalles principales",
+        "title": "Key details",
         "content": "- Una página con el menú.",
         "metadata": {
           "kind": "list"
@@ -16,12 +16,12 @@
       },
       {
         "id": "gaps",
-        "title": "Información pendiente y riesgos",
+        "title": "Gaps and risks",
         "content": "El cliente debe confirmar el plazo, el presupuesto, el público objetivo y las restricciones."
       },
       {
         "id": "next-steps",
-        "title": "Preguntas al cliente",
+        "title": "Questions to ask",
         "content": "- ¿Cuándo se necesita el sitio?\n- ¿Quién usará el sitio?",
         "metadata": {
           "kind": "list"
