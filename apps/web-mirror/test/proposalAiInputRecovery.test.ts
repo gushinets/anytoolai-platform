@@ -40,3 +40,20 @@ it("counts Unicode code points consistently with submission validation", () => {
   const input = { ...wire, task_text: "🙂".repeat(4000) };
   expect(proposalAiDefinition.parseInputValues?.(input)?.taskText).toBe(input.task_text);
 });
+
+it.each(["auto", ...LOCALES] as const)("adds only the contract to legacy %s input without mutating it", language => {
+  const compatible = proposalAiDefinition.toInput({ ...values, language });
+  const legacy = { ...compatible };
+  delete legacy.result_contract;
+  const frozen = structuredClone(legacy);
+  expect(proposalAiDefinition.recoverLegacyInput?.(legacy)).toEqual(compatible);
+  expect(legacy).toEqual(frozen);
+});
+
+it.each([
+  null, [], {}, wire, { ...wire, result_contract: null }, { ...wire, result_contract: "unknown" },
+  { task_text: "hello", freelancer_positioning: "hello", tone: "unknown" },
+  { task_text: "hello", freelancer_positioning: "hello", tone: "firm", extra: "unknown" },
+])("does not migrate unknown or damaged contracts: %j", input => {
+  expect(proposalAiDefinition.recoverLegacyInput?.(input)).toBeNull();
+});

@@ -115,3 +115,19 @@ describe("page-owned quota admission", () => {
     expect(current.getSnapshot().quota?.guestId).toBe("guest_2");
   });
 });
+
+it("invalidates positive counters after authoritative exhaustion and a failed refresh", async () => {
+  const { admission, resolveCall } = setup();
+  admission.refresh("advisory");
+  resolveCall(route, 0, quotaResponse(ids, { used_count: 2, remaining_count: 1 }));
+  await vi.waitFor(() => expect(admission.getSnapshot().quota?.remainingCount).toBe(1));
+  admission.markExhausted();
+  expect(admission.getSnapshot()).toEqual({ status: "exhausted", quota: null });
+  const settled = vi.fn();
+  admission.subscribe(settled);
+  admission.refresh("advisory");
+  resolveCall(route, 1, errorResponse(503, "unavailable"));
+  await vi.waitFor(() => expect(settled).toHaveBeenCalledOnce());
+  expect(admission.getSnapshot()).toEqual({ status: "exhausted", quota: null });
+  expect(admission.blocksNewRun()).toBe(true);
+});

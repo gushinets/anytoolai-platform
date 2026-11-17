@@ -226,8 +226,9 @@ The shared runtime, not a product, owns the web side of a handoff:
   Products without the decoder retain the existing exact-request draft matching behavior.
 - Paid recovery does not require current new-start availability. If runtime config is unavailable,
   or no longer lists the scenario/enabled web frontend, a saved owner-bound pending request or
-  accepted/explicitly selected session opens a recovery-only view. It replays only the original
-  frozen key/request or reads that session; new submissions and "New task" stay disabled. Result
+  accepted/explicitly selected session opens a recovery-only view. It recovers the saved key/request
+  (including the bounded compatibility protocol below) or reads that session; new submissions
+  and "New task" stay disabled. Result
   schema ref/version must match the bundled product renderer's `outputSchema` before parsing;
   the architecture contract test checks these pins against product workflows/schema versions.
   Delegated identity and backend ownership checks remain required for every protected request.
@@ -508,14 +509,29 @@ will not commit. Preserve the key, field/Submit/mode locks and same-key recovery
 and manual retries, including enveloped 4xx, quota exhaustion and unknown-guest responses. Do not
 enter a paywall or replace guest identity while that execution is unresolved. Once a session is
 known, retry polls it instead of sending another start.
+Restoration belongs to the exact prepared operation, not the component lifetime: a later new
+task follows ordinary validation and safe edited-input submission. A matching accepted run's
+original input is restored independently of whether editable draft values still exist.
 An explicit `idempotency_key_conflict` proves that the immutable request does not own that key's
 execution; discard that handle and allow a fresh key rather than keeping an unrecoverable lock.
+
+The bounded compatibility exception is a recognized pre-marker ProposalAI paid pending request.
+The product supplies one wire variant adding only `result_contract: proposal_ai.field_errors_v1`.
+Recovery first sends the original request; after `422 scenario_input_invalid` or
+`409 idempotency_key_conflict` it tries that variant under the same original key. A conflict on
+the variant triggers one original replay, since an old in-flight request may have won admission.
+The backend's owner/product/scenario/key uniqueness permits at most one execution. The persisted
+original request is never overwritten; reload can recover either accepted variant, including a
+lost migration response. Other failures retain uncertain recovery. Unknown contracts are not
+migrated. Ordinary retries remain byte-identical; new submissions still require the marker.
 
 When the key has no unresolved sends, definite 4xx rejections unlock the form and allow a fresh key.
 Repeated definite rejections alone do not create uncertainty. For `429 quota_exhausted` in that case:
 
 - keep quota state advisory in the frontend and treat the backend response as authoritative;
 - disable the run action or show a clear quota-exhausted state after the response;
+- discard obsolete quota counters until a successful read supplies coherent numbers; a failed
+  refresh must preserve the exhausted gate without displaying the old positive remainder;
 - do not show a progress row, job, or partial session for the rejected attempt because the backend
   creates none.
 

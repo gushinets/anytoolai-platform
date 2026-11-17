@@ -319,7 +319,7 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
     } catch { return { recovery: null, failed: true }; }
   });
   const recovery = selection.kind !== "form" && recoveryState.recovery?.scenarioId === definition.scenarioId ? recoveryState.recovery : null;
-  const restoredStartRef = useRef(false);
+  const restoredStartRef = useRef<PreparedScenarioStart | null>(null);
   const th = useHostT();
   const tp = useProductT();
   const title = tp("title");
@@ -561,11 +561,13 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
     if (restoredDraftRef.current || draftKey === null || (client.portalIdentity && !client.portalIdentity.isCurrent())) return;
     restoredDraftRef.current = true;
     const stored = readProductDraft(draftKey);
+    if (paid && attachSessionId && stored?.run?.scenarioSessionId === attachSessionId) {
+      activeInputRef.current = parseStoredValues(stored.run.input);
+    }
     const restored = parseStoredValues(stored?.values);
     if (restored === null) return;
     if (!attachSessionId || (paid && stored?.run?.scenarioSessionId === attachSessionId)) {
       setValues(restored);
-      if (paid && attachSessionId) activeInputRef.current = parseStoredValues(stored?.run?.input);
     } else if (paid) {
       // An older draft has no proof of belonging to this result. Restore only on request.
       setManualDraft(restored);
@@ -669,12 +671,13 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
 
   useEffect(() => {
     if (!paidPersistence || recovery?.kind !== "pending" || (boot.kind !== "ready" && boot.kind !== "recovery") || restoredStartRef.current || attachSessionId) return;
-    restoredStartRef.current = true;
-    const prepared = restorePaidScenarioStart(recovery, paidPersistence);
+    const compatibleInput = definition.recoverLegacyInput?.(recovery.request.input) ?? undefined;
+    const prepared = restorePaidScenarioStart(recovery, paidPersistence, compatibleInput);
+    restoredStartRef.current = prepared;
     const storedValues = draftKey === null ? null : parseStoredValues(readProductDraft(draftKey)?.values);
     // The submitted baseline must survive edits to the current draft and accepted-session reload.
     if (definition.parseInputValues) {
-      activeInputRef.current = definition.parseInputValues(recovery.request.input);
+      activeInputRef.current = definition.parseInputValues(compatibleInput ?? recovery.request.input);
     } else if (storedValues !== null && shallowEqualValues(definition.toInput(storedValues), recovery.request.input)) {
       activeInputRef.current = storedValues;
     }
@@ -1191,10 +1194,16 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
       void runPoll(attachedSessionRef.current);
       return;
     }
-    if (paid && pendingStart && restoredStartRef.current) {
+    if (paid && pendingStart && pendingStart.prepared === restoredStartRef.current) {
       // A reload restored the frozen wire request, not editable product form values.
       // Validating the empty form here would strand the original paid operation.
-      beginStart(pendingStart.prepared);
+      const sessionId = startedSessionsRef.current.get(pendingStart.prepared);
+      if (sessionId) {
+        setPhase({ kind: "running", scenarioSessionId: sessionId });
+        void runPoll(sessionId);
+      } else {
+        beginStart(pendingStart.prepared);
+      }
       return;
     }
     if (resumedRunRef.current !== null) {

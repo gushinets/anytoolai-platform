@@ -41,6 +41,10 @@ function rejectedResult() {
   } });
 }
 
+function requestPath(url: RequestInfo | URL): string {
+  return new URL(typeof url === "string" ? url : url instanceof URL ? url.href : url.url).pathname;
+}
+
 function setup(draft: unknown = original, submitted: ProposalAIValues = original) {
   const client = createPlatformApiClient();
   const persistence = getPaidPersistence(client)!;
@@ -52,7 +56,7 @@ function setup(draft: unknown = original, submitted: ProposalAIValues = original
     configAvailable: true, result: rejectedResult,
   };
   fetcher.mockImplementation(async (url, init) => {
-    const path = new URL(typeof url === "string" ? url : url instanceof URL ? url.href : url.url).pathname;
+    const path = requestPath(url);
     if (path.endsWith("runtime-config")) return controls.configAvailable ? runtimeConfigResponse(ids, { scenarios: [{
       scenario_id: ids.scenarioId, version: 1, allowed_next_actions: ["copy_result"],
       input_renderer_hint: { renderer: "json_schema", schema_ref: "proposal_ai.generate_input_v1", schema_version: 2 },
@@ -221,4 +225,122 @@ it.each(["logout", "new-owner"])("ignores a delayed recovered result after %s", 
   expect(JSON.stringify(window.sessionStorage)).toBe(savedStorage);
   fireEvent.submit(screen.getByRole("form"));
   expect(starts).toHaveLength(1);
+});
+
+it.each([null, "damaged", proposalAiDefinition.emptyValues])("accepted reload uses known input independently of draft: %j", async draft => {
+  const { client, persistence, controls } = setup(draft);
+  let finish!: (response: Response) => void;
+  controls.result = () => new Promise(resolve => { finish = resolve; });
+  const first = render(<ProposalAIProduct client={client} />);
+  await waitFor(() => expect(finish).toBeDefined());
+  expect(readProductDraft(draftKey)?.run?.input).toEqual(original);
+  first.unmount();
+  controls.result = rejectedResult;
+  render(<ProposalAIProduct client={createPlatformApiClient()} />);
+  await settled(persistence);
+  fireEvent.change(screen.getByLabelText(/^Describe the task/), { target: { value: original.taskText } });
+  fireEvent.change(screen.getByLabelText(/^Your experience and strengths/), { target: { value: original.freelancerPositioning } });
+  await act(async () => { fireEvent.submit(screen.getByRole("form")); });
+  expect(starts).toHaveLength(1);
+  expectHints(true, true);
+  await act(async () => { finish(rejectedResult()); });
+});
+
+it("new task retry does not inherit restored identity", async () => {
+  const { client, controls } = setup(corrected, corrected);
+  controls.result = () => resultResponse(ids, { output: { text: "Successful proposal." } });
+  const route = fetcher.getMockImplementation()!;
+  fetcher.mockImplementation(async (url, init) => {
+    if (requestPath(url).endsWith("/start") && starts.length === 1) {
+      starts.push(init!);
+      return errorResponse(429, "quota_capacity_reserved");
+    }
+    return route(url, init);
+  });
+  render(<ProposalAIProduct client={client} />);
+  await screen.findByText("Successful proposal.");
+  fireEvent.click(screen.getByRole("button", { name: "New task" }));
+  fireEvent.change(screen.getByLabelText(/^Describe the task/), { target: { value: "Input A task" } });
+  fireEvent.change(screen.getByLabelText(/^Your experience and strengths/), { target: { value: corrected.freelancerPositioning } });
+  fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+  await screen.findByRole("button", { name: "Try again" });
+  fireEvent.change(screen.getByLabelText(/^Describe the task/), { target: { value: "Input B task" } });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Try again" })); });
+  await screen.findByText("Successful proposal.");
+  expect(requestBody(2)).toMatchObject({ input: { task_text: "Input B task" } });
+  expect(new Headers(starts[2].headers).get("Idempotency-Key")).not.toBe(new Headers(starts[1].headers).get("Idempotency-Key"));
+});
+
+it("accepted restored request retries the session read", async () => {
+  const { client, controls } = setup(corrected, corrected);
+  controls.result = () => resultResponse(ids, { output: { text: "Successful proposal." } });
+  const route = fetcher.getMockImplementation()!;
+  let polls = 0;
+  fetcher.mockImplementation(async (url, init) => {
+    if (requestPath(url).includes("/v1/scenario-sessions/") && polls++ === 0) return errorResponse(503, "temporarily_unavailable");
+    if (requestPath(url).endsWith("/start") && starts.length > 0) {
+      starts.push(init!);
+      return errorResponse(503, "temporarily_unavailable");
+    }
+    return route(url, init);
+  });
+  render(<ProposalAIProduct client={client} />);
+  await screen.findByRole("button", { name: "Try again" });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Try again" })); });
+  expect(starts).toHaveLength(1);
+  await screen.findByText("Successful proposal.");
+});
+
+it.each([false, true])("recovers a legacy pending request with original accepted=%s", async accepted => {
+  const { client, persistence, input } = setup();
+  const saved = readPaidStartRecovery(persistence, ids.productId)!;
+  if (saved.kind !== "pending") throw new Error("Expected pending recovery");
+  const legacyInput = { ...input };
+  delete legacyInput.result_contract;
+  window.sessionStorage.setItem(`anytoolai.paid_start.v1.${ids.productId}`, JSON.stringify({
+    ...saved, request: { ...saved.request, input: legacyInput },
+  }));
+  const route = fetcher.getMockImplementation()!;
+  fetcher.mockImplementation(async (url, init) => {
+    if (requestPath(url).endsWith("/start")) {
+      starts.push(init!);
+      const body = JSON.parse(init!.body as string) as { input: Record<string, unknown> };
+      return accepted || body.input.result_contract === input.result_contract ? startResponse() : errorResponse(422, "scenario_input_invalid");
+    }
+    return route(url, init);
+  });
+  render(<ProposalAIProduct client={client} />);
+  await settled(persistence);
+  expect(starts).toHaveLength(accepted ? 1 : 2);
+  expect(new Set(starts.map(start => new Headers(start.headers).get("Idempotency-Key")))).toEqual(new Set(["original_key"]));
+  expect(requestBody(0)).toMatchObject({ input: legacyInput });
+  if (!accepted) expect(requestBody(1)).toMatchObject({ input });
+  expectHints(true, true);
+  fireEvent.submit(screen.getByRole("form"));
+  expect(starts).toHaveLength(accepted ? 1 : 2);
+});
+
+it("keeps rejected source identity after historical New task clears the draft and recovery reloads", async () => {
+  const { client, persistence, controls } = setup();
+  const historical = render(<ProposalAIProduct client={client} attachFromUrl attachSessionId="historical_session" />);
+  await screen.findByText("Historical proposal.");
+  fireEvent.click(screen.getByRole("button", { name: "New task" }));
+  expect(readPaidStartRecovery(persistence, ids.productId)?.kind).toBe("pending");
+  expect(readProductDraft(draftKey)?.values).toBeUndefined();
+  historical.unmount();
+  let finish!: (response: Response) => void;
+  controls.result = () => new Promise(resolve => { finish = resolve; });
+  const recovered = render(<ProposalAIProduct client={createPlatformApiClient()} />);
+  await waitFor(() => expect(finish).toBeDefined());
+  expect(readProductDraft(draftKey)?.run?.input).toEqual(original);
+  recovered.unmount();
+  controls.result = rejectedResult;
+  render(<ProposalAIProduct client={createPlatformApiClient()} />);
+  await settled(persistence);
+  fireEvent.change(screen.getByLabelText(/^Describe the task/), { target: { value: original.taskText } });
+  fireEvent.change(screen.getByLabelText(/^Your experience and strengths/), { target: { value: original.freelancerPositioning } });
+  expectHints(true, true);
+  fireEvent.submit(screen.getByRole("form"));
+  expect(starts).toHaveLength(1);
+  await act(async () => { finish(rejectedResult()); });
 });

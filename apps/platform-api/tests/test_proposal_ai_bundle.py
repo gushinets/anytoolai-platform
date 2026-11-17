@@ -464,3 +464,32 @@ def test_proposal_ai_rejects_invalid_required_field_values_at_start(
     with transaction_boundary(session_factory) as session:
         count = session.execute(sa.select(sa.func.count()).select_from(provider_calls_table))
         assert count.scalar_one() == 0
+
+
+def test_unaccepted_legacy_request_can_negotiate_required_contract_under_same_key(app, session_factory):
+    path = "/v1/products/proposal_ai/scenarios/proposal_ai.generate_v1/start"
+    legacy = {"frontend_id": "web_mirror", "guest_id": GUEST_ID, "input": {
+        "task_text": "hello", "freelancer_positioning": "hello", "tone": "firm",
+    }}
+    compatible = {**legacy, "input": {**legacy["input"], "result_contract": RESULT_CONTRACT}}
+
+    async def negotiate():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+            responses = []
+            for payload in (legacy, compatible, legacy, compatible):
+                responses.append(await client.post(path, json=payload, headers={"Idempotency-Key": "legacy-start"}))
+            return responses
+
+    rejected, accepted, conflict, replay = asyncio.run(negotiate())
+    assert rejected.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert rejected.json()["error"]["code"] == "scenario_input_invalid"
+    assert accepted.status_code == HTTPStatus.OK, accepted.text
+    assert conflict.status_code == HTTPStatus.CONFLICT
+    assert conflict.json()["error"]["code"] == "idempotency_key_conflict"
+    assert replay.status_code == HTTPStatus.OK
+    assert replay.json()["job_id"] == accepted.json()["job_id"]
+    with transaction_boundary(session_factory) as session:
+        for table in (scenario_sessions_table, jobs_table, execution_reservations_table):
+            assert session.scalar(sa.select(sa.func.count()).select_from(table)) == 1
+        quota = session.execute(sa.select(guest_quota_usage_table)).mappings().one()
+        assert (quota["used_count"], quota["reserved_count"]) == (0, 1)

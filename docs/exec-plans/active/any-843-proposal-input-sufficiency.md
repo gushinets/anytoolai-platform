@@ -527,3 +527,75 @@ production, an actual peer Portal deployment and remote CI were not rerun. Alrea
 historical records with missing original input cannot be reconstructed from a newer draft.
 After verification, the owner explicitly authorized committing, pushing and updating PR #277.
 The disposable smoke stack and volume were removed; the original database was preserved.
+
+## Recovery lifecycle and rollout compatibility: round 6 (2026-11-17)
+
+The owner approved all four finding groups and a PR comment identifying the Retry defect's
+origin in ANY-766 (main commit de7c1cd9). Scope: shared paid Retry, accepted input restoration,
+quota counter invalidation, and ProposalAI pre-marker pending recovery. No billing-policy change.
+
+Plan:
+- Bind restored Retry to its exact prepared operation; poll a known accepted session first.
+- Restore matching accepted run.input independently of absent/malformed editable draft.values.
+- Clear obsolete counters on authoritative exhaustion while retaining the exhausted gate.
+- Reconcile only recognized legacy ProposalAI input by adding the required marker. Keep the
+  original persisted request and idempotency key. Try the original first; after input-validation
+  rejection or hash conflict try the compatible variant with that same key. If the variant
+  conflicts, retry the original once to recover a legacy execution that won the race. Database
+  uniqueness admits at most one variant. Lost responses retain recovery; ordinary starts/retries
+  remain immutable. Never infer nonacceptance from a 422 or silently generate a replacement key.
+- Add journey, decoder, CE-kit protocol and PostgreSQL concurrency regressions, including
+  accepted legacy replay, unknown outcomes, reload and owner changes. Run focused checks,
+  frontend-check and proposal-ai-smoke preserving the real 429; document actual outcomes.
+- Post the authorized provenance comment after verification. Commit/push require a new request.
+
+Known boundary: compatibility covers the old web form's valid wire shape, not arbitrary damaged
+storage or unknown contract versions. The required marker remains mandatory for new admission.
+
+Implemented all four groups. Restored operation identity is an exact prepared handle; keeping
+that handle also prevents repeated restoration on the same mount. Known accepted sessions retry
+reads. Accepted original input is restored before attempting editable-draft restoration. Exhausted
+admission invalidates stale numeric snapshots. Product-owned legacy recognition and CE-kit's
+bounded same-key negotiation preserve original storage, owner guards and ambiguous recovery.
+No backend production code, schema, prompt, dependency or billing policy changed.
+
+Added 47 regressions (28 web, 15 CE-kit, 4 backend): both inherited Retry sequences; accepted reload
+with absent/malformed/empty drafts and the actual historical-result/New task path; both rejected
+fields; stale quota UI and failed refresh; recognized/unknown contracts, accepted legacy replay,
+unaccepted migration, lost compatible response/reload, a legacy winner, unrelated failures,
+owner change and cancellation. Real PostgreSQL tests verify exactly one session/job/reservation
+for concurrent variants and replay of either accepted variant under the current schema.
+
+Final verification:
+- Canonical frontend-check completed successfully: lint/typecheck, 1,072 web tests, 423 CE-kit
+  tests, 55 shared-ui tests, 349 Chromium tests (6.5 minutes), API-type drift and production builds.
+- ProposalAI API/worker bundle: 17 passed. Targeted PostgreSQL compatibility regressions: 3 passed.
+- Canonical proposal-ai-smoke: 11/11 passed (1.3 minutes), including real backend 429 after reload
+  (32.5 seconds) and delayed terminal-quota admission. Smoke assertions and fixtures were unchanged.
+- Managed Python 3.12 doctor, architecture/documentation validation and whitespace checks passed.
+
+During setup the sandboxed ASGI run stalled and was terminated; the same suite passed outside the
+sandbox. Initial PostgreSQL setup selected the wrong driver, then the new fixture used the kernel
+metric unit; selecting installed psycopg and the actual ProposalAI metric unit resolved those test
+setup failures. Initial frontend lint found unsafe Request stringification in new tests; request
+capture was corrected before the complete successful gate. No checks or assertions were relaxed.
+No source/test changes followed the successful frontend gate's start. Repository-wide local-skill
+name audit found pre-existing references in other tickets (including ANY-17, ANY-339 and ANY-391);
+those unrelated files were left untouched.
+
+Smoke used a disposable PostgreSQL volume, preserving the existing database. Live LLM, actual peer
+Portal, production, full backend suite and remote CI were not rerun. Compatibility intentionally
+covers the old web input shape only; unsupported/damaged descriptors retain uncertain recovery.
+The owner authorized a provenance comment on PR #277; these fixes remain local until commit/push
+is requested. The comment must distinguish local verification from the currently published head.
+
+Posted and read back the authorized [ANY-766 provenance comment](https://github.com/gushinets/anytoolai-platform/pull/277#issuecomment-6941937506).
+It links the original main code and integration merge, explains both Retry failures, reports local
+verification and explicitly distinguishes the unpublished fixes from PR head af7b61a8. No PR body,
+review reply or thread resolution was changed. The disposable stack and its new database volume
+were removed; existing volumes were preserved. No commit or push was performed.
+
+The owner subsequently authorized committing and pushing all round-6 fixes and updating PR #277
+through gh. The published description will include the final recovery behavior, ANY-766
+provenance, completed local checks and remaining verification limits. No source/test changes
+were needed for publication; the successful checks above cover the committed implementation.

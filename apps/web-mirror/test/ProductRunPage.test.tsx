@@ -2480,3 +2480,22 @@ it.each([false, true])("gates a definitely capacity-rejected key on fresh quota 
   expect(new Set(starts.map(idempotencyKeyOf)).size).toBe(1);
   if (!exhausted) await waitForResult();
 });
+
+it("hides stale positive quota after START exhaustion even when the refresh fails", async () => {
+  const { client, calls } = makeClientCapturingRequests({
+    ...bootRoutes(),
+    [ROUTES.QUOTA]: [quotaResponse(TEST_PRODUCT_IDS, { used_count: 2, remaining_count: 1 }), errorResponse(503, "unavailable")],
+    [ROUTES.START]: [errorResponse(429, "quota_exhausted")],
+  });
+  renderPage({ client });
+  await waitForForm();
+  await screen.findByText("1 of 3 runs remaining.");
+  fillValidForm();
+  submit();
+  await screen.findByText("You've used all your Test Product runs for now.");
+  await waitFor(() => expect(calls.filter(call => call.key === ROUTES.QUOTA)).toHaveLength(2));
+  expect(screen.queryByText("1 of 3 runs remaining.")).toBeNull();
+  expect((screen.getByRole("button", { name: "Run" }) as HTMLButtonElement).disabled).toBe(true);
+  submit();
+  expect(calls.filter(call => call.key === ROUTES.START)).toHaveLength(1);
+});

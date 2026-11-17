@@ -126,6 +126,9 @@ export type ProductDefinition<V extends Record<string, unknown>, R> = {
   /** Frozen wire input -> submitted form values for recovery, independently of a newer draft.
    * Return null for unsupported input; never reconstruct submitted values from the current form. */
   parseInputValues?: (input: unknown) => V | null;
+  /** One compatible wire variant for a recognized legacy pending request, preserving its meaning.
+   * Recovery negotiates both variants under the original key; never migrate unknown contracts. */
+  recoverLegacyInput?: (input: unknown) => Record<string, unknown> | null;
   /** Canonical per-field values for matching server rejections; must share toInput's normalization.
    * Form keys are preserved, while displayed and stored draft values remain raw. */
   normalizeValues?: (values: V) => V;

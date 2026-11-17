@@ -40,7 +40,7 @@ export class QuotaAdmission {
     // An authoritative START rejection supersedes any earlier advisory read.
     ++this.generation;
     this.pending = false;
-    this.publish({ ...this.snapshot, status: "exhausted" });
+    this.publish({ status: "exhausted", quota: null });
   }
 
   refresh(reason: "advisory" | "execution"): void {

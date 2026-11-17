@@ -138,3 +138,14 @@ it("opens an explicitly selected result without config and preserves another pen
   expect(starts).toHaveLength(0);
   expect(readPaidStartRecovery(persistence, TEST_PRODUCT_IDS.productId)).toEqual(pending);
 });
+
+it.each([true, false])("retries a known session after pending replay with config available=%s", async available => {
+  const { client } = setup("pending", () => available ? runtimeConfigResponse(TEST_PRODUCT_IDS) : errorResponse(503, "runtime_unavailable"), {}, "poll");
+  render(<ProductRunPage client={client} definition={testProductDefinition} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
+  await screen.findByText("Generated result text.");
+  expect(starts).toHaveLength(1);
+  expect(paths.filter(path => path.startsWith("/v1/scenario-sessions/"))).toEqual([
+    "/v1/scenario-sessions/session_1", "/v1/scenario-sessions/session_1",
+  ]);
+});

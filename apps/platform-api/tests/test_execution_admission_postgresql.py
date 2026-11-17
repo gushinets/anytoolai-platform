@@ -814,3 +814,63 @@ def test_accept_competing_with_decline_or_expiry_has_one_consistent_winner(runti
         assert len(reservations) == 1
         assert reservations[0]["job_id"] == outcome.preview.target_job_id
         assert rows(factory, guest_quota_usage_table)[0]["reserved_count"] == 1
+
+
+@pytest.mark.parametrize("accepted_variant", [None, "legacy", "compatible"])
+def test_proposal_contract_variants_share_one_paid_execution(runtime, monkeypatch, accepted_variant):
+    """A rolling deployment or lost response must not admit both variants under one key."""
+    factory, _, registry = runtime
+    product_id = "proposal_ai"
+    schema = registry.schemas["proposal_ai.generate_input_v1"]
+    legacy_schema = replace(schema, version=1, schema={
+        **schema.schema,
+        "properties": {key: value for key, value in schema.schema["properties"].items() if key != "result_contract"},
+        "required": [key for key in schema.schema["required"] if key != "result_contract"],
+    })
+    legacy_registry = replace(registry, schemas={**registry.schemas, schema.schema_ref: legacy_schema})
+    legacy_input = {"task_text": "hello", "freelancer_positioning": "hello", "tone": "firm"}
+    compatible_input = {**legacy_input, "result_contract": "proposal_ai.field_errors_v1"}
+    metric = registry.get_product(product_id).usage_metrics[0]
+    grant = allowance(product_id=product_id, metric_key=metric.metric_key, unit=metric.unit)
+
+    def submit(variant, *, current_registry=False):
+        selected_registry = registry if variant == "compatible" or current_registry else legacy_registry
+        try:
+            with transaction_boundary(factory) as session:
+                return start(session, selected_registry, grant, product_id=product_id,
+                             scenario_id="proposal_ai.generate_v1", frontend_id="web_mirror",
+                             input_payload=legacy_input if variant == "legacy" else compatible_input)
+        except IdempotencyKeyConflictError:
+            return "conflict"
+
+    if accepted_variant:
+        accepted = submit(accepted_variant)
+    else:
+        barrier = threading.Barrier(2)
+        original = ScenarioRuntimeService.find_execution_replay
+        local = threading.local()
+
+        def miss_together(self, *args):
+            result = original(self, *args)
+            if not getattr(local, "looked", False):
+                local.looked = True
+                assert result is None
+                barrier.wait(timeout=15)
+            return result
+
+        with monkeypatch.context() as patch:
+            patch.setattr(ScenarioRuntimeService, "find_execution_replay", miss_together)
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                outcomes = list(pool.map(submit, ["legacy", "compatible"]))
+        assert outcomes.count("conflict") == 1
+        accepted = next(item for item in outcomes if item != "conflict")
+
+    # Reload always tries original then compatible against the current schema.
+    recovered = [submit(variant, current_registry=True) for variant in ("legacy", "compatible")]
+    assert recovered.count("conflict") == 1
+    replay = next(item for item in recovered if item != "conflict")
+    assert replay.is_replay and replay.job_id == accepted.job_id
+    for table in (scenario_sessions_table, jobs_table, execution_reservations_table):
+        assert len(rows(factory, table)) == 1
+    bucket = rows(factory, paid_allowance_usage_table)[0]
+    assert (bucket["used_count"], bucket["reserved_count"]) == (0, 1)

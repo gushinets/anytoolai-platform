@@ -104,6 +104,12 @@ function parseInputValues(input: unknown): ProposalAIValues | null {
   return Object.keys(validate(values)).length === 0 ? values : null;
 }
 
+function recoverLegacyInput(input: unknown): Record<string, unknown> | null {
+  if (!isRecord(input) || Object.hasOwn(input, "result_contract")) return null;
+  const compatible = { ...input, result_contract: RESULT_CONTRACT };
+  return parseInputValues(compatible) === null ? null : compatible;
+}
+
 const GAP_FIELDS = {
   experience_gap: null,
   missing_task_description: "taskText",
@@ -318,6 +324,7 @@ export const proposalAiDefinition: ProductDefinition<ProposalAIValues, ProposalA
   validate,
   normalizeValues,
   parseInputValues,
+  recoverLegacyInput,
   toInput: (values) => {
     const normalized = normalizeValues(values);
     return {
