@@ -1,6 +1,10 @@
 {
   "type": "object",
   "properties": {
+    "result_contract": {
+      "type": "string",
+      "const": "proposal_ai.field_errors_v1"
+    },
     "task_text": {
       "type": "string",
       "minLength": 1,
@@ -22,6 +26,6 @@
       "pattern": "^[a-z]{2}(-[A-Z]{2})?(?!\\n)$"
     }
   },
-  "required": ["task_text", "freelancer_positioning"],
+  "required": ["result_contract", "task_text", "freelancer_positioning"],
   "additionalProperties": false
 }

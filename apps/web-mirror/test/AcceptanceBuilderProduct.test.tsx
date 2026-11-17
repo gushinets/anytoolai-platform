@@ -5,7 +5,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AcceptanceBuilderProduct, checkDefinition, draftDefinition } from "../src/products/acceptanceBuilder/AcceptanceBuilderProduct";
 import { ACCEPTANCE_BUILDER_MESSAGES } from "../src/products/acceptanceBuilder/messages";
@@ -32,6 +32,8 @@ import {
   startResponse,
   type RouteQueues,
 } from "./fixtures/platformResponses";
+import { ProductPageShell } from "../src/products/ProductPageShell";
+import { getRegisteredProduct } from "../src/products/registry";
 import { ProductRunPage } from "../src/products/runtime/ProductRunPage";
 import { AcceptanceBuilderResultView } from "../src/products/acceptanceBuilder/AcceptanceBuilderResult";
 import { LOCALE_STORAGE_KEY } from "../src/i18n/localeStorage";
@@ -69,12 +71,10 @@ function schema<T>(name: string): T {
 type Suffix = "" | ".weak_input";
 const draftOutput = (suffix: Suffix = "") => ({
   extracted: fixture("extract", suffix),
-  document: fixture("draft_document", suffix),
 });
 const checkOutput = (suffix: Suffix = "") => ({
   extracted: fixture("extract", suffix),
   comparison: fixture("compare", suffix),
-  document: fixture("check_document", suffix),
 });
 
 afterEach(() => {
@@ -103,7 +103,7 @@ describe("Acceptance Builder definitions", () => {
 
   it("copies the schemas' enums, delta order and text length limits (drift guard)", () => {
     const output = schema<CheckOutputSchema>("check_output.schema.json");
-    expect([...LIST_FIELDS]).toEqual(Object.keys(output.properties.extracted.properties.values.properties));
+    expect([...LIST_FIELDS]).toEqual(Object.keys(output.properties.extracted.properties.values.properties).filter((key) => key !== "analysis_language"));
     const { comparison } = output.properties;
     expect([...VERDICTS]).toEqual(comparison.properties.verdict.enum);
     expect(DELTA_CRITERIA.map((id) => `#/$defs/delta_${id}`)).toEqual(
@@ -278,7 +278,7 @@ describe("Acceptance Builder page", () => {
   it("draft: shows the structured copy text, copies exactly it, and never the narrative", async () => {
     const events: ProductRunEvent[] = [];
     const { calls } = await run("draft", draftOutput(), events);
-    await waitFor(() => expect(screen.getByText("Acceptance criteria")).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByText("Acceptance criteria")[0]).toBeTruthy());
 
     const expected = [
       "Acceptance criteria\n- A student who finishes a course automatically receives a PDF certificate\n- The certificate is issued for every existing course\n- The certificate uses the brand colors",
@@ -290,7 +290,7 @@ describe("Acceptance Builder page", () => {
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expected));
     await waitFor(() => expect(calls.some((c) => c.key.endsWith("/next-actions/copy_result"))).toBe(true));
 
-    const narrative = (draftOutput().document as { summary: string }).summary;
+    const narrative = (fixture("draft_document", "") as { summary: string }).summary;
     expect(expected).not.toContain(narrative);
     await waitFor(() => expect(events.find((e) => e.type === "scenario_completed")).toMatchObject({ resultViewed: true }));
   });
@@ -317,7 +317,7 @@ describe("Acceptance Builder page", () => {
     expect(resultText()).not.toMatch(/went wrong/i);
   });
 
-  it("keeps the contract's English copy text whatever the UI locale", () => {
+  it("keeps English analysis output in English when UI locale differs", () => {
     window.localStorage.setItem(LOCALE_STORAGE_KEY, "fr");
     const result = extractDraftResult(draftOutput())!;
     render(<AcceptanceBuilderResultView result={result} onCopy={() => Promise.resolve(true)} />);
@@ -487,4 +487,53 @@ describe("Acceptance Builder page", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "New task" })).toBeTruthy());
     expect(checkMode.disabled).toBe(false);
   });
+});
+
+
+it.each(["pending-exhausted", "known-exhausted", "pending-available"] as const)("retains %s product quota across a real mode remount", async (state) => {
+  const exhausted = state !== "pending-available";
+  const r = routesFor(IDS.draft);
+  const checkRoutes = routesFor(IDS.check);
+  const routed = makeClientWithDeferredCalls({
+    ...bothModesRoutes(draftOutput()),
+    [checkRoutes.START]: [startResponse()],
+    [r.SESSION]: [sessionResponse({ scenario_id: IDS.draft.scenarioId }), sessionResponse({ scenario_id: IDS.check.scenarioId })],
+    [r.RESULT]: [resultResponse(IDS.draft, { output: draftOutput() }), resultResponse(IDS.check, { output: checkOutput() })],
+  }, { [r.QUOTA]: 5 });
+  const product = getRegisteredProduct("acceptance_builder")!;
+  render(<ProductPageShell product={product} client={routed.client} />);
+  fireEvent.change(await screen.findByLabelText("Client brief"), { target: { value: "Create course certificates." } });
+  await act(async () => routed.resolveCall(r.QUOTA, 0, quotaResponse(IDS.draft, { used_count: 2, remaining_count: 1 })));
+  fireEvent.click(screen.getByRole("button", { name: "Draft criteria" }));
+  await screen.findByRole("button", { name: "Copy" });
+  if (state === "known-exhausted") {
+    await act(async () => routed.resolveCall(r.QUOTA, 2, quotaResponse(IDS.draft, {
+      used_count: 3, remaining_count: 0, exhausted: true,
+    })));
+    await screen.findByText("0 of 3 runs remaining.");
+  }
+  fireEvent.click(screen.getByRole("radio", { name: "Check deliverable" }));
+  const deliverable = await screen.findByLabelText("Finished work");
+  fireEvent.change(screen.getByLabelText("Client brief"), { target: { value: "Create course certificates." } });
+  fireEvent.change(deliverable, { target: { value: "Completed certificate template." } });
+  const button = screen.getByRole("button", { name: "Check deliverable" }) as HTMLButtonElement;
+  expect(button.disabled).toBe(true);
+  fireEvent.submit(screen.getByRole("form"));
+  await act(async () => {});
+  expect(routed.calls.filter((call) => call.key === checkRoutes.START)).toHaveLength(0);
+  if (state !== "known-exhausted") {
+    expect(routed.calls.filter((call) => call.key === r.QUOTA)).toHaveLength(3);
+    await act(async () => routed.resolveCall(r.QUOTA, 2, quotaResponse(IDS.draft, {
+      used_count: exhausted ? 3 : 2, remaining_count: exhausted ? 0 : 1, exhausted,
+    })));
+  } else {
+    // A failed advisory refresh on the new mode must preserve the known zero.
+    await act(async () => routed.resolveCall(r.QUOTA, 3, errorResponse(503, "temporarily_unavailable")));
+  }
+  await screen.findByText(`${exhausted ? 0 : 1} of 3 runs remaining.`);
+  expect(button.disabled).toBe(exhausted);
+  fireEvent.submit(screen.getByRole("form"));
+  await act(async () => {});
+  expect(routed.calls.filter((call) => call.key === checkRoutes.START)).toHaveLength(exhausted ? 0 : 1);
+  if (!exhausted) await screen.findByRole("button", { name: "Copy" });
 });

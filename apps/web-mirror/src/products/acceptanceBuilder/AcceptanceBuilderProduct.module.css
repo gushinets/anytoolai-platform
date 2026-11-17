@@ -1,4 +1,4 @@
-/* The recap quotes model text (URLs, long tokens): without this a single unbroken token widens the
+/* The structured recap can contain model text (URLs, long tokens): without this a single unbroken token widens the
  * whole page on mobile. */
 .result,
 .section {
@@ -24,4 +24,8 @@
 .meta {
   color: var(--color-text-secondary);
   font-size: 13px;
+}
+
+.content {
+  white-space: pre-wrap;
 }

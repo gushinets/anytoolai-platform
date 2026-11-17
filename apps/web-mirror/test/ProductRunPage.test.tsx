@@ -2341,3 +2341,161 @@ describe("opt-in draft recovery", () => {
     expect(window.sessionStorage.getItem(key)).toContain('"run"');
   });
 });
+
+
+describe("new execution admission after terminal outcomes", () => {
+  describe.each(["regenerate", "new-task", "failed", "expired", "missing-artifact", "invalid-result", "unavailable-result"] as const)("%s", (outcome) => {
+    it.each([false, true])("waits for terminal quota and handles exhausted=%s without an extra START", async (exhausted) => {
+      const terminalError = !["regenerate", "new-task"].includes(outcome);
+      const routed = makeClientWithDeferredCalls({
+        ...happyPathRoutes(),
+        [ROUTES.START]: [startResponse(), startResponse()],
+        [ROUTES.SESSION]: [sessionResponse({
+          ...(outcome === "failed" || outcome === "expired" ? { status: outcome } : {}),
+          ...(outcome === "missing-artifact" ? { result_artifact_id: null } : {}),
+        }), sessionResponse()],
+        [ROUTES.RESULT]: [outcome === "invalid-result" ? resultResponse(TEST_PRODUCT_IDS, { output: {} })
+          : outcome === "unavailable-result" ? errorResponse(422, "result_artifact_unavailable") : resultResponse(TEST_PRODUCT_IDS),
+        resultResponse(TEST_PRODUCT_IDS)],
+      }, { [ROUTES.QUOTA]: 3 });
+      renderPage({ client: routed.client });
+      await waitForForm();
+      await act(async () => routed.resolveCall(ROUTES.QUOTA, 0, quotaResponse(TEST_PRODUCT_IDS, { used_count: 2, remaining_count: 1 })));
+      fillValidForm();
+      submit();
+      if (terminalError) {
+        await screen.findByText(RUN_FAILED);
+        fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+      } else {
+        await waitForResult();
+        expect((screen.getByRole("button", { name: "Copy" }) as HTMLButtonElement).disabled).toBe(false);
+        if (outcome === "new-task") fireEvent.click(screen.getByRole("button", { name: "New task" }));
+      }
+      expect(screen.getByText("Checking remaining runs…")).toBeTruthy();
+      const field = screen.getByLabelText("Text") as HTMLTextAreaElement;
+      expect(field.disabled).toBe(false);
+      fireEvent.change(field, { target: { value: "Corrected input." } });
+      const button = screen.getByRole("button", { name: outcome === "regenerate" ? "Run again" : "Run" }) as HTMLButtonElement;
+      expect(button.disabled).toBe(true);
+      fireEvent.submit(screen.getByRole("form"));
+      await act(async () => {});
+      expect(routed.calls.filter((call) => call.key === ROUTES.START)).toHaveLength(1);
+      // New task must retain the pending terminal read, not supersede it with another GET.
+      expect(routed.calls.filter((call) => call.key === ROUTES.QUOTA)).toHaveLength(3);
+      await act(async () => routed.resolveCall(ROUTES.QUOTA, 2, quotaResponse(TEST_PRODUCT_IDS, {
+        used_count: exhausted ? 3 : 2, remaining_count: exhausted ? 0 : 1, exhausted,
+      })));
+      // An older reservation response cannot undo the terminal decision in either direction.
+      await act(async () => routed.resolveCall(ROUTES.QUOTA, 1, quotaResponse(TEST_PRODUCT_IDS, {
+        used_count: exhausted ? 0 : 3, remaining_count: exhausted ? 3 : 0, exhausted: !exhausted,
+      })));
+      expect(button.disabled).toBe(exhausted);
+      expect(field.value).toBe("Corrected input.");
+      fireEvent.submit(screen.getByRole("form"));
+      fireEvent.submit(screen.getByRole("form"));
+      await act(async () => {});
+      expect(routed.calls.filter((call) => call.key === ROUTES.START)).toHaveLength(exhausted ? 1 : 2);
+    });
+  });
+});
+
+
+it("switches quota ownership on guest self-heal and ignores the old guest's late zero", async () => {
+  const routed = makeClientWithDeferredCalls({
+    ...happyPathRoutes(),
+    [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse(), guestIdentityResponse("guest_2")],
+    [ROUTES.START]: [errorResponse(404, "guest_identity_not_found"), startResponse()],
+  }, { [ROUTES.QUOTA]: 4 });
+  renderPage({ client: routed.client });
+  await waitForForm();
+  fillValidForm();
+  submit();
+  await screen.findByRole("button", { name: "Try again" });
+  await act(async () => routed.resolveCall(ROUTES.QUOTA, 1, quotaResponse(TEST_PRODUCT_IDS, { guest_id: "guest_2" })));
+  await act(async () => routed.resolveCall(ROUTES.QUOTA, 0, quotaResponse(TEST_PRODUCT_IDS, {
+    used_count: 3, remaining_count: 0, exhausted: true,
+  })));
+  expect(screen.getByText("3 of 3 runs remaining.")).toBeTruthy();
+  expect((screen.getByRole("button", { name: "Run" }) as HTMLButtonElement).disabled).toBe(false);
+  submit();
+  await waitForResult();
+  const starts = routed.calls.filter((call) => call.key === ROUTES.START);
+  expect(starts).toHaveLength(2);
+  const body = starts[1]!.init.body;
+  if (typeof body !== "string") throw new Error("Expected a JSON request body");
+  expect(JSON.parse(body)).toMatchObject({ guest_id: "guest_2" });
+});
+
+it.each(["ambiguous-start", "poll", "result"] as const)("recovers %s while quota is pending/exhausted without creating another execution", async (failure) => {
+  const routed = makeClientWithDeferredCalls({
+    ...happyPathRoutes(),
+    [ROUTES.START]: failure === "ambiguous-start"
+      ? [errorResponse(503, "unavailable"), errorResponse(503, "unavailable"), startResponse()]
+      : [startResponse()],
+    [ROUTES.SESSION]: failure === "poll" ? [errorResponse(503, "unavailable"), sessionResponse()] : [sessionResponse()],
+    [ROUTES.RESULT]: failure === "result" ? [errorResponse(503, "unavailable"), resultResponse(TEST_PRODUCT_IDS)] : [resultResponse(TEST_PRODUCT_IDS)],
+  }, { [ROUTES.QUOTA]: 3 });
+  renderPage({ client: routed.client });
+  await waitForForm();
+  fillValidForm();
+  submit();
+  const retry = await screen.findByRole("button", { name: "Try again" });
+  if (failure === "ambiguous-start") {
+    await act(async () => routed.resolveCall(ROUTES.QUOTA, 0, quotaResponse(TEST_PRODUCT_IDS, {
+      used_count: 3, remaining_count: 0, exhausted: true,
+    })));
+  }
+  fireEvent.click(retry);
+  await waitForResult();
+  const starts = routed.calls.filter((call) => call.key === ROUTES.START);
+  expect(starts).toHaveLength(failure === "ambiguous-start" ? 3 : 1);
+  expect(new Set(starts.map(idempotencyKeyOf)).size).toBe(1);
+  expect((screen.getByRole("button", { name: "Copy" }) as HTMLButtonElement).disabled).toBe(false);
+});
+
+
+it.each([false, true])("gates a definitely capacity-rejected key on fresh quota (exhausted=%s)", async (exhausted) => {
+  const routed = makeClientWithDeferredCalls({
+    ...happyPathRoutes(),
+    [ROUTES.START]: [errorResponse(429, "quota_capacity_reserved"), startResponse()],
+  }, { [ROUTES.QUOTA]: 4 });
+  renderPage({ client: routed.client });
+  await waitForForm();
+  fillValidForm();
+  submit();
+  const retry = await screen.findByRole("button", { name: "Try again" });
+  expect((screen.getByLabelText("Text") as HTMLTextAreaElement).disabled).toBe(false);
+  expect((screen.getByRole("button", { name: "Run" }) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(retry);
+  fireEvent.submit(screen.getByRole("form"));
+  expect(routed.calls.filter((call) => call.key === ROUTES.START)).toHaveLength(1);
+  await act(async () => routed.resolveCall(ROUTES.QUOTA, 1, quotaResponse(TEST_PRODUCT_IDS, {
+    used_count: exhausted ? 3 : 2, remaining_count: exhausted ? 0 : 1, reserved_count: exhausted ? 0 : 1, exhausted,
+  })));
+  expect((screen.getByRole("button", { name: "Run" }) as HTMLButtonElement).disabled).toBe(exhausted);
+  fireEvent.click(retry);
+  await act(async () => {});
+  const starts = routed.calls.filter((call) => call.key === ROUTES.START);
+  expect(starts).toHaveLength(exhausted ? 1 : 2);
+  expect(new Set(starts.map(idempotencyKeyOf)).size).toBe(1);
+  if (!exhausted) await waitForResult();
+});
+
+it("hides stale positive quota after START exhaustion even when the refresh fails", async () => {
+  const { client, calls } = makeClientCapturingRequests({
+    ...bootRoutes(),
+    [ROUTES.QUOTA]: [quotaResponse(TEST_PRODUCT_IDS, { used_count: 2, remaining_count: 1 }), errorResponse(503, "unavailable")],
+    [ROUTES.START]: [errorResponse(429, "quota_exhausted")],
+  });
+  renderPage({ client });
+  await waitForForm();
+  await screen.findByText("1 of 3 runs remaining.");
+  fillValidForm();
+  submit();
+  await screen.findByText("You've used all your Test Product runs for now.");
+  await waitFor(() => expect(calls.filter(call => call.key === ROUTES.QUOTA)).toHaveLength(2));
+  expect(screen.queryByText("1 of 3 runs remaining.")).toBeNull();
+  expect((screen.getByRole("button", { name: "Run" }) as HTMLButtonElement).disabled).toBe(true);
+  submit();
+  expect(calls.filter(call => call.key === ROUTES.START)).toHaveLength(1);
+});

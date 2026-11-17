@@ -8,6 +8,7 @@ import type { RegisteredProduct } from "./registry";
 import type { ProductRunEvent } from "./runtime/productDefinition";
 import type { AttachProps } from "./runtime/attachSession";
 import { ProductShellContext, type ProductShell } from "./runtime/ProductShellContext";
+import { ProductQuotaStore } from "./runtime/quotaAdmission";
 import styles from "./ProductPageShell.module.css";
 
 /**
@@ -53,7 +54,7 @@ function ProductPageContent({ Component, client, onEvent, visitId, attach }: Pic
   const th = useHostT();
   const [busy, setBusy] = useState(false);
   // Stable identity: the run page's effect depends on it and must not re-fire every render.
-  const shell = useMemo<ProductShell>(() => ({ reportBusy: setBusy }), []);
+  const shell = useMemo<ProductShell>(() => ({ reportBusy: setBusy, quotaStore: new ProductQuotaStore() }), []);
   return (
     <div className={styles.shell}>
       <nav className={styles.nav} aria-label={th("nav.label")}>

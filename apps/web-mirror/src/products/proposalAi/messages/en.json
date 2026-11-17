@@ -30,6 +30,10 @@
     "gapsTitle": "Not covered by your experience",
     "gapsHint": "The proposal does not claim these. Cover them yourself or leave them out."
   },
+  "validation": {
+    "missing_task_description": "Describe what needs to be done for the client.",
+    "missing_profile_information": "Add information about your skills or experience."
+  },
   "generate": {
     "submit": "Generate proposal",
     "running": "Generating your proposal…",

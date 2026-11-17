@@ -373,6 +373,7 @@ describe("UI locale is independent of scenario input and state", () => {
     fireEvent.click(screen.getByRole("button", { name: PROPOSAL_AI_MESSAGES.en.generate.submit }));
     await waitFor(() => expect(screen.getByText("Generated.")).toBeTruthy());
     expect(startInput(calls)).toEqual({
+      result_contract: "proposal_ai.field_errors_v1",
       task_text: "Build a landing page.",
       freelancer_positioning: "Frontend freelancer.",
       tone: "warm",
@@ -671,8 +672,7 @@ describe("attach props through the shell and the registry", () => {
   it("reach a registered product: the queued session is polled, shown and reported (begin), with no start request", async () => {
     const ids = routesFor(AB_IDS);
     const output = {
-      extracted: { values: { acceptance_criteria: ["Students get a PDF"] }, missing_fields: ["assumptions", "deliverables"] },
-      document: { sections: [], summary: "Recap" },
+      extracted: { values: { acceptance_criteria: ["Students get a PDF"], analysis_language: "en" }, missing_fields: ["assumptions", "deliverables"] },
     };
     const { client, calls } = makeClientCapturingRequests({
       [ids.RUNTIME_CONFIG]: [runtimeConfigResponse(AB_IDS)],

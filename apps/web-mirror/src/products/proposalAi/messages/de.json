@@ -30,6 +30,10 @@
     "gapsTitle": "Nicht durch Ihre Erfahrung abgedeckt",
     "gapsHint": "Das Angebot behauptet dies nicht. Ergänzen Sie es selbst oder lassen Sie es weg."
   },
+  "validation": {
+    "missing_task_description": "Beschreibe, was für den Kunden erledigt werden soll.",
+    "missing_profile_information": "Ergänze Angaben zu deinen Fähigkeiten oder deiner Erfahrung."
+  },
   "generate": {
     "submit": "Angebot erstellen",
     "running": "Ihr Angebot wird erstellt…",

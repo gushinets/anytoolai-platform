@@ -519,3 +519,31 @@ def test_profile_cli_build_and_check_fail_closed(monkeypatch, tmp_path, capsys):
     assert validate_configs.main(args) == 0
     assert validate_configs.main(args[:-1] + ["proposal_ai=default_fake_provider_v1,-"]) == 1
     assert "expected default_fake_provider_v1" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("unmetered", [False, True])
+def test_ab_live_profile_uses_sol_without_changing_bd_or_fake_sources(tmp_path, unmetered):
+    output_dir = tmp_path / "profile"
+    source_fingerprint = validate_configs.tree_fingerprint(PRODUCTS_ROOT)
+    manifest = validate_configs.build_deployment_profile(
+        output_dir, ["acceptance_builder", "brief_decoder"],
+        {"acceptance_builder", "brief_decoder"} if unmetered else set(),
+    )
+    assert generated_action_refs(output_dir, "acceptance_builder") == {"sol_text_generation_v1"}
+    assert generated_action_refs(output_dir, "brief_decoder") == {"default_text_generation_v1"}
+    assert (
+        manifest.enabled_products["acceptance_builder"].provider_policy_ref
+        == "sol_text_generation_v1"
+    )
+    registry = validate_configs.ConfigLoader(
+        validate_configs.ROOT / "configs/kernel",
+        extra_product_roots=sorted((output_dir / "products").iterdir()),
+    ).load()
+    policy = registry.provider_policies["sol_text_generation_v1"]
+    router = yaml.safe_load(
+        (validate_configs.ROOT / "configs/kernel/litellm_router.yaml").read_text()
+    )
+    deployment = next(item for item in router["model_list"] if item["model_name"] == policy.model)
+    assert deployment["litellm_params"]["model"] == "openai/gpt-6.1-sol"
+    assert deployment["litellm_params"]["reasoning_effort"] == "medium"
+    assert validate_configs.tree_fingerprint(PRODUCTS_ROOT) == source_fingerprint

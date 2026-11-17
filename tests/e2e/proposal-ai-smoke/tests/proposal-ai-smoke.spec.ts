@@ -311,18 +311,95 @@ test.describe("ProposalAI web product", () => {
     await expect(page.getByRole("button", { name: "Generate proposal" })).toHaveCount(0);
   });
 
-  test("quota: advisory display reflects consumption, and the next genuinely new start is authoritatively rejected", async ({
-    page,
-  }) => {
-    // 10 full submit-and-wait cycles plus an 11th submit, each against a real
-    // fake-provider-backed job/worker round trip.
-    test.setTimeout(240_000);
+  test("corrected rejected input waits for the terminal quota read before a fresh START", async ({ page }) => {
+    const starts = trackScenarioStarts(page, START_ROUTE_PATTERN);
     await page.goto(PRODUCT_URL);
     await expect(page.getByText("10 of 10 proposals remaining.")).toBeVisible();
+    let releaseQuota!: () => void;
+    const quotaGate = new Promise<void>((resolve) => { releaseQuota = resolve; });
+    let heldReads = 0;
+    await page.route("**/v1/products/proposal_ai/quota**", async (route) => {
+      const response = await route.fetch();
+      heldReads += 1;
+      await quotaGate;
+      await route.fulfill({ response });
+    });
+    // The real deterministic worker uses one fixed fixture. Inject only the supported field-error
+    // output at the artifact boundary; START, session completion and quota remain real backend calls.
+    await page.route("**/v1/results/*", async (route) => {
+      const response = await route.fetch();
+      const artifact: unknown = await response.json();
+      if (typeof artifact !== "object" || artifact === null || Array.isArray(artifact)) {
+        throw new Error("Expected a canonical result object");
+      }
+      await route.fulfill({ response, json: { ...artifact, output: {
+        text: "Input needs clarification.",
+        gaps: ["missing_task_description", "missing_profile_information"].map((category) => ({
+          category, description: "Missing source information.", severity: "high",
+        })),
+      } } });
+    });
+    try {
+      await fillValidForm(page);
+      await page.getByRole("button", { name: "Generate proposal" }).click();
+      await expect(page.locator("#proposal-ai-task-text")).toHaveAttribute("aria-invalid", "true");
+      await expect(page.locator("#proposal-ai-positioning")).toHaveAttribute("aria-invalid", "true");
+      await expect.poll(() => heldReads).toBe(2);
+      await page.locator("#proposal-ai-task-text").fill("Write a product description for a bakery.");
+      await page.locator("#proposal-ai-positioning").fill("I write product descriptions for local shops.");
+      const generate = page.getByRole("button", { name: "Generate proposal" });
+      await expect(generate).toBeDisabled();
+      await expect(page.getByText("Checking remaining runs…")).toBeVisible();
+      await page.locator("form").dispatchEvent("submit");
+      expect(starts).toHaveLength(1);
+      releaseQuota();
+      await expect(page.getByText("9 of 10 proposals remaining.")).toBeVisible();
+      await expect(generate).toBeEnabled();
+      await page.unroute("**/v1/results/*");
+      await generate.click();
+      await expect(page.getByRole("button", { name: "Copy" })).toBeVisible({ timeout: 30_000 });
+      expect(starts).toHaveLength(2);
+    } finally {
+      releaseQuota();
+    }
+  });
 
+  test("quota: known exhaustion blocks submit, and unavailable quota after reload still receives a real 429", async ({
+    page,
+  }) => {
+    // Ten real worker runs exhaust quota; the eleventh START must be rejected before a job.
+    test.setTimeout(240_000);
+    const starts = trackScenarioStarts(page, START_ROUTE_PATTERN);
+    await page.goto(PRODUCT_URL);
+    await expect(page.getByText("10 of 10 proposals remaining.")).toBeVisible();
+    const guestId = await page.evaluate(() => window.localStorage.getItem("anytoolai.guest_id"));
+    expect(guestId).toBeTruthy();
+
+    let releaseFinalQuota!: () => void;
+    const finalQuotaGate = new Promise<void>((resolve) => { releaseFinalQuota = resolve; });
     for (const remainingAfter of [9, 8, 7, 6, 5, 4, 3, 2, 1, 0]) {
+      if (remainingAfter === 0) {
+        await page.route("**/v1/products/proposal_ai/quota**", async (route) => {
+          const response = await route.fetch();
+          await finalQuotaGate;
+          await route.fulfill({ response });
+        });
+      }
       await fillValidForm(page);
       await submitAndWaitForResult(page);
+      if (remainingAfter === 0) {
+        try {
+          await expect(page.getByText("Checking remaining runs…")).toBeVisible();
+          await expect(page.getByRole("button", { name: "Regenerate proposal" })).toBeDisabled();
+          await page.locator("#proposal-ai-task-text").fill("Write another bakery landing page.");
+          await page.locator("form").dispatchEvent("submit");
+          expect(starts).toHaveLength(10);
+        } finally {
+          releaseFinalQuota();
+        }
+        await expect(page.getByText("0 of 10 proposals remaining.")).toBeVisible();
+        await page.unroute("**/v1/products/proposal_ai/quota**");
+      }
       if (remainingAfter > 0) {
         await page.getByRole("button", { name: "New task" }).click();
         // "New task" focuses the first field one frame later; filling before that lands the
@@ -334,23 +411,41 @@ test.describe("ProposalAI web product", () => {
       }
     }
 
-    // The refresh would short-circuit into quota-exhausted before any submit, which is correct but
-    // wouldn't prove the authoritative 429 path, so block that advisory call for the final attempt.
+    // A failed refresh must retain the exhausted snapshot already accepted by this mount.
+    await expect(page.getByText("0 of 10 proposals remaining.")).toBeVisible();
     await page.route("**/v1/products/proposal_ai/quota**", (route) => route.abort());
+    const quotaRefreshFailed = page.waitForEvent("requestfailed", (request) =>
+      new URL(request.url()).pathname === "/v1/products/proposal_ai/quota",
+    );
     await page.getByRole("button", { name: "New task" }).click();
+    await quotaRefreshFailed;
     await expect(page.locator("#proposal-ai-task-text")).toBeFocused();
     await expect(page.locator("#proposal-ai-task-text")).toBeEmpty();
     await expect(page.locator("#proposal-ai-positioning")).toBeEmpty();
+    const generate = page.getByRole("button", { name: "Generate proposal" });
+    // Next.js also has an empty route-announcer alert; select the app's quota message.
+    const quotaAlert = page.getByRole("alert").filter({ hasText: "used all your" });
+    await expect(generate).toBeDisabled();
+    await expect(quotaAlert).toHaveText("You've used all your ProposalAI runs for now.");
+    await fillValidForm(page);
+    await expect(generate).toBeDisabled();
+    await page.locator("form").dispatchEvent("submit");
+    expect(starts).toHaveLength(10);
+    await expect(page.getByRole("status")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Copy" })).toHaveCount(0);
+
+    // Reload keeps the exhausted guest but drops the snapshot; unavailable quota permits a real START.
+    await page.reload();
+    await expect(generate).toBeEnabled();
+    expect(await page.evaluate(() => window.localStorage.getItem("anytoolai.guest_id"))).toBe(guestId);
     await fillValidForm(page);
     const rejectedStart = page.waitForResponse((response) =>
       response.request().method() === "POST" && START_ROUTE_PATTERN.test(response.url()),
     );
-    await page.getByRole("button", { name: "Generate proposal" }).click();
+    await generate.click();
     expect((await rejectedStart).status()).toBe(429);
+    expect(starts).toHaveLength(11);
 
-    // Next.js's own route-announcer div also carries role="alert" (empty text) -- scope to the
-    // one this app renders.
-    const quotaAlert = page.getByRole("alert").filter({ hasText: "used all your" });
     await expect(quotaAlert).toHaveText("You've used all your ProposalAI runs for now.", { timeout: 10_000 });
     // No fake progress, scenario session, or job for the rejected attempt.
     await expect(page.getByRole("status")).toHaveCount(0);

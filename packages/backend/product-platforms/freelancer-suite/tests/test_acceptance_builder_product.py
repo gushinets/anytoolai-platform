@@ -32,11 +32,10 @@ FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "provider" / "fake_provider_ou
 DRAFT = "acceptance_builder.draft_v1"
 CHECK = "acceptance_builder.check_v1"
 STEP_ACTION_TYPES = {
-    DRAFT: ("text.extract_structured_fields", "document.generate_from_template"),
+    DRAFT: ("text.extract_structured_fields",),
     CHECK: (
         "text.extract_structured_fields",
         "text.compare_and_classify",
-        "document.generate_from_template",
     ),
 }
 OUTPUT_SCHEMA_REFS = {
@@ -121,7 +120,10 @@ def test_workflows_use_only_generic_atom_action_types_with_backend_resolved_poli
 
     for workflow_id, workflow in _workflows().items():
         assert (
-            tuple(action_configs[step["action_config_id"]]["action_type"] for step in workflow["steps"])
+            tuple(
+                action_configs[step["action_config_id"]]["action_type"]
+                for step in workflow["steps"]
+            )
             == STEP_ACTION_TYPES[workflow_id]
         )
     # A policy ref is the only provider knob a product config may carry -- never a model string.
@@ -129,7 +131,12 @@ def test_workflows_use_only_generic_atom_action_types_with_backend_resolved_poli
         "default_fake_provider_v1"
     }
     for entry in action_configs.values():
-        assert set(entry) == {"action_config_id", "action_type", "prompt_ref", "provider_policy_ref"}
+        assert set(entry) == {
+            "action_config_id",
+            "action_type",
+            "prompt_ref",
+            "provider_policy_ref",
+        }
 
 
 def test_product_has_exactly_the_two_one_run_scenarios() -> None:
@@ -180,15 +187,19 @@ def test_config_owned_literals_agree_with_the_output_schemas() -> None:
     for workflow_id in (DRAFT, CHECK):
         extract = _steps(workflow_id)["extract"]["input_mapping"]
         fields = _literal(extract["fields"])
-        assert _literal(extract["strict"]) is False
-        assert [f["name"] for f in fields] == EXTRACTED_FIELDS
-        assert {f["type"] for f in fields} == {"array_of_strings"}
+        assert _literal(extract["strict"]) is True
+        assert [f["name"] for f in fields] == EXTRACTED_FIELDS + ["analysis_language"]
+        assert {f["type"] for f in fields} == {"array_of_strings", "string"}
         extracted = _load_schema(OUTPUT_SCHEMA_REFS[workflow_id])["properties"]["extracted"][
             "properties"
         ]
-        assert set(extracted["values"]["properties"]) == set(EXTRACTED_FIELDS)
+        assert set(extracted["values"]["properties"]) == set(
+            EXTRACTED_FIELDS + ["analysis_language"]
+        )
         assert set(extracted["missing_fields"]["items"]["enum"]) == set(EXTRACTED_FIELDS)
-        assert set(extracted["confidence"]["properties"]) == set(EXTRACTED_FIELDS)
+        assert set(extracted["confidence"]["properties"]) == set(
+            EXTRACTED_FIELDS + ["analysis_language"]
+        )
         for name in EXTRACTED_FIELDS:
             assert extracted["values"]["properties"][name]["type"] == "array"
 
@@ -206,15 +217,17 @@ def test_config_owned_literals_agree_with_the_output_schemas() -> None:
     assert comparison["properties"]["deltas"]["maxItems"] == len(criteria)
     defs = _load_schema(OUTPUT_SCHEMA_REFS[CHECK])["$defs"]
     prefix = comparison["properties"]["deltas"]["prefixItems"]
-    assert [defs[ref["$ref"].rsplit("/", 1)[1]]["properties"]["criterion_id"]["const"] for ref in prefix] == (
-        criterion_ids
-    )
+    assert [
+        defs[ref["$ref"].rsplit("/", 1)[1]]["properties"]["criterion_id"]["const"] for ref in prefix
+    ] == (criterion_ids)
     assert comparison["properties"]["rationale"]["maxLength"] == 500  # A11's own cap
 
 
 @pytest.mark.parametrize("suffix", ["", ".weak_input"])
 def test_fixture_deltas_cover_the_workflows_criterion_ids_in_order(suffix: str) -> None:
-    criterion_ids = [c["id"] for c in _literal(_steps(CHECK)["compare"]["input_mapping"]["criteria"])]
+    criterion_ids = [
+        c["id"] for c in _literal(_steps(CHECK)["compare"]["input_mapping"]["criteria"])
+    ]
     deltas = _fixture_response("acceptance_builder.compare_v1" + suffix)["deltas"]
 
     assert [d["criterion_id"] for d in deltas] == criterion_ids
@@ -227,10 +240,9 @@ def test_a01_field_invariants_hold_for_every_configured_field(state: str) -> Non
     schema = _load_schema(OUTPUT_SCHEMA_REFS[DRAFT])
     validator = jsonschema.validators.validator_for(schema)(schema)
     complete = _fixture_response("acceptance_builder.extract_v1")
-    document = _fixture_response("acceptance_builder.draft_document_v1")
 
     def output(extracted: dict[str, Any]) -> dict[str, Any]:
-        return {"extracted": extracted, "document": document}
+        return {"extracted": extracted}
 
     assert validator.is_valid(output(complete))  # control: every field present, none missing
     for name in EXTRACTED_FIELDS:
@@ -244,56 +256,6 @@ def test_a01_field_invariants_hold_for_every_configured_field(state: str) -> Non
             del extracted["values"][name]
             extracted["missing_fields"] = [name]
         assert not validator.is_valid(output(extracted)), (state, name)
-
-
-_GAPS_KEYWORD = {
-    "acceptance_criteria": "acceptance criteria",
-    "assumptions": "assumptions",
-    "deliverables": "deliverables",
-}
-_DOCUMENT_FIXTURES = [  # (A10 stem, A01 stem)
-    ("acceptance_builder.draft_document_v1" + s, "acceptance_builder.extract_v1" + s)
-    for s in ("", ".weak_input")
-] + [
-    ("acceptance_builder.check_document_v1" + s, "acceptance_builder.extract_v1" + s)
-    for s in ("", ".weak_input")
-]
-
-
-@pytest.mark.parametrize(("document_stem", "extract_stem"), _DOCUMENT_FIXTURES)
-def test_document_fixtures_obey_the_a10_prompts(document_stem: str, extract_stem: str) -> None:
-    """Both A10 prompts: list sections carry every extracted item verbatim (or "Not specified in
-    the brief."), and `open-gaps` names every entry of `missing_fields`. Checked against the A01
-    fixture that feeds the same run, so a fixture cannot narrate items the run did not extract."""
-    extracted = _fixture_response(extract_stem)
-    document = _fixture_response(document_stem)
-    sections = {s["id"]: s["content"] for s in document["sections"]}
-
-    assert set(_GAPS_KEYWORD) == set(EXTRACTED_FIELDS)
-    for name in EXTRACTED_FIELDS:
-        content = sections[name.replace("_", "-")]
-        if name in extracted["values"]:
-            assert content.splitlines() == [f"- {item}" for item in extracted["values"][name]], name
-        else:
-            assert content == "Not specified in the brief.", name
-    for name in extracted["missing_fields"]:
-        assert _GAPS_KEYWORD[name] in sections["open-gaps"].lower(), name
-
-
-@pytest.mark.parametrize("suffix", ["", ".weak_input"])
-def test_check_document_verdict_section_agrees_with_the_comparison(suffix: str) -> None:
-    comparison = _fixture_response("acceptance_builder.compare_v1" + suffix)
-    document = _fixture_response("acceptance_builder.check_document_v1" + suffix)
-    verdict_section = document["sections"][0]
-    text = verdict_section["content"].lower()
-
-    assert verdict_section["id"] == "verdict"
-    assert comparison["verdict"].replace("_", " ") in text
-    for delta in comparison["deltas"]:
-        assert delta["criterion_id"].replace("_", " ") in text, delta["criterion_id"]
-        assert delta["status"] in text, delta["criterion_id"]
-    # The verdict is on the general criteria, never presented as a per-extracted-criterion check.
-    assert "not item by item" in text
 
 
 def test_schemas_are_closed() -> None:
@@ -340,13 +302,11 @@ def test_inlined_kernel_atom_output_copies_stay_in_sync_with_the_kernel_schemas(
     draft = _load_schema(OUTPUT_SCHEMA_REFS[DRAFT])
     kernel_extract = _load_schema("kernel.schemas.extract_output_v1")
     kernel_compare = _load_schema("kernel.schemas.compare_classify_output_v1")
-    kernel_document = _load_schema("kernel.schemas.generate_document_output_v1")
 
     # The extract copy is identical in both product schemas.
     assert draft["properties"]["extracted"] == check["properties"]["extracted"]
     for output in (draft, check):
         _assert_same_shape(output["properties"]["extracted"], kernel_extract, "extracted")
-        _assert_same_shape(output["properties"]["document"], kernel_document, "document")
     comparison = check["properties"]["comparison"]
     _assert_same_shape(comparison, kernel_compare, "comparison")
     _assert_same_shape(
@@ -386,7 +346,9 @@ def test_renderer_contract_agrees_with_workflows_and_scenarios() -> None:
     draft_parts = next(s for s in contract["scenarios"] if s["scenario_id"] == DRAFT)["parts"]
     assert "comparison_verdict" not in draft_parts
     # The verdict is on general criteria, not the extracted list -- the contract must say so.
-    assert "not item by item" in " ".join(parts["comparison_verdict"]["description"].split()).lower()
+    assert (
+        "not item by item" in " ".join(parts["comparison_verdict"]["description"].split()).lower()
+    )
 
 
 def test_copy_text_is_derived_from_structured_fields_never_from_the_a10_document() -> None:
@@ -403,23 +365,29 @@ def test_copy_text_is_derived_from_structured_fields_never_from_the_a10_document
     assert copy_text["authority"] == "structured_fields_only"
     assert copy_text["not_copyable_fields"] == ["document"]
     assert "canonical_field" not in contract  # `document` is deliberately not the canonical field
-    assert "display-only" in parts["narrative_document"]["description"]
+    assert "narrative_document" not in parts
 
     blocks = {block["block_id"]: block for block in copy_text["blocks"]}
-    assert list(blocks) == ["verdict", "acceptance_criteria", "assumptions", "deliverables", "open_gaps"]
+    assert list(blocks) == [
+        "verdict",
+        "acceptance_criteria",
+        "assumptions",
+        "deliverables",
+        "open_gaps",
+    ]
     for block in blocks.values():
         applies_to = block.get("scenarios", list(schemas))
         assert applies_to
         for scenario_id in applies_to:
             for path in [block["source"], *block.get("also_uses", [])]:
-                assert not path.split(".")[0] == "document", (block["block_id"], path)
+                assert path.split(".")[0] != "document", (block["block_id"], path)
                 assert _resolves(schemas[scenario_id], path), (scenario_id, path)
     # The verdict block exists only where there is a comparison.
     assert blocks["verdict"]["scenarios"] == [CHECK]
     assert all("scenarios" not in b for b in copy_text["blocks"] if b["block_id"] != "verdict")
     # Every list block's absent-list text is the one the output schemas pin for the document.
     for block_id in ("acceptance_criteria", "assumptions", "deliverables"):
-        assert blocks[block_id]["when_absent"] == "Not specified in the brief."
+        assert blocks[block_id]["when_absent"] == "analysis_language.missing"
     # Fallback semantics follow the source schema: the list sources are optional keys of `values`
     # (and an empty array is invalid), so their fallback is `when_absent`; `missing_fields` is
     # required and is `[]` for a complete brief, so its fallback is `when_empty`.
@@ -434,10 +402,12 @@ def test_copy_text_is_derived_from_structured_fields_never_from_the_a10_document
     assert "when_empty" in blocks["open_gaps"] and "when_absent" not in blocks["open_gaps"]
     complete = _fixture_response("acceptance_builder.extract_v1")
     assert complete["missing_fields"] == []  # the normal no-gap case is empty, not absent
-    assert blocks["open_gaps"]["when_empty"] == "The brief states all three lists."
+    assert blocks["open_gaps"]["when_empty"] == "analysis_language.complete"
     # Each block's source is also a rendered part, so the page and the copy agree on the authority.
     part_fields = {part["field"] for part in contract["parts"]}
-    assert {block["source"] for block in copy_text["blocks"]} - {"comparison.verdict"} <= part_fields
+    assert {block["source"] for block in copy_text["blocks"]} - {
+        "comparison.verdict"
+    } <= part_fields
     assert "comparison" in part_fields
 
 
@@ -454,7 +424,9 @@ def test_every_action_config_has_a_happy_and_a_weak_input_fixture() -> None:
     action_config_ids = {
         entry["action_config_id"] for entry in _load_yaml("action_configs.yaml")["action_configs"]
     }
-    assert action_config_ids == set(FIXTURE_KERNEL_SCHEMAS)
+    assert action_config_ids <= set(
+        FIXTURE_KERNEL_SCHEMAS
+    )  # Older document fixtures remain historical test data.
     for action_config_id in action_config_ids:
         assert (FIXTURE_ROOT / f"{action_config_id}.json").is_file()
         assert (FIXTURE_ROOT / f"{action_config_id}.weak_input.json").is_file()
