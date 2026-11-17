@@ -34,6 +34,10 @@
     "rationale": "Perché chiederlo: {text}",
     "document": "Documento di riepilogo"
   },
+  "copy": {
+    "missingFields": "Non indicato nel brief",
+    "hint": "Si copiano parola per parola il brief, i problemi e le domande qui sopra. Il documento di riepilogo non viene copiato."
+  },
   "briefFields": {
     "project_goal": "Obiettivo del progetto",
     "deliverables": "Consegne",

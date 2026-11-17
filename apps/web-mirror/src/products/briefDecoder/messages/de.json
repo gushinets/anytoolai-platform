@@ -34,6 +34,10 @@
     "rationale": "Warum fragen: {text}",
     "document": "Zusammenfassung"
   },
+  "copy": {
+    "missingFields": "Im Briefing nicht angegeben",
+    "hint": "Kopiert werden Briefing, Probleme und Rückfragen oben im Wortlaut. Die Zusammenfassung wird nicht kopiert."
+  },
   "briefFields": {
     "project_goal": "Projektziel",
     "deliverables": "Liefergegenstände",

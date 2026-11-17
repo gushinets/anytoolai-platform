@@ -54,9 +54,9 @@ const ACTION_CONFIG_IDS = [
 
 type Suffix = "" | ".weak_input" | ".no_issues";
 type Output = {
-  brief: unknown;
-  issues: unknown[];
-  questions: unknown[];
+  brief: { values: Partial<Record<BriefField, string | string[]>>; missing_fields: BriefField[] };
+  issues: { category: keyof typeof CATEGORY_LABELS; severity: keyof typeof SEVERITY_LABELS; description: string; evidence?: string }[];
+  questions: { question: string }[];
   document: { sections: { title: string; content: string }[]; summary: string };
 };
 
@@ -69,17 +69,49 @@ function fixture(action: string, suffix: Suffix): Record<string, unknown> {
  * it. A05 is skipped for `.no_issues`, so there is no question fixture and questions is empty. */
 function composedOutput(suffix: Suffix): Output {
   return {
-    brief: fixture("extract_brief", suffix),
-    issues: (fixture("detect_issues", suffix) as { issues: unknown[] }).issues,
+    brief: fixture("extract_brief", suffix) as Output["brief"],
+    issues: (fixture("detect_issues", suffix) as { issues: Output["issues"] }).issues,
     questions:
-      suffix === ".no_issues" ? [] : (fixture("generate_questions", suffix) as { questions: unknown[] }).questions,
+      suffix === ".no_issues" ? [] : (fixture("generate_questions", suffix) as { questions: Output["questions"] }).questions,
     document: fixture("generate_summary", suffix) as Output["document"],
   };
 }
 
-/** renderer_contract.yaml `canonical_field_composition`. */
-function composeCopyText({ sections, summary }: Output["document"]): string {
-  return [...sections.map((section) => `${section.title}\n${section.content}`), summary].join("\n\n");
+const FIELD_LABELS = {
+  project_goal: "Project goal", deliverables: "Deliverables", deadline: "Deadline",
+  budget: "Budget", target_audience: "Target audience", constraints: "Constraints",
+} as const;
+type BriefField = keyof typeof FIELD_LABELS;
+const CATEGORY_LABELS = {
+  missing_information: "Missing information", ambiguity: "Ambiguity", scope_risk: "Scope risk",
+  timeline_risk: "Timeline risk", budget_risk: "Budget risk", contradiction: "Contradiction",
+} as const;
+const SEVERITY_LABELS = { low: "Low severity", medium: "Medium severity", high: "High severity" } as const;
+
+/** Mirrors parseBriefDecoder.ts#composeCopyText for the en locale. */
+function composeCopyText({ brief, issues, questions }: Output): string {
+  const fields = Object.keys(FIELD_LABELS) as BriefField[];
+  const briefLines = ["Brief"];
+  for (const field of fields) {
+    const value = brief.values[field];
+    if (value === undefined) continue;
+    briefLines.push(...(Array.isArray(value)
+      ? [`${FIELD_LABELS[field]}:`, ...value.map((item) => `- ${item}`)]
+      : [`${FIELD_LABELS[field]}: ${value}`]));
+  }
+  const blocks = [briefLines.join("\n")];
+  if (brief.missing_fields.length > 0) {
+    blocks.push(["Not stated in the brief", ...fields.filter((field) => brief.missing_fields.includes(field)).map((field) => `- ${FIELD_LABELS[field]}`)].join("\n"));
+  }
+  blocks.push(["Issues", ...(issues.length === 0 ? ["No issues found."] : issues.flatMap((issue) => [
+    `- ${CATEGORY_LABELS[issue.category]} · ${SEVERITY_LABELS[issue.severity]}: ${issue.description}`,
+    ...(issue.evidence ? [`  Evidence: ${issue.evidence}`] : []),
+  ]))].join("\n"));
+  blocks.push([
+    `${questions.length} clarifying question${questions.length === 1 ? "" : "s"}`,
+    ...(questions.length === 0 ? ["No clarifying questions were generated."] : questions.map((question, index) => `${index + 1}. ${question.question}`)),
+  ].join("\n"));
+  return blocks.join("\n\n");
 }
 
 async function submitBrief(page: Page): Promise<void> {
@@ -139,7 +171,11 @@ test.describe("Brief Decoder web product", () => {
 
     await copyButton.click();
     await expect(page.getByRole("button", { name: "Copied" })).toBeVisible();
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(composeCopyText(expected.document));
+    const copied = await page.evaluate(() => navigator.clipboard.readText());
+    expect(copied).toBe(composeCopyText(expected));
+    expect(copied).not.toContain(expected.document.summary);
+    for (const question of expected.questions) expect(copied).toContain(question.question);
+    expect(copied.match(/^\d+\. /gm)).toHaveLength(expected.questions.length);
     await expect.poll(() => copyRequests.length, { timeout: 5_000 }).toBe(1);
     await expect.poll(() => countEvents("client.next_action_clicked", sessionId), { timeout: 5_000 }).toBe(1);
     // Copy is independent of activation: still exactly one result_viewed.
@@ -192,7 +228,7 @@ test.describe("Brief Decoder web product", () => {
     await expect.poll(() => countEvents("web.result_viewed", run.sessionId()), { timeout: 10_000 }).toBe(1);
   });
 
-  test("zero questions: both empty states, no readiness claim, no result_viewed, summary still copyable", async ({
+  test("zero questions: both empty states, no readiness claim, no result_viewed, structured result still copyable", async ({
     page,
   }) => {
     const run = trackRun(page, START_ROUTE_PATTERN);
@@ -211,7 +247,9 @@ test.describe("Brief Decoder web product", () => {
 
     await page.getByRole("button", { name: "Copy" }).click();
     await expect(page.getByRole("button", { name: "Copied" })).toBeVisible();
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(composeCopyText(output.document));
+    const copied = await page.evaluate(() => navigator.clipboard.readText());
+    expect(copied).toBe(composeCopyText(output));
+    expect(copied).toContain("No clarifying questions were generated.");
     // Fence, not a sleep: the copy activation is recorded after the result rendered, so a
     // web.result_viewed POST (sent at render) would already have been issued by now.
     await expect.poll(() => countEvents("client.next_action_clicked", run.sessionId()), { timeout: 5_000 }).toBe(1);

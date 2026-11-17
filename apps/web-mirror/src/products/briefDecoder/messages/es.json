@@ -34,6 +34,10 @@
     "rationale": "Por qué preguntar: {text}",
     "document": "Documento resumen"
   },
+  "copy": {
+    "missingFields": "No se indica en el brief",
+    "hint": "Se copian literalmente el brief, los problemas y las preguntas de arriba. El documento resumen no se copia."
+  },
   "briefFields": {
     "project_goal": "Objetivo del proyecto",
     "deliverables": "Entregables",

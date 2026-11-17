@@ -34,6 +34,10 @@
     "rationale": "Pourquoi la poser : {text}",
     "document": "Document de synthèse"
   },
+  "copy": {
+    "missingFields": "Non précisé dans le brief",
+    "hint": "La copie reprend mot pour mot le brief, les problèmes et les questions ci-dessus. Le document de synthèse n’est pas copié."
+  },
   "briefFields": {
     "project_goal": "Objectif du projet",
     "deliverables": "Livrables",

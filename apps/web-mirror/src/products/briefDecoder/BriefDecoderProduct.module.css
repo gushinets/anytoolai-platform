@@ -2,6 +2,7 @@
  * `min-width: auto`, so without these a single unbroken token widens the whole page on mobile. */
 .result,
 .section,
+.content,
 .list,
 .list li {
   min-width: 0;
@@ -45,4 +46,8 @@
 .meta {
   color: var(--color-text-secondary);
   font-size: 13px;
+}
+
+.content {
+  white-space: pre-line;
 }

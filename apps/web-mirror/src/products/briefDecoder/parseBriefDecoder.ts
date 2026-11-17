@@ -1,9 +1,10 @@
+import type { Translate } from "../../i18n";
 import { isRecord, isStringArray, isOneOf } from "../shared/resultGuards";
 
 // Brief Decoder's canonical result (`brief_decoder.decode_output_v1`) as the page consumes it.
 // The backend schema stays authoritative: this only checks the shapes and closed sets the renderer
-// indexes into, not the 4-section tuple or `questions.maxItems`. `BRIEF_FIELDS`/`LEVELS`/
-// `ISSUE_CATEGORIES` are copies of the schema's enums, pinned by test/BriefDecoderProduct.test.tsx.
+// indexes into, including missing_fields for copy, not the 4-section tuple or `questions.maxItems`.
+// `BRIEF_FIELDS`/`LEVELS`/`ISSUE_CATEGORIES` mirror schema enums, pinned by test/BriefDecoderProduct.test.tsx.
 
 export const BRIEF_FIELDS = ["project_goal", "deliverables", "deadline", "budget", "target_audience", "constraints"] as const;
 export const LEVELS = ["low", "medium", "high"] as const;
@@ -16,7 +17,7 @@ export const ISSUE_CATEGORIES = [
   "contradiction",
 ] as const;
 
-type BriefField = (typeof BRIEF_FIELDS)[number];
+export type BriefField = (typeof BRIEF_FIELDS)[number];
 type Level = (typeof LEVELS)[number];
 export type IssueCategory = (typeof ISSUE_CATEGORIES)[number];
 
@@ -24,9 +25,10 @@ export type BriefIssue = { category: IssueCategory; severity: Level; description
 export type ClarifyingQuestion = { question: string; rationale: string; priority: Level; category: IssueCategory };
 export type BriefDecoderResult = {
   // Fields the brief does not state are simply absent from `values` (rendered as "not provided").
-  brief: { values: Partial<Record<BriefField, string | string[]>> };
+  brief: { values: Partial<Record<BriefField, string | string[]>>; missingFields: BriefField[] };
   issues: BriefIssue[];
   questions: ClarifyingQuestion[];
+  // Display only; copy is built from the structured fields.
   document: { sections: { title: string; content: string }[]; summary: string };
 };
 
@@ -98,6 +100,15 @@ export function extractBriefDecoderResult(output: Record<string, unknown>): Brie
     }
     values[field] = value;
   }
+  const rawMissingFields = brief.missing_fields;
+  if (rawMissingFields !== undefined && (
+    !Array.isArray(rawMissingFields) || !rawMissingFields.every((field) => isOneOf(BRIEF_FIELDS, field))
+  )) {
+    return null;
+  }
+  const missingFields = BRIEF_FIELDS.filter((field) =>
+    rawMissingFields === undefined ? values[field] === undefined : rawMissingFields.includes(field),
+  );
   const issues = mapAll(output.issues, toIssue);
   const questions = mapAll(output.questions, toQuestion);
   const sections = mapAll(document.sections, toSection);
@@ -105,17 +116,43 @@ export function extractBriefDecoderResult(output: Record<string, unknown>): Brie
     return null;
   }
   return {
-    brief: { values },
+    brief: { values, missingFields },
     issues,
     questions,
     document: { sections, summary: document.summary },
   };
 }
 
-/** `renderer_contract.yaml`'s `canonical_field_composition`: each section as a title line then its
- * content, sections separated by one blank line, then one more blank line and the summary. */
-export function composeCopyText({ sections, summary }: BriefDecoderResult["document"]): string {
-  return [...sections.map((section) => `${section.title}\n${section.content}`), summary].join("\n\n");
+type CopySource = Pick<BriefDecoderResult, "brief" | "issues" | "questions">;
+
+/** Copy structured content verbatim; labels use the UI locale because the result has no analysis language. */
+export function composeCopyText({ brief, issues, questions }: CopySource, t: Translate): string {
+  const briefLines = [t("result.brief")];
+  for (const field of BRIEF_FIELDS) {
+    const value = brief.values[field];
+    if (value === undefined) continue;
+    if (Array.isArray(value)) {
+      briefLines.push(`${t(`briefFields.${field}`)}:`, ...value.map((item) => `- ${item}`));
+    } else {
+      briefLines.push(`${t(`briefFields.${field}`)}: ${value}`);
+    }
+  }
+  const blocks = [briefLines.join("\n")];
+  if (brief.missingFields.length > 0) {
+    blocks.push([t("copy.missingFields"), ...brief.missingFields.map((field) => `- ${t(`briefFields.${field}`)}`)].join("\n"));
+  }
+  const issueLines = issues.length === 0
+    ? [t("result.noIssues")]
+    : issues.flatMap((issue) => [
+        `- ${t(`categories.${issue.category}`)} · ${t(`severity.${issue.severity}`)}: ${issue.description}`,
+        ...(issue.evidence ? [`  ${t("result.evidence", { text: issue.evidence })}`] : []),
+      ]);
+  blocks.push([t("result.issues"), ...issueLines].join("\n"));
+  const questionLines = questions.length === 0
+    ? [t("result.noQuestions")]
+    : questions.map((question, index) => `${index + 1}. ${question.question}`);
+  blocks.push([t("result.questions", { count: questions.length }), ...questionLines].join("\n"));
+  return blocks.join("\n\n");
 }
 
 /** Activation = first rendering of a non-empty clarifying-question list. */

@@ -2,7 +2,7 @@ renderer_contract:
   scenario_id: brief_decoder.decode_v1
   output_schema_ref: brief_decoder.decode_output_v1
   # The result is one composed object with four parts. apps/web-mirror/src/products/briefDecoder
-  # (ANY-248) renders them in this order; this file pins the contract that renderer is built against, not the renderer.
+  # renders them in this order; copied text follows copy_text below.
   parts:
     - part_id: brief
       field: brief
@@ -28,17 +28,31 @@ renderer_contract:
     - part_id: summary_document
       field: document
       description: >-
-        Ordered `sections` (id, title, content) followed by `summary`. This is the copy-ready part.
-  canonical_field: document
-  # `document` is an object ({sections[], summary}), not a single string -- unlike sibling
-  # contracts' `canonical_field`, copying it needs a serialization rule, not verbatim use.
+        Ordered `sections` (id, title, content) followed by `summary`, written by the model.
+        Display only: never copied (see `copy_text`).
   canonical_field_composition: >-
-    For each entry in `document.sections`, in array order, emit the section's `title` as a
-    heading line followed by its `content` as one paragraph; separate sections by one blank
-    line. After the last section, emit one more blank line followed by `document.summary` as
-    the closing paragraph. `metadata.kind` (when present) is a rendering hint only (e.g. render
-    a `list`-kind section's content as a bulleted list if it already reads as one item per
-    line) and never changes which fields are included.
+    Built from the structured fields only, never from `document` (ANY-616). Blocks in this
+    order, separated by one blank line: (1) the brief heading, then one "<field label>: <value>"
+    line per stated `brief.values` string field and, for an array field, a "<field label>:"
+    line followed by one "- <item>" line per item, in schema field order; (2) only when
+    `brief.missing_fields` is non-empty, a "not stated in the brief" heading followed by one
+    "- <field label>" line per missing field (labels in words, never schema keys); (3) the
+    issues heading, then one "- <category label> · <severity label>: <description>" line per
+    issue, with an indented localized evidence line when `evidence` is non-empty, or the
+    "no issues found" line; (4) the clarifying-questions heading with the count, then one
+    "<n>. <question>" line per question in array order, or the "no clarifying questions"
+    line. Values, descriptions, evidence and question texts are copied verbatim. Labels are
+    UI-locale words (decode_output_v1 carries no analysis language).
+  copy_text:
+    authority: structured_fields_only
+    sources:
+      - brief.values
+      - brief.missing_fields
+      - issues
+      - questions
+    not_copyable_fields:
+      - document
+      - brief.confidence
   next_action: copy_result
   excluded_fields:
     - brief_text
