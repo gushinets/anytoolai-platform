@@ -10,7 +10,10 @@ import jsonschema
 import pytest
 import yaml
 
-from tests.support.brief_decoder_deadline_status import assert_deadline_status
+from tests.support.brief_decoder_deadline_status import (
+    assert_deadline_clauses,
+    assert_deadline_status,
+)
 
 ROOT = Path(__file__).resolve().parents[5]
 PRODUCT = (
@@ -113,7 +116,7 @@ def test_case_input_fits_decode_input_schema(case: dict) -> None:
 
 @pytest.mark.parametrize("case", SUITE["cases"], ids=lambda case: case["id"])
 def test_canonical_deadline_and_key_details_keep_status(case: dict) -> None:
-    assert_deadline_status(
+    assert_deadline_clauses(
         case["id"],
         {
             "brief": {"values": {"deadline": case["canonical"]["deadline"]}},
@@ -346,4 +349,99 @@ def test_presentation_changes_preserve_the_reviewed_clause(bullet: str) -> None:
             ]
         },
     }
-    assert_deadline_status("BD-EN-PLAIN", output)
+    assert_deadline_clauses("BD-EN-PLAIN", output)
+
+
+COPIED_TEXT_FIELDS = [(None, "summary")] + [
+    (section_id, field)
+    for section_id in ("overview", "key-details", "gaps", "next-steps")
+    for field in ("title", "content")
+]
+CONTRADICTORY_PROSE = [
+    ("BD-RU-05", "Срок выполнения согласован: 10 дней."),
+    (
+        "BD-EN-PREFERRED",
+        "The three-week schedule from kickoff and December 10 launch are fixed and agreed.",
+    ),
+    ("BD-RU-CONDITIONAL", "Запуск гарантирован 15 декабря независимо от готовности макетов."),
+    ("BD-RU-CONDITIONAL", "Если запуск будет 1 декабря, макеты будут готовы к 15 декабря."),
+    ("BD-RU-CONDITIONAL", "Если макеты будут готовы к 15 декабря, запуск будет 1 декабря."),
+    ("BD-ES-TENTATIVE", "El plazo de cuatro semanas ya está confirmado con el diseñador."),
+    ("BD-RU-AGREED", "Срок 20 декабря пока не согласован с исполнителем."),
+    ("BD-EN-AGREED", "The December 20 deadline has not been agreed with the developer."),
+    ("BD-EN-PLAIN", "The March 3 deadline is agreed and confirmed."),
+    ("BD-EN-PLAIN", "The March 3 deadline is tentative and unconfirmed."),
+]
+
+
+@pytest.mark.parametrize("append", [False, True], ids=["replace", "append"])
+@pytest.mark.parametrize(
+    ("section_id", "field"),
+    COPIED_TEXT_FIELDS,
+    ids=[f"{section_id or 'document'}-{field}" for section_id, field in COPIED_TEXT_FIELDS],
+)
+@pytest.mark.parametrize(("case_id", "contradiction"), CONTRADICTORY_PROSE)
+def test_contradictions_in_every_copied_text_field_are_rejected(
+    case_id: str, contradiction: str, section_id: str | None, field: str, append: bool
+) -> None:
+    run = next(run for run in EVIDENCE["runs"] if run["case_id"] == case_id)
+    output = _captured_output(run)
+    target = output["document"]
+    if section_id is not None:
+        target = next(s for s in target["sections"] if s["id"] == section_id)
+    if section_id == "key-details" and field == "content":
+        # Leave the checked deadline clause intact; contradict it in a different list item.
+        contradiction = "- Note: " + contradiction
+        original = target[field] if append else "\n".join(target[field].splitlines()[1:])
+        target[field] = original + "\n" + contradiction
+    else:
+        target[field] = target[field] + "\n" + contradiction if append else contradiction
+    assert_deadline_clauses(case_id, output)
+    with pytest.raises(AssertionError, match="unreviewed copied document"):
+        assert_deadline_status(case_id, output)
+
+
+@pytest.mark.parametrize(
+    ("section_id", "field"),
+    [(None, "summary"), ("overview", "title"), ("overview", "content")],
+)
+def test_missing_copied_text_is_not_silently_ignored(section_id: str | None, field: str) -> None:
+    run = EVIDENCE["runs"][0]
+    output = _captured_output(run)
+    target = output["document"]
+    if section_id is not None:
+        target = next(s for s in target["sections"] if s["id"] == section_id)
+    del target[field]
+    with pytest.raises(AssertionError, match="unreviewed copied document"):
+        assert_deadline_status(run["case_id"], output)
+
+
+@pytest.mark.parametrize("change", ["remove", "duplicate", "reorder"])
+def test_changed_document_sections_require_review(change: str) -> None:
+    run = EVIDENCE["runs"][0]
+    output = _captured_output(run)
+    sections = output["document"]["sections"]
+    if change == "remove":
+        sections.pop(0)
+    elif change == "duplicate":
+        sections.append(deepcopy(sections[0]))
+    else:
+        sections.reverse()
+    with pytest.raises(AssertionError, match="unreviewed copied document"):
+        assert_deadline_status(run["case_id"], output)
+
+
+def test_unreviewed_prose_requires_review_even_without_a_deadline_claim() -> None:
+    run = EVIDENCE["runs"][0]
+    output = _captured_output(run)
+    output["document"]["summary"] = "Сначала уточните технические требования."
+    with pytest.raises(AssertionError, match="unreviewed copied document"):
+        assert_deadline_status(run["case_id"], output)
+
+
+def test_uncopied_metadata_does_not_change_the_reviewed_text() -> None:
+    run = EVIDENCE["runs"][0]
+    output = _captured_output(run)
+    for section in output["document"]["sections"]:
+        section.pop("metadata", None)
+    assert_deadline_status(run["case_id"], output)

@@ -1,10 +1,19 @@
 """Bounded output oracle for the seven ANY-762 cases, not a natural-language classifier.
 
-Only reviewed clause forms and one labeled deadline list item are supported. New wording
-or layout requires review; a matching keyword alone never proves a term's status.
+Clause checks preserve required facts; independent fingerprints cover every copied text field.
+New document wording or layout requires review, even when it is semantically correct.
 """
 
+import hashlib
+import json
 import re
+from pathlib import Path
+
+_REVIEWED_DOCUMENTS = json.loads(
+    (
+        Path(__file__).resolve().parents[1] / "fixtures/brief_decoder_eval/reviewed_documents.json"
+    ).read_text(encoding="utf-8")
+)["document_sha256"]
 
 _NO_FINAL_ESTIMATE = (
     r"(?:окончательную оценку исполнитель еще не давал|"
@@ -58,8 +67,8 @@ def _normalize(text: str) -> str:
     return " ".join(re.sub(r"[.,:;—–]", " ", text.casefold().replace("ё", "е")).split())
 
 
-def assert_deadline_status(case_id: str, output: dict) -> None:
-    """Check a real decode output; callers must separately verify capture provenance/schema."""
+def assert_deadline_clauses(case_id: str, output: dict) -> None:
+    """Check only the two deadline clauses, including partial authored canonical examples."""
     assert case_id in _CLAUSES, f"unsupported deadline case: {case_id}"
     clause = _CLAUSES[case_id]
     values = output["brief"]["values"]
@@ -82,4 +91,28 @@ def assert_deadline_status(case_id: str, output: dict) -> None:
     assert re.fullmatch(clause, deadlines[0]), (
         f"{case_id}: key-details deadline lost a required fact or uses unreviewed wording: "
         f"{deadlines[0]}"
+    )
+
+
+def assert_deadline_status(case_id: str, output: dict) -> None:
+    """Check a complete output; callers must separately verify capture provenance/schema."""
+    assert_deadline_clauses(case_id, output)
+    document = output["document"]
+    # composeCopyText copies summary and every title/content in order; metadata is not copied.
+    copied_fields = {
+        "summary": document.get("summary"),
+        "sections": [
+            {field: section.get(field) for field in ("id", "title", "content")}
+            for section in document["sections"]
+        ],
+    }
+    fingerprint = hashlib.sha256(
+        json.dumps(copied_fields, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode(
+            "utf-8"
+        )
+    ).hexdigest()
+    # shortcut: exact reviewed prose only; review new variants before extending the references.
+    assert fingerprint in _REVIEWED_DOCUMENTS[case_id], (
+        f"{case_id}: unreviewed copied document ({fingerprint}); review the entire document "
+        "for contradictions before approving a new reference"
     )

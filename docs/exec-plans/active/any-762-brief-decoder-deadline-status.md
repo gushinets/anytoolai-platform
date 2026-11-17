@@ -187,3 +187,57 @@ Validation:
 No additional paid provider runs were made. This replay verifies the recorded answers and the
 checker; it does not establish future model behavior. The checker deliberately accepts only
 reviewed clause forms and one labeled deadline item: unfamiliar wording/layout requires review.
+
+## Review correction 2
+
+The second P2 exposed a broader gap: the checker ignored summary, other sections, titles,
+and additional Key details lines, although these are all included in the copied document.
+Contradictions inserted into those surfaces passed while the checked deadline clause stayed valid.
+The user authorized checking the complete copied document, negative controls, replaying the 21
+saved answers, validation, push, and a PR description update. No paid reruns are needed.
+
+### Implementation plan
+
+1. Keep the clause checks for the extracted deadline and Key details. Separate their narrow
+   canonical-example entry point from the complete-output checker so partial fixtures cannot
+   silently bypass whole-document validation.
+2. Review every saved document and record independent SHA-256 references for its summary and
+   ordered section IDs/titles/contents as one complete variant. The persisted evidence remains
+   the readable reference; the checker must not derive allowed hashes from the candidate or
+   automatically regenerate the approved references. Metadata is not copied and is excluded.
+3. Reject unknown document variants pending semantic review. Exercise replacements and appended
+   contradictions in summary, every section content/title, and extra Key details lines, across
+   all seven cases. Preserve positive coverage of omitted deadlines and missing-year questions.
+4. Replay all 21 saved answers, run the product suite and repository checks, record the outcomes,
+   and publish the correction. Prompts, runtime behavior, and existing evidence stay unchanged.
+
+Implemented the independent references in
+[`reviewed_documents.json`](../../../tests/fixtures/brief_decoder_eval/reviewed_documents.json).
+All 21 complete documents were read for deadline-status contradictions; none were found.
+Questions about missing years, budget confirmation, and summaries omitting the deadline are
+compatible with the reviewed deadline facts. This review does not certify unrelated prose quality.
+
+The complete-output checker requires both the existing clause checks and a reviewed document
+fingerprint. Partial canonical examples use the explicitly narrower `assert_deadline_clauses`.
+There is no automatic reference regeneration: a new fingerprint requires review of every copied
+text field. Neither cached PASS labels nor the candidate itself supply approved references.
+
+Validation:
+
+- Focused module: **295 passed**, including **21/21 saved outputs**.
+- Added **180** independent replacement/append contradiction checks across all nine copied text
+  fields. Every mutation keeps the extracted deadline and checked Key details clause valid.
+  Additional controls cover missing text, removed/duplicated/reordered sections, unknown prose,
+  and unchanged copy text when uncopied metadata is removed.
+- Full Freelancer Suite: **612 passed**.
+- Ruff on changed Python files, repository doctor, configuration, architecture, documentation,
+  and generated-doc checks: passed.
+- `PYTEST_ADDOPTS=-x python scripts/agent/runner.py quick-check`: **313 passed, 1 failed,
+  720 deselected**. It stops at the unchanged
+  `test_prod_stack_running_reflects_compose_ps_output`, the same local Compose environment /
+  subprocess mock mismatch recorded above. The broad gate is not green.
+
+Prompts, workflow configuration, source briefs, and captured evidence are unchanged; no new paid
+runs were made. Exact reviewed variants are a bounded regression guard, not an unrestricted
+natural-language contradiction detector; even harmless prose changes require review. Replaying
+saved outputs does not establish future model behavior.
