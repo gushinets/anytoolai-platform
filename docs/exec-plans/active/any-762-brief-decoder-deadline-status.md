@@ -8,8 +8,8 @@
 - Created: 2026-11-17
 - Last updated: 2026-11-17
 - Review date: 2026-11-24
-- Next action: user review; explicit approval is required for live provider evaluation and GitHub writes.
-- Blocker: live evaluation was rejected by automatic approval review; broad checks have unrelated failures below.
+- Next action: product-owner review and acceptance of this iteration; live deadline regression passed.
+- Blocker: none for the scoped implementation/live regression; broad repository checks retain the unrelated failures below.
 
 ## Goal
 
@@ -87,13 +87,57 @@ found in unrelated tracked plans for ANY-17, ANY-339, ANY-391, ANY-221, and ANY-
 
 ### Live verification
 
-Live verification not run: automatic approval review twice rejected exporting these seven brief
-inputs to the configured paid OpenAI provider and requires the user's specific approval of the
-payloads and destination. An explicit approval request is pending; no live case was submitted.
+On 2026-11-17 the user explicitly authorized sending these seven fixture briefs to OpenAI for
+21 live runs and pushing the result to `feature/ANY-762`. This resolved the initial automatic
+approval rejection. Exactly three runs per case were collected through `brief_decoder.decode_v1`
+over the local API and worker; no extra workflow runs were submitted.
 
 The existing worktree stack was refreshed using `dev-live-up --product brief_decoder` on its
-existing API/PostgreSQL ports (8015/5455); both deployment-profile checks passed. Worker readback
-before refresh showed `openai/gpt-6-luna` / `medium`; no model configuration was changed.
-Three repetitions of each of the seven cases remain to collect and review after approval.
-No live pass counts are claimed. Deterministic fixtures are authored expected outputs, not captured
-model responses; passing fixture tests is not proof of live behavior.
+existing API/PostgreSQL ports (8015/5455); both deployment-profile checks passed. The collector
+verified that the running extraction prompt, summary prompt, and workflow hashes matched the
+changed source files, and that the worker snapshot stayed unchanged throughout all 21 runs.
+
+**Result: 21/21 PASS for deadline status**, based on direct agent reading of each extracted
+`deadline`, its Key details line, and the summary for contradictions, plus deterministic checks
+of status markers, deadline digits, input/output schemas, and persisted ledger/artifact identity.
+This is an agent semantic review, not recorded human acceptance or a full product-quality audit.
+
+| Case | Expected meaning | Extracted deadline | Key details |
+| --- | --- | --- | --- |
+| BD-RU-05 | Desired 10 days; freelancer has not given a final estimate | 3/3 PASS | 3/3 PASS |
+| BD-EN-PREFERRED | Preferred three weeks from kickoff, launch by December 10 | 3/3 PASS | 3/3 PASS |
+| BD-RU-CONDITIONAL | Launch December 15 only if designs are ready December 1 | 3/3 PASS | 3/3 PASS |
+| BD-ES-TENTATIVE | About four weeks, tentative and pending designer confirmation | 3/3 PASS | 3/3 PASS |
+| BD-RU-AGREED | Agreed December 20 delivery | 3/3 PASS | 3/3 PASS |
+| BD-EN-AGREED | December 20 agreed with the developer | 3/3 PASS | 3/3 PASS |
+| BD-EN-PLAIN | Plain March 3 date, without an invented status | 3/3 PASS | 3/3 PASS |
+
+No new date, duration, final estimate, or confirmation was found in the checked deadline fields
+and lines. The agreed/plain cases sometimes ask for the unspecified year; that preserves the
+source date and does not turn an agreed term into a tentative one.
+
+All **84 physical provider calls succeeded**, with `actual_provider=openai` and `model=gpt-6-luna`.
+The worker router reported `openai/gpt-6-luna` / `reasoning_effort=medium` before and after the runs.
+The provider-call ledger's separate reasoning-effort field is null, so the evidence establishes the
+configured effort but does not claim independent confirmation of each request's effort.
+No model configuration was changed.
+
+[Captured live evidence](any-762-brief-decoder-deadline-status.evidence-20261117.json) contains the
+source commit and hashes, fixture/input hashes, all 21 session/job/result identifiers, actual deadline
+fields and document outputs, projected provider-call rows, formal check results, and agent review
+rationales. Authored canonical fixtures remain separate from these captured responses.
+
+After recording the evidence, `validate-docs` and `generate-docs --check` passed. The latter
+needed a network-enabled retry after LiteLLM's model-cost-map import failed inside the sandbox.
+All seven input schemas and all 21 recorded formal/semantic verdicts were checked again locally.
+No production code changed during live verification, so the earlier broad-check results stand.
+
+### Limits and deferred polish
+
+- Three repetitions per case on one configured model are regression evidence, not a guarantee for
+  arbitrary inputs. Budget-status behavior was not live-tested by this deadline-focused suite.
+- The English preferred-schedule input is the permitted synthetic fallback, not the original QA brief.
+- Some outputs repeat missing-budget or deliverable information, and some mention a missing budget
+  in Key details. These presentation issues do not change deadline status and are deferred.
+- The scoped fix is good enough for this iteration's product-team review. Keep broader product
+  improvement iterative; unrelated repository-check failures above remain visible and unchanged.
