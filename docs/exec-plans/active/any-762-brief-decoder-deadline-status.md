@@ -141,3 +141,49 @@ No production code changed during live verification, so the earlier broad-check 
   in Key details. These presentation issues do not change deadline status and are deferred.
 - The scoped fix is good enough for this iteration's product-team review. Keep broader product
   improvement iterative; unrelated repository-check failures above remain visible and unchanged.
+
+## Review correction 1
+
+The inline P2 identified a real test gap: authored canonical strings and any-marker checks
+cannot verify a captured workflow result, and a subset-of-digits check permits lost prerequisites.
+Local negative probes also accepted reversed dependencies and the negated phrase "not agreed".
+The captured live answers remain valid; this correction changes tests, not product prompts.
+
+### Implementation plan
+
+1. Add one output-shaped test helper with closed clause rules for the seven known cases.
+   Accept a deadline only when all required facts and their relationship are present in a
+   reviewed form. Unrecognized wording fails for review rather than receiving a semantic guess.
+2. Replay all 21 captured responses through that helper, independently checking the extracted
+   deadline and the actual Key details content; ignore cached verdicts and derived line fields.
+3. Assert the exact case/attempt inventory, input hashes, and relevant source hashes. Add
+   negative controls for each field, every case, missing/duplicate sections, irrelevant marker
+   decoys, lost dates/confirmation, reversed conditions, and negated agreement.
+4. Validate and record results, then push the correction and update PR #281 as authorized.
+
+Implemented the shared output check in
+[`tests/support/brief_decoder_deadline_status.py`](../../../tests/support/brief_decoder_deadline_status.py).
+The regression module now applies it to all seven canonical examples and all 21 saved answers.
+The evidence adapter reconstructs `brief.values.deadline` from the captured projection and reads
+the persisted document directly; cached verdicts and the derived `deadline_line` do not decide
+whether an answer passes. Inventory and source/input hashes guard the capture's provenance.
+
+Negative coverage includes 26 corrupted clauses, each tested independently in the extracted field
+and Key details, plus missing/duplicate structure, unrelated qualifier decoys, contradictory
+deadline items, and a prerequisite detached from its launch clause. Presentation-only changes
+remain accepted. Fixtures, prompts, workflow configuration, and captured evidence are unchanged.
+
+Validation:
+
+- Focused regression module: **107 passed**, including **21/21 captured answers**.
+- Freelancer Suite tests: **424 passed**.
+- Ruff on both changed Python files: passed.
+- Repository doctor, configuration, architecture, documentation, and generated-doc checks: passed.
+- `PYTEST_ADDOPTS=-x python scripts/agent/runner.py quick-check`: **313 passed, 1 failed,
+  720 deselected**. The unchanged `test_prod_stack_running_reflects_compose_ps_output` still fails
+  because the local Compose environment file activates an extra resolver call that its subprocess
+  mock does not handle. This is the previously recorded broad-check blocker, not a passing gate.
+
+No additional paid provider runs were made. This replay verifies the recorded answers and the
+checker; it does not establish future model behavior. The checker deliberately accepts only
+reviewed clause forms and one labeled deadline item: unfamiliar wording/layout requires review.
