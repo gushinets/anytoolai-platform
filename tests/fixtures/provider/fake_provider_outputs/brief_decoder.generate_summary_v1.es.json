@@ -1,0 +1,40 @@
+{
+  "response_json": {
+    "sections": [
+      {
+        "id": "overview",
+        "title": "Resumen del proyecto",
+        "content": "Crear un sitio web para una panadería."
+      },
+      {
+        "id": "key-details",
+        "title": "Detalles principales",
+        "content": "- Una página con el menú.",
+        "metadata": {
+          "kind": "list"
+        }
+      },
+      {
+        "id": "gaps",
+        "title": "Información pendiente y riesgos",
+        "content": "El cliente debe confirmar el plazo, el presupuesto, el público objetivo y las restricciones."
+      },
+      {
+        "id": "next-steps",
+        "title": "Preguntas al cliente",
+        "content": "- ¿Cuándo se necesita el sitio?\n- ¿Quién usará el sitio?",
+        "metadata": {
+          "kind": "list"
+        }
+      }
+    ],
+    "summary": "El resumen todavía no está listo para empezar: primero hay que confirmar el plazo y el presupuesto."
+  },
+  "input_tokens": 100,
+  "output_tokens": 100,
+  "latency_ms": 10,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "brief_decoder.generate_summary_v1.es"
+  }
+}

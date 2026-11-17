@@ -1,0 +1,27 @@
+{
+  "response_json": {
+    "values": {
+      "project_goal": "Создать сайт пекарни.",
+      "deliverables": [
+        "Страница меню."
+      ]
+    },
+    "missing_fields": [
+      "deadline",
+      "budget",
+      "target_audience",
+      "constraints"
+    ],
+    "confidence": {
+      "project_goal": 0.9,
+      "deliverables": 0.9
+    }
+  },
+  "input_tokens": 100,
+  "output_tokens": 100,
+  "latency_ms": 10,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "brief_decoder.extract_brief_v1.ru"
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "response_json": {
+    "sections": [
+      {
+        "id": "overview",
+        "title": "Обзор проекта",
+        "content": "Создать сайт пекарни."
+      },
+      {
+        "id": "key-details",
+        "title": "Основные детали",
+        "content": "- Страница меню.",
+        "metadata": {
+          "kind": "list"
+        }
+      },
+      {
+        "id": "gaps",
+        "title": "Пробелы и риски",
+        "content": "Клиенту нужно уточнить срок, бюджет, целевую аудиторию и ограничения."
+      },
+      {
+        "id": "next-steps",
+        "title": "Вопросы клиенту",
+        "content": "- Когда нужен сайт?\n- Кто будет пользоваться сайтом?",
+        "metadata": {
+          "kind": "list"
+        }
+      }
+    ],
+    "summary": "Бриф пока не готов к работе: сначала нужно уточнить срок и бюджет."
+  },
+  "input_tokens": 100,
+  "output_tokens": 100,
+  "latency_ms": 10,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "brief_decoder.generate_summary_v1.ru"
+  }
+}

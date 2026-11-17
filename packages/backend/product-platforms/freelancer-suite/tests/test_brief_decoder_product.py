@@ -15,7 +15,7 @@ import importlib.util
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import jsonschema
 import pytest
@@ -284,6 +284,26 @@ _GAPS_KEYWORD = {
     "target_audience": "audience",
     "constraints": "constraint",
 }
+DocumentLanguage = Literal["en", "ru", "es"]
+_GAPS_KEYWORDS_BY_LANGUAGE: dict[DocumentLanguage, dict[str, str]] = {
+    "en": _GAPS_KEYWORD,
+    "ru": {
+        "project_goal": "цель проекта",
+        "deliverables": "результат",
+        "deadline": "срок",
+        "budget": "бюджет",
+        "target_audience": "аудитор",
+        "constraints": "ограничен",
+    },
+    "es": {
+        "project_goal": "objetivo del proyecto",
+        "deliverables": "entregable",
+        "deadline": "plazo",
+        "budget": "presupuesto",
+        "target_audience": "público objetivo",
+        "constraints": "restricc",
+    },
+}
 _INTERNAL_FIELD_KEY = re.compile(
     r"\b(?:"
     + "|".join(re.escape(key) for key in (*_GAPS_KEYWORD, "missing_fields"))
@@ -295,11 +315,13 @@ _LITERAL_SPAN = re.compile(
     r"|(?<!\w)(?P<quote>[\"'])[^\r\n]*?(?P=quote)"
 )
 _FIELD_LABEL_WORD = r"(?:fields?|поле|поля|полей|campos?)"
-_FIELD_LABEL_BEFORE = re.compile(rf"\b{_FIELD_LABEL_WORD}$", re.IGNORECASE)
-_FIELD_LABEL_AFTER = re.compile(rf"^{_FIELD_LABEL_WORD}\b", re.IGNORECASE)
+# Punctuation separates words; sentences, lines and masked source facts separate assertions.
+_FIELD_SEPARATOR = r"[^\w.!?\r\n\0]*"
+_FIELD_LABEL_BEFORE = re.compile(rf"\b{_FIELD_LABEL_WORD}{_FIELD_SEPARATOR}\Z", re.IGNORECASE)
+_FIELD_LABEL_AFTER = re.compile(rf"^{_FIELD_SEPARATOR}{_FIELD_LABEL_WORD}\b", re.IGNORECASE)
 _KEY_LABELS = re.compile(r"missing fields?\s*:|fields? by name|пропущено поле", re.IGNORECASE)
-_FACT_START = re.compile(r"(?:^|[.!?]\s+|\n)[ \t]*$")
-_FACT_END = re.compile(r"^[ \t]*(?:$|[.!?](?:\s|$)|\n)")
+_FACT_START = re.compile(r"(?:^|\n)[ \t]*(?:(?:[-+*•]|\d+[.)])[ \t]+)?\Z|[.!?][ \t]+\Z")
+_FACT_END = re.compile(r"^[ \t]*(?:\Z|[.!?](?:\s|\Z)|\r?\n)")
 _TECHNICAL_GAP_SENTENCES = (
     "The {key} field is not present.",
     "Поле {key} не указано.",
@@ -327,13 +349,16 @@ def _without_copied_source_facts(text: str, source_facts: tuple[str, ...]) -> st
             source_ends_assertion = fact[-1] in ".!?" and (not after or after[0].isspace())
             if _FACT_START.search(before) and (_FACT_END.match(after) or source_ends_assertion):
                 # Keep a barrier so adjacent narration cannot inherit words from the copied fact.
-                remaining[copied.start() : copied.end()] = ["~"] * len(fact)
+                remaining[copied.start() : copied.end()] = ["\0"] * len(fact)
     return "".join(remaining)
 
 
-def _field_key_leaks(text: str, *, source_facts: tuple[str, ...] = ()) -> list[str]:
+def _field_key_leaks(
+    text: str, *, source_facts: tuple[str, ...] = (), language: DocumentLanguage = "en"
+) -> list[str]:
     """Check internal notation in narration, separately from complete copied client facts."""
     # shortcut: only complete verbatim assertions establish provenance; review paraphrases live.
+    assert language in _GAPS_KEYWORDS_BY_LANGUAGE, f"unsupported document language: {language}"
     untrusted = _without_copied_source_facts(text, source_facts)
     literal_keys = {
         (literal.start() + key.start(), literal.start() + key.end())
@@ -342,10 +367,11 @@ def _field_key_leaks(text: str, *, source_facts: tuple[str, ...] = ()) -> list[s
     }
     leaks = _KEY_LABELS.findall(untrusted)
     for match in _INTERNAL_FIELD_KEY.finditer(untrusted):
-        before = untrusted[:match.start()].rstrip(" \t:`'\"")
-        after = untrusted[match.end():].lstrip(" \t:`'\"")
+        before = untrusted[: match.start()]
+        after = untrusted[match.end() :]
         if (
-            "_" in match.group()
+            language != "en"
+            or "_" in match.group()
             or match.span() in literal_keys
             or _FIELD_LABEL_BEFORE.search(before)
             or _FIELD_LABEL_AFTER.match(after)
@@ -452,6 +478,7 @@ def test_source_values_cannot_combine_into_a_new_client_fact() -> None:
         "  Rename target_audience  ",
         "Rename target_audience.",
         "Project facts. Rename target_audience. Confirm the budget.",
+        "The limit is 100. Rename target_audience.",
         "Project facts\nRename target_audience\nConfirm the budget.",
     ],
 )
@@ -553,10 +580,13 @@ _NON_FACT_WORDS = {
     "overview": {"lets", "that", "wants", "clien"},
     "key-details": {"deliv", "deadl", "budge", "const", "rathe", "than", "brief", "found", "were"},
 }
-_SUMMARY_FIXTURES = {  # A10 fixture suffix -> matching A01 fixture suffix
-    "": "",
-    ".weak_input": ".weak_input",
-    ".no_issues": ".no_issues",
+# A10 suffix -> (A01 suffix, expected document language).
+_SUMMARY_FIXTURES: dict[str, tuple[str, DocumentLanguage]] = {
+    "": ("", "en"),
+    ".weak_input": (".weak_input", "en"),
+    ".no_issues": (".no_issues", "en"),
+    ".ru": (".ru", "ru"),
+    ".es": (".es", "es"),
 }
 
 
@@ -564,18 +594,24 @@ _MIN_WORD_LEN = 4  # shorter words are articles/prepositions, not facts
 
 
 def _stems(text: str) -> set[str]:
-    return {w[:5] for w in re.findall(r"[a-z0-9]+", text.lower()) if len(w) >= _MIN_WORD_LEN}
+    return {w[:5] for w in re.findall(r"[^\W_]+", text.casefold()) if len(w) >= _MIN_WORD_LEN}
 
 
-@pytest.mark.parametrize(("summary_suffix", "extract_suffix"), _SUMMARY_FIXTURES.items())
-def test_summary_fixtures_obey_the_a10_prompt(summary_suffix: str, extract_suffix: str) -> None:
+@pytest.mark.parametrize(
+    ("summary_suffix", "extract_suffix", "language"),
+    [(suffix, *case) for suffix, case in _SUMMARY_FIXTURES.items()],
+)
+def test_summary_fixtures_obey_the_a10_prompt(
+    summary_suffix: str, extract_suffix: str, language: DocumentLanguage
+) -> None:
     """generate_summary.v1.md: built from `data` only (never invent facts) and `gaps` names every
     `data.brief.missing_fields` entry. The fixtures are the deterministic evidence for those
     rules, so they are checked against the A01 fixture that feeds the same run (code review:
     the overview named a "bakery" and "new website" that no A01 value carried, and the weak
     fixture never reported `constraints` missing). ANY-615 forbids internal missing-field
     notation in titles, content and summary while preserving identifiers from client facts."""
-    assert set(_GAPS_KEYWORD) == {
+    gap_keywords = _GAPS_KEYWORDS_BY_LANGUAGE[language]
+    assert set(gap_keywords) == {
         f["name"] for f in _literal(_steps()["extract"]["input_mapping"]["fields"])
     }
     brief = _fixture_response("brief_decoder.extract_brief_v1" + extract_suffix)
@@ -594,14 +630,18 @@ def test_summary_fixtures_obey_the_a10_prompt(summary_suffix: str, extract_suffi
         for field in ("title", "content")
     ]
     for where, text in [*texts, ("summary", document["summary"])]:
-        leaks = _field_key_leaks(text, source_facts=source_facts)
+        leaks = _field_key_leaks(text, source_facts=source_facts, language=language)
         assert not leaks, f"{where}: field key leaks {leaks}"
 
     for section_id, allowed in _NON_FACT_WORDS.items():
-        ungrounded = _stems(sections[section_id]) - _stems(json.dumps(brief["values"])) - allowed
+        ungrounded = (
+            _stems(sections[section_id])
+            - _stems(json.dumps(brief["values"], ensure_ascii=False))
+            - allowed
+        )
         assert not ungrounded, (section_id, sorted(ungrounded))
     for name in brief["missing_fields"]:
-        assert _GAPS_KEYWORD[name] in sections["gaps"].lower(), name
+        assert gap_keywords[name] in sections["gaps"].casefold(), name
 
 
 @pytest.mark.parametrize("suffix", _SUMMARY_FIXTURES)
@@ -621,7 +661,7 @@ def test_summary_fixture_guard_rejects_leaks_in_every_copied_field(
         globals(), "_fixture_response", lambda name: document if name == stem else original(name)
     )
     with pytest.raises(AssertionError, match="field key leaks"):
-        test_summary_fixtures_obey_the_a10_prompt(suffix, _SUMMARY_FIXTURES[suffix])
+        test_summary_fixtures_obey_the_a10_prompt(suffix, *_SUMMARY_FIXTURES[suffix])
 
 
 @pytest.mark.parametrize("delimiter", ["", "`", "``", '"', "'"])
@@ -643,7 +683,7 @@ def test_summary_fixture_guard_preserves_identifiers_from_extracted_values(
         return response
 
     monkeypatch.setitem(globals(), "_fixture_response", fixture_response)
-    test_summary_fixtures_obey_the_a10_prompt("", "")
+    test_summary_fixtures_obey_the_a10_prompt("", "", "en")
 
 
 @pytest.mark.parametrize("source", _CLIENT_FACTS_WITH_COLLIDING_IDENTIFIERS)
@@ -666,7 +706,7 @@ def test_summary_fixture_guard_preserves_complete_client_facts(
         return response
 
     monkeypatch.setitem(globals(), "_fixture_response", fixture_response)
-    test_summary_fixtures_obey_the_a10_prompt("", "")
+    test_summary_fixtures_obey_the_a10_prompt("", "", "en")
 
 
 @pytest.mark.parametrize("key", [key for key in _GAPS_KEYWORD if "_" not in key])
@@ -682,7 +722,7 @@ def test_summary_fixture_guard_rejects_code_formatted_single_word_fields(
         globals(), "_fixture_response", lambda name: document if name == stem else original(name)
     )
     with pytest.raises(AssertionError, match="field key leaks"):
-        test_summary_fixtures_obey_the_a10_prompt(".weak_input", ".weak_input")
+        test_summary_fixtures_obey_the_a10_prompt(".weak_input", ".weak_input", "en")
 
 
 @pytest.mark.parametrize(
@@ -712,7 +752,7 @@ def test_source_identifier_does_not_hide_a_still_missing_brief_field(
 
     monkeypatch.setitem(globals(), "_fixture_response", fixture_response)
     with pytest.raises(AssertionError, match="field key leaks"):
-        test_summary_fixtures_obey_the_a10_prompt("", "")
+        test_summary_fixtures_obey_the_a10_prompt("", "", "en")
 
 
 @pytest.mark.parametrize("key", [key for key in _GAPS_KEYWORD if "_" not in key])
@@ -731,7 +771,187 @@ def test_json_quoting_of_extracted_values_cannot_authorize_a_literal(
 
     monkeypatch.setitem(globals(), "_fixture_response", fixture_response)
     with pytest.raises(AssertionError, match="field key leaks"):
-        test_summary_fixtures_obey_the_a10_prompt("", "")
+        test_summary_fixtures_obey_the_a10_prompt("", "", "en")
+
+
+@pytest.mark.parametrize("key", [key for key in _GAPS_KEYWORD if "_" not in key])
+@pytest.mark.parametrize("label", ["Missing field", "Не заполнено поле", "Falta el campo"])
+@pytest.mark.parametrize("notation", ["({key})", "[{key}]", "= {key}", "- {key}", "«{key}»"])
+def test_summary_fixture_rejects_field_labels_across_punctuation(
+    monkeypatch: pytest.MonkeyPatch, key: str, label: str, notation: str
+) -> None:
+    original = _fixture_response
+    stem = "brief_decoder.generate_summary_v1.weak_input"
+    document = original(stem)
+    document["sections"][2]["content"] += " " + label + " " + notation.format(key=key)
+    monkeypatch.setitem(
+        globals(), "_fixture_response", lambda name: document if name == stem else original(name)
+    )
+    with pytest.raises(AssertionError, match="field key leaks"):
+        test_summary_fixtures_obey_the_a10_prompt(".weak_input", ".weak_input", "en")
+
+
+@pytest.mark.parametrize("prefix", ["- ", "• ", "* ", "+ ", "1. ", "2) ", "  - ", "\t• "])
+@pytest.mark.parametrize("suffix", ["", ".ru", ".es"])
+def test_summary_fixture_preserves_deliverables_in_list_items(
+    monkeypatch: pytest.MonkeyPatch, prefix: str, suffix: str
+) -> None:
+    original = _fixture_response
+    source = "Rename target_audience to intended_audience."
+    extract_suffix, language = _SUMMARY_FIXTURES[suffix]
+    extra_gap = ""
+
+    def fixture_response(name: str) -> dict[str, Any]:
+        response = original(name)
+        if name == "brief_decoder.extract_brief_v1" + extract_suffix:
+            response["values"]["deliverables"].append(source)
+        elif name == "brief_decoder.generate_summary_v1" + suffix:
+            response["sections"][1]["content"] = (
+                prefix + source + "\n" + prefix + source + extra_gap
+            )
+        return response
+
+    monkeypatch.setitem(globals(), "_fixture_response", fixture_response)
+    test_summary_fixtures_obey_the_a10_prompt(suffix, extract_suffix, language)
+    for separator in (" ", "\n" + prefix):
+        extra_gap = separator + "The target_audience field is missing."
+        with pytest.raises(AssertionError, match="field key leaks"):
+            test_summary_fixtures_obey_the_a10_prompt(suffix, extract_suffix, language)
+
+
+@pytest.mark.parametrize("prefix", ["Do not - ", "Missing: • ", "Ignore + ", "Exclude 2) "])
+def test_inline_list_markers_do_not_authorize_changed_client_facts(prefix: str) -> None:
+    source = "Rename target_audience to intended_audience."
+    assert _field_key_leaks(prefix + source, source_facts=(source,))
+
+
+@pytest.mark.parametrize("line_ending", ["\n", "\r\n"])
+def test_list_items_without_terminal_punctuation_keep_source_provenance(line_ending: str) -> None:
+    source = "Rename target_audience to intended_audience"
+    text = "- " + source + line_ending + "1) " + source
+    assert not _field_key_leaks(text, source_facts=(source,))
+    assert _field_key_leaks(
+        text + line_ending + "- target_audience is missing.", source_facts=(source,)
+    )
+
+
+@pytest.mark.parametrize("marker", ["field", "поле", "campo"])
+@pytest.mark.parametrize("separator", [" (", " [", " = ", " - ", " — ", " «", " / ", " ~ "])
+def test_field_marker_punctuation_is_checked_in_both_directions(
+    marker: str, separator: str
+) -> None:
+    assert _field_key_leaks(marker + separator + "budget") == ["budget"]
+    assert _field_key_leaks("budget" + separator + marker) == ["budget"]
+    source = marker + separator + "budget"
+    assert not _field_key_leaks(source, source_facts=(source,))
+
+
+@pytest.mark.parametrize("separator", [". ", "! ", "? ", "\n", "\r\n", " unrelated "])
+def test_field_labels_cannot_cross_sentences_lines_or_other_words(separator: str) -> None:
+    assert not _field_key_leaks("field" + separator + "budget")
+    assert not _field_key_leaks("budget" + separator + "field")
+
+
+@pytest.mark.parametrize("key", [key for key in _GAPS_KEYWORD if "_" not in key])
+@pytest.mark.parametrize(("suffix", "prefix"), [(".ru", "Не указан "), (".es", "Falta ")])
+@pytest.mark.parametrize(
+    ("section_index", "field"),
+    [(None, "summary"), *[(i, field) for i in range(4) for field in ("title", "content")]],
+)
+def test_localized_fixtures_reject_untranslated_keys_but_preserve_client_facts(
+    monkeypatch: pytest.MonkeyPatch,
+    key: str,
+    suffix: str,
+    prefix: str,
+    section_index: int | None,
+    field: str,
+) -> None:
+    original = _fixture_response
+    extract_suffix, language = _SUMMARY_FIXTURES[suffix]
+    extract_stem = "brief_decoder.extract_brief_v1" + extract_suffix
+    summary_stem = "brief_decoder.generate_summary_v1" + suffix
+    brief, document = original(extract_stem), original(summary_stem)
+    source = f"The {key} database field is missing; restore it."
+    brief["values"]["deliverables"].append(source)
+    document["sections"][1]["content"] += "\n- " + source
+    responses = {extract_stem: brief, summary_stem: document}
+    monkeypatch.setitem(globals(), "_fixture_response", responses.__getitem__)
+    test_summary_fixtures_obey_the_a10_prompt(suffix, extract_suffix, language)
+
+    target = document if section_index is None else document["sections"][section_index]
+    target[field] += " " + prefix + key + "."
+    with pytest.raises(AssertionError, match="field key leaks"):
+        test_summary_fixtures_obey_the_a10_prompt(suffix, extract_suffix, language)
+
+
+@pytest.mark.parametrize("suffix", [".weak_input", ".ru", ".es"])
+def test_fixture_completeness_requires_gap_words_in_the_declared_language(
+    monkeypatch: pytest.MonkeyPatch, suffix: str
+) -> None:
+    original = _fixture_response
+    extract_suffix, language = _SUMMARY_FIXTURES[suffix]
+    brief = original("brief_decoder.extract_brief_v1" + extract_suffix)
+    stem = "brief_decoder.generate_summary_v1" + suffix
+    for key in brief["missing_fields"]:
+        document = original(stem)
+        gap = document["sections"][2]
+        keyword = _GAPS_KEYWORDS_BY_LANGUAGE[language][key]
+        gap["content"] = re.sub(re.escape(keyword), "…", gap["content"], flags=re.IGNORECASE)
+        monkeypatch.setitem(
+            globals(),
+            "_fixture_response",
+            lambda name, document=document: document if name == stem else original(name),
+        )
+        with pytest.raises(AssertionError, match=key):
+            test_summary_fixtures_obey_the_a10_prompt(suffix, extract_suffix, language)
+
+
+@pytest.mark.parametrize(
+    ("suffix", "goal_gap"),
+    [
+        (".ru", "Цель проекта не определена."),
+        (".es", "El objetivo del proyecto no está definido."),
+    ],
+)
+def test_localized_audience_gap_cannot_cover_a_missing_project_goal(
+    monkeypatch: pytest.MonkeyPatch, suffix: str, goal_gap: str
+) -> None:
+    extract_suffix, language = _SUMMARY_FIXTURES[suffix]
+    extract_stem = "brief_decoder.extract_brief_v1" + extract_suffix
+    summary_stem = "brief_decoder.generate_summary_v1" + suffix
+    brief, document = _fixture_response(extract_stem), _fixture_response(summary_stem)
+    del brief["values"]["project_goal"]
+    del brief["confidence"]["project_goal"]
+    brief["missing_fields"].append("project_goal")
+    document["sections"][0]["content"] = brief["values"]["deliverables"][0]
+    responses = {extract_stem: brief, summary_stem: document}
+    monkeypatch.setitem(globals(), "_fixture_response", responses.__getitem__)
+    with pytest.raises(AssertionError, match="project_goal"):
+        test_summary_fixtures_obey_the_a10_prompt(suffix, extract_suffix, language)
+    document["sections"][2]["content"] += " " + goal_gap
+    test_summary_fixtures_obey_the_a10_prompt(suffix, extract_suffix, language)
+
+
+@pytest.mark.parametrize(
+    ("suffix", "invented"), [(".ru", "Неподтверждённый факт."), (".es", "Afirmación inventada.")]
+)
+def test_localized_fixture_grounding_checks_unicode_words(
+    monkeypatch: pytest.MonkeyPatch, suffix: str, invented: str
+) -> None:
+    original = _fixture_response
+    stem = "brief_decoder.generate_summary_v1" + suffix
+    document = original(stem)
+    document["sections"][0]["content"] += " " + invented
+    monkeypatch.setitem(
+        globals(), "_fixture_response", lambda name: document if name == stem else original(name)
+    )
+    with pytest.raises(AssertionError, match="overview"):
+        test_summary_fixtures_obey_the_a10_prompt(suffix, *_SUMMARY_FIXTURES[suffix])
+
+
+def test_field_key_guard_rejects_unknown_document_languages() -> None:
+    with pytest.raises(AssertionError, match="unsupported document language"):
+        _field_key_leaks("Confirm the budget.", language="de")  # type: ignore[arg-type]
 
 
 def test_schemas_are_closed() -> None:

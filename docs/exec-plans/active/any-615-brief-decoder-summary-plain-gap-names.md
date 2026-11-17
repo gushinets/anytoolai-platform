@@ -5,11 +5,11 @@
 - State: active
 - Owner: agent
 - Created: 2026-11-16
-- Last updated: 2026-11-16
-- Review date: 2026-11-16
-- Next action: review the round 3 fix; CI and live acceptance on B02/B04/B05 and
-  `asdf ::: 12345 !!!` remain pending.
-- Blocker: prior local full-check environment failures and pending live acceptance; see Validation.
+- Last updated: 2026-11-17
+- Review date: 2026-11-17
+- Next action: review the round 4 fix; CI for the new commit and live acceptance on B02/B04/B05
+  and `asdf ::: 12345 !!!` remain pending.
+- Blocker: live acceptance pending; earlier local full-check limitations are recorded in Validation.
 
 ## Goal
 
@@ -22,8 +22,8 @@ unchanged.
 - Map all six extracted brief fields to readable names in the existing v1 summary prompt.
 - Prohibit internal missing-field notation in section titles, content and `summary`, while
   preserving literal identifiers and code formatting from client facts.
-- Add Python regression checks for reported leaks, ordinary wording, all three summary fixtures
-  and the prompt contract, using the existing raw YAML/JSON product test approach.
+- Add Python regression checks for reported leaks, ordinary wording, all five summary fixtures
+  (three original English cases and paired RU/ES cases) and the prompt contract, using raw YAML/JSON.
 - Check sibling product prompts for the same instruction.
 
 ## Out of scope
@@ -40,9 +40,13 @@ The leak guard is a fixture regression check, not a runtime filter or a general 
 The test contract distinguishes complete source facts from newly generated narration. Only a
 complete extracted value copied verbatim within standalone assertion boundaries can establish
 source provenance. Identifiers, quote spans and partial text matches alone cannot. Text/line
-boundaries and sentence-ending punctuation (`.`, `!`, `?`) delimit assertions; colons and
-semicolons do not detach a source match from a changed surrounding claim. Arbitrary paraphrases,
-fragments, added quotation wrappers and semantic interpretation beyond that closed contract
+boundaries, line-start list markers and sentence-ending punctuation (`.`, `!`, `?`) delimit
+assertions; colons and semicolons do not detach a source match from a changed surrounding claim.
+List syntax covers `-`, `+`, `*`, `•` and numeric markers ending in `.` or `)`, with indentation
+and LF/CRLF. Expected EN/RU/ES language comes from test-case metadata, not language inference.
+Untranslated internal keys outside copied facts are forbidden in RU/ES; English single-word
+names can remain ordinary prose. Positive gap completeness uses language-specific fixture words.
+Arbitrary paraphrases, fragments, added quotation wrappers and interpretation beyond that contract
 remain live-acceptance concerns. It may conservatively flag such valid rewrites for review.
 
 ## Implementation steps
@@ -60,6 +64,10 @@ remain live-acceptance concerns. It may conservatively flag such valid rewrites 
 - [x] Replace quote-based exemptions with complete copied-fact provenance.
 - [x] Verify bare client facts, genuine source claims about missing database fields, and new gap claims.
 - [x] Run regression checks and record the round 3 evidence and remaining limits.
+- [x] Recognize line-start list prefixes without allowing changed inline assertions.
+- [x] Check neighboring field/key words across punctuation within the same assertion.
+- [x] Declare fixture languages and test translated gaps plus copied facts in EN/RU/ES.
+- [x] Record round 4 regression and validation results.
 
 ## Decision log
 
@@ -89,6 +97,11 @@ remain live-acceptance concerns. It may conservatively flag such valid rewrites 
   within standalone assertion boundaries before exempting it. Inspect all remaining narration.
   A copied database-field fact stays valid with or without quotes; a different assertion about
   a missing brief field cannot inherit that source proof.
+- 2026-11-17, review round 4: retain complete-fact provenance, with explicit list structure and
+  expected document language. Technical labels are adjacent lexical words across punctuation,
+  bounded by sentences, lines and masked facts. Replace ASCII-only grounding tokenization with
+  Unicode words so Russian fixture facts are checked rather than silently ignored. Language
+  metadata is test-owned; no runtime schema or language-detection dependency is introduced.
 
 ## Validation
 
@@ -197,3 +210,30 @@ remain live-acceptance concerns. It may conservatively flag such valid rewrites 
 - Only tests and plans change in this round. API/full-check were not repeated: the prior API
   slice passed, and full-check's existing environment blockers remain documented above.
   No live provider evaluation, GitHub write or push was performed.
+
+### Review round 4
+
+- Confirmed all three findings after reading PR inline replies: punctuation hid single-word
+  technical keys, list prefixes rejected real deliverables, and RU/ES raw keys passed. Also
+  confirmed that the previous positive gap check incorrectly required English `audience` in a
+  Russian gap sentence. All reproductions used the actual fixture assertion.
+- Before implementation, the new punctuation/list fixture regressions had **67 failed, 1 passed**;
+  the numbered `1. ` item already passed via the old sentence boundary. The new guard handles
+  line-start list markers and independent adjacent claims without granting token-level exemptions.
+- Full translated RU/ES extract/summary fixture pairs pass the same contract as English cases.
+  New tests cover all copied titles, content and summary; all four single-word keys; copied
+  English client facts inside RU/ES lists; genuine source statements about missing database
+  fields; invalid new gap statements using the same identifiers; localized positive completeness;
+  indentation, LF/CRLF, sentence/line boundaries and punctuation on either side of field markers.
+- Final **532 Brief Decoder tests and 762 full Freelancer product tests passed**, including
+  packaging and the schema checks for all four new fixture files. The suite grew by 225 cases.
+  Missing project goals must be named separately from the target audience in RU/ES; regression
+  mutations verify both rejection of the incomplete wording and acceptance after naming the goal.
+  Managed Python 3.12 doctor, config, architecture and documentation validation passed;
+  `git diff --check` is clean.
+- Ruff reports only the same two pre-existing findings in the unchanged schema-version test
+  (E501, PLR2004). No new findings or suppressions. The unrelated pre-existing literal review
+  command references in other tickets were not edited.
+- Changes are limited to tests, deterministic fixture data and plans. API/full-check were not
+  repeated for this test-only change; historical results remain above. No live model run,
+  GitHub write or push was performed. Live acceptance remains required before closure.
