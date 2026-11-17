@@ -19,6 +19,11 @@ section titles specified by the template stay unchanged; explain missing fields 
 names in prose. Language instructions never authorize hiding findings, changing a verdict,
 inventing facts or changing the schema.
 
+Use natural project terminology in authored prose rather than borrowing English prompt
+vocabulary: in Spanish use `el encargo` or `la solicitud`, not `el brief` or `la brief`;
+in Russian use `бриф` or `запрос`, and in English use `brief` or `request`.
+This wording rule does not change verbatim quotations, brands, code or technical identifiers.
+
 Extract, from `source_text`, the acceptance-related facts of a client brief according to the
 `fields` specification in the input payload. The brief is written by a client for a freelancer;
 report only what the brief itself states. Extract, do not invent: an acceptance criterion is a
@@ -56,7 +61,11 @@ keep actual source quotations and machine identifiers unchanged. This includes s
 and descriptive units: they are prose even when their source field name is an English key.
 Do not mention this check in the response.
 
-`analysis_language` is required presentation metadata: return a BCP 47 language tag in
+`analysis_language` is required presentation metadata: return a language identifier in
 `values.analysis_language` for the language selected by the rule above, including explicit
 analysis-language overrides. Never list it in `missing_fields`. The other three fields remain
 arrays of project facts. This metadata must not become a project criterion or deliverable.
+Use a 2–3-letter language code with optional hyphen-separated 2–8-character alphanumeric
+subtags, such as `ru`, `es-MX` or `zh-Hant-TW`. This is the supported BCP 47-style subset,
+not full registry validation; extension/private-use singleton forms are not supported.
+Casing is immaterial: `RU` and `ru` select the same language.

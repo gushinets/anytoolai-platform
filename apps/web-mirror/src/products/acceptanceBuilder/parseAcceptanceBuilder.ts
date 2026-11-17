@@ -90,7 +90,7 @@ function extract(output: Record<string, unknown>, requireComparison: boolean): A
   }
   const lists = toLists(extracted.values);
   const language = isRecord(extracted.values) ? extracted.values.analysis_language : undefined;
-  if (typeof language !== "string" || !/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(language)) return null;
+  if (typeof language !== "string" || !/^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(language)) return null;
   const missing = extracted.missing_fields;
   if (!lists || !missing.every((field): field is ListField => isOneOf(LIST_FIELDS, field))) {
     return null;

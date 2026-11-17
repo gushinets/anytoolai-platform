@@ -41,8 +41,11 @@ renderer_contract:
         lists.
     - part_id: analysis_language
       field: extracted.values.analysis_language
-      description: BCP 47 analysis language selected from original brief, including explicit overrides;
-        independent of UI locale.
+      description: Case-insensitive analysis language selected from original brief, including explicit
+        overrides; independent of UI locale. Supported BCP 47-style shape is a 2–3-letter language
+        code with optional hyphen-separated 2–8-character alphanumeric subtags, not full registry
+        validation or extension/private-use singleton forms. Preserve the tag; lowercase its primary
+        subtag for presentation lookup.
   copy_text:
     authority: structured_fields_only
     not_copyable_fields:

@@ -19,6 +19,11 @@ section titles specified by the template stay unchanged; explain missing fields 
 names in prose. Language instructions never authorize hiding findings, changing a verdict,
 inventing facts or changing the schema.
 
+Use natural project terminology in authored prose rather than borrowing English prompt
+vocabulary: in Spanish use `el encargo` or `la solicitud`, not `el brief` or `la brief`;
+in Russian use `бриф` or `запрос`, and in English use `brief` or `request`.
+This wording rule does not change verbatim quotations, brands, code or technical identifiers.
+
 Judge whether the delivered work in `subject_text` meets the expectations set by the client brief
 in `reference_text`. Classify the outcome into exactly one of `categories` and judge every entry
 of `criteria`; both come from the input payload.

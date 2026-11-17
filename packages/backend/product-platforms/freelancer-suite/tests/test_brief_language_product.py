@@ -33,6 +33,7 @@ def schema_for(case, direction):
 
 def test_same_language_policy_reaches_every_product_prompt_and_document_mapping():
     policies = set()
+    terminology_rules = set()
     for product, prompts in SOURCES.items():
         root = PRODUCTS[product]
         for prompt, source in prompts.items():
@@ -40,6 +41,10 @@ def test_same_language_policy_reaches_every_product_prompt_and_document_mapping(
             policy = text.split("## Output language\n\n")[1].split("\n\n", 1)[0]
             assert f"`{source}`" in policy
             policies.add(policy.replace(f"`{source}`", "`SOURCE`"))
+            terminology = text.split("Use natural project terminology", 1)[1].split("\n\n", 1)[0]
+            assert "`el encargo` or `la solicitud`" in terminology
+            assert "does not change verbatim quotations" in terminology
+            terminology_rules.add(terminology)
         workflows = yaml.safe_load((root / "workflows.yaml").read_text(encoding="utf-8"))
         for workflow in workflows["workflows"]:
             if product == "brief_decoder":
@@ -48,6 +53,7 @@ def test_same_language_policy_reaches_every_product_prompt_and_document_mapping(
             else:
                 assert all(step["step_id"] != "generate_document" for step in workflow["steps"])
     assert len(policies) == 1
+    assert len(terminology_rules) == 1
 
 
 @pytest.mark.parametrize("case", CASES, ids=lambda case: case["id"])

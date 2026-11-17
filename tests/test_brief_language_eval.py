@@ -258,7 +258,7 @@ def test_ab_metadata_must_match_expected_analysis_language(mode, language, famil
     run = ab_record(f"ANY761-AB-{mode}-{language}-{family}")
     expected = run["case"]["expected_language"]
     values = run["output"]["extracted"]["values"]
-    for tag in (expected, expected + "-MX"):
+    for tag in (expected, expected.upper(), expected.title() + "-mX"):
         values["analysis_language"] = tag
         assert evaluation.review_status(run, completed_review(run)) == "PASS"
     values["analysis_language"] = "en" if expected != "en" else "ru"
@@ -276,7 +276,7 @@ def test_explicit_analysis_language_override_takes_precedence_over_source_langua
     assert evaluation.review_status(run, completed_review(run)) == "PASS"
 
 
-@pytest.mark.parametrize("tag", [None, "", "RU", "ru_XX", "ru-", "ru-!", "ru\n", 1, [], {}])
+@pytest.mark.parametrize("tag", [None, "", "ru_XX", "ru-", "ru-!", "ru\n", 1, [], {}])
 def test_ab_invalid_language_tag_cannot_pass(tag):
     run = ab_record("ANY761-AB-D-RU-weak")
     run["output"]["extracted"]["values"]["analysis_language"] = tag
@@ -296,9 +296,10 @@ def test_ab_missing_or_invalid_expected_language_cannot_pass(expected):
     assert evaluation.review_status(run, completed_review(run)) == "FAIL"
 
 
-def test_ab_regional_expected_language_matches_primary_tag():
+@pytest.mark.parametrize("expected", ["es-MX", "ES-mx", "eS-MX"])
+def test_ab_regional_expected_language_matches_primary_tag(expected):
     run = ab_record("ANY761-AB-D-ES-weak")
-    run["case"] = {**run["case"], "expected_language": "es-MX"}
+    run["case"] = {**run["case"], "expected_language": expected}
     assert evaluation.review_status(run, completed_review(run)) == "PASS"
 
 
@@ -320,7 +321,7 @@ def test_legacy_document_requires_its_historical_ledger_step():
 
 @pytest.mark.parametrize(
     ("tag", "status", "exit_code"),
-    [("en", "FAIL", 1), ("ru", "PASS", 0), ("ru-RU", "PASS", 0)],
+    [("en", "FAIL", 1), ("ru", "PASS", 0), ("ru-RU", "PASS", 0), ("RU-ru", "PASS", 0)],
 )
 def test_weak_draft_report_checks_metadata_without_modifying_evidence(
     monkeypatch, tmp_path, capsys, tag, status, exit_code,
@@ -437,3 +438,13 @@ def test_evidence_path_rejects_a_filename_resolving_outside_root(monkeypatch, tm
     monkeypatch.setattr(Path, "resolve", resolve_path)
     with pytest.raises(ValueError, match="outside the output directory"):
         evaluation.evidence_path(directory, filename)
+
+
+def test_evaluator_uses_the_shared_language_tag_contract():
+    tags = json.loads(
+        (ROOT / "tests/fixtures/brief_language_eval/language_tags.json").read_text(encoding="utf-8")
+    )
+    for tag in tags["accepted"]:
+        assert evaluation.primary_language(tag) == tag.split("-")[0].lower()
+    for tag in tags["rejected"]:
+        assert evaluation.primary_language(tag) is None

@@ -19,6 +19,11 @@ section titles specified by the template stay unchanged; explain missing fields 
 names in prose. Language instructions never authorize hiding findings, changing a verdict,
 inventing facts or changing the schema.
 
+Use natural project terminology in authored prose rather than borrowing English prompt
+vocabulary: in Spanish use `el encargo` or `la solicitud`, not `el brief` or `la brief`;
+in Russian use `бриф` or `запрос`, and in English use `brief` or `request`.
+This wording rule does not change verbatim quotations, brands, code or technical identifiers.
+
 `data.source_brief` is supplied only to select language and recognize an explicit language
 request. Do not extract facts again from it or use it to change findings, lists, missing fields
 or verdicts. Those come exclusively from the structured results below. Keep extracted list

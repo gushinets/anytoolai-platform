@@ -19,6 +19,11 @@ section titles specified by the template stay unchanged; explain missing fields 
 names in prose. Language instructions never authorize hiding findings, changing a verdict,
 inventing facts or changing the schema.
 
+Use natural project terminology in authored prose rather than borrowing English prompt
+vocabulary: in Spanish use `el encargo` or `la solicitud`, not `el brief` or `la brief`;
+in Russian use `бриф` or `запрос`, and in English use `brief` or `request`.
+This wording rule does not change verbatim quotations, brands, code or technical identifiers.
+
 Write the clarifying questions a freelancer should send back to the client who wrote the brief,
 for the actionable entries in `issues`, using `context` (the original brief) to stay grounded.
 Prefer one question per actionable issue, but this is guidance, not a guarantee: several

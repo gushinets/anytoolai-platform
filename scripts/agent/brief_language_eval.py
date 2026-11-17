@@ -141,9 +141,9 @@ def review_template(record: dict) -> dict:
 
 def primary_language(tag: object) -> str | None:
     """Accept the AB contract's language tags, matching the presenter's primary subtag."""
-    if not isinstance(tag, str) or not re.fullmatch(r"[a-z]{2,3}(-[A-Za-z0-9]{2,8})*", tag):
+    if not isinstance(tag, str) or not re.fullmatch(r"[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*", tag):
         return None
-    return tag.split("-")[0]
+    return tag.split("-")[0].lower()
 
 
 def analysis_language_matches(record: dict) -> bool:

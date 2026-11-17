@@ -5,7 +5,7 @@
 - State: active
 - Owner: agent
 - Created: 2026-11-10
-- Last updated: 2026-11-10
+- Last updated: 2026-11-17
 - Review date: 2026-11-10
 - Next action: Required CI and owner review for the reviewed follow-up revision.
 - Blocker: Current-revision CI and owner approval pending.
@@ -240,3 +240,62 @@ frontend parsers. Both schema patterns also passed the matrix in Node's ECMAScri
 The strict end assertion `(?![\s\S])` rejects any remaining character, including a final LF,
 without Python-only regex anchors. Ruff, web lint/typecheck, doctor, config/architecture and
 docs/generated/whitespace checks passed. No live runs; current-revision CI remains pending.
+
+## Implementation plan — review round 6
+
+The case mismatch began in `751af35b`: schemas and parser required a lowercase primary
+language subtag while the producer-facing description promised BCP 47. Its initial frontend
+test also rejected `RU`. The evaluator copied that assumption in `bbf3c0d5`; `048e0bfd`
+fixed string endings but retained the invalid `RU` expectation in the shared vectors.
+
+Accept ASCII case variants in both AB schemas, the client parser and evaluator. Preserve
+original tags; lowercase the primary subtag only for presentation lookup and comparison.
+Describe the existing supported tag shape explicitly rather than promising full BCP 47
+validation. Extend the shared backend/frontend/evaluator vectors and verify localized recap
+and actual Copy under RU/EN/ES UI, preserving rejection of trailing line endings.
+
+The Spanish observation predates the schema patches. The retained November 16 report records
+English `brief` in all three Spanish summaries and the first issue evidence. English prompt
+terminology being treated as an acceptable loanword is a hypothesis, not a proven causal
+explanation. Add natural terminology guidance to the common language policy in all four BD
+and both AB prompts so intermediate authored prose follows the same rule. Preserve quotations,
+identifiers, structural invariants, model selection and the original negative report.
+
+The owner authorized implementation with offline verification only. Run relevant backend,
+frontend, config and documentation checks. Do not run live calls, change ANY-849, rewrite
+historical assessments or claim the Spanish generation now passes without new evidence.
+
+### Review round 6 — implementation and offline verification, 2026-11-17
+
+Both AB v1 schemas, parser, presentation lookup and evaluator now accept case-equivalent
+language identifiers. The original tag is preserved; only lookup/comparison uses a lowercase
+primary subtag. Producer descriptions explicitly state the existing supported shape. The
+shared 34-vector matrix covers uppercase/mixed-case, regional/script tags, newline rejection
+and unsupported forms; real backend canonical validation, frontend parsing and the evaluator
+consume the same vectors. Both schema regexes also pass this matrix in Node/ECMAScript.
+Eighteen rendered Copy regressions cover Draft/Check, RU/EN/ES analysis and RU/EN/ES UI.
+
+All six BD/AB language policies now specify native terminology (`el encargo` / `la solicitud`
+for Spanish) and preserve verbatim quotations, brands, code and identifiers. The shared prompt
+contract test guards consistent deployment of this guidance; it does not prove model compliance.
+ProposalAI and Client Update Writer do not share this brief-analysis policy and remain unchanged.
+No schema prose restrictions, dependencies, model changes or ANY-849 behavior were introduced.
+
+Validation: 221 targeted Python tests plus 7 BD fake-provider multilingual workflow tests passed;
+77 targeted web tests passed. Web typecheck/lint, Ruff, managed Python 3.12 doctor, config,
+architecture, docs and generated-doc checks passed. Initial YAML wording failed parsing and
+was corrected before the successful checks. Full baseline remains delegated to CI.
+
+Offline replay compared the previous HEAD evaluator with this revision on all 255 retained AB
+agent assessments: 204 PASS / 51 FAIL in both versions, zero changed statuses or evaluation
+errors. Record/review bytes were checked unchanged. These aggregate historical outcomes include
+rejected candidates and are not the selected-model acceptance result.
+
+Actual AC: full canonical multilingual fixtures, hidden fields, original-brief language mapping,
+UI independence, quoted facts and structured verdict/missing-list invariants remain covered by
+the passing offline suites. Historical live evidence and the original recipe report remain
+unchanged. Per the owner, no new live calls were made: the Spanish recipe series remains 0/3
+under its recorded strict language assessment. The prompt correction is implemented, but its
+stochastic efficacy is unverified; do not report it as a new Spanish PASS or as proof for the
+changed prompts. Missing historical QA originals and recipe input sufficiency remain outside
+this correction. Changes are local and uncommitted; current-revision CI and owner review remain.

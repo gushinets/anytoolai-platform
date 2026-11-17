@@ -67,16 +67,36 @@ it("preserves unknown-language prose without English fallback sentences", () => 
   expect(composeCopyText(result)).not.toContain("the client should confirm");
 });
 
-it.each([undefined, "", "RU", 42])("rejects missing or invalid analysis language: %s", (language) => {
+it.each([undefined, "", 42])("rejects missing or invalid analysis language: %s", (language) => {
   const output = structuredClone(fixtures["ANY761-AB-D-RU-basic"]!) as { extracted: { values: Record<string, unknown> } };
   output.extracted.values.analysis_language = language;
   expect(extractDraftResult(output)).toBeNull();
 });
 
 const languageTags = JSON.parse(readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../../../tests/fixtures/brief_language_eval/language_tags.json"), "utf8")) as { accepted: string[]; rejected: string[] };
+for (const [language, tag] of [["RU", "RU-ru"], ["EN", "En-us"], ["ES", "eS-mX"]] as const) {
+  for (const [mode, parse] of [["D", extractDraftResult], ["C", extractCheckResult]] as const) {
+    for (const locale of ["ru", "en", "es"] as const) {
+      it(`${mode} ${tag}: recap and Copy ignore tag casing and ${locale} UI`, async () => {
+        window.localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+        const output = structuredClone(fixtures[`ANY761-AB-${mode}-${language}-basic`]!) as { extracted: { values: Record<string, unknown> } };
+        const baseline = parse(output)!;
+        output.extracted.values.analysis_language = tag;
+        const result = parse(output)!;
+        expect(result.analysisLanguage).toBe(tag);
+        expect(result.document).toEqual(baseline.document);
+        const onCopy = vi.fn<(text: string) => Promise<boolean>>().mockResolvedValue(true);
+        render(<AcceptanceBuilderResultView result={result} onCopy={onCopy} />);
+        fireEvent.click(screen.getByRole("button", { name: { ru: "Скопировать", en: "Copy", es: "Copiar" }[locale] }));
+        await waitFor(() => expect(onCopy).toHaveBeenCalledWith(composeCopyText(baseline)));
+      });
+    }
+  }
+}
+
 for (const [mode, parse] of [["D", extractDraftResult], ["C", extractCheckResult]] as const) {
   for (const family of ["basic", "weak"]) {
-    it(`${mode} ${family}: accepts regional tags and rejects all trailing line endings`, () => {
+    it(`${mode} ${family}: accepts case variants and regional tags, rejecting all trailing line endings`, () => {
       const output = structuredClone(fixtures[`ANY761-AB-${mode}-RU-${family}`]!) as { extracted: { values: Record<string, unknown> } };
       for (const tag of languageTags.accepted) {
         output.extracted.values.analysis_language = tag;

@@ -110,7 +110,7 @@ const NEUTRAL: Words = {
 type StructuredResult = Pick<AcceptanceBuilderResult, "lists" | "missingFields" | "comparison" | "analysisLanguage">;
 
 export function composeDocument(result: StructuredResult): AcceptanceBuilderResult["document"] {
-  const words = WORDS[result.analysisLanguage.split("-")[0]] ?? NEUTRAL;
+  const words = WORDS[result.analysisLanguage.split("-")[0].toLowerCase()] ?? NEUTRAL;
   const sections: { title: string; content: string }[] = [];
   let summary = words.complete;
   if (result.comparison) {

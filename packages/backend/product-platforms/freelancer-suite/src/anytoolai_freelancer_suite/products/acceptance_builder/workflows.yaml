@@ -11,8 +11,9 @@ workflows:
       fields: literal:[{"name":"acceptance_criteria","type":"array_of_strings","description":"Conditions the brief says the
         finished work must satisfy.","required":false},{"name":"assumptions","type":"array_of_strings","description":"Things
         the brief takes for granted or states as assumed.","required":false},{"name":"deliverables","type":"array_of_strings","description":"Concrete
-        deliverables the client expects.","required":false},{"name":"analysis_language","type":"string","description":"BCP
-        47 language tag for this analysis, selected from the original brief by the prompt language rule. Always report it,
+        deliverables the client expects.","required":false},{"name":"analysis_language","type":"string","description":"Case-insensitive
+        analysis language identifier using 2-3 ASCII letters, optionally followed by hyphen-separated 2-8-character alphanumeric
+        subtags (ru, es-MX, zh-Hant-TW). Select it from the original brief by the prompt language rule. Always report it,
         even for a vague brief; it is presentation metadata, not a project requirement.","required":true}]
       strict: literal:true
     output_mapping:
@@ -29,8 +30,9 @@ workflows:
       fields: literal:[{"name":"acceptance_criteria","type":"array_of_strings","description":"Conditions the brief says the
         finished work must satisfy.","required":false},{"name":"assumptions","type":"array_of_strings","description":"Things
         the brief takes for granted or states as assumed.","required":false},{"name":"deliverables","type":"array_of_strings","description":"Concrete
-        deliverables the client expects.","required":false},{"name":"analysis_language","type":"string","description":"BCP
-        47 language tag for this analysis, selected from the original brief by the prompt language rule. Always report it,
+        deliverables the client expects.","required":false},{"name":"analysis_language","type":"string","description":"Case-insensitive
+        analysis language identifier using 2-3 ASCII letters, optionally followed by hyphen-separated 2-8-character alphanumeric
+        subtags (ru, es-MX, zh-Hant-TW). Select it from the original brief by the prompt language rule. Always report it,
         even for a vague brief; it is presentation metadata, not a project requirement.","required":true}]
       strict: literal:true
     output_mapping:
