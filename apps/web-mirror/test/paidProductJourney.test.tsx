@@ -16,6 +16,10 @@ import { testProductDefinition, TEST_PRODUCT_MESSAGES_EN } from "./fixtures/test
 import { errorResponse, resultResponse, runtimeConfigResponse, sessionResponse, startResponse } from "./fixtures/platformResponses";
 import { englishForAllLocales, makeRender } from "./support/renderWithI18n";
 
+import { ProposalAIProduct, proposalAiDefinition } from "../src/products/proposalAi/ProposalAIProduct";
+import { PROPOSAL_AI_MESSAGES } from "../src/products/proposalAi/messages";
+import { productDraftKey, saveDraftRun, saveDraftValues } from "../src/products/runtime/draftStorage";
+
 const routerPush = vi.hoisted(() => vi.fn());
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: routerPush }) }));
 const render = makeRender(englishForAllLocales(TEST_PRODUCT_MESSAGES_EN));
@@ -516,4 +520,71 @@ it("rejects foreign audience before changing custody or clearing private recover
   writePortalSession(tabStorage, { ...session, consumerId: "foreign-backend" });
   expect(synchronizePortalIdentity()).toMatchObject({ kind: "required", owner });
   expect(readPaidStartRecovery(persistence, ids.productId)?.kind).toBe("pending");
+});
+
+
+it.each(["fresh", "accepted", "pending", "pending-newer-draft"] as const)("completes paid semantic rejection from %s without retaining dead recovery", async (origin) => {
+  const renderProposal = makeRender(PROPOSAL_AI_MESSAGES);
+  const rejected = { ...proposalAiDefinition.emptyValues, taskText: "hello", freelancerPositioning: "hello" };
+  const corrected = { ...rejected, taskText: "Write a bakery landing page.", freelancerPositioning: "I write landing pages." };
+  const client = createPlatformApiClient();
+  const persistence = getPaidPersistence(client)!;
+  const key = productDraftKey(ids.productId, proposalAiDefinition.messageScope, owner);
+  if (origin !== "fresh") {
+    saveDraftValues(key, origin === "pending-newer-draft" ? corrected : rejected);
+    if (origin === "accepted") {
+      saveDraftRun(key, { scenarioSessionId: "session_1", input: rejected });
+      persistPaidStartRecovery(persistence, { version: 1, kind: "accepted", owner, ...ids, scenarioSessionId: "session_1" });
+    } else {
+      persistPaidStartRecovery(persistence, { version: 1, kind: "pending", owner, ...ids, idempotencyKey: "rejected_key",
+        request: { ...ids, frontendId: "web_mirror", input: proposalAiDefinition.toInput(rejected) } });
+    }
+  }
+  routeFetch();
+  const routed = fetcher.getMockImplementation()!;
+  let results = 0;
+  fetcher.mockImplementation(async (url, init) => {
+    const path = new URL(typeof url === "string" ? url : url instanceof URL ? url.href : url.url).pathname;
+    if (path.startsWith("/v1/results/")) {
+      results += 1;
+      return resultResponse(ids, { output: results === 1 ? {
+        text: "Internal clarification.",
+        gaps: ["missing_task_description", "missing_profile_information"].map((category) => ({ category, description: "Missing input", severity: "high" })),
+      } : { text: "Corrected paid proposal." } });
+    }
+    return routed(url, init);
+  });
+  const first = renderProposal(<ProposalAIProduct client={client} />);
+  if (origin === "fresh") {
+    fireEvent.change(await screen.findByLabelText(/^Describe the task/), { target: { value: rejected.taskText } });
+    fireEvent.change(screen.getByLabelText(/^Your experience and strengths/), { target: { value: rejected.freelancerPositioning } });
+    fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+  }
+  if (origin !== "pending-newer-draft") {
+    await screen.findByText(PROPOSAL_AI_MESSAGES.en.validation.missing_task_description);
+    expect(screen.getByText(PROPOSAL_AI_MESSAGES.en.validation.missing_profile_information)).toBeTruthy();
+    fireEvent.submit(screen.getByRole("form"));
+  } else {
+    await waitFor(() => expect(readPaidStartRecovery(persistence, ids.productId)).toBeNull());
+    expect(screen.queryByText(PROPOSAL_AI_MESSAGES.en.validation.missing_task_description)).toBeNull();
+    expect(screen.queryByText(PROPOSAL_AI_MESSAGES.en.validation.missing_profile_information)).toBeNull();
+    expect((screen.getByLabelText(/^Describe the task/) as HTMLTextAreaElement).value).toBe(corrected.taskText);
+  }
+  expect(readPaidStartRecovery(persistence, ids.productId)).toBeNull();
+  expect(screen.queryByRole("button", { name: "Copy" })).toBeNull();
+  const startsBefore = origin === "accepted" ? 0 : 1;
+  expect(starts).toHaveLength(startsBefore);
+  const rejectedKey = starts[0] ? new Headers(starts[0].headers).get("Idempotency-Key") : null;
+  first.unmount();
+  renderProposal(<ProposalAIProduct client={createPlatformApiClient()} />);
+  await screen.findByRole("form");
+  expect(results).toBe(1);
+  expect(starts).toHaveLength(startsBefore);
+  fireEvent.change(screen.getByLabelText(/^Describe the task/), { target: { value: corrected.taskText } });
+  fireEvent.change(screen.getByLabelText(/^Your experience and strengths/), { target: { value: corrected.freelancerPositioning } });
+  fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+  await screen.findByText("Corrected paid proposal.");
+  expect(starts).toHaveLength(startsBefore + 1);
+  expect(new Headers(starts.at(-1)!.headers).get("Idempotency-Key")).not.toBe(rejectedKey);
+  expect(parseBody(starts.at(-1)!.body)).toMatchObject({ input: proposalAiDefinition.toInput(corrected), guest_id: null });
 });

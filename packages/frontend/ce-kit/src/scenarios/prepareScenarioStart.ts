@@ -37,17 +37,21 @@ export function prepareScenarioStart(request: ScenarioStartRequest, persistence?
   return prepareWithKey(request, generateIdempotencyKey(), persistence);
 }
 
-export function restorePaidScenarioStart(recovery: PaidStartRecovery & { kind: "pending" }, persistence: PaidStartPersistence): PreparedScenarioStart {
-  return prepareWithKey(recovery.request, recovery.idempotencyKey, persistence);
+/** A product may supply one compatible legacy input; both variants retain the original key. */
+export function restorePaidScenarioStart(
+  recovery: PaidStartRecovery & { kind: "pending" }, persistence: PaidStartPersistence,
+  compatibleInput?: Record<string, unknown>,
+): PreparedScenarioStart {
+  return prepareWithKey(recovery.request, recovery.idempotencyKey, persistence, compatibleInput);
 }
 
-function prepareWithKey(request: ScenarioStartRequest, idempotencyKey: string, persistence?: PaidStartPersistence): PreparedScenarioStart {
+function prepareWithKey(request: ScenarioStartRequest, idempotencyKey: string, persistence?: PaidStartPersistence, compatibleInput?: Record<string, unknown>): PreparedScenarioStart {
   const frozenRequest = structuredClone(request);
   let acceptedSessionId: string | undefined;
   // Snapshotted once, here, rather than read from `request` inside `execute()`: a retry must
   // resend exactly the same payload as the original submission even if the caller mutates (or
   // reuses a form-bound) `request` object between two `execute()` calls on this handle --
-  // otherwise the same `Idempotency-Key` would go out attached to two different bodies.
+  // Compatibility recovery is the sole exception: its explicit second variant is frozen too.
   const path = `/v1/products/${encodeURIComponent(request.productId)}/scenarios/${encodeURIComponent(request.scenarioId)}/start`;
   const body = {
     frontend_id: request.frontendId,
@@ -56,6 +60,7 @@ function prepareWithKey(request: ScenarioStartRequest, idempotencyKey: string, p
     user_id: request.userId ?? null,
     source_frontend_instance_id: request.sourceFrontendInstanceId ?? null,
   };
+  const compatibleBody = compatibleInput ? { ...body, input: structuredClone(compatibleInput) } : undefined;
 
   return {
     forgetRecovery() {
@@ -80,19 +85,27 @@ function prepareWithKey(request: ScenarioStartRequest, idempotencyKey: string, p
         }
         options?.onRecoveryPersisted?.();
       }
-      const result = await requestAndParse(
-        client,
-        {
-          method: "POST",
-          path,
-          body,
+      async function send(requestBody: typeof body): Promise<PlatformApiResult<ScenarioSessionSnapshot>> {
+        if ((persistence && !persistence.isCurrent()) || options?.signal?.aborted) {
+          return { ok: false, error: { type: "aborted" } };
+        }
+        return requestAndParse(client, {
+          method: "POST", path, body: requestBody,
           headers: { "Idempotency-Key": idempotencyKey },
-          signal: options?.signal,
-          timeoutMs: options?.timeoutMs,
-        },
-        parseScenarioStartResponse,
-        "Scenario start response was invalid.",
-      );
+          signal: options?.signal, timeoutMs: options?.timeoutMs,
+        }, parseScenarioStartResponse, "Scenario start response was invalid.");
+      }
+      let result = await send(body);
+      if (compatibleBody && !result.ok && result.error.type === "backend_error" && (
+        (result.error.status === 422 && result.error.code === "scenario_input_invalid") ||
+        (result.error.status === 409 && result.error.code === "idempotency_key_conflict")
+      )) {
+        // Both variants retain one key: reservation uniqueness prevents a second execution.
+        result = await send(compatibleBody);
+        if (!result.ok && result.error.type === "backend_error" && result.error.status === 409 && result.error.code === "idempotency_key_conflict") {
+          result = await send(body); // An in-flight legacy request may have won admission.
+        }
+      }
       if (persistence && !persistence.isCurrent()) return { ok: false, error: { type: "aborted" } };
       if (persistence && result.ok) {
         acceptedSessionId = result.value.scenarioSessionId;

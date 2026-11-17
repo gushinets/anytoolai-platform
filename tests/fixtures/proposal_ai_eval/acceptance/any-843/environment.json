@@ -1,0 +1,35 @@
+{
+  "git_sha": "8a0ae64773c16482301ccde4978604443269a785",
+  "candidate_worktree_modified": true,
+  "environment": "isolated local live Compose stack; no production deployment",
+  "compose_project": "anytoolai-e986bbcb",
+  "api_url": "http://127.0.0.1:18782",
+  "web_url": "http://localhost:3000",
+  "python": "3.12.13",
+  "node": "24.22.1",
+  "model": "openai/gpt-6-luna",
+  "reasoning_effort": "medium",
+  "quota_mode": "canonical",
+  "prompt_sha256_running_worker": {
+    "compose_persuasive_text.v1.md": "a38426fed4b541c5387a68ade0a70744d73850432193ec8696a1302ad8f8b280",
+    "detect_experience_gaps.v1.md": "8fe40565903b383eb4aa6cde0aca6523a72e5202ce056196b3fc974d4cbce989"
+  },
+  "changed_file_sha256": {
+    "apps/web-mirror/src/products/proposalAi/ProposalAIProduct.tsx": "647fe2c39e340416a368ae701d316a716e4aaebabfb58978c678848a35264248",
+    "apps/web-mirror/src/products/proposalAi/messages/de.json": "871d485fc7c4e5b2beecde49440536bbad8fe9f462f9d3a5f492b3d006ae3ca3",
+    "apps/web-mirror/src/products/proposalAi/messages/en.json": "82e3f3a45a8ef94be5df1534de4807003719d139861e6c59cef7015b561991ab",
+    "apps/web-mirror/src/products/proposalAi/messages/es.json": "b85e6ded06e400126c210cb1d603eb8d35b00651a12531984c4a91775540811a",
+    "apps/web-mirror/src/products/proposalAi/messages/fr.json": "97be33f9ce1f1c83f474de1f607f193e6ba279f2e7ac2c89011e16a543f3e866",
+    "apps/web-mirror/src/products/proposalAi/messages/it.json": "970b9cc4a50f8aafe87a3c89d8a4abd95031c664b2ce40df3c4fe0330034355d",
+    "apps/web-mirror/src/products/proposalAi/messages/pt.json": "22dbf7c815582b76fe8394b54c2905ab99971eb829528c67204a725dde828e45",
+    "apps/web-mirror/src/products/proposalAi/messages/ru.json": "731d2912665fca73693fd20eca4b9daf4b3563e2200581bd35ba17d131987ca3",
+    "apps/web-mirror/src/products/runtime/ProductRunPage.tsx": "76a905cd2283e868da4450c81a9d1a8e5de2a2b61aea005f991f6827e30e2d6f",
+    "apps/web-mirror/src/products/runtime/productDefinition.ts": "57f959f027dc3a827f0535bdd98f3c435d54cda667525a1b8828bf027eb066de",
+    "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/proposal_ai/prompts/compose_persuasive_text.v1.md": "a38426fed4b541c5387a68ade0a70744d73850432193ec8696a1302ad8f8b280",
+    "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/proposal_ai/prompts/detect_experience_gaps.v1.md": "8fe40565903b383eb4aa6cde0aca6523a72e5202ce056196b3fc974d4cbce989",
+    "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/proposal_ai/renderer_contract.yaml": "395a3cf7b2b2ee087a4a185fa3638581055865cf5a2d6c1d632b8efd5c19de6a",
+    "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/proposal_ai/workflows.yaml": "81f41c5a262b85a0cea3a78c050b1fcbc12218765f12735aaf746b6d2359ccc9"
+  },
+  "baseline_note": "Baseline product sources matched HEAD; git_dirty was true because the execution plan had been added before running. Prompt hashes are recorded per run.",
+  "checks_note": "Hashes cover changed product/runtime source files, not mutable test reports or execution-plan prose."
+}

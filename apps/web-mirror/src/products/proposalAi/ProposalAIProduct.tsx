@@ -8,6 +8,7 @@ import { FieldErrorMessage } from "../../components/FieldErrorMessage";
 import { ResultView } from "../../components/ResultView";
 import { LOCALES, LOCALE_NAMES, useProductT, type Locale } from "../../i18n";
 import { ProductRunPage } from "../runtime/ProductRunPage";
+import { isOneOf, isRecord } from "../shared/resultGuards";
 import {
   backendTrimmedLength,
   collectFieldErrors,
@@ -26,6 +27,7 @@ type Tone = (typeof TONE_VALUES)[number];
 
 // Mirrors `proposal_ai.generate_input_v1` maxLength for both text fields.
 const TEXT_MAX_LENGTH = 4000;
+const RESULT_CONTRACT = "proposal_ai.field_errors_v1";
 // The counter appears only when the limit is near, so it stays quiet for ordinary input.
 const COUNTER_THRESHOLD = 3500;
 
@@ -64,7 +66,11 @@ function parseDraftValues(raw: unknown): ProposalAIValues | null {
 
 // Mirrors `proposal_ai.generate_output_v1`: the proposal and the `experience_gap` issues.
 export type ProposalAIGap = { description: string };
-export type ProposalAIResult = { text: string; gaps: ProposalAIGap[] };
+export type ProposalAIResult = {
+  text: string;
+  gaps: ProposalAIGap[];
+  fieldErrors?: Partial<Record<keyof ProposalAIValues, FieldError>>;
+};
 
 function validate(values: ProposalAIValues): Partial<Record<keyof ProposalAIValues, FieldError>> {
   return collectFieldErrors<ProposalAIValues>([
@@ -73,16 +79,67 @@ function validate(values: ProposalAIValues): Partial<Record<keyof ProposalAIValu
   ]);
 }
 
-function isGap(value: unknown): value is ProposalAIGap {
-  return typeof value === "object" && value !== null && "description" in value && typeof value.description === "string";
+function normalizeValues(values: ProposalAIValues): ProposalAIValues {
+  return {
+    ...values,
+    taskText: trimBackendWhitespace(values.taskText),
+    freelancerPositioning: trimBackendWhitespace(values.freelancerPositioning),
+  };
+}
+
+function parseInputValues(input: unknown): ProposalAIValues | null {
+  // Decode requests this form can produce, without defaulting missing submitted source values.
+  if (
+    !isRecord(input) || input.result_contract !== RESULT_CONTRACT ||
+    typeof input.task_text !== "string" || typeof input.freelancer_positioning !== "string" ||
+    !isTone(input.tone) || (input.language !== undefined && (!isProposalLanguage(input.language) || input.language === AUTO_LANGUAGE)) ||
+    Object.keys(input).some(key => !["result_contract", "task_text", "freelancer_positioning", "tone", "language"].includes(key))
+  ) return null;
+  const values = normalizeValues({
+    taskText: input.task_text,
+    freelancerPositioning: input.freelancer_positioning,
+    tone: input.tone,
+    language: input.language ?? AUTO_LANGUAGE,
+  });
+  return Object.keys(validate(values)).length === 0 ? values : null;
+}
+
+function recoverLegacyInput(input: unknown): Record<string, unknown> | null {
+  if (!isRecord(input) || Object.hasOwn(input, "result_contract")) return null;
+  const compatible = { ...input, result_contract: RESULT_CONTRACT };
+  return parseInputValues(compatible) === null ? null : compatible;
+}
+
+const GAP_FIELDS = {
+  experience_gap: null,
+  missing_task_description: "taskText",
+  missing_profile_information: "freelancerPositioning",
+} as const;
+
+function isGapCategory(value: unknown): value is keyof typeof GAP_FIELDS {
+  return typeof value === "string" && Object.hasOwn(GAP_FIELDS, value);
 }
 
 function extractResult(output: Record<string, unknown>): ProposalAIResult | null {
-  if (typeof output.text !== "string") {
+  if (typeof output.text !== "string" || !output.text.trim()) {
     return null;
   }
-  const gaps = Array.isArray(output.gaps) ? output.gaps.filter(isGap).map(({ description }) => ({ description })) : [];
-  return { text: output.text, gaps };
+  // Old text-only results remain readable; present issue lists must obey the closed contract.
+  const issues = output.gaps === undefined ? [] : output.gaps;
+  if (!Array.isArray(issues)) return null;
+  const gaps: ProposalAIGap[] = [];
+  const fieldErrors: Partial<Record<keyof ProposalAIValues, FieldError>> = {};
+  for (const issue of issues) {
+    if (!isRecord(issue) || !isGapCategory(issue.category) ||
+      typeof issue.description !== "string" || !issue.description.trim() ||
+      !isOneOf(["low", "medium", "high"] as const, issue.severity)) return null;
+    const field = GAP_FIELDS[issue.category];
+    if (field === null) gaps.push({ description: issue.description });
+    else fieldErrors[field] = { code: "product", key: `validation.${issue.category}` };
+  }
+  return Object.keys(fieldErrors).length > 0
+    ? { text: output.text, gaps, fieldErrors }
+    : { text: output.text, gaps };
 }
 
 function ProposalAIResultView({ result, onCopy, secondaryAction }: ProductResultProps<ProposalAIResult>) {
@@ -265,14 +322,22 @@ export const proposalAiDefinition: ProductDefinition<ProposalAIValues, ProposalA
   emptyValues: EMPTY_VALUES,
   draft: { parseValues: parseDraftValues },
   validate,
-  toInput: (values) => ({
-    task_text: trimBackendWhitespace(values.taskText),
-    freelancer_positioning: trimBackendWhitespace(values.freelancerPositioning),
-    tone: values.tone,
-    // Sent only when chosen: without it the backend writes in the language of the task.
-    ...(values.language === AUTO_LANGUAGE ? {} : { language: values.language }),
-  }),
+  normalizeValues,
+  parseInputValues,
+  recoverLegacyInput,
+  toInput: (values) => {
+    const normalized = normalizeValues(values);
+    return {
+      result_contract: RESULT_CONTRACT,
+      task_text: normalized.taskText,
+      freelancer_positioning: normalized.freelancerPositioning,
+      tone: normalized.tone,
+      // Sent only when chosen: without it the backend writes in the language of the task.
+      ...(normalized.language === AUTO_LANGUAGE ? {} : { language: normalized.language }),
+    };
+  },
   extractResult,
+  resultFieldErrors: (result) => result.fieldErrors ?? {},
   Fields: ProposalAIFields,
   Result: ProposalAIResultView,
 };
