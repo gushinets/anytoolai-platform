@@ -7,16 +7,10 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
-  ALL_STATED,
-  DELTA_CRITERIA,
-  DELTA_LABELS,
-  GAP_NAMES,
   LIST_FIELDS,
-  LIST_TITLES,
-  NOT_SPECIFIED,
-  VERDICT_WORDS,
-  VERDICTS,
 } from "../src/products/acceptanceBuilder/parseAcceptanceBuilder";
+
+import { WORDS } from "../src/products/acceptanceBuilder/presentation";
 
 const CONTRACT = readFileSync(
   resolve(
@@ -55,13 +49,13 @@ describe("renderer_contract.yaml copy contract vs the web copy text", () => {
     expect(blocks.map((b) => b.id)).toEqual(["verdict", "acceptance_criteria", "assumptions", "deliverables", "open_gaps"]);
     expect(blocks[0]!.title).toBe("Verdict");
     for (const field of LIST_FIELDS) {
-      expect(blocks.find((b) => b.id === field)?.title).toBe(LIST_TITLES[field]);
+      expect(blocks.find((b) => b.id === field)?.title).toBe(WORDS.en!.lists[LIST_FIELDS.indexOf(field)]);
     }
     expect(blocks.at(-1)!.title).toBe("Open gaps");
   });
 
   it("applies the verdict block to check_v1 only (the renderer composes it only when a comparison exists)", () => {
-    expect(blocks[0]!.scenarios).toBe("[acceptance_builder.check_v1]");
+    expect(prose).toContain("scenarios: - acceptance_builder.check_v1");
     for (const block of blocks.slice(1)) {
       expect(block.scenarios).toBeUndefined();
     }
@@ -69,23 +63,18 @@ describe("renderer_contract.yaml copy contract vs the web copy text", () => {
 
   it("uses the contract's fallbacks for an absent list and an empty gap list", () => {
     for (const field of LIST_FIELDS) {
-      expect(blocks.find((b) => b.id === field)?.whenAbsent).toBe(NOT_SPECIFIED);
+      expect(blocks.find((b) => b.id === field)?.whenAbsent).toBe("analysis_language.missing");
     }
-    expect(blocks.find((b) => b.id === "open_gaps")?.whenEmpty).toBe(ALL_STATED);
+    expect(blocks.find((b) => b.id === "open_gaps")?.whenEmpty).toBe("analysis_language.complete");
   });
 
   it("keeps copy_result as the next action the shared runtime records", () => {
     expect(/^ {2}next_action: (.+)$/m.exec(CONTRACT)?.[1]).toBe("copy_result");
   });
 
-  it("names the verdict words, delta labels and gap wording the contract prose requires", () => {
-    expect(prose).toContain([...VERDICTS].map((v) => VERDICT_WORDS[v]).join(" | "));
-    expect(prose).toContain(`labels ${DELTA_CRITERIA.map((c) => DELTA_LABELS[c]).join(", ")}`);
-    expect(prose).toContain(
-      `as "${LIST_FIELDS.map((f) => GAP_NAMES[f]).slice(0, 2).map((n) => n).join('", "')}" or "${GAP_NAMES.deliverables}"`,
-    );
-    expect(prose).toContain('"- <name>: the client should confirm it."');
-    expect(prose).toContain('"<Label>: <status>. <evidence>"');
-    expect(prose).toContain('"Verdict: " followed by the verdict in words');
+  it("binds recap and copy wording to the analysis language rather than UI", () => {
+    expect(prose).toContain("language_source: extracted.values.analysis_language");
+    expect(prose).toContain("Independent model document content is ignored");
+    expect(prose).toContain("no English prose fallback");
   });
 });

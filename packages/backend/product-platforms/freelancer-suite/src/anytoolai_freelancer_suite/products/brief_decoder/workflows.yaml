@@ -47,6 +47,7 @@ workflows:
         action_config_id: brief_decoder.generate_summary_v1
         input_mapping:
           template_ref: 'literal:"brief_decoder.summary_v1"'
+          data.source_brief: scenario.input.brief_text
           data.brief: steps.extract.output
           data.issues: steps.detect_issues.output.issues
           data.questions: '?steps.generate_questions.output.questions'

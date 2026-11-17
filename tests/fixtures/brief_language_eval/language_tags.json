@@ -1,0 +1,40 @@
+{
+  "accepted": [
+    "ru",
+    "en",
+    "es",
+    "ru-RU",
+    "en-US",
+    "es-MX",
+    "zh-Hant-TW",
+    "RU",
+    "rU",
+    "RU-ru",
+    "eS-mX",
+    "ZH-hANT-tw"
+  ],
+  "rejected": [
+    "ru\n",
+    "ru\r",
+    "ru\r\n",
+    "ru\n\n",
+    "ru ",
+    "ru ",
+    "ru\nRU",
+    "es-MX\n",
+    "es-MX\r\n",
+    " ru",
+    "ru ",
+    "ru\t",
+    "es_MX",
+    "es-",
+    "RU\n",
+    "Ru-RU\r\n",
+    "e",
+    "engl",
+    "es-419-u-nu-latn",
+    "x-private",
+    "рус",
+    "ru-abcdefghi"
+  ]
+}

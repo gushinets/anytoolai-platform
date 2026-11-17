@@ -13,7 +13,8 @@
         "Certificate template in brand colors",
         "Automated PDF generation service",
         "Email that delivers the certificate"
-      ]
+      ],
+      "analysis_language": "en"
     },
     "missing_fields": [],
     "confidence": {

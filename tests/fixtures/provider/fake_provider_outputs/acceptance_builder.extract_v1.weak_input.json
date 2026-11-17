@@ -3,7 +3,8 @@
     "values": {
       "deliverables": [
         "A certificate"
-      ]
+      ],
+      "analysis_language": "en"
     },
     "missing_fields": [
       "acceptance_criteria",
