@@ -100,15 +100,16 @@ export function extractBriefDecoderResult(output: Record<string, unknown>): Brie
     }
     values[field] = value;
   }
+  const missingFields = BRIEF_FIELDS.filter((field) => values[field] === undefined);
   const rawMissingFields = brief.missing_fields;
+  // Supplied metadata must list each absent field exactly once.
   if (rawMissingFields !== undefined && (
-    !Array.isArray(rawMissingFields) || !rawMissingFields.every((field) => isOneOf(BRIEF_FIELDS, field))
+    !Array.isArray(rawMissingFields) ||
+    rawMissingFields.length !== missingFields.length ||
+    !missingFields.every((field) => rawMissingFields.includes(field))
   )) {
     return null;
   }
-  const missingFields = BRIEF_FIELDS.filter((field) =>
-    rawMissingFields === undefined ? values[field] === undefined : rawMissingFields.includes(field),
-  );
   const issues = mapAll(output.issues, toIssue);
   const questions = mapAll(output.questions, toQuestion);
   const sections = mapAll(document.sections, toSection);

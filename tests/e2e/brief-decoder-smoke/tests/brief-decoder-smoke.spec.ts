@@ -258,15 +258,22 @@ test.describe("Brief Decoder web product", () => {
     expect(await countEvents("web.result_viewed", run.sessionId())).toBe(0);
   });
 
-  test("mobile: a long unbroken token in the result does not widen the page", async ({ page }) => {
+  test("mobile: long tokens fit and document whitespace is preserved", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 800 });
     const output = composedOutput("");
     const longUrl = `https://example.com/${"a".repeat(200)}`;
     output.issues = [{ category: "ambiguity", severity: "low", description: "Long link", evidence: longUrl }];
+    output.document.sections[0]!.content = `Item    Qty\nDesign\t\t2\n${longUrl}`;
+    output.document.summary = "Confirm    scope\nThen\t\tstart.";
     await overrideResult(page, output);
     await page.goto(PRODUCT_URL);
     await submitBrief(page);
     await expect(page.getByText(`Evidence: ${longUrl}`)).toBeVisible({ timeout: 60_000 });
+    const documentSection = page.getByRole("region", { name: "Summary document" });
+    for (const text of [output.document.sections[0]!.content, output.document.summary]) {
+      const content = documentSection.getByText(text, { exact: true });
+      expect(await content.innerText()).toBe(text);
+    }
     await expectNoHorizontalScroll(page);
   });
 

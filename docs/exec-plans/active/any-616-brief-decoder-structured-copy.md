@@ -7,7 +7,7 @@
 - Created: 2026-11-17
 - Last updated: 2026-11-17
 - Review date: 2026-11-17
-- Next action: review the completed change and baseline limitations; obtain approval before push.
+- Next action: commit and push validated corrections to feature/ANY-616 as authorized; no GitHub comments.
 - Blocker: baseline runner tests depend on local env-file presence and passwordless sudo; implementation checks pass.
 
 ## Goal
@@ -41,8 +41,8 @@ No API, DB, workflow or event change. The product renderer's copy authority beco
 `brief.values`, `brief.missing_fields`, `issues`, `questions`; `document` and confidence are
 excluded. Copy blocks are brief, optional missing fields, issues, numbered questions, separated
 by one blank line. UI-locale labels name fields/categories/severity; content is verbatim.
-Missing fields are normalized to schema order; absent legacy metadata is derived from values,
-and malformed metadata is rejected. Empty issues/questions retain explicit empty-state text.
+Missing fields are derived from values in schema order. Supplied metadata must list exactly
+those fields once each; absent legacy metadata is accepted, and malformed metadata is rejected. Empty issues/questions retain explicit empty-state text.
 
 ## Implementation steps
 
@@ -131,3 +131,35 @@ independently. No source or test changes were made outside ANY-616 to make the g
 
 Ready for user review and a local commit. Push requires explicit user approval. Live-provider
 QA and parent-task confirmation remain separate; no Linear or GitHub write was performed.
+
+## Review round 1 corrections
+
+The user authorized local fixes and tests only. The initial implementation's duplicate
+normalization and pre-line choices are superseded by:
+
+- Derive missing fields from values; supplied metadata must contain every absent field exactly
+  once, rejecting overlap, omission, duplication and unknown entries. Preserve the legacy
+  absent-metadata path and schema ordering.
+- Restore pre-wrap for displayed section content and summary, retaining existing overflow rules.
+- Add parser contract regressions and significant-whitespace coverage to the mobile browser test.
+- Run frontend tests, typecheck, lint and an isolated browser check with mocked API responses.
+
+The parser issue is defensive consistency with the schema: the current result API already
+revalidates stored artifacts and refuses invalid complements. Whitespace loss was reproduced
+in Chromium and affects valid content. No backend, Docker, live stack or GitHub changes are
+needed for these corrections.
+
+Validation:
+- New parser regressions failed for all six fields before the fix; afterward the focused
+  product, language and shared-UI suites passed all 58 tests. Valid metadata and legacy
+  absence are checked for all 64 partitions of the six fields.
+- Web-mirror and browser-smoke TypeScript checks passed; ESLint passed for changed TypeScript.
+- Chromium rendered the actual product with mocked API responses at 390px and 1280px:
+  section content and summary retained spaces, tabs and newlines, with no horizontal overflow
+  from a long URL. External font requests were blocked. The temporary frontend was stopped.
+- The persistent mobile smoke test now asserts significant whitespace. The full backend
+  browser suite and full-check were not rerun for these local corrections; their earlier
+  results and environment limitations remain recorded above.
+
+Both corrections passed local validation. The user subsequently authorized committing and
+pushing them to feature/ANY-616; GitHub comments remain outside the authorized scope.

@@ -278,9 +278,28 @@ describe("Brief Decoder definition", () => {
     for (const missing_fields of [["nope"], ["deadline", 3], "deadline", null, {}]) {
       expect(extractBriefDecoderResult({ ...good, brief: { values: {}, missing_fields } })).toBeNull();
     }
-    expect(extractBriefDecoderResult({ ...good, brief: { values: {}, missing_fields: ["target_audience", "deadline", "deadline"] } })?.brief.missingFields)
-      .toEqual(["deadline", "target_audience"]);
     expect(extractBriefDecoderResult({})).toBeNull();
+  });
+
+  it.each(BRIEF_FIELDS)("rejects overlapping, omitted and duplicate missing metadata for %s", (field) => {
+    const good = composedOutput("");
+    const others = BRIEF_FIELDS.filter((candidate) => candidate !== field);
+    const stated = field === "deliverables" || field === "constraints" ? ["stated"] : "stated";
+    expect(extractBriefDecoderResult({ ...good, brief: { values: { [field]: stated }, missing_fields: [...BRIEF_FIELDS] } })).toBeNull();
+    expect(extractBriefDecoderResult({ ...good, brief: { values: {}, missing_fields: others } })).toBeNull();
+    expect(extractBriefDecoderResult({ ...good, brief: { values: {}, missing_fields: [...BRIEF_FIELDS, field] } })).toBeNull();
+  });
+
+  it("accepts every valid field partition, normalizes order and derives legacy missing metadata", () => {
+    const good = composedOutput("");
+    for (let mask = 0; mask < 2 ** BRIEF_FIELDS.length; mask++) {
+      const present = BRIEF_FIELDS.filter((_, index) => mask & (1 << index));
+      const values = Object.fromEntries(present.map((field) => [field, field === "deliverables" || field === "constraints" ? ["stated"] : "stated"]));
+      const missing = BRIEF_FIELDS.filter((field) => !present.includes(field));
+      for (const brief of [{ values }, { values, missing_fields: [...missing].reverse() }]) {
+        expect(extractBriefDecoderResult({ ...good, brief })?.brief).toEqual({ values, missingFields: missing });
+      }
+    }
   });
 
   it("composes the copy text per renderer_contract.yaml", () => {
