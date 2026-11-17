@@ -10,6 +10,7 @@
   "loading": "Загрузка {product}…",
   "unavailable": "{product} сейчас недоступен. Обновите страницу.",
   "quotaReserved": "Доступно сейчас: {available}. Выполняется: {reserved}.",
+  "quotaChecking": "Проверяем оставшиеся запуски…",
   "quotaExhausted": "Лимит использования {product} исчерпан.",
   "resultFetchFailed": "Результат готов, но загрузить его не удалось. Попробуйте ещё раз.",
   "starting": "Запускаем…",

@@ -10,6 +10,7 @@
   "loading": "{product} wird geladen…",
   "unavailable": "{product} ist derzeit nicht verfügbar. Bitte laden Sie die Seite neu.",
   "quotaReserved": "Jetzt verfügbar: {available}. In Bearbeitung: {reserved}.",
+  "quotaChecking": "Verbleibende Durchläufe werden geprüft…",
   "quotaExhausted": "Sie haben vorerst alle Ihre {product}-Durchläufe verbraucht.",
   "resultFetchFailed": "Ihr Ergebnis ist fertig, konnte aber nicht geladen werden. Bitte versuchen Sie es erneut.",
   "starting": "Wird gestartet…",

@@ -1,13 +1,12 @@
 "use client";
 
-import { useCallback, useContext, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { useIsomorphicLayoutEffect } from "../../lib/useIsomorphicLayoutEffect";
 import { Button, Card } from "@anytoolai/shared-ui";
 import {
   copyResultAndRecordActivation,
   createHandoff,
   createWindowNavigator,
-  getQuota,
   getResult,
   getRuntimeConfig,
   isAmbiguousFailure,
@@ -27,7 +26,7 @@ import {
   type AsyncStorage,
   type PlatformApiClient,
   type PreparedScenarioStart,
-  type QuotaState,
+  type RuntimeQuotaSummary,
 } from "@anytoolai/ce-kit";
 import { ErrorState } from "../../components/ErrorState";
 import { DataProcessingNotice, DATA_NOTICE_ID } from "../../components/DataProcessingNotice";
@@ -42,6 +41,7 @@ import { isProductEnabled } from "./enabledProducts";
 import { useLatest } from "./useLatest";
 import { getPaidPersistence } from "../../lib/portalSession";
 import type { FieldError } from "./fieldValidation";
+import { ProductQuotaStore, UNKNOWN_QUOTA, type QuotaAdmission } from "./quotaAdmission";
 import { ProductShellContext } from "./ProductShellContext";
 import { RunProgress } from "./RunProgress";
 import { assertNever, type ProductDefinition, type ProductRunEvent } from "./productDefinition";
@@ -50,6 +50,7 @@ import styles from "./ProductRunPage.module.css";
 export type ProductRunPageProps<V extends Record<string, unknown>, R> = AttachProps & {
   definition: ProductDefinition<V, R>;
   client: PlatformApiClient;
+  quotaStore?: ProductQuotaStore;
   /**
    * Generic event integration point (ANY-453's "The foundation exposes callbacks/integration
    * points and tests them with injected handlers; product integration verifies the real event
@@ -191,13 +192,8 @@ async function writeTextToClipboard(value: string): Promise<void> {
 // switch. Keyed by the client instance (not a bare module-level cache) so distinct clients --
 // different tests, or a real app with more than one client -- never share entries.
 //
-// Guest identity and quota are deliberately NOT cached this way: identity already caches itself
-// via guestStorage, and quota genuinely changes over the page's lifetime as the guest consumes
-// it -- a code review finding caught a first attempt at caching quota the same way this file
-// caches runtime config, which went stale the instant a run actually consumed quota (never
-// invalidated after a successful start), didn't key by guestId (a guest-identity self-heal could
-// read a stale/wrong guest's cached result), and didn't dedupe concurrent calls the way this
-// function does. Quota is cheap, advisory, and re-fetched on mount and after accepted inline runs.
+// Guest identity caches through guestStorage. Mutable quota lives in the page-owned store,
+// separately scoped by guest/policy and refreshed after execution.
 const runtimeConfigCache = new WeakMap<PlatformApiClient, Map<string, ReturnType<typeof getRuntimeConfig>>>();
 
 function getCachedRuntimeConfig(client: PlatformApiClient, productId: string) {
@@ -244,16 +240,25 @@ function markEventFired(client: PlatformApiClient, scopeKey: string, eventType: 
 }
 
 
-function shallowEqualValues<V extends Record<string, unknown>>(a: V, b: V): boolean {
-  const keys = Object.keys(a);
-  return keys.length === Object.keys(b).length && keys.every((key) => Object.is(a[key], b[key]));
+function shallowEqualValues(a: Record<string, unknown>, b: unknown): boolean {
+  if (typeof b !== "object" || b === null || Array.isArray(b)) return false;
+  const entries = Object.entries(b);
+  return Object.keys(a).length === entries.length && entries.every(([key, value]) => Object.hasOwn(a, key) && Object.is(a[key], value));
 }
 
 type BootState =
   | { kind: "loading" }
   | { kind: "boot-error" }
   | { kind: "recovery"; outputSchemaRef: string; outputSchemaVersion: number }
-  | { kind: "ready"; scenarioId: string; frontendId: string; hasQuota: boolean; outputSchemaRef: string; outputSchemaVersion: number | null };
+  | {
+    kind: "ready";
+    scenarioId: string;
+    frontendId: string;
+    quotaPolicy: RuntimeQuotaSummary | null;
+    quotaAdmission: QuotaAdmission | null;
+    outputSchemaRef: string;
+    outputSchemaVersion: number | null;
+  };
 
 /** Why a run is retryable. A closed reason -- not finished English prose -- so an error already on
  * screen re-renders in the new language when the UI locale changes (`host.errors.<reason>`). */
@@ -295,6 +300,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>(props: Prod
 export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
   definition,
   client,
+  quotaStore: inheritedQuotaStore,
   onEvent,
   onLockedChange,
   visitId,
@@ -313,13 +319,14 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
     } catch { return { recovery: null, failed: true }; }
   });
   const recovery = selection.kind !== "form" && recoveryState.recovery?.scenarioId === definition.scenarioId ? recoveryState.recovery : null;
-  const restoredStartRef = useRef(false);
-  const paidSendingRef = useRef(false);
+  const restoredStartRef = useRef<PreparedScenarioStart | null>(null);
   const th = useHostT();
   const tp = useProductT();
   const title = tp("title");
   const shell = useContext(ProductShellContext);
   const inProductShell = shell !== null;
+  const [localQuotaStore] = useState(() => new ProductQuotaStore());
+  const quotaStore = shell?.quotaStore ?? inheritedQuotaStore ?? localQuotaStore;
   // Inside ProductPageShell the shell owns the one <main> (heading, product controls such as a
   // mode selector, and this run content share it); standalone, this page is its own landmark.
   const Root = inProductShell ? "div" : "main";
@@ -352,14 +359,18 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
   const activeScenarioSessionIdRef = useRef<string | null>(null);
 
   const [boot, setBoot] = useState<BootState>({ kind: "loading" });
-  const [quota, setQuota] = useState<QuotaState | null>(null);
-  // A pre-start quota GET may resolve after a newer post-start GET; only the newest may update UI.
-  const quotaRequestGenerationRef = useRef(0);
+  const quotaAdmission = boot.kind === "ready" ? boot.quotaAdmission : null;
+  const quotaSnapshot = useSyncExternalStore(
+    quotaAdmission?.subscribe ?? subscribeWithoutQuota,
+    quotaAdmission?.getSnapshot ?? unknownQuotaSnapshot,
+    unknownQuotaSnapshot,
+  );
+  const quota = quotaSnapshot.quota;
   const [guestId, setGuestId] = useState<string | undefined>(undefined);
   // See `getClientStorage`: one storage per client, so a remount never mints a new guest.
   const [guestStorage] = useState<AsyncStorage>(() => getClientStorage(client));
   // Fresh AbortController created inside the effect itself, not a `useState` singleton: aborts
-  // every in-flight read (identity/runtime-config/quota on mount, poll/result while a run is
+  // every component-owned read (identity/runtime-config on mount, poll/result while a run is
   // active) on unmount so none of them can call setState after this component is gone. A
   // `useState`-held controller would be the SAME instance across React StrictMode's double-invoke
   // of effects (mount -> cleanup -> remount): that cleanup's abort() would permanently kill the
@@ -381,9 +392,12 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
   }, []);
 
   const [values, setValues] = useState<V>(definition.emptyValues);
+  const valuesRef = useLatest(values);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof V, FieldError>>>({});
+  const rejectedInputRef = useRef<{ input: V; errors: Partial<Record<keyof V, FieldError>> } | null>(null);
   const liveValidationFieldsRef = useRef(new Set<keyof V>());
   const [phase, setPhase] = useState<Phase<R>>({ kind: "idle" });
+  const quotaExhausted = quotaSnapshot.status === "exhausted" || (quotaAdmission === null && phase.kind === "quota-exhausted");
   // Ambiguous/accepted retries retain timing; a definite rejection lets the next start reset it.
   const [runStartedAtMs, setRunStartedAtMs] = useState<number | null>(null);
   const [displayedResult, setDisplayedResult] = useState<{
@@ -443,12 +457,20 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
   // Editing after a definite rejection makes the next submit build a new handle instead.
   // Declared before `busy` below, which reads it.
   const [pendingStart, setPendingStart] = useState<{ prepared: PreparedScenarioStart; input: V } | null>(null);
+  const reusesStart = pendingStart !== null && shallowEqualValues(pendingStart.input, values);
   const activePreparedRef = useRef<PreparedScenarioStart | null>(null);
   // A later rejection settles only that attempt. Earlier unresolved sends of the same key may
   // still accept, so keep their lock and recovery handle across automatic and manual retries.
   const uncertainStartsRef = useRef(new WeakSet<PreparedScenarioStart>());
+  const startInFlightRef = useRef(false);
   // Once accepted, retry polls this session instead of sending another start.
   const startedSessionsRef = useRef(new WeakMap<PreparedScenarioStart, string>());
+  function quotaBlocksSubmit(): boolean {
+    // A definitely capacity-rejected key can still create its first execution; only recovery bypasses admission.
+    const recoveringStart = reusesStart && pendingStart !== null &&
+      (uncertainStartsRef.current.has(pendingStart.prepared) || startedSessionsRef.current.has(pendingStart.prepared));
+    return !recoveringStart && (quotaAdmission?.blocksNewRun() ?? (phase.kind === "quota-exhausted"));
+  }
   // True while the run on screen is the attached session (no local submit since): "Try again"
   // re-polls it instead of validating an empty form or starting a second, quota-spending run.
   const attachActiveRef = useRef(false);
@@ -539,11 +561,13 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
     if (restoredDraftRef.current || draftKey === null || (client.portalIdentity && !client.portalIdentity.isCurrent())) return;
     restoredDraftRef.current = true;
     const stored = readProductDraft(draftKey);
+    if (paid && attachSessionId && stored?.run?.scenarioSessionId === attachSessionId) {
+      activeInputRef.current = parseStoredValues(stored.run.input);
+    }
     const restored = parseStoredValues(stored?.values);
     if (restored === null) return;
     if (!attachSessionId || (paid && stored?.run?.scenarioSessionId === attachSessionId)) {
       setValues(restored);
-      if (paid && attachSessionId) activeInputRef.current = parseStoredValues(stored?.run?.input);
     } else if (paid) {
       // An older draft has no proof of belonging to this result. Restore only on request.
       setManualDraft(restored);
@@ -566,24 +590,6 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
       clearPaidStartRecovery(paidPersistence.storage, productId);
     } catch { /* Retain recovery if tab storage cannot safely read or remove it. */ }
   }
-  const refreshQuota = useCallback((
-    resolvedGuestId: string,
-    resolvedScenarioId: string,
-    controller: AbortController | null,
-    onExhausted?: () => void,
-  ) => {
-    if (client.portalIdentity) return;
-    const generation = ++quotaRequestGenerationRef.current;
-    getQuota(client, { productId, guestId: resolvedGuestId, scenarioId: resolvedScenarioId }).then((quotaResult) => {
-      if (controller?.signal.aborted || (client.portalIdentity && !client.portalIdentity.isCurrent()) || generation !== quotaRequestGenerationRef.current || !quotaResult.ok) {
-        return;
-      }
-      setQuota(quotaResult.value);
-      if (quotaResult.value.exhausted) {
-        onExhausted?.();
-      }
-    }, _noop);
-  }, [client, productId]);
   // See `ProductRunPageProps.visitId`'s own docstring: falls back to `productId` alone (the old
   // behavior) when no route wrapper supplies a per-visit id.
   const eventScopeKey = visitId ?? productId;
@@ -638,27 +644,21 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
           unavailableBoot();
           return;
         }
+        const quotaPolicy = paid ? null : runtimeResult.value.quotaSummary;
+        const admission = resolvedGuestId && quotaPolicy
+          ? quotaStore.get(client, { productId, guestId: resolvedGuestId, scenarioId: scenario.scenarioId }, quotaPolicy)
+          : null;
         setBoot({
           kind: "ready",
           scenarioId: scenario.scenarioId,
           frontendId: frontend.frontendId,
-          hasQuota: !paid && runtimeResult.value.quotaSummary !== null,
+          quotaPolicy,
+          quotaAdmission: admission,
           outputSchemaRef: scenario.outputRendererHint.schemaRef,
           outputSchemaVersion: scenario.outputRendererHint.schemaVersion,
         });
 
-        if (resolvedGuestId && runtimeResult.value.quotaSummary !== null) {
-          // Advisory only: shown if it loads in time, never blocks the form from becoming usable.
-          // scenarioId is always passed, not just for scenario-dimension policies: per
-          // frontend-boundaries.md, a scenario-dimension quota policy *requires* it while a
-          // product-wide policy simply "does not require it" (optional, not rejected) -- passing
-          // it unconditionally keeps this shared runtime correct for either policy shape without
-          // needing to know which one a given product uses.
-          refreshQuota(resolvedGuestId, scenario.scenarioId, controller, () => {
-            // An advisory GET must not replace an active or completed run.
-            setPhase((prev) => (prev.kind === "idle" ? { kind: "quota-exhausted" } : prev));
-          });
-        }
+        admission?.refresh("advisory");
       },
       () => {
         if (!controller?.signal.aborted && (!client.portalIdentity || client.portalIdentity.isCurrent())) {
@@ -667,12 +667,20 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
         }
       },
     );
-  }, [client, guestStorage, productId, scenarioId, eventScopeKey, refreshQuota, onEventRef, paid, recovery, attachSessionId, recoverySchemaRef, recoverySchemaVersion, draftKey, parseStoredValues]);
+  }, [client, guestStorage, productId, scenarioId, eventScopeKey, quotaStore, onEventRef, paid, recovery, attachSessionId, recoverySchemaRef, recoverySchemaVersion, draftKey, parseStoredValues]);
 
   useEffect(() => {
     if (!paidPersistence || recovery?.kind !== "pending" || (boot.kind !== "ready" && boot.kind !== "recovery") || restoredStartRef.current || attachSessionId) return;
-    restoredStartRef.current = true;
-    const prepared = restorePaidScenarioStart(recovery, paidPersistence);
+    const compatibleInput = definition.recoverLegacyInput?.(recovery.request.input) ?? undefined;
+    const prepared = restorePaidScenarioStart(recovery, paidPersistence, compatibleInput);
+    restoredStartRef.current = prepared;
+    const storedValues = draftKey === null ? null : parseStoredValues(readProductDraft(draftKey)?.values);
+    // The submitted baseline must survive edits to the current draft and accepted-session reload.
+    if (definition.parseInputValues) {
+      activeInputRef.current = definition.parseInputValues(compatibleInput ?? recovery.request.input);
+    } else if (storedValues !== null && shallowEqualValues(definition.toInput(storedValues), recovery.request.input)) {
+      activeInputRef.current = storedValues;
+    }
     uncertainStartsRef.current.add(prepared);
     setPendingStart({ prepared, input: values });
     beginStart(prepared);
@@ -742,10 +750,7 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
     }
     const quotaRejected = !result.ok && isQuotaExhausted(result.error);
     const capacityReserved = !result.ok && isQuotaCapacityReserved(result.error);
-    if (boot.kind === "ready" && boot.hasQuota && guestId && (result.ok || quotaRejected || capacityReserved)) {
-      // Read the backend counter after acceptance (or 429); idempotent retries cannot spend it twice.
-      refreshQuota(guestId, scenarioId, controller);
-    }
+    if (result.ok || capacityReserved) quotaAdmission?.refresh("execution");
     if (!result.ok) {
       if (result.error.type === "local_error") {
         if (result.error.code === "paid_recovery_pending") {
@@ -772,6 +777,9 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
         return;
       }
       if (quotaRejected) {
+        quotaAdmission?.markExhausted();
+        quotaAdmission?.refresh("advisory");
+        setPendingStart(null);
         forgetPaidRecovery();
         setPhase({ kind: "quota-exhausted" });
         return;
@@ -784,7 +792,15 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
         if (controller?.signal.aborted) {
           return;
         }
-        setGuestId(fresh.ok ? fresh.value.guestId : undefined);
+        const freshGuestId = fresh.ok ? fresh.value.guestId : undefined;
+        setGuestId(freshGuestId);
+        if (boot.kind === "ready") {
+          const admission = freshGuestId && boot.quotaPolicy
+            ? quotaStore.get(client, { productId, guestId: freshGuestId, scenarioId }, boot.quotaPolicy)
+            : null;
+          setBoot({ ...boot, quotaAdmission: admission });
+          admission?.refresh("advisory");
+        }
         setPendingStart(null);
         forgetPaidRecovery();
         setPhase({ kind: "retryable-error", reason: "tryAgain" });
@@ -850,6 +866,7 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
       // A definite 404 for an attached id (stale, foreign or mistyped `?session=`) can never
       // succeed on retry: end in the run-failed state instead of offering an endless re-poll.
       if (polled.result.error.type === "backend_error" && polled.result.error.status === 404) {
+        quotaAdmission?.refresh("execution");
         if (attachActiveRef.current) {
           enterUnknownError(scenarioSessionId);
           return;
@@ -866,9 +883,7 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
       return;
     }
     const session = polled.result.value;
-    if (boot.kind === "ready" && boot.hasQuota && guestId) {
-      refreshQuota(guestId, scenarioId, controller);
-    }
+    quotaAdmission?.refresh("execution");
     if (session.status !== "completed") {
       // `failed`/`expired` land here as genuinely terminal. `waiting_for_user` does too, since
       // this runtime only supports the single-checkpoint "run to completion, then one
@@ -994,6 +1009,41 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
       return;
     }
     resultFetchSettledRef.current = true;
+    const inputErrors: Partial<Record<keyof V, FieldError>> = definition.resultFieldErrors?.(extracted) ?? {};
+    if (Object.keys(inputErrors).length > 0) {
+      // Recovered runs can belong to an older draft; only mark fields still matching that input.
+      const submittedValues = normalizeValues(activeInputRef.current ?? definition.emptyValues);
+      // Unknown attachment inputs may explain empty fields, but cannot establish rejection identity.
+      rejectedInputRef.current = activeInputRef.current === null ? null : { input: submittedValues, errors: inputErrors };
+      const currentValues = normalizeValues(valuesRef.current);
+      const currentErrors: Partial<Record<keyof V, FieldError>> = {};
+      for (const field in inputErrors) {
+        liveValidationFieldsRef.current.add(field);
+        if (currentValues[field] === submittedValues[field]) {
+          currentErrors[field] = inputErrors[field];
+        }
+      }
+      if (draftKey !== null && readProductDraft(draftKey)?.run?.scenarioSessionId === scenarioSessionId) {
+        saveDraftRun(draftKey, null);
+      }
+      forgetPaidRecovery();
+      if (attachActiveRef.current || displayedResult?.attached) callSafely(onAttachEndRef.current);
+      attachActiveRef.current = false;
+      resumedRunRef.current = null;
+      activeInputRef.current = null;
+      setPendingStart(null);
+      setDisplayedResult(null);
+      setHandoffStatus("idle");
+      setFieldErrors(currentErrors);
+      setPhase({ kind: "idle" });
+      requestAnimationFrame(() => {
+        if (!controller?.signal.aborted && activeScenarioSessionIdRef.current === scenarioSessionId) {
+          formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+        }
+      });
+      return;
+    }
+    rejectedInputRef.current = null;
     // `scenario_completed` is emitted by the commit-time effect on `phase` below, not here:
     // `setPhase` only queues the update, so emitting here would report a result that never
     // rendered (unmount, navigation, a renderer that throws).
@@ -1015,8 +1065,7 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
 
   // Shared by handleSubmit/handleRetry: both begin a (new or reused) prepared start the same way.
   function beginStart(prepared: PreparedScenarioStart, selectOwnStart = false) {
-    if (paid && paidSendingRef.current) return;
-    paidSendingRef.current = paid;
+    if (startInFlightRef.current) return;
     activePreparedRef.current = prepared;
     const startedAtMs = pendingStart?.prepared === prepared && !capacityRejectedSafely
       ? runStartedAtMs ?? Date.now()
@@ -1025,9 +1074,29 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
     resumedRunRef.current = null;
     // Not the end of the attach yet: if this start fails, the attached result is still what is on screen.
     attachActiveRef.current = false;
+    startInFlightRef.current = true;
     setPhase({ kind: "submitting" });
     emitEvent(onEventRef.current, { type: "form_submitted", guestId });
-    void runStart(prepared, startedAtMs, selectOwnStart).finally(() => { paidSendingRef.current = false; });
+    void runStart(prepared, startedAtMs, selectOwnStart).finally(() => { startInFlightRef.current = false; });
+  }
+
+  function normalizeValues(next: V): V {
+    return definition.normalizeValues?.(next) ?? next;
+  }
+
+  function validateFields(next: V): Partial<Record<keyof V, FieldError>> {
+    const errors = definition.validate(next);
+    const rejected = rejectedInputRef.current;
+    if (rejected !== null) {
+      const normalized = normalizeValues(next);
+      // Editing another field or submitting again cannot invalidate this field's server verdict.
+      for (const field in rejected.errors) {
+        if (!errors[field] && normalized[field] === rejected.input[field]) {
+          errors[field] = rejected.errors[field];
+        }
+      }
+    }
+    return errors;
   }
 
   // Shared by handleSubmit and handleRetry (the "Try again" button on retryable-error): always
@@ -1037,7 +1106,6 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
   // that reused the stale prepared request; only truly unchanged values reuse the same
   // PreparedScenarioStart/Idempotency-Key (see prepareScenarioStart()'s own ANY-150 contract).
   function submitCurrentValues() {
-    if (paid && paidSendingRef.current) return;
     if (client.portalIdentity && !client.portalIdentity.isCurrent()) return;
     // guestId undefined here means either the initial identity fetch never succeeded, or (after a
     // guest_identity_not_found self-heal) the refresh itself failed -- prepareScenarioStart() would
@@ -1047,6 +1115,7 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
     // the same failure.
     if (
       boot.kind !== "ready" ||
+      startInFlightRef.current ||
       phase.kind === "submitting" ||
       phase.kind === "running" ||
       (!paid && guestId === undefined) ||
@@ -1059,7 +1128,7 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
       setPhase({ kind: "retryable-error", reason: "storageUnavailable" });
       return;
     }
-    const errors = definition.validate(values);
+    const errors = validateFields(values);
     for (const field in errors) {
       liveValidationFieldsRef.current.add(field);
     }
@@ -1070,7 +1139,8 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
       });
       return;
     }
-    const reuseExisting = pendingStart !== null && shallowEqualValues(pendingStart.input, values);
+    const reuseExisting = reusesStart;
+    if (quotaBlocksSubmit()) return;
     if (!reuseExisting && pendingStart) {
       if (uncertainStartsRef.current.has(pendingStart.prepared) || startedSessionsRef.current.has(pendingStart.prepared)) return;
       try { pendingStart.prepared.forgetRecovery(); }
@@ -1124,10 +1194,16 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
       void runPoll(attachedSessionRef.current);
       return;
     }
-    if (paid && pendingStart && restoredStartRef.current) {
+    if (paid && pendingStart && pendingStart.prepared === restoredStartRef.current) {
       // A reload restored the frozen wire request, not editable product form values.
       // Validating the empty form here would strand the original paid operation.
-      beginStart(pendingStart.prepared);
+      const sessionId = startedSessionsRef.current.get(pendingStart.prepared);
+      if (sessionId) {
+        setPhase({ kind: "running", scenarioSessionId: sessionId });
+        void runPoll(sessionId);
+      } else {
+        beginStart(pendingStart.prepared);
+      }
       return;
     }
     if (resumedRunRef.current !== null) {
@@ -1260,6 +1336,7 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
     setValues(definition.emptyValues);
     if (draftKey !== null) clearProductDraft(draftKey);
     setFieldErrors({});
+    rejectedInputRef.current = null;
     liveValidationFieldsRef.current.clear();
     setPendingStart(null);
     forgetPaidRecovery();
@@ -1276,15 +1353,7 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
     // Focus contract: the first field of every product's form is a `textarea` or `input`.
     requestAnimationFrame(() => formRef.current?.querySelector<HTMLElement>("textarea, input")?.focus());
 
-    // Leaving the result never needs an identity (an attached result can be on screen after a failed
-    // identity resolution); only the advisory quota refresh does.
-    if (boot.kind !== "ready" || !boot.hasQuota || guestId === undefined) {
-      return;
-    }
-
-    refreshQuota(guestId, scenarioId, controllerRef.current, () => {
-      setPhase((prev) => (prev.kind === "idle" ? { kind: "quota-exhausted" } : prev));
-    });
+    quotaAdmission?.refresh("advisory");
   }
 
   function updateField<K extends keyof V>(field: K, value: V[K]) {
@@ -1311,7 +1380,7 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
     }
     // Previously invalid fields stay live after correction, until New task resets the form.
     if (liveValidationFieldsRef.current.has(field)) {
-      const error = definition.validate(next)[field];
+      const error = validateFields(next)[field];
       setFieldErrors((previous) => {
         const errors = { ...previous };
         if (error) errors[field] = error;
@@ -1370,7 +1439,7 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
             type="submit"
             aria-describedby={DATA_NOTICE_ID}
             loading={phase.kind === "submitting" || phase.kind === "running"}
-            disabled={identityUnavailable || locked || recoveryOnly || phase.kind === "quota-exhausted"}
+            disabled={identityUnavailable || locked || recoveryOnly || quotaBlocksSubmit()}
           >
             {phase.kind === "submitting"
               ? th("starting")
@@ -1382,6 +1451,7 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
           </Button>
           <div className={styles.statusRegion}>
             {identityUnavailable ? <p role="alert">{th("identityUnavailable")}</p> : null}
+            {!busy && quotaSnapshot.status === "checking" ? <p role="status">{th("quotaChecking")}</p> : null}
             {recoveryOnly ? <p role="status">{th("unavailable", { product: title })}</p> : null}
           </div>
         </div>
@@ -1398,7 +1468,7 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
   let showNewTask = false;
   switch (phase.kind) {
     case "idle":
-      if (!displayedResult) placeholderMessage = tp(`${definition.messageScope}.placeholder`);
+      if (!displayedResult && !quotaExhausted) placeholderMessage = tp(`${definition.messageScope}.placeholder`);
       break;
     case "submitting":
     case "running": {
@@ -1420,7 +1490,6 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
       error = <ErrorState message={th("resultFetchFailed")} onRetry={handleRetryResult} embedded />;
       break;
     case "quota-exhausted":
-      error = <ErrorState message={th("quotaExhausted", { product: title })} embedded />;
       break;
     case "retryable-error":
       error = <ErrorState message={th(`errors.${phase.reason}`, { product: title })} onRetry={identityUnavailable && !attachActiveRef.current ? undefined : handleRetry} embedded />;
@@ -1431,6 +1500,7 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
     default:
       return assertNever(phase);
   }
+  if (quotaExhausted && !busy && (phase.kind === "quota-exhausted" || phase.kind === "retryable-error" || !displayedResult)) error = <ErrorState message={th("quotaExhausted", { product: title })} embedded />;
 
   return (
     <Root className={inProductShell ? undefined : "page-container"}>
@@ -1533,6 +1603,5 @@ const HANDOFF_STATUS_IS_LOCKED: Record<HandoffUiStatus, boolean> = {
   failed: false,
 };
 
-function _noop(): void {
-  // Deliberately discards a settled promise's value/rejection -- see call sites' comments.
-}
+function subscribeWithoutQuota(): () => void { return () => {}; }
+function unknownQuotaSnapshot() { return UNKNOWN_QUOTA; }

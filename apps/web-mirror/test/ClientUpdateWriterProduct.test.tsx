@@ -192,6 +192,29 @@ describe.each(MODE_SCENARIOS)("Client Update Writer $mode mode: one-screen works
     expectDataProcessingNotice(form, "https://example.com/privacy");
   });
 
+  it("keeps unmetered regeneration available without quota reads", async () => {
+    const { queues, routes } = bootAndHappyPathRoutes(scenario.ids, { text: "First draft." });
+    const routed = makeClient({
+      ...queues,
+      [routes.RUNTIME_CONFIG]: [runtimeConfigResponse(scenario.ids, { quota_summary: null })],
+      [routes.START]: [startResponse(), startResponse()],
+      [routes.SESSION]: [sessionResponse(), sessionResponse()],
+      [routes.RESULT]: [resultResponse(scenario.ids, { output: { text: "First draft." } }), resultResponse(scenario.ids, { output: { text: "Second draft." } })],
+    });
+    render(<ProductRunPage definition={scenario.definition} client={routed.client} />);
+    await screen.findByRole("form");
+    for (const [label, value] of scenario.fields) fireEvent.change(screen.getByLabelText(label), { target: { value } });
+    fireEvent.click(screen.getByRole("button", { name: scenario.submit }));
+    await screen.findByText("First draft.");
+    const regenerate = screen.getByRole("button", { name: scenario.regenerate }) as HTMLButtonElement;
+    expect(regenerate.disabled).toBe(false);
+    fireEvent.click(regenerate);
+    await screen.findByText("Second draft.");
+    expect(routed.calls.filter((call) => call.key === routes.START)).toHaveLength(2);
+    expect(routed.calls.some((call) => call.key === routes.QUOTA)).toBe(false);
+    expect(screen.queryByText("Checking remaining runs…")).toBeNull();
+  });
+
   it("defaults to neutral and offers three exclusive tone radios", async () => {
     const { queues } = bootAndHappyPathRoutes(scenario.ids, { text: "Draft." });
     const { client } = makeClient(queues);

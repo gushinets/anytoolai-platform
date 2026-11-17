@@ -30,6 +30,10 @@
     "gapsTitle": "Ce que votre expérience ne couvre pas",
     "gapsHint": "La proposition ne l’affirme pas. Complétez-le vous-même ou passez-le sous silence."
   },
+  "validation": {
+    "missing_task_description": "Décrivez ce qui doit être fait pour le client.",
+    "missing_profile_information": "Ajoutez des informations sur vos compétences ou votre expérience."
+  },
   "generate": {
     "submit": "Générer la proposition",
     "running": "Génération de votre proposition…",

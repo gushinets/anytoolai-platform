@@ -1,0 +1,118 @@
+{
+  "quota": [
+    {
+      "scenario_session_id": "scenario_session_01794567302447480760_0000000464_594efa077ed44910b4a6e90338696b0e",
+      "state": "consumed",
+      "result_artifact_id": "artifact_01794567306603456189_0000001425_cc41841cf3b749fdab285219bc25e052",
+      "used_count": 2,
+      "reserved_count": 0,
+      "limit_count": 10
+    },
+    {
+      "scenario_session_id": "scenario_session_01794567309229451427_0000000471_4900ccf3818d4f9f9c41fb63b60ff259",
+      "state": "consumed",
+      "result_artifact_id": "artifact_01794567320383154564_0000001452_4ee26bf94187435a811b3393cc9fbfa3",
+      "used_count": 2,
+      "reserved_count": 0,
+      "limit_count": 10
+    },
+    {
+      "scenario_session_id": "scenario_session_01794567277562160950_0000000447_7d59595d34754f678209e836f40f3df8",
+      "state": "consumed",
+      "result_artifact_id": "artifact_01794567293553189039_0000001371_5eae34b2e6db4f27b9c2f273bd1c7e22",
+      "used_count": 2,
+      "reserved_count": 0,
+      "limit_count": 10
+    },
+    {
+      "scenario_session_id": "scenario_session_01794567265282146399_0000000431_21fac413ec7241398481954fcd835022",
+      "state": "consumed",
+      "result_artifact_id": "artifact_01794567273858311990_0000001317_ffdb5973e36a4aadacfe3e8bebca094f",
+      "used_count": 2,
+      "reserved_count": 0,
+      "limit_count": 10
+    }
+  ],
+  "provider_calls": {
+    "scenario_session_01794567265282146399_0000000431_21fac413ec7241398481954fcd835022": [
+      {
+        "step_id": "detect_gaps",
+        "model": "gpt-6-luna",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "status": "succeeded",
+        "latency_ms": 1298,
+        "estimated_cost": 5.5010000000000004e-05
+      },
+      {
+        "step_id": "compose_persuasive_text",
+        "model": "gpt-6-luna",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "status": "succeeded",
+        "latency_ms": 1527,
+        "estimated_cost": 7.507999999999999e-05
+      }
+    ],
+    "scenario_session_01794567277562160950_0000000447_7d59595d34754f678209e836f40f3df8": [
+      {
+        "step_id": "detect_gaps",
+        "model": "gpt-6-luna",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "status": "succeeded",
+        "latency_ms": 1177,
+        "estimated_cost": 3.413e-05
+      },
+      {
+        "step_id": "compose_persuasive_text",
+        "model": "gpt-6-luna",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "status": "succeeded",
+        "latency_ms": 8302,
+        "estimated_cost": 0.00048669999999999996
+      }
+    ],
+    "scenario_session_01794567302447480760_0000000464_594efa077ed44910b4a6e90338696b0e": [
+      {
+        "step_id": "detect_gaps",
+        "model": "gpt-6-luna",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "status": "succeeded",
+        "latency_ms": 1825,
+        "estimated_cost": 6.452e-05
+      },
+      {
+        "step_id": "compose_persuasive_text",
+        "model": "gpt-6-luna",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "status": "succeeded",
+        "latency_ms": 1759,
+        "estimated_cost": 0.0005507999999999999
+      }
+    ],
+    "scenario_session_01794567309229451427_0000000471_4900ccf3818d4f9f9c41fb63b60ff259": [
+      {
+        "step_id": "detect_gaps",
+        "model": "gpt-6-luna",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "status": "succeeded",
+        "latency_ms": 1113,
+        "estimated_cost": 3.112e-05
+      },
+      {
+        "step_id": "compose_persuasive_text",
+        "model": "gpt-6-luna",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "status": "succeeded",
+        "latency_ms": 9495,
+        "estimated_cost": 0.00052819
+      }
+    ]
+  }
+}

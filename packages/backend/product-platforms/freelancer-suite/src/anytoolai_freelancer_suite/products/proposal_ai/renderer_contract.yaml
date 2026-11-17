@@ -7,19 +7,25 @@ renderer_contract:
     - part_id: proposal
       field: text
       description: >-
-        The copy-ready proposal body, verbatim, no wrapping or reformatting. It is the only copy
+        The copy-ready proposal body when no missing-input category is present, verbatim. It is the only copy
         target and the only text a successful copy is recorded for (`copy_result`).
     - part_id: experience_gaps
       field: gaps
       description: >-
         Requirements of the task that the freelancer's stated experience does not cover, each with
-        `category` (always `experience_gap`), `description`, `severity` and optional `evidence`.
+        `category` (`experience_gap`), `description`, `severity` and optional `evidence`.
         Informational, shown next to the proposal and never copied. An empty list is valid and the
         block is hidden.
   canonical_field: text
   next_action: copy_result
   excluded_fields: [angle, rationale, model, provider]
   description: >-
+    New starts require input.result_contract="proposal_ai.field_errors_v1" (input schema version 2)
+    so clients that cannot handle field errors are rejected before execution and quota reservation.
+    Old browser tabs must reload; existing completed results retain their output contract.
     ProposalAI never exposes angle, rationale, model, provider or other hidden product fields in the
-    rendered result. `gaps` is the A04 `experience_gap` issue list and is not part of the proposal
-    text.
+    rendered result. `gaps` carries typed A04 issues and is not part of the proposal
+    text. Before rendering, `missing_task_description` maps to the task field and
+    `missing_profile_information` to the profile field, using UI-locale hints. Either suppresses
+    the entire result, Copy and result-view activation. Unknown categories are invalid results.
+    Semantic rejection still completes the existing workflow and consumes its normal quota.

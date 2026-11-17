@@ -5,6 +5,7 @@ import { useIsomorphicLayoutEffect } from "../../lib/useIsomorphicLayoutEffect";
 import { ProductShellContext } from "../runtime/ProductShellContext";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
 import type { AttachProps } from "../runtime/attachSession";
+import { ProductQuotaStore } from "../runtime/quotaAdmission";
 import { ResolvedProductRunPage } from "../runtime/ProductRunPage";
 import { ProductSelectionStatus, useProductSelection } from "../runtime/useProductSelection";
 import type { ProductDefinition, ProductRunEvent } from "../runtime/productDefinition";
@@ -45,6 +46,7 @@ export function MultiModeProduct<Id extends string, R>({
   const containerRef = useRef<HTMLDivElement>(null);
   const focusFreshFormRef = useRef(false);
   const shell = useContext(ProductShellContext);
+  const [quotaStore] = useState(() => new ProductQuotaStore());
   useIsomorphicLayoutEffect(() => {
     if (state.kind === "ready" || !attach.attachSessionId) return;
     shell?.reportBusy(true);
@@ -73,6 +75,7 @@ export function MultiModeProduct<Id extends string, R>({
         key={mode.id}
         definition={mode.definition}
         client={client}
+        quotaStore={quotaStore}
         onEvent={onEvent}
         onLockedChange={setLocked}
         visitId={visitId}
