@@ -7,9 +7,9 @@
 - Created: 2026-11-16
 - Last updated: 2026-11-17
 - Review date: 2026-11-17
-- Next action: review the round 4 fix; CI for the new commit and live acceptance on B02/B04/B05
-  and `asdf ::: 12345 !!!` remain pending.
-- Blocker: live acceptance pending; earlier local full-check limitations are recorded in Validation.
+- Next action: review the recorded live findings and decide follow-up scope; collection is complete.
+- Blocker: live acceptance is not fully green. Noise attempt 3 failed final output validation
+  (`key-details.metadata.kind = paragraph`, schema requires `list`); 29/30 API results completed.
 
 ## Goal
 
@@ -28,14 +28,16 @@ unchanged.
 
 ## Out of scope
 
-ANY-849 input guidance, ANY-850 copy controls, schemas, workflows, DSL, UI, dependencies and live
-acceptance runs. No prompt-reference or version changes.
+ANY-849 input guidance, ANY-850 copy controls, schemas, workflows, DSL, UI and dependencies.
+No prompt-reference or version changes. The user separately authorized live acceptance on 2026-11-17.
 
 ## Risks
 
-Prompt-text and fake-provider fixture tests do not prove live model behavior. QA must re-run
-B02 (missing audience), B04 (missing deliverables), B05 (Russian missing audience), and the input
-`asdf ::: 12345 !!!`. Live evals should cover Russian, English and Spanish.
+Prompt-text and fake-provider fixture tests do not prove live model behavior. The authorized
+30-run live series below covers B02/B04/B05 in Russian, English and Spanish and the exact noise
+input. No raw gap notation was found, but one runtime failure prevents a clean end-to-end PASS.
+The current model extracted B04 deliverables, so that historical missing-deliverables branch was
+not reproduced by B04; all six missing fields were exercised by the English-fallback noise case.
 The leak guard is a fixture regression check, not a runtime filter or a general language detector.
 The test contract distinguishes complete source facts from newly generated narration. Only a
 complete extracted value copied verbatim within standalone assertion boundaries can establish
@@ -68,6 +70,9 @@ remain live-acceptance concerns. It may conservatively flag such valid rewrites 
 - [x] Check neighboring field/key words across punctuation within the same assertion.
 - [x] Declare fixture languages and test translated gaps plus copied facts in EN/RU/ES.
 - [x] Record round 4 regression and validation results.
+- [x] Run all 30 authorized live scenarios, preserve outputs/failures and inspect generated text.
+- [x] Record the failed noise scenario and separate extraction-completeness observation.
+- [ ] Obtain user acceptance/follow-up decision; do not claim 30/30 end-to-end PASS.
 
 ## Decision log
 
@@ -104,6 +109,97 @@ remain live-acceptance concerns. It may conservatively flag such valid rewrites 
   metadata is test-owned; no runtime schema or language-detection dependency is introduced.
 
 ## Validation
+
+### Live acceptance results (2026-11-17)
+
+**29/30 end-to-end runs completed; one failed.** The targeted gap-wording check passed on all
+30 generated documents, including the unpublished document recovered from the failed job's
+persisted workflow state. This is not a fully green acceptance or authorization to close the issue.
+
+Evidence: [complete inputs, outputs, ledger and agent assessment](any-615-live-acceptance.evidence.json).
+The artifact retains exact source text, labelled translations, session/result IDs, all 120 physical
+provider-call records, runtime hashes and the failed job's persisted state. Review is by the agent,
+not independent human sign-off. Raw results were not edited, and no failed run was replaced.
+
+| Input | Attempts | API results | Gap wording in generated documents |
+| --- | ---: | ---: | --- |
+| B02, EN/RU/ES | 9 | 9 | 9 pass; source CSV identifiers preserved |
+| B04, EN/RU/ES | 9 | 9 | 9 pass; current extraction includes deliverables |
+| B05, EN/RU/ES | 9 | 9 | 9 pass; separate fact omission below |
+| `asdf ::: 12345 !!!`, unchanged | 3 | 2 | 3 pass; third document unpublished |
+
+- Source revision: `1c79e1751110048d9ab369ee521dc72312a49730`, including merged ANY-761 language
+  policy. Checkout/worker prompt and config hashes were checked before and after the series;
+  generated live action bindings are recorded separately. Deployment fingerprint:
+  `f59847e9394c77298ae92bf6f8d21a3a8c544df9cced8091a43d1b2582a54b8b`.
+- Real local API → worker → Provider Gateway → OpenAI path, using the standard live profile.
+  All 120 provider calls succeeded, with actual provider/model recorded as `openai`/`gpt-6-luna`,
+  no fixture results and no retries. Reasoning `medium` is verified configuration, not returned
+  provider reasoning telemetry. No model/prompt tuning or comparison runs were performed.
+- **Estimated cost: USD 0.05809896**, below the authorized USD 2 cap; 199,655 input and 72,885
+  output tokens. A local worker-only `LITELLM_LOCAL_MODEL_COST_MAP=True` override avoided a
+  LiteLLM catalog-fetch import failure before collection. Cost comes from the bundled catalog
+  and provider-call ledger, not a billing invoice. No production configuration changed.
+- Inspected all **270 title/content/summary fields** across the 30 generated documents. The
+  existing fixture lexical guard also reported zero flags; it was supplementary to reading the
+  actual missing-field meanings and source facts. Valid Spanish synonyms were not rejected for
+  differing from fixture stems. Machine keys inside structured JSON remain intentional.
+- Authored EN/RU/ES content and summaries follow the input language. Fixed section titles remain
+  English as explicitly required by the current template/schema. Noise has no language marker
+  and used the English fallback; this does not establish RU/ES all-six-missing-field coverage.
+  B02 retains `account_id`, `booked_at`, and `amount_eur`, including legitimate code formatting.
+- The original October 2026 dates were retained. Past-deadline findings are expected at the
+  November evaluation date. The first run's collection duration includes collector recovery;
+  use individual provider timestamps/latency rather than that duration for performance analysis.
+
+#### Findings and acceptance boundary
+
+1. **LIVE-01 — noise attempt 3 produced no API result.** All four actions succeeded, but
+   `document.sections[1].metadata.kind` was `paragraph`; the final schema requires `list`.
+   Job error: `workflow_output_validation_failed`. Local validation of the preserved payload
+   reproduces exactly this one schema error. The document uses ordinary gap wording but cannot
+   count as an end-to-end success. See `runs[29].failure_diagnostics` in the evidence.
+2. **LIVE-02 — separate extraction-completeness issue.** In B05 EN attempt 1, ES attempt 2 and
+   RU attempt 3, the explicit requirement for Russian-language voice-over is absent from both
+   extracted values and the final document (3/9 B05 runs). Original `brief_text` remains intact.
+   This is outside ANY-615's gap-naming change; full extraction fidelity is not accepted here.
+
+The finite wording pass is sufficient evidence for this iteration of ANY-615's prompt change,
+but the runtime failure and separate completeness observation need a user follow-up decision.
+No code fixes were made during acceptance. Browser rendering/clipboard and ANY-849 invalid-input
+guidance were not tested. No GitHub/Linear write, push or issue closure was performed.
+
+Fresh validation on the merged revision: **532 Brief Decoder tests passed**. The 29 API payloads
+validate against the product output schema; the remaining persisted payload reproduces LIVE-01.
+Documentation and whitespace checks passed. Full-check was not repeated for evidence/plan-only
+changes; older validation records below are historical, not current CI status.
+
+### Live acceptance plan and preparation history (2026-11-17, authorized)
+
+- Freeze the current revision and prompt hashes. Run the real Brief Decoder four-atom workflow
+  through the local HTTP API, worker, Provider Gateway and PostgreSQL call ledger. Use the standard
+  live deployment profile, `openai/gpt-6-luna`, reasoning `medium`, without prompt/model tuning.
+- Retain original QA inputs for B02/B04 (EN) and B05 (RU); explicitly label translated RU/EN/ES
+  variants. Three attempts per case/language (27), plus three exact `asdf ::: 12345 !!!` attempts.
+  Noise has no expected language: the input contract has no language selector, so do not inject
+  a language instruction and misrepresent it as the original noise case.
+- Preserve complete input/output, session and result IDs, prompt/config hashes, provider calls,
+  tokens, estimated cost and failures. Inspect all section titles/content and summary for raw
+  gap notation, missing-detail wording, language and preservation of actual client identifiers.
+  Keep costs bounded at USD 2 estimated; stop on unknown cost or unfinished runtime work.
+- This is backend live acceptance; browser/clipboard behavior is not exercised by these API runs.
+  Report unrelated quality defects separately rather than silently changing the prompt mid-series.
+  Record a reproducible evidence artifact and result; do not write to GitHub/Linear or close issues.
+- Preparation completed: the standard live stack is running on isolated ports 8015/5455 with
+  verified API/worker deployment fingerprints. All ten frozen inputs satisfy the product schema;
+  original QA payload hashes match, and translated inputs are labelled. Automatic approval review
+  rejected the first collector launch before execution because paid calls and external disclosure
+  of these specific texts require explicit consent. Requested OpenAI transmission approval with a
+  USD 2 estimated-cost cap. No model calls had occurred at that preparation stage.
+- Explicit consent subsequently received for the prepared QA texts and all 30 OpenAI runs. The
+  branch had meanwhile merged main at `1c79e175`, including ANY-761's language policy. Hash checks
+  caught the stale worker before any provider call. Rebuilt against this current revision; the
+  evidence evaluates the combined current prompt, not isolated pre-merge ANY-615.
 
 ### Initial implementation
 
