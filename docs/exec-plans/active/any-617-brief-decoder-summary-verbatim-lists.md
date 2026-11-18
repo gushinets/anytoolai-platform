@@ -68,6 +68,12 @@ and selects the reviewed confirmation sentence by language and missing field set
 Russian and Spanish examples exercise audience labels because the bakery fixtures omit the
 audience. All 1,472 freelancer product and Brief Decoder API bundle tests passed.
 
+The third code review reproduced a reversed readiness verdict in the fake-provider summary.
+The fixture check derives readiness from the three A10 inputs and recognizes explicit verdict
+clauses in English, Russian and Spanish. The explanation stays free. Mutation tests exercise
+reversed, absent and conflicting verdicts. The signal matrix includes a missing budget with
+empty issue and question lists.
+
 ## Open questions
 
 Review separate verdict presentation under the UI follow-up.

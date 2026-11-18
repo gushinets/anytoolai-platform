@@ -749,6 +749,37 @@ _MISSING_FIELD_CONFIRMATION = {
 }
 
 
+# Match complete verdict clauses in the reviewed fixtures. Explanatory clauses are free prose.
+_READINESS_CLAUSE = {
+    "en": re.compile(
+        r"(?:(?:the brief|it) is )?(?P<negative>not (?:yet |fully )?)?"
+        r"ready to start(?: work)?"
+    ),
+    "ru": re.compile(r"бриф (?:пока )?(?P<negative>не )?готов к работе"),
+    "es": re.compile(
+        r"el (?:encargo|resumen) (?:todavía )?(?P<negative>no )?está listo para empezar"
+    ),
+}
+
+
+def _assert_summary_readiness(
+    summary: str,
+    language: DocumentLanguage,
+    *,
+    issues: list[dict[str, Any]],
+    missing_fields: list[str],
+    questions: list[dict[str, Any]],
+) -> None:
+    expected_ready = not (issues or missing_fields or questions)
+    clauses = re.split(r"[.,;:—–]|\bbut\b", " ".join(summary.casefold().split()))
+    verdicts = {
+        match["negative"] is None
+        for clause in clauses
+        if (match := _READINESS_CLAUSE[language].fullmatch(clause.strip()))
+    }
+    assert verdicts == {expected_ready}, f"Expected readiness={expected_ready} in {summary!r}"
+
+
 def _assert_overview(content: str, values: dict[str, Any], language: DocumentLanguage) -> None:
     labels = {"en": "Target audience", "ru": "Целевая аудитория", "es": "Público objetivo"}
     lines = [values["project_goal"]] if "project_goal" in values else []
@@ -795,6 +826,14 @@ def test_summary_fixtures_copy_lists_verbatim(summary_suffix: str) -> None:
     )
     document = _fixture_response("brief_decoder.generate_summary_v1" + summary_suffix)
 
+    _assert_summary_readiness(
+        document["summary"],
+        language,
+        issues=issues,
+        missing_fields=brief["missing_fields"],
+        questions=questions,
+    )
+
     fields = ("deliverables", "deadline", "budget", "constraints")
     labels = {
         "en": ("Deliverables", "Deadline", "Budget", "Constraints"),
@@ -837,6 +876,78 @@ def test_summary_fixtures_copy_lists_verbatim(summary_suffix: str) -> None:
         ("gaps", "\n".join(gap_lines)),
         ("next-steps", "\n".join(question_lines)),
     ]
+
+
+@pytest.mark.parametrize(
+    ("language", "positive", "negative"),
+    [
+        (
+            "en",
+            "The brief is ready to start work. Book the kickoff.",
+            "The brief is not ready to start work: confirm the launch date.",
+        ),
+        (
+            "ru",
+            "Бриф готов к работе — можно назначить встречу.",
+            "Бриф пока не готов к работе: уточните срок.",
+        ),
+        (
+            "es",
+            "El encargo está listo para empezar. Se puede programar la reunión.",
+            "El encargo no está listo para empezar: falta confirmar el plazo.",
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    ("issues", "missing_fields", "questions", "expected_ready"),
+    [
+        pytest.param([], [], [], True, id="complete"),
+        pytest.param([{"description": "Unclear scope"}], [], [], False, id="issue-only"),
+        pytest.param([], ["budget"], [], False, id="missing-budget-without-questions"),
+        pytest.param([], [], [{"question": "When?"}], False, id="question-only"),
+    ],
+)
+def test_summary_readiness_depends_on_each_input(
+    language: DocumentLanguage,
+    positive: str,
+    negative: str,
+    issues: list[dict[str, Any]],
+    missing_fields: list[str],
+    questions: list[dict[str, Any]],
+    expected_ready: bool,
+) -> None:
+    correct, incorrect = (positive, negative) if expected_ready else (negative, positive)
+    _assert_summary_readiness(
+        correct, language, issues=issues, missing_fields=missing_fields, questions=questions
+    )
+    with pytest.raises(AssertionError, match="readiness"):
+        _assert_summary_readiness(
+            incorrect, language, issues=issues, missing_fields=missing_fields, questions=questions
+        )
+
+
+@pytest.mark.parametrize(
+    ("suffix", "wrong_summary"),
+    [
+        (".weak_input", "The brief is ready to start work."),
+        (".no_issues", "The brief is not ready to start work."),
+        (".weak_input", "Confirm the budget first."),
+        (".weak_input", "The brief is not ready to start. The brief is ready to start."),
+        (".ru", "Бриф готов к работе."),
+        (".es", "El encargo está listo para empezar."),
+    ],
+)
+def test_summary_fixture_rejects_wrong_readiness(
+    monkeypatch: pytest.MonkeyPatch, suffix: str, wrong_summary: str
+) -> None:
+    original = _fixture_response
+    stem = "brief_decoder.generate_summary_v1" + suffix
+    document = {**original(stem), "summary": wrong_summary}
+    monkeypatch.setitem(
+        globals(), "_fixture_response", lambda name: document if name == stem else original(name)
+    )
+    with pytest.raises(AssertionError, match="readiness"):
+        test_summary_fixtures_copy_lists_verbatim(suffix)
 
 
 @pytest.mark.parametrize(
@@ -1498,8 +1609,7 @@ def test_renderer_contract_agrees_with_workflow_and_scenario() -> None:
     # Code review finding (me #2): the `clarifying_questions` part used to describe an empty
     # `questions` list as "no clarification needed" -- a readiness claim that contradicts
     # generate_summary.v1.md's own rule (empty `questions` alone never implies the brief is
-    # ready) and the deterministic `.no_issues` fixture, which pairs empty `questions` with a
-    # not-ready summary.
+    # ready). The complete-brief fixture is ready because all three inputs are empty.
     (questions_part,) = (
         part for part in contract["parts"] if part["part_id"] == "clarifying_questions"
     )
