@@ -1211,10 +1211,19 @@ def test_renderer_contract_agrees_with_workflow_and_scenario() -> None:
     assert {part["field"] for part in contract["parts"]} | set(contract["excluded_fields"]) == set(
         output_schema["properties"]
     )
-    assert contract["canonical_field"] in output_schema["properties"]
-    # Code review finding (round #1, finding #10): `canonical_field` (`document`) is an object,
-    # not a single string like sibling products' `text` -- pin that a serialization rule exists.
+    # The model-written document must never be the copy authority (ANY-616).
+    assert "canonical_field" not in contract
+    copy_text = contract["copy_text"]
+    assert copy_text["authority"] == "structured_fields_only"
+    assert copy_text["sources"] == ["brief.values", "brief.missing_fields", "issues", "questions"]
+    assert copy_text["not_copyable_fields"] == ["document", "brief.confidence"]
+    for source in copy_text["sources"]:
+        head, *rest = source.split(".")
+        node = output_schema["properties"][head]
+        for key in rest:
+            node = node["properties"][key]
     assert contract["canonical_field_composition"].strip()
+    assert "never from `document`" in contract["canonical_field_composition"]
 
     # Code review finding (me #2): the `clarifying_questions` part used to describe an empty
     # `questions` list as "no clarification needed" -- a readiness claim that contradicts

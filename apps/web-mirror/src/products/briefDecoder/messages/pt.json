@@ -34,6 +34,10 @@
     "rationale": "Por que perguntar: {text}",
     "document": "Documento-resumo"
   },
+  "copy": {
+    "missingFields": "Não indicado no briefing",
+    "hint": "São copiados literalmente o briefing, os problemas e as perguntas acima. O documento-resumo não é copiado."
+  },
   "briefFields": {
     "project_goal": "Objetivo do projeto",
     "deliverables": "Entregas",

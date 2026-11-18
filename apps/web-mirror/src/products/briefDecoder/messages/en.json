@@ -34,6 +34,10 @@
     "rationale": "Why ask: {text}",
     "document": "Summary document"
   },
+  "copy": {
+    "missingFields": "Not stated in the brief",
+    "hint": "Copy takes the brief, issues and questions above word for word. The summary document is not copied."
+  },
   "briefFields": {
     "project_goal": "Project goal",
     "deliverables": "Deliverables",

@@ -2,6 +2,8 @@
 // contract's copy composition, and the activation rule (`web.result_viewed` only for a non-empty
 // question list). Shared runtime behavior is proven once in ProductRunPage.test.tsx. Results are
 // composed from the on-disk fake-provider fixtures exactly as the backend bundle test composes them.
+import { createTranslator } from "use-intl";
+import { BriefDecoderResultView } from "../src/products/briefDecoder/BriefDecoderResult";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
 import { useAttachSession, readAttachSessionId } from "../src/products/runtime/attachSession";
 import { readFileSync } from "node:fs";
@@ -36,10 +38,11 @@ import {
 import { makeRender } from "./support/renderWithI18n";
 import { expectDataProcessingNotice } from "./support/expectDataProcessingNotice";
 import { simulateBrowserTranslation } from "@anytoolai/shared-ui/test/support/simulateBrowserTranslation";
-import { LOCALES } from "../src/i18n";
+import { LOCALES, type Translate } from "../src/i18n";
 import { LOCALE_STORAGE_KEY } from "../src/i18n/localeStorage";
 
 const render = makeRender(BRIEF_DECODER_MESSAGES);
+const enT = createTranslator({ locale: "en", messages: BRIEF_DECODER_MESSAGES.en }) as Translate;
 const IDS = { productId: "brief_decoder", scenarioId: "brief_decoder.decode_v1" } as const;
 const ROUTES = routesFor(IDS);
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -269,21 +272,129 @@ describe("Brief Decoder definition", () => {
     expect(extractBriefDecoderResult({ ...good, brief: { values: { budget: 5 } } })).toBeNull();
     // brief.values is closed: an unknown key is rejected, not silently dropped.
     expect(extractBriefDecoderResult({ ...good, brief: { values: { project_goal: "x", invented: "y" } } })).toBeNull();
-    // missing_fields is not rendered, so its absence must not discard an otherwise usable result.
-    expect(extractBriefDecoderResult({ ...good, brief: { values: { project_goal: "g" } } })).not.toBeNull();
+    // Legacy artifacts derive missing_fields from absent values.
+    expect(extractBriefDecoderResult({ ...good, brief: { values: { project_goal: "g" } } })?.brief.missingFields)
+      .toEqual(BRIEF_FIELDS.filter((field) => field !== "project_goal"));
+    for (const missing_fields of [["nope"], ["deadline", 3], "deadline", null, {}]) {
+      expect(extractBriefDecoderResult({ ...good, brief: { values: {}, missing_fields } })).toBeNull();
+    }
     expect(extractBriefDecoderResult({})).toBeNull();
   });
 
+  it.each(BRIEF_FIELDS)("rejects overlapping, omitted and duplicate missing metadata for %s", (field) => {
+    const good = composedOutput("");
+    const others = BRIEF_FIELDS.filter((candidate) => candidate !== field);
+    const stated = field === "deliverables" || field === "constraints" ? ["stated"] : "stated";
+    expect(extractBriefDecoderResult({ ...good, brief: { values: { [field]: stated }, missing_fields: [...BRIEF_FIELDS] } })).toBeNull();
+    expect(extractBriefDecoderResult({ ...good, brief: { values: {}, missing_fields: others } })).toBeNull();
+    expect(extractBriefDecoderResult({ ...good, brief: { values: {}, missing_fields: [...BRIEF_FIELDS, field] } })).toBeNull();
+  });
+
+  it("accepts every valid field partition, normalizes order and derives legacy missing metadata", () => {
+    const good = composedOutput("");
+    for (let mask = 0; mask < 2 ** BRIEF_FIELDS.length; mask++) {
+      const present = BRIEF_FIELDS.filter((_, index) => mask & (1 << index));
+      const values = Object.fromEntries(present.map((field) => [field, field === "deliverables" || field === "constraints" ? ["stated"] : "stated"]));
+      const missing = BRIEF_FIELDS.filter((field) => !present.includes(field));
+      for (const brief of [{ values }, { values, missing_fields: [...missing].reverse() }]) {
+        expect(extractBriefDecoderResult({ ...good, brief })?.brief).toEqual({ values, missingFields: missing });
+      }
+    }
+  });
+
   it("composes the copy text per renderer_contract.yaml", () => {
-    expect(
-      composeCopyText({
-        sections: [
-          { title: "A", content: "one" },
-          { title: "B", content: "two" },
-        ],
-        summary: "done",
-      }),
-    ).toBe("A\none\n\nB\ntwo\n\ndone");
+    const t = (key: string, values?: Record<string, string | number>) => values ? `${key}(${Object.values(values).join(",")})` : key;
+    expect(composeCopyText({
+      brief: { values: { project_goal: "G", deliverables: ["d1", "d2"] }, missingFields: ["deadline", "target_audience"] },
+      issues: [
+        { category: "ambiguity", severity: "high", description: "D1", evidence: "E1" },
+        { category: "scope_risk", severity: "low", description: "D2" },
+        { category: "budget_risk", severity: "medium", description: "D3", evidence: "" },
+      ],
+      questions: [
+        { question: "Q1?", rationale: "not copied", priority: "high", category: "ambiguity" },
+        { question: "Q2?", rationale: "not copied", priority: "low", category: "scope_risk" },
+      ],
+    }, t)).toBe([
+      "result.brief\nbriefFields.project_goal: G\nbriefFields.deliverables:\n- d1\n- d2",
+      "copy.missingFields\n- briefFields.deadline\n- briefFields.target_audience",
+      "result.issues\n- categories.ambiguity · severity.high: D1\n  result.evidence(E1)\n- categories.scope_risk · severity.low: D2\n- categories.budget_risk · severity.medium: D3",
+      "result.questions(2)\n1. Q1?\n2. Q2?",
+    ].join("\n\n"));
+  });
+
+  it("omits an empty missing-field block and preserves the empty issue/question states", () => {
+    const values = Object.fromEntries(BRIEF_FIELDS.map((field) => [field, "stated"]));
+    expect(composeCopyText({ brief: { values, missingFields: [] }, issues: [], questions: [] }, enT)).toBe([
+      "Brief\nProject goal: stated\nDeliverables: stated\nDeadline: stated\nBudget: stated\nTarget audience: stated\nConstraints: stated",
+      "Issues\nNo issues found.",
+      "0 clarifying questions\nNo clarifying questions were generated.",
+    ].join("\n\n"));
+  });
+
+  it("lists all missing labels for an empty brief and keeps all five questions", () => {
+    const output = composedOutput("");
+    output.brief = { values: {} };
+    const result = extractBriefDecoderResult(output)!;
+    result.questions = Array.from({ length: 5 }, (_, index) => ({ ...result.questions[0]!, question: `Question ${index + 1}?` }));
+    const copy = composeCopyText(result, enT);
+    expect(copy).toContain("Brief\n\nNot stated in the brief\n- Project goal\n- Deliverables\n- Deadline\n- Budget\n- Target audience\n- Constraints");
+    expect(copy).toContain("5 clarifying questions\n1. Question 1?\n2. Question 2?\n3. Question 3?\n4. Question 4?\n5. Question 5?");
+  });
+
+  it("copies whitespace, newlines, URLs, quotes and ICU argument braces verbatim", () => {
+    const verbatim = '  Keep {rights} and "quotes"\nhttps://example.com/a?x={b}  ';
+    const result = extractBriefDecoderResult(composedOutput(""))!;
+    result.brief.values = { project_goal: verbatim, deliverables: [verbatim] };
+    result.issues = [{ category: "ambiguity", severity: "low", description: verbatim, evidence: verbatim }];
+    result.questions = [{ question: verbatim, rationale: "excluded", priority: "low", category: "ambiguity" }];
+    const copy = composeCopyText(result, enT);
+    expect(copy).toContain(`Project goal: ${verbatim}\nDeliverables:\n- ${verbatim}`);
+    expect(copy).toContain(`- Ambiguity · Low severity: ${verbatim}\n  Evidence: ${verbatim}`);
+    expect(copy).toContain(`1. ${verbatim}`);
+    expect(copy).not.toContain("excluded");
+  });
+
+  it.each(["", ".weak_input"] as const)("copy contains every value and every question verbatim, and nothing from document (%s)", async (suffix) => {
+    const output = composedOutput(suffix);
+    const sentinel = "LLM_DOCUMENT_ONLY_SENTINEL";
+    const original = extractBriefDecoderResult(output)!;
+    output.document = { summary: sentinel, sections: original.document.sections.map(() => ({ title: sentinel, content: sentinel })) };
+    const result = extractBriefDecoderResult(output)!;
+    const onCopy = vi.fn<(text: string) => Promise<boolean>>().mockResolvedValue(true);
+    render(<BriefDecoderResultView result={result} onCopy={onCopy} />);
+    expect(within(screen.getByRole("region", { name: "Summary document" })).getAllByText(sentinel).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    await screen.findByRole("button", { name: "Copied" });
+    expect(onCopy).toHaveBeenCalledTimes(1);
+    const copy = onCopy.mock.calls[0]![0];
+    for (const value of Object.values(result.brief.values)) {
+      for (const item of Array.isArray(value) ? value : [value]) expect(copy).toContain(item);
+    }
+    for (const question of result.questions) expect(copy).toContain(question.question);
+    expect(copy.match(/^\d+\. /gm)).toHaveLength(result.questions.length);
+    for (const issue of result.issues) expect(copy).toContain(issue.description);
+    expect(copy).not.toContain(sentinel);
+    expect(copy).not.toContain(RAW_BRIEF_SENTINEL);
+    expect(copy).not.toMatch(/\b(project_goal|target_audience)\b/);
+    if (suffix === ".weak_input") {
+      expect(copy).toContain("Not stated in the brief");
+      for (const field of result.brief.missingFields) expect(copy).toContain(`- ${BRIEF_DECODER_MESSAGES.en.briefFields[field]}`);
+    }
+  });
+
+  it("reveals the structured text for manual selection when the clipboard is blocked", async () => {
+    const result = extractBriefDecoderResult(composedOutput(""))!;
+    const onCopy = vi.fn<(text: string) => Promise<boolean>>().mockResolvedValue(false);
+    render(<BriefDecoderResultView result={result} onCopy={onCopy} />);
+    const copyButton = screen.getByRole("button", { name: "Copy" });
+    expect(copyButton.parentElement!.parentElement!.querySelector("[hidden]")!.nextElementSibling).toBe(copyButton.parentElement);
+    fireEvent.click(copyButton);
+    const select = await screen.findByRole("button", { name: "Select text" });
+    const copyText = select.parentElement!.previousElementSibling!;
+    expect(copyText.textContent).toBe(composeCopyText(result, enT));
+    fireEvent.click(select);
+    expect(window.getSelection()?.toString()).toBe(composeCopyText(result, enT));
   });
 });
 
@@ -306,7 +417,7 @@ describe("Brief Decoder page", () => {
     expect(calls.some((call) => call.key === ROUTES.START)).toBe(false);
   });
 
-  it("renders the four parts for the happy fixtures, emits one result_viewed, and copies the composed document", async () => {
+  it("renders the four parts for the happy fixtures, emits one result_viewed, and copies the structured result", async () => {
     const output = composedOutput("");
     const expected = extractBriefDecoderResult(output)!;
     const events: ProductRunEvent[] = [];
@@ -347,7 +458,7 @@ describe("Brief Decoder page", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Copy" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(composeCopyText(expected.document));
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(composeCopyText(expected, enT));
     expect(document.body.textContent).not.toContain(RAW_BRIEF_SENTINEL);
     expect(JSON.stringify(vi.mocked(navigator.clipboard.writeText).mock.calls)).not.toContain(RAW_BRIEF_SENTINEL);
     const nextAction = calls.filter((call) => call.key === ROUTES.NEXT_ACTION);
@@ -404,14 +515,14 @@ describe("Brief Decoder page", () => {
     // One completion per session; the zero-question rerun does not count as a viewed result.
     await waitFor(() => expect(completedEvents(events).map((e) => (e as { resultViewed: boolean }).resultViewed)).toEqual([true, false]));
 
-    // Copy copies the document only, in one group with "New task".
+    // Copy copies the structured result, in one group with "New task".
     const expected = extractBriefDecoderResult(composedOutput(".no_issues"))!;
     const copy = screen.getByRole("button", { name: "Copy" });
     const newTask = screen.getByRole("button", { name: "New task" });
     expect(copy.parentElement).toBe(newTask.parentElement);
     fireEvent.click(copy);
     await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(composeCopyText(expected.document));
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(composeCopyText(expected, enT));
 
     // New task: brief and result cleared, focus back on the brief field.
     fireEvent.click(newTask);

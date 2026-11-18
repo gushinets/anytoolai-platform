@@ -8,7 +8,8 @@ import { BRIEF_FIELDS, composeCopyText, type BriefDecoderResult } from "./parseB
 
 /** The four contract parts in `renderer_contract.yaml` order, embedded in the workspace's result
  * card (whose `h2` they sit under, hence `h3`) and separated by rules, not nested cards. Severity
- * and priority are text labels, never colour alone; `brief.confidence` is deliberately not shown. */
+ * and priority are text labels, never colour alone; `brief.confidence` is deliberately not shown.
+ * Copy uses structured fields only; the model-written document is display only (ANY-616). */
 export function BriefDecoderResultView({ result, onCopy, secondaryAction }: ProductResultProps<BriefDecoderResult>) {
   const t = useProductT();
   const { brief, issues, questions, document } = result;
@@ -85,8 +86,16 @@ export function BriefDecoderResultView({ result, onCopy, secondaryAction }: Prod
 
       <section className={styles.section} aria-labelledby="brief-decoder-document-heading">
         <h3 id="brief-decoder-document-heading">{t("result.document")}</h3>
-        <ResultView text={composeCopyText(document)} onCopy={onCopy} secondaryAction={secondaryAction} embedded />
+        {document.sections.map((section, index) => (
+          <div key={index}>
+            <div className={styles.label}>{section.title}</div>
+            <div className={styles.content}>{section.content}</div>
+          </div>
+        ))}
+        <p className={styles.content}>{document.summary}</p>
       </section>
+      <p className={styles.meta}>{t("copy.hint")}</p>
+      <ResultView text={composeCopyText(result, t)} onCopy={onCopy} secondaryAction={secondaryAction} embedded hideText />
     </div>
   );
 }
