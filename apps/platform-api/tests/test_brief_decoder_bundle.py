@@ -40,7 +40,11 @@ from anytoolai_platform_core.structured_output.schemas import normalize_schema_m
 from anytoolai_platform_core.workflows.models import JobStatus
 from anytoolai_platform_worker.composition import build_worker
 
-from tests.support.brief_language import golden_cases, write_provider_fixtures
+from tests.support.brief_language import (
+    assert_summary_readiness,
+    golden_cases,
+    write_provider_fixtures,
+)
 from tests.support.fake_provider_recording import RecordingProviderAdapter
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -492,11 +496,13 @@ def test_no_issues_skips_question_generation_and_still_produces_a_consistent_doc
     no_issues_document_text = json.dumps(output["document"])
     assert no_issues_document_text != happy_document_text
 
-    # A brief with no issues and nothing missing is the one case generate_summary.v1.md's
-    # readiness rule actually allows to claim the brief is ready.
-    summary = output["document"]["summary"].lower()
-    assert "ready" in summary
-    assert "not ready" not in summary and "not fully ready" not in summary
+    assert_summary_readiness(
+        output["document"]["summary"],
+        "en",
+        issues=output["issues"],
+        missing_fields=output["brief"]["missing_fields"],
+        questions=output["questions"],
+    )
 
 
 @pytest.mark.parametrize("brief_text", ["", "   ", " padded "], ids=["empty", "blank", "untrimmed"])
@@ -583,6 +589,13 @@ def test_multilingual_canonical_output_and_original_language_source(
     adapter = RecordingProviderAdapter(tmp_path)
     source = case["input"]["brief_text"]
     _, output = _run_to_result(app, request_platform_api, session_factory, source, adapter)
+    assert_summary_readiness(
+        output["document"]["summary"],
+        case["expected_language"],
+        issues=output["issues"],
+        missing_fields=output["brief"]["missing_fields"],
+        questions=output["questions"],
+    )
     assert output == expected  # Includes summary, questions/rationale and every section.
     assert adapter.input_payload(0)["source_text"] == source
     assert adapter.input_payload(1)["source_text"] == source

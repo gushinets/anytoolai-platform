@@ -15,12 +15,14 @@ import importlib.util
 import json
 import re
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 import jsonschema
 import pytest
 import yaml
 from anytoolai_freelancer_suite.bundle import FreelancerSuiteBundle
+
+from tests.support.brief_language import DocumentLanguage, assert_summary_readiness
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 KERNEL_DIR = REPO_ROOT / "configs" / "kernel"
@@ -284,7 +286,6 @@ _GAPS_KEYWORD = {
     "target_audience": "audience",
     "constraints": "constraint",
 }
-DocumentLanguage = Literal["en", "ru", "es"]
 _GAPS_KEYWORDS_BY_LANGUAGE: dict[DocumentLanguage, dict[str, str]] = {
     "en": _GAPS_KEYWORD,
     "ru": {
@@ -749,37 +750,6 @@ _MISSING_FIELD_CONFIRMATION = {
 }
 
 
-# Match complete verdict clauses in the reviewed fixtures. Explanatory clauses are free prose.
-_READINESS_CLAUSE = {
-    "en": re.compile(
-        r"(?:(?:the brief|it) is )?(?P<negative>not (?:yet |fully )?)?"
-        r"ready to start(?: work)?"
-    ),
-    "ru": re.compile(r"бриф (?:пока )?(?P<negative>не )?готов к работе"),
-    "es": re.compile(
-        r"el (?:encargo|resumen) (?:todavía )?(?P<negative>no )?está listo para empezar"
-    ),
-}
-
-
-def _assert_summary_readiness(
-    summary: str,
-    language: DocumentLanguage,
-    *,
-    issues: list[dict[str, Any]],
-    missing_fields: list[str],
-    questions: list[dict[str, Any]],
-) -> None:
-    expected_ready = not (issues or missing_fields or questions)
-    clauses = re.split(r"[.,;:—–]|\bbut\b", " ".join(summary.casefold().split()))
-    verdicts = {
-        match["negative"] is None
-        for clause in clauses
-        if (match := _READINESS_CLAUSE[language].fullmatch(clause.strip()))
-    }
-    assert verdicts == {expected_ready}, f"Expected readiness={expected_ready} in {summary!r}"
-
-
 def _assert_overview(content: str, values: dict[str, Any], language: DocumentLanguage) -> None:
     labels = {"en": "Target audience", "ru": "Целевая аудитория", "es": "Público objetivo"}
     lines = [values["project_goal"]] if "project_goal" in values else []
@@ -826,7 +796,7 @@ def test_summary_fixtures_copy_lists_verbatim(summary_suffix: str) -> None:
     )
     document = _fixture_response("brief_decoder.generate_summary_v1" + summary_suffix)
 
-    _assert_summary_readiness(
+    assert_summary_readiness(
         document["summary"],
         language,
         issues=issues,
@@ -887,6 +857,17 @@ def test_summary_fixtures_copy_lists_verbatim(summary_suffix: str) -> None:
             "The brief is not ready to start work: confirm the launch date.",
         ),
         (
+            "en",
+            "The request is ready to start work.",
+            "The request is not ready to start work: confirm who approves it.",
+        ),
+        ("ru", "Запрос готов к работе.", "Запрос пока не готов к работе."),
+        (
+            "es",
+            "La solicitud está lista para empezar.",
+            "La solicitud todavía no está lista para empezar: falta confirmar el plazo.",
+        ),
+        (
             "ru",
             "Бриф готов к работе — можно назначить встречу.",
             "Бриф пока не готов к работе: уточните срок.",
@@ -917,11 +898,11 @@ def test_summary_readiness_depends_on_each_input(
     expected_ready: bool,
 ) -> None:
     correct, incorrect = (positive, negative) if expected_ready else (negative, positive)
-    _assert_summary_readiness(
+    assert_summary_readiness(
         correct, language, issues=issues, missing_fields=missing_fields, questions=questions
     )
     with pytest.raises(AssertionError, match="readiness"):
-        _assert_summary_readiness(
+        assert_summary_readiness(
             incorrect, language, issues=issues, missing_fields=missing_fields, questions=questions
         )
 
@@ -934,6 +915,20 @@ def test_summary_readiness_depends_on_each_input(
         (".weak_input", "Confirm the budget first."),
         (".weak_input", "The brief is not ready to start. The brief is ready to start."),
         (".ru", "Бриф готов к работе."),
+        (".es", "El resumen todavía no está listo para empezar."),
+        (".es", "El encargo no está lista para empezar."),
+        (".es", "La solicitud no está listo para empezar."),
+        (".es", "El resumen no está listo para empezar. La solicitud no está lista para empezar."),
+        (
+            ".es",
+            "La solicitud no está lista para empezar, pero el encargo está listo para empezar.",
+        ),
+        (".es", "La solicitud no está lista para empezar; está lista para empezar."),
+        (".weak_input", "The brief is not ready to start. It is ready to start."),
+        (".ru", "Запрос не готов к работе, но готов к работе."),
+        (".ru", "Отчёт пока не готов к работе."),
+        (".weak_input", "The summary is workable but not ready to start."),
+        (".no_issues", "The summary has been checked; it is ready to start work."),
         (".es", "El encargo está listo para empezar."),
     ],
 )

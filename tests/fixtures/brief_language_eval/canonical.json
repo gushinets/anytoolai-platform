@@ -528,7 +528,7 @@
       }
     ],
     "document": {
-      "summary": "Не указаны цель проекта, результаты работы, срок, бюджет, целевая аудитория и ограничения. Какую задачу нужно решить и какой результат вы хотите получить?",
+      "summary": "Запрос пока не готов к работе. Не указаны цель проекта, результаты работы, срок, бюджет, целевая аудитория и ограничения. Какую задачу нужно решить и какой результат вы хотите получить?",
       "sections": [
         {
           "id": "overview",
@@ -643,7 +643,7 @@
       }
     ],
     "document": {
-      "summary": "The project goal, deliverables, deadline, budget, target audience and constraints are not specified. What problem should be solved and what result do you want?",
+      "summary": "The request is not ready to start work. The project goal, deliverables, deadline, budget, target audience and constraints are not specified. What problem should be solved and what result do you want?",
       "sections": [
         {
           "id": "overview",
@@ -758,7 +758,7 @@
       }
     ],
     "document": {
-      "summary": "No se indican el objetivo, los entregables, el plazo, el presupuesto, el público destinatario ni las restricciones. ¿Qué problema hay que resolver y qué resultado desea obtener?",
+      "summary": "La solicitud todavía no está lista para empezar. No se indican el objetivo, los entregables, el plazo, el presupuesto, el público destinatario ni las restricciones. ¿Qué problema hay que resolver y qué resultado desea obtener?",
       "sections": [
         {
           "id": "overview",

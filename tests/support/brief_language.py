@@ -3,13 +3,59 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "tests/fixtures/brief_language_eval"
 CASES = json.loads((FIXTURES / "cases.json").read_text(encoding="utf-8"))["cases"]
 CANONICAL = json.loads((FIXTURES / "canonical.json").read_text(encoding="utf-8"))
+
+DocumentLanguage = Literal["en", "ru", "es"]
+
+# Authored fixtures open with a verdict about the brief. Keep each subject paired with
+# its grammatical predicate; the following explanation is independently worded.
+_READINESS_CLAUSES = {
+    "en": (
+        r"(?:(?P<subject>the (?:brief|request) is )|it is )?"
+        r"(?P<negative>not (?:yet |fully )?)?ready to start(?: work)?",
+    ),
+    "ru": (
+        r"(?:(?P<subject>бриф|запрос) )?(?:пока )?"
+        r"(?P<negative>не )?готов к (?:работе|началу работы)",
+    ),
+    "es": tuple(
+        rf"(?:(?P<subject>{subject}) )?(?:(?:aún|todavía) )?"
+        rf"(?P<negative>no )?está {adjective} para empezar"
+        for subject, adjective in (("el encargo", "listo"), ("la solicitud", "lista"))
+    ),
+}
+
+
+def _fixture_verdict(clause: str, language: DocumentLanguage, *, opening: bool) -> bool | None:
+    for pattern in _READINESS_CLAUSES[language]:
+        match = re.fullmatch(pattern, clause.strip())
+        if match and (not opening or match["subject"]):
+            return match["negative"] is None
+    return None
+
+
+def assert_summary_readiness(
+    summary: str,
+    language: DocumentLanguage,
+    *,
+    issues: list[dict[str, Any]],
+    missing_fields: list[str],
+    questions: list[dict[str, Any]],
+) -> None:
+    expected_ready = not (issues or missing_fields or questions)
+    normalized = " ".join(summary.casefold().split())
+    first, *explanation = re.split(r"[.,;:—–]|\b(?:but|pero|но)\b", normalized)
+    opening = _fixture_verdict(first, language, opening=True)
+    assert opening is expected_ready, f"Expected opening readiness={expected_ready}: {summary!r}"
+    rest = {_fixture_verdict(clause, language, opening=False) for clause in explanation}
+    assert (not expected_ready) not in rest, f"Conflicting readiness verdicts: {summary!r}"
 
 
 def golden_cases(product: str) -> list[dict[str, Any]]:

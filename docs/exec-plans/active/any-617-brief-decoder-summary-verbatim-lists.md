@@ -35,7 +35,7 @@ The A10 prompt and fake-provider examples define the document wording within the
 
 1. Specify copying and localized labels for each section.
 2. Align English, Russian, and Spanish fixtures with their upstream results.
-3. Compare fixture output against the sources and exercise six regressions.
+3. Compare complete fixture sections with their sources and exercise source-copy and readiness mutations.
 
 ## Validation
 
@@ -73,6 +73,15 @@ The fixture check derives readiness from the three A10 inputs and recognizes exp
 clauses in English, Russian and Spanish. The explanation stays free. Mutation tests exercise
 reversed, absent and conflicting verdicts. The signal matrix includes a missing budget with
 empty issue and question lists.
+
+The fourth code review found that the Spanish fixture evaluated the summary document and the
+test accepted that subject. The five provider fixtures and seven canonical Brief Decoder API
+examples now open with an explicit verdict about the brief or request. Both test suites use
+the same check, including the prompt's two terms per language and Spanish gender agreement.
+The opening-clause convention applies to authored fixtures. Live-generated prose remains
+subject to the existing product prompt and separate evaluation. The freelancer product suite,
+Brief Decoder API tests and brief-language evaluation tests passed (1,590 cases), as did the
+46 web-mirror Brief Decoder tests.
 
 ## Open questions
 
