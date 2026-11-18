@@ -1,0 +1,2100 @@
+{
+  "issue": "ANY-762",
+  "collected_at_utc": "2026-11-17T16:04:15.488556+00:00",
+  "source_commit": "d91402524ccfe43b7561d47fc45d6a296d7d8872",
+  "scenario_id": "brief_decoder.decode_v1",
+  "channel": "local API -> worker -> OpenAI",
+  "fixture_path": "tests/fixtures/brief_decoder_eval/deadline_status.json",
+  "fixture_sha256": "d80f575da13acaacb0f4934d73316d8758cb603a7199eda66ad667906e8ca4b2",
+  "configured_model": {
+    "model": "openai/gpt-6-luna",
+    "reasoning_effort": "medium",
+    "alias": "anytoolai.default_text"
+  },
+  "reasoning_evidence": "medium read from the running worker router; provider-call ledger reasoning_effort is null, so no independent per-request confirmation is claimed.",
+  "worker_source_sha256": {
+    "configs/kernel/litellm_router.yaml": "dede022d99bc94440ea14f212cc669d939a39b51dbb73e8d0ef83ef5510aa1d2",
+    "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/action_configs.yaml": "ecc9a7ede8c14667230f21fbe461e71c7a6ab6d76328c97170e53b4fe30c3eb5",
+    "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/frontends.yaml": "5f5eac1312dddf0ab129ccb58108e38aed9cd0c633503ccb91ba4c036f7512bd",
+    "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/handoffs.yaml": "08d5c5b3717f2b0db972213243a56f0cf98811fd4328105da998f5a3116d49c4",
+    "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/product.yaml": "80fd84069671fca9472afdf078643ddb9799d206e66a100d419528ec5449bbf6",
+    "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/detect_issues.v1.md": "a8b150c1f681ad541aadcf8a2ba6e8340f2e85e813e13ba316b2de0bc70cf37f",
+    "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/extract_brief.v1.md": "0968f8fcc1762feaf10e86c11fffe41a58b960eceac2b4dda034d56902903c44",
+    "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/generate_questions.v1.md": "198c42b2e229ecd26d23d1e92fa6fefe5cf5f38b95b961957f06bda1dbc9e003",
+    "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/generate_summary.v1.md": "970d9026c064272b4033d60c539a53450725acf1d9eefe8352a4a199879e48c2",
+    "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts.yaml": "03cb35d961dd1d9b1d95a1d1490eb2355e438c239a391b757c5a554473845daf",
+    "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/quotas.yaml": "1ed4154065125cf4da02e88015f8112caf11090279f292bebd7dd4534d98df6c",
+    "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/renderer_contract.yaml": "386f963a75379f224d581f42d72abae110a3369308aba3d196d06f2a4589e95d",
+    "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/scenarios.yaml": "f352e089e7129c5c2a36c46a147b1a59c3013a13171363f833222bd171529c9c",
+    "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas/decode_input.schema.json": "998b82bde28beb6be77e0fb522a8e0a9871c88d9500b884523912f2d257d8454",
+    "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas/decode_output.schema.json": "5a76652a23623ba7a025410a8d0a509e9b8495636f3f6adca8ecb5288610cc0a",
+    "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas.yaml": "e2038c31be3810ee6a04ac82994f9b7bbcc8cd0d68a74ff90e4e0ad3973188f9",
+    "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/workflows.yaml": "456c649b2f413eced34434383533265f5ef57ca70c1bb71964ee7448cc65353a"
+  },
+  "review_scope": "Deadline status, confirmation/condition, and stated date/duration in the extracted field and Key details deadline line, with summary read for contradictions; not whole-product acceptance or budget live coverage.",
+  "reviewer": "Codex (agent semantic review; not human acceptance)",
+  "runs": [
+    {
+      "case_id": "BD-RU-05",
+      "attempt": 1,
+      "expected_status": "unconfirmed",
+      "input_sha256": "28de603ce1d141a6b19e550dcf07f6a072bbe05debd3b233e0b38b96b2f2bcac",
+      "session_id": "scenario_session_01794930918374339109_0000000002_f832914440aa4093a5c3a6e75aa8ddde",
+      "job_id": "job_01794930918396619907_0000000004_ecf221ff4f384567a8aa1cb90bdf0a6c",
+      "result_id": "artifact_01794930956769928697_0000000041_0b8a1adb73044e0a9eebeda24ddb5be7",
+      "latency_ms": 38742,
+      "deadline": "Желаемый срок клиента — 10 дней; окончательную оценку исполнитель ещё не давал.",
+      "deadline_line": "• Результаты: интеграция формы https://courses.example/apply с amoCRM, журнал ошибок и инструкция запуска.\n• Желаемый срок клиента — 10 дней; исполнитель ещё не подтвердил окончательную оценку, поэтому срок не согласован.",
+      "document": {
+        "summary": "К работе пока не следует приступать: есть неразрешённые технические и функциональные вопросы, а также не указаны бюджет и целевая аудитория. В первую очередь уточните устройство формы и доступ к ней и рабочему аккаунту amoCRM, а также согласуйте обработку повторных заявок и недоступности CRM; желаемый срок в 10 дней ещё не подтверждён исполнителем.",
+        "sections": [
+          {
+            "id": "overview",
+            "title": "Project overview",
+            "content": "Заказчик хочет связать форму заявки сайта онлайн-курсов с amoCRM. При новой заявке должны создаваться контакт и сделка с названием курса; повторная заявка с тем же email не должна дублировать контакт.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "key-details",
+            "title": "Key details",
+            "content": "• Результаты: интеграция формы https://courses.example/apply с amoCRM, журнал ошибок и инструкция запуска.\n• Желаемый срок клиента — 10 дней; исполнитель ещё не подтвердил окончательную оценку, поэтому срок не согласован.\n• Ограничения: источник заявок — одна форма на https://courses.example/apply; перенос старых заявок, рассылки и телефония исключены. Тестовый аккаунт CRM предоставляет заказчик. Нужно проверить успешную заявку, повторный email и недоступность CRM.",
+            "metadata": {
+              "kind": "list"
+            }
+          },
+          {
+            "id": "gaps",
+            "title": "Gaps and risks",
+            "content": "Не указано, как устроена форма и каким способом будет предоставлен доступ к ней и к рабочему аккаунту amoCRM, поэтому до начала интеграции могут потребоваться уточнения технических условий. Неясно, нужно ли создавать новую сделку при повторной заявке с тем же email или связывать заявку с существующей сделкой. Не определено, откуда брать название курса для сделки — из поля формы или из другого источника. Не задано поведение при недоступности CRM: например, нужно ли повторять отправку заявки, сохранять её для последующей обработки или только записывать ошибку. Срок в 10 дней обозначен как желаемый, но исполнитель ещё не подтвердил оценку, поэтому срок выполнения не согласован. Бюджет или модель оплаты не указаны, поэтому финансовые рамки и возможный объём работ не согласованы.\nНе указаны бюджет и целевая аудитория.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "next-steps",
+            "title": "Questions to ask",
+            "content": "• Как устроена форма на сайте и каким способом вы сможете предоставить доступ к ней и к рабочему аккаунту amoCRM? Это поможет заранее определить необходимые условия доступа и подготовить интеграцию.\n• Если на тот же email поступит повторная заявка, нужно ли создавать новую сделку или добавлять заявку к существующей? Ответ определит, как обрабатывать повторные заявки, не создавая лишних сделок.\n• Откуда брать название курса для сделки — из какого-либо поля формы или из другого источника? Это нужно, чтобы сделки создавались с правильным названием курса.\n• Что должно происходить с заявкой, если amoCRM временно недоступна: повторять отправку, сохранить её для обработки позже или только записать ошибку? Это позволит определить, как не потерять заявки и что именно фиксировать в журнале ошибок.\n• К какому сроку вы хотели бы получить готовую интеграцию, если исполнитель подтвердит, что срок в 10 дней реалистичен? Это поможет согласовать срок выполнения после оценки объёма работ.",
+            "metadata": {
+              "kind": "list"
+            }
+          }
+        ]
+      },
+      "formal_checks": {
+        "input_and_output_schema": "PASS",
+        "ledger_integrity": "PASS",
+        "status_markers": "PASS",
+        "deadline_digits_from_input": "PASS",
+        "worker_snapshot_unchanged": "PASS"
+      },
+      "semantic_review": {
+        "verdict": "PASS",
+        "rationale": "Desired ten-day duration and the absence of the freelancer final estimate survive in both the extracted field and Key details; summary does not turn the preference into a commitment."
+      },
+      "provider_calls": [
+        {
+          "id": "provider_call_01794930919626920594_0000000004_d7be46534abb40db89492acaa319642a",
+          "step_id": "extract",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00044692500000000003
+        },
+        {
+          "id": "provider_call_01794930927339481382_0000000014_d105b7fd42b54c73be67d6e1a1aec4b0",
+          "step_id": "detect_issues",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.0007681750000000001
+        },
+        {
+          "id": "provider_call_01794930942161200715_0000000024_d884f6091bfc45dca6ca049a06764d23",
+          "step_id": "generate_questions",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00043942499999999996
+        },
+        {
+          "id": "provider_call_01794930947898622272_0000000034_423ef2a7a57d46b6ae0f885637fd1d81",
+          "step_id": "generate_document",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00077005
+        }
+      ]
+    },
+    {
+      "case_id": "BD-RU-05",
+      "attempt": 2,
+      "expected_status": "unconfirmed",
+      "input_sha256": "28de603ce1d141a6b19e550dcf07f6a072bbe05debd3b233e0b38b96b2f2bcac",
+      "session_id": "scenario_session_01794931086800065104_0000000037_6da78aa256b944daaf9f0c8926705588",
+      "job_id": "job_01794931086805995296_0000000039_3c87e8e00a6540558ded690947b2cf0e",
+      "result_id": "artifact_01794931111271442716_0000000363_7e6710ff4cd54d1c98fce6bec425c25f",
+      "latency_ms": 25398,
+      "deadline": "Желаемый срок клиента — 10 дней; окончательную оценку исполнитель ещё не давал.",
+      "deadline_line": "• Результаты: интеграция формы с amoCRM, журнал ошибок и инструкция по запуску.\n• Желаемый срок клиента — 10 дней; окончательную оценку исполнитель ещё не давал, поэтому срок не согласован.",
+      "document": {
+        "summary": "К работе пока не стоит приступать: сначала нужно согласовать, какие поля передавать в amoCRM и как обрабатывать повторные заявки; также требуется уточнить журнал ошибок, желаемый срок, бюджет и целевую аудиторию.",
+        "sections": [
+          {
+            "id": "overview",
+            "title": "Project overview",
+            "content": "Заказчик хочет связать форму заявки сайта онлайн-курсов с amoCRM. При новой заявке должны создаваться контакт и сделка с названием курса; повторная заявка с тем же адресом электронной почты не должна создавать дубликат контакта.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "key-details",
+            "title": "Key details",
+            "content": "• Результаты: интеграция формы с amoCRM, журнал ошибок и инструкция по запуску.\n• Желаемый срок клиента — 10 дней; окончательную оценку исполнитель ещё не давал, поэтому срок не согласован.\n• Источник заявок — одна форма: https://courses.example/apply.\n• Перенос старых заявок, рассылки и телефония исключены.\n• Тестовый аккаунт CRM предоставляет заказчик.\n• Нужно проверить успешную заявку, повторный адрес электронной почты и недоступность CRM.",
+            "metadata": {
+              "kind": "list"
+            }
+          },
+          {
+            "id": "gaps",
+            "title": "Gaps and risks",
+            "content": "Не указано, какие поля формы передавать в контакт и сделку, поэтому состав и распределение данных не определены. Неясно, нужно ли создавать новую сделку при повторной заявке с того же адреса электронной почты или только не создавать дубликат контакта. Не уточнено, где хранить журнал ошибок и какие ошибки или сведения в нём фиксировать. Желаемый срок в 10 дней не согласован, поскольку исполнитель ещё не дал окончательную оценку. Бюджет не указан, поэтому финансовые ограничения проекта неизвестны. Также не указаны целевая аудитория и бюджет.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "next-steps",
+            "title": "Questions to ask",
+            "content": "• Какие именно поля из формы нужно передавать в контакт и сделку в amoCRM? Это позволит согласовать состав данных и их распределение между контактом и сделкой.\n• При повторной заявке с того же адреса электронной почты нужно создавать новую сделку или оставлять существующую без изменений? Ответ определит, как обрабатывать повторные заявки, не создавая лишних сделок.\n• Где должен храниться журнал ошибок и какие сведения в него нужно записывать? Это поможет настроить журнал так, чтобы по нему можно было находить и разбирать сбои.\n• Срок в 10 дней для вас обязателен или это предпочтительный срок, который можно уточнить после оценки работ? Это позволит согласовать реалистичный срок выполнения до начала работ.\n• Какой бюджет вы планируете на эту работу? Это поможет проверить, соответствует ли предполагаемый объём работ вашим финансовым ограничениям.",
+            "metadata": {
+              "kind": "list"
+            }
+          }
+        ]
+      },
+      "formal_checks": {
+        "input_and_output_schema": "PASS",
+        "ledger_integrity": "PASS",
+        "status_markers": "PASS",
+        "deadline_digits_from_input": "PASS",
+        "worker_snapshot_unchanged": "PASS"
+      },
+      "semantic_review": {
+        "verdict": "PASS",
+        "rationale": "Desired ten-day duration and the absence of the freelancer final estimate survive in both the extracted field and Key details; summary does not turn the preference into a commitment."
+      },
+      "provider_calls": [
+        {
+          "id": "provider_call_01794931087213971608_0000000326_dbb657c51b7d42aaa089461089bde00e",
+          "step_id": "extract",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00020865
+        },
+        {
+          "id": "provider_call_01794931091694653792_0000000336_e74d3010a8b14dc0a0134b9a5ad9f267",
+          "step_id": "detect_issues",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00034793
+        },
+        {
+          "id": "provider_call_01794931099629390670_0000000346_cbe02488a9f0433eadfb381e80592482",
+          "step_id": "generate_questions",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.000375925
+        },
+        {
+          "id": "provider_call_01794931103648792169_0000000356_4140423002204b39a210d640c2b1de20",
+          "step_id": "generate_document",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.0007243
+        }
+      ]
+    },
+    {
+      "case_id": "BD-RU-05",
+      "attempt": 3,
+      "expected_status": "unconfirmed",
+      "input_sha256": "28de603ce1d141a6b19e550dcf07f6a072bbe05debd3b233e0b38b96b2f2bcac",
+      "session_id": "scenario_session_01794931242596098625_0000000072_842d3bb7d76644cfb234d7a25bb7fa8f",
+      "job_id": "job_01794931242604217289_0000000074_f4954bff520c43fdb230f5ddcaa62f51",
+      "result_id": "artifact_01794931277671493559_0000000685_e7d818cb050140c598cb9699e15fa720",
+      "latency_ms": 35572,
+      "deadline": "Желаемый срок клиента — 10 дней; окончательную оценку исполнитель ещё не давал.",
+      "deadline_line": "• Результат: журнал ошибок и инструкция по запуску.\n• Желаемый срок клиента — 10 дней; окончательную оценку исполнитель ещё не давал.",
+      "document": {
+        "summary": "К работе пока рано приступать: сначала нужно уточнить платформу и способ доступа к форме, а также данные и поля amoCRM для сопоставления. Кроме того, не указаны бюджет и целевая аудитория, а желаемый срок в 10 дней ещё не подтверждён оценкой исполнителя.",
+        "sections": [
+          {
+            "id": "overview",
+            "title": "Project overview",
+            "content": "Заказчик хочет связать форму заявки сайта онлайн-курсов с amoCRM.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "key-details",
+            "title": "Key details",
+            "content": "• Результат: интеграция формы с amoCRM, при которой для новой заявки создаются контакт и сделка с названием курса.\n• Результат: журнал ошибок и инструкция по запуску.\n• Желаемый срок клиента — 10 дней; окончательную оценку исполнитель ещё не давал.\n• Источник заявок — одна форма: https://courses.example/apply.\n• Повторная заявка на тот же email не должна дублировать контакт.\n• Перенос старых заявок, рассылки и телефония исключены.\n• Тестовый аккаунт CRM предоставляет заказчик.\n• Нужно проверить успешную заявку, повторный email и недоступность CRM.",
+            "metadata": {
+              "kind": "list"
+            }
+          },
+          {
+            "id": "gaps",
+            "title": "Gaps and risks",
+            "content": "Не указаны технология и способ доступа к форме, состав передаваемых данных и правила их сопоставления с полями amoCRM; без этих сведений нельзя спланировать и начать интеграцию. Неясно, должна ли повторная заявка с тем же email создавать новую сделку или не создавать ни контакт, ни сделку. Бюджет или диапазон оплаты не указан, поэтому исполнитель не сможет оценить приемлемость объёма работ для заказчика. Срок в 10 дней обозначен как пожелание клиента, но его реалистичность не подтверждена оценкой исполнителя. Также не указаны бюджет и целевая аудитория.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "next-steps",
+            "title": "Questions to ask",
+            "content": "• На какой платформе работает форма, как к ней можно получить доступ и какие данные из неё нужно передавать в amoCRM и в какие поля? Эти сведения нужны, чтобы выбрать способ интеграции и спланировать её настройку.\n• Если с того же адреса электронной почты поступит новая заявка, нужно ли создать для неё новую сделку, даже если контакт уже существует? Ответ определит, как обрабатывать повторные заявки и какие сделки создавать в amoCRM.\n• Какой бюджет или диапазон оплаты вы предусмотрели для этой работы? Это поможет исполнителю оценить, подходит ли объём работ вашему бюджету.\n• Насколько для вас обязателен срок в 10 дней и можно ли его сдвинуть, если оценка работ покажет, что нужно больше времени? Ответ поможет согласовать реалистичный срок выполнения интеграции и её проверки.",
+            "metadata": {
+              "kind": "list"
+            }
+          }
+        ]
+      },
+      "formal_checks": {
+        "input_and_output_schema": "PASS",
+        "ledger_integrity": "PASS",
+        "status_markers": "PASS",
+        "deadline_digits_from_input": "PASS",
+        "worker_snapshot_unchanged": "PASS"
+      },
+      "semantic_review": {
+        "verdict": "PASS",
+        "rationale": "Desired ten-day duration and the absence of the freelancer final estimate survive in both the extracted field and Key details; summary does not turn the preference into a commitment."
+      },
+      "provider_calls": [
+        {
+          "id": "provider_call_01794931243484521871_0000000648_a7358cff421a449bab08141d05d15a1f",
+          "step_id": "extract",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00025814999999999996
+        },
+        {
+          "id": "provider_call_01794931248846583155_0000000658_266b61920c6c4158a17d451b4f16fe74",
+          "step_id": "detect_issues",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00030042999999999997
+        },
+        {
+          "id": "provider_call_01794931258385013541_0000000668_e2cbee9f72d045aa81a3572a4698e25b",
+          "step_id": "generate_questions",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.000397675
+        },
+        {
+          "id": "provider_call_01794931263763077042_0000000678_d43b3088f6e64cb2a41228226e76fcdb",
+          "step_id": "generate_document",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.0007067999999999999
+        }
+      ]
+    },
+    {
+      "case_id": "BD-EN-PREFERRED",
+      "attempt": 1,
+      "expected_status": "unconfirmed",
+      "input_sha256": "c8517d221406998e63fa8488535851f095ed75be462661dd63b2db9c064e7df5",
+      "session_id": "scenario_session_01794930957969360331_0000000007_66a66e2bfe214bad9f23f01069d4db10",
+      "job_id": "job_01794930957974862079_0000000009_904abb515a9d47259df47cbe665fcefe",
+      "result_id": "artifact_01794930978792257630_0000000087_d4d2d6dd6d4a4c52ae5cfa448a4e2a84",
+      "latency_ms": 21398,
+      "deadline": "Preferred schedule: three weeks from kickoff, with launch by December 10.",
+      "deadline_line": "- Deliverable: A one-page landing site with a hero block, class schedule, instructor bios, and a sign-up form that emails the studio.\n- Preferred schedule: Three weeks from kickoff, with launch by December 10; the kickoff date and launch year are not specified.",
+      "document": {
+        "summary": "The brief is not ready to start because the launch timeline cannot be assessed and the budget and sign-up form requirements are unclear. Resolve the kickoff date and launch year first, then confirm the budget and form details.",
+        "sections": [
+          {
+            "id": "overview",
+            "title": "Project overview",
+            "content": "The client wants to promote the yoga studio’s new evening classes.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "key-details",
+            "title": "Key details",
+            "content": "- Deliverable: A one-page landing site with a hero block, class schedule, instructor bios, and a sign-up form that emails the studio.\n- Preferred schedule: Three weeks from kickoff, with launch by December 10; the kickoff date and launch year are not specified.\n- Constraint: Texts and photos come from the studio.",
+            "metadata": {
+              "kind": "list"
+            }
+          },
+          {
+            "id": "gaps",
+            "title": "Gaps and risks",
+            "content": "The three-week schedule cannot be assessed against the December 10 launch date because the kickoff date and launch year are not specified. No budget or pricing expectations are provided, making it difficult to confirm a feasible scope and estimate the work. The sign-up form requirements are unclear, including what information it should collect and whether emailing the studio is the only required handling of submissions. The brief does not state the budget or target audience.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "next-steps",
+            "title": "Questions to ask",
+            "content": "- What date would you like to use as the kickoff, and which year do you mean for the December 10 launch? These dates will help confirm whether the three-week schedule can meet your launch target.\n- Do you have a budget range in mind for the landing site? Your budget will help confirm a feasible scope and estimate the work.\n- What information should the sign-up form collect, and should submissions only be emailed to the studio? Knowing what the form should collect and how submissions should be handled will clarify what needs to be built.",
+            "metadata": {
+              "kind": "list"
+            }
+          }
+        ]
+      },
+      "formal_checks": {
+        "input_and_output_schema": "PASS",
+        "ledger_integrity": "PASS",
+        "status_markers": "PASS",
+        "deadline_digits_from_input": "PASS",
+        "worker_snapshot_unchanged": "PASS"
+      },
+      "semantic_review": {
+        "verdict": "PASS",
+        "rationale": "Preferred three-week schedule from kickoff and December 10 launch target survive together; no fixed commitment or new kickoff date/year is introduced."
+      },
+      "provider_calls": [
+        {
+          "id": "provider_call_01794930961991331214_0000000060_a01b4ecba0114cc2bc4b4dec54cf0e06",
+          "step_id": "detect_issues",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00038005000000000005
+        },
+        {
+          "id": "provider_call_01794930958854404294_0000000050_04a0979691844256acb1499250d94805",
+          "step_id": "extract",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.0003143
+        },
+        {
+          "id": "provider_call_01794930968881129796_0000000070_a787c46b0ad94d79a831b21bf0d7b006",
+          "step_id": "generate_questions",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.000287675
+        },
+        {
+          "id": "provider_call_01794930972638509706_0000000080_8bd6e090fa04425b830a2f8a119929ea",
+          "step_id": "generate_document",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.000524925
+        }
+      ]
+    },
+    {
+      "case_id": "BD-EN-PREFERRED",
+      "attempt": 2,
+      "expected_status": "unconfirmed",
+      "input_sha256": "c8517d221406998e63fa8488535851f095ed75be462661dd63b2db9c064e7df5",
+      "session_id": "scenario_session_01794931112884484941_0000000042_fd68ee80c474484caf8e78f0abe6ea48",
+      "job_id": "job_01794931112888162329_0000000044_782b29ee18db45779b672b7b7bee75a1",
+      "result_id": "artifact_01794931132737925243_0000000409_1c549d3a8fd84462b65780ee7fc019ab",
+      "latency_ms": 20380,
+      "deadline": "Preferred schedule: three weeks from kickoff, with launch by December 10.",
+      "deadline_line": "- Deliverable: One-page landing site with a hero block, class schedule, instructor bios, and a sign-up form that emails the studio.\n- Preferred schedule: Three weeks from kickoff, with launch by December 10.",
+      "document": {
+        "summary": "The brief is not ready to start: the kickoff date and launch year are needed to check the preferred schedule against the December 10 target, and the form details and budget also need clarification. Resolve the timeline first.",
+        "sections": [
+          {
+            "id": "overview",
+            "title": "Project overview",
+            "content": "The client wants a landing site for the yoga studio’s new evening classes.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "key-details",
+            "title": "Key details",
+            "content": "- Deliverable: One-page landing site with a hero block, class schedule, instructor bios, and a sign-up form that emails the studio.\n- Preferred schedule: Three weeks from kickoff, with launch by December 10.\n- Constraint: Texts and photos come from the client.",
+            "metadata": {
+              "kind": "list"
+            }
+          },
+          {
+            "id": "gaps",
+            "title": "Gaps and risks",
+            "content": "The three-week schedule cannot be reconciled with the December 10 launch target because the kickoff date and launch year are unspecified. The sign-up form cannot be configured without knowing which email address should receive submissions and what information the form should collect. No budget or budget range is provided, so the freelancer cannot assess whether the requested work fits the available budget. The target audience and budget are also not specified.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "next-steps",
+            "title": "Questions to ask",
+            "content": "- What date do you expect the project to kick off, and which year should the December 10 launch date refer to? These dates will help confirm whether the three-week schedule can meet your launch target.\n- Which email address should receive sign-up submissions, and what information should the form ask for? We need these details to set up the form to collect and send sign-ups correctly.\n- Do you have a budget or budget range for the landing site? Knowing your budget will help determine whether the requested work fits within it.",
+            "metadata": {
+              "kind": "list"
+            }
+          }
+        ]
+      },
+      "formal_checks": {
+        "input_and_output_schema": "PASS",
+        "ledger_integrity": "PASS",
+        "status_markers": "PASS",
+        "deadline_digits_from_input": "PASS",
+        "worker_snapshot_unchanged": "PASS"
+      },
+      "semantic_review": {
+        "verdict": "PASS",
+        "rationale": "Preferred three-week schedule from kickoff and December 10 launch target survive together; no fixed commitment or new kickoff date/year is introduced."
+      },
+      "provider_calls": [
+        {
+          "id": "provider_call_01794931113343399191_0000000372_fac0ce72c15845ffaa8af41c15a11a3c",
+          "step_id": "extract",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00015742
+        },
+        {
+          "id": "provider_call_01794931116804864443_0000000382_eedebcb3ddc44486ba91adc621116c69",
+          "step_id": "detect_issues",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.0002667
+        },
+        {
+          "id": "provider_call_01794931123028481897_0000000392_d04a9565beb34710b98fb78a0c1c4f95",
+          "step_id": "generate_questions",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.0002828
+        },
+        {
+          "id": "provider_call_01794931126682159941_0000000402_02cde734d9474164a24c41fd27c2325a",
+          "step_id": "generate_document",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.0005453
+        }
+      ]
+    },
+    {
+      "case_id": "BD-EN-PREFERRED",
+      "attempt": 3,
+      "expected_status": "unconfirmed",
+      "input_sha256": "c8517d221406998e63fa8488535851f095ed75be462661dd63b2db9c064e7df5",
+      "session_id": "scenario_session_01794931278941198419_0000000077_ed6769a7dced4d779b315b13689d0396",
+      "job_id": "job_01794931278946533692_0000000079_b3ea3df61b044ad5ae4b5b036e168aa0",
+      "result_id": "artifact_01794931312272479741_0000000731_53c9ee971766486897893c457a84f898",
+      "latency_ms": 33606,
+      "deadline": "Preferred schedule: three weeks from kickoff, with launch by December 10.",
+      "deadline_line": "- Deliverables: Hero block, Class schedule, Instructor bios, and a sign-up form that emails the studio.\n- Deadline: The preferred schedule is three weeks from kickoff, with launch by December 10; the kickoff date and year are unspecified.",
+      "document": {
+        "summary": "The brief is not ready to start because the form setup, schedule, and budget need clarification, and the target audience is not specified. Resolve the form’s recipient address and submission handling first so the sign-up form can be configured reliably.",
+        "sections": [
+          {
+            "id": "overview",
+            "title": "Project overview",
+            "content": "The client wants a one-page landing site for the yoga studio’s new evening classes.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "key-details",
+            "title": "Key details",
+            "content": "- Deliverables: Hero block, Class schedule, Instructor bios, and a sign-up form that emails the studio.\n- Deadline: The preferred schedule is three weeks from kickoff, with launch by December 10; the kickoff date and year are unspecified.\n- Constraint: Texts and photos come from the studio.\n- No budget is specified.",
+            "metadata": {
+              "kind": "list"
+            }
+          },
+          {
+            "id": "gaps",
+            "title": "Gaps and risks",
+            "content": "The recipient email address and expected handling of form submissions are unspecified, so the sign-up form cannot be configured reliably. The kickoff date and year for the December 10 launch are unspecified, so it is unclear whether the preferred three-week schedule can meet the launch date. No budget or budget range is provided, making it difficult to confirm feasibility within the available funds. The target audience is not specified.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "next-steps",
+            "title": "Questions to ask",
+            "content": "- Which email address should receive sign-up submissions, and what would you like to happen after someone submits the form? This will let me set up the form to send sign-ups to the right place and respond as you expect.\n- When do you expect kickoff to happen, and which year should the December 10 launch date refer to? These dates will help me confirm whether the preferred three-week schedule can meet your launch date.\n- What budget or budget range have you set aside for this landing site? Knowing the available budget will help me confirm whether the requested work is feasible and plan it appropriately.",
+            "metadata": {
+              "kind": "list"
+            }
+          }
+        ]
+      },
+      "formal_checks": {
+        "input_and_output_schema": "PASS",
+        "ledger_integrity": "PASS",
+        "status_markers": "PASS",
+        "deadline_digits_from_input": "PASS",
+        "worker_snapshot_unchanged": "PASS"
+      },
+      "semantic_review": {
+        "verdict": "PASS",
+        "rationale": "Preferred three-week schedule from kickoff and December 10 launch target survive together; no fixed commitment or new kickoff date/year is introduced."
+      },
+      "provider_calls": [
+        {
+          "id": "provider_call_01794931279739881373_0000000694_51444ee101254918b0b96c19c8e44cd1",
+          "step_id": "extract",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00013042000000000002
+        },
+        {
+          "id": "provider_call_01794931283656977353_0000000704_cc16a229f905450c9048d34bc5763548",
+          "step_id": "detect_issues",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.0003127
+        },
+        {
+          "id": "provider_call_01794931295277912314_0000000714_84c2b60bd84d407b8d3b8421f5981eb5",
+          "step_id": "generate_questions",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.000295925
+        },
+        {
+          "id": "provider_call_01794931298771154436_0000000724_a270a95c810840c4a26f0f3e6cd00690",
+          "step_id": "generate_document",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.0005614249999999999
+        }
+      ]
+    },
+    {
+      "case_id": "BD-RU-CONDITIONAL",
+      "attempt": 1,
+      "expected_status": "unconfirmed",
+      "input_sha256": "d95b2ecebbb9982d4132ecdf9f84321345f12c0016a00cd837e93d054242c676",
+      "session_id": "scenario_session_01794930980120138984_0000000012_87f1544314f64721bf614a01a9911fff",
+      "job_id": "job_01794930980124598876_0000000014_1a3f7071745949188c959b4f6bfc2e91",
+      "result_id": "artifact_01794931002189058075_0000000133_70c7bfb6085d40e69f46733b458a89b5",
+      "latency_ms": 22391,
+      "deadline": "Если макеты будут готовы к 1 декабря, запуск — 15 декабря.",
+      "deadline_line": "• Срок указан условно: если макеты будут готовы к 1 декабря, запуск планируется на 15 декабря.",
+      "document": {
+        "summary": "Работу пока рано начинать: сначала нужно уточнить, требуются ли только макеты или также вёрстка и запуск лендинга. Также необходимо определить год запуска, способ обработки регистраций и бюджет; не указаны целевая аудитория и ограничения.",
+        "sections": [
+          {
+            "id": "overview",
+            "title": "Project overview",
+            "content": "Клиент хочет создать лендинг для конференции.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "key-details",
+            "title": "Key details",
+            "content": "• Материалы: программа, информация о спикерах и форма регистрации.\n• Срок указан условно: если макеты будут готовы к 1 декабря, запуск планируется на 15 декабря.",
+            "metadata": {
+              "kind": "list"
+            }
+          },
+          {
+            "id": "gaps",
+            "title": "Gaps and risks",
+            "content": "Неясно, требуется ли только разработать макеты или также сверстать и запустить лендинг, поскольку макеты упомянуты как отдельный этап. Не указано, куда должны поступать данные из формы регистрации и нужна ли интеграция с конкретным сервисом. Для дат подготовки макетов и запуска не указан год, поэтому календарный график нельзя однозначно определить. Бюджет на разработку и запуск лендинга не указан. Также не указаны целевая аудитория и ограничения.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "next-steps",
+            "title": "Questions to ask",
+            "content": "• Вам нужны только макеты лендинга или также его вёрстка и запуск? Это определит объём работ и планирование запуска к 15 декабря.\n• Куда должны поступать данные из формы регистрации и нужно ли подключить её к определённому сервису? Это поможет предусмотреть нужный способ обработки регистраций при разработке лендинга.\n• О каком годе идёт речь для подготовки макетов к 1 декабря и запуска 15 декабря? Год нужен, чтобы определить календарный график работ и сроки запуска.\n• Какой бюджет предусмотрен на разработку и запуск лендинга? Бюджет поможет согласовать подходящий объём работ и техническое решение.",
+            "metadata": {
+              "kind": "list"
+            }
+          }
+        ]
+      },
+      "formal_checks": {
+        "input_and_output_schema": "PASS",
+        "ledger_integrity": "PASS",
+        "status_markers": "PASS",
+        "deadline_digits_from_input": "PASS",
+        "worker_snapshot_unchanged": "PASS"
+      },
+      "semantic_review": {
+        "verdict": "PASS",
+        "rationale": "December 15 launch remains conditional on designs being ready by December 1 in both outputs; no unconditional launch commitment is introduced."
+      },
+      "provider_calls": [
+        {
+          "id": "provider_call_01794930980851902926_0000000096_69ed3cdae6e349ad87c700aace863498",
+          "step_id": "extract",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00032292499999999995
+        },
+        {
+          "id": "provider_call_01794930984511164318_0000000106_7397e16d603c48c7958d65a2e870619c",
+          "step_id": "detect_issues",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.000409175
+        },
+        {
+          "id": "provider_call_01794930991825992162_0000000116_b9ec90f4245f4a1fac1fac61e9e1414b",
+          "step_id": "generate_questions",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.0003123
+        },
+        {
+          "id": "provider_call_01794930994905833105_0000000126_9f970ad12c1f47b6ba349a1ae7a9f41e",
+          "step_id": "generate_document",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.0006023
+        }
+      ]
+    },
+    {
+      "case_id": "BD-RU-CONDITIONAL",
+      "attempt": 2,
+      "expected_status": "unconfirmed",
+      "input_sha256": "d95b2ecebbb9982d4132ecdf9f84321345f12c0016a00cd837e93d054242c676",
+      "session_id": "scenario_session_01794931134045096755_0000000047_d3aeff9dbb4548d196edd6b336771320",
+      "job_id": "job_01794931134049170464_0000000049_89d34897ef804b719ebbbd4c8e4ebb6e",
+      "result_id": "artifact_01794931154037584033_0000000455_c2b04c9781b14a119def385a4d7638be",
+      "latency_ms": 20322,
+      "deadline": "Если макеты будут готовы к 1 декабря, запуск — 15 декабря.",
+      "deadline_line": "• Запуск запланирован на 15 декабря при условии, что макеты будут готовы к 1 декабря; год не указан.",
+      "document": {
+        "summary": "Запрос пока не готов к началу работы: сначала нужно уточнить год запуска, поскольку без него нельзя определить календарный план; также необходимо согласовать материалы, объём работ и бюджет.",
+        "sections": [
+          {
+            "id": "overview",
+            "title": "Project overview",
+            "content": "Нужно создать лендинг для конференции.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "key-details",
+            "title": "Key details",
+            "content": "• Разделы лендинга: программа, спикеры и форма регистрации.\n• Запуск запланирован на 15 декабря при условии, что макеты будут готовы к 1 декабря; год не указан.",
+            "metadata": {
+              "kind": "list"
+            }
+          },
+          {
+            "id": "gaps",
+            "title": "Gaps and risks",
+            "content": "Не указаны материалы и данные для разделов программы и спикеров, а также требования к полям формы регистрации и обработке заявок. Неясно, должен ли исполнитель подготовить макеты или их предоставит заказчик. Для подготовки макетов и запуска не указан год, поэтому календарный план нельзя однозначно определить. Не указан бюджет или ориентир по стоимости.\nТакже не указаны целевая аудитория и ограничения.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "next-steps",
+            "title": "Questions to ask",
+            "content": "• На какой год запланированы подготовка макетов к 1 декабря и запуск 15 декабря? Год нужен, чтобы определить календарный план и понять, достаточно ли времени на подготовку и запуск.\n• Какие материалы и сведения нужно разместить в разделах программы и спикеров, какие поля включить в форму регистрации и как обрабатывать заявки? Эти данные помогут подготовить содержание лендинга и настроить регистрацию в соответствии с вашими потребностями.\n• Макеты подготовите вы или нужно включить их разработку в работу исполнителя? От этого зависит объём работ и то, какие задачи нужно завершить до запуска.\n• Какой бюджет или ориентир по стоимости вы планируете для этого проекта? Бюджет поможет согласовать подходящий объём работ и условия выполнения.",
+            "metadata": {
+              "kind": "list"
+            }
+          }
+        ]
+      },
+      "formal_checks": {
+        "input_and_output_schema": "PASS",
+        "ledger_integrity": "PASS",
+        "status_markers": "PASS",
+        "deadline_digits_from_input": "PASS",
+        "worker_snapshot_unchanged": "PASS"
+      },
+      "semantic_review": {
+        "verdict": "PASS",
+        "rationale": "December 15 launch remains conditional on designs being ready by December 1 in both outputs; no unconditional launch commitment is introduced."
+      },
+      "provider_calls": [
+        {
+          "id": "provider_call_01794931134810861055_0000000418_be362b0539734a1e90271b5fba938868",
+          "step_id": "extract",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00014219
+        },
+        {
+          "id": "provider_call_01794931137990918578_0000000428_be5e12c8295b41b5b366ceee9416f88b",
+          "step_id": "detect_issues",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00027247
+        },
+        {
+          "id": "provider_call_01794931144199387469_0000000438_96f58a136be545c297b2b8caf5b97623",
+          "step_id": "generate_questions",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.000340425
+        },
+        {
+          "id": "provider_call_01794931147990424965_0000000448_bbfe9cc6d8ed44f2ba8f561664fd1b75",
+          "step_id": "generate_document",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.000572925
+        }
+      ]
+    },
+    {
+      "case_id": "BD-RU-CONDITIONAL",
+      "attempt": 3,
+      "expected_status": "unconfirmed",
+      "input_sha256": "d95b2ecebbb9982d4132ecdf9f84321345f12c0016a00cd837e93d054242c676",
+      "session_id": "scenario_session_01794931313237227030_0000000082_a14038dd864a40fa9cc2bb714d3ae28f",
+      "job_id": "job_01794931313244581537_0000000084_8e52e4f259044281ab99d5f54270c129",
+      "result_id": "artifact_01794931336077472557_0000000777_05a910fcc113498484e4d37f3fb7a3ae",
+      "latency_ms": 23451,
+      "deadline": "Если макеты будут готовы к 1 декабря, запуск — 15 декабря.",
+      "deadline_line": "• Срок запуска указан условно: если макеты будут готовы к 1 декабря, запуск — 15 декабря. Год не указан.",
+      "document": {
+        "summary": "Запрос пока не готов к началу работ: сначала нужно уточнить, кто готовит макеты, а также год дат, требования к форме регистрации и бюджет; кроме того, не указаны целевая аудитория и ограничения проекта.",
+        "sections": [
+          {
+            "id": "overview",
+            "title": "Project overview",
+            "content": "Заказчик хочет создать лендинг для конференции.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "key-details",
+            "title": "Key details",
+            "content": "• Результаты: программа, информация о спикерах и форма регистрации.\n• Срок запуска указан условно: если макеты будут готовы к 1 декабря, запуск — 15 декабря. Год не указан.",
+            "metadata": {
+              "kind": "list"
+            }
+          },
+          {
+            "id": "gaps",
+            "title": "Gaps and risks",
+            "content": "Неясно, кто должен подготовить макеты — заказчик или исполнитель, поэтому нельзя определить объём работ по дизайну. У дат 1 и 15 декабря не указан год, что затрудняет планирование. Не заданы требования к форме регистрации: какие данные собирать и куда отправлять заявки. Бюджет проекта не указан, поэтому нельзя согласовать реалистичный объём и стоимость.\nТакже не указаны бюджет, целевая аудитория и ограничения проекта.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "next-steps",
+            "title": "Questions to ask",
+            "content": "• Подскажите, пожалуйста, кто подготовит макеты лендинга — вы или исполнитель? Это поможет определить объём работ по дизайну и спланировать подготовку лендинга.\n• Уточните, пожалуйста, о каком годе идёт речь для дат 1 и 15 декабря? Год необходим, чтобы однозначно запланировать подготовку макетов и запуск лендинга.\n• Какие данные нужно собирать в форме регистрации и куда должны поступать заявки? Ответ поможет определить содержание формы и настроить получение регистраций.\n• Какой бюджет предусмотрен на проект? Бюджет поможет согласовать реалистичный объём работ и стоимость проекта.",
+            "metadata": {
+              "kind": "list"
+            }
+          }
+        ]
+      },
+      "formal_checks": {
+        "input_and_output_schema": "PASS",
+        "ledger_integrity": "PASS",
+        "status_markers": "PASS",
+        "deadline_digits_from_input": "PASS",
+        "worker_snapshot_unchanged": "PASS"
+      },
+      "semantic_review": {
+        "verdict": "PASS",
+        "rationale": "December 15 launch remains conditional on designs being ready by December 1 in both outputs; no unconditional launch commitment is introduced."
+      },
+      "provider_calls": [
+        {
+          "id": "provider_call_01794931313346277143_0000000740_b9fb0f42e837453aa43a0986185c070a",
+          "step_id": "extract",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00012669
+        },
+        {
+          "id": "provider_call_01794931316721923914_0000000750_92147c28f376460baf1adc41c0fca77c",
+          "step_id": "detect_issues",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00027047
+        },
+        {
+          "id": "provider_call_01794931324134404148_0000000760_ab319f70fed04dd78824f966ae490729",
+          "step_id": "generate_questions",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00031492499999999997
+        },
+        {
+          "id": "provider_call_01794931327775786529_0000000770_c8a3af8cf97b4248ab477a5996056285",
+          "step_id": "generate_document",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.0006253
+        }
+      ]
+    },
+    {
+      "case_id": "BD-ES-TENTATIVE",
+      "attempt": 1,
+      "expected_status": "unconfirmed",
+      "input_sha256": "6a6baf62dcfd774b1e454a2fcb44d2d52c6335d43a71ad88a7ff0ee7693df93c",
+      "session_id": "scenario_session_01794931003285345773_0000000017_0ca41428c0fa406dbfb6f18f949c464f",
+      "job_id": "job_01794931003291310119_0000000019_e8dd715e69ce4cb692effcf617b99e7a",
+      "result_id": "artifact_01794931024011567563_0000000179_89adb98146674f039bd38a4b84fc8cab",
+      "latency_ms": 21360,
+      "deadline": "Plazo tentativo: unas cuatro semanas, aún por confirmar con el diseñador.",
+      "deadline_line": "- Plazo: tentativo, de unas cuatro semanas, aún por confirmar con el diseñador.",
+      "document": {
+        "summary": "El encargo aún no está listo para comenzar: hay que resolver los riesgos y los datos faltantes. Lo más importante es confirmar el plazo tentativo de unas cuatro semanas; también se deben definir el presupuesto, quién aportará las fotos y el público destinatario.",
+        "sections": [
+          {
+            "id": "overview",
+            "title": "Project overview",
+            "content": "El cliente quiere presentar 20 productos con fotos y precios en un catálogo en PDF.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "key-details",
+            "title": "Key details",
+            "content": "- Entregable: catálogo en PDF.\n- Plazo: tentativo, de unas cuatro semanas, aún por confirmar con el diseñador.\n- El catálogo debe incluir 20 productos, fotos y precios.\n- No se indica un presupuesto.",
+            "metadata": {
+              "kind": "list"
+            }
+          },
+          {
+            "id": "gaps",
+            "title": "Gaps and risks",
+            "content": "El plazo de unas cuatro semanas aún no está confirmado, por lo que no se puede fijar una fecha de entrega fiable. No se indica el presupuesto disponible para diseñar y producir el catálogo. No queda claro si el cliente proporcionará las fotos de los productos o si el diseñador deberá conseguirlas o producirlas. También falta información sobre el público destinatario.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "next-steps",
+            "title": "Questions to ask",
+            "content": "- ¿Podrían confirmar la fecha de entrega prevista con el diseñador? Confirmarla permitirá organizar el trabajo y acordar un plazo fiable.\n- ¿Qué presupuesto tienen disponible para diseñar y producir el catálogo? Conocerlo permitirá ajustar el alcance a los recursos disponibles.\n- ¿Proporcionarán las fotos de los productos o esperan que el diseñador las consiga o las produzca? Aclararlo permitirá definir el trabajo necesario para completar el catálogo.",
+            "metadata": {
+              "kind": "list"
+            }
+          }
+        ]
+      },
+      "formal_checks": {
+        "input_and_output_schema": "PASS",
+        "ledger_integrity": "PASS",
+        "status_markers": "PASS",
+        "deadline_digits_from_input": "PASS",
+        "worker_snapshot_unchanged": "PASS"
+      },
+      "semantic_review": {
+        "verdict": "PASS",
+        "rationale": "Approximately four weeks remains tentative and pending confirmation with the designer in both outputs and any summary mention."
+      },
+      "provider_calls": [
+        {
+          "id": "provider_call_01794931004255055232_0000000142_4fbb147340484936b06f52fd63a822d2",
+          "step_id": "extract",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.000415425
+        },
+        {
+          "id": "provider_call_01794931009733623578_0000000152_fa8ae55fb38644138b262c62bb7049b9",
+          "step_id": "detect_issues",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.000325675
+        },
+        {
+          "id": "provider_call_01794931015028711681_0000000162_cbe3b01ee19e43a2b5eea7e5de439dcc",
+          "step_id": "generate_questions",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.0002718
+        },
+        {
+          "id": "provider_call_01794931017909625327_0000000172_5b0af946ea344c6d86757880c1afda1a",
+          "step_id": "generate_document",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.000515175
+        }
+      ]
+    },
+    {
+      "case_id": "BD-ES-TENTATIVE",
+      "attempt": 2,
+      "expected_status": "unconfirmed",
+      "input_sha256": "6a6baf62dcfd774b1e454a2fcb44d2d52c6335d43a71ad88a7ff0ee7693df93c",
+      "session_id": "scenario_session_01794931155083741763_0000000052_23a5356ee175430396643a1471745a67",
+      "job_id": "job_01794931155090476337_0000000054_821140a25c96448b97fa91d9eb6ad111",
+      "result_id": "artifact_01794931175346163247_0000000501_e3f9e47b6c3140088b6b57c9a880a9f3",
+      "latency_ms": 21335,
+      "deadline": "Plazo tentativo: unas cuatro semanas, aún por confirmar con el diseñador.",
+      "deadline_line": "- Plazo: unas cuatro semanas, tentativo y aún por confirmar con el diseñador.",
+      "document": {
+        "summary": "El encargo aún no está listo para iniciar el trabajo: primero hay que aclarar quién proporcionará los nombres y precios de los productos y las fotos, además de confirmar el plazo tentativo y el presupuesto.",
+        "sections": [
+          {
+            "id": "overview",
+            "title": "Project overview",
+            "content": "El cliente quiere crear un catálogo de productos en PDF.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "key-details",
+            "title": "Key details",
+            "content": "- Entregable: un catálogo en PDF de 20 productos, con fotos y precios.\n- Requisito: el catálogo debe incluir 20 productos, fotos y precios.\n- Plazo: unas cuatro semanas, tentativo y aún por confirmar con el diseñador.",
+            "metadata": {
+              "kind": "list"
+            }
+          },
+          {
+            "id": "gaps",
+            "title": "Gaps and risks",
+            "content": "No se indica si se proporcionarán los datos de los 20 productos, incluidos sus nombres y precios, ni cuándo estarán disponibles. No queda claro si el cliente proporcionará las fotos o si el diseñador deberá buscarlas o producirlas. El plazo de unas cuatro semanas no está confirmado, por lo que no se puede establecer una fecha de entrega fiable. No se indica el presupuesto disponible para realizar el catálogo. También faltan datos sobre el presupuesto y el público al que se dirige el catálogo.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "next-steps",
+            "title": "Questions to ask",
+            "content": "- ¿Quién proporcionará los nombres y precios de los 20 productos, y cuándo estarán disponibles? Estos datos son necesarios para preparar el contenido y organizar el trabajo del catálogo.\n- ¿Proporcionarás las fotos de los productos o esperas que el diseñador las busque o las produzca? Saber quién se encargará de las fotos permite definir el trabajo necesario para el catálogo.\n- ¿Puedes confirmar si el plazo de unas cuatro semanas es viable y desde qué fecha empezaría a contar? Confirmar el plazo y su fecha de inicio permite acordar una fecha de entrega fiable.\n- ¿Qué presupuesto tienes disponible para realizar el catálogo? Conocer el presupuesto permite ajustar el alcance del trabajo a los recursos disponibles.",
+            "metadata": {
+              "kind": "list"
+            }
+          }
+        ]
+      },
+      "formal_checks": {
+        "input_and_output_schema": "PASS",
+        "ledger_integrity": "PASS",
+        "status_markers": "PASS",
+        "deadline_digits_from_input": "PASS",
+        "worker_snapshot_unchanged": "PASS"
+      },
+      "semantic_review": {
+        "verdict": "PASS",
+        "rationale": "Approximately four weeks remains tentative and pending confirmation with the designer in both outputs and any summary mention."
+      },
+      "provider_calls": [
+        {
+          "id": "provider_call_01794931156103279162_0000000464_08a8b815910345a49f9a7cdfa4da5c09",
+          "step_id": "extract",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00017915
+        },
+        {
+          "id": "provider_call_01794931160237010904_0000000474_c17d1d9e8e3d48a5b94134508fc39ea5",
+          "step_id": "detect_issues",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00023343
+        },
+        {
+          "id": "provider_call_01794931166177739773_0000000484_82856440a1c147e8a0fb27f6908e197d",
+          "step_id": "generate_questions",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.000308925
+        },
+        {
+          "id": "provider_call_01794931169248828897_0000000494_4346dfdfa23e4b9eb5f9772b94a9e05f",
+          "step_id": "generate_document",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.0005392999999999999
+        }
+      ]
+    },
+    {
+      "case_id": "BD-ES-TENTATIVE",
+      "attempt": 3,
+      "expected_status": "unconfirmed",
+      "input_sha256": "6a6baf62dcfd774b1e454a2fcb44d2d52c6335d43a71ad88a7ff0ee7693df93c",
+      "session_id": "scenario_session_01794931337477860813_0000000087_7c63686894f14c52bff8f75599476300",
+      "job_id": "job_01794931337484248733_0000000089_c6a184e718864ce6939de09f99a746e4",
+      "result_id": "artifact_01794931357267221839_0000000823_9211d254b4874d469d88d214b8052b7f",
+      "latency_ms": 20360,
+      "deadline": "Plazo tentativo: unas cuatro semanas, aún por confirmar con el diseñador.",
+      "deadline_line": "• Plazo tentativo: unas cuatro semanas, aún por confirmar con el diseñador.",
+      "document": {
+        "summary": "El encargo aún no está listo para iniciar: faltan el presupuesto, el público objetivo y las restricciones, y el plazo sigue pendiente de confirmación. Lo más importante es definir un presupuesto viable y acordar una fecha de entrega.",
+        "sections": [
+          {
+            "id": "overview",
+            "title": "Project overview",
+            "content": "El cliente quiere crear un catálogo de productos.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "key-details",
+            "title": "Key details",
+            "content": "• Entregable: catálogo en PDF de 20 productos, con fotos y precios.\n• Plazo tentativo: unas cuatro semanas, aún por confirmar con el diseñador.",
+            "metadata": {
+              "kind": "list"
+            }
+          },
+          {
+            "id": "gaps",
+            "title": "Gaps and risks",
+            "content": "No se indica el presupuesto disponible, por lo que no es posible valorar el alcance viable ni confirmar la viabilidad del encargo. El plazo de cuatro semanas es tentativo y depende de la confirmación del diseñador, así que no hay una fecha de entrega acordada. También faltan el público objetivo y las restricciones.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "next-steps",
+            "title": "Questions to ask",
+            "content": "• ¿Qué presupuesto tienen previsto para el catálogo? Conocerlo permitirá definir un alcance viable para el catálogo de 20 productos.\n• ¿Qué fecha de entrega les gustaría acordar una vez que el diseñador confirme el plazo? Acordar una fecha de entrega permitirá organizar el trabajo y planificar las revisiones.",
+            "metadata": {
+              "kind": "list"
+            }
+          }
+        ]
+      },
+      "formal_checks": {
+        "input_and_output_schema": "PASS",
+        "ledger_integrity": "PASS",
+        "status_markers": "PASS",
+        "deadline_digits_from_input": "PASS",
+        "worker_snapshot_unchanged": "PASS"
+      },
+      "semantic_review": {
+        "verdict": "PASS",
+        "rationale": "Approximately four weeks remains tentative and pending confirmation with the designer in both outputs and any summary mention."
+      },
+      "provider_calls": [
+        {
+          "id": "provider_call_01794931338173881452_0000000786_d26073d9aa714e61b487a1d8106df0a0",
+          "step_id": "extract",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00011064999999999999
+        },
+        {
+          "id": "provider_call_01794931340953585440_0000000796_ad0a383b74c8488cb8e074b455af115b",
+          "step_id": "detect_issues",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00015693
+        },
+        {
+          "id": "provider_call_01794931347013373103_0000000806_745ff7a8b94d4f97806e3f9638f51c95",
+          "step_id": "generate_questions",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00023229999999999998
+        },
+        {
+          "id": "provider_call_01794931349243330798_0000000816_35d359092788427aaa71e4431741868b",
+          "step_id": "generate_document",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.000524925
+        }
+      ]
+    },
+    {
+      "case_id": "BD-RU-AGREED",
+      "attempt": 1,
+      "expected_status": "agreed",
+      "input_sha256": "0aec1b2302e79e5bef6349d3a3d507285ca31ef9009de4c3a9c661ffc0332b2f",
+      "session_id": "scenario_session_01794931025320776879_0000000022_1064ef0efd1949daa26181e18eba04be",
+      "job_id": "job_01794931025326130909_0000000024_2db65e385a624f7190c53d5b2b84ebc6",
+      "result_id": "artifact_01794931042674833880_0000000225_c861d309b9454db999b619d932081a36",
+      "latency_ms": 18332,
+      "deadline": "Срок согласован с исполнителем: сдача 20 декабря.",
+      "deadline_line": "- Срок согласован с исполнителем: сдача 20 декабря.",
+      "document": {
+        "summary": "Работа пока не готова к началу: сначала нужно уточнить, какие элементы статей сохранять и как сопоставить старые адреса с новыми; также не указаны бюджет, целевая аудитория и ограничения.",
+        "sections": [
+          {
+            "id": "overview",
+            "title": "Project overview",
+            "content": "Клиент хочет перенести блог с WordPress на Tilda.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "key-details",
+            "title": "Key details",
+            "content": "- Перенести 40 статей.\n- Настроить редиректы со старых адресов.\n- Срок согласован с исполнителем: сдача 20 декабря.",
+            "metadata": {
+              "kind": "list"
+            }
+          },
+          {
+            "id": "gaps",
+            "title": "Gaps and risks",
+            "content": "Не указано, нужно ли сохранять оформление статей, изображения, метаданные и другие элементы; из-за этого объем и ожидаемый результат могут пониматься по-разному. Не уточнено, для каких старых адресов нужны редиректы и каким новым адресам они должны соответствовать. Также не указаны бюджет, целевая аудитория и ограничения.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "next-steps",
+            "title": "Questions to ask",
+            "content": "- Подскажите, пожалуйста, что нужно сохранить при переносе статей: оформление, изображения, метаданные или другие элементы? Это поможет точно определить объем переноса и ожидаемый результат.\n- Подскажите, пожалуйста, для каких старых адресов нужны перенаправления и на какие новые адреса каждый из них должен вести? Это позволит настроить перенаправления так, чтобы посетители попадали на нужные страницы.",
+            "metadata": {
+              "kind": "list"
+            }
+          }
+        ]
+      },
+      "formal_checks": {
+        "input_and_output_schema": "PASS",
+        "ledger_integrity": "PASS",
+        "status_markers": "PASS",
+        "deadline_digits_from_input": "PASS",
+        "worker_snapshot_unchanged": "PASS"
+      },
+      "semantic_review": {
+        "verdict": "PASS",
+        "rationale": "Agreed December 20 delivery remains agreed in both outputs. Asking for the missing year does not downgrade the agreement or invent a year."
+      },
+      "provider_calls": [
+        {
+          "id": "provider_call_01794931026093209083_0000000188_0e3271b352e348898d7a57b514ecd1b6",
+          "step_id": "extract",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.000304675
+        },
+        {
+          "id": "provider_call_01794931029546241560_0000000198_63e577df68154ac7a3c8bfb6995efe97",
+          "step_id": "detect_issues",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.000313425
+        },
+        {
+          "id": "provider_call_01794931034705988455_0000000208_86f955bb6b01400c90987d6b4553620c",
+          "step_id": "generate_questions",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.0002643
+        },
+        {
+          "id": "provider_call_01794931037377134953_0000000218_2d4df26a7df141e58ee10aca191d3522",
+          "step_id": "generate_document",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.0004743
+        }
+      ]
+    },
+    {
+      "case_id": "BD-RU-AGREED",
+      "attempt": 2,
+      "expected_status": "agreed",
+      "input_sha256": "0aec1b2302e79e5bef6349d3a3d507285ca31ef9009de4c3a9c661ffc0332b2f",
+      "session_id": "scenario_session_01794931177098033703_0000000057_233bb6b742e84c3dbf3772c1c9d0f923",
+      "job_id": "job_01794931177101329927_0000000059_4f5cd71d7fae4d91ba1ba514f90de144",
+      "result_id": "artifact_01794931196163418163_0000000547_b9f4a9bc2faa488ba9d167defe4e5aaa",
+      "latency_ms": 19342,
+      "deadline": "Срок согласован с исполнителем: сдача 20 декабря.",
+      "deadline_line": "• Срок согласован с исполнителем: сдача 20 декабря; год не указан.",
+      "document": {
+        "summary": "Запрос пока не готов к началу работы: неясен состав переноса каждой статьи, а также остаются вопросы по году срока сдачи, стоимости и подготовке соответствия адресов. В первую очередь следует уточнить, что именно переносить для каждой статьи; также не указаны целевая аудитория и ограничения проекта.",
+        "sections": [
+          {
+            "id": "overview",
+            "title": "Project overview",
+            "content": "Клиент хочет перенести блог с WordPress на Tilda.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "key-details",
+            "title": "Key details",
+            "content": "• Перенести 40 статей.\n• Настроить редиректы со старых адресов.\n• Срок согласован с исполнителем: сдача 20 декабря; год не указан.",
+            "metadata": {
+              "kind": "list"
+            }
+          },
+          {
+            "id": "gaps",
+            "title": "Gaps and risks",
+            "content": "Не определено, что входит в перенос каждой статьи, например изображения, форматирование и SEO-данные, поэтому неясны объём работы и критерии готовности. У срока «20 декабря» не указан год. Не указан бюджет или согласованная стоимость. Не уточнено, кто подготовит соответствие старых адресов новым для настройки редиректов. Также не указаны целевая аудитория и ограничения проекта.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "next-steps",
+            "title": "Questions to ask",
+            "content": "• Что нужно перенести для каждой из 40 статей: только текст или также изображения, форматирование и SEO-данные?\n• К какому году относится срок сдачи 20 декабря?\n• Какой бюджет или стоимость работы согласованы?\n• Кто подготовит список соответствия старых адресов новым для настройки редиректов?",
+            "metadata": {
+              "kind": "list"
+            }
+          }
+        ]
+      },
+      "formal_checks": {
+        "input_and_output_schema": "PASS",
+        "ledger_integrity": "PASS",
+        "status_markers": "PASS",
+        "deadline_digits_from_input": "PASS",
+        "worker_snapshot_unchanged": "PASS"
+      },
+      "semantic_review": {
+        "verdict": "PASS",
+        "rationale": "Agreed December 20 delivery remains agreed in both outputs. Asking for the missing year does not downgrade the agreement or invent a year."
+      },
+      "provider_calls": [
+        {
+          "id": "provider_call_01794931177401621144_0000000510_d773d7d04ca34f18815f323ee326a568",
+          "step_id": "extract",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00011375000000000001
+        },
+        {
+          "id": "provider_call_01794931179944780177_0000000520_d04a647b62524a40bb0ff8d7a65d46f8",
+          "step_id": "detect_issues",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00028652999999999996
+        },
+        {
+          "id": "provider_call_01794931186781072255_0000000530_4e0ef574499a4631b0a4af9d6a9c78d1",
+          "step_id": "generate_questions",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.000302175
+        },
+        {
+          "id": "provider_call_01794931190162934658_0000000540_30e1bf663f6e4170bd78359dc4173448",
+          "step_id": "generate_document",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.0005363
+        }
+      ]
+    },
+    {
+      "case_id": "BD-RU-AGREED",
+      "attempt": 3,
+      "expected_status": "agreed",
+      "input_sha256": "0aec1b2302e79e5bef6349d3a3d507285ca31ef9009de4c3a9c661ffc0332b2f",
+      "session_id": "scenario_session_01794931358661268476_0000000092_478d7dd186dd4cb8a3f9cfdaaf64440b",
+      "job_id": "job_01794931358671058417_0000000094_8f355cf3019147828d260707f3a6bad4",
+      "result_id": "artifact_01794931386992074694_0000000869_0897dbd08a6141069bf25ce7e897697f",
+      "latency_ms": 28509,
+      "deadline": "Срок согласован с исполнителем: сдача 20 декабря.",
+      "deadline_line": "• Срок согласован с исполнителем: сдача 20 декабря; год не указан.",
+      "document": {
+        "summary": "К работе пока не следует приступать: сначала нужно уточнить состав переноса и соответствие старых адресов новым, а также согласовать год сдачи и бюджет. Кроме того, не указана целевая аудитория.",
+        "sections": [
+          {
+            "id": "overview",
+            "title": "Project overview",
+            "content": "Клиент хочет перенести блог с WordPress на Tilda."
+          },
+          {
+            "id": "key-details",
+            "title": "Key details",
+            "content": "• Перенести 40 статей.\n• Настроить редиректы со старых адресов.\n• Срок согласован с исполнителем: сдача 20 декабря; год не указан.\n• Блог переносится с WordPress на Tilda.",
+            "metadata": {
+              "kind": "list"
+            }
+          },
+          {
+            "id": "gaps",
+            "title": "Gaps and risks",
+            "content": "Неясно, входят ли в перенос только тексты статей или также оформление, изображения и SEO-данные. Для настройки редиректов не указаны целевые адреса для старых URL или порядок их сопоставления с новыми. У срока сдачи не указан год, поэтому дату нельзя однозначно привязать к календарю. Бюджет или ценовой диапазон не указан, поэтому финансовые условия пока нельзя согласовать. Также не указана целевая аудитория.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "next-steps",
+            "title": "Questions to ask",
+            "content": "• Подскажите, пожалуйста, что нужно перенести помимо текстов 40 статей: оформление, изображения и SEO-данные? Это поможет точно определить объём работ и сохранить нужные элементы блога при переносе.\n• Можете предоставить список старых адресов и указать, на какие новые адреса должен вести каждый из них? Так можно настроить редиректы без потери посетителей и переходов на нужные страницы.\n• Какой год имеется в виду для сдачи 20 декабря? Точный год поможет однозначно зафиксировать срок сдачи.\n• Какой бюджет или ценовой диапазон вы предусмотрели для переноса блога? Это поможет согласовать стоимость с объёмом работ до начала проекта.",
+            "metadata": {
+              "kind": "list"
+            }
+          }
+        ]
+      },
+      "formal_checks": {
+        "input_and_output_schema": "PASS",
+        "ledger_integrity": "PASS",
+        "status_markers": "PASS",
+        "deadline_digits_from_input": "PASS",
+        "worker_snapshot_unchanged": "PASS"
+      },
+      "semantic_review": {
+        "verdict": "PASS",
+        "rationale": "Agreed December 20 delivery remains agreed in both outputs. Asking for the missing year does not downgrade the agreement or invent a year."
+      },
+      "provider_calls": [
+        {
+          "id": "provider_call_01794931359344911035_0000000832_168e96dc7c104c71b06419f68fd06914",
+          "step_id": "extract",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00021024999999999996
+        },
+        {
+          "id": "provider_call_01794931364479011729_0000000842_c1f59f8045404d1c8dc8e4fac8c08359",
+          "step_id": "detect_issues",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00039003
+        },
+        {
+          "id": "provider_call_01794931376156214579_0000000852_d67e16ed73bc4d7e8ec104f76b9e8490",
+          "step_id": "generate_questions",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.000311425
+        },
+        {
+          "id": "provider_call_01794931380493170936_0000000862_dc8b1e292ed44443b108d7e4bef1e150",
+          "step_id": "generate_document",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.0005353000000000001
+        }
+      ]
+    },
+    {
+      "case_id": "BD-EN-AGREED",
+      "attempt": 1,
+      "expected_status": "agreed",
+      "input_sha256": "eac6750267d27e3e50e945379aa8882bd10054b777717a4e8b1f36d14ba014a2",
+      "session_id": "scenario_session_01794931044465692077_0000000027_3ca55f95c1674d6799e2bbe7b197f33d",
+      "job_id": "job_01794931044472013941_0000000029_b126edaae7b644bc9d5f28a98fc980b4",
+      "result_id": "artifact_01794931065886221264_0000000271_ff12ba3154cc44829d2de2fc7e6b3ca1",
+      "latency_ms": 22420,
+      "deadline": "Agreed with the developer on our call: December 20.",
+      "deadline_line": "- Deadline: Agreed with the developer on a call as December 20; the year is not specified.",
+      "document": {
+        "summary": "The brief is not ready to start: first clarify the Shopify theme, implementation expectations, and the size chart and reviews block requirements. The delivery year and budget also need confirmation, and the target audience is not specified.",
+        "sections": [
+          {
+            "id": "overview",
+            "title": "Project overview",
+            "content": "The client wants a Shopify product page template."
+          },
+          {
+            "id": "key-details",
+            "title": "Key details",
+            "content": "- Deliverable: A Shopify product page template with a size chart and reviews block.\n- Constraints: The template must be for Shopify and include a size chart and reviews block.\n- Deadline: Agreed with the developer on a call as December 20; the year is not specified.",
+            "metadata": {
+              "kind": "list"
+            }
+          },
+          {
+            "id": "gaps",
+            "title": "Gaps and risks",
+            "content": "The existing Shopify theme, store access, design direction, and implementation expectations are unspecified, leaving the technical and visual scope unclear. The size chart and reviews block are not defined in enough detail to establish their content or behavior, or whether a particular reviews app or integration is required. The deadline gives a month and day but no year, so the intended delivery date is unclear. No budget or pricing expectations are provided, so feasibility within the client’s budget cannot be assessed. The budget and target audience are also not specified."
+          },
+          {
+            "id": "next-steps",
+            "title": "Questions to ask",
+            "content": "- Which Shopify theme should I build this in, what store access will you provide, and do you have a design direction or specific expectations for how the template should be implemented? This will clarify the technical and visual scope and what I need to get started.\n- What information and behavior should the size chart and reviews block include, and do you have a preferred reviews app or integration? These details will determine how the two blocks should be designed and implemented.\n- What year do you mean for the December 20 deadline? Confirming the year will let me plan the work against the correct delivery date.\n- What budget range do you have in mind for this work? Knowing the available budget will help me assess whether the requested scope is feasible.",
+            "metadata": {
+              "kind": "list"
+            }
+          }
+        ]
+      },
+      "formal_checks": {
+        "input_and_output_schema": "PASS",
+        "ledger_integrity": "PASS",
+        "status_markers": "PASS",
+        "deadline_digits_from_input": "PASS",
+        "worker_snapshot_unchanged": "PASS"
+      },
+      "semantic_review": {
+        "verdict": "PASS",
+        "rationale": "December 20 remains agreed with the developer in both outputs. Missing-year clarification does not mark the agreement tentative."
+      },
+      "provider_calls": [
+        {
+          "id": "provider_call_01794931044756371062_0000000234_20d704bb02c34607a69b51a2001250bb",
+          "step_id": "extract",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00035605
+        },
+        {
+          "id": "provider_call_01794931048670598931_0000000244_08aa4d6d836d44b9a5e569e2f24bf4ce",
+          "step_id": "detect_issues",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.0003718
+        },
+        {
+          "id": "provider_call_01794931055546651332_0000000254_ad83babd53ac4827b63cba262a460b84",
+          "step_id": "generate_questions",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.0003093
+        },
+        {
+          "id": "provider_call_01794931058974343120_0000000264_5255295811ba43b0b5eda78fa829ffde",
+          "step_id": "generate_document",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.0005850499999999999
+        }
+      ]
+    },
+    {
+      "case_id": "BD-EN-AGREED",
+      "attempt": 2,
+      "expected_status": "agreed",
+      "input_sha256": "eac6750267d27e3e50e945379aa8882bd10054b777717a4e8b1f36d14ba014a2",
+      "session_id": "scenario_session_01794931197156504891_0000000062_d485a989b0a64babb1da3a833fadff3e",
+      "job_id": "job_01794931197160219739_0000000064_46bf0301fb5840a68a815fa339b81977",
+      "result_id": "artifact_01794931217178092422_0000000593_1a64651a1a534613a2d272d53c99b9b0",
+      "latency_ms": 20354,
+      "deadline": "Agreed with the developer on our call: December 20.",
+      "deadline_line": "- Deadline: December 20, agreed with the developer on a call; the year is not specified.",
+      "document": {
+        "summary": "The brief is not ready to start: first clarify which Shopify store and theme the template is for and its design requirements. The agreed December 20 deadline also needs a year, and the size-chart content, reviews source, budget, target audience, and other constraints remain unspecified.",
+        "sections": [
+          {
+            "id": "overview",
+            "title": "Project overview",
+            "content": "The client wants a Shopify product page template built.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "key-details",
+            "title": "Key details",
+            "content": "- Deliverables: Shopify product page template; Size chart; Reviews block.\n- Deadline: December 20, agreed with the developer on a call; the year is not specified.\n- No budget or pricing expectations were provided.",
+            "metadata": {
+              "kind": "list"
+            }
+          },
+          {
+            "id": "gaps",
+            "title": "Gaps and risks",
+            "content": "The Shopify store or theme to apply the template to, along with its design requirements, is not specified, so the implementation target is unclear. The size chart content and review source or app are not specified, so the required content and integration cannot be determined. The deadline gives December 20 but does not specify a year. No budget or pricing expectations are provided, making it difficult to confirm the work is feasible within the client’s expected cost. The target audience and other project constraints are also not specified.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "next-steps",
+            "title": "Questions to ask",
+            "content": "- Which Shopify store and theme should I use, and are there any design requirements for the product page? This will clarify where to build the template and how it should look.\n- What information should the size chart include, and which review app or source should the reviews block use? I need these details to add the right content and connect the reviews correctly.\n- Which year do you mean for the December 20 deadline? The year is needed to confirm the delivery date.\n- What budget or price range do you have in mind for this work? Knowing your budget will help confirm the work can be completed within your expectations.",
+            "metadata": {
+              "kind": "list"
+            }
+          }
+        ]
+      },
+      "formal_checks": {
+        "input_and_output_schema": "PASS",
+        "ledger_integrity": "PASS",
+        "status_markers": "PASS",
+        "deadline_digits_from_input": "PASS",
+        "worker_snapshot_unchanged": "PASS"
+      },
+      "semantic_review": {
+        "verdict": "PASS",
+        "rationale": "December 20 remains agreed with the developer in both outputs. Missing-year clarification does not mark the agreement tentative."
+      },
+      "provider_calls": [
+        {
+          "id": "provider_call_01794931197215202640_0000000556_21bb76dab4c74843ae6922421479ee75",
+          "step_id": "extract",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00012162
+        },
+        {
+          "id": "provider_call_01794931200041457090_0000000566_0a746290519c4e33a69de24ce60670ef",
+          "step_id": "detect_issues",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.0002804
+        },
+        {
+          "id": "provider_call_01794931207054141135_0000000576_30de626b9f9942f6b7dc189dedce5441",
+          "step_id": "generate_questions",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.000295425
+        },
+        {
+          "id": "provider_call_01794931210366405760_0000000586_9b612fd5e6464887a303a3f95981814b",
+          "step_id": "generate_document",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00056155
+        }
+      ]
+    },
+    {
+      "case_id": "BD-EN-AGREED",
+      "attempt": 3,
+      "expected_status": "agreed",
+      "input_sha256": "eac6750267d27e3e50e945379aa8882bd10054b777717a4e8b1f36d14ba014a2",
+      "session_id": "scenario_session_01794931388119394062_0000000097_0f8b2c87197742f288ef301689c9c2c0",
+      "job_id": "job_01794931388126342826_0000000099_99270603b473449b97db64a77c916b1a",
+      "result_id": "artifact_01794931408475238366_0000000915_1576a4e5381246dab4e7ca1370475041",
+      "latency_ms": 21374,
+      "deadline": "Agreed with the developer on our call: December 20.",
+      "deadline_line": "- Deadline: December 20, agreed with the developer on a call; the year is unspecified.",
+      "document": {
+        "summary": "The brief is not ready to start: first confirm which year the agreed December 20 deadline refers to, then clarify the section requirements and budget. The target audience is also unspecified.",
+        "sections": [
+          {
+            "id": "overview",
+            "title": "Project overview",
+            "content": "The client wants a Shopify product page template with a size chart and reviews block.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "key-details",
+            "title": "Key details",
+            "content": "- Deliverables: Shopify product page template, size chart, and reviews block.\n- Deadline: December 20, agreed with the developer on a call; the year is unspecified.\n- Constraint: The template is for Shopify.",
+            "metadata": {
+              "kind": "list"
+            }
+          },
+          {
+            "id": "gaps",
+            "title": "Gaps and risks",
+            "content": "The size chart’s content and the reviews block’s source or required functionality are unspecified, so their implementation cannot be scoped reliably. The deadline gives December 20 without a year, so the required completion date is unclear. No budget or payment terms are provided for the work. The target audience and budget are also unspecified.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "next-steps",
+            "title": "Questions to ask",
+            "content": "- Which year should I use for the December 20 deadline? The year is needed to confirm the delivery date and plan the work.\n- Could you share the size chart content and explain what you’d like the reviews block to show and how it should work? These details are needed to build both sections to your expectations.\n- What budget and payment terms should I plan for this work? This information is needed to agree on the project’s cost and payment arrangements.",
+            "metadata": {
+              "kind": "list"
+            }
+          }
+        ]
+      },
+      "formal_checks": {
+        "input_and_output_schema": "PASS",
+        "ledger_integrity": "PASS",
+        "status_markers": "PASS",
+        "deadline_digits_from_input": "PASS",
+        "worker_snapshot_unchanged": "PASS"
+      },
+      "semantic_review": {
+        "verdict": "PASS",
+        "rationale": "December 20 remains agreed with the developer in both outputs. Missing-year clarification does not mark the agreement tentative."
+      },
+      "provider_calls": [
+        {
+          "id": "provider_call_01794931389079115980_0000000878_ba04e056f7474f7080aac4c54d328e13",
+          "step_id": "extract",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00013361999999999998
+        },
+        {
+          "id": "provider_call_01794931392281059407_0000000888_c9495577c19f46e1bc9093e5e2bf44dd",
+          "step_id": "detect_issues",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00017639999999999998
+        },
+        {
+          "id": "provider_call_01794931397420892204_0000000898_a0eb1a32dc59400eb2dcad093fe2270d",
+          "step_id": "generate_questions",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00026605
+        },
+        {
+          "id": "provider_call_01794931400433293266_0000000908_de65a94cfe5040d0843de4cf802c4fb2",
+          "step_id": "generate_document",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.0005060500000000001
+        }
+      ]
+    },
+    {
+      "case_id": "BD-EN-PLAIN",
+      "attempt": 1,
+      "expected_status": "plain",
+      "input_sha256": "a839dffc4b0b26d44980719c51f991ee72a41ea24c621eed9465f6f74dcfacc9",
+      "session_id": "scenario_session_01794931067611467998_0000000032_1dd925dcfb4844e5bd955c7ad547b770",
+      "job_id": "job_01794931067615662763_0000000034_77b865ee79014d03a7deb3a422bd5e92",
+      "result_id": "artifact_01794931085152695349_0000000317_cb0277f8147846b4be3271a957bcd783",
+      "latency_ms": 18388,
+      "deadline": "March 3",
+      "deadline_line": "- Deadline: March 3; the year is not specified.",
+      "document": {
+        "summary": "The brief is not ready to start: first, obtain the mugs’ specifications and product facts so the descriptions can be accurate and avoid unsupported claims. Also clarify which year March 3 refers to and agree on the budget and payment terms.",
+        "sections": [
+          {
+            "id": "overview",
+            "title": "Project overview",
+            "content": "The client wants five product descriptions for ceramic mugs, each about 150 words long.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "key-details",
+            "title": "Key details",
+            "content": "- Deliverables: Five product descriptions, about 150 words each.\n- Deadline: March 3; the year is not specified.",
+            "metadata": {
+              "kind": "list"
+            }
+          },
+          {
+            "id": "gaps",
+            "title": "Gaps and risks",
+            "content": "No mug specifications, distinguishing features, or other product facts are provided, so the descriptions may require invented claims or substantial revision. The deadline does not specify a year, making it unclear which March 3 is intended. No budget or payment terms are stated, so the freelancer cannot assess whether the work is viable before accepting it. The brief also does not state the budget, target audience, or constraints.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "next-steps",
+            "title": "Questions to ask",
+            "content": "- Could you share the mugs’ specifications, distinguishing features, and any product facts you’d like included? This will help ensure the descriptions are accurate and avoid unsupported claims or substantial revisions.\n- Which year do you mean for the March 3 deadline? Knowing the year will let me confirm the timeline and plan the work accordingly.\n- What budget and payment terms do you have in mind for this work? This will help me assess whether the project is viable before accepting it.",
+            "metadata": {
+              "kind": "list"
+            }
+          }
+        ]
+      },
+      "formal_checks": {
+        "input_and_output_schema": "PASS",
+        "ledger_integrity": "PASS",
+        "status_markers": "PASS",
+        "deadline_digits_from_input": "PASS",
+        "worker_snapshot_unchanged": "PASS"
+      },
+      "semantic_review": {
+        "verdict": "PASS",
+        "rationale": "March 3 remains a plain date without an invented agreement or unconfirmed status; missing-year clarification does not invent a date."
+      },
+      "provider_calls": [
+        {
+          "id": "provider_call_01794931067979492444_0000000280_2c27551638cb4bcb955a36bdad010ec3",
+          "step_id": "extract",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.0002678
+        },
+        {
+          "id": "provider_call_01794931070971206411_0000000290_6f510efc641d45f0afe71fc42b008f92",
+          "step_id": "detect_issues",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00034255
+        },
+        {
+          "id": "provider_call_01794931076196483654_0000000300_dd9a98581a9b4722b5d058ab8a78313e",
+          "step_id": "generate_questions",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.000260425
+        },
+        {
+          "id": "provider_call_01794931078811155962_0000000310_ccedd7b8a1ff48589badee378cc65cd1",
+          "step_id": "generate_document",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.0005008
+        }
+      ]
+    },
+    {
+      "case_id": "BD-EN-PLAIN",
+      "attempt": 2,
+      "expected_status": "plain",
+      "input_sha256": "a839dffc4b0b26d44980719c51f991ee72a41ea24c621eed9465f6f74dcfacc9",
+      "session_id": "scenario_session_01794931218345849824_0000000067_aa737faa8de94ec9aa2bde254f78d2bb",
+      "job_id": "job_01794931218350648759_0000000069_e98a663dc8124ffb9e80662e02123451",
+      "result_id": "artifact_01794931241420146044_0000000639_84e5383a26104590928d73e522e5f5cc",
+      "latency_ms": 23432,
+      "deadline": "March 3",
+      "deadline_line": "- Deadline: March 3; the year is unspecified.",
+      "document": {
+        "summary": "The brief is not ready to start: first clarify the mug designs and features, intended audience, and brand voice so the descriptions can be accurate, and confirm the deadline year and budget.",
+        "sections": [
+          {
+            "id": "overview",
+            "title": "Project overview",
+            "content": "The client wants five product descriptions for ceramic mugs.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "key-details",
+            "title": "Key details",
+            "content": "- Deliverables: Five product descriptions.\n- Length: Each description should be about 150 words.\n- Deadline: March 3; the year is unspecified.",
+            "metadata": {
+              "kind": "list"
+            }
+          },
+          {
+            "id": "gaps",
+            "title": "Gaps and risks",
+            "content": "The mug designs, features, brand voice, and intended audience are unspecified, so the descriptions may be generic or inaccurate. The deadline does not specify a year, so the due date is unclear. No budget or payment terms are provided, making it difficult to assess whether the work is viable. The budget and intended audience are also missing.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "next-steps",
+            "title": "Questions to ask",
+            "content": "- Could you share the mugs’ designs and features, the intended audience, and the brand voice you’d like the descriptions to use? These details will help make each description accurate and suited to your customers and brand.\n- Which year is the March 3 deadline for? Knowing the year will let me confirm the delivery date and plan the work accordingly.\n- What is the budget for this work, and are there any payment terms I should know about? This will help me confirm the project’s scope and payment arrangements before starting.",
+            "metadata": {
+              "kind": "list"
+            }
+          }
+        ]
+      },
+      "formal_checks": {
+        "input_and_output_schema": "PASS",
+        "ledger_integrity": "PASS",
+        "status_markers": "PASS",
+        "deadline_digits_from_input": "PASS",
+        "worker_snapshot_unchanged": "PASS"
+      },
+      "semantic_review": {
+        "verdict": "PASS",
+        "rationale": "March 3 remains a plain date without an invented agreement or unconfirmed status; missing-year clarification does not invent a date."
+      },
+      "provider_calls": [
+        {
+          "id": "provider_call_01794931219228690207_0000000602_3d0f577be582481384b4dc6351f96198",
+          "step_id": "extract",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00013156
+        },
+        {
+          "id": "provider_call_01794931222866365444_0000000612_3db42aad934340d0b5e859ab85421f66",
+          "step_id": "detect_issues",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00024234
+        },
+        {
+          "id": "provider_call_01794931230553183542_0000000622_70ac97124df446bb9d932482ec41497f",
+          "step_id": "generate_questions",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00026955
+        },
+        {
+          "id": "provider_call_01794931233661878783_0000000632_17c405a534ef469484078966bfbbff04",
+          "step_id": "generate_document",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00050055
+        }
+      ]
+    },
+    {
+      "case_id": "BD-EN-PLAIN",
+      "attempt": 3,
+      "expected_status": "plain",
+      "input_sha256": "a839dffc4b0b26d44980719c51f991ee72a41ea24c621eed9465f6f74dcfacc9",
+      "session_id": "scenario_session_01794931410214939951_0000000102_233b68b5019547bdbf7caa93859da916",
+      "job_id": "job_01794931410218341645_0000000104_ceae3a2de1fd450bb261a89abaa6d7e7",
+      "result_id": "artifact_01794931430804970014_0000000961_7fc5fc9b1e6544a695fa6d4be62937e2",
+      "latency_ms": 21309,
+      "deadline": "March 3",
+      "deadline_line": "- Deadline: March 3; the year is unspecified.",
+      "document": {
+        "summary": "The brief is not ready to start: clarify the mugs’ specifications, distinguishing features, target audience, and brand voice, and confirm which year the March 3 deadline refers to. The budget is also not specified.",
+        "sections": [
+          {
+            "id": "overview",
+            "title": "Project overview",
+            "content": "The client wants product descriptions for ceramic mugs.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "key-details",
+            "title": "Key details",
+            "content": "- Deliverable: Five product descriptions, about 150 words each.\n- Length constraint: Each description should be about 150 words.\n- Deadline: March 3; the year is unspecified.",
+            "metadata": {
+              "kind": "list"
+            }
+          },
+          {
+            "id": "gaps",
+            "title": "Gaps and risks",
+            "content": "The mug specifications, distinguishing features, target audience, and brand voice are not provided, making it difficult to write accurate and appropriately tailored descriptions. The deadline does not specify a year, so the delivery date is unclear. The budget and target audience are not stated.",
+            "metadata": {
+              "kind": "paragraph"
+            }
+          },
+          {
+            "id": "next-steps",
+            "title": "Questions to ask",
+            "content": "- Could you share the mugs’ key specifications and distinguishing features, who the descriptions should appeal to, and the brand voice you’d like them to use? These details will help ensure the descriptions are accurate and suited to your customers and brand.\n- Which year should I use for the March 3 deadline? Knowing the year will make the delivery date clear.",
+            "metadata": {
+              "kind": "list"
+            }
+          }
+        ]
+      },
+      "formal_checks": {
+        "input_and_output_schema": "PASS",
+        "ledger_integrity": "PASS",
+        "status_markers": "PASS",
+        "deadline_digits_from_input": "PASS",
+        "worker_snapshot_unchanged": "PASS"
+      },
+      "semantic_review": {
+        "verdict": "PASS",
+        "rationale": "March 3 remains a plain date without an invented agreement or unconfirmed status; missing-year clarification does not invent a date."
+      },
+      "provider_calls": [
+        {
+          "id": "provider_call_01794931410547559602_0000000924_da6d85ab1c7e4f7ebd737974dddce106",
+          "step_id": "extract",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00018906
+        },
+        {
+          "id": "provider_call_01794931414737630878_0000000934_bd80e6eac03e4fc28c2e6d4ccf3ac3db",
+          "step_id": "detect_issues",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.00019433999999999999
+        },
+        {
+          "id": "provider_call_01794931421031172662_0000000944_54a7e1241c244003a139c43aef42067f",
+          "step_id": "generate_questions",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.000231425
+        },
+        {
+          "id": "provider_call_01794931423969808957_0000000954_64a9b90d75714158b3e6f3657fd50118",
+          "step_id": "generate_document",
+          "model": "gpt-6-luna",
+          "actual_provider": "openai",
+          "status": "succeeded",
+          "ledger_reasoning_effort": null,
+          "estimated_cost": 0.0004893
+        }
+      ]
+    }
+  ],
+  "result": {
+    "runs": 21,
+    "formal_passes": 21,
+    "agent_semantic_passes": 21,
+    "human_acceptance": "Not recorded; user acceptance is separate."
+  },
+  "limitations": [
+    "Three repetitions per case on one configured model are bounded regression evidence, not a guarantee for arbitrary inputs.",
+    "The English preferred-schedule brief is the explicitly permitted synthetic fallback, not a recovered original QA brief.",
+    "Budget status is covered by the prompt contract but was not exercised in these seven deadline-focused live cases.",
+    "Provider-call ledger reasoning_effort is null; medium is verified only from the running worker router.",
+    "Some outputs repeat missing-budget or deliverable information and occasionally put missing-budget prose in Key details; these presentation issues are outside the deadline-status acceptance scope and remain deferred."
+  ]
+}
