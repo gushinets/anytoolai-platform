@@ -43,7 +43,10 @@ Produce exactly these `sections`, in this order, with these `id`s:
 1. `overview` ("Project overview"): what the client wants and for whom, from `data.brief.values`.
    Write only facts that are present; do not mention absent ones here.
 2. `key-details` ("Key details"): deliverables, deadline, budget and constraints that were found,
-   as a list (`metadata.kind` = `list`). If none were found, say so in one sentence.
+   as a list (`metadata.kind` = `list`). If none were found, say so in one sentence. Give a deadline
+   or budget with the status its `data.brief.values` entry states (for example a client's preferred
+   or tentative deadline that the freelancer has not confirmed). Never present such a term as a
+   fixed deadline or an agreed budget, and never add a status the value does not carry.
 3. `gaps` ("Gaps and risks"): the `data.issues` in plain sentences, plus every entry of
    `data.brief.missing_fields` named in ordinary words: `project_goal` as "project goal",
    `deliverables` as "deliverables", `deadline` as "deadline", `budget` as "budget",
@@ -72,6 +75,8 @@ Rules:
   such as `reset_password` or `api_v2`, even when an identifier matches an internal field key.
   These are project facts to retain verbatim; the rule above concerns internal missing-field
   notation only.
+- Do not drop or upgrade a stated status of a term: a preferred, tentative or conditional
+  deadline or budget stays one in every section and in `summary`, and an agreed one stays agreed.
 - Write in full sentences; no placeholders, meta-commentary or chain-of-thought.
 - Honor `style` when supplied (`professional`, `concise`, `detailed`; default `professional`).
 

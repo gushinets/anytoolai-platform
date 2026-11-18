@@ -1,0 +1,42 @@
+{
+  "description": "Independent references approved after reading all 21 documents for ANY-762 deadline status. Never regenerate these from candidates to make a failing check pass. Review every copied field before approving a new variant; unrelated prose quality is not certified.",
+  "readable_reference": "docs/exec-plans/active/any-762-brief-decoder-deadline-status.evidence-20261117.json",
+  "serialization": "SHA-256 of UTF-8 json.dumps({summary, sections: [{id, title, content}, ...]}, ensure_ascii=False, sort_keys=True, separators=(comma, colon)); exact strings and section order, no metadata.",
+  "document_sha256": {
+    "BD-RU-05": [
+      "bb1d1bbc7ae8cdf911e007332716e6b662a6bdb83f3488882205c97e2abb684b",
+      "2c56dbfabe09ac2de7d664a763555b1d314b588bf3c69d629410f38914d09ef8",
+      "f9c222ac56b261d47c654c440cafaf858ca745cdc259607fa66774961999f8ab"
+    ],
+    "BD-EN-PREFERRED": [
+      "5059f98597b543550aa0375b70faeef495c502cd1db7f070157249dfa718958f",
+      "cb5936a3463b8d4c09e4810251fe8bca8a3ce28d2abd368123474351451efcb9",
+      "68a912d31b39528eecc3ee1fec9c52025fdba3bad7b6669688777a1a063367f4"
+    ],
+    "BD-RU-CONDITIONAL": [
+      "fa06e48d73bd557807a44fadddaa10ac73b4d26f3ad4f51fd5ef4c7f0ff9e84a",
+      "dfa5ba39c87ab87447399fd04e58180a0068930c1c8639b1e47a2db7f15e1dec",
+      "19e5b45a076f67b146b9a65b61ad44d7cc5c56ea5988706c66c139d58ee58a30"
+    ],
+    "BD-ES-TENTATIVE": [
+      "212234a8d1d21916a97f9bd42be2c8202848a802e160b304eb96e06b5e8d832f",
+      "eed4590912062e474d4ae2589675f60bba9ade93070707de5aeeef4a27329e56",
+      "3526784937933d8792a629edec31d51f054ce5b4ade56deb5efd01fbb088e412"
+    ],
+    "BD-RU-AGREED": [
+      "1d165efe87f2f03629954de45832ea9aae7284d99f2a65ba294ff7760e3dba4e",
+      "68df6f5aac60083f1d93b2707ccfd65e5cf845726f36f0cafaf10e3082b86bcf",
+      "97324562828c90c7a30c3a082d3a2440f81d2d05c6d634fa8472846bffdc82e6"
+    ],
+    "BD-EN-AGREED": [
+      "b866450a7a9dc33140dcf8905e1016bce4352902379cbbeb8ac30c4bcb915897",
+      "a528635409888bee6ae4b139b0b917ea1318d1bd549b483eb15d0372b9242311",
+      "7c3016515fb6a1d66f7e03297728c90e64ca6596f977507656f5487e236c5c30"
+    ],
+    "BD-EN-PLAIN": [
+      "f940c5901cca88560097559ecadae1412aca792c93ab70a13545c03cef299717",
+      "9fc1b8bbeaf7d33d57b949b3b021459029ed0ffa7fd5bd1ee6d1598068072250",
+      "7811e5ad0ea7be13a5d5901d5ce45d9edb07e3325748db4fb9eab2f1af093f50"
+    ]
+  }
+}
