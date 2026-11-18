@@ -9,7 +9,7 @@
       {
         "id": "key-details",
         "title": "Key details",
-        "content": "- Una página con el menú.",
+        "content": "Entregables:\n- Una página con el menú.",
         "metadata": {
           "kind": "list"
         }
@@ -17,7 +17,7 @@
       {
         "id": "gaps",
         "title": "Gaps and risks",
-        "content": "El cliente debe confirmar el plazo, el presupuesto, el público objetivo y las restricciones."
+        "content": "- No se indica el plazo de entrega del sitio.\n- No se indica para quién es el sitio.\nEl cliente debe confirmar el plazo, el presupuesto, el público objetivo y las restricciones."
       },
       {
         "id": "next-steps",

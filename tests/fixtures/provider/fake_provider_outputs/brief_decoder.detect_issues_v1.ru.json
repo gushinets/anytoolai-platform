@@ -1,0 +1,25 @@
+{
+  "response_json": {
+    "issues": [
+      {
+        "category": "timeline_risk",
+        "description": "Срок готовности сайта не указан.",
+        "severity": "high",
+        "evidence": "Создать сайт пекарни."
+      },
+      {
+        "category": "ambiguity",
+        "description": "Не указано, для кого делается сайт.",
+        "severity": "medium",
+        "evidence": "Создать сайт пекарни."
+      }
+    ]
+  },
+  "input_tokens": 230,
+  "output_tokens": 120,
+  "latency_ms": 16,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "brief_decoder.detect_issues_v1.ru"
+  }
+}

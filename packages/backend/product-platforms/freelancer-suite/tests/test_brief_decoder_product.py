@@ -581,14 +581,68 @@ def test_summary_prompt_names_gaps_in_words_not_field_keys() -> None:
     assert "no code formatting" not in prompt
 
 
+def test_summary_prompt_copies_lists_verbatim() -> None:
+    """ANY-617: paraphrased lists changed who acts, what rights cover and times. Only `summary`
+    is free text; lists, issues and questions are copied verbatim, one per line."""
+    prompt = " ".join(
+        (PRODUCT_DIR / "prompts" / "generate_summary.v1.md").read_text(encoding="utf-8").split()
+    )
+    for phrase in (
+        'one item per line, each line starting with "- "',
+        "Do not merge, split, shorten, reword, reorder, summarize or drop items.",
+        "keeps who performs each action",
+        "what a right or license covers",
+        "a time stays a time and never becomes a date range",
+        "Only `summary` is written freely.",
+        "every `constraints` item verbatim. List all of them, including exclusions",
+        "every `data.issues` `description` verbatim",
+        "every `data.questions` `question` verbatim",
+        "`summary` is the only free text",
+    ):
+        assert phrase in prompt, phrase
+    assert "in plain sentences" not in prompt
+    assert "The questions and their rationales must also use that language" not in prompt
+
+
 # Words a section may use that carry no project fact. Deliberately per-section: `overview` is
 # only allowed to state present facts (generate_summary.v1.md: "do not mention absent ones
 # here"), so it gets no words for talking about the brief or missing details -- allowing them
 # there once masked an "the brief gives no further detail" violation. `key-details` may label
 # fields and say that none were found.
 _NON_FACT_WORDS = {
-    "overview": {"lets", "that", "wants", "clien"},
-    "key-details": {"deliv", "deadl", "budge", "const", "rathe", "than", "brief", "found", "were"},
+    # ANY-617: overview may label the verbatim target audience in the document language.
+    "overview": {
+        "lets",
+        "that",
+        "wants",
+        "clien",
+        "targe",
+        "audie",
+        "целев",
+        "аудит",
+        "públi",
+        "objet",
+    },
+    "key-details": {
+        "deliv",
+        "deadl",
+        "budge",
+        "const",
+        "rathe",
+        "than",
+        "brief",
+        "found",
+        "were",
+        # ANY-617: localized group labels (ru, es).
+        "резул",
+        "срок",
+        "бюдже",
+        "огран",
+        "entre",
+        "plazo",
+        "presu",
+        "restr",
+    },
 }
 # A10 suffix -> (A01 suffix, expected document language).
 _SUMMARY_FIXTURES: dict[str, tuple[str, DocumentLanguage]] = {
@@ -673,6 +727,82 @@ def test_summary_fixture_rejects_changed_fixed_titles(
     )
     with pytest.raises(jsonschema.ValidationError, match="was expected"):
         test_summary_fixtures_obey_the_a10_prompt(suffix, *_SUMMARY_FIXTURES[suffix])
+
+
+def _list_lines(content: str) -> list[str]:
+    return [line[2:] for line in content.splitlines() if line.startswith("- ")]
+
+
+@pytest.mark.parametrize("summary_suffix", _SUMMARY_FIXTURES)
+def test_summary_fixtures_copy_lists_verbatim(summary_suffix: str) -> None:
+    """ANY-617: deliverables, every constraint, issue descriptions and questions appear
+    verbatim, one per line, in source order; only `summary` is free text."""
+    values = _fixture_response("brief_decoder.extract_brief_v1" + summary_suffix)["values"]
+    issues = _fixture_response("brief_decoder.detect_issues_v1" + summary_suffix)["issues"]
+    questions = (
+        []
+        if summary_suffix == ".no_issues"
+        else _fixture_response("brief_decoder.generate_questions_v1" + summary_suffix)["questions"]
+    )
+    sections = {
+        s["id"]: s["content"]
+        for s in _fixture_response("brief_decoder.generate_summary_v1" + summary_suffix)["sections"]
+    }
+
+    key_items = [*values.get("deliverables", []), *values.get("constraints", [])]
+    assert _list_lines(sections["key-details"]) == key_items
+    for scalar in ("deadline", "budget"):
+        if scalar in values:
+            assert any(
+                line.endswith(": " + values[scalar])
+                for line in sections["key-details"].splitlines()
+            ), scalar
+    if "project_goal" in values:
+        assert sections["overview"].splitlines()[0] == values["project_goal"]
+    if "target_audience" in values:
+        assert any(
+            line.endswith(": " + values["target_audience"])
+            for line in sections["overview"].splitlines()
+        )
+    assert _list_lines(sections["gaps"]) == [issue["description"] for issue in issues]
+    assert _list_lines(sections["next-steps"]) == [q["question"] for q in questions]
+
+
+@pytest.mark.parametrize(
+    ("suffix", "section_id", "original_text", "replacement"),
+    [
+        ("", "key-details", "should look modern", "the look should be modern"),
+        (
+            ".no_issues",
+            "key-details",
+            "- checkout goes through a third-party payment processor, "
+            "not a custom payment system\n",
+            "",
+        ),
+        ("", "next-steps", "the exact date the website needs to be live", "the exact launch date"),
+        ("", "next-steps", "live?\n- Could", "live? Could"),
+        ("", "key-details", "- menu page\n- order form", "- order form\n- menu page"),
+        (".no_issues", "key-details", "2026-11-02", "2026-11-01 – 2026-11-02"),
+    ],
+)
+def test_summary_fixture_rejects_changed_source_items(
+    monkeypatch: pytest.MonkeyPatch,
+    suffix: str,
+    section_id: str,
+    original_text: str,
+    replacement: str,
+) -> None:
+    original = _fixture_response
+    stem = "brief_decoder.generate_summary_v1" + suffix
+    document = original(stem)
+    section = next(s for s in document["sections"] if s["id"] == section_id)
+    assert original_text in section["content"]
+    section["content"] = section["content"].replace(original_text, replacement, 1)
+    monkeypatch.setitem(
+        globals(), "_fixture_response", lambda name: document if name == stem else original(name)
+    )
+    with pytest.raises(AssertionError):
+        test_summary_fixtures_copy_lists_verbatim(suffix)
 
 
 @pytest.mark.parametrize("suffix", _SUMMARY_FIXTURES)

@@ -38,35 +38,60 @@ facts the brief does not state), `data.issues` is the list of problems found in 
 empty), and `data.questions` is the list of clarifying questions to ask the client (absent or
 empty when there was nothing to ask).
 
+Copy rule. Items marked "verbatim" below are copied from `data` exactly as written, one item per
+line, each line starting with "- ", in the order `data` gives them. Do not merge, split, shorten,
+reword, reorder, summarize or drop items. Copying them exactly also keeps who performs each
+action (the party who hands over or receives something stays the same), what a right or license
+covers (for example rights to audio stay rights to audio), and every date, time, duration,
+amount and currency exactly as stated (a time stays a time and never becomes a date range).
+Only `summary` is written freely.
+
 Produce exactly these `sections`, in this order, with these `id`s:
 
-1. `overview` ("Project overview"): what the client wants and for whom, from `data.brief.values`.
-   Write only facts that are present; do not mention absent ones here.
-2. `key-details` ("Key details"): deliverables, deadline, budget and constraints that were found,
-   as a list (`metadata.kind` = `list`). If none were found, say so in one sentence. Give a deadline
-   or budget with the status its `data.brief.values` entry states (for example a client's preferred
-   or tentative deadline that the freelancer has not confirmed). Never present such a term as a
-   fixed deadline or an agreed budget, and never add a status the value does not carry.
-3. `gaps` ("Gaps and risks"): the `data.issues` in plain sentences, plus every entry of
-   `data.brief.missing_fields` named in ordinary words: `project_goal` as "project goal",
-   `deliverables` as "deliverables", `deadline` as "deadline", `budget` as "budget",
-   `target_audience` as "target audience", `constraints` as "constraints" -- translated into
-   the language the document is written in. Say the client should confirm them. If there are
-   no issues and nothing is missing, say the brief is clear and complete.
-4. `next-steps` ("Questions to ask"): the `data.questions` as a list (`metadata.kind` = `list`).
-   If there are none, say that no clarifying questions were generated -- do not claim work can
-   start here; an empty question list only means nothing needed asking, not that the brief is
-   complete. Readiness is `summary`'s call, not this section's.
+1. `overview` ("Project overview"): the `data.brief.values.project_goal` value verbatim (as plain
+   text, without "- "). If `target_audience` is present, add a second line: the word for
+   "Target audience" in the document language, a colon, and the value verbatim. Write only facts
+   that are present; do not mention absent ones here. If neither value is present, write one
+   sentence that the brief does not state what the client wants.
+2. `key-details` ("Key details"), `metadata.kind` = `list`. Use these groups in this order and
+   skip any group whose value is absent:
+   - a "Deliverables:" line, then every `deliverables` item verbatim;
+   - "Deadline: " followed by the `deadline` value verbatim;
+   - "Budget: " followed by the `budget` value verbatim;
+   - a "Constraints:" line, then every `constraints` item verbatim. List all of them, including
+     exclusions, limits and anything the client says is not included.
+   Group labels use the document language (for example "Результаты:", "Срок:", "Бюджет:",
+   "Ограничения:" in Russian; "Entregables:", "Plazo:", "Presupuesto:", "Restricciones:" in
+   Spanish). Give a deadline or budget with the status its `data.brief.values` entry states
+   (for example a client's preferred or tentative deadline that the freelancer has not
+   confirmed); the verbatim value already carries it. Never present such a term as a fixed
+   deadline or an agreed budget, and never add a status the value does not carry. If none of
+   these four values were found, say so in one sentence.
+3. `gaps` ("Gaps and risks"): first every `data.issues` `description` verbatim, then one sentence
+   naming every entry of `data.brief.missing_fields` in ordinary words:
+   `project_goal` as "project goal", `deliverables` as "deliverables",
+   `deadline` as "deadline", `budget` as "budget",
+   `target_audience` as "target audience", `constraints` as "constraints" --
+   translated into the language the document is written in. Say the client should confirm them.
+   If there are no issues and nothing is missing, say the brief is clear and complete.
+4. `next-steps` ("Questions to ask"), `metadata.kind` = `list`: every `data.questions` `question`
+   verbatim, without rationales. If there are none, say that no clarifying questions were
+   generated -- do not claim work can start here; an empty question list only means nothing
+   needed asking, not that the brief is complete. Readiness is `summary`'s call, not this
+   section's.
 
-`summary` is one short paragraph with the bottom line: whether the brief is ready to start work and
-what is the most important thing to resolve first. Base the readiness claim on all three of
-`data.issues`, `data.brief.missing_fields`, and `data.questions` together -- an empty
-`data.questions` alone never implies the brief is ready; only "no issues and nothing missing"
-does. It is not a list of section titles.
+`summary` is the only free text: one short paragraph with the bottom line, whether the brief is
+ready to start work and what is the most important thing to resolve first. Base the readiness
+claim on all three of `data.issues`, `data.brief.missing_fields`, and `data.questions` together --
+an empty `data.questions` alone never implies the brief is ready; only "no issues and nothing
+missing" does. Do not repeat the lists in `summary`. When it names a fact, keep its subject,
+rights, dates and times as `data` states them. It is not a list of section titles.
 
 Rules:
 
 - Never invent facts, figures or dates that are not in `data`.
+- Never paraphrase, merge or drop a verbatim item, even when `style` is `concise`.
+  Apply `style` only to `summary` and connecting sentences.
 - Do not use internal field keys from `data.brief.missing_fields` (such as `target_audience` or
   `project_goal`), the container name `missing_fields`, or technical labels like "Missing field:"
   to describe missing information. In section titles, section content and `summary`, name that
@@ -77,7 +102,7 @@ Rules:
   notation only.
 - Do not drop or upgrade a stated status of a term: a preferred, tentative or conditional
   deadline or budget stays one in every section and in `summary`, and an agreed one stays agreed.
-- Write in full sentences; no placeholders, meta-commentary or chain-of-thought.
+- Outside the verbatim lines and group labels, write in full sentences; no placeholders, meta-commentary or chain-of-thought.
 - Honor `style` when supplied (`professional`, `concise`, `detailed`; default `professional`).
 
 Before returning the JSON, check `summary` and every section content, including labels and names of missing facts against the analysis language selected
@@ -87,5 +112,6 @@ and descriptive units: they are prose even when their source field name is an En
 Do not mention this check in the response.
 When naming missing facts or introducing a list, use natural words in the analysis
 language, never copy `missing_fields` keys as prose. An empty extraction still uses the
-language of `data.source_brief`. The questions and their rationales must also use that
-language; translate an upstream explanation faithfully without changing its finding.
+language of `data.source_brief`. Verbatim items and questions are copied unchanged when they already use that
+language. Only an item written in another language is translated, faithfully and without
+changing its subject, rights, dates, times or finding.

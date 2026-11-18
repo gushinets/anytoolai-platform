@@ -4,12 +4,12 @@
       {
         "id": "overview",
         "title": "Project overview",
-        "content": "A bakery wants a website that lets customers browse the menu and place cake orders online, for local families and small offices in town who order celebration cakes for birthdays and other events."
+        "content": "Build a website for our small bakery so customers can browse the menu and place cake orders online\nTarget audience: local families and small offices in our town who order celebration cakes for birthdays and other events"
       },
       {
         "id": "key-details",
         "title": "Key details",
-        "content": "Deliverables: menu page, online order form with checkout, contact page. Deadline: 2026-11-02. Budget: $3,000, already approved. Constraints: checkout goes through a third-party payment processor rather than a custom payment system; style is clean and minimal using the existing navy and cream logo colors.",
+        "content": "Deliverables:\n- menu page\n- online order form with checkout\n- contact page\nDeadline: 2026-11-02\nBudget: $3,000, already approved\nConstraints:\n- checkout goes through a third-party payment processor, not a custom payment system\n- clean and minimal style using our existing logo colors of navy and cream",
         "metadata": {
           "kind": "list"
         }
