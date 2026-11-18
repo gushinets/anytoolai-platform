@@ -5,11 +5,13 @@
 - State: active
 - Owner: agent
 - Created: 2026-11-16
-- Last updated: 2026-11-17
-- Review date: 2026-11-17
-- Next action: review the completed round 5 fixture/test corrections; no push performed.
-- Blocker: none for round 5. User accepted ANY-615's live wording result; the separate runtime
-  and extraction findings are tracked in ANY-884 and ANY-885.
+- Last updated: 2026-11-18
+- Review date: 2026-11-18
+- Next action: monitor upstream security notices and remove the temporary fork after a verified
+  official fix. Required checks on PR #279 own the final clean-environment CI validation.
+- Blocker: no dependency-specific blocker found. Local full-check encountered unrelated test
+  environment failures, recorded below; clean CI must pass before merge. User accepted ANY-615's
+  live wording result; the separate runtime and extraction findings remain in ANY-884 and ANY-885.
 
 ## Goal
 
@@ -30,6 +32,8 @@ unchanged.
 
 ANY-849 input guidance, ANY-850 copy controls, schemas, workflows, DSL, UI and dependencies.
 No prompt-reference or version changes. The user separately authorized live acceptance on 2026-11-17.
+On 2026-11-18 the user additionally requested dependency remediation and a replacement assessment
+for the picomatch CI blocker; that investigation is recorded below, separate from product behavior.
 
 ## Risks
 
@@ -47,11 +51,21 @@ assertions; colons and semicolons do not detach a source match from a changed su
 List syntax covers `-`, `+`, `*`, `•` and numeric markers ending in `.` or `)`, with indentation
 and LF/CRLF. Expected EN/RU/ES language comes from test-case metadata, not language inference.
 Untranslated internal keys outside copied facts are forbidden in RU/ES; English single-word
-names can remain ordinary prose. Positive gap completeness uses language-specific fixture words.
+names can remain ordinary prose. After round 6, an unverified assertion containing a technical
+field marker and an internal key requires review regardless of linking words, order or inline
+list position. Sentences, line breaks and masked facts bound scope; internal dots such as v1.0
+do not end an assertion. This conservative fixture rule can flag valid technical prose without
+source evidence; it does not assert a semantic violation or filter production output. Positive gap completeness uses language-specific fixture words.
 Arbitrary paraphrases, fragments, added quotation wrappers and interpretation beyond that contract
 remain live-acceptance concerns. It may conservatively flag such valid rewrites for review.
 
 ## Implementation steps
+
+- [x] Merge main `06d79037`, preserving both ANY-615 and ANY-762 prompt requirements.
+- [x] Round 6: replace adjacency grammar with assertion-level technical-context review;
+  preserve whole source facts and test the conservative boundary explicitly.
+- [x] Round 6: bind historical ANY-762 evidence to verified source snapshots, not current prompts.
+- [x] Round 6: add regressions, run validation and record results.
 
 - [x] Round 5: validate every summary fixture against the product document schema and restore
   fixed English titles in RU/ES fixtures, with title mutation regressions.
@@ -375,3 +389,137 @@ changes; older validation records below are historical, not current CI status.
   changes, paid live calls, GitHub/Linear writes, commit or push. API/full-check were not repeated
   for this fixture/test-only change. The accepted live evidence is retained unchanged; separate
   production findings remain in ANY-884 and ANY-885.
+
+
+### Review round 6 (2026-11-18)
+
+- User explicitly requested both updating from main and fixing the repeated model defect.
+  Read PR inline threads, including the reopened `field name is budget` reproduction. Merged
+  `06d79037` as `951a6312`; resolved the summary-prompt conflict by retaining both ANY-615's
+  gap wording/client-fact rules and ANY-762's deadline/budget-status requirements.
+- Replaced before/after adjacency patterns and optional label suffixes with whole-assertion
+  technical context. Source facts are masked first, as before. Every known key in an unverified
+  assertion with a technical field marker requires review; no enumeration of linking verbs,
+  modifiers or list separators. All keys in an inline list are covered, in either order.
+- Kept punctuation/line/masked-fact boundaries and identifier word boundaries. Internal dots in
+  versions or identifiers do not sever context. Ordinary English without a technical marker is
+  accepted. A source identifier elsewhere cannot exempt a new gap assertion.
+- Explicitly changed the old unsupported assumption that unrelated intervening words prove
+  safety: e.g. `Choose a field name after confirming the budget.` now requires review unless
+  it is a complete copied source fact. This is a conservative test contract, not a claim that
+  every flagged sentence is semantically wrong. Unknown marker vocabulary and cross-assertion
+  meaning remain outside this deterministic guard; live semantic review stays necessary.
+- Added mutations covering all single-word keys, nine linking/order/modifier forms, EN/RU/ES,
+  every copied document location, inline lists, and complete source facts. The initial expanded
+  selection against the old implementation had **49 failures, 169 passes**. Final suite contains
+  **837 Brief Decoder tests** (120 more than round 5); all **1416 Freelancer product tests passed**,
+  including the new ANY-762 suite and wheel packaging.
+- Integration initially exposed a historical-evidence test in ANY-762 comparing a captured
+  worker hash to the current summary prompt: 1011 tests passed and that assertion failed. Bound
+  those historical checks to frozen copies of the three reviewed source files instead. Each
+  copy was recovered from `06d79037` and its SHA-256 exactly matches the existing worker ledger.
+  Current prompt-contract checks remain active; neither historical evidence nor hashes were
+  rewritten. Old live results are not represented as acceptance of the merged prompt.
+- Managed doctor, config, architecture, documentation and whitespace validation passed. Ruff
+  reports only the same pre-existing E501/PLR2004 in the untouched schema-version test.
+- No new paid calls, GitHub/Linear writes or push. The merge commit is local; round 6 corrections
+  are prepared for review. Full-check and browser/API journeys were not repeated. The earlier
+  live acceptance, ANY-884 and ANY-885 remain separate from this deterministic fix.
+
+### Picomatch replacement assessment (2026-11-18)
+
+The user requested a replacement that unblocks CI without waiting for an upstream release or
+suppressing Trivy. Evaluated an isolated archive of `cda3a03d`; the working dependency files
+remain unchanged. A scoped fork is a different supplier, not a new upstream release.
+
+Proposed temporary addition to the existing workspace overrides (retain the PostCSS override):
+
+```yaml
+picomatch: "npm:@ryotsu/picomatch@4.0.7-a"
+```
+
+Regenerate `pnpm-lock.yaml` with pnpm 10.34.1. The trial changed only this override and the
+lockfile's picomatch resolutions: no parent upgrades, new runtime dependency chains or scanner
+changes. All three original versions disappear from the dependency graph. All nine consumers
+(visualizer, fdir, tinyglobby, unimport, unplugin-utils, unplugin, Vite, Vitest and WXT) resolve
+the same fork. Their resolution/API checks cover callable matchers, arrays, ignores, dotfiles,
+`scan`, RegExp-returning `makeRe` and Windows separators.
+
+Verified artifact and security evidence:
+
+- Candidate source: [secured-picomatch commit 3ab5a76](https://github.com/ryotsu-kankichi/secured-picomatch/commit/3ab5a7627d480259e3d9ca67fbc14c125d374f0e).
+  All 10 published files match that commit byte-for-byte. npm registry signatures and
+  provenance verification passed; the attested commit and tarball digest match. No runtime
+  dependencies or install hooks. Preserve the exact version and pnpm integrity hash.
+- Reviewed the real parser changes. Supported single-branch wildcard repetitions lose the
+  redundant quantifier; unsupported complex forms become literal patterns. This changes
+  executable code, not just the package name. The fork also incorporates upstream changes
+  to POSIX bracket negation, punctuation classes, newlines and adjacent globstars.
+- `+(*a)` against 80 `a` characters followed by `!` exceeded a two-second subprocess limit
+  on each original version (2.3.2, 4.0.4, 4.0.7). The fork completed 42 attack cases covering
+  default, Windows and capture options in about 0.11 seconds. Its full Mocha suite passed:
+  **2004 tests**. These checks establish bounded evidence for this CVE, not proof that every
+  possible glob or option is safe; explicitly disabling its safeguard remains unsafe.
+- Trivy **0.76.1**, same database and unchanged CI flags
+  `fs --scanners vuln --include-dev-deps --severity HIGH,CRITICAL --exit-code 1`:
+  clean original checkout exits **1** with three picomatch findings; clean trial checkout
+  exits **0**, with **zero High/Critical findings** across all seven lockfiles. No ignore
+  rule, severity downgrade, dev-dependency exclusion or invented upstream version.
+- `wxt build --analyze` passed, exercising the visualizer consumer that previously used 2.x.
+  Canonical `frontend-check` exited **0**: frozen install, lint, typecheck, tests, generated
+  API-type drift check and all workspace builds, including Next and WXT. **2009 tests passed**:
+  55 shared-ui, 423 ce-kit, 1118 web-mirror, 349 Atom Lab browser cases and 64 Node tests.
+  Node emitted timer-overflow warnings during web tests; no test failed or was suppressed.
+
+Alternatives rejected: `zeromatch@1.0.0` does not preserve the RegExp-returning `makeRe`
+contract used by Vite, and its published optional binaries only list Windows x64.
+`@flupkejs/picomatch@1.3.0` lacks `scan`, array-pattern and ignore-option support required by
+the consumers. Neither is a safe alias. Updating parent packages retains vulnerable upstream
+picomatch. A local patch keeping the upstream identity does not remove the current
+version-based Trivy finding.
+
+Adoption limits: the fork has one maintainer and a short history. Future advisories filed
+against upstream `picomatch` may not match the scoped package name, so manually track upstream
+security notices and remove the override once an official fix passes these checks. The fork
+does not preserve all capture/extglob semantics, and switching the visualizer from 2.x to 4.x
+is a compatibility change. The visualizer also embeds a separate old matcher in its optional
+browser analysis templates; an npm alias cannot rewrite bundled JavaScript. This is a remaining
+code-derived risk for the developer report, not evidence of a defect in the shipped application.
+Normal extension build does not enable analysis. Do not describe this trial as replacing every
+embedded matcher or as blanket security certification.
+
+No dependency changes applied to the working branch, GitHub writes, commit or push. Native
+Windows execution, the backend/full-check suite and a fresh GitHub Actions run have not been
+performed for this isolated dependency trial. Documentation and whitespace checks pass.
+The repository-wide terminology check found pre-existing local-command references in unrelated
+ANY-17, ANY-339, ANY-391, ANY-221 and ANY-227 plans; those files were left unchanged.
+
+### Picomatch replacement adoption (2026-11-18, authorized)
+
+The user explicitly approved applying `@ryotsu/picomatch@4.0.7-a`, regenerating the lockfile,
+updating this plan, running full-check, committing/pushing to `feature/ANY-615`, and checking
+PR #279 CI. No PR comments or reviews are part of this step.
+
+- Added the exact workspace alias and its temporary maintenance/removal condition. Regenerated
+  the lockfile using pnpm 10.34.1; it matches the isolated trial byte-for-byte. Kept the existing
+  PostCSS override and all parent versions. No Trivy rules or workflow changes.
+- Managed Python 3.12 / Node 24 doctor passed. Trivy 0.76.1 scanned a clean tracked-file copy
+  containing the applied dependency files with the unchanged CI flags: exit **0**, no
+  High/Critical findings. The earlier provenance, source and bounded attack checks remain
+  applicable to the identical pinned artifact. Frozen installation and all nine consumer
+  resolution/API checks also passed in the actual working checkout.
+- Canonical local full-check ran and stopped in its backend baseline: **4251 passed, 3 failed,
+  12 skipped, 720 deselected**. Two existing runner tests
+  (`test_prod_stack_running_reflects_compose_ps_output` and
+  `test_prod_stack_running_propagates_timeout`) accidentally consume the local production env
+  file; both pass when the supported `ANYTOOLAI_PROD_ENV_FILE` override points to a nonexistent
+  test-only path, matching clean CI. The third,
+  `test_activation_marker_is_readable_by_non_root_api_user`, cannot switch to `nobody` because
+  this host lacks passwordless sudo. No production env file, sudo policy, test or gate was
+  changed. This is not a successful local full-check result.
+- The full frontend check, 2009 tests and WXT analysis already passed on the identical candidate
+  lockfile during the isolated assessment. The unrelated backend failures do not invalidate
+  that evidence. Required CI will run full-check on the pushed commit in its clean environment;
+  inspect the checks attached to the exact PR head before declaring the CI blocker resolved.
+- The fork's maintenance, advisory-name and optional visualizer-template limitations from the
+  assessment remain accepted constraints; this change does not claim to rewrite bundled code.

@@ -38,6 +38,14 @@ Rules:
   omit it and list it in `missing_fields`, the same as if it were never mentioned.
 - Copy `deadline` and `budget` the way the brief words them (for example "end of Q3", "around
   $2k"); do not normalize or convert them.
+- Keep the status the brief gives a deadline or budget together with its value. A qualifier that makes
+  the term a wish, preference, target, estimate, or a tentative or conditional term is part of the value,
+  even when the brief writes it as a label before the value (for example "Preferred schedule: ...",
+  "desired deadline -- ...", "if the designs are ready by ..."), and so is a stated lack of confirmation
+  (for example "the freelancer has not given a final estimate yet"). Never reduce such a term to the bare
+  date, duration or amount. Do not add a status the brief does not state: a term the brief states as
+  agreed or fixed stays agreed or fixed, and a plain term without a qualifier is not marked as
+  unconfirmed. Never invent a final estimate, a new date or a confirmation.
 - List `deliverables` and `constraints` as separate short items, one per array entry. An empty
   list is not an extracted value: if the brief states none, omit the field and list it in
   `missing_fields` instead of returning `[]`.

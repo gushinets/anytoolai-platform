@@ -1,0 +1,170 @@
+{
+  "description": "ANY-762 deadline status cases. Inputs for live evaluation; canonical entries are authored expected outputs for deterministic regression, not captured model responses.",
+  "cases": [
+    {
+      "id": "BD-RU-05",
+      "status": "unconfirmed",
+      "language": "ru",
+      "provenance": "Input transcribed verbatim from ANY-762 (basic acceptance 2026-10-27).",
+      "input": {
+        "brief_text": "Нужно связать форму заявки сайта онлайн-курсов с amoCRM. При новой заявке создаётся контакт и сделка с названием курса; повторная заявка на тот же email не должна дублировать контакт. Источник — одна форма на https://courses.example/apply. Нужен журнал ошибок и инструкция запуска. Перенос старых заявок, рассылки и телефония исключены. Тестовый аккаунт CRM предоставляет заказчик. Нужно проверить успешную заявку, повторный email и недоступность CRM. Желаемый срок клиента — 10 дней; окончательную оценку исполнитель ещё не давал."
+      },
+      "unconfirmed_markers": [
+        "желаем",
+        "предварительн",
+        "ориентировочн",
+        "не подтвержд",
+        "не согласован",
+        "если",
+        "при условии",
+        "ещё не давал"
+      ],
+      "canonical": {
+        "deadline": "Желаемый срок клиента — 10 дней; окончательную оценку исполнитель ещё не давал",
+        "key_details_line": "Срок: желаемый срок клиента — 10 дней, окончательная оценка исполнителем ещё не дана."
+      }
+    },
+    {
+      "id": "BD-EN-PREFERRED",
+      "status": "unconfirmed",
+      "language": "en",
+      "provenance": "Synthetic; reproduces the ANY-762 re-test line. The retrieved ANY-850 protocol does not contain the original English landing brief.",
+      "input": {
+        "brief_text": "We need a one-page landing site for our yoga studio's new evening classes: hero block, class schedule, instructor bios and a sign-up form that emails the studio. Texts and photos come from us. Preferred schedule: three weeks from kickoff, with launch by December 10."
+      },
+      "unconfirmed_markers": [
+        "preferred",
+        "desired",
+        "tentative",
+        "target",
+        "not confirmed",
+        "unconfirmed",
+        "if ",
+        "estimate"
+      ],
+      "canonical": {
+        "deadline": "Preferred schedule: three weeks from kickoff, with launch by December 10",
+        "key_details_line": "Deadline: preferred schedule of three weeks from kickoff, with launch by December 10."
+      }
+    },
+    {
+      "id": "BD-RU-CONDITIONAL",
+      "status": "unconfirmed",
+      "language": "ru",
+      "provenance": "Synthetic contrast case for ANY-762.",
+      "input": {
+        "brief_text": "Нужен лендинг для конференции: программа, спикеры, форма регистрации. Если макеты будут готовы к 1 декабря, запуск — 15 декабря."
+      },
+      "unconfirmed_markers": [
+        "желаем",
+        "предварительн",
+        "ориентировочн",
+        "не подтвержд",
+        "не согласован",
+        "если",
+        "при условии",
+        "ещё не давал"
+      ],
+      "canonical": {
+        "deadline": "Если макеты будут готовы к 1 декабря, запуск — 15 декабря",
+        "key_details_line": "Срок: запуск 15 декабря, если макеты будут готовы к 1 декабря."
+      }
+    },
+    {
+      "id": "BD-ES-TENTATIVE",
+      "status": "unconfirmed",
+      "language": "es",
+      "provenance": "Synthetic contrast case for ANY-762.",
+      "input": {
+        "brief_text": "Necesitamos un catálogo PDF de 20 productos con fotos y precios. Plazo tentativo: unas cuatro semanas, aún por confirmar con el diseñador."
+      },
+      "unconfirmed_markers": [
+        "tentativ",
+        "preferid",
+        "desead",
+        "por confirmar",
+        "no confirmad",
+        "si "
+      ],
+      "canonical": {
+        "deadline": "Plazo tentativo: unas cuatro semanas, aún por confirmar con el diseñador",
+        "key_details_line": "Plazo tentativo: unas cuatro semanas, aún por confirmar con el diseñador."
+      }
+    },
+    {
+      "id": "BD-RU-AGREED",
+      "status": "agreed",
+      "language": "ru",
+      "provenance": "Synthetic contrast case for ANY-762.",
+      "input": {
+        "brief_text": "Нужно перенести блог с WordPress на Tilda: 40 статей, редиректы со старых адресов. Срок согласован с исполнителем: сдача 20 декабря."
+      },
+      "unconfirmed_markers": [
+        "желаем",
+        "предварительн",
+        "ориентировочн",
+        "не подтвержд",
+        "не согласован",
+        "если",
+        "при условии",
+        "ещё не давал"
+      ],
+      "canonical": {
+        "deadline": "согласован с исполнителем: сдача 20 декабря",
+        "key_details_line": "Срок согласован с исполнителем: сдача 20 декабря."
+      },
+      "agreed_markers": [
+        "согласован"
+      ]
+    },
+    {
+      "id": "BD-EN-AGREED",
+      "status": "agreed",
+      "language": "en",
+      "provenance": "Synthetic contrast case for ANY-762.",
+      "input": {
+        "brief_text": "Please build a Shopify product page template with size chart and reviews block. Deadline agreed with the developer on our call: December 20."
+      },
+      "unconfirmed_markers": [
+        "preferred",
+        "desired",
+        "tentative",
+        "target",
+        "not confirmed",
+        "unconfirmed",
+        "if ",
+        "estimate"
+      ],
+      "canonical": {
+        "deadline": "agreed with the developer on our call: December 20",
+        "key_details_line": "Deadline agreed with the developer on our call: December 20."
+      },
+      "agreed_markers": [
+        "agreed"
+      ]
+    },
+    {
+      "id": "BD-EN-PLAIN",
+      "status": "plain",
+      "language": "en",
+      "provenance": "Synthetic contrast case for ANY-762.",
+      "input": {
+        "brief_text": "Write five product descriptions of about 150 words each for our ceramic mugs. Deadline: March 3."
+      },
+      "unconfirmed_markers": [
+        "preferred",
+        "desired",
+        "tentative",
+        "target",
+        "not confirmed",
+        "unconfirmed",
+        "if ",
+        "estimate"
+      ],
+      "canonical": {
+        "deadline": "March 3",
+        "key_details_line": "Deadline: March 3."
+      }
+    }
+  ]
+}

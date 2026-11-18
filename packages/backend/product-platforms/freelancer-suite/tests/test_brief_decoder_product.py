@@ -315,16 +315,13 @@ _LITERAL_SPAN = re.compile(
     r"|(?<!\w)(?P<quote>[\"'])[^\r\n]*?(?P=quote)"
 )
 _FIELD_LABEL_WORD = r"(?:fields?|поле|поля|полей|campos?)"
-# Punctuation separates words; sentences, lines and masked source facts separate assertions.
+# Sentence/line boundaries and masked facts delimit independent assertions.
+_ASSERTION = re.compile(r"(?:[^.!?\r\n\0]|[.!?](?!\s|\Z))+")
 _FIELD_SEPARATOR = r"[^\w.!?\r\n\0]*"
-# shortcut: a finite label grammar, not arbitrary paraphrases; review other wording live.
-_FIELD_LABEL_PHRASE = (
-    rf"(?:{_FIELD_LABEL_WORD}\b"
-    rf"(?:{_FIELD_SEPARATOR}(?:names?|identifiers?|labels?|keys?)\b)?"
-    rf"|(?:schema|internal)\b{_FIELD_SEPARATOR}keys?\b)"
+_TECHNICAL_FIELD_MARKER = re.compile(
+    rf"\b(?:{_FIELD_LABEL_WORD}|(?:schema|internal)\b{_FIELD_SEPARATOR}keys?)\b",
+    re.IGNORECASE,
 )
-_FIELD_LABEL_BEFORE = re.compile(rf"\b{_FIELD_LABEL_PHRASE}{_FIELD_SEPARATOR}\Z", re.IGNORECASE)
-_FIELD_LABEL_AFTER = re.compile(rf"^{_FIELD_SEPARATOR}{_FIELD_LABEL_PHRASE}", re.IGNORECASE)
 _KEY_LABELS = re.compile(r"missing fields?\s*:|fields? by name|пропущено поле", re.IGNORECASE)
 _FACT_START = re.compile(r"(?:^|\n)[ \t]*(?:(?:[-+*•]|\d+[.)])[ \t]+)?\Z|[.!?][ \t]+\Z")
 _FACT_END = re.compile(r"^[ \t]*(?:\Z|[.!?](?:\s|\Z)|\r?\n)")
@@ -362,7 +359,7 @@ def _without_copied_source_facts(text: str, source_facts: tuple[str, ...]) -> st
 def _field_key_leaks(
     text: str, *, source_facts: tuple[str, ...] = (), language: DocumentLanguage = "en"
 ) -> list[str]:
-    """Check internal notation in narration, separately from complete copied client facts."""
+    """Flag unverified technical assertions; co-occurrence requires review, not semantic proof."""
     # shortcut: only complete verbatim assertions establish provenance; review paraphrases live.
     assert language in _GAPS_KEYWORDS_BY_LANGUAGE, f"unsupported document language: {language}"
     untrusted = _without_copied_source_facts(text, source_facts)
@@ -371,16 +368,20 @@ def _field_key_leaks(
         for literal in _LITERAL_SPAN.finditer(untrusted)
         for key in _INTERNAL_FIELD_KEY.finditer(literal.group())
     }
+    # No linker vocabulary: every key in an unverified technical assertion needs review.
+    technical_keys = {
+        (assertion.start() + key.start(), assertion.start() + key.end())
+        for assertion in _ASSERTION.finditer(untrusted)
+        if _TECHNICAL_FIELD_MARKER.search(assertion.group())
+        for key in _INTERNAL_FIELD_KEY.finditer(assertion.group())
+    }
     leaks = _KEY_LABELS.findall(untrusted)
     for match in _INTERNAL_FIELD_KEY.finditer(untrusted):
-        before = untrusted[: match.start()]
-        after = untrusted[match.end() :]
         if (
             language != "en"
             or "_" in match.group()
             or match.span() in literal_keys
-            or _FIELD_LABEL_BEFORE.search(before)
-            or _FIELD_LABEL_AFTER.match(after)
+            or match.span() in technical_keys
         ):
             leaks.append(match.group())
     return leaks
@@ -548,7 +549,10 @@ def test_complete_source_facts_preserve_expressions_and_quoted_messages(literal:
 
 
 def test_uncopied_source_fact_cannot_change_field_context() -> None:
-    assert not _field_key_leaks("field `source_id` budget", source_facts=("Keep `source_id`.",))
+    text = "field `source_id` budget"
+    assert _field_key_leaks(text) == ["budget"]
+    assert _field_key_leaks(text, source_facts=("Keep `source_id`.",)) == ["budget"]
+    assert not _field_key_leaks(text, source_facts=(text,))
 
 
 @pytest.mark.parametrize(
@@ -875,9 +879,9 @@ def test_field_marker_punctuation_is_checked_in_both_directions(
     assert not _field_key_leaks(source, source_facts=(source,))
 
 
-@pytest.mark.parametrize("separator", [". ", "! ", "? ", "\n", "\r\n", " unrelated "])
+@pytest.mark.parametrize("separator", [". ", "! ", "? ", "\n", "\r\n"])
 @pytest.mark.parametrize("marker", ["field", "field name", "field identifier", "schema key"])
-def test_field_labels_cannot_cross_sentences_lines_or_other_words(
+def test_field_labels_cannot_cross_independent_assertions(
     separator: str, marker: str
 ) -> None:
     assert not _field_key_leaks(marker + separator + "budget")
@@ -923,15 +927,98 @@ def test_summary_fixture_distinguishes_technical_label_phrases_from_client_facts
     [
         "Confirm the budget with the client.",
         "The name of the project is missing; confirm the budget.",
-        "Choose a field name after confirming the budget.",
         "The field name is unknown. Budget needs confirmation.",
         "fieldname budget",
-        "field namesake budget",
         "schema keyboard budget",
     ],
 )
 def test_technical_label_phrases_do_not_reject_ordinary_english(text: str) -> None:
     assert not _field_key_leaks(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Choose a field name after confirming the budget.",
+        "field unrelated budget",
+        "budget unrelated field",
+        "field namesake budget",
+    ],
+)
+def test_unverified_technical_assertions_require_source_evidence(text: str) -> None:
+    # These can be valid prose; the fixture guard cannot establish their meaning without a source.
+    assert _field_key_leaks(text) == ["budget"]
+    assert not _field_key_leaks(text, source_facts=(text,))
+
+
+@pytest.mark.parametrize("key", [key for key in _GAPS_KEYWORD if "_" not in key])
+@pytest.mark.parametrize(
+    "template",
+    [
+        "Missing field name is {key}.",
+        "The missing field would be {key}.",
+        "The field was identified as {key}.",
+        "The field is commonly referred to as {key}.",
+        "The schema key that remains unfilled is {key}.",
+        "{key} is the name of the missing field.",
+        "{key} has been described as an internal key.",
+        "The field which needs clarification, according to the analysis, is {key}.",
+        "The missing field in API v1.0 is {key}.",
+    ],
+)
+@pytest.mark.parametrize("suffix", [".weak_input", ".ru", ".es"])
+def test_summary_fixture_reviews_technical_assertions_independently_of_linking_words(
+    monkeypatch: pytest.MonkeyPatch, key: str, template: str, suffix: str
+) -> None:
+    extract_suffix, language = _SUMMARY_FIXTURES[suffix]
+    extract_stem = "brief_decoder.extract_brief_v1" + extract_suffix
+    summary_stem = "brief_decoder.generate_summary_v1" + suffix
+    brief, document = _fixture_response(extract_stem), _fixture_response(summary_stem)
+    source = template.format(key=key)
+    brief["values"]["project_goal"] = source
+    document["sections"][0]["content"] = source
+    responses = {extract_stem: brief, summary_stem: document}
+    monkeypatch.setitem(globals(), "_fixture_response", responses.__getitem__)
+    test_summary_fixtures_obey_the_a10_prompt(suffix, extract_suffix, language)
+
+    # A different assertion about the same key cannot inherit the source fact's exemption.
+    document["sections"][2]["content"] += " " + source.removesuffix(".") + " in this brief."
+    with pytest.raises(AssertionError, match="field key leaks"):
+        test_summary_fixtures_obey_the_a10_prompt(suffix, extract_suffix, language)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Missing fields are budget, deadline, deliverables and constraints.",
+        "The schema keys would be budget / deadline / deliverables / constraints.",
+        "budget, deadline, deliverables and constraints are the missing fields.",
+        "The field names are: (budget), [deadline], deliverables & constraints.",
+        "Missing fields in API v1.0 are budget, deadline, deliverables and constraints.",
+    ],
+)
+def test_technical_context_covers_every_key_in_an_assertion(text: str) -> None:
+    assert _field_key_leaks(text) == ["budget", "deadline", "deliverables", "constraints"]
+    assert not _field_key_leaks(text, source_facts=(text,))
+
+
+@pytest.mark.parametrize(
+    ("section_index", "field"),
+    [(None, "summary"), *[(i, field) for i in range(4) for field in ("title", "content")]],
+)
+def test_linked_field_name_is_rejected_in_every_copied_location(
+    monkeypatch: pytest.MonkeyPatch, section_index: int | None, field: str
+) -> None:
+    original = _fixture_response
+    stem = "brief_decoder.generate_summary_v1.weak_input"
+    document = original(stem)
+    target = document if section_index is None else document["sections"][section_index]
+    target[field] += " Missing field name is budget."
+    monkeypatch.setitem(
+        globals(), "_fixture_response", lambda name: document if name == stem else original(name)
+    )
+    with pytest.raises(AssertionError, match="field key leaks"):
+        test_summary_fixtures_obey_the_a10_prompt(".weak_input", ".weak_input", "en")
 
 
 @pytest.mark.parametrize("key", [key for key in _GAPS_KEYWORD if "_" not in key])
