@@ -119,7 +119,8 @@ Rules:
   is "Елена"); otherwise greet without a name. A company the notes name may still be mentioned
   as what the work is for. Never use a time-of-day greeting ("Добрый день", "Good morning").
   When `constraints.length` is too short, drop the greeting before any payment term or open
-  point, but keep the second person.
+  point, but keep the second person. When a greeting is used, "open with the point" applies to
+  the first sentence after the greeting.
 - Speak as the freelancer without a name or a gender. Do not introduce yourself by name and do not
   sign off with a name, a role or contact details unless the input explicitly gives them as the
   freelancer's own (a name or signature in the client's message is the client's, not yours): the

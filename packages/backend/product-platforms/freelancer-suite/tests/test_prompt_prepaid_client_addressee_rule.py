@@ -32,7 +32,9 @@ RULE = (
     'unambiguous ("с Никитой" is "Никита", "для Елены" is "Елена"); otherwise greet without a '
     'name. A company the notes name may still be mentioned as what the work is for. Never use a '
     'time-of-day greeting ("Добрый день", "Good morning"). When `constraints.length` is too '
-    'short, drop the greeting before any payment term or open point, but keep the second person.'
+    'short, drop the greeting before any payment term or open point, but keep the second person. '
+    'When a greeting is used, "open with the point" applies to the first sentence after the '
+    'greeting.'
 )
 
 
