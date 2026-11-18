@@ -908,6 +908,66 @@ def test_summary_readiness_depends_on_each_input(
 
 
 @pytest.mark.parametrize(
+    ("language", "ready", "opening", "opposite", "other_object"),
+    [
+        (
+            "en",
+            False,
+            "The brief is not ready to start work.",
+            "It is ready to start work now.",
+            "The artwork is ready to start work now.",
+        ),
+        (
+            "en",
+            True,
+            "The request is ready to start work.",
+            "The request is not ready to start work today.",
+            "The printer is not ready to start work today.",
+        ),
+        (
+            "ru",
+            False,
+            "Бриф не готов к работе.",
+            "Бриф готов к работе уже сегодня.",
+            "Макет готов к работе уже сегодня.",
+        ),
+        (
+            "ru",
+            True,
+            "Запрос готов к работе.",
+            "Запрос пока не готов к работе сегодня.",
+            "Принтер пока не готов к работе сегодня.",
+        ),
+        (
+            "es",
+            False,
+            "La solicitud no está lista para empezar.",
+            "La solicitud está lista para empezar ahora.",
+            "La maqueta está lista para empezar ahora.",
+        ),
+        (
+            "es",
+            True,
+            "El encargo está listo para empezar.",
+            "El encargo no está listo para empezar hoy.",
+            "El equipo no está listo para empezar hoy.",
+        ),
+    ],
+)
+def test_readiness_with_time_qualifier_keeps_its_subject(
+    language: DocumentLanguage, ready: bool, opening: str, opposite: str, other_object: str
+) -> None:
+    missing = [] if ready else ["budget"]
+    assert_summary_readiness(
+        f"{opening} {other_object}", language, issues=[], missing_fields=missing, questions=[]
+    )
+    with pytest.raises(AssertionError, match="Conflicting readiness"):
+        assert_summary_readiness(
+            f"{opening} {opposite}", language, issues=[], missing_fields=missing, questions=[]
+        )
+
+
+@pytest.mark.parametrize(
     ("suffix", "wrong_summary"),
     [
         (".weak_input", "The brief is ready to start work."),
@@ -925,6 +985,7 @@ def test_summary_readiness_depends_on_each_input(
         ),
         (".es", "La solicitud no está lista para empezar; está lista para empezar."),
         (".weak_input", "The brief is not ready to start. It is ready to start."),
+        (".weak_input", "The brief is not ready to start work. It is ready to start work now."),
         (".ru", "Запрос не готов к работе, но готов к работе."),
         (".ru", "Отчёт пока не готов к работе."),
         (".weak_input", "The summary is workable but not ready to start."),

@@ -34,8 +34,10 @@ _READINESS_CLAUSES = {
 
 
 def _fixture_verdict(clause: str, language: DocumentLanguage, *, opening: bool) -> bool | None:
+    # The opening is a complete verdict; later assertions may carry a trailing qualifier.
+    end = r"\Z" if opening else r"(?=\s|\Z)"
     for pattern in _READINESS_CLAUSES[language]:
-        match = re.fullmatch(pattern, clause.strip())
+        match = re.match(pattern + end, clause.strip())
         if match and (not opening or match["subject"]):
             return match["negative"] is None
     return None

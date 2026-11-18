@@ -83,6 +83,13 @@ subject to the existing product prompt and separate evaluation. The freelancer p
 Brief Decoder API tests and brief-language evaluation tests passed (1,590 cases), as did the
 46 web-mirror Brief Decoder tests.
 
+The fifth code review reproduced a missed contradiction when a later verdict ended in a time
+qualifier. The fixture guard now matches that verdict at the start of its clause and permits
+trailing words after a word boundary. The opening verdict still uses the complete clause.
+All seven new regressions failed before the fix and passed afterward. The six language and
+polarity combinations also accepted a statement about a different named object with the same
+predicate. All 1,597 freelancer product, Brief Decoder API and language evaluation tests passed.
+
 ## Open questions
 
 Review separate verdict presentation under the UI follow-up.
