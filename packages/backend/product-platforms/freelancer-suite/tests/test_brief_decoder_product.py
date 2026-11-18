@@ -22,7 +22,12 @@ import pytest
 import yaml
 from anytoolai_freelancer_suite.bundle import FreelancerSuiteBundle
 
-from tests.support.brief_language import DocumentLanguage, assert_summary_readiness
+from tests.support.brief_language import (
+    DocumentLanguage,
+    assert_brief_overview,
+    assert_summary_matches_sources,
+    assert_summary_readiness,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 KERNEL_DIR = REPO_ROOT / "configs" / "kernel"
@@ -595,12 +600,17 @@ def test_summary_prompt_copies_lists_verbatim() -> None:
         "what a right or license covers",
         "a time stays a time and never becomes a date range",
         "Only `summary` is written freely.",
+        "Copy verbatim fields unchanged even when their language differs "
+        "from the analysis language.",
+        "Check the analysis language only for prose you authored.",
         "every `constraints` item verbatim. List all of them, including exclusions",
         "every `data.issues` `description` verbatim",
         "every `data.questions` `question` verbatim",
         "`summary` is the only free text",
     ):
         assert phrase in prompt, phrase
+    assert "Translate authored explanations" not in prompt
+    assert "an item written in another language is translated" not in prompt
     assert "in plain sentences" not in prompt
     assert "The questions and their rationales must also use that language" not in prompt
 
@@ -730,35 +740,6 @@ def test_summary_fixture_rejects_changed_fixed_titles(
         test_summary_fixtures_obey_the_a10_prompt(suffix, *_SUMMARY_FIXTURES[suffix])
 
 
-# A10 authors the confirmation sentence. Pin the reviewed wording to the A01 fields it names.
-_LOCALIZED_MISSING_FIELDS = frozenset({"deadline", "budget", "target_audience", "constraints"})
-_MISSING_FIELD_CONFIRMATION = {
-    ("en", frozenset({"target_audience"})): (
-        "The target audience is not stated; the client should confirm it."
-    ),
-    ("en", _LOCALIZED_MISSING_FIELDS | {"deliverables"}): (
-        "Deliverables, deadline, budget, target audience and constraints are missing; "
-        "the client should confirm them."
-    ),
-    ("ru", _LOCALIZED_MISSING_FIELDS): (
-        "Клиенту нужно уточнить срок, бюджет, целевую аудиторию и ограничения."
-    ),
-    ("es", _LOCALIZED_MISSING_FIELDS): (
-        "El cliente debe confirmar el plazo, el presupuesto, el público objetivo "
-        "y las restricciones."
-    ),
-}
-
-
-def _assert_overview(content: str, values: dict[str, Any], language: DocumentLanguage) -> None:
-    labels = {"en": "Target audience", "ru": "Целевая аудитория", "es": "Público objetivo"}
-    lines = [values["project_goal"]] if "project_goal" in values else []
-    if "target_audience" in values:
-        lines.append(f"{labels[language]}: {values['target_audience']}")
-    assert lines, "Each reviewed overview fixture has a goal or an audience"
-    assert content == "\n".join(lines)
-
-
 @pytest.mark.parametrize(
     ("language", "goal", "audience", "audience_line", "wrong_label"),
     [
@@ -776,9 +757,9 @@ def test_localized_overview_with_audience(
     language: DocumentLanguage, goal: str, audience: str, audience_line: str, wrong_label: str
 ) -> None:
     values = {"project_goal": goal, "target_audience": audience}
-    _assert_overview(f"{goal}\n{audience_line}", values, language)
+    assert_brief_overview(f"{goal}\n{audience_line}", values, language)
     with pytest.raises(AssertionError):
-        _assert_overview(f"{goal}\n{wrong_label}: {audience}", values, language)
+        assert_brief_overview(f"{goal}\n{wrong_label}: {audience}", values, language)
 
 
 @pytest.mark.parametrize("summary_suffix", _SUMMARY_FIXTURES)
@@ -787,7 +768,6 @@ def test_summary_fixtures_copy_lists_verbatim(summary_suffix: str) -> None:
     verbatim, one per line, in source order; only `summary` is free text."""
     extract_suffix, language = _SUMMARY_FIXTURES[summary_suffix]
     brief = _fixture_response("brief_decoder.extract_brief_v1" + extract_suffix)
-    values = brief["values"]
     issues = _fixture_response("brief_decoder.detect_issues_v1" + summary_suffix)["issues"]
     questions = (
         []
@@ -796,56 +776,43 @@ def test_summary_fixtures_copy_lists_verbatim(summary_suffix: str) -> None:
     )
     document = _fixture_response("brief_decoder.generate_summary_v1" + summary_suffix)
 
-    assert_summary_readiness(
-        document["summary"],
-        language,
-        issues=issues,
-        missing_fields=brief["missing_fields"],
-        questions=questions,
+    assert_summary_matches_sources(document, brief, issues, questions, language)
+
+
+@pytest.fixture
+def mixed_language_summary() -> dict[str, Any]:
+    path = REPO_ROOT / "tests/fixtures/brief_decoder_eval/russian_analysis_english_sources.json"
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def test_russian_analysis_preserves_english_sources(mixed_language_summary: dict[str, Any]) -> None:
+    case = mixed_language_summary
+    jsonschema.validate(case, _load_schema("brief_decoder.decode_output_v1"))
+    assert_summary_matches_sources(
+        case["document"], case["brief"], case["issues"], case["questions"], "ru"
     )
 
-    fields = ("deliverables", "deadline", "budget", "constraints")
-    labels = {
-        "en": ("Deliverables", "Deadline", "Budget", "Constraints"),
-        "ru": ("Результаты", "Срок", "Бюджет", "Ограничения"),
-        "es": ("Entregables", "Plazo", "Presupuesto", "Restricciones"),
-    }
-    expected_lines = []
-    for field, label in zip(fields, labels[language], strict=True):
-        if field not in values:
-            continue
-        if field in ("deliverables", "constraints"):
-            expected_lines.append(f"{label}:")
-            expected_lines.extend(f"- {item}" for item in values[field])
-        else:
-            expected_lines.append(f"{label}: {values[field]}")
-    if not expected_lines:
-        assert language == "en"  # The empty-details fixture uses the English fallback.
-        expected_lines.append(
-            "No deliverables, deadline, budget or constraints were found in the brief."
+
+@pytest.mark.parametrize(
+    ("section_id", "source", "translation"),
+    [
+        ("overview", "Record an audio guide.", "Записать аудиогид."),
+        ("key-details", "One audio recording.", "Одна аудиозапись."),
+        ("gaps", "The audio rights are not specified.", "Права на аудио не указаны."),
+        ("next-steps", "Who holds the audio rights?", "Кому принадлежат права на аудио?"),
+    ],
+)
+def test_russian_analysis_rejects_translated_source(
+    mixed_language_summary: dict[str, Any], section_id: str, source: str, translation: str
+) -> None:
+    case = mixed_language_summary
+    section = next(s for s in case["document"]["sections"] if s["id"] == section_id)
+    assert source in section["content"]
+    section["content"] = section["content"].replace(source, translation)
+    with pytest.raises(AssertionError):
+        assert_summary_matches_sources(
+            case["document"], case["brief"], case["issues"], case["questions"], "ru"
         )
-
-    gap_lines = [f"- {issue['description']}" for issue in issues]
-    if brief["missing_fields"]:
-        missing = frozenset(brief["missing_fields"])
-        gap_lines.append(_MISSING_FIELD_CONFIRMATION[language, missing])
-    elif not issues:
-        assert language == "en"  # The complete-brief fixture is English.
-        gap_lines.append("No issues were found in the brief, and nothing requested is missing.")
-
-    question_lines = [f"- {question['question']}" for question in questions]
-    if not questions:
-        assert language == "en"  # The empty-question fixture is English.
-        question_lines.append("No clarifying questions were generated for this brief.")
-
-    overview, *remaining = document["sections"]
-    assert overview["id"] == "overview"
-    _assert_overview(overview["content"], values, language)
-    assert [(section["id"], section["content"]) for section in remaining] == [
-        ("key-details", "\n".join(expected_lines)),
-        ("gaps", "\n".join(gap_lines)),
-        ("next-steps", "\n".join(question_lines)),
-    ]
 
 
 @pytest.mark.parametrize(

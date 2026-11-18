@@ -10,14 +10,11 @@ sets the language; use English only when no language can be determined. A reques
 English deliverable does not by itself request an English analysis. UI locale, English field
 descriptions, taxonomy, intermediate outputs and the delivered work do not select the language.
 
-Write all authored prose in that language, including extracted descriptions and criteria,
-issue descriptions, questions and their rationale, comparison rationale and explanatory evidence,
-and every document summary and section content. A paraphrase is authored prose, not a quotation.
-Preserve verbatim quotations, brands, code, technical identifiers and exact source dates/amounts;
-do not translate JSON keys, enums, section/criterion IDs or `missing_fields` entries. Fixed
-section titles specified by the template stay unchanged; explain missing fields by localized
-names in prose. Language instructions never authorize hiding findings, changing a verdict,
-inventing facts or changing the schema.
+Write the readiness verdict, group labels, missing-field confirmations and fallback sentences
+in the analysis language. Keep the template's fixed section titles unchanged. Preserve literal
+quotations, brands, code, technical identifiers and exact dates and amounts. Keep JSON keys,
+enums, IDs and `missing_fields` entries unchanged. Language instructions never authorize hiding
+findings, changing a verdict, inventing facts or changing the schema.
 
 Use natural project terminology in authored prose rather than borrowing English prompt
 vocabulary: in Spanish use `el encargo` or `la solicitud`, not `el brief` or `la brief`;
@@ -26,9 +23,7 @@ This wording rule does not change verbatim quotations, brands, code or technical
 
 `data.source_brief` is supplied only to select language and recognize an explicit language
 request. Do not extract facts again from it or use it to change findings, lists, missing fields
-or verdicts. Those come exclusively from the structured results below. Keep extracted list
-items verbatim; they already follow this same language policy. Translate authored explanations
-faithfully without changing their meaning if an upstream explanation uses the wrong language.
+or verdicts. Those come exclusively from the structured results below.
 
 This prompt defines the `brief_decoder.summary_v1` template: a short summary document a freelancer
 can copy and keep, built from `data` -- never from anything outside it.
@@ -38,8 +33,10 @@ facts the brief does not state), `data.issues` is the list of problems found in 
 empty), and `data.questions` is the list of clarifying questions to ask the client (absent or
 empty when there was nothing to ask).
 
-Copy rule. Items marked "verbatim" below are copied from `data` exactly as written, one item per
-line, each line starting with "- ", in the order `data` gives them. Do not merge, split, shorten,
+Copy verbatim fields unchanged even when their language differs from the analysis language.
+The producers of `data.brief.values`, issue descriptions and questions own their wording and
+language. Treat those strings as quotations. For lists, write one item per line, each line
+starting with "- ", in the order `data` gives them. Do not merge, split, shorten,
 reword, reorder, summarize or drop items. Copying them exactly also keeps who performs each
 action (the party who hands over or receives something stays the same), what a right or license
 covers (for example rights to audio stay rights to audio), and every date, time, duration,
@@ -105,13 +102,7 @@ Rules:
 - Outside the verbatim lines and group labels, write in full sentences; no placeholders, meta-commentary or chain-of-thought.
 - Honor `style` when supplied (`professional`, `concise`, `detailed`; default `professional`).
 
-Before returning the JSON, check `summary` and every section content, including labels and names of missing facts against the analysis language selected
-from the original brief. Correct any authored words in another language before returning;
-keep actual source quotations and machine identifiers unchanged. This includes short labels
-and descriptive units: they are prose even when their source field name is an English key.
-Do not mention this check in the response.
-When naming missing facts or introducing a list, use natural words in the analysis
-language, never copy `missing_fields` keys as prose. An empty extraction still uses the
-language of `data.source_brief`. Verbatim items and questions are copied unchanged when they already use that
-language. Only an item written in another language is translated, faithfully and without
-changing its subject, rights, dates, times or finding.
+Before returning the JSON, compare each verbatim field with its structured source, including
+its original wording and language. Check the analysis language only for prose you authored.
+Use localized names for missing facts and keep the language selected from `data.source_brief`
+even when the extraction is empty.

@@ -10,7 +10,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from tests.support.brief_language import CANONICAL, CASES
+from tests.support.brief_language import CANONICAL, CASES, assert_summary_matches_sources
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts/agent"))
@@ -76,6 +76,23 @@ def test_every_authored_field_including_hidden_summary_is_reviewed():
     assert "/issues/0/description" in bd
     assert "/questions/0/rationale" in bd
     assert "/brief_text" not in bd
+
+
+@pytest.mark.parametrize(
+    ("section_id", "replacement"),
+    [("gaps", ""), ("next-steps", "- How much will the article cost?\n")],
+    ids=["dropped-issue", "rephrased-question"],
+)
+def test_canonical_brief_rejects_changed_section(section_id, replacement):
+    case = CANONICAL["ANY761-BD-EN-basic"]
+    document = deepcopy(case["document"])
+    sources = (case["brief"], case["issues"], case["questions"], "en")
+    assert_summary_matches_sources(document, *sources)
+    section = next(s for s in document["sections"] if s["id"] == section_id)
+    _, remaining = section["content"].split("\n", 1)
+    section["content"] = replacement + remaining
+    with pytest.raises(AssertionError, match=section_id):
+        assert_summary_matches_sources(document, *sources)
 
 
 def test_generated_output_is_pending_until_every_field_and_fact_is_reviewed():

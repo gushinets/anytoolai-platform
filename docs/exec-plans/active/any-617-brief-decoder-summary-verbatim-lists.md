@@ -36,6 +36,8 @@ The A10 prompt and fake-provider examples define the document wording within the
 1. Specify copying and localized labels for each section.
 2. Align English, Russian, and Spanish fixtures with their upstream results.
 3. Compare complete fixture sections with their sources and exercise source-copy and readiness mutations.
+4. Apply the same assertions to the seven canonical API documents using recorded A10 inputs.
+   Cover empty extractions in all three languages, a dropped issue and a rephrased question.
 
 ## Validation
 
@@ -89,6 +91,20 @@ trailing words after a word boundary. The opening verdict still uses the complet
 All seven new regressions failed before the fix and passed afterward. The six language and
 polarity combinations also accepted a statement about a different named object with the same
 predicate. All 1,597 freelancer product, Brief Decoder API and language evaluation tests passed.
+
+The sixth code review found conflicting A10 instructions for a language mismatch. Extraction,
+issue detection and question generation already select the language for the strings they author.
+A10 preserves those strings and applies its language check to the text it writes. A Russian
+brief with English upstream values now exercises the same source comparison as the five standard
+fixtures. A translated goal, deliverable, issue or question fails the regression. All 1,602
+freelancer product, Brief Decoder API and language evaluation tests passed.
+
+The seventh code review found that the canonical API replay accepted seven documents whose
+sections disagreed with their structured inputs. The shared assertion rejected all seven
+original examples. The corrected documents pass against the recorded A10 inputs, including
+empty extractions in English, Russian and Spanish. Removing an issue or rephrasing a question
+now fails its section check. All 1,604 product, API and language evaluation tests passed,
+along with the three web tests that copy the canonical Russian recipe across UI locales.
 
 ## Open questions
 

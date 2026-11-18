@@ -41,7 +41,7 @@ from anytoolai_platform_core.workflows.models import JobStatus
 from anytoolai_platform_worker.composition import build_worker
 
 from tests.support.brief_language import (
-    assert_summary_readiness,
+    assert_summary_matches_sources,
     golden_cases,
     write_provider_fixtures,
 )
@@ -496,12 +496,9 @@ def test_no_issues_skips_question_generation_and_still_produces_a_consistent_doc
     no_issues_document_text = json.dumps(output["document"])
     assert no_issues_document_text != happy_document_text
 
-    assert_summary_readiness(
-        output["document"]["summary"],
-        "en",
-        issues=output["issues"],
-        missing_fields=output["brief"]["missing_fields"],
-        questions=output["questions"],
+    data = adapter.input_payload(-1)["data"]
+    assert_summary_matches_sources(
+        output["document"], data["brief"], data["issues"], data.get("questions", []), "en"
     )
 
 
@@ -589,13 +586,6 @@ def test_multilingual_canonical_output_and_original_language_source(
     adapter = RecordingProviderAdapter(tmp_path)
     source = case["input"]["brief_text"]
     _, output = _run_to_result(app, request_platform_api, session_factory, source, adapter)
-    assert_summary_readiness(
-        output["document"]["summary"],
-        case["expected_language"],
-        issues=output["issues"],
-        missing_fields=output["brief"]["missing_fields"],
-        questions=output["questions"],
-    )
     assert output == expected  # Includes summary, questions/rationale and every section.
     assert adapter.input_payload(0)["source_text"] == source
     assert adapter.input_payload(1)["source_text"] == source
@@ -603,3 +593,10 @@ def test_multilingual_canonical_output_and_original_language_source(
     data = adapter.input_payload(-1)["data"]
     assert data == {"source_brief": source, "brief": output["brief"],
                     "issues": output["issues"], "questions": output["questions"]}
+    assert_summary_matches_sources(
+        output["document"],
+        data["brief"],
+        data["issues"],
+        data["questions"],
+        case["expected_language"],
+    )

@@ -60,6 +60,138 @@ def assert_summary_readiness(
     assert (not expected_ready) not in rest, f"Conflicting readiness verdicts: {summary!r}"
 
 
+_EMPTY_OVERVIEW = {
+    "en": "The brief does not state what the client wants.",
+    "ru": "В брифе не указано, что хочет получить клиент.",
+    "es": "La solicitud no indica qué quiere obtener el cliente.",
+}
+
+_EMPTY_DETAILS = {
+    "en": "No deliverables, deadline, budget or constraints were found in the brief.",
+    "ru": "Конкретные результаты работы, сроки, бюджет и ограничения не указаны.",
+    "es": "No se indican entregables concretos, plazo, presupuesto ni restricciones.",
+}
+
+_EMPTY_GAPS = {
+    "en": "No issues were found in the brief, and nothing requested is missing.",
+    "ru": "Бриф полон, все необходимые сведения указаны.",
+    "es": "La solicitud está completa y contiene toda la información necesaria.",
+}
+
+_EMPTY_QUESTIONS = {
+    "en": "No clarifying questions were generated for this brief.",
+    "ru": "Уточняющих вопросов по брифу нет.",
+    "es": "No se generaron preguntas aclaratorias para esta solicitud.",
+}
+
+# Inflected field names for the confirmation sentence in the authored fixtures.
+_MISSING_NAMES = {
+    "en": {
+        "project_goal": "project goal",
+        "target_audience": "target audience",
+        "deliverables": "deliverables",
+        "deadline": "deadline",
+        "budget": "budget",
+        "constraints": "constraints",
+    },
+    "ru": {
+        "project_goal": "цель проекта",
+        "target_audience": "целевую аудиторию",
+        "deliverables": "результаты работы",
+        "deadline": "срок",
+        "budget": "бюджет",
+        "constraints": "ограничения",
+    },
+    "es": {
+        "project_goal": "el objetivo del proyecto",
+        "target_audience": "el público objetivo",
+        "deliverables": "los entregables",
+        "deadline": "el plazo",
+        "budget": "el presupuesto",
+        "constraints": "las restricciones",
+    },
+}
+
+
+def _missing_confirmation(missing_fields: list[str], language: DocumentLanguage) -> str:
+    # Only the set of missing facts matters. The authored sentence uses template field order.
+    order = ("project_goal", "deliverables", "deadline", "budget", "target_audience", "constraints")
+    names = [_MISSING_NAMES[language][field] for field in sorted(missing_fields, key=order.index)]
+    phrase = names[-1]
+    if len(names) > 1:
+        conjunction = {"en": " and ", "ru": " и ", "es": " y "}[language]
+        phrase = ", ".join(names[:-1]) + conjunction + phrase
+    if language == "ru":
+        return f"Клиенту нужно уточнить {phrase}."
+    if language == "es":
+        return f"El cliente debe confirmar {phrase}."
+    if len(names) == 1:
+        plural = missing_fields[0] in {"deliverables", "constraints"}
+        verb, pronoun = ("are", "them") if plural else ("is", "it")
+        return f"The {phrase} {verb} not stated; the client should confirm {pronoun}."
+    return f"{phrase.capitalize()} are missing; the client should confirm them."
+
+
+def assert_brief_overview(content: str, values: dict[str, Any], language: DocumentLanguage) -> None:
+    labels = {"en": "Target audience", "ru": "Целевая аудитория", "es": "Público objetivo"}
+    lines = [values["project_goal"]] if "project_goal" in values else []
+    if "target_audience" in values:
+        lines.append(f"{labels[language]}: {values['target_audience']}")
+    if not lines:
+        lines.append(_EMPTY_OVERVIEW[language])
+    assert content == "\n".join(lines), "overview"
+
+
+def assert_summary_matches_sources(
+    document: dict[str, Any],
+    brief: dict[str, Any],
+    issues: list[dict[str, Any]],
+    questions: list[dict[str, Any]],
+    language: DocumentLanguage,
+) -> None:
+    """Check authored A10 fixtures against the structured inputs of the same run."""
+    values = brief["values"]
+    missing = brief["missing_fields"]
+    assert_summary_readiness(
+        document["summary"], language, issues=issues, missing_fields=missing, questions=questions
+    )
+    sections = document["sections"]
+    assert [s["id"] for s in sections] == ["overview", "key-details", "gaps", "next-steps"]
+    overview, details, gaps, next_steps = (s["content"] for s in sections)
+    assert_brief_overview(overview, values, language)
+
+    fields = ("deliverables", "deadline", "budget", "constraints")
+    labels = {
+        "en": ("Deliverables", "Deadline", "Budget", "Constraints"),
+        "ru": ("Результаты", "Срок", "Бюджет", "Ограничения"),
+        "es": ("Entregables", "Plazo", "Presupuesto", "Restricciones"),
+    }
+    detail_lines = []
+    for field, label in zip(fields, labels[language], strict=True):
+        if field not in values:
+            continue
+        if field in ("deliverables", "constraints"):
+            detail_lines.append(f"{label}:")
+            detail_lines.extend(f"- {item}" for item in values[field])
+        else:
+            detail_lines.append(f"{label}: {values[field]}")
+    if not detail_lines:
+        detail_lines.append(_EMPTY_DETAILS[language])
+    assert details == "\n".join(detail_lines), "key-details"
+
+    gap_lines = [f"- {issue['description']}" for issue in issues]
+    if missing:
+        gap_lines.append(_missing_confirmation(missing, language))
+    elif not issues:
+        gap_lines.append(_EMPTY_GAPS[language])
+    assert gaps == "\n".join(gap_lines), "gaps"
+
+    question_lines = [f"- {question['question']}" for question in questions]
+    if not questions:
+        question_lines.append(_EMPTY_QUESTIONS[language])
+    assert next_steps == "\n".join(question_lines), "next-steps"
+
+
 def golden_cases(product: str) -> list[dict[str, Any]]:
     return [
         case
