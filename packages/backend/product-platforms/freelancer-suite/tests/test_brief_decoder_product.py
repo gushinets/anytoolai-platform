@@ -737,7 +737,8 @@ def _list_lines(content: str) -> list[str]:
 def test_summary_fixtures_copy_lists_verbatim(summary_suffix: str) -> None:
     """ANY-617: deliverables, every constraint, issue descriptions and questions appear
     verbatim, one per line, in source order; only `summary` is free text."""
-    values = _fixture_response("brief_decoder.extract_brief_v1" + summary_suffix)["values"]
+    extract_suffix, language = _SUMMARY_FIXTURES[summary_suffix]
+    values = _fixture_response("brief_decoder.extract_brief_v1" + extract_suffix)["values"]
     issues = _fixture_response("brief_decoder.detect_issues_v1" + summary_suffix)["issues"]
     questions = (
         []
@@ -749,14 +750,28 @@ def test_summary_fixtures_copy_lists_verbatim(summary_suffix: str) -> None:
         for s in _fixture_response("brief_decoder.generate_summary_v1" + summary_suffix)["sections"]
     }
 
-    key_items = [*values.get("deliverables", []), *values.get("constraints", [])]
-    assert _list_lines(sections["key-details"]) == key_items
-    for scalar in ("deadline", "budget"):
-        if scalar in values:
-            assert any(
-                line.endswith(": " + values[scalar])
-                for line in sections["key-details"].splitlines()
-            ), scalar
+    fields = ("deliverables", "deadline", "budget", "constraints")
+    labels = {
+        "en": ("Deliverables", "Deadline", "Budget", "Constraints"),
+        "ru": ("Результаты", "Срок", "Бюджет", "Ограничения"),
+        "es": ("Entregables", "Plazo", "Presupuesto", "Restricciones"),
+    }
+    expected_lines = []
+    for field, label in zip(fields, labels[language], strict=True):
+        if field not in values:
+            continue
+        if field in ("deliverables", "constraints"):
+            expected_lines.append(f"{label}:")
+            expected_lines.extend(f"- {item}" for item in values[field])
+        else:
+            expected_lines.append(f"{label}: {values[field]}")
+    if not expected_lines:
+        assert language == "en"  # The empty-details fixture uses the English fallback.
+        expected_lines.append(
+            "No deliverables, deadline, budget or constraints were found in the brief."
+        )
+    assert sections["key-details"] == "\n".join(expected_lines)
+
     if "project_goal" in values:
         assert sections["overview"].splitlines()[0] == values["project_goal"]
     if "target_audience" in values:
@@ -769,35 +784,62 @@ def test_summary_fixtures_copy_lists_verbatim(summary_suffix: str) -> None:
 
 
 @pytest.mark.parametrize(
-    ("suffix", "section_id", "original_text", "replacement"),
+    ("suffix", "section_id", "replacements"),
     [
-        ("", "key-details", "should look modern", "the look should be modern"),
+        ("", "key-details", {"should look modern": "the look should be modern"}),
         (
             ".no_issues",
             "key-details",
-            "- checkout goes through a third-party payment processor, "
-            "not a custom payment system\n",
-            "",
+            {
+                "- checkout goes through a third-party payment processor, "
+                "not a custom payment system\n": ""
+            },
         ),
-        ("", "next-steps", "the exact date the website needs to be live", "the exact launch date"),
-        ("", "next-steps", "live?\n- Could", "live? Could"),
-        ("", "key-details", "- menu page\n- order form", "- order form\n- menu page"),
-        (".no_issues", "key-details", "2026-11-02", "2026-11-01 – 2026-11-02"),
+        (
+            "",
+            "next-steps",
+            {"the exact date the website needs to be live": "the exact launch date"},
+        ),
+        ("", "next-steps", {"live?\n- Could": "live? Could"}),
+        ("", "key-details", {"- menu page\n- order form": "- order form\n- menu page"}),
+        (".no_issues", "key-details", {"2026-11-02": "2026-11-01 – 2026-11-02"}),
+        pytest.param(
+            ".no_issues",
+            "key-details",
+            {"Deliverables:": "Constraints:", "Constraints:": "Deliverables:"},
+            id="swapped-list-headings",
+        ),
+        pytest.param(
+            ".no_issues",
+            "key-details",
+            {"Deadline:": "Budget:", "Budget:": "Deadline:"},
+            id="swapped-scalar-labels",
+        ),
+        pytest.param(
+            ".no_issues",
+            "key-details",
+            {"- menu page": "menu page\n- menu page"},
+            id="unexpected-non-bullet-line",
+        ),
     ],
 )
 def test_summary_fixture_rejects_changed_source_items(
     monkeypatch: pytest.MonkeyPatch,
     suffix: str,
     section_id: str,
-    original_text: str,
-    replacement: str,
+    replacements: dict[str, str],
 ) -> None:
     original = _fixture_response
     stem = "brief_decoder.generate_summary_v1" + suffix
     document = original(stem)
     section = next(s for s in document["sections"] if s["id"] == section_id)
-    assert original_text in section["content"]
-    section["content"] = section["content"].replace(original_text, replacement, 1)
+    assert all(section["content"].count(text) == 1 for text in replacements)
+    # Replace simultaneously so swapping labels cannot undo the first substitution.
+    section["content"] = re.sub(
+        "|".join(map(re.escape, replacements)),
+        lambda match: replacements[match[0]],
+        section["content"],
+    )
     monkeypatch.setitem(
         globals(), "_fixture_response", lambda name: document if name == stem else original(name)
     )
