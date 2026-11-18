@@ -157,8 +157,10 @@ def test_captured_runs_cover_every_case_and_match_the_reviewed_sources() -> None
         "workflows.yaml",
     ):
         path = PRODUCT / relative
+        # Captured results prove the reviewed sources, not later edits to the runtime prompts.
+        snapshot = ROOT / "tests/fixtures/brief_decoder_eval/reviewed_sources_20261117" / relative
         assert EVIDENCE["worker_source_sha256"][path.relative_to(ROOT).as_posix()] == (
-            hashlib.sha256(path.read_bytes()).hexdigest()
+            hashlib.sha256(snapshot.read_bytes()).hexdigest()
         )
     inputs = {
         case["id"]: hashlib.sha256(case["input"]["brief_text"].encode()).hexdigest()

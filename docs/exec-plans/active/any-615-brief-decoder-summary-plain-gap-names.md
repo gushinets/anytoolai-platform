@@ -5,10 +5,10 @@
 - State: active
 - Owner: agent
 - Created: 2026-11-16
-- Last updated: 2026-11-17
-- Review date: 2026-11-17
-- Next action: review the completed round 5 fixture/test corrections; no push performed.
-- Blocker: none for round 5. User accepted ANY-615's live wording result; the separate runtime
+- Last updated: 2026-11-18
+- Review date: 2026-11-18
+- Next action: review the completed round 6 changes; main is merged locally, no push performed.
+- Blocker: none for round 6. User accepted ANY-615's live wording result; the separate runtime
   and extraction findings are tracked in ANY-884 and ANY-885.
 
 ## Goal
@@ -47,11 +47,21 @@ assertions; colons and semicolons do not detach a source match from a changed su
 List syntax covers `-`, `+`, `*`, `•` and numeric markers ending in `.` or `)`, with indentation
 and LF/CRLF. Expected EN/RU/ES language comes from test-case metadata, not language inference.
 Untranslated internal keys outside copied facts are forbidden in RU/ES; English single-word
-names can remain ordinary prose. Positive gap completeness uses language-specific fixture words.
+names can remain ordinary prose. After round 6, an unverified assertion containing a technical
+field marker and an internal key requires review regardless of linking words, order or inline
+list position. Sentences, line breaks and masked facts bound scope; internal dots such as v1.0
+do not end an assertion. This conservative fixture rule can flag valid technical prose without
+source evidence; it does not assert a semantic violation or filter production output. Positive gap completeness uses language-specific fixture words.
 Arbitrary paraphrases, fragments, added quotation wrappers and interpretation beyond that contract
 remain live-acceptance concerns. It may conservatively flag such valid rewrites for review.
 
 ## Implementation steps
+
+- [x] Merge main `06d79037`, preserving both ANY-615 and ANY-762 prompt requirements.
+- [x] Round 6: replace adjacency grammar with assertion-level technical-context review;
+  preserve whole source facts and test the conservative boundary explicitly.
+- [x] Round 6: bind historical ANY-762 evidence to verified source snapshots, not current prompts.
+- [x] Round 6: add regressions, run validation and record results.
 
 - [x] Round 5: validate every summary fixture against the product document schema and restore
   fixed English titles in RU/ES fixtures, with title mutation regressions.
@@ -375,3 +385,39 @@ changes; older validation records below are historical, not current CI status.
   changes, paid live calls, GitHub/Linear writes, commit or push. API/full-check were not repeated
   for this fixture/test-only change. The accepted live evidence is retained unchanged; separate
   production findings remain in ANY-884 and ANY-885.
+
+
+### Review round 6 (2026-11-18)
+
+- User explicitly requested both updating from main and fixing the repeated model defect.
+  Read PR inline threads, including the reopened `field name is budget` reproduction. Merged
+  `06d79037` as `951a6312`; resolved the summary-prompt conflict by retaining both ANY-615's
+  gap wording/client-fact rules and ANY-762's deadline/budget-status requirements.
+- Replaced before/after adjacency patterns and optional label suffixes with whole-assertion
+  technical context. Source facts are masked first, as before. Every known key in an unverified
+  assertion with a technical field marker requires review; no enumeration of linking verbs,
+  modifiers or list separators. All keys in an inline list are covered, in either order.
+- Kept punctuation/line/masked-fact boundaries and identifier word boundaries. Internal dots in
+  versions or identifiers do not sever context. Ordinary English without a technical marker is
+  accepted. A source identifier elsewhere cannot exempt a new gap assertion.
+- Explicitly changed the old unsupported assumption that unrelated intervening words prove
+  safety: e.g. `Choose a field name after confirming the budget.` now requires review unless
+  it is a complete copied source fact. This is a conservative test contract, not a claim that
+  every flagged sentence is semantically wrong. Unknown marker vocabulary and cross-assertion
+  meaning remain outside this deterministic guard; live semantic review stays necessary.
+- Added mutations covering all single-word keys, nine linking/order/modifier forms, EN/RU/ES,
+  every copied document location, inline lists, and complete source facts. The initial expanded
+  selection against the old implementation had **49 failures, 169 passes**. Final suite contains
+  **837 Brief Decoder tests** (120 more than round 5); all **1416 Freelancer product tests passed**,
+  including the new ANY-762 suite and wheel packaging.
+- Integration initially exposed a historical-evidence test in ANY-762 comparing a captured
+  worker hash to the current summary prompt: 1011 tests passed and that assertion failed. Bound
+  those historical checks to frozen copies of the three reviewed source files instead. Each
+  copy was recovered from `06d79037` and its SHA-256 exactly matches the existing worker ledger.
+  Current prompt-contract checks remain active; neither historical evidence nor hashes were
+  rewritten. Old live results are not represented as acceptance of the merged prompt.
+- Managed doctor, config, architecture, documentation and whitespace validation passed. Ruff
+  reports only the same pre-existing E501/PLR2004 in the untouched schema-version test.
+- No new paid calls, GitHub/Linear writes or push. The merge commit is local; round 6 corrections
+  are prepared for review. Full-check and browser/API journeys were not repeated. The earlier
+  live acceptance, ANY-884 and ANY-885 remain separate from this deterministic fix.
