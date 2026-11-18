@@ -729,8 +729,55 @@ def test_summary_fixture_rejects_changed_fixed_titles(
         test_summary_fixtures_obey_the_a10_prompt(suffix, *_SUMMARY_FIXTURES[suffix])
 
 
-def _list_lines(content: str) -> list[str]:
-    return [line[2:] for line in content.splitlines() if line.startswith("- ")]
+# A10 authors the confirmation sentence. Pin the reviewed wording to the A01 fields it names.
+_LOCALIZED_MISSING_FIELDS = frozenset({"deadline", "budget", "target_audience", "constraints"})
+_MISSING_FIELD_CONFIRMATION = {
+    ("en", frozenset({"target_audience"})): (
+        "The target audience is not stated; the client should confirm it."
+    ),
+    ("en", _LOCALIZED_MISSING_FIELDS | {"deliverables"}): (
+        "Deliverables, deadline, budget, target audience and constraints are missing; "
+        "the client should confirm them."
+    ),
+    ("ru", _LOCALIZED_MISSING_FIELDS): (
+        "Клиенту нужно уточнить срок, бюджет, целевую аудиторию и ограничения."
+    ),
+    ("es", _LOCALIZED_MISSING_FIELDS): (
+        "El cliente debe confirmar el plazo, el presupuesto, el público objetivo "
+        "y las restricciones."
+    ),
+}
+
+
+def _assert_overview(content: str, values: dict[str, Any], language: DocumentLanguage) -> None:
+    labels = {"en": "Target audience", "ru": "Целевая аудитория", "es": "Público objetivo"}
+    lines = [values["project_goal"]] if "project_goal" in values else []
+    if "target_audience" in values:
+        lines.append(f"{labels[language]}: {values['target_audience']}")
+    assert lines, "Each reviewed overview fixture has a goal or an audience"
+    assert content == "\n".join(lines)
+
+
+@pytest.mark.parametrize(
+    ("language", "goal", "audience", "audience_line", "wrong_label"),
+    [
+        ("ru", "Создать сайт.", "Местные семьи", "Целевая аудитория: Местные семьи", "Срок"),
+        (
+            "es",
+            "Crear un sitio.",
+            "Familias locales",
+            "Público objetivo: Familias locales",
+            "Plazo",
+        ),
+    ],
+)
+def test_localized_overview_with_audience(
+    language: DocumentLanguage, goal: str, audience: str, audience_line: str, wrong_label: str
+) -> None:
+    values = {"project_goal": goal, "target_audience": audience}
+    _assert_overview(f"{goal}\n{audience_line}", values, language)
+    with pytest.raises(AssertionError):
+        _assert_overview(f"{goal}\n{wrong_label}: {audience}", values, language)
 
 
 @pytest.mark.parametrize("summary_suffix", _SUMMARY_FIXTURES)
@@ -738,17 +785,15 @@ def test_summary_fixtures_copy_lists_verbatim(summary_suffix: str) -> None:
     """ANY-617: deliverables, every constraint, issue descriptions and questions appear
     verbatim, one per line, in source order; only `summary` is free text."""
     extract_suffix, language = _SUMMARY_FIXTURES[summary_suffix]
-    values = _fixture_response("brief_decoder.extract_brief_v1" + extract_suffix)["values"]
+    brief = _fixture_response("brief_decoder.extract_brief_v1" + extract_suffix)
+    values = brief["values"]
     issues = _fixture_response("brief_decoder.detect_issues_v1" + summary_suffix)["issues"]
     questions = (
         []
-        if summary_suffix == ".no_issues"
+        if not issues
         else _fixture_response("brief_decoder.generate_questions_v1" + summary_suffix)["questions"]
     )
-    sections = {
-        s["id"]: s["content"]
-        for s in _fixture_response("brief_decoder.generate_summary_v1" + summary_suffix)["sections"]
-    }
+    document = _fixture_response("brief_decoder.generate_summary_v1" + summary_suffix)
 
     fields = ("deliverables", "deadline", "budget", "constraints")
     labels = {
@@ -770,17 +815,28 @@ def test_summary_fixtures_copy_lists_verbatim(summary_suffix: str) -> None:
         expected_lines.append(
             "No deliverables, deadline, budget or constraints were found in the brief."
         )
-    assert sections["key-details"] == "\n".join(expected_lines)
 
-    if "project_goal" in values:
-        assert sections["overview"].splitlines()[0] == values["project_goal"]
-    if "target_audience" in values:
-        assert any(
-            line.endswith(": " + values["target_audience"])
-            for line in sections["overview"].splitlines()
-        )
-    assert _list_lines(sections["gaps"]) == [issue["description"] for issue in issues]
-    assert _list_lines(sections["next-steps"]) == [q["question"] for q in questions]
+    gap_lines = [f"- {issue['description']}" for issue in issues]
+    if brief["missing_fields"]:
+        missing = frozenset(brief["missing_fields"])
+        gap_lines.append(_MISSING_FIELD_CONFIRMATION[language, missing])
+    elif not issues:
+        assert language == "en"  # The complete-brief fixture is English.
+        gap_lines.append("No issues were found in the brief, and nothing requested is missing.")
+
+    question_lines = [f"- {question['question']}" for question in questions]
+    if not questions:
+        assert language == "en"  # The empty-question fixture is English.
+        question_lines.append("No clarifying questions were generated for this brief.")
+
+    overview, *remaining = document["sections"]
+    assert overview["id"] == "overview"
+    _assert_overview(overview["content"], values, language)
+    assert [(section["id"], section["content"]) for section in remaining] == [
+        ("key-details", "\n".join(expected_lines)),
+        ("gaps", "\n".join(gap_lines)),
+        ("next-steps", "\n".join(question_lines)),
+    ]
 
 
 @pytest.mark.parametrize(
@@ -803,6 +859,48 @@ def test_summary_fixtures_copy_lists_verbatim(summary_suffix: str) -> None:
         ("", "next-steps", {"live?\n- Could": "live? Could"}),
         ("", "key-details", {"- menu page\n- order form": "- order form\n- menu page"}),
         (".no_issues", "key-details", {"2026-11-02": "2026-11-01 – 2026-11-02"}),
+        pytest.param(
+            ".no_issues",
+            "overview",
+            {"Target audience:": "Deadline:"},
+            id="wrong-audience-label",
+        ),
+        pytest.param(
+            ".es",
+            "overview",
+            {"panadería.": "panadería.\nCrear un sitio web."},
+            id="extra-overview-line",
+        ),
+        pytest.param(
+            "",
+            "next-steps",
+            {"yourself?": "yourself?\nRationale: Ask this first."},
+            id="appended-question-rationale",
+        ),
+        pytest.param(
+            ".no_issues",
+            "next-steps",
+            {"this brief.": "this brief. Work can start."},
+            id="altered-empty-questions",
+        ),
+        pytest.param(
+            ".ru",
+            "gaps",
+            {"ограничения.": "ограничения.\nБюджет согласован."},
+            id="appended-gap-claim",
+        ),
+        pytest.param(
+            ".es",
+            "gaps",
+            {"El cliente debe": "Presupuesto aprobado. El cliente debe"},
+            id="extra-claim-on-confirmation-line",
+        ),
+        pytest.param(
+            ".no_issues",
+            "gaps",
+            {"is missing.": "is missing. Payment is approved."},
+            id="altered-empty-gaps",
+        ),
         pytest.param(
             ".no_issues",
             "key-details",

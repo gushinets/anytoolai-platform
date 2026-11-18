@@ -62,6 +62,12 @@ Updated the summary prompt and compared five summary fixtures to their same-run 
 localized issue and question sources. The six negative cases rejected altered source text.
 The existing field-key guard accepts the group labels in all three languages.
 
+The second code review reproduced seven accepted fixture mutations across overview, gaps and
+questions. The fixture guard now compares complete ordered sections with their upstream inputs
+and selects the reviewed confirmation sentence by language and missing field set. Synthetic
+Russian and Spanish examples exercise audience labels because the bakery fixtures omit the
+audience. All 1,472 freelancer product and Brief Decoder API bundle tests passed.
+
 ## Open questions
 
 Review separate verdict presentation under the UI follow-up.
