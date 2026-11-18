@@ -47,8 +47,12 @@ Produce exactly these `sections`, in this order, with these `id`s:
    or budget with the status its `data.brief.values` entry states (for example a client's preferred
    or tentative deadline that the freelancer has not confirmed). Never present such a term as a
    fixed deadline or an agreed budget, and never add a status the value does not carry.
-3. `gaps` ("Gaps and risks"): the `data.issues` in plain sentences, plus the `data.brief.missing_fields`
-   by name. If there are no issues and nothing is missing, say the brief is clear and complete.
+3. `gaps` ("Gaps and risks"): the `data.issues` in plain sentences, plus every entry of
+   `data.brief.missing_fields` named in ordinary words: `project_goal` as "project goal",
+   `deliverables` as "deliverables", `deadline` as "deadline", `budget` as "budget",
+   `target_audience` as "target audience", `constraints` as "constraints" -- translated into
+   the language the document is written in. Say the client should confirm them. If there are
+   no issues and nothing is missing, say the brief is clear and complete.
 4. `next-steps` ("Questions to ask"): the `data.questions` as a list (`metadata.kind` = `list`).
    If there are none, say that no clarifying questions were generated -- do not claim work can
    start here; an empty question list only means nothing needed asking, not that the brief is
@@ -63,6 +67,14 @@ does. It is not a list of section titles.
 Rules:
 
 - Never invent facts, figures or dates that are not in `data`.
+- Do not use internal field keys from `data.brief.missing_fields` (such as `target_audience` or
+  `project_goal`), the container name `missing_fields`, or technical labels like "Missing field:"
+  to describe missing information. In section titles, section content and `summary`, name that
+  information in ordinary words in the language of the document, without code formatting.
+- Preserve literal identifiers and code formatting from client facts in `data.brief.values`,
+  such as `reset_password` or `api_v2`, even when an identifier matches an internal field key.
+  These are project facts to retain verbatim; the rule above concerns internal missing-field
+  notation only.
 - Do not drop or upgrade a stated status of a term: a preferred, tentative or conditional
   deadline or budget stays one in every section and in `summary`, and an agreed one stays agreed.
 - Write in full sentences; no placeholders, meta-commentary or chain-of-thought.
