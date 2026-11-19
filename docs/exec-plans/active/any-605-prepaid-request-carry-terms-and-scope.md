@@ -96,6 +96,7 @@ Canonical quick-check: 4,251 passed, 3 failed, 12 skipped, 720 deselected. All t
 | 2026-11-19 | Traced the single prepaid compose step to the registered v1 prompt. | Run doctor and update the prompt. |
 | 2026-11-19 | Updated attribution, confirmation and request wording, and added three tests against the registered prompt. | Validate the API bundle and repository baseline. |
 | 2026-11-19 | Verified all 106 targeted tests and recorded three runner failures in the broader baseline. | ANY-608 live acceptance on A02/A03/A05 + S5. |
+| 2026-11-19 | Routed shares requiring rounding to terms confirmation and checked the one-third of USD 100 example. All 91 product and shared-prompt tests, config and documentation checks passed. | ANY-608 live acceptance. |
 
 ## Open questions
 

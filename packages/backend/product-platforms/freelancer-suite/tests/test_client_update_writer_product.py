@@ -611,7 +611,11 @@ def test_prepaid_request_prompt_resolves_a_share_amount_against_an_agreed_base()
     assert "this payment's amount is that share of the base, in the base's currency" in prompt
     assert "a share of an agreed base takes the base's currency" in step_2
     assert "names only a share (a percentage or fraction) and the notes state no base" in step_2
-    assert "that share of the base computed exactly" in rule_d
+    assert "the exact share is not a whole number of the currency's smallest payable unit" in step_2
+    assert "one-third of USD 100 cannot be paid in whole cents" in step_2
+    assert "confirm a concrete payable amount under rule B" in step_2
+    assert "do not round or request payment" in step_2
+    assert "computed exactly as a whole number of the currency's smallest payable unit" in rule_d
     assert "name the base and the computed amount as two separate figures" in prompt
     assert "This is the only figure you may compute" in prompt
     assert "never compute a balance the notes do not state" in prompt

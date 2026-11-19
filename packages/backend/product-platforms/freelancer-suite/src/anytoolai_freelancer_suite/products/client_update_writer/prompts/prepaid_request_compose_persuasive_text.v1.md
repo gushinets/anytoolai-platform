@@ -46,6 +46,9 @@ schedule) is open when any of these holds:
   a rejected or superseded base next to one agreed current base opens nothing;
 - `context.amount` names only a share (a percentage or fraction) and the notes state no base for
   it, or state no currency for that base;
+- the exact share is not a whole number of the currency's smallest payable unit (for example,
+  one-third of USD 100 cannot be paid in whole cents). Ask the client to confirm a concrete payable
+  amount under rule B; do not round or request payment;
 - `context.amount`, or a given `context.due_date`, is a placeholder such as "TBD" or "to be
   agreed", or does not name one value (alternatives such as "USD 500 or EUR 460", or a range)
   (an absent `due_date` is not a placeholder);
@@ -101,7 +104,8 @@ X by Y" is a payment ask too), and never ask the client to report a payment.
   acknowledgment: a short note that you will wait.
 - D. Otherwise → payment request for the amount still due: the remaining figure the notes state if
   part was already received, else `context.amount`, or, when `context.amount` names only a share of
-  an agreed base, that share of the base computed exactly. Follow a "go gently" note in the wording.
+  an agreed base, that share of the base computed exactly as a whole number of the currency's
+  smallest payable unit. Follow a "go gently" note in the wording.
   Explicitly and politely ask the client to pay that amount. Describing the payment terms or
   asking only to be notified after payment does not replace the request to pay.
 
@@ -154,8 +158,8 @@ Rules:
 - In a payment request where `context.amount` names only a share of an agreed base, name the
   base and the computed amount as two separate figures, each with its currency, so neither can
   be read as the other (for example "аванс 50% от согласованного бюджета 90 000 ₽ — 45 000 ₽",
-  "a 40% deposit of the EUR 2,400 total, EUR 960"). Compute the amount exactly, keeping the
-  base's precision (no rounding: 35% of 82 350 RUB is 28 822,50 RUB). This is the only figure
+  "a 40% deposit of the EUR 2,400 total, EUR 960"). Use the exact payable amount
+  (for example, 35% of 82 350 RUB is 28 822,50 RUB). This is the only figure
   you may compute; never compute a balance the notes do not state.
 - In a payment request, preserve the complete explicitly stated payment arrangement and scope:
   carry into the message every payment condition and every scope boundary that `context.notes`
