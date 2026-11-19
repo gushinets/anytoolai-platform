@@ -33,6 +33,11 @@ The A10 prompt and fake-provider examples define the document wording within the
 
 ## Implementation steps
 
+Verify that the opening establishes current readiness. When a conditional
+explanation follows it, identify the shared consequence of its alternatives and
+check subsequent independent claims. Cover the two findings in EN/RU/ES for both
+opening verdicts.
+
 For the condition-led consequence finding, distinguish a coordinated prerequisite
 from the consequence in the shared fixture assertion. Verify both polarities in
 EN/RU/ES and the reported summary through the canonical document assertion.
@@ -172,6 +177,15 @@ condition-led clause can also contain the readiness consequence itself.
 The six localized regressions and the original
 canonical document mutation failed before the fix. All 1,650 freelancer product,
 Brief Decoder API and language evaluation tests passed after it.
+
+The next two findings reproduced with both opening verdicts in all three languages.
+The authored verdict must establish current readiness. Free explanations can follow
+a sentence boundary, colon, semicolon or dash. A comma may introduce a conditional
+explanation when its premises have a separate consequence. Coordinated premises
+can share one conditional introducer; the guard resumes checking assertions
+after their consequence. All twelve new parameterized cases failed before the
+change. The freelancer product, Brief Decoder API and language suites cover both
+reported examples and the earlier conditional-scope regressions.
 
 ## Open questions
 

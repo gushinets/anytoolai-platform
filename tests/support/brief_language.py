@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import re
-from collections import deque
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, Literal
@@ -33,9 +32,14 @@ _READINESS_CLAUSES = {
 }
 
 # An explicitly conditional or interrogative complement does not assert its contents.
-_CONDITION = {"en": r"if|when|once", "ru": r"если|когда", "es": r"si|cuando"}
+_CONDITION = {
+    "en": r"(?:only )?(?:if|when|once)",
+    "ru": r"(?:только )?(?:если|когда)",
+    "es": r"(?:s[oó]lo )?(?:si|cuando)",
+}
 _COORDINATORS = {"en": {"and", "or"}, "ru": {"и", "или", "либо", "а"}, "es": {"y", "o"}}
 _STATEMENT_END = re.compile(r"[.!?;:—–]|\b(?:but|pero|но)\b")
+_OPENING_END = re.compile(r",|" + _STATEMENT_END.pattern)
 _INDEPENDENT_PREFIX = {
     "en": r"(?:however|in any case)\b",
     "ru": r"(?:однако|в любом случае)\b",
@@ -70,37 +74,54 @@ def _verdict_matches(
                     yield match
 
 
-def _statement_verdicts(statement: str, language: DocumentLanguage) -> Iterator[bool]:
-    parts = deque(part.strip() for part in statement.split(",") if part.strip())
-    awaiting_consequence = False
-    while parts:
-        clause = parts.popleft()
-        if _joins_condition(clause, language):
-            awaiting_consequence = True
+def _consequence_index(clauses: list[str], start: int, language: DocumentLanguage) -> int | None:
+    """Find the consequence shared by the condition at start and its alternatives."""
+    for index in range(start + 1, len(clauses)):
+        clause = clauses[index]
+        first, _, rest = clause.partition(" ")
+        joined = first in _COORDINATORS[language]
+        if re.match(_INDEPENDENT_PREFIX[language], rest if joined else clause):
+            break
+        if joined:
+            # A coordinated prerequisite may omit the repeated "if".
             continue
-        if _starts_condition(clause, language):
-            # The next clause can start with a modifier and already supply the
-            # pending consequence ("once funding arrives the brief is ready").
-            has_consequence = awaiting_consequence and any(
-                _verdict_matches(clause, language, opening=False)
-            )
-            awaiting_consequence = not has_consequence
+        if not _starts_condition(clause, language) or any(
+            _verdict_matches(clause, language, opening=False)
+        ):
+            return index
+    return None
+
+
+def _statement_verdicts(
+    statement: str, language: DocumentLanguage, *, opening_separator: str = ""
+) -> Iterator[bool]:
+    parts = [part.strip() for part in statement.split(",") if part.strip()]
+    index = 0
+    while index < len(parts):
+        clause = parts[index]
+        index += 1
+        conditional = _starts_condition(clause, language) or _joins_condition(clause, language)
+        if index == 1 and opening_separator == ",":
+            # A bare comma can attach an arbitrary qualification to the verdict.
+            # In fixtures it may also introduce a complete "if A, do B" explanation.
+            assert conditional, f"Ambiguous opening readiness: {statement!r}"
+        if conditional:
+            consequence = _consequence_index(parts, index - 1, language)
+            if opening_separator in (",", ":", "—", "–") and index == 1:
+                # Without a consequence of its own, this condition qualifies the opening.
+                assert consequence is not None, f"Conditional opening readiness: {statement!r}"
+            if consequence is not None:
+                index = consequence + 1
             continue
-        if awaiting_consequence:
-            awaiting_consequence = False
-            # A coordinated assertion or explicit contrast is independent even
-            # when the preceding prose starts with a conditional modifier.
-            joined = clause.partition(" ")[0] in _COORDINATORS[language]
-            if not joined and not re.match(_INDEPENDENT_PREFIX[language], clause):
-                continue
         for match in _verdict_matches(clause, language, opening=False):
             suffix = clause[match.end() :].strip()
-            if not suffix and parts and _starts_condition(parts[0], language):
+            if not suffix and index < len(parts) and _starts_condition(parts[index], language):
                 # The same postposed condition can be set off with a comma.
-                suffix = parts.popleft()
+                suffix = parts[index]
+                index += 1
             if _starts_condition(suffix, language):
-                while parts and _joins_condition(parts[0], language):
-                    parts.popleft()
+                while index < len(parts) and _joins_condition(parts[index], language):
+                    index += 1
             else:
                 yield match["negative"] is None
 
@@ -115,18 +136,19 @@ def assert_summary_readiness(
 ) -> None:
     expected_ready = not (issues or missing_fields or questions)
     normalized = " ".join(summary.casefold().split())
-    first_statement, *explanation = _STATEMENT_END.split(normalized)
-    first, _, continuation = first_statement.partition(",")
+    boundary = _OPENING_END.search(normalized)
+    first = normalized[:boundary.start()] if boundary else normalized
+    separator = boundary.group() if boundary else ""
     opening = next(_verdict_matches(first.strip(), language, opening=True), None)
-    assert opening and (opening["negative"] is None) == expected_ready, (
+    assert opening and separator != "?" and (opening["negative"] is None) == expected_ready, (
         f"Expected opening readiness={expected_ready}: {summary!r}"
     )
-    rest = {
-        verdict
-        for statement in (continuation, *explanation)
-        for verdict in _statement_verdicts(statement, language)
-    }
-    assert (not expected_ready) not in rest, f"Conflicting readiness verdicts: {summary!r}"
+    explanation = normalized[boundary.end():] if boundary else ""
+    for index, statement in enumerate(_STATEMENT_END.split(explanation)):
+        verdicts = _statement_verdicts(
+            statement, language, opening_separator=separator if index == 0 else ""
+        )
+        assert (not expected_ready) not in verdicts, f"Conflicting readiness verdicts: {summary!r}"
 
 
 _EMPTY_OVERVIEW = {

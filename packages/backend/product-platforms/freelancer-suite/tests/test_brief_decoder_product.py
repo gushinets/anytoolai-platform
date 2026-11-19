@@ -1075,12 +1075,14 @@ def test_conditional_consequence_and_independent_readiness(
 
 def test_conditional_loss_of_readiness_preserves_the_positive_verdict():
     signals = {"issues": [], "missing_fields": [], "questions": []}
-    opening = "The brief is ready to start,"
+    opening = "The brief is ready to start"
     opposite = "the brief is not ready to start."
-    assert_summary_readiness(f"{opening} if funding is withdrawn, {opposite}", "en", **signals)
+    assert_summary_readiness(f"{opening}, if funding is withdrawn, {opposite}", "en", **signals)
     for intro in ("once again", "if anything", "and if anything", "whether funding changes or not"):
+        with pytest.raises(AssertionError, match="opening readiness"):
+            assert_summary_readiness(f"{opening}, {intro}, {opposite}", "en", **signals)
         with pytest.raises(AssertionError, match="Conflicting readiness"):
-            assert_summary_readiness(f"{opening} {intro}, {opposite}", "en", **signals)
+            assert_summary_readiness(f"{opening}. {intro}, {opposite}", "en", **signals)
 
 
 @pytest.mark.parametrize(
@@ -1160,6 +1162,66 @@ def test_condition_inside_consequence_does_not_hide_next_verdict(
     assert_summary_readiness(f"{prerequisites}, {opposite}.", language, **signals)
     with pytest.raises(AssertionError, match="Conflicting readiness"):
         assert_summary_readiness(f"{prerequisites} {opposite}, {opposite}.", language, **signals)
+
+
+_readiness_scope_cases = pytest.mark.parametrize(
+    ("language", "positive", "negative", "condition", "alternative", "action"),
+    [
+        ("en", "The brief is ready to start", "The brief is not ready to start",
+         "if funding is withdrawn", "or", "postpone kickoff"),
+        ("ru", "Бриф готов к работе", "Бриф не готов к работе",
+         "если финансирование отзовут", "или", "перенесите старт"),
+        ("es", "El encargo está listo para empezar", "El encargo no está listo para empezar",
+         "si se retira la financiación", "o", "pospongan el inicio"),
+    ],
+    ids=["en", "ru", "es"],
+)
+
+
+@_readiness_scope_cases
+@pytest.mark.parametrize("ready", [True, False], ids=["ready", "not-ready"])
+def test_opening_requires_current_readiness(
+    language, positive, negative, condition, alternative, action, ready
+):
+    opening = positive if ready else negative
+    signals = {"issues": [], "missing_fields": [] if ready else ["budget"], "questions": []}
+    only = {"en": "only", "ru": "только", "es": "solo"}[language]
+    for qualifier in (condition, f"{only} {condition}"):
+        for separator in (", ", " ", ": ", " — "):
+            with pytest.raises(AssertionError, match="opening readiness"):
+                assert_summary_readiness(f"{opening}{separator}{qualifier}.", language, **signals)
+    qualification = {
+        "en": "subject to final approval",
+        "ru": "при условии окончательного согласования",
+        "es": "a condición de que se dé la aprobación final",
+    }[language]
+    with pytest.raises(AssertionError, match="opening readiness"):
+        assert_summary_readiness(f"{opening}, {qualification}.", language, **signals)
+    with pytest.raises(AssertionError, match="opening readiness"):
+        summary = f"{opening}, {condition}, {alternative} {condition}."
+        assert_summary_readiness(summary, language, **signals)
+    with pytest.raises(AssertionError, match="opening readiness"):
+        assert_summary_readiness(f"{opening}?", language, **signals)
+    # The condition can instead introduce a separate instruction with its own consequence.
+    assert_summary_readiness(f"{opening}, {condition}, {action}.", language, **signals)
+    for separator in (". ", ": ", " — ", "; "):
+        assert_summary_readiness(f"{opening}{separator}{action}.", language, **signals)
+
+
+@_readiness_scope_cases
+@pytest.mark.parametrize("ready", [True, False], ids=["ready", "not-ready"])
+def test_alternatives_share_their_condition_and_consequence(
+    language, positive, negative, condition, alternative, action, ready
+):
+    opening, opposite = (positive, negative) if ready else (negative, positive)
+    signals = {"issues": [], "missing_fields": [] if ready else ["budget"], "questions": []}
+    for separator in (", ", " "):
+        choices = f"{condition}{separator}{alternative} {opposite.lower()}"
+        for consequence in (action, opposite.lower()):
+            explanation = f"{opening}. {choices}, {consequence}"
+            assert_summary_readiness(explanation + ".", language, **signals)
+            with pytest.raises(AssertionError, match="Conflicting readiness"):
+                assert_summary_readiness(f"{explanation}, {opposite.lower()}.", language, **signals)
 
 
 @pytest.mark.parametrize(
