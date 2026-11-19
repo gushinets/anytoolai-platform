@@ -33,6 +33,10 @@ The A10 prompt and fake-provider examples define the document wording within the
 
 ## Implementation steps
 
+For the tenth review, limit the scope of a fronted condition to its consequence and
+check subsequent assertions in the same sentence. Cover both readiness polarities in
+English, Russian and Spanish and exercise the canonical API fixture assertion.
+
 For the ninth review, preserve fronted conditions across commas in the shared fixture readiness check. Verify conditional and unconditional claims in all three languages, including an independent contradiction following a condition.
 
 Round 8: distinguish source items from physical lines, share localized field labels with the provenance check, and exercise multiline copies and labeled identifiers. Keep weak summaries focused on the first clarification. Verify prefixed readiness claims and unrelated explanations in all three languages.
@@ -123,6 +127,13 @@ The ninth review reproduced a false contradiction when a comma separated a condi
 its consequence. The fixture verifier now retains that scope and checks the next independent
 statement for contradictions. Conditional and unconditional controls cover English, Russian
 and Spanish. All 1,632 product, API and language evaluation tests passed.
+
+The tenth review found that a fronted condition stopped the verifier from checking
+the rest of the statement. For the authored "condition, consequence" form the verifier
+now consumes the consequence and resumes scanning at the next comma. Six regression
+cases cover both polarities in all three languages. A seventh exercises the reported
+contradiction through the canonical document assertion. All seven reproduced the
+failure before the change. All 1,639 product, API and language evaluation tests passed.
 
 ## Open questions
 

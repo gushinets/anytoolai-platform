@@ -1044,6 +1044,34 @@ def test_conditional_loss_of_readiness_preserves_the_positive_verdict():
 
 
 @pytest.mark.parametrize(
+    ("language", "positive", "negative", "condition", "contrast", "other"),
+    [
+        ("en", "the brief is ready to start", "the brief is not ready to start",
+         "if funding changes", "however", "the artwork"),
+        ("ru", "бриф готов к работе", "бриф не готов к работе",
+         "если бюджет изменится", "однако", "макет"),
+        ("es", "el encargo está listo para empezar", "el encargo no está listo para empezar",
+         "si cambia el presupuesto", "sin embargo", "el equipo"),
+    ],
+)
+@pytest.mark.parametrize("ready", [False, True], ids=["not-ready", "ready"])
+def test_independent_verdict_after_conditional_consequence(
+    language, positive, negative, condition, contrast, other, ready
+):
+    opening, opposite = (positive, negative) if ready else (negative, positive)
+    signals = {"issues": [], "missing_fields": [] if ready else ["budget"], "questions": []}
+    hypothetical = f"{opening}. {condition}, {opposite}"
+    assert_summary_readiness(hypothetical + ".", language, **signals)
+    assert_summary_readiness(f"{hypothetical}, {condition}, {opposite}.", language, **signals)
+    subject = {"en": "the brief", "ru": "бриф", "es": "el encargo"}[language]
+    unrelated = opposite.replace(subject, other)
+    assert_summary_readiness(f"{hypothetical}, {contrast} {unrelated}.", language, **signals)
+    for independent in (opposite, f"{contrast} {opposite}", f"{contrast}, {opposite}"):
+        with pytest.raises(AssertionError, match="Conflicting readiness"):
+            assert_summary_readiness(f"{hypothetical}, {independent}.", language, **signals)
+
+
+@pytest.mark.parametrize(
     ("suffix", "wrong_summary"),
     [
         (".weak_input", "The brief is ready to start work."),

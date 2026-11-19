@@ -52,15 +52,22 @@ def _fixture_verdicts(clause: str, language: DocumentLanguage, *, opening: bool)
 
 
 def _asserted_clauses(statement: str, language: DocumentLanguage) -> Iterator[str]:
+    # Authored fixtures express a hypothetical as "condition, consequence".
+    awaiting_consequence = False
     *prefixes, last = statement.split(",")
-    for prefix in prefixes:
-        # A fronted condition governs the consequence up to the next statement boundary.
-        clause = prefix.strip()
+    for part in prefixes:
+        clause = part.strip()
+        if not clause:
+            continue
         discourse_marker = clause in {"once again", "once more", "if anything"}
         if not discourse_marker and re.match(rf"(?:{_CONDITION[language]})\b", clause):
-            return
-        yield clause
-    yield last
+            awaiting_consequence = True
+        elif awaiting_consequence:
+            awaiting_consequence = False
+        else:
+            yield clause
+    if not awaiting_consequence:
+        yield last
 
 
 def assert_summary_readiness(
