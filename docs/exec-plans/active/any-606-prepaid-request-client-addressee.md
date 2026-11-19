@@ -6,7 +6,7 @@
 - Owner: agent
 - Linear: ANY-606
 - Created: 2026-11-18
-- Last updated: 2026-11-18
+- Last updated: 2026-11-19
 - Review date: 2026-11-20
 - Next action: review and merge the Prepaid Request addressee rule; live check in ANY-608.
 - Blocker: none
@@ -37,6 +37,7 @@ The only configuration change is the text of the existing v1 prompt. API, databa
 
 - [x] Add the supplied rule between the placeholder and speaker instructions.
 - [x] Pin its normalized text and relative position in the product suite.
+- [x] Extend the live collector with the Prepaid Request form and verify the scenario start and result session in the driver tests.
 
 ## Validation
 
@@ -62,4 +63,4 @@ The only configuration change is the text of the existing v1 prompt. API, databa
 
 ## Open questions / Follow-up
 
-ANY-608 will check three live outputs per case using provider credentials and the live stack with `tests/e2e/client-update-writer-smoke/collect-live-run.mjs`. Check that Елена keeps her name (A01), Jordan receives a named greeting and direct address (A02), Никита is greeted in the nominative and addressed as «вы» (A03), and the company-only input receives no personal greeting (A05).
+For ANY-608, follow the [ANY-604 live browser procedure](../completed/any-604-prepaid-request-live-acceptance.md) with provider credentials. Run each case three times through `tests/e2e/client-update-writer-smoke/collect-live.mjs`. In the input JSON set `mode` to `prepaid_request`, supply `billing_context` with string fields `notes`, `amount` and optional `due_date`, and set `tone` for the case. The collector selects Prepaid Request in the web UI and submits those fields. Count the run only after capturing a successful `POST` to `/scenarios/client_update_writer.prepaid_request_v1/start`. Use the returned `scenario_session_id` to identify the output being checked. Verify that the greeting names Елена (A01), Jordan is greeted by name and addressed directly (A02), Никита is greeted in the nominative and addressed as «вы» (A03), and the company-only input gets a greeting without a person's name (A05).
