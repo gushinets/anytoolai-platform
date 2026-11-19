@@ -28,7 +28,7 @@
         }
       }
     ],
-    "summary": "El encargo todavía no está listo para empezar: primero hay que confirmar el plazo y el presupuesto."
+    "summary": "El encargo todavía no está listo para empezar: primero hay que confirmar el plazo."
   },
   "input_tokens": 100,
   "output_tokens": 100,

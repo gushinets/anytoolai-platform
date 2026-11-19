@@ -35,8 +35,10 @@ empty when there was nothing to ask).
 
 Copy verbatim fields unchanged even when their language differs from the analysis language.
 The producers of `data.brief.values`, issue descriptions and questions own their wording and
-language. Treat those strings as quotations. For lists, write one item per line, each line
-starting with "- ", in the order `data` gives them. Do not merge, split, shorten,
+language. Treat those strings as quotations. For lists, start each item on a new line with one "- " marker,
+then copy the entire source string. Preserve embedded line breaks and continuation lines
+exactly, including their original indentation and punctuation. Add no continuation markers.
+Keep the order supplied by `data`. Do not merge, split, shorten,
 reword, reorder, summarize or drop items. Copying them exactly also keeps who performs each
 action (the party who hands over or receives something stays the same), what a right or license
 covers (for example rights to audio stay rights to audio), and every date, time, duration,
@@ -46,7 +48,7 @@ Only `summary` is written freely.
 Produce exactly these `sections`, in this order, with these `id`s:
 
 1. `overview` ("Project overview"): the `data.brief.values.project_goal` value verbatim (as plain
-   text, without "- "). If `target_audience` is present, add a second line: the word for
+   text, without "- "). If `target_audience` is present, start a new line after the complete goal: the word for
    "Target audience" in the document language, a colon, and the value verbatim. Write only facts
    that are present; do not mention absent ones here. If neither value is present, write one
    sentence that the brief does not state what the client wants.

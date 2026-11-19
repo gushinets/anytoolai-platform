@@ -1,9 +1,9 @@
 {
-  "brief_text": "Запишите аудиогид. Нужна одна аудиозапись. Разбор напишите по-русски.",
+  "brief_text": "Запишите аудиогид. Нужна одна аудиозапись. Завершите запись точной фразой «No fees.». Разбор напишите по-русски.",
   "brief": {
     "values": {
       "project_goal": "Record an audio guide.",
-      "deliverables": ["One audio recording."]
+      "deliverables": ["One audio recording.\n  Exact closing words: No fees."]
     },
     "confidence": {"project_goal": 0.9, "deliverables": 0.9},
     "missing_fields": ["deadline", "budget", "target_audience", "constraints"]
@@ -24,7 +24,7 @@
   "document": {
     "sections": [
       {"id": "overview", "title": "Project overview", "content": "Record an audio guide."},
-      {"id": "key-details", "title": "Key details", "content": "Результаты:\n- One audio recording.", "metadata": {"kind": "list"}},
+      {"id": "key-details", "title": "Key details", "content": "Результаты:\n- One audio recording.\n  Exact closing words: No fees.", "metadata": {"kind": "list"}},
       {"id": "gaps", "title": "Gaps and risks", "content": "- The audio rights are not specified.\nКлиенту нужно уточнить срок, бюджет, целевую аудиторию и ограничения."},
       {"id": "next-steps", "title": "Questions to ask", "content": "- Who holds the audio rights?", "metadata": {"kind": "list"}}
     ],

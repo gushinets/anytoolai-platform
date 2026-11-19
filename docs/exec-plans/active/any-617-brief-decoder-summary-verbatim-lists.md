@@ -33,6 +33,8 @@ The A10 prompt and fake-provider examples define the document wording within the
 
 ## Implementation steps
 
+Round 8: distinguish source items from physical lines, share localized field labels with the provenance check, and exercise multiline copies and labeled identifiers. Keep weak summaries focused on the first clarification. Verify prefixed readiness claims and unrelated explanations in all three languages.
+
 1. Specify copying and localized labels for each section.
 2. Align English, Russian, and Spanish fixtures with their upstream results.
 3. Compare complete fixture sections with their sources and exercise source-copy and readiness mutations.
@@ -105,6 +107,15 @@ original examples. The corrected documents pass against the recorded A10 inputs,
 empty extractions in English, Russian and Spanish. Removing an issue or rephrasing a question
 now fails its section check. All 1,604 product, API and language evaluation tests passed,
 along with the three web tests that copy the canonical Russian recipe across UI locales.
+
+The eighth review exposed a mismatch between logical source items and physical lines.
+A10 now prefixes each item once and preserves internal line breaks. The fixture checks use
+the same localized scalar labels when verifying source provenance and comparing sections.
+The weak examples now explain the first clarification, and the shared check catches a
+verbatim repetition of the entire issue or question list. The readiness check recognizes
+explicit fixture verdicts after introductory text in all three languages. It is a check
+of authored examples with known verdict wording. Live language quality is evaluated separately.
+All 1,626 freelancer product, Brief Decoder API and language evaluation tests passed.
 
 ## Open questions
 

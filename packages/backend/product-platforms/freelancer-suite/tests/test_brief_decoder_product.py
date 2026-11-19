@@ -27,6 +27,7 @@ from tests.support.brief_language import (
     assert_brief_overview,
     assert_summary_matches_sources,
     assert_summary_readiness,
+    labeled_brief_value,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
@@ -107,6 +108,14 @@ def _literal(value: str) -> Any:
 
 def _fixture_response(stem: str) -> dict[str, Any]:
     return json.loads((FIXTURE_ROOT / f"{stem}.json").read_text(encoding="utf-8"))["response_json"]
+
+
+def _override_fixture_responses(monkeypatch, responses):
+    original = _fixture_response
+    monkeypatch.setitem(
+        globals(), "_fixture_response",
+        lambda name: responses[name] if name in responses else original(name),
+    )
 
 
 def test_product_directory_contains_no_python_or_forbidden_provider_references() -> None:
@@ -589,12 +598,13 @@ def test_summary_prompt_names_gaps_in_words_not_field_keys() -> None:
 
 def test_summary_prompt_copies_lists_verbatim() -> None:
     """ANY-617: paraphrased lists changed who acts, what rights cover and times. Only `summary`
-    is free text; lists, issues and questions are copied verbatim, one per line."""
+    is free text; lists, issues and questions are copied verbatim, one marker per item."""
     prompt = " ".join(
         (PRODUCT_DIR / "prompts" / "generate_summary.v1.md").read_text(encoding="utf-8").split()
     )
     for phrase in (
-        'one item per line, each line starting with "- "',
+        'start each item on a new line with one "- " marker',
+        "Preserve embedded line breaks and continuation lines exactly",
         "Do not merge, split, shorten, reword, reorder, summarize or drop items.",
         "keeps who performs each action",
         "what a right or license covers",
@@ -699,19 +709,34 @@ def test_summary_fixtures_obey_the_a10_prompt(
         for value in brief["values"].values()
         for item in ([value] if isinstance(value, str) else value)
     )
+    # Labels are part of the copied assertion only in the section that owns the field.
+    section_facts = {
+        where: tuple(
+            labeled_brief_value(field, brief["values"][field], language)
+            for field in fields if field in brief["values"]
+        )
+        for where, fields in (
+            ("overview.content", ("target_audience",)),
+            ("key-details.content", ("deadline", "budget")),
+        )
+    }
+    issues, questions = _summary_issue_and_question_sources(summary_suffix)
+    section_facts["gaps.content"] = tuple(f"- {issue['description']}" for issue in issues)
+    section_facts["next-steps.content"] = tuple(f"- {q['question']}" for q in questions)
     texts = [
         (f"{section['id']}.{field}", section[field])
         for section in document["sections"]
         for field in ("title", "content")
     ]
     for where, text in [*texts, ("summary", document["summary"])]:
-        leaks = _field_key_leaks(text, source_facts=source_facts, language=language)
+        facts = source_facts + section_facts.get(where, ())
+        leaks = _field_key_leaks(text, source_facts=facts, language=language)
         assert not leaks, f"{where}: field key leaks {leaks}"
 
     for section_id, allowed in _NON_FACT_WORDS.items():
         ungrounded = (
             _stems(sections[section_id])
-            - _stems(json.dumps(brief["values"], ensure_ascii=False))
+            - _stems("\n".join(source_facts))
             - allowed
         )
         assert not ungrounded, (section_id, sorted(ungrounded))
@@ -762,18 +787,25 @@ def test_localized_overview_with_audience(
         assert_brief_overview(f"{goal}\n{wrong_label}: {audience}", values, language)
 
 
-@pytest.mark.parametrize("summary_suffix", _SUMMARY_FIXTURES)
-def test_summary_fixtures_copy_lists_verbatim(summary_suffix: str) -> None:
-    """ANY-617: deliverables, every constraint, issue descriptions and questions appear
-    verbatim, one per line, in source order; only `summary` is free text."""
-    extract_suffix, language = _SUMMARY_FIXTURES[summary_suffix]
-    brief = _fixture_response("brief_decoder.extract_brief_v1" + extract_suffix)
+def _summary_issue_and_question_sources(
+    summary_suffix: str,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     issues = _fixture_response("brief_decoder.detect_issues_v1" + summary_suffix)["issues"]
     questions = (
         []
         if not issues
         else _fixture_response("brief_decoder.generate_questions_v1" + summary_suffix)["questions"]
     )
+    return issues, questions
+
+
+@pytest.mark.parametrize("summary_suffix", _SUMMARY_FIXTURES)
+def test_summary_fixtures_copy_lists_verbatim(summary_suffix: str) -> None:
+    """ANY-617: deliverables, every constraint, issue descriptions and questions appear
+    verbatim, one marker per item, in source order; only `summary` is free text."""
+    extract_suffix, language = _SUMMARY_FIXTURES[summary_suffix]
+    brief = _fixture_response("brief_decoder.extract_brief_v1" + extract_suffix)
+    issues, questions = _summary_issue_and_question_sources(summary_suffix)
     document = _fixture_response("brief_decoder.generate_summary_v1" + summary_suffix)
 
     assert_summary_matches_sources(document, brief, issues, questions, language)
@@ -810,6 +842,21 @@ def test_russian_analysis_rejects_translated_source(
     assert source in section["content"]
     section["content"] = section["content"].replace(source, translation)
     with pytest.raises(AssertionError):
+        assert_summary_matches_sources(
+            case["document"], case["brief"], case["issues"], case["questions"], "ru"
+        )
+
+
+@pytest.mark.parametrize(
+    "continuation", [" Exact closing words: No fees.", "\n- Exact closing words: No fees."]
+)
+def test_multiline_item_rejects_folded_or_rebulleted_text(mixed_language_summary, continuation):
+    case = mixed_language_summary
+    details = case["document"]["sections"][1]
+    original = "\n  Exact closing words: No fees."
+    assert original in details["content"]
+    details["content"] = details["content"].replace(original, continuation)
+    with pytest.raises(AssertionError, match="key-details"):
         assert_summary_matches_sources(
             case["document"], case["brief"], case["issues"], case["questions"], "ru"
         )
@@ -925,13 +972,32 @@ def test_readiness_with_time_qualifier_keeps_its_subject(
     language: DocumentLanguage, ready: bool, opening: str, opposite: str, other_object: str
 ) -> None:
     missing = [] if ready else ["budget"]
-    assert_summary_readiness(
-        f"{opening} {other_object}", language, issues=[], missing_fields=missing, questions=[]
-    )
-    with pytest.raises(AssertionError, match="Conflicting readiness"):
+    signals = {"issues": [], "missing_fields": missing, "questions": []}
+    for prefix in ("", {"en": "In fact ", "ru": "На самом деле ", "es": "De hecho "}[language]):
         assert_summary_readiness(
-            f"{opening} {opposite}", language, issues=[], missing_fields=missing, questions=[]
+            f"{opening} {prefix}{other_object}", language, **signals
         )
+        with pytest.raises(AssertionError, match="Conflicting readiness"):
+            assert_summary_readiness(
+                f"{opening} {prefix}{opposite}", language, **signals
+            )
+
+
+@pytest.mark.parametrize(
+    ("language", "opening", "explanation"),
+    [
+        ("en", "The brief is not ready to start.", "Confirm whether the brief is ready to start."),
+        ("ru", "Бриф не готов к работе.", "Вернитесь, когда бриф готов к работе."),
+        (
+            "es", "El encargo no está listo para empezar.",
+            "Confirme si el encargo está listo para empezar.",
+        ),
+    ],
+)
+def test_conditional_readiness_in_explanation_is_not_a_verdict(language, opening, explanation):
+    assert_summary_readiness(
+        f"{opening} {explanation}", language, issues=[], missing_fields=["budget"], questions=[]
+    )
 
 
 @pytest.mark.parametrize(
@@ -1119,6 +1185,60 @@ def test_summary_fixture_guard_preserves_identifiers_from_extracted_values(
 
     monkeypatch.setitem(globals(), "_fixture_response", fixture_response)
     test_summary_fixtures_obey_the_a10_prompt("", "", "en")
+
+
+@pytest.mark.parametrize("language", ["en", "ru", "es"])
+@pytest.mark.parametrize(
+    ("field", "section"), [("target_audience", 0), ("deadline", 1), ("budget", 1)]
+)
+def test_labeled_identifiers_preserve_only_the_copied_value(monkeypatch, language, field, section):
+    suffix = ".no_issues" if language == "en" else "." + language
+    original = _fixture_response
+    brief = original("brief_decoder.extract_brief_v1" + suffix)
+    document = original("brief_decoder.generate_summary_v1" + suffix)
+    source = "After the `target_audience` migration."
+    old = brief["values"].get(field)
+    brief["values"][field] = source
+    content = document["sections"][section]["content"]
+    line = labeled_brief_value(field, source, language)
+    if old is None:
+        content += "\n" + line
+    else:
+        content = content.replace(labeled_brief_value(field, old, language), line)
+    document["sections"][section]["content"] = content
+    responses = {
+        "brief_decoder.extract_brief_v1" + suffix: brief,
+        "brief_decoder.generate_summary_v1" + suffix: document,
+    }
+    _override_fixture_responses(monkeypatch, responses)
+    test_summary_fixtures_obey_the_a10_prompt(suffix, suffix, language)
+    document["sections"][section]["content"] += " Missing field: target_audience."
+    with pytest.raises(AssertionError, match="field key leaks"):
+        test_summary_fixtures_obey_the_a10_prompt(suffix, suffix, language)
+
+
+@pytest.mark.parametrize(
+    ("stem", "collection", "key", "section"),
+    [
+        ("brief_decoder.detect_issues_v1", "issues", "description", 2),
+        ("brief_decoder.generate_questions_v1", "questions", "question", 3),
+    ],
+)
+def test_multiline_issue_and_question_keep_source_identifiers(
+    monkeypatch, stem, collection, key, section
+):
+    response = _fixture_response(stem)
+    document = _fixture_response("brief_decoder.generate_summary_v1")
+    original = response[collection][0][key]
+    source = original + "\n  Preserve `target_audience`."
+    response[collection][0][key] = source
+    content = document["sections"][section]["content"]
+    document["sections"][section]["content"] = content.replace(original, source)
+    _override_fixture_responses(
+        monkeypatch, {stem: response, "brief_decoder.generate_summary_v1": document}
+    )
+    test_summary_fixtures_obey_the_a10_prompt("", "", "en")
+    test_summary_fixtures_copy_lists_verbatim("")
 
 
 @pytest.mark.parametrize("source", _CLIENT_FACTS_WITH_COLLIDING_IDENTIFIERS)
@@ -1318,7 +1438,7 @@ def test_summary_fixture_distinguishes_technical_label_phrases_from_client_facts
     brief["values"]["project_goal"] = source
     document["sections"][0]["content"] = source
     responses = {extract_stem: brief, summary_stem: document}
-    monkeypatch.setitem(globals(), "_fixture_response", responses.__getitem__)
+    _override_fixture_responses(monkeypatch, responses)
     test_summary_fixtures_obey_the_a10_prompt(suffix, extract_suffix, language)
 
     document["sections"][2]["content"] += f" Missing {label}: {key}."
@@ -1382,7 +1502,7 @@ def test_summary_fixture_reviews_technical_assertions_independently_of_linking_w
     brief["values"]["project_goal"] = source
     document["sections"][0]["content"] = source
     responses = {extract_stem: brief, summary_stem: document}
-    monkeypatch.setitem(globals(), "_fixture_response", responses.__getitem__)
+    _override_fixture_responses(monkeypatch, responses)
     test_summary_fixtures_obey_the_a10_prompt(suffix, extract_suffix, language)
 
     # A different assertion about the same key cannot inherit the source fact's exemption.
@@ -1448,7 +1568,7 @@ def test_localized_fixtures_reject_untranslated_keys_but_preserve_client_facts(
     brief["values"]["deliverables"].append(source)
     document["sections"][1]["content"] += "\n- " + source
     responses = {extract_stem: brief, summary_stem: document}
-    monkeypatch.setitem(globals(), "_fixture_response", responses.__getitem__)
+    _override_fixture_responses(monkeypatch, responses)
     test_summary_fixtures_obey_the_a10_prompt(suffix, extract_suffix, language)
 
     target = document if section_index is None else document["sections"][section_index]
@@ -1498,7 +1618,7 @@ def test_localized_audience_gap_cannot_cover_a_missing_project_goal(
     brief["missing_fields"].append("project_goal")
     document["sections"][0]["content"] = brief["values"]["deliverables"][0]
     responses = {extract_stem: brief, summary_stem: document}
-    monkeypatch.setitem(globals(), "_fixture_response", responses.__getitem__)
+    _override_fixture_responses(monkeypatch, responses)
     with pytest.raises(AssertionError, match="project_goal"):
         test_summary_fixtures_obey_the_a10_prompt(suffix, extract_suffix, language)
     document["sections"][2]["content"] += " " + goal_gap

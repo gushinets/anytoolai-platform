@@ -95,6 +95,20 @@ def test_canonical_brief_rejects_changed_section(section_id, replacement):
         assert_summary_matches_sources(document, *sources)
 
 
+@pytest.mark.parametrize("language", ["en", "ru", "es"])
+@pytest.mark.parametrize(
+    ("collection", "key"), [("issues", "description"), ("questions", "question")]
+)
+def test_weak_summary_rejects_repeated_clarification_lists(language, collection, key):
+    case = CANONICAL[f"ANY761-BD-{language.upper()}-weak"]
+    repeated = " ".join(record[key] for record in case[collection])
+    document = {**case["document"], "summary": f"{case['document']['summary']} {repeated}"}
+    with pytest.raises(AssertionError, match="summary repeats"):
+        assert_summary_matches_sources(
+            document, case["brief"], case["issues"], case["questions"], language
+        )
+
+
 def test_generated_output_is_pending_until_every_field_and_fact_is_reviewed():
     run = record()
     assert evaluation.review_status(run, evaluation.review_template(run)) == "PENDING"

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, Literal
 
@@ -14,33 +15,38 @@ CANONICAL = json.loads((FIXTURES / "canonical.json").read_text(encoding="utf-8")
 
 DocumentLanguage = Literal["en", "ru", "es"]
 
-# Authored fixtures open with a verdict about the brief. Keep each subject paired with
-# its grammatical predicate; the following explanation is independently worded.
+# Fixture verdicts use a closed set of subjects and predicates. Only a named subject
+# can establish a verdict inside a clause; an omitted subject must start the clause.
 _READINESS_CLAUSES = {
     "en": (
-        r"(?:(?P<subject>the (?:brief|request) is )|it is )?"
-        r"(?P<negative>not (?:yet |fully )?)?ready to start(?: work)?",
+        (
+            r"the (?:brief|request) is ",
+            r"(?P<negative>not (?:yet |fully )?)?ready to start(?: work)?",
+        ),
     ),
-    "ru": (
-        r"(?:(?P<subject>бриф|запрос) )?(?:пока )?"
-        r"(?P<negative>не )?готов к (?:работе|началу работы)",
-    ),
+    "ru": ((r"(?:бриф|запрос) ", r"(?:пока )?(?P<negative>не )?готов к (?:работе|началу работы)"),),
     "es": tuple(
-        rf"(?:(?P<subject>{subject}) )?(?:(?:aún|todavía) )?"
-        rf"(?P<negative>no )?está {adjective} para empezar"
+        (subject + " ", rf"(?:(?:aún|todavía) )?(?P<negative>no )?está {adjective} para empezar")
         for subject, adjective in (("el encargo", "listo"), ("la solicitud", "lista"))
     ),
 }
 
+# An explicitly conditional or interrogative complement does not assert its contents.
+_CONDITION = {"en": r"if|whether|when|once", "ru": r"если|когда", "es": r"si|cuando"}
 
-def _fixture_verdict(clause: str, language: DocumentLanguage, *, opening: bool) -> bool | None:
-    # The opening is a complete verdict; later assertions may carry a trailing qualifier.
-    end = r"\Z" if opening else r"(?=\s|\Z)"
-    for pattern in _READINESS_CLAUSES[language]:
-        match = re.match(pattern + end, clause.strip())
-        if match and (not opening or match["subject"]):
-            return match["negative"] is None
-    return None
+
+def _fixture_verdicts(clause: str, language: DocumentLanguage, *, opening: bool) -> Iterator[bool]:
+    clause = clause.strip()
+    for subject, predicate in _READINESS_CLAUSES[language]:
+        if opening:
+            match = re.fullmatch(subject + predicate, clause)
+            if match:
+                yield match["negative"] is None
+        else:
+            named = rf"(?:{subject}|it is )" if language == "en" else subject
+            for match in re.finditer(rf"(?:\b{named}|^){predicate}(?=\s|$)", clause):
+                if not re.search(rf"\b(?:{_CONDITION[language]})\s+$", clause[: match.start()]):
+                    yield match["negative"] is None
 
 
 def assert_summary_readiness(
@@ -53,10 +59,10 @@ def assert_summary_readiness(
 ) -> None:
     expected_ready = not (issues or missing_fields or questions)
     normalized = " ".join(summary.casefold().split())
-    first, *explanation = re.split(r"[.,;:—–]|\b(?:but|pero|но)\b", normalized)
-    opening = _fixture_verdict(first, language, opening=True)
+    first, *explanation = re.split(r"[.!?;,:—–]|\b(?:but|pero|но)\b", normalized)
+    opening = next(_fixture_verdicts(first, language, opening=True), None)
     assert opening is expected_ready, f"Expected opening readiness={expected_ready}: {summary!r}"
-    rest = {_fixture_verdict(clause, language, opening=False) for clause in explanation}
+    rest = {v for clause in explanation for v in _fixture_verdicts(clause, language, opening=False)}
     assert (not expected_ready) not in rest, f"Conflicting readiness verdicts: {summary!r}"
 
 
@@ -132,11 +138,23 @@ def _missing_confirmation(missing_fields: list[str], language: DocumentLanguage)
     return f"{phrase.capitalize()} are missing; the client should confirm them."
 
 
+def labeled_brief_value(field: str, value: str, language: DocumentLanguage) -> str:
+    labels = {
+        "target_audience": {
+            "en": "Target audience",
+            "ru": "Целевая аудитория",
+            "es": "Público objetivo",
+        },
+        "deadline": {"en": "Deadline", "ru": "Срок", "es": "Plazo"},
+        "budget": {"en": "Budget", "ru": "Бюджет", "es": "Presupuesto"},
+    }
+    return f"{labels[field][language]}: {value}"
+
+
 def assert_brief_overview(content: str, values: dict[str, Any], language: DocumentLanguage) -> None:
-    labels = {"en": "Target audience", "ru": "Целевая аудитория", "es": "Público objetivo"}
     lines = [values["project_goal"]] if "project_goal" in values else []
     if "target_audience" in values:
-        lines.append(f"{labels[language]}: {values['target_audience']}")
+        lines.append(labeled_brief_value("target_audience", values["target_audience"], language))
     if not lines:
         lines.append(_EMPTY_OVERVIEW[language])
     assert content == "\n".join(lines), "overview"
@@ -155,26 +173,29 @@ def assert_summary_matches_sources(
     assert_summary_readiness(
         document["summary"], language, issues=issues, missing_fields=missing, questions=questions
     )
+    for records, key in ((issues, "description"), (questions, "question")):
+        if records:
+            assert not all(record[key] in document["summary"] for record in records), (
+                f"summary repeats the full {key} list"
+            )
     sections = document["sections"]
     assert [s["id"] for s in sections] == ["overview", "key-details", "gaps", "next-steps"]
     overview, details, gaps, next_steps = (s["content"] for s in sections)
     assert_brief_overview(overview, values, language)
 
-    fields = ("deliverables", "deadline", "budget", "constraints")
-    labels = {
-        "en": ("Deliverables", "Deadline", "Budget", "Constraints"),
-        "ru": ("Результаты", "Срок", "Бюджет", "Ограничения"),
-        "es": ("Entregables", "Plazo", "Presupuesto", "Restricciones"),
+    group_labels = {
+        "deliverables": {"en": "Deliverables", "ru": "Результаты", "es": "Entregables"},
+        "constraints": {"en": "Constraints", "ru": "Ограничения", "es": "Restricciones"},
     }
     detail_lines = []
-    for field, label in zip(fields, labels[language], strict=True):
+    for field in ("deliverables", "deadline", "budget", "constraints"):
         if field not in values:
             continue
-        if field in ("deliverables", "constraints"):
-            detail_lines.append(f"{label}:")
+        if field in group_labels:
+            detail_lines.append(f"{group_labels[field][language]}:")
             detail_lines.extend(f"- {item}" for item in values[field])
         else:
-            detail_lines.append(f"{label}: {values[field]}")
+            detail_lines.append(labeled_brief_value(field, values[field], language))
     if not detail_lines:
         detail_lines.append(_EMPTY_DETAILS[language])
     assert details == "\n".join(detail_lines), "key-details"
