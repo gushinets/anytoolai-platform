@@ -5,7 +5,7 @@
 - State: active
 - Owner: agent
 - Created: 2026-11-18
-- Last updated: 2026-11-18
+- Last updated: 2026-11-19
 - Review date: 2026-11-18
 - Next action: Review the verified prompt and fixture changes.
 - Blocker: The local baseline requires passwordless sudo for its cross-user permission test.
@@ -32,6 +32,14 @@ Separate UI verdict, copy-questions control (ANY-850), and three-run live QA (AN
 The A10 prompt and fake-provider examples define the document wording within the existing schema.
 
 ## Implementation steps
+
+For the condition-led consequence finding, distinguish a coordinated prerequisite
+from the consequence in the shared fixture assertion. Verify both polarities in
+EN/RU/ES and the reported summary through the canonical document assertion.
+
+For review 12, verify both positions of a readiness condition and independent claims in
+the shared fixture guard. Exercise canonical empty extractions through the product guard
+and use the same localized fallback contract as the API replay.
 
 For review 11, classify each coordinated prerequisite before consuming the conditional
 consequence. Check both verdict polarities in all three languages and verify that an
@@ -145,6 +153,25 @@ until their common consequence and continues checking later assertions. The EN/R
 regressions cover both verdict polarities, two and three prerequisites, and an independent
 contradiction. The canonical replay assertion covers the exact English example.
 All 1,640 freelancer product, Brief Decoder API and language evaluation tests passed.
+
+The twelfth review reproduced a false contradiction when a readiness claim preceded its
+condition, and a false grounding failure on the canonical weak overview. The shared fixture
+check now recognizes conditions on either side of the claim, including a trailing condition
+after a comma. Independent claims following it still undergo the polarity check.
+The product guard checks empty overview and key-details sections against the same localized
+fallbacks as the canonical replay. Tests exercise all three languages, including altered
+fallback text and a separate unconditional verdict after a hypothetical.
+
+The subsequent P2 reproduced on top of the twelfth review changes in both
+directions in all three languages. A consequence beginning with a modifier
+such as "when necessary" extended the prerequisite list and hid the following
+independent verdict. The guard examines each clause before applying conditional
+scope. It preserves coordinated and consecutive prerequisites, and checks a
+following coordinated or explicitly contrasting assertion independently. A
+condition-led clause can also contain the readiness consequence itself.
+The six localized regressions and the original
+canonical document mutation failed before the fix. All 1,650 freelancer product,
+Brief Decoder API and language evaluation tests passed after it.
 
 ## Open questions
 

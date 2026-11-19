@@ -14,6 +14,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import re
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,9 @@ import yaml
 from anytoolai_freelancer_suite.bundle import FreelancerSuiteBundle
 
 from tests.support.brief_language import (
+    BRIEF_DETAIL_FIELDS,
+    CANONICAL,
+    EMPTY_BRIEF_DETAILS,
     DocumentLanguage,
     assert_brief_overview,
     assert_summary_matches_sources,
@@ -733,7 +737,14 @@ def test_summary_fixtures_obey_the_a10_prompt(
         leaks = _field_key_leaks(text, source_facts=facts, language=language)
         assert not leaks, f"{where}: field key leaks {leaks}"
 
+    values = brief["values"]
     for section_id, allowed in _NON_FACT_WORDS.items():
+        if section_id == "overview" and {"project_goal", "target_audience"}.isdisjoint(values):
+            assert_brief_overview(sections[section_id], values, language)
+            continue
+        if section_id == "key-details" and values.keys().isdisjoint(BRIEF_DETAIL_FIELDS):
+            assert sections[section_id] == EMPTY_BRIEF_DETAILS[language], section_id
+            continue
         ungrounded = (
             _stems(sections[section_id])
             - _stems("\n".join(source_facts))
@@ -746,6 +757,29 @@ def test_summary_fixtures_obey_the_a10_prompt(
     schema = _load_schema("brief_decoder.decode_output_v1")
     document_schema = {"$defs": schema["$defs"], **schema["properties"]["document"]}
     jsonschema.validators.validator_for(schema)(document_schema).validate(document)
+
+
+@pytest.mark.parametrize("language", ["en", "ru", "es"])
+def test_product_guard_accepts_only_canonical_empty_sections(monkeypatch, language):
+    case = CANONICAL[f"ANY761-BD-{language.upper()}-weak"]
+    document = deepcopy(case["document"])
+    assert_summary_matches_sources(
+        document, case["brief"], case["issues"], case["questions"], language
+    )
+    suffix = ".weak_input"
+    _override_fixture_responses(monkeypatch, {
+        "brief_decoder.extract_brief_v1" + suffix: case["brief"],
+        "brief_decoder.detect_issues_v1" + suffix: {"issues": case["issues"]},
+        "brief_decoder.generate_questions_v1" + suffix: {"questions": case["questions"]},
+        "brief_decoder.generate_summary_v1" + suffix: document,
+    })
+    test_summary_fixtures_obey_the_a10_prompt(suffix, suffix, language)
+    for section in document["sections"][:2]:
+        fallback = section["content"]
+        section["content"] = f"{fallback} {fallback}"
+        with pytest.raises(AssertionError, match=section["id"]):
+            test_summary_fixtures_obey_the_a10_prompt(suffix, suffix, language)
+        section["content"] = fallback
 
 
 @pytest.mark.parametrize("suffix", _SUMMARY_FIXTURES)
@@ -1023,6 +1057,12 @@ def test_conditional_consequence_and_independent_readiness(
     }
     hypothetical = f"{opening} {condition}, {claim}"
     assert_summary_readiness(hypothetical + ".", language, **signals)
+    for separator in (" ", ", "):
+        trailing = f"{opening} {claim}{separator}{condition.lower()}"
+        assert_summary_readiness(trailing + ".", language, **signals)
+        for independent in (f". {claim}", f", {intro} {claim}"):
+            with pytest.raises(AssertionError, match="Conflicting readiness"):
+                assert_summary_readiness(trailing + independent + ".", language, **signals)
     for summary in (
         f"{opening} {intro}, {claim}.",
         f"{hypothetical}. {claim}.",
@@ -1065,6 +1105,14 @@ def test_independent_verdict_after_conditional_consequence(
     signals = {"issues": [], "missing_fields": [] if ready else ["budget"], "questions": []}
     subject = {"en": "the brief", "ru": "бриф", "es": "el encargo"}[language]
     unrelated = opposite.replace(subject, other)
+    trailing = f"{opening}. {opposite} {condition}"
+    assert_summary_readiness(trailing + ".", language, **signals)
+    with pytest.raises(AssertionError, match="Conflicting readiness"):
+        assert_summary_readiness(f"{trailing}, {contrast} {opposite}.", language, **signals)
+    extended = f"{trailing}, {additional_conditions[0]}"
+    assert_summary_readiness(extended + ".", language, **signals)
+    with pytest.raises(AssertionError, match="Conflicting readiness"):
+        assert_summary_readiness(f"{extended}, {contrast} {opposite}.", language, **signals)
     prerequisites = []
     for clause in (condition, *additional_conditions):
         prerequisites.append(clause)
@@ -1075,6 +1123,43 @@ def test_independent_verdict_after_conditional_consequence(
         for independent in (opposite, f"{contrast} {opposite}", f"{contrast}, {opposite}"):
             with pytest.raises(AssertionError, match="Conflicting readiness"):
                 assert_summary_readiness(f"{hypothetical}, {independent}.", language, **signals)
+
+
+@pytest.mark.parametrize(
+    ("language", "positive", "negative", "condition", "modifier", "action", "intro"),
+    [
+        ("en", "the brief is ready to start", "the brief is not ready to start",
+         "if anything changes", "when necessary", "we will revisit the scope", "and in any case"),
+        ("ru", "бриф готов к работе", "бриф не готов к работе",
+         "если планы изменятся", "когда потребуется", "мы пересмотрим объём работ",
+         "и в любом случае"),
+        ("es", "el encargo está listo para empezar", "el encargo no está listo para empezar",
+         "si algo cambia", "cuando sea necesario", "revisaremos el alcance", "y en cualquier caso"),
+    ],
+    ids=["en", "ru", "es"],
+)
+@pytest.mark.parametrize("ready", [False, True], ids=["not-ready", "ready"])
+def test_condition_inside_consequence_does_not_hide_next_verdict(
+    language, positive, negative, condition, modifier, action, intro, ready
+):
+    opening, opposite = (positive, negative) if ready else (negative, positive)
+    signals = {"issues": [], "missing_fields": [] if ready else ["budget"], "questions": []}
+    _, _, unjoined_intro = intro.partition(" ")
+    for consequence in (f"{modifier} {action}", f"{modifier}, {action}", f"{action} {modifier}"):
+        explanation = f"{opening}. {condition}, {consequence}"
+        assert_summary_readiness(explanation + ".", language, **signals)
+        assert_summary_readiness(f"{explanation}, {intro} {opening}.", language, **signals)
+        for separator in (". ", "; ", f", {intro} ", f", {unjoined_intro} "):
+            with pytest.raises(AssertionError, match="Conflicting readiness"):
+                summary = f"{explanation}{separator}{opposite}."
+                assert_summary_readiness(summary, language, **signals)
+
+    # Asyndetic prerequisites still govern a bare verdict. If the intervening
+    # clause already supplies the readiness consequence, the next verdict is independent.
+    prerequisites = f"{opening}. {condition}, {modifier}"
+    assert_summary_readiness(f"{prerequisites}, {opposite}.", language, **signals)
+    with pytest.raises(AssertionError, match="Conflicting readiness"):
+        assert_summary_readiness(f"{prerequisites} {opposite}, {opposite}.", language, **signals)
 
 
 @pytest.mark.parametrize(
@@ -1693,7 +1778,8 @@ def test_localized_audience_gap_cannot_cover_a_missing_project_goal(
     del brief["values"]["project_goal"]
     del brief["confidence"]["project_goal"]
     brief["missing_fields"].append("project_goal")
-    document["sections"][0]["content"] = brief["values"]["deliverables"][0]
+    weak = CANONICAL[f"ANY761-BD-{language.upper()}-weak"]
+    document["sections"][0]["content"] = weak["document"]["sections"][0]["content"]
     responses = {extract_stem: brief, summary_stem: document}
     _override_fixture_responses(monkeypatch, responses)
     with pytest.raises(AssertionError, match="project_goal"):

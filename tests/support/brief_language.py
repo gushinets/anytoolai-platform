@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections import deque
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, Literal
@@ -35,42 +36,73 @@ _READINESS_CLAUSES = {
 _CONDITION = {"en": r"if|when|once", "ru": r"если|когда", "es": r"si|cuando"}
 _COORDINATORS = {"en": {"and", "or"}, "ru": {"и", "или", "либо", "а"}, "es": {"y", "o"}}
 _STATEMENT_END = re.compile(r"[.!?;:—–]|\b(?:but|pero|но)\b")
+_INDEPENDENT_PREFIX = {
+    "en": r"(?:however|in any case)\b",
+    "ru": r"(?:однако|в любом случае)\b",
+    "es": r"(?:sin embargo|en cualquier caso)\b",
+}
 
 
-def _fixture_verdicts(clause: str, language: DocumentLanguage, *, opening: bool) -> Iterator[bool]:
-    clause = clause.strip()
+def _starts_condition(condition: str, language: DocumentLanguage) -> bool:
+    if condition in {"once again", "once more", "if anything"}:
+        return False
+    return bool(re.match(rf"(?:{_CONDITION[language]})\s+\S", condition))
+
+
+def _joins_condition(clause: str, language: DocumentLanguage) -> bool:
+    conjunction, _, condition = clause.partition(" ")
+    return conjunction in _COORDINATORS[language] and _starts_condition(condition, language)
+
+
+def _verdict_matches(
+    clause: str, language: DocumentLanguage, *, opening: bool
+) -> Iterator[re.Match[str]]:
     introducer = _CONDITION[language] + (r"|whether" if language == "en" else "")
     for subject, predicate in _READINESS_CLAUSES[language]:
         if opening:
             match = re.fullmatch(subject + predicate, clause)
             if match:
-                yield match["negative"] is None
+                yield match
         else:
             named = rf"(?:{subject}|it is )" if language == "en" else subject
             for match in re.finditer(rf"(?:\b{named}|^){predicate}(?=\s|$)", clause):
                 if not re.search(rf"\b(?:{introducer})\s+$", clause[: match.start()]):
-                    yield match["negative"] is None
+                    yield match
 
 
-def _asserted_clauses(statement: str, language: DocumentLanguage) -> Iterator[str]:
-    # A chain of prerequisites governs one consequence in the authored fixtures.
+def _statement_verdicts(statement: str, language: DocumentLanguage) -> Iterator[bool]:
+    parts = deque(part.strip() for part in statement.split(",") if part.strip())
     awaiting_consequence = False
-    *prefixes, last = statement.split(",")
-    for part in prefixes:
-        clause = part.strip()
-        if not clause:
-            continue
-        first, _, rest = clause.partition(" ")
-        condition_text = rest if first in _COORDINATORS[language] else clause
-        discourse_marker = condition_text in {"once again", "once more", "if anything"}
-        if not discourse_marker and re.match(rf"(?:{_CONDITION[language]})\b", condition_text):
+    while parts:
+        clause = parts.popleft()
+        if _joins_condition(clause, language):
             awaiting_consequence = True
-        elif awaiting_consequence:
+            continue
+        if _starts_condition(clause, language):
+            # The next clause can start with a modifier and already supply the
+            # pending consequence ("once funding arrives the brief is ready").
+            has_consequence = awaiting_consequence and any(
+                _verdict_matches(clause, language, opening=False)
+            )
+            awaiting_consequence = not has_consequence
+            continue
+        if awaiting_consequence:
             awaiting_consequence = False
-        else:
-            yield clause
-    if not awaiting_consequence:
-        yield last
+            # A coordinated assertion or explicit contrast is independent even
+            # when the preceding prose starts with a conditional modifier.
+            joined = clause.partition(" ")[0] in _COORDINATORS[language]
+            if not joined and not re.match(_INDEPENDENT_PREFIX[language], clause):
+                continue
+        for match in _verdict_matches(clause, language, opening=False):
+            suffix = clause[match.end() :].strip()
+            if not suffix and parts and _starts_condition(parts[0], language):
+                # The same postposed condition can be set off with a comma.
+                suffix = parts.popleft()
+            if _starts_condition(suffix, language):
+                while parts and _joins_condition(parts[0], language):
+                    parts.popleft()
+            else:
+                yield match["negative"] is None
 
 
 def assert_summary_readiness(
@@ -85,13 +117,14 @@ def assert_summary_readiness(
     normalized = " ".join(summary.casefold().split())
     first_statement, *explanation = _STATEMENT_END.split(normalized)
     first, _, continuation = first_statement.partition(",")
-    opening = next(_fixture_verdicts(first, language, opening=True), None)
-    assert opening is expected_ready, f"Expected opening readiness={expected_ready}: {summary!r}"
+    opening = next(_verdict_matches(first.strip(), language, opening=True), None)
+    assert opening and (opening["negative"] is None) == expected_ready, (
+        f"Expected opening readiness={expected_ready}: {summary!r}"
+    )
     rest = {
         verdict
         for statement in (continuation, *explanation)
-        for clause in _asserted_clauses(statement, language)
-        for verdict in _fixture_verdicts(clause, language, opening=False)
+        for verdict in _statement_verdicts(statement, language)
     }
     assert (not expected_ready) not in rest, f"Conflicting readiness verdicts: {summary!r}"
 
@@ -102,7 +135,8 @@ _EMPTY_OVERVIEW = {
     "es": "La solicitud no indica qué quiere obtener el cliente.",
 }
 
-_EMPTY_DETAILS = {
+BRIEF_DETAIL_FIELDS = ("deliverables", "deadline", "budget", "constraints")
+EMPTY_BRIEF_DETAILS = {
     "en": "No deliverables, deadline, budget or constraints were found in the brief.",
     "ru": "Конкретные результаты работы, сроки, бюджет и ограничения не указаны.",
     "es": "No se indican entregables concretos, plazo, presupuesto ni restricciones.",
@@ -218,7 +252,7 @@ def assert_summary_matches_sources(
         "constraints": {"en": "Constraints", "ru": "Ограничения", "es": "Restricciones"},
     }
     detail_lines = []
-    for field in ("deliverables", "deadline", "budget", "constraints"):
+    for field in BRIEF_DETAIL_FIELDS:
         if field not in values:
             continue
         if field in group_labels:
@@ -227,7 +261,7 @@ def assert_summary_matches_sources(
         else:
             detail_lines.append(labeled_brief_value(field, values[field], language))
     if not detail_lines:
-        detail_lines.append(_EMPTY_DETAILS[language])
+        detail_lines.append(EMPTY_BRIEF_DETAILS[language])
     assert details == "\n".join(detail_lines), "key-details"
 
     gap_lines = [f"- {issue['description']}" for issue in issues]

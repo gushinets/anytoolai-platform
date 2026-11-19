@@ -124,6 +124,19 @@ def test_canonical_brief_rejects_current_readiness_claim_after_budget_condition(
         assert_summary_matches_sources(document, *sources)
 
 
+def test_canonical_brief_rejects_independent_verdict_after_scope_change():
+    case = CANONICAL["ANY761-BD-EN-basic"]
+    summary = (
+        "The brief is not ready to start. If anything changes, when necessary we will "
+        "revisit the scope, and in any case the brief is ready to start right now."
+    )
+    with pytest.raises(AssertionError, match="Conflicting readiness"):
+        assert_summary_matches_sources(
+            {**case["document"], "summary": summary},
+            case["brief"], case["issues"], case["questions"], "en",
+        )
+
+
 def test_generated_output_is_pending_until_every_field_and_fact_is_reviewed():
     run = record()
     assert evaluation.review_status(run, evaluation.review_template(run)) == "PENDING"
