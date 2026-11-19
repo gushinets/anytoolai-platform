@@ -605,20 +605,32 @@ def test_prepaid_request_prompt_carries_every_stated_term_and_scope_boundary() -
 
 def test_prepaid_request_prompt_resolves_a_share_amount_against_an_agreed_base() -> None:
     prompt = _normalized_prepaid_prompt()
-    step_2 = prompt.split("Step 2.", 1)[1].split("Step 3.", 1)[0]
+    step_1, rest = prompt.split("Step 2.", 1)
+    step_2 = rest.split("Step 3.", 1)[0]
     rule_d = prompt.split("- D. Otherwise", 1)[1].split("Rules:", 1)[0]
 
-    assert "this payment's amount is that share of the base, in the base's currency" in prompt
+    assert "use one agreed current base and its currency to resolve the payable deposit" in step_1
+    assert "use the exact share if payable in the currency's smallest unit" in step_1
     assert "a share of an agreed base takes the base's currency" in step_2
     assert "names only a share (a percentage or fraction) and the notes state no base" in step_2
-    assert "the exact share is not a whole number of the currency's smallest payable unit" in step_2
-    assert "one-third of USD 100 cannot be paid in whole cents" in step_2
-    assert "confirm a concrete payable amount under rule B" in step_2
-    assert "do not round or request payment" in step_2
-    assert "computed exactly as a whole number of the currency's smallest payable unit" in rule_d
-    assert "name the base and the computed amount as two separate figures" in prompt
-    assert "This is the only figure you may compute" in prompt
+    assert "confirm the payable amount under rule B" in step_2
+    assert "else the payable deposit from Step 1 for a share-only amount" in rule_d
+    assert "name the base and the payable deposit from Step 1 as two separate figures" in prompt
+    assert "Only the deposit may be computed" in prompt
     assert "never compute a balance the notes do not state" in prompt
+
+
+def test_prepaid_request_prompt_resolves_fractional_cents_from_agreed_terms() -> None:
+    prompt = _normalized_prepaid_prompt()
+    cases = prompt.split("For one-third of USD 100:", 1)[1].split("Use this payable deposit", 1)[0]
+
+    assert "An agreed deposit of USD 33.33 gives USD 33.33" in cases
+    assert "An agreed rule to round down to cents also gives USD 33.33" in cases
+    assert "Without either agreement the amount is open" in cases
+    assert (
+        "An agreed USD 33.34 alongside an agreed rule to round down to cents is also open"
+        in cases
+    )
 
 
 def test_prepaid_request_confirmation_keeps_agreed_terms_below_open_points() -> None:

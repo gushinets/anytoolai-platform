@@ -17,10 +17,20 @@ are never a conflict with `context.amount` / `context.due_date` and never a reas
 remaining USD 1,500 due 30 November" is consistent). A project total is no exception when this payment is computed from it (for example "deposit is 50%
 of the final fee"): if the notes say that total is not agreed or leave two current candidates, this amount is
 open; a total the notes call rejected or superseded is history, and the current one is the base.
-When `context.amount` names this payment only as a share (for example "предоплата 50%" or
-"40% deposit") and the notes state one agreed current base (for example "согласованный бюджет
-90 000 рублей"), this payment's amount is that share of the base, in the base's currency: the
-base is a fact about this payment, not about something else.
+
+When `context.amount` names only a share, use one agreed current base and its currency to
+resolve the payable deposit. Apply a rounding convention only if explicitly agreed for this
+payment. Otherwise use the exact share if payable in the currency's smallest unit. If it falls
+between two payable units, use either adjacent amount only if the notes explicitly agree to that
+figure for this deposit. All current terms must agree on one payable amount.
+For one-third of USD 100:
+- An agreed deposit of USD 33.33 gives USD 33.33. An agreed rule to round down to cents also
+  gives USD 33.33, even without a stated figure.
+- Without either agreement the amount is open. An agreed USD 33.34 alongside an agreed rule to
+  round down to cents is also open because the two terms conflict.
+
+Use this payable deposit whenever comparing a share-only `context.amount` with amounts in the
+notes, including receipts and stated remainders.
 What is left of *this* amount after a partial
 receipt is part of this payment, not another one: its stated due date is a due date for this
 payment (`due_date: 15 October` against "remaining USD 750 due 30 October" is a different due date). When it is unclear whether a fact concerns
@@ -46,9 +56,8 @@ schedule) is open when any of these holds:
   a rejected or superseded base next to one agreed current base opens nothing;
 - `context.amount` names only a share (a percentage or fraction) and the notes state no base for
   it, or state no currency for that base;
-- the exact share is not a whole number of the currency's smallest payable unit (for example,
-  one-third of USD 100 cannot be paid in whole cents). Ask the client to confirm a concrete payable
-  amount under rule B; do not round or request payment;
+- the share and the current terms do not resolve to one payable deposit under Step 1. Ask the
+  client to confirm the payable amount under rule B; never choose a rounding convention yourself;
 - `context.amount`, or a given `context.due_date`, is a placeholder such as "TBD" or "to be
   agreed", or does not name one value (alternatives such as "USD 500 or EUR 460", or a range)
   (an absent `due_date` is not a placeholder);
@@ -103,9 +112,8 @@ X by Y" is a payment ask too), and never ask the client to report a payment.
   waiting for the client's review"), whether or not they call the terms agreed → hold-off
   acknowledgment: a short note that you will wait.
 - D. Otherwise → payment request for the amount still due: the remaining figure the notes state if
-  part was already received, else `context.amount`, or, when `context.amount` names only a share of
-  an agreed base, that share of the base computed exactly as a whole number of the currency's
-  smallest payable unit. Follow a "go gently" note in the wording.
+  part was already received, else the payable deposit from Step 1 for a share-only amount, or the
+  concrete `context.amount`. Follow a "go gently" note in the wording.
   Explicitly and politely ask the client to pay that amount. Describing the payment terms or
   asking only to be notified after payment does not replace the request to pay.
 
@@ -156,11 +164,10 @@ Rules:
   agreed amounts and dates as context and request confirmation only for open points; rules A and C never present an
   amount or due date as owed or upcoming.
 - In a payment request where `context.amount` names only a share of an agreed base, name the
-  base and the computed amount as two separate figures, each with its currency, so neither can
+  base and the payable deposit from Step 1 as two separate figures, each with its currency, so neither can
   be read as the other (for example "аванс 50% от согласованного бюджета 90 000 ₽ — 45 000 ₽",
-  "a 40% deposit of the EUR 2,400 total, EUR 960"). Use the exact payable amount
-  (for example, 35% of 82 350 RUB is 28 822,50 RUB). This is the only figure
-  you may compute; never compute a balance the notes do not state.
+  "a 40% deposit of the EUR 2,400 total, EUR 960"). For example, 35% of 82 350 RUB is 28 822,50 RUB.
+  Only the deposit may be computed; never compute a balance the notes do not state.
 - In a payment request, preserve the complete explicitly stated payment arrangement and scope:
   carry into the message every payment condition and every scope boundary that `context.notes`
   states as a fact of the deal. These are payment terms, not optional background. They include:

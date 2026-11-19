@@ -98,6 +98,17 @@ Canonical quick-check: 4,251 passed, 3 failed, 12 skipped, 720 deselected. All t
 | 2026-11-19 | Verified all 106 targeted tests and recorded three runner failures in the broader baseline. | ANY-608 live acceptance on A02/A03/A05 + S5. |
 | 2026-11-19 | Routed shares requiring rounding to terms confirmation and checked the one-third of USD 100 example. All 91 product and shared-prompt tests, config and documentation checks passed. | ANY-608 live acceptance. |
 
+## Fractional deposit review
+
+The input schema accepts a fraction in the amount field and deal terms in free-text notes.
+Resolve both to one payable deposit before checking conflicts, receipts or the amount still due.
+Cover the exact share, an agreed rounded figure, a rounding convention alone, and missing or
+conflicting rounding terms in the product prompt contract.
+
+All 107 targeted product, shared-prompt and API bundle tests passed after the change.
+Doctor, config validation, documentation validation and the whitespace check passed.
+ANY-608 retains live verification of generated messages.
+
 ## Open questions
 
 None for implementation.
