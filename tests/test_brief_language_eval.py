@@ -109,12 +109,13 @@ def test_weak_summary_rejects_repeated_clarification_lists(language, collection,
         )
 
 
-def test_canonical_brief_rejects_current_readiness_claim_after_budget_condition():
+@pytest.mark.parametrize("condition", [
+    "If the budget is approved",
+    "If the budget is approved, and if the client signs",
+])
+def test_canonical_brief_rejects_current_readiness_claim_after_budget_condition(condition):
     case = CANONICAL["ANY761-BD-EN-basic"]
-    conditional = (
-        "The brief is not ready to start. If the budget is approved, "
-        "the brief is ready to start work"
-    )
+    conditional = f"The brief is not ready to start. {condition}, the brief is ready to start work"
     document = {**case["document"], "summary": conditional + "."}
     sources = (case["brief"], case["issues"], case["questions"], "en")
     assert_summary_matches_sources(document, *sources)

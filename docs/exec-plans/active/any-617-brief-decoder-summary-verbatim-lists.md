@@ -33,6 +33,10 @@ The A10 prompt and fake-provider examples define the document wording within the
 
 ## Implementation steps
 
+For review 11, classify each coordinated prerequisite before consuming the conditional
+consequence. Check both verdict polarities in all three languages and verify that an
+independent claim following the consequence is still checked.
+
 For the tenth review, limit the scope of a fronted condition to its consequence and
 check subsequent assertions in the same sentence. Cover both readiness polarities in
 English, Russian and Spanish and exercise the canonical API fixture assertion.
@@ -134,6 +138,13 @@ now consumes the consequence and resumes scanning at the next comma. Six regress
 cases cover both polarities in all three languages. A seventh exercises the reported
 contradiction through the canonical document assertion. All seven reproduced the
 failure before the change. All 1,639 product, API and language evaluation tests passed.
+
+In the eleventh review, a conjunction before a second prerequisite caused the verifier to
+consume it as the consequence. The shared verifier now recognizes coordinated prerequisites
+until their common consequence and continues checking later assertions. The EN/RU/ES
+regressions cover both verdict polarities, two and three prerequisites, and an independent
+contradiction. The canonical replay assertion covers the exact English example.
+All 1,640 freelancer product, Brief Decoder API and language evaluation tests passed.
 
 ## Open questions
 

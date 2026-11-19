@@ -33,6 +33,7 @@ _READINESS_CLAUSES = {
 
 # An explicitly conditional or interrogative complement does not assert its contents.
 _CONDITION = {"en": r"if|when|once", "ru": r"если|когда", "es": r"si|cuando"}
+_COORDINATORS = {"en": {"and", "or"}, "ru": {"и", "или", "либо", "а"}, "es": {"y", "o"}}
 _STATEMENT_END = re.compile(r"[.!?;:—–]|\b(?:but|pero|но)\b")
 
 
@@ -52,15 +53,17 @@ def _fixture_verdicts(clause: str, language: DocumentLanguage, *, opening: bool)
 
 
 def _asserted_clauses(statement: str, language: DocumentLanguage) -> Iterator[str]:
-    # Authored fixtures express a hypothetical as "condition, consequence".
+    # A chain of prerequisites governs one consequence in the authored fixtures.
     awaiting_consequence = False
     *prefixes, last = statement.split(",")
     for part in prefixes:
         clause = part.strip()
         if not clause:
             continue
-        discourse_marker = clause in {"once again", "once more", "if anything"}
-        if not discourse_marker and re.match(rf"(?:{_CONDITION[language]})\b", clause):
+        first, _, rest = clause.partition(" ")
+        condition_text = rest if first in _COORDINATORS[language] else clause
+        discourse_marker = condition_text in {"once again", "once more", "if anything"}
+        if not discourse_marker and re.match(rf"(?:{_CONDITION[language]})\b", condition_text):
             awaiting_consequence = True
         elif awaiting_consequence:
             awaiting_consequence = False
