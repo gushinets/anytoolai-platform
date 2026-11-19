@@ -1001,6 +1001,49 @@ def test_conditional_readiness_in_explanation_is_not_a_verdict(language, opening
 
 
 @pytest.mark.parametrize(
+    ("language", "opening", "condition", "claim", "intro", "contrast"),
+    [
+        ("en", "The brief is not ready to start.", "Once the budget is confirmed",
+         "the brief is ready to start work", "In fact", "but"),
+        ("en", "The brief is not ready to start.", "If the budget is approved",
+         "the brief is ready to start work", "In fact", "but"),
+        ("en", "The brief is not ready to start.", "When all questions are answered",
+         "the brief is ready to start work", "In fact", "but"),
+        ("ru", "Бриф не готов к работе.", "Если бюджет утвердят",
+         "бриф готов к работе", "На самом деле", "но"),
+        ("es", "El encargo no está listo para empezar.", "Cuando se confirme el presupuesto",
+         "el encargo está listo para empezar", "De hecho", "pero"),
+    ],
+)
+def test_conditional_consequence_and_independent_readiness(
+    language, opening, condition, claim, intro, contrast
+):
+    signals = {
+        "issues": [{"description": "Budget unapproved"}], "missing_fields": [], "questions": []
+    }
+    hypothetical = f"{opening} {condition}, {claim}"
+    assert_summary_readiness(hypothetical + ".", language, **signals)
+    for summary in (
+        f"{opening} {intro}, {claim}.",
+        f"{hypothetical}. {claim}.",
+        f"{hypothetical}; {claim}.",
+        f"{hypothetical}, {contrast} {claim}.",
+    ):
+        with pytest.raises(AssertionError, match="Conflicting readiness"):
+            assert_summary_readiness(summary, language, **signals)
+
+
+def test_conditional_loss_of_readiness_preserves_the_positive_verdict():
+    signals = {"issues": [], "missing_fields": [], "questions": []}
+    opening = "The brief is ready to start,"
+    opposite = "the brief is not ready to start."
+    assert_summary_readiness(f"{opening} if funding is withdrawn, {opposite}", "en", **signals)
+    for intro in ("once again", "if anything", "whether funding changes or not"):
+        with pytest.raises(AssertionError, match="Conflicting readiness"):
+            assert_summary_readiness(f"{opening} {intro}, {opposite}", "en", **signals)
+
+
+@pytest.mark.parametrize(
     ("suffix", "wrong_summary"),
     [
         (".weak_input", "The brief is ready to start work."),

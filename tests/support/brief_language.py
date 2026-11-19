@@ -32,11 +32,13 @@ _READINESS_CLAUSES = {
 }
 
 # An explicitly conditional or interrogative complement does not assert its contents.
-_CONDITION = {"en": r"if|whether|when|once", "ru": r"если|когда", "es": r"si|cuando"}
+_CONDITION = {"en": r"if|when|once", "ru": r"если|когда", "es": r"si|cuando"}
+_STATEMENT_END = re.compile(r"[.!?;:—–]|\b(?:but|pero|но)\b")
 
 
 def _fixture_verdicts(clause: str, language: DocumentLanguage, *, opening: bool) -> Iterator[bool]:
     clause = clause.strip()
+    introducer = _CONDITION[language] + (r"|whether" if language == "en" else "")
     for subject, predicate in _READINESS_CLAUSES[language]:
         if opening:
             match = re.fullmatch(subject + predicate, clause)
@@ -45,8 +47,20 @@ def _fixture_verdicts(clause: str, language: DocumentLanguage, *, opening: bool)
         else:
             named = rf"(?:{subject}|it is )" if language == "en" else subject
             for match in re.finditer(rf"(?:\b{named}|^){predicate}(?=\s|$)", clause):
-                if not re.search(rf"\b(?:{_CONDITION[language]})\s+$", clause[: match.start()]):
+                if not re.search(rf"\b(?:{introducer})\s+$", clause[: match.start()]):
                     yield match["negative"] is None
+
+
+def _asserted_clauses(statement: str, language: DocumentLanguage) -> Iterator[str]:
+    *prefixes, last = statement.split(",")
+    for prefix in prefixes:
+        # A fronted condition governs the consequence up to the next statement boundary.
+        clause = prefix.strip()
+        discourse_marker = clause in {"once again", "once more", "if anything"}
+        if not discourse_marker and re.match(rf"(?:{_CONDITION[language]})\b", clause):
+            return
+        yield clause
+    yield last
 
 
 def assert_summary_readiness(
@@ -59,10 +73,16 @@ def assert_summary_readiness(
 ) -> None:
     expected_ready = not (issues or missing_fields or questions)
     normalized = " ".join(summary.casefold().split())
-    first, *explanation = re.split(r"[.!?;,:—–]|\b(?:but|pero|но)\b", normalized)
+    first_statement, *explanation = _STATEMENT_END.split(normalized)
+    first, _, continuation = first_statement.partition(",")
     opening = next(_fixture_verdicts(first, language, opening=True), None)
     assert opening is expected_ready, f"Expected opening readiness={expected_ready}: {summary!r}"
-    rest = {v for clause in explanation for v in _fixture_verdicts(clause, language, opening=False)}
+    rest = {
+        verdict
+        for statement in (continuation, *explanation)
+        for clause in _asserted_clauses(statement, language)
+        for verdict in _fixture_verdicts(clause, language, opening=False)
+    }
     assert (not expected_ready) not in rest, f"Conflicting readiness verdicts: {summary!r}"
 
 
