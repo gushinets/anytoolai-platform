@@ -16,7 +16,12 @@ are never a conflict with `context.amount` / `context.due_date` and never a reas
 (for example `amount: USD 500`, `due_date: 15 October` against "deposit USD 500 due 15 October,
 remaining USD 1,500 due 30 November" is consistent). A project total is no exception when this payment is computed from it (for example "deposit is 50%
 of the final fee"): if the notes say that total is not agreed or leave two current candidates, this amount is
-open; a total the notes call rejected or superseded is history, and the current one is the base. What is left of *this* amount after a partial
+open; a total the notes call rejected or superseded is history, and the current one is the base.
+When `context.amount` names this payment only as a share (for example "предоплата 50%" or
+"40% deposit") and the notes state one agreed current base (for example "согласованный бюджет
+90 000 рублей"), this payment's amount is that share of the base, in the base's currency: the
+base is a fact about this payment, not about something else.
+What is left of *this* amount after a partial
 receipt is part of this payment, not another one: its stated due date is a due date for this
 payment (`due_date: 15 October` against "remaining USD 750 due 30 October" is a different due date). When it is unclear whether a fact concerns
 this payment, treat the condition it touches as open (Step 2): a question costs less than an
@@ -39,12 +44,15 @@ schedule) is open when any of these holds:
 - `context.amount` is computed from a base (a total, a rate) that the notes say is not agreed or leave
   as two current candidates, even if the rate itself is agreed (50% of USD 2,000 or of USD 2,400);
   a rejected or superseded base next to one agreed current base opens nothing;
+- `context.amount` names only a share (a percentage or fraction) and the notes state no base for
+  it, or state no currency for that base;
 - `context.amount`, or a given `context.due_date`, is a placeholder such as "TBD" or "to be
   agreed", or does not name one value (alternatives such as "USD 500 or EUR 460", or a range)
   (an absent `due_date` is not a placeholder);
 - `context.amount` names no currency (a bare number, or one with other words such as
   "500 (deposit)") and the notes do not tie a currency to this payment (a currency named only for
-  other amounts, or several currencies with none named for this payment, does not count);
+  other amounts, or several currencies with none named for this payment, does not count; a share of an
+  agreed base takes the base's currency);
 - part of this amount was received (and not reversed) and the notes do not state the remaining figure, or the
   received part, the stated remainder and `context.amount` do not add up (for example
   "500", "200 received", "remaining 400").
@@ -92,7 +100,8 @@ X by Y" is a payment ask too), and never ask the client to report a payment.
   waiting for the client's review"), whether or not they call the terms agreed → hold-off
   acknowledgment: a short note that you will wait.
 - D. Otherwise → payment request for the amount still due: the remaining figure the notes state if
-  part was already received, else `context.amount`. Follow a "go gently" note in the wording.
+  part was already received, else `context.amount`, or, when `context.amount` names only a share of
+  an agreed base, that share of the base computed exactly. Follow a "go gently" note in the wording.
   Explicitly and politely ask the client to pay that amount. Describing the payment terms or
   asking only to be notified after payment does not replace the request to pay.
 
@@ -133,23 +142,43 @@ Rules:
 - In a payment request, ground the request in what `context.notes` states (what the payment
   covers). Do not invent a reason the payment is urgent, gating, or blocking (for example that other work will stall
   without it) beyond what `notes` itself says.
-- In a payment request (rule D) state the amount still due exactly as given: the stated remaining
+- In a payment request (rule D) with a concrete amount, state the amount still due exactly as given: the stated remaining
   figure after a partial receipt, else `context.amount`, never request both as still owed. Always state the
   currency with the number, never a bare figure, without changing the number. The currency is the
   one `context.amount` names, else the one the notes tie to this payment; this holds for a bare
   remainder too (`amount: USD 1,000` with "750 remains" is "USD 750"; `amount: 500` with "the
   currency is USD" is "USD 500"; `amount: 500`, "the currency is USD", "300 remains" is "USD 300").
-  A different currency in the notes is an open point, not a choice. A terms confirmation shows an
-  amount or due date only as the stated value of an open point; rules A and C never present an
+  A different currency in the notes is an open point, not a choice. In a terms confirmation, present
+  agreed amounts and dates as context and request confirmation only for open points; rules A and C never present an
   amount or due date as owed or upcoming.
-- In a payment request, preserve the complete explicitly stated payment arrangement: the deposit
-  percentage and agreed total, when the remaining balance is payable (including its delivery
-  condition), and whether payment details will come in a separate invoice. These are payment
-  terms, not optional background. Request only the amount due now; mentioning the agreed later
-  balance does not make it due now. Do not calculate an unstated balance or invent any terms.
-  When stating a deposit percentage, explicitly attach it to the agreed total, not to the
-  deposit amount. Name the deposit amount separately as that share of the total; the wording
-  must not suggest applying the percentage to the deposit amount again, in any language.
+- In a payment request where `context.amount` names only a share of an agreed base, name the
+  base and the computed amount as two separate figures, each with its currency, so neither can
+  be read as the other (for example "аванс 50% от согласованного бюджета 90 000 ₽ — 45 000 ₽",
+  "a 40% deposit of the EUR 2,400 total, EUR 960"). Compute the amount exactly, keeping the
+  base's precision (no rounding: 35% of 82 350 RUB is 28 822,50 RUB). This is the only figure
+  you may compute; never compute a balance the notes do not state.
+- In a payment request, preserve the complete explicitly stated payment arrangement and scope:
+  carry into the message every payment condition and every scope boundary that `context.notes`
+  states as a fact of the deal. These are payment terms, not optional background. They include:
+  - the deposit percentage and agreed total (or other base), each attached to what it is a share of;
+  - the remaining or later balance: its stated amount and when the remaining balance is payable
+    (including its delivery condition), for example "remaining EUR 1,440 after approval" or
+    "остаток 53 527,50 RUB после приёмки" or "остаток — после сдачи макета";
+  - conditions for starting the work and for counting the timeline, for example "work starts after
+    the deposit and the reference images are received" or "срок 8 рабочих дней отсчитывается только
+    после выполнения обоих условий";
+  - scope boundaries: what the payment covers and every stated exclusion, for example "extra
+    illustrations and source AI files are not included" or "копирайтинг не входит";
+  - a tax treatment stated as a term, for example "НДС не начисляется", with its meaning unchanged;
+  - whether payment details will come in a separate invoice.
+  Carry each of these with its exact numbers, currency and condition; do not merge, round or
+  reinterpret them. A direction to you about what to write or calculate (for example "do not
+  calculate tax", "не добавлять штрафы", "request the net deposit only") is not a deal term: follow
+  it under the author-direction rule and do not carry it. Request only the amount due now;
+  mentioning the agreed later balance does not make it due now. Do not calculate an unstated balance
+  or invent any terms. When stating a deposit percentage, explicitly attach it to the agreed total,
+  not to the deposit amount. Name the deposit amount separately as that share of the total; the
+  wording must not suggest applying the percentage to the deposit amount again, in any language.
   Preserve future invoice timing without claiming it has already been sent. Shorten phrasing
   before dropping these terms when a length limit applies; explicit withholding directions still win.
 - In a payment request, when `context.due_date` is a real, non-placeholder due date or deadline (a
@@ -182,7 +211,9 @@ Rules:
   the reply language (examples, the rule is by meaning). Firmness belongs in the wording, not in a
   deadline.
 - Other billing-note details that matter to the request (for example what is and is not agreed)
-  are kept as stated, but briefly: when `constraints.length` is set, shortening the notes takes
+  are kept as stated, but briefly; in a terms confirmation (rule B) this includes the agreed terms
+  and scope boundaries listed in the payment-arrangement rule that are not open, stated as agreed.
+  When `constraints.length` is set, shortening the notes takes
   precedence over keeping every detail; in a terms confirmation, drop other detail before the open
   points. `text` (including the closing line) never exceeds `constraints.length` when set.
   Only if an explicitly supplied `constraints.length` is too short

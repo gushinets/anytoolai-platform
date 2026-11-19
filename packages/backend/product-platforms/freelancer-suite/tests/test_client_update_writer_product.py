@@ -580,6 +580,53 @@ def test_prepaid_request_prompt_keeps_percentage_attached_to_total() -> None:
     assert "must not suggest applying the percentage to the deposit amount again" in prompt
 
 
+# ANY-605 (QA Q-004 A01/A02/A05, production S5): every payment condition and scope boundary the
+# notes state must reach the client; author directions are followed, not carried. This pins the
+# instruction only -- model retention is checked live by ANY-608.
+def test_prepaid_request_prompt_carries_every_stated_term_and_scope_boundary() -> None:
+    prompt = _normalized_prepaid_prompt()
+    rule = prompt.split("preserve the complete explicitly stated payment arrangement", 1)[1].split(
+        "- In a payment request, when `context.due_date` is a real", 1
+    )[0]
+
+    for fragment in (
+        "carry into the message every payment condition and every scope boundary",
+        "its stated amount and when the remaining balance is payable",
+        "conditions for starting the work and for counting the timeline",
+        "scope boundaries: what the payment covers and every stated exclusion",
+        "a tax treatment stated as a term",
+        "with its meaning unchanged",
+        "Carry each of these with its exact numbers, currency and condition",
+        "is not a deal term: follow it under the author-direction rule and do not carry it",
+        "Shorten phrasing before dropping these terms when a length limit applies",
+    ):
+        assert fragment in rule, fragment
+
+
+def test_prepaid_request_prompt_resolves_a_share_amount_against_an_agreed_base() -> None:
+    prompt = _normalized_prepaid_prompt()
+    step_2 = prompt.split("Step 2.", 1)[1].split("Step 3.", 1)[0]
+    rule_d = prompt.split("- D. Otherwise", 1)[1].split("Rules:", 1)[0]
+
+    assert "this payment's amount is that share of the base, in the base's currency" in prompt
+    assert "a share of an agreed base takes the base's currency" in step_2
+    assert "names only a share (a percentage or fraction) and the notes state no base" in step_2
+    assert "that share of the base computed exactly" in rule_d
+    assert "name the base and the computed amount as two separate figures" in prompt
+    assert "This is the only figure you may compute" in prompt
+    assert "never compute a balance the notes do not state" in prompt
+
+
+def test_prepaid_request_confirmation_keeps_agreed_terms_below_open_points() -> None:
+    prompt = _normalized_prepaid_prompt()
+
+    assert (
+        "in a terms confirmation (rule B) this includes the agreed terms and scope boundaries "
+        "listed in the payment-arrangement rule that are not open, stated as agreed"
+    ) in prompt
+    assert "drop other detail before the open points" in prompt
+
+
 def test_prepaid_request_prompt_requires_a_payment_request_only_in_rule_d() -> None:
     prompt = _normalized_prepaid_prompt()
     rule_d = prompt.split("- D. Otherwise", 1)[1].split("Rules:", 1)[0]
