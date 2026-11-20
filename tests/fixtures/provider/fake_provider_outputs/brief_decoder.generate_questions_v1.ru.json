@@ -1,0 +1,27 @@
+{
+  "response_json": {
+    "questions": [
+      {
+        "question": "Когда нужен сайт?",
+        "rationale": "Без срока нельзя спланировать работу.",
+        "priority": "high",
+        "category": "timeline_risk",
+        "source_issue_index": 0
+      },
+      {
+        "question": "Кто будет пользоваться сайтом?",
+        "rationale": "От аудитории зависят структура и тон сайта.",
+        "priority": "medium",
+        "category": "ambiguity",
+        "source_issue_index": 1
+      }
+    ]
+  },
+  "input_tokens": 240,
+  "output_tokens": 130,
+  "latency_ms": 15,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "brief_decoder.generate_questions_v1.ru"
+  }
+}
