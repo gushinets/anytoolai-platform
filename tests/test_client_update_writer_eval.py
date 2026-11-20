@@ -1014,6 +1014,38 @@ def driver_result(spec, failure, run_process):
     return json.loads(completed.stdout)
 
 
+@pytest.mark.parametrize("due_date", [None, "Friday"])
+def test_prepaid_driver_submits_billing_form_and_records_its_session(tmp_path, due_date):
+    billing = {"notes": "For Jordan", "amount": "EUR 960"}
+    expected = [
+        ["fill", "#client-update-writer-billing-notes", "For Jordan"],
+        ["fill", "#client-update-writer-billing-amount", "EUR 960"],
+    ]
+    if due_date:
+        billing["due_date"] = due_date
+        expected.append(["fill", "#client-update-writer-billing-due-date", due_date])
+    result = driver_result({
+        "mode": "prepaid_request", "billing_context": billing, "tone": "neutral",
+        "trace": str(tmp_path / "attempt.zip"), "language": "es", "web_url": "http://web",
+    }, "success", eval_module.subprocess.run)
+    assert [call for call in result["calls"] if isinstance(call, list)] == expected
+    record = result["record"]
+    assert record["ui_outcome"] == "result"
+    assert record["start_path"] == "/scenarios/client_update_writer.prepaid_request_v1/start"
+    assert record["session_id"] == record["result"]["scenario_session_id"]
+    assert record["output"] == {"text": "Done"}
+
+
+@pytest.mark.parametrize("failure", ["wrong-start", "wrong-method", "empty-session", "wrong-session", "html-start"])
+def test_prepaid_driver_rejects_unverified_run(tmp_path, failure):
+    result = driver_result({
+        "mode": "prepaid_request", "billing_context": {"notes": "For Jordan", "amount": "EUR 960"},
+        "trace": str(tmp_path / "attempt.zip"), "language": "en", "tone": "warm", "web_url": "http://web",
+    }, failure, eval_module.subprocess.run)
+    assert result["record"]["ui_outcome"] == "error"
+    assert result["record"]["output"] is None
+
+
 @pytest.mark.parametrize("failure", ["success", *DRIVER_FAILURES])
 def test_live_driver_finalizes_each_attempt_independently(tmp_path, failure):
     trace = tmp_path / "attempt.zip"
@@ -1022,6 +1054,7 @@ def test_live_driver_finalizes_each_attempt_independently(tmp_path, failure):
         "progress_notes": "Done", "web_url": "http://web",
     }, failure, eval_module.subprocess.run)
     record, calls = result["record"], result["calls"]
+    assert ["fill", "#client-update-writer-progress-notes", "Done"] in calls
     assert record["ui_outcome"] == ("error" if failure in API_FAILURES else "result")
     assert calls.count("submit") == 1
     assert calls.count("screenshot") == calls.count("trace") == calls.count("close") == 1
