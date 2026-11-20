@@ -1007,7 +1007,12 @@ def test_readiness_with_time_qualifier_keeps_its_subject(
 ) -> None:
     missing = [] if ready else ["budget"]
     signals = {"issues": [], "missing_fields": missing, "questions": []}
-    for prefix in ("", {"en": "In fact ", "ru": "На самом деле ", "es": "De hecho "}[language]):
+    prefixes = {
+        "en": ("In fact ", "After all, "),
+        "ru": ("На самом деле ", "В конце концов, "),
+        "es": ("De hecho ", "Después de todo, "),
+    }
+    for prefix in ("", *prefixes[language]):
         assert_summary_readiness(
             f"{opening} {prefix}{other_object}", language, **signals
         )
@@ -1015,6 +1020,48 @@ def test_readiness_with_time_qualifier_keeps_its_subject(
             assert_summary_readiness(
                 f"{opening} {prefix}{opposite}", language, **signals
             )
+
+
+@pytest.mark.parametrize(
+    ("language", "subject", "other", "condition", "positive", "negative"),
+    [
+        ("en", "the brief", "the artwork", "if funding changes",
+         "is still ready to start work", "is still not ready to start work"),
+        ("en", "the request", "the printer", "once the client signs",
+         "still is ready to start", "still isn’t ready to start"),
+        ("en", "the brief", "the artwork", "if funding changes",
+         "is still ready to start", "is not still ready to start"),
+        ("ru", "бриф", "макет", "если бюджет изменится",
+         "всё ещё готов к работе", "всё ещё не готов к работе"),
+        ("ru", "запрос", "принтер", "когда клиент подпишет договор",
+         "по-прежнему готов к работе", "по-прежнему не готов к работе"),
+        ("ru", "бриф", "макет", "если бюджет изменится",
+         "до сих пор готов к работе", "все еще не готов к работе"),
+        ("es", "el encargo", "el equipo", "si cambia el presupuesto",
+         "todavía está listo para empezar", "todavía no está listo para empezar"),
+        ("es", "la solicitud", "la maqueta", "cuando firme el cliente",
+         "está aún lista para empezar", "no está aún lista para empezar"),
+        ("es", "la solicitud", "la maqueta", "si cambia el presupuesto",
+         "sigue estando lista para empezar", "sigue sin estar lista para empezar"),
+    ],
+    ids=["en-still", "en-before-copula", "en-after-negation",
+         "ru-eshchyo", "ru-po-prezhnemu", "ru-do-sikh-por",
+         "es-todavia", "es-aun", "es-seguir"],
+)
+@pytest.mark.parametrize("ready", [False, True], ids=["not-ready", "ready"])
+def test_continuing_readiness_preserves_polarity_and_scope(
+    language, subject, other, condition, positive, negative, ready
+):
+    matching, opposite = (positive, negative) if ready else (negative, positive)
+    opening = f"{subject} {matching}."
+    contrary = f"{subject} {opposite}"
+    signals = {"issues": [], "missing_fields": [] if ready else ["budget"], "questions": []}
+    assert_summary_readiness(f"{opening} {subject} {matching}.", language, **signals)
+    assert_summary_readiness(f"{opening} {other} {opposite}.", language, **signals)
+    assert_summary_readiness(f"{opening} {condition}, {contrary}.", language, **signals)
+    assert_summary_readiness(f"{opening} {contrary} {condition}.", language, **signals)
+    with pytest.raises(AssertionError, match="Conflicting readiness"):
+        assert_summary_readiness(f"{opening} {contrary}.", language, **signals)
 
 
 @pytest.mark.parametrize(
@@ -1190,13 +1237,6 @@ def test_opening_requires_current_readiness(
         for separator in (", ", " ", ": ", " — "):
             with pytest.raises(AssertionError, match="opening readiness"):
                 assert_summary_readiness(f"{opening}{separator}{qualifier}.", language, **signals)
-    qualification = {
-        "en": "subject to final approval",
-        "ru": "при условии окончательного согласования",
-        "es": "a condición de que se dé la aprobación final",
-    }[language]
-    with pytest.raises(AssertionError, match="opening readiness"):
-        assert_summary_readiness(f"{opening}, {qualification}.", language, **signals)
     with pytest.raises(AssertionError, match="opening readiness"):
         summary = f"{opening}, {condition}, {alternative} {condition}."
         assert_summary_readiness(summary, language, **signals)
@@ -1206,6 +1246,35 @@ def test_opening_requires_current_readiness(
     assert_summary_readiness(f"{opening}, {condition}, {action}.", language, **signals)
     for separator in (". ", ": ", " — ", "; "):
         assert_summary_readiness(f"{opening}{separator}{action}.", language, **signals)
+
+
+@_readiness_scope_cases
+@pytest.mark.parametrize("ready", [True, False], ids=["ready", "not-ready"])
+@pytest.mark.parametrize(
+    "separator", [", ", ": ", " — ", " – "], ids=["comma", "colon", "em-dash", "en-dash"]
+)
+def test_qualification_attaches_to_opening_verdict(
+    language, positive, negative, condition, alternative, action, ready, separator
+):
+    opening, opposite = (positive, negative) if ready else (negative, positive)
+    signals = {"issues": [], "missing_fields": [] if ready else ["budget"], "questions": []}
+    qualifiers = {
+        "en": ("subject to final approval",),
+        "ru": ("при условии окончательного согласования", "при условии, что бюджет утвердят"),
+        "es": ("a condición de que se dé la aprobación final",),
+    }[language]
+    for qualifier in qualifiers:
+        summary = f"{opening}{separator}{qualifier}"
+        with pytest.raises(AssertionError, match="opening readiness"):
+            assert_summary_readiness(summary + ".", language, **signals)
+        assert_summary_readiness(f"{summary}, {action}.", language, **signals)
+        alternatives = f"{summary}, {alternative} {condition}"
+        with pytest.raises(AssertionError, match="opening readiness"):
+            assert_summary_readiness(alternatives + ".", language, **signals)
+        explanation = f"{alternatives}, {action}"
+        assert_summary_readiness(explanation + ".", language, **signals)
+        with pytest.raises(AssertionError, match="Conflicting readiness"):
+            assert_summary_readiness(f"{explanation}, {opposite.lower()}.", language, **signals)
 
 
 @_readiness_scope_cases
@@ -1222,6 +1291,51 @@ def test_alternatives_share_their_condition_and_consequence(
             assert_summary_readiness(explanation + ".", language, **signals)
             with pytest.raises(AssertionError, match="Conflicting readiness"):
                 assert_summary_readiness(f"{explanation}, {opposite.lower()}.", language, **signals)
+
+
+@_readiness_scope_cases
+@pytest.mark.parametrize("ready", [True, False], ids=["ready", "not-ready"])
+@pytest.mark.parametrize(
+    "separator", [", ", ": ", " — ", " – "], ids=["comma", "colon", "em-dash", "en-dash"]
+)
+def test_time_restriction_on_verdict_or_instruction(
+    language, positive, negative, condition, alternative, action, ready, separator
+):
+    opening, opposite = (positive, negative) if ready else (negative, positive)
+    signals = {"issues": [], "missing_fields": [] if ready else ["budget"], "questions": []}
+    timings = {
+        "en": ("after approval", "only after approval",
+               "only after the client approves the budget"),
+        "ru": ("после согласования", "только после согласования", "лишь после согласования",
+               "только после того, как клиент утвердит бюджет"),
+        "es": ("solo después de la aprobación", "sólo tras la aprobación",
+               "solamente después de que el cliente apruebe el presupuesto",
+               "únicamente tras la aprobación"),
+    }[language]
+    contrast = {"en": "but", "ru": "но", "es": "pero"}[language]
+    for timing in timings:
+        restricted = f"{opening}{separator}{timing}"
+        with pytest.raises(AssertionError, match="opening readiness"):
+            assert_summary_readiness(restricted + ".", language, **signals)
+        with pytest.raises(AssertionError, match="opening readiness"):
+            summary = f"{opening}{separator}{contrast} {timing}."
+            assert_summary_readiness(summary, language, **signals)
+        with pytest.raises(AssertionError, match="opening readiness"):
+            summary = f"{restricted}, {alternative} {condition}."
+            assert_summary_readiness(summary, language, **signals)
+
+        instruction = f"{restricted}, {action}"
+        assert_summary_readiness(instruction + ".", language, **signals)
+        with pytest.raises(AssertionError, match="Conflicting readiness"):
+            assert_summary_readiness(f"{instruction}, {opposite.lower()}.", language, **signals)
+        assert_summary_readiness(f"{opening}. {action} {timing}.", language, **signals)
+        assert_summary_readiness(f"{opening}. {timing} {action}.", language, **signals)
+        hypothetical = f"{opening}. {opposite}{separator}{timing}"
+        assert_summary_readiness(hypothetical + ".", language, **signals)
+        with pytest.raises(AssertionError, match="Conflicting readiness"):
+            assert_summary_readiness(f"{hypothetical}. {opposite}.", language, **signals)
+        with pytest.raises(AssertionError, match="Conflicting readiness"):
+            assert_summary_readiness(f"{hypothetical}, {action}.", language, **signals)
 
 
 @pytest.mark.parametrize(

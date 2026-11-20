@@ -17,29 +17,44 @@ DocumentLanguage = Literal["en", "ru", "es"]
 
 # Fixture verdicts use a closed set of subjects and predicates. Only a named subject
 # can establish a verdict inside a clause; an omitted subject must start the clause.
+# Continuative aspect modifies the predicate; the negative group determines polarity.
+_EN_STILL = r"(?:still )?"
+_EN_COPULA = rf"(?: {_EN_STILL}is |['’]s )"
+_RU_ASPECT = r"(?:(?:пока|(?:вс[её] )?ещ[её]|по[-‑]прежнему|до сих пор) )?"
+_ES_ASPECT = r"(?:(?:aún|todavía) )?"
 _READINESS_CLAUSES = {
     "en": (
         (
-            r"the (?:brief|request) is ",
-            r"(?P<negative>not (?:yet |fully )?)?ready to start(?: work)?",
+            r"the (?:brief|request)" + _EN_COPULA,
+            rf"{_EN_STILL}(?P<negative>not {_EN_STILL}(?:yet |fully )?)?ready to start(?: work)?",
         ),
     ),
-    "ru": ((r"(?:бриф|запрос) ", r"(?:пока )?(?P<negative>не )?готов к (?:работе|началу работы)"),),
+    "ru": (
+        (r"(?:бриф|запрос) ", _RU_ASPECT + r"(?P<negative>не )?готов к (?:работе|началу работы)"),
+    ),
     "es": tuple(
-        (subject + " ", rf"(?:(?:aún|todavía) )?(?P<negative>no )?está {adjective} para empezar")
+        (subject + " ", rf"{_ES_ASPECT}{verb}{_ES_ASPECT}{adjective} para empezar")
         for subject, adjective in (("el encargo", "listo"), ("la solicitud", "lista"))
+        for verb in (
+            r"(?P<negative>no )?está ",
+            r"sigue (?:(?P<negative>sin estar )|(?:estando )?)",
+        )
     ),
 }
 
-# An explicitly conditional or interrogative complement does not assert its contents.
+# A prerequisite can be a clause ("once the client signs") or a time phrase
+# ("after sign-off"). The focus particle is optional in either construction.
 _CONDITION = {
-    "en": r"(?:only )?(?:if|when|once)",
-    "ru": r"(?:только )?(?:если|когда)",
-    "es": r"(?:s[oó]lo )?(?:si|cuando)",
+    "en": r"(?:only )?(?:if|when|once|after|subject to)",
+    "ru": r"(?:(?:только|лишь) )?(?:если|когда|после|при условии)",
+    "es": r"(?:(?:s[oó]lo|solamente|únicamente) )?(?:si|cuando|después de|tras|a condición de)",
 }
 _COORDINATORS = {"en": {"and", "or"}, "ru": {"и", "или", "либо", "а"}, "es": {"y", "o"}}
-_STATEMENT_END = re.compile(r"[.!?;:—–]|\b(?:but|pero|но)\b")
-_OPENING_END = re.compile(r",|" + _STATEMENT_END.pattern)
+_CONTRAST = r"\b(?:but|pero|но)\b"
+_STATEMENT_END = re.compile(r"[.!?;]|" + _CONTRAST)
+# These separators can connect a predicate to a qualification on either side.
+_CLAUSE_END = re.compile(r"[,:—–]")
+_OPENING_END = re.compile(_CLAUSE_END.pattern + "|" + _STATEMENT_END.pattern)
 _INDEPENDENT_PREFIX = {
     "en": r"(?:however|in any case)\b",
     "ru": r"(?:однако|в любом случае)\b",
@@ -48,7 +63,7 @@ _INDEPENDENT_PREFIX = {
 
 
 def _starts_condition(condition: str, language: DocumentLanguage) -> bool:
-    if condition in {"once again", "once more", "if anything"}:
+    if condition in {"once again", "once more", "if anything", "after all", "después de todo"}:
         return False
     return bool(re.match(rf"(?:{_CONDITION[language]})\s+\S", condition))
 
@@ -68,7 +83,7 @@ def _verdict_matches(
             if match:
                 yield match
         else:
-            named = rf"(?:{subject}|it is )" if language == "en" else subject
+            named = rf"(?:{subject}|it{_EN_COPULA})" if language == "en" else subject
             for match in re.finditer(rf"(?:\b{named}|^){predicate}(?=\s|$)", clause):
                 if not re.search(rf"\b(?:{introducer})\s+$", clause[: match.start()]):
                     yield match
@@ -95,7 +110,12 @@ def _consequence_index(clauses: list[str], start: int, language: DocumentLanguag
 def _statement_verdicts(
     statement: str, language: DocumentLanguage, *, opening_separator: str = ""
 ) -> Iterator[bool]:
-    parts = [part.strip() for part in statement.split(",") if part.strip()]
+    if language == "ru":
+        # The internal comma in a compound conjunction does not start a consequence.
+        statement = re.sub(
+            r"(?<=\bпри условии),\s*(?=что\b)|(?<=\bпосле того),\s*(?=как\b)", " ", statement
+        )
+    parts = [part.strip() for part in _CLAUSE_END.split(statement) if part.strip()]
     index = 0
     while index < len(parts):
         clause = parts[index]
@@ -107,7 +127,7 @@ def _statement_verdicts(
             assert conditional, f"Ambiguous opening readiness: {statement!r}"
         if conditional:
             consequence = _consequence_index(parts, index - 1, language)
-            if opening_separator in (",", ":", "—", "–") and index == 1:
+            if index == 1 and _CLAUSE_END.fullmatch(opening_separator):
                 # Without a consequence of its own, this condition qualifies the opening.
                 assert consequence is not None, f"Conditional opening readiness: {statement!r}"
             if consequence is not None:
@@ -115,8 +135,14 @@ def _statement_verdicts(
             continue
         for match in _verdict_matches(clause, language, opening=False):
             suffix = clause[match.end() :].strip()
-            if not suffix and index < len(parts) and _starts_condition(parts[index], language):
-                # The same postposed condition can be set off with a comma.
+            if (
+                not suffix
+                and index < len(parts)
+                and _starts_condition(parts[index], language)
+                and _consequence_index(parts, index, language) is None
+            ):
+                # A detached qualifier belongs to this verdict only if it does
+                # not introduce its own consequence to the right.
                 suffix = parts[index]
                 index += 1
             if _starts_condition(suffix, language):
@@ -136,6 +162,11 @@ def assert_summary_readiness(
 ) -> None:
     expected_ready = not (issues or missing_fields or questions)
     normalized = " ".join(summary.casefold().split())
+    if language == "en":
+        normalized = re.sub(r"\bisn['’]t\b", "is not", normalized)
+    # "But only after approval" introduces a qualifier; a contrast introducing
+    # an assertion still starts a new statement.
+    normalized = re.sub(rf"{_CONTRAST}(?= (?:{_CONDITION[language]})\s+\S)", ":", normalized)
     boundary = _OPENING_END.search(normalized)
     first = normalized[:boundary.start()] if boundary else normalized
     separator = boundary.group() if boundary else ""

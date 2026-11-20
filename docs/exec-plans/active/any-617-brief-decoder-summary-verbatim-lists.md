@@ -33,6 +33,18 @@ The A10 prompt and fake-provider examples define the document wording within the
 
 ## Implementation steps
 
+Verify temporal prerequisites at the opening and in the free explanation for
+both polarities in EN/RU/ES. Exercise a restriction on readiness, its use to
+schedule an independent action, and a conflicting verdict after that action.
+
+Recognize continuative aspect in readiness predicates while preserving the
+subject, negation, and conditional scope. Verify contradictions and matching
+verdicts in English, Russian and Spanish through the common fixture checks.
+
+Check nominal conditions such as "subject to final approval" across comma,
+colon and dash separators. Keep independent explanations and complete
+conditional instructions valid in all three fixture languages.
+
 Verify that the opening establishes current readiness. When a conditional
 explanation follows it, identify the shared consequence of its alternatives and
 check subsequent independent claims. Cover the two findings in EN/RU/ES for both
@@ -186,6 +198,27 @@ can share one conditional introducer; the guard resumes checking assertions
 after their consequence. All twelve new parameterized cases failed before the
 change. The freelancer product, Brief Decoder API and language suites cover both
 reported examples and the earlier conditional-scope regressions.
+
+The opening verdict also accepts or rejects conditions introduced by "subject to",
+"при условии" and "a condición de" using the same scope check as other conditions.
+The comma within "при условии, что" stays inside the condition. The punctuation
+regressions cover both polarities after a comma, colon, em dash and en dash.
+They also check that a conditional instruction with its own consequence passes,
+and that a later independent contradiction is detected.
+
+The shared predicate matcher treats continuative aspect separately from
+negation. The fixture tests cover English "still", Russian "всё ещё" and
+"по-прежнему", and Spanish "todavía", "aún" and "sigue sin estar". They check
+both readiness polarities, subject agreement and conditional scope. The
+canonical English replay rejects the reported contradiction with a missing
+budget, including the variant that refers back to the brief as "it".
+
+The temporal qualification regressions reproduced the gap across 24 combinations
+of language, verdict polarity and separator. The common fixture guard now treats
+"only after approval" and its Russian and Spanish equivalents as prerequisites.
+An instruction can have its own prerequisite, and a later independent verdict
+is checked against the source data. Three canonical document cases exercise
+the same distinction through the full source comparison.
 
 ## Open questions
 

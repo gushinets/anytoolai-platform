@@ -137,6 +137,43 @@ def test_canonical_brief_rejects_independent_verdict_after_scope_change():
         )
 
 
+@pytest.mark.parametrize("subject_and_verb", ["the brief is", "it’s"])
+def test_canonical_brief_rejects_contradictory_continuing_readiness(subject_and_verb):
+    case = CANONICAL["ANY761-BD-EN-basic"]
+    summary = (
+        "The brief is not ready to start work. "
+        f"However, {subject_and_verb} still ready to start work."
+    )
+    with pytest.raises(AssertionError, match="Conflicting readiness"):
+        assert_summary_matches_sources(
+            {**case["document"], "summary": summary},
+            case["brief"], case["issues"], case["questions"], "en",
+        )
+
+
+@pytest.mark.parametrize(
+    ("language", "verdict", "timing", "instruction"),
+    [
+        ("en", "The brief is not ready to start work", "only after the client approves the budget",
+         "contact the client"),
+        ("ru", "Бриф не готов к работе", "только после согласования", "свяжитесь с клиентом"),
+        ("es", "El encargo no está listo para empezar", "solo después de la aprobación",
+         "contacte con el cliente"),
+    ],
+    ids=["en", "ru", "es"],
+)
+def test_canonical_brief_distinguishes_timed_verdict_from_timed_action(
+    language, verdict, timing, instruction
+):
+    case = CANONICAL[f"ANY761-BD-{language.upper()}-basic"]
+    sources = case["brief"], case["issues"], case["questions"], language
+    summary = f"{verdict} — {timing}"
+    with pytest.raises(AssertionError, match="opening readiness"):
+        assert_summary_matches_sources({**case["document"], "summary": summary + "."}, *sources)
+    document = {**case["document"], "summary": f"{summary}, {instruction}."}
+    assert_summary_matches_sources(document, *sources)
+
+
 def test_generated_output_is_pending_until_every_field_and_fact_is_reviewed():
     run = record()
     assert evaluation.review_status(run, evaluation.review_template(run)) == "PENDING"
