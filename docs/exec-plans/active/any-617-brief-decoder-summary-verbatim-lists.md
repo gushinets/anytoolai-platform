@@ -33,6 +33,10 @@ The A10 prompt and fake-provider examples define the document wording within the
 
 ## Implementation steps
 
+Align the active A10 summary instructions with the standalone verdict used by
+the fixtures. Check the prompt text and exercise ready and unready openings in
+English, Russian and Spanish with a freely worded follow-up in the same paragraph.
+
 Keep numeric range dashes inside fixture conditions. Verify localized ranges in
 both verdict polarities. In StrictMode draft recovery tests wait for the completion
 event emitted after rendering before asserting its session identity.

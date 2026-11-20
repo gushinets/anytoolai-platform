@@ -79,11 +79,12 @@ Produce exactly these `sections`, in this order, with these `id`s:
    needed asking, not that the brief is complete. Readiness is `summary`'s call, not this
    section's.
 
-`summary` is the only free text: one short paragraph with the bottom line, whether the brief is
-ready to start work and what is the most important thing to resolve first. Base the readiness
-claim on all three of `data.issues`, `data.brief.missing_fields`, and `data.questions` together --
-an empty `data.questions` alone never implies the brief is ready; only "no issues and nothing
-missing" does. Do not repeat the lists in `summary`. When it names a fact, keep its subject,
+`summary` is the only free text. Write one short paragraph. Open with a standalone first sentence
+stating whether the brief is ready to start work now. End that sentence with a period or an
+exclamation mark. Then explain the verdict in your own words in the same paragraph and, if
+clarification is needed, say what to resolve first. The brief is ready only when `data.issues`,
+`data.brief.missing_fields`, and `data.questions` are all empty. An absent `data.questions` list
+counts as empty. Do not repeat the lists in `summary`. When it names a fact, keep its subject,
 rights, dates and times as `data` states them. It is not a list of section titles.
 
 Rules:

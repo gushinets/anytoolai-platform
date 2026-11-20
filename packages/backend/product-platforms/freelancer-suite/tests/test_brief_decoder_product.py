@@ -629,6 +629,17 @@ def test_summary_prompt_copies_lists_verbatim() -> None:
     assert "The questions and their rationales must also use that language" not in prompt
 
 
+def test_summary_prompt_requires_a_standalone_current_verdict() -> None:
+    prompt = (PRODUCT_DIR / "prompts" / "generate_summary.v1.md").read_text(encoding="utf-8")
+    instructions = " ".join(prompt.split())
+    assert (
+        "a standalone first sentence stating whether the brief is ready to start work now"
+        in instructions
+    )
+    assert "in your own words in the same paragraph" in instructions
+    assert "if clarification is needed, say what to resolve first" in instructions
+
+
 # Words a section may use that carry no project fact. Deliberately per-section: `overview` is
 # only allowed to state present facts (generate_summary.v1.md: "do not mention absent ones
 # here"), so it gets no words for talking about the brief or missing details -- allowing them
