@@ -2293,7 +2293,9 @@ describe("opt-in draft recovery", () => {
     await waitForResult();
     expect(routed.calls.filter((call) => call.key === ROUTES.SESSION)).toHaveLength(1);
     expect(routed.calls.some((call) => call.key === ROUTES.START)).toBe(false);
-    expect(onEvent).toHaveBeenCalledWith({ type: "scenario_completed", scenarioSessionId: "session_1", guestId: undefined, resultViewed: true });
+    await waitFor(() => expect(onEvent).toHaveBeenCalledWith({
+      type: "scenario_completed", scenarioSessionId: "session_1", guestId: undefined, resultViewed: true,
+    }));
   });
 
   it("gives handoff attachment precedence over a saved draft and run", async () => {

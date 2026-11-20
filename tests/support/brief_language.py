@@ -115,6 +115,8 @@ def _consequence_index(clauses: list[str], start: int, language: DocumentLanguag
 
 
 def _statement_verdicts(statement: str, language: DocumentLanguage) -> Iterator[bool]:
+    # A range dash joins numeric endpoints even when the author spaces it.
+    statement = re.sub(r"(?<=\d) *[–—] *(?=\d)", "-", statement)
     if language == "ru":
         # The internal comma in a compound conjunction does not start a consequence.
         statement = re.sub(

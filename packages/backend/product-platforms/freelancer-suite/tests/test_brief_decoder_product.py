@@ -1282,12 +1282,19 @@ def test_relative_clause_cannot_complete_an_opening_verdict(
     ("es", "El encargo está listo para empezar", "El encargo no está listo para empezar",
      "después de las 10:00", "avise al cliente"),
     ("en", "The brief is ready to start", "The brief is not ready to start",
+     "after the 10:00–12:00 review", "notify the client"),
+    ("ru", "Бриф готов к работе", "Бриф не готов к работе",
+     "после встречи в 10:00 — 12:00", "уведомите клиента"),
+    ("es", "El encargo está listo para empezar", "El encargo no está listo para empezar",
+     "después de la reunión de 10:00–12:00", "avise al cliente"),
+    ("en", "The brief is ready to start", "The brief is not ready to start",
      "only after the client signs off, which is still pending", "notify the client"),
     ("ru", "Бриф готов к работе", "Бриф не готов к работе",
      "только после согласования, которого мы ещё ждём", "уведомите клиента"),
     ("es", "El encargo está listo para empezar", "El encargo no está listo para empezar",
      "solo después de la aprobación, que sigue pendiente", "avise al cliente"),
-], ids=["en-time", "ru-time", "es-time", "en-relative", "ru-relative", "es-relative"])
+], ids=["en-time", "ru-time", "es-time", "en-range", "ru-range", "es-range",
+        "en-relative", "ru-relative", "es-relative"])
 @pytest.mark.parametrize("ready", [True, False], ids=["ready", "not-ready"])
 def test_explanation_keeps_condition_intact(language, positive, negative, condition, action, ready):
     opening, opposite = (positive, negative) if ready else (negative, positive)

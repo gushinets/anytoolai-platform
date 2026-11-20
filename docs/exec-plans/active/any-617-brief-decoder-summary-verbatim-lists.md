@@ -33,6 +33,10 @@ The A10 prompt and fake-provider examples define the document wording within the
 
 ## Implementation steps
 
+Keep numeric range dashes inside fixture conditions. Verify localized ranges in
+both verdict polarities. In StrictMode draft recovery tests wait for the completion
+event emitted after rendering before asserting its session identity.
+
 Preserve colons within numeric times and comma-led relative modifiers when splitting
 clauses in fixture explanations. Check both condition positions, later independent
 assertions and separately timed instructions in English, Russian and Spanish.
