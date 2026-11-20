@@ -52,8 +52,16 @@ _CONDITION = {
 _COORDINATORS = {"en": {"and", "or"}, "ru": {"и", "или", "либо", "а"}, "es": {"y", "o"}}
 _CONTRAST = r"\b(?:but|pero|но)\b"
 _STATEMENT_END = re.compile(r"[.!?;]|" + _CONTRAST)
-# These separators can connect a predicate to a qualification on either side.
-_CLAUSE_END = re.compile(r"[,:—–]")
+_RELATIVE_PRONOUN = {
+    "en": r"which|who|whom|whose",
+    "ru": r"что|котор(?:ый|ая|ое|ые|ого|ой|ому|ым|ую|ых|ыми|ом|ою)",
+    "es": r"(?:lo )?que|quien(?:es)?|(?:el|la) cual|(?:los|las) cuales",
+}
+# Keep numeric colons and comma-led relative modifiers inside their clause.
+_CLAUSE_END = {
+    lang: re.compile(rf"[—–]|(?<!\d):|:(?!\d)|,(?!\s*(?:{relative})\b)")
+    for lang, relative in _RELATIVE_PRONOUN.items()
+}
 _INDEPENDENT_PREFIX = {
     "en": r"(?:however|in any case)\b",
     "ru": r"(?:однако|в любом случае)\b",
@@ -83,7 +91,7 @@ def _verdict_matches(
                 yield match
         else:
             named = rf"(?:{subject}|it{_EN_COPULA})" if language == "en" else subject
-            for match in re.finditer(rf"(?:\b{named}|^){predicate}(?=\s|$)", clause):
+            for match in re.finditer(rf"(?:\b{named}|^){predicate}(?=[\s,]|$)", clause):
                 if not re.search(rf"\b(?:{introducer})\s+$", clause[: match.start()]):
                     yield match
 
@@ -112,7 +120,7 @@ def _statement_verdicts(statement: str, language: DocumentLanguage) -> Iterator[
         statement = re.sub(
             r"(?<=\bпри условии),\s*(?=что\b)|(?<=\bпосле того),\s*(?=как\b)", " ", statement
         )
-    parts = [part.strip() for part in _CLAUSE_END.split(statement) if part.strip()]
+    parts = [part.strip() for part in _CLAUSE_END[language].split(statement) if part.strip()]
     index = 0
     while index < len(parts):
         clause = parts[index]

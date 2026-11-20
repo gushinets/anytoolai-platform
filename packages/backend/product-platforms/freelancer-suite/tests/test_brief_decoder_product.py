@@ -1274,6 +1274,41 @@ def test_relative_clause_cannot_complete_an_opening_verdict(
         assert_summary_readiness(f"{opening}. {explanation} {opposite}.", language, **signals)
 
 
+@pytest.mark.parametrize(("language", "positive", "negative", "condition", "action"), [
+    ("en", "The brief is ready to start", "The brief is not ready to start",
+     "after 10:00", "notify the client"),
+    ("ru", "Бриф готов к работе", "Бриф не готов к работе",
+     "после 10:00", "уведомите клиента"),
+    ("es", "El encargo está listo para empezar", "El encargo no está listo para empezar",
+     "después de las 10:00", "avise al cliente"),
+    ("en", "The brief is ready to start", "The brief is not ready to start",
+     "only after the client signs off, which is still pending", "notify the client"),
+    ("ru", "Бриф готов к работе", "Бриф не готов к работе",
+     "только после согласования, которого мы ещё ждём", "уведомите клиента"),
+    ("es", "El encargo está listo para empezar", "El encargo no está listo para empezar",
+     "solo después de la aprobación, que sigue pendiente", "avise al cliente"),
+], ids=["en-time", "ru-time", "es-time", "en-relative", "ru-relative", "es-relative"])
+@pytest.mark.parametrize("ready", [True, False], ids=["ready", "not-ready"])
+def test_explanation_keeps_condition_intact(language, positive, negative, condition, action, ready):
+    opening, opposite = (positive, negative) if ready else (negative, positive)
+    signals = {"issues": [], "missing_fields": [] if ready else ["budget"], "questions": []}
+    however = {"en": "however", "ru": "однако", "es": "sin embargo"}[language]
+    for explanation in (f"{condition}, {opposite}", f"{condition}: {opposite}",
+                        f"{opposite} — {condition}", f"{condition}, {action}"):
+        summary = f"{opening}. {explanation}"
+        assert_summary_readiness(summary + ".", language, **signals)
+        for separator in (". ", f", {however} "):
+            with pytest.raises(AssertionError, match="Conflicting readiness"):
+                assert_summary_readiness(f"{summary}{separator}{opposite}.", language, **signals)
+    # The action owns the condition here, so the preceding contrary assertion counts.
+    with pytest.raises(AssertionError, match="Conflicting readiness"):
+        summary = f"{opening}. {opposite} — {condition}, {action}."
+        assert_summary_readiness(summary, language, **signals)
+    aside = {"en": "which is surprising", "ru": "что удивительно", "es": "lo que sorprende"}
+    with pytest.raises(AssertionError, match="Conflicting readiness"):
+        assert_summary_readiness(f"{opening}. {opposite}, {aside[language]}.", language, **signals)
+
+
 @_readiness_scope_cases
 @pytest.mark.parametrize("ready", [True, False], ids=["ready", "not-ready"])
 @pytest.mark.parametrize(

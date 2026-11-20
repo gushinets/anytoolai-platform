@@ -33,6 +33,10 @@ The A10 prompt and fake-provider examples define the document wording within the
 
 ## Implementation steps
 
+Preserve colons within numeric times and comma-led relative modifiers when splitting
+clauses in fixture explanations. Check both condition positions, later independent
+assertions and separately timed instructions in English, Russian and Spanish.
+
 For review 13, require the entire opening sentence of each authored fixture to
 match its source-derived readiness verdict. Migrate the five provider summaries,
 seven canonical summaries and mixed-language document to this format. Exercise
