@@ -57,9 +57,9 @@ _RELATIVE_PRONOUN = {
     "ru": r"что|котор(?:ый|ая|ое|ые|ого|ой|ому|ым|ую|ых|ыми|ом|ою)",
     "es": r"(?:lo )?que|quien(?:es)?|(?:el|la) cual|(?:los|las) cuales",
 }
-# Keep numeric colons and comma-led relative modifiers inside their clause.
+# Keep comma-led relative modifiers inside their clause.
 _CLAUSE_END = {
-    lang: re.compile(rf"[—–]|(?<!\d):|:(?!\d)|,(?!\s*(?:{relative})\b)")
+    lang: re.compile(rf"[—–:]|,(?!\s*(?:{relative})\b)")
     for lang, relative in _RELATIVE_PRONOUN.items()
 }
 _INDEPENDENT_PREFIX = {
@@ -171,8 +171,10 @@ def assert_summary_readiness(
     assert opening and (opening["negative"] is None) == expected_ready, (
         f"Expected opening readiness={expected_ready}: {summary!r}"
     )
-    # A contrast can introduce a trailing condition on a later assertion.
     explanation = normalized[boundary.end():]
+    # Readiness depends on clause boundaries, so ignore separators inside amounts and times.
+    explanation = re.sub(r"(?<=\d)[.,:](?=\d)", "", explanation)
+    # A contrast can introduce a trailing condition on a later assertion.
     explanation = re.sub(rf"{_CONTRAST}(?= (?:{_CONDITION[language]})\s+\S)", ":", explanation)
     for statement in _STATEMENT_END.split(explanation):
         verdicts = _statement_verdicts(statement, language)

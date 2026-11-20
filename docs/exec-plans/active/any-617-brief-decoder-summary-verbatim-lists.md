@@ -33,6 +33,10 @@ The A10 prompt and fake-provider examples define the document wording within the
 
 ## Implementation steps
 
+Treat punctuation between digits in a formatted amount as part of the number
+before checking sentence and clause boundaries. Verify that the comma after the
+amount introduces the consequence and a later independent contradiction is caught.
+
 Align the active A10 summary instructions with the standalone verdict used by
 the fixtures. Check the prompt text and exercise ready and unready openings in
 English, Russian and Spanish with a freely worded follow-up in the same paragraph.
