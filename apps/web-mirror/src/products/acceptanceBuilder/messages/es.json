@@ -34,5 +34,8 @@
   "result": {
     "verdictScope": "El veredicto se basa en cuatro criterios generales de revisión, no punto por punto en los criterios listados abajo.",
     "recap": "Resumen estructurado"
+  },
+  "validation": {
+    "insufficient_brief": "Añade los requisitos del cliente: qué se debe entregar, en qué plazo y cómo se acepta. Un saludo o un texto al azar no permite comprobar el trabajo."
   }
 }

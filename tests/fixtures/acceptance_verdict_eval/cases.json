@@ -1,0 +1,322 @@
+{
+  "cases": [
+    {
+      "id": "ANY893-W1",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "verdict",
+      "source_language": "ru",
+      "expected_language": "ru",
+      "input": {
+        "brief_text": "Нужен редизайн одностраничного сайта йога-студии. На сайте нужны главный экран, расписание, тренеры, цены, отзывы и форма записи. Нужна адаптивная вёрстка, форма должна отправлять заявки на почту студии. Тексты и фотографии предоставим сами. Срок — три недели с начала работ, запуск не позднее 10 декабря. Бюджет — 90 000 рублей. Включено два раунда правок. Макеты согласую лично. Результат — рабочий сайт на нашем домене и исходники макетов в Figma.",
+        "deliverable_text": "Сдан одностраничный сайт на домене клиента: главный экран, расписание, тренеры, цены, отзывы, форма записи. Вёрстка адаптивная, форма записи приходит на почту студии. Макеты в Figma переданы. Два раунда правок проведены и закрыты. Сдано 3 декабря."
+      },
+      "criteria": [
+        "partially_meets with clarity match and no mismatch.",
+        "Confirm Dec 3 satisfies Dec 10. Identify start-relative duration and personal approval as unconfirmed."
+      ],
+      "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
+    },
+    {
+      "id": "ANY893-HELLO",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "verdict",
+      "source_language": "ru",
+      "expected_language": "ru",
+      "input": {
+        "brief_text": "привет",
+        "deliverable_text": "Сдан одностраничный сайт на домене клиента: главный экран, расписание, тренеры, цены, отзывы, форма записи. Вёрстка адаптивная, форма записи приходит на почту студии. Макеты в Figma переданы. Два раунда правок проведены и закрыты. Сдано 3 декабря."
+      },
+      "criteria": [
+        "Insufficient brief or all three lists missing. Ask for a meaningful brief without a negative verdict."
+      ],
+      "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
+    },
+    {
+      "id": "ANY893-JUNK",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "verdict",
+      "source_language": "ru",
+      "expected_language": "en",
+      "input": {
+        "brief_text": "asdf ::: 12345 !!!",
+        "deliverable_text": "Сдан одностраничный сайт на домене клиента: главный экран, расписание, тренеры, цены, отзывы, форма записи. Вёрстка адаптивная, форма записи приходит на почту студии. Макеты в Figma переданы. Два раунда правок проведены и закрыты. Сдано 3 декабря."
+      },
+      "criteria": [
+        "Insufficient brief or all three lists missing. Ask for a meaningful brief without a negative verdict."
+      ],
+      "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
+    },
+    {
+      "id": "ANY893-NO-REVIEWS",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "verdict",
+      "source_language": "ru",
+      "expected_language": "ru",
+      "input": {
+        "brief_text": "Нужен редизайн одностраничного сайта йога-студии. На сайте нужны главный экран, расписание, тренеры, цены, отзывы и форма записи. Нужна адаптивная вёрстка, форма должна отправлять заявки на почту студии. Тексты и фотографии предоставим сами. Срок — три недели с начала работ, запуск не позднее 10 декабря. Бюджет — 90 000 рублей. Включено два раунда правок. Макеты согласую лично. Результат — рабочий сайт на нашем домене и исходники макетов в Figma.",
+        "deliverable_text": "Сдан одностраничный сайт на домене клиента: главный экран, расписание, тренеры, цены, форма записи. Вёрстка адаптивная, форма записи приходит на почту студии. Макеты в Figma переданы. Два раунда правок проведены и закрыты. Сдано 3 декабря. Блок отзывов не сделан."
+      },
+      "criteria": [
+        "does_not_meet with mismatch specifically naming omitted reviews."
+      ],
+      "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
+    },
+    {
+      "id": "ANY893-NO-FIGMA",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "verdict",
+      "source_language": "ru",
+      "expected_language": "ru",
+      "input": {
+        "brief_text": "Нужен редизайн одностраничного сайта йога-студии. На сайте нужны главный экран, расписание, тренеры, цены, отзывы и форма записи. Нужна адаптивная вёрстка, форма должна отправлять заявки на почту студии. Тексты и фотографии предоставим сами. Срок — три недели с начала работ, запуск не позднее 10 декабря. Бюджет — 90 000 рублей. Включено два раунда правок. Макеты согласую лично. Результат — рабочий сайт на нашем домене и исходники макетов в Figma.",
+        "deliverable_text": "Сдан одностраничный сайт на домене клиента: главный экран, расписание, тренеры, цены, отзывы, форма записи. Вёрстка адаптивная, форма записи приходит на почту студии. Исходники макетов в Figma не переданы. Два раунда правок проведены и закрыты. Сдано 3 декабря."
+      },
+      "criteria": [
+        "does_not_meet with mismatch specifically naming absent Figma sources."
+      ],
+      "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
+    },
+    {
+      "id": "ANY893-IRRELEVANT",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "verdict",
+      "source_language": "ru",
+      "expected_language": "ru",
+      "input": {
+        "brief_text": "Нужен редизайн одностраничного сайта йога-студии. На сайте нужны главный экран, расписание, тренеры, цены, отзывы и форма записи. Нужна адаптивная вёрстка, форма должна отправлять заявки на почту студии. Тексты и фотографии предоставим сами. Срок — три недели с начала работ, запуск не позднее 10 декабря. Бюджет — 90 000 рублей. Включено два раунда правок. Макеты согласую лично. Результат — рабочий сайт на нашем домене и исходники макетов в Figma.",
+        "deliverable_text": "Нарисован логотип для кофейни в трёх цветах."
+      },
+      "criteria": [
+        "does_not_meet because the work is unrelated."
+      ],
+      "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
+    },
+    {
+      "id": "ANY893-FULL",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "verdict",
+      "source_language": "ru",
+      "expected_language": "ru",
+      "input": {
+        "brief_text": "Нужен редизайн одностраничного сайта йога-студии. На сайте нужны главный экран, расписание, тренеры, цены, отзывы и форма записи. Нужна адаптивная вёрстка, форма должна отправлять заявки на почту студии. Тексты и фотографии предоставим сами. Срок — три недели с начала работ, запуск не позднее 10 декабря. Бюджет — 90 000 рублей. Включено два раунда правок. Макеты согласую лично. Результат — рабочий сайт на нашем домене и исходники макетов в Figma.",
+        "deliverable_text": "Сдан одностраничный сайт на домене клиента: главный экран, расписание, тренеры, цены, отзывы, форма записи. Вёрстка адаптивная, форма записи приходит на почту студии. Макеты в Figma переданы. Два раунда правок проведены и закрыты. Сдано 3 декабря. Работы начаты 12 ноября, макеты согласованы с вами лично 18 ноября."
+      },
+      "criteria": [
+        "meets_expectations with all four criteria confirmed."
+      ],
+      "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
+    },
+    {
+      "id": "ANY893-W1-EN",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "verdict",
+      "source_language": "en",
+      "expected_language": "en",
+      "input": {
+        "brief_text": "We need a redesign of our one-page yoga studio website. Include a hero section, schedule, trainers, pricing, reviews and a booking form. The layout must be responsive and bookings must reach the studio by email. We will provide text and photos. The timeframe is three weeks from the start, with launch by December 10. The budget is 90,000 rubles. Two revision rounds are included. I will personally approve the mock-ups. Deliver a working site on our domain and the Figma source files.",
+        "deliverable_text": "Delivered the single-page site on the client domain with a hero section, schedule, trainers, pricing, reviews, and booking form. The layout is responsive and bookings reach the studio by email. The Figma files were handed over. Both revision rounds were completed. Delivered on December 3."
+      },
+      "criteria": [
+        "partially_meets with clarity match and no mismatch.",
+        "Confirm Dec 3 satisfies Dec 10. Identify start-relative duration and personal approval as unconfirmed."
+      ],
+      "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
+    },
+    {
+      "id": "ANY893-HELLO-EN",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "verdict",
+      "source_language": "en",
+      "expected_language": "en",
+      "input": {
+        "brief_text": "hello",
+        "deliverable_text": "Delivered the single-page site on the client domain with a hero section, schedule, trainers, pricing, reviews, and booking form. The layout is responsive and bookings reach the studio by email. The Figma files were handed over. Both revision rounds were completed. Delivered on December 3."
+      },
+      "criteria": [
+        "Insufficient brief or all three lists missing. Ask for a meaningful brief without a negative verdict."
+      ],
+      "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
+    },
+    {
+      "id": "ANY893-JUNK-EN",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "verdict",
+      "source_language": "en",
+      "expected_language": "en",
+      "input": {
+        "brief_text": "asdf ::: 12345 !!!",
+        "deliverable_text": "Delivered the single-page site on the client domain with a hero section, schedule, trainers, pricing, reviews, and booking form. The layout is responsive and bookings reach the studio by email. The Figma files were handed over. Both revision rounds were completed. Delivered on December 3."
+      },
+      "criteria": [
+        "Insufficient brief or all three lists missing. Ask for a meaningful brief without a negative verdict."
+      ],
+      "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
+    },
+    {
+      "id": "ANY893-NO-REVIEWS-EN",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "verdict",
+      "source_language": "en",
+      "expected_language": "en",
+      "input": {
+        "brief_text": "We need a redesign of our one-page yoga studio website. Include a hero section, schedule, trainers, pricing, reviews and a booking form. The layout must be responsive and bookings must reach the studio by email. We will provide text and photos. The timeframe is three weeks from the start, with launch by December 10. The budget is 90,000 rubles. Two revision rounds are included. I will personally approve the mock-ups. Deliver a working site on our domain and the Figma source files.",
+        "deliverable_text": "Delivered the single-page site on the client domain with a hero section, schedule, trainers, pricing, and booking form. The layout is responsive and bookings reach the studio by email. The Figma files were handed over. Both revision rounds were completed. Delivered on December 3. The reviews section was not built."
+      },
+      "criteria": [
+        "does_not_meet with mismatch specifically naming omitted reviews."
+      ],
+      "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
+    },
+    {
+      "id": "ANY893-NO-FIGMA-EN",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "verdict",
+      "source_language": "en",
+      "expected_language": "en",
+      "input": {
+        "brief_text": "We need a redesign of our one-page yoga studio website. Include a hero section, schedule, trainers, pricing, reviews and a booking form. The layout must be responsive and bookings must reach the studio by email. We will provide text and photos. The timeframe is three weeks from the start, with launch by December 10. The budget is 90,000 rubles. Two revision rounds are included. I will personally approve the mock-ups. Deliver a working site on our domain and the Figma source files.",
+        "deliverable_text": "Delivered the single-page site on the client domain with a hero section, schedule, trainers, pricing, reviews, and booking form. The layout is responsive and bookings reach the studio by email. The Figma source files were not handed over. Both revision rounds were completed. Delivered on December 3."
+      },
+      "criteria": [
+        "does_not_meet with mismatch specifically naming absent Figma sources."
+      ],
+      "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
+    },
+    {
+      "id": "ANY893-IRRELEVANT-EN",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "verdict",
+      "source_language": "en",
+      "expected_language": "en",
+      "input": {
+        "brief_text": "We need a redesign of our one-page yoga studio website. Include a hero section, schedule, trainers, pricing, reviews and a booking form. The layout must be responsive and bookings must reach the studio by email. We will provide text and photos. The timeframe is three weeks from the start, with launch by December 10. The budget is 90,000 rubles. Two revision rounds are included. I will personally approve the mock-ups. Deliver a working site on our domain and the Figma source files.",
+        "deliverable_text": "I drew a three-color logo for a coffee shop."
+      },
+      "criteria": [
+        "does_not_meet because the work is unrelated."
+      ],
+      "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
+    },
+    {
+      "id": "ANY893-FULL-EN",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "verdict",
+      "source_language": "en",
+      "expected_language": "en",
+      "input": {
+        "brief_text": "We need a redesign of our one-page yoga studio website. Include a hero section, schedule, trainers, pricing, reviews and a booking form. The layout must be responsive and bookings must reach the studio by email. We will provide text and photos. The timeframe is three weeks from the start, with launch by December 10. The budget is 90,000 rubles. Two revision rounds are included. I will personally approve the mock-ups. Deliver a working site on our domain and the Figma source files.",
+        "deliverable_text": "Delivered the single-page site on the client domain with a hero section, schedule, trainers, pricing, reviews, and booking form. The layout is responsive and bookings reach the studio by email. The Figma files were handed over. Both revision rounds were completed. Delivered on December 3. Work started on November 12 and you personally approved the mock-ups on November 18."
+      },
+      "criteria": [
+        "meets_expectations with all four criteria confirmed."
+      ],
+      "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
+    },
+    {
+      "id": "ANY893-W1-ES",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "verdict",
+      "source_language": "es",
+      "expected_language": "es",
+      "input": {
+        "brief_text": "Necesitamos rediseñar la web de una sola página del estudio de yoga. Debe incluir portada, horarios, entrenadores, precios, reseñas y formulario de reserva. La web debe ser adaptable y enviar las reservas al correo del estudio. Nosotros aportaremos los textos y fotos. El plazo es de tres semanas desde el inicio y el lanzamiento debe ser el 10 de diciembre como máximo. El presupuesto es de 90 000 rublos. Se incluyen dos rondas de cambios. Aprobaré personalmente las maquetas. Hay que entregar la web en nuestro dominio y los archivos fuente de Figma.",
+        "deliverable_text": "Se entregó la web de una página en el dominio del cliente con portada, horarios, entrenadores, precios, reseñas y formulario de reserva. El diseño es adaptable y las reservas llegan al correo del estudio. Se entregaron los archivos de Figma. Se completaron las dos rondas de cambios. Entrega el 3 de diciembre."
+      },
+      "criteria": [
+        "partially_meets with clarity match and no mismatch.",
+        "Confirm Dec 3 satisfies Dec 10. Identify start-relative duration and personal approval as unconfirmed."
+      ],
+      "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
+    },
+    {
+      "id": "ANY893-HELLO-ES",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "verdict",
+      "source_language": "es",
+      "expected_language": "es",
+      "input": {
+        "brief_text": "hola",
+        "deliverable_text": "Se entregó la web de una página en el dominio del cliente con portada, horarios, entrenadores, precios, reseñas y formulario de reserva. El diseño es adaptable y las reservas llegan al correo del estudio. Se entregaron los archivos de Figma. Se completaron las dos rondas de cambios. Entrega el 3 de diciembre."
+      },
+      "criteria": [
+        "Insufficient brief or all three lists missing. Ask for a meaningful brief without a negative verdict."
+      ],
+      "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
+    },
+    {
+      "id": "ANY893-JUNK-ES",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "verdict",
+      "source_language": "es",
+      "expected_language": "en",
+      "input": {
+        "brief_text": "asdf ::: 12345 !!!",
+        "deliverable_text": "Se entregó la web de una página en el dominio del cliente con portada, horarios, entrenadores, precios, reseñas y formulario de reserva. El diseño es adaptable y las reservas llegan al correo del estudio. Se entregaron los archivos de Figma. Se completaron las dos rondas de cambios. Entrega el 3 de diciembre."
+      },
+      "criteria": [
+        "Insufficient brief or all three lists missing. Ask for a meaningful brief without a negative verdict."
+      ],
+      "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
+    },
+    {
+      "id": "ANY893-NO-REVIEWS-ES",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "verdict",
+      "source_language": "es",
+      "expected_language": "es",
+      "input": {
+        "brief_text": "Necesitamos rediseñar la web de una sola página del estudio de yoga. Debe incluir portada, horarios, entrenadores, precios, reseñas y formulario de reserva. La web debe ser adaptable y enviar las reservas al correo del estudio. Nosotros aportaremos los textos y fotos. El plazo es de tres semanas desde el inicio y el lanzamiento debe ser el 10 de diciembre como máximo. El presupuesto es de 90 000 rublos. Se incluyen dos rondas de cambios. Aprobaré personalmente las maquetas. Hay que entregar la web en nuestro dominio y los archivos fuente de Figma.",
+        "deliverable_text": "Se entregó la web de una página en el dominio del cliente con portada, horarios, entrenadores, precios, formulario de reserva. El diseño es adaptable y las reservas llegan al correo del estudio. Se entregaron los archivos de Figma. Se completaron las dos rondas de cambios. Entrega el 3 de diciembre. No se hizo la sección de reseñas."
+      },
+      "criteria": [
+        "does_not_meet with mismatch specifically naming omitted reviews."
+      ],
+      "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
+    },
+    {
+      "id": "ANY893-NO-FIGMA-ES",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "verdict",
+      "source_language": "es",
+      "expected_language": "es",
+      "input": {
+        "brief_text": "Necesitamos rediseñar la web de una sola página del estudio de yoga. Debe incluir portada, horarios, entrenadores, precios, reseñas y formulario de reserva. La web debe ser adaptable y enviar las reservas al correo del estudio. Nosotros aportaremos los textos y fotos. El plazo es de tres semanas desde el inicio y el lanzamiento debe ser el 10 de diciembre como máximo. El presupuesto es de 90 000 rublos. Se incluyen dos rondas de cambios. Aprobaré personalmente las maquetas. Hay que entregar la web en nuestro dominio y los archivos fuente de Figma.",
+        "deliverable_text": "Se entregó la web de una página en el dominio del cliente con portada, horarios, entrenadores, precios, reseñas y formulario de reserva. El diseño es adaptable y las reservas llegan al correo del estudio. No se entregaron los archivos fuente de Figma. Se completaron las dos rondas de cambios. Entrega el 3 de diciembre."
+      },
+      "criteria": [
+        "does_not_meet with mismatch specifically naming absent Figma sources."
+      ],
+      "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
+    },
+    {
+      "id": "ANY893-IRRELEVANT-ES",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "verdict",
+      "source_language": "es",
+      "expected_language": "es",
+      "input": {
+        "brief_text": "Necesitamos rediseñar la web de una sola página del estudio de yoga. Debe incluir portada, horarios, entrenadores, precios, reseñas y formulario de reserva. La web debe ser adaptable y enviar las reservas al correo del estudio. Nosotros aportaremos los textos y fotos. El plazo es de tres semanas desde el inicio y el lanzamiento debe ser el 10 de diciembre como máximo. El presupuesto es de 90 000 rublos. Se incluyen dos rondas de cambios. Aprobaré personalmente las maquetas. Hay que entregar la web en nuestro dominio y los archivos fuente de Figma.",
+        "deliverable_text": "Dibujé un logotipo en tres colores para una cafetería."
+      },
+      "criteria": [
+        "does_not_meet because the work is unrelated."
+      ],
+      "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
+    },
+    {
+      "id": "ANY893-FULL-ES",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "verdict",
+      "source_language": "es",
+      "expected_language": "es",
+      "input": {
+        "brief_text": "Necesitamos rediseñar la web de una sola página del estudio de yoga. Debe incluir portada, horarios, entrenadores, precios, reseñas y formulario de reserva. La web debe ser adaptable y enviar las reservas al correo del estudio. Nosotros aportaremos los textos y fotos. El plazo es de tres semanas desde el inicio y el lanzamiento debe ser el 10 de diciembre como máximo. El presupuesto es de 90 000 rublos. Se incluyen dos rondas de cambios. Aprobaré personalmente las maquetas. Hay que entregar la web en nuestro dominio y los archivos fuente de Figma.",
+        "deliverable_text": "Se entregó la web de una página en el dominio del cliente con portada, horarios, entrenadores, precios, reseñas y formulario de reserva. El diseño es adaptable y las reservas llegan al correo del estudio. Se entregaron los archivos de Figma. Se completaron las dos rondas de cambios. Entrega el 3 de diciembre. El trabajo comenzó el 12 de noviembre y usted aprobó personalmente las maquetas el 18 de noviembre."
+      },
+      "criteria": [
+        "meets_expectations with all four criteria confirmed."
+      ],
+      "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
+    }
+  ]
+}

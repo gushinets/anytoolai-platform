@@ -1,0 +1,106 @@
+{
+  "issue": "ANY-893",
+  "date": "2026-11-20",
+  "source": {
+    "git_sha": "5899798e4e7e283f54dc5b757286b23a678ab90b",
+    "git_dirty": true
+  },
+  "deployment_profile_sha256": "b18eb4b32b0ae3f6a21c8108eafe3991a34a3f54c0fb985682bbb9c293b90c6f",
+  "worker_snapshot": {
+    "source_sha256": {
+      "configs/kernel/litellm_router.yaml": "dede022d99bc94440ea14f212cc669d939a39b51dbb73e8d0ef83ef5510aa1d2",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/action_configs.yaml": "d1813bad6ff02019160b7ce2664acf4d92d36bcd87bec95c3c37a2975a104462",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/frontends.yaml": "5f5eac1312dddf0ab129ccb58108e38aed9cd0c633503ccb91ba4c036f7512bd",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/handoffs.yaml": "08d5c5b3717f2b0db972213243a56f0cf98811fd4328105da998f5a3116d49c4",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/product.yaml": "247a7d2c45740d6d821231ed73cfa787300b8170d8923f0760c841e8b3d8a66a",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/detect_issues.v1.md": "a8b150c1f681ad541aadcf8a2ba6e8340f2e85e813e13ba316b2de0bc70cf37f",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/extract_brief.v1.md": "0968f8fcc1762feaf10e86c11fffe41a58b960eceac2b4dda034d56902903c44",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/generate_questions.v1.md": "198c42b2e229ecd26d23d1e92fa6fefe5cf5f38b95b961957f06bda1dbc9e003",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/generate_summary.v1.md": "cf6c9b11022e7d9b73d4dbbcecf047e2d1155e8e06b6fa47314d0975f85f3f28",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts.yaml": "03cb35d961dd1d9b1d95a1d1490eb2355e438c239a391b757c5a554473845daf",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/quotas.yaml": "2fcee433e370547ff34d27f8ddfbf9abff01d456586ae2627203ee6745d298ba",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/renderer_contract.yaml": "adf12d7169078704b01b9b1106fdb3982cc08718b2a8b7d651a53cc6021f827f",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/scenarios.yaml": "f352e089e7129c5c2a36c46a147b1a59c3013a13171363f833222bd171529c9c",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas/decode_input.schema.json": "998b82bde28beb6be77e0fb522a8e0a9871c88d9500b884523912f2d257d8454",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas/decode_output.schema.json": "5a76652a23623ba7a025410a8d0a509e9b8495636f3f6adca8ecb5288610cc0a",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas.yaml": "e2038c31be3810ee6a04ac82994f9b7bbcc8cd0d68a74ff90e4e0ad3973188f9",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/workflows.yaml": "456c649b2f413eced34434383533265f5ef57ca70c1bb71964ee7448cc65353a",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/action_configs.yaml": "e179f207d997d1b6f7c72b085e3346878320e4466b74071168002c2048ff6b48",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/frontends.yaml": "8e43fb844dd43efb59a2c3ba4b9757795c546ea49fd79e837031f58092f5c1e6",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/product.yaml": "cd0a6c49cdfb0f4487e2719fbd04f0faaa2c4defd0c31b111d1fad94afc66905",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/compare.v1.md": "590d2516b396c4424d94119f9c37c26de4764ac99003c05f5a3e2a8e0e06841c",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/extract.v1.md": "0240f368c23ab093f5caffb6828bf7ab6faea9b5e31fdc739eca3839120c23e4",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts.yaml": "3d209f0b965ceb6c8f2b5b373a35cd791db39e7cac6f8e1f4713368f8253e0b2",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/quotas.yaml": "1ed4154065125cf4da02e88015f8112caf11090279f292bebd7dd4534d98df6c",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/renderer_contract.yaml": "e93ef3c78cde0c883985947f21140ce7477f809d00059f9e7a82395d1327b40c",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/scenarios.yaml": "43e16f85adfe8a785c4b22878e89677f5e45563f89aba7c025d82e732477d539",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/check_input.schema.json": "909e70ffbc6b6a7acbf5bc4eb64065a0beb0858be2f200a5b7573e45191def09",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/check_output.schema.json": "ce14623df715d4d33b6030aad11afe202d0075180ec0c84728e7be5c233a6b30",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/draft_input.schema.json": "268d5301b8b8cc610e1f4cc7668878913d2eefb877bb1c4ab2d9ab2118bfba7e",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/draft_output.schema.json": "ca4558c76b871f4fa808e875056095da7c98ff6a523cce0acc184f9f81498fbd",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas.yaml": "6c32116dcd116268045aeb45cd881c5fba8144ac0e22b5fcb8a1750216f43c1b",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/workflows.yaml": "3380c5eaacdd0938c696973c1dea69610c41a9412cf92fb437f2b17418daec75"
+    },
+    "configured_models": [
+      {
+        "model": "openai/gpt-6-luna",
+        "reasoning_effort": "medium",
+        "alias": "anytoolai.default_text"
+      },
+      {
+        "model": "openai/gpt-6.1-sol",
+        "reasoning_effort": "medium",
+        "alias": "anytoolai.sol_text"
+      }
+    ]
+  },
+  "suite": "tests/fixtures/acceptance_verdict_eval/cases.json",
+  "planned_runs": 63,
+  "attempted_runs": 1,
+  "completed_runs": 0,
+  "stop_reason": "The provider reported an expired credential (401) during extraction. Comparison was never reached.",
+  "runs": [
+    {
+      "case_id": "ANY893-W1",
+      "attempt": 1,
+      "input": {
+        "brief_text": "Нужен редизайн одностраничного сайта йога-студии. На сайте нужны главный экран, расписание, тренеры, цены, отзывы и форма записи. Нужна адаптивная вёрстка, форма должна отправлять заявки на почту студии. Тексты и фотографии предоставим сами. Срок — три недели с начала работ, запуск не позднее 10 декабря. Бюджет — 90 000 рублей. Включено два раунда правок. Макеты согласую лично. Результат — рабочий сайт на нашем домене и исходники макетов в Figma.",
+        "deliverable_text": "Сдан одностраничный сайт на домене клиента: главный экран, расписание, тренеры, цены, отзывы, форма записи. Вёрстка адаптивная, форма записи приходит на почту студии. Макеты в Figma переданы. Два раунда правок проведены и закрыты. Сдано 3 декабря."
+      },
+      "session_id": "scenario_session_01795172015665427827_0000000002_1cbe764e3eb2472d834aacc2e71a9588",
+      "result_id": null,
+      "output": null,
+      "error": "RuntimeError: session ended: failed",
+      "provider_calls": [
+        {
+          "id": "provider_call_01795172024523059543_0000000005_5799e754a6344d47b941095b975ea0a1",
+          "step_id": "extract",
+          "physical_call_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1",
+          "model": "anytoolai.sol_text",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "estimated_cost": 0.0,
+          "failure_kind": "transport",
+          "http_status": null,
+          "error_code": "provider_request_failed",
+          "status": "failed"
+        },
+        {
+          "id": "provider_call_01795172025878071243_0000000008_9764ebee717a409a8dec4aef21e62382",
+          "step_id": "extract",
+          "physical_call_index": 2,
+          "provider_policy_ref": "sol_text_generation_v1",
+          "model": "anytoolai.sol_text",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "estimated_cost": 0.0,
+          "failure_kind": "transport",
+          "http_status": null,
+          "error_code": "provider_request_failed",
+          "status": "failed"
+        }
+      ]
+    }
+  ]
+}

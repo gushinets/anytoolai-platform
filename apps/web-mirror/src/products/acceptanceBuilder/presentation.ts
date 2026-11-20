@@ -3,7 +3,7 @@ import {
 } from "./parseAcceptanceBuilder";
 
 type Words = {
-  verdicts: readonly [string, string, string];
+  verdicts: readonly [string, string, string, string];
   statuses: readonly [string, string, string];
   criteria: readonly [string, string, string, string];
   lists: readonly [string, string, string];
@@ -17,8 +17,8 @@ type Words = {
 // These are output-language words, never UI-locale messages.
 export const WORDS: Readonly<Record<string, Words>> = {
   en: {
-    verdicts: ["meets expectations", "partially meets expectations", "does not meet expectations"],
-    statuses: ["match", "partial", "mismatch"],
+    verdicts: ["meets expectations", "partially meets expectations", "does not meet expectations", "cannot be checked without requirements"],
+    statuses: ["confirmed", "not fully confirmed", "not met"],
     criteria: ["Scope coverage", "Requirement fit", "Completeness", "Clarity"],
     lists: ["Acceptance criteria", "Assumptions", "Deliverables"],
     verdict: "Verdict",
@@ -28,8 +28,8 @@ export const WORDS: Readonly<Record<string, Words>> = {
     confirm: "the client should confirm it"
   },
   ru: {
-    verdicts: ["соответствует ожиданиям", "частично соответствует ожиданиям", "не соответствует ожиданиям"],
-    statuses: ["выполнено", "частично выполнено", "не выполнено"],
+    verdicts: ["соответствует ожиданиям", "частично соответствует ожиданиям", "не соответствует ожиданиям", "проверить нельзя: в брифе нет требований"],
+    statuses: ["подтверждено", "подтверждено не полностью", "не выполнено"],
     criteria: ["Охват объёма работ", "Соответствие требованиям", "Полнота", "Ясность"],
     lists: ["Критерии приёмки", "Допущения", "Результаты работы"],
     verdict: "Вердикт",
@@ -39,8 +39,8 @@ export const WORDS: Readonly<Record<string, Words>> = {
     confirm: "клиенту следует подтвердить"
   },
   es: {
-    verdicts: ["cumple las expectativas", "cumple parcialmente las expectativas", "no cumple las expectativas"],
-    statuses: ["cumplido", "parcialmente cumplido", "no cumplido"],
+    verdicts: ["cumple las expectativas", "cumple parcialmente las expectativas", "no cumple las expectativas", "no se puede comprobar sin requisitos"],
+    statuses: ["confirmado", "no confirmado del todo", "no cumplido"],
     criteria: ["Cobertura del alcance", "Adecuación a los requisitos", "Integridad", "Claridad"],
     lists: ["Criterios de aceptación", "Supuestos", "Entregables"],
     verdict: "Veredicto",
@@ -50,8 +50,8 @@ export const WORDS: Readonly<Record<string, Words>> = {
     confirm: "el cliente debe confirmarlo"
   },
   de: {
-    verdicts: ["erfüllt die Erwartungen", "erfüllt die Erwartungen teilweise", "erfüllt die Erwartungen nicht"],
-    statuses: ["erfüllt", "teilweise erfüllt", "nicht erfüllt"],
+    verdicts: ["erfüllt die Erwartungen", "erfüllt die Erwartungen teilweise", "erfüllt die Erwartungen nicht", "ohne Anforderungen nicht prüfbar"],
+    statuses: ["bestätigt", "nicht vollständig bestätigt", "nicht erfüllt"],
     criteria: ["Umfang", "Anforderungserfüllung", "Vollständigkeit", "Klarheit"],
     lists: ["Abnahmekriterien", "Annahmen", "Liefergegenstände"],
     verdict: "Urteil",
@@ -61,8 +61,8 @@ export const WORDS: Readonly<Record<string, Words>> = {
     confirm: "vom Kunden zu bestätigen"
   },
   fr: {
-    verdicts: ["répond aux attentes", "répond partiellement aux attentes", "ne répond pas aux attentes"],
-    statuses: ["satisfait", "partiellement satisfait", "non satisfait"],
+    verdicts: ["répond aux attentes", "répond partiellement aux attentes", "ne répond pas aux attentes", "vérification impossible sans exigences"],
+    statuses: ["confirmé", "pas entièrement confirmé", "non satisfait"],
     criteria: ["Couverture du périmètre", "Conformité aux exigences", "Exhaustivité", "Clarté"],
     lists: ["Critères d’acceptation", "Hypothèses", "Livrables"],
     verdict: "Verdict",
@@ -72,8 +72,8 @@ export const WORDS: Readonly<Record<string, Words>> = {
     confirm: "à confirmer par le client"
   },
   it: {
-    verdicts: ["soddisfa le aspettative", "soddisfa parzialmente le aspettative", "non soddisfa le aspettative"],
-    statuses: ["soddisfatto", "parzialmente soddisfatto", "non soddisfatto"],
+    verdicts: ["soddisfa le aspettative", "soddisfa parzialmente le aspettative", "non soddisfa le aspettative", "verifica impossibile senza requisiti"],
+    statuses: ["confermato", "non del tutto confermato", "non soddisfatto"],
     criteria: ["Copertura dell’ambito", "Conformità ai requisiti", "Completezza", "Chiarezza"],
     lists: ["Criteri di accettazione", "Presupposti", "Risultati da consegnare"],
     verdict: "Verdetto",
@@ -83,8 +83,8 @@ export const WORDS: Readonly<Record<string, Words>> = {
     confirm: "da confermare con il cliente"
   },
   pt: {
-    verdicts: ["cumpre as expectativas", "cumpre parcialmente as expectativas", "não cumpre as expectativas"],
-    statuses: ["cumprido", "parcialmente cumprido", "não cumprido"],
+    verdicts: ["cumpre as expectativas", "cumpre parcialmente as expectativas", "não cumpre as expectativas", "não é possível verificar sem requisitos"],
+    statuses: ["confirmado", "não totalmente confirmado", "não cumprido"],
     criteria: ["Cobertura do âmbito", "Adequação aos requisitos", "Completude", "Clareza"],
     lists: ["Critérios de aceitação", "Pressupostos", "Entregáveis"],
     verdict: "Veredicto",
@@ -97,7 +97,7 @@ export const WORDS: Readonly<Record<string, Words>> = {
 
 // shortcut: other languages use neutral markers; add wording when localization is needed.
 const NEUTRAL: Words = {
-  verdicts: ["✓", "△", "✗"],
+  verdicts: ["✓", "△", "✗", "?"],
   statuses: ["✓", "△", "✗"],
   criteria: ["scope_coverage", "requirement_fit", "completeness", "clarity"],
   lists: ["acceptance_criteria", "assumptions", "deliverables"],

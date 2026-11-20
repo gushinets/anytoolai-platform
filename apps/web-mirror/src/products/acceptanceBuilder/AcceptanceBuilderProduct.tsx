@@ -59,7 +59,7 @@ const briefError = (values: DraftValues) => requiredBackendTrimmedFieldError(val
 
 /** The two scenarios share one product namespace; `draft_v1` (brief -> criteria) counts as
  * activation only when it lists criteria (the draft has no verdict, see `renderer_contract.yaml`),
- * `check_v1` always shows a verdict. Neither scenario has an extra client-side decision. */
+ * `check_v1` requires a meaningful brief before showing a verdict. */
 export const draftDefinition: ProductDefinition<DraftValues, AcceptanceBuilderResult> = {
   productId: "acceptance_builder",
   scenarioId: "acceptance_builder.draft_v1",
@@ -89,6 +89,9 @@ export const checkDefinition: ProductDefinition<CheckValues, AcceptanceBuilderRe
     ]),
   toInput: (values) => ({ brief_text: trimBackendWhitespace(values.briefText), deliverable_text: trimBackendWhitespace(values.deliverableText) }),
   extractResult: extractCheckResult,
+  resultFieldErrors: (result) => result.insufficientBrief
+    ? { briefText: { code: "product", key: "validation.insufficient_brief" } } : {},
+  emitsResultViewed: (result) => !result.insufficientBrief,
   Fields: CheckFields,
   Result: AcceptanceBuilderResultView,
 };

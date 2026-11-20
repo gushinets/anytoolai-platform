@@ -34,5 +34,8 @@
   "result": {
     "verdictScope": "The verdict is judged on four general review criteria, not item by item on the criteria listed below.",
     "recap": "Structured recap"
+  },
+  "validation": {
+    "insufficient_brief": "Add a brief with the client's requirements: what must be delivered, by when and how it is accepted. A greeting or random text gives nothing to check the work against."
   }
 }

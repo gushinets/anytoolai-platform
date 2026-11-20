@@ -276,7 +276,8 @@
           "enum": [
             "meets_expectations",
             "partially_meets",
-            "does_not_meet"
+            "does_not_meet",
+            "insufficient_brief"
           ]
         },
         "confidence": {
@@ -404,6 +405,28 @@
                   "properties": {
                     "status": {
                       "const": "mismatch"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "verdict": {
+                "const": "insufficient_brief"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "deltas": {
+                "items": {
+                  "properties": {
+                    "status": {
+                      "const": "partial"
                     }
                   }
                 }

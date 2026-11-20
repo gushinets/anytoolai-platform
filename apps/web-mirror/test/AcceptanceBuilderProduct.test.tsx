@@ -21,6 +21,7 @@ import {
 import {
   errorResponse,
   guestIdentityResponse,
+  idempotencyKeyOf,
   makeClientCapturingRequests,
   makeClientWithDeferredRoute,
   makeClientWithDeferredCalls,
@@ -169,6 +170,22 @@ describe("Acceptance Builder result parsing", () => {
     expect(extractCheckResult({ ...check, comparison: { ...comparison, verdict: "great" } })).toBeNull();
   });
 
+  it("requires partial deltas for an insufficient brief and recognizes an empty extraction", () => {
+    const normal = checkOutput();
+    const comparison = fixture("compare", ".insufficient_brief");
+    expect(extractCheckResult({ ...normal, comparison })?.insufficientBrief).toBe(true);
+    for (const status of ["match", "mismatch"]) {
+      const deltas = DELTA_CRITERIA.map((criterion_id, i) => ({
+        criterion_id, status: i === 3 ? status : "partial", evidence: "No requirements."
+      }));
+      expect(extractCheckResult({ ...normal, comparison: { ...comparison, deltas } })).toBeNull();
+    }
+    const extracted = { values: { analysis_language: "en" }, missing_fields: [...LIST_FIELDS] };
+    expect(extractCheckResult({ ...normal, extracted })?.insufficientBrief).toBe(true);
+    expect(extractDraftResult({ extracted })?.insufficientBrief).toBeUndefined();
+    expect(extractCheckResult(normal)?.insufficientBrief).toBeUndefined();
+  });
+
   it("counts a draft as viewed only when it lists criteria", () => {
     expect(hasCriteria(extractDraftResult(draftOutput())!)).toBe(true);
     expect(hasCriteria(extractDraftResult(draftOutput(".weak_input"))!)).toBe(false);
@@ -302,9 +319,56 @@ describe("Acceptance Builder page", () => {
     fireEvent.click(screen.getByRole("button", { name: "Copy" }));
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled());
     const copied = (navigator.clipboard.writeText as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
-    expect(copied.startsWith("Verdict\nVerdict: partially meets expectations.\nScope coverage: partial. ")).toBe(true);
-    expect(copied).toContain("\nRequirement fit: match. ");
+    expect(copied.startsWith("Verdict\nVerdict: partially meets expectations.\nScope coverage: not fully confirmed. ")).toBe(true);
+    expect(copied).toContain("\nRequirement fit: confirmed. ");
     expect(copied).toContain("\n\nAcceptance criteria\n- ");
+  });
+
+  it.each([false, true])("focuses the brief for an insufficient result, including attachment=%s", async (attached) => {
+    const r = routesFor(IDS.check);
+    const output = { ...checkOutput(), comparison: fixture("compare", ".insufficient_brief") };
+    const made = makeClientCapturingRequests({
+      ...routes("check", output),
+      [r.RESULT]: [resultResponse(IDS.check, { output }), resultResponse(IDS.check, { output: checkOutput() })],
+      [r.START]: [startResponse(), startResponse()],
+      [r.SESSION]: Array.from({ length: 4 }, () => sessionResponse({ scenario_id: IDS.check.scenarioId })),
+      [r.QUOTA]: Array.from({ length: 4 }, () => quotaResponse(IDS.check)),
+    });
+    const onEvent = vi.fn();
+    if (attached) {
+      render(<AcceptanceBuilderProduct client={made.client} attachSessionId="session_1" onEvent={onEvent} />);
+    } else {
+      render(<ProductRunPage definition={checkDefinition} client={made.client} onEvent={onEvent} />);
+      fireEvent.change(await screen.findByLabelText("Client brief"), { target: { value: "hello" } });
+      fireEvent.change(screen.getByLabelText("Finished work"), { target: { value: "Delivered a site." } });
+      fireEvent.click(screen.getByRole("button", { name: "Check deliverable" }));
+    }
+    const hint = await screen.findByText(ACCEPTANCE_BUILDER_MESSAGES.en.validation.insufficient_brief);
+    const brief = document.getElementById("acceptance-builder-brief-text")!;
+    expect(brief.getAttribute("aria-describedby")?.split(" ")).toContain(hint.id);
+    await waitFor(() => expect(document.activeElement).toBe(brief));
+    expect(screen.queryByRole("button", { name: "Copy" })).toBeNull();
+    expect(resultText()).not.toContain("Verdict:");
+    expect(onEvent).not.toHaveBeenCalledWith(expect.objectContaining({ type: "scenario_completed" }));
+    if (!attached) {
+      fireEvent.change(brief, { target: { value: "Deliver a website." } });
+      fireEvent.click(screen.getByRole("button", { name: "Check deliverable" }));
+      await screen.findByRole("button", { name: "Copy" });
+      expect(resultText()).toContain("Verdict: partially meets expectations.");
+      const starts = made.calls.filter((call) => call.key === r.START);
+      expect(starts).toHaveLength(2);
+      expect(idempotencyKeyOf(starts[0]!)).not.toBe(idempotencyKeyOf(starts[1]!));
+    }
+  });
+
+  it("renders the negative verdict with the explicitly missing item", async () => {
+    const output = checkOutput(".weak_input");
+    const deltas = output.comparison.deltas as { status: string; evidence: string }[];
+    deltas[0] = { ...deltas[0]!, status: "mismatch", evidence: "Required Figma sources were explicitly withheld." };
+    await run("check", output);
+    await screen.findByRole("button", { name: "Copy" });
+    expect(resultText()).toContain("Verdict: does not meet expectations.");
+    expect(resultText()).toContain("Scope coverage: not met. Required Figma sources were explicitly withheld.");
   });
 
   it("weak input: renders the documented gaps instead of an error, and does not count a draft as viewed", async () => {

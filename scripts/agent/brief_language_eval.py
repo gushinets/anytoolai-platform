@@ -307,7 +307,8 @@ def main() -> int:
     run.add_argument("--api-url", required=True)
     run.add_argument("--project", required=True, type=_parse_compose_project)
     run.add_argument("--scenario", choices=SCENARIOS, required=True)
-    run.add_argument("--family", choices=("basic", "weak", "mixed", "override"))
+    run.add_argument("--suite", type=Path, default=SUITE)
+    run.add_argument("--family", choices=("basic", "weak", "mixed", "override", "verdict"))
     run.add_argument("--repeats", type=int, default=3)
     run.add_argument("--timeout", type=int, default=240)
     run.add_argument("--out", type=Path, required=True)
@@ -354,10 +355,12 @@ def main() -> int:
     args.api_url = args.api_url.rstrip("/")
     cases = [
         case
-        for case in json.loads(SUITE.read_text(encoding="utf-8"))["cases"]
+        for case in json.loads(args.suite.read_text(encoding="utf-8"))["cases"]
         if case["scenario_id"] == args.scenario
         and (args.family is None or case["family"] == args.family)
     ]
+    if not cases:
+        parser.error("no cases match the selected scenario and family in this suite")
     runs = [f"{case['id']}--{attempt}" for attempt in range(1, args.repeats + 1) for case in cases]
     for key in runs:
         evidence_path(args.out, f"{key}.json")

@@ -1,0 +1,36 @@
+{
+  "response_json": {
+    "verdict": "insufficient_brief",
+    "confidence": 0.78,
+    "deltas": [
+      {
+        "criterion_id": "scope_coverage",
+        "status": "partial",
+        "evidence": "The brief gives no requirements to check this criterion against."
+      },
+      {
+        "criterion_id": "requirement_fit",
+        "status": "partial",
+        "evidence": "The brief gives no requirements to check this criterion against."
+      },
+      {
+        "criterion_id": "completeness",
+        "status": "partial",
+        "evidence": "The brief gives no requirements to check this criterion against."
+      },
+      {
+        "criterion_id": "clarity",
+        "status": "partial",
+        "evidence": "The brief gives no requirements to check this criterion against."
+      }
+    ],
+    "rationale": "The greeting gives no requirements to check."
+  },
+  "input_tokens": 420,
+  "output_tokens": 160,
+  "latency_ms": 10,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "acceptance_builder.compare_v1.insufficient_brief"
+  }
+}
