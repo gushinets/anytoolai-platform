@@ -4,14 +4,16 @@ import { collectLive } from '../../e2e/client-update-writer-smoke/collect-live-r
 
 const spec = JSON.parse(readFileSync(0, 'utf8'));
 const calls = [];
+let selectedMode = 'update';
 let listener;
 const failure = spec.failure;
 const apiFailure = /^(json-error|(html|plain|body)-(start|result))$/.test(failure);
 function response(kind) {
   return {
     url: () => kind === 'start'
-      ? 'https://api/scenarios/client_update_writer.update_v1/start'
+      ? `https://api/scenarios/client_update_writer.${failure === 'wrong-start' ? 'update' : selectedMode}_v1/start`
       : 'https://api/v1/results/result1',
+    request: () => ({ method: () => failure === 'wrong-method' ? 'GET' : 'POST' }),
     status: () => failure === `html-${kind}` || failure === `plain-${kind}` || failure === 'json-error' ? 502 : 200,
     json: async () => {
       if (kind === 'start') await new Promise(resolve => setTimeout(resolve, 5));
@@ -20,7 +22,11 @@ function response(kind) {
       if (failure === `html-${kind}`) return JSON.parse('<html>Bad gateway</html>');
       if (failure === `plain-${kind}`) return JSON.parse('Bad gateway');
       if (failure === 'json-error') return { error: 'gateway error' };
-      return kind === 'start' ? { scenario_session_id: 'scenario_session_test' } : { output: { text: 'Done' } };
+      if (kind === 'start') return { scenario_session_id: failure === 'empty-session' ? '' : 'scenario_session_test' };
+      return {
+        scenario_session_id: failure === 'wrong-session' ? 'another_session' : 'scenario_session_test',
+        output: { text: 'Done' },
+      };
     },
   };
 }
@@ -37,8 +43,11 @@ const page = {
   },
   locator: selector => ({
     selectOption: async () => {},
-    fill: async () => {},
+    fill: async value => { calls.push(['fill', selector, value]); },
     click: async () => {
+      if (selector === 'label:has(input[name="client-update-writer-mode"][value="prepaid_request"])') {
+        selectedMode = 'prepaid_request';
+      }
       if (!selector.includes('submit')) return;
       calls.push('submit');
       listener(response('start'));
