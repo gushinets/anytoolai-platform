@@ -170,7 +170,7 @@ def test_canonical_brief_distinguishes_timed_verdict_from_timed_action(
     summary = f"{verdict} — {timing}"
     with pytest.raises(AssertionError, match="opening readiness"):
         assert_summary_matches_sources({**case["document"], "summary": summary + "."}, *sources)
-    document = {**case["document"], "summary": f"{summary}, {instruction}."}
+    document = {**case["document"], "summary": f"{verdict}. {timing.capitalize()}, {instruction}."}
     assert_summary_matches_sources(document, *sources)
 
 

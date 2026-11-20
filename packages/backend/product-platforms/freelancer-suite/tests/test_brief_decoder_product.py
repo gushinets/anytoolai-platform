@@ -902,28 +902,28 @@ def test_multiline_item_rejects_folded_or_rebulleted_text(mixed_language_summary
         (
             "en",
             "The brief is ready to start work. Book the kickoff.",
-            "The brief is not ready to start work: confirm the launch date.",
+            "The brief is not ready to start work. Confirm the launch date.",
         ),
         (
             "en",
             "The request is ready to start work.",
-            "The request is not ready to start work: confirm who approves it.",
+            "The request is not ready to start work. Confirm who approves it.",
         ),
         ("ru", "Запрос готов к работе.", "Запрос пока не готов к работе."),
         (
             "es",
             "La solicitud está lista para empezar.",
-            "La solicitud todavía no está lista para empezar: falta confirmar el plazo.",
+            "La solicitud todavía no está lista para empezar. Falta confirmar el plazo.",
         ),
         (
             "ru",
-            "Бриф готов к работе — можно назначить встречу.",
-            "Бриф пока не готов к работе: уточните срок.",
+            "Бриф готов к работе. Можно назначить встречу.",
+            "Бриф пока не готов к работе. Уточните срок.",
         ),
         (
             "es",
             "El encargo está listo para empezar. Se puede programar la reunión.",
-            "El encargo no está listo para empezar: falta confirmar el plazo.",
+            "El encargo no está listo para empezar. Falta confirmar el plazo.",
         ),
     ],
 )
@@ -1124,7 +1124,7 @@ def test_conditional_loss_of_readiness_preserves_the_positive_verdict():
     signals = {"issues": [], "missing_fields": [], "questions": []}
     opening = "The brief is ready to start"
     opposite = "the brief is not ready to start."
-    assert_summary_readiness(f"{opening}, if funding is withdrawn, {opposite}", "en", **signals)
+    assert_summary_readiness(f"{opening}. If funding is withdrawn, {opposite}", "en", **signals)
     for intro in ("once again", "if anything", "and if anything", "whether funding changes or not"):
         with pytest.raises(AssertionError, match="opening readiness"):
             assert_summary_readiness(f"{opening}, {intro}, {opposite}", "en", **signals)
@@ -1240,12 +1240,38 @@ def test_opening_requires_current_readiness(
     with pytest.raises(AssertionError, match="opening readiness"):
         summary = f"{opening}, {condition}, {alternative} {condition}."
         assert_summary_readiness(summary, language, **signals)
-    with pytest.raises(AssertionError, match="opening readiness"):
-        assert_summary_readiness(f"{opening}?", language, **signals)
-    # The condition can instead introduce a separate instruction with its own consequence.
-    assert_summary_readiness(f"{opening}, {condition}, {action}.", language, **signals)
-    for separator in (". ", ": ", " — ", "; "):
-        assert_summary_readiness(f"{opening}{separator}{action}.", language, **signals)
+    for ending in ("", "?"):
+        with pytest.raises(AssertionError, match="opening readiness"):
+            assert_summary_readiness(opening + ending, language, **signals)
+    for ending in (".", "!"):
+        assert_summary_readiness(opening + ending, language, **signals)
+    assert_summary_readiness(f"{opening}. {condition}, {action}.", language, **signals)
+    for separator in (": ", " — ", "; ", ", "):
+        with pytest.raises(AssertionError, match="opening readiness"):
+            assert_summary_readiness(f"{opening}{separator}{action}.", language, **signals)
+
+
+@pytest.mark.parametrize(("language", "positive", "negative", "restriction", "instruction"), [
+    ("en", "The brief is ready to start work", "The brief is not ready to start work",
+     "only after the client signs off, which is still pending", "Send the signed copy to finance"),
+    ("ru", "Бриф готов к работе", "Бриф не готов к работе",
+     "только после согласования, которого мы ещё ждём", "Отправьте копию бухгалтеру"),
+    ("es", "El encargo está listo para empezar", "El encargo no está listo para empezar",
+     "solo después de la aprobación, que sigue pendiente", "Envíe la copia a contabilidad"),
+])
+@pytest.mark.parametrize("ready", [True, False], ids=["ready", "not-ready"])
+def test_relative_clause_cannot_complete_an_opening_verdict(
+    language, positive, negative, restriction, instruction, ready
+):
+    opening, opposite = (positive, negative) if ready else (negative, positive)
+    signals = {"issues": [], "missing_fields": [] if ready else ["budget"], "questions": []}
+    for separator in (": ", ", ", " — ", " – ", "; ", " "):
+        with pytest.raises(AssertionError, match="opening readiness"):
+            assert_summary_readiness(f"{opening}{separator}{restriction}.", language, **signals)
+    explanation = f"{instruction} {restriction}."
+    assert_summary_readiness(f"{opening}. {explanation}", language, **signals)
+    with pytest.raises(AssertionError, match="Conflicting readiness"):
+        assert_summary_readiness(f"{opening}. {explanation} {opposite}.", language, **signals)
 
 
 @_readiness_scope_cases
@@ -1267,11 +1293,12 @@ def test_qualification_attaches_to_opening_verdict(
         summary = f"{opening}{separator}{qualifier}"
         with pytest.raises(AssertionError, match="opening readiness"):
             assert_summary_readiness(summary + ".", language, **signals)
-        assert_summary_readiness(f"{summary}, {action}.", language, **signals)
+        with pytest.raises(AssertionError, match="opening readiness"):
+            assert_summary_readiness(f"{summary}, {action}.", language, **signals)
         alternatives = f"{summary}, {alternative} {condition}"
         with pytest.raises(AssertionError, match="opening readiness"):
             assert_summary_readiness(alternatives + ".", language, **signals)
-        explanation = f"{alternatives}, {action}"
+        explanation = f"{opening}. {qualifier}, {alternative} {condition}, {action}"
         assert_summary_readiness(explanation + ".", language, **signals)
         with pytest.raises(AssertionError, match="Conflicting readiness"):
             assert_summary_readiness(f"{explanation}, {opposite.lower()}.", language, **signals)
@@ -1324,7 +1351,7 @@ def test_time_restriction_on_verdict_or_instruction(
             summary = f"{restricted}, {alternative} {condition}."
             assert_summary_readiness(summary, language, **signals)
 
-        instruction = f"{restricted}, {action}"
+        instruction = f"{opening}. {timing}, {action}"
         assert_summary_readiness(instruction + ".", language, **signals)
         with pytest.raises(AssertionError, match="Conflicting readiness"):
             assert_summary_readiness(f"{instruction}, {opposite.lower()}.", language, **signals)
@@ -1343,6 +1370,8 @@ def test_time_restriction_on_verdict_or_instruction(
     [
         (".weak_input", "The brief is ready to start work."),
         (".no_issues", "The brief is not ready to start work."),
+        (".no_issues", "The brief is ready to start work: only after the client signs off, "
+         "which is still pending."),
         (".weak_input", "Confirm the budget first."),
         (".weak_input", "The brief is not ready to start. The brief is ready to start."),
         (".ru", "Бриф готов к работе."),

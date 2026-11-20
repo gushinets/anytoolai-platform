@@ -57,7 +57,7 @@
       }
     ],
     "document": {
-      "summary": "Бриф пока не готов к началу работы: сначала согласуйте бюджет.",
+      "summary": "Бриф пока не готов к началу работы. Сначала согласуйте бюджет.",
       "sections": [
         {
           "id": "overview",
@@ -223,7 +223,7 @@
       }
     ],
     "document": {
-      "summary": "The brief is not ready to start work: agree the budget first.",
+      "summary": "The brief is not ready to start work. Agree the budget first.",
       "sections": [
         {
           "id": "overview",
@@ -389,7 +389,7 @@
       }
     ],
     "document": {
-      "summary": "El encargo aún no está listo para empezar: primero hay que acordar el presupuesto.",
+      "summary": "El encargo aún no está listo para empezar. Primero hay que acordar el presupuesto.",
       "sections": [
         {
           "id": "overview",
@@ -528,7 +528,7 @@
       }
     ],
     "document": {
-      "summary": "Запрос пока не готов к работе: сначала уточните, какой результат нужен клиенту.",
+      "summary": "Запрос пока не готов к работе. Сначала уточните, какой результат нужен клиенту.",
       "sections": [
         {
           "id": "overview",
@@ -643,7 +643,7 @@
       }
     ],
     "document": {
-      "summary": "The request is not ready to start work: first clarify the outcome the client wants.",
+      "summary": "The request is not ready to start work. First clarify the outcome the client wants.",
       "sections": [
         {
           "id": "overview",
@@ -758,7 +758,7 @@
       }
     ],
     "document": {
-      "summary": "La solicitud todavía no está lista para empezar: primero hay que aclarar qué resultado espera el cliente.",
+      "summary": "La solicitud todavía no está lista para empezar. Primero hay que aclarar qué resultado espera el cliente.",
       "sections": [
         {
           "id": "overview",
@@ -876,7 +876,7 @@
       }
     ],
     "document": {
-      "summary": "Бриф пока не готов к работе: сначала нужно уточнить количество свёклы, капусты и говядины.",
+      "summary": "Бриф пока не готов к работе. Сначала нужно уточнить количество свёклы, капусты и говядины.",
       "sections": [
         {
           "id": "overview",

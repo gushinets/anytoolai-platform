@@ -33,6 +33,12 @@ The A10 prompt and fake-provider examples define the document wording within the
 
 ## Implementation steps
 
+For review 13, require the entire opening sentence of each authored fixture to
+match its source-derived readiness verdict. Migrate the five provider summaries,
+seven canonical summaries and mixed-language document to this format. Exercise
+relative clauses, independent instructions and later conflicting claims for
+both polarities in all three languages.
+
 Verify temporal prerequisites at the opening and in the free explanation for
 both polarities in EN/RU/ES. Exercise a restriction on readiness, its use to
 schedule an independent action, and a conflicting verdict after that action.
@@ -219,6 +225,13 @@ of language, verdict polarity and separator. The common fixture guard now treats
 An instruction can have its own prerequisite, and a later independent verdict
 is checked against the source data. Three canonical document cases exercise
 the same distinction through the full source comparison.
+
+Review 13 supersedes the inline opening formats described above. In an authored
+fixture the first sentence now contains the complete current verdict and ends
+with a period or exclamation mark. The explanation begins after that boundary.
+Consequently, adding a relative clause to an inline qualification cannot make the
+opening valid. Later hypothetical and independent assertions continue through
+the existing explanation checks.
 
 ## Open questions
 

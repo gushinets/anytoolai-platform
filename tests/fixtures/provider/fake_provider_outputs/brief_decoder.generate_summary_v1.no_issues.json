@@ -28,7 +28,7 @@
         }
       }
     ],
-    "summary": "The brief is ready to start work: there are no detected issues or missing details."
+    "summary": "The brief is ready to start work. There are no detected issues or missing details."
   },
   "input_tokens": 245,
   "output_tokens": 100,

@@ -28,7 +28,7 @@
         }
       }
     ],
-    "summary": "The brief is not ready to start: confirm the exact launch date first."
+    "summary": "The brief is not ready to start. Confirm the exact launch date first."
   },
   "input_tokens": 300,
   "output_tokens": 160,

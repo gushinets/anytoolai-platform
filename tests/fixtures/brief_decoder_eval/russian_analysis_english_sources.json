@@ -28,6 +28,6 @@
       {"id": "gaps", "title": "Gaps and risks", "content": "- The audio rights are not specified.\nКлиенту нужно уточнить срок, бюджет, целевую аудиторию и ограничения."},
       {"id": "next-steps", "title": "Questions to ask", "content": "- Who holds the audio rights?", "metadata": {"kind": "list"}}
     ],
-    "summary": "Бриф пока не готов к работе: сначала уточните, кому принадлежат права на аудио."
+    "summary": "Бриф пока не готов к работе. Сначала уточните, кому принадлежат права на аудио."
   }
 }

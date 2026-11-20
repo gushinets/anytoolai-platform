@@ -54,7 +54,6 @@ _CONTRAST = r"\b(?:but|pero|но)\b"
 _STATEMENT_END = re.compile(r"[.!?;]|" + _CONTRAST)
 # These separators can connect a predicate to a qualification on either side.
 _CLAUSE_END = re.compile(r"[,:—–]")
-_OPENING_END = re.compile(_CLAUSE_END.pattern + "|" + _STATEMENT_END.pattern)
 _INDEPENDENT_PREFIX = {
     "en": r"(?:however|in any case)\b",
     "ru": r"(?:однако|в любом случае)\b",
@@ -107,9 +106,7 @@ def _consequence_index(clauses: list[str], start: int, language: DocumentLanguag
     return None
 
 
-def _statement_verdicts(
-    statement: str, language: DocumentLanguage, *, opening_separator: str = ""
-) -> Iterator[bool]:
+def _statement_verdicts(statement: str, language: DocumentLanguage) -> Iterator[bool]:
     if language == "ru":
         # The internal comma in a compound conjunction does not start a consequence.
         statement = re.sub(
@@ -121,15 +118,8 @@ def _statement_verdicts(
         clause = parts[index]
         index += 1
         conditional = _starts_condition(clause, language) or _joins_condition(clause, language)
-        if index == 1 and opening_separator == ",":
-            # A bare comma can attach an arbitrary qualification to the verdict.
-            # In fixtures it may also introduce a complete "if A, do B" explanation.
-            assert conditional, f"Ambiguous opening readiness: {statement!r}"
         if conditional:
             consequence = _consequence_index(parts, index - 1, language)
-            if index == 1 and _CLAUSE_END.fullmatch(opening_separator):
-                # Without a consequence of its own, this condition qualifies the opening.
-                assert consequence is not None, f"Conditional opening readiness: {statement!r}"
             if consequence is not None:
                 index = consequence + 1
             continue
@@ -164,21 +154,18 @@ def assert_summary_readiness(
     normalized = " ".join(summary.casefold().split())
     if language == "en":
         normalized = re.sub(r"\bisn['’]t\b", "is not", normalized)
-    # "But only after approval" introduces a qualifier; a contrast introducing
-    # an assertion still starts a new statement.
-    normalized = re.sub(rf"{_CONTRAST}(?= (?:{_CONDITION[language]})\s+\S)", ":", normalized)
-    boundary = _OPENING_END.search(normalized)
-    first = normalized[:boundary.start()] if boundary else normalized
-    separator = boundary.group() if boundary else ""
-    opening = next(_verdict_matches(first.strip(), language, opening=True), None)
-    assert opening and separator != "?" and (opening["negative"] is None) == expected_ready, (
+    # A fixture must establish current readiness before its free-form explanation.
+    boundary = re.search(r"[.!](?=\s|$)", normalized)
+    assert boundary, f"Expected a separate opening readiness sentence: {summary!r}"
+    opening = next(_verdict_matches(normalized[:boundary.start()], language, opening=True), None)
+    assert opening and (opening["negative"] is None) == expected_ready, (
         f"Expected opening readiness={expected_ready}: {summary!r}"
     )
-    explanation = normalized[boundary.end():] if boundary else ""
-    for index, statement in enumerate(_STATEMENT_END.split(explanation)):
-        verdicts = _statement_verdicts(
-            statement, language, opening_separator=separator if index == 0 else ""
-        )
+    # A contrast can introduce a trailing condition on a later assertion.
+    explanation = normalized[boundary.end():]
+    explanation = re.sub(rf"{_CONTRAST}(?= (?:{_CONDITION[language]})\s+\S)", ":", explanation)
+    for statement in _STATEMENT_END.split(explanation):
+        verdicts = _statement_verdicts(statement, language)
         assert (not expected_ready) not in verdicts, f"Conflicting readiness verdicts: {summary!r}"
 
 
