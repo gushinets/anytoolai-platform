@@ -609,12 +609,19 @@ def test_prepaid_request_prompt_resolves_a_share_amount_against_an_agreed_base()
     step_2 = rest.split("Step 3.", 1)[0]
     rule_d = prompt.split("- D. Otherwise", 1)[1].split("Rules:", 1)[0]
 
-    assert "use one agreed current base and its currency to resolve the payable deposit" in step_1
+    assert (
+        "read `context.amount` and `context.notes` together to identify one agreed current base "
+        "and its currency" in step_1
+    )
+    assert (
+        "`amount: 50% of agreed USD 100` gives a USD 50 deposit even when the notes give only "
+        "its purpose" in step_1
+    )
     assert "use the exact share if payable in the currency's smallest unit" in step_1
     assert "a share of an agreed base takes the base's currency" in step_2
-    assert "names only a share (a percentage or fraction) and the notes state no base" in step_2
+    assert "the two fields together leave its current base or currency missing or conflicting" in step_2
     assert "confirm the payable amount under rule B" in step_2
-    assert "else the payable deposit from Step 1 for a share-only amount" in rule_d
+    assert "the payable deposit from Step 1 for an amount expressed as a share" in rule_d
     assert "name the base and the payable deposit from Step 1 as two separate figures" in prompt
     assert "Only the deposit may be computed" in prompt
     assert "never compute a balance the notes do not state" in prompt

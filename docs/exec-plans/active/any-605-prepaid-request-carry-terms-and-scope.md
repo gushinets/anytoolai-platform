@@ -5,9 +5,9 @@
 - State: active
 - Owner: agent
 - Created: 2026-11-19
-- Last updated: 2026-11-19
-- Review date: 2026-11-19
-- Next action: ANY-608 live acceptance on A02/A03/A05 + S5
+- Last updated: 2026-11-20
+- Review date: 2026-11-20
+- Next action: ANY-608 live acceptance on A01/A02/A03/A05 + S5
 - Blocker: none
 
 ## Goal
@@ -109,10 +109,14 @@ All 107 targeted product, shared-prompt and API bundle tests passed after the ch
 Doctor, config validation, documentation validation and the whitespace check passed.
 ANY-608 retains live verification of generated messages.
 
+On 2026-11-20 the share rule was updated to use the agreed base and currency across the amount
+field and notes. The A01 balance trigger was added to the live checklist in ANY-608.
+
 ## Open questions
 
 None for implementation.
 
 ## Follow-up debt
 
-ANY-608 live acceptance on A02/A03/A05 + S5.
+ANY-608 live acceptance on A01/A02/A03/A05 + S5. Each of the three A01 messages must greet
+Елена by name and state that the balance is payable after delivery of both the final PDF and PPTX.
