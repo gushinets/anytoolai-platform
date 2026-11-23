@@ -580,6 +580,76 @@ def test_prepaid_request_prompt_keeps_percentage_attached_to_total() -> None:
     assert "must not suggest applying the percentage to the deposit amount again" in prompt
 
 
+# ANY-605 (QA Q-004 A01/A02/A05, production S5): every payment condition and scope boundary the
+# notes state must reach the client; author directions are followed, not carried. This pins the
+# instruction only -- model retention is checked live by ANY-608.
+def test_prepaid_request_prompt_carries_every_stated_term_and_scope_boundary() -> None:
+    prompt = _normalized_prepaid_prompt()
+    rule = prompt.split("preserve the complete explicitly stated payment arrangement", 1)[1].split(
+        "- In a payment request, when `context.due_date` is a real", 1
+    )[0]
+
+    for fragment in (
+        "carry into the message every payment condition and every scope boundary",
+        "its stated amount and when the remaining balance is payable",
+        "conditions for starting the work and for counting the timeline",
+        "scope boundaries: what the payment covers and every stated exclusion",
+        "a tax treatment stated as a term",
+        "with its meaning unchanged",
+        "Carry each of these with its exact numbers, currency and condition",
+        "is not a deal term: follow it under the author-direction rule and do not carry it",
+        "Shorten phrasing before dropping these terms when a length limit applies",
+    ):
+        assert fragment in rule, fragment
+
+
+def test_prepaid_request_prompt_resolves_a_share_amount_against_an_agreed_base() -> None:
+    prompt = _normalized_prepaid_prompt()
+    step_1, rest = prompt.split("Step 2.", 1)
+    step_2 = rest.split("Step 3.", 1)[0]
+    rule_d = prompt.split("- D. Otherwise", 1)[1].split("Rules:", 1)[0]
+
+    assert (
+        "read `context.amount` and `context.notes` together to identify one agreed current base "
+        "and its currency" in step_1
+    )
+    assert (
+        "`amount: 50% of agreed USD 100` gives a USD 50 deposit even when the notes give only "
+        "its purpose" in step_1
+    )
+    assert "use the exact share if payable in the currency's smallest unit" in step_1
+    assert "a share of an agreed base takes the base's currency" in step_2
+    assert "the two fields together leave its current base or currency missing or conflicting" in step_2
+    assert "confirm the payable amount under rule B" in step_2
+    assert "the payable deposit from Step 1 for an amount expressed as a share" in rule_d
+    assert "name the base and the payable deposit from Step 1 as two separate figures" in prompt
+    assert "Only the deposit may be computed" in prompt
+    assert "never compute a balance the notes do not state" in prompt
+
+
+def test_prepaid_request_prompt_resolves_fractional_cents_from_agreed_terms() -> None:
+    prompt = _normalized_prepaid_prompt()
+    cases = prompt.split("For one-third of USD 100:", 1)[1].split("Use this payable deposit", 1)[0]
+
+    assert "An agreed deposit of USD 33.33 gives USD 33.33" in cases
+    assert "An agreed rule to round down to cents also gives USD 33.33" in cases
+    assert "Without either agreement the amount is open" in cases
+    assert (
+        "An agreed USD 33.34 alongside an agreed rule to round down to cents is also open"
+        in cases
+    )
+
+
+def test_prepaid_request_confirmation_keeps_agreed_terms_below_open_points() -> None:
+    prompt = _normalized_prepaid_prompt()
+
+    assert (
+        "in a terms confirmation (rule B) this includes the agreed terms and scope boundaries "
+        "listed in the payment-arrangement rule that are not open, stated as agreed"
+    ) in prompt
+    assert "drop other detail before the open points" in prompt
+
+
 def test_prepaid_request_prompt_requires_a_payment_request_only_in_rule_d() -> None:
     prompt = _normalized_prepaid_prompt()
     rule_d = prompt.split("- D. Otherwise", 1)[1].split("Rules:", 1)[0]

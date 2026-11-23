@@ -5,6 +5,11 @@ const UI_TIMEOUT_MS = 120_000;
 
 /** One fresh browser context per attempt; never retries. */
 export async function collectLive(spec, { chromium, writeJournal = writeFileSync }) {
+  const { mode = 'update' } = spec;
+  if (mode !== 'update' && mode !== 'prepaid_request') {
+    throw new Error(`Unsupported Client Update Writer mode: ${mode}`);
+  }
+  const startPath = `/scenarios/client_update_writer.${mode}_v1/start`;
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ locale: spec.language });
   const page = await context.newPage();
@@ -12,9 +17,10 @@ export async function collectLive(spec, { chromium, writeJournal = writeFileSync
   let startCapture = Promise.resolve();
   let resultResponse;
   page.on('response', response => {
-    if (/\/scenarios\/client_update_writer\.update_v1\/start$/.test(response.url())) {
+    if (new URL(response.url()).pathname.endsWith(startPath) && response.request().method() === 'POST') {
       startCapture = capture('start_response', async () => {
         record.start_status = response.status();
+        record.start_path = startPath;
         record.start = await response.json();
         record.session_id = record.start.scenario_session_id ?? null;
         await capture('start_journal', () => {
@@ -46,6 +52,19 @@ export async function collectLive(spec, { chromium, writeJournal = writeFileSync
   if (record.start_status >= 400 || record.result_status >= 400) {
     record.ui_outcome = 'error';
   }
+  if (mode === 'prepaid_request' && record.submitted) {
+    const started = record.start_status >= 200 && record.start_status < 300
+      && typeof record.session_id === 'string' && record.session_id.trim() !== '';
+    if (!started) {
+      record.error ??= `Missing successful POST to ${startPath} with a session ID`;
+      record.ui_outcome = 'error';
+      record.output = null;
+    } else if (record.ui_outcome === 'result' && record.result?.scenario_session_id !== record.session_id) {
+      record.error = 'Result does not belong to the started Prepaid Request session';
+      record.ui_outcome = 'error';
+      record.output = null;
+    }
+  }
   await capture('journal', () => {
     writeJournal(`${spec.trace}.journal.json`, JSON.stringify({ ...record, phase: 'complete' }));
   });
@@ -66,7 +85,15 @@ async function collectPage(page, spec, record, writeJournal) {
   try {
     await page.goto(`${spec.web_url}/products/client_update_writer`);
     await page.locator('#ui-language').selectOption(spec.language);
-    await page.locator('#client-update-writer-progress-notes').fill(spec.progress_notes);
+    if (spec.mode === 'prepaid_request') {
+      await page.locator('label:has(input[name="client-update-writer-mode"][value="prepaid_request"])').click();
+      const { notes, amount, due_date } = spec.billing_context;
+      await page.locator('#client-update-writer-billing-notes').fill(notes);
+      await page.locator('#client-update-writer-billing-amount').fill(amount);
+      if (due_date != null) await page.locator('#client-update-writer-billing-due-date').fill(due_date);
+    } else {
+      await page.locator('#client-update-writer-progress-notes').fill(spec.progress_notes);
+    }
     await page.locator(`label[for="client-update-writer-tone-${spec.tone}"]`).click();
     submittedAt = performance.now();
     record.submitted_at = new Date().toISOString();
