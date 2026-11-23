@@ -1,7 +1,7 @@
 """ANY-228 quick-check-covered evidence for the acceptance_builder product bundle.
 
 1. The product loads through anytoolai_platform_api.bootstrap.build_runtime()'s real default
-   bundle set, with exact per-scenario action-type sequences (A01 for draft_v1,
+   bundle set, with exact per-scenario action-type sequences (A01, A04 and conditional A05 for draft_v1,
    A01 -> A11 for check_v1).
 2. Its input and composed-output schemas are non-permissive.
 3. A real scenario start + one worker pass runs every step against the fake provider and the

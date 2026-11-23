@@ -153,7 +153,7 @@ test.describe("Acceptance Builder web product", () => {
     // The structured recap is display-only and starts collapsed.
     await expect(page.locator("details")).not.toHaveAttribute("open", "");
 
-    await expectCorrelatedRun(run.sessionId(), run.resultArtifactId(), DRAFT_ACTIONS);
+    await expectCorrelatedRun(run.sessionId(), run.resultArtifactId(), DRAFT_ACTIONS, ["acceptance_builder.generate_questions_v1"]);
     await expect.poll(() => countEvents("scenario.completed", run.sessionId()), { timeout: 10_000 }).toBe(1);
     await expect.poll(() => countEvents("web.result_viewed", run.sessionId()), { timeout: 10_000 }).toBe(1);
     await expectCopyActivation(page, run.sessionId(), copyText);
@@ -398,7 +398,7 @@ test.describe("Brief Decoder -> Acceptance Builder handoff", () => {
         expect(types).toContain(expected);
       }
     });
-    await expectCorrelatedRun(targetSessionId, run.resultArtifactId(), DRAFT_ACTIONS);
+    await expectCorrelatedRun(targetSessionId, run.resultArtifactId(), DRAFT_ACTIONS, ["acceptance_builder.generate_questions_v1"]);
     await expect.poll(() => countEvents("scenario.completed", targetSessionId), { timeout: 10_000 }).toBe(1);
     await expect.poll(() => countEvents("web.result_viewed", targetSessionId), { timeout: 10_000 }).toBe(1);
 

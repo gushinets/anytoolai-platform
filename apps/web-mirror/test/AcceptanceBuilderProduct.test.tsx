@@ -174,14 +174,15 @@ describe("Acceptance Builder result parsing", () => {
   });
 
   it("uses the Russian QA brief's evidence and numbered question in copy", () => {
-    const { cases } = JSON.parse(readFileSync(resolve(FIXTURE_ROOT, "../../acceptance_builder_eval/draft_risks_questions.json"), "utf8"));
-    const { canonical } = cases.find((item: { id: string }) => item.id === "AB-894-C-RU");
+    type DraftCase = { id: string; canonical: { issues: { evidence: string }[]; questions: { question: string }[] } };
+    const { cases } = JSON.parse(readFileSync(resolve(FIXTURE_ROOT, "../../acceptance_builder_eval/draft_risks_questions.json"), "utf8")) as { cases: DraftCase[] };
+    const { canonical } = cases.find((item) => item.id === "AB-894-C-RU")!;
     const result = extractDraftResult(canonical)!;
     const text = composeCopyText(result);
     expect(text).toContain("Риски и противоречия");
-    expect(text).toContain("Из брифа: " + canonical.issues[0].evidence);
+    expect(text).toContain("Из брифа: " + canonical.issues[0]!.evidence);
     expect(text).toContain("15 000 рублей");
-    expect(text).toContain("1. " + canonical.questions[0].question);
+    expect(text).toContain("1. " + canonical.questions[0]!.question);
   });
 
   it("requires a comparison for check and none for draft", () => {

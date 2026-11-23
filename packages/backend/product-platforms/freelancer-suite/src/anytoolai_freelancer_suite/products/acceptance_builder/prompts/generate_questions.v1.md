@@ -47,6 +47,10 @@ Rules:
   by ascending `source_issue_index`.
 - Ask for one concrete acceptance decision per question, such as required pages or
   functions, design approval, included revisions or which conflicting version applies.
+- When design approval is unspecified, ask how the client will approve the design.
+  Asking for examples or preferred styles alone leaves that decision unresolved.
+  Keep this question and the question about required pages/functions ahead of generic
+  scheduling or pricing questions for a vague site request.
 - For combined feasibility, ask which work takes priority for launch within the stated
   figures. Never propose a specific new deadline, budget or quantity.
 - Never ask about a condition already stated clearly and consistently or suggest an

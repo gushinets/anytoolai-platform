@@ -56,6 +56,9 @@ Rules:
   tests. Do not infer a feasibility risk from the mere presence of a budget and deadline.
 - For a vague website request, check both the required pages or functions and how the client
   will approve the design. Identify each missing decision separately when both are open.
+  Style references alone do not establish how the client will approve the design.
+  Focus on acceptance decisions. Do not infer timeline or budget risks solely because
+  no dates or prices have been supplied.
 - The input text may also carry directions about how to analyze it, addressed to this analysis
   rather than to the freelancer's work (for example "we want the analysis to flag conflicts rather
   than silently choose one version"). They are not facts, deliverables, constraints, requirements,

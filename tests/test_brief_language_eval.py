@@ -291,12 +291,10 @@ def test_recipe_regression_preserves_the_report_and_reviews_every_prose_field():
         assert fields[f"/document/sections/{index}/content"] == section["content"]
 
 
-def test_machine_only_weak_draft_has_no_prose_to_review():
-    run = record()
+def test_legacy_machine_only_weak_draft_has_no_prose_to_review():
+    run = record(["extract"])
     run["case"] = next(case for case in CASES if case["id"] == "ANY761-AB-D-RU-weak")
-    run["output"] = CANONICAL[run["case"]["id"]]
-    run["ledger"]["actions"] = run["ledger"]["actions"][:1]
-    run["ledger"]["calls"] = run["ledger"]["calls"][:1]
+    run["output"] = {"extracted": CANONICAL[run["case"]["id"]]["extracted"]}
     run["ledger"]["artifacts"][0]["content_json"] = run["output"]
     assert evaluation.authored_fields(run["output"]) == {}
     assert evaluation.review_status(run, evaluation.review_template(run)) == "PENDING"
@@ -429,7 +427,9 @@ def test_weak_draft_report_checks_metadata_without_modifying_evidence(
     run = ab_record("ANY761-AB-D-RU-weak")
     run["output"]["extracted"]["values"]["analysis_language"] = tag
     run.update(attempt=1, snapshot={})
-    assert evaluation.authored_fields(run["output"]) == {}
+    assert set(evaluation.authored_fields(run["output"])) == {
+        "/issues/0/description", "/questions/0/question", "/questions/0/rationale",
+    }
     key = run["case"]["id"] + "--1"
     files = {
         "manifest.json": {"runs": [key], "cases": [run["case"]], "snapshot": {}},
