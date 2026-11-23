@@ -49,7 +49,7 @@ describe("renderer_contract.yaml copy contract vs the web copy text", () => {
     expect(blocks.map((b) => b.id)).toEqual(["verdict", "acceptance_criteria", "assumptions", "deliverables", "risks", "client_questions", "open_gaps"]);
     expect(blocks[0]!.title).toBe("Verdict");
     for (const field of LIST_FIELDS) {
-      expect(blocks.find((b) => b.id === field)?.title).toBe(WORDS.en!.lists[LIST_FIELDS.indexOf(field)]);
+      expect(blocks.find((b) => b.id === field)?.title).toBe(WORDS.en!.lists[field]);
     }
     expect(blocks[4]!.title).toBe(WORDS.en!.risks);
     expect(blocks[5]!.title).toBe(WORDS.en!.questions);

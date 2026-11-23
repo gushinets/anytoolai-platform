@@ -70,3 +70,11 @@ The managed Python 3.12 environment passed doctor.
 - Repository-wide frontend-check passed with one workspace and Vitest worker at a time,
   including lint, typecheck, the generated API contract check, 1,141 web-mirror tests
   and the production build. Earlier concurrent runs timed out in the CE-kit ESLint test.
+
+## PR duplication check
+
+SonarCloud attributed all 56 duplicated new lines to the repeated language dictionaries in
+the Draft presenter. The product now stores its seven output-language dictionaries in
+`outputWording.json`. Each label is keyed by the corresponding schema enum or list field.
+The TypeScript presenter checks the catalog shape and selects wording from the analysis language.
+All 87 focused web tests and the web typecheck passed after migration.
